@@ -1,0 +1,3 @@
+﻿app/asesor/configuracion/page.tsx(22,24): error TS2307: Cannot find module '@/components/ui/switch' or its corresponding type declarations.
+app/asesor/leads/page.tsx(336,14): error TS2304: Cannot find name 'User'.
+app/director/configuracion/page.tsx(26,24): error TS2307: Cannot find module '@/components/ui/switch' or its corresponding type declarations.

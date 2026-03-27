@@ -1,0 +1,420 @@
+﻿node.exe : 
+En línea: 1 Carácter: 1
++ & "C:\Program 
+Files\nodejs/node.exe" "C:\Us
+ers\LENOVO\AppData\Roaming 
+...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: (:String  
+  ) [], RemoteException
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+./app/api/tokko/sync/route.ts
+49:56  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+64:33  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+
+./app/api/valuation/generate/
+route.ts
+62:19  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+
+./app/asesor/calendario/page.
+tsx
+45:40  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+62:6  Warning: React Hook 
+useEffect has a missing 
+dependency: 'fetchData'. 
+Either include it or remove 
+the dependency array.  
+react-hooks/exhaustive-deps
+84:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+
+./app/asesor/dashboard/page.t
+sx
+39:42  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+48:26  Error: 'error' is 
+assigned a value but never 
+used.  @typescript-eslint/no-
+unused-vars
+181:51  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+217:47  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+
+./app/asesor/leads/page.tsx
+55:6  Warning: React Hook 
+useEffect has a missing 
+dependency: 'supabase.auth'. 
+Either include it or remove 
+the dependency array.  
+react-hooks/exhaustive-deps
+
+./app/asesor/pipeline/page.ts
+x
+49:6  Warning: React Hook 
+useEffect has a missing 
+dependency: 'supabase.auth'. 
+Either include it or remove 
+the dependency array.  
+react-hooks/exhaustive-deps
+
+./app/asesor/propiedades/page
+.tsx
+46:48  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+72:6  Warning: React Hook 
+useEffect has a missing 
+dependency: 'supabase.auth'. 
+Either include it or remove 
+the dependency array.  
+react-hooks/exhaustive-deps
+155:21  Warning: Using 
+`<img>` could result in 
+slower LCP and higher 
+bandwidth. Consider using 
+`<Image />` from 
+`next/image` to 
+automatically optimize 
+images. This may incur 
+additional usage or cost 
+from your provider. See: http
+s://nextjs.org/docs/messages/
+no-img-element  
+@next/next/no-img-element
+231:27  Warning: Using 
+`<img>` could result in 
+slower LCP and higher 
+bandwidth. Consider using 
+`<Image />` from 
+`next/image` to 
+automatically optimize 
+images. This may incur 
+additional usage or cost 
+from your provider. See: http
+s://nextjs.org/docs/messages/
+no-img-element  
+@next/next/no-img-element
+
+./app/director/asesores/page.
+tsx
+5:3  Error: 'Users' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+26:3  Error: 
+'CardDescription' is defined 
+but never used.  @typescript-
+eslint/no-unused-vars
+56:10  Error: 'cn' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+59:40  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+65:54  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+96:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+105:6  Warning: React Hook 
+useEffect has a missing 
+dependency: 'fetchAgents'. 
+Either include it or remove 
+the dependency array.  
+react-hooks/exhaustive-deps
+118:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+
+./app/director/calendario/pag
+e.tsx
+17:16  Error: 'CardContent' 
+is defined but never used.  @
+typescript-eslint/no-unused-v
+ars
+45:3  Error: 'addDays' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+55:40  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+56:10  Error: 'loading' is 
+assigned a value but never 
+used.  @typescript-eslint/no-
+unused-vars
+58:40  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+65:6  Warning: React Hook 
+useEffect has a missing 
+dependency: 'fetchData'. 
+Either include it or remove 
+the dependency array.  
+react-hooks/exhaustive-deps
+103:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+
+./app/director/documentacion/
+page.tsx
+14:3  Error: 'CheckCircle2' 
+is defined but never used.  @
+typescript-eslint/no-unused-v
+ars
+15:3  Error: 'AlertCircle' 
+is defined but never used.  @
+typescript-eslint/no-unused-v
+ars
+46:46  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+66:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+75:6  Warning: React Hook 
+useEffect has a missing 
+dependency: 'fetchDocs'. 
+Either include it or remove 
+the dependency array.  
+react-hooks/exhaustive-deps
+125:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+140:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+
+./app/director/leads/page.tsx
+13:3  Error: 'Calendar' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+61:38  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+62:40  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+79:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+248:72  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+251:10  Error: 'chatFile' is 
+assigned a value but never 
+used.  @typescript-eslint/no-
+unused-vars
+252:48  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+275:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+309:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+392:41  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+506:45  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+
+./app/director/propiedades/pa
+ge.tsx
+5:3  Error: 'Building2' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+7:3  Error: 'Filter' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+15:3  Error: 'CheckCircle2' 
+is defined but never used.  @
+typescript-eslint/no-unused-v
+ars
+36:16  Error: 'TabsContent' 
+is defined but never used.  @
+typescript-eslint/no-unused-v
+ars
+50:48  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+82:6  Warning: React Hook 
+useEffect has a missing 
+dependency: 
+'fetchProperties'. Either 
+include it or remove the 
+dependency array.  
+react-hooks/exhaustive-deps
+96:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+193:21  Warning: Using 
+`<img>` could result in 
+slower LCP and higher 
+bandwidth. Consider using 
+`<Image />` from 
+`next/image` to 
+automatically optimize 
+images. This may incur 
+additional usage or cost 
+from your provider. See: http
+s://nextjs.org/docs/messages/
+no-img-element  
+@next/next/no-img-element
+273:27  Warning: Using 
+`<img>` could result in 
+slower LCP and higher 
+bandwidth. Consider using 
+`<Image />` from 
+`next/image` to 
+automatically optimize 
+images. This may incur 
+additional usage or cost 
+from your provider. See: http
+s://nextjs.org/docs/messages/
+no-img-element  
+@next/next/no-img-element
+273:27  Warning: img 
+elements must have an alt 
+prop, either with meaningful 
+text, or an empty string for 
+decorative images.  
+jsx-a11y/alt-text
+
+./app/director/tasaciones/pag
+e.tsx
+5:3  Error: 'Calculator' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+27:3  Error: 
+'CardDescription' is defined 
+but never used.  @typescript-
+eslint/no-unused-vars
+44:10  Error: 'es' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+49:58  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+50:56  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+66:6  Warning: React Hook 
+useEffect has a missing 
+dependency: 'fetchHistory'. 
+Either include it or remove 
+the dependency array.  
+react-hooks/exhaustive-deps
+98:14  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+
+./components/kanban/kanban-bo
+ard.tsx
+3:31  Error: 'useOptimistic' 
+is defined but never used.  @
+typescript-eslint/no-unused-v
+ars
+122:16  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+129:9  Error: 
+'handleCardClick' is 
+assigned a value but never 
+used.  @typescript-eslint/no-
+unused-vars
+
+./components/kanban/kanban-ca
+rd.tsx
+8:17  Error: 'MessageSquare' 
+is defined but never used.  @
+typescript-eslint/no-unused-v
+ars
+
+./components/kanban/lead-deta
+il-sheet.tsx
+162:17  Error: `"` can be 
+escaped with `&quot;`, 
+`&ldquo;`, `&#34;`, 
+`&rdquo;`.  
+react/no-unescaped-entities
+162:139  Error: `"` can be 
+escaped with `&quot;`, 
+`&ldquo;`, `&#34;`, 
+`&rdquo;`.  
+react/no-unescaped-entities
+
+./components/kanban/types.ts
+3:3  Error: 'Mail' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+
+./lib/queries/director.ts
+53:44  Error: Unexpected 
+any. Specify a different 
+type.  @typescript-eslint/no-
+explicit-any
+64:41  Error: 'agencyId' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+
+./lib/supabase/server.ts
+18:20  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+27:20  Error: 'error' is 
+defined but never used.  @typ
+escript-eslint/no-unused-vars
+
+./lib/tokko.ts
+27:56  Error: 'daysBack' is 
+assigned a value but never 
+used.  @typescript-eslint/no-
+unused-vars
+
+info  - Need to disable some 
+ESLint rules? Learn more 
+here: https://nextjs.org/docs
+/basic-features/eslint#disabl
+ing-rules

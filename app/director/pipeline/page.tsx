@@ -1,0 +1,182 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { KanbanBoard } from "@/components/kanban/kanban-board"
+import { LeadDetailSheet } from "@/components/kanban/lead-detail-sheet"
+import { Lead } from "@/components/kanban/types"
+import { 
+  Search, 
+  Filter, 
+  Plus, 
+  Download,
+  LayoutGrid,
+  ListFilter
+} from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { getAgencyLeads, getAgencyAgents } from "@/lib/queries/director"
+import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+
+export default function PipelinePage() {
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [agents, setAgents] = useState<{id: string, full_name: string}[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState("")
+  const [agentFilter, setAgentFilter] = useState("all")
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+
+  // Agency ID should come from context/auth, using mock for now or fetching from session
+  const agencyId = "00000000-0000-0000-0000-000000000000" // We'll need a better way to get this
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true)
+        // Note: Real agencyId should be fetched from session in a real scenario
+        // For now, these queries might fail if RLS is strict and no session exists, 
+        // but this is the structural implementation.
+        const [leadsData, agentsData] = await Promise.all([
+          getAgencyLeads({ agencyId }).catch(() => []),
+          getAgencyAgents({ agencyId }).catch(() => [])
+        ])
+        
+        setLeads(leadsData as unknown as Lead[])
+        setAgents(agentsData)
+      } catch (error) {
+        console.error("Error loading pipeline data:", error)
+        toast.error("Error al cargar los leads")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadData()
+  }, [])
+
+  const filteredLeads = leads.filter(lead => {
+    const matchesSearch = lead.full_name.toLowerCase().includes(search.toLowerCase()) || 
+                          (lead.email && lead.email.toLowerCase().includes(search.toLowerCase())) ||
+                          (lead.phone && lead.phone.includes(search))
+    
+    const matchesAgent = agentFilter === "all" || lead.assigned_agent_id === agentFilter
+    
+    return matchesSearch && matchesAgent
+  })
+
+  const handleOpenDetail = (lead: Lead) => {
+    setSelectedLead(lead)
+    setIsSheetOpen(true)
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+
+      {/* ── ESTÁTICO: Título + Botones ── */}
+      <div className="flex items-center justify-between px-4 md:px-8 pt-6 pb-4 shrink-0">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            Pipeline Global
+            <Badge variant="secondary" className="text-xs font-semibold bg-accent/10 text-accent border-none">
+              Beta
+            </Badge>
+          </h2>
+          <p className="text-muted-foreground mt-1">
+            Gestiona el embudo comercial de toda tu inmobiliaria en tiempo real.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+            <Download className="h-4 w-4" />
+            Exportar
+          </Button>
+          <Button className="bg-accent hover:bg-accent/90 gap-2">
+            <Plus className="h-4 w-4" />
+            Nuevo Lead
+          </Button>
+        </div>
+      </div>
+
+      {/* ── ESTÁTICO: Filtros ── */}
+      <div className="px-4 md:px-8 pb-4 shrink-0">
+        <div className="bg-card/30 backdrop-blur-md p-4 rounded-2xl border border-accent/10 flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre, email o teléfono..."
+              className="pl-10 bg-background/50 border-accent/10 focus-visible:ring-accent/30"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="flex items-center gap-2 min-w-[200px]">
+              <ListFilter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Select value={agentFilter} onValueChange={setAgentFilter}>
+                <SelectTrigger className="bg-background/50 border-accent/10">
+                  <SelectValue placeholder="Filtrar por asesor" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los asesores</SelectItem>
+                  {agents.map(agent => (
+                    <SelectItem key={agent.id} value={agent.id}>{agent.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Separator orientation="vertical" className="h-8 hidden md:block" />
+
+            <div className="flex items-center gap-1 bg-muted px-1 py-1 rounded-lg">
+              <Button variant="ghost" size="icon" className="h-8 w-8 bg-background shadow-sm">
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SCROLLEABLE HORIZONTAL: Solo el Kanban ── */}
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden">
+        {loading ? (
+          <div className="flex gap-4 px-4 md:px-8 pb-4 h-full">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="w-[300px] shrink-0 space-y-4">
+                <Skeleton className="h-10 w-full rounded-lg" />
+                <Skeleton className="h-[120px] w-full rounded-xl" />
+                <Skeleton className="h-[120px] w-full rounded-xl" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <KanbanBoard initialLeads={filteredLeads} onCardClick={handleOpenDetail} />
+        )}
+      </div>
+
+      {/* Detail Sheet */}
+      <LeadDetailSheet
+        lead={selectedLead}
+        isOpen={isSheetOpen}
+        onClose={() => setIsSheetOpen(false)}
+        onAssignAgent={(id) => console.log("Assign agent to lead", id)}
+        onScheduleVisit={(id) => console.log("Schedule visit for lead", id)}
+        onLogActivity={(id) => console.log("Log activity", id)}
+      />
+    </div>
+  )
+}
+

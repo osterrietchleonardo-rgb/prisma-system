@@ -1,0 +1,45 @@
+﻿
+> prisma-ia@0.1.0 build
+> next build
+
+  Ôû▓ Next.js 14.2.22
+  - Environments: .env
+
+   Creating an optimized production build ...
+node.exe : Failed to 
+compile.
+En línea: 1 Carácter: 
+1
++ & "C:\Program Files\
+nodejs/node.exe" "C:\U
+sers\LENOVO\AppData\Ro
+aming ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (Failed to    
+ compile.:String)     
+[], RemoteExcepti    
+on
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+
+./app/director/tasacio
+nes/page.tsx
+Module not found: 
+Can't resolve '@/compo
+nents/ui/progress'
+
+https://nextjs.org/doc
+s/messages/module-not-
+found
+
+
+> Build failed 
+because of webpack 
+errors
