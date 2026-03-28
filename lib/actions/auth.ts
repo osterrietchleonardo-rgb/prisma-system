@@ -186,7 +186,9 @@ export async function signInWithGoogle(origin: string, role?: string, inviteCode
   if (inviteCode) queryParams.set('inviteCode', inviteCode)
   if (agencyName) queryParams.set('agencyName', agencyName)
   
-  const redirectTo = `${origin}/auth/callback${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+  // En producción usamos la URL de Vercel, en local window.location.origin
+  const baseOrigin = origin || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+  const redirectTo = `${baseOrigin}/auth/callback${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
