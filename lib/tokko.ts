@@ -29,7 +29,7 @@ export const fetchTokko = async (endpoint: string, apiKey: string, options: Requ
 
 export const syncPropertiesFromTokko = async (apiKey: string) => {
   let allProperties: any[] = [];
-  let limit = 100;
+  const limit = 100;
   let offset = 0;
   let totalCount = 1;
 

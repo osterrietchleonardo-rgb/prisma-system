@@ -231,7 +231,7 @@ export default function PropertyDetailPage() {
                     activeImage === idx ? "border-accent scale-105" : "border-transparent opacity-50 hover:opacity-100"
                   )}
                 >
-                  <img src={img} className="object-cover w-full h-full" />
+                  <img src={img} alt="" className="object-cover w-full h-full" />
                 </button>
               ))}
             </div>
@@ -367,7 +367,7 @@ export default function PropertyDetailPage() {
                 {tokko.internal_comments && (
                   <div className="p-3 rounded-lg bg-background/50 border border-accent/10">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Comentario Interno:</p>
-                    <p className="text-sm font-medium italic">"{tokko.internal_comments}"</p>
+                    <p className="text-sm font-medium italic">&quot;{tokko.internal_comments}&quot;</p>
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4">
@@ -377,7 +377,7 @@ export default function PropertyDetailPage() {
                    </div>
                    {branch.logo && (
                      <div className="flex justify-end">
-                        <img src={branch.logo} className="h-8 object-contain opacity-80" />
+                        <img src={branch.logo} alt="" className="h-8 object-contain opacity-80" />
                      </div>
                    )}
                 </div>

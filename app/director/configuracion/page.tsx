@@ -331,7 +331,7 @@ export default function DirectorConfiguracionPage() {
                   ))
                 ) : (
                   <div className="text-center py-6 text-muted-foreground border-2 border-dashed border-accent/10 rounded-xl">
-                    No hay códigos generados. Haz clic en "Generar Código" para invitar asesores.
+                    No hay códigos generados. Haz clic en &quot;Generar Código&quot; para invitar asesores.
                   </div>
                 )}
               </div>

@@ -361,7 +361,7 @@ export default function PropiedadesPage() {
                     >
                       <TableCell>
                         <Link href={`/director/propiedades/${prop.id}`} className="flex items-center gap-3">
-                          <img src={prop.images?.[0]} className="h-10 w-10 rounded-md object-cover" />
+                          <img src={prop.images?.[0]} alt={prop.title} className="h-10 w-10 rounded-md object-cover" />
                           <div>
                             <p className="font-semibold text-sm">{prop.title}</p>
                             <p className="text-xs text-muted-foreground">{prop.address}</p>
