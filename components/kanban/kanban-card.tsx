@@ -41,7 +41,10 @@ export function KanbanCard({ lead, onClick }: KanbanCardProps) {
     ? lead.assigned_agent.full_name.split(" ").map(n => n[0]).join("").toUpperCase()
     : "?"
 
-  const timeInStage = formatDistanceToNow(new Date(lead.updated_at), { locale: es, addSuffix: true })
+  const updatedAtDate = lead.updated_at ? new Date(lead.updated_at) : null
+  const timeInStage = (updatedAtDate && !isNaN(updatedAtDate.getTime()))
+    ? formatDistanceToNow(updatedAtDate, { locale: es, addSuffix: true })
+    : "Sin fecha"
 
   if (isDragging) {
     return (
