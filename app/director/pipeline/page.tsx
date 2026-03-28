@@ -36,23 +36,38 @@ export default function PipelinePage() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
 
-  // Agency ID should come from context/auth, using mock for now or fetching from session
-  const agencyId = "00000000-0000-0000-0000-000000000000" // We'll need a better way to get this
+
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true)
-        // Note: Real agencyId should be fetched from session in a real scenario
-        // For now, these queries might fail if RLS is strict and no session exists, 
-        // but this is the structural implementation.
-        const [leadsData, agentsData] = await Promise.all([
-          getAgencyLeads({ agencyId }).catch(() => []),
-          getAgencyAgents({ agencyId }).catch(() => [])
-        ])
+        const { createClient } = await import("@/lib/supabase/client")
+        const supabase = createClient()
         
-        setLeads(leadsData as unknown as Lead[])
-        setAgents(agentsData)
+        const { data: { session } } = await supabase.auth.getSession()
+        const userAgencyId = session?.user?.user_metadata?.agency_id || session?.user?.email // Fallback or improved logic
+        
+        // Let's also try to get it from profile if not in metadata
+        let finalAgencyId = userAgencyId
+        if (!finalAgencyId && session?.user?.id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('agency_id')
+            .eq('id', session.user.id)
+            .single()
+          finalAgencyId = profile?.agency_id
+        }
+
+        if (finalAgencyId) {
+          const [leadsData, agentsData] = await Promise.all([
+            getAgencyLeads({ agencyId: finalAgencyId }).catch(() => []),
+            getAgencyAgents({ agencyId: finalAgencyId }).catch(() => [])
+          ])
+          
+          setLeads(leadsData as unknown as Lead[])
+          setAgents(agentsData)
+        }
       } catch (error) {
         console.error("Error loading pipeline data:", error)
         toast.error("Error al cargar los leads")
@@ -64,15 +79,21 @@ export default function PipelinePage() {
     loadData()
   }, [])
 
-  const filteredLeads = leads.filter(lead => {
-    const matchesSearch = lead.full_name.toLowerCase().includes(search.toLowerCase()) || 
-                          (lead.email && lead.email.toLowerCase().includes(search.toLowerCase())) ||
-                          (lead.phone && lead.phone.includes(search))
+  const filteredLeads = leads?.filter(lead => {
+    if (!lead) return false;
+    
+    const fullName = lead.full_name || "";
+    const email = lead.email || "";
+    const phone = lead.phone || "";
+
+    const matchesSearch = fullName.toLowerCase().includes(search.toLowerCase()) || 
+                          email.toLowerCase().includes(search.toLowerCase()) ||
+                          phone.includes(search)
     
     const matchesAgent = agentFilter === "all" || lead.assigned_agent_id === agentFilter
     
     return matchesSearch && matchesAgent
-  })
+  }) || []
 
   const handleOpenDetail = (lead: Lead) => {
     setSelectedLead(lead)

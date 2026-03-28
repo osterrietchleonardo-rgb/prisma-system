@@ -72,15 +72,18 @@ export function KanbanBoard({ initialLeads, onCardClick }: KanbanBoardProps) {
 
     if (!isActiveALead) return
 
-    // Impl dropping lead over another lead
     if (isActiveALead && isOverALead) {
       setLeads((leads) => {
         const activeIndex = leads.findIndex((l) => l.id === activeId)
         const overIndex = leads.findIndex((l) => l.id === overId)
 
         if (leads[activeIndex].pipeline_stage !== leads[overIndex].pipeline_stage) {
-          leads[activeIndex].pipeline_stage = leads[overIndex].pipeline_stage
-          return arrayMove(leads, activeIndex, overIndex - 1)
+          const updatedLeads = [...leads]
+          updatedLeads[activeIndex] = {
+            ...updatedLeads[activeIndex],
+            pipeline_stage: leads[overIndex].pipeline_stage
+          }
+          return arrayMove(updatedLeads, activeIndex, overIndex - 1)
         }
 
         return arrayMove(leads, activeIndex, overIndex)
@@ -93,8 +96,12 @@ export function KanbanBoard({ initialLeads, onCardClick }: KanbanBoardProps) {
     if (isActiveALead && isOverAColumn) {
       setLeads((leads) => {
         const activeIndex = leads.findIndex((l) => l.id === activeId)
-        leads[activeIndex].pipeline_stage = overId as string
-        return arrayMove(leads, activeIndex, activeIndex)
+        const updatedLeads = [...leads]
+        updatedLeads[activeIndex] = {
+          ...updatedLeads[activeIndex],
+          pipeline_stage: overId as string
+        }
+        return arrayMove(updatedLeads, activeIndex, activeIndex)
       })
     }
   }
