@@ -36,7 +36,7 @@ export async function getDashboardData(agencyId: string) {
 
   const totalSalesVolume = closings?.reduce((acc, c) => acc + (Number(c.closing_price) || 0), 0) || 0
 
-  // 2. Leads por Canal (Chart Data)
+  // 2. Leads por Canal (Chart Data) - Solo del agencyId actual
   const { data: leadsBySource } = await supabase
     .from("leads")
     .select("source")
@@ -44,7 +44,7 @@ export async function getDashboardData(agencyId: string) {
 
   const sourceCounts: Record<string, number> = {}
   leadsBySource?.forEach(lead => {
-    const src = lead.source || "Desconocido"
+    const src = lead.source || "Sin fuente"
     sourceCounts[src] = (sourceCounts[src] || 0) + 1
   })
   
@@ -53,7 +53,7 @@ export async function getDashboardData(agencyId: string) {
     total
   }))
 
-  // 3. Pipeline Data
+  // 3. Pipeline Data - Solo del agencyId actual
   const { data: leadsPipeline } = await supabase
     .from("leads")
     .select("pipeline_stage")
@@ -61,18 +61,18 @@ export async function getDashboardData(agencyId: string) {
 
   const stageCounts: Record<string, number> = {}
   leadsPipeline?.forEach(lead => {
-    const stage = lead.pipeline_stage || "Contacto"
+    const stage = lead.pipeline_stage || "Nuevo"
     stageCounts[stage] = (stageCounts[stage] || 0) + 1
   })
 
-  // Ensure standard stages are present even if 0
-  const stages = ["Contacto", "Visita", "Oferta", "Cierre"]
-  const chartDataPipeline = stages.map(stage => ({
+  // Standard stages based on our Kanban stages
+  const standardStages = ["Nuevo", "Contacto", "Visita", "Oferta", "Cierre"]
+  const chartDataPipeline = standardStages.map(stage => ({
     name: stage,
     value: stageCounts[stage] || 0
   }))
 
-  // 4. Actividad Reciente
+  // 4. Actividad Reciente - Filtrado por los leads de la agencia
   const { data: recentActivity } = await supabase
     .from("lead_activities")
     .select(`
@@ -92,11 +92,11 @@ export async function getDashboardData(agencyId: string) {
       newLeads: newLeadsCount || 0,
       pendingVisits: pendingVisitsCount || 0,
       valuations: valuationsCount || 0,
-      salesVolume: totalSalesVolume,
+      salesVolume: totalSalesVolume || 0,
     },
     charts: {
       channels: chartDataChannels,
-      pipeline: chartDataPipeline
+      pipeline: chartDataPipeline || []
     },
     activity: recentActivity || []
   }

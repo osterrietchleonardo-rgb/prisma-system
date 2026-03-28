@@ -1,8 +1,8 @@
 import { DashboardKpis } from "@/components/dashboard-kpis"
 import { DashboardActivity } from "@/components/dashboard-activity"
 import { Button } from "@/components/ui/button"
+import { DashboardHeaderActions } from "@/components/dashboard-header-actions"
 import { 
-  Plus, 
   Download, 
   Filter,
   Calendar as CalendarIcon
@@ -66,16 +66,7 @@ export default async function DashboardPage() {
             Bienvenido al centro de control de tu inmobiliaria.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="hidden sm:flex border-accent/20 bg-accent/5 transition-all hover:bg-accent/10">
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
-          </Button>
-          <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-md shadow-accent/20">
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva Propiedad
-          </Button>
-        </div>
+        <DashboardHeaderActions data={dashboardData} />
       </div>
 
       {/* Filters Bar */}
@@ -92,7 +83,6 @@ export default async function DashboardPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los asesores</SelectItem>
-              {/* This could also be fetched from agency agents */}
             </SelectContent>
           </Select>
 
@@ -136,4 +126,3 @@ export default async function DashboardPage() {
     </div>
   )
 }
-

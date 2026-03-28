@@ -67,7 +67,7 @@ export default async function DirectorLayout({
           agencyName={agencyName}
           userRole="Director"
         />
-        <main className="flex-1 overflow-hidden flex flex-col min-h-0">
+        <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-accent/20 flex flex-col min-h-0">
           {children}
         </main>
       </div>
