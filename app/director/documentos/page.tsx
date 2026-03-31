@@ -14,7 +14,6 @@ import {
   Loader2,
   ExternalLink,
   Video,
-  Youtube,
   Lock,
   Users,
   CheckCircle2,
@@ -203,7 +202,7 @@ export default function DocumentosPage() {
           <DialogContent className="bg-card border-accent/20 sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                {uploadType === "file" ? <FileText className="text-accent" /> : <Youtube className="text-red-500" />}
+                {uploadType === "file" ? <FileText className="text-accent" /> : <Video className="text-red-500" />}
                 Agregar Recurso
               </DialogTitle>
               <DialogDescription>
@@ -291,7 +290,7 @@ export default function DocumentosPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-semibold">URL del Video de YouTube</label>
                     <div className="relative">
-                      <Youtube className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                      <Video className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                       <Input name="youtubeUrl" placeholder="https://youtube.com/watch?v=..." className="pl-10" required />
                     </div>
                     <p className="text-[10px] text-muted-foreground">La IA transcribirá el contenido para indexarlo.</p>
@@ -367,7 +366,7 @@ export default function DocumentosPage() {
                       "p-2.5 rounded-xl",
                       doc.type === "youtube" ? "bg-red-500/10 text-red-500" : "bg-accent/10 text-accent"
                     )}>
-                      {doc.type === "youtube" ? <Youtube className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                      {doc.type === "youtube" ? <Video className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                     </div>
                     {doc.visibility === "director" ? (
                       <Badge variant="outline" className="bg-orange-500/5 text-orange-500 border-none px-2 py-0 h-6 flex items-center gap-1">

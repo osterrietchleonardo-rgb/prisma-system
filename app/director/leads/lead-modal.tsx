@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { 
   Plus, 
   User, 
@@ -30,19 +30,38 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
+import { getAgencyAgents } from "@/lib/queries/director"
 
 interface LeadModalProps {
   isOpen: boolean
   setIsOpen: (open: boolean) => void
-  agents: Record<string, any>[]
-  onSuccess: () => void
+  onSuccess: () => Promise<void> | void
 }
 
-export function LeadModal({ isOpen, setIsOpen, agents, onSuccess }: LeadModalProps) {
+export function LeadModal({ isOpen, setIsOpen, onSuccess }: LeadModalProps) {
+  const [agents, setAgents] = useState<Record<string, any>[]>([])
   const [activeTab, setActiveTab] = useState("manual")
   const [loading, setLoading] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<Record<string, any> | null>(null)
   const supabase = createClient()
+
+  useEffect(() => {
+    if (!isOpen) return;
+    async function loadAgents() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return;
+        const { data: profile } = await supabase.from("profiles").select("agency_id").eq("id", session.user.id).single()
+        if (profile?.agency_id) {
+           const ags = await getAgencyAgents({ agencyId: profile.agency_id })
+           setAgents(ags || [])
+        }
+      } catch (err) {
+        console.error("Error loading agents:", err)
+      }
+    }
+    loadAgents()
+  }, [isOpen, supabase])
 
   const [formData, setFormData] = useState({
     full_name: "",

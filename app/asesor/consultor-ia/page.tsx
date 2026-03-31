@@ -72,8 +72,8 @@ Por favor, recomendame 2 o 3 propiedades de mi cartera que mejor se adapten y ex
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [newMessage],
-          agentId,
+          message: newMessage.content,
+          history: [],
         }),
       })
 
@@ -102,11 +102,19 @@ Por favor, recomendame 2 o 3 propiedades de mi cartera que mejor se adapten y ex
     e?.preventDefault()
     if (!input.trim() || !agentId) return
 
+    const userMessage = input.trim()
     const newMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: userMessage,
     }
+    
+    // Create history for API (last 5 messages for context)
+    const currentHistory = messages.slice(-5).map(m => ({ 
+      role: m.role, 
+      content: m.content 
+    }))
+    
     setMessages(prev => [...prev, newMessage])
     setInput("")
     setIsLoading(true)
@@ -116,8 +124,8 @@ Por favor, recomendame 2 o 3 propiedades de mi cartera que mejor se adapten y ex
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...messages, newMessage],
-          agentId,
+          message: userMessage,
+          history: currentHistory,
         }),
       })
 
@@ -133,7 +141,7 @@ Por favor, recomendame 2 o 3 propiedades de mi cartera que mejor se adapten y ex
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.reply
+        content: data.reply || data.text
       }])
     } catch (_error) {
       toast.error("Error al comunicarse con el Consultor IA.")

@@ -34,13 +34,18 @@ export default function TutorIAPage() {
 
   const handleSubmit = async (e?: React.FormEvent<HTMLFormElement>) => {
     e?.preventDefault()
-    if (!input.trim() || !agencyId) return
+    if (!input.trim()) return
 
+    const userMessage = input.trim()
     const newMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: userMessage,
     }
+    
+    // We keep a local history to send to the API
+    const currentHistory = messages.map(m => ({ role: m.role, content: m.content }))
+    
     setMessages(prev => [...prev, newMessage])
     setInput("")
     setIsLoading(true)
@@ -50,17 +55,13 @@ export default function TutorIAPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [...messages, newMessage],
-          agencyId,
+          message: userMessage,
+          history: currentHistory
         }),
       })
 
-      if (!response.ok) {
-        throw new Error(response.statusText)
-      }
+      if (!response.ok) throw new Error(response.statusText)
 
-      // Handle streaming response or standard JSON
-      // If it's pure JSON for now (if streaming is complex to implement here)
       const data = await response.json()
       
       if (data.error) {
@@ -71,7 +72,7 @@ export default function TutorIAPage() {
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: data.reply,
+        content: data.reply || data.text,
       }
       setMessages(prev => [...prev, aiMessage])
       
@@ -83,7 +84,7 @@ export default function TutorIAPage() {
   }
 
   const handleEvaluate = async () => {
-     if (isLoading || !agencyId) return
+     if (isLoading) return
      
      const promptMsg = "Quiero que me evalúes. Por favor haceme 3 a 5 preguntas cerradas o de opción múltiple sobre los documentos y procesos de la inmobiliaria para poner a prueba mis conocimientos."
      const newMessage: Message = {
@@ -91,6 +92,8 @@ export default function TutorIAPage() {
        role: "user",
        content: promptMsg
      }
+     
+     const currentHistory = messages.map(m => ({ role: m.role, content: m.content }))
      
      setMessages(prev => [...prev, newMessage])
      setIsLoading(true)
@@ -100,8 +103,8 @@ export default function TutorIAPage() {
          method: "POST",
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({
-           messages: [...messages, newMessage],
-           agencyId,
+           message: promptMsg,
+           history: currentHistory
          }),
        })
        
@@ -117,7 +120,7 @@ export default function TutorIAPage() {
        const aiMessage: Message = {
          id: (Date.now() + 1).toString(),
          role: "assistant",
-         content: data.reply,
+         content: data.reply || data.text,
        }
        setMessages(prev => [...prev, aiMessage])
      } catch (_error) {
@@ -137,6 +140,7 @@ export default function TutorIAPage() {
           Asistente entrenado con los documentos y procesos de tu inmobiliaria.
         </p>
       </div>
+
 
       <div className="flex-1 min-h-0 relative">
         <ChatInterface 

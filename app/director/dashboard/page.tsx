@@ -24,7 +24,11 @@ import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
 import { createClient } from "@/lib/supabase/server"
 import { getDashboardData } from "@/lib/queries/dashboard"
+import { getPropertiesDashboardData } from "@/lib/queries/properties-dashboard"
 import { redirect } from "next/navigation"
+import { DashboardLeadsSection } from "./components/DashboardLeadsSection"
+import { DashboardPropertiesSection } from "./components/DashboardPropertiesSection"
+import { TrackingSection } from "@/components/tracking/TrackingSection"
 
 const DashboardCharts = dynamic(() => import("@/components/dashboard-charts").then(m => m.DashboardCharts), {
   ssr: false,
@@ -55,10 +59,13 @@ export default async function DashboardPage() {
     )
   }
 
-  const dashboardData = await getDashboardData(profile.agency_id)
+  const [dashboardData, propertiesData] = await Promise.all([
+    getDashboardData(profile.agency_id),
+    getPropertiesDashboardData(profile.agency_id)
+  ])
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 px-4 md:px-8 py-8">
+    <div className="space-y-8 animate-in fade-in duration-300 px-4 md:px-8 py-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Dashboard Overview</h2>
@@ -69,6 +76,8 @@ export default async function DashboardPage() {
         <DashboardHeaderActions data={dashboardData} />
       </div>
 
+      <TrackingSection isDirector={true} />
+      
       {/* Filters Bar */}
       <div className="flex flex-col gap-4 p-4 rounded-xl border border-accent/10 bg-card/30 backdrop-blur-sm sm:flex-row sm:items-center">
         <div className="flex items-center gap-2">
@@ -111,15 +120,14 @@ export default async function DashboardPage() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <DashboardKpis data={dashboardData.kpis} />
+      <DashboardLeadsSection />
 
-      {/* Main Grid: Charts & Activity */}
+      {propertiesData && (
+        <DashboardPropertiesSection data={propertiesData} />
+      )}
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
-        <div className="lg:col-span-4">
-          <DashboardCharts data={dashboardData.charts} />
-        </div>
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-7">
           <DashboardActivity data={dashboardData.activity} />
         </div>
       </div>

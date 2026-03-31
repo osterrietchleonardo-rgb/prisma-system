@@ -8,7 +8,7 @@ const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
 // Fetch ALL contacts from Tokko with pagination + rate-limit respect
 // ─────────────────────────────────────────────────────────────
 async function fetchAllTokkoContacts(apiKey: string) {
-  const MAX_CONTACTS = 5000
+  const MAX_CONTACTS = 10000
   const LIMIT        = 100
   const DELAY_MS     = 350
 
@@ -218,13 +218,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sin permisos" }, { status: 403 })
     }
 
-    const body = await req.json()
+    let body;
+    try {
+      body = await req.json();
+    } catch (e) {
+      return NextResponse.json({ error: "Cuerpo de solicitud inválido o vacío" }, { status: 400 });
+    }
+
     const { mode = "all", leads: selectedLeads, assigned_agent_id } = body
 
     let contactsToImport: any[] = []
 
     if (mode === "all") {
-      // Fetch all contacts from Tokko
       const { data: agency } = await supabase
         .from("agencies")
         .select("tokko_api_key")
@@ -238,7 +243,6 @@ export async function POST(req: NextRequest) {
       const { contacts } = await fetchAllTokkoContacts(agency.tokko_api_key)
       contactsToImport = contacts
     } else {
-      // Use pre-fetched leads passed from frontend
       contactsToImport = selectedLeads || []
     }
 
@@ -246,15 +250,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No hay contactos para importar" }, { status: 400 })
     }
 
-    // Map to DB rows
     const rows = contactsToImport.map((c: any) => ({
       ...mapTokkoContact(c, profile.agency_id!),
       ...(assigned_agent_id ? { assigned_agent_id } : {}),
     }))
 
-    // Upsert in batches of 50 to avoid payload limits
-    const BATCH = 50
+    const BATCH = 100
     let totalUpserted = 0
+    let errors: any[] = []
 
     for (let i = 0; i < rows.length; i += BATCH) {
       const batch = rows.slice(i, i + BATCH)
@@ -262,16 +265,20 @@ export async function POST(req: NextRequest) {
         .from("leads")
         .upsert(batch, {
           onConflict: "tokko_contact_id",
-          ignoreDuplicates: false  // Update existing records too
+          ignoreDuplicates: false
         })
         .select("id")
 
       if (error) {
+        errors.push(error);
         console.error(`Batch ${i / BATCH + 1} error:`, error)
-        // Continue with next batch instead of failing entirely
       } else {
         totalUpserted += data?.length || batch.length
       }
+    }
+
+    if (totalUpserted === 0 && errors.length > 0) {
+      throw new Error(`Error en base de datos: ${errors[0].message}`);
     }
 
     return NextResponse.json({
@@ -280,9 +287,9 @@ export async function POST(req: NextRequest) {
       total:    rows.length,
     })
   } catch (error: any) {
-    console.error("Tokko import error:", error?.message)
+    console.error("Tokko import error details:", error)
     return NextResponse.json({
-      error: error.message || "Error al importar contactos"
+      error: error.message || "Error interno al importar contactos"
     }, { status: 500 })
   }
 }

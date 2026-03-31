@@ -40,15 +40,20 @@ export async function POST(req: NextRequest) {
     })
 
     // 4. Intent Analysis: Should we fetch from knowledge base?
+    const intentAnalysisPrompt = `Analiza el mensaje del usuario y determina su intención.
+    
+    MENSAJE: "${message}"
+    
+    INTENCIONES POSIBLES:
+    - 'RETRIEVAL': El usuario hace una pregunta técnica, busca información sobre procesos, documentos, manuales o videos de la inmobiliaria.
+    - 'GENERAL': Es un saludo, una charla casual, un agradecimiento, una broma o una despedida. No requiere buscar en documentos.
+    
+    Responde ÚNICAMENTE con la palabra de la intención.`;
+
     const intentCheck = await prismaIA.generateContent({
-      contents: [{ 
-        role: "user", 
-        parts: [{ text: `Analiza si el siguiente mensaje requiere buscar información específica en documentos técnicos o si es una charla general (saludo, agradecimiento, charla casual). 
-        Responde SOLO con una palabra: 'RETRIEVAL' o 'GENERAL'.
-        Mensaje: "${message}"` }]
-      }]
+      contents: [{ role: "user", parts: [{ text: intentAnalysisPrompt }] }]
     })
-    const isRetrieval = intentCheck.response.text().includes("RETRIEVAL")
+    const isRetrieval = intentCheck.response.text().toUpperCase().includes("RETRIEVAL")
 
     let context = ""
     let documents = []
@@ -57,7 +62,7 @@ export async function POST(req: NextRequest) {
       const queryEmbedding = await generateEmbedding(message)
       const { data: dbDocs, error: rpcError } = await supabase.rpc("match_agency_documents", {
         query_embedding: queryEmbedding,
-        match_threshold: 0.1,
+        match_threshold: 0.15, // Un poco más estricto pero efectivo
         match_count: 5,
         p_agency_id: profile.agency_id
       })
@@ -69,32 +74,38 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Generate Response with Gemini
-    const systemPrompt = `Eres el "Tutor IA" de PRISMA, un asistente inteligente y mentor experto para directores de agencias inmobiliarias en Argentina.
+    const systemPrompt = `Eres el "Tutor de PRISMA", un mentor experto y mano derecha para el equipo de una inmobiliaria en Argentina. 
+    Tu objetivo es ayudar a los asesores y directores a entender sus procesos, manuales y herramientas basándote en la información que han subido.
 
-TU PERSONALIDAD:
-- Eres carismático, profesional y conversacional. 
-- No actúas como un motor de búsqueda, sino como un colega experto.
-- Saludas cálidamente, puedes bromear sanamente sobre el mercado y mantienes el hilo de la conversación.
+    TU PERSONALIDAD Y TONO:
+    - Hablás en español rioplatense (voseo: "che", "mirá", "tenés", "viste").
+    - Sos un colega copado, experto y con mucha cancha. No sos un bot rígido.
+    - Si te saludan, respondé con onda. Si te preguntan algo técnico, sé preciso pero explicá como si estuvieras tomando un café con alguien.
+    - Tenés iniciativa. Si ves que el usuario tiene dudas, ofrecé evaluarlo o explicarle algo relacionado.
+    
+    MANEJO DEL CONOCIMIENTO:
+    - SOLO si hay información en la "BASE DE CONOCIMIENTO" de abajo, usala como fuente principal.
+    - Si no hay información específica sobre la agencia en el contexto, explicá que "en los manuales de la agencia no encontré eso específicamente", pero aportá según tu conocimiento general del rubro inmobiliario en Argentina.
+    - NUNCA inventes nombres de departamentos o personas que no estén en el contexto.
 
-INSTRUCCIONES DE USO DEL CONOCIMIENTO:
-- SOLO si tienes información en la "BASE DE CONOCIMIENTO" de abajo, úsala para responder.
-- Si la información es general del rubro, responde con tu experiencia sin inventar datos de la agencia.
-- Si el contexto es vacío, responde de forma natural a la charla del usuario.
+    BASE DE CONOCIMIENTO (CONTEXTO):
+    ${context ? context : 'No se encontró información específica de la agencia para esta consulta. Respondé de forma general y profesional.'}
 
-${context ? `BASE DE CONOCIMIENTO:\n${context}` : 'No se ha proporcionado contexto específico para este mensaje.'}
+    REGLAS CLAVE:
+    - No uses frases robóticas tipo "Según los documentos proporcionados...".
+    - Usá un estilo fluido. 
+    - Sé proactivo. Ejemplo: "Che, mirá que en el manual de ingresos dice que... ¿Querés que repasemos eso o preferís que te tome una pruebita?"
+    - Si el usuario te pide que lo evalúes ("handleEvaluate"), hacé preguntas directas y desafiantes sobre los procesos.`;
 
-REGLAS DE ORO:
-- Responde en español de Argentina.
-- No uses prefijos robóticos como "Basándome en lo que encontré...". Di algo como "Che, estuve viendo el manual que subiste y dice que..." o "Mirá, sobre ese tema no tenemos nada en los archivos, pero por lo general se maneja así...".
-- Mantén las respuestas fluidas.`;
+    const chatHistory = (history || []).map((m: any) => ({
+      role: m.role === "user" ? "user" : "model",
+      parts: [{ text: m.content }]
+    }))
 
     const result = await prismaIA.generateContent({
       contents: [
         { role: "user", parts: [{ text: systemPrompt }] },
-        ...(history || []).map((m: any) => ({
-          role: m.role === "user" ? "user" : "model",
-          parts: [{ text: m.content }]
-        })),
+        ...chatHistory,
         { role: "user", parts: [{ text: message }] }
       ]
     })
@@ -109,48 +120,34 @@ REGLAS DE ORO:
       metadata: { sources: documents.map((d: any) => ({ title: d.title, type: d.type })) }
     })
 
-    // 7. Topic Summarization & Analytics (Strict Title Generation)
+    // 7. Topic Summarization (Asynchronous)
     const historyCount = (history || []).length
-    if (historyCount === 0 || historyCount % 5 === 0) {
-      const summaryPrompt = `Analiza este fragmento de chat y define un Título (tema principal) y un Resumen corto.
-      IMPORTANTE: El título debe tener MÁXIMO 20 caracteres.
-      Responde ÚNICAMENTE con el objeto JSON, sin Markdown ni explicaciones.
-      Formato: { "title": "...", "summary": "..." }
-
-      Chat:
-      User: ${message}
-      Assistant: ${responseText.substring(0, 500)}...`;
-
-      try {
-        const summaryResult = await prismaIA.generateContent(summaryPrompt);
-        const summaryTextRaw = summaryResult.response.text().trim();
-        // Remove potential markdown blocks
-        const cleanedJson = summaryTextRaw.replace(/```json/g, "").replace(/```/g, "").trim();
-        console.log("Tutor IA Summary Candidate:", cleanedJson);
-        const summaryData = JSON.parse(cleanedJson);
-        
-        if (summaryData.title) {
-          const { error: updateError } = await supabase
-            .from("tutor_chat_sessions")
-            .update({
-              title: summaryData.title,
-              summary: summaryData.summary || ""
-            })
-            .eq("id", currentSessionId);
+    if (historyCount === 0 || (historyCount + 1) % 4 === 0) {
+      // Background promise to not block the main response
+      (async () => {
+        try {
+          const summaryPrompt = `Resume este chat en un título (máx 22 carac.) y un resumen corto (1 frase). 
+          Responde SOLO JSON: {"title": "...", "summary": "..."}
+          Chat: "${message}" - Assistant: "${responseText.substring(0, 100)}"`;
+          const summaryRes = await prismaIA.generateContent(summaryPrompt);
+          const rawText = summaryRes.response.text().trim();
+          const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+          const { title, summary } = JSON.parse(cleanJson);
           
-          if (updateError) console.error("Database Update Error (Title):", updateError);
-          else console.log("Tutor IA Title Updated:", summaryData.title);
+          await supabase.from("tutor_chat_sessions").update({ title, summary }).eq("id", currentSessionId);
+        } catch (e) {
+          console.error("Async Summary Error:", e);
         }
-      } catch (e) {
-        console.error("Error parsing or updating session summary:", e);
-      }
+      })();
     }
 
     return NextResponse.json({ 
       text: responseText,
+      reply: responseText, // Added for compatibility with ChatInterface
       sources: documents.map((d: any) => ({ title: d.title, type: d.type, similarity: d.similarity })),
       sessionId: currentSessionId
     })
+
 
   } catch (error: any) {
     console.error("Tutor IA API Error:", error)

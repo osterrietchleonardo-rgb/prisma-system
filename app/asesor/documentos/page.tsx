@@ -9,7 +9,7 @@ import {
   FileBadge,
   ExternalLink,
   Video,
-  Youtube,
+
   Users,
   CheckCircle2
 } from "lucide-react"
@@ -137,7 +137,7 @@ export default function AsesorDocumentosPage() {
                       "p-2.5 rounded-xl",
                       doc.type === "youtube" ? "bg-red-500/10 text-red-500" : "bg-accent/10 text-accent"
                     )}>
-                      {doc.type === "youtube" ? <Youtube className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                      {doc.type === "youtube" ? <Video className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                     </div>
                     <Badge variant="outline" className="bg-accent/5 text-accent border-none px-2 py-0 h-6 flex items-center gap-1">
                       <Users className="h-3 w-3" /> Compartido

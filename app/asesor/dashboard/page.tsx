@@ -26,6 +26,7 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import dynamic from "next/dynamic"
+import { TrackingSection } from "@/components/tracking/TrackingSection"
 
 const EvolutionChart = dynamic(() => import("@/components/asesor-charts").then(m => m.EvolutionChart), {
   ssr: false,
@@ -88,23 +89,7 @@ export default function AsesorDashboard() {
         </p>
       </div>
 
-      {/* KPI Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        {kpis.map((kpi, i) => (
-          <Card key={i} className="border-accent/10 bg-card/50 backdrop-blur-sm group hover:border-accent/30 transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{kpi.title}</CardTitle>
-              <kpi.icon className="h-4 w-4 text-accent opacity-70 group-hover:opacity-100 transition-opacity" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpi.value}</div>
-              <div className="flex items-center gap-1 mt-1">
-                <p className="text-[10px] text-muted-foreground">{kpi.description}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <TrackingSection isDirector={false} />
 
       <div className="grid gap-8 md:grid-cols-7">
         {/* Evolution Chart */}
@@ -205,6 +190,7 @@ export default function AsesorDashboard() {
           </Card>
         </div>
       </div>
+
     </div>
   )
 }

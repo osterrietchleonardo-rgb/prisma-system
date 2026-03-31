@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
-    const { message, sessionId, agencyId } = await req.json();
+    const { message, sessionId, agencyId, history } = await req.json();
     console.log("Consultor IA Request:", { message, sessionId, agencyId });
     const supabase = await createClient();
 
@@ -44,91 +44,107 @@ export async function POST(req: Request) {
       .from('consultor_chat_messages')
       .insert({ session_id: currentSessionId, role: 'user', content: message });
 
-    // 4. Intent Analysis & Search
-    console.log("Generating embedding...");
-    const queryEmbedding = await generateEmbedding(message);
-    
-    // Get seen property IDs from session metadata if exists
-    const { data: sessionData } = await supabase
-      .from('consultor_chat_sessions')
-      .select('metadata')
-      .eq('id', currentSessionId)
-      .single();
-    const seenIds = (sessionData?.metadata as any)?.seen_property_ids || [];
-
-    console.log("Querying Supabase RPC match_properties...");
-    const { data: matchedProperties, error: rpcError } = await supabase.rpc('match_properties', {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.40, // Loosely match for intelligence/mapping (e.g. 13 -> Avenida 13)
-      match_count: 10,        // Get more, we will pick the best 3 non-repeating
-      p_agency_id: finalAgencyId
+    // 4. Intent Analysis: Is it property search or general chat?
+    const intentCheck = await prismaIA.generateContent({
+      contents: [{ 
+        role: "user", 
+        parts: [{ text: `Analiza si el siguiente mensaje requiere buscar o recomendar propiedades de una inmobiliaria o si es una charla general (saludo, agradecimiento, pregunta sobre el clima, charla casual).
+        Responde SOLO con una palabra: 'RETRIEVAL' o 'GENERAL'.
+        Mensaje: "${message}"` }]
+      }]
     });
+    const isRetrieval = intentCheck.response.text().toUpperCase().includes("RETRIEVAL");
 
-    if (rpcError) {
-      console.error("RPC Error:", rpcError);
-      throw rpcError;
+    let newMatchedProperties = [];
+    let propertyContext = "";
+
+    if (isRetrieval) {
+      console.log("Generating embedding for search...");
+      const queryEmbedding = await generateEmbedding(message);
+      
+      const { data: sessionData } = await supabase
+        .from('consultor_chat_sessions')
+        .select('metadata')
+        .eq('id', currentSessionId)
+        .single();
+      const seenIds = (sessionData?.metadata as any)?.seen_property_ids || [];
+
+      console.log("Querying Supabase match_properties RPC (lower threshold)...");
+      const { data: matchedProperties, error: rpcError } = await supabase.rpc('match_properties', {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.25, // Lowered for better recall
+        match_count: 8,
+        p_agency_id: finalAgencyId
+      });
+
+      if (rpcError) {
+        console.error("RPC Error:", rpcError);
+        throw rpcError;
+      }
+
+      // Filter and Re-rank
+      const filteredProperties = matchedProperties?.filter((p: any) => !seenIds.includes(p.id)) || [];
+      const searchTerms = message.toLowerCase().split(/\s+/).filter((t: string) => t.length > 2);
+      
+      const rerankedProperties = filteredProperties.sort((a: any, b: any) => {
+        const aScore = searchTerms.filter((t: string) => a.address?.toLowerCase().includes(t) || a.title?.toLowerCase().includes(t)).length;
+        const bScore = searchTerms.filter((t: string) => b.address?.toLowerCase().includes(t) || b.title?.toLowerCase().includes(t)).length;
+        if (aScore !== bScore) return bScore - aScore;
+        return b.similarity - a.similarity;
+      });
+      
+      newMatchedProperties = rerankedProperties.slice(0, 3);
+      
+      // Update metadata
+      const updatedSeenIds = Array.from(new Set([...seenIds, ...newMatchedProperties.map((p: any) => p.id)]));
+      await supabase
+        .from('consultor_chat_sessions')
+        .update({ 
+          metadata: { seen_property_ids: updatedSeenIds },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentSessionId);
+
+      propertyContext = newMatchedProperties.length > 0
+        ? newMatchedProperties.map((p: any) => 
+            `- ID: ${p.id}, Titulo: ${p.title}, Tipo: ${p.property_type}, Precio: ${p.currency} ${p.price}, Direccion: ${p.address}, Dormitorios: ${p.bedrooms}`
+          ).join('\n')
+        : "No se encontraron nuevas propiedades coincidiendo exactamente. Sugiere alternativas.";
     }
 
-    // Filter out seen properties to avoid repetition
-    const filteredProperties = matchedProperties?.filter((p: any) => !seenIds.includes(p.id)) || [];
+    // 5. Generate Assistant Response with Context & History
+    const systemPrompt = `Eres el "Consultor IA" de la inmobiliaria PRISMA. Tu misión es ser la mano derecha del Director para encontrar propiedades en la cartera de la agencia.
     
-    // Intelligent Re-ranking: Boost properties with matching numbers/words in address/title
-    const searchTerms = message.toLowerCase().split(/\s+/).filter((t: string) => t.length > 1);
-    const rerankedProperties = filteredProperties.sort((a: any, b: any) => {
-      const aScore = searchTerms.filter((t: string) => a.address?.toLowerCase().includes(t) || a.title?.toLowerCase().includes(t)).length;
-      const bScore = searchTerms.filter((t: string) => b.address?.toLowerCase().includes(t) || b.title?.toLowerCase().includes(t)).length;
-      if (aScore !== bScore) return bScore - aScore; // Boost by keyword matches
-      return b.similarity - a.similarity; // Then by vector similarity
-    });
-    
-    // Pick the top 3 from the reranked list
-    const newMatchedProperties = rerankedProperties.slice(0, 3);
-    
-    // Update seen IDs
-    const updatedSeenIds = Array.from(new Set([...seenIds, ...newMatchedProperties.map((p: any) => p.id)]));
-    await supabase
-      .from('consultor_chat_sessions')
-      .update({ 
-        metadata: { seen_property_ids: updatedSeenIds },
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', currentSessionId);
+    PERSONALIDAD Y TONO:
+    - Sos un colega experto, profesional pero cercano. Hablás en español de Argentina (usá voseo: "che", "mirá", "querés", "avisame", "tenés").
+    - No sos un robot de búsqueda; sos un consultor. Si te saludan, saludás cálidamente y te ponés a disposición.
+    - Tenés iniciativa. Si el usuario te pregunta algo vago, pedile detalles amablemente (zona, presupuesto, tipo de propiedad).
+    - Evitá frases robóticas como "Entiendo que estás buscando...". Di cosas como "Dale, estuve chequeando la cartera y mirá lo que encontré que te puede servir:" o "Che, decime un poco más qué zona buscás así te ayudo mejor".
 
-    console.log("New Matched Properties:", newMatchedProperties.length);
+    INSTRUCCIONES DE USO:
+    - Solo si el sistema te pasa "PROPIEDADES ENCONTRADAS", usalas para recomendar.
+    - Si no hay propiedades encontradas en el contexto, explicá que por ahora no hay nada que coincida exacto y sugerí ampliar la búsqueda o charlá normalmente.
+    - Mantené siempre un estilo fluido, como si estuvieras chateando por WhatsApp con un socio.
 
-    // 5. Build Context for Gemini
-    const propertyContext = newMatchedProperties.length > 0
-      ? newMatchedProperties.map((p: any) => 
-          `- ID: ${p.id}, Titulo: ${p.title}, Tipo: ${p.property_type}, Precio: ${p.currency} ${p.price}, Direccion: ${p.address}, Dormitorios: ${p.bedrooms}, Similarity: ${p.similarity.toFixed(2)}`
-        ).join('\n')
-      : "No se encontraron nuevas propiedades en esta consulta. Si el usuario pide más, intenta sugerir una búsqueda diferente.";
+    ${isRetrieval ? `PROPIEDADES ENCONTRADAS:\n${propertyContext}` : 'Charla General: No se requiere búsqueda en este turno.'}
+    
+    Responde SIEMPRE en español de Argentina.`;
 
-    // 6. Generate Assistant Response
-    const systemPrompt = `Eres el "Consultor IA" de la inmobiliaria PRISMA. 
-    Tu objetivo es ayudar al Director a encontrar propiedades que coincidan con su pedido.
-    
-    Tono: Profesional, experto, cálido. Hablas como un colega experimentado en Argentina.
-    
-    IMPORTANTE - REGLAS DE RESPUESTA:
-    1. Menciona EXACTAMENTE las ${newMatchedProperties.length} propiedades que te proporciono a continuación. Ni una más, ni una menos.
-    2. Si el número de propiedades es 0, informa que no hay nuevas coincidencias y sugiere ampliar la búsqueda.
-    3. No inventes propiedades ni menciones ID de propiedades que no estén en la lista actual.
-    4. El sistema ya filtró las que el usuario ya vio, así que estas ${newMatchedProperties.length} son todas RECOMENDACIONES NUEVAS.
-    5. No digas "tengo 2" si te pasé 3. Sé exacto: ${newMatchedProperties.length}.
-    
-    PROPIEDADES COINCIDENTES (PARA ESTE MENSAJE):
-    ${propertyContext}
-    
-    Responde en español de Argentina.`;
 
     const chatResult = await prismaIA.generateContent({
-      contents: [{ role: 'user', parts: [{ text: `Usuario pregunta: ${message}\n\nContexto de propiedades encontradas:\n${propertyContext}` }] }],
-      systemInstruction: systemPrompt
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] },
+        ...(history || []).map((m: any) => ({
+          role: m.role === 'user' ? 'user' : 'model',
+          parts: [{ text: m.content }]
+        })),
+        { role: 'user', parts: [{ text: message }] }
+      ]
     });
 
     const assistantContent = chatResult.response.text();
 
-    // 7. Save Assistant Message with Metadata
+    // 6. Save Assistant Message with Metadata
     await supabase
       .from('consultor_chat_messages')
       .insert({ 
@@ -172,6 +188,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       content: assistantContent, 
+      reply: assistantContent, // Added for compatibility with Asesor frontend
       sessionId: currentSessionId,
       matchedProperties: newMatchedProperties 
     });

@@ -189,7 +189,8 @@ export default function ConsultorIAPage() {
         body: JSON.stringify({ 
           message: userMessage,
           sessionId: currentSessionId,
-          agencyId
+          agencyId,
+          history: messages.slice(-5) // Send last 5 messages for context
         })
       })
 

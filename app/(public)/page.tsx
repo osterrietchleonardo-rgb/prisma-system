@@ -20,12 +20,12 @@ export default function LandingPage() {
       {/* HEADER */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
         <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-accent rounded-sm rotate-45 flex items-center justify-center">
-              <div className="w-4 h-4 bg-background/20 rounded-full scale-110"></div>
+          <Link href="/" className="flex items-center gap-3">
+            <div className="w-10 h-10 relative rounded-full overflow-hidden bg-[#131A2D] shadow-inner shadow-accent/20">
+              <img src="/logo-icon.png" alt="PRISMA IA Logo" className="w-full h-full object-cover scale-105" />
             </div>
             <span className="text-xl font-bold tracking-tighter">PRISMA IA</span>
-          </div>
+          </Link>
           
           <nav className="hidden md:flex gap-8 text-sm font-medium text-muted-foreground">
             <Link href="#features" className="hover:text-foreground transition-colors">Funciones</Link>
@@ -187,7 +187,9 @@ export default function LandingPage() {
         <div className="container flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-accent rounded-sm rotate-45"></div>
+              <div className="w-8 h-8 relative rounded-full flex-shrink-0 overflow-hidden bg-[#131A2D]">
+                <img src="/logo-icon.png" alt="PRISMA IA Logo" className="w-full h-full object-cover scale-110" />
+              </div>
               <span className="text-lg font-bold">PRISMA IA</span>
             </div>
             <p className="text-sm text-muted-foreground">PRISMA Method™ · El sistema que convierte caos en crecimiento.</p>

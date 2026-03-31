@@ -13,12 +13,24 @@ export function DashboardHeaderActions({ data }: DashboardHeaderActionsProps) {
     if (!data?.kpis) return;
     
     const kpis = data.kpis;
+    let csvRows = [
+      ["KPI", "Valor"],
+      ["Leads Nuevos", kpis.newLeads],
+      ["Visitas Pendientes", kpis.pendingVisits],
+      ["Volumen de Ventas", kpis.salesVolume],
+      ["", ""],
+      ["DISTRIBUCIÓN POR FUENTE", "Cantidad"],
+      ...(kpis.sourceDistribution?.map((d: any) => [d.label, d.count]) || []),
+      ["", ""],
+      ["DISTRIBUCIÓN POR OPERACIÓN", "Cantidad"],
+      ...(kpis.operationDistribution?.map((d: any) => [d.label, d.count]) || []),
+      ["", ""],
+      ["DISTRIBUCIÓN POR TIPO", "Cantidad"],
+      ...(kpis.typeDistribution?.map((d: any) => [d.label, d.count]) || [])
+    ];
+    
     const csvContent = "data:text/csv;charset=utf-8," 
-      + "KPI,Valor\n"
-      + `Leads Nuevos,${kpis.newLeads}\n`
-      + `Visitas Pendientes,${kpis.pendingVisits}\n`
-      + `Tasaciones Realizadas,${kpis.valuations}\n`
-      + `Volumen de Ventas,${kpis.salesVolume}\n`;
+      + csvRows.map(e => e.join(",")).join("\n");
       
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");

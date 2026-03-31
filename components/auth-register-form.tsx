@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChromeIcon as Google, Loader2, Info } from "lucide-react"
+import { Globe as Google, Loader2, Info } from "lucide-react"
 
 export default function RegisterForm() {
   const [loading, setLoading] = useState(false)
@@ -58,7 +58,9 @@ export default function RegisterForm() {
   return (
     <Card className="w-full max-w-lg border-accent/20 bg-card/50 backdrop-blur-sm">
       <CardHeader className="space-y-1 items-center">
-        <div className="w-10 h-10 bg-accent rotate-45 mb-2 shadow-lg shadow-accent/20"></div>
+        <div className="w-16 h-16 relative rounded-xl overflow-hidden mb-2 shadow-lg shadow-accent/20 bg-background/50">
+          <img src="/logo-icon.jpg" alt="PRISMA IA Logo" className="w-full h-full object-cover scale-110 mix-blend-screen" />
+        </div>
         <CardTitle className="text-2xl font-bold tracking-tight">Crear cuenta en PRISMA</CardTitle>
         <CardDescription>Elegí tu rol y completá tus datos</CardDescription>
       </CardHeader>

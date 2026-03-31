@@ -14,7 +14,8 @@ import {
   Calendar, 
   Settings, 
   LogOut,
-  Sparkles
+  Sparkles,
+  TrendingUp
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -24,7 +25,9 @@ const navItems = [
   { name: "Dashboard", href: "/director/dashboard", icon: Home },
   { name: "Pipeline", href: "/director/pipeline", icon: LayoutGrid },
   { name: "Propiedades", href: "/director/propiedades", icon: Building },
+  { name: "Tracking Performance", href: "/director/tracking-performance", icon: TrendingUp },
   { name: "Leads", href: "/director/leads", icon: Users },
+  { name: "Marketing IA", href: "/director/marketing-ia", icon: Sparkles },
   { name: "Asesores", href: "/director/asesores", icon: UserCircle },
   { name: "Documentos", href: "/director/documentos", icon: FileText },
   { name: "Tasaciones", href: "/director/tasaciones", icon: Calculator },
@@ -47,8 +50,8 @@ export function DirectorSidebar({ className, agencyName, userName, userRole }: D
   return (
     <div className={cn("flex flex-col h-full border-r bg-card", className)}>
       <div className="p-6 flex items-center gap-2">
-        <div className="w-8 h-8 bg-accent rounded-sm rotate-45 flex items-center justify-center">
-          <div className="w-4 h-4 bg-background/20 rounded-full scale-110"></div>
+        <div className="w-9 h-9 relative rounded-full overflow-hidden flex-shrink-0 bg-[#131A2D] shadow-inner shadow-accent/20">
+          <img src="/logo-icon.png" alt="PRISMA IA Logo" className="w-full h-full object-cover scale-105" />
         </div>
         <div>
           <h1 className="text-xl font-bold tracking-tighter leading-none">PRISMA IA</h1>

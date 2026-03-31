@@ -1,0 +1,598 @@
+﻿"use client"
+
+import { useState, useEffect, useCallback, useRef } from "react"
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  Download,
+  MoreVertical,
+  User,
+  Phone,
+  Mail,
+  FileText,
+  RefreshCcw,
+  Building2,
+  Loader2,
+  CheckCircle2,
+  ArrowUp,
+  ArrowDown,
+  Clock,
+  MapPin
+} from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Skeleton } from "@/components/ui/skeleton"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
+import { getAgencyLeads, getAgencyAgents } from "@/lib/queries/director"
+import { createClient } from "@/lib/supabase"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { cn } from "@/lib/utils"
+import { LeadModal } from "./lead-modal"
+
+export default function LeadsPage() {
+  const router = useRouter()
+  const [leads, setLeads] = useState<Record<string, any>[]>([])
+  const [agents, setAgents] = useState<Record<string, any>[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [search, setSearch] = useState("")
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalLeads, setTotalLeads] = useState(0)
+  
+  // Sorting & Filtering
+  const [orderBy, setOrderBy] = useState("tokko_created_date")
+  const [orderAsc, setOrderAsc] = useState(false)
+  const [filters, setFilters] = useState({
+    stage: "all",
+    source: "all"
+  })
+  
+  const [profile, setProfile] = useState<any>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncProgress, setSyncProgress] = useState<{imported: number, total: number} | null>(null)
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function getProfile() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single()
+        setProfile(data)
+      }
+    }
+    getProfile()
+  }, [supabase])
+
+  const pageRef = useRef(0)
+  const isFetchingRef = useRef(false)
+
+  const fetchData = useCallback(async (
+    isFirstLoad = true, 
+    currentOrderBy = orderBy, 
+    currentOrderAsc = orderAsc,
+    currentFilters = filters
+  ) => {
+    if (!profile?.agency_id || (isFetchingRef.current && !isFirstLoad)) return;
+
+    isFetchingRef.current = true;
+    try {
+      if (isFirstLoad) {
+        setLoading(true)
+        setPage(0)
+        pageRef.current = 0
+      } else {
+        setLoadingMore(true)
+      }
+
+      const currentPage = isFirstLoad ? 0 : pageRef.current + 1
+      const { data: newLeads, count: total } = await getAgencyLeads({
+        agencyId: profile.agency_id,
+        page: currentPage,
+        pageSize: 20,
+        orderBy: currentOrderBy,
+        orderAsc: currentOrderAsc,
+        stage: currentFilters.stage === "all" ? undefined : currentFilters.stage,
+        source: currentFilters.source === "all" ? undefined : currentFilters.source
+      })
+
+      if (isFirstLoad) {
+        setLeads(newLeads || [])
+      } else {
+        // Evitar duplicados si por alguna raz├│n la petici├│n se repiti├│
+        setLeads(prev => {
+          const existingIds = new Set(prev.map(l => l.id));
+          const filteredNew = (newLeads || []).filter(l => !existingIds.has(l.id));
+          return [...prev, ...filteredNew];
+        })
+        setPage(currentPage)
+        pageRef.current = currentPage
+      }
+
+      setTotalLeads(total || 0)
+      setHasMore((newLeads?.length || 0) >= 20)
+
+      // Fetch agents if first load
+      if (isFirstLoad && agents.length === 0) {
+        const ags = await getAgencyAgents({ agencyId: profile.agency_id })
+        setAgents(ags || [])
+      }
+    } catch (_error) {
+      console.error("Error fetching leads:", _error)
+      toast.error("Error al cargar datos")
+    } finally {
+      isFetchingRef.current = false;
+      if (isFirstLoad) setLoading(false)
+      else setLoadingMore(false)
+    }
+  }, [profile?.agency_id, orderBy, orderAsc, filters])
+
+  useEffect(() => {
+    if (profile?.agency_id) {
+      fetchData(true)
+    }
+  }, [profile?.agency_id, orderBy, orderAsc, filters, fetchData])
+
+  const handleSort = (column: string) => {
+    const isSameColumn = orderBy === column
+    const newOrderAsc = isSameColumn ? !orderAsc : false
+    setOrderBy(column)
+    setOrderAsc(newOrderAsc)
+    setPage(0)
+    fetchData(true, column, newOrderAsc)
+  }
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget
+    const isBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 100
+    if (isBottom && !loadingMore && hasMore && !loading) {
+      fetchData(false)
+    }
+  }
+
+  const handleSync = async () => {
+    setSyncing(true)
+    const toastId = toast.loading("Sincronizando con Tokko Broker...")
+    try {
+      const res = await fetch("/api/tokko/sync-leads", { 
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "all" })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      
+      setSyncProgress({ imported: data.imported, total: data.total })
+      toast.success(`Ô£à ${data.imported} leads sincronizados/actualizados`, { id: toastId })
+      setTimeout(() => fetchData(true), 500)
+    } catch (err: any) {
+      toast.error(err.message || "Error al sincronizar", { id: toastId })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const filteredLeads = leads.filter(l => {
+    const searchLower = search.toLowerCase()
+    return (
+      l.full_name?.toLowerCase().includes(searchLower) ||
+      l.email?.toLowerCase().includes(searchLower) ||
+      l.phone?.includes(search) ||
+      l.tokko_property_title?.toLowerCase().includes(searchLower)
+    )
+  })
+
+  return (
+    <div className="flex flex-col h-full space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            Gesti├│n de Leads
+            {!loading && (
+              <Badge variant="secondary" className="text-xs bg-accent/10 text-accent border-accent/20">
+                {totalLeads} {totalLeads === 1 ? "lead" : "leads"}
+              </Badge>
+            )}
+            {syncing && <Loader2 className="h-4 w-4 animate-spin text-accent" />}
+          </h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Administra prospectos sincronizados con Tokko Broker. Visualiza agentes, b├║squedas y estados en tiempo real.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleSync} 
+            disabled={syncing}
+            className="gap-2 bg-card/50 border-accent/10 hover:bg-accent/5 hover:border-accent/30 transition-all active:scale-95"
+          >
+            <RefreshCcw className={cn("h-3 w-3 transition-transform duration-700", syncing && "animate-spin")} />
+            {syncing ? "Sincronizando..." : "Sincronizar Tokko"}
+          </Button>
+          <LeadModal 
+            isOpen={isModalOpen} 
+            setIsOpen={setIsModalOpen} 
+            agents={agents} 
+            onSuccess={() => fetchData(true)} 
+          />
+        </div>
+      </div>
+
+      {syncProgress && (
+        <div className="p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="h-4 w-4" />
+            <p className="text-sm font-medium">
+              Sincronizaci├│n completada: {syncProgress.imported} leads procesados de Tokko Broker.
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => setSyncProgress(null)} className="h-6 w-6 p-0 hover:bg-green-500/10">
+             <Plus className="h-3 w-3 rotate-45" />
+          </Button>
+        </div>
+      )}
+
+      {/* Filters Bar */}
+      <div className="bg-card/30 backdrop-blur-md p-4 rounded-2xl border border-accent/10 flex flex-col md:flex-row gap-4 items-center justify-between shrink-0">
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Buscar por nombre, email, propiedad..." 
+            className="pl-10 bg-background/50 border-none focus-visible:ring-accent/30"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" className={cn(
+                "text-muted-foreground gap-2 hover:bg-accent/5",
+                (filters.stage !== 'all' || filters.source !== 'all') && "text-accent bg-accent/5"
+              )}>
+                <Filter className="h-4 w-4" />
+                <span>Filtros {(filters.stage !== 'all' || filters.source !== 'all') && "(Activos)"}</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md bg-card border-accent/20">
+              <DialogHeader>
+                <DialogTitle>Filtros Avanzados</DialogTitle>
+                <DialogDescription>Ajusta la lista de leads seg├║n criterios espec├¡ficos.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Etapa del Pipeline</Label>
+                  <Select value={filters.stage} onValueChange={(v) => setFilters({...filters, stage: v})}>
+                    <SelectTrigger><SelectValue placeholder="Todas las etapas" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas las etapas</SelectItem>
+                      <SelectItem value="nuevo">Nuevo</SelectItem>
+                      <SelectItem value="contacto">Contacto</SelectItem>
+                      <SelectItem value="visita">Visita</SelectItem>
+                      <SelectItem value="negociacion">Negociaci├│n</SelectItem>
+                      <SelectItem value="cerrado">Cerrado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Origen / Fuente</Label>
+                  <Select value={filters.source} onValueChange={(v) => setFilters({...filters, source: v})}>
+                    <SelectTrigger><SelectValue placeholder="Todos los or├¡genes" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los or├¡genes</SelectItem>
+                      <SelectItem value="Tokko Broker">Tokko Broker</SelectItem>
+                      <SelectItem value="Zonaprop">Zonaprop</SelectItem>
+                      <SelectItem value="Argenprop">Argenprop</SelectItem>
+                      <SelectItem value="Manual">Carga Manual</SelectItem>
+                      <SelectItem value="WhatsApp IA">WhatsApp IA</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter className="flex justify-between sm:justify-between items-center">
+                <Button variant="ghost" size="sm" onClick={() => {
+                  const newFilters = {stage: "all", source: "all"}
+                  setFilters(newFilters)
+                  setPage(0)
+                  fetchData(true, orderBy, orderAsc, newFilters)
+                  setIsFilterOpen(false)
+                }}>Limpiar</Button>
+                <Button className="bg-accent" onClick={() => {
+                  setPage(0)
+                  fetchData(true, orderBy, orderAsc, filters)
+                  setIsFilterOpen(false)
+                }}>Aplicar Filtros</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          
+          <Button variant="outline" size="sm" className="hidden sm:flex gap-2">
+            <Download className="h-4 w-4" />
+            Exportar
+          </Button>
+        </div>
+      </div>
+
+      {/* Leads Table Container */}
+      <div className="flex-1 rounded-2xl border border-accent/10 bg-card/30 backdrop-blur-sm overflow-hidden flex flex-col min-h-0">
+        <div className="overflow-y-auto h-full custom-scrollbar" onScroll={handleScroll}>
+          <Table>
+            <TableHeader className="sticky top-0 bg-card/80 backdrop-blur-md z-10 border-b border-accent/10">
+              <TableRow className="hover:bg-transparent border-none">
+                <TableHead className="w-[150px] cursor-pointer hover:text-accent transition-colors py-4 px-4 font-bold text-[10px] uppercase tracking-wider text-muted-foreground" onClick={() => handleSort("full_name")}>
+                  <div className="flex items-center gap-1">
+                    Contacto {orderBy === "full_name" && (orderAsc ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                  </div>
+                </TableHead>
+                <TableHead className="w-[180px] font-bold text-[10px] uppercase tracking-wider text-muted-foreground">Email</TableHead>
+                <TableHead className="w-[130px] font-bold text-[10px] uppercase tracking-wider text-muted-foreground">Celular</TableHead>
+                <TableHead className="text-center font-bold text-[10px] uppercase tracking-wider text-muted-foreground">Fuente</TableHead>
+                <TableHead className="text-center font-bold text-[10px] uppercase tracking-wider text-muted-foreground">Operaci├│n</TableHead>
+                <TableHead className="text-center font-bold text-[10px] uppercase tracking-wider text-muted-foreground">Tipo</TableHead>
+                <TableHead className="w-[200px] font-bold text-[10px] uppercase tracking-wider text-muted-foreground">Propiedad / Inter├®s</TableHead>
+                <TableHead className="cursor-pointer hover:text-accent transition-colors w-[150px] font-bold text-[10px] uppercase tracking-wider text-muted-foreground" onClick={() => handleSort("tokko_agent_name")}>
+                   <div className="flex items-center gap-1">
+                    Asesor {orderBy === "tokko_agent_name" && (orderAsc ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                  </div>
+                </TableHead>
+                <TableHead className="font-bold text-[10px] uppercase tracking-wider text-muted-foreground">Etapa</TableHead>
+                <TableHead className="cursor-pointer hover:text-accent transition-colors w-[100px] font-bold text-[10px] uppercase tracking-wider text-muted-foreground" onClick={() => handleSort("tokko_created_date")}>
+                  <div className="flex items-center gap-1">
+                    Ingreso {orderBy === "tokko_created_date" && (orderAsc ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
+                  </div>
+                </TableHead>
+                <TableHead className="text-right font-bold text-[10px] uppercase tracking-wider text-muted-foreground p-4">Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading && leads.length === 0 ? (
+                [1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                  <TableRow key={i} className="border-accent/5">
+                    <TableCell colSpan={11}><Skeleton className="h-10 w-full" /></TableCell>
+                  </TableRow>
+                ))
+              ) : filteredLeads.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="h-64 text-center text-muted-foreground border-none">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-16 h-16 rounded-full bg-accent/5 flex items-center justify-center animate-pulse">
+                        <User className="h-8 w-8 opacity-20" />
+                      </div>
+                      <p className="font-medium">No se encontraron leads.</p>
+                      <p className="text-xs max-w-[250px]">Prob├í ajustando los filtros o sincroniz├í con Tokko Broker.</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                <>
+                  {filteredLeads.map((lead) => {
+                    const sourceTag = lead.tokko_raw?.tags?.find((t: any) => t.group_name === "Origen de contacto")?.name || lead.tokko_origin || lead.source;
+                    const operation = lead.tokko_property_operation || lead.tokko_raw?.tags?.find((t: any) => t.name === "Alquiler" || t.name === "Venta")?.name;
+                    
+                    // L├│gica para Tipo de Propiedad (Detecci├│n mejorada con Regex)
+                    const tags = lead.tokko_raw?.tags || [];
+                    let propertyType = lead.tokko_property_type;
+                    
+                    if (!propertyType || propertyType === "No espec." || propertyType === "Consulta") {
+                      const typeTag = tags.find((t: any) => 
+                        /departamento|casa|ph|oficina|local|terreno|lote|cochera|quinta/i.test(t.name)
+                      );
+                      if (typeTag) {
+                        const name = typeTag.name.toLowerCase();
+                        if (name.includes("departamento")) propertyType = "Departamento";
+                        else if (name.includes("casa")) propertyType = "Casa";
+                        else if (name.includes("ph")) propertyType = "PH";
+                        else if (name.includes("oficina")) propertyType = "Oficina";
+                        else if (name.includes("local")) propertyType = "Local";
+                        else if (name.includes("terreno") || name.includes("lote")) propertyType = "Terreno";
+                        else propertyType = typeTag.name;
+                      }
+                    }
+                    if (propertyType === "Apartment") propertyType = "Departamento";
+                    if (propertyType === "House") propertyType = "Casa";
+
+                    return (
+                      <TableRow 
+                        key={lead.id} 
+                        className="group hover:bg-accent/5 transition-colors cursor-pointer border-accent/10 h-16"
+                        onClick={() => router.push(`/director/leads/${lead.id}`)}
+                      >
+                        {/* CONTACTO */}
+                        <TableCell className="px-4">
+                          <div className="flex items-center gap-2">
+                             <Avatar className="h-8 w-8 border border-accent/10 shadow-sm transition-transform group-hover:scale-110">
+                               <AvatarFallback className="bg-accent/5 text-accent font-bold text-[10px]">
+                                 {lead.full_name?.substring(0, 2).toUpperCase() || "L"}
+                               </AvatarFallback>
+                             </Avatar>
+                             <span className="font-bold text-foreground group-hover:text-accent transition-colors text-xs truncate max-w-[120px]">
+                               {lead.full_name || "Sin nombre"}
+                             </span>
+                          </div>
+                        </TableCell>
+
+                        {/* EMAIL */}
+                        <TableCell>
+                          <span className="text-[10px] text-muted-foreground/80 font-medium truncate max-w-[160px] block">
+                            {lead.email || "ÔÇö"}
+                          </span>
+                        </TableCell>
+
+                        {/* CELULAR */}
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-bold">
+                            <Phone className="h-2.5 w-2.5 opacity-40 shrink-0" />
+                            {lead.phone || "ÔÇö"}
+                          </div>
+                        </TableCell>
+
+                        {/* FUENTE */}
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 border-none font-bold text-[8px] px-2 py-0.5 uppercase tracking-wider">
+                            {sourceTag || "Web"}
+                          </Badge>
+                        </TableCell>
+
+                        {/* OPERACI├ôN */}
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={cn(
+                            "capitalize font-bold border-none text-[8px] px-2 py-0.5",
+                            operation === 'Venta' ? 'bg-orange-500/10 text-orange-500' : 'bg-green-500/10 text-green-500'
+                          )}>
+                            {operation || "B├║squeda"}
+                          </Badge>
+                        </TableCell>
+
+                        {/* TIPO */}
+                        <TableCell className="text-center">
+                          <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-tighter italic whitespace-nowrap">
+                            {propertyType || "Consulta"}
+                          </span>
+                        </TableCell>
+
+                        {/* PROPIEDAD / INTER├ëS */}
+                        <TableCell>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[11px] font-bold leading-tight line-clamp-1 group-hover:text-accent transition-colors">
+                              {lead.tokko_property_title || "B├║squeda Gen├®rica"}
+                            </span>
+                            <div className="flex items-center gap-1.5 mt-1">
+                               {lead.tokko_property_price && (
+                                 <span className="text-[9px] font-black text-accent tracking-tighter">
+                                   {lead.tokko_property_price}
+                                 </span>
+                               )}
+                               {lead.tokko_property_location && (
+                                 <span className="text-[8px] text-muted-foreground truncate max-w-[100px] flex items-center gap-1 uppercase font-bold">
+                                   <MapPin className="h-2 w-2 shrink-0" />
+                                   {lead.tokko_property_location.split('|').pop()}
+                                 </span>
+                               )}
+                            </div>
+                          </div>
+                        </TableCell>
+
+                        {/* ASESOR */}
+                        <TableCell>
+                          {lead.tokko_agent_name ? (
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6 border border-white/50">
+                                <AvatarImage src={lead.tokko_agent_picture} />
+                                <AvatarFallback className="text-[8px] bg-slate-100">{lead.tokko_agent_name.substring(0, 2)}</AvatarFallback>
+                              </Avatar>
+                              <span className="text-[10px] font-bold text-foreground/80 leading-none truncate max-w-[80px]">{lead.tokko_agent_name.split(' ')[0]}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest pl-1">Sin asignar</span>
+                          )}
+                        </TableCell>
+
+                        {/* ETAPA */}
+                        <TableCell>
+                          <Badge variant="secondary" className="text-[8px] font-black px-1.5 py-0 capitalize bg-accent/10 text-accent border-none h-4 uppercase tracking-tighter">
+                            {lead.pipeline_stage?.replace("_", " ")}
+                          </Badge>
+                        </TableCell>
+
+                        {/* INGRESO */}
+                        <TableCell>
+                          <div className="flex flex-col items-start px-2">
+                            <p className="text-[10px] font-bold text-foreground whitespace-nowrap">
+                              {(lead.tokko_created_date || lead.created_at) && format(new Date(lead.tokko_created_date || lead.created_at), "d MMM", { locale: es })}
+                            </p>
+                            <span className="text-[8px] text-muted-foreground/60 font-medium whitespace-nowrap">
+                              {(lead.tokko_created_date || lead.created_at) && format(new Date(lead.tokko_created_date || lead.created_at), "HH:mm")}
+                            </span>
+                          </div>
+                        </TableCell>
+
+                        {/* ACCIONES */}
+                        <TableCell className="text-right px-4" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-accent rounded-full">
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-card/95 backdrop-blur-xl border-accent/20 min-w-[160px] shadow-2xl rounded-xl">
+                              <DropdownMenuItem asChild className="focus:bg-accent focus:text-white cursor-pointer py-1.5">
+                                <Link href={`/director/leads/${lead.id}`} className="flex items-center gap-2 w-full text-xs">
+                                  <FileText className="h-3.5 w-3.5" />
+                                  <span className="font-medium">Ver Ficha</span>
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="focus:bg-destructive focus:text-white font-medium cursor-pointer py-1.5 gap-2 text-xs text-destructive">
+                                <Plus className="h-3.5 w-3.5 rotate-45" />
+                                <span>Eliminar</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                  
+                  {loadingMore && (
+                    <TableRow>
+                       <TableCell colSpan={11} className="text-center py-8 border-none">
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="h-6 w-6 animate-spin text-accent" />
+                            <p className="text-[10px] text-muted-foreground font-medium animate-pulse uppercase tracking-widest">Cargando...</p>
+                          </div>
+                       </TableCell>
+                    </TableRow>
+                  )}
+                  
+                  {!hasMore && leads.length > 10 && (
+                    <TableRow>
+                      <TableCell colSpan={11} className="text-center py-6 text-[10px] text-muted-foreground border-t border-accent/5 font-medium tracking-wide">
+                        FIN DE LA LISTA
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  )
+}

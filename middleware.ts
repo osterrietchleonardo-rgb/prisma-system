@@ -42,60 +42,25 @@ export async function middleware(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser()
     const url = request.nextUrl.clone()
 
-    // Skip middleware for favicon, static files, etc. (should be handled by matcher but just in case)
-    if (url.pathname.includes('.') || url.pathname.startsWith('/_next')) {
-       return response
-    }
-
-    // 1. PUBLIC ROUTES (Login, Register, Landing)
+    // 1. PUBLIC ROUTES (Login, Register, Landing) - Basic session check
     if (url.pathname.startsWith('/auth')) {
       if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-
-        if (profile?.role === 'director') return NextResponse.redirect(new URL('/director/dashboard', request.url))
-        if (profile?.role === 'asesor') return NextResponse.redirect(new URL('/asesor/dashboard', request.url))
+        // Redirigir a sus áreas respectivas, pero solo si es estrictamente necesario
+        // Dejamos que el layout decida el rol para mayor velocidad aquí
+        return response
       }
       return response
     }
 
-    // 2. ROLE-BASED ROUTES PROTECTION
-    if (url.pathname.startsWith('/director')) {
+    // 2. PROTECTED ROUTES - Just check for session
+    if (url.pathname.startsWith('/director') || url.pathname.startsWith('/asesor')) {
       if (!user) {
         return NextResponse.redirect(new URL('/auth/login', request.url))
       }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (profile?.role !== 'director') {
-        return NextResponse.redirect(new URL('/auth/login', request.url))
-      }
-    }
-
-    if (url.pathname.startsWith('/asesor')) {
-      if (!user) {
-        return NextResponse.redirect(new URL('/auth/login', request.url))
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (profile?.role !== 'asesor') {
-        return NextResponse.redirect(new URL('/auth/login', request.url))
-      }
+      // El chequeo de ROL (si es director o asesor) ya está implementado en app/(director|asesor)/layout.tsx
+      // Eliminar la query a base de datos aquí reduce enormemente la latencia de navegación.
     }
   } catch (e) {
-    // If anything fails during middleware (like DB down during build), just proceed
     console.error('Middleware error:', e)
   }
 

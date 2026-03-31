@@ -2,44 +2,504 @@
 > prisma-ia@0.1.0 build
 > next build
 
-  Ôû▓ Next.js 14.2.22
+  Ôû▓ Next.js 14.2.24
   - Environments: .env
 
    Creating an optimized production build ...
-node.exe : Failed to 
-compile.
-En línea: 1 Carácter: 
-1
-+ & "C:\Program Files\
-nodejs/node.exe" "C:\U
-sers\LENOVO\AppData\Ro
-aming ...
-+ ~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~~~~~~~~
-~~~~~
-    + CategoryInfo    
-          : NotSpeci  
-  fied: (Failed to    
- compile.:String)     
-[], RemoteExcepti    
-on
-    + FullyQualifiedE 
-   rrorId : NativeCo  
-  mmandError
+node.exe :  ÔÜá Compiled 
+with warnings
+En línea: 1 Carácter: 1
++ & "C:\Program 
+Files\nodejs/node.exe" "C:
+\Users\LENOVO\AppData\Roam
+ing ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo        
+      : NotSpecified: (   
+  ÔÜá Compiled with war   
+ nings:String) [], Rem    
+oteException
+    + FullyQualifiedError 
+   Id : NativeCommandErr  
+  or
  
 
-./app/director/tasacio
-nes/page.tsx
-Module not found: 
-Can't resolve '@/compo
-nents/ui/progress'
+./app/asesor/documentos/pa
+ge.tsx
+Attempted import error: 
+'Youtube' is not exported 
+from '__barrel_optimize__?
+names=BookOpen,CheckCircle
+2,ExternalLink,Eye,FileTex
+t,Search,Users,Youtube!=!l
+ucide-react' (imported as 
+'Youtube').
 
-https://nextjs.org/doc
-s/messages/module-not-
-found
+Import trace for 
+requested module:
+./app/asesor/documentos/pa
+ge.tsx
 
+./app/director/documentos/
+page.tsx
+Attempted import error: 
+'Youtube' is not exported 
+from '__barrel_optimize__?
+names=CheckCircle2,Externa
+lLink,Eye,FileBadge,FileCh
+eck,FileText,Loader2,Lock,
+Plus,Search,Trash2,Upload,
+Users,Video,Youtube!=!luci
+de-react' (imported as 
+'Youtube').
 
-> Build failed 
-because of webpack 
-errors
+Import trace for 
+requested module:
+./app/director/documentos/
+page.tsx
+
+./app/director/documentos/
+page.tsx
+Attempted import error: 
+'Youtube' is not exported 
+from '__barrel_optimize__?
+names=CheckCircle2,Externa
+lLink,Eye,FileBadge,FileCh
+eck,FileText,Loader2,Lock,
+Plus,Search,Trash2,Upload,
+Users,Video,Youtube!=!luci
+de-react' (imported as 
+'Youtube').
+
+Import trace for 
+requested module:
+./app/director/documentos/
+page.tsx
+
+./app/director/documentos/
+page.tsx
+Attempted import error: 
+'Youtube' is not exported 
+from '__barrel_optimize__?
+names=CheckCircle2,Externa
+lLink,Eye,FileBadge,FileCh
+eck,FileText,Loader2,Lock,
+Plus,Search,Trash2,Upload,
+Users,Video,Youtube!=!luci
+de-react' (imported as 
+'Youtube').
+
+Import trace for 
+requested module:
+./app/director/documentos/
+page.tsx
+
+./components/auth-login-fo
+rm.tsx
+Attempted import error: 
+'ChromeIcon' is not 
+exported from '__barrel_op
+timize__?names=ChromeIcon,
+Loader2!=!lucide-react' 
+(imported as 'Google').
+
+Import trace for 
+requested module:
+./components/auth-login-fo
+rm.tsx
+
+./components/auth-register
+-form.tsx
+Attempted import error: 
+'ChromeIcon' is not 
+exported from '__barrel_op
+timize__?names=ChromeIcon,
+Info,Loader2!=!lucide-reac
+t' (imported as 'Google').
+
+Import trace for 
+requested module:
+./components/auth-register
+-form.tsx
+
+ ÔÜá Compiled with 
+warnings
+
+./app/asesor/documentos/pa
+ge.tsx
+Attempted import error: 
+'Youtube' is not exported 
+from '__barrel_optimize__?
+names=BookOpen,CheckCircle
+2,ExternalLink,Eye,FileTex
+t,Search,Users,Youtube!=!l
+ucide-react' (imported as 
+'Youtube').
+
+Import trace for 
+requested module:
+./app/asesor/documentos/pa
+ge.tsx
+
+./app/director/documentos/
+page.tsx
+Attempted import error: 
+'Youtube' is not exported 
+from '__barrel_optimize__?
+names=CheckCircle2,Externa
+lLink,Eye,FileBadge,FileCh
+eck,FileText,Loader2,Lock,
+Plus,Search,Trash2,Upload,
+Users,Video,Youtube!=!luci
+de-react' (imported as 
+'Youtube').
+
+Import trace for 
+requested module:
+./app/director/documentos/
+page.tsx
+
+./app/director/documentos/
+page.tsx
+Attempted import error: 
+'Youtube' is not exported 
+from '__barrel_optimize__?
+names=CheckCircle2,Externa
+lLink,Eye,FileBadge,FileCh
+eck,FileText,Loader2,Lock,
+Plus,Search,Trash2,Upload,
+Users,Video,Youtube!=!luci
+de-react' (imported as 
+'Youtube').
+
+Import trace for 
+requested module:
+./app/director/documentos/
+page.tsx
+
+./app/director/documentos/
+page.tsx
+Attempted import error: 
+'Youtube' is not exported 
+from '__barrel_optimize__?
+names=CheckCircle2,Externa
+lLink,Eye,FileBadge,FileCh
+eck,FileText,Loader2,Lock,
+Plus,Search,Trash2,Upload,
+Users,Video,Youtube!=!luci
+de-react' (imported as 
+'Youtube').
+
+Import trace for 
+requested module:
+./app/director/documentos/
+page.tsx
+
+./components/auth-login-fo
+rm.tsx
+Attempted import error: 
+'ChromeIcon' is not 
+exported from '__barrel_op
+timize__?names=ChromeIcon,
+Loader2!=!lucide-react' 
+(imported as 'Google').
+
+Import trace for 
+requested module:
+./components/auth-login-fo
+rm.tsx
+
+./components/auth-register
+-form.tsx
+Attempted import error: 
+'ChromeIcon' is not 
+exported from '__barrel_op
+timize__?names=ChromeIcon,
+Info,Loader2!=!lucide-reac
+t' (imported as 'Google').
+
+Import trace for 
+requested module:
+./components/auth-register
+-form.tsx
+
+ Ô£ô Compiled successfully
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...
+   Generating static pages (0/41) ...
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+   Generating static pages (10/41) 
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+Error: Element type is 
+invalid: expected a 
+string (for built-in 
+components) or a 
+class/function (for 
+composite components) but 
+got: undefined.
+    at nM (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:61600)
+    at nN (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:64547)
+    at nB (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:67539)
+    at nD (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:66681)
+    at nN (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:64854)
+    at nB (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:67539)
+    at nM (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:58561)
+    at nN (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:64547)
+    at nI (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:47011)
+    at nM (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:60863) {
+  digest: '1049261963'
+}
+
+Error occurred 
+prerendering page 
+"/auth/login". Read more: 
+https://nextjs.org/docs/me
+ssages/prerender-error
+
+Error: Element type is 
+invalid: expected a 
+string (for built-in 
+components) or a 
+class/function (for 
+composite components) but 
+got: undefined.
+    at nM (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:61600)
+    at nN (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:64547)
+    at nB (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:67539)
+    at nD (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:66681)
+    at nN (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:64854)
+    at nB (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:67539)
+    at nM (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:58561)
+    at nN (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:64547)
+    at nI (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:47011)
+    at nM (C:\Users\LENOVO
+\Desktop\CODE\Antigravity 
+- Apps\PRISMA-SYSTEM\node_
+modules\next\dist\compiled
+\next-server\app-page.runt
+ime.prod.js:12:60863)
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+   Generating static pages (20/41) 
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+   Generating static pages (30/41) 
+ ÔÜá metadataBase 
+property in metadata 
+export is not set for 
+resolving social open 
+graph or twitter images, 
+using 
+"http://localhost:3000". 
+See https://nextjs.org/doc
+s/app/api-reference/functi
+ons/generate-metadata#meta
+database
+ Ô£ô Generating static pages (41/41)
+
+> Export encountered 
+errors on following paths:
+	/(public)/auth/login/page
+: /auth/login

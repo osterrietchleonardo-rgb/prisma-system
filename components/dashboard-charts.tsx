@@ -23,98 +23,71 @@ const COLORS = ["#b87333", "#8b4513", "#d2691e", "#cd853f", "#f4a460"]
 
 interface DashboardChartsProps {
   data: {
-    channels: Array<{ name: string, total: number }>
+    sources: Array<{ label: string, count: number }>
+    operations: Array<{ label: string, count: number }>
+    types: Array<{ label: string, count: number }>
     pipeline: Array<{ name: string, value: number }>
   }
 }
 
-export function DashboardCharts({ data }: DashboardChartsProps) {
-  // Use real data or empty defaults if no data exists
-  const sourceData = data.channels.length > 0 
-    ? data.channels 
-    : [{ name: "Sin datos", total: 0 }]
+const HorizontalBar = ({ label, count, total, color }: { label: string, count: number, total: number, color: string }) => (
+  <div className="space-y-1">
+    <div className="flex justify-between text-xs font-medium">
+      <span className="truncate mr-2">{label}</span>
+      <span>{count}</span>
+    </div>
+    <div className="h-2 w-full bg-accent/10 rounded-full overflow-hidden">
+      <div 
+        className="h-full rounded-full transition-all duration-500"
+        style={{ width: `${(count / total) * 100}%`, backgroundColor: color }}
+      />
+    </div>
+  </div>
+)
 
-  const pipelineData = data.pipeline
+export function DashboardCharts({ data }: DashboardChartsProps) {
+  const maxSources = Math.max(...data.sources.map(s => s.count), 1)
+  const maxOps = Math.max(...data.operations.map(o => o.count), 1)
+  const maxTypes = Math.max(...data.types.map(t => t.count), 1)
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-      <Card className="col-span-4 border-accent/10 bg-card/50 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle>Leads por Canal</CardTitle>
-          <CardDescription>
-            Distribución de leads por fuente de contacto.
-          </CardDescription>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Fuentes */}
+      <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Leads por Fuente</CardTitle>
+          <CardDescription className="text-xs">Portales y canales</CardDescription>
         </CardHeader>
-        <CardContent className="pl-2">
-          <ResponsiveContainer width="100%" height={350}>
-            <BarChart data={sourceData}>
-              <XAxis
-                dataKey="name"
-                stroke="#888888"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                stroke="#888888"
-                fontSize={12}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(value) => `${value}`}
-              />
-              <Tooltip 
-                cursor={{fill: 'rgba(184, 115, 51, 0.1)'}}
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--card))', 
-                  borderColor: 'hsl(var(--accent) / 0.2)',
-                  borderRadius: '8px' 
-                }}
-              />
-              <Bar
-                dataKey="total"
-                radius={[4, 4, 0, 0]}
-              >
-                {sourceData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+        <CardContent className="space-y-4">
+          {data.sources.slice(0, 5).map((item, i) => (
+            <HorizontalBar key={i} label={item.label} count={item.count} total={maxSources} color={COLORS[i % COLORS.length]} />
+          ))}
         </CardContent>
       </Card>
 
-      <Card className="col-span-3 border-accent/10 bg-card/50 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle>Estado del Pipeline</CardTitle>
-          <CardDescription>
-            Embudo de conversión de leads.
-          </CardDescription>
+      {/* Operaciones */}
+      <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Tipo de Operación</CardTitle>
+          <CardDescription className="text-xs">Venta vs Alquiler</CardDescription>
         </CardHeader>
-        <CardContent className="flex justify-center items-center">
-          <ResponsiveContainer width="100%" height={350}>
-            <PieChart>
-              <Pie
-                data={pipelineData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="value"
-              >
-                {pipelineData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: 'hsl(var(--card))', 
-                  borderColor: 'hsl(var(--accent) / 0.2)',
-                  borderRadius: '8px' 
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+        <CardContent className="space-y-4">
+          {data.operations.map((item, i) => (
+            <HorizontalBar key={i} label={item.label} count={item.count} total={maxOps} color={COLORS[(i + 2) % COLORS.length]} />
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Tipos de Propiedad */}
+      <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Tipos de Propiedad</CardTitle>
+          <CardDescription className="text-xs">Preferencias de búsqueda</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {data.types.slice(0, 5).map((item, i) => (
+            <HorizontalBar key={i} label={item.label} count={item.count} total={maxTypes} color={COLORS[(i + 4) % COLORS.length]} />
+          ))}
         </CardContent>
       </Card>
     </div>
