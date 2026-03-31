@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 export async function GET(req: Request) {
   try {
@@ -8,7 +9,27 @@ export async function GET(req: Request) {
     const operation_type = searchParams.get('operation_type') || "1"; // Default to Venta if matches Tokko IDs
     const zone = searchParams.get('zone');
 
-    const TOKKO_API_KEY = process.env.TOKKO_API_KEY;
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("agency_id")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile?.agency_id) {
+      return NextResponse.json({ error: "Agencia no encontrada" }, { status: 404 });
+    }
+
+    const { data: agency } = await supabase
+      .from("agencies")
+      .select("tokko_api_key")
+      .eq("id", profile.agency_id)
+      .single();
+
+    const TOKKO_API_KEY = agency?.tokko_api_key || process.env.TOKKO_API_KEY;
     if (!TOKKO_API_KEY) {
       return NextResponse.json({ error: "Tokko API Key not configured" }, { status: 500 });
     }
