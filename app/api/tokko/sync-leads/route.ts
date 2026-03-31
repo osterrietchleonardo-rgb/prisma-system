@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+
+export const dynamic = "force-dynamic";
 import { fetchTokko } from "@/lib/tokko"
 
 const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))

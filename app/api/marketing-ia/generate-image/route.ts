@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 import { GenerateImagePayload } from "@/types/marketing-ia";
 
 const buildImagePrompt = (payload: GenerateImagePayload): string => {

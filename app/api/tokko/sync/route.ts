@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { syncPropertiesFromTokko } from "@/lib/tokko"
+
+export const dynamic = "force-dynamic";
 import { rateLimit, LIMITS } from "@/lib/rate-limiter"
 
 interface TokkoProperty {

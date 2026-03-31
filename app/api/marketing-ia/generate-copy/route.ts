@@ -3,6 +3,8 @@ import { prismaIA } from "@/lib/gemini";
 import { NextResponse } from "next/server";
 import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel } from "@/types/marketing-ia";
 
+export const dynamic = "force-dynamic";
+
 interface CopyConfig {
   copy_type: CopyType;
   angle: CopyAngle;
