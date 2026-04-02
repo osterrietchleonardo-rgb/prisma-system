@@ -49,10 +49,14 @@ export const useTokkoTagCatalog = (apiKey?: string) => {
         let nextUrl: string | null = `/api/tokko-proxy/contact_tag/?limit=100`;
 
         while (nextUrl) {
-          // Si Tokko devuelve una URL absoluta en 'next', extraer solo el querystring y re-enviar por proxy
+          // Normalizar la URL para que siempre pase por el proxy
           if (nextUrl.startsWith("http")) {
             const urlObj = new URL(nextUrl);
             nextUrl = `/api/tokko-proxy/contact_tag/?${urlObj.searchParams.toString()}`;
+          } else if (nextUrl.startsWith("/api/v1/")) {
+            // Si viene como path relativo de Tokko, lo convertimos a nuestro proxy
+            const queryString = nextUrl.split('?')[1] || '';
+            nextUrl = `/api/tokko-proxy/contact_tag/?${queryString}`;
           }
 
           const response = await fetch(nextUrl);

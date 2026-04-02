@@ -15,7 +15,8 @@ import {
   Settings, 
   LogOut,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  FileSignature
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -28,6 +29,7 @@ const navItems = [
   { name: "Tracking Performance", href: "/director/tracking-performance", icon: TrendingUp },
   { name: "Leads", href: "/director/leads", icon: Users },
   { name: "Marketing IA", href: "/director/marketing-ia", icon: Sparkles },
+  { name: "Contratos IA", href: "/director/contratos-ia", icon: FileSignature },
   { name: "Asesores", href: "/director/asesores", icon: UserCircle },
   { name: "Documentos", href: "/director/documentos", icon: FileText },
   { name: "Tasaciones", href: "/director/tasaciones", icon: Calculator },
