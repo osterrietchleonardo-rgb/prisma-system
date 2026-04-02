@@ -47,10 +47,10 @@ export default function LoginForm() {
   return (
     <Card className="w-full max-w-md border-accent/20 bg-card/50 backdrop-blur-sm">
       <CardHeader className="space-y-1 items-center">
-        <div className="w-16 h-16 relative rounded-full overflow-hidden mb-2 shadow-lg shadow-accent/20 bg-[#131A2D]">
+        <div className="w-16 h-16 relative rounded-full overflow-hidden mb-2 shadow-lg shadow-accent/20 bg-[#131A2D] p-1 border border-accent/20">
           <img src="/logo-icon.png" alt="PRISMA IA Logo" className="w-full h-full object-cover scale-105" />
         </div>
-        <CardTitle className="text-2xl font-bold tracking-tight">Bienvenido a PRISMA</CardTitle>
+        <CardTitle className="text-2xl font-bold tracking-tight">Bienvenido a PRISMA IA</CardTitle>
         <CardDescription>Ingresá tus credenciales para continuar</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">

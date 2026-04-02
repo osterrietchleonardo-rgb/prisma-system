@@ -21,6 +21,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { logout } from "@/lib/actions/auth"
+import BrandLogo from "./brand-logo"
 
 const navItems = [
   { name: "Mi Dashboard", href: "/asesor/dashboard", icon: Home },
@@ -50,14 +51,13 @@ export function AsesorSidebar({ className, agencyName, userName, userRole }: Ase
 
   return (
     <div className={cn("flex flex-col h-full border-r bg-card", className)}>
-      <div className="p-6 flex items-center gap-2">
-        <div className="w-9 h-9 relative rounded-full overflow-hidden flex-shrink-0 bg-[#131A2D] shadow-inner shadow-accent/20">
-          <img src="/logo-icon.png" alt="PRISMA IA Logo" className="w-full h-full object-cover scale-105" />
-        </div>
-        <div>
-          <h1 className="text-xl font-bold tracking-tighter leading-none">PRISMA IA</h1>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1 font-semibold">{agencyName || "Agencia Inmobiliaria"}</p>
-        </div>
+      <div className="p-6 pb-2">
+        <Link href="/">
+          <BrandLogo logoSize="sm" />
+        </Link>
+        <p className="text-[9px] text-muted-foreground uppercase tracking-[0.2em] mt-2 font-bold opacity-60 border-t border-accent/10 pt-2">
+          {agencyName || "Agencia Inmobiliaria"}
+        </p>
       </div>
 
       <div className="px-4 mb-4">

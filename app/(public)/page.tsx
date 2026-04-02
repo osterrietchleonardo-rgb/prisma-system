@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
+import BrandLogo from "@/components/brand-logo";
 
 export default function LandingPage() {
   return (
@@ -20,11 +21,8 @@ export default function LandingPage() {
       {/* HEADER */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
         <div className="container flex h-16 items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 relative rounded-full overflow-hidden bg-[#131A2D] shadow-inner shadow-accent/20">
-              <img src="/logo-icon.png" alt="PRISMA IA Logo" className="w-full h-full object-cover scale-105" />
-            </div>
-            <span className="text-xl font-bold tracking-tighter">PRISMA IA</span>
+          <Link href="/">
+            <BrandLogo />
           </Link>
           
           <nav className="hidden md:flex gap-8 text-sm font-medium text-muted-foreground">
@@ -186,13 +184,8 @@ export default function LandingPage() {
       <footer className="py-12 border-t mt-auto">
         <div className="container flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 relative rounded-full flex-shrink-0 overflow-hidden bg-[#131A2D]">
-                <img src="/logo-icon.png" alt="PRISMA IA Logo" className="w-full h-full object-cover scale-110" />
-              </div>
-              <span className="text-lg font-bold">PRISMA IA</span>
-            </div>
-            <p className="text-sm text-muted-foreground">PRISMA Method™ · El sistema que convierte caos en crecimiento.</p>
+            <BrandLogo logoSize="sm" />
+            <p className="text-sm text-muted-foreground">REAL ESTATE · SISTEMA INTELIGENTE · PRISMA Method™</p>
           </div>
           
           <div className="flex gap-8 text-sm text-muted-foreground">

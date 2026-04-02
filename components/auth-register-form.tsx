@@ -58,10 +58,10 @@ export default function RegisterForm() {
   return (
     <Card className="w-full max-w-lg border-accent/20 bg-card/50 backdrop-blur-sm">
       <CardHeader className="space-y-1 items-center">
-        <div className="w-16 h-16 relative rounded-xl overflow-hidden mb-2 shadow-lg shadow-accent/20 bg-background/50">
-          <img src="/logo-icon.jpg" alt="PRISMA IA Logo" className="w-full h-full object-cover scale-110 mix-blend-screen" />
+        <div className="w-16 h-16 relative rounded-full overflow-hidden mb-2 shadow-lg shadow-accent/20 bg-[#131A2D] p-1 border border-accent/20">
+          <img src="/logo-icon.png" alt="PRISMA IA Logo" className="w-full h-full object-cover scale-105" />
         </div>
-        <CardTitle className="text-2xl font-bold tracking-tight">Crear cuenta en PRISMA</CardTitle>
+        <CardTitle className="text-2xl font-bold tracking-tight">Crear cuenta en PRISMA IA</CardTitle>
         <CardDescription>Elegí tu rol y completá tus datos</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
