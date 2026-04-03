@@ -305,27 +305,27 @@ export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
                   <TableHead className="py-4 px-4 font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('nombre_mostrar')}>
                      Contacto {getSortIcon('nombre_mostrar')}
                   </TableHead>
-                  <TableHead className="font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('telefono_principal')}>
+                  <TableHead className="hidden md:table-cell font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('telefono_principal')}>
                      Teléfono {getSortIcon('telefono_principal')}
                   </TableHead>
                   <TableHead className="font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('lead_status')}>
                      Estado {getSortIcon('lead_status')}
                   </TableHead>
-                  <TableHead className="font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('tipo_cliente')}>
+                  <TableHead className="hidden lg:table-cell font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('tipo_cliente')}>
                      Tipo de Cliente {getSortIcon('tipo_cliente')}
                   </TableHead>
-                  <TableHead className="font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('origen')}>
+                  <TableHead className="hidden sm:table-cell font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('origen')}>
                      Origen {getSortIcon('origen')}
                   </TableHead>
-                  <TableHead className="font-bold text-[10px] uppercase">Propiedad</TableHead>
-                  <TableHead className="font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('operacion')}>
+                  <TableHead className="hidden xl:table-cell font-bold text-[10px] uppercase">Propiedad</TableHead>
+                  <TableHead className="hidden sm:table-cell font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('operacion')}>
                      Operación {getSortIcon('operacion')}
                   </TableHead>
-                  <TableHead className="font-bold text-[10px] uppercase">Agente</TableHead>
-                  <TableHead className="font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('created_at')}>
+                  <TableHead className="hidden md:table-cell font-bold text-[10px] uppercase">Agente</TableHead>
+                  <TableHead className="hidden md:table-cell font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('created_at')}>
                      Ingreso {getSortIcon('created_at')}
                   </TableHead>
-                  <TableHead className="font-bold text-[10px] uppercase cursor-pointer text-center" onClick={() => toggleSort('dias_en_sistema')}>
+                  <TableHead className="hidden sm:table-cell font-bold text-[10px] uppercase cursor-pointer text-center" onClick={() => toggleSort('dias_en_sistema')}>
                      Días {getSortIcon('dias_en_sistema')}
                   </TableHead>
                   <TableHead className="text-right font-bold text-[10px] uppercase px-4">Acciones</TableHead>
@@ -384,7 +384,7 @@ export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
                               </div>
                            </TableCell>
                            
-                           <TableCell>
+                           <TableCell className="hidden md:table-cell">
                               {lead.telefono_principal ? (
                                  <TooltipProvider>
                                     <Tooltip>
@@ -413,19 +413,19 @@ export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
                               </Badge>
                            </TableCell>
 
-                           <TableCell>
+                           <TableCell className="hidden lg:table-cell">
                               <Badge className={cn("text-[9px] px-2 uppercase tracking-wide border-none", CLIENT_TYPE_COLORS[lead.tipo_cliente || "Sin clasificar"])}>
                                 {lead.tipo_cliente || "—"}
                               </Badge>
                            </TableCell>
 
-                           <TableCell>
+                           <TableCell className="hidden sm:table-cell">
                               <Badge className={cn("text-[9px] px-2 font-bold", CHANNEL_COLORS[lead.origen] || "bg-accent/10 text-accent")}>
                                 {lead.origen}
                               </Badge>
                            </TableCell>
 
-                           <TableCell>
+                           <TableCell className="hidden xl:table-cell">
                               <div className="flex flex-wrap gap-1 max-w-[120px]">
                                  {lead.tipo_propiedad.length > 0 ? lead.tipo_propiedad.map((t, i) => (
                                     <Badge variant="outline" key={i} className="text-[9px] px-1 py-0">{t}</Badge>
@@ -433,13 +433,13 @@ export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
                               </div>
                            </TableCell>
 
-                           <TableCell>
+                           <TableCell className="hidden sm:table-cell">
                                 <Badge className={cn("text-[9px] border-none", OPERATION_COLORS[lead.operacion] || "bg-slate-100 text-slate-500")}>
                                   {lead.operacion}
                                 </Badge>
                            </TableCell>
 
-                           <TableCell>
+                           <TableCell className="hidden md:table-cell">
                               {lead.agent ? (
                                  <TooltipProvider>
                                     <Tooltip>
@@ -460,13 +460,13 @@ export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
                               ) : <span className="text-[10px] text-muted-foreground italic">Sin asignar</span>}
                            </TableCell>
 
-                           <TableCell>
+                           <TableCell className="hidden md:table-cell">
                               <div className="flex flex-col">
                                  <span className="text-[10px] font-bold">{format(new Date(lead.created_at), "dd/MM/yyyy")}</span>
                               </div>
                            </TableCell>
 
-                           <TableCell className="text-center">
+                           <TableCell className="text-center hidden sm:table-cell">
                               <Badge className={cn("text-[10px] font-bold",
                                  lead.dias_en_sistema < 7 ? "bg-green-500/10 text-green-500 hover:bg-green-500/20" :
                                  lead.dias_en_sistema <= 30 ? "bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20" :

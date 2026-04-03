@@ -14,13 +14,19 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import BrandLogo from "@/components/brand-logo";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Menu } from "lucide-react";
 
 export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-background selection:bg-accent/30">
       {/* HEADER */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="container flex h-16 items-center justify-between px-4">
           <Link href="/">
             <BrandLogo />
           </Link>
@@ -29,43 +35,64 @@ export default function LandingPage() {
             <Link href="#features" className="hover:text-foreground transition-colors">Funciones</Link>
             <Link href="#director" className="hover:text-foreground transition-colors">Directores</Link>
             <Link href="#asesor" className="hover:text-foreground transition-colors">Asesores</Link>
-            <Link href="/auth/login" className="hover:text-foreground transition-colors">Ingresar</Link>
           </nav>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <ModeToggle />
-            <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-white border-0">
-              <Link href="/auth/register">Empezar gratis</Link>
-            </Button>
+            <div className="hidden sm:flex items-center gap-4">
+              <Link href="/auth/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Ingresar</Link>
+              <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-white border-0">
+                <Link href="/auth/register">Empezar gratis</Link>
+              </Button>
+            </div>
+            
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Menu</span>
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="flex flex-col gap-8 pt-12">
+                <div className="flex flex-col gap-4 text-lg font-medium">
+                  <Link href="#features" className="hover:text-accent transition-colors">Funciones</Link>
+                  <Link href="#director" className="hover:text-accent transition-colors">Directores</Link>
+                  <Link href="#asesor" className="hover:text-accent transition-colors">Asesores</Link>
+                  <hr className="border-accent/10" />
+                  <Link href="/auth/login" className="hover:text-accent transition-colors">Ingresar</Link>
+                  <Link href="/auth/register" className="text-accent underline underline-offset-4">Empezar gratis</Link>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </header>
 
       <main className="flex-1">
         {/* HERO */}
-        <section className="relative pt-24 pb-32 overflow-hidden">
+        <section className="relative pt-16 md:pt-24 pb-20 md:pb-32 overflow-hidden px-4">
           <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px]"></div>
           <div className="absolute inset-0 -z-10 bg-radial-[at_center_top] from-accent/5 to-transparent"></div>
           
-          <div className="container flex flex-col items-center text-center gap-8">
-            <div className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium bg-accent/5 border-accent/20 text-accent animate-fade-in">
+          <div className="container flex flex-col items-center text-center gap-6 md:gap-8">
+            <div className="inline-flex items-center rounded-full border px-3 py-1 text-[10px] md:text-xs font-medium bg-accent/5 border-accent/20 text-accent animate-fade-in">
               ✨ PRISMA IA · La evolución inmobiliaria ha llegado
             </div>
             
-            <h1 className="text-4xl md:text-7xl font-extrabold tracking-tight max-w-4xl text-foreground">
+            <h1 className="text-3xl sm:text-5xl md:text-7xl font-extrabold tracking-tight max-w-4xl text-foreground">
               El sistema operativo para la <span className="text-accent">inmobiliaria moderna</span>.
             </h1>
             
-            <p className="text-xl text-muted-foreground max-w-2xl leading-relaxed">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed">
               Gestión comercial avanzada con IA. Centraliza tu equipo, automatiza tus ventas y tomá decisiones basadas en datos reales.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 mt-8">
-              <Button asChild size="lg" className="bg-accent hover:bg-accent/90 text-white border-0 px-8 h-14 text-lg">
-                <Link href="/auth/register?role=director">Soy Director Comercial <ChevronRight className="ml-2 w-5 h-5" /></Link>
+            <div className="flex flex-col sm:flex-row gap-4 mt-4 md:mt-8 w-full sm:w-auto">
+              <Button asChild size="lg" className="bg-accent hover:bg-accent/90 text-white border-0 px-8 h-12 md:h-14 text-base md:text-lg w-full sm:w-auto">
+                <Link href="/auth/register?role=director" className="flex items-center justify-center">Soy Director Comercial <ChevronRight className="ml-2 w-5 h-5" /></Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="border-accent/20 hover:bg-accent/5 px-8 h-14 text-lg">
-                <Link href="/auth/register?role=asesor">Soy Asesor Inmobiliario</Link>
+              <Button asChild variant="outline" size="lg" className="border-accent/20 hover:bg-accent/5 px-8 h-12 md:h-14 text-base md:text-lg w-full sm:w-auto">
+                <Link href="/auth/register?role=asesor" className="flex items-center justify-center">Soy Asesor Inmobiliario</Link>
               </Button>
             </div>
           </div>

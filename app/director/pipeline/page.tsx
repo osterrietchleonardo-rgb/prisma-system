@@ -104,48 +104,48 @@ export default function PipelinePage() {
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── ESTÁTICO: Título + Botones ── */}
-      <div className="flex items-center justify-between px-4 md:px-8 pt-6 pb-4 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between px-4 md:px-8 pt-6 pb-4 shrink-0 gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            Pipeline Global
-            <Badge variant="secondary" className="text-xs font-semibold bg-accent/10 text-accent border-none">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2 overflow-hidden">
+            <span className="truncate">Pipeline Global</span>
+            <Badge variant="secondary" className="text-[10px] font-semibold bg-accent/10 text-accent border-none px-1.5 py-0">
               Beta
             </Badge>
           </h2>
-          <p className="text-muted-foreground mt-1">
-            Gestiona el embudo comercial de toda tu inmobiliaria en tiempo real.
+          <p className="text-xs md:text-sm text-muted-foreground mt-1 line-clamp-1">
+            Gestiona el embudo comercial de toda tu inmobiliaria.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" className="hidden sm:flex gap-2 h-9 text-xs md:text-sm">
             <Download className="h-4 w-4" />
             Exportar
           </Button>
-          <Button className="bg-accent hover:bg-accent/90 gap-2">
+          <Button className="flex-1 sm:flex-none bg-accent hover:bg-accent/90 gap-2 h-9 text-xs md:text-sm">
             <Plus className="h-4 w-4" />
-            Nuevo Lead
+            <span className="inline sm:inline">Nuevo Lead</span>
           </Button>
         </div>
       </div>
 
       {/* ── ESTÁTICO: Filtros ── */}
       <div className="px-4 md:px-8 pb-4 shrink-0">
-        <div className="bg-card/30 backdrop-blur-md p-4 rounded-2xl border border-accent/10 flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:w-96">
+        <div className="bg-card/30 backdrop-blur-md p-3 md:p-4 rounded-2xl border border-accent/10 flex flex-col lg:flex-row gap-3 md:gap-4 items-center justify-between">
+          <div className="relative w-full lg:w-96 shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre, email o teléfono..."
-              className="pl-10 bg-background/50 border-accent/10 focus-visible:ring-accent/30"
+              placeholder="Buscar..."
+              className="pl-10 h-9 bg-background/50 border-accent/10 focus-visible:ring-accent/30 text-xs md:text-sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="flex items-center gap-2 min-w-[200px]">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+            <div className="flex items-center gap-2 w-full lg:min-w-[200px]">
               <ListFilter className="h-4 w-4 text-muted-foreground shrink-0" />
               <Select value={agentFilter} onValueChange={setAgentFilter}>
-                <SelectTrigger className="bg-background/50 border-accent/10">
+                <SelectTrigger className="h-9 bg-background/50 border-accent/10 text-xs md:text-sm">
                   <SelectValue placeholder="Filtrar por asesor" />
                 </SelectTrigger>
                 <SelectContent>
@@ -157,13 +157,13 @@ export default function PipelinePage() {
               </Select>
             </div>
 
-            <Separator orientation="vertical" className="h-8 hidden md:block" />
+            <Separator orientation="vertical" className="h-8 hidden lg:block" />
 
-            <div className="flex items-center gap-1 bg-muted px-1 py-1 rounded-lg">
-              <Button variant="ghost" size="icon" className="h-8 w-8 bg-background shadow-sm">
+            <div className="flex items-center gap-1 bg-muted px-1 py-1 rounded-lg self-end sm:self-auto">
+              <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 bg-background shadow-sm">
                 <LayoutGrid className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+              <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8 text-muted-foreground">
                 <Filter className="h-4 w-4" />
               </Button>
             </div>

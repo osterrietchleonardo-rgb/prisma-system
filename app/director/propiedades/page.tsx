@@ -181,50 +181,52 @@ export default function PropiedadesPage() {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col h-full space-y-4 p-4 md:p-8 pt-6 min-h-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            Propiedades
-            <Badge variant="outline" className="text-xs">Tokko Sync</Badge>
-            {!loading && (
-              <Badge variant="secondary" className="text-xs bg-accent/10 text-accent border-accent/20">
-                {totalCount} {totalCount === 1 ? 'propiedad' : 'propiedades'}
-              </Badge>
-            )}
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-3 overflow-hidden">
+            <span className="truncate">Propiedades</span>
+            <div className="flex gap-1 shrink-0">
+              <Badge variant="outline" className="text-[10px] md:text-xs px-1.5">Tokko</Badge>
+              {!loading && (
+                <Badge variant="secondary" className="text-[10px] md:text-xs bg-accent/10 text-accent border-accent/20 px-1.5 whitespace-nowrap">
+                  {totalCount} {totalCount === 1 ? 'prop' : 'props'}
+                </Badge>
+              )}
+            </div>
           </h2>
-          <p className="text-muted-foreground mt-1">
-            Catálogo de activos inmobiliarios sincronizados con Tokko Broker.
+          <p className="text-xs md:text-sm text-muted-foreground mt-1 line-clamp-1">
+            Catálogo sincronizado con Tokko Broker.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button 
             variant="outline" 
             onClick={handleSync} 
             disabled={syncing}
-            className="gap-2 bg-accent/5 border-accent/20 hover:bg-accent/10"
+            className="w-full sm:w-auto gap-2 bg-accent/5 border-accent/20 hover:bg-accent/10 h-9 text-xs md:text-sm"
           >
             <RefreshCcw className={cn("h-4 w-4", syncing && "animate-spin")} />
-            {syncing ? "Sincronizando..." : "Sincronizar Tokko"}
+            {syncing ? "Sincronizando..." : "Sincronizar"}
           </Button>
         </div>
       </div>
 
       {/* Filters & View Toggle */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        <div className="flex flex-1 items-center gap-4 w-full md:w-auto">
-          <div className="relative w-full md:w-80">
+      <div className="flex flex-col space-y-3 md:space-y-0 md:flex-row md:gap-4 items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:flex-1">
+          <div className="relative w-full md:max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Buscar por título o dirección..." 
-              className="pl-10 bg-card/50 border-accent/10"
+              placeholder="Buscar..." 
+              className="pl-10 bg-card/50 border-accent/10 h-9 transition-all focus:bg-card"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[180px] bg-card/50 border-accent/10">
-              <SelectValue placeholder="Tipo de propiedad" />
+            <SelectTrigger className="w-full sm:w-[180px] bg-card/50 border-accent/10 h-9">
+              <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los tipos</SelectItem>
@@ -240,13 +242,13 @@ export default function PropiedadesPage() {
         </div>
 
         <Tabs value={view} onValueChange={setView} className="w-full md:w-auto">
-          <TabsList className="bg-card/50 border border-accent/10">
-            <TabsTrigger value="grid" className="data-[state=active]:bg-accent data-[state=active]:text-white">
-              <LayoutGrid className="h-4 w-4 mr-2" />
+          <TabsList className="grid grid-cols-2 bg-card/50 border border-accent/10 w-full h-9">
+            <TabsTrigger value="grid" className="data-[state=active]:bg-accent data-[state=active]:text-white text-xs py-1">
+              <LayoutGrid className="h-3.5 w-3.5 mr-1.5" />
               Grid
             </TabsTrigger>
-            <TabsTrigger value="list" className="data-[state=active]:bg-accent data-[state=active]:text-white">
-              <List className="h-4 w-4 mr-2" />
+            <TabsTrigger value="list" className="data-[state=active]:bg-accent data-[state=active]:text-white text-xs py-1">
+              <List className="h-3.5 w-3.5 mr-1.5" />
               Lista
             </TabsTrigger>
           </TabsList>
@@ -345,11 +347,11 @@ export default function PropiedadesPage() {
                 <TableHeader className="sticky top-0 bg-card/95 backdrop-blur-sm z-20 shadow-sm border-b border-accent/10">
                   <TableRow className="hover:bg-accent/5 border-none">
                     <TableHead>Propiedad</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead className="hidden lg:table-cell">Tipo</TableHead>
+                    <TableHead className="hidden md:table-cell">Estado</TableHead>
                     <TableHead>Precio</TableHead>
-                    <TableHead>Asignado</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableHead className="hidden xl:table-cell">Asignado</TableHead>
+                    <TableHead className="text-right">Link</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -368,19 +370,28 @@ export default function PropiedadesPage() {
                           </div>
                         </Link>
                       </TableCell>
-                      <TableCell>{translateType(prop.property_type)}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[10px]">{translateStatus(prop.status)}</Badge>
+                      <TableCell className="hidden lg:table-cell">{translateType(prop.property_type)}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <Badge variant="secondary" className="text-[10px] whitespace-nowrap">{translateStatus(prop.status)}</Badge>
                       </TableCell>
-                      <TableCell className="font-bold">
-                        {new Intl.NumberFormat('es-AR', { style: 'currency', currency: prop.currency || 'USD' }).format(prop.price)}
+                      <TableCell className="font-bold whitespace-nowrap">
+                        {new Intl.NumberFormat('es-AR', { 
+                          style: 'currency', 
+                          currency: prop.currency || 'USD',
+                          maximumFractionDigits: 0 
+                        }).format(prop.price)}
                       </TableCell>
-                      <TableCell>
-                        {prop.assigned_agent?.full_name || "Sin asignar"}
+                      <TableCell className="hidden xl:table-cell">
+                        <span className="truncate block max-w-[120px]">
+                          {prop.assigned_agent?.full_name || "Sin asignar"}
+                        </span>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right px-2">
                         <Link href={`/director/propiedades/${prop.id}`}>
-                          <Button variant="ghost" size="sm">Detalle</Button>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 md:w-auto md:px-3">
+                            <span className="hidden md:inline">Ver</span>
+                            <MoreVertical className="h-4 w-4 md:hidden" />
+                          </Button>
                         </Link>
                       </TableCell>
                     </TableRow>
