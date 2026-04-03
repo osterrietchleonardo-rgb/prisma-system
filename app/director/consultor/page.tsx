@@ -356,83 +356,135 @@ export default function ConsultorIAPage() {
 
         <ScrollArea className="flex-1 p-4 md:p-8" ref={scrollRef}>
           <div className="max-w-4xl mx-auto space-y-10 pb-10">
-            {messages.map((message, i) => (
-              <div key={i} className={cn("flex gap-6", message.role === "user" ? "flex-row-reverse" : "flex-row")}>
-                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border shadow-md", message.role === "assistant" ? "bg-accent/20 text-accent" : "bg-background")}>
-                  {message.role === "assistant" ? <Bot className="w-6 h-6" /> : <User className="w-6 h-6" />}
-                </div>
-                
-                <div className={cn("flex flex-col gap-4 max-w-[90%] lg:max-w-[85%]", message.role === "user" ? "items-end" : "items-start")}>
-                  <div className={cn("p-5 rounded-2xl text-[15px] leading-relaxed border shadow-sm", message.role === "user" ? "bg-accent text-accent-foreground border-accent rounded-tr-none" : "bg-background border-border/40 rounded-tl-none")}>
-                    {message.content.split('\n').map((line, k) => <p key={k} className="mb-2 last:mb-0">{line}</p>)}
+            {messages.map((message, i) => {
+              const fragments = message.content.split(/\n\n+/).filter(f => f.trim().length > 0);
+              return (
+                <div key={i} className={cn(
+                  "flex gap-4 group/msg",
+                  message.role === "user" ? "flex-row-reverse" : "flex-row"
+                )}>
+                  {/* Avatar only on the first fragment equivalent */}
+                  <div className={cn(
+                    "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border shadow-md transition-transform group-hover/msg:scale-105",
+                    message.role === "assistant" 
+                      ? "bg-gradient-to-br from-accent/20 to-accent/40 border-accent/20 text-accent" 
+                      : "bg-background border-border"
+                  )}>
+                    {message.role === "assistant" ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
                   </div>
 
-                  {message.matchedProperties && message.matchedProperties.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full animate-in fade-in slide-in-from-top-4 duration-700">
-                      {message.matchedProperties.map((prop) => {
-                        const currentImgIdx = activeImageIndices[prop.id] || 0;
-                        const images = prop.images && prop.images.length > 0 ? prop.images : ['https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=400'];
-                        
-                        return (
-                          <Card key={prop.id} className="overflow-hidden border-accent/10 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm group hover:border-accent/30 transition-all shadow-lg hover:shadow-xl">
-                            <div className="relative aspect-video overflow-hidden">
-                              <img src={images[currentImgIdx]} alt={prop.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                              
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                              
-                              <div className="absolute top-2 right-2 flex gap-1">
-                                <Badge className="bg-black/60 text-[8px] uppercase">{prop.status}</Badge>
-                                <Badge className="bg-accent text-[8px] uppercase">{prop.property_type}</Badge>
-                              </div>
+                  <div className={cn(
+                    "flex flex-col gap-1.5 flex-1 max-w-[85%] lg:max-w-[80%]",
+                    message.role === "user" ? "items-end" : "items-start"
+                  )}>
+                    {fragments.map((fragment, idx) => {
+                      const isFirst = idx === 0;
+                      // Strip ** symbols as requested
+                      const cleanFragment = fragment.replace(/\*\*/g, "");
 
-                              {images.length > 1 && (
-                                <>
-                                  <button onClick={(e) => { e.stopPropagation(); prevImage(prop.id, images.length); }} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/50">
-                                    <ChevronLeft className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={(e) => { e.stopPropagation(); nextImage(prop.id, images.length); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/50">
-                                    <ChevronRight className="w-4 h-4" />
-                                  </button>
-                                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-                                    {images.slice(0, 5).map((_, idx) => (
-                                      <div key={idx} className={cn("w-1.5 h-1.5 rounded-full", idx === currentImgIdx ? "bg-accent" : "bg-white/40")} />
-                                    ))}
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                            
-                            <CardHeader className="p-4 pb-2">
-                              <div className="flex justify-between items-start">
-                                <h4 className="font-bold text-sm line-clamp-1 flex-1">{prop.title}</h4>
-                                <span className="text-accent font-bold text-sm whitespace-nowrap ml-2">{prop.currency} {new Intl.NumberFormat().format(prop.price)}</span>
+                      return (
+                        <div
+                          key={idx}
+                          className={cn(
+                            "p-4 px-5 rounded-[1.5rem] text-[15px] leading-relaxed shadow-sm relative border transition-all hover:shadow-md",
+                            message.role === "user" 
+                              ? "bg-accent/15 dark:bg-accent/20 text-[#432c18] dark:text-accent-foreground border-accent/10 rounded-tr-none" 
+                              : "bg-background border-border/40 rounded-tl-none",
+                            !isFirst && (message.role === "user" ? "rounded-tr-[1.5rem]" : "rounded-tl-[1.5rem]"),
+                             "whitespace-pre-wrap"
+                          )}
+                        >
+                          {cleanFragment}
+                          
+                          {/* Tail for first fragment */}
+                          {isFirst && (
+                             <div className={cn(
+                                "absolute top-0 w-2 h-2",
+                                message.role === "user" 
+                                  ? "-right-1.5 bg-accent/15 dark:bg-accent/20 border-r border-t border-accent/10 [clip-path:polygon(0_0,0_100%,100%_0)]" 
+                                  : "-left-1.5 bg-background border-l border-t border-border/40 [clip-path:polygon(0_0,100%_0,100%_100%)]",
+                             )} />
+                          )}
+
+                          {/* Timestamp mock */}
+                          <div className={cn(
+                             "text-[10px] mt-1 text-right opacity-40",
+                             message.role === "user" ? "text-accent" : "text-muted-foreground"
+                          )}>
+                             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Matched Properties after all bubbles */}
+                    {message.matchedProperties && message.matchedProperties.length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full animate-in fade-in slide-in-from-top-4 duration-700 mt-4">
+                        {message.matchedProperties.map((prop) => {
+                          const currentImgIdx = activeImageIndices[prop.id] || 0;
+                          const images = prop.images && prop.images.length > 0 ? prop.images : ['https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=400'];
+                          
+                          return (
+                            <Card key={prop.id} className="overflow-hidden border-accent/10 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm group hover:border-accent/30 transition-all shadow-lg hover:shadow-xl">
+                              <div className="relative aspect-video overflow-hidden">
+                                <img src={images[currentImgIdx]} alt={prop.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                
+                                <div className="absolute top-2 right-2 flex gap-1">
+                                  <Badge className="bg-black/60 text-[8px] uppercase">{prop.status}</Badge>
+                                  <Badge className="bg-accent text-[8px] uppercase">{prop.property_type}</Badge>
+                                </div>
+
+                                {images.length > 1 && (
+                                  <>
+                                    <button onClick={(e) => { e.stopPropagation(); prevImage(prop.id, images.length); }} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/50">
+                                      <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); nextImage(prop.id, images.length); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/50">
+                                      <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                                      {images.slice(0, 5).map((_, idx) => (
+                                        <div key={idx} className={cn("w-1.5 h-1.5 rounded-full", idx === currentImgIdx ? "bg-accent" : "bg-white/40")} />
+                                      ))}
+                                    </div>
+                                  </>
+                                )}
                               </div>
-                              <div className="flex items-center text-[10px] text-muted-foreground gap-1 mt-1">
-                                <MapPin className="h-3 w-3" /> {prop.address}
-                              </div>
-                            </CardHeader>
-                            
-                            <CardContent className="p-4 pt-2 pb-2 flex items-center justify-between text-[11px] font-medium text-muted-foreground border-b border-border/10">
-                              <div className="flex items-center gap-1"><BedDouble className="w-3 h-3 text-accent" /> {prop.bedrooms} Dorm.</div>
-                              <div className="flex items-center gap-1"><Bath className="w-3 h-3 text-accent" /> {prop.bathrooms} Baños</div>
-                              <div className="flex items-center gap-1"><Maximize className="w-3 h-3 text-accent" /> {prop.total_area}m²</div>
-                            </CardContent>
-                            
-                            <CardFooter className="p-3 bg-muted/5 transition-colors group-hover:bg-accent/5">
-                              <Button variant="ghost" className="w-full text-xs gap-2 h-8 group-hover:text-accent" asChild>
-                                <a href={`/director/propiedades/${prop.id}`} target="_blank">
-                                  Ver Ficha Completa <ExternalLink className="w-3 h-3" />
-                                </a>
-                              </Button>
-                            </CardFooter>
-                          </Card>
-                        )
-                      })}
-                    </div>
-                  )}
+                              
+                              <CardHeader className="p-4 pb-2">
+                                <div className="flex justify-between items-start">
+                                  <h4 className="font-bold text-sm line-clamp-1 flex-1">{prop.title}</h4>
+                                  <span className="text-accent font-bold text-sm whitespace-nowrap ml-2">{prop.currency} {new Intl.NumberFormat().format(prop.price)}</span>
+                                </div>
+                                <div className="flex items-center text-[10px] text-muted-foreground gap-1 mt-1">
+                                  <MapPin className="h-3 w-3" /> {prop.address}
+                                </div>
+                              </CardHeader>
+                              
+                              <CardContent className="p-4 pt-2 pb-2 flex items-center justify-between text-[11px] font-medium text-muted-foreground border-b border-border/10">
+                                <div className="flex items-center gap-1"><BedDouble className="w-3 h-3 text-accent" /> {prop.bedrooms} Dorm.</div>
+                                <div className="flex items-center gap-1"><Bath className="w-3 h-3 text-accent" /> {prop.bathrooms} Baños</div>
+                                <div className="flex items-center gap-1"><Maximize className="w-3 h-3 text-accent" /> {prop.total_area}m²</div>
+                              </CardContent>
+                              
+                              <CardFooter className="p-3 bg-muted/5 transition-colors group-hover:bg-accent/5">
+                                <Button variant="ghost" className="w-full text-xs gap-2 h-8 group-hover:text-accent" asChild>
+                                  <a href={`/director/propiedades/${prop.id}`} target="_blank">
+                                    Ver Ficha Completa <ExternalLink className="w-3 h-3" />
+                                  </a>
+                                </Button>
+                              </CardFooter>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             {isLoading && (
               <div className="flex gap-6 items-start animate-in fade-in duration-300">

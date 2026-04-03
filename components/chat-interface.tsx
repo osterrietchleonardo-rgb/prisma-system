@@ -146,7 +146,7 @@ export function ChatInterface({
                             isLast ? "mb-4" : "mb-0.5"
                           )}
                         >
-                          {fragment}
+                          {fragment.replace(/\*\*/g, "")}
                           
                           {/* Mock timestamp */}
                           <div className={cn(

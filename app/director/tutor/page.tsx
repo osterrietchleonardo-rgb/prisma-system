@@ -355,56 +355,85 @@ export default function TutorIAPage() {
 
         <ScrollArea className="flex-1 p-4 md:p-8" ref={scrollRef}>
           <div className="max-w-4xl mx-auto space-y-10 pb-10">
-            {messages.map((message, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "flex gap-6 group/msg",
+            {messages.map((message, i) => {
+              const fragments = message.content.split(/\n\n+/).filter(f => f.trim().length > 0);
+              return (
+                <div key={i} className={cn(
+                  "flex gap-4 group/msg",
                   message.role === "user" ? "flex-row-reverse" : "flex-row"
-                )}
-              >
-                {/* Avatar */}
-                <div className={cn(
-                  "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border shadow-md transition-transform group-hover/msg:scale-105",
-                  message.role === "assistant" 
-                    ? "bg-gradient-to-br from-accent/20 to-accent/40 border-accent/20 text-accent" 
-                    : "bg-background border-border"
                 )}>
-                  {message.role === "assistant" ? <Bot className="w-6 h-6" /> : <User className="w-6 h-6" />}
-                </div>
-                
-                <div className={cn(
-                  "flex flex-col gap-3 max-w-[85%] lg:max-w-[80%]",
-                  message.role === "user" ? "items-end" : "items-start"
-                )}>
+                  {/* Avatar only on the first fragment equivalent */}
                   <div className={cn(
-                    "p-5 rounded-[2rem] text-[15px] leading-relaxed shadow-sm transition-all relative border",
-                    message.role === "user" 
-                      ? "bg-accent text-accent-foreground border-accent shadow-accent/10 rounded-tr-none" 
-                      : "bg-background border-border/40 rounded-tl-none"
+                    "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border shadow-md transition-transform group-hover/msg:scale-105",
+                    message.role === "assistant" 
+                      ? "bg-gradient-to-br from-accent/20 to-accent/40 border-accent/20 text-accent" 
+                      : "bg-background border-border"
                   )}>
-                    {message.content.split('\n').map((line, k) => (
-                      <p key={k} className={line.trim() === "" ? "h-3" : "mb-2 last:mb-0"}>{line}</p>
-                    ))}
+                    {message.role === "assistant" ? <Bot className="w-5 h-5" /> : <User className="w-5 h-5" />}
                   </div>
 
-                  {/* Sources display */}
-                  {message.sources && message.sources.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-1 animate-in fade-in slide-in-from-top-2 duration-500">
-                      <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/10 text-[9px] text-accent font-bold uppercase tracking-widest">
-                        <BookOpen className="w-3 h-3" /> Contexto Extraído
-                      </div>
-                      {message.sources.map((src, idx) => (
-                        <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-white dark:bg-zinc-900 border border-border/60 rounded-full text-[11px] font-medium shadow-sm transition-all hover:bg-muted">
-                          <Quote className="w-3 h-3 text-accent/60" />
-                          <span className="truncate max-w-[150px] md:max-w-[250px]">{src.title}</span>
+                  <div className={cn(
+                    "flex flex-col gap-1.5 flex-1 max-w-[85%] lg:max-w-[80%]",
+                    message.role === "user" ? "items-end" : "items-start"
+                  )}>
+                    {fragments.map((fragment, idx) => {
+                      const isFirst = idx === 0;
+                      // Strip ** symbols as requested
+                      const cleanFragment = fragment.replace(/\*\*/g, "");
+
+                      return (
+                        <div
+                          key={idx}
+                          className={cn(
+                            "p-4 px-5 rounded-[1.5rem] text-[15px] leading-relaxed shadow-sm relative border transition-all hover:shadow-md",
+                            message.role === "user" 
+                              ? "bg-accent/15 dark:bg-accent/20 text-[#432c18] dark:text-accent-foreground border-accent/10 rounded-tr-none" 
+                              : "bg-background border-border/40 rounded-tl-none",
+                            !isFirst && (message.role === "user" ? "rounded-tr-[1.5rem]" : "rounded-tl-[1.5rem]"),
+                             "whitespace-pre-wrap"
+                          )}
+                        >
+                          {cleanFragment}
+                          
+                          {/* Tail for first fragment */}
+                          {isFirst && (
+                             <div className={cn(
+                                "absolute top-0 w-2 h-2",
+                                message.role === "user" 
+                                  ? "-right-1.5 bg-accent/15 dark:bg-accent/20 border-r border-t border-accent/10 [clip-path:polygon(0_0,0_100%,100%_0)]" 
+                                  : "-left-1.5 bg-background border-l border-t border-border/40 [clip-path:polygon(0_0,100%_0,100%_100%)]",
+                             )} />
+                          )}
+
+                          {/* Timestamp mock */}
+                          <div className={cn(
+                             "text-[10px] mt-1 text-right opacity-40",
+                             message.role === "user" ? "text-accent" : "text-muted-foreground"
+                          )}>
+                             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      );
+                    })}
+
+                    {/* Sources display below the entire group of bubbles */}
+                    {message.sources && message.sources.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2 animate-in fade-in slide-in-from-top-2 duration-500">
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-accent/10 text-[9px] text-accent font-bold uppercase tracking-widest">
+                          <BookOpen className="w-3 h-3" /> Contexto Extraído
+                        </div>
+                        {message.sources.map((src, idx) => (
+                          <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-white dark:bg-zinc-900 border border-border/60 rounded-full text-[11px] font-medium shadow-sm transition-all hover:bg-muted">
+                            <Quote className="w-3 h-3 text-accent/60" />
+                            <span className="truncate max-w-[150px] md:max-w-[250px]">{src.title}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             
             {isLoading && (
               <div className="flex gap-6 items-start animate-in fade-in duration-300">
