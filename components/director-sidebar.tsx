@@ -56,7 +56,7 @@ export function DirectorSidebar({ className, agencyName, userName, userRole }: D
         <Link href="/">
           <BrandLogo logoSize="sm" />
         </Link>
-        <p className="text-[9px] text-muted-foreground uppercase tracking-[0.2em] mt-2 font-bold opacity-60 border-t border-accent/10 pt-2">
+        <p className="text-[10px] md:text-[9px] text-muted-foreground uppercase tracking-[0.2em] mt-2 font-bold opacity-60 border-t border-accent/10 pt-2">
           {agencyName || "Agencia Inmobiliaria"}
         </p>
       </div>

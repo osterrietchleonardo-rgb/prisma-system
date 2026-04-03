@@ -48,8 +48,8 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole }: Di
         <div className="flex items-center gap-4">
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <Menu className="h-5 w-5" />
+              <Button variant="ghost" size="icon" className="h-12 w-12 md:h-9 md:w-9">
+                <Menu className="h-6 w-6 md:h-5 md:w-5" />
                 <span className="sr-only">Toggle Sidebar</span>
               </Button>
             </SheetTrigger>
@@ -63,23 +63,22 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole }: Di
             </SheetContent>
           </Sheet>
           
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Panel</span>
-            <span className="text-sm text-muted-foreground">/</span>
-            <span className="text-sm font-semibold truncate max-w-[200px]">{pageTitle}</span>
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Panel</span>
+            <span className="text-base md:text-sm font-semibold truncate max-w-[200px]">{pageTitle}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hidden sm:flex">
-            <Search className="h-4 w-4" />
+        <div className="flex items-center gap-2 md:gap-4">
+          <Button variant="ghost" size="icon" className="text-muted-foreground hidden sm:flex h-12 w-12 md:h-9 md:w-9">
+            <Search className="h-5 w-5 md:h-4 md:w-4" />
           </Button>
           
           <div className="relative">
-            <Button variant="ghost" size="icon" className="text-muted-foreground">
-              <Bell className="h-4 w-4" />
+            <Button variant="ghost" size="icon" className="text-muted-foreground w-10 h-10 md:w-9 md:h-9">
+              <Bell className="h-5 w-5 md:h-4 md:h-4" />
             </Button>
-            <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full border-2 border-background"></span>
+            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-accent rounded-full border-2 border-background"></span>
           </div>
           
           <div className="flex items-center gap-3">

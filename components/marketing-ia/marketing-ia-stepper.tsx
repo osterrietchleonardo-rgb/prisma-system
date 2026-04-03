@@ -36,12 +36,17 @@ export function MarketingIAStepper({ steps, currentStep, className }: StepperPro
               </div>
               <span 
                 className={cn(
-                  "absolute -bottom-6 text-[10px] whitespace-nowrap font-medium transition-colors duration-300",
+                  "absolute -bottom-6 text-[10px] whitespace-nowrap font-medium transition-colors duration-300 hidden sm:block",
                   isCurrent ? "text-foreground font-bold" : "text-muted-foreground"
                 )}
               >
                 {step}
               </span>
+              {isCurrent && (
+                <span className="absolute -top-10 text-[10px] sm:hidden whitespace-nowrap font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full border border-accent/20">
+                  {step}
+                </span>
+              )}
             </div>
           );
         })}

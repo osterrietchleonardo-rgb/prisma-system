@@ -46,15 +46,15 @@ export default function CRMLeadsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex flex-wrap items-center gap-3">
             CRM: Leads Comerciales
-            <Badge variant="outline" className="text-xs hidden sm:inline-flex">Tokko Sync</Badge>
+            <Badge variant="outline" className="text-[10px] md:text-xs">Tokko Sync</Badge>
             {leads.length > 0 && !isLoading && (
-              <Badge variant="secondary" className="text-xs bg-accent/10 text-accent border-accent/20">
+              <Badge variant="secondary" className="text-[10px] md:text-xs bg-accent/10 text-accent border-accent/20">
                 {leads.length} {leads.length === 1 ? 'lead' : 'leads'}
               </Badge>
             )}
-            {isLoading && <Loader2 className="h-5 w-5 animate-spin text-accent" />}
+            {isLoading && <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin text-accent" />}
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
             Gestión inteligente de contactos y dashboard estratégico sincronizado con Tokko Broker.

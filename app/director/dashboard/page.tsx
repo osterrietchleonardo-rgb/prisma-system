@@ -68,8 +68,8 @@ export default async function DashboardPage() {
     <div className="space-y-8 animate-in fade-in duration-300 px-4 md:px-8 py-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard Overview</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard Overview</h2>
+          <p className="text-xs md:text-sm text-muted-foreground">
             Bienvenido al centro de control de tu inmobiliaria.
           </p>
         </div>
@@ -85,21 +85,21 @@ export default async function DashboardPage() {
           <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Filtros</span>
         </div>
         
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-4 flex-1">
+        <div className="grid grid-cols-1 sm:flex sm:items-center sm:gap-4 flex-1 gap-2">
           <Select defaultValue="all">
-            <SelectTrigger className="w-full sm:w-[180px] h-9 text-xs">
+            <SelectTrigger className="w-full sm:w-[180px] h-10 md:h-9 text-xs">
               <SelectValue placeholder="Asesor" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los asesores</SelectItem>
             </SelectContent>
           </Select>
-
+ 
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant={"outline"}
-                className={"w-full sm:w-[240px] h-9 text-xs justify-start text-left font-normal border-input hover:bg-accent/5"}
+                className={"w-full sm:w-[240px] h-10 md:h-9 text-xs justify-start text-left font-normal border-input hover:bg-accent/5"}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 <span>Últimos 30 días</span>

@@ -97,7 +97,7 @@ export default function RegisterForm() {
             <div className="grid gap-2">
               <Label htmlFor="inviteCode">Código de Inmobiliaria</Label>
               <Input id="inviteCode" name="inviteCode" placeholder="ABC123" required disabled={loading} className="bg-background/50" />
-              <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Info className="w-3 h-3" /> Solicitalo al Director de tu agencia.
               </p>
             </div>

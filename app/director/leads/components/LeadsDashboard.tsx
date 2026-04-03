@@ -76,9 +76,9 @@ export function LeadsDashboard({ leads, tagsByGroup, lastSync }: LeadsDashboardP
       <div className="flex flex-col gap-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
            <div className="space-y-1">
-              <h1 className="text-2xl font-black tracking-tight flex items-center gap-3 text-white">
+              <h1 className="text-xl md:text-2xl font-black tracking-tight flex flex-wrap items-center gap-2 text-white">
                  Análisis de Leads — Tokko CRM
-                 <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[10px] font-bold">
+                 <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[9px] md:text-[10px] font-bold">
                     Datos Reales (Sincronizado)
                  </Badge>
               </h1>
@@ -95,7 +95,7 @@ export function LeadsDashboard({ leads, tagsByGroup, lastSync }: LeadsDashboardP
               </div>
               
               <Select value={dateRange} onValueChange={setDateRange}>
-                <SelectTrigger className="w-[140px] h-8 text-[10px] bg-transparent border-none focus:ring-0">
+                <SelectTrigger className="w-full sm:w-[140px] h-10 md:h-8 text-[11px] md:text-[10px] bg-transparent border-none focus:ring-0">
                    <CalendarIcon className="h-3 w-3 mr-2 text-accent" />
                    <SelectValue placeholder="Rango" />
                 </SelectTrigger>
@@ -107,8 +107,8 @@ export function LeadsDashboard({ leads, tagsByGroup, lastSync }: LeadsDashboardP
                 </SelectContent>
               </Select>
 
-              <Select value={agentFilter} onValueChange={setAgentFilter}>
-                <SelectTrigger className="w-[160px] h-8 text-[10px] bg-transparent border-none focus:ring-0">
+               <Select value={agentFilter} onValueChange={setAgentFilter}>
+                <SelectTrigger className="w-full sm:w-[160px] h-10 md:h-8 text-[11px] md:text-[10px] bg-transparent border-none focus:ring-0">
                    <LayoutDashboard className="h-3 w-3 mr-2 text-accent" />
                    <SelectValue placeholder="Asesor" />
                 </SelectTrigger>
@@ -120,8 +120,8 @@ export function LeadsDashboard({ leads, tagsByGroup, lastSync }: LeadsDashboardP
                 </SelectContent>
               </Select>
 
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px] h-8 text-[10px] bg-transparent border-none focus:ring-0">
+               <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-[140px] h-10 md:h-8 text-[11px] md:text-[10px] bg-transparent border-none focus:ring-0">
                    <Database className="h-3 w-3 mr-2 text-accent" />
                    <SelectValue placeholder="Estado" />
                 </SelectTrigger>

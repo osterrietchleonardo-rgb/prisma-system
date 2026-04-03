@@ -79,7 +79,7 @@ export default function LandingPage() {
               ✨ PRISMA IA · La evolución inmobiliaria ha llegado
             </div>
             
-            <h1 className="text-3xl sm:text-5xl md:text-7xl font-extrabold tracking-tight max-w-4xl text-foreground">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight max-w-4xl text-foreground">
               El sistema operativo para la <span className="text-accent">inmobiliaria moderna</span>.
             </h1>
             
