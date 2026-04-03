@@ -17,14 +17,14 @@ export default function MarketingIAPage() {
       </div>
 
       <Tabs defaultValue="copys" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-14 bg-muted/50 p-1 rounded-xl">
-          <TabsTrigger value="copys" className="text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg">
+        <TabsList className="flex md:grid md:grid-cols-3 h-14 bg-muted/50 p-1 rounded-xl overflow-x-auto scrollbar-none justify-start md:justify-center w-full">
+          <TabsTrigger value="copys" className="flex-1 md:flex-none text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <Sparkles className="w-4 h-4 mr-2" /> Crear Anuncio
           </TabsTrigger>
-          <TabsTrigger value="ipcs" className="text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg">
+          <TabsTrigger value="ipcs" className="flex-1 md:flex-none text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <UserSearch className="w-4 h-4 mr-2" /> Clientes Ideales (IPC)
           </TabsTrigger>
-          <TabsTrigger value="history" className="text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg">
+          <TabsTrigger value="history" className="flex-1 md:flex-none text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <History className="w-4 h-4 mr-2" /> Historial / Galería
           </TabsTrigger>
         </TabsList>

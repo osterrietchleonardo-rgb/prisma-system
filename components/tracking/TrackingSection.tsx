@@ -67,18 +67,18 @@ export function TrackingSection({ isDirector }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Tabs defaultValue="month" className="w-full md:w-auto" onValueChange={(v) => setFilters(prev => ({ ...prev, period: v as any }))}>
-             <TabsList className="bg-muted/50 border p-1 rounded-lg">
-                <TabsTrigger value="week" className="px-5 data-[state=active]:bg-background">Semana</TabsTrigger>
-                <TabsTrigger value="month" className="px-5 data-[state=active]:bg-background">Mes</TabsTrigger>
-                <TabsTrigger value="3months" className="px-5 data-[state=active]:bg-background">3 Meses</TabsTrigger>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+          <Tabs defaultValue="month" className="w-full sm:w-auto" onValueChange={(v) => setFilters(prev => ({ ...prev, period: v as any }))}>
+             <TabsList className="bg-muted/50 border p-1 rounded-lg w-full flex justify-between sm:justify-start">
+                <TabsTrigger value="week" className="flex-1 sm:flex-none px-3 md:px-5 data-[state=active]:bg-background">Semana</TabsTrigger>
+                <TabsTrigger value="month" className="flex-1 sm:flex-none px-3 md:px-5 data-[state=active]:bg-background">Mes</TabsTrigger>
+                <TabsTrigger value="3months" className="flex-1 sm:flex-none px-3 md:px-5 data-[state=active]:bg-background">3 Meses</TabsTrigger>
              </TabsList>
           </Tabs>
 
           {isDirector && (
             <Select onValueChange={(v) => setFilters(prev => ({ ...prev, userId: v === "all" ? undefined : v }))}>
-              <SelectTrigger className="w-[180px] bg-background">
+              <SelectTrigger className="w-full sm:w-[180px] bg-background">
                  <Filter className="w-3 h-3 mr-2 text-muted-foreground" />
                  <SelectValue placeholder="Todos los asesores" />
               </SelectTrigger>
