@@ -1,0 +1,47 @@
+﻿[96mapp/api/contratos/convert-template/route.ts[0m:[93m58[0m:[93m38[0m - [91merror[0m[90m TS7016: [0mCould not find a declaration file for module 'pdf-parse-fork'. 'C:/Users/LENOVO/Desktop/CODE/Antigravity - Apps/PRISMA-SYSTEM/node_modules/pdf-parse-fork/index.js' implicitly has an 'any' type.
+  Try `npm i --save-dev @types/pdf-parse-fork` if it exists or add a new declaration (.d.ts) file containing `declare module 'pdf-parse-fork';`
+
+[7m58[0m       const pdfParse = (await import("pdf-parse-fork")).default
+[7m  [0m [91m                                     ~~~~~~~~~~~~~~~~[0m
+
+[96mapp/asesor/tasaciones/components/step3-grilla.tsx[0m:[93m244[0m:[93m30[0m - [91merror[0m[90m TS2802: [0mType 'Set<string>' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+
+[7m244[0m             setExcluidos([...new Set([...excluidos, ...outLiersIds])]);
+[7m   [0m [91m                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96mcomponents/tracking/LeadForm.tsx[0m:[93m31[0m:[93m5[0m - [91merror[0m[90m TS2322: [0mType 'Resolver<{ nombre_lead: string; fecha_primer_contacto: string; estado: "visita_agendada" | "cerrado" | "perdido" | "activo" | "en_negociacion"; telefono?: string | undefined; visita_realizada?: boolean | undefined; ... 10 more ...; wa_analisis_pendiente?: boolean | undefined; }, any, { ...; }>' is not assignable to type 'Resolver<{ visita_realizada: boolean; nombre_lead: string; fecha_primer_contacto: string; estado: "visita_agendada" | "cerrado" | "perdido" | "activo" | "en_negociacion"; propuesta_enviada: boolean; ... 10 more ...; wa_analisis_pendiente?: boolean | undefined; }, any, { ...; }>'.
+  Types of parameters 'options' and 'options' are incompatible.
+    Type 'ResolverOptions<{ visita_realizada: boolean; nombre_lead: string; fecha_primer_contacto: string; estado: "visita_agendada" | "cerrado" | "perdido" | "activo" | "en_negociacion"; propuesta_enviada: boolean; ... 10 more ...; wa_analisis_pendiente?: boolean | undefined; }>' is not assignable to type 'ResolverOptions<{ nombre_lead: string; fecha_primer_contacto: string; estado: "visita_agendada" | "cerrado" | "perdido" | "activo" | "en_negociacion"; telefono?: string | undefined; visita_realizada?: boolean | undefined; ... 10 more ...; wa_analisis_pendiente?: boolean | undefined; }>'.
+      Type 'boolean | undefined' is not assignable to type 'boolean'.
+        Type 'undefined' is not assignable to type 'boolean'.
+
+[7m31[0m     resolver: zodResolver(leadFormSchema),
+[7m  [0m [91m    ~~~~~~~~[0m
+
+[96mcomponents/tracking/LeadForm.tsx[0m:[93m88[0m:[93m39[0m - [91merror[0m[90m TS2345: [0mArgument of type '(values: LeadFormData) => Promise<void>' is not assignable to parameter of type 'SubmitHandler<TFieldValues>'.
+  Types of parameters 'values' and 'data' are incompatible.
+    Type 'TFieldValues' is not assignable to type '{ visita_realizada: boolean; nombre_lead: string; fecha_primer_contacto: string; estado: "visita_agendada" | "cerrado" | "perdido" | "activo" | "en_negociacion"; propuesta_enviada: boolean; ... 10 more ...; wa_analisis_pendiente?: boolean | undefined; }'.
+      Type 'FieldValues' is missing the following properties from type '{ visita_realizada: boolean; nombre_lead: string; fecha_primer_contacto: string; estado: "visita_agendada" | "cerrado" | "perdido" | "activo" | "en_negociacion"; propuesta_enviada: boolean; ... 10 more ...; wa_analisis_pendiente?: boolean | undefined; }': visita_realizada, nombre_lead, fecha_primer_contacto, estado, propuesta_enviada
+
+[7m88[0m     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 pb-32">
+[7m  [0m [91m                                      ~~~~~~~~[0m
+
+[96mscripts/check-columns.ts[0m:[93m2[0m:[93m30[0m - [91merror[0m[90m TS2307: [0mCannot find module './lib/supabase/server' or its corresponding type declarations.
+
+[7m2[0m import { createClient } from './lib/supabase/server';
+[7m [0m [91m                             ~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+[96mscripts/list-models.ts[0m:[93m9[0m:[93m85[0m - [91merror[0m[90m TS2339: [0mProperty 'listModels' does not exist on type 'GenerativeModel'.
+
+[7m9[0m     const modelList = await genAI.getGenerativeModel({ model: "gemini-1.5-flash" }).listModels();
+[7m [0m [91m                                                                                    ~~~~~~~~~~[0m
+
+
+Found 6 errors in 5 files.
+
+Errors  Files
+     1  app/api/contratos/convert-template/route.ts[90m:58[0m
+     1  app/asesor/tasaciones/components/step3-grilla.tsx[90m:244[0m
+     2  components/tracking/LeadForm.tsx[90m:31[0m
+     1  scripts/check-columns.ts[90m:2[0m
+     1  scripts/list-models.ts[90m:9[0m
