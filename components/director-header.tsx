@@ -27,6 +27,7 @@ interface DirectorHeaderProps {
 export function DirectorHeader({ userName, userEmail, agencyName, userRole }: DirectorHeaderProps) {
   const pathname = usePathname()
   const [customTitle, setCustomTitle] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
   
   // Listen for custom title updates (e.g. from dynamic pages)
   useEffect(() => {
@@ -46,7 +47,7 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole }: Di
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="w-full px-4 md:px-8 flex h-16 items-center justify-between">
         <div className="flex items-center gap-4">
-          <Sheet>
+          <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-12 w-12 md:h-9 md:w-9">
                 <Menu className="h-6 w-6 md:h-5 md:w-5" />
@@ -59,6 +60,7 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole }: Di
                 agencyName={agencyName} 
                 userName={userName} 
                 userRole={userRole} 
+                onSelect={() => setOpen(false)}
               />
             </SheetContent>
           </Sheet>

@@ -44,9 +44,10 @@ interface AsesorSidebarProps {
   agencyName?: string
   userName?: string
   userRole?: string
+  onSelect?: () => void
 }
 
-export function AsesorSidebar({ className, agencyName, userName, userRole }: AsesorSidebarProps) {
+export function AsesorSidebar({ className, agencyName, userName, userRole, onSelect }: AsesorSidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -80,6 +81,7 @@ export function AsesorSidebar({ className, agencyName, userName, userRole }: Ase
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={onSelect}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all",
                   isActive 
@@ -96,7 +98,7 @@ export function AsesorSidebar({ className, agencyName, userName, userRole }: Ase
       </ScrollArea>
 
       <div className="p-4 border-t">
-        <form action={logout}>
+        <form action={logout} onSubmit={onSelect}>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-3">
             <LogOut className="w-4 h-4" />
             Cerrar Sesión
