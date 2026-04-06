@@ -246,6 +246,9 @@ export default function ConsultorIAPage() {
             <History className="w-5 h-5" />
             <span className="text-sm uppercase tracking-tighter">Búsquedas Guardadas</span>
           </div>
+          <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(false)} className="md:hidden hover:bg-accent/10 hover:text-accent transition-colors">
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
         </div>
         
         <div className="p-3">
@@ -337,6 +340,16 @@ export default function ConsultorIAPage() {
           </div>
         </ScrollArea>
       </aside>
+      
+      {/* Re-open sidebar floating button if closed */}
+      {!isSidebarOpen && (
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="absolute left-0 top-20 z-40 bg-accent text-accent-foreground p-1.5 rounded-r-lg shadow-lg hover:pr-3 transition-all"
+        >
+          <History className="w-5 h-5 flex-shrink-0" />
+        </button>
+      )}
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
         <header className="p-4 md:p-6 border-b bg-card/30 backdrop-blur-sm flex items-center justify-between">
