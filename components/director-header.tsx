@@ -49,8 +49,8 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole }: Di
         <div className="flex items-center gap-4">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-12 w-12 md:h-9 md:w-9">
-                <Menu className="h-6 w-6 md:h-5 md:w-5" />
+              <Button variant="ghost" size="icon" className="md:hidden h-12 w-12">
+                <Menu className="h-6 w-6" />
                 <span className="sr-only">Toggle Sidebar</span>
               </Button>
             </SheetTrigger>
