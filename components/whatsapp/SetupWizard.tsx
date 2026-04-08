@@ -1,8 +1,8 @@
-"use client"
+use client"
 
 import { useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { Check, Circle, ExternalLink, AlertTriangle, Info, Loader2, Eye, EyeOff, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react"
+import { Check, Circle, ExternalLink, AlertTriangle, Info, Loader2, Eye, EyeOff, ChevronLeft, ChevronRight, MessageSquare, Copy } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -325,6 +325,38 @@ interface StepCheckProps {
   onToggle: () => void
 }
 
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value)
+    setCopied(true)
+    toast.success(`${label} copiado al portapapeles`)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 w-full">
+      <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider ml-1">
+        {label}
+      </span>
+      <div className="flex gap-2">
+        <div className="flex-1 font-mono text-xs px-3 py-2.5 bg-muted/50 border rounded-lg overflow-hidden truncate">
+          {value}
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-9 w-9 shrink-0 hover:bg-accent hover:text-white transition-colors"
+          onClick={handleCopy}
+        >
+          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function StepCheckbox({ checked, onToggle, label }: StepCheckProps & { label: string }) {
   return (
     <div
@@ -490,7 +522,11 @@ function Step4({ checked, onToggle }: StepCheckProps) {
 // --- Step 5: Configurar Webhook en Meta ---
 function Step5({ checked, onToggle }: StepCheckProps) {
   const webhookVerifyToken = process.env.NEXT_PUBLIC_WHATSAPP_WEBHOOK_VERIFY_TOKEN
-    || "••••••••••••••••"
+    || "PrismaSaaS2026_Verificacion!"
+  
+  const evolutionUrl = process.env.NEXT_PUBLIC_EVOLUTION_API_URL
+    ? `${process.env.NEXT_PUBLIC_EVOLUTION_API_URL}/webhook/whatsapp`
+    : "https://vevolutionapiv.vakdor.com/webhook/whatsapp"
 
   return (
     <Card className="border-0 shadow-none bg-transparent">
@@ -499,64 +535,43 @@ function Step5({ checked, onToggle }: StepCheckProps) {
           <span className="text-accent">05.</span> Configurar Webhook en Meta
         </CardTitle>
         <CardDescription className="text-base">
-          Configurá el webhook para que Meta envíe los mensajes entrantes a tu plataforma.
+          Este paso es fundamental: le daremos a Meta la &quot;dirección&quot; de PRISMA para que los mensajes de tus clientes lleguen aquí.
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0">
-        <Alert className="mb-5 border-blue-500/30 bg-blue-500/5">
+        <Alert className="mb-6 border-blue-500/30 bg-blue-500/5">
           <Info className="h-4 w-4 text-blue-500" />
           <AlertTitle className="text-blue-600 dark:text-blue-400 font-bold">
-            Paso crítico
+            Guía paso a paso (Sin tecnicismos)
           </AlertTitle>
-          <AlertDescription className="text-blue-600/80 dark:text-blue-400/80">
-            Este paso permite que Meta envíe los mensajes de tus clientes a tu plataforma PRISMA.
+          <AlertDescription className="text-blue-600/80 dark:text-blue-400/80 space-y-2 mt-2">
+            <p>1. Entrá al panel de Meta Developers (el botón del Paso 1).</p>
+            <p>2. En el menú izquierdo, hacé clic en <strong>WhatsApp</strong> y luego en <strong>Configuración</strong>.</p>
+            <p>3. Buscá la sección que dice <strong>Webhooks</strong> y hacé clic en el botón <strong>Editar</strong>.</p>
+            <p>4. Copiá y pegá los dos valores que verás aquí abajo en los campos correspondientes de Meta.</p>
+            <p>5. Una vez guardado, hacé clic en el botón <strong>Administrar</strong> cerca de Webhooks, buscá la palabra <strong>messages</strong> y hacé clic en <strong>Suscribirse</strong>. ¡Sin esto no funciona!</p>
           </AlertDescription>
         </Alert>
 
-        <OrderedList
-          items={[
-            "En tu app → WhatsApp → Configuración → sección Webhooks.",
-            "URL del Webhook:",
-            "Token de verificación:",
-            'Hacé clic en "Verificar y guardar". Meta verificará automáticamente la conexión.',
-            'Clic en "Administrar" en el campo "messages" → activá la casilla.',
-          ]}
-        />
-
-        {/* URL & Token badges */}
-        <div className="mt-4 space-y-3">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              URL del Webhook
-            </span>
-            <Badge
-              variant="secondary"
-              className="font-mono text-xs px-3 py-2 bg-muted/50 border justify-start max-w-full overflow-hidden"
-            >
-              La URL de Evolution API — la provee el admin de PRISMA
-            </Badge>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">
-              Token de Verificación
-            </span>
-            <Badge
-              variant="secondary"
-              className="font-mono text-xs px-3 py-2 bg-muted/50 border justify-start"
-            >
-              {webhookVerifyToken}
-            </Badge>
-          </div>
+        <div className="space-y-4 p-5 rounded-2xl border bg-muted/20 mb-6">
+          <CopyButton 
+            label="URL de devolución de llamada (Callback URL)" 
+            value={evolutionUrl} 
+          />
+          <CopyButton 
+            label="Token de verificación (Verify Token)" 
+            value={webhookVerifyToken} 
+          />
         </div>
 
-        <Alert className="mt-5 border-amber-500/30 bg-amber-500/5">
+        <Alert className="border-amber-500/30 bg-amber-500/5">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
-          <AlertDescription className="text-amber-600/80 dark:text-amber-400/80 font-medium">
-            ⚠️ Si no activás &quot;messages&quot; en los campos del webhook, Meta no enviará los mensajes de tus clientes.
+          <AlertDescription className="text-amber-600/80 dark:text-amber-400/80 font-medium text-xs">
+            ⚠️ Si Meta te da error al verificar, asegurate de no haber copiado espacios en blanco al principio o al final de los textos.
           </AlertDescription>
         </Alert>
 
-        <StepCheckbox checked={checked} onToggle={onToggle} label='Configuré el webhook y activé "messages"' />
+        <StepCheckbox checked={checked} onToggle={onToggle} label='Ya configuré el webhook en Meta y activé la suscripción de "messages"' />
       </CardContent>
     </Card>
   )
@@ -599,13 +614,15 @@ function Step6({
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0 space-y-5">
-        <div className="text-sm text-muted-foreground space-y-1">
-          <p>
-            <strong>Phone Number ID:</strong> Tu app → WhatsApp → Configuración de la API.
-          </p>
-          <p>
-            <strong>Business ID:</strong> Business Manager → Cuentas de WhatsApp Business.
-          </p>
+        <div className="space-y-4 text-sm text-muted-foreground">
+          <div className="p-4 rounded-xl bg-accent/5 border border-accent/10">
+            <p className="font-semibold text-foreground mb-1">¿Dónde encuentro estos datos?</p>
+            <ul className="list-disc ml-5 space-y-1">
+              <li><strong>Phone Number ID:</strong> En el panel de Meta, ve a WhatsApp → Configuración de la API. Está en la sección &quot;Envía y recibe mensajes&quot;.</li>
+              <li><strong>Business ID:</strong> En la misma pantalla de arriba, lo verás debajo del nombre de tu cuenta de WhatsApp Business.</li>
+              <li><strong>Token:</strong> Es el código largo que generaste en el <strong>Paso 4</strong>.</li>
+            </ul>
+          </div>
         </div>
 
         {/* Token */}
