@@ -151,6 +151,10 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
       })
 
       toast.success("Contrato finalizado exitosamente")
+      
+      // Auto-download PDF
+      const { downloadContractFromId } = await import("@/lib/contratos/download-helper")
+      await downloadContractFromId(wizardState.contrato_guardado_id!)
     } catch {
       toast.error("Error al finalizar")
     } finally {

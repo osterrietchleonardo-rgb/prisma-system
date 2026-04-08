@@ -1,12 +1,16 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { FileSignature, FilePlus, FileText, Layout } from "lucide-react"
+import { FileSignature, FilePlus, FileText, Layout, Download, Loader2 } from "lucide-react"
 import { TipoContratoSelector } from "./TipoContratoSelector"
 import { ContratoWizard } from "./ContratoWizard"
 import { PlantillasList } from "./PlantillasList"
-import type { TipoContrato, ContractTemplate, ContratoWizardState } from "@/types/contratos"
+import type { TipoContrato, ContractTemplate, ContratoWizardState, FirmanteRol, ContractSignature } from "@/types/contratos"
+import { interpolateTemplate } from "@/lib/contratos/template-interpolator"
+import { generateContratoPDF, generatePDFFilename } from "@/lib/contratos/pdf-generator"
+import { TIPO_CONTRATO_LABELS } from "@/types/contratos"
+import { toast } from "sonner"
 
 export function ContratosIAPage() {
   const [activeTab, setActiveTab] = useState("nuevo")
@@ -88,9 +92,10 @@ export function ContratosIAPage() {
 }
 
 function MisContratos() {
-  const [contratos, setContratos] = useState<Array<{ id: string; tipo: string; nombre_referencia: string | null; estado: string; created_at: string }>>([])
-  const [loading, setLoading] = useState(false)
+  const [contratos, setContratos] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [loaded, setLoaded] = useState(false)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   const loadContratos = useCallback(async () => {
     setLoading(true)
@@ -98,19 +103,34 @@ function MisContratos() {
       const res = await fetch("/api/contratos")
       if (res.ok) {
         const data = await res.json()
-        setContratos(data)
+        if (Array.isArray(data)) {
+          setContratos(data)
+        }
       }
-    } catch {
-      // ignore
+    } catch (error) {
+      console.error("Error loading contracts:", error)
+      toast.error("Error al cargar la lista de contratos")
     } finally {
       setLoading(false)
       setLoaded(true)
     }
   }, [])
 
-  if (!loaded) {
-    loadContratos()
+  const handleDownload = async (c: any) => {
+    setDownloadingId(c.id)
+    try {
+      const { downloadContractFromId } = await import("@/lib/contratos/download-helper")
+      await downloadContractFromId(c.id)
+    } finally {
+      setDownloadingId(null)
+    }
   }
+
+  useEffect(() => {
+    if (!loaded) {
+      loadContratos()
+    }
+  }, [loaded, loadContratos])
 
   const estadoColors: Record<string, string> = {
     borrador: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
@@ -119,11 +139,11 @@ function MisContratos() {
     anulado: "bg-red-500/10 text-red-500 border-red-500/20",
   }
 
-  if (loading) {
+  if (loading || !loaded) {
     return (
       <div className="grid gap-4">
         {[1, 2, 3].map(i => (
-          <div key={i} className="h-20 rounded-xl bg-muted/50 animate-pulse" />
+          <div key={i} className="h-24 rounded-2xl bg-muted/50 animate-pulse border border-border" />
         ))}
       </div>
     )
@@ -132,28 +152,63 @@ function MisContratos() {
   if (contratos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-20 text-center bg-muted/20 rounded-3xl border border-dashed border-muted">
-        <FileText className="w-12 h-12 text-muted-foreground mb-4 opacity-20" />
-        <h3 className="text-xl font-bold">Sin contratos generados</h3>
-        <p className="text-muted-foreground max-w-sm mt-2">
-          Creá tu primer contrato desde la pestaña &quot;Nuevo Contrato&quot;.
+        <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-6">
+          <FileText className="w-10 h-10 text-muted-foreground opacity-30" />
+        </div>
+        <h3 className="text-2xl font-bold tracking-tight">Sin contratos generados</h3>
+        <p className="text-muted-foreground max-w-sm mt-3 leading-relaxed">
+          Todavía no generaste ningún contrato con IA.
+          ¡Empezá ahora desde la pestaña &quot;Nuevo Contrato&quot;!
         </p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-3">
-      {contratos.map(c => (
-        <div key={c.id} className="flex items-center justify-between p-4 rounded-xl bg-card border border-border hover:border-accent/30 transition-colors">
-          <div>
-            <p className="font-semibold">{c.nombre_referencia || `Contrato ${c.tipo}`}</p>
-            <p className="text-sm text-muted-foreground">{new Date(c.created_at).toLocaleDateString("es-AR")}</p>
+    <div className="grid gap-4">
+      {contratos.map(c => {
+        const date = c.created_at ? new Date(c.created_at) : new Date()
+        const isValidDate = !isNaN(date.getTime())
+        const displayDate = isValidDate ? date.toLocaleDateString("es-AR") : "---"
+
+        return (
+          <div key={c.id} className="group relative flex items-center justify-between p-6 rounded-2xl bg-card border border-border hover:border-accent/40 hover:shadow-xl hover:shadow-accent/5 transition-all duration-300">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center">
+                <FileText className="w-6 h-6 text-accent" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <p className="font-bold text-lg group-hover:text-accent transition-colors">
+                  {c.nombre_referencia || `Contrato ${c.tipo}`}
+                </p>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Creado:</span>
+                  <span className="font-medium text-foreground/80">{displayDate}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <span className={`text-[10px] sm:text-xs font-black px-4 py-1.5 rounded-full border shadow-sm ${estadoColors[c.estado] || "bg-muted text-muted-foreground border-muted-foreground/20"}`}>
+                {(c.estado || "borrador").replace("_", " ").toUpperCase()}
+              </span>
+
+              <button
+                onClick={() => handleDownload(c)}
+                disabled={downloadingId === c.id}
+                className="p-2.5 rounded-xl bg-muted/50 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-all duration-300 disabled:opacity-50 group/download"
+                title="Descargar PDF"
+              >
+                {downloadingId === c.id ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Download className="w-5 h-5 group-hover/download:scale-110 transition-transform" />
+                )}
+              </button>
+            </div>
           </div>
-          <span className={`text-xs font-bold px-3 py-1 rounded-full border ${estadoColors[c.estado] || ""}`}>
-            {c.estado.replace("_", " ").toUpperCase()}
-          </span>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
