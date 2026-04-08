@@ -68,10 +68,10 @@ export function LeadsList({ leads, onRefresh }: Props) {
           <TableRow>
             <TableHead className="w-10"></TableHead>
             <TableHead>Nombre Lead</TableHead>
-            <TableHead>Ingreso</TableHead>
+            <TableHead className="hidden md:table-cell">Ingreso</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead>Score WA</TableHead>
-            <TableHead>Ult. Actividad</TableHead>
+            <TableHead className="hidden lg:table-cell">Ult. Actividad</TableHead>
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
@@ -96,12 +96,12 @@ export function LeadsList({ leads, onRefresh }: Props) {
                     {expandedRow === lead.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                   </TableCell>
                   <TableCell className="font-semibold">{lead.nombre_lead}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                     {format(new Date(lead.fecha_primer_contacto), "dd MMM yyyy", { locale: es })}
                   </TableCell>
                   <TableCell>{getStatusBadge(lead.estado)}</TableCell>
                   <TableCell>{getWaScore(lead.wa_score_general)}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="hidden lg:table-cell text-xs text-muted-foreground">
                     {format(new Date(lead.updated_at), "dd/MM/yy HH:mm", { locale: es })}
                   </TableCell>
                   <TableCell className="text-right">
@@ -128,7 +128,7 @@ export function LeadsList({ leads, onRefresh }: Props) {
                 
                 {expandedRow === lead.id && (
                   <TableRow className="bg-muted/10 hover:bg-muted/10 border-none animate-in fade-in slide-in-from-top-2">
-                    <TableCell colSpan={7} className="p-6">
+                    <TableCell colSpan={7} className="p-4 md:p-6">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* Resumen Métricas */}
                         <div className="space-y-4">

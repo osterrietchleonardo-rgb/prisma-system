@@ -2,11 +2,11 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { format } from "date-fns";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Calculator, History } from "lucide-react";
+import { Calculator, History } from "lucide-react";
 
 import { Sujeto, Comparable, ResultadoTasacion, FactorAjusteValor } from "@/lib/tasacion/types";
 import { Step1Sujeto } from "@/app/asesor/tasaciones/components/step1-sujeto";
@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 
 export default function TasacionesPageWrapper() {
-  const [tab, setTab] = useState("mcm");
+
   const [step, setStep] = useState(1);
   const supabase = createClient();
 
@@ -164,17 +164,7 @@ export default function TasacionesPageWrapper() {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="bg-card w-full justify-start h-12 p-1 border border-accent/10 mb-6">
-          <TabsTrigger value="mcm" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground flex-1 sm:flex-none">
-            <Calculator className="w-4 h-4 mr-2" /> Método Comparación (MCM)
-          </TabsTrigger>
-          <TabsTrigger value="ia" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground flex-1 sm:flex-none">
-            <Sparkles className="w-4 h-4 mr-2" /> Tasador Rápido (IA)
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="mcm" className="mt-0">
+      <div className="mt-0">
           <div className="grid lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
                 <Card className="border-accent/10 bg-card/20 backdrop-blur-md shadow-xl overflow-hidden print:shadow-none print:border-none print:bg-white">
@@ -265,14 +255,7 @@ export default function TasacionesPageWrapper() {
                </div>
             </div>
           </div>
-        </TabsContent>
-
-        <TabsContent value="ia" className="mt-0">
-           <div className="p-12 text-center text-muted-foreground bg-card/10 rounded-2xl border border-accent/10">
-               El módulo IA rápido ha sido movido temporalmente.
-           </div>
-        </TabsContent>
-      </Tabs>
+      </div>
     </div>
   );
 }

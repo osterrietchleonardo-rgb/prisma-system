@@ -49,6 +49,15 @@
 
 ## 🔄 ENTRADAS DE PROGRESO
 
+### 2026-04-07 | P7 — WhatsApp Module: Webhook UI Polish & UX
+- **Refactor `SetupWizard.tsx`**:
+  - Mejora de los pasos 5 y 6 con instrucciones simplificadas para usuarios no técnicos.
+  - Implementación de `CopyButton`: Facilidad para copiar URL de Callback y Verify Token al portapapeles.
+  - Exposición controlada de variables `NEXT_PUBLIC_` para mostrar valores reales dinámicamente.
+- **Configuración**:
+  - Actualización de `.env` y `.env.example` con los nuevos prefijos públicos.
+  - Verificación de la URL del webhook de Evolution (`/webhook/whatsapp`) para conectividad directa de Meta.
+
 ### 2026-04-06 | P4 Extra — WhatsApp Module: Lead Traceability
 - **Nuevo Componente `LeadTraceability.tsx`**:
   - Panel informativo lateral anidado (Desktop) / por Tabulación (Mobile) para inluir metadata dinámica del lead.

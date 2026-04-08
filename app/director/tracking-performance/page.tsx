@@ -31,6 +31,8 @@ export default function TrackingPerformancePage() {
 
   useEffect(() => {
     fetchLeads();
+    // Update header title
+    window.dispatchEvent(new CustomEvent('prisma-header-title', { detail: "Seguimiento" }));
   }, [fetchLeads]);
 
   const filteredLeads = leads.filter(l => {
@@ -43,37 +45,37 @@ export default function TrackingPerformancePage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8 flex flex-col gap-8 pb-32">
+    <div className="max-w-7xl mx-auto p-4 md:p-8 flex flex-col gap-6 md:gap-8 pb-32">
       {/* Header Section */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
         <div className="space-y-1">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
             Gestión de Leads
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-xs md:text-sm lg:text-base text-muted-foreground max-w-md hidden sm:block">
             Centralizá el seguimiento de tus prospectos y optimizá el Score de Profesionalismo.
           </p>
         </div>
 
         <Button 
-          size="lg" 
-          className="h-12 bg-primary shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all font-bold group"
+          size="sm" 
+          className="h-10 md:h-12 bg-primary shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all font-bold group px-4"
           onClick={() => setIsDrawerOpen(true)}
         >
-          <Plus className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform" />
-          Nuevo Lead
+          <Plus className="w-4 h-4 md:w-5 md:h-5 mr-2 group-hover:rotate-90 transition-transform" />
+          <span className="text-sm md:text-base">Nuevo Lead</span>
         </Button>
       </header>
 
       {/* Grid: Filters & Table */}
       <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <Tabs defaultValue="todos" className="w-full md:w-auto" onValueChange={setFilter}>
-            <TabsList className="bg-muted/50 p-1 rounded-lg border">
-              <TabsTrigger value="todos" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">Todos</TabsTrigger>
-              <TabsTrigger value="activos" className="data-[state=active]:bg-background">Activos</TabsTrigger>
-              <TabsTrigger value="cerrados" className="data-[state=active]:bg-background">Cerrados</TabsTrigger>
-              <TabsTrigger value="sin_seguimiento" className="data-[state=active]:bg-background">Sin Seguimiento</TabsTrigger>
+          <Tabs defaultValue="todos" className="w-full md:w-auto overflow-x-auto scrollbar-none" onValueChange={setFilter}>
+            <TabsList className="bg-muted/50 p-1 rounded-lg border w-fit">
+              <TabsTrigger value="todos" className="text-xs md:text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm">Todos</TabsTrigger>
+              <TabsTrigger value="activos" className="text-xs md:text-sm data-[state=active]:bg-background">Activos</TabsTrigger>
+              <TabsTrigger value="cerrados" className="text-xs md:text-sm data-[state=active]:bg-background">Cerrados</TabsTrigger>
+              <TabsTrigger value="sin_seguimiento" className="text-xs md:text-sm data-[state=active]:bg-background">S/ Seguim.</TabsTrigger>
             </TabsList>
           </Tabs>
 
