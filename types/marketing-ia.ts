@@ -8,29 +8,25 @@ export interface IpcProfile {
   id: string;
   user_id: string;
   nombre_perfil: string;
+  tipo_lead: 'Comprador' | 'Vendedor' | 'Inversor' | 'Otro';
   rango_edad: string;
   genero: 'Hombre' | 'Mujer' | 'Mixto';
   zona_geografica: string;
-  rol_sector: string;
-  problema_principal: string;
-  mayor_frustracion: string;
-  pierde_tiempo_dinero: string;
-  mayor_estres: string;
+  presupuesto_estimado?: string;
+  situacion_actual: string;
+  motivacion_principal: string;
+  problema_resuelve: string;
+  nivel_urgencia: number;
   mayor_miedo: string[];
-  freno_para_avanzar: string;
   objeciones: string;
-  meta_12_meses: string;
-  negocio_ideal: string;
-  vida_transformada: string;
-  motiva_decision: string[];
-  valora_en_proveedor: string;
-  trigger_decision: string;
+  estilo_vida: string;
+  intereses: string[];
   redes_sociales: string[];
   tipo_contenido: string[];
-  frecuencia_publica: string;
   created_at: string;
   updated_at: string;
 }
+
 
 export interface TokkoProperty {
   id: number;

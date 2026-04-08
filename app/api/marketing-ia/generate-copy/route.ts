@@ -33,23 +33,22 @@ const buildCopyPrompt = (ipc: IpcProfile, config: CopyConfig): string => {
   }[config.angle];
 
   const ipcCtx = `
-PERFIL DEL CLIENTE IDEAL:
-- Nombre: ${ipc.nombre_perfil} | Edad: ${ipc.rango_edad} | Género: ${ipc.genero}
-- Zona: ${ipc.zona_geografica} | Rol: ${ipc.rol_sector}
-- Problema principal: ${ipc.problema_principal}
-- Mayor frustración: ${ipc.mayor_frustracion}
-- Lo que le hace perder tiempo/dinero: ${ipc.pierde_tiempo_dinero}
-- Mayor estrés: ${ipc.mayor_estres}
+PERFIL DEL SEGMENTO DE LEADS (IPC):
+- Nombre Segmento: ${ipc.nombre_perfil}
+- Tipo de Lead: ${ipc.tipo_lead} | Edad: ${ipc.rango_edad} | Género: ${ipc.genero}
+- Zona de Interés: ${ipc.zona_geografica}
+- Presupuesto/Ticket: ${ipc.presupuesto_estimado || 'No especificado'}
+- Situación Actual: ${ipc.situacion_actual}
+- Motivación Principal: ${ipc.motivacion_principal}
+- Problema que resuelve: ${ipc.problema_resuelve}
+- Nivel de Urgencia: ${ipc.nivel_urgencia}/10
 - Miedos: ${JSON.stringify(ipc.mayor_miedo)}
-- Freno para avanzar: ${ipc.freno_para_avanzar}
 - Objeciones: ${ipc.objeciones}
-- Meta 12 meses: ${ipc.meta_12_meses}
-- Negocio ideal: ${ipc.negocio_ideal}
-- Vida transformada: ${ipc.vida_transformada}
-- Lo que lo mueve a decidir: ${JSON.stringify(ipc.motiva_decision)}
-- Valora en proveedor: ${ipc.valora_en_proveedor}
-- Trigger de decisión: ${ipc.trigger_decision}
-- Redes sociales: ${JSON.stringify(ipc.redes_sociales)}`.trim();
+- Estilo de Vida: ${ipc.estilo_vida}
+- Intereses: ${JSON.stringify(ipc.intereses)}
+- Redes sociales: ${JSON.stringify(ipc.redes_sociales)}
+- Contenido que consume: ${JSON.stringify(ipc.tipo_contenido)}`.trim();
+
 
   const base = `Sos un experto en copywriting para el sector inmobiliario argentino.
 
