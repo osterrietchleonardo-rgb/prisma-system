@@ -10,6 +10,7 @@ export async function GET(request: Request) {
     const { data: { session }, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error && session?.user) {
+      console.log('Auth Callback Success: User logged in', session.user.email)
       const user = session.user
       const role = searchParams.get('role') as 'director' | 'asesor'
       const inviteCode = searchParams.get('inviteCode')
@@ -100,8 +101,14 @@ export async function GET(request: Request) {
 
     // Handle error case within 'if (code)'
     const errorMessage = error?.message || 'session_not_found'
+    console.error('Auth Callback Error (exchangeCodeForSession):', {
+      error,
+      errorMessage,
+      code: code ? 'present' : 'missing'
+    })
     return NextResponse.redirect(`${origin}/auth/auth-code-error?error=${encodeURIComponent(errorMessage)}`)
   }
 
+  console.error('Auth Callback Error: No code provided in URL')
   return NextResponse.redirect(`${origin}/auth/auth-code-error?error=no_code`)
 }
