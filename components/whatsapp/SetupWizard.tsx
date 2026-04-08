@@ -8,724 +8,572 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { connectWhatsApp, getInstanceStatus } from "@/app/actions/whatsapp"
-import { toast } from "sonner"
+import { connectWhatsApp, verifyWhatsAppWebhook } from "@/app/actions/whatsapp"
+import { cn } from "@/lib/utils"
 
-// =============================================
-// Step configuration
-// =============================================
+// Componente simple para copiar al portapapeles
+const CopyButton = ({ value, label }: { value: string, label: string }) => {
+  const [copied, setCopied] = useState(false)
 
-const STEPS = [
-  { number: 1, title: "Cuenta Meta", shortTitle: "Meta" },
-  { number: 2, title: "Creá tu app", shortTitle: "App" },
-  { number: 3, title: "Agregá WhatsApp", shortTitle: "WhatsApp" },
-  { number: 4, title: "System User y Token", shortTitle: "Token" },
-  { number: 5, title: "Configurar Webhook", shortTitle: "Webhook" },
-  { number: 6, title: "Credenciales", shortTitle: "Conectar" },
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error("Error al copiar:", err)
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between p-3 bg-slate-900/50 border border-slate-700/50 rounded-lg group">
+      <div className="flex flex-col gap-0.5 overflow-hidden">
+        <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">{label}</span>
+        <code className="text-xs text-blue-400 font-mono truncate">{value}</code>
+      </div>
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className={cn(
+          "h-8 w-8 shrink-0 transition-all",
+          copied ? "text-green-400" : "text-slate-400 hover:text-white"
+        )}
+        onClick={handleCopy}
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      </Button>
+    </div>
+  )
+}
+
+interface Step {
+  id: number
+  title: string
+  description: string
+}
+
+const steps: Step[] = [
+  { 
+    id: 1, 
+    title: "Requisitos", 
+    description: "Cuentas y acceso" 
+  },
+  { 
+    id: 2, 
+    title: "App en Meta", 
+    description: "Crear aplicación" 
+  },
+  { 
+    id: 3, 
+    title: "WhatsApp", 
+    description: "Configurar producto" 
+  },
+  { 
+    id: 4, 
+    title: "Número", 
+    description: "Vincular teléfono" 
+  },
+  { 
+    id: 5, 
+    title: "Webhook", 
+    description: "Activar avisos" 
+  },
+  { 
+    id: 6, 
+    title: "Conexión", 
+    description: "Vincular a PRISMA" 
+  }
 ]
-
-// =============================================
-// Main Component
-// =============================================
 
 export function SetupWizard() {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
-  const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set())
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
+  // Form State
+  const [formData, setFormData] = useState({
+    name: "",
+    phoneNumberId: "",
+    wabaId: "",
+    accessToken: "",
+    verifyToken: process.env.NEXT_PUBLIC_WHATSAPP_WEBHOOK_VERIFY_TOKEN || "PrismaSaaS2026_Verificacion!",
+    useExistingWebhook: true
+  })
 
-  // Step 6 form state (no form tag)
-  const [token, setToken] = useState("")
-  const [phoneNumberId, setPhoneNumberId] = useState("")
-  const [businessId, setBusinessId] = useState("")
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [isPolling, setIsPolling] = useState(false)
-  const [connectionError, setConnectionError] = useState("")
+  const [preReqs, setPreReqs] = useState({
+    metaAccount: false,
+    businessAccount: false,
+    phoneNumber: false
+  })
+
   const [showToken, setShowToken] = useState(false)
 
-  const toggleCheck = useCallback((step: number) => {
-    setCheckedSteps((prev) => {
-      const next = new Set(prev)
-      if (next.has(step)) next.delete(step)
-      else next.add(step)
-      return next
-    })
-  }, [])
+  const handleNext = () => {
+    if (currentStep < steps.length) {
+      setCurrentStep(prev => prev + 1)
+      window.scrollTo(0, 0)
+    }
+  }
 
-  const canAdvance = currentStep < 6
-    ? checkedSteps.has(currentStep)
-    : false
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(prev => prev - 1)
+      window.scrollTo(0, 0)
+    }
+  }
 
-  const progressValue = ((currentStep - 1) / (STEPS.length - 1)) * 100
-
-  // Step 6: Connect handler
   const handleConnect = async () => {
-    setConnectionError("")
-
-    if (token.length < 20) {
-      setConnectionError("El token debe tener al menos 20 caracteres.")
-      return
-    }
-    if (!/^\d{10,16}$/.test(phoneNumberId)) {
-      setConnectionError("Phone Number ID debe ser entre 10 y 16 dígitos.")
-      return
-    }
-    if (!/^\d{8,16}$/.test(businessId)) {
-      setConnectionError("Business ID debe ser entre 8 y 16 dígitos.")
-      return
-    }
-
-    setIsConnecting(true)
-
-    const result = await connectWhatsApp({
-      token,
-      phone_number_id: phoneNumberId,
-      business_id: businessId,
-    })
-
-    if (!result.success) {
-      setConnectionError(result.error || "Error al conectar.")
-      setIsConnecting(false)
-      return
-    }
-
-    toast.success("¡Instancia creada exitosamente!")
-    setIsConnecting(false)
-    setIsPolling(true)
-
-    // Polling: check status every 5s, max 60s (12 attempts)
-    let attempts = 0
-    const maxAttempts = 12
-    const agencySlice = "" // We don't have agency_id client-side, but the action already named it
-
-    const pollInterval = setInterval(async () => {
-      attempts++
-      if (attempts >= maxAttempts) {
-        clearInterval(pollInterval)
-        setIsPolling(false)
-        toast.info("Conexión en proceso. Recargá la página en unos minutos.")
-        router.refresh()
-        return
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      if (!formData.name || !formData.phoneNumberId || !formData.wabaId || !formData.accessToken) {
+        throw new Error("Por favor, completa todos los campos de credenciales.")
       }
 
-      // On successful create, just refresh to show the ChatInterface placeholder
-      // The page server component will query the new instance
-      clearInterval(pollInterval)
-      setIsPolling(false)
-      router.refresh()
-    }, 5000)
+      await connectWhatsApp({
+        name: formData.name,
+        phoneNumberId: formData.phoneNumberId,
+        wabaId: formData.wabaId,
+        accessToken: formData.accessToken,
+        verifyToken: formData.verifyToken
+      })
 
-    // First check after 5s
-    setTimeout(() => {
-      clearInterval(pollInterval)
-      setIsPolling(false)
-      router.refresh()
-    }, 5000)
+      router.push("/director/asesor-ia-whatsapp?connected=true")
+    } catch (err: any) {
+      setError(err.message || "Error al conectar con WhatsApp")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
+  const isNextDisabled = () => {
+    if (currentStep === 1) {
+      return !preReqs.metaAccount || !preReqs.businessAccount || !preReqs.phoneNumber
+    }
+    if (currentStep === 6) {
+      return !formData.name || !formData.phoneNumberId || !formData.wabaId || !formData.accessToken
+    }
+    return false
+  }
+
+  const progress = (currentStep / steps.length) * 100
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-500">
-      {/* Header */}
-      <div className="px-4 sm:px-6 lg:px-8 py-6 border-b bg-card/50">
-        <div className="flex items-center gap-3 mb-1">
-          <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-            <MessageSquare className="w-5 h-5 text-accent" />
-          </div>
+    <div className="max-w-4xl mx-auto space-y-8">
+      {/* Header & Progress */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-black tracking-tight">
-              Asesor IA en <span className="text-accent">WhatsApp</span>
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+              Configuración del Asesor IA
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Configurá tu instancia en 6 pasos simples
-            </p>
+            <p className="text-slate-400 mt-1">Sigue los pasos para conectar tu cuenta de WhatsApp Business</p>
+          </div>
+          <div className="text-right">
+            <span className="text-sm font-medium text-blue-400">Paso {currentStep} de {steps.length}</span>
+            <p className="text-xs text-slate-500">{steps[currentStep-1].title}</p>
           </div>
         </div>
-
-        {/* Progress bar — copper */}
-        <div className="mt-4">
-          <Progress
-            value={progressValue}
-            className="h-2"
-            indicatorClassName="bg-accent transition-all duration-500"
-          />
-          <p className="text-xs text-muted-foreground mt-1.5">
-            Paso {currentStep} de {STEPS.length}
-          </p>
-        </div>
-      </div>
-
-      {/* Content area */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
-        {/* Desktop: Left column — Steps sidebar (hidden on mobile) */}
-        <div className="hidden md:flex md:flex-col md:w-[260px] md:flex-shrink-0 border-r bg-card/30 p-4 sticky top-0">
-          <nav className="space-y-1">
-            {STEPS.map((step) => {
-              const isActive = currentStep === step.number
-              const isCompleted = checkedSteps.has(step.number)
-              const isPast = step.number < currentStep
-
-              return (
-                <button
-                  key={step.number}
-                  onClick={() => {
-                    if (step.number <= currentStep || checkedSteps.has(step.number - 1) || step.number === 1) {
-                      setCurrentStep(step.number)
-                    }
-                  }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left ${
-                    isActive
-                      ? "bg-accent/10 text-accent border border-accent/20"
-                      : isPast || isCompleted
-                      ? "text-muted-foreground hover:bg-muted/50"
-                      : "text-muted-foreground/50 cursor-not-allowed"
-                  }`}
-                >
-                  <div
-                    className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${
-                      isCompleted
-                        ? "bg-green-500 text-white"
-                        : isActive
-                        ? "bg-accent text-white"
-                        : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <Check className="w-4 h-4" />
-                    ) : (
-                      <span className="text-xs font-bold">{step.number}</span>
-                    )}
-                  </div>
-                  <span className="truncate">{step.title}</span>
-                </button>
-              )
-            })}
-          </nav>
-        </div>
-
-        {/* Mobile: Pills (visible only on mobile) */}
-        <div className="md:hidden absolute top-[140px] left-0 right-0 z-10 bg-background/80 backdrop-blur-sm border-b px-3 py-2">
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1">
-            {STEPS.map((step) => {
-              const isActive = currentStep === step.number
-              const isCompleted = checkedSteps.has(step.number)
-
-              return (
-                <button
-                  key={step.number}
-                  onClick={() => {
-                    if (step.number <= currentStep || checkedSteps.has(step.number - 1) || step.number === 1) {
-                      setCurrentStep(step.number)
-                    }
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
-                    isActive
-                      ? "bg-accent text-white"
-                      : isCompleted
-                      ? "bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {isCompleted && <Check className="w-3 h-3" />}
-                  {step.shortTitle}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Right column — Step content */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 md:pt-6 pt-16">
-          <div className="max-w-2xl mx-auto animate-in fade-in duration-300" key={currentStep}>
-            {currentStep === 1 && <Step1 checked={checkedSteps.has(1)} onToggle={() => toggleCheck(1)} />}
-            {currentStep === 2 && <Step2 checked={checkedSteps.has(2)} onToggle={() => toggleCheck(2)} />}
-            {currentStep === 3 && <Step3 checked={checkedSteps.has(3)} onToggle={() => toggleCheck(3)} />}
-            {currentStep === 4 && <Step4 checked={checkedSteps.has(4)} onToggle={() => toggleCheck(4)} />}
-            {currentStep === 5 && <Step5 checked={checkedSteps.has(5)} onToggle={() => toggleCheck(5)} />}
-            {currentStep === 6 && (
-              <Step6
-                token={token}
-                setToken={setToken}
-                phoneNumberId={phoneNumberId}
-                setPhoneNumberId={setPhoneNumberId}
-                businessId={businessId}
-                setBusinessId={setBusinessId}
-                showToken={showToken}
-                setShowToken={setShowToken}
-                isConnecting={isConnecting}
-                isPolling={isPolling}
-                connectionError={connectionError}
-                onConnect={handleConnect}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile: Fixed footer nav (visible only on mobile) */}
-      <div className="md:hidden flex items-center justify-between p-3 border-t bg-card/80 backdrop-blur-sm">
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={currentStep === 1}
-          onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
-        >
-          <ChevronLeft className="w-4 h-4 mr-1" />
-          Anterior
-        </Button>
-        <span className="text-xs text-muted-foreground font-medium">
-          {currentStep} / {STEPS.length}
-        </span>
-        {currentStep < 6 ? (
-          <Button
-            size="sm"
-            disabled={!canAdvance}
-            onClick={() => setCurrentStep((s) => Math.min(6, s + 1))}
-            className="bg-accent hover:bg-accent/90 text-white"
-          >
-            Siguiente
-            <ChevronRight className="w-4 h-4 ml-1" />
-          </Button>
-        ) : (
-          <div className="w-[100px]" />
-        )}
-      </div>
-
-      {/* Desktop: Bottom navigation (hidden on mobile) */}
-      <div className="hidden md:flex items-center justify-between px-8 py-4 border-t bg-card/50">
-        <Button
-          variant="outline"
-          disabled={currentStep === 1}
-          onClick={() => setCurrentStep((s) => Math.max(1, s - 1))}
-        >
-          <ChevronLeft className="w-4 h-4 mr-2" />
-          Anterior
-        </Button>
-        {currentStep < 6 && (
-          <Button
-            disabled={!canAdvance}
-            onClick={() => setCurrentStep((s) => Math.min(6, s + 1))}
-            className="bg-accent hover:bg-accent/90 text-white"
-          >
-            Siguiente
-            <ChevronRight className="w-4 h-4 ml-2" />
-          </Button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// =============================================
-// Step Components
-// =============================================
-
-interface StepCheckProps {
-  checked: boolean
-  onToggle: () => void
-}
-
-function CopyButton({ value, label }: { value: string; label: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(value)
-    setCopied(true)
-    toast.success(`${label} copiado al portapapeles`)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <div className="flex flex-col gap-1.5 w-full">
-      <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider ml-1">
-        {label}
-      </span>
-      <div className="flex gap-2">
-        <div className="flex-1 font-mono text-xs px-3 py-2.5 bg-muted/50 border rounded-lg overflow-hidden truncate">
-          {value}
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-9 w-9 shrink-0 hover:bg-accent hover:text-white transition-colors"
-          onClick={handleCopy}
-        >
-          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-function StepCheckbox({ checked, onToggle, label }: StepCheckProps & { label: string }) {
-  return (
-    <div
-      className="flex items-start gap-3 mt-6 p-4 rounded-xl border bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
-      onClick={onToggle}
-    >
-      <Checkbox
-        checked={checked}
-        onCheckedChange={onToggle}
-        className="mt-0.5 data-[state=checked]:bg-accent data-[state=checked]:border-accent"
-      />
-      <span className="text-sm font-medium leading-snug">{label}</span>
-    </div>
-  )
-}
-
-function OrderedList({ items }: { items: string[] }) {
-  return (
-    <ol className="space-y-2.5 mt-4">
-      {items.map((item, i) => (
-        <li key={i} className="flex gap-3 text-sm">
-          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-accent/10 text-accent text-xs font-bold flex items-center justify-center">
-            {i + 1}
-          </span>
-          <span className="text-muted-foreground leading-relaxed pt-0.5">{item}</span>
-        </li>
-      ))}
-    </ol>
-  )
-}
-
-// --- Step 1: Cuenta Meta ---
-function Step1({ checked, onToggle }: StepCheckProps) {
-  return (
-    <Card className="border-0 shadow-none bg-transparent">
-      <CardHeader className="px-0 pt-0">
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
-          <span className="text-accent">01.</span> Cuenta Meta Business
-        </CardTitle>
-        <CardDescription className="text-base">
-          Necesitás una cuenta de Meta for Developers para conectar WhatsApp a PRISMA.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-0">
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Si ya tenés una cuenta, verificá que tenés acceso como administrador al Business Manager vinculado.
-          </p>
-          <a
-            href="https://developers.facebook.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent/10 border border-accent/20 text-accent text-sm font-semibold hover:bg-accent/20 transition-colors"
-          >
-            <ExternalLink className="w-4 h-4" />
-            Ir a Meta for Developers
-          </a>
-        </div>
-
-        <StepCheckbox
-          checked={checked}
-          onToggle={onToggle}
-          label="Tengo acceso a Meta for Developers con permisos de administrador"
-        />
-      </CardContent>
-    </Card>
-  )
-}
-
-// --- Step 2: Crear App ---
-function Step2({ checked, onToggle }: StepCheckProps) {
-  return (
-    <Card className="border-0 shadow-none bg-transparent">
-      <CardHeader className="px-0 pt-0">
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
-          <span className="text-accent">02.</span> Creá tu App
-        </CardTitle>
-        <CardDescription className="text-base">
-          Creá una aplicación de tipo &quot;Empresa&quot; en Meta for Developers.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-0">
-        <OrderedList
-          items={[
-            'Ingresá a "Mis Apps" en Meta for Developers.',
-            'Clic en "Crear App".',
-            'Seleccioná tipo "Empresa".',
-            "Elegí un nombre descriptivo (ej: PRISMA WhatsApp).",
-            "Vinculá al Business Manager de tu inmobiliaria.",
-          ]}
-        />
-        <StepCheckbox checked={checked} onToggle={onToggle} label="Creé mi app en Meta for Developers" />
-      </CardContent>
-    </Card>
-  )
-}
-
-// --- Step 3: Agregar WhatsApp ---
-function Step3({ checked, onToggle }: StepCheckProps) {
-  return (
-    <Card className="border-0 shadow-none bg-transparent">
-      <CardHeader className="px-0 pt-0">
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
-          <span className="text-accent">03.</span> Agregá WhatsApp
-        </CardTitle>
-        <CardDescription className="text-base">
-          Habilitá el producto WhatsApp dentro de tu app.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-0">
-        <OrderedList
-          items={[
-            "En el Dashboard de tu app, buscá la sección de productos.",
-            'Encontrá "WhatsApp" y hacé clic en "Configurar".',
-            "Aceptá los términos y condiciones de uso de la API.",
-            "Verificá que el producto quede habilitado correctamente.",
-          ]}
-        />
-        <StepCheckbox checked={checked} onToggle={onToggle} label="Agregué el producto WhatsApp a mi app" />
-      </CardContent>
-    </Card>
-  )
-}
-
-// --- Step 4: System User + Token ---
-function Step4({ checked, onToggle }: StepCheckProps) {
-  return (
-    <Card className="border-0 shadow-none bg-transparent">
-      <CardHeader className="px-0 pt-0">
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
-          <span className="text-accent">04.</span> System User y Token
-        </CardTitle>
-        <CardDescription className="text-base">
-          Creá un System User en tu Business Manager para obtener un token de acceso permanente.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-0">
-        <Alert className="mb-5 border-amber-500/30 bg-amber-500/5">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-          <AlertTitle className="text-amber-600 dark:text-amber-400 font-bold">
-            ⚠️ Token visible UNA SOLA VEZ
-          </AlertTitle>
-          <AlertDescription className="text-amber-600/80 dark:text-amber-400/80">
-            Guardá el token inmediatamente después de generarlo. No podrás verlo de nuevo.
-          </AlertDescription>
-        </Alert>
-
-        <OrderedList
-          items={[
-            'Business Manager → Configuración → Usuarios del sistema → "Agregar". Asigná rol Admin.',
-            "Asigná la app creada al System User con permiso de Administración total.",
-            'Hacé clic en "Generar token". Activá los permisos: whatsapp_business_messaging y whatsapp_business_management.',
-            "¡Copiá el token inmediatamente! No se podrá recuperar.",
-          ]}
-        />
-
-        <StepCheckbox checked={checked} onToggle={onToggle} label="Generé y guardé mi token de acceso permanente" />
-      </CardContent>
-    </Card>
-  )
-}
-
-// --- Step 5: Configurar Webhook en Meta ---
-function Step5({ checked, onToggle }: StepCheckProps) {
-  const webhookVerifyToken = process.env.NEXT_PUBLIC_WHATSAPP_WEBHOOK_VERIFY_TOKEN
-    || "PrismaSaaS2026_Verificacion!"
-  
-  const evolutionUrl = process.env.NEXT_PUBLIC_EVOLUTION_API_URL
-    ? `${process.env.NEXT_PUBLIC_EVOLUTION_API_URL}/webhook/whatsapp`
-    : "https://vevolutionapiv.vakdor.com/webhook/whatsapp"
-
-  return (
-    <Card className="border-0 shadow-none bg-transparent">
-      <CardHeader className="px-0 pt-0">
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
-          <span className="text-accent">05.</span> Configurar Webhook en Meta
-        </CardTitle>
-        <CardDescription className="text-base">
-          Este paso es fundamental: le daremos a Meta la &quot;dirección&quot; de PRISMA para que los mensajes de tus clientes lleguen aquí.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-0">
-        <Alert className="mb-6 border-blue-500/30 bg-blue-500/5">
-          <Info className="h-4 w-4 text-blue-500" />
-          <AlertTitle className="text-blue-600 dark:text-blue-400 font-bold">
-            Guía paso a paso (Sin tecnicismos)
-          </AlertTitle>
-          <AlertDescription className="text-blue-600/80 dark:text-blue-400/80 space-y-2 mt-2">
-            <p>1. Entrá al panel de Meta Developers (el botón del Paso 1).</p>
-            <p>2. En el menú izquierdo, hacé clic en <strong>WhatsApp</strong> y luego en <strong>Configuración</strong>.</p>
-            <p>3. Buscá la sección que dice <strong>Webhooks</strong> y hacé clic en el botón <strong>Editar</strong>.</p>
-            <p>4. Copiá y pegá los dos valores que verás aquí abajo en los campos correspondientes de Meta.</p>
-            <p>5. Una vez guardado, hacé clic en el botón <strong>Administrar</strong> cerca de Webhooks, buscá la palabra <strong>messages</strong> y hacé clic en <strong>Suscribirse</strong>. ¡Sin esto no funciona!</p>
-          </AlertDescription>
-        </Alert>
-
-        <div className="space-y-4 p-5 rounded-2xl border bg-muted/20 mb-6">
-          <CopyButton 
-            label="URL de devolución de llamada (Callback URL)" 
-            value={evolutionUrl} 
-          />
-          <CopyButton 
-            label="Token de verificación (Verify Token)" 
-            value={webhookVerifyToken} 
+        
+        <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700/50">
+          <div 
+            className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-600 to-indigo-500 transition-all duration-500"
+            style={{ width: `${progress}%` }}
           />
         </div>
 
-        <Alert className="border-amber-500/30 bg-amber-500/5">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-          <AlertDescription className="text-amber-600/80 dark:text-amber-400/80 font-medium text-xs">
-            ⚠️ Si Meta te da error al verificar, asegurate de no haber copiado espacios en blanco al principio o al final de los textos.
-          </AlertDescription>
-        </Alert>
-
-        <StepCheckbox checked={checked} onToggle={onToggle} label='Ya configuré el webhook en Meta y activé la suscripción de "messages"' />
-      </CardContent>
-    </Card>
-  )
-}
-
-// --- Step 6: Credenciales + Connect ---
-interface Step6Props {
-  token: string
-  setToken: (v: string) => void
-  phoneNumberId: string
-  setPhoneNumberId: (v: string) => void
-  businessId: string
-  setBusinessId: (v: string) => void
-  showToken: boolean
-  setShowToken: (v: boolean) => void
-  isConnecting: boolean
-  isPolling: boolean
-  connectionError: string
-  onConnect: () => void
-}
-
-function Step6({
-  token, setToken,
-  phoneNumberId, setPhoneNumberId,
-  businessId, setBusinessId,
-  showToken, setShowToken,
-  isConnecting, isPolling,
-  connectionError, onConnect,
-}: Step6Props) {
-  const isValid = token.length >= 20 && /^\d{10,16}$/.test(phoneNumberId) && /^\d{8,16}$/.test(businessId)
-
-  return (
-    <Card className="border-0 shadow-none bg-transparent">
-      <CardHeader className="px-0 pt-0">
-        <CardTitle className="text-xl font-bold flex items-center gap-2">
-          <span className="text-accent">06.</span> Credenciales
-        </CardTitle>
-        <CardDescription className="text-base">
-          Ingresá los datos de tu app para conectar WhatsApp a PRISMA.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="px-0 space-y-5">
-        <div className="space-y-4 text-sm text-muted-foreground">
-          <div className="p-4 rounded-xl bg-accent/5 border border-accent/10">
-            <p className="font-semibold text-foreground mb-1">¿Dónde encuentro estos datos?</p>
-            <ul className="list-disc ml-5 space-y-1">
-              <li><strong>Phone Number ID:</strong> En el panel de Meta, ve a WhatsApp → Configuración de la API. Está en la sección &quot;Envía y recibe mensajes&quot;.</li>
-              <li><strong>Business ID:</strong> En la misma pantalla de arriba, lo verás debajo del nombre de tu cuenta de WhatsApp Business.</li>
-              <li><strong>Token:</strong> Es el código largo que generaste en el <strong>Paso 4</strong>.</li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Token */}
-        <div className="space-y-2">
-          <label htmlFor="token" className="text-sm font-semibold">Token de acceso permanente</label>
-          <div className="relative">
-            <Input
-              id="token"
-              type={showToken ? "text" : "password"}
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="EAAxxxxxxxx..."
-              className="pr-10 font-mono text-sm"
-            />
-            <button
-              type="button"
-              onClick={() => setShowToken(!showToken)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+        {/* Desktop Steps Indicator */}
+        <div className="hidden md:grid grid-cols-6 gap-2">
+          {steps.map((step) => (
+            <div 
+              key={step.id} 
+              className={cn(
+                "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
+                currentStep === step.id 
+                  ? "bg-blue-500/10 border-blue-500/50" 
+                  : currentStep > step.id
+                    ? "bg-slate-800/50 border-slate-700 opacity-60"
+                    : "bg-transparent border-transparent opacity-40"
+              )}
             >
-              {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          {token.length > 0 && token.length < 20 && (
-            <p className="text-xs text-destructive">Mínimo 20 caracteres</p>
-          )}
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
+                currentStep >= step.id ? "bg-blue-600 text-white" : "bg-slate-800 text-slate-500"
+              )}>
+                {currentStep > step.id ? <Check className="h-4 w-4" /> : step.id}
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-center line-clamp-1">{step.title}</span>
+            </div>
+          ))}
         </div>
+      </div>
 
-        {/* Phone Number ID */}
-        <div className="space-y-2">
-          <label htmlFor="phoneNumberId" className="text-sm font-semibold">Phone Number ID</label>
-          <Input
-            id="phoneNumberId"
-            type="text"
-            value={phoneNumberId}
-            onChange={(e) => setPhoneNumberId(e.target.value.replace(/\D/g, ""))}
-            placeholder="Ej: 1234567890123"
-            className="font-mono text-sm"
-            maxLength={16}
-          />
-          {phoneNumberId.length > 0 && !/^\d{10,16}$/.test(phoneNumberId) && (
-            <p className="text-xs text-destructive">Debe ser entre 10 y 16 dígitos</p>
+      {/* Step Content */}
+      <Card className="bg-slate-900/50 border-slate-800 backdrop-blur-xl">
+        <CardContent className="p-8">
+          {/* STEP 1: PRE-REQS */}
+          {currentStep === 1 && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold text-white">Antes de comenzar</h2>
+                <p className="text-slate-400">Asegúrate de tener acceso a lo siguiente:</p>
+              </div>
+
+              <div className="grid gap-4">
+                {[
+                  { id: 'metaAccount', label: "Cuenta personal de Facebook activa", desc: "Necesaria para entrar al portal de desarrolladores.", icon: <ExternalLink className="h-4 w-4" /> },
+                  { id: 'businessAccount', label: "Business Manager de Meta", desc: "Donde se gestionará tu negocio y línea de WhatsApp.", icon: <ExternalLink className="h-4 w-4" /> },
+                  { id: 'phoneNumber', label: "Número de teléfono para WhatsApp", desc: "No debe estar activo en WhatsApp/Business app actualmente.", icon: <MessageSquare className="h-4 w-4" /> }
+                ].map((item) => (
+                  <div 
+                    key={item.id}
+                    className={cn(
+                      "group flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer",
+                      preReqs[item.id as keyof typeof preReqs] 
+                        ? "bg-blue-500/5 border-blue-500/30" 
+                        : "bg-slate-800/30 border-white/5 hover:border-slate-700"
+                    )}
+                    onClick={() => setPreReqs(prev => ({ ...prev, [item.id]: !prev[item.id as keyof typeof preReqs] }))}
+                  >
+                    <div className={cn(
+                      "mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors",
+                      preReqs[item.id as keyof typeof preReqs] ? "bg-blue-600 border-blue-600" : "border-slate-600"
+                    )}>
+                      {preReqs[item.id as keyof typeof preReqs] && <Check className="h-3 w-3 text-white" />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white">{item.label}</span>
+                        <div className="p-1 rounded bg-white/5 text-slate-400 group-hover:text-blue-400 transition-colors">
+                          {item.icon}
+                        </div>
+                      </div>
+                      <p className="text-sm text-slate-500 mt-0.5">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-4">
+                <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-200/80 leading-relaxed">
+                  <span className="font-bold text-amber-400">Importante:</span> El número de teléfono que elijas <span className="font-bold">no debe estar activo</span> en la aplicación normal de WhatsApp o WhatsApp Business de tu celular. Si lo está, deberás eliminar la cuenta antes de vincularla a la API.
+                </p>
+              </div>
+            </div>
           )}
-        </div>
 
-        {/* Business ID */}
-        <div className="space-y-2">
-          <label htmlFor="businessId" className="text-sm font-semibold">Business ID</label>
-          <Input
-            id="businessId"
-            type="text"
-            value={businessId}
-            onChange={(e) => setBusinessId(e.target.value.replace(/\D/g, ""))}
-            placeholder="Ej: 123456789"
-            className="font-mono text-sm"
-            maxLength={16}
-          />
-          {businessId.length > 0 && !/^\d{8,16}$/.test(businessId) && (
-            <p className="text-xs text-destructive">Debe ser entre 8 y 16 dígitos</p>
+          {/* STEP 2: CREATE META APP */}
+          {currentStep === 2 && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold text-white">Crear aplicación en Meta</h2>
+                <p className="text-slate-400">Sigue este proceso en el portal de desarrolladores</p>
+              </div>
+
+              <div className="space-y-4">
+                {[
+                  { step: "1", text: "Ve a Meta for Developers e inicia sesión.", link: "https://developers.facebook.com" },
+                  { step: "2", text: "Haz clic en 'Mis aplicaciones' y luego en 'Crear aplicación'." },
+                  { step: "3", text: "Selecciona el tipo de uso 'Otro' y luego 'Empresa' como tipo de aplicación." },
+                  { step: "4", text: "Asigna un nombre (ej: 'PRISMA Asesor') y vincula tu cuenta comercial de Meta (Business Account)." }
+                ].map((item) => (
+                  <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-slate-800/30 border border-white/5">
+                    <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                      {item.step}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-slate-300 font-medium">{item.text}</p>
+                      {item.link && (
+                        <a 
+                          href={item.link} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-2 w-fit underline decoration-blue-400/30"
+                        >
+                          Ir al portal <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
-        </div>
 
-        {/* Error */}
-        {connectionError && (
-          <Alert variant="destructive" className="border-destructive/30">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{connectionError}</AlertDescription>
-          </Alert>
-        )}
+          {/* STEP 3: CONFIGURE WHATSAPP */}
+          {currentStep === 3 && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold text-white">Activar Producto WhatsApp</h2>
+                <p className="text-slate-400">Añade la funcionalidad a tu aplicación de Meta</p>
+              </div>
 
-        {/* Connect button */}
-        <Button
-          onClick={onConnect}
-          disabled={!isValid || isConnecting || isPolling}
-          className="w-full bg-accent hover:bg-accent/90 text-white h-12 text-base font-bold"
-        >
-          {isConnecting ? (
-            <>
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Conectando...
-            </>
-          ) : isPolling ? (
-            <>
-              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Verificando conexión...
-            </>
+              <div className="space-y-4">
+                {[
+                  { step: "1", text: "En el panel izquierdo de tu aplicación en Meta, busca 'Añadir producto'." },
+                  { step: "2", text: "Busca 'WhatsApp' y haz clic en el botón 'Configurar'." },
+                  { step: "3", text: "Se te pedirá elegir una cuenta comercial (Business Account). Selecciona la correcta.", warning: "Asegúrate de que sea la misma que usas para administrar tu negocio." }
+                ].map((item) => (
+                  <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-slate-800/30 border border-white/5">
+                    <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                      {item.step}
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <p className="text-slate-300 font-medium">{item.text}</p>
+                      {item.warning && (
+                        <div className="flex items-center gap-2 p-2 rounded bg-amber-500/5 text-[10px] text-amber-500/80 font-bold uppercase tracking-wider border border-amber-500/10">
+                          <Info className="h-3 w-3" />
+                          {item.warning}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: PHONE NUMBER */}
+          {currentStep === 4 && (
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h2 className="text-xl font-bold text-white">Vincular Número de Teléfono</h2>
+                <p className="text-slate-400">Registra tu línea oficial de WhatsApp</p>
+              </div>
+
+              <div className="space-y-4">
+                {[
+                  { step: "1", text: "Ve a WhatsApp > Configuración de la API en el menú lateral." },
+                  { step: "2", text: "Baja hasta 'Paso 5: Añade un número de teléfono' y haz clic en 'Añadir número de teléfono'." },
+                  { step: "3", text: "Completa el perfil público de tu cuenta de WhatsApp (Nombre, Horario, etc)." },
+                  { step: "4", text: "Ingresa el número y verifícalo mediante el código SMS o llamada que te llegará." }
+                ].map((item) => (
+                  <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-slate-800/30 border border-white/5">
+                    <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                      {item.step}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-slate-300 font-medium">{item.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 5: WEBHOOK CONFIGURATION */}
+          {currentStep === 5 && (
+            <div className="space-y-8">
+              <div className="space-y-3 border-b border-slate-800 pb-6">
+                <h2 className="text-2xl font-bold text-white">Configurar Webhook</h2>
+                <p className="text-slate-400 leading-relaxed">
+                  Para que PRISMA reciba los mensajes en tiempo real, Meta necesita saber a dónde enviarlos.
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">1</div>
+                    <h3 className="font-bold text-white">Copia estos valores en Meta</h3>
+                  </div>
+                  
+                  <div className="bg-slate-950/50 p-6 rounded-2xl border border-slate-800 space-y-4">
+                    <p className="text-xs text-slate-500 font-medium mb-2">Dentro de Meta: <span className="text-slate-300">WhatsApp &gt; Configuración &gt; Seccion Webhooks</span></p>
+                    <div className="grid gap-4">
+                      <CopyButton 
+                        label="Callback URL (URL de retorno)" 
+                        value="https://vevolutionapiv.vakdor.com/webhook/whatsapp" 
+                      />
+                      <CopyButton 
+                        label="Verify Token (Token de verificación)" 
+                        value={formData.verifyToken} 
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs shrink-0">2</div>
+                    <h3 className="font-bold text-white">Activar la suscripción</h3>
+                  </div>
+                  
+                  <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <Check className="h-5 w-5 text-green-500 mt-1 shrink-0" />
+                      <p className="text-sm text-slate-300 leading-relaxed">
+                        Una vez guardados los valores anteriores, haz clic en <span className="text-white font-bold">"Administrar"</span> (Manage) dentro de la misma sección de Webhooks.
+                      </p>
+                    </div>
+                    <div className="flex items-start gap-3 pl-8">
+                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                      <p className="text-sm text-slate-300">
+                        Busca el campo llamado <span className="text-blue-400 font-mono font-bold">messages</span> y haz clic en <span className="text-white font-bold">Suscribirse</span>.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-blue-500/5 border border-blue-500/10 flex gap-4">
+                  <Info className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-200/80 leading-relaxed italic">
+                    Esto le dice a Facebook: "Cada vez que PRISMA reciba un mensaje nuevo de un cliente, avísale al servidor de PRISMA".
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: FINALIZE & CONNECT */}
+          {currentStep === 6 && (
+            <div className="space-y-6">
+              <div className="space-y-3 border-b border-slate-800 pb-6">
+                <h2 className="text-2xl font-bold text-white">Conectar con PRISMA</h2>
+                <p className="text-slate-400 leading-relaxed">
+                  Copia los datos finales desde el portal de Meta para activar tu inteligencia artificial.
+                </p>
+              </div>
+
+              <div className="grid gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">Nombre de la instancia</label>
+                  <Input 
+                    placeholder="Ej: Inmobiliaria Central"
+                    className="h-12 bg-slate-950 border-slate-800"
+                    value={formData.name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  />
+                  <p className="text-xs text-slate-600 italic">Solo para identificarla dentro de tu panel.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">Identificador de teléfono</label>
+                      <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded text-blue-400">Phone Number ID</span>
+                    </div>
+                    <Input 
+                      placeholder="15 dígitos numéricos..."
+                      className="h-12 bg-slate-950 border-slate-800 font-mono text-sm"
+                      value={formData.phoneNumberId}
+                      onChange={(e) => setFormData(prev => ({ ...prev, phoneNumberId: e.target.value }))}
+                    />
+                    <p className="text-[11px] text-slate-500">Se encuentra en <span className="text-slate-300">WhatsApp &gt; Configuración de la API</span>.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">ID de Cuenta Business</label>
+                      <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded text-blue-400">Business Account ID</span>
+                    </div>
+                    <Input 
+                      placeholder="15 dígitos numéricos..."
+                      className="h-12 bg-slate-950 border-slate-800 font-mono text-sm"
+                      value={formData.wabaId}
+                      onChange={(e) => setFormData(prev => ({ ...prev, wabaId: e.target.value }))}
+                    />
+                    <p className="text-[11px] text-slate-500">Está justo debajo del ID de teléfono en Meta.</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">Token de Acceso Permanente</label>
+                    <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded text-amber-500">System User Token</span>
+                  </div>
+                  <div className="relative">
+                    <Input 
+                      type={showToken ? "text" : "password"}
+                      placeholder="Comienza con EA..."
+                      className="h-12 bg-slate-950 border-slate-800 pr-12 font-mono text-sm"
+                      value={formData.accessToken}
+                      onChange={(e) => setFormData(prev => ({ ...prev, accessToken: e.target.value }))}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1 text-slate-500 hover:text-white"
+                      onClick={() => setShowToken(!showToken)}
+                    >
+                      {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                    <p className="text-[11px] text-amber-200/70 leading-relaxed italic">
+                      <span className="font-bold uppercase text-amber-500">Nota:</span> No uses el token "temporal" que expira en 24h. Debes crear un <span className="text-white font-bold">Usuario del Sistema</span> en la configuración de tu negocio y generar un token allí.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex gap-3 text-red-500 animate-in fade-in slide-in-from-top-2">
+                  <AlertTriangle className="h-5 w-5 shrink-0" />
+                  <p className="text-sm font-medium">{error}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+
+        {/* Footer Navigation */}
+        <div className="p-6 border-t border-slate-800 flex items-center justify-between bg-slate-900/50 rounded-b-xl">
+          <Button
+            variant="ghost"
+            className="text-slate-400 hover:text-white"
+            onClick={handleBack}
+            disabled={currentStep === 1 || isLoading}
+          >
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Anterior
+          </Button>
+
+          {currentStep === steps.length ? (
+            <Button
+              className="bg-blue-600 hover:bg-blue-500 text-white px-8 h-12 rounded-xl font-bold shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              onClick={handleConnect}
+              disabled={isLoading || isNextDisabled()}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Conectando...
+                </>
+              ) : (
+                "Finalizar Conexión"
+              )}
+            </Button>
           ) : (
-            <>
-              <MessageSquare className="w-5 h-5 mr-2" />
-              Conectar WhatsApp
-            </>
+            <Button
+              className={cn(
+                "bg-slate-100 hover:bg-white text-slate-900 px-8 h-12 rounded-xl font-bold transition-all hover:scale-[1.02] active:scale-[0.98]",
+                isNextDisabled() && "opacity-50 cursor-not-allowed"
+              )}
+              onClick={handleNext}
+              disabled={isNextDisabled()}
+            >
+              Siguiente
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
           )}
-        </Button>
+        </div>
+      </Card>
 
-        {/* Polling badge */}
-        {isPolling && (
-          <div className="flex items-center justify-center gap-2">
-            <Badge variant="secondary" className="bg-accent/10 text-accent border-accent/20">
-              <Loader2 className="w-3 h-3 animate-spin mr-1.5" />
-              Conectando... esperá unos segundos
-            </Badge>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {/* Help Note */}
+      <div className="flex justify-center flex-col items-center gap-2">
+        <p className="text-slate-500 text-sm">¿Necesitas ayuda con la configuración?</p>
+        <div className="flex gap-4">
+          <a href="#" className="text-xs font-bold text-blue-400 hover:underline">Video Tutorial</a>
+          <span className="text-slate-700">|</span>
+          <a href="#" className="text-xs font-bold text-blue-400 hover:underline">Documentación PDF</a>
+          <span className="text-slate-700">|</span>
+          <a href="#" className="text-xs font-bold text-blue-400 hover:underline">Soporte Técnico</a>
+        </div>
+      </div>
+    </div>
   )
 }
