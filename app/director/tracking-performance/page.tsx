@@ -45,7 +45,7 @@ export default function TrackingPerformancePage() {
   });
 
   return (
-    <div className="max-w-7xl mx-auto p-4 md:p-8 flex flex-col gap-6 md:gap-8 pb-32">
+    <div className="w-full p-4 md:p-8 flex flex-col gap-6 md:gap-8 pb-32">
       {/* Header Section */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
         <div className="space-y-1">
