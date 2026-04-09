@@ -159,14 +159,14 @@ export function SetupWizard() {
   const progress = (currentStep / steps.length) * 100
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="flex flex-col h-full space-y-8 p-4 md:p-8 pt-6">
       {/* Header & Progress */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent to-accent/60">
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
               Configuración del Asesor IA
-            </h1>
+            </h2>
             <p className="text-muted-foreground mt-1">Sigue los pasos para conectar tu cuenta de WhatsApp Business</p>
           </div>
           <div className="text-right">

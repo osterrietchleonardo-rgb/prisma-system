@@ -49,9 +49,9 @@ export default function TrackingPerformancePage() {
       {/* Header Section */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
         <div className="space-y-1">
-          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight bg-gradient-to-r from-accent to-accent/60 bg-clip-text text-transparent">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
             Gestión de Leads
-          </h1>
+          </h2>
           <p className="text-xs md:text-sm lg:text-base text-muted-foreground max-w-md hidden sm:block">
             Centralizá el seguimiento de tus prospectos y optimizá el Score de Profesionalismo.
           </p>

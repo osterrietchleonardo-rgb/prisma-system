@@ -45,10 +45,10 @@ export function ContratosIAPage() {
   return (
     <div className="w-full px-4 md:px-8 py-8 space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-black tracking-tight flex items-center gap-3">
-          <FileSignature className="w-10 h-10 text-accent" />
-          Contratos <span className="text-accent">IA</span>
-        </h1>
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+          <FileSignature className="w-8 h-8 text-accent" />
+          Contratos IA
+        </h2>
         <p className="text-muted-foreground text-lg max-w-2xl">
           Genera contratos inmobiliarios profesionales, gestiona plantillas y firma digitalmente tus documentos.
         </p>

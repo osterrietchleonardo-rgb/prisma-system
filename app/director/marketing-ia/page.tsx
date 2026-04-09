@@ -5,12 +5,12 @@ import { Bot, UserSearch, History, Sparkles } from "lucide-react"
 
 export default function MarketingIAPage() {
   return (
-    <div className="container mx-auto py-8 space-y-8 animate-in fade-in duration-700">
+    <div className="w-full px-4 md:px-8 py-8 space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-black tracking-tight flex items-center gap-3">
-          <Bot className="w-10 h-10 text-accent" />
-          Marketing IA <span className="text-accent">Pro</span>
-        </h1>
+        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+          <Bot className="w-8 h-8 text-accent" />
+          Marketing IA Pro
+        </h2>
         <p className="text-muted-foreground text-lg max-w-2xl">
           Cree perfiles de cliente ideal, genere copies estratégicos y diseñe anuncios de alto impacto en segundos.
         </p>
