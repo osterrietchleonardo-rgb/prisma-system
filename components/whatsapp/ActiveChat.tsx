@@ -272,7 +272,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack }: Acti
           )}
 
           {/* Avatar */}
-          <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-sm flex-shrink-0">
             {initial}
           </div>
 
@@ -566,12 +566,12 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
       <div className="flex justify-start">
         <div className="max-w-[70%]">
           <div className="flex items-center gap-1.5 mb-1">
-            <Bot className="w-3 h-3 text-orange-500" />
-            <span className="text-xs font-semibold text-orange-600 dark:text-orange-400">
+            <Bot className="w-3 h-3 text-accent" />
+            <span className="text-xs font-semibold text-accent">
               Asesor IA
             </span>
           </div>
-          <div className="bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-2xl rounded-bl-sm px-4 py-2.5">
+          <div className="bg-accent/5 dark:bg-accent/10 border border-accent/20 rounded-2xl rounded-bl-sm px-4 py-2.5">
             <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">{time}</p>
@@ -585,12 +585,12 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
       <div className="flex justify-start">
         <div className="max-w-[70%]">
           <div className="flex items-center gap-1.5 mb-1">
-            <User className="w-3 h-3 text-blue-500" />
-            <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+            <User className="w-3 h-3 text-primary" />
+            <span className="text-xs font-semibold text-primary">
               Director
             </span>
           </div>
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-2xl rounded-bl-sm px-4 py-2.5">
+          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl rounded-bl-sm px-4 py-2.5">
             <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">{time}</p>

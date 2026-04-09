@@ -182,12 +182,12 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                   onClick={() => onSelect(conv)}
                   className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors mb-0.5 ${
                     isActive
-                      ? "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
+                      ? "bg-accent/5 dark:bg-accent/10 border border-accent/20"
                       : "hover:bg-muted/50"
                   }`}
                 >
                   {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-sm flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-sm flex-shrink-0">
                     {initial}
                   </div>
 

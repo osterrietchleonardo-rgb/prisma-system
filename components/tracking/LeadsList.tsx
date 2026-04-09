@@ -118,7 +118,7 @@ export function LeadsList({ leads, onRefresh }: Props) {
                         <DropdownMenuItem className="gap-2">
                           <Edit2 className="w-4 h-4" /> Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="gap-2 text-primary font-medium">
+                        <DropdownMenuItem className="gap-2 text-accent font-medium">
                           <Activity className="w-4 h-4" /> Registrar Actividad
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -166,7 +166,7 @@ export function LeadsList({ leads, onRefresh }: Props) {
                            <h4 className="text-xs font-bold uppercase text-muted-foreground flex items-center gap-1.5">
                              <Activity className="w-3 h-3" /> Feedback IA
                            </h4>
-                           <div className="p-4 rounded-xl bg-primary/5 border border-primary/10">
+                           <div className="p-4 rounded-xl bg-accent/5 border border-accent/10">
                               <p className="text-sm italic text-foreground/80">
                                 {lead.wa_resumen || "Análisis cualitativo pendiente de procesamiento."}
                               </p>

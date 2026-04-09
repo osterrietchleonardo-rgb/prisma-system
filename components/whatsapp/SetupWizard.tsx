@@ -29,7 +29,7 @@ const CopyButton = ({ value, label }: { value: string, label: string }) => {
     <div className="flex items-center justify-between p-3 bg-muted/50 border border-border rounded-lg group">
       <div className="flex flex-col gap-0.5 overflow-hidden">
         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
-        <code className="text-xs text-primary font-mono truncate">{value}</code>
+        <code className="text-xs text-accent font-mono truncate">{value}</code>
       </div>
       <Button 
         variant="ghost" 
@@ -164,20 +164,20 @@ export function SetupWizard() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
+            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent to-accent/60">
               Configuración del Asesor IA
             </h1>
             <p className="text-muted-foreground mt-1">Sigue los pasos para conectar tu cuenta de WhatsApp Business</p>
           </div>
           <div className="text-right">
-            <span className="text-sm font-medium text-primary">Paso {currentStep} de {steps.length}</span>
+            <span className="text-sm font-medium text-accent">Paso {currentStep} de {steps.length}</span>
             <p className="text-xs text-muted-foreground">{steps[currentStep-1].title}</p>
           </div>
         </div>
         
         <div className="relative h-2 bg-muted rounded-full overflow-hidden border">
-          <div 
-            className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-primary/60 transition-all duration-500"
+            <div 
+              className="absolute top-0 left-0 h-full bg-gradient-to-r from-accent to-accent/60 transition-all duration-500"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -190,7 +190,7 @@ export function SetupWizard() {
               className={cn(
                 "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all",
                 currentStep === step.id 
-                  ? "bg-primary/10 border-primary/50" 
+                  ? "bg-accent/10 border-accent/50" 
                   : currentStep > step.id
                     ? "bg-muted/50 border-border opacity-60"
                     : "bg-transparent border-transparent opacity-40"
@@ -198,7 +198,7 @@ export function SetupWizard() {
             >
               <div className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold",
-                currentStep >= step.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                currentStep >= step.id ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground"
               )}>
                 {currentStep > step.id ? <Check className="h-4 w-4" /> : step.id}
               </div>
@@ -230,21 +230,21 @@ export function SetupWizard() {
                     className={cn(
                       "group flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer",
                       preReqs[item.id as keyof typeof preReqs] 
-                        ? "bg-primary/5 border-primary/30" 
-                        : "bg-muted/30 border-border hover:border-primary/50"
+                        ? "bg-accent/5 border-accent/30" 
+                        : "bg-muted/30 border-border hover:border-accent/50"
                     )}
                     onClick={() => setPreReqs(prev => ({ ...prev, [item.id]: !prev[item.id as keyof typeof preReqs] }))}
                   >
                     <div className={cn(
                       "mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors",
-                      preReqs[item.id as keyof typeof preReqs] ? "bg-primary border-primary" : "border-input"
+                      preReqs[item.id as keyof typeof preReqs] ? "bg-accent border-accent" : "border-input"
                     )}>
-                      {preReqs[item.id as keyof typeof preReqs] && <Check className="h-3 w-3 text-primary-foreground" />}
+                      {preReqs[item.id as keyof typeof preReqs] && <Check className="h-3 w-3 text-accent-foreground" />}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-foreground">{item.label}</span>
-                        <div className="p-1 rounded bg-muted text-muted-foreground group-hover:text-primary transition-colors">
+                        <div className="p-1 rounded bg-muted text-muted-foreground group-hover:text-accent transition-colors">
                           {item.icon}
                         </div>
                       </div>
@@ -279,7 +279,7 @@ export function SetupWizard() {
                   { step: "4", text: "Asigna un nombre (ej: 'PRISMA Asesor') y vincula tu cuenta comercial de Meta (Business Account)." }
                 ].map((item) => (
                   <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                    <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">
+                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold text-xs">
                       {item.step}
                     </div>
                     <div className="flex-1">
@@ -289,7 +289,7 @@ export function SetupWizard() {
                           href={item.link} 
                           target="_blank" 
                           rel="noreferrer"
-                          className="text-xs text-primary hover:underline flex items-center gap-1 mt-2 w-fit"
+                          className="text-xs text-accent hover:underline flex items-center gap-1 mt-2 w-fit"
                         >
                           Ir al portal <ExternalLink className="h-3 w-3" />
                         </a>
@@ -316,7 +316,7 @@ export function SetupWizard() {
                   { step: "3", text: "Se te pedirá elegir una cuenta comercial (Business Account). Selecciona la correcta.", warning: "Asegúrate de que sea la misma que usas para administrar tu negocio." }
                 ].map((item) => (
                   <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                    <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">
+                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold text-xs">
                       {item.step}
                     </div>
                     <div className="flex-1 space-y-2">
@@ -350,7 +350,7 @@ export function SetupWizard() {
                   { step: "4", text: "Ingresa el número y verifícalo mediante el código SMS o llamada que te llegará." }
                 ].map((item) => (
                   <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                    <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs">
+                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold text-xs">
                       {item.step}
                     </div>
                     <div className="flex-1">
@@ -375,7 +375,7 @@ export function SetupWizard() {
               <div className="space-y-6">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0">1</div>
+                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold text-xs shrink-0">1</div>
                     <h3 className="font-bold text-foreground">Copia estos valores en Meta</h3>
                   </div>
                   
@@ -396,7 +396,7 @@ export function SetupWizard() {
 
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-xs shrink-0">2</div>
+                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold text-xs shrink-0">2</div>
                     <h3 className="font-bold text-foreground">Activar la suscripción</h3>
                   </div>
                   
@@ -404,20 +404,20 @@ export function SetupWizard() {
                     <div className="flex items-start gap-3">
                       <Check className="h-5 w-5 text-green-600 mt-1 shrink-0" />
                       <p className="text-sm text-foreground leading-relaxed">
-                        Una vez guardados los valores anteriores, haz clic en <span className="text-primary font-bold">"Administrar"</span> (Manage) dentro de la misma sección de Webhooks.
+                        Una vez guardados los valores anteriores, haz clic en <span className="text-accent font-bold">"Administrar"</span> (Manage) dentro de la misma sección de Webhooks.
                       </p>
                     </div>
                     <div className="flex items-start gap-3 pl-8">
-                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
                       <p className="text-sm text-muted-foreground">
-                        Busca el campo llamado <span className="text-primary font-mono font-bold">messages</span> y haz clic en <span className="text-foreground font-bold">Suscribirse</span>.
+                        Busca el campo llamado <span className="text-accent font-mono font-bold">messages</span> y haz clic en <span className="text-foreground font-bold">Suscribirse</span>.
                       </p>
                     </div>
                   </div>
                 </div>
 
                 <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex gap-4">
-                  <Info className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                  <Info className="h-5 w-5 text-accent shrink-0 mt-0.5" />
                   <p className="text-sm text-muted-foreground leading-relaxed italic">
                     Esto le dice a Facebook: "Cada vez que PRISMA reciba un mensaje nuevo de un cliente, avísale al servidor de PRISMA".
                   </p>
@@ -452,7 +452,7 @@ export function SetupWizard() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Identificador de teléfono</label>
-                      <span className="text-[10px] bg-primary/5 px-2 py-0.5 rounded text-primary">Phone Number ID</span>
+                      <span className="text-[10px] bg-accent/5 px-2 py-0.5 rounded text-accent">Phone Number ID</span>
                     </div>
                     <Input 
                       placeholder="15 dígitos numéricos..."
@@ -466,7 +466,7 @@ export function SetupWizard() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-bold text-muted-foreground uppercase tracking-wider">ID de Cuenta Business</label>
-                      <span className="text-[10px] bg-primary/5 px-2 py-0.5 rounded text-primary">Business Account ID</span>
+                      <span className="text-[10px] bg-accent/5 px-2 py-0.5 rounded text-accent">Business Account ID</span>
                     </div>
                     <Input 
                       placeholder="15 dígitos numéricos..."
@@ -532,7 +532,7 @@ export function SetupWizard() {
 
           {currentStep === steps.length ? (
             <Button
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 h-12 rounded-xl font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+              className="bg-accent hover:bg-accent/90 text-accent-foreground px-8 h-12 rounded-xl font-bold shadow-lg shadow-accent/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
               onClick={handleConnect}
               disabled={isLoading || isNextDisabled()}
             >
@@ -565,11 +565,11 @@ export function SetupWizard() {
       <div className="flex justify-center flex-col items-center gap-2">
         <p className="text-muted-foreground text-sm">¿Necesitas ayuda con la configuración?</p>
         <div className="flex gap-4">
-          <a href="#" className="text-xs font-bold text-primary hover:underline">Video Tutorial</a>
+          <a href="#" className="text-xs font-bold text-accent hover:underline">Video Tutorial</a>
           <span className="text-border">|</span>
-          <a href="#" className="text-xs font-bold text-primary hover:underline">Documentación PDF</a>
+          <a href="#" className="text-xs font-bold text-accent hover:underline">Documentación PDF</a>
           <span className="text-border">|</span>
-          <a href="#" className="text-xs font-bold text-primary hover:underline">Soporte Técnico</a>
+          <a href="#" className="text-xs font-bold text-accent hover:underline">Soporte Técnico</a>
         </div>
       </div>
     </div>

@@ -34,7 +34,7 @@ export function WAMetricsPreview({ quant, qual, isAnalyzing }: Props) {
         <MetricCard
           label="Total Mensajes"
           value={quant.wa_total_mensajes ?? 0}
-          icon={<MessageSquare className="w-3.5 h-3.5 text-primary" />}
+          icon={<MessageSquare className="w-3.5 h-3.5 text-accent" />}
         />
         <MetricCard
           label="Ratio MSGs"
@@ -48,7 +48,7 @@ export function WAMetricsPreview({ quant, qual, isAnalyzing }: Props) {
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-semibold flex items-center gap-2">
             Análisis Cualitativo (IA)
-            {isAnalyzing && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
+            {isAnalyzing && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
           </h4>
           {!qual && !isAnalyzing && (
             <Badge variant="outline" className="text-[10px]">Sin datos</Badge>
@@ -96,7 +96,7 @@ export function WAMetricsPreview({ quant, qual, isAnalyzing }: Props) {
 
 function MetricCard({ label, value, icon, description }: any) {
   return (
-    <Card className="p-3 bg-background/50 border-muted-foreground/10 hover:border-primary/20 transition-all">
+    <Card className="p-3 bg-background/50 border-muted-foreground/10 hover:border-accent/20 transition-all">
       <div className="flex items-center gap-2 mb-1.5">
         {icon}
         <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{label}</span>

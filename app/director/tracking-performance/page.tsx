@@ -49,7 +49,7 @@ export default function TrackingPerformancePage() {
       {/* Header Section */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
         <div className="space-y-1">
-          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight bg-gradient-to-r from-accent to-accent/60 bg-clip-text text-transparent">
             Gestión de Leads
           </h1>
           <p className="text-xs md:text-sm lg:text-base text-muted-foreground max-w-md hidden sm:block">
@@ -59,7 +59,7 @@ export default function TrackingPerformancePage() {
 
         <Button 
           size="sm" 
-          className="h-10 md:h-12 bg-primary shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all font-bold group px-4"
+          className="h-10 md:h-12 bg-accent shadow-xl shadow-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all font-bold group px-4 text-accent-foreground"
           onClick={() => setIsDrawerOpen(true)}
         >
           <Plus className="w-4 h-4 md:w-5 md:h-5 mr-2 group-hover:rotate-90 transition-transform" />
@@ -92,7 +92,7 @@ export default function TrackingPerformancePage() {
 
         {isLoading ? (
           <div className="h-64 flex flex-col items-center justify-center gap-4 text-muted-foreground border-2 border-dashed rounded-3xl bg-muted/5">
-             <Loader2 className="w-8 h-8 animate-spin text-primary" />
+             <Loader2 className="w-8 h-8 animate-spin text-accent" />
              <p className="font-medium">Cargando tus leads...</p>
           </div>
         ) : (

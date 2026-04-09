@@ -89,7 +89,7 @@ export function LeadForm({ onSuccess }: Props) {
       
       {/* SECCIÓN 1: Datos del lead */}
       <section className="space-y-4">
-        <header className="flex items-center gap-2 text-primary font-semibold">
+        <header className="flex items-center gap-2 text-accent font-semibold">
            <Plus className="w-4 h-4" />
            <h3 className="text-sm uppercase tracking-wider">Datos del Lead</h3>
         </header>
@@ -158,7 +158,7 @@ export function LeadForm({ onSuccess }: Props) {
 
       {/* SECCIÓN 2: Actividad registrada */}
       <section className="space-y-4">
-        <header className="flex items-center gap-2 text-primary font-semibold">
+        <header className="flex items-center gap-2 text-accent font-semibold">
            <Briefcase className="w-4 h-4" />
            <h3 className="text-sm uppercase tracking-wider">Actividad Registrada</h3>
         </header>
@@ -237,14 +237,14 @@ export function LeadForm({ onSuccess }: Props) {
 
       {/* SECCIÓN 4: Análisis de WhatsApp */}
       <section className="space-y-4">
-        <header className="flex items-center gap-2 text-primary font-semibold">
+        <header className="flex items-center gap-2 text-accent font-semibold">
            <MessageCircle className="w-4 h-4" />
            <h3 className="text-sm uppercase tracking-wider">Análisis WhatsApp</h3>
         </header>
 
         <p className="text-xs text-muted-foreground leading-relaxed">
           Subí el historial de chat para obtener métricas de tiempo de respuesta, 
-          ratio de conversación y <span className="font-semibold text-primary">Score de Profesionalismo</span> vía IA.
+          ratio de conversación y <span className="font-semibold text-accent">Score de Profesionalismo</span> vía IA.
         </p>
 
         <WAUploader onDataCalculated={handleWADataCalculated} onAnalysisStatusChange={setIsAnalyzing} />
@@ -255,7 +255,7 @@ export function LeadForm({ onSuccess }: Props) {
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10 lg:relative lg:p-0 lg:bg-transparent lg:border-0 lg:z-auto">
         <Button 
           type="submit" 
-          className="w-full h-12 text-base font-bold shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-[0.99] transition-all"
+          className="w-full h-12 text-base font-bold bg-accent text-accent-foreground shadow-lg shadow-accent/20 hover:scale-[1.01] active:scale-[0.99] transition-all"
           disabled={isSubmitting}
         >
           {isSubmitting ? (

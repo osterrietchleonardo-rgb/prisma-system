@@ -16,7 +16,7 @@ interface Props {
 export function LeadDrawer({ open, onOpenChange, onSuccess }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-[560px] p-0 border-l border-primary/10">
+      <SheetContent className="w-full sm:max-w-[560px] p-0 border-l border-accent/10">
         <div className="h-full flex flex-col">
           <SheetHeader className="p-6 pb-2">
             <div className="flex items-center justify-between">

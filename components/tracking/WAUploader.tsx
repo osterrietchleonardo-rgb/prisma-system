@@ -90,7 +90,7 @@ export function WAUploader({ onDataCalculated, onAnalysisStatusChange }: Props) 
         <div
           {...getRootProps()}
           className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center transition-colors cursor-pointer ${
-            isDragActive ? "border-primary bg-primary/5" : "border-muted-foreground/20 hover:border-primary/50"
+            isDragActive ? "border-accent bg-accent/5" : "border-muted-foreground/20 hover:border-accent/50"
           }`}
         >
           <input {...getInputProps()} />
@@ -104,7 +104,7 @@ export function WAUploader({ onDataCalculated, onAnalysisStatusChange }: Props) 
           </p>
         </div>
       ) : (
-        <Card className="p-4 border-primary/20 bg-primary/5">
+        <Card className="p-4 border-accent/20 bg-accent/5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <CheckCircle2 className="w-5 h-5 text-green-500" />
