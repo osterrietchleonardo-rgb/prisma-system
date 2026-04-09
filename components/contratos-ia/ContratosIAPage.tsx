@@ -43,7 +43,7 @@ export function ContratosIAPage() {
   }, [])
 
   return (
-    <div className="container mx-auto py-8 space-y-8 animate-in fade-in duration-700">
+    <div className="w-full px-4 md:px-8 py-8 space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col gap-2">
         <h1 className="text-4xl font-black tracking-tight flex items-center gap-3">
           <FileSignature className="w-10 h-10 text-accent" />
@@ -134,7 +134,7 @@ function MisContratos() {
 
   const estadoColors: Record<string, string> = {
     borrador: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-    pendiente_firma: "bg-blue-500/10 text-blue-500 border-blue-500/20",
+    pendiente_firma: "bg-accent/10 text-accent border-accent/20",
     firmado: "bg-green-500/10 text-green-500 border-green-500/20",
     anulado: "bg-red-500/10 text-red-500 border-red-500/20",
   }

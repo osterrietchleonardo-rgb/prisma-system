@@ -58,8 +58,9 @@ export default function TrackingPerformancePage() {
         </div>
 
         <Button 
+          variant="accent"
           size="sm" 
-          className="h-10 md:h-12 bg-accent shadow-xl shadow-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all font-bold group px-4 text-accent-foreground"
+          className="h-10 md:h-12 shadow-xl shadow-accent/20 hover:scale-[1.02] active:scale-[0.98] transition-all font-bold group px-4"
           onClick={() => setIsDrawerOpen(true)}
         >
           <Plus className="w-4 h-4 md:w-5 md:h-5 mr-2 group-hover:rotate-90 transition-transform" />

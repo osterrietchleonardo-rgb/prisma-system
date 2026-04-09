@@ -43,8 +43,8 @@ export function LeadsList({ leads, onRefresh }: Props) {
 
   const getStatusBadge = (status: string) => {
     const map: Record<string, { label: string; class: string }> = {
-      activo: { label: "Activo", class: "bg-blue-500/10 text-blue-600 border-blue-200" },
-      visita_agendada: { label: "Visita", class: "bg-purple-500/10 text-purple-600 border-purple-200" },
+      activo: { label: "Activo", class: "bg-accent/10 text-accent border-accent/20" },
+      visita_agendada: { label: "Visita", class: "bg-primary/10 text-primary border-primary/20" },
       en_negociacion: { label: "Negociación", class: "bg-orange-500/10 text-orange-600 border-orange-200" },
       cerrado: { label: "Cerrado", class: "bg-green-500/10 text-green-600 border-green-200" },
       perdido: { label: "Perdido", class: "bg-red-500/10 text-red-600 border-red-200" },
@@ -139,7 +139,7 @@ export function LeadsList({ leads, onRefresh }: Props) {
                               <div className="p-3 rounded-lg bg-background border">
                                 <p className="text-[10px] text-muted-foreground uppercase">T. de Respuesta</p>
                                 <p className="text-sm font-bold flex items-center gap-1.5 mt-0.5">
-                                  <Clock className="w-3.5 h-3.5 text-blue-500" />
+                                  <Clock className="w-3.5 h-3.5 text-accent" />
                                   {lead.wa_tiempo_respuesta_promedio_min ?? "-"}m
                                 </p>
                               </div>

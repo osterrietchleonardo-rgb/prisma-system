@@ -16,7 +16,7 @@ export function TrackingKPIs({ data }: Props) {
         value={data.operacionesActual}
         variation={data.operacionesVar}
         icon={<Target className="w-5 h-5" />}
-        color="blue"
+        color="accent"
       />
       <KPICard
         title="Comisión Generada"
@@ -48,7 +48,8 @@ function KPICard({ title, value, variation, icon, color }: any) {
   const isNeutral = variation === 0;
 
   const colorMap: any = {
-    blue: "text-blue-500 bg-blue-500/10",
+    accent: "text-accent bg-accent/10",
+    blue: "text-primary bg-primary/10",
     green: "text-green-500 bg-green-500/10",
     purple: "text-purple-500 bg-purple-500/10",
     yellow: "text-yellow-500 bg-yellow-500/10",

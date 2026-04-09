@@ -28,7 +28,7 @@ export function WAMetricsPreview({ quant, qual, isAnalyzing }: Props) {
         <MetricCard
           label="Prom. Respuesta"
           value={quant.wa_tiempo_respuesta_promedio_min !== null ? `${quant.wa_tiempo_respuesta_promedio_min}m` : "-"}
-          icon={<Clock className="w-3.5 h-3.5 text-blue-500" />}
+          icon={<Clock className="w-3.5 h-3.5 text-accent" />}
           description="Solo en horario laboral (<8h)"
         />
         <MetricCard

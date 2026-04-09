@@ -329,7 +329,7 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
               <Button 
                 onClick={handleSubmit} 
                 disabled={disableSubmit || loading} 
-                className="bg-[#b87333] hover:bg-[#a0622a] text-white"
+                className="bg-accent hover:bg-accent/90 text-white"
               >
                 {loading ? "Enviando..." : "Enviar a Meta"}
               </Button>
@@ -386,10 +386,10 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
             Sincronizar desde Meta
           </Button>
           <Button 
-            className="bg-[#b87333] hover:bg-[#a0622a] text-white" 
+            className="bg-accent hover:bg-accent/90 text-white" 
             size="sm"
             onClick={() => {
-              setFormData({ template_name: "", category: "MARKETING", language: "es_AR", header: "", body: "", footer: "", buttons: [] })
+              setFormData({ template_name: "", category: "MARKETING", language: "es_AR", header: "", body: "", footer: "", buttonType: "NONE", buttons: [] })
               setShowBuilder(true)
             }}
           >

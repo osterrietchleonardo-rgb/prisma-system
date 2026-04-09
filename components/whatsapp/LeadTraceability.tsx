@@ -72,9 +72,9 @@ export default function LeadTraceability({ conversation, messages }: LeadTraceab
   
   const roleColors: Record<string, string> = {
     lead: "bg-neutral-400",
-    bot: "bg-amber-500",
-    human: "bg-blue-500",
-    internal: "bg-yellow-500"
+    bot: "bg-accent",
+    human: "bg-primary",
+    internal: "bg-amber-400"
   }
   
   const roleTexts: Record<string, string> = {

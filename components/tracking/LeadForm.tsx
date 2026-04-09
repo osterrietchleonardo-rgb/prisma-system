@@ -28,16 +28,22 @@ export function LeadForm({ onSuccess }: Props) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const form = useForm<LeadFormData>({
-    resolver: zodResolver(leadFormSchema),
+    resolver: zodResolver(leadFormSchema) as any,
     defaultValues: {
       nombre_lead: "",
       telefono: "",
       canal_origen: "whatsapp",
       fecha_primer_contacto: new Date().toISOString().split("T")[0],
       estado: "activo",
+      notas: "",
       visita_realizada: false,
       propuesta_enviada: false,
-    } as any,
+      propiedad_ofrecida: "",
+      tipo_operacion: "venta",
+      precio_operacion: 0,
+      comision_generada: 0,
+      wa_analisis_pendiente: false
+    },
   });
 
   const { watch, setValue } = form;
@@ -85,7 +91,7 @@ export function LeadForm({ onSuccess }: Props) {
   };
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 pb-32">
+    <form onSubmit={form.handleSubmit(onSubmit as any)} className="space-y-8 pb-32">
       
       {/* SECCIÓN 1: Datos del lead */}
       <section className="space-y-4">
@@ -255,7 +261,8 @@ export function LeadForm({ onSuccess }: Props) {
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10 lg:relative lg:p-0 lg:bg-transparent lg:border-0 lg:z-auto">
         <Button 
           type="submit" 
-          className="w-full h-12 text-base font-bold bg-accent text-accent-foreground shadow-lg shadow-accent/20 hover:scale-[1.01] active:scale-[0.99] transition-all"
+          variant="accent"
+          className="w-full h-12 text-base font-bold shadow-lg shadow-accent/20 hover:scale-[1.01] active:scale-[0.99] transition-all"
           disabled={isSubmitting}
         >
           {isSubmitting ? (
