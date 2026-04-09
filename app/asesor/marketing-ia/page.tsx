@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { IpcForm } from "@/components/marketing-ia/ipc-form"
+import { IpcManager } from "@/components/marketing-ia/ipc-manager"
 import { CopyGeneratorFlow } from "@/components/marketing-ia/copy-generator-flow"
 import { Bot, UserSearch, History, Sparkles } from "lucide-react"
 
@@ -34,9 +34,7 @@ export default function MarketingIAPage() {
         </TabsContent>
 
         <TabsContent value="ipcs" className="mt-8">
-          <div className="max-w-4xl mx-auto">
-            <IpcForm />
-          </div>
+          <IpcManager />
         </TabsContent>
 
         <TabsContent value="history" className="mt-8">

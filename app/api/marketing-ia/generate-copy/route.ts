@@ -35,6 +35,8 @@ const buildCopyPrompt = (ipc: IpcProfile, config: CopyConfig): string => {
   const ipcCtx = `
 PERFIL DEL SEGMENTO DE LEADS (IPC):
 - Nombre Segmento: ${ipc.nombre_perfil}
+- Objetivo de esta comunicación: ${ipc.objetivo === 'captacion' ? 'CAPTAR propiedades (dueños directos)' : 'COMERCIALIZAR propiead de la cartera'}
+- Intención específica: ${ipc.sub_objetivo || 'No especificada'}
 - Tipo de Lead: ${ipc.tipo_lead} | Edad: ${ipc.rango_edad} | Género: ${ipc.genero}
 - Zona de Interés: ${ipc.zona_geografica}
 - Presupuesto/Ticket: ${ipc.presupuesto_estimado || 'No especificado'}
@@ -45,6 +47,7 @@ PERFIL DEL SEGMENTO DE LEADS (IPC):
 - Miedos: ${JSON.stringify(ipc.mayor_miedo)}
 - Objeciones: ${ipc.objeciones}
 - Estilo de Vida: ${ipc.estilo_vida}
+- Formato Preferido del Lead: ${ipc.formato_preferido || 'No especificado'}
 - Intereses: ${JSON.stringify(ipc.intereses)}
 - Redes sociales: ${JSON.stringify(ipc.redes_sociales)}
 - Contenido que consume: ${JSON.stringify(ipc.tipo_contenido)}`.trim();

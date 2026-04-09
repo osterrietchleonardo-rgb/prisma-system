@@ -30,6 +30,7 @@ export function CopyGeneratorFlow() {
   const [ipcs, setIpcs] = useState<IpcProfile[]>([])
   const [selectedIpcId, setSelectedIpcId] = useState<string>("")
   const [copyType, setCopyType] = useState<CopyType>('video')
+  const [objective, setObjective] = useState<'captacion' | 'comercializacion'>('comercializacion')
   const [angle, setAngle] = useState<CopyAngle>('pas')
   const [consciousnessLevel, setConsciousnessLevel] = useState<ConsciousnessLevel>(0)
   const [extraContext, setExtraContext] = useState("")
@@ -153,15 +154,55 @@ export function CopyGeneratorFlow() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-6">
                 <div className="space-y-3">
-                  <Label className="text-sm font-bold">¿Para qué IPC es este copy?</Label>
+                  <Label className="text-sm font-bold text-accent">¿Cuál es tu objetivo hoy?</Label>
+                  <RadioGroup 
+                    value={objective} 
+                    onValueChange={(v: any) => {
+                      setObjective(v)
+                      setSelectedIpcId("")
+                    }} 
+                    className="flex gap-4"
+                  >
+                    <div className={cn(
+                      "flex-1 flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer",
+                      objective === 'comercializacion' ? "border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500" : "border-muted"
+                    )} onClick={() => { setObjective('comercializacion'); setSelectedIpcId(""); }}>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold">Vender / Alquilar</p>
+                        <p className="text-[10px] text-muted-foreground text-balance">Mover mi cartera de propiedades</p>
+                      </div>
+                      <RadioGroupItem value="comercializacion" id="comercializacion" className="sr-only" />
+                    </div>
+                    <div className={cn(
+                      "flex-1 flex items-center gap-3 p-4 rounded-xl border transition-all cursor-pointer",
+                      objective === 'captacion' ? "border-amber-500 bg-amber-500/5 ring-1 ring-amber-500" : "border-muted"
+                    )} onClick={() => { setObjective('captacion'); setSelectedIpcId(""); }}>
+                      <div className="flex-1">
+                        <p className="text-sm font-bold">Captar</p>
+                        <p className="text-[10px] text-muted-foreground text-balance">Conseguir nuevos dueños directos</p>
+                      </div>
+                      <RadioGroupItem value="captacion" id="captacion" className="sr-only" />
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-sm font-bold">Selecciona el IPC ideal</Label>
                   <Select value={selectedIpcId} onValueChange={setSelectedIpcId}>
                     <SelectTrigger className="bg-accent/5"><SelectValue placeholder="Seleccione un IPC" /></SelectTrigger>
                     <SelectContent>
-                      {ipcs.map(ipc => (
-                        <SelectItem key={ipc.id} value={ipc.id}>{ipc.nombre_perfil}</SelectItem>
-                      ))}
+                      {ipcs
+                        .filter(ipc => ipc.objetivo === objective || !ipc.objetivo)
+                        .map(ipc => (
+                          <SelectItem key={ipc.id} value={ipc.id}>{ipc.nombre_perfil}</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
+                  {ipcs.filter(ipc => ipc.objetivo === objective).length === 0 && (
+                    <p className="text-[10px] text-amber-600 font-bold bg-amber-50 p-2 rounded border border-amber-100 italic">
+                      No tienes IPCs específicos para {objective === 'captacion' ? 'Captación' : 'Venta/Alquiler'}. Se muestran los genéricos.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-3">

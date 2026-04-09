@@ -19,7 +19,9 @@ import { cn } from "@/lib/utils"
 
 const ipcSchema = z.object({
   nombre_perfil: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
-  tipo_lead: z.enum(['Comprador', 'Vendedor', 'Inversor', 'Otro']),
+  objetivo: z.enum(['captacion', 'comercializacion']),
+  sub_objetivo: z.enum(['vender', 'alquilar']),
+  tipo_lead: z.enum(['Comprador', 'Vendedor', 'Inversor', 'Inquilino', 'Propietario', 'Otro']),
   rango_edad: z.string(),
   genero: z.string(),
   zona_geografica: z.string(),
@@ -34,6 +36,7 @@ const ipcSchema = z.object({
   intereses: z.array(z.string()),
   redes_sociales: z.array(z.string()),
   tipo_contenido: z.array(z.string()),
+  formato_preferido: z.enum(['video', 'texto', 'ambos']),
 })
 
 type IpcFormValues = z.infer<typeof ipcSchema>
@@ -55,6 +58,8 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
     resolver: zodResolver(ipcSchema),
     defaultValues: initialData || {
       nombre_perfil: "",
+      objetivo: "comercializacion",
+      sub_objetivo: "vender",
       tipo_lead: "Comprador",
       rango_edad: "35-44",
       genero: "Mixto",
@@ -70,6 +75,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
       intereses: [],
       redes_sociales: [],
       tipo_contenido: [],
+      formato_preferido: "ambos",
     }
   })
 
@@ -103,8 +109,11 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
       if (error) throw error
 
       toast.success(initialData?.id ? "Segmento actualizado correctamente" : "Segmento creado correctamente")
-      if (onSave) onSave()
-      else router.push('./')
+      if (onSave) {
+        onSave()
+      } else {
+        router.push('/asesor/marketing-ia')
+      }
     } catch (error: any) {
       toast.error("Error al guardar: " + error.message)
     } finally {
@@ -142,18 +151,77 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                 <Label className="text-sm font-bold">¿Cómo vas a llamar a este segmento?</Label>
                 <Input {...form.register("nombre_perfil")} placeholder="Ej: Inversores buscando pozo en Palermo" className="h-12 border-accent/10 focus:border-accent" />
               </div>
+
               <div className="space-y-2">
-                <Label className="text-sm font-bold">Tipo de Lead</Label>
-                <Select onValueChange={(v) => form.setValue("tipo_lead", v as any)} defaultValue={form.getValues("tipo_lead")}>
-                  <SelectTrigger className="h-12 bg-accent/5 transition-all hover:bg-accent/10"><SelectValue /></SelectTrigger>
+                <Label className="text-sm font-bold text-accent">Objetivo Principal</Label>
+                <Select 
+                  onValueChange={(v) => {
+                    form.setValue("objetivo", v as any)
+                    if (v === 'captacion') {
+                      form.setValue("tipo_lead", "Propietario")
+                    } else {
+                      form.setValue("tipo_lead", "Comprador")
+                    }
+                  }} 
+                  defaultValue={form.getValues("objetivo")}
+                >
+                  <SelectTrigger className="h-12 bg-accent/10 border-accent/20"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Comprador">Comprador</SelectItem>
-                    <SelectItem value="Vendedor">Vendedor</SelectItem>
-                    <SelectItem value="Inversor">Inversor</SelectItem>
-                    <SelectItem value="Otro">Otro</SelectItem>
+                    <SelectItem value="comercializacion">Vender / Alquilar mi cartera</SelectItem>
+                    <SelectItem value="captacion">Captar nuevas propiedades</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-bold">Operación</Label>
+                <Select onValueChange={(v) => form.setValue("sub_objetivo", v as any)} defaultValue={form.getValues("sub_objetivo")}>
+                  <SelectTrigger className="h-12 bg-accent/5"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="vender">Venta</SelectItem>
+                    <SelectItem value="alquilar">Alquiler</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-bold">Tipo de Lead</Label>
+                <Select onValueChange={(v) => form.setValue("tipo_lead", v as any)} value={form.watch("tipo_lead")}>
+                  <SelectTrigger className="h-12 bg-accent/5 transition-all hover:bg-accent/10"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {form.watch("objetivo") === 'captacion' ? (
+                      <>
+                        <SelectItem value="Propietario">Propietario</SelectItem>
+                        <SelectItem value="Vendedor">Vendedor</SelectItem>
+                        <SelectItem value="Inversor">Inversor</SelectItem>
+                        <SelectItem value="Otro">Otro</SelectItem>
+                      </>
+                    ) : (
+                      <>
+                        <SelectItem value="Comprador">Comprador</SelectItem>
+                        <SelectItem value="Inquilino">Inquilino</SelectItem>
+                        <SelectItem value="Inversor">Inversor</SelectItem>
+                        <SelectItem value="Otro">Otro</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-bold">Formato Ideal</Label>
+                <Select onValueChange={(v) => form.setValue("formato_preferido", v as any)} defaultValue={form.getValues("formato_preferido")}>
+                  <SelectTrigger className="h-12 bg-accent/5"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="video">Específico para Video (Reels/TikTok)</SelectItem>
+                    <SelectItem value="texto">Específico para Texto (Post/Ads)</SelectItem>
+                    <SelectItem value="ambos">Versátil (Ambos formatos)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="col-span-full h-px bg-accent/10 my-2" />
+
               <div className="space-y-2">
                 <Label className="text-sm font-bold">Zona Geográfica</Label>
                 <Input {...form.register("zona_geografica")} placeholder="Ej: Palermo Soho, Recoleta, Nordelta..." className="h-12" />
@@ -182,8 +250,8 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2 col-span-full">
-                <Label className="text-sm font-bold">Presupuesto / Ticket Estimado (Opcional)</Label>
+              <div className="space-y-2">
+                <Label className="text-sm font-bold">Presupuesto / Ticket Estimado</Label>
                 <Input {...form.register("presupuesto_estimado")} placeholder="Ej: USD 150.000 - 250.000" className="h-12" />
               </div>
             </div>

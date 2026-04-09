@@ -8,7 +8,9 @@ export interface IpcProfile {
   id: string;
   user_id: string;
   nombre_perfil: string;
-  tipo_lead: 'Comprador' | 'Vendedor' | 'Inversor' | 'Otro';
+  objetivo: 'captacion' | 'comercializacion';
+  sub_objetivo?: 'vender' | 'alquilar';
+  tipo_lead: 'Comprador' | 'Vendedor' | 'Inversor' | 'Inquilino' | 'Propietario' | 'Otro';
   rango_edad: string;
   genero: 'Hombre' | 'Mujer' | 'Mixto';
   zona_geografica: string;
@@ -23,6 +25,7 @@ export interface IpcProfile {
   intereses: string[];
   redes_sociales: string[];
   tipo_contenido: string[];
+  formato_preferido: 'video' | 'texto' | 'ambos';
   created_at: string;
   updated_at: string;
 }
