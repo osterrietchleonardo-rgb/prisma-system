@@ -112,7 +112,13 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
       if (onSave) {
         onSave()
       } else {
-        router.push('/asesor/marketing-ia')
+        // Redirect to the current section (asesor or director)
+        const path = window.location.pathname
+        if (path.includes('/director/')) {
+          router.push('/director/marketing-ia')
+        } else {
+          router.push('/asesor/marketing-ia')
+        }
       }
     } catch (error: any) {
       toast.error("Error al guardar: " + error.message)
@@ -150,6 +156,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
               <div className="space-y-2 col-span-full">
                 <Label className="text-sm font-bold">¿Cómo vas a llamar a este segmento?</Label>
                 <Input {...form.register("nombre_perfil")} placeholder="Ej: Inversores buscando pozo en Palermo" className="h-12 border-accent/10 focus:border-accent" />
+                {form.formState.errors.nombre_perfil && <p className="text-red-500 text-xs font-medium">{form.formState.errors.nombre_perfil.message}</p>}
               </div>
 
               <div className="space-y-2">
@@ -182,6 +189,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                     <SelectItem value="alquilar">Alquiler</SelectItem>
                   </SelectContent>
                 </Select>
+                {form.formState.errors.sub_objetivo && <p className="text-red-500 text-[10px] font-medium">{form.formState.errors.sub_objetivo.message}</p>}
               </div>
 
               <div className="space-y-2">
@@ -206,6 +214,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                     )}
                   </SelectContent>
                 </Select>
+                {form.formState.errors.tipo_lead && <p className="text-red-500 text-[10px] font-medium">{form.formState.errors.tipo_lead.message}</p>}
               </div>
 
               <div className="space-y-2">
@@ -225,6 +234,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
               <div className="space-y-2">
                 <Label className="text-sm font-bold">Zona Geográfica</Label>
                 <Input {...form.register("zona_geografica")} placeholder="Ej: Palermo Soho, Recoleta, Nordelta..." className="h-12" />
+                {form.formState.errors.zona_geografica && <p className="text-red-500 text-[10px] font-medium">{form.formState.errors.zona_geografica.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-bold">Rango de edad</Label>
@@ -263,15 +273,18 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                 <div className="space-y-2">
                   <Label className="text-sm font-bold">Contexto / Situación Actual</Label>
                   <Textarea {...form.register("situacion_actual")} placeholder="¿En qué momento de su vida está? Ej: 'Alquilando, pero acaba de recibir una herencia' o 'Viviendo en una casa muy grande que ya no puede mantener'..." className="min-h-[120px] bg-accent/5" />
+                  {form.formState.errors.situacion_actual && <p className="text-red-500 text-xs font-medium">{form.formState.errors.situacion_actual.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-bold">Motivación principal (El por qué)</Label>
-                  <Textarea {...form.register("motivacion_principal")} placeholder="¿Cuál es el motor de su decisión? Ej: 'Capitalizarse ante la inflación' o 'Darle independencia a sus hijos'..." className="min-h-[120px] bg-accent/5" />
+                  <Textarea {...form.register("motivacion_principal")} placeholder="¿Cuál es el motor de su decision? Ej: 'Capitalizarse ante la inflación' o 'Darle independencia a sus hijos'..." className="min-h-[120px] bg-accent/5" />
+                  {form.formState.errors.motivacion_principal && <p className="text-red-500 text-xs font-medium">{form.formState.errors.motivacion_principal.message}</p>}
                 </div>
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-bold">¿Qué gran problema resuelve mudarse / vender?</Label>
                 <Textarea {...form.register("problema_resuelve")} placeholder="Ej: 'Dejar de tirar dinero en alquiler' o 'Reducir gastos fijos mensuales'..." className="bg-accent/5" />
+                {form.formState.errors.problema_resuelve && <p className="text-red-500 text-xs font-medium">{form.formState.errors.problema_resuelve.message}</p>}
               </div>
               <div className="space-y-4 pt-4">
                 <div className="flex justify-between items-center">
@@ -303,6 +316,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                   <ShieldAlert className="w-4 h-4 text-red-500" />
                   Mayores miedos del lead (Múltiple)
                 </Label>
+                {form.formState.errors.mayor_miedo && <p className="text-red-500 text-xs font-medium">{form.formState.errors.mayor_miedo.message}</p>}
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                   {[
                     "Elegir mal la zona", "Ser estafado", "Liquidez atrapada", "Impuestos ocultos", 
