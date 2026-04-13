@@ -69,3 +69,29 @@ export const analyzeChat = async (history: string) => {
   const response = await result.response;
   return response.text();
 };
+
+export const generateImage = async (prompt: string, quality: 'standard' | 'pro' = 'standard') => {
+  const modelId = quality === 'pro' ? "gemini-3-pro-image-preview" : "gemini-3.1-flash-image-preview";
+  const model = genAI.getGenerativeModel({ 
+    model: modelId,
+  });
+
+  const result = await model.generateContent({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: {
+      // @ts-ignore - Image generation modalities for 2026 models
+      responseModalities: ["image"],
+    }
+  });
+
+  const response = await result.response;
+  // The response for image modality contains the image data in the parts
+  const candidate = response.candidates?.[0];
+  const imagePart = candidate?.content.parts.find(p => p.inlineData?.mimeType.startsWith("image/"));
+  
+  if (!imagePart || !imagePart.inlineData) {
+    throw new Error("No image was generated in the response");
+  }
+
+  return Buffer.from(imagePart.inlineData.data, "base64");
+};

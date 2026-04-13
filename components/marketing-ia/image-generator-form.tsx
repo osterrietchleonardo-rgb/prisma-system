@@ -14,9 +14,10 @@ interface ImageGeneratorFormProps {
   draftId: string;
   copyContent: CopyContent;
   tokkoProperty?: TokkoProperty | null;
+  onBack?: () => void;
 }
 
-export function ImageGeneratorForm({ draftId, copyContent, tokkoProperty }: ImageGeneratorFormProps) {
+export function ImageGeneratorForm({ draftId, copyContent, tokkoProperty, onBack }: ImageGeneratorFormProps) {
   const [format, setFormat] = useState<ImageFormat>('reels')
   const [style, setStyle] = useState<ImageStyle>('moderno')
   const [extraPrompt, setExtraPrompt] = useState("")
@@ -84,7 +85,22 @@ export function ImageGeneratorForm({ draftId, copyContent, tokkoProperty }: Imag
   ]
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 pt-4 border-t border-accent/10">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            <Camera className="w-6 h-6 text-accent" />
+            Paso 2: Generación Visual Pro
+          </h3>
+          <p className="text-sm text-muted-foreground">Configura el arte de tu anuncio basado en el copy generado.</p>
+        </div>
+        {onBack && (
+          <Button variant="ghost" size="sm" onClick={onBack} className="text-accent hover:text-accent hover:bg-accent/5">
+            <RefreshCw className="w-4 h-4 mr-2" /> Volver al Copy
+          </Button>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-6">
           <div className="space-y-4">

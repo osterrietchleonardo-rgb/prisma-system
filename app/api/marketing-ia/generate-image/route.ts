@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
-
-export const dynamic = "force-dynamic";
+import { generateImage } from "@/lib/gemini";
 import { GenerateImagePayload } from "@/types/marketing-ia";
 
 const buildImagePrompt = (payload: GenerateImagePayload): string => {
@@ -61,87 +60,86 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const prompt = buildImagePrompt(payload);
-    const dims = { reels: [1080, 1920], post: [1080, 1080], historia: [1080, 1920] }[payload.format];
+    const finalPrompt = buildImagePrompt(payload);
+    const { draft_id, style, format, extra_prompt } = payload;
 
-    if (!process.env.NANO_BANANA_API_KEY) {
-      return NextResponse.json({ error: "Nano Banana API Key not configured" }, { status: 500 });
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json({ error: "Gemini API Key not configured" }, { status: 500 });
     }
 
-    const response = await fetch('https://api.nanobanana.ai/v2/generate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.NANO_BANANA_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'nano-banana-pro-2',
-        prompt: prompt,
-        width: dims[0],
-        height: dims[1],
-        quality: 'hd',
-        output_format: 'png'
-      })
-    });
+    console.log('[DEBUG] Generating image with Gemini (Nano Banana) for draft:', draft_id);
+    
+    let imageBuffer: Buffer;
+    try {
+      // Use Nano Banana 2 (Standard/Flash) for efficiency or Pro for higher quality
+      imageBuffer = await generateImage(finalPrompt, 'pro');
+    } catch (apiError: any) {
+      console.error("Gemini Image Generation Error:", apiError);
+      
+      const errorMessage = apiError.message || "";
+      if (errorMessage.includes("429") || errorMessage.includes("quota")) {
+        return NextResponse.json({ 
+          error: "Cuota de generación excedida o requiere habilitar facturación en Google Cloud.",
+          details: "La generación de imágenes con Gemini Imagen requiere un plan de pago habilitado."
+        }, { status: 429 });
+      }
 
-    if (!response.ok) {
-      const err = await response.text();
-      console.error("Nano Banana API Error:", err);
-      return NextResponse.json({ error: "Failed to generate image" }, { status: response.status });
+      return NextResponse.json({ 
+        error: "Error al generar imagen con la IA", 
+        details: apiError.message 
+      }, { status: 500 });
     }
 
-    const data = await response.json();
-    const imageUrl = data.image_url;
-
-    if (!imageUrl) {
-      return NextResponse.json({ error: "No image URL returned" }, { status: 500 });
-    }
-
-    // Download image
-    const imageRes = await fetch(imageUrl);
-    const imageBlob = await imageRes.blob();
-
-    // Upload to Supabase Storage
-    const storagePath = `${user.id}/${payload.draft_id}/${Date.now()}.png`;
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    // Upload to Storage
+    const fileName = `${user.id}/${draft_id}/${Date.now()}.jpg`;
+    const { error: uploadError } = await supabase.storage
       .from('marketing-images')
-      .upload(storagePath, imageBlob, { contentType: 'image/png', upsert: false });
+      .upload(fileName, imageBuffer, {
+        contentType: 'image/jpeg',
+        cacheControl: '3600'
+      });
 
     if (uploadError) {
       console.error("Storage Upload Error:", uploadError);
-      return NextResponse.json({ error: "Failed to upload image to storage" }, { status: 500 });
+      return NextResponse.json({ error: "Error uploading to storage" }, { status: 500 });
     }
 
-    const publicUrl = supabase.storage
+    const { data: { publicUrl } } = supabase.storage
       .from('marketing-images')
-      .getPublicUrl(uploadData.path).data.publicUrl;
+      .getPublicUrl(fileName);
 
-    // Save to Database
-    const { data: generatedImage, error: dbError } = await supabase
+    // Get dimensions based on format
+    const width = 1080;
+    const height = format === 'post' ? 1080 : 1920;
+
+    const { data: savedImage, error: dbError } = await supabase
       .from('generated_images')
       .insert({
         user_id: user.id,
-        draft_id: payload.draft_id,
-        format: payload.format,
-        style: payload.style,
-        storage_path: storagePath,
+        draft_id,
+        format,
+        style,
+        storage_path: fileName,
         public_url: publicUrl,
-        width: dims[0],
-        height: dims[1],
-        extra_prompt: payload.extra_prompt
+        width,
+        height,
+        extra_prompt
       })
       .select()
       .single();
 
     if (dbError) {
       console.error("Database Insert Error:", dbError);
-      return NextResponse.json({ error: "Failed to save image record" }, { status: 500 });
     }
 
-    return NextResponse.json(generatedImage);
+    return NextResponse.json({
+      success: true,
+      image_url: publicUrl,
+      id: savedImage?.id
+    });
 
   } catch (error: any) {
-    console.error("Generate Image Error:", error);
+    console.error("Main Generate Image Route Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

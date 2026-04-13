@@ -56,7 +56,6 @@ export function CopyGeneratorFlow() {
   const handleGenerateCopy = async () => {
     if (!selectedIpcId || !selectedIpc) return toast.error("Seleccione un IPC")
     setIsGenerating(true)
-    setCurrentStep(1)
     
     // Helper mappings (consistent with API)
     const levelMap: Record<string, number> = {
@@ -100,7 +99,7 @@ export function CopyGeneratorFlow() {
       if (!res.ok) throw new Error("Error en la generación")
       const content = await res.json()
       setEditableContent(content)
-      setCurrentStep(2)
+      setCurrentStep(1)
       
       // Save draft automatically
       const { data: { user } } = await supabase.auth.getUser()
@@ -272,7 +271,7 @@ export function CopyGeneratorFlow() {
         </Card>
       )}
 
-      {currentStep === 1 && (
+      {isGenerating && (
         <div className="flex flex-col items-center justify-center p-20 space-y-6 animate-pulse">
           <Loader2 className="w-16 h-16 text-accent animate-spin" />
           <div className="text-center">
@@ -282,7 +281,7 @@ export function CopyGeneratorFlow() {
         </div>
       )}
 
-      {currentStep === 2 && editableContent && (
+      {currentStep === 1 && editableContent && !isGenerating && (
         <Card className="border-accent/20 shadow-2xl animate-in zoom-in-95">
           <CardHeader className="bg-accent/5">
             <CardTitle className="flex justify-between items-center">
@@ -342,11 +341,12 @@ export function CopyGeneratorFlow() {
         </Card>
       )}
 
-      {currentStep === 2 && generatedDraft && editableContent && (
+      {currentStep === 2 && generatedDraft && editableContent && !isGenerating && (
         <ImageGeneratorForm 
           draftId={generatedDraft.id} 
           copyContent={editableContent} 
           tokkoProperty={selectedIpc?.tipo_ipc === 'vender' ? (selectedIpc.flow_data as any).tokko_property_details : null} 
+          onBack={() => setCurrentStep(1)}
         />
       )}
     </div>
