@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { prismaIA } from "@/lib/gemini";
 import { NextResponse } from "next/server";
-import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel } from "@/types/marketing-ia";
+import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ interface CopyConfig {
   extra_context?: string;
 }
 
-const buildCopyPrompt = (ipc: IpcProfile, config: CopyConfig): string => {
+const buildCopyPrompt = (ipc: IpcProfile, config: CopyConfig, property?: TokkoProperty | null): string => {
   const nivelDesc = {
     0: "El público no sabe que tiene el problema. Creá el problema en su mente antes de hablar de la solución.",
     1: "Siente que algo no funciona pero no identifica la causa. Ayudalo a ponerle nombre al dolor.",
@@ -32,43 +32,83 @@ const buildCopyPrompt = (ipc: IpcProfile, config: CopyConfig): string => {
     datos:        "Datos. Estadísticas y números concretos del mercado inmobiliario argentino."
   }[config.angle];
 
-  const ipcCtx = `
-PERFIL DEL SEGMENTO DE LEADS (IPC):
-- Nombre Segmento: ${ipc.nombre_perfil}
-- Objetivo de esta comunicación: ${ipc.objetivo === 'captacion' ? 'CAPTAR propiedades (dueños directos)' : 'COMERCIALIZAR propiead de la cartera'}
-- Intención específica: ${ipc.sub_objetivo || 'No especificada'}
-- Tipo de Lead: ${ipc.tipo_lead} | Edad: ${ipc.rango_edad} | Género: ${ipc.genero}
-- Zona de Interés: ${ipc.zona_geografica}
-- Presupuesto/Ticket: ${ipc.presupuesto_estimado || 'No especificado'}
-- Situación Actual: ${ipc.situacion_actual}
-- Motivación Principal: ${ipc.motivacion_principal}
-- Problema que resuelve: ${ipc.problema_resuelve}
-- Nivel de Urgencia: ${ipc.nivel_urgencia}/10
-- Miedos: ${JSON.stringify(ipc.mayor_miedo)}
-- Objeciones: ${ipc.objeciones}
-- Estilo de Vida: ${ipc.estilo_vida}
-- Formato Preferido del Lead: ${ipc.formato_preferido || 'No especificado'}
-- Intereses: ${JSON.stringify(ipc.intereses)}
-- Redes sociales: ${JSON.stringify(ipc.redes_sociales)}
-- Contenido que consume: ${JSON.stringify(ipc.tipo_contenido)}`.trim();
+  let ipcCtx = "";
 
+  if (ipc.tipo_ipc === 'captar') {
+    const fd = ipc.flow_data as any;
+    ipcCtx = `
+PERFIL: CAPTAR PROPIETARIOS
+- Nombre: ${ipc.nombre_perfil}
+- Objetivo: ${ipc.objetivo}
+- Tipo Propietario: ${fd.tipo_propietario}
+- Motivo Venta: ${fd.motivo_venta}
+- Etapa Actual: ${fd.etapa_hoy}
+- Urgencia: ${fd.urgencia_necesidad}
+- Depende de venta para comprar: ${fd.dependencia_venta}
+- Preocupaciones: ${fd.preocupaciones?.join(", ")}
+- Objeción Principal: ${fd.objecion_principal}
+- Freno Hoy: ${fd.freno_hoy}
+- Miedo Frecuente: ${fd.miedo_frecuente}
+- Logro Esperado: ${fd.logro_esperado}
+- Prioridad Sugerida: ${fd.valor_prioridad}
+- Inmobiliaria que confía: ${fd.tipo_inmobiliaria_confia}
+- Prueba necesaria: ${fd.prueba_confianza?.join(", ")}
+- Ángulo Recomendado: ${fd.angulo_marketing}
+- Tono Sugerido: ${fd.tono_comunicacion}
+- Canales: ${fd.canal_formato?.join(", ")}
+- NO PROMETER: ${fd.no_prometer}
+- Resumen: ${fd.resumen_frase}
+- Promesa Central: ${fd.promesa_central}
+- CTA Sugerido: ${fd.cta_recomendado}`;
+  } else {
+    const fd = ipc.flow_data as any;
+    ipcCtx = `
+PERFIL: VENDER PROPIEDAD
+- Nombre: ${ipc.nombre_perfil}
+- Comprador Ideal: ${fd.tipo_comprador_ideal}
+- Situación Vida: ${fd.situacion_vida}
+- Necesidad: ${fd.necesidad_concreta}
+- Problema que resuelve el inmueble: ${fd.problema_resolver}
+- Resultado Querido: ${fd.resultado_querido}
+- Atractivos Propiedad: ${fd.atractivo_propiedad?.join(", ")}
+- Factores Duda / Frenos: ${fd.factores_duda?.join(", ")}
+- Objeción Común: ${fd.objecion_comun}
+- Evidencia Necesaria: ${fd.evidencia_necesaria?.join(", ")}
+- Ángulo de Venta: ${fd.angulo_copy}
+- Tono: ${fd.tono}
+- NO MOSTRAR/MENCIONAR: ${fd.no_mostrar}
+- Promesa: ${fd.promesa_creible}
+- Mensaje Central: ${fd.mensaje_central}
+- CTA: ${fd.cta}`;
 
-  const base = `Sos un experto en copywriting para el sector inmobiliario argentino.
+    if (property) {
+      ipcCtx += `\n\nDATOS TÉCNICOS DE LA PROPIEDAD (CONTEXTO REAL):
+- Título: ${property.title}
+- Dirección/Zona: ${property.address}, ${property.zone}
+- Tipo: ${property.property_type}
+- Precio: ${property.currency} ${property.price.toLocaleString()}
+- Superficie: ${property.surface_total}m2 (${property.surface_covered}m2 cubiertos)
+- Ambientes: ${property.rooms} | Baños: ${property.bathrooms}
+- Descripción: ${property.description}`;
+    }
+  }
+
+  const base = `Sos un experto en copywriting para el sector inmobiliario argentino. Tu misión es persuadir al IPC detallado abajo.
 
 ${ipcCtx}
 
-ÁNGULO: ${angleDesc}
-NIVEL DE CONSCIENCIA: Nivel ${config.consciousness_level}/4 — ${nivelDesc}
-${config.extra_context ? `CONTEXTO ADICIONAL: ${config.extra_context}` : ''}
+REGLAS ESTRATÉGICAS:
+- ÁNGULO: ${angleDesc}
+- NIVEL DE CONSCIENCIA: Nivel ${config.consciousness_level}/4 — ${nivelDesc}
+${config.extra_context ? `- CONTEXTO EXTRA DEL USUARIO: ${config.extra_context}` : ''}
 
-Usá lenguaje coloquial rioplatense, directo, auténtico. Nada genérico.
-Cada sección debe conectar directamente con los datos del IPC.
-Respondé ÚNICAMENTE en JSON válido, sin texto adicional ni backticks.`;
+TONO: Usá un lenguaje 100% rioplatense (voseo), auténtico, empático y profesional. Nada de "un hogar para vos", hablá de "tu próxima casa" o "la venta de tu depto".
+Respondé ÚNICAMENTE en JSON válido.`;
 
   if (config.copy_type === 'video') {
-    return `${base}\n\nEstructura exacta:\n{"hook":"texto para primeros 3 segundos","problema":"2-3 frases sobre el dolor","agitacion":"consecuencias de no resolver (2-3 frases)","solucion":"presentación de la solución (2-4 frases)","cta":"llamada a la acción (1-2 frases)"}`;
+    return `${base}\n\nEstructura exacta:\n{"hook":"texto para captar atención en 3 segundos","problema":"conectar con el dolor/situación (2-3 frases)","agitacion":"intensificar el sentimiento/consecuencia (2-3 frases)","solucion":"presentar la solución/beneficio (2-4 frases)","cta":"llamada a la acción clara"}`;
   } else {
-    return `${base}\n\nEstructura exacta:\n{"hook":"primera línea que frena el scroll (1 oración impactante)","desarrollo":"3-5 párrafos cortos conectados al IPC con la estructura del ángulo","cta":"llamada a la acción directa (1-2 frases)"}`;
+    return `${base}\n\nEstructura exacta:\n{"hook":"una frase de apertura demoledora","desarrollo":"3-5 párrafos cortos que construyan el deseo usando el ángulo ${config.angle}","cta":"llamada a la acción estratégica"}`;
   }
 };
 
@@ -91,7 +131,57 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "IPC not found" }, { status: 404 });
     }
 
-    const prompt = buildCopyPrompt(ipc as any as IpcProfile, { copy_type, angle, consciousness_level, extra_context });
+    let propertyData: TokkoProperty | null = null;
+    if (ipc.tipo_ipc === 'vender' && ipc.propiedad_tokko_id) {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("agency_id")
+          .eq("id", user.id)
+          .single();
+
+        if (profile?.agency_id) {
+          const { data: agency } = await supabase
+            .from("agencies")
+            .select("tokko_api_key")
+            .eq("id", profile.agency_id)
+            .single();
+
+          const TOKKO_API_KEY = agency?.tokko_api_key || process.env.TOKKO_API_KEY;
+          if (TOKKO_API_KEY) {
+            const tokkoRes = await fetch(`https://tokkobroker.com/api/v1/property/${ipc.propiedad_tokko_id}/?key=${TOKKO_API_KEY}&format=json`);
+            if (tokkoRes.ok) {
+              const p = await tokkoRes.json();
+              propertyData = {
+                id: p.id,
+                reference_code: p.reference_code,
+                title: p.publication_title || p.address,
+                address: p.address,
+                zone: p.location?.name || "",
+                property_type: p.type?.name || "",
+                operation_type: p.operations?.[0]?.operation_type || "",
+                price: p.operations?.[0]?.prices?.[0]?.price || 0,
+                currency: p.operations?.[0]?.prices?.[0]?.currency || "USD",
+                surface_total: p.surface || 0,
+                surface_covered: p.roofed_surface || 0,
+                rooms: p.room_amount || 0,
+                bathrooms: p.bathroom_amount || 0,
+                description: p.description,
+                photos: (p.photos || []).slice(0, 5).map((f: any) => ({
+                  thumb: f.thumb,
+                  image: f.image
+                })),
+                tags: (p.tags || []).map((t: any) => t.name)
+              };
+            }
+          }
+        }
+      } catch (tokkoError) {
+        console.error("Error fetching Tokko property for copy generation:", tokkoError);
+      }
+    }
+
+    const prompt = buildCopyPrompt(ipc as any as IpcProfile, { copy_type, angle, consciousness_level, extra_context }, propertyData);
 
     const result = await prismaIA.generateContent(prompt);
     const rawResponse = result.response.text();
