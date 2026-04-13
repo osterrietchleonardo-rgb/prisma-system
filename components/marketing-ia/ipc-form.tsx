@@ -27,6 +27,12 @@ import {
   Info
 } from "lucide-react"
 import { toast } from "sonner"
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -69,9 +75,10 @@ const venderSchema = z.object({
   tipo_ipc: z.literal('vender'),
   nombre_perfil: z.string().min(3, "El nombre debe tener al menos 3 caracteres"),
   propiedad_tokko_id: z.number().optional(),
+  objetivo: z.string().min(1, "El objetivo es requerido"),
   tipo_inmueble: z.array(z.string()).min(1, "Seleccione al menos un tipo"),
-  zona_principal: z.string().optional(),
-  rango_valor_precio: z.string().optional(),
+  zona_principal: z.string().min(1, "La zona es requerida"),
+  rango_valor_precio: z.string().min(1, "El rango es requerido"),
   flow_data: z.object({
     tipo_comprador_ideal: z.string(),
     situacion_vida: z.string(),
@@ -83,8 +90,8 @@ const venderSchema = z.object({
     factores_duda: z.array(z.string()),
     objecion_comun: z.string(),
     evidencia_necesaria: z.array(z.string()),
-    angulo_copy: z.string(),
-    promesa_creible: z.string(),
+    angulo_marketing: z.string(),
+    promesa_central: z.string(),
     tono: z.string(),
     formato_anuncio: z.array(z.string()),
     no_mostrar: z.string(),
@@ -126,7 +133,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
 
   const form = useForm<IpcFormValues>({
     resolver: zodResolver(ipcSchema),
-    defaultValues: initialData || {
+    defaultValues: (initialData as any) || {
       tipo_ipc: 'captar',
       nombre_perfil: "",
       objetivo: "Captar propietarios",
@@ -147,14 +154,14 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
         valor_prioridad: "",
         tipo_inmobiliaria_confia: "",
         prueba_confianza: [],
-        angulo_marketing: "",
-        tono_comunicacion: "",
+        angulo_marketing: "Necesidad/Problema",
+        tono_comunicacion: "Profesional y directo",
         canal_formato: [],
         no_prometer: "",
         resumen_frase: "",
         promesa_central: "",
         cta_recomendado: "",
-        nivel_conciencia: ""
+        nivel_conciencia: "Consciente del Problema"
       }
     }
   })
@@ -170,6 +177,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
     form.reset({
       tipo_ipc: type,
       nombre_perfil: "",
+      objetivo: type === 'captar' ? "Captar propietarios" : "Vender Cartera",
       tipo_inmueble: [],
       zona_principal: "",
       rango_valor_precio: "",
@@ -187,14 +195,14 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
         valor_prioridad: "",
         tipo_inmobiliaria_confia: "",
         prueba_confianza: [],
-        angulo_marketing: "",
-        tono_comunicacion: "",
+        angulo_marketing: "Necesidad/Problema",
+        tono_comunicacion: "Profesional",
         canal_formato: [],
         no_prometer: "",
         resumen_frase: "",
         promesa_central: "",
         cta_recomendado: "",
-        nivel_conciencia: ""
+        nivel_conciencia: "Consciente del Problema"
       } : {
         tipo_comprador_ideal: "",
         situacion_vida: "",
@@ -206,15 +214,15 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
         factores_duda: [],
         objecion_comun: "",
         evidencia_necesaria: [],
-        angulo_copy: "",
-        promesa_creible: "",
-        tono: "",
+        angulo_marketing: "Emoción/Deseo",
+        promesa_central: "",
+        tono: "Inspirador",
         formato_anuncio: [],
         no_mostrar: "",
         resumen_frase: "",
         mensaje_central: "",
         cta: "",
-        nivel_conciencia: ""
+        nivel_conciencia: "Consciente de la Solución"
       }
     } as any)
     setCurrentStep(0)
@@ -227,10 +235,19 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
       if (!user) throw new Error("No hay sesión activa")
 
       const payload = {
-        ...data,
+        nombre_perfil: data.nombre_perfil,
+        tipo_ipc: data.tipo_ipc,
+        objetivo: (data as any).objetivo || (data.tipo_ipc === 'vender' ? 'Vender Cartera' : 'Captar Propiedades'),
+        tipo_inmueble: data.tipo_inmueble,
+        zona_principal: data.zona_principal || "",
+        rango_valor_precio: data.rango_valor_precio || "",
+        propiedad_tokko_id: (data as any).propiedad_tokko_id || null,
+        flow_data: data.flow_data,
         user_id: user.id,
         updated_at: new Date().toISOString()
       }
+
+      console.log("Saving IPC profile:", payload)
 
       let error
       if (initialData?.id) {
@@ -244,16 +261,23 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
           .insert([payload]))
       }
 
-      if (error) throw error
+      if (error) {
+        console.error("Supabase Error details:", error)
+        throw error
+      }
 
       toast.success(initialData?.id ? "Segmento actualizado" : "Segmento creado")
+      
+      // Intentar forzar la revalidación
       if (onSave) {
         onSave()
       } else {
+        router.refresh()
         router.push(window.location.pathname.includes('/director/') ? '/director/marketing-ia' : '/asesor/marketing-ia')
       }
     } catch (error: any) {
-      toast.error("Error al guardar: " + error.message)
+      console.error("IPC Save Error:", error)
+      toast.error("Error al guardar: " + (error.message || "Error desconocido"))
     } finally {
       setIsSaving(false)
     }
@@ -330,61 +354,55 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
         </div>
         <MarketingIAStepper steps={steps} currentStep={currentStep} className="mt-8" />
       </CardHeader>
-      
       <CardContent className="mt-6 min-h-[500px]">
-        <form className="space-y-8">
-          {/* FLOW: CAPTAR */}
+        <form className="space-y-8" onSubmit={(e) => e.preventDefault()}>
+          {/* FLOW: CAPTAR (PROPIETARIOS) */}
           {flowType === 'captar' && (
             <>
               {currentStep === 0 && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+                <div className="space-y-6 animate-in fade-in duration-500">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-bold">Nombre del Perfil de Propietario</Label>
+                    <Input {...form.register("nombre_perfil")} placeholder="Ej: Propietario con herencia en recoleta" className="h-12 border-accent/20 focus:border-accent" />
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2 col-span-full">
-                      <Label className="text-sm font-bold">Nombre del IPC</Label>
-                      <Input {...form.register("nombre_perfil")} placeholder="Ej: Propietario con urgencia media y necesidad de liquidez" className="h-12" />
-                    </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold">Objetivo de este IPC</Label>
-                      <Select 
-                        onValueChange={(v) => form.setValue("objetivo", v)} 
-                        defaultValue={form.getValues("objetivo")}
-                      >
-                        <SelectTrigger className="h-12"><SelectValue /></SelectTrigger>
+                      <Label className="text-sm font-bold">Objetivo de Captación</Label>
+                      <Select onValueChange={(v) => form.setValue("objetivo", v)} defaultValue={form.getValues("objetivo")}>
+                        <SelectTrigger className="h-12 border-accent/20 focus:border-accent"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Captar propietarios">Captar propietarios</SelectItem>
-                          <SelectItem value="Captar propietarios de alto valor">Captar propietarios de alto valor</SelectItem>
-                          <SelectItem value="Captar propietarios con urgencia">Captar propietarios con urgencia</SelectItem>
-                          <SelectItem value="Captar propietarios que ya intentaron vender">Captar propietarios que ya intentaron vender</SelectItem>
+                          <SelectItem value="captar">Atraer nuevos propietarios</SelectItem>
+                          <SelectItem value="reactivar">Reactivar prospectos antiguos</SelectItem>
+                          <SelectItem value="referidos">Incentivar referidos</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold">Zona principal de captación</Label>
-                      <Input {...form.register("zona_principal")} placeholder="Ej: Palermo, Recoleta, etc." className="h-12" />
+                      <Label className="text-sm font-bold">Zona Principal</Label>
+                      <Input {...form.register("zona_principal")} placeholder="Ej: Palermo, Recoleta..." className="h-12" />
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    <Label className="text-sm font-bold">Tipo de inmueble (Múltiple)</Label>
-                    <div className="flex flex-wrap gap-2">
-                      {["Casa", "Departamento", "PH", "Terreno / lote", "Local comercial", "Oficina"].map(tipo => (
-                        <Button
-                          key={tipo}
-                          type="button"
-                          variant="outline"
-                          className={cn(
-                            "text-xs px-4 py-2 font-bold transition-all",
-                            form.watch("tipo_inmueble").includes(tipo) ? "bg-accent/20 border-accent text-foreground" : "border-muted/50"
-                          )}
-                          onClick={() => toggleArrayItem("tipo_inmueble", tipo)}
-                        >
-                          {tipo}
-                        </Button>
-                      ))}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-bold">Tipo de Inmueble que buscamos</Label>
+                      <div className="flex flex-wrap gap-2">
+                        {["Casa", "Departamento", "PH", "Terreno", "Local", "Oficina"].map(t => (
+                          <Button
+                            key={t}
+                            type="button"
+                            variant={form.watch("tipo_inmueble")?.includes(t) ? "default" : "outline"}
+                            onClick={() => toggleArrayItem("tipo_inmueble", t)}
+                            className="h-9 px-3 text-xs font-bold"
+                          >
+                            {t}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-bold">Rango de valor de propiedad para captar</Label>
-                    <Input {...form.register("rango_valor_precio")} placeholder="Ej: USD 150k - 300k" className="h-12" />
+                    <div className="space-y-2">
+                      <Label className="text-sm font-bold">Rango de Valor / Precio</Label>
+                      <Input {...form.register("rango_valor_precio")} placeholder="Ej: USD 100k - 250k" className="h-12" />
+                    </div>
                   </div>
                 </div>
               )}
@@ -393,66 +411,49 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold">Tipo de propietario</Label>
+                      <Label className="text-sm font-bold">Tipo de Propietario</Label>
                       <Select onValueChange={(v) => form.setValue("flow_data.tipo_propietario", v)} defaultValue={form.getValues("flow_data.tipo_propietario")}>
                         <SelectTrigger className="h-12"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Heredero">Heredero</SelectItem>
-                          <SelectItem value="Inversor">Inversor</SelectItem>
-                          <SelectItem value="Familia en crecimiento">Familia en crecimiento</SelectItem>
-                          <SelectItem value="Divorciado / Separado">Divorciado / Separado</SelectItem>
-                          <SelectItem value="Empty Nester (Hijos se fueron)">Empty Nester (Hijos se fueron)</SelectItem>
-                          <SelectItem value="Relocalización (Muda por trabajo/viaje)">Relocalización (Muda por trabajo/viaje)</SelectItem>
+                          <SelectItem value="Herencia / Familia">Herencia / Familia</SelectItem>
+                          <SelectItem value="Inversor (liquidez)">Inversor (liquidez)</SelectItem>
+                          <SelectItem value="Vende para comprar algo mejor">Vende para comprar algo mejor</SelectItem>
+                          <SelectItem value="Urgencia (Divorcio/Deuda)">Urgencia (Divorcio/Deuda)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold">Motivo principal de la venta</Label>
-                      <Select onValueChange={(v) => form.setValue("flow_data.motivo_venta", v)} defaultValue={form.getValues("flow_data.motivo_venta")}>
-                        <SelectTrigger className="h-12"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Necesidad de liquidez">Necesidad de liquidez</SelectItem>
-                          <SelectItem value="Mudanza a algo más grande">Mudanza a algo más grande</SelectItem>
-                          <SelectItem value="Mudanza a algo más chico">Mudanza a algo más chico</SelectItem>
-                          <SelectItem value="Inversión en otro negocio">Inversión en otro negocio</SelectItem>
-                          <SelectItem value="Miedo a la baja de precios">Miedo a la baja de precios</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-sm font-bold">Motivo real de la venta</Label>
+                      <Input {...form.register("flow_data.motivo_venta")} placeholder="Ej: Necesidad de repartir dinero entre hermanos" className="h-12" />
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-sm font-bold">¿En qué etapa está hoy?</Label>
-                    <Select onValueChange={(v) => form.setValue("flow_data.etapa_hoy", v)} defaultValue={form.getValues("flow_data.etapa_hoy")}>
-                      <SelectTrigger className="h-12"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Solo curioseando valores">Solo curioseando valores</SelectItem>
-                        <SelectItem value="Necesita tasar para decidir">Necesita tasar para decidir</SelectItem>
-                        <SelectItem value="Publicó él mismo y no vendió">Publicó él mismo y no vendió</SelectItem>
-                        <SelectItem value="Está con otra inmobiliaria y no está conforme">Está con otra inmobiliaria y no está conforme</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold">Nivel de urgencia / necesidad</Label>
-                      <Select onValueChange={(v) => form.setValue("flow_data.urgencia_necesidad", v)} defaultValue={form.getValues("flow_data.urgencia_necesidad")}>
+                      <Label className="text-sm font-bold">Etapa donde está hoy</Label>
+                      <Select onValueChange={(v) => form.setValue("flow_data.etapa_hoy", v)} defaultValue={form.getValues("flow_data.etapa_hoy")}>
                         <SelectTrigger className="h-12"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Baja (vende solo si llega al precio)">Baja (vende solo si llega al precio)</SelectItem>
-                          <SelectItem value="Media (quiere vender en 6 meses)">Media (quiere vender en 6 meses)</SelectItem>
-                          <SelectItem value="Alta (necesita vender ya)">Alta (necesita vender ya)</SelectItem>
+                          <SelectItem value="Solo pensando">Solo pensando</SelectItem>
+                          <SelectItem value="Buscando tasación">Buscando tasación</SelectItem>
+                          <SelectItem value="Ya lo tiene publicado (sin éxito)">Ya lo tiene publicado (sin éxito)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold">¿Depende de la venta para comprar otra cosa?</Label>
-                      <Select onValueChange={(v) => form.setValue("flow_data.dependencia_venta", v as any)} defaultValue={form.getValues("flow_data.dependencia_venta")}>
-                        <SelectTrigger className="h-12"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Si">Si</SelectItem>
-                          <SelectItem value="No">No</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-sm font-bold">¿Depende de la venta para comprar?</Label>
+                      <div className="flex gap-4 h-12 items-center">
+                        {["Si", "No"].map(v => (
+                          <Button
+                            key={v}
+                            type="button"
+                            variant={form.watch("flow_data.dependencia_venta") === v ? "default" : "outline"}
+                            onClick={() => form.setValue("flow_data.dependencia_venta", v as any)}
+                            className="flex-1 font-bold"
+                          >
+                            {v}
+                          </Button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -461,19 +462,16 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
               {currentStep === 2 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div className="space-y-4">
-                    <Label className="text-sm font-bold">Principales preocupaciones (Múltiple)</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        "Malvender la propiedad", "Seguridad en las visitas", "Gastos excesivos de comisión",
-                        "Papelería/Trámites lentos", "No encontrar donde vivir después", "Pagar muchos impuestos"
-                      ].map(p => (
+                    <Label className="text-sm font-bold text-red-500">Preocupaciones principales (Múltiple)</Label>
+                    <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                      {["Que se queme la propiedad", "Cobrar menos de lo esperado", "Inseguridad en visitas", "Trámites papeleros", "Honorarios caros", "Demora en la venta"].map(p => (
                         <Button
                           key={p}
                           type="button"
                           variant="outline"
                           className={cn(
-                            "text-xs px-3 py-2 justify-start h-auto font-bold",
-                            form.watch("flow_data.preocupaciones").includes(p) ? "bg-accent/10 border-accent" : "border-muted/50"
+                            "text-[10px] px-2 py-2 font-bold",
+                            form.watch("flow_data.preocupaciones").includes(p) ? "bg-red-500/10 border-red-500/50 text-red-600" : "border-muted/50"
                           )}
                           onClick={() => toggleArrayItem("flow_data.preocupaciones", p)}
                         >
@@ -484,7 +482,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold">Objeción principal para no contratar inmobiliaria</Label>
+                      <Label className="text-sm font-bold">Objeción principal contra inmobiliarias</Label>
                       <Input {...form.register("flow_data.objecion_principal")} placeholder="Ej: Son todos iguales, cobran caro..." className="h-12" />
                     </div>
                     <div className="space-y-2">
@@ -494,11 +492,11 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold">Miedo más frecuente</Label>
+                      <Label className="text-sm font-bold text-red-500">Miedo más frecuente</Label>
                       <Input {...form.register("flow_data.miedo_frecuente")} placeholder="Ej: Que la propiedad se queme en el mercado" className="h-12" />
                     </div>
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold">Logro esperado</Label>
+                      <Label className="text-sm font-bold text-green-600">Logro esperado</Label>
                       <Input {...form.register("flow_data.logro_esperado")} placeholder="Ej: Vender en 90 días al mejor valor" className="h-12" />
                     </div>
                   </div>
@@ -532,34 +530,75 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                       </Select>
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    <Label className="text-sm font-bold">¿Qué prueba de confianza necesita ver? (Múltiple)</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                      {["Testimonios en video", "Propiedades vendidas en la zona", "Plan de marketing detallado", "Títulos oficiales"].map(p => (
-                        <Button
-                          key={p}
-                          type="button"
-                          variant="outline"
-                          className={cn(
-                            "text-[10px] px-2 py-2 font-bold",
-                            form.watch("flow_data.prueba_confianza").includes(p) ? "bg-accent/10 border-accent" : "border-muted/50"
-                          )}
-                          onClick={() => toggleArrayItem("flow_data.prueba_confianza", p)}
-                        >
-                          {p}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold text-accent">Ángulo de marketing recomendado</Label>
+                      <Label className="text-sm font-bold flex items-center justify-between">
+                        Ángulo de Marketing (Captar)
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger><Info className="w-3 h-3 text-muted-foreground" /></TooltipTrigger>
+                            <TooltipContent className="max-w-[300px] p-4 bg-popover border-border">
+                              <div className="text-xs space-y-2 text-foreground">
+                                <p><strong>Necesidad/Problema:</strong> Enfocado en cómo el producto resuelve una necesidad específica.</p>
+                                <p><strong>Emoción/Deseo:</strong> Apela a cómo se sentirá el cliente (transformación personal).</p>
+                                <p><strong>Exclusividad/Estatus:</strong> Resalta la singularidad del servicio.</p>
+                                <p><strong>Dolor/Miedo:</strong> Resalta los problemas si el cliente no actúa hoy.</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </Label>
                       <Select onValueChange={(v) => form.setValue("flow_data.angulo_marketing", v)} defaultValue={form.getValues("flow_data.angulo_marketing")}>
-                        <SelectTrigger className="h-12"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                        <SelectTrigger className="h-12 border-accent/20 focus:border-accent font-bold"><SelectValue placeholder="Seleccione el enfoque..." /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Autoridad (Sé el experto)">Autoridad (Sé el experto)</SelectItem>
-                          <SelectItem value="Empatía (Entiendo tu dolor)">Empatía (Entiendo tu dolor)</SelectItem>
-                          <SelectItem value="Oportunidad (Ahora es el momento)">Oportunidad (Ahora es el momento)</SelectItem>
+                          <SelectItem value="Necesidad/Problema">
+                            <div className="flex flex-col">
+                              <span className="font-bold">1. Ángulo de Necesidad/Problema</span>
+                              <span className="text-[10px] text-muted-foreground">Enfocado en cómo el producto resuelve una necesidad específica.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Emoción/Deseo">
+                            <div className="flex flex-col">
+                              <span className="font-bold">2. Ángulo de Emoción/Deseo</span>
+                              <span className="text-[10px] text-muted-foreground">Apela a la transformación personal y cómo se sentirá el cliente.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Exclusividad/Estatus">
+                            <div className="flex flex-col">
+                              <span className="font-bold">3. Ángulo de Exclusividad/Estatus</span>
+                              <span className="text-[10px] text-muted-foreground">Hace sentir al cliente parte de un grupo especial y único.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Comparación/Competencia">
+                            <div className="flex flex-col">
+                              <span className="font-bold">4. Ángulo de Comparación/Competencia</span>
+                              <span className="text-[10px] text-muted-foreground">Muestra por qué eres la mejor opción frente a los demás.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Autoridad/Prueba Social">
+                            <div className="flex flex-col">
+                              <span className="font-bold">5. Ángulo de Autoridad/Prueba Social</span>
+                              <span className="text-[10px] text-muted-foreground">Basado en testimonios, expertos y casos de éxito reales.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Dolor/Miedo">
+                            <div className="flex flex-col">
+                              <span className="font-bold">6. Ángulo de Dolor/Miedo</span>
+                              <span className="text-[10px] text-muted-foreground">Resalta los problemas y riesgos si el cliente no toma acción hoy.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Inmediatez/Escasez">
+                            <div className="flex flex-col">
+                              <span className="font-bold">7. Ángulo de Inmediatez/Escasez</span>
+                              <span className="text-[10px] text-muted-foreground">Crea urgencia por tiempo limitado o disponibilidad exclusiva.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Beneficio Lógico/Pragmático">
+                            <div className="flex flex-col">
+                              <span className="font-bold">8. Ángulo de Beneficio Lógico</span>
+                              <span className="text-[10px] text-muted-foreground">Enfocado en datos duros, rentabilidad y ahorro concreto.</span>
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -580,43 +619,80 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
 
               {currentStep === 4 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-bold">Resumen del IPC en una frase</Label>
-                    <Input {...form.register("flow_data.resumen_frase")} placeholder="Ej: Propietario por herencia con miedo a gastar en impuestos y urgencia por liquidez." className="h-12" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-bold flex items-center justify-between">
+                        Nivel de Conciencia (Eugene Schwartz)
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger><Info className="w-3 h-3 text-muted-foreground" /></TooltipTrigger>
+                            <TooltipContent className="max-w-[300px] p-4 bg-popover border-border">
+                              <div className="text-xs space-y-2 text-foreground">
+                                <p><strong>Inconsciente:</strong> No sabe que la venta es posible o necesaria.</p>
+                                <p><strong>Problema Aware:</strong> Sabe que necesita vender pero no sabe cómo.</p>
+                                <p><strong>Solución Aware:</strong> Conoce qué tipo de ayuda necesita (inmobiliaria).</p>
+                                <p><strong>Producto Aware:</strong> Te conoce y te evalúa contra otros.</p>
+                                <p><strong>Most Aware:</strong> Listo para contratarte ya.</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </Label>
+                      <Select onValueChange={(v) => form.setValue("flow_data.nivel_conciencia", v)} defaultValue={form.getValues("flow_data.nivel_conciencia")}>
+                        <SelectTrigger className="h-12 border-accent/20 focus:border-accent font-bold"><SelectValue placeholder="Seleccione nivel..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Inconsciente">
+                            <div className="flex flex-col py-1">
+                              <span className="font-bold">1. Inconsciente</span>
+                              <span className="text-[10px] text-muted-foreground">No sabe que tiene un problema ni que la venta es posible.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Consciente del Problema">
+                            <div className="flex flex-col py-1">
+                              <span className="font-bold">2. Consciente del Problema</span>
+                              <span className="text-[10px] text-muted-foreground">Siente la necesidad de vender pero no sabe por dónde empezar.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Consciente de la Solución">
+                            <div className="flex flex-col py-1">
+                              <span className="font-bold">3. Consciente de la Solución</span>
+                              <span className="text-[10px] text-muted-foreground">Busca inmobiliarias o ayuda para vender su propiedad.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Consciente del Producto">
+                            <div className="flex flex-col py-1">
+                              <span className="font-bold">4. Consciente del Producto</span>
+                              <span className="text-[10px] text-muted-foreground">Conoce tu inmobiliaria y te está comparando con otros.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Muy Consciente">
+                            <div className="flex flex-col py-1">
+                              <span className="font-bold">5. Muy Consciente</span>
+                              <span className="text-[10px] text-muted-foreground">Está listo para contratarte y solo necesita el empujón final.</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-bold">Resumen del IPC en una frase</Label>
+                      <Input {...form.register("flow_data.resumen_frase")} placeholder="Ej: Propietario por herencia con miedo a gastar en impuestos." className="h-12" />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-bold">Promesa central del copy</Label>
                     <Textarea {...form.register("flow_data.promesa_central")} placeholder="¿Qué le prometemos como solución principal?" className="min-h-[80px]" />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-bold">CTA recomendado</Label>
-                      <Input {...form.register("flow_data.cta_recomendado")} placeholder="Ej: Agendá una tasación sin compromiso" className="h-12" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-bold">Nivel de conciencia del mercado</Label>
-                      <Select onValueChange={(v) => form.setValue("flow_data.nivel_conciencia", v)} defaultValue={form.getValues("flow_data.nivel_conciencia")}>
-                        <SelectTrigger className="h-12"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Inconsciente (no sabe que necesita vender)">Inconsciente (no sabe que necesita vender)</SelectItem>
-                          <SelectItem value="Consciente del problema (sabe que tiene que vender)">Consciente del problema (sabe que tiene que vender)</SelectItem>
-                          <SelectItem value="Consciente de la solución (busca inmobiliaria)">Consciente de la solución (busca inmobiliaria)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="bg-accent/5 p-4 rounded-lg flex gap-3 border border-accent/10">
-                    <Info className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                      <strong>Tip:</strong> Cuanto más específico seas en las objeciones y miedos, más persuasivos serán los textos generados por la IA.
-                    </p>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-bold">CTA recomendado</Label>
+                    <Input {...form.register("flow_data.cta_recomendado")} placeholder="Ej: Agendá una tasación sin compromiso" className="h-12" />
                   </div>
                 </div>
               )}
             </>
           )}
 
-          {/* FLOW: VENDER */}
+          {/* FLOW: VENDER (COMPRADORES) */}
           {flowType === 'vender' && (
             <>
               {currentStep === 0 && (
@@ -646,7 +722,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                     </div>
                   )}
                   <div className="space-y-4 pt-4 border-t">
-                    <Label className="text-sm font-bold">O configuralo manualmente:</Label>
+                    <Label className="text-sm font-bold">O configuralo manually:</Label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label className="text-xs">Nombre del Perfil</Label>
@@ -692,25 +768,6 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                       <Input {...form.register("flow_data.problema_resolver")} placeholder="Ej: Dejar de pagar expensas caras" className="h-12" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-bold">Resultado querido / Sueño</Label>
-                      <Input {...form.register("flow_data.resultado_querido")} placeholder="Ej: Tener su propio estudio en casa" className="h-12" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-bold">¿Qué valora más al elegir?</Label>
-                      <Select onValueChange={(v) => form.setValue("flow_data.valor_prioridad", v)} defaultValue={form.getValues("flow_data.valor_prioridad")}>
-                        <SelectTrigger className="h-12"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Ubicación / Conectividad">Ubicación / Conectividad</SelectItem>
-                          <SelectItem value="Estado del inmueble (A estrenar/Refaccionado)">Estado del inmueble (A estrenar/Refaccionado)</SelectItem>
-                          <SelectItem value="Precio / Oportunidad">Precio / Oportunidad</SelectItem>
-                          <SelectItem value="Amenities / Lifestyle">Amenities / Lifestyle</SelectItem>
-                          <SelectItem value="Seguridad">Seguridad</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -735,25 +792,6 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                       ))}
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    <Label className="text-sm font-bold text-red-500 font-black">Factores de duda / Frenos (Múltiple)</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {["Falta de placards", "Baño a refaccionar", "Cocina pequeña", "Calle ruidosa", "Muchos años de antigüedad", "Falta de luz natural"].map(d => (
-                        <Button
-                          key={d}
-                          type="button"
-                          variant="outline"
-                          className={cn(
-                            "text-xs px-2 py-2 justify-start font-bold",
-                            form.watch("flow_data.factores_duda").includes(d) ? "bg-red-500/10 border-red-500/50 text-red-600" : "border-muted/50"
-                          )}
-                          onClick={() => toggleArrayItem("flow_data.factores_duda", d)}
-                        >
-                          {d}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-bold">Objeción más común que te dicen</Label>
                     <Input {...form.register("flow_data.objecion_comun")} placeholder="Ej: Es un piso muy alto, no me gusta el barrio..." className="h-12" />
@@ -765,14 +803,73 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold text-accent font-black">Ángulo de copy para vender</Label>
-                      <Select onValueChange={(v) => form.setValue("flow_data.angulo_copy", v)} defaultValue={form.getValues("flow_data.angulo_copy")}>
-                        <SelectTrigger className="h-12"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
+                      <Label className="text-sm font-bold flex items-center justify-between">
+                        Ángulo de Copy (Vender)
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger><Info className="w-3 h-3 text-muted-foreground" /></TooltipTrigger>
+                            <TooltipContent className="max-w-[300px] p-4 bg-popover border-border">
+                              <div className="text-xs space-y-2 text-foreground">
+                                <p><strong>Necesidad:</strong> Enfoque en resolver el problema habitacional.</p>
+                                <p><strong>Emoción:</strong> Cómo se sentirá el cliente al vivir allí.</p>
+                                <p><strong>Estatus:</strong> Resalta la exclusividad del inmueble.</p>
+                                <p><strong>Dolor:</strong> Riesgos de perder la oportunidad ahora.</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </Label>
+                      <Select onValueChange={(v) => form.setValue("flow_data.angulo_marketing", v)} defaultValue={form.getValues("flow_data.angulo_marketing")}>
+                        <SelectTrigger className="h-12 border-accent/20 focus:border-accent font-bold"><SelectValue placeholder="Seleccione ángulo..." /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Oportunidad de inversión">Oportunidad de inversión</SelectItem>
-                          <SelectItem value="Lifestyle / Disfrute">Lifestyle / Disfrute</SelectItem>
-                          <SelectItem value="Escasez (Última disponible)">Escasez (Última disponible)</SelectItem>
-                          <SelectItem value="Transformación (Cómo será tu vida)">Transformación (Cómo será tu vida)</SelectItem>
+                          <SelectItem value="Necesidad/Problema">
+                            <div className="flex flex-col">
+                              <span className="font-bold">1. Ángulo de Necesidad/Problema</span>
+                              <span className="text-[10px] text-muted-foreground">Enfocado en resolver el problema habitacional directo.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Emoción/Deseo">
+                            <div className="flex flex-col">
+                              <span className="font-bold">2. Ángulo de Emoción/Deseo</span>
+                              <span className="text-[10px] text-muted-foreground">Cómo se sentirá el cliente viviendo en este nuevo hogar.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Exclusividad/Estatus">
+                            <div className="flex flex-col">
+                              <span className="font-bold">3. Ángulo de Exclusividad/Estatus</span>
+                              <span className="text-[10px] text-muted-foreground">Resalta la singularidad y prestigio de la propiedad.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Comparación/Competencia">
+                            <div className="flex flex-col">
+                              <span className="font-bold">4. Ángulo de Comparación/Competencia</span>
+                              <span className="text-[10px] text-muted-foreground">Muestra por qué esta propiedad es la mejor inversión.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Autoridad/Prueba Social">
+                            <div className="flex flex-col">
+                              <span className="font-bold">5. Ángulo de Autoridad/Prueba Social</span>
+                              <span className="text-[10px] text-muted-foreground">Propiedad validada por el mercado o expertos.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Dolor/Miedo">
+                            <div className="flex flex-col">
+                              <span className="font-bold">6. Ángulo de Dolor/Miedo</span>
+                              <span className="text-[10px] text-muted-foreground">Pérdida de oportunidad (FOMO) o riesgos de no comprar hoy.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Inmediatez/Escasez">
+                            <div className="flex flex-col">
+                              <span className="font-bold">7. Ángulo de Inmediatez/Escasez</span>
+                              <span className="text-[10px] text-muted-foreground">Última unidad disponible o precio por tiempo limitado.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Rentabilidad/Lógica">
+                            <div className="flex flex-col">
+                              <span className="font-bold">8. Ángulo de Rentabilidad/Lógica</span>
+                              <span className="text-[10px] text-muted-foreground">Datos sobre m², expensas bajas y alta plusvalía.</span>
+                            </div>
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -789,8 +886,8 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-bold">Promesa creíble</Label>
-                    <Input {...form.register("flow_data.promesa_creible")} placeholder="Ej: La mejor relación precio-m2 de la zona" className="h-12" />
+                    <Label className="text-sm font-bold">Promesa central</Label>
+                    <Input {...form.register("flow_data.promesa_central")} placeholder="Ej: Mudate a las mejores expensas de la zona" className="h-12" />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-bold text-red-500">¿Qué NO mostrar o mencionar? (Filtro)</Label>
@@ -801,30 +898,73 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
 
               {currentStep === 4 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
-                   <div className="space-y-2">
-                    <Label className="text-sm font-bold">Resumen del comprador en una frase</Label>
-                    <Input {...form.register("flow_data.resumen_frase")} placeholder="Ej: Joven profesional buscando rentabilidad en zona premium con bajo presupuesto." className="h-12" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-bold flex items-center justify-between">
+                        Nivel de Conciencia (Eugene Schwartz)
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger><Info className="w-3 h-3 text-muted-foreground" /></TooltipTrigger>
+                            <TooltipContent className="max-w-[300px] p-4 bg-popover border-border">
+                              <div className="text-xs space-y-2 text-foreground">
+                                <p><strong>Inconsciente:</strong> No busca mudarse pronto.</p>
+                                <p><strong>Problema Aware:</strong> Necesita más espacio/zona, pero no mira opciones.</p>
+                                <p><strong>Solución Aware:</strong> Sabe que quiere comprar, mira portales.</p>
+                                <p><strong>Producto Aware:</strong> Le gusta esta propiedad, busca razones para reservar.</p>
+                                <p><strong>Most Aware:</strong> Listo para visitar o hacer reserva.</p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </Label>
+                      <Select onValueChange={(v) => form.setValue("flow_data.nivel_conciencia", v)} defaultValue={form.getValues("flow_data.nivel_conciencia")}>
+                        <SelectTrigger className="h-12 border-accent/20 focus:border-accent font-bold"><SelectValue placeholder="Seleccione nivel..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Inconsciente">
+                            <div className="flex flex-col py-1">
+                              <span className="font-bold">1. Inconsciente</span>
+                              <span className="text-[10px] text-muted-foreground">No busca mudarse ni es consciente de que este inmueble existe.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Consciente del Problema">
+                            <div className="flex flex-col py-1">
+                              <span className="font-bold">2. Consciente del Problema</span>
+                              <span className="text-[10px] text-muted-foreground">Sabe que su hogar actual le queda chico/incómodo.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Consciente de la Solución">
+                            <div className="flex flex-col py-1">
+                              <span className="font-bold">3. Consciente de la Solución</span>
+                              <span className="text-[10px] text-muted-foreground">Está activamente buscando propiedades en portales.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Consciente del Producto">
+                            <div className="flex flex-col py-1">
+                              <span className="font-bold">4. Consciente del Producto</span>
+                              <span className="text-[10px] text-muted-foreground">Conoce esta propiedad y está evaluando el precio y zona.</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Muy Consciente">
+                            <div className="flex flex-col py-1">
+                              <span className="font-bold">5. Muy Consciente</span>
+                              <span className="text-[10px] text-muted-foreground">Listo para visitar o reservar este inmueble específico.</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-bold">Resumen del comprador en una frase</Label>
+                      <Input {...form.register("flow_data.resumen_frase")} placeholder="Ej: Joven profesional buscando rentabilidad en zona premium." className="h-12" />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-bold">Mensaje central a comunicar</Label>
                     <Textarea {...form.register("flow_data.mensaje_central")} placeholder="¿Cuál es el corazón del anuncio?" className="min-h-[100px]" />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-bold">CTA para vender</Label>
-                      <Input {...form.register("flow_data.cta")} placeholder="Ej: Agendá tu visita hoy mismo" className="h-12" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-bold">Nivel de conciencia</Label>
-                      <Select onValueChange={(v) => form.setValue("flow_data.nivel_conciencia", v)} defaultValue={form.getValues("flow_data.nivel_conciencia")}>
-                        <SelectTrigger className="h-12"><SelectValue placeholder="Seleccione..." /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Busca genérico (no sabe qué zona)">Busca genérico (no sabe qué zona)</SelectItem>
-                          <SelectItem value="Busca zona (conoce el barrio)">Busca zona (conoce el barrio)</SelectItem>
-                          <SelectItem value="Busca producto específico (ya vio otras similares)">Busca producto específico (ya vio otras similares)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-bold">CTA para vender</Label>
+                    <Input {...form.register("flow_data.cta")} placeholder="Ej: Agendá tu visita hoy mismo" className="h-12" />
                   </div>
                 </div>
               )}

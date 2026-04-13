@@ -39,8 +39,8 @@ export interface VenderFlowData {
   factores_duda: string[];
   objecion_comun: string;
   evidencia_necesaria: string[];
-  angulo_copy: string;
-  promesa_creible: string;
+  angulo_marketing: string;
+  promesa_central: string;
   tono: string;
   formato_anuncio: string[];
   no_mostrar: string;
