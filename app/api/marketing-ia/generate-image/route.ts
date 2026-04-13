@@ -105,7 +105,10 @@ export async function POST(req: Request) {
 
     if (uploadError) {
       console.error("Storage Upload Error:", uploadError);
-      return NextResponse.json({ error: "Error uploading to storage" }, { status: 500 });
+      return NextResponse.json({ 
+        error: `Error al subir a Storage: ${uploadError.message}`,
+        details: uploadError
+      }, { status: 500 });
     }
 
     const { data: { publicUrl } } = supabase.storage
