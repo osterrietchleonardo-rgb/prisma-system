@@ -120,7 +120,7 @@ export function CopyGeneratorFlow() {
     }
   }
 
-  const handleUpdateDraft = async () => {
+  const handleUpdateDraft = async (targetStep?: number) => {
     if (!generatedDraft || !editableContent) return
     try {
       const { error } = await supabase
@@ -129,9 +129,14 @@ export function CopyGeneratorFlow() {
         .eq('id', generatedDraft.id)
       
       if (error) throw error
-      toast.success("Borrador actualizado")
-      setCurrentStep(3)
-      setTimeout(() => setCurrentStep(4), 1000)
+      
+      if (targetStep !== undefined) {
+        setCurrentStep(targetStep)
+      } else {
+        toast.success("Borrador actualizado")
+        setCurrentStep(3)
+        setTimeout(() => setCurrentStep(4), 1000)
+      }
     } catch (error) {
       toast.error("Error al guardar cambios")
     }
@@ -192,7 +197,7 @@ export function CopyGeneratorFlow() {
                     <SelectTrigger className="bg-accent/5"><SelectValue placeholder="Seleccione un IPC" /></SelectTrigger>
                     <SelectContent>
                       {ipcs
-                        .filter(ipc => ipc.objetivo === objective || !ipc.objetivo)
+                        .filter(ipc => ipc.objective === objective || !ipc.objetivo)
                         .map(ipc => (
                           <SelectItem key={ipc.id} value={ipc.id}>{ipc.nombre_perfil}</SelectItem>
                         ))}
@@ -360,7 +365,7 @@ export function CopyGeneratorFlow() {
           </CardContent>
           <CardFooter className="flex justify-between border-t p-6 gap-4">
             <Button variant="outline" onClick={() => setCurrentStep(0)}>Generar otra versión</Button>
-            <Button className="bg-accent flex-1" onClick={handleUpdateDraft}>
+            <Button className="bg-accent flex-1" onClick={() => handleUpdateDraft()}>
               Continuar al Paso de Imagen <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </CardFooter>
@@ -378,10 +383,7 @@ export function CopyGeneratorFlow() {
       {currentStep === 4 && (
         <PropertySelector 
           onSelect={setSelectedProperty} 
-          onContinue={() => {
-            // Update draft with property before moving to step 6
-            handleUpdateDraft().then(() => setCurrentStep(5))
-          }} 
+          onContinue={() => handleUpdateDraft(5)} 
         />
       )}
 
