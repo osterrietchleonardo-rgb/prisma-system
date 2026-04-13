@@ -141,8 +141,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      image_url: publicUrl,
-      id: savedImage?.id
+      ...savedImage
     });
 
   } catch (error: any) {
