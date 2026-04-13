@@ -172,6 +172,12 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
   const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, steps.length))
   const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 0))
 
+  // Debug errors
+  const errors = form.formState.errors
+  if (Object.keys(errors).length > 0) {
+    console.warn("IPC Form Validation Errors:", errors)
+  }
+
   const handleSelectFlow = (type: 'captar' | 'vender') => {
     setFlowType(type)
     form.reset({
@@ -705,6 +711,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                         form.setValue("nombre_perfil", `Comprador para ${p.title.substring(0, 30)}...`)
                         form.setValue("zona_principal", p.zone)
                         form.setValue("tipo_inmueble", [p.property_type])
+                        form.setValue("rango_valor_precio", `${p.currency} ${p.price?.toLocaleString() || 'N/A'}`)
                       }
                     }}
                     onContinue={nextStep}
@@ -722,15 +729,19 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                     </div>
                   )}
                   <div className="space-y-4 pt-4 border-t">
-                    <Label className="text-sm font-bold">O configuralo manually:</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
+                    <Label className="text-sm font-bold text-accent italic">O configuralo manualmente:</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-2 lg:col-span-2">
                         <Label className="text-xs">Nombre del Perfil</Label>
                         <Input {...form.register("nombre_perfil")} placeholder="Ej: Comprador para Monoambiente en Cañitas" />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs">Zona</Label>
                         <Input {...form.register("zona_principal")} placeholder="Ej: Recoleta" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Valor Estimado</Label>
+                        <Input {...form.register("rango_valor_precio")} placeholder="Ej: USD 150k" />
                       </div>
                     </div>
                   </div>

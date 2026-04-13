@@ -72,7 +72,7 @@ export function CopyGeneratorFlow() {
       if (!res.ok) throw new Error("Error en la generación")
       const content = await res.json()
       setEditableContent(content)
-      setCurrentStep(1)
+      setCurrentStep(2)
       
       // Save draft automatically
       const { data: { user } } = await supabase.auth.getUser()
