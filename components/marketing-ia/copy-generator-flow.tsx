@@ -54,10 +54,35 @@ export function CopyGeneratorFlow() {
 
 
   const handleGenerateCopy = async () => {
-    if (!selectedIpcId) return toast.error("Seleccione un IPC")
+    if (!selectedIpcId || !selectedIpc) return toast.error("Seleccione un IPC")
     setIsGenerating(true)
     setCurrentStep(1)
     
+    // Helper mappings (consistent with API)
+    const levelMap: Record<string, number> = {
+      "Inconsciente": 0,
+      "Consciente del Problema": 1,
+      "Consciente de la Solución": 2,
+      "Consciente del Producto": 3,
+      "Muy Consciente": 4
+    };
+
+    const angleMap: Record<string, string> = {
+      "Necesidad/Problema": "pas",
+      "Emoción/Deseo": "transformacion",
+      "Exclusividad/Estatus": "aspiracional",
+      "Comparación/Competencia": "autoridad",
+      "Autoridad/Prueba Social": "social_proof",
+      "Dolor/Miedo": "pas",
+      "Inmediatez/Escasez": "urgencia",
+      "Beneficio Lógico/Pragmático": "datos"
+    };
+
+    const fd = selectedIpc.flow_data as any;
+    const rawAngle = fd?.angulo_marketing || fd?.angulo_copy || 'pas';
+    const finalAngle = angleMap[rawAngle] || rawAngle;
+    const finalLevel = levelMap[fd?.nivel_conciencia] ?? 1;
+
     try {
       const res = await fetch('/api/marketing-ia/generate-copy', {
         method: 'POST',
@@ -65,6 +90,9 @@ export function CopyGeneratorFlow() {
         body: JSON.stringify({
           ipc_id: selectedIpcId,
           copy_type: copyType,
+          angle: finalAngle,
+          consciousness_level: finalLevel,
+          propiedad_tokko_id: selectedProperty?.id,
           extra_context: extraContext
         })
       })
@@ -81,17 +109,24 @@ export function CopyGeneratorFlow() {
         .insert({
           user_id: user?.id,
           ipc_id: selectedIpcId,
+          propiedad_tokko_id: selectedProperty?.id,
           copy_type: copyType,
+          angle: finalAngle,
+          consciousness_level: finalLevel,
           extra_context: extraContext,
           content
         })
         .select()
         .single()
       
-      if (error) throw error
+      if (error) {
+        console.error('Error saving draft:', error);
+        throw error;
+      }
       setGeneratedDraft(draft)
       toast.success("Copia generada con éxito")
     } catch (error) {
+      console.error('handleGenerateCopy error:', error);
       toast.error("Error al generar copy")
       setCurrentStep(0)
     } finally {

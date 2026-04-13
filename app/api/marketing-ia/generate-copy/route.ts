@@ -114,7 +114,7 @@ Respondé ÚNICAMENTE en JSON válido.`;
 
 export async function POST(req: Request) {
   try {
-    const { ipc_id, copy_type, angle, consciousness_level, extra_context } = await req.json();
+    const { ipc_id, copy_type, angle: reqAngle, consciousness_level: reqLevel, extra_context, propiedad_tokko_id: reqPropertyId } = await req.json();
     const supabase = await createClient();
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -132,24 +132,26 @@ export async function POST(req: Request) {
     }
 
     let propertyData: TokkoProperty | null = null;
-    if (ipc.tipo_ipc === 'vender' && ipc.propiedad_tokko_id) {
+    const propertyId = reqPropertyId || ipc.propiedad_tokko_id || (ipc.flow_data as any).propiedad_tokko_id;
+
+    if (propertyId) {
       try {
         const { data: profile } = await supabase
           .from("profiles")
           .select("agency_id")
           .eq("id", user.id)
           .single();
-
+ 
         if (profile?.agency_id) {
           const { data: agency } = await supabase
             .from("agencies")
             .select("tokko_api_key")
             .eq("id", profile.agency_id)
             .single();
-
+ 
           const TOKKO_API_KEY = agency?.tokko_api_key || process.env.TOKKO_API_KEY;
           if (TOKKO_API_KEY) {
-            const tokkoRes = await fetch(`https://tokkobroker.com/api/v1/property/${ipc.propiedad_tokko_id}/?key=${TOKKO_API_KEY}&format=json`);
+            const tokkoRes = await fetch(`https://tokkobroker.com/api/v1/property/${propertyId}/?key=${TOKKO_API_KEY}&format=json`);
             if (tokkoRes.ok) {
               const p = await tokkoRes.json();
               propertyData = {
@@ -181,18 +183,60 @@ export async function POST(req: Request) {
       }
     }
 
-    const prompt = buildCopyPrompt(ipc as any as IpcProfile, { copy_type, angle, consciousness_level, extra_context }, propertyData);
+    // Helper mappings
+    const levelMap: Record<string, number> = {
+      "Inconsciente": 0,
+      "Consciente del Problema": 1,
+      "Consciente de la Solución": 2,
+      "Consciente del Producto": 3,
+      "Muy Consciente": 4
+    };
+
+    const angleMap: Record<string, string> = {
+      "Necesidad/Problema": "pas",
+      "Emoción/Deseo": "transformacion",
+      "Exclusividad/Estatus": "aspiracional",
+      "Comparación/Competencia": "autoridad",
+      "Autoridad/Prueba Social": "social_proof",
+      "Dolor/Miedo": "pas",
+      "Inmediatez/Escasez": "urgencia",
+      "Beneficio Lógico/Pragmático": "datos"
+    };
+
+    const fd = ipc.flow_data as any;
+    const rawAngle = reqAngle || fd.angulo_marketing || fd.angulo_copy || 'pas';
+    const finalAngle = (angleMap[rawAngle] || rawAngle) as CopyAngle;
+    const finalLevel = (reqLevel !== undefined ? reqLevel : (levelMap[fd.nivel_conciencia] ?? 1)) as ConsciousnessLevel;
+
+    console.log('[DEBUG] Generating copy with:', { finalAngle, finalLevel, copy_type });
+
+    const prompt = buildCopyPrompt(ipc as any as IpcProfile, { 
+      copy_type, 
+      angle: finalAngle, 
+      consciousness_level: finalLevel, 
+      extra_context 
+    }, propertyData);
 
     const result = await prismaIA.generateContent(prompt);
     const rawResponse = result.response.text();
-    const cleanJsonString = rawResponse.replace(/```json|```/g, '').trim();
-    
+    console.log('[DEBUG] Raw AI Response:', rawResponse);
+
+    // Robust JSON extraction
+    let cleanResponse = rawResponse;
+    const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      cleanResponse = jsonMatch[0];
+    } else {
+      cleanResponse = rawResponse.replace(/```json|```/g, '').trim();
+    }
+
     try {
-      const copyContent = JSON.parse(cleanJsonString);
+      const copyContent = JSON.parse(cleanResponse);
       return NextResponse.json(copyContent);
     } catch (parseError) {
-      console.error("Failed to parse Gemini response:", rawResponse);
-      return NextResponse.json({ error: "Invalid AI response structure" }, { status: 500 });
+      console.error('[DEBUG] JSON Parse Error:', parseError);
+      console.error('[DEBUG] Failed to parse:', cleanResponse);
+      return NextResponse.json({ error: "Error parsing AI response" }, { status: 500 });
     }
 
   } catch (error: any) {
