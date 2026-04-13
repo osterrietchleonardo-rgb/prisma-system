@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { IpcManager } from "@/components/marketing-ia/ipc-manager"
 import { CopyGeneratorFlow } from "@/components/marketing-ia/copy-generator-flow"
+import { MarketingHistory } from "@/components/marketing-ia/marketing-history"
 import { Bot, UserSearch, History, Sparkles } from "lucide-react"
 
 export default function MarketingIAPage() {
@@ -38,11 +39,7 @@ export default function MarketingIAPage() {
         </TabsContent>
 
         <TabsContent value="history" className="mt-8">
-          <div className="flex flex-col items-center justify-center p-20 text-center bg-muted/20 rounded-3xl border border-dashed border-muted">
-             <History className="w-12 h-12 text-muted-foreground mb-4 opacity-20" />
-             <h3 className="text-xl font-bold">Próximamente: Historial y Galería</h3>
-             <p className="text-muted-foreground max-w-sm mt-2">Estamos construyendo la vista para que puedas ver todos tus anuncios y perfiles generados.</p>
-          </div>
+           <MarketingHistory />
         </TabsContent>
       </Tabs>
     </div>
