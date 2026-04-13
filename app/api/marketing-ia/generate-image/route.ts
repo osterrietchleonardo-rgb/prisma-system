@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { generateImage } from "@/lib/gemini";
 import { GenerateImagePayload } from "@/types/marketing-ia";
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
   try {
     const payload: GenerateImagePayload = await req.json();
     const supabase = await createClient();
+    const supabaseAdmin = createAdminClient();
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -90,9 +92,11 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    // Upload to Storage
+    // Upload to Storage using Admin Client
     const fileName = `${user.id}/${draft_id}/${Date.now()}.jpg`;
-    const { error: uploadError } = await supabase.storage
+    console.log('[DEBUG] Uploading to bucket: marketing-images, file:', fileName);
+    
+    const { error: uploadError } = await supabaseAdmin.storage
       .from('marketing-images')
       .upload(fileName, imageBuffer, {
         contentType: 'image/jpeg',
@@ -112,7 +116,7 @@ export async function POST(req: Request) {
     const width = 1080;
     const height = format === 'post' ? 1080 : 1920;
 
-    const { data: savedImage, error: dbError } = await supabase
+    const { data: savedImage, error: dbError } = await supabaseAdmin
       .from('generated_images')
       .insert({
         user_id: user.id,

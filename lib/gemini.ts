@@ -80,7 +80,7 @@ export const generateImage = async (prompt: string, quality: 'standard' | 'pro' 
     contents: [{ role: "user", parts: [{ text: prompt }] }],
     generationConfig: {
       // @ts-ignore - Image generation modalities for 2026 models
-      responseModalities: ["image"],
+      responseModalities: ["IMAGE"],
     }
   });
 

@@ -40,12 +40,17 @@ export function ImageGeneratorForm({ draftId, copyContent, tokkoProperty, onBack
         })
       })
 
-      if (!res.ok) throw new Error("Error en la generación")
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || errorData.details || "Error en la generación");
+      }
+      
       const data = await res.json()
       setGeneratedImage(data)
       toast.success("¡Imagen generada con éxito!")
-    } catch (error) {
-      toast.error("Error al generar imagen. Verifique su API Key.")
+    } catch (error: any) {
+      console.error("Image generation client error:", error);
+      toast.error(error.message || "Error al generar imagen. Verifique su API Key.");
     } finally {
       setIsGenerating(false)
     }
