@@ -55,18 +55,18 @@ interface Step {
 const steps: Step[] = [
   { 
     id: 1, 
-    title: "Requisitos", 
-    description: "Cuentas y acceso" 
+    title: "Preparación", 
+    description: "Cuentas y verificación" 
   },
   { 
     id: 2, 
     title: "App en Meta", 
-    description: "Crear aplicación" 
+    description: "Configurar caso de uso" 
   },
   { 
     id: 3, 
-    title: "WhatsApp", 
-    description: "Configurar producto" 
+    title: "API WhatsApp", 
+    description: "Configuración inicial" 
   },
   { 
     id: 4, 
@@ -98,6 +98,7 @@ export function SetupWizard() {
     wabaId: "",
     accessToken: "",
     verifyToken: process.env.NEXT_PUBLIC_WHATSAPP_WEBHOOK_VERIFY_TOKEN || "PrismaSaaS2026_Verificacion!",
+    apiUrl: typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/meta` : "https://prisma.vakdor.com/api/webhooks/meta",
     useExistingWebhook: true
   })
 
@@ -215,15 +216,17 @@ export function SetupWizard() {
           {currentStep === 1 && (
             <div className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-xl font-bold text-foreground">Antes de comenzar</h2>
-                <p className="text-muted-foreground">Asegúrate de tener acceso a lo siguiente:</p>
+                <h2 className="text-xl font-bold text-foreground italic flex items-center gap-2">
+                  <span className="text-accent underline">1.</span> Antes de comenzar
+                </h2>
+                <p className="text-muted-foreground">Necesitas tener estos 3 elementos listos para una conexión exitosa:</p>
               </div>
 
               <div className="grid gap-4">
                 {[
-                  { id: 'metaAccount', label: "Cuenta personal de Facebook activa", desc: "Necesaria para entrar al portal de desarrolladores.", icon: <ExternalLink className="h-4 w-4" /> },
-                  { id: 'businessAccount', label: "Business Manager de Meta", desc: "Donde se gestionará tu negocio y línea de WhatsApp.", icon: <ExternalLink className="h-4 w-4" /> },
-                  { id: 'phoneNumber', label: "Número de teléfono para WhatsApp", desc: "No debe estar activo en WhatsApp/Business app actualmente.", icon: <MessageSquare className="h-4 w-4" /> }
+                  { id: 'metaAccount', label: "Perfil de Facebook verificado", desc: "Debes ser administrador y tener autenticación en dos pasos activa.", icon: <ExternalLink className="h-4 w-4" /> },
+                  { id: 'businessAccount', label: "Meta Business Suite", desc: "Tu cuenta de empresa (Business Manager) debe estar activa y verificada.", icon: <ExternalLink className="h-4 w-4" /> },
+                  { id: 'phoneNumber', label: "Número limpio (No WhastApp)", desc: "El número no debe estar en WhatsApp/Business app. Si lo está, borra la cuenta primero.", icon: <MessageSquare className="h-4 w-4" /> }
                 ].map((item) => (
                   <div 
                     key={item.id}
@@ -231,22 +234,19 @@ export function SetupWizard() {
                       "group flex items-start gap-4 p-4 rounded-xl border transition-all cursor-pointer",
                       preReqs[item.id as keyof typeof preReqs] 
                         ? "bg-accent/5 border-accent/30" 
-                        : "bg-muted/30 border-border hover:border-accent/50"
+                        : "bg-muted/30 border-border hover:border-accent/50 shadow-sm"
                     )}
                     onClick={() => setPreReqs(prev => ({ ...prev, [item.id]: !prev[item.id as keyof typeof preReqs] }))}
                   >
                     <div className={cn(
-                      "mt-1 w-5 h-5 rounded border flex items-center justify-center transition-colors",
-                      preReqs[item.id as keyof typeof preReqs] ? "bg-accent border-accent" : "border-input"
+                      "mt-1 w-5 h-5 rounded-full border flex items-center justify-center transition-all",
+                      preReqs[item.id as keyof typeof preReqs] ? "bg-accent border-accent scale-110 shadow-[0_0_10px_rgba(var(--accent),0.3)]" : "border-input"
                     )}>
                       {preReqs[item.id as keyof typeof preReqs] && <Check className="h-3 w-3 text-accent-foreground" />}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-foreground">{item.label}</span>
-                        <div className="p-1 rounded bg-muted text-muted-foreground group-hover:text-accent transition-colors">
-                          {item.icon}
-                        </div>
                       </div>
                       <p className="text-sm text-muted-foreground mt-0.5">{item.desc}</p>
                     </div>
@@ -257,7 +257,7 @@ export function SetupWizard() {
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-4">
                 <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5 dark:text-amber-500" />
                 <p className="text-sm text-amber-900/80 leading-relaxed dark:text-amber-200/80">
-                  <span className="font-bold text-amber-700 dark:text-amber-400">Importante:</span> El número de teléfono que elijas <span className="font-bold">no debe estar activo</span> en la aplicación normal de WhatsApp o WhatsApp Business de tu celular. Si lo está, deberás eliminar la cuenta antes de vincularla a la API.
+                  <span className="font-bold text-amber-700 dark:text-amber-400">¡AVISO CRÍTICO!</span> Si usas un número que ya tiene WhatsApp, el proceso de vinculación fallará. <span className="font-extrabold underline">Debes eliminar la cuenta definitivamente</span> en Configuración {'->'} Cuenta {'->'} Eliminar cuenta.
                 </p>
               </div>
             </div>
@@ -267,31 +267,33 @@ export function SetupWizard() {
           {currentStep === 2 && (
             <div className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-xl font-bold text-foreground">Crear aplicación en Meta</h2>
-                <p className="text-muted-foreground">Sigue este proceso en el portal de desarrolladores</p>
+                <h2 className="text-xl font-bold text-foreground italic flex items-center gap-2">
+                  <span className="text-accent underline">2.</span> Crear aplicación en Meta
+                </h2>
+                <p className="text-muted-foreground">Configura el entorno de desarrollo oficial.</p>
               </div>
 
               <div className="space-y-4">
                 {[
-                  { step: "1", text: "Ve a Meta for Developers e inicia sesión.", link: "https://developers.facebook.com" },
-                  { step: "2", text: "Haz clic en 'Mis aplicaciones' y luego en 'Crear aplicación'." },
-                  { step: "3", text: "Selecciona el tipo de uso 'Otro' y luego 'Empresa' como tipo de aplicación." },
-                  { step: "4", text: "Asigna un nombre (ej: 'PRISMA Asesor') y vincula tu cuenta comercial de Meta (Business Account)." }
+                  { step: "1", text: "Visita Meta for Developers e inicia sesión con tu perfil verificado.", link: "https://developers.facebook.com" },
+                  { step: "2", text: "En 'Mis aplicaciones', pulsa el botón 'Crear aplicación'." },
+                  { step: "3", text: "Selecciona el caso de uso: 'Conectarte con los clientes a través de WhatsApp'." },
+                  { step: "4", text: "Escribe un nombre (ej: 'PRISMA CRM') y selecciona tu Business Account correcta en el desplegable." }
                 ].map((item) => (
-                  <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold text-xs">
+                  <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border group hover:bg-muted/50 transition-colors">
+                    <div className="w-6 h-6 rounded-full bg-accent text-accent-foreground flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
                       {item.step}
                     </div>
                     <div className="flex-1">
-                      <p className="text-foreground font-medium">{item.text}</p>
+                      <p className="text-foreground font-semibold leading-tight">{item.text}</p>
                       {item.link && (
                         <a 
                           href={item.link} 
                           target="_blank" 
                           rel="noreferrer"
-                          className="text-xs text-accent hover:underline flex items-center gap-1 mt-2 w-fit"
+                          className="text-[11px] font-bold text-accent hover:text-accent/80 flex items-center gap-1 mt-2 uppercase tracking-wide"
                         >
-                          Ir al portal <ExternalLink className="h-3 w-3" />
+                          Abrir Portal de Meta <ExternalLink className="h-3 w-3" />
                         </a>
                       )}
                     </div>
@@ -305,22 +307,24 @@ export function SetupWizard() {
           {currentStep === 3 && (
             <div className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-xl font-bold text-foreground">Activar Producto WhatsApp</h2>
-                <p className="text-muted-foreground">Añade la funcionalidad a tu aplicación de Meta</p>
+                <h2 className="text-xl font-bold text-foreground italic flex items-center gap-2">
+                  <span className="text-accent underline">3.</span> Configurar API WhatsApp
+                </h2>
+                <p className="text-muted-foreground">Activa el motor de WhatsApp en tu nueva App.</p>
               </div>
 
               <div className="space-y-4">
                 {[
-                  { step: "1", text: "En el panel izquierdo de tu aplicación en Meta, busca 'Añadir producto'." },
-                  { step: "2", text: "Busca 'WhatsApp' y haz clic en el botón 'Configurar'." },
-                  { step: "3", text: "Se te pedirá elegir una cuenta comercial (Business Account). Selecciona la correcta.", warning: "Asegúrate de que sea la misma que usas para administrar tu negocio." }
+                  { step: "1", text: "En la barra lateral izquierda, localiza 'WhatsApp' y entra en 'Configuración de la API'." },
+                  { step: "2", text: "Confirma que tu Business Account esté seleccionada y que el número de prueba se vea correctamente." },
+                  { step: "3", text: "Si el sistema te pide aceptar políticas de WhatsApp Business, acéptalas para continuar.", warning: "Cualquier error aquí suele ser por falta de verificación del Business Manager." }
                 ].map((item) => (
-                  <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold text-xs">
+                  <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border group hover:bg-muted/50 transition-colors">
+                    <div className="w-6 h-6 rounded-full bg-accent text-accent-foreground flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
                       {item.step}
                     </div>
                     <div className="flex-1 space-y-2">
-                      <p className="text-foreground font-medium">{item.text}</p>
+                      <p className="text-foreground font-semibold leading-tight">{item.text}</p>
                       {item.warning && (
                         <div className="flex items-center gap-2 p-2 rounded bg-amber-500/5 text-[10px] text-amber-600 font-bold uppercase tracking-wider border border-amber-500/10 dark:text-amber-500">
                           <Info className="h-3 w-3" />
@@ -338,23 +342,25 @@ export function SetupWizard() {
           {currentStep === 4 && (
             <div className="space-y-6">
               <div className="space-y-2">
-                <h2 className="text-xl font-bold text-foreground">Vincular Número de Teléfono</h2>
-                <p className="text-muted-foreground">Registra tu línea oficial de WhatsApp</p>
+                <h2 className="text-xl font-bold text-foreground italic flex items-center gap-2">
+                  <span className="text-accent underline">4.</span> Vincular Número de Teléfono
+                </h2>
+                <p className="text-muted-foreground">Registra tu línea oficial para que PRISMA pueda hablar.</p>
               </div>
 
               <div className="space-y-4">
                 {[
-                  { step: "1", text: "Ve a WhatsApp > Configuración de la API en el menú lateral." },
-                  { step: "2", text: "Baja hasta 'Paso 5: Añade un número de teléfono' y haz clic en 'Añadir número de teléfono'." },
-                  { step: "3", text: "Completa el perfil público de tu cuenta de WhatsApp (Nombre, Horario, etc)." },
-                  { step: "4", text: "Ingresa el número y verifícalo mediante el código SMS o llamada que te llegará." }
+                  { step: "1", text: "En 'Configuración de la API', baja hasta la sección 'Paso 5: Añade un número de teléfono'." },
+                  { step: "2", text: "Haz clic en 'Añadir número de teléfono' y rellena el perfil de tu empresa." },
+                  { step: "3", text: "Introduce tu número real y selecciona el método de verificación (SMS es lo más rápido)." },
+                  { step: "4", text: "Introduce el código recibido. Una vez verificado, tu número aparecerá como 'Activo'." }
                 ].map((item) => (
-                  <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border">
-                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold text-xs">
+                  <div key={item.step} className="flex gap-4 p-4 rounded-xl bg-muted/30 border border-border group hover:bg-muted/50 transition-colors">
+                    <div className="w-6 h-6 rounded-full bg-accent text-accent-foreground flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
                       {item.step}
                     </div>
                     <div className="flex-1">
-                      <p className="text-foreground font-medium">{item.text}</p>
+                      <p className="text-foreground font-semibold">{item.text}</p>
                     </div>
                   </div>
                 ))}
@@ -366,25 +372,29 @@ export function SetupWizard() {
           {currentStep === 5 && (
             <div className="space-y-8">
               <div className="space-y-3 border-b border-border pb-6">
-                <h2 className="text-2xl font-bold text-foreground">Configurar Webhook</h2>
+                <h2 className="text-2xl font-bold text-foreground italic">
+                  <span className="text-accent underline">5.</span> Configurar Webhook
+                </h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  Para que PRISMA reciba los mensajes en tiempo real, Meta necesita saber a dónde enviarlos.
+                  Este es el "oído" de PRISMA. Le permite escuchar a tus clientes en tiempo real.
                 </p>
               </div>
 
               <div className="space-y-6">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold text-xs shrink-0">1</div>
-                    <h3 className="font-bold text-foreground">Copia estos valores en Meta</h3>
+                    <div className="w-6 h-6 rounded-full bg-accent text-accent-foreground flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">1</div>
+                    <h3 className="font-bold text-foreground">Copia estos datos en el Portal de Meta</h3>
                   </div>
                   
-                  <div className="bg-muted p-6 rounded-2xl border border-border space-y-4">
-                    <p className="text-xs text-muted-foreground font-medium mb-2">Dentro de Meta: <span className="text-foreground">WhatsApp &gt; Configuración &gt; Seccion Webhooks</span></p>
+                  <div className="bg-muted p-6 rounded-2xl border border-border space-y-4 shadow-inner">
+                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em] mb-2 text-center">
+                      Configuración {'->'} Webhooks de WhatsApp
+                    </p>
                     <div className="grid gap-4">
                       <CopyButton 
                         label="Callback URL (URL de retorno)" 
-                        value="https://vevolutionapiv.vakdor.com/webhook/whatsapp" 
+                        value={formData.apiUrl} 
                       />
                       <CopyButton 
                         label="Verify Token (Token de verificación)" 
@@ -430,9 +440,11 @@ export function SetupWizard() {
           {currentStep === 6 && (
             <div className="space-y-6">
               <div className="space-y-3 border-b border-border pb-6">
-                <h2 className="text-2xl font-bold text-foreground">Conectar con PRISMA</h2>
+                <h2 className="text-2xl font-bold text-foreground italic">
+                  <span className="text-accent underline">6.</span> Conectar con PRISMA
+                </h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  Copia los datos finales desde el portal de Meta para activar tu inteligencia artificial.
+                  ¡Casi listos! Introduce las credenciales finales para activar tu Asesor con IA.
                 </p>
               </div>
 
