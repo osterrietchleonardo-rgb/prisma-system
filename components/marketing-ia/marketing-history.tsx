@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Trash2, Loader2, Image as ImageIcon, FileText, Calendar, ExternalLink, Download, Edit2, History as HistoryIcon, Search, Eye } from "lucide-react"
+import { Trash2, Loader2, Image as ImageIcon, FileText, Calendar, ExternalLink, Download, Edit2, History as HistoryIcon, Search, Eye, Save } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -38,6 +38,9 @@ export function MarketingHistory() {
   const [adToDelete, setAdToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [selectedAd, setSelectedAd] = useState<MarketingAd | null>(null)
+  const [isEditingMode, setIsEditingMode] = useState(false)
+  const [editContent, setEditContent] = useState<any>(null)
+  const [isSaving, setIsSaving] = useState(false)
   
   const supabase = createClient()
 
@@ -72,6 +75,28 @@ export function MarketingHistory() {
   useEffect(() => {
     fetchAds()
   }, [])
+
+  const handleSaveEdit = async () => {
+    if (!selectedAd || !editContent) return
+    setIsSaving(true)
+    try {
+      const { error } = await supabase
+        .from('copy_drafts')
+        .update({ content: editContent })
+        .eq('id', selectedAd.id)
+      
+      if (error) throw error
+      
+      toast.success("Anuncio actualizado correctamente")
+      setAds(ads.map(a => a.id === selectedAd.id ? { ...a, content: editContent } : a))
+      setSelectedAd({ ...selectedAd, content: editContent })
+      setIsEditingMode(false)
+    } catch (error: any) {
+      toast.error("Error al guardar: " + error.message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   const handleDelete = async () => {
     if (!adToDelete) return
@@ -228,12 +253,18 @@ export function MarketingHistory() {
       )}
 
       {/* Details View */}
-      <Dialog open={!!selectedAd} onOpenChange={() => setSelectedAd(null)}>
+      <Dialog open={!!selectedAd} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedAd(null)
+          setIsEditingMode(false)
+          setEditContent(null)
+        }
+      }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto border-accent/20 scrollbar-hide">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black flex items-center gap-3">
               <Sparkles className="w-6 h-6 text-accent" />
-              Detalles del Anuncio
+              {isEditingMode ? "Editar Anuncio" : "Detalles del Anuncio"}
             </DialogTitle>
             <DialogDescription>
               Generado el {selectedAd && format(new Date(selectedAd.created_at), "PPP 'a las' HH:mm", { locale: es })}
@@ -268,20 +299,47 @@ export function MarketingHistory() {
 
               <div className="space-y-6">
                  <div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-accent mb-3">Copy Estratégico</h4>
+                    <h4 className="text-xs font-black uppercase tracking-widest text-accent mb-3">
+                      {selectedAd.copy_type === 'video' ? 'Guión de Video' : 'Copy Persuasivo'}
+                    </h4>
                     <div className="bg-muted/30 p-6 rounded-2xl border border-muted space-y-4">
-                       <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Hook (Atracción):</label>
-                          <p className="text-sm font-bold leading-relaxed">{selectedAd.content?.hook}</p>
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">Cuerpo / Beneficios:</label>
-                          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">{selectedAd.content?.body}</p>
-                       </div>
-                       <div className="space-y-1">
-                          <label className="text-[10px] font-bold text-muted-foreground uppercase">CTA (Llamado a la acción):</label>
-                          <p className="text-sm font-black text-accent">{selectedAd.content?.cta}</p>
-                       </div>
+                       {selectedAd.copy_type === 'video' ? (
+                         // FIELDS FOR VIDEO
+                         ['hook', 'problema', 'agitacion', 'solucion', 'cta'].map(field => (
+                           <div key={field} className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">{field}:</label>
+                              {isEditingMode ? (
+                                <textarea 
+                                  value={editContent?.[field] || ""} 
+                                  onChange={(e) => setEditContent({ ...editContent, [field]: e.target.value })}
+                                  className="w-full bg-background border rounded-lg p-2 text-sm min-h-[60px]"
+                                />
+                              ) : (
+                                <p className="text-sm font-medium leading-relaxed">{selectedAd.content?.[field]}</p>
+                              )}
+                           </div>
+                         ))
+                       ) : (
+                         // FIELDS FOR POST
+                         ['hook', 'desarrollo', 'cta'].map(field => (
+                           <div key={field} className="space-y-1">
+                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                {field === 'desarrollo' ? 'Cuerpo / Beneficios' : field}:
+                              </label>
+                              {isEditingMode ? (
+                                <textarea 
+                                  value={editContent?.[field] || ""} 
+                                  onChange={(e) => setEditContent({ ...editContent, [field]: e.target.value })}
+                                  className="w-full bg-background border rounded-lg p-2 text-sm min-h-[80px]"
+                                />
+                              ) : (
+                                <p className={cn("text-sm leading-relaxed whitespace-pre-wrap", field === 'hook' || field === 'cta' ? "font-bold" : "text-muted-foreground")}>
+                                  {selectedAd.content?.[field] || selectedAd.content?.['body']} 
+                                </p>
+                              )}
+                           </div>
+                         ))
+                       )}
                     </div>
                  </div>
 
@@ -297,12 +355,29 @@ export function MarketingHistory() {
                  </div>
 
                  <div className="flex gap-2">
-                    <Button variant="outline" className="flex-1 font-bold border-accent/20" onClick={() => toast.info("Función de edición en desarrollo")}>
-                       <Edit2 className="w-4 h-4 mr-2" /> Editar Texto
-                    </Button>
-                    <Button variant="destructive" size="icon" className="h-10 w-10" onClick={() => { setAdToDelete(selectedAd.id); setSelectedAd(null); }}>
-                       <Trash2 className="w-4 h-4" />
-                    </Button>
+                    {isEditingMode ? (
+                      <>
+                        <Button variant="outline" className="flex-1 font-bold" onClick={() => setIsEditingMode(false)}>
+                          Cancelar
+                        </Button>
+                        <Button className="flex-1 font-bold bg-accent" onClick={handleSaveEdit} disabled={isSaving}>
+                          {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                          Guardar Cambios
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="outline" className="flex-1 font-bold border-accent/20" onClick={() => {
+                          setEditContent(selectedAd.content)
+                          setIsEditingMode(true)
+                        }}>
+                          <Edit2 className="w-4 h-4 mr-2" /> Editar Texto
+                        </Button>
+                        <Button variant="destructive" size="icon" className="h-10 w-10" onClick={() => { setAdToDelete(selectedAd.id); setSelectedAd(null); }}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </>
+                    )}
                  </div>
               </div>
             </div>
