@@ -77,11 +77,10 @@ export async function POST(req: Request) {
                 if (message.type === 'text') content = message.text.body
                 else if (message.type === 'image') content = message.image.caption || 'Imagen recibida'
                 else if (message.type === 'interactive') {
-                    // Manejar botones o listas
                     content = message.interactive.button_reply?.title || message.interactive.list_reply?.title || 'Respuesta interactiva'
                 } else continue // Ignorar otros tipos por ahora
 
-                // Buscar o crear la conversación (Lógica compartida con Evolution)
+                // Buscar o crear la conversacion
                 let conversation_id: string
                 let botIsActive = true
                 
@@ -136,18 +135,57 @@ export async function POST(req: Request) {
                         metadata: message
                     })
 
-                // Gatillar n8n si el bot está activo
+                // Gatillar n8n si el bot esta activo
                 if (botIsActive && process.env.N8N_WEBHOOK_URL) {
+                    // Obtener los ultimos 10 mensajes para dar contexto de historial
+                    const { data: recentMessages } = await supabase
+                        .from('wa_messages')
+                        .select('role, content, created_at')
+                        .eq('conversation_id', conversation_id)
+                        .order('created_at', { ascending: false })
+                        .limit(10)
+
+                    // Obtener etiquetas y score actualizados de la conversacion
+                    const { data: convMeta } = await supabase
+                        .from('wa_conversations')
+                        .select('etiquetas, score, status')
+                        .eq('id', conversation_id)
+                        .single()
+
+                    const enrichedPayload = {
+                        // IDs necesarios para que n8n pueda responder de vuelta
+                        agency_id: instance.agency_id,
+                        conversation_id,
+                        // Datos del contacto
+                        contact_phone: contactPhone,
+                        contact_name: contactName,
+                        // El mensaje actual que llego
+                        message: {
+                            content,
+                            type: message.type,
+                            wamid,
+                            received_at: new Date().toISOString(),
+                        },
+                        // Metadatos de la conversacion (etiquetas, score, estado)
+                        conversation: {
+                            etiquetas: convMeta?.etiquetas || [],
+                            score: convMeta?.score || 0,
+                            status: convMeta?.status || 'active',
+                        },
+                        // Historial de mensajes (del mas antiguo al mas reciente)
+                        history: (recentMessages || []).reverse().map((m: { role: string; content: string; created_at: string }) => ({
+                            role: m.role,
+                            content: m.content,
+                            at: m.created_at,
+                        })),
+                        // URL a la que n8n debe hacer POST para guardar la respuesta y enviarla al lead
+                        reply_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/n8n/reply`,
+                    }
+
                     fetch(process.env.N8N_WEBHOOK_URL, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            agency_id: instance.agency_id,
-                            conversation_id,
-                            contact_phone: contactPhone,
-                            contact_name: contactName,
-                            content,
-                        })
+                        body: JSON.stringify(enrichedPayload)
                     }).catch(e => console.error('Error triggering n8n from meta webhook:', e))
                 }
              }
