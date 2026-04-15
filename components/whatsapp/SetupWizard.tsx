@@ -139,7 +139,7 @@ export function SetupWizard() {
         business_id: formData.wabaId
       })
 
-      router.push("/director/asesor-ia-whatsapp?connected=true")
+      router.push("/asesor/whatsapp?connected=true")
     } catch (err: any) {
       setError(err.message || "Error al conectar con WhatsApp")
     } finally {

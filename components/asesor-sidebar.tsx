@@ -16,7 +16,8 @@ import {
   LogOut,
   BookOpen,
   TrendingUp,
-  FileSignature
+  FileSignature,
+  MessageSquare
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -29,6 +30,7 @@ const navItems = [
   { name: "Mis Propiedades", href: "/asesor/propiedades", icon: Building },
   { name: "Tracking Performance", href: "/asesor/tracking-performance", icon: TrendingUp },
   { name: "Mis Leads", href: "/asesor/leads", icon: Users },
+  { name: "WhatsApp Bandeja", href: "/asesor/whatsapp", icon: MessageSquare },
   { name: "Marketing IA", href: "/asesor/marketing-ia", icon: Bot },
   { name: "Contratos IA", href: "/asesor/contratos-ia", icon: FileSignature },
   { name: "Mi Calendario", href: "/asesor/calendario", icon: Calendar },

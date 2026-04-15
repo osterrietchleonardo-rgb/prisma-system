@@ -12,7 +12,11 @@ import type {
 // Helper: Director-only access guard
 // =============================================
 
-async function getDirectorProfile(): Promise<{ agency_id: string }> {
+// =============================================
+// Helper: Agency access guard (asesor + director)
+// =============================================
+
+async function getAgencyProfile(): Promise<{ agency_id: string; role: string }> {
   const supabase = createClient()
 
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -30,16 +34,27 @@ async function getDirectorProfile(): Promise<{ agency_id: string }> {
     throw new Error('Acceso denegado: perfil no encontrado')
   }
 
-  if (profile.role !== 'director') {
-    throw new Error('Acceso denegado: se requiere rol director')
+  const allowedRoles = ['director', 'asesor']
+  if (!allowedRoles.includes(profile.role)) {
+    throw new Error('Acceso denegado: rol no autorizado')
   }
 
   if (!profile.agency_id) {
     throw new Error('Acceso denegado: sin agencia asignada')
   }
 
-  return { agency_id: profile.agency_id }
+  return { agency_id: profile.agency_id, role: profile.role }
 }
+
+// Backward-compatible director-only guard (used by connectWhatsApp + createTemplate + sync)
+async function getDirectorProfile(): Promise<{ agency_id: string }> {
+  const result = await getAgencyProfile()
+  if (result.role !== 'director') {
+    throw new Error('Acceso denegado: se requiere rol director')
+  }
+  return { agency_id: result.agency_id }
+}
+
 
 // =============================================
 // Action 1: Conectar instancia WhatsApp
@@ -185,7 +200,7 @@ export async function toggleBotActive(
   active: boolean
 ): Promise<WhatsAppActionResult> {
   try {
-    await getDirectorProfile()
+    await getAgencyProfile()
     const supabase = createClient()
 
     const { error } = await supabase
@@ -213,7 +228,7 @@ export async function sendDirectMessage(
   content: string
 ): Promise<WhatsAppActionResult> {
   try {
-    const { agency_id } = await getDirectorProfile()
+    const { agency_id } = await getAgencyProfile()
     const supabase = createClient()
 
     const evolutionUrl = process.env.EVOLUTION_API_URL
@@ -312,7 +327,7 @@ export async function addInternalNote(
   content: string
 ): Promise<WhatsAppActionResult> {
   try {
-    const { agency_id } = await getDirectorProfile()
+    const { agency_id } = await getAgencyProfile()
     const supabase = createClient()
 
     const { error } = await supabase
@@ -345,7 +360,7 @@ export async function updateEtiquetas(
   etiquetas: string[]
 ): Promise<WhatsAppActionResult> {
   try {
-    await getDirectorProfile()
+    await getAgencyProfile()
     const supabase = createClient()
 
     const { error } = await supabase
