@@ -53,7 +53,7 @@ export default async function AsesorIAWhatsAppPage() {
     .select("*")
     .eq("agency_id", profile.agency_id)
     .limit(1)
-    .single()
+    .maybeSingle()
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
