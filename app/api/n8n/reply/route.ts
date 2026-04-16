@@ -76,11 +76,12 @@ export async function POST(req: Request) {
     // =============================================
     if (instance.integration_type === 'evolution' && instance.evo_instance_name) {
       const evolutionUrl = process.env.EVOLUTION_API_URL
+      // AUTHENTICATION_API_KEY global — administra todas las instancias
       const evolutionKey = process.env.EVOLUTION_API_KEY
 
       if (!evolutionUrl || !evolutionKey) {
         return NextResponse.json(
-          { error: 'EVOLUTION_API_URL o EVOLUTION_API_KEY no configurados en el servidor' },
+          { error: 'Faltan EVOLUTION_API_URL / EVOLUTION_API_KEY en las variables de entorno del servidor' },
           { status: 500 }
         )
       }

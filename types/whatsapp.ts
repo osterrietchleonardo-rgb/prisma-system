@@ -21,6 +21,8 @@ export interface WhatsAppInstance {
   id: string
   agency_id: string
   instance_name: string
+  evo_instance_name: string | null
+  integration_type: 'evolution' | 'meta_direct'
   token: string
   phone_number_id: string
   business_id: string

@@ -71,8 +71,9 @@ export async function connectWhatsApp(
 
     const instance_name = `prisma_${agency_id.slice(0, 8)}`
     const evolutionUrl = process.env.EVOLUTION_API_URL
-    const evolutionKey = process.env.EVOLUTION_API_KEY
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    // AUTHENTICATION_API_KEY global del servidor Evolution (no por instancia)
+    const evolutionKey = process.env.EVOLUTION_API_KEY
 
     // -----------------------------------------------------------
     // MODO A: Evolution API como intermediario (modo preferido)
