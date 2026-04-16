@@ -203,6 +203,7 @@ export async function POST(req: Request) {
       } catch (n8nErr) {
         console.error('[Evolution Webhook] Error llamando n8n:', n8nErr)
       }
+    } // end if (botIsActive)
 
     return NextResponse.json({ success: true })
   } catch (error) {
