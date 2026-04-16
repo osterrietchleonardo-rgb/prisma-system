@@ -69,7 +69,8 @@ export async function connectWhatsApp(
     const { agency_id } = await getDirectorProfile()
     const supabase = createClient()
 
-    const instance_name = `prisma_${agency_id.slice(0, 8)}`
+    // UUID completo como instanceName = 100% único por agencia, imposible de repetir
+    const instance_name = `prisma-${agency_id}`
     const evolutionUrl = process.env.EVOLUTION_API_URL
     const appUrl = process.env.NEXT_PUBLIC_APP_URL
     // AUTHENTICATION_API_KEY global del servidor Evolution (no por instancia)
@@ -79,29 +80,36 @@ export async function connectWhatsApp(
     // MODO A: Evolution API como intermediario (modo preferido)
     // -----------------------------------------------------------
     if (evolutionUrl && evolutionKey && appUrl) {
-      // 1a. Crear (o reemplazar) la instancia en Evolution API
+      // Verificar si ya existe para eliminarla antes de recrear
+      const { data: existing } = await supabase
+        .from('whatsapp_instances')
+        .select('id, evo_instance_name')
+        .eq('agency_id', agency_id)
+        .maybeSingle()
+
+      if (existing?.evo_instance_name) {
+        // Eliminar instancia anterior en Evolution (best-effort)
+        fetch(`${evolutionUrl}/instance/delete/${existing.evo_instance_name}`, {
+          method: 'DELETE',
+          headers: { apikey: evolutionKey },
+        }).catch(() => null)
+      }
+
+      // Crear instancia: integration WHATSAPP-BUSINESS = Meta Cloud API oficial
       const evoRes = await fetch(`${evolutionUrl}/instance/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', apikey: evolutionKey },
         body: JSON.stringify({
           instanceName: instance_name,
+          integration: 'WHATSAPP-BUSINESS', // Meta Cloud API
+          token: input.token,              // Meta Access Token permanente
+          number: input.phone_number_id,   // Phone Number ID de Meta
           qrcode: false,
-          integration: 'WHATSAPP_CLOUD',
-          cloud: {
-            token: input.token,
-            phoneNumberId: input.phone_number_id,
-            businessId: input.business_id,
-          },
           webhook: {
-            enabled: true,
             url: `${appUrl}/api/webhooks/evolution`,
-            webhookByEvents: true,
+            byEvents: true,
             base64: false,
-            events: [
-              'MESSAGES_UPSERT',
-              'MESSAGES_UPDATE',
-              'CONNECTION_UPDATE',
-            ],
+            events: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'CONNECTION_UPDATE', 'SEND_MESSAGE'],
           },
         }),
       })
@@ -115,19 +123,20 @@ export async function connectWhatsApp(
       }
 
       const evoData = await evoRes.json()
-      const evoInstanceName = evoData?.instance?.instanceName || instance_name
+      // Evolution devuelve: { instance: { instanceName, instanceId }, hash: { apikey } }
+      const evoInstanceName: string = evoData?.instance?.instanceName || instance_name
+      const evoInstanceId: string | null = evoData?.instance?.instanceId || null
 
-      // 2a. Guardar en Supabase con integration_type = 'evolution'
-      const { data: existing } = await supabase
-        .from('whatsapp_instances')
-        .select('id')
-        .eq('agency_id', agency_id)
-        .maybeSingle()
+      // Guardar en Supabase
+      const { data: existing2 } = existing
+        ? { data: existing }
+        : await supabase.from('whatsapp_instances').select('id').eq('agency_id', agency_id).maybeSingle()
 
       const instancePayload = {
         agency_id,
         instance_name,
         evo_instance_name: evoInstanceName,
+        evo_instance_id: evoInstanceId,
         token: input.token,
         phone_number_id: input.phone_number_id,
         business_id: input.business_id,
@@ -135,11 +144,11 @@ export async function connectWhatsApp(
         integration_type: 'evolution',
       }
 
-      if (existing) {
+      if (existing2) {
         const { error } = await supabase
           .from('whatsapp_instances')
           .update(instancePayload)
-          .eq('id', existing.id)
+          .eq('id', existing2.id)
         if (error) return { success: false, error: `Error actualizando instancia: ${error.message}` }
       } else {
         const { error } = await supabase

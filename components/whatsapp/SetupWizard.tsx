@@ -75,11 +75,6 @@ const steps: Step[] = [
   },
   { 
     id: 5, 
-    title: "Webhook", 
-    description: "Activar avisos" 
-  },
-  { 
-    id: 6, 
     title: "Conexión", 
     description: "Vincular a PRISMA" 
   }
@@ -151,7 +146,7 @@ export function SetupWizard() {
     if (currentStep === 1) {
       return !preReqs.metaAccount || !preReqs.businessAccount || !preReqs.phoneNumber
     }
-    if (currentStep === 6) {
+    if (currentStep === 5) {
       return !formData.name || !formData.phoneNumberId || !formData.wabaId || !formData.accessToken
     }
     return false
@@ -368,84 +363,27 @@ export function SetupWizard() {
             </div>
           )}
 
-          {/* STEP 5: WEBHOOK CONFIGURATION */}
+          {/* STEP 5: CREDENCIALES + CONECTAR (antes era step 6) */}
           {currentStep === 5 && (
-            <div className="space-y-8">
-              <div className="space-y-3 border-b border-border pb-6">
-                <h2 className="text-2xl font-bold text-foreground italic">
-                  <span className="text-accent underline">5.</span> Configurar Webhook
-                </h2>
-                <p className="text-muted-foreground leading-relaxed">
-                  Este es el "oído" de PRISMA. Le permite escuchar a tus clientes en tiempo real.
-                </p>
-              </div>
-
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-accent text-accent-foreground flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">1</div>
-                    <h3 className="font-bold text-foreground">Copia estos datos en el Portal de Meta</h3>
-                  </div>
-                  
-                  <div className="bg-muted p-6 rounded-2xl border border-border space-y-4 shadow-inner">
-                    <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-[0.2em] mb-2 text-center">
-                      Configuración {'->'} Webhooks de WhatsApp
-                    </p>
-                    <div className="grid gap-4">
-                      <CopyButton 
-                        label="Callback URL (URL de retorno)" 
-                        value={formData.apiUrl} 
-                      />
-                      <CopyButton 
-                        label="Verify Token (Token de verificación)" 
-                        value={formData.verifyToken} 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-accent/20 text-accent flex items-center justify-center font-bold text-xs shrink-0">2</div>
-                    <h3 className="font-bold text-foreground">Activar la suscripción</h3>
-                  </div>
-                  
-                  <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 space-y-3">
-                    <div className="flex items-start gap-3">
-                      <Check className="h-5 w-5 text-green-600 mt-1 shrink-0" />
-                      <p className="text-sm text-foreground leading-relaxed">
-                        Una vez guardados los valores anteriores, haz clic en <span className="text-accent font-bold">"Administrar"</span> (Manage) dentro de la misma sección de Webhooks.
-                      </p>
-                    </div>
-                    <div className="flex items-start gap-3 pl-8">
-                      <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-                      <p className="text-sm text-muted-foreground">
-                        Busca el campo llamado <span className="text-accent font-mono font-bold">messages</span> y haz clic en <span className="text-foreground font-bold">Suscribirse</span>.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-primary/5 border border-primary/10 flex gap-4">
-                  <Info className="h-5 w-5 text-accent shrink-0 mt-0.5" />
-                  <p className="text-sm text-muted-foreground leading-relaxed italic">
-                    Esto le dice a Facebook: "Cada vez que PRISMA reciba un mensaje nuevo de un cliente, avísale al servidor de PRISMA".
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 6: FINALIZE & CONNECT */}
-          {currentStep === 6 && (
             <div className="space-y-6">
               <div className="space-y-3 border-b border-border pb-6">
                 <h2 className="text-2xl font-bold text-foreground italic">
-                  <span className="text-accent underline">6.</span> Conectar con PRISMA
+                  <span className="text-accent underline">5.</span> Conectar con PRISMA
                 </h2>
                 <p className="text-muted-foreground leading-relaxed">
-                  ¡Casi listos! Introduce las credenciales finales para activar tu Asesor con IA.
+                  ¡Casi listos! Introduce las credenciales para activar tu Asesor con IA.
                 </p>
+              </div>
+
+              {/* Info: Evolution maneja el webhook automáticamente */}
+              <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/20 flex gap-3">
+                <Check className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-foreground">Webhook configurado automáticamente</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    PRISMA se conecta a Meta a través de Evolution API. No necesitás configurar webhooks manualmente en el portal de Meta.
+                  </p>
+                </div>
               </div>
 
               <div className="grid gap-6">
