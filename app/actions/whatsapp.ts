@@ -57,8 +57,9 @@ async function getDirectorProfile(): Promise<{ agency_id: string }> {
 
 
 // =============================================
-// Action 1: Conectar instancia WhatsApp (Meta Cloud API)
-// Evolution API es OPCIONAL — no requerida
+// Action 1: Conectar instancia WhatsApp via Evolution API
+// Evolution API es el intermediario preferido.
+// Fallback: Meta Cloud API directa si Evo no esta configurado.
 // =============================================
 
 export async function connectWhatsApp(
@@ -69,8 +70,89 @@ export async function connectWhatsApp(
     const supabase = createClient()
 
     const instance_name = `prisma_${agency_id.slice(0, 8)}`
+    const evolutionUrl = process.env.EVOLUTION_API_URL
+    const evolutionKey = process.env.EVOLUTION_API_KEY
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL
 
-    // 1. Validar token y phone_number_id contra Meta Graph API
+    // -----------------------------------------------------------
+    // MODO A: Evolution API como intermediario (modo preferido)
+    // -----------------------------------------------------------
+    if (evolutionUrl && evolutionKey && appUrl) {
+      // 1a. Crear (o reemplazar) la instancia en Evolution API
+      const evoRes = await fetch(`${evolutionUrl}/instance/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: evolutionKey },
+        body: JSON.stringify({
+          instanceName: instance_name,
+          qrcode: false,
+          integration: 'WHATSAPP_CLOUD',
+          cloud: {
+            token: input.token,
+            phoneNumberId: input.phone_number_id,
+            businessId: input.business_id,
+          },
+          webhook: {
+            enabled: true,
+            url: `${appUrl}/api/webhooks/evolution`,
+            webhookByEvents: true,
+            base64: false,
+            events: [
+              'MESSAGES_UPSERT',
+              'MESSAGES_UPDATE',
+              'CONNECTION_UPDATE',
+            ],
+          },
+        }),
+      })
+
+      if (!evoRes.ok) {
+        const evoErr = await evoRes.text()
+        return {
+          success: false,
+          error: `Error al crear instancia en Evolution API (${evoRes.status}): ${evoErr}`,
+        }
+      }
+
+      const evoData = await evoRes.json()
+      const evoInstanceName = evoData?.instance?.instanceName || instance_name
+
+      // 2a. Guardar en Supabase con integration_type = 'evolution'
+      const { data: existing } = await supabase
+        .from('whatsapp_instances')
+        .select('id')
+        .eq('agency_id', agency_id)
+        .maybeSingle()
+
+      const instancePayload = {
+        agency_id,
+        instance_name,
+        evo_instance_name: evoInstanceName,
+        token: input.token,
+        phone_number_id: input.phone_number_id,
+        business_id: input.business_id,
+        status: 'connected',
+        integration_type: 'evolution',
+      }
+
+      if (existing) {
+        const { error } = await supabase
+          .from('whatsapp_instances')
+          .update(instancePayload)
+          .eq('id', existing.id)
+        if (error) return { success: false, error: `Error actualizando instancia: ${error.message}` }
+      } else {
+        const { error } = await supabase
+          .from('whatsapp_instances')
+          .insert(instancePayload)
+        if (error) return { success: false, error: `Error guardando instancia: ${error.message}` }
+      }
+
+      return { success: true }
+    }
+
+    // -----------------------------------------------------------
+    // MODO B: Meta Cloud API directa (fallback sin Evolution)
+    // -----------------------------------------------------------
     const verifyRes = await fetch(
       `https://graph.facebook.com/v20.0/${input.phone_number_id}?fields=display_phone_number,verified_name`,
       { headers: { Authorization: `Bearer ${input.token}` } }
@@ -90,72 +172,34 @@ export async function connectWhatsApp(
     const phoneData = await verifyRes.json() as { display_phone_number?: string }
     const phoneDisplay = phoneData.display_phone_number || null
 
-    // 2. Guardar (o actualizar) la instancia en Supabase
-    // Primero verificar si ya existe una instancia para esta agencia
     const { data: existing } = await supabase
       .from('whatsapp_instances')
       .select('id')
       .eq('agency_id', agency_id)
       .maybeSingle()
 
-    if (existing) {
-      // Actualizar la existente
-      const { error: updateError } = await supabase
-        .from('whatsapp_instances')
-        .update({
-          token: input.token,
-          phone_number_id: input.phone_number_id,
-          business_id: input.business_id,
-          phone_display: phoneDisplay,
-          status: 'connected',
-        })
-        .eq('id', existing.id)
-
-      if (updateError) {
-        return { success: false, error: `Error al actualizar instancia: ${updateError.message}` }
-      }
-    } else {
-      // Insertar nueva
-      const { error: insertError } = await supabase
-        .from('whatsapp_instances')
-        .insert({
-          agency_id,
-          instance_name,
-          token: input.token,
-          phone_number_id: input.phone_number_id,
-          business_id: input.business_id,
-          phone_display: phoneDisplay,
-          status: 'connected',
-        })
-
-      if (insertError) {
-        return { success: false, error: `Error al guardar instancia: ${insertError.message}` }
-      }
+    const metaPayload = {
+      agency_id,
+      instance_name,
+      token: input.token,
+      phone_number_id: input.phone_number_id,
+      business_id: input.business_id,
+      phone_display: phoneDisplay,
+      status: 'connected',
+      integration_type: 'meta_direct',
     }
 
-    // 3. Evolution API es OPCIONAL — se registra si esta configurada
-    const evolutionUrl = process.env.EVOLUTION_API_URL
-    const evolutionKey = process.env.EVOLUTION_API_KEY
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL
-
-    if (evolutionUrl && evolutionKey && appUrl) {
-      fetch(`${evolutionUrl}/instance/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: evolutionKey },
-        body: JSON.stringify({
-          instanceName: instance_name,
-          qrcode: false,
-          integration: 'WHATSAPP_CLOUD',
-          cloud: { token: input.token, phoneNumberId: input.phone_number_id },
-          webhook: {
-            enabled: true,
-            url: `${appUrl}/api/webhooks/evolution`,
-            webhookByEvents: false,
-            base64: true,
-            events: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'APPLICATION_STARTUP'],
-          },
-        }),
-      }).catch(e => console.warn('Evolution API opcional no disponible:', e))
+    if (existing) {
+      const { error } = await supabase
+        .from('whatsapp_instances')
+        .update(metaPayload)
+        .eq('id', existing.id)
+      if (error) return { success: false, error: `Error actualizando instancia: ${error.message}` }
+    } else {
+      const { error } = await supabase
+        .from('whatsapp_instances')
+        .insert(metaPayload)
+      if (error) return { success: false, error: `Error guardando instancia: ${error.message}` }
     }
 
     return { success: true }
