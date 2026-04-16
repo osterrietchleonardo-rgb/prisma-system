@@ -181,12 +181,28 @@ export async function POST(req: Request) {
         reply_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/n8n/reply`,
       }
 
-      fetch(process.env.N8N_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(enrichedPayload),
-      }).catch(e => console.error('[Evolution Webhook] Error disparando n8n:', e))
-    }
+      // Llamada a n8n con timeout para garantizar que Vercel no la corte
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000) // 15s max
+
+        const n8nRes = await fetch(process.env.N8N_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(enrichedPayload),
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+
+        if (!n8nRes.ok) {
+          const errBody = await n8nRes.text().catch(() => '')
+          console.error(`[Evolution Webhook] n8n respondió ${n8nRes.status}: ${errBody}`)
+        } else {
+          console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
+        }
+      } catch (n8nErr) {
+        console.error('[Evolution Webhook] Error llamando n8n:', n8nErr)
+      }
 
     return NextResponse.json({ success: true })
   } catch (error) {
