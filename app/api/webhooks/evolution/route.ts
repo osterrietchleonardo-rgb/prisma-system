@@ -148,6 +148,7 @@ export async function POST(req: Request) {
         agency_id: instance.agency_id,
         conversation_id,
         instance_name: instance.evo_instance_name || resolvedName,
+        evolution_url: process.env.EVOLUTION_API_URL,
 
         // Datos del contacto
         contact_phone: contactPhone,

@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     )
 
     const body = await req.json()
-    const { conversation_id, reply, secret, update_score, add_etiquetas } = body
+    const { conversation_id, reply, secret, update_score, add_etiquetas, instance_name, media_url, media_type } = body
 
     // Seguridad: verificar secret compartido con n8n
     const expectedSecret = process.env.N8N_REPLY_SECRET
@@ -32,9 +32,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!conversation_id || !reply?.trim()) {
+    if (!conversation_id || (!reply?.trim() && !media_url)) {
       return NextResponse.json(
-        { error: 'conversation_id y reply son requeridos' },
+        { error: 'conversation_id y reply (o media_url) son requeridos' },
         { status: 400 }
       )
     }
@@ -69,6 +69,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Instancia WhatsApp no encontrada' }, { status: 404 })
     }
 
+    // Validación anti-cruce: asegurar que la conversación pertenece a la instancia que n8n cree
+    if (instance_name && instance.integration_type === 'evolution') {
+      const dbInstanceName = instance.evo_instance_name;
+      if (dbInstanceName && dbInstanceName !== instance_name) {
+        console.warn(`[n8n reply] CRUCE DETECTADO: n8n envió instance_name=${instance_name} pero la conv es de ${dbInstanceName}`);
+        return NextResponse.json(
+          { error: `Mismatch de instancia: la conversación pertenece a ${dbInstanceName}, no a ${instance_name}` },
+          { status: 400 }
+        )
+      }
+    }
+
     let wamid: string | null = null
 
     // =============================================
@@ -86,22 +98,31 @@ export async function POST(req: Request) {
         )
       }
 
-      const evoRes = await fetch(
-        `${evolutionUrl}/message/sendText/${instance.evo_instance_name}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: evolutionKey,
-          },
-          body: JSON.stringify({
-            number: conv.contact_phone,
-            text: reply,
-            // Opciones de delay para parecer más humano (ms)
-            delay: 1200,
-          }),
+      let endpoint = `${evolutionUrl}/message/sendText/${instance.evo_instance_name}`;
+      let evoPayload: any = {
+        number: conv.contact_phone,
+        delay: 1200, // Opciones de delay para parecer más humano (ms)
+      };
+
+      if (media_url) {
+        endpoint = `${evolutionUrl}/message/sendMedia/${instance.evo_instance_name}`;
+        evoPayload.mediatype = media_type || 'image'; // image, video, audio, document
+        evoPayload.media = media_url;
+        if (reply?.trim()) {
+          evoPayload.caption = reply;
         }
-      )
+      } else {
+        evoPayload.text = reply;
+      }
+
+      const evoRes = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: evolutionKey,
+        },
+        body: JSON.stringify(evoPayload),
+      })
 
       const evoData = await evoRes.json()
 
@@ -119,6 +140,24 @@ export async function POST(req: Request) {
     // FALLBACK: Meta Cloud API directa
     // =============================================
     } else if (instance.phone_number_id && instance.token) {
+      
+      let metaPayload: any = {
+        messaging_product: 'whatsapp',
+        to: conv.contact_phone,
+      };
+
+      if (media_url) {
+        const mType = media_type || 'image';
+        metaPayload.type = mType;
+        metaPayload[mType] = { link: media_url };
+        if (reply?.trim()) {
+          metaPayload[mType].caption = reply;
+        }
+      } else {
+        metaPayload.type = 'text';
+        metaPayload.text = { body: reply };
+      }
+
       const metaRes = await fetch(
         `https://graph.facebook.com/v20.0/${instance.phone_number_id}/messages`,
         {
@@ -127,12 +166,7 @@ export async function POST(req: Request) {
             Authorization: `Bearer ${instance.token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: conv.contact_phone,
-            type: 'text',
-            text: { body: reply },
-          }),
+          body: JSON.stringify(metaPayload),
         }
       )
 
@@ -158,13 +192,14 @@ export async function POST(req: Request) {
     await supabase.from('wa_messages').insert({
       conversation_id,
       agency_id: conv.agency_id,
-      content: reply,
+      content: media_url && !reply?.trim() ? media_url : reply,
       role: 'bot',
-      message_type: 'text',
+      message_type: media_url ? (media_type || 'image') : 'text',
       wamid,
       metadata: {
         source: 'n8n',
         sent_via: instance.integration_type,
+        media_url: media_url || undefined,
       },
     })
 
