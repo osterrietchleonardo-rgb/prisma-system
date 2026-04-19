@@ -99,26 +99,38 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             })
           } else if (payload.eventType === "UPDATE") {
             const updatedItem = payload.new as WAConversation
-            
-            // Extraemos el item viejo usando el Ref exterior (para no poner hooks/toasts dentro del setState puro)
             const prev = convRef.current
-            const oldItem = prev.find(c => c.id === updatedItem.id)
-            
-            const isInbound = oldItem && updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
-            const isNewMessage = oldItem && updatedItem.last_message_at && updatedItem.last_message_at !== oldItem.last_message_at;
-              
-            // Lanzamos los triggers de UI con la certeza y seguridad fuera del setState closure
+            const oldItem = prev.find((c) => c.id === updatedItem.id)
+
+            // Detectamos si es un mensaje de lead comprobando si cambió el last_inbound_at
+            // Si el item no estaba cargado (no estaba en los primeros 50), asumimos que si last_inbound_at 
+            // es muy reciente (hace menos de 10 seg), debe ser nuevo, para poder lanzar el toast igual.
+            let isInbound = false;
+            if (oldItem) {
+              isInbound = !!oldItem.last_inbound_at && !!updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
+            } else if (updatedItem.last_inbound_at) {
+               const diff = Date.now() - new Date(updatedItem.last_inbound_at).getTime();
+               isInbound = diff < 10000; // Recibido en los ultimos 10 segundos
+            }
+
             if (isInbound && activeIdRef.current !== updatedItem.id) {
               setUnreadCounts((prevCounts) => ({ ...prevCounts, [updatedItem.id]: (prevCounts[updatedItem.id] || 0) + 1 }))
               toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
             }
-            
-            // Actualizamos solo el react state
+
             setConversations((currentPrev) => {
-              const newList = currentPrev.map((c) => c.id === updatedItem.id ? updatedItem : c)
-              if (isNewMessage || !oldItem) {
-                newList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
+              const prevItem = currentPrev.find((c) => c.id === updatedItem.id)
+              let newList: WAConversation[] = []
+              
+              if (!prevItem) {
+                // Si la conversación no estaba cargada localmente, hay insertarla
+                newList = [updatedItem, ...currentPrev]
+              } else {
+                newList = currentPrev.map((c) => (c.id === updatedItem.id ? updatedItem : c))
               }
+
+              // Reordenar siempre que se actualice la lista
+              newList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
               return newList
             })
           } else if (payload.eventType === "DELETE") {
