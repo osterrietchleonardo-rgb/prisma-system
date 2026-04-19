@@ -67,9 +67,7 @@ interface AiSetting {
   geographic_zone: string
   currency: string
   working_hours: string
-  human_advisor_name: string
   property_types: string
-  catalog_url: string
   min_anticipation_hours: number
   cancelation_deadline_hours: number
   knowledge_text?: string | null
@@ -190,9 +188,7 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
       geographic_zone: "CABA y GBA Norte, Argentina",
       currency: "USD",
       working_hours: "Lunes a Sábado 9–19 h",
-      human_advisor_name: "",
       property_types: "departamentos, casas, PH, locales comerciales",
-      catalog_url: "",
       min_anticipation_hours: 4,
       cancelation_deadline_hours: 2,
     }
@@ -209,8 +205,7 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
         ...agencyDefault,
         id: undefined,
         agent_id: agentData.id,
-        tokko_agent_id: agentData.tokko_id,
-        human_advisor_name: agentData.full_name || ""
+        tokko_agent_id: agentData.tokko_id
       })
     } else {
       setSelectedSetting(setting)
@@ -275,6 +270,8 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
 
       if (res.ok) {
         toast.success("Documento procesado y guardado correctamente")
+        // Update the local state of the selected setting to show the changes immediately
+        setSelectedSetting(prev => prev ? { ...prev, knowledge_text: "Cargado" } : null)
         loadData()
       } else {
         throw new Error(data.error)
