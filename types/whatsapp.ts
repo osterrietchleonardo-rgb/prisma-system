@@ -43,6 +43,7 @@ export interface WAConversation {
   bot_active: boolean
   status: ConversationStatus
   score: number
+  unread_count: number
   etiquetas: string[]
   created_at: string
 }

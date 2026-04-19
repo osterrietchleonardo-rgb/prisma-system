@@ -593,3 +593,57 @@ export async function syncTemplatesFromMeta(): Promise<WhatsAppActionResult & { 
     return { success: false, error: message }
   }
 }
+
+// =============================================
+// Action 9: Marcar conversación como leída
+// =============================================
+
+export async function markConversationRead(
+  conversation_id: string
+): Promise<WhatsAppActionResult> {
+  try {
+    await getAgencyProfile()
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from('wa_conversations')
+      .update({ unread_count: 0 })
+      .eq('id', conversation_id)
+
+    if (error) {
+      return { success: false, error: `Error al marcar como leída: ${error.message}` }
+    }
+
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
+
+// =============================================
+// Action 10: Eliminar conversación
+// =============================================
+
+export async function deleteConversation(
+  conversation_id: string
+): Promise<WhatsAppActionResult> {
+  try {
+    await getAgencyProfile()
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from('wa_conversations')
+      .delete()
+      .eq('id', conversation_id)
+
+    if (error) {
+      return { success: false, error: `Error al eliminar conversación: ${error.message}` }
+    }
+
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}

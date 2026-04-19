@@ -41,6 +41,7 @@ export default function ChatInterface({ instance }: ChatInterfaceProps) {
             conversation={activeConversation}
             instance={instance}
             onBack={() => setActiveConversation(null)}
+            onDeleteChat={() => setActiveConversation(null)}
           />
         ) : (
           <EmptyState 

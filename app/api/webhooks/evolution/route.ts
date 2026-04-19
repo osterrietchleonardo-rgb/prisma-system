@@ -73,7 +73,7 @@ export async function POST(req: Request) {
 
     const { data: conv } = await supabase
       .from('wa_conversations')
-      .select('id, bot_active, etiquetas, score, status')
+      .select('id, bot_active, etiquetas, score, status, unread_count')
       .eq('instance_id', instance.id)
       .eq('contact_phone', contactPhone)
       .maybeSingle()
@@ -89,6 +89,7 @@ export async function POST(req: Request) {
           status: 'active',
           bot_active: true,
           score: 0,
+          unread_count: 1,
           etiquetas: [],
           last_message_at: new Date().toISOString(),
           last_inbound_at: new Date().toISOString(),
@@ -111,6 +112,7 @@ export async function POST(req: Request) {
           contact_name: contactName,
           last_message_at: new Date().toISOString(),
           last_inbound_at: new Date().toISOString(),
+          unread_count: (conv.unread_count || 0) + 1,
         })
         .eq('id', conversation_id)
     }
@@ -126,8 +128,8 @@ export async function POST(req: Request) {
       metadata: data,
     }).select('id').single()
 
-    // 4. Disparar n8n con payload enriquecido (solo si bot activo)
-    if (botIsActive && process.env.N8N_WEBHOOK_URL) {
+    // 4. Disparar n8n con payload enriquecido (siempre se envía, n8n decide)
+    if (process.env.N8N_WEBHOOK_URL) {
       // Obtener historial reciente para contexto
       const { data: recentMessages } = await supabase
         .from('wa_messages')
@@ -169,6 +171,7 @@ export async function POST(req: Request) {
           etiquetas: convMeta?.etiquetas || [],
           score: convMeta?.score || 0,
           status: convMeta?.status || 'active',
+          bot_active: botIsActive,
         },
 
         // Historial (del más antiguo al más reciente)
@@ -184,29 +187,34 @@ export async function POST(req: Request) {
         reply_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/n8n/reply`,
       }
 
-      // Llamada a n8n con timeout para garantizar que Vercel no la corte
+      // Llamada a n8n en segundo plano segura para Vercel
       try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 15000) // 15s max
-
-        const n8nRes = await fetch(process.env.N8N_WEBHOOK_URL, {
+        const n8nPromise = fetch(process.env.N8N_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(enrichedPayload),
-          signal: controller.signal,
+        }).then(async (n8nRes) => {
+          if (!n8nRes.ok) {
+            const errBody = await n8nRes.text().catch(() => '')
+            console.error(`[Evolution Webhook] n8n respondió ${n8nRes.status}: ${errBody}`)
+          } else {
+            console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
+          }
+        }).catch(err => {
+          console.error('[Evolution Webhook] Error interno llamando n8n:', err)
         })
-        clearTimeout(timeoutId)
 
-        if (!n8nRes.ok) {
-          const errBody = await n8nRes.text().catch(() => '')
-          console.error(`[Evolution Webhook] n8n respondió ${n8nRes.status}: ${errBody}`)
-        } else {
-          console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
-        }
+        // Esperamos un máximo de 5 segundos a que el fetch inicie correctamente
+        // Esto previene que Vercel cancele la ejecución inmediatamente pero tampoco 
+        // bloquea a Evolution API esperando 15-30s. No usamos AbortController para que la llamada a n8n siempre se complete con éxito de igual forma!
+        await Promise.race([
+          n8nPromise,
+          new Promise(r => setTimeout(r, 5000))
+        ])
       } catch (n8nErr) {
-        console.error('[Evolution Webhook] Error llamando n8n:', n8nErr)
+        console.error('[Evolution Webhook] Error iniciando n8n:', n8nErr)
       }
-    } // end if (botIsActive)
+    } // end if n8n configured
 
     return NextResponse.json({ success: true })
   } catch (error) {

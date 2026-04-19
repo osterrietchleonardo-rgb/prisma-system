@@ -12,13 +12,18 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Copy, Edit2, Check, Clock, Home, Info, User, Calendar, MapPin, Building2, Link as LinkIcon, DollarSign } from "lucide-react"
 import { toast } from "sonner"
 
+import { deleteConversation } from "@/app/actions/whatsapp"
+import { Button } from "@/components/ui/button"
+
 interface LeadTraceabilityProps {
   conversation: WAConversation
   messages: WAMessage[]
+  onDeleteChat?: () => void
 }
 
-export default function LeadTraceability({ conversation, messages }: LeadTraceabilityProps) {
+export default function LeadTraceability({ conversation, messages, onDeleteChat }: LeadTraceabilityProps) {
   const supabase = createClient()
+  const [isDeleting, setIsDeleting] = useState(false)
   
   // Section 1: Phone Copy
   const [copied, setCopied] = useState(false)
@@ -63,6 +68,22 @@ export default function LeadTraceability({ conversation, messages }: LeadTraceab
       toast.error("Error al actualizar estado")
     } else {
       toast.success("Estado actualizado")
+    }
+  }
+
+  // Section 1.5: Delete Chat
+  const handleDeleteChat = async () => {
+    if (!window.confirm("¿Seguro que querés eliminar esta conversación? Esta acción no se puede deshacer.")) {
+      return
+    }
+    setIsDeleting(true)
+    const result = await deleteConversation(conversation.id)
+    if (result.success) {
+      toast.success("Conversación eliminada")
+      if (onDeleteChat) onDeleteChat()
+    } else {
+      toast.error(result.error || "Error al eliminar conversación")
+      setIsDeleting(false)
     }
   }
 
@@ -328,6 +349,17 @@ export default function LeadTraceability({ conversation, messages }: LeadTraceab
           )}
         </CardContent>
       </Card>
+
+      <div className="pt-4 pb-2">
+        <Button 
+          variant="destructive" 
+          className="w-full text-xs font-semibold"
+          onClick={handleDeleteChat}
+          disabled={isDeleting}
+        >
+          {isDeleting ? "Eliminando..." : "Eliminar Conversación"}
+        </Button>
+      </div>
 
     </div>
   )

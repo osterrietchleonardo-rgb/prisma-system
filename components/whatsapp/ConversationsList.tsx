@@ -31,12 +31,13 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 7)}sem`
 }
 
+import { markConversationRead } from "@/app/actions/whatsapp"
+
 export function ConversationsList({ instance, activeId, onSelect }: ConversationsListProps) {
   const [conversations, setConversations] = useState<WAConversation[]>([])
   const [search, setSearch] = useState("")
   const [tab, setTab] = useState("all")
   const [loading, setLoading] = useState(true)
-  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
 
   const activeIdRef = useRef(activeId)
   const convRef = useRef(conversations)
@@ -88,8 +89,10 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             
             // Si inserta una nueva y no es la activa, notificar
             if (activeIdRef.current !== newItem.id) {
-              setUnreadCounts((prevCounts) => ({ ...prevCounts, [newItem.id]: (prevCounts[newItem.id] || 0) + 1 }))
               toast.info(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
+            } else {
+              // Si la recibimos mientras la tenemos activa, la marcamos como leida auto
+              markConversationRead(newItem.id)
             }
             
             setConversations((prev) => {
@@ -114,8 +117,10 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             }
 
             if (isInbound && activeIdRef.current !== updatedItem.id) {
-              setUnreadCounts((prevCounts) => ({ ...prevCounts, [updatedItem.id]: (prevCounts[updatedItem.id] || 0) + 1 }))
               toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
+            } else if (isInbound && activeIdRef.current === updatedItem.id && updatedItem.unread_count > 0) {
+               // Si estamos viendo el chat y entra mensaje nuevo, lo marcamos leído
+               markConversationRead(updatedItem.id)
             }
 
             setConversations((currentPrev) => {
@@ -261,7 +266,9 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                   key={conv.id}
                   onClick={() => {
                     onSelect(conv)
-                    setUnreadCounts((prev) => ({ ...prev, [conv.id]: 0 }))
+                    if (conv.unread_count > 0) {
+                       markConversationRead(conv.id)
+                    }
                   }}
                   className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors mb-0.5 ${
                     isActive
@@ -282,9 +289,9 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                       </span>
                       <span className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-end gap-1">
                         <span className="whitespace-nowrap">{timeAgo(conv.last_message_at)}</span>
-                        {unreadCounts[conv.id] ? (
+                        {conv.unread_count > 0 ? (
                           <span className="bg-red-500 text-white text-[10px] font-bold h-[18px] min-w-[18px] px-1 flex items-center justify-center rounded-full leading-none">
-                            {unreadCounts[conv.id] > 99 ? "99+" : unreadCounts[conv.id]}
+                            {conv.unread_count > 99 ? "99+" : conv.unread_count}
                           </span>
                         ) : null}
                       </span>

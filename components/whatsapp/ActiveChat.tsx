@@ -51,6 +51,7 @@ interface ActiveChatProps {
   conversation: WAConversation
   instance: WhatsAppInstance
   onBack?: () => void
+  onDeleteChat?: () => void
 }
 
 function formatTime(dateStr: string): string {
@@ -69,7 +70,7 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
 }
 
-export function ActiveChat({ conversation: initialConv, instance, onBack }: ActiveChatProps) {
+export function ActiveChat({ conversation: initialConv, instance, onBack, onDeleteChat }: ActiveChatProps) {
   const [conv, setConv] = useState<WAConversation>(initialConv)
   const [messages, setMessages] = useState<WAMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -534,7 +535,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack }: Acti
            </Button>
          </div>
          <ScrollArea className="flex-1">
-           <LeadTraceability conversation={conv} messages={messages} />
+           <LeadTraceability conversation={conv} messages={messages} onDeleteChat={onDeleteChat} />
          </ScrollArea>
       </div>
     </div>
