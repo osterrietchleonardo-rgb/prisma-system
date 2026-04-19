@@ -116,7 +116,7 @@ export async function POST(req: Request) {
     }
 
     // 3. Guardar el mensaje del lead en Supabase
-    await supabase.from('wa_messages').insert({
+    const { data: insertedMessage } = await supabase.from('wa_messages').insert({
       conversation_id,
       agency_id: instance.agency_id,
       content,
@@ -124,7 +124,7 @@ export async function POST(req: Request) {
       message_type: messageType,
       wamid,
       metadata: data,
-    })
+    }).select('id').single()
 
     // 4. Disparar n8n con payload enriquecido (solo si bot activo)
     if (botIsActive && process.env.N8N_WEBHOOK_URL) {
@@ -144,6 +144,7 @@ export async function POST(req: Request) {
         .single()
 
       const enrichedPayload = {
+        webhook_event_id: crypto.randomUUID(), // ID único e irrepetible de disparo del webhook
         // IDs para que n8n pueda responder de vuelta
         agency_id: instance.agency_id,
         conversation_id,
@@ -156,6 +157,7 @@ export async function POST(req: Request) {
 
         // Mensaje actual
         message: {
+          id: insertedMessage?.id, // ID único del mensaje en la base de datos (clave primaria)
           content,
           type: messageType,
           wamid,
