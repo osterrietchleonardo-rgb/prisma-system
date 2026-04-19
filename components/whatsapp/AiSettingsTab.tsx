@@ -17,7 +17,11 @@ import {
   ChevronRight,
   Info,
   Building2,
-  Calendar
+  Calendar,
+  FileText,
+  Loader2,
+  CheckCircle2,
+  XCircle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -67,6 +71,7 @@ interface AiSetting {
   catalog_url: string
   min_anticipation_hours: number
   cancelation_deadline_hours: number
+  knowledge_text?: string | null
 }
 
 export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
@@ -78,6 +83,7 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
   const [selectedSetting, setSelectedSetting] = useState<AiSetting | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [search, setSearch] = useState("")
+  const [uploading, setUploading] = useState(false)
 
   const supabase = createClient()
 
@@ -239,6 +245,44 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
       toast.error("Error al guardar: " + err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file || !selectedSetting?.id) {
+      if (!selectedSetting?.id) toast.error("Primero guarda la configuración antes de subir el archivo")
+      return
+    }
+
+    if (!file.name.endsWith('.docx')) {
+      toast.error("Solo se permiten archivos Word (.docx)")
+      return
+    }
+
+    setUploading(true)
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("settingId", selectedSetting.id)
+
+    try {
+      const res = await fetch("/api/whatsapp/ai-settings/knowledge-upload", {
+        method: "POST",
+        body: formData
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        toast.success("Documento procesado y guardado correctamente")
+        setSelectedSetting(prev => prev ? { ...prev, knowledge_text: "Actualizado" } : null)
+        loadData()
+      } else {
+        throw new Error(data.error)
+      }
+    } catch (err: any) {
+      toast.error("Error al procesar archivo: " + err.message)
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -461,15 +505,6 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
                   />
                 </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="human_advisor_name">Nombre del Asesor Humano (Handoff)</Label>
-                  <Input 
-                    id="human_advisor_name" 
-                    value={selectedSetting.human_advisor_name} 
-                    onChange={e => setSelectedSetting({...selectedSetting, human_advisor_name: e.target.value})}
-                    placeholder="Ej: Martín Rodríguez" 
-                  />
-                </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="language">Idioma / Dialecto</Label>
@@ -479,6 +514,63 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
                     onChange={e => setSelectedSetting({...selectedSetting, language: e.target.value})}
                     placeholder="Ej: Español rioplatense" 
                   />
+                </div>
+
+                {/* Knowledge Base Section */}
+                <div className="pt-4 mt-4 border-t border-accent/10">
+                   <h3 className="font-bold text-sm flex items-center gap-2 mb-4 text-accent">
+                    <FileText className="w-4 h-4" /> Base de Conocimiento (RAG)
+                  </h3>
+                  
+                  <div className="bg-card/50 border border-dashed border-accent/20 rounded-xl p-6 text-center space-y-4">
+                    {selectedSetting.id ? (
+                      <>
+                        <div className="flex flex-col items-center gap-2">
+                          {selectedSetting.knowledge_text ? (
+                            <div className="flex items-center gap-2 text-green-500 font-medium text-sm">
+                              <CheckCircle2 className="w-4 h-4" /> Conocimiento cargado
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                              <XCircle className="w-4 h-4" /> Sin información extra
+                            </div>
+                          )}
+                          <p className="text-[10px] text-muted-foreground px-4">
+                            Sube un archivo Word con la historia, servicios y procesos de la inmobiliaria para que el bot sea experto.
+                          </p>
+                        </div>
+                        
+                        <div className="relative">
+                          <input
+                            type="file"
+                            id="docx-upload"
+                            className="hidden"
+                            accept=".docx"
+                            onChange={handleFileUpload}
+                            disabled={uploading}
+                          />
+                          <Button 
+                            variant="outline" 
+                            className="bg-background/50 gap-2 w-full"
+                            asChild
+                          >
+                            <label htmlFor="docx-upload">
+                              {uploading ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                              ) : (
+                                <FileText className="w-4 h-4 text-accent" />
+                              )}
+                              {uploading ? "Procesando documento..." : (selectedSetting.knowledge_text ? "Actualizar Documento" : "Subir Word (.docx)")}
+                            </label>
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">
+                        Guarda la configuración básica primero para habilitar la base de conocimiento.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -585,15 +677,6 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
                   />
                 </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="catalog_url">URL del Catálogo</Label>
-                  <Input 
-                    id="catalog_url" 
-                    value={selectedSetting.catalog_url} 
-                    onChange={e => setSelectedSetting({...selectedSetting, catalog_url: e.target.value})}
-                    placeholder="https://tudominio.com/propiedades" 
-                  />
-                </div>
                 
                 <div className="mt-4 p-4 bg-accent/5 rounded-xl border border-accent/10 flex items-start gap-3">
                   <Info className="w-5 h-5 text-accent shrink-0 mt-0.5" />
