@@ -10,8 +10,10 @@ import {
   MapPin,
   User,
   CheckCircle2,
-  Clock3
+  Clock3,
+  CalendarPlus
 } from "lucide-react"
+import { NewVisitDialog } from "@/components/calendar/NewVisitDialog"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -44,16 +46,31 @@ export default function AsesorCalendarioPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [visits, setVisits] = useState<Record<string, any>[]>([])
   const [userId, setUserId] = useState<string | null>(null)
+  const [agencyId, setAgencyId] = useState<string | null>(null)
+  const [isNewVisitOpen, setIsNewVisitOpen] = useState(false)
   
   const supabase = createClient()
 
   useEffect(() => {
     async function loadUser() {
       const { data: { session } } = await supabase.auth.getSession()
-      if (session) setUserId(session.user.id)
+      if (session) {
+        setUserId(session.user.id)
+        
+        // Get agency_id for the form
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("agency_id")
+          .eq("id", session.user.id)
+          .single()
+        
+        if (profile?.agency_id) {
+          setAgencyId(profile.agency_id)
+        }
+      }
     }
     loadUser()
-  }, [supabase.auth])
+  }, [supabase])
 
   useEffect(() => {
     if (userId) {
@@ -112,12 +129,23 @@ export default function AsesorCalendarioPage() {
         </div>
         
         <div className="flex items-center gap-2">
-           <Button className="bg-accent hover:bg-accent/90 gap-2">
-             <Plus className="h-4 w-4" />
+           <Button 
+             className="bg-accent hover:bg-accent/90 gap-2 shadow-lg shadow-accent/20"
+             onClick={() => setIsNewVisitOpen(true)}
+           >
+             <CalendarPlus className="h-4 w-4" />
              Agendar Visita
            </Button>
         </div>
       </div>
+
+      <NewVisitDialog 
+        open={isNewVisitOpen}
+        onOpenChange={setIsNewVisitOpen}
+        onSuccess={fetchData}
+        agencyId={agencyId || ""}
+        userId={userId || ""}
+      />
 
       <Card className="border-accent/10 bg-card/30 backdrop-blur-md shadow-2xl overflow-hidden">
         {/* Calendar Header */}

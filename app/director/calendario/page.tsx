@@ -11,8 +11,10 @@ import {
   User,
   Filter,
   CheckCircle2,
-  Clock3
+  Clock3,
+  CalendarPlus
 } from "lucide-react"
+import { NewVisitDialog } from "@/components/calendar/NewVisitDialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -58,11 +60,14 @@ export default function CalendarioPage() {
   
   const supabase = createClient()
   const [agencyId, setAgencyId] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [isNewVisitOpen, setIsNewVisitOpen] = useState(false)
 
   useEffect(() => {
     async function getAgency() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
+        setUserId(user.id)
         const { data: profile } = await supabase
           .from("profiles")
           .select("agency_id")
@@ -166,12 +171,25 @@ export default function CalendarioPage() {
                 ))}
               </SelectContent>
            </Select>
-           <Button className="bg-accent hover:bg-accent/90 gap-2">
-             <Plus className="h-4 w-4" />
+           <Button 
+             className="bg-accent hover:bg-accent/90 gap-2 shadow-lg shadow-accent/20"
+             onClick={() => setIsNewVisitOpen(true)}
+           >
+             <CalendarPlus className="h-4 w-4" />
              Nueva Visita
            </Button>
         </div>
       </div>
+
+      <NewVisitDialog 
+        open={isNewVisitOpen}
+        onOpenChange={setIsNewVisitOpen}
+        onSuccess={fetchData}
+        agencyId={agencyId || ""}
+        userId={userId || ""}
+        isAdmin={true}
+        agents={agents}
+      />
 
       <Card className="border-accent/10 bg-card/30 backdrop-blur-md shadow-2xl overflow-hidden">
         {/* Calendar Header */}
