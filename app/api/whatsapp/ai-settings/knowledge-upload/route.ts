@@ -28,21 +28,34 @@ export async function POST(req: NextRequest) {
     const cleanText = text.replace(/\s+/g, ' ').trim();
 
     // Generate Embedding using Gemini (768 dimensions)
-    // For now, we embed the whole text or a major part since it's typically a small business profile
-    // If it's too large, we should chunk it, but the user asked for "en una columna"
-    const embedding = await generateEmbedding(cleanText);
+    console.log("Generando embedding para texto de longitud:", cleanText.length);
+    const embeddingArray = await generateEmbedding(cleanText);
+    
+    if (!embeddingArray || !Array.isArray(embeddingArray)) {
+      throw new Error("La API de Google no devolvió un vector válido");
+    }
 
+    // Convert array to pgvector string format: "[0.1, 0.2, ...]"
+    const vectorString = `[${embeddingArray.join(',')}]`;
+
+    console.log("Actualizando Supabase para ID:", settingId);
     const supabase = createClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("whatsapp_ai_settings")
       .update({
         knowledge_text: cleanText,
-        knowledge_embedding: embedding,
+        knowledge_embedding: vectorString,
         updated_at: new Date().toISOString()
       })
-      .eq("id", settingId);
+      .eq("id", settingId)
+      .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase Update Error:", error);
+      throw error;
+    }
+
+    console.log("Resultado Supabase:", data);
 
     return NextResponse.json({ 
       success: true, 
