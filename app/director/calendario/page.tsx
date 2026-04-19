@@ -57,11 +57,32 @@ export default function CalendarioPage() {
   const [agents, setAgents] = useState<Record<string, any>[]>([])
   
   const supabase = createClient()
-  const agencyId = "00000000-0000-0000-0000-000000000000" // Mock
+  const [agencyId, setAgencyId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchData()
-  }, [currentDate, selectedAgent])
+    async function getAgency() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("agency_id")
+          .eq("id", user.id)
+          .single()
+        
+        if (profile?.agency_id) {
+          setAgencyId(profile.agency_id)
+        }
+      }
+    }
+    getAgency()
+  }, [supabase])
+
+  useEffect(() => {
+    if (agencyId) {
+      fetchData()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDate, selectedAgent, agencyId])
 
   const fetchData = async () => {
     try {
@@ -81,16 +102,14 @@ export default function CalendarioPage() {
       const end = endOfMonth(currentDate)
       
       let query = supabase
-        .from("visits")
+        .from("scheduled_visits")
         .select(`
           *,
-          agent:profiles(id, full_name, avatar_url),
-          property:properties(id, title, address),
-          lead:leads(id, full_name)
+          agent:profiles(id, full_name, avatar_url)
         `)
         .eq("agency_id", agencyId)
-        .gte("visit_date", start.toISOString())
-        .lte("visit_date", end.toISOString())
+        .gte("fecha_visita", format(start, "yyyy-MM-dd"))
+        .lte("fecha_visita", format(end, "yyyy-MM-dd"))
 
       if (selectedAgent !== "all") {
         query = query.eq("agent_id", selectedAgent)
@@ -117,7 +136,8 @@ export default function CalendarioPage() {
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate })
 
   const getDayVisits = (day: Date) => {
-    return visits.filter(v => isSameDay(parseISO(v.visit_date), day))
+    const dateStr = format(day, "yyyy-MM-dd")
+    return visits.filter(v => v.fecha_visita === dateStr)
   }
 
   return (
@@ -167,8 +187,8 @@ export default function CalendarioPage() {
              </div>
           </div>
           <div className="flex items-center gap-2">
-             <Badge variant="outline" className="bg-card/50 text-[10px] gap-1"><Clock3 className="h-3 w-3" /> Pendientes</Badge>
-             <Badge variant="outline" className="bg-card/50 text-[10px] gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" /> Realizadas</Badge>
+             <Badge variant="outline" className="bg-card/50 text-[10px] gap-1"><Clock3 className="h-3 w-3" /> Agendadas</Badge>
+             <Badge variant="outline" className="bg-card/50 text-[10px] gap-1"><CheckCircle2 className="h-3 w-3 text-red-500" /> Canceladas</Badge>
           </div>
         </div>
 
@@ -213,17 +233,19 @@ export default function CalendarioPage() {
                       <DialogTrigger asChild>
                         <div className={cn(
                           "group p-1.5 rounded-lg border text-[10px] cursor-pointer transition-all hover:scale-[1.02]",
-                          visit.status === 'confirmed' ? "bg-green-500/5 border-green-500/20 text-green-500/80" : "bg-accent/5 border-accent/20 text-accent/80"
+                          visit.estado_visita === 'agendada' ? "bg-accent/5 border-accent/20 text-accent/80" : 
+                          visit.estado_visita === 'cancelada' ? "bg-red-500/5 border-red-500/20 text-red-500/80" : 
+                          "bg-amber-500/5 border-amber-500/20 text-amber-500/80"
                         )}>
                           <div className="flex items-center justify-between gap-1 mb-1 font-bold">
-                            <span className="truncate">{format(parseISO(visit.visit_date), "HH:mm")} • {visit.lead?.full_name}</span>
+                            <span className="truncate">{visit.hora_visita.substring(0, 5)} • {visit.nombre_completo}</span>
                           </div>
                           <div className="truncate text-muted-foreground group-hover:text-foreground">
-                            {visit.property?.address}
+                            {visit.zona_propiedad || visit.propiedad_id}
                           </div>
                         </div>
                       </DialogTrigger>
-                      <DialogContent className="bg-card border-accent/20">
+                      <DialogContent className="bg-card border-accent/20 max-w-2xl max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                           <div className="flex justify-between items-start">
                              <DialogTitle className="text-xl font-bold flex items-center gap-2">
@@ -231,10 +253,12 @@ export default function CalendarioPage() {
                                Detalle de Visita
                              </DialogTitle>
                              <Badge className={cn(
-                               "border-none px-3",
-                               visit.status === 'confirmed' ? "bg-green-500/10 text-green-500" : "bg-amber-500/10 text-amber-500"
+                               "border-none px-3 capitalize",
+                               visit.estado_visita === 'agendada' ? "bg-accent/10 text-accent" : 
+                               visit.estado_visita === 'cancelada' ? "bg-red-500/10 text-red-500" : 
+                               "bg-amber-500/10 text-amber-500"
                              )}>
-                               {visit.status === 'confirmed' ? 'Realizada' : 'Pendiente'}
+                               {visit.estado_visita}
                              </Badge>
                           </div>
                         </DialogHeader>
@@ -243,37 +267,81 @@ export default function CalendarioPage() {
                            <div className="flex items-center gap-4 bg-accent/5 p-4 rounded-xl border border-accent/10">
                               <MapPin className="h-10 w-10 text-accent bg-accent/10 p-2 rounded-full" />
                               <div>
-                                 <h4 className="font-bold text-lg">{visit.property?.title}</h4>
-                                 <p className="text-sm text-muted-foreground">{visit.property?.address}</p>
+                                 <h4 className="font-bold text-lg">{visit.propiedad_id || 'Propiedad sin ID'}</h4>
+                                 <p className="text-sm text-muted-foreground">{visit.zona_propiedad || 'Zona no especificada'}</p>
                               </div>
                            </div>
 
-                           <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-1">
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-1 bg-card/50 p-3 rounded-lg border border-accent/5">
                                  <span className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
                                    <User className="h-3 w-3" /> Lead
                                  </span>
-                                 <p className="font-bold">{visit.lead?.full_name}</p>
+                                 <p className="font-bold">{visit.nombre_completo}</p>
+                                 <p className="text-xs text-muted-foreground">{visit.telefono}</p>
+                                 <p className="text-xs text-muted-foreground">{visit.email}</p>
                               </div>
-                              <div className="space-y-1">
+                              <div className="space-y-1 bg-card/50 p-3 rounded-lg border border-accent/5">
                                  <span className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
-                                   <User className="h-3 w-3" /> Asesor
+                                   <User className="h-3 w-3" /> Asesor Asignado
                                  </span>
                                  <div className="flex items-center gap-2">
-                                    <Avatar className="h-5 w-5">
+                                    <Avatar className="h-6 w-6">
                                       <AvatarImage src={visit.agent?.avatar_url} />
-                                      <AvatarFallback className="text-[8px]">
+                                      <AvatarFallback className="text-[10px] font-black">
                                         {visit.agent?.full_name?.substring(0,2).toUpperCase()}
                                       </AvatarFallback>
                                     </Avatar>
-                                    <p className="font-bold text-xs">{visit.agent?.full_name}</p>
+                                    <p className="font-bold text-sm">{visit.agent?.full_name || 'Sin asignar'}</p>
                                  </div>
                               </div>
                            </div>
+
+                           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div className="space-y-1">
+                                 <span className="text-[10px] uppercase font-bold text-muted-foreground">Operación</span>
+                                 <Badge variant="outline" className="block text-center border-accent/20 capitalize">{visit.tipo_operacion || '-'}</Badge>
+                              </div>
+                              <div className="space-y-1">
+                                 <span className="text-[10px] uppercase font-bold text-muted-foreground">Presupuesto</span>
+                                 <p className="text-sm font-bold">{visit.presupuesto || '-'}</p>
+                              </div>
+                              <div className="space-y-1">
+                                 <span className="text-[10px] uppercase font-bold text-muted-foreground">Calificación</span>
+                                 <Badge className={cn(
+                                   "block text-center border-none",
+                                   visit.calificacion_lead === 'HOT' ? "bg-red-500/10 text-red-500" : 
+                                   visit.calificacion_lead === 'WARM' ? "bg-amber-500/10 text-amber-500" : 
+                                   "bg-blue-500/10 text-blue-500"
+                                 )}>
+                                   {visit.calificacion_lead || '-'}
+                                 </Badge>
+                              </div>
+                              <div className="space-y-1">
+                                 <span className="text-[10px] uppercase font-bold text-muted-foreground">Score BANT</span>
+                                 <p className="text-sm font-bold">{visit.score_bant}/12</p>
+                              </div>
+                           </div>
                            
-                           <div className="bg-accent/5 p-4 rounded-xl border border-accent/10 space-y-2">
-                              <span className="text-[10px] uppercase font-bold text-muted-foreground">Notas</span>
-                              <p className="text-sm italic text-muted-foreground">{visit.notes ? `"${visit.notes}"` : "Sin notas adicionales"}</p>
+                           <div className="space-y-3">
+                              <div className="bg-accent/5 p-4 rounded-xl border border-accent/10 space-y-2">
+                                <span className="text-[10px] uppercase font-bold text-muted-foreground">Intereses Clave</span>
+                                <p className="text-sm text-foreground">{visit.intereses_clave || 'No especificados'}</p>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="bg-card/50 p-4 rounded-xl border border-accent/10 space-y-2">
+                                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Objeciones</span>
+                                  <p className="text-xs text-muted-foreground italic">{visit.objeciones_detectadas || 'Ninguna detectada'}</p>
+                                </div>
+                                <div className="bg-card/50 p-4 rounded-xl border border-accent/10 space-y-2">
+                                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Decisores</span>
+                                  <p className="text-xs text-muted-foreground">{visit.decisores || 'No especificados'}</p>
+                                </div>
+                              </div>
+                              <div className="bg-accent/5 p-4 rounded-xl border border-accent/10 space-y-2">
+                                <span className="text-[10px] uppercase font-bold text-muted-foreground">Resumen Conversación</span>
+                                <p className="text-xs text-muted-foreground">{visit.resumen_conversacion || 'Sin resumen'}</p>
+                              </div>
                            </div>
                         </div>
                       </DialogContent>
