@@ -39,10 +39,15 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
 
   const activeIdRef = useRef(activeId)
+  const convRef = useRef(conversations)
 
   useEffect(() => {
     activeIdRef.current = activeId
   }, [activeId])
+
+  useEffect(() => {
+    convRef.current = conversations
+  }, [conversations])
 
   // Initial load & Polling
   useEffect(() => {
@@ -80,30 +85,38 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
         (payload) => {
           if (payload.eventType === "INSERT") {
             const newItem = payload.new as WAConversation
-            setConversations((prev) => [newItem, ...prev])
             
             // Si inserta una nueva y no es la activa, notificar
             if (activeIdRef.current !== newItem.id) {
               setUnreadCounts((prevCounts) => ({ ...prevCounts, [newItem.id]: (prevCounts[newItem.id] || 0) + 1 }))
-              toast(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
+              toast.info(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
             }
+            
+            setConversations((prev) => {
+              const unshiftList = [newItem, ...prev];
+              unshiftList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+              return unshiftList;
+            })
           } else if (payload.eventType === "UPDATE") {
             const updatedItem = payload.new as WAConversation
-            setConversations((prev) => {
-              const oldItem = prev.find(c => c.id === updatedItem.id)
+            
+            // Extraemos el item viejo usando el Ref exterior (para no poner hooks/toasts dentro del setState puro)
+            const prev = convRef.current
+            const oldItem = prev.find(c => c.id === updatedItem.id)
+            
+            const isInbound = oldItem && updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
+            const isNewMessage = oldItem && updatedItem.last_message_at && updatedItem.last_message_at !== oldItem.last_message_at;
               
-              // Si cambió el last_inbound_at es un mensaje nuevo del cliente
-              const isInbound = oldItem && updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
-              // Si cambió el last_message_at (del cliente o del bot) hay que reordenar
-              const isNewMessage = oldItem && updatedItem.last_message_at && updatedItem.last_message_at !== oldItem.last_message_at;
-              
-              if (isInbound && activeIdRef.current !== updatedItem.id) {
-                setUnreadCounts((prevCounts) => ({ ...prevCounts, [updatedItem.id]: (prevCounts[updatedItem.id] || 0) + 1 }))
-                toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
-              }
-              
-              const newList = prev.map((c) => c.id === updatedItem.id ? updatedItem : c)
-              if (isNewMessage) {
+            // Lanzamos los triggers de UI con la certeza y seguridad fuera del setState closure
+            if (isInbound && activeIdRef.current !== updatedItem.id) {
+              setUnreadCounts((prevCounts) => ({ ...prevCounts, [updatedItem.id]: (prevCounts[updatedItem.id] || 0) + 1 }))
+              toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
+            }
+            
+            // Actualizamos solo el react state
+            setConversations((currentPrev) => {
+              const newList = currentPrev.map((c) => c.id === updatedItem.id ? updatedItem : c)
+              if (isNewMessage || !oldItem) {
                 newList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
               }
               return newList
