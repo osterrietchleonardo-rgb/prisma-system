@@ -388,6 +388,23 @@ export async function sendDirectMessage(
       }
     }
 
+    // Sincronizar con la memoria de n8n (n8n_chat_histories)
+    // Se guarda como tipo 'ai' porque es un mensaje enviado por la inmobiliaria/agente (nuestro lado)
+    await supabase
+      .from('n8n_chat_histories')
+      .insert({
+        session_id: conversation_id,
+        message: {
+          type: 'ai',
+          content: content,
+          additional_kwargs: {},
+          response_metadata: {
+            source: 'system_manual_chat',
+            agent_role: 'human_intervention'
+          }
+        }
+      })
+
     return { success: true }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido'
