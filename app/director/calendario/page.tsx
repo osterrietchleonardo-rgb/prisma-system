@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -80,7 +80,7 @@ export default function CalendarioPage() {
       }
     }
     getAgency()
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     if (agencyId) {
@@ -144,6 +144,8 @@ export default function CalendarioPage() {
     const dateStr = format(day, "yyyy-MM-dd")
     return visits.filter(v => v.fecha_visita === dateStr)
   }
+
+  if (loading && !agencyId) return <div className="p-8 text-center text-foreground bg-background h-screen flex items-center justify-center">Cargando sistema de gestión...</div>
 
   return (
     <div className="flex flex-col h-full space-y-4 p-4 md:p-8 pt-6">
@@ -256,7 +258,10 @@ export default function CalendarioPage() {
                           "bg-amber-500/5 border-amber-500/20 text-amber-500/80"
                         )}>
                           <div className="flex items-center justify-between gap-1 mb-1 font-bold">
-                            <span className="truncate">{visit.hora_visita.substring(0, 5)} • {visit.nombre_completo}</span>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-2 w-2" />
+                              {visit.hora_visita?.substring(0, 5) || '00:00'} - {visit.nombre_completo}
+                            </div>
                           </div>
                           <div className="truncate text-muted-foreground group-hover:text-foreground">
                             {visit.zona_propiedad || visit.propiedad_id}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -209,7 +209,8 @@ export default function AsesorCalendarioPage() {
                           "bg-amber-500/5 border-amber-500/20 text-amber-500/80"
                         )}>
                           <div className="flex items-center justify-between gap-1 mb-1 font-bold">
-                            <span className="truncate">{visit.hora_visita.substring(0, 5)} • {visit.nombre_completo}</span>
+                            <Clock className="h-2 w-2" />
+                            {visit.hora_visita?.substring(0, 5) || '00:00'} - {visit.nombre_completo}
                           </div>
                         </div>
                       </DialogTrigger>
