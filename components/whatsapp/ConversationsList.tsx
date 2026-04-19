@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { WAConversation, WhatsAppInstance } from "@/types/whatsapp"
-import { Search, Bot, BotOff, MessageSquare } from "lucide-react"
+import { Search, Bot, BotOff, MessageSquare, RefreshCw } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -139,9 +139,9 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
 
   return (
     <div className="flex flex-col h-full">
-      {/* Search */}
-      <div className="p-3 border-b">
-        <div className="relative">
+      {/* Search & Refresh */}
+      <div className="p-3 border-b flex items-center gap-2">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             value={search}
@@ -151,6 +151,26 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             className="pl-9 h-9 text-sm"
           />
         </div>
+        <button
+          onClick={() => {
+            setLoading(true)
+            const supabase = createClient()
+            supabase
+              .from("wa_conversations")
+              .select("*")
+              .eq("instance_id", instance.id)
+              .order("last_message_at", { ascending: false })
+              .then(({ data }) => {
+                if (data) setConversations(data as WAConversation[])
+                setLoading(false)
+              })
+          }}
+          disabled={loading}
+          title="Actualizar chats"
+          className="w-9 h-9 flex items-center justify-center rounded-md border bg-background hover:bg-muted text-muted-foreground transition-colors disabled:opacity-50 flex-shrink-0"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+        </button>
       </div>
 
       {/* Tabs */}
