@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { WAConversation, WhatsAppInstance } from "@/types/whatsapp"
-import { Search, Bot, BotOff, MessageSquare, RefreshCw } from "lucide-react"
+import { Search, Bot, BotOff, MessageSquare, RefreshCw, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -31,7 +31,7 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 7)}sem`
 }
 
-import { markConversationRead } from "@/app/actions/whatsapp"
+import { markConversationRead, deleteConversation } from "@/app/actions/whatsapp"
 
 export function ConversationsList({ instance, activeId, onSelect }: ConversationsListProps) {
   const [conversations, setConversations] = useState<WAConversation[]>([])
@@ -131,7 +131,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                 // Si la conversación no estaba cargada localmente, hay insertarla
                 newList = [updatedItem, ...currentPrev]
               } else {
-                newList = currentPrev.map((c) => (c.id === updatedItem.id ? updatedItem : c))
+                newList = currentPrev.map((c) => (c.id === updatedItem.id ? { ...c, ...updatedItem } : c))
               }
 
               // Reordenar siempre que se actualice la lista
@@ -142,16 +142,24 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             setConversations((prev) =>
               prev.filter((c) => c.id !== (payload.old as { id: string }).id)
             )
-          }
-        }
-      )
-      .subscribe()
-
     return () => {
       supabase.removeChannel(channel)
       clearInterval(interval)
     }
   }, [instance.id])
+
+  const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
+    e.stopPropagation();
+    if (!window.confirm("¿Seguro que querés eliminar esta conversación?")) return;
+    
+    const res = await deleteConversation(conversationId);
+    if (res.success) {
+      toast.success("Conversación eliminada");
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+    } else {
+      toast.error(res.error || "Error al eliminar");
+    }
+  };
 
   // Filter by search + tab
   const filtered = useMemo(() => {
@@ -270,12 +278,20 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                        markConversationRead(conv.id)
                     }
                   }}
-                  className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors mb-0.5 ${
+                  className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors mb-0.5 group/item relative ${
                     isActive
                       ? "bg-accent/5 dark:bg-accent/10 border border-accent/20"
                       : "hover:bg-muted/50"
                   }`}
                 >
+                  {/* Delete Button (on hover) */}
+                  <button
+                    onClick={(e) => handleDelete(e, conv.id)}
+                    className="absolute right-2 top-2 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover/item:opacity-100 z-10"
+                    title="Eliminar chat"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                   {/* Avatar */}
                   <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-sm flex-shrink-0">
                     {initial}
@@ -290,9 +306,11 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                       <span className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-end gap-1">
                         <span className="whitespace-nowrap">{timeAgo(conv.last_message_at)}</span>
                         {conv.unread_count > 0 ? (
-                          <span className="bg-red-500 text-white text-[10px] font-bold h-[18px] min-w-[18px] px-1 flex items-center justify-center rounded-full leading-none">
-                            {conv.unread_count > 99 ? "99+" : conv.unread_count}
-                          </span>
+                          <div className="flex items-center justify-center">
+                             <Badge className="bg-red-500 hover:bg-red-600 text-white border-none text-[10px] font-bold h-[18px] min-w-[18px] px-1 flex items-center justify-center rounded-full leading-none shadow-sm">
+                               {conv.unread_count > 99 ? "99+" : conv.unread_count}
+                             </Badge>
+                          </div>
                         ) : null}
                       </span>
                     </div>

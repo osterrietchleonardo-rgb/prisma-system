@@ -118,7 +118,7 @@ export async function POST(req: Request) {
     }
 
     // 3. Guardar el mensaje del lead en Supabase
-    const { data: insertedMessage } = await supabase.from('wa_messages').insert({
+    const { data: insertedMsg, error: insertError } = await supabase.from('wa_messages').insert({
       conversation_id,
       agency_id: instance.agency_id,
       content,
@@ -126,7 +126,11 @@ export async function POST(req: Request) {
       message_type: messageType,
       wamid,
       metadata: data,
-    }).select('id').single()
+    }).select('*').single()
+
+    if (insertError) {
+      console.error('[Evolution Webhook] Error insertando mensaje:', insertError)
+    }
 
     // 4. Disparar n8n con payload enriquecido (siempre se envía, n8n decide)
     if (process.env.N8N_WEBHOOK_URL) {
@@ -159,7 +163,7 @@ export async function POST(req: Request) {
 
         // Mensaje actual
         message: {
-          id: insertedMessage?.id, // ID único del mensaje en la base de datos (clave primaria)
+          id: insertedMsg?.id || null, // ID único del mensaje en la base de datos (Clave primaria UUID)
           content,
           type: messageType,
           wamid,
