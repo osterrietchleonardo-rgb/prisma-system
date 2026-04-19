@@ -71,6 +71,7 @@ export async function POST(req: Request) {
     let conversation_id: string
     let botIsActive = true
 
+
     const { data: conv } = await supabase
       .from('wa_conversations')
       .select('id, bot_active, etiquetas, score, status, unread_count')
@@ -150,8 +151,9 @@ export async function POST(req: Request) {
         .single()
 
       const enrichedPayload = {
-        webhook_event_id: crypto.randomUUID(), // ID único e irrepetible de disparo del webhook
-        message_id: insertedMsg?.id || null, // ID raíz para asegurar visibilidad en n8n
+        debug_v: '5.0_final', // Versión de debug para confirmar deploy exitoso
+        message_id: insertedMsg?.id || null, // ID raíz garantizado
+        webhook_event_id: crypto.randomUUID(), 
         // IDs para que n8n pueda responder de vuelta
         agency_id: instance.agency_id,
         conversation_id,

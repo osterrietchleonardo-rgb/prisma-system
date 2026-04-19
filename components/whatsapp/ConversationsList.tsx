@@ -74,7 +74,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
 
     // Realtime subscription
     const channel = supabase
-      .channel(`wa_conversations_${instance.id}`)
+      .channel(`wa_conversations:instance_id=eq.${instance.id}`)
       .on(
         "postgres_changes",
         {
