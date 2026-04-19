@@ -86,10 +86,10 @@ export async function POST(req: Request) {
                 
                 const { data: conv } = await supabase
                     .from('wa_conversations')
-                    .select('id, bot_active')
+                    .select('id, bot_active, unread_count')
                     .eq('instance_id', instance.id)
                     .eq('contact_phone', contactPhone)
-                    .single()
+                    .maybeSingle()
 
                 if (!conv) {
                     const { data: newConv } = await supabase
@@ -101,6 +101,7 @@ export async function POST(req: Request) {
                             contact_name: contactName,
                             status: 'active',
                             bot_active: true,
+                            unread_count: 1,
                             last_message_at: new Date().toISOString(),
                             last_inbound_at: new Date().toISOString()
                         })
@@ -117,13 +118,14 @@ export async function POST(req: Request) {
                         .update({
                             contact_name: contactName,
                             last_message_at: new Date().toISOString(),
-                            last_inbound_at: new Date().toISOString()
+                            last_inbound_at: new Date().toISOString(),
+                            unread_count: (conv.unread_count || 0) + 1,
                         })
                         .eq('id', conversation_id)
                 }
 
                 // Insertar el mensaje
-                await supabase
+                const { data: insertedMsg } = await supabase
                     .from('wa_messages')
                     .insert({
                         conversation_id,
@@ -134,6 +136,8 @@ export async function POST(req: Request) {
                         wamid,
                         metadata: message
                     })
+                    .select('id')
+                    .single()
 
                 // Gatillar n8n si el bot esta activo
                 if (botIsActive && process.env.N8N_WEBHOOK_URL) {
@@ -153,6 +157,9 @@ export async function POST(req: Request) {
                         .single()
 
                     const enrichedPayload = {
+                        debug_v: '5.0_meta_final',
+                        webhook_event_id: crypto.randomUUID(),
+                        message_id: insertedMsg?.id || null,
                         // IDs necesarios para que n8n pueda responder de vuelta
                         agency_id: instance.agency_id,
                         conversation_id,
@@ -161,6 +168,7 @@ export async function POST(req: Request) {
                         contact_name: contactName,
                         // El mensaje actual que llego
                         message: {
+                            id: insertedMsg?.id || null,
                             content,
                             type: message.type,
                             wamid,
@@ -171,6 +179,7 @@ export async function POST(req: Request) {
                             etiquetas: convMeta?.etiquetas || [],
                             score: convMeta?.score || 0,
                             status: convMeta?.status || 'active',
+                            bot_active: botIsActive,
                         },
                         // Historial de mensajes (del mas antiguo al mas reciente)
                         history: (recentMessages || []).reverse().map((m: { role: string; content: string; created_at: string }) => ({
