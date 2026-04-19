@@ -21,7 +21,24 @@ import {
 } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
-import { CalendarIcon, Clock, User, Phone, Mail, MapPin, Tag, Briefcase } from "lucide-react"
+import { 
+  CalendarIcon, 
+  Clock, 
+  User, 
+  Phone, 
+  Mail, 
+  MapPin, 
+  Tag, 
+  Briefcase,
+  Search,
+  Check
+} from "lucide-react"
+import { 
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
 
 interface NewVisitDialogProps {
   open: boolean
@@ -43,6 +60,10 @@ export function NewVisitDialog({
   agents 
 }: NewVisitDialogProps) {
   const [loading, setLoading] = useState(false)
+  const [properties, setProperties] = useState<any[]>([])
+  const [allAgencyProfiles, setAllAgencyProfiles] = useState<any[]>([])
+  const [propertySearch, setPropertySearch] = useState("")
+
   const [formData, setFormData] = useState({
     nombre_completo: "",
     telefono: "",
@@ -64,6 +85,60 @@ export function NewVisitDialog({
   })
 
   const supabase = createClient()
+
+  // Fetch properties and initial profiles on mount/open
+  useEffect(() => {
+    if (open && agencyId) {
+      async function fetchData() {
+        // Fetch properties
+        const { data: propsData } = await supabase
+          .from("properties")
+          .select("id, title, address, assigned_agent, city")
+          .eq("agency_id", agencyId)
+          .order("title")
+        
+        if (propsData) setProperties(propsData)
+
+        // Fetch all profiles for the agency to match assigned_agent by email
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .eq("agency_id", agencyId)
+        
+        if (profiles) setAllAgencyProfiles(profiles)
+      }
+      fetchData()
+    }
+  }, [open, agencyId, supabase])
+
+  const handlePropertyChange = (propertyId: string) => {
+    const property = properties.find(p => p.id === propertyId)
+    if (property) {
+      let updatedData = {
+        ...formData,
+        propiedad_id: property.title,
+        zona_propiedad: property.city || property.address || ""
+      }
+
+      // Try to auto-assign agent if email matches
+      if (property.assigned_agent?.email) {
+        const matchedProfile = allAgencyProfiles.find(
+          p => p.email?.toLowerCase() === property.assigned_agent.email.toLowerCase()
+        )
+        if (matchedProfile) {
+          updatedData.agent_id = matchedProfile.id
+          toast.info(`Asesor asignado automáticamente: ${matchedProfile.full_name}`)
+        }
+      }
+
+      setFormData(updatedData)
+    }
+  }
+
+  const filteredProperties = properties.filter(p => 
+    p.title.toLowerCase().includes(propertySearch.toLowerCase()) ||
+    p.address?.toLowerCase().includes(propertySearch.toLowerCase())
+  )
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -205,14 +280,54 @@ export function NewVisitDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="propiedad_id">ID Propiedad / Título</Label>
-                <Input 
-                  id="propiedad_id" 
-                  value={formData.propiedad_id}
-                  onChange={(e) => setFormData({...formData, propiedad_id: e.target.value})}
-                  placeholder="Ej: DEP-456"
-                  className="bg-accent/5 border-accent/10"
-                />
+                <Label htmlFor="propiedad_id">Seleccionar Propiedad (Tokko)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between bg-accent/5 border-accent/10 h-10 font-normal"
+                    >
+                      {formData.propiedad_id || "Seleccionar propiedad..."}
+                      <Briefcase className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[400px] p-0 bg-card border-accent/20 shadow-2xl" align="start">
+                    <div className="p-2 border-b border-accent/10">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Buscar propiedad por título o dirección..."
+                          className="pl-8 h-9 border-none bg-accent/5 focus-visible:ring-0"
+                          value={propertySearch}
+                          onChange={(e) => setPropertySearch(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto p-1">
+                      {filteredProperties.length === 0 ? (
+                        <div className="p-4 text-sm text-center text-muted-foreground">
+                          No se encontraron propiedades
+                        </div>
+                      ) : (
+                        filteredProperties.map((prop) => (
+                          <button
+                            key={prop.id}
+                            type="button"
+                            className={cn(
+                              "w-full text-left p-2 rounded-sm text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5",
+                              formData.propiedad_id === prop.title && "bg-accent/10"
+                            )}
+                            onClick={() => handlePropertyChange(prop.id)}
+                          >
+                            <span className="font-semibold">{prop.title}</span>
+                            <span className="text-xs text-muted-foreground line-clamp-1">{prop.address}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="zona_propiedad">Zona / Barrio</Label>
@@ -295,9 +410,14 @@ export function NewVisitDialog({
               <Briefcase className="h-4 w-4" /> Gestión y Asignación
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {isAdmin && (
+              {(isAdmin || formData.agent_id !== userId) && (
                 <div className="space-y-2">
-                  <Label>Asesor Asignado *</Label>
+                  <Label className="flex items-center gap-2">
+                    Asesor Asignado * 
+                    {formData.agent_id !== userId && !isAdmin && (
+                      <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">Propiedad Ajena</span>
+                    )}
+                  </Label>
                   <Select 
                     value={formData.agent_id} 
                     onValueChange={(v) => setFormData({...formData, agent_id: v})}
@@ -306,7 +426,7 @@ export function NewVisitDialog({
                       <SelectValue placeholder="Seleccionar asesor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {agents?.map(agent => (
+                      {allAgencyProfiles?.map(agent => (
                         <SelectItem key={agent.id} value={agent.id}>{agent.full_name}</SelectItem>
                       ))}
                     </SelectContent>
