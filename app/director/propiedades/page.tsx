@@ -96,10 +96,7 @@ export default function PropiedadesPage() {
 
       let query = supabase
         .from("properties")
-        .select(`
-          *,
-          assigned_agent:profiles(id, full_name, avatar_url)
-        `, { count: 'exact' })
+        .select(`*`, { count: 'exact' })
 
       if (search) {
         query = query.or(`title.ilike.%${search}%,address.ilike.%${search}%`)
@@ -321,10 +318,10 @@ export default function PropiedadesPage() {
                       </div>
                     </CardContent>
                     <CardFooter className="p-4 bg-accent/5 border-t border-accent/10 flex items-center justify-between">
-                      {prop.assigned_agent ? (
+                      {prop.assigned_agent && prop.assigned_agent.name !== "Sin asignar" ? (
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-[10px] border-accent/20">
-                            {prop.assigned_agent.full_name}
+                            {prop.assigned_agent.name}
                           </Badge>
                         </div>
                       ) : (
@@ -383,7 +380,7 @@ export default function PropiedadesPage() {
                       </TableCell>
                       <TableCell className="hidden xl:table-cell">
                         <span className="truncate block max-w-[120px]">
-                          {prop.assigned_agent?.full_name || "Sin asignar"}
+                          {prop.assigned_agent?.name || "Sin asignar"}
                         </span>
                       </TableCell>
                       <TableCell className="text-right px-2">

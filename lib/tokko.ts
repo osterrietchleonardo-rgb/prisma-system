@@ -50,6 +50,11 @@ export const syncPropertiesFromTokko = async (apiKey: string) => {
   return allProperties;
 };
 
+export const syncAgentsFromTokko = async (apiKey: string) => {
+  const data = await fetchTokko('/agent/', apiKey, { method: 'GET' });
+  return data.objects || [];
+};
+
 export const getLeadConsultas = async (apiKey: string, _daysBack: number = 7) => {
   // Fetch recent queries/leads from Tokko
   // Example endpoint: /webcontact/

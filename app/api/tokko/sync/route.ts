@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { syncPropertiesFromTokko } from "@/lib/tokko"
+import { syncPropertiesFromTokko, syncAgentsFromTokko } from "@/lib/tokko"
 
 export const dynamic = "force-dynamic";
 import { rateLimit, LIMITS } from "@/lib/rate-limiter"
@@ -59,7 +59,10 @@ export async function POST() {
     }
 
     // 4. Sync from Tokko
-    const tokkoProperties = await syncPropertiesFromTokko(agency.tokko_api_key)
+    const [tokkoProperties, tokkoAgents] = await Promise.all([
+      syncPropertiesFromTokko(agency.tokko_api_key),
+      syncAgentsFromTokko(agency.tokko_api_key)
+    ])
     
     // 5. Mapear y Upsert en Supabase
     const typeMapping: Record<string, string> = {
@@ -78,17 +81,37 @@ export async function POST() {
       "Temporary Rent": "Alquiler Temporario",
     }
 
-    const propertiesToUpsert = tokkoProperties.map((p: TokkoProperty) => {
+    // Obtener perfiles de la agencia para matcheo por email
+    const { data: agencyProfiles } = await supabase
+      .from("profiles")
+      .select("id, email")
+      .eq("agency_id", profile.agency_id)
+
+    const propertiesToUpsert = tokkoProperties.map((p: any) => {
       const rawType = p.type?.name || "Desconocido"
       const rawStatus = p.operations?.[0]?.operation_type || "Venta"
+      const producerEmail = p.producer?.email?.toLowerCase()
+      
+      const matchedProfile = agencyProfiles?.find(ap => 
+        ap.email?.toLowerCase() === producerEmail
+      )
+
+      // Buscar el primer precio que sea mayor a 0
+      const activeOperation = p.operations?.[0];
+      const validPrice = activeOperation?.prices?.find((pr: any) => pr.price > 0) || activeOperation?.prices?.[0];
 
       return {
         tokko_id: p.id.toString(),
         agency_id: profile.agency_id,
+        assigned_agent: {
+          name: p.producer?.name || "Sin asignar",
+          email: p.producer?.email || "",
+          cellphone: p.producer?.cellphone || p.producer?.phone || ""
+        },
         title: p.publication_title,
         description: p.description,
-        price: p.operations?.[0]?.prices?.[0]?.price || 0,
-        currency: p.operations?.[0]?.prices?.[0]?.currency || "USD",
+        price: validPrice?.price || 0,
+        currency: validPrice?.currency || "USD",
         property_type: typeMapping[rawType] || rawType,
         status: statusMapping[rawStatus] || rawStatus,
         address: p.address,
@@ -108,6 +131,25 @@ export async function POST() {
       .upsert(propertiesToUpsert, { onConflict: "tokko_id" })
 
     if (upsertError) throw upsertError
+
+    // 5.5 Mapear y Upsert Agents
+    const agentsToUpsert = tokkoAgents.map((a: any) => ({
+      tokko_id: a.id.toString(),
+      agency_id: profile.agency_id,
+      full_name: a.name,
+      email: a.email,
+      phone: a.cellphone || a.phone,
+      avatar_url: a.image,
+      updated_at: new Date().toISOString()
+    }))
+
+    if (agentsToUpsert.length > 0) {
+      const { error: agentsUpsertError } = await supabase
+        .from("tokko_agents")
+        .upsert(agentsToUpsert, { onConflict: "tokko_id" })
+      
+      if (agentsUpsertError) throw agentsUpsertError
+    }
 
     // 6. Actualizar última sync
     await supabase

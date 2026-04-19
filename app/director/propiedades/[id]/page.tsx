@@ -79,10 +79,7 @@ export default function PropertyDetailPage() {
         setLoading(true)
         const { data, error } = await supabase
           .from("properties")
-          .select(`
-            *,
-            assigned_agent:profiles(id, full_name, avatar_url, phone, email)
-          `)
+          .select("*")
           .eq("id", id)
           .single()
 
@@ -392,25 +389,26 @@ export default function PropertyDetailPage() {
             <CardContent className="p-6 pt-2 space-y-6">
               {/* Internal Assigned Agent */}
               <div className="space-y-3">
-                <p className="text-[10px] font-bold text-accent uppercase tracking-wider">Asesor en PRISMA</p>
-                {property.assigned_agent ? (
+                <p className="text-[10px] font-bold text-accent uppercase tracking-wider">Asesor Responsable</p>
+                {property.assigned_agent && property.assigned_agent.name !== "Sin asignar" ? (
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-background/40 border border-accent/5 transition-all hover:border-accent/20">
                     <Avatar className="h-12 w-12 border-2 border-accent/10">
                       <AvatarImage src={property.assigned_agent.avatar_url} />
                       <AvatarFallback className="bg-accent text-white font-bold">
-                        {property.assigned_agent.full_name?.substring(0,2)}
+                        {property.assigned_agent.name?.substring(0,2)}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-bold text-sm leading-none">{property.assigned_agent.full_name}</p>
+                      <p className="font-bold text-sm leading-none">{property.assigned_agent.name}</p>
                       <p className="text-[10px] text-muted-foreground mt-1">{property.assigned_agent.email}</p>
+                      {property.assigned_agent.cellphone && <p className="text-[10px] font-mono text-accent mt-1">{property.assigned_agent.cellphone}</p>}
                     </div>
                   </div>
                 ) : (
-                  <Button variant="outline" className="w-full gap-2 border-dashed border-accent/30 hover:bg-accent/5 h-12">
-                    <UserPlus className="h-4 w-4 text-accent" />
-                    Asignar Asesor PRISMA
-                  </Button>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 border border-dashed border-accent/20">
+                    <User className="h-8 w-8 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground italic">Sin asesor asignado en Tokko</p>
+                  </div>
                 )}
               </div>
 
