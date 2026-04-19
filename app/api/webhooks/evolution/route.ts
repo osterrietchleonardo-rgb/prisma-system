@@ -151,6 +151,7 @@ export async function POST(req: Request) {
 
       const enrichedPayload = {
         webhook_event_id: crypto.randomUUID(), // ID único e irrepetible de disparo del webhook
+        message_id: insertedMsg?.id || null, // ID raíz para asegurar visibilidad en n8n
         // IDs para que n8n pueda responder de vuelta
         agency_id: instance.agency_id,
         conversation_id,

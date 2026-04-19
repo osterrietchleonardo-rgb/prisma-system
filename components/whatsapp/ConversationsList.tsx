@@ -123,21 +123,31 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                markConversationRead(updatedItem.id)
             }
 
-            setConversations((currentPrev) => {
-              const prevItem = currentPrev.find((c) => c.id === updatedItem.id)
-              let newList: WAConversation[] = []
-              
-              if (!prevItem) {
-                // Si la conversación no estaba cargada localmente, hay insertarla
-                newList = [updatedItem, ...currentPrev]
-              } else {
-                newList = currentPrev.map((c) => (c.id === updatedItem.id ? { ...c, ...updatedItem } : c))
-              }
-
-              // Reordenar siempre que se actualice la lista
-              newList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
-              return newList
-            })
+              setConversations((currentPrev) => {
+                const prevItem = currentPrev.find((c) => c.id === updatedItem.id)
+                let newList: WAConversation[] = []
+                
+                if (!prevItem) {
+                  newList = [updatedItem, ...currentPrev]
+                } else {
+                  newList = currentPrev.map((c) => {
+                    if (c.id === updatedItem.id) {
+                      const merged = { ...c };
+                      (Object.keys(updatedItem) as Array<keyof WAConversation>).forEach(key => {
+                        if (updatedItem[key] !== undefined && updatedItem[key] !== null) {
+                           // @ts-ignore
+                           merged[key] = updatedItem[key];
+                        }
+                      });
+                      return merged;
+                    }
+                    return c;
+                  })
+                }
+                
+                newList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
+                return newList
+              })
           } else if (payload.eventType === "DELETE") {
             setConversations((prev) =>
               prev.filter((c) => c.id !== (payload.old as { id: string }).id)
