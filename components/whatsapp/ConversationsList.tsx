@@ -92,17 +92,21 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             setConversations((prev) => {
               const oldItem = prev.find(c => c.id === updatedItem.id)
               
-              // Notificar si last_inbound_at es más reciente y no es la conv. activa
-              if (oldItem && updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at) {
-                if (activeIdRef.current !== updatedItem.id) {
-                  setUnreadCounts((prevCounts) => ({ ...prevCounts, [updatedItem.id]: (prevCounts[updatedItem.id] || 0) + 1 }))
-                  toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
-                }
+              // Si cambió el last_inbound_at es un mensaje nuevo del cliente
+              const isInbound = oldItem && updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
+              // Si cambió el last_message_at (del cliente o del bot) hay que reordenar
+              const isNewMessage = oldItem && updatedItem.last_message_at && updatedItem.last_message_at !== oldItem.last_message_at;
+              
+              if (isInbound && activeIdRef.current !== updatedItem.id) {
+                setUnreadCounts((prevCounts) => ({ ...prevCounts, [updatedItem.id]: (prevCounts[updatedItem.id] || 0) + 1 }))
+                toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
               }
               
-              return prev.map((c) =>
-                c.id === updatedItem.id ? updatedItem : c
-              )
+              const newList = prev.map((c) => c.id === updatedItem.id ? updatedItem : c)
+              if (isNewMessage) {
+                newList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime())
+              }
+              return newList
             })
           } else if (payload.eventType === "DELETE") {
             setConversations((prev) =>
