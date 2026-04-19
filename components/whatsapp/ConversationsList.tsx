@@ -10,6 +10,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "./EmptyState"
+import { toast } from "sonner"
+import { useRef } from "react"
 
 interface ConversationsListProps {
   instance: WhatsAppInstance
@@ -35,7 +37,13 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   const [tab, setTab] = useState("all")
   const [loading, setLoading] = useState(true)
 
-  // Initial load
+  const activeIdRef = useRef(activeId)
+
+  useEffect(() => {
+    activeIdRef.current = activeId
+  }, [activeId])
+
+  // Initial load & Polling
   useEffect(() => {
     const supabase = createClient()
 
@@ -52,6 +60,11 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
 
     load()
 
+    // Refresh param: Auto-refresh cada 5 minutos
+    const interval = setInterval(() => {
+      load()
+    }, 5 * 60 * 1000)
+
     // Realtime subscription
     const channel = supabase
       .channel(`wa_conversations_${instance.id}`)
@@ -65,15 +78,29 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
         },
         (payload) => {
           if (payload.eventType === "INSERT") {
-            setConversations((prev) => [payload.new as WAConversation, ...prev])
+            const newItem = payload.new as WAConversation
+            setConversations((prev) => [newItem, ...prev])
+            
+            // Si inserta una nueva y no es la activa, notificar
+            if (activeIdRef.current !== newItem.id) {
+              toast(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
+            }
           } else if (payload.eventType === "UPDATE") {
-            setConversations((prev) =>
-              prev.map((c) =>
-                c.id === (payload.new as WAConversation).id
-                  ? (payload.new as WAConversation)
-                  : c
+            const updatedItem = payload.new as WAConversation
+            setConversations((prev) => {
+              const oldItem = prev.find(c => c.id === updatedItem.id)
+              
+              // Notificar si last_inbound_at es más reciente y no es la conv. activa
+              if (oldItem && updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at) {
+                if (activeIdRef.current !== updatedItem.id) {
+                  toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
+                }
+              }
+              
+              return prev.map((c) =>
+                c.id === updatedItem.id ? updatedItem : c
               )
-            )
+            })
           } else if (payload.eventType === "DELETE") {
             setConversations((prev) =>
               prev.filter((c) => c.id !== (payload.old as { id: string }).id)
@@ -85,6 +112,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
 
     return () => {
       supabase.removeChannel(channel)
+      clearInterval(interval)
     }
   }, [instance.id])
 
