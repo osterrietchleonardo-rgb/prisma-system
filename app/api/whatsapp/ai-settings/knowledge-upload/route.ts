@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 import mammoth from "mammoth";
 import { generateEmbedding } from "@/lib/gemini";
+
+// Use Admin client to bypass RLS for this internal system process
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,9 +44,9 @@ export async function POST(req: NextRequest) {
     // Convert array to pgvector string format: "[0.1, 0.2, ...]"
     const vectorString = `[${embeddingArray.join(',')}]`;
 
-    console.log("Actualizando Supabase para ID:", settingId);
-    const supabase = createClient();
-    const { data, error } = await supabase
+    console.log("Actualizando Supabase Admin para ID:", settingId);
+    
+    const { data, error } = await supabaseAdmin
       .from("whatsapp_ai_settings")
       .update({
         knowledge_text: cleanText,
@@ -51,7 +57,7 @@ export async function POST(req: NextRequest) {
       .select();
 
     if (error) {
-      console.error("Supabase Update Error:", error);
+      console.error("Supabase Admin Update Error:", error);
       throw error;
     }
 
