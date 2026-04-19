@@ -142,6 +142,11 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             setConversations((prev) =>
               prev.filter((c) => c.id !== (payload.old as { id: string }).id)
             )
+          }
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(channel)
       clearInterval(interval)
