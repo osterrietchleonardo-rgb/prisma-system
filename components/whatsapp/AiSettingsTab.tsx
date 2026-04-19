@@ -21,7 +21,8 @@ import {
   FileText,
   Loader2,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Trash2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -274,13 +275,37 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
 
       if (res.ok) {
         toast.success("Documento procesado y guardado correctamente")
-        setSelectedSetting(prev => prev ? { ...prev, knowledge_text: "Actualizado" } : null)
         loadData()
       } else {
         throw new Error(data.error)
       }
     } catch (err: any) {
       toast.error("Error al procesar archivo: " + err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleRemoveKnowledge = async () => {
+    if (!selectedSetting?.id) return
+    
+    setUploading(true)
+    try {
+      const { error } = await supabase
+        .from('whatsapp_ai_settings')
+        .update({
+          knowledge_text: null,
+          knowledge_embedding: null
+        })
+        .eq('id', selectedSetting.id)
+
+      if (error) throw error
+      
+      toast.success("Conocimiento eliminado correctamente")
+      setSelectedSetting(prev => prev ? { ...prev, knowledge_text: null } : null)
+      loadData()
+    } catch (err: any) {
+      toast.error("Error al eliminar: " + err.message)
     } finally {
       setUploading(false)
     }
@@ -553,6 +578,7 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
                             variant="outline" 
                             className="bg-background/50 gap-2 w-full"
                             asChild
+                            disabled={uploading}
                           >
                             <label htmlFor="docx-upload">
                               {uploading ? (
@@ -560,9 +586,21 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
                               ) : (
                                 <FileText className="w-4 h-4 text-accent" />
                               )}
-                              {uploading ? "Procesando documento..." : (selectedSetting.knowledge_text ? "Actualizar Documento" : "Subir Word (.docx)")}
+                              {uploading ? "Procesando..." : (selectedSetting.knowledge_text ? "Cambiar Documento" : "Subir Word (.docx)")}
                             </label>
                           </Button>
+                          
+                          {selectedSetting.knowledge_text && !uploading && (
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 gap-2 mt-2"
+                              onClick={handleRemoveKnowledge}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              Eliminar conocimiento actual
+                            </Button>
+                          )}
                         </div>
                       </>
                     ) : (
