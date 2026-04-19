@@ -127,7 +127,9 @@ export function NewVisitDialog({
         )
         if (matchedProfile) {
           updatedData.agent_id = matchedProfile.id
-          toast.info(`Asesor asignado automáticamente: ${matchedProfile.full_name}`)
+          toast.info(`Asesor asignado automáticamente: ${matchedProfile.full_name} (${property.assigned_agent.name} en Tokko)`)
+        } else {
+          toast.warning(`No se encontró un perfil en PRISMA para el asesor de Tokko: ${property.assigned_agent.name} (${property.assigned_agent.email})`)
         }
       }
 
@@ -413,7 +415,7 @@ export function NewVisitDialog({
               {(isAdmin || formData.agent_id !== userId) && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
-                    Asesor Asignado * 
+                    Asesor Responsable * 
                     {formData.agent_id !== userId && !isAdmin && (
                       <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">Propiedad Ajena</span>
                     )}
@@ -431,6 +433,9 @@ export function NewVisitDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[10px] text-muted-foreground italic">
+                    Este es el asesor que gestionará la visita en el sistema.
+                  </p>
                 </div>
               )}
               <div className="space-y-2">
