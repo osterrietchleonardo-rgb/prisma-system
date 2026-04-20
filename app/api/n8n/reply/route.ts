@@ -98,9 +98,12 @@ export async function POST(req: Request) {
         )
       }
 
+      // Clean phone number (remove +, spaces, etc)
+      const cleanPhone = conv.contact_phone.replace(/\D/g, "");
+
       let endpoint = `${evolutionUrl}/message/sendText/${instance.evo_instance_name}`;
       let evoPayload: any = {
-        number: conv.contact_phone,
+        number: cleanPhone,
         delay: 1200, // Opciones de delay para parecer más humano (ms)
       };
 

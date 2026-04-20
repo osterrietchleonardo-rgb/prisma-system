@@ -125,34 +125,44 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
 
     load()
 
-    // Realtime INSERT for new messages
+    // Realtime subscription for ALL changes in this conversation's messages
     const channel = supabase
-      .channel(`wa_messages_${conv.id}`)
+      .channel(`chat_messages_${conv.id}`)
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
           schema: "public",
           table: "wa_messages",
           filter: `conversation_id=eq.${conv.id}`,
         },
         (payload) => {
-          const newMsg = payload.new as WAMessage
-          setMessages((prev) => {
-            // Dedup
-            if (prev.some((m) => m.id === newMsg.id)) return prev
-            return [...prev, newMsg]
-          })
+          if (payload.eventType === "INSERT") {
+            const newMsg = payload.new as WAMessage
+            setMessages((prev) => {
+              // Dedup
+              if (prev.some((m) => m.id === newMsg.id)) return prev
+              return [...prev, newMsg]
+            })
 
-          // Auto-scroll if near bottom
-          if (shouldAutoScroll.current) {
-            setTimeout(() => {
-              bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-            }, 50)
+            // Auto-scroll if near bottom
+            if (shouldAutoScroll.current) {
+              setTimeout(() => {
+                bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+              }, 50)
+            }
+          } else if (payload.eventType === "DELETE") {
+             setMessages(prev => prev.filter(m => m.id !== (payload.old as any).id))
+          } else if (payload.eventType === "UPDATE") {
+             setMessages(prev => prev.map(m => m.id === (payload.new as any).id ? (payload.new as WAMessage) : m))
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`[Realtime] Subscribed to messages for conversation ${conv.id}`)
+        }
+      })
 
     return () => {
       supabase.removeChannel(channel)
@@ -183,16 +193,58 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     setSwitchingBot(false)
   }
 
+  const handleRefreshMessages = async () => {
+    const supabase = createClient()
+    setLoading(true)
+    const { data } = await supabase
+      .from("wa_messages")
+      .select("*")
+      .eq("conversation_id", conv.id)
+      .order("created_at", { ascending: true })
+      .range(0, 49)
+
+    if (data) {
+      setMessages(data as WAMessage[])
+      // Auto-scroll to bottom
+      setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "auto" })
+      }, 100)
+    }
+    setLoading(false)
+    toast.success("Mensajes actualizados")
+  }
+
   const handleSendMessage = async () => {
     if (!msgText.trim() || sending) return
     const text = msgText.trim()
     setSending(true)
+    
+    // Optimistic insert
+    const tempId = crypto.randomUUID()
+    const optimisticMsg: WAMessage = {
+      id: tempId,
+      conversation_id: conv.id,
+      agency_id: instance.agency_id,
+      content: text,
+      role: 'human',
+      message_type: 'text',
+      created_at: new Date().toISOString(),
+      metadata: { optimistic: true }
+    }
+    setMessages(prev => [...prev, optimisticMsg])
     setMsgText("")
 
     const result = await sendDirectMessage(conv.id, text)
     if (!result.success) {
       setMsgText(text)
+      setMessages(prev => prev.filter(m => m.id !== tempId))
       toast.error(result.error || "Error al enviar mensaje")
+    } else {
+      // El mensaje real llegará por Realtime y el dedup por ID lo manejará, 
+      // pero como el tempId es diferente, lo removemos cuando sabemos que el real está por llegar.
+      // O mejor, si el backend devolviera el ID real, podríamos actualizarlo.
+      // Por ahora, removemos el optimista y esperamos el real de Realtime.
+      setMessages(prev => prev.filter(m => m.id !== tempId))
     }
     setSending(false)
   }
@@ -201,12 +253,29 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     if (!noteText.trim() || sendingNote) return
     const text = noteText.trim()
     setSendingNote(true)
+    
+    // Optimistic insert
+    const tempId = crypto.randomUUID()
+    const optimisticNote: WAMessage = {
+      id: tempId,
+      conversation_id: conv.id,
+      agency_id: instance.agency_id,
+      content: text,
+      role: 'internal',
+      message_type: 'text',
+      created_at: new Date().toISOString(),
+      metadata: { optimistic: true }
+    }
+    setMessages(prev => [...prev, optimisticNote])
     setNoteText("")
 
     const result = await addInternalNote(conv.id, text)
     if (!result.success) {
       setNoteText(text)
+      setMessages(prev => prev.filter(m => m.id !== tempId))
       toast.error(result.error || "Error al agregar nota")
+    } else {
+      setMessages(prev => prev.filter(m => m.id !== tempId))
     }
     setSendingNote(false)
   }
@@ -288,12 +357,23 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
             <p className="text-xs text-muted-foreground">{conv.contact_phone}</p>
           </div>
 
-          {/* Score */}
           <div
             className={`px-2 py-1 rounded-md text-xs font-bold ${scoreColor}`}
           >
             {conv.score}pts
           </div>
+
+          {/* Refresh button for messages */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefreshMessages}
+            disabled={loading}
+            className="h-8 w-8 text-muted-foreground hover:text-accent"
+            title="Sincronizar mensajes"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
 
           {/* Bot toggle */}
           <div className="hidden sm:flex items-center gap-2">

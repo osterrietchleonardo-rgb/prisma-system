@@ -348,6 +348,9 @@ export async function sendDirectMessage(
     }
 
     // Enviar mensaje via Evolution API
+    // Clean phone (remove +, spaces)
+    const cleanPhone = conversation.contact_phone.replace(/\D/g, "");
+
     const response = await fetch(
       `${evolutionUrl}/message/sendText/${instance.instance_name}`,
       {
@@ -357,7 +360,7 @@ export async function sendDirectMessage(
           apikey: evolutionKey,
         },
         body: JSON.stringify({
-          number: conversation.contact_phone,
+          number: cleanPhone,
           text: content,
         }),
       }
@@ -388,20 +391,37 @@ export async function sendDirectMessage(
       }
     }
 
-    // Sincronizar con la memoria de n8n (n8n_chat_histories)
+    // Sincronizar con la memoria de n8n (n8n_chat_histories) con el formato exacto que espera LangChain/n8n
     // Se guarda como tipo 'ai' porque es un mensaje enviado por la inmobiliaria/agente (nuestro lado)
+    const fecha = new Date().toLocaleString('es-AR', { 
+      timeZone: 'America/Argentina/Buenos_Aires',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    }).replace(',', '');
+
     await supabase
       .from('n8n_chat_histories')
       .insert({
         session_id: conversation_id,
         message: {
           type: 'ai',
-          content: content,
+          content: JSON.stringify({
+            output: {
+              Mensaje: content,
+              Fecha: fecha
+            }
+          }),
+          tool_calls: [],
           additional_kwargs: {},
           response_metadata: {
             source: 'system_manual_chat',
             agent_role: 'human_intervention'
-          }
+          },
+          invalid_tool_calls: []
         }
       })
 

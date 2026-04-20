@@ -117,19 +117,33 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
   useEffect(() => {
     async function fetchVisit() {
       try {
+        // 1. Find the lead by phone
+        const cleanPhone = conversation.contact_phone.replace(/\D/g, "");
+        const { data: lead } = await supabase
+          .from("leads")
+          .select("id")
+          .ilike("phone", `%${cleanPhone.slice(-10)}%`) // Match last 10 digits to handle local variations
+          .maybeSingle();
+
+        if (!lead) {
+            setVisitLoading(false);
+            return;
+        }
+
+        // 2. Fetch the latest visit for this lead
         const { data, error } = await supabase
           .from("visits")
           .select("*")
-          .eq("conversation_id", conversation.id)
+          .eq("lead_id", lead.id)
           .order("scheduled_at", { ascending: false })
           .limit(1)
-          .single()
+          .maybeSingle();
           
         if (!error && data) {
           setVisit(data)
         }
       } catch (err) {
-        // Silently ignore
+        console.error("Error fetching lead/visit for traceability:", err);
       } finally {
         setVisitLoading(false)
       }
