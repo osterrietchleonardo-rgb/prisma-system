@@ -191,21 +191,6 @@ export async function POST(req: Request) {
       )
     }
 
-    // Guardar la respuesta del bot en Supabase (aparece en el chat en tiempo real)
-    await supabase.from('wa_messages').insert({
-      conversation_id,
-      agency_id: conv.agency_id,
-      content: media_url && !reply?.trim() ? media_url : reply,
-      role: 'bot',
-      message_type: media_url ? (media_type || 'image') : 'text',
-      wamid,
-      metadata: {
-        source: 'n8n',
-        sent_via: instance.integration_type,
-        media_url: media_url || undefined,
-      },
-    })
-
     // Actualizar conversación: timestamp + score + etiquetas opcionales
     const conversationUpdates: Record<string, unknown> = {
       last_message_at: new Date().toISOString(),
@@ -220,20 +205,38 @@ export async function POST(req: Request) {
       conversationUpdates.etiquetas = Array.from(new Set([...existing, ...add_etiquetas]))
     }
 
-    await supabase
-      .from('wa_conversations')
-      .update(conversationUpdates)
-      .eq('id', conversation_id)
+    // Guardar todo en paralelo para responder a n8n rapidísimo
+    const promises = [
+      supabase.from('wa_messages').insert({
+        conversation_id,
+        agency_id: conv.agency_id,
+        content: media_url && !reply?.trim() ? media_url : reply,
+        role: 'bot',
+        message_type: media_url ? (media_type || 'image') : 'text',
+        wamid,
+        metadata: {
+          source: 'n8n',
+          sent_via: instance.integration_type,
+          media_url: media_url || undefined,
+        },
+      }),
+      supabase
+        .from('wa_conversations')
+        .update(conversationUpdates)
+        .eq('id', conversation_id)
+    ]
 
-    // Disparar broadcast manual
-    await supabase.channel(`agency-${conv.agency_id}`).send({
+    await Promise.all(promises)
+
+    // Disparar broadcast manual sin bloquear (fire-and-forget)
+    supabase.channel(`agency-${conv.agency_id}`).send({
       type: 'broadcast',
       event: 'refresh-whatsapp',
       payload: {
         conversation_id,
         type: 'bot_reply'
       }
-    })
+    }).catch(() => {})
 
     return NextResponse.json({
       success: true,

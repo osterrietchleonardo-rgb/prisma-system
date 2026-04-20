@@ -106,59 +106,75 @@ export async function POST(req: Request) {
     } else {
       conversation_id = conv.id
       botIsActive = conv.bot_active
-
-      await supabase
-        .from('wa_conversations')
-        .update({
-          contact_name: contactName,
-          last_message_at: new Date().toISOString(),
-          last_inbound_at: new Date().toISOString(),
-          unread_count: (conv.unread_count || 0) + 1,
-        })
-        .eq('id', conversation_id)
     }
 
-    // 3. Guardar el mensaje del lead en Supabase
-    const { data: insertedMsg, error: insertError } = await supabase.from('wa_messages').insert({
-      conversation_id,
-      agency_id: instance.agency_id,
-      content,
-      role: 'lead',
-      message_type: messageType,
-      wamid,
-      metadata: data,
-    }).select('*').single()
+    const activeConv = conv || newConv
+
+    // Ejecutar queries lentas de BD en paralelo para acelerar trigger a n8n
+    const promises: Promise<any>[] = []
+
+    // 1. Promesa: UPDATE wa_conversations (Solo si la conv ya existía)
+    if (conv) {
+      promises.push(
+        supabase
+          .from('wa_conversations')
+          .update({
+            contact_name: contactName,
+            last_message_at: new Date().toISOString(),
+            last_inbound_at: new Date().toISOString(),
+            unread_count: (conv.unread_count || 0) + 1,
+          })
+          .eq('id', conversation_id)
+      )
+    } else {
+      promises.push(Promise.resolve(null)) // Mantener indice del array
+    }
+
+    // 2. Promesa: INSERT wa_messages
+    promises.push(
+      supabase.from('wa_messages').insert({
+        conversation_id,
+        agency_id: instance.agency_id,
+        content,
+        role: 'lead',
+        message_type: messageType,
+        wamid,
+        metadata: data,
+      }).select('id').single()  // Solo necesitamos el ID para confirmar y evitar cargar data innecesaria
+    )
+
+    // 3. Promesa: GET history
+    if (process.env.N8N_WEBHOOK_URL) {
+      promises.push(
+        supabase
+          .from('wa_messages')
+          .select('id, role, content, created_at')
+          .eq('conversation_id', conversation_id)
+          .order('created_at', { ascending: false })
+          .limit(10)
+      )
+    } else {
+      promises.push(Promise.resolve({ data: [] }))
+    }
+
+    // Esperar todas juntas (~66% de reducción en latencia de BD)
+    const [ _, insertResult, historyResult ] = await Promise.all(promises)
+    const { data: insertedMsg, error: insertError } = insertResult
+    const { data: recentMessages } = historyResult
 
     if (insertError) {
       console.error('[Evolution Webhook] Error insertando mensaje:', insertError)
     } else {
-      // Disparar broadcast manual para bypassear fallas de caché de RLS en Realtime
-      await supabase.channel(`agency-${instance.agency_id}`).send({
+      // Broadcast manual "fire-and-forget" para no retrasar n8n
+      supabase.channel(`agency-${instance.agency_id}`).send({
         type: 'broadcast',
         event: 'refresh-whatsapp',
-        payload: {
-          conversation_id,
-          type: 'new_message'
-        }
-      })
+        payload: { conversation_id, type: 'new_message' }
+      }).catch(() => {})
     }
 
-    // 4. Disparar n8n con payload enriquecido (siempre se envía, n8n decide)
+    // 4. Disparar n8n con payload enriquecido
     if (process.env.N8N_WEBHOOK_URL) {
-      // Obtener historial reciente para contexto
-      const { data: recentMessages } = await supabase
-        .from('wa_messages')
-        .select('role, content, created_at')
-        .eq('conversation_id', conversation_id)
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      // Obtener metadatos actualizados de la conversación
-      const { data: convMeta } = await supabase
-        .from('wa_conversations')
-        .select('etiquetas, score, status')
-        .eq('id', conversation_id)
-        .single()
 
       const enrichedPayload = {
         debug_v: '5.0_final', // Versión de debug para confirmar deploy exitoso
@@ -185,14 +201,15 @@ export async function POST(req: Request) {
 
         // Metadatos de la conversación para que la IA tenga contexto
         conversation: {
-          etiquetas: convMeta?.etiquetas || [],
-          score: convMeta?.score || 0,
-          status: convMeta?.status || 'active',
+          etiquetas: activeConv?.etiquetas || [],
+          score: activeConv?.score || 0,
+          status: activeConv?.status || 'active',
           bot_active: botIsActive,
         },
 
-        // Historial (del más antiguo al más reciente)
+        // Historial (del más antiguo al más reciente, saltándonos el mensaje actual si quedó atrapado en la race condition)
         history: (recentMessages || [])
+          .filter((m: { id: string }) => m.id !== insertedMsg?.id)
           .reverse()
           .map((m: { role: string; content: string; created_at: string }) => ({
             role: m.role,
@@ -221,12 +238,11 @@ export async function POST(req: Request) {
           console.error('[Evolution Webhook] Error interno llamando n8n:', err)
         })
 
-        // Esperamos un máximo de 5 segundos a que el fetch inicie correctamente
-        // Esto previene que Vercel cancele la ejecución inmediatamente pero tampoco 
-        // bloquea a Evolution API esperando 15-30s. No usamos AbortController para que la llamada a n8n siempre se complete con éxito de igual forma!
+        // Esperamos un máximo de 800ms a que el fetch inicie correctamente
+        // Liberamos el webhook rápido para no bloquear Evolution API
         await Promise.race([
           n8nPromise,
-          new Promise(r => setTimeout(r, 5000))
+          new Promise(r => setTimeout(r, 800))
         ])
       } catch (n8nErr) {
         console.error('[Evolution Webhook] Error iniciando n8n:', n8nErr)
