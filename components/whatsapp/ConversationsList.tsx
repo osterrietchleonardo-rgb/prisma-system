@@ -131,17 +131,28 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
           } else if (payload.eventType === "DELETE") {
             setConversations((prev) =>
               prev.filter((c) => c.id !== (payload.old as { id: string }).id)
-            )
           }
         }
       )
       .subscribe()
 
+    const broadcastChannel = supabase
+      .channel(`agency-${instance.agency_id}`)
+      .on(
+        "broadcast",
+        { event: "refresh-whatsapp" },
+        (payload) => {
+          load()
+        }
+      )
+      .subscribe()
+
     return () => {
-      supabase.removeChannel(channel)
       clearInterval(interval)
+      supabase.removeChannel(channel)
+      supabase.removeChannel(broadcastChannel)
     }
-  }, [instance.id])
+  }, [instance.id, instance.agency_id])
 
   const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
     e.stopPropagation();

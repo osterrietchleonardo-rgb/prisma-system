@@ -79,6 +79,7 @@ export interface WATemplate {
 export interface WhatsAppActionResult {
   success: boolean
   error?: string
+  data?: any
 }
 
 export interface ConnectWhatsAppInput {

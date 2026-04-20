@@ -374,7 +374,7 @@ export async function sendDirectMessage(
     }
 
     // Guardar mensaje en Supabase
-    const { error: insertError } = await supabase
+    const { data: insertedMsg, error: insertError } = await supabase
       .from('wa_messages')
       .insert({
         conversation_id,
@@ -383,6 +383,8 @@ export async function sendDirectMessage(
         role: 'human',
         message_type: 'text',
       })
+      .select()
+      .single()
 
     if (insertError) {
       return {
@@ -425,7 +427,7 @@ export async function sendDirectMessage(
         }
       })
 
-    return { success: true }
+    return { success: true, data: insertedMsg }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido'
     return { success: false, error: message }
@@ -444,7 +446,7 @@ export async function addInternalNote(
     const { agency_id } = await getAgencyProfile()
     const supabase = createClient()
 
-    const { error } = await supabase
+    const { data: insertedNote, error } = await supabase
       .from('wa_messages')
       .insert({
         conversation_id,
@@ -453,12 +455,14 @@ export async function addInternalNote(
         role: 'internal',
         message_type: 'text',
       })
+      .select()
+      .single()
 
     if (error) {
       return { success: false, error: `Error al guardar nota: ${error.message}` }
     }
 
-    return { success: true }
+    return { success: true, data: insertedNote }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido'
     return { success: false, error: message }

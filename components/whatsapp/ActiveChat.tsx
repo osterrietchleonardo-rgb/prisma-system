@@ -165,10 +165,25 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
         }
       })
 
+    const broadcastChannel = supabase
+      .channel(`active-agency-${instance.agency_id}`)
+      .on(
+        "broadcast",
+        { event: "refresh-whatsapp" },
+        (payload) => {
+          // If the broadcast is for THIS conversation, force a refresh
+          if (payload.payload?.conversation_id === conv.id) {
+            load()
+          }
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(channel)
+      supabase.removeChannel(broadcastChannel)
     }
-  }, [conv.id])
+  }, [conv.id, instance.agency_id])
 
   // Track scroll position for auto-scroll
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -240,12 +255,9 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
       setMsgText(text)
       setMessages(prev => prev.filter(m => m.id !== tempId))
       toast.error(result.error || "Error al enviar mensaje")
-    } else {
-      // El mensaje real llegará por Realtime y el dedup por ID lo manejará, 
-      // pero como el tempId es diferente, lo removemos cuando sabemos que el real está por llegar.
-      // O mejor, si el backend devolviera el ID real, podríamos actualizarlo.
-      // Por ahora, removemos el optimista y esperamos el real de Realtime.
-      setMessages(prev => prev.filter(m => m.id !== tempId))
+    } else if (result.data) {
+      // Reemplazamos el optimista por el real de la base de datos
+      setMessages(prev => prev.map(m => m.id === tempId ? (result.data as WAMessage) : m))
     }
     setSending(false)
   }
@@ -275,8 +287,9 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
       setNoteText(text)
       setMessages(prev => prev.filter(m => m.id !== tempId))
       toast.error(result.error || "Error al agregar nota")
-    } else {
-      setMessages(prev => prev.filter(m => m.id !== tempId))
+    } else if (result.data) {
+      // Reemplazamos el optimista por el real de la base de datos
+      setMessages(prev => prev.map(m => m.id === tempId ? (result.data as WAMessage) : m))
     }
     setSendingNote(false)
   }

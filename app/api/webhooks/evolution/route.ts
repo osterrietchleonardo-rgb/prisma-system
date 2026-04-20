@@ -131,6 +131,16 @@ export async function POST(req: Request) {
 
     if (insertError) {
       console.error('[Evolution Webhook] Error insertando mensaje:', insertError)
+    } else {
+      // Disparar broadcast manual para bypassear fallas de caché de RLS en Realtime
+      await supabase.channel(`agency-${instance.agency_id}`).send({
+        type: 'broadcast',
+        event: 'refresh-whatsapp',
+        payload: {
+          conversation_id,
+          type: 'new_message'
+        }
+      })
     }
 
     // 4. Disparar n8n con payload enriquecido (siempre se envía, n8n decide)
