@@ -232,10 +232,13 @@ export async function POST(req: Request) {
     supabase.channel(`agency-${conv.agency_id}`).send({
       type: 'broadcast',
       event: 'refresh-whatsapp',
-      payload: {
-        conversation_id,
-        type: 'bot_reply'
-      }
+      payload: { conversation_id, type: 'bot_reply' }
+    }).catch(() => {})
+
+    supabase.channel(`active-agency-${conv.agency_id}`).send({
+      type: 'broadcast',
+      event: 'refresh-whatsapp',
+      payload: { conversation_id, type: 'bot_reply' }
     }).catch(() => {})
 
     return NextResponse.json({

@@ -171,6 +171,12 @@ export async function POST(req: Request) {
         event: 'refresh-whatsapp',
         payload: { conversation_id, type: 'new_message' }
       }).catch(() => {})
+
+      supabase.channel(`active-agency-${instance.agency_id}`).send({
+        type: 'broadcast',
+        event: 'refresh-whatsapp',
+        payload: { conversation_id, type: 'new_message' }
+      }).catch(() => {})
     }
 
     // 4. Disparar n8n con payload enriquecido
