@@ -131,6 +131,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
           } else if (payload.eventType === "DELETE") {
             setConversations((prev) =>
               prev.filter((c) => c.id !== (payload.old as { id: string }).id)
+            )
           }
         }
       )
