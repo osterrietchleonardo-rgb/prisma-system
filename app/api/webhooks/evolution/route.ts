@@ -179,11 +179,15 @@ export async function POST(req: Request) {
       }).catch(() => {})
     }
 
-    // 4. Disparar n8n con payload enriquecido
+    // 4. Disparar n8n con payload enriquecido SOLO si el bot está activo
     if (process.env.N8N_WEBHOOK_URL) {
+      if (!botIsActive) {
+        console.log(`[Evolution Webhook] Bot inactivo (Control manual) para conv: ${conversation_id}. Mensaje NO enviado a n8n.`)
+        return NextResponse.json({ success: true, message: 'Message saved but n8n ignored (bot_active = false)' })
+      }
 
       const enrichedPayload = {
-        debug_v: '5.0_final', // Versión de debug para confirmar deploy exitoso
+        debug_v: '5.1_final_manual_mode', // Versión de debug
         message_id: insertedMsg?.id || null, // ID raíz garantizado
         webhook_event_id: crypto.randomUUID(), 
         // IDs para que n8n pueda responder de vuelta
@@ -244,11 +248,11 @@ export async function POST(req: Request) {
           console.error('[Evolution Webhook] Error interno llamando n8n:', err)
         })
 
-        // Esperamos un máximo de 800ms a que el fetch inicie correctamente
+        // Esperamos un máximo de 1500ms a que el fetch inicie correctamente
         // Liberamos el webhook rápido para no bloquear Evolution API
         await Promise.race([
           n8nPromise,
-          new Promise(r => setTimeout(r, 800))
+          new Promise(r => setTimeout(r, 1500))
         ])
       } catch (n8nErr) {
         console.error('[Evolution Webhook] Error iniciando n8n:', n8nErr)

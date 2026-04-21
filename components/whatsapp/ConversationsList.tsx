@@ -67,10 +67,10 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
 
     load()
 
-    // Refresh param: Auto-refresh cada 5 minutos
+    // Refresh param: Auto-refresh cada 5 segundos
     const interval = setInterval(() => {
       load()
-    }, 5 * 60 * 1000)
+    }, 5 * 1000)
 
     // Realtime subscription
     const channel = supabase
@@ -119,7 +119,8 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             if (isInbound && activeIdRef.current !== updatedItem.id) {
               toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
             } else if (isInbound && activeIdRef.current === updatedItem.id && updatedItem.unread_count > 0) {
-               // Si estamos viendo el chat y entra mensaje nuevo, lo marcamos leído
+               // Si estamos viendo el chat y entra mensaje nuevo, lo marcamos leído localmente y en BD
+               updatedItem.unread_count = 0
                markConversationRead(updatedItem.id)
             }
 
@@ -282,6 +283,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                   onClick={() => {
                     onSelect(conv)
                     if (conv.unread_count > 0) {
+                       setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c))
                        markConversationRead(conv.id)
                     }
                   }}

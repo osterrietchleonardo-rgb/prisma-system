@@ -192,6 +192,31 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
       el.scrollTop + el.clientHeight >= el.scrollHeight - 50
   }, [])
 
+  // Auto-refresh messages every 5 seconds (silent polling)
+  useEffect(() => {
+    const supabase = createClient()
+    const interval = setInterval(async () => {
+      const { data } = await supabase
+        .from("wa_messages")
+        .select("*")
+        .eq("conversation_id", conv.id)
+        .order("created_at", { ascending: true })
+        .range(0, 49)
+
+      if (data) {
+        setMessages(data as WAMessage[])
+        // Auto-scroll if near bottom
+        if (shouldAutoScroll.current) {
+          setTimeout(() => {
+            bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+          }, 50)
+        }
+      }
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [conv.id])
+
   // ---- Actions ----
 
   const handleToggleBot = async () => {
@@ -390,7 +415,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
           </Button>
 
           {/* Bot toggle */}
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-2 border-r pr-3 mr-1">
             <div className="text-right">
               <p className="text-xs font-semibold">Asesor IA</p>
               <p className="text-[10px] text-muted-foreground">
@@ -404,6 +429,19 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
               className="data-[state=checked]:bg-green-500"
             />
           </div>
+
+          {/* Close chat button (Desktop) */}
+          {onBack && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="h-8 w-8 text-muted-foreground hover:text-destructive hidden md:flex flex-shrink-0"
+              title="Cerrar chat"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          )}
         </div>
 
         {/* Tags row */}
