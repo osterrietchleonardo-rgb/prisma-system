@@ -231,31 +231,22 @@ export async function POST(req: Request) {
         reply_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/n8n/reply`,
       }
 
-      // Llamada a n8n en segundo plano segura para Vercel
+      // Llamada a n8n esperando la respuesta para evitar que Vercel cancele el request
       try {
-        const n8nPromise = fetch(process.env.N8N_WEBHOOK_URL, {
+        const n8nRes = await fetch(process.env.N8N_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(enrichedPayload),
-        }).then(async (n8nRes) => {
-          if (!n8nRes.ok) {
-            const errBody = await n8nRes.text().catch(() => '')
-            console.error(`[Evolution Webhook] n8n respondió ${n8nRes.status}: ${errBody}`)
-          } else {
-            console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
-          }
-        }).catch(err => {
-          console.error('[Evolution Webhook] Error interno llamando n8n:', err)
-        })
+        });
 
-        // Esperamos un máximo de 1500ms a que el fetch inicie correctamente
-        // Liberamos el webhook rápido para no bloquear Evolution API
-        await Promise.race([
-          n8nPromise,
-          new Promise(r => setTimeout(r, 1500))
-        ])
+        if (!n8nRes.ok) {
+          const errBody = await n8nRes.text().catch(() => '')
+          console.error(`[Evolution Webhook] n8n respondió ${n8nRes.status}: ${errBody}`)
+        } else {
+          console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
+        }
       } catch (n8nErr) {
-        console.error('[Evolution Webhook] Error iniciando n8n:', n8nErr)
+        console.error('[Evolution Webhook] Error llamando a n8n:', n8nErr)
       }
     } // end if n8n configured
 

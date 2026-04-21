@@ -314,7 +314,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                       </span>
                       <span className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-end gap-1">
                         <span className="whitespace-nowrap">{timeAgo(conv.last_message_at)}</span>
-                        {conv.unread_count > 0 ? (
+                        {conv.unread_count > 0 && !isActive ? (
                           <div className="flex items-center justify-center">
                              <Badge className="bg-red-500 hover:bg-red-600 text-white border-none text-[10px] font-bold h-[18px] min-w-[18px] px-1 flex items-center justify-center rounded-full leading-none shadow-sm">
                                {conv.unread_count > 99 ? "99+" : conv.unread_count}
