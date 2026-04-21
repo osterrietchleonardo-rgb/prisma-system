@@ -72,12 +72,15 @@ export async function POST(req: Request) {
     let botIsActive = true
 
 
-    const { data: conv } = await supabase
+    const { data: convs } = await supabase
       .from('wa_conversations')
       .select('id, bot_active, etiquetas, score, status, unread_count')
       .eq('instance_id', instance.id)
       .eq('contact_phone', contactPhone)
-      .maybeSingle()
+      .order('last_message_at', { ascending: false })
+      .limit(1)
+
+    const conv = convs && convs.length > 0 ? convs[0] : null
 
     if (!conv) {
       const { data: newConv, error: newConvErr } = await supabase

@@ -96,9 +96,16 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             }
             
             setConversations((prev) => {
+              // Prevenir duplicados visuales en RT
+              if (prev.some(c => c.id === newItem.id)) return prev;
+
               const unshiftList = [newItem, ...prev];
               unshiftList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
-              return unshiftList;
+              
+              // Filter by contact_phone to deduplicate orphaned duplicates
+              return unshiftList.filter((c, index, self) => 
+                index === self.findIndex((t) => t.contact_phone === c.contact_phone)
+              );
             })
           } else if (payload.eventType === "UPDATE") {
             const updatedItem = payload.new as WAConversation
@@ -271,7 +278,11 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
           )
         ) : (
           <div className="p-1.5">
-            {filtered.map((conv) => {
+            {filtered
+              .filter((conv, index, self) =>
+                index === self.findIndex((t) => t.contact_phone === conv.contact_phone)
+              )
+              .map((conv) => {
               const isActive = activeId === conv.id
               const initial = (conv.contact_name || conv.contact_phone || "?")
                 .charAt(0)
