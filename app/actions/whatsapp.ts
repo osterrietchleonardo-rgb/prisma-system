@@ -523,10 +523,31 @@ export async function createTemplate(
     }
 
     const components: Record<string, unknown>[] = []
-    if (input.header) {
-      components.push({ type: 'HEADER', format: 'TEXT', text: input.header })
+
+    const extractVariables = (text: string) => {
+      const matches = text.match(/\{\{(\d+)\}\}/g)
+      if (!matches) return null
+      // Obtener el valor máximo de la variable (p. ej. si hay {{1}} y {{2}}, necesitamos 2 ejemplos)
+      const maxVar = Math.max(...matches.map(m => parseInt(m.replace(/\D/g, ''), 10)))
+      return Array.from({ length: maxVar }, (_, i) => `ejemplo_${i + 1}`)
     }
-    components.push({ type: 'BODY', text: input.body })
+
+    if (input.header) {
+      const headerComp: Record<string, unknown> = { type: 'HEADER', format: 'TEXT', text: input.header }
+      const headerVars = extractVariables(input.header)
+      if (headerVars) {
+        headerComp.example = { header_text: headerVars }
+      }
+      components.push(headerComp)
+    }
+    
+    const bodyComp: Record<string, unknown> = { type: 'BODY', text: input.body }
+    const bodyVars = extractVariables(input.body)
+    if (bodyVars) {
+      bodyComp.example = { body_text: [bodyVars] }
+    }
+    components.push(bodyComp)
+
     if (input.footer) {
       components.push({ type: 'FOOTER', text: input.footer })
     }
