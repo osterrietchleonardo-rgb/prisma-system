@@ -45,6 +45,8 @@ interface NewTemplate {
   footer: string
   buttonType: "NONE" | "QUICK_REPLY" | "URL"
   buttons: any[]
+  header_examples?: string[]
+  body_examples?: string[]
 }
 
 const parseVariables = (text: string) => {
@@ -69,7 +71,9 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
     body: "",
     footer: "",
     buttonType: "NONE",
-    buttons: []
+    buttons: [],
+    header_examples: [],
+    body_examples: []
   })
   
   const deferredBody = useDeferredValue(formData.body)
@@ -124,11 +128,25 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
     let footer = "";
     let buttonType: "NONE" | "QUICK_REPLY" | "URL" = "NONE";
     let buttons: any[] = [];
+    let header_examples: string[] = [];
+    let body_examples: string[] = [];
 
     if (t.components && Array.isArray(t.components)) {
       t.components.forEach((c: any) => {
-        if (c.type === 'HEADER') header = c.text || "";
-        if (c.type === 'BODY') body = c.text || "";
+        if (c.type === 'HEADER') {
+          header = c.text || "";
+          if (c.example?.header_text && Array.isArray(c.example.header_text)) {
+            header_examples = c.example.header_text;
+          }
+        }
+        if (c.type === 'BODY') {
+          body = c.text || "";
+          if (c.example?.body_text && Array.isArray(c.example.body_text)) {
+             const bTexts = c.example.body_text[0];
+             if (Array.isArray(bTexts)) body_examples = bTexts;
+             else if (typeof bTexts === 'string') body_examples = [bTexts];
+          }
+        }
         if (c.type === 'FOOTER') footer = c.text || "";
         if (c.type === 'BUTTONS') {
            buttons = c.buttons || [];
@@ -150,7 +168,9 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
       body,
       footer,
       buttonType,
-      buttons
+      buttons,
+      header_examples,
+      body_examples
     })
     setShowBuilder(true)
   }
@@ -202,7 +222,9 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
         header: formData.header.trim() || undefined,
         body: formData.body.trim(),
         footer: formData.footer.trim() || undefined,
-        buttons: finalButtons.length > 0 ? finalButtons : undefined
+        buttons: finalButtons.length > 0 ? finalButtons : undefined,
+        header_examples: formData.header_examples,
+        body_examples: formData.body_examples
       })
     } else {
       result = await createTemplate({
@@ -212,7 +234,9 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
         header: formData.header.trim() || undefined,
         body: formData.body.trim(),
         footer: formData.footer.trim() || undefined,
-        buttons: finalButtons.length > 0 ? finalButtons : undefined
+        buttons: finalButtons.length > 0 ? finalButtons : undefined,
+        header_examples: formData.header_examples,
+        body_examples: formData.body_examples
       })
     }
 
@@ -248,6 +272,7 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
 
   if (showBuilder) {
     const requiredVars = parseVariables(formData.body)
+    const headerRequiredVars = parseVariables(formData.header)
     const disableSubmit = !formData.template_name || !formData.body
 
     return (
@@ -310,6 +335,27 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
                   placeholder="Ej: ¡Nuevo Ingreso!" 
                 />
                 <p className="text-xs text-muted-foreground text-right">{formData.header.length}/60</p>
+                {headerRequiredVars.length > 0 && (
+                  <div className="mt-2 space-y-3 p-3 bg-muted/30 rounded-lg border">
+                    <p className="text-xs font-medium">Ejemplo para variable del Header</p>
+                    <div className="grid gap-2">
+                    {headerRequiredVars.map((v, idx) => (
+                      <div key={v} className="flex flex-col gap-1.5">
+                        <Input 
+                          className="h-8 text-xs bg-background" 
+                          placeholder={`Ejemplo para ${v}`}
+                          value={formData.header_examples?.[idx] || ""}
+                          onChange={(e) => {
+                             const newEx = [...(formData.header_examples || [])];
+                             newEx[idx] = e.target.value;
+                             setFormData({...formData, header_examples: newEx});
+                          }}
+                        />
+                      </div>
+                    ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -329,6 +375,29 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
                   </div>
                   <span>{formData.body.length}/1024</span>
                 </div>
+                {requiredVars.length > 0 && (
+                  <div className="mt-4 space-y-3 p-4 bg-muted/30 rounded-lg border">
+                    <p className="text-sm font-medium">Ejemplos para variables del Body</p>
+                    <p className="text-xs text-muted-foreground mb-2">Meta exige enviar un ejemplo claro por cada variable para aprobar la plantilla.</p>
+                    <div className="grid gap-3">
+                    {requiredVars.map((v, idx) => (
+                      <div key={v} className="flex flex-col gap-1.5">
+                        <label className="text-xs font-medium">Variable {v}</label>
+                        <Input 
+                          className="h-8 text-sm bg-background" 
+                          placeholder={`Ej: Juan / 15-04 / Link`}
+                          value={formData.body_examples?.[idx] || ""}
+                          onChange={(e) => {
+                             const newEx = [...(formData.body_examples || [])];
+                             newEx[idx] = e.target.value;
+                             setFormData({...formData, body_examples: newEx});
+                          }}
+                        />
+                      </div>
+                    ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

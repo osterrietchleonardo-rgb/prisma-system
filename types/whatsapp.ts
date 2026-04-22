@@ -100,4 +100,6 @@ export interface CreateTemplateInput {
   body: string
   footer?: string
   buttons?: unknown[]
+  header_examples?: string[]
+  body_examples?: string[]
 }

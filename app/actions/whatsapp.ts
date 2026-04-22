@@ -524,17 +524,21 @@ export async function createTemplate(
 
     const components: Record<string, unknown>[] = []
 
-    const extractVariables = (text: string) => {
+    const extractVariables = (text: string, providedExamples?: string[]) => {
       const matches = text.match(/\{\{(\d+)\}\}/g)
       if (!matches) return null
       // Obtener el valor máximo de la variable (p. ej. si hay {{1}} y {{2}}, necesitamos 2 ejemplos)
       const maxVar = Math.max(...matches.map(m => parseInt(m.replace(/\D/g, ''), 10)))
-      return Array.from({ length: maxVar }, (_, i) => `ejemplo_${i + 1}`)
+      const examples = []
+      for (let i = 0; i < maxVar; i++) {
+        examples.push(providedExamples?.[i] || `ejemplo_${i + 1}`)
+      }
+      return examples
     }
 
     if (input.header) {
       const headerComp: Record<string, unknown> = { type: 'HEADER', format: 'TEXT', text: input.header }
-      const headerVars = extractVariables(input.header)
+      const headerVars = extractVariables(input.header, input.header_examples)
       if (headerVars) {
         headerComp.example = { header_text: headerVars }
       }
@@ -542,7 +546,7 @@ export async function createTemplate(
     }
     
     const bodyComp: Record<string, unknown> = { type: 'BODY', text: input.body }
-    const bodyVars = extractVariables(input.body)
+    const bodyVars = extractVariables(input.body, input.body_examples)
     if (bodyVars) {
       bodyComp.example = { body_text: [bodyVars] }
     }
@@ -796,16 +800,20 @@ export async function editTemplate(
 
     const components: Record<string, unknown>[] = []
 
-    const extractVariables = (text: string) => {
+    const extractVariables = (text: string, providedExamples?: string[]) => {
       const matches = text.match(/\{\{(\d+)\}\}/g)
       if (!matches) return null
       const maxVar = Math.max(...matches.map(m => parseInt(m.replace(/\D/g, ''), 10)))
-      return Array.from({ length: maxVar }, (_, i) => `ejemplo_${i + 1}`)
+      const examples = []
+      for (let i = 0; i < maxVar; i++) {
+        examples.push(providedExamples?.[i] || `ejemplo_${i + 1}`)
+      }
+      return examples
     }
 
     if (input.header) {
       const headerComp: Record<string, unknown> = { type: 'HEADER', format: 'TEXT', text: input.header }
-      const headerVars = extractVariables(input.header)
+      const headerVars = extractVariables(input.header, input.header_examples)
       if (headerVars) {
         headerComp.example = { header_text: headerVars }
       }
@@ -813,7 +821,7 @@ export async function editTemplate(
     }
 
     const bodyComp: Record<string, unknown> = { type: 'BODY', text: input.body }
-    const bodyVars = extractVariables(input.body)
+    const bodyVars = extractVariables(input.body, input.body_examples)
     if (bodyVars) {
       bodyComp.example = { body_text: [bodyVars] }
     }
