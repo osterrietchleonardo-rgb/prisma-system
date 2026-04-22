@@ -182,32 +182,33 @@ export async function POST(req: Request) {
       }).catch(() => {})
     }
 
-    // 4. Disparar n8n con payload enriquecido SOLO si el bot está activo
-    if (process.env.N8N_WEBHOOK_URL) {
-      if (!botIsActive) {
-        // Bot apagado: guardar el mensaje del lead en n8n_chat_histories con await
-        // para que cuando el bot se reactive, tenga el historial completo
-        const fechaManual = new Date().toLocaleString('es-AR', {
-          timeZone: 'America/Argentina/Buenos_Aires',
-          day: '2-digit', month: '2-digit', year: 'numeric',
-          hour: '2-digit', minute: '2-digit', second: '2-digit'
-        }).replace(',', '')
-        const { error: historyErr } = await supabase.from('n8n_chat_histories').insert({
-          session_id: conversation_id,
-          message: {
-            type: 'human',
-            content: `# Mensaje a responder del usuario: \n\n- Mensaje: <${messageType}> ${content} </${messageType}>\n\n- Fecha actual: ${fechaManual}\n`,
-            additional_kwargs: { source: 'lead_during_manual_mode' },
-            response_metadata: {}
-          }
-        })
-        if (historyErr) {
-          console.error('[Evolution Webhook] Error guardando en n8n_chat_histories (modo manual):', historyErr)
-        } else {
-          console.log(`[Evolution Webhook] Bot inactivo — mensaje del lead guardado en n8n_chat_histories para conv: ${conversation_id}`)
+    // Si el bot está inactivo: guardar en n8n_chat_histories y salir
+    // (independiente de N8N_WEBHOOK_URL, para que siempre funcione)
+    if (!botIsActive) {
+      const fechaManual = new Date().toLocaleString('es-AR', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      }).replace(',', '')
+      const { error: historyErr } = await supabase.from('n8n_chat_histories').insert({
+        session_id: conversation_id,
+        message: {
+          type: 'human',
+          content: `# Mensaje a responder del usuario: \n\n- Mensaje: <${messageType}> ${content} </${messageType}>\n\n- Fecha actual: ${fechaManual}\n`,
+          additional_kwargs: { source: 'lead_during_manual_mode' },
+          response_metadata: {}
         }
-        return NextResponse.json({ success: true, message: 'Message saved but n8n ignored (bot_active = false)' })
+      })
+      if (historyErr) {
+        console.error('[Evolution Webhook] Error guardando en n8n_chat_histories (modo manual):', historyErr)
+      } else {
+        console.log(`[Evolution Webhook] Bot inactivo — mensaje del lead guardado en n8n_chat_histories para conv: ${conversation_id}`)
       }
+      return NextResponse.json({ success: true, message: 'Message saved, n8n skipped (bot_active = false)' })
+    }
+
+    // 4. Disparar n8n con payload enriquecido (bot activo)
+    if (process.env.N8N_WEBHOOK_URL) {
 
       const enrichedPayload = {
         debug_v: '5.1_final_manual_mode', // Versión de debug
