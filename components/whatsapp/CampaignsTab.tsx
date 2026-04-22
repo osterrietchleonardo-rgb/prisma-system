@@ -52,7 +52,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
   // Execution state
   const [isSending, setIsSending] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [results, setResults] = useState<{success: number, error: number, total: number}>({ success: 0, error: 0, total: 0 })
+  const [results, setResults] = useState<{success: number, error: number, skipped: number, total: number}>({ success: 0, error: 0, skipped: 0, total: 0 })
   const abortControllerRef = useRef<AbortController | null>(null)
 
   const supabase = createClient()
@@ -105,14 +105,131 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    const fileExt = file.name.split('.').pop()?.toLowerCase()
+    
+    clearFile()
     setFile(file)
+
+    if (fileExt === 'csv') {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          if (results.data.length > 0) {
+            processAndValidateData(results.data)
+          } else {
+            toast.error("El archivo CSV está vacío.")
+            clearFile()
+          }
+        },
+        error: (error) => {
+          toast.error("Error al leer el CSV: " + error.message)
+          clearFile()
+        }
+      })
+    } else if (fileExt === 'xls' || fileExt === 'xlsx') {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer)
+          const workbook = XLSX.read(data, { type: 'array' })
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet)
+          if (jsonData.length > 0) {
+            processAndValidateData(jsonData)
+          } else {
+            toast.error("El archivo Excel está vacío.")
+            clearFile()
+          }
+        } catch (error) {
+          toast.error("Error al procesar el Excel. Asegúrate de que sea válido.")
+          clearFile()
+        }
+      }
+      reader.readAsArrayBuffer(file)
+    } else {
+      toast.error("Formato no soportado. Por favor sube un CSV o Excel.")
+      clearFile()
+    }
+  }
+
+  const processAndValidateData = (data: any[]) => {
+    // Validar headers y buscar dinámicamente el del celular/telefono
+    const cols = Object.keys(data[0] as object)
+    const lowerCols = cols.map(c => c.toLowerCase().trim())
+    
+    let pCol = ""
+    if (lowerCols.includes('celular')) pCol = cols[lowerCols.indexOf('celular')]
+    else if (lowerCols.includes('telefono')) pCol = cols[lowerCols.indexOf('telefono')]
+    else if (lowerCols.includes('teléfono')) pCol = cols[lowerCols.indexOf('teléfono')]
+    else if (lowerCols.includes('phone')) pCol = cols[lowerCols.indexOf('phone')]
+
+    if (!pCol) {
+       toast.error("❌ Archivo Inválido: Debe contener una columna exactamente llamada 'celular' o 'telefono'.")
+       return clearFile()
+    }
+
+    let nCol = ""
+    if (lowerCols.includes('nombre')) nCol = cols[lowerCols.indexOf('nombre')]
+    else if (lowerCols.includes('name')) nCol = cols[lowerCols.indexOf('name')]
+
+    if (!nCol) {
+       toast.error("❌ Archivo Inválido: Debe contener una columna exactamente llamada 'nombre'.")
+       return clearFile()
+    }
+
+    // Now strict validation for the entire dataset
+    const seenPhones = new Set<string>()
+    let errorMsg = ""
+
+    for (let i = 0; i < data.length; i++) {
+        const row = data[i]
+        const phoneRaw = row[pCol] ? String(row[pCol]) : ""
+        const phone = phoneRaw.replace(/\D/g, '')
+        const name = row[nCol] ? String(row[nCol]) : ""
+
+        if (!phone || phone.length < 8) {
+           errorMsg = `Fila ${i + 2}: Teléfono inválido o vacío para el contacto "${name || 'sin nombre'}".`
+           break;
+        }
+        if (!name.trim()) {
+           errorMsg = `Fila ${i + 2}: Nombre vacío (Teléfono: ${phone}).`
+           break;
+        }
+        if (seenPhones.has(phone)) {
+           errorMsg = `Fila ${i + 2}: El teléfono ${phone} está duplicado en la lista.`
+           break;
+        }
+        seenPhones.add(phone)
+    }
+
+    if (errorMsg) {
+       toast.error("❌ No se permite cargar la lista con errores: " + errorMsg)
+       return clearFile()
+    }
+
+    // Passed validation
+    setColumns(cols)
+    setParsedData(data)
+    
+    // Setting these automatically avoids the useEffect auto-detection which is redundant now
+    setTimeout(() => {
+        setPhoneColumn(pCol)
+        setNameColumn(nCol)
+    }, 0)
+  }
+
+  const clearFile = () => {
+    setFile(null)
     setParsedData([])
     setColumns([])
     setPhoneColumn("")
     setNameColumn("")
     setVariableMap({})
     setProgress(0)
-    setResults({ success: 0, error: 0, total: 0 })
+    setResults({ success: 0, error: 0, skipped: 0, total: 0 })
+    const fileInput = document.getElementById('file_upload') as HTMLInputElement
+    if (fileInput) fileInput.value = ''
 
     const fileExt = file.name.split('.').pop()?.toLowerCase()
 
@@ -152,25 +269,8 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
     }
   }
 
-  // Pre-fill variable mapping if columns match by name
-  useEffect(() => {
-    if (columns.length > 0) {
-      const lowerCols = columns.map(c => c.toLowerCase())
-      
-      // Auto-detect phone
-      let pCol = ""
-      if (lowerCols.includes('celular')) pCol = columns[lowerCols.indexOf('celular')]
-      else if (lowerCols.includes('telefono')) pCol = columns[lowerCols.indexOf('telefono')]
-      else if (lowerCols.includes('phone')) pCol = columns[lowerCols.indexOf('phone')]
-      if (pCol) setPhoneColumn(pCol)
-
-      // Auto-detect name
-      let nCol = ""
-      if (lowerCols.includes('nombre')) nCol = columns[lowerCols.indexOf('nombre')]
-      else if (lowerCols.includes('name')) nCol = columns[lowerCols.indexOf('name')]
-      if (nCol) setNameColumn(nCol)
-    }
-  }, [columns])
+  // Pre-fill mapping depends entirely on processAndValidateData now.
+  // The useEffect auto-detect logic was replaced to happen INSTANTLY upon upload.
 
   const startCampaign = async () => {
     if (!selectedTemplate || !phoneColumn || !nameColumn || parsedData.length === 0) {
@@ -189,14 +289,17 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
       return
     }
 
+    // Eliminamos la validación de filas aquí ya que ahora se forza inmediatamente AL SUBIR el archivo.
+
     setIsSending(true)
     setProgress(0)
-    setResults({ success: 0, error: 0, total: parsedData.length })
+    setResults({ success: 0, error: 0, skipped: 0, total: parsedData.length })
     
     abortControllerRef.current = new AbortController()
 
     let s = 0;
     let e = 0;
+    let skipCount = 0;
 
     for (let i = 0; i < parsedData.length; i++) {
        if (abortControllerRef.current.signal.aborted) {
@@ -208,7 +311,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
        const phone = row[phoneColumn] ? String(row[phoneColumn]) : ""
        const name = row[nameColumn] ? String(row[nameColumn]) : "Lead"
 
-       // Limpiar teléfono
+       // Esto técnicamente ya no se arrojará debido a la pre-validación estricta de arriba
        if (!phone || phone.replace(/\D/g, '').length < 8) {
           e++;
           setResults(prev => ({ ...prev, error: e }))
@@ -233,6 +336,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
 
        try {
          const res = await sendCampaignMessage({
+           //...
            phone,
            name,
            template_name: selectedTemplate.template_name,
@@ -243,7 +347,12 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
          })
 
          if (res.success) {
-           s++;
+           // @ts-ignore
+           if (res.warning === 'skipped_duplicate') {
+             skipCount++;
+           } else {
+             s++;
+           }
          } else {
            e++;
            console.error("Error envío fila", i, res.error)
@@ -252,7 +361,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
          e++;
        }
 
-       setResults(prev => ({ ...prev, success: s, error: e }))
+       setResults(prev => ({ ...prev, success: s, error: e, skipped: skipCount }))
        setProgress(Math.round(((i + 1) / parsedData.length) * 100))
        
        // Retraso artificial amigable para prevenir rate-limit y timeouts de Vercel/Meta
@@ -415,26 +524,31 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                    <div className="space-y-2">
                      <div className="flex justify-between text-sm font-medium">
                        <span>Progreso de envíos</span>
-                       <span>{progress}% ({results.success + results.error}/{results.total})</span>
+                       <span>{progress}% ({results.success + results.error + results.skipped}/{results.total})</span>
                      </div>
                      <Progress value={progress} className="h-3" />
                    </div>
                    
-                   <div className="grid grid-cols-2 gap-4">
-                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4 flex flex-col items-center">
-                       <CheckCircle2 className="w-8 h-8 text-green-500 mb-2" />
-                       <span className="text-2xl font-bold text-green-700 dark:text-green-400">{results.success}</span>
-                       <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium">Enviados</span>
+                   <div className="grid grid-cols-3 gap-3">
+                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex flex-col items-center">
+                       <CheckCircle2 className="w-6 h-6 text-green-500 mb-1" />
+                       <span className="text-xl font-bold text-green-700 dark:text-green-400">{results.success}</span>
+                       <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Enviados</span>
                      </div>
-                     <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 flex flex-col items-center">
-                       <AlertCircle className="w-8 h-8 text-red-500 mb-2" />
-                       <span className="text-2xl font-bold text-red-700 dark:text-red-400">{results.error}</span>
-                       <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium">Errores</span>
+                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex flex-col items-center">
+                       <Info className="w-6 h-6 text-yellow-500 mb-1" />
+                       <span className="text-xl font-bold text-yellow-700 dark:text-yellow-400">{results.skipped}</span>
+                       <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Salteados</span>
+                     </div>
+                     <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex flex-col items-center">
+                       <AlertCircle className="w-6 h-6 text-red-500 mb-1" />
+                       <span className="text-xl font-bold text-red-700 dark:text-red-400">{results.error}</span>
+                       <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Errores</span>
                      </div>
                    </div>
 
                    <p className="text-xs text-muted-foreground text-center">
-                     Los leads exitosos se cargarán automáticamente en el Inbox y quedarán con el IA activo.
+                     Los leads exitosos se cargarán automáticamente en el Inbox y quedarán con el IA activo. Los "Salteados" ya recibieron esta plantilla previamente.
                    </p>
                  </div>
                ) : (

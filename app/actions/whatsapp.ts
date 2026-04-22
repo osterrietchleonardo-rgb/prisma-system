@@ -1024,6 +1024,20 @@ export async function sendCampaignMessage(
         .from('wa_conversations')
         .update({ bot_active: true })
         .eq('id', conversation_id)
+
+      // CHEQUEO ANTI-DUPLICADO DE CAMPAÑA
+      const { data: alreadySent } = await supabase
+        .from('wa_messages')
+        .select('id')
+        .eq('conversation_id', conversation_id)
+        .eq('content', input.template_full_text)
+        .limit(1)
+        .maybeSingle()
+
+      if (alreadySent) {
+         // Ya se envió exactamente el mismo texto a este lead (probablemente se pausó la campaña y reanudó)
+         return { success: true, warning: 'skipped_duplicate' }
+      }
     } else {
       const { data: newConv, error: createConvErr } = await supabase
         .from('wa_conversations')
