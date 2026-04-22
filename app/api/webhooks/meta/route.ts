@@ -196,6 +196,28 @@ export async function POST(req: Request) {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(enrichedPayload)
                     }).catch(e => console.error('Error triggering n8n from meta webhook:', e))
+                } else if (!botIsActive) {
+                    // Bot apagado (modo manual): guardar mensaje del lead en n8n_chat_histories
+                    // con await para que Vercel no corte la función antes de completar
+                    const fechaManual = new Date().toLocaleString('es-AR', {
+                        timeZone: 'America/Argentina/Buenos_Aires',
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit', second: '2-digit'
+                    }).replace(',', '')
+                    const { error: historyErr } = await supabase.from('n8n_chat_histories').insert({
+                        session_id: conversation_id,
+                        message: {
+                            type: 'human',
+                            content: `# Mensaje a responder del usuario: \n\n- Mensaje: <${message.type}> ${content} </${message.type}>\n\n- Fecha actual: ${fechaManual}\n`,
+                            additional_kwargs: {},
+                            response_metadata: {}
+                        }
+                    })
+                    if (historyErr) {
+                        console.error('[Meta Webhook] Error guardando en n8n_chat_histories (modo manual):', historyErr)
+                    } else {
+                        console.log(`[Meta Webhook] Bot inactivo — mensaje del lead guardado en n8n_chat_histories para conv: ${conversation_id}`)
+                    }
                 }
              }
           }
