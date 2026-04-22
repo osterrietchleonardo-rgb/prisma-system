@@ -766,3 +766,150 @@ export async function removeInstance(): Promise<WhatsAppActionResult> {
     return { success: false, error: message }
   }
 }
+
+// =============================================
+// Action 12: Editar template (Meta + Local)
+// =============================================
+
+export interface EditTemplateInput extends CreateTemplateInput {
+  template_id: string
+  meta_template_id: string
+}
+
+export async function editTemplate(
+  input: EditTemplateInput
+): Promise<WhatsAppActionResult> {
+  try {
+    const { agency_id } = await getDirectorProfile()
+    const supabase = createClient()
+
+    const { data: instance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('token, business_id')
+      .eq('agency_id', agency_id)
+      .limit(1)
+      .single()
+
+    if (instanceError || !instance) {
+      return { success: false, error: 'Instancia no configurada.' }
+    }
+
+    const components: Record<string, unknown>[] = []
+
+    const extractVariables = (text: string) => {
+      const matches = text.match(/\{\{(\d+)\}\}/g)
+      if (!matches) return null
+      const maxVar = Math.max(...matches.map(m => parseInt(m.replace(/\D/g, ''), 10)))
+      return Array.from({ length: maxVar }, (_, i) => `ejemplo_${i + 1}`)
+    }
+
+    if (input.header) {
+      const headerComp: Record<string, unknown> = { type: 'HEADER', format: 'TEXT', text: input.header }
+      const headerVars = extractVariables(input.header)
+      if (headerVars) {
+        headerComp.example = { header_text: headerVars }
+      }
+      components.push(headerComp)
+    }
+
+    const bodyComp: Record<string, unknown> = { type: 'BODY', text: input.body }
+    const bodyVars = extractVariables(input.body)
+    if (bodyVars) {
+      bodyComp.example = { body_text: [bodyVars] }
+    }
+    components.push(bodyComp)
+
+    if (input.footer) {
+      components.push({ type: 'FOOTER', text: input.footer })
+    }
+    if (input.buttons && input.buttons.length > 0) {
+      components.push({ type: 'BUTTONS', buttons: input.buttons })
+    }
+
+    const res = await fetch(`https://graph.facebook.com/v19.0/${input.meta_template_id}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${instance.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        components,
+      }),
+    })
+
+    const result = await res.json()
+
+    if (!res.ok) {
+      return { success: false, error: result.error?.message || 'Error al editar template en Meta' }
+    }
+
+    const { error: updateError } = await supabase
+      .from('wa_templates')
+      .update({
+        components,
+        status: 'PENDING',
+      })
+      .eq('id', input.template_id)
+
+    if (updateError) {
+      return { success: false, error: `Error local: ${updateError.message}` }
+    }
+
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
+
+// =============================================
+// Action 13: Eliminar template
+// =============================================
+
+export async function deleteTemplate(
+  template_id: string,
+  template_name: string
+): Promise<WhatsAppActionResult> {
+  try {
+    const { agency_id } = await getDirectorProfile()
+    const supabase = createClient()
+
+    const { data: instance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('token, business_id')
+      .eq('agency_id', agency_id)
+      .limit(1)
+      .single()
+
+    if (instanceError || !instance) {
+      return { success: false, error: 'Instancia no configurada.' }
+    }
+
+    const res = await fetch(`https://graph.facebook.com/v19.0/${instance.business_id}/message_templates?name=${template_name}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${instance.token}`
+      }
+    })
+
+    const result = await res.json().catch(() => ({}))
+
+    if (!res.ok && result?.error?.code !== 100) {
+      console.warn("Meta Delete Error:", result.error)
+    }
+
+    const { error: deleteError } = await supabase
+      .from('wa_templates')
+      .delete()
+      .eq('id', template_id)
+
+    if (deleteError) {
+      return { success: false, error: `Error local: ${deleteError.message}` }
+    }
+
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}

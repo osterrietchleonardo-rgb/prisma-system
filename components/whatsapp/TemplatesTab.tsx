@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useDeferredValue } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { createTemplate, syncTemplatesFromMeta } from "@/app/actions/whatsapp"
+import { createTemplate, syncTemplatesFromMeta, editTemplate, deleteTemplate } from "@/app/actions/whatsapp"
 import type { WATemplate, TemplateCategory } from "@/types/whatsapp"
 import { 
   Plus, 
@@ -12,8 +12,10 @@ import {
   Clock, 
   Eye, 
   Edit3, 
+  Trash2,
   RefreshCw, 
-  ArrowLeft 
+  ArrowLeft,
+  Loader2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -33,6 +35,8 @@ interface TemplatesTabProps {
 }
 
 interface NewTemplate {
+  id?: string
+  meta_template_id?: string
   template_name: string
   category: TemplateCategory
   language: string
@@ -56,6 +60,8 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
   
   // Builder state
   const [formData, setFormData] = useState<NewTemplate>({
+    id: undefined,
+    meta_template_id: undefined,
     template_name: "",
     category: "MARKETING",
     language: "es_AR",
@@ -107,9 +113,62 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
   }
 
   const handleNameChange = (val: string) => {
-    // lowercase, replace spaces with underscores, only az09_
+    // Si estamos editando y la plantilla ya está aprobada, podríamos advertir, pero dejaremos editar componentes
     const formatted = val.toLowerCase().replace(/[\s-]/g, '_').replace(/[^a-z0-9_]/g, '')
     setFormData(prev => ({ ...prev, template_name: formatted.substring(0, 512) }))
+  }
+
+  const handleEdit = (t: WATemplate) => {
+    let header = "";
+    let body = "";
+    let footer = "";
+    let buttonType: "NONE" | "QUICK_REPLY" | "URL" = "NONE";
+    let buttons: any[] = [];
+
+    if (t.components && Array.isArray(t.components)) {
+      t.components.forEach((c: any) => {
+        if (c.type === 'HEADER') header = c.text || "";
+        if (c.type === 'BODY') body = c.text || "";
+        if (c.type === 'FOOTER') footer = c.text || "";
+        if (c.type === 'BUTTONS') {
+           buttons = c.buttons || [];
+           if (buttons.length > 0) {
+             if (buttons[0].type === 'URL') buttonType = 'URL';
+             else if (buttons[0].type === 'QUICK_REPLY') buttonType = 'QUICK_REPLY';
+           }
+        }
+      });
+    }
+
+    setFormData({
+      id: t.id,
+      meta_template_id: t.meta_template_id || undefined,
+      template_name: t.template_name,
+      category: t.category || "MARKETING",
+      language: t.language || "es_AR",
+      header,
+      body,
+      footer,
+      buttonType,
+      buttons
+    })
+    setShowBuilder(true)
+  }
+
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const handleDelete = async (t: WATemplate) => {
+    if (!confirm(`¿Estás seguro que deseas eliminar la plantilla "${t.template_name}"? Esta acción no se puede deshacer.`)) return;
+
+    setDeletingId(t.id)
+    const result = await deleteTemplate(t.id, t.template_name)
+    if (result.success) {
+      toast.success("Plantilla eliminada correctamente.")
+      loadTemplates()
+    } else {
+      toast.error(result.error || "Error al eliminar la plantilla.")
+    }
+    setDeletingId(null)
   }
 
   const handleSubmit = async () => {
@@ -117,7 +176,6 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
     
     setLoading(true)
     
-    // Formatting buttons for Meta API correctly based on selected type
     let finalButtons: any[] = []
     if (formData.buttonType === "QUICK_REPLY" && formData.buttons.length > 0) {
       finalButtons = formData.buttons.filter((b: any) => b.text.trim() !== "").map((b: any) => ({
@@ -132,18 +190,34 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
       }]
     }
 
-    const result = await createTemplate({
-      template_name: formData.template_name,
-      category: formData.category,
-      language: formData.language,
-      header: formData.header.trim() || undefined,
-      body: formData.body.trim(),
-      footer: formData.footer.trim() || undefined,
-      buttons: finalButtons.length > 0 ? finalButtons : undefined
-    })
+    let result;
+    
+    if (formData.id && formData.meta_template_id) {
+      result = await editTemplate({
+        template_id: formData.id,
+        meta_template_id: formData.meta_template_id,
+        template_name: formData.template_name,
+        category: formData.category,
+        language: formData.language,
+        header: formData.header.trim() || undefined,
+        body: formData.body.trim(),
+        footer: formData.footer.trim() || undefined,
+        buttons: finalButtons.length > 0 ? finalButtons : undefined
+      })
+    } else {
+      result = await createTemplate({
+        template_name: formData.template_name,
+        category: formData.category,
+        language: formData.language,
+        header: formData.header.trim() || undefined,
+        body: formData.body.trim(),
+        footer: formData.footer.trim() || undefined,
+        buttons: finalButtons.length > 0 ? finalButtons : undefined
+      })
+    }
 
     if (result.success) {
-      toast.success("Plantilla enviada exitosamente a Meta.")
+      toast.success(formData.id ? "Plantilla actualizada exitosamente." : "Plantilla enviada exitosamente a Meta.")
       setShowBuilder(false)
       loadTemplates()
     } else {
@@ -436,6 +510,27 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
                 {getStatusBadge(t.status, t.rejection_reason)}
               </div>
               <div className="col-span-2 flex items-center justify-end gap-2">
+                {t.meta_template_id && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-muted-foreground hover:text-accent hover:bg-accent/10"
+                    onClick={() => handleEdit(t)}
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </Button>
+                )}
+                
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => handleDelete(t)}
+                  disabled={deletingId === t.id}
+                >
+                  {deletingId === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                </Button>
+
                 <Drawer>
                   <DrawerTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
