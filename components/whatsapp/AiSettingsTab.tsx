@@ -22,7 +22,8 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
-  Trash2
+  Trash2,
+  AlertTriangle
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -50,6 +51,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useRouter } from "next/navigation"
+import { removeInstance } from "@/app/actions/whatsapp"
 
 interface AiSettingsTabProps {
   instance: any
@@ -83,8 +86,10 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [uploading, setUploading] = useState(false)
+  const [isRemoving, setIsRemoving] = useState(false)
 
   const supabase = createClient()
+  const router = useRouter()
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -308,6 +313,21 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
     }
   }
 
+  const handleRemoveInstance = async () => {
+    if (!confirm("¿Estás seguro/a de que quieres desconectar este número? Se borrarán las credenciales y el estado de conexión de WhatsApp (tu instancia en Evolution API), pero se conservarán los historiales de chat guardados en la base de datos. Todo dejará de funcionar temporalmente.")) return
+
+    setIsRemoving(true)
+    const result = await removeInstance()
+    setIsRemoving(false)
+
+    if (result.success) {
+      toast.success("Número desconectado correctamente")
+      router.refresh()
+    } else {
+      toast.error(result.error || "Error al desconectar")
+    }
+  }
+
   const filteredAgents = combinedAgentsList.filter(a => 
     a.full_name?.toLowerCase().includes(search.toLowerCase()) || 
     a.email?.toLowerCase().includes(search.toLowerCase())
@@ -482,6 +502,39 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
                 </TableBody>
               </Table>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="mt-12">
+        <div className="flex flex-col gap-2 mb-4">
+          <h2 className="text-xl font-bold flex items-center gap-2 text-destructive">
+            <AlertTriangle className="w-6 h-6" />
+            Zona Peligrosa
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Estas acciones son destructivas y afectarán el funcionamiento operativo de la inmobiliaria en WhatsApp.
+          </p>
+        </div>
+        <Card className="border-destructive/20 bg-destructive/5">
+          <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-1">
+              <h3 className="font-bold text-destructive">Desconectar Número de WhatsApp</h3>
+              <p className="text-sm text-muted-foreground">
+                Elimina la instancia de conexión y desconecta el número del sistema. 
+                Se conservará todo el historial de conversaciones y leads, pero los bots dejarán de responder hasta que se vuelva a vincular.
+              </p>
+            </div>
+            <Button 
+              variant="destructive" 
+              onClick={handleRemoveInstance} 
+              disabled={isRemoving}
+              className="whitespace-nowrap"
+            >
+              {isRemoving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Desconectar Número
+            </Button>
           </CardContent>
         </Card>
       </div>

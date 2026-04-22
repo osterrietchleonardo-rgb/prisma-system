@@ -691,3 +691,57 @@ export async function deleteConversation(
     return { success: false, error: message }
   }
 }
+
+// =============================================
+// Action 11: Eliminar instancia de WhatsApp (Zona Peligrosa)
+// =============================================
+
+export async function removeInstance(): Promise<WhatsAppActionResult> {
+  try {
+    const { agency_id } = await getDirectorProfile()
+    const supabase = createClient()
+
+    // 1. Obtener la instancia actual
+    const { data: instance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('id, evo_instance_name')
+      .eq('agency_id', agency_id)
+      .limit(1)
+      .single()
+
+    if (instanceError || !instance) {
+      return { success: false, error: 'Instancia no encontrada.' }
+    }
+
+    // 2. Intentar eliminarla en Evolution API si existe
+    const evolutionUrl = process.env.EVOLUTION_API_URL
+    const evolutionKey = process.env.EVOLUTION_API_KEY
+
+    // Usamos el evo_instance_name si está, si no el instanceName default
+    const evoName = instance.evo_instance_name || `prisma-${agency_id}`
+
+    if (evolutionUrl && evolutionKey) {
+      await fetch(`${evolutionUrl}/instance/delete/${evoName}`, {
+        method: 'DELETE',
+        headers: { apikey: evolutionKey },
+      }).catch(err => {
+        console.error('Error al intentar borrar en evolution:', err)
+      })
+    }
+
+    // 3. Eliminar el registro en la base de datos (whatsapp_instances)
+    const { error: deleteError } = await supabase
+      .from('whatsapp_instances')
+      .delete()
+      .eq('id', instance.id)
+
+    if (deleteError) {
+      return { success: false, error: `Error al eliminar la instancia local: ${deleteError.message}` }
+    }
+
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
