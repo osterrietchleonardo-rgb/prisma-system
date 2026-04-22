@@ -168,6 +168,26 @@ export async function POST(req: Request) {
     if (insertError) {
       console.error('[Evolution Webhook] Error insertando mensaje:', insertError)
     } else {
+      // Guardar mensaje del lead en n8n_chat_histories SIEMPRE (bot activo o manual)
+      // Así el historial está completo para cuando el bot se reactive
+      const fechaChat = new Date().toLocaleString('es-AR', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      }).replace(',', '')
+      const { error: historyInsertError } = await supabase.from('n8n_chat_histories').insert({
+        session_id: conversation_id,
+        message: {
+          type: 'human',
+          content: `# Mensaje a responder del usuario: \n\n- Mensaje: <${messageType}> ${content} </${messageType}>\n\n- Fecha actual: ${fechaChat}\n`,
+          additional_kwargs: { source: 'lead_webhook' },
+          response_metadata: {}
+        }
+      })
+      if (historyInsertError) {
+        console.error('[Evolution Webhook] Error guardando en n8n_chat_histories:', historyInsertError)
+      }
+
       // Broadcast manual "fire-and-forget" para no retrasar n8n
       supabase.channel(`agency-${instance.agency_id}`).send({
         type: 'broadcast',
@@ -185,24 +205,7 @@ export async function POST(req: Request) {
     // 4. Disparar n8n con payload enriquecido SOLO si el bot está activo
     if (process.env.N8N_WEBHOOK_URL) {
       if (!botIsActive) {
-        // Guardar mensaje del lead en n8n_chat_histories para mantener historial completo
-        // aunque el bot esté pausado — cuando se reactive tendrá contexto de la intervención manual
-        const fechaManual = new Date().toLocaleString('es-AR', {
-          timeZone: 'America/Argentina/Buenos_Aires',
-          day: '2-digit', month: '2-digit', year: 'numeric',
-          hour: '2-digit', minute: '2-digit', second: '2-digit'
-        }).replace(',', '')
-        supabase.from('n8n_chat_histories').insert({
-          session_id: conversation_id,
-          message: {
-            type: 'human',
-            content: `# Mensaje a responder del usuario: \n\n- Mensaje: <${messageType}> ${content} </${messageType}>\n\n- Fecha actual: ${fechaManual}\n`,
-            additional_kwargs: { source: 'lead_during_manual_mode' },
-            response_metadata: {}
-          }
-        }).catch((e: Error) => console.error('[Evolution Webhook] Error guardando en n8n_chat_histories (manual mode):', e))
-
-        console.log(`[Evolution Webhook] Bot inactivo (Control manual) para conv: ${conversation_id}. Mensaje guardado en historial.`)
+        console.log(`[Evolution Webhook] Bot inactivo (Control manual) para conv: ${conversation_id}. Historial ya guardado.`)
         return NextResponse.json({ success: true, message: 'Message saved but n8n ignored (bot_active = false)' })
       }
 
