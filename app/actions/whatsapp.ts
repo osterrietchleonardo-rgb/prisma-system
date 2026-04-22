@@ -321,7 +321,7 @@ export async function sendDirectMessage(
     // Obtener instance_name de la agencia
     const { data: instance, error: instanceError } = await supabase
       .from('whatsapp_instances')
-      .select('instance_name')
+      .select('instance_name, evo_instance_name, integration_type')
       .eq('agency_id', agency_id)
       .limit(1)
       .single()
@@ -351,8 +351,11 @@ export async function sendDirectMessage(
     // Clean phone (remove +, spaces)
     const cleanPhone = conversation.contact_phone.replace(/\D/g, "");
 
+    // Usar evo_instance_name si está disponible (Evolution API), si no caer al instance_name legacy
+    const evoName = instance.evo_instance_name || instance.instance_name
     const response = await fetch(
-      `${evolutionUrl}/message/sendText/${instance.instance_name}`,
+      `${evolutionUrl}/message/sendText/${evoName}`,
+
       {
         method: 'POST',
         headers: {
