@@ -47,7 +47,8 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
   // Mapping state
   const [phoneColumn, setPhoneColumn] = useState<string>("")
   const [nameColumn, setNameColumn] = useState<string>("")
-  const [variableMap, setVariableMap] = useState<Record<string, string>>({}) // e.g. "body_1": "ColumnName"
+  const [variableMap, setVariableMap] = useState<Record<string, string>>({}) // e.g. "body_1": "ColumnName" OR "body_1": "Static text"
+  const [variableMode, setVariableMode] = useState<Record<string, "column" | "manual">>({}) // e.g. "body_1": "manual"
 
   // Execution state
   const [isSending, setIsSending] = useState(false)
@@ -219,13 +220,14 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
     }, 0)
   }
 
-  const clearFile = () => {
+    const clearFile = () => {
     setFile(null)
     setParsedData([])
     setColumns([])
     setPhoneColumn("")
     setNameColumn("")
     setVariableMap({})
+    setVariableMode({})
     setProgress(0)
     setResults({ success: 0, error: 0, skipped: 0, total: 0 })
     const fileInput = document.getElementById('file_upload') as HTMLInputElement
@@ -282,10 +284,18 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
     
     // validaciones variables
     let missingMap = false;
-    headerVars.forEach(v => { if (!variableMap[`header_${v}`]) missingMap = true })
-    bodyVars.forEach(v => { if (!variableMap[`body_${v}`]) missingMap = true })
+    headerVars.forEach(v => {
+       const m = variableMode[`header_${v}`] || "column"
+       if (m === "column" && !variableMap[`header_${v}`]) missingMap = true
+       if (m === "manual" && !variableMap[`header_${v}`]) missingMap = true // Require something even manual
+    })
+    bodyVars.forEach(v => {
+       const m = variableMode[`body_${v}`] || "column"
+       if (m === "column" && !variableMap[`body_${v}`]) missingMap = true
+       if (m === "manual" && !variableMap[`body_${v}`]) missingMap = true
+    })
     if (missingMap) {
-      toast.error("Falta mapear una o más variables de la plantilla.")
+      toast.error("Falta mapear o rellenar una o más variables de la plantilla.")
       return
     }
 
@@ -320,8 +330,16 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
        }
 
        // Armar construct variables
-       const headerParams = headerVars.map(v => String(row[variableMap[`header_${v}`]] || ""))
-       const bodyParams = bodyVars.map(v => String(row[variableMap[`body_${v}`]] || ""))
+       const headerParams = headerVars.map(v => {
+           const mode = variableMode[`header_${v}`] || "column"
+           if (mode === "column") return String(row[variableMap[`header_${v}`]] || "")
+           return variableMap[`header_${v}`] || ""
+       })
+       const bodyParams = bodyVars.map(v => {
+           const mode = variableMode[`body_${v}`] || "column"
+           if (mode === "column") return String(row[variableMap[`body_${v}`]] || "")
+           return variableMap[`body_${v}`] || ""
+       })
 
        let fullText = ""
        selectedTemplate.components?.forEach((c: any) => {
@@ -486,21 +504,50 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
 
                 <div className="pt-2 border-t mt-4 gap-4 flex flex-col">
                   {headerVars.map(v => (
-                    <div key={`header_${v}`} className="space-y-2">
-                      <Label className="text-accent">Variable Header {`{{${v}}}`}</Label>
-                      <Select value={variableMap[`header_${v}`] || ""} onValueChange={val => setVariableMap(p => ({...p, [`header_${v}`]: val}))} disabled={isSending}>
-                        <SelectTrigger><SelectValue placeholder="Matchear columna..." /></SelectTrigger>
-                        <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                      </Select>
+                    <div key={`header_${v}`} className="space-y-2 p-3 bg-muted/30 rounded-lg border">
+                      <div className="flex justify-between items-center mb-2">
+                        <Label className="text-accent font-medium">Variable Header {`{{${v}}}`}</Label>
+                        <Select value={variableMode[`header_${v}`] || "column"} onValueChange={val => setVariableMode(p => ({...p, [`header_${v}`]: val as "column" | "manual"}))} disabled={isSending}>
+                          <SelectTrigger className="h-7 w-[130px] text-xs bg-background"><SelectValue/></SelectTrigger>
+                          <SelectContent>
+                             <SelectItem value="column">De columna</SelectItem>
+                             <SelectItem value="manual">Texto manual fijo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {(variableMode[`header_${v}`] || "column") === "column" ? (
+                        <Select value={variableMap[`header_${v}`] || ""} onValueChange={val => setVariableMap(p => ({...p, [`header_${v}`]: val}))} disabled={isSending}>
+                          <SelectTrigger className="bg-background"><SelectValue placeholder="Matchear columna..." /></SelectTrigger>
+                          <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <Input value={variableMap[`header_${v}`] || ""} onChange={e => setVariableMap(p => ({...p, [`header_${v}`]: e.target.value}))} placeholder="Escribe el texto fijo para todos..." className="bg-background" disabled={isSending} />
+                      )}
                     </div>
                   ))}
+                  
                   {bodyVars.map(v => (
-                    <div key={`body_${v}`} className="space-y-2">
-                      <Label className="text-accent">Variable Body {`{{${v}}}`}</Label>
-                      <Select value={variableMap[`body_${v}`] || ""} onValueChange={val => setVariableMap(p => ({...p, [`body_${v}`]: val}))} disabled={isSending}>
-                        <SelectTrigger><SelectValue placeholder="Matchear columna..." /></SelectTrigger>
-                        <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                      </Select>
+                    <div key={`body_${v}`} className="space-y-2 p-3 bg-muted/30 rounded-lg border">
+                      <div className="flex justify-between items-center mb-2">
+                        <Label className="text-accent font-medium">Variable Body {`{{${v}}}`}</Label>
+                        <Select value={variableMode[`body_${v}`] || "column"} onValueChange={val => setVariableMode(p => ({...p, [`body_${v}`]: val as "column" | "manual"}))} disabled={isSending}>
+                          <SelectTrigger className="h-7 w-[130px] text-xs bg-background"><SelectValue/></SelectTrigger>
+                          <SelectContent>
+                             <SelectItem value="column">De columna</SelectItem>
+                             <SelectItem value="manual">Texto manual fijo</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {(variableMode[`body_${v}`] || "column") === "column" ? (
+                        <Select value={variableMap[`body_${v}`] || ""} onValueChange={val => setVariableMap(p => ({...p, [`body_${v}`]: val}))} disabled={isSending}>
+                          <SelectTrigger className="bg-background"><SelectValue placeholder="Matchear columna..." /></SelectTrigger>
+                          <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <Input value={variableMap[`body_${v}`] || ""} onChange={e => setVariableMap(p => ({...p, [`body_${v}`]: e.target.value}))} placeholder="Escribe el texto fijo para todos..." className="bg-background" disabled={isSending} />
+                      )}
                     </div>
                   ))}
                   {headerVars.length === 0 && bodyVars.length === 0 && selectedTemplate && (
