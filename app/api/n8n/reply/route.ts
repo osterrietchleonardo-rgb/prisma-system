@@ -101,14 +101,14 @@ export async function POST(req: Request) {
       // Clean phone number (remove +, spaces, etc)
       const cleanPhone = conv.contact_phone.replace(/\D/g, "");
 
-      let endpoint = `${evolutionUrl}/message/sendText/${instance.instance_name}`;
+      let endpoint = `${evolutionUrl}/message/sendText/${instance.evo_instance_name}`;
       let evoPayload: any = {
         number: cleanPhone,
         delay: 1200, // Opciones de delay para parecer más humano (ms)
       };
 
       if (media_url) {
-        endpoint = `${evolutionUrl}/message/sendMedia/${instance.instance_name}`;
+        endpoint = `${evolutionUrl}/message/sendMedia/${instance.evo_instance_name}`;
         evoPayload.mediatype = media_type || 'image'; // image, video, audio, document
         evoPayload.media = media_url;
         if (reply?.trim()) {
