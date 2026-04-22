@@ -7,6 +7,7 @@ import { SetupWizard } from "@/components/whatsapp/SetupWizard"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import TemplatesTab from "@/components/whatsapp/TemplatesTab"
 import AiSettingsTab from "@/components/whatsapp/AiSettingsTab"
+import CampaignsTab from "@/components/whatsapp/CampaignsTab"
 import { ConnectionIndicator } from "@/components/whatsapp/ConnectionIndicator"
 
 const ChatInterface = dynamic(
@@ -66,6 +67,7 @@ export default async function AsesorIAWhatsAppPage() {
             <TabsList className="bg-muted h-9">
               <TabsTrigger value="chat" className="text-xs px-4">💬 Chat</TabsTrigger>
               <TabsTrigger value="plantillas" className="text-xs px-4">📋 Plantillas</TabsTrigger>
+              <TabsTrigger value="campanas" className="text-xs px-4">📣 Campañas</TabsTrigger>
               <TabsTrigger value="config" className="text-xs px-4">⚙️ Configuración IA</TabsTrigger>
             </TabsList>
             <ConnectionIndicator instanceId={instance.id} initialStatus={instance.status} />
@@ -78,6 +80,9 @@ export default async function AsesorIAWhatsAppPage() {
           </TabsContent>
           <TabsContent value="config" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
             <AiSettingsTab instance={instance} />
+          </TabsContent>
+          <TabsContent value="campanas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
+            <CampaignsTab instance={instance} />
           </TabsContent>
         </Tabs>
       )}

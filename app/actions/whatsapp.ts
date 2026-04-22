@@ -921,3 +921,173 @@ export async function deleteTemplate(
     return { success: false, error: message }
   }
 }
+
+// =============================================
+// Action 14: Enviar Template de Campaña Masiva
+// =============================================
+
+export interface SendCampaignMessageInput {
+  phone: string;
+  name: string;
+  template_name: string;
+  template_language: string;
+  body_variables: string[];
+  header_variables?: string[];
+  template_full_text: string; // El texto armado "Hola Juan..." para guardar en el historial
+}
+
+export async function sendCampaignMessage(
+  input: SendCampaignMessageInput
+): Promise<WhatsAppActionResult> {
+  try {
+    const { agency_id } = await getAgencyProfile()
+    const supabase = createClient()
+
+    // 1. Obtener la instancia y credenciales
+    const { data: instance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('token, phone_number_id, business_id')
+      .eq('agency_id', agency_id)
+      .limit(1)
+      .single()
+
+    if (instanceError || !instance) {
+      return { success: false, error: 'Instancia no configurada.' }
+    }
+
+    const cleanPhone = input.phone.replace(/\D/g, "");
+
+    // 2. Construir payload de Meta Cloud API
+    const components: any[] = []
+    
+    if (input.header_variables && input.header_variables.length > 0) {
+      components.push({
+        type: "header",
+        parameters: input.header_variables.map((val) => ({
+          type: "text",
+          text: val
+        }))
+      })
+    }
+
+    if (input.body_variables && input.body_variables.length > 0) {
+      components.push({
+        type: "body",
+        parameters: input.body_variables.map((val) => ({
+          type: "text",
+          text: val
+        }))
+      })
+    }
+
+    const payload = {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to: cleanPhone,
+      type: "template",
+      template: {
+        name: input.template_name,
+        language: { code: input.template_language },
+        components: components.length > 0 ? components : undefined
+      }
+    }
+
+    // 3. Enviar a Meta directamente
+    const res = await fetch(`https://graph.facebook.com/v20.0/${instance.phone_number_id}/messages`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${instance.token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await res.json()
+
+    if (!res.ok) {
+      return { success: false, error: result.error?.message || 'Error al enviar template a Meta' }
+    }
+
+    // 4. Buscar o crear la conversación
+    let conversation_id: string;
+    const { data: convData, error: convErr } = await supabase
+      .from('wa_conversations')
+      .select('id')
+      .eq('agency_id', agency_id)
+      .eq('contact_phone', cleanPhone)
+      .maybeSingle()
+
+    if (convData) {
+      conversation_id = convData.id;
+      // Actualizar a bot_active = true para que responda la IA cuando el lead conteste
+      await supabase
+        .from('wa_conversations')
+        .update({ bot_active: true })
+        .eq('id', conversation_id)
+    } else {
+      const { data: newConv, error: createConvErr } = await supabase
+        .from('wa_conversations')
+        .insert({
+          agency_id,
+          contact_phone: cleanPhone,
+          contact_name: input.name,
+          bot_active: true, // Listo para la IA
+          unread_count: 0
+        })
+        .select('id')
+        .single()
+        
+      if (createConvErr || !newConv) {
+        return { success: false, error: `Mensaje enviado pero falló crear conversación: ${createConvErr?.message}` }
+      }
+      conversation_id = newConv.id;
+    }
+
+    // 5. Guardar en wa_messages
+    const { data: insertedMsg, error: insertError } = await supabase
+      .from('wa_messages')
+      .insert({
+        conversation_id,
+        agency_id,
+        content: input.template_full_text,
+        role: 'human', // se muestra como que lo mandamos nosotros
+        message_type: 'text',
+      })
+      .select()
+      .single()
+
+    // 6. Guardar en n8n_chat_histories
+    const fecha = new Date().toLocaleString('es-AR', { 
+      timeZone: 'America/Argentina/Buenos_Aires',
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }).replace(',', '');
+
+    await supabase
+      .from('n8n_chat_histories')
+      .insert({
+        session_id: conversation_id,
+        message: {
+          type: 'ai',
+          content: JSON.stringify({
+            output: {
+              Mensaje: input.template_full_text,
+              Fecha: fecha
+            }
+          }),
+          tool_calls: [],
+          additional_kwargs: {},
+          response_metadata: {
+            source: 'campaign_template_mass',
+            agent_role: 'system_campaign'
+          },
+          invalid_tool_calls: []
+        }
+      })
+
+    return { success: true, data: insertedMsg }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
