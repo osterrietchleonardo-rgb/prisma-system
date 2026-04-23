@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { generateEmbedding, prismaIA } from "@/lib/gemini";
+import { generateEmbedding } from "@/lib/gemini";
+import { openaiIA } from "@/lib/openai";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function POST(req: Request) {
       .insert({ session_id: currentSessionId, role: 'user', content: message });
 
     // 4. Intent Analysis: Is it property search or general chat?
-    const intentCheck = await prismaIA.generateContent({
+    const intentCheck = await openaiIA.generateContent({
       contents: [{ 
         role: "user", 
         parts: [{ text: `Analiza si el siguiente mensaje requiere buscar o recomendar propiedades de una inmobiliaria o si es una charla general (saludo, agradecimiento, pregunta sobre el clima, charla casual).
@@ -133,7 +134,7 @@ export async function POST(req: Request) {
     Responde SIEMPRE en español de Argentina.`;
 
 
-    const chatResult = await prismaIA.generateContent({
+    const chatResult = await openaiIA.generateContent({
       contents: [
         { role: 'user', parts: [{ text: systemPrompt }] },
         ...(history || []).map((m: any) => ({
@@ -175,7 +176,7 @@ export async function POST(req: Request) {
         Conversación:
         ${historyStr}`;
         
-        const analysisResult = await prismaIA.generateContent(analysisPrompt);
+        const analysisResult = await openaiIA.generateContent(analysisPrompt);
         const jsonStr = analysisResult.response.text().replace(/```json|```/g, "").trim();
         const analysis = JSON.parse(jsonStr);
         

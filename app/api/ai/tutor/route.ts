@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { generateEmbedding, prismaIA } from "@/lib/gemini"
+import { generateEmbedding } from "@/lib/gemini"
+import { openaiIA } from "@/lib/openai"
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     
     Responde ÚNICAMENTE con la palabra de la intención.`;
 
-    const intentCheck = await prismaIA.generateContent({
+    const intentCheck = await openaiIA.generateContent({
       contents: [{ role: "user", parts: [{ text: intentAnalysisPrompt }] }]
     })
     const isRetrieval = intentCheck.response.text().toUpperCase().includes("RETRIEVAL")
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest) {
       parts: [{ text: m.content }]
     }))
 
-    const result = await prismaIA.generateContent({
+    const result = await openaiIA.generateContent({
       contents: [
         { role: "user", parts: [{ text: systemPrompt }] },
         ...chatHistory,
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
           const summaryPrompt = `Resume este chat en un título (máx 22 carac.) y un resumen corto (1 frase). 
           Responde SOLO JSON: {"title": "...", "summary": "..."}
           Chat: "${message}" - Assistant: "${responseText.substring(0, 100)}"`;
-          const summaryRes = await prismaIA.generateContent(summaryPrompt);
+          const summaryRes = await openaiIA.generateContent(summaryPrompt);
           const rawText = summaryRes.response.text().trim();
           const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
           const { title, summary } = JSON.parse(cleanJson);
