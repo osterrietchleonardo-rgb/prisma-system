@@ -123,6 +123,7 @@ export interface CopyDraft {
   tokko_property?: TokkoProperty | null;
   version: number;
   parent_draft_id?: string | null;
+  session_id?: string | null;
   created_at: string;
   updated_at: string;
 }

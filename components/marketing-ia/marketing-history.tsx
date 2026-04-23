@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Trash2, Loader2, Image as ImageIcon, FileText, Calendar, ExternalLink, Download, Edit2, History as HistoryIcon, Search, Eye, Save } from "lucide-react"
+import { Trash2, Loader2, Image as ImageIcon, FileText, Calendar, Download, Edit2, History as HistoryIcon, Search, Eye, Save, Copy } from "lucide-react"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -29,15 +29,28 @@ interface MarketingAd {
   public_url?: string
   image_format?: string
   image_id?: string
+  session_id?: string
+}
+
+interface AdGroup {
+  groupId: string;
+  created_at: string;
+  variants: MarketingAd[];
 }
 
 export function MarketingHistory() {
-  const [ads, setAds] = useState<MarketingAd[]>([])
+  const [adGroups, setAdGroups] = useState<AdGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
-  const [adToDelete, setAdToDelete] = useState<string | null>(null)
+
+  // Delete states
+  const [variantToDelete, setVariantToDelete] = useState<string | null>(null)
+  const [groupToDelete, setGroupToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [selectedAd, setSelectedAd] = useState<MarketingAd | null>(null)
+
+  // Edit states
+  const [selectedGroup, setSelectedGroup] = useState<AdGroup | null>(null)
+  const [activeVariantIndex, setActiveVariantIndex] = useState(0)
   const [isEditingMode, setIsEditingMode] = useState(false)
   const [editContent, setEditContent] = useState<any>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -57,14 +70,24 @@ export function MarketingHistory() {
       
       if (error) throw error
 
-      const formattedAds = data.map((d: any) => ({
+      const formattedAds: MarketingAd[] = data.map((d: any) => ({
         ...d,
         public_url: d.images?.[0]?.public_url,
         image_format: d.images?.[0]?.format,
         image_id: d.images?.[0]?.id
       }))
 
-      setAds(formattedAds)
+      // Combine by session_id or id
+      const groupsMap = new Map<string, AdGroup>()
+      for (const ad of formattedAds) {
+        const key = ad.session_id || ad.id
+        if (!groupsMap.has(key)) {
+          groupsMap.set(key, { groupId: key, created_at: ad.created_at, variants: [] })
+        }
+        groupsMap.get(key)!.variants.push(ad)
+      }
+
+      setAdGroups(Array.from(groupsMap.values()))
     } catch (error: any) {
       toast.error("Error al cargar el historial: " + error.message)
     } finally {
@@ -74,22 +97,34 @@ export function MarketingHistory() {
 
   useEffect(() => {
     fetchAds()
+    
+    const reloadHandler = () => fetchAds()
+    window.addEventListener('generation-complete', reloadHandler)
+    return () => window.removeEventListener('generation-complete', reloadHandler)
   }, [])
 
   const handleSaveEdit = async () => {
-    if (!selectedAd || !editContent) return
+    if (!selectedGroup) return
+    const activeVariant = selectedGroup.variants[activeVariantIndex]
+    if (!activeVariant || !editContent) return
+    
     setIsSaving(true)
     try {
       const { error } = await supabase
         .from('copy_drafts')
         .update({ content: editContent })
-        .eq('id', selectedAd.id)
+        .eq('id', activeVariant.id)
       
       if (error) throw error
       
-      toast.success("Anuncio actualizado correctamente")
-      setAds(ads.map(a => a.id === selectedAd.id ? { ...a, content: editContent } : a))
-      setSelectedAd({ ...selectedAd, content: editContent })
+      toast.success("Variante actualizada correctamente")
+      fetchAds() // quick refetch to sync all states
+      setSelectedGroup(prev => {
+        if(!prev) return prev;
+        const newV = [...prev.variants];
+        newV[activeVariantIndex] = { ...newV[activeVariantIndex], content: editContent };
+        return { ...prev, variants: newV };
+      })
       setIsEditingMode(false)
     } catch (error: any) {
       toast.error("Error al guardar: " + error.message)
@@ -98,27 +133,51 @@ export function MarketingHistory() {
     }
   }
 
-  const handleDelete = async () => {
-    if (!adToDelete) return
+  const handleDeleteVariant = async () => {
+    if (!variantToDelete) return
     setIsDeleting(true)
     try {
-      // First delete associated images if any (since we might not have cascade)
-      await supabase.from('generated_images').delete().eq('draft_id', adToDelete)
-      
-      const { error } = await supabase
-        .from('copy_drafts')
-        .delete()
-        .eq('id', adToDelete)
-      
+      await supabase.from('generated_images').delete().eq('draft_id', variantToDelete)
+      const { error } = await supabase.from('copy_drafts').delete().eq('id', variantToDelete)
       if (error) throw error
       
-      toast.success("Anuncio eliminado correctamente")
-      setAds(ads.filter(a => a.id !== adToDelete))
+      toast.success("Variante eliminada")
+      if (selectedGroup) {
+        if (selectedGroup.variants.length === 1) {
+          setSelectedGroup(null)
+        } else {
+          setActiveVariantIndex(0) // reset
+        }
+      }
+      fetchAds()
     } catch (error: any) {
-      toast.error("Error al eliminar: " + error.message)
+      toast.error("Error al eliminar variante: " + error.message)
     } finally {
       setIsDeleting(false)
-      setAdToDelete(null)
+      setVariantToDelete(null)
+    }
+  }
+
+  const handleDeleteGroup = async () => {
+    if (!groupToDelete) return
+    setIsDeleting(true)
+    try {
+      // Find the group
+      const group = adGroups.find(g => g.groupId === groupToDelete)
+      if (!group) return
+
+      for (const variant of group.variants) {
+        await supabase.from('generated_images').delete().eq('draft_id', variant.id)
+        await supabase.from('copy_drafts').delete().eq('id', variant.id)
+      }
+      toast.success("Conjunto de creativos eliminado")
+      fetchAds()
+    } catch (error: any) {
+      toast.error("Error al eliminar el conjunto: " + error.message)
+    } finally {
+      setIsDeleting(false)
+      setGroupToDelete(null)
+      setSelectedGroup(null) // Just in case we were viewing it
     }
   }
 
@@ -139,11 +198,25 @@ export function MarketingHistory() {
     }
   }
 
-  const filteredAds = ads.filter(ad => {
-    const hook = ad.content?.hook?.toLowerCase() || ""
-    const angle = ad.angle?.toLowerCase() || ""
+  const handleCopyText = (content: any) => {
+    let txt = ""
+    if (content.hook) txt += content.hook + "\n\n"
+    if (content.problema) txt += content.problema + "\n"
+    if (content.agitacion) txt += content.agitacion + "\n"
+    if (content.solucion) txt += content.solucion + "\n\n"
+    if (content.desarrollo) txt += content.desarrollo + "\n\n"
+    if (content.cta) txt += content.cta
+    
+    navigator.clipboard.writeText(txt).then(() => toast.success("Texto copiado al portapapeles"))
+  }
+
+  const filteredGroups = adGroups.filter(grp => {
     const searchTerm = search.toLowerCase()
-    return hook.includes(searchTerm) || angle.includes(searchTerm)
+    return grp.variants.some(ad => {
+      const hook = ad.content?.hook?.toLowerCase() || ""
+      const angle = ad.angle?.toLowerCase() || ""
+      return hook.includes(searchTerm) || angle.includes(searchTerm)
+    })
   })
 
   return (
@@ -165,44 +238,64 @@ export function MarketingHistory() {
           <Loader2 className="w-10 h-10 text-accent animate-spin" />
           <p className="text-muted-foreground font-medium">Cargando galería de anuncios...</p>
         </div>
-      ) : filteredAds.length === 0 ? (
+      ) : filteredGroups.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-20 text-center bg-muted/10 rounded-3xl border border-dashed border-muted">
            <HistoryIcon className="w-12 h-12 text-muted-foreground mb-4 opacity-20" />
            <h3 className="text-xl font-bold">{search ? "No se encontraron resultados" : "Aún no tienes anuncios generados"}</h3>
            <p className="text-muted-foreground max-w-sm mt-2">
-             Comienza el flujo de generación para ver tus piezas de marketing aquí.
+             Ve a 'Crear Anuncio' para generar tus creatividades de marketing.
            </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAds.map((ad) => (
-            <Card key={ad.id} className="group border-accent/10 hover:border-accent/30 transition-all hover:shadow-xl hover:shadow-accent/5 bg-card/50 overflow-hidden flex flex-col">
+          {filteredGroups.map((group) => {
+            const primaryAd = group.variants[0]
+            if (!primaryAd) return null;
+
+            return (
+            <Card key={group.groupId} className="group border-accent/10 hover:border-accent/30 transition-all hover:shadow-xl hover:shadow-accent/5 bg-card/50 overflow-hidden flex flex-col pt-0">
+              <div className="w-full flex items-center justify-between p-2 bg-gradient-to-br from-accent/5 to-accent/10 border-b border-accent/10">
+                <span className="text-[10px] font-bold text-accent px-2">SESIÓN DE GENERACIÓN</span>
+                <span className="text-[10px] bg-accent text-accent-foreground px-2 py-0.5 rounded font-black">
+                  {group.variants.length} VARIANTES
+                </span>
+                <Button variant="ghost" size="icon" className="h-6 w-6 hover:text-destructive text-muted-foreground" onClick={() => setGroupToDelete(group.groupId)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+
               <div className="relative aspect-[16/9] bg-muted overflow-hidden">
-                {ad.public_url ? (
-                  <img 
-                    src={ad.public_url} 
-                    alt={ad.angle}
-                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                  />
+                {primaryAd.public_url ? (
+                  <div className="w-full h-full flex overflow-x-hidden snap-x snap-mandatory">
+                    {group.variants.map((v, i) => (
+                      <div key={v.id} className="min-w-full h-full snap-start relative">
+                        {v.public_url ? (
+                          <img src={v.public_url} alt={v.angle} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground">
+                            <ImageIcon className="w-8 h-8 opacity-20 mb-2" />
+                            <span className="text-xs">V{i+1}: Sin imagen</span>
+                          </div>
+                        )}
+                        <span className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded">
+                          V{i+1} : {v.angle}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
                       <ImageIcon className="w-10 h-10 opacity-20 mb-2" />
-                      <span className="text-xs">Sin imagen generada</span>
+                      <span className="text-xs">Sin imágenes generadas</span>
                    </div>
                 )}
-                <div className="absolute top-2 left-2 flex gap-2">
-                  <Badge variant="secondary" className="bg-background/80 backdrop-blur-md border-none text-[10px] font-bold uppercase">
-                    {ad.copy_type === 'video' ? '🎬 Video' : '📸 Post'}
-                  </Badge>
-                  {ad.image_format && (
-                    <Badge variant="secondary" className="bg-background/80 backdrop-blur-md border-none text-[10px] font-bold uppercase">
-                      {ad.image_format}
-                    </Badge>
-                  )}
-                </div>
+                
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <Button size="sm" variant="secondary" className="rounded-full gap-2" onClick={() => setSelectedAd(ad)}>
-                    <Eye className="w-4 h-4" /> Ver Detalles
+                  <Button size="sm" className="rounded-full gap-2 bg-accent hover:bg-accent/90" onClick={() => {
+                    setSelectedGroup(group);
+                    setActiveVariantIndex(0);
+                  }}>
+                    <Eye className="w-4 h-4" /> Inspeccionar Variantes
                   </Button>
                 </div>
               </div>
@@ -211,51 +304,30 @@ export function MarketingHistory() {
                 <div className="flex justify-between items-start">
                   <div className="text-[10px] text-muted-foreground flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
-                    {format(new Date(ad.created_at), "d 'de' MMMM, HH:mm", { locale: es })}
-                  </div>
-                  <div className="flex gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setAdToDelete(ad.id)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                    {format(new Date(group.created_at), "d 'de' MMMM, HH:mm", { locale: es })}
                   </div>
                 </div>
                 <CardTitle className="text-sm line-clamp-2 leading-relaxed">
-                  {ad.content?.hook || ad.angle}
+                  {primaryAd.content?.hook || "Generación de Marketing"}
                 </CardTitle>
-                <CardDescription className="text-[11px] font-medium text-accent italic">
-                  Ángulo: {ad.angle}
-                </CardDescription>
+                <div className="flex flex-wrap gap-1 mt-2">
+                    {group.variants.map((v, idx) => (
+                      <Badge key={v.id} variant="outline" className="text-[9px] capitalize px-1 py-0 border-accent/20">
+                        V{idx+1} {v.angle.slice(0, 10)}...
+                      </Badge>
+                    ))}
+                </div>
               </CardHeader>
 
-              <CardFooter className="p-4 pt-0 mt-auto flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="flex-1 text-xs h-8 border-accent/20 hover:bg-accent/5 text-accent font-bold"
-                  onClick={() => setSelectedAd(ad)}
-                >
-                  <FileText className="w-3 h-3 mr-1" /> Copy
-                </Button>
-                {ad.public_url && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0"
-                    onClick={() => handleDownload(ad.public_url!, `prisma-ad-${ad.id}`)}
-                  >
-                    <Download className="w-3 h-3" />
-                  </Button>
-                )}
-              </CardFooter>
             </Card>
-          ))}
+          )})}
         </div>
       )}
 
       {/* Details View */}
-      <Dialog open={!!selectedAd} onOpenChange={(open) => {
+      <Dialog open={!!selectedGroup} onOpenChange={(open) => {
         if (!open) {
-          setSelectedAd(null)
+          setSelectedGroup(null)
           setIsEditingMode(false)
           setEditContent(null)
         }
@@ -264,173 +336,183 @@ export function MarketingHistory() {
           <DialogHeader>
             <DialogTitle className="text-2xl font-black flex items-center gap-3">
               <Sparkles className="w-6 h-6 text-accent" />
-              {isEditingMode ? "Editar Anuncio" : "Detalles del Anuncio"}
+              Conjunto de Variantes 
             </DialogTitle>
             <DialogDescription>
-              Generado el {selectedAd && format(new Date(selectedAd.created_at), "PPP 'a las' HH:mm", { locale: es })}
+              Generado el {selectedGroup && format(new Date(selectedGroup.created_at), "PPP 'a las' HH:mm", { locale: es })}
             </DialogDescription>
           </DialogHeader>
 
-          {selectedAd && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 py-4">
-              <div className="space-y-4">
-                <div className="aspect-[4/5] md:aspect-auto md:h-[500px] w-full bg-muted rounded-3xl overflow-hidden shadow-2xl relative border border-accent/10">
-                  {selectedAd.public_url ? (
-                    <img 
-                      src={selectedAd.public_url} 
-                      className="w-full h-full object-cover"
-                      alt="Art"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground p-10 text-center">
-                      <ImageIcon className="w-16 h-16 opacity-10 mb-4" />
-                      <p className="text-sm opacity-50">No hay pieza visual generada para este anuncio.</p>
+          {selectedGroup && (
+            <div className="space-y-4 py-4">
+              {/* TABS FOR VARIANTS */}
+              <div className="flex gap-2 overflow-x-auto pb-2 border-b border-accent/10">
+                {selectedGroup.variants.map((v, i) => (
+                  <Button 
+                    key={v.id} 
+                    variant={i === activeVariantIndex ? 'default' : 'outline'}
+                    className={cn("whitespace-nowrap transition-all", i === activeVariantIndex ? "bg-accent text-accent-foreground shadow-md" : "hover:border-accent")}
+                    onClick={() => {
+                      setActiveVariantIndex(i)
+                      setIsEditingMode(false)
+                    }}
+                  >
+                    Variante {i + 1}: <span className="capitalize ml-1">{v.angle.split('_').join(' ')}</span>
+                  </Button>
+                ))}
+              </div>
+
+              {selectedGroup.variants[activeVariantIndex] && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in zoom-in-95 duration-300">
+                  <div className="space-y-4">
+                    <div className="aspect-[4/5] md:aspect-auto md:h-[500px] w-full bg-muted rounded-3xl overflow-hidden shadow-2xl relative border border-accent/10">
+                      {selectedGroup.variants[activeVariantIndex].public_url ? (
+                        <img 
+                          src={selectedGroup.variants[activeVariantIndex].public_url} 
+                          className="w-full h-full object-cover"
+                          alt="Art"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground p-10 text-center">
+                          <ImageIcon className="w-16 h-16 opacity-10 mb-4" />
+                          <p className="text-sm opacity-50">Generación de imagen fallida o pendiente.</p>
+                        </div>
+                      )}
+                      {selectedGroup.variants[activeVariantIndex].public_url && (
+                        <div className="absolute bottom-4 right-4">
+                          <Button onClick={() => handleDownload(selectedGroup.variants[activeVariantIndex].public_url!, `prisma-v${activeVariantIndex+1}-${selectedGroup.variants[activeVariantIndex].id}`)} className="rounded-full shadow-xl bg-black/80 hover:bg-black text-white hover:text-white border-0">
+                            <Download className="w-4 h-4 mr-2" /> Descargar HD
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {selectedAd.public_url && (
-                    <div className="absolute bottom-4 right-4">
-                      <Button onClick={() => handleDownload(selectedAd.public_url!, `prisma-full-${selectedAd.id}`)} className="rounded-full shadow-xl">
-                        <Download className="w-4 h-4 mr-2" /> Descargar HD
-                      </Button>
+                  </div>
+
+                  <div className="space-y-6 flex flex-col">
+                    <div className="flex justify-between items-center bg-accent/5 p-3 rounded-xl border border-accent/10">
+                       <div>
+                          <p className="text-[10px] font-bold text-accent uppercase">Formato</p>
+                          <p className="text-xs font-bold capitalize">{selectedGroup.variants[activeVariantIndex].copy_type}</p>
+                       </div>
+                       <div>
+                          <Button variant="ghost" size="sm" className="h-8 group hover:bg-accent/10" onClick={() => handleCopyText(selectedGroup.variants[activeVariantIndex].content)}>
+                            <Copy className="w-3.5 h-3.5 mr-2 text-accent group-hover:text-accent" /> 
+                            Copiar Todo
+                          </Button>
+                       </div>
                     </div>
-                  )}
+
+                    <div className="flex-1">
+                        <div className="bg-muted/30 p-6 rounded-2xl border border-muted space-y-4 h-full">
+                          {selectedGroup.variants[activeVariantIndex].copy_type === 'video' ? (
+                            ['hook', 'problema', 'agitacion', 'solucion', 'cta'].map(field => (
+                              <div key={field} className="space-y-1">
+                                  <label className="text-[10px] font-bold text-muted-foreground uppercase">{field}:</label>
+                                  {isEditingMode ? (
+                                    <textarea 
+                                      value={editContent?.[field] || ""} 
+                                      onChange={(e) => setEditContent({ ...editContent, [field]: e.target.value })}
+                                      className="w-full bg-background border rounded-lg p-2 text-sm min-h-[60px]"
+                                    />
+                                  ) : (
+                                    <p className="text-sm font-medium leading-relaxed">{selectedGroup.variants[activeVariantIndex].content?.[field]}</p>
+                                  )}
+                              </div>
+                            ))
+                          ) : (
+                            ['hook', 'desarrollo', 'cta'].map(field => (
+                              <div key={field} className="space-y-1">
+                                  <label className="text-[10px] font-bold text-muted-foreground uppercase">
+                                    {field === 'desarrollo' ? 'Cuerpo / Beneficios' : field}:
+                                  </label>
+                                  {isEditingMode ? (
+                                    <textarea 
+                                      value={editContent?.[field] || ""} 
+                                      onChange={(e) => setEditContent({ ...editContent, [field]: e.target.value })}
+                                      className="w-full bg-background border rounded-lg p-2 text-sm min-h-[80px]"
+                                    />
+                                  ) : (
+                                    <p className={cn("text-sm leading-relaxed whitespace-pre-wrap", field === 'hook' || field === 'cta' ? "font-bold text-foreground" : "text-muted-foreground")}>
+                                      {selectedGroup.variants[activeVariantIndex].content?.[field] || selectedGroup.variants[activeVariantIndex].content?.['body']} 
+                                    </p>
+                                  )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-auto pt-2">
+                        {isEditingMode ? (
+                          <>
+                            <Button variant="outline" className="flex-1 font-bold" onClick={() => setIsEditingMode(false)}>
+                              Cancelar
+                            </Button>
+                            <Button className="flex-1 font-bold bg-accent hover:bg-accent/90" onClick={handleSaveEdit} disabled={isSaving}>
+                              {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                              Guardar Cambios
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button variant="outline" className="flex-1 font-bold border-accent/20" onClick={() => {
+                              setEditContent(selectedGroup.variants[activeVariantIndex].content)
+                              setIsEditingMode(true)
+                            }}>
+                              <Edit2 className="w-4 h-4 mr-2" /> Editar Variante
+                            </Button>
+                            <Button variant="destructive" className="font-bold flex-1" onClick={() => setVariantToDelete(selectedGroup.variants[activeVariantIndex].id)}>
+                              <Trash2 className="w-4 h-4 mr-2" /> Borrar Variante
+                            </Button>
+                          </>
+                        )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div className="space-y-6">
-                 <div>
-                    <h4 className="text-xs font-black uppercase tracking-widest text-accent mb-3">
-                      {selectedAd.copy_type === 'video' ? 'Guión de Video' : 'Copy Persuasivo'}
-                    </h4>
-                    <div className="bg-muted/30 p-6 rounded-2xl border border-muted space-y-4">
-                       {selectedAd.copy_type === 'video' ? (
-                         // FIELDS FOR VIDEO
-                         ['hook', 'problema', 'agitacion', 'solucion', 'cta'].map(field => (
-                           <div key={field} className="space-y-1">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase">{field}:</label>
-                              {isEditingMode ? (
-                                <textarea 
-                                  value={editContent?.[field] || ""} 
-                                  onChange={(e) => setEditContent({ ...editContent, [field]: e.target.value })}
-                                  className="w-full bg-background border rounded-lg p-2 text-sm min-h-[60px]"
-                                />
-                              ) : (
-                                <p className="text-sm font-medium leading-relaxed">{selectedAd.content?.[field]}</p>
-                              )}
-                           </div>
-                         ))
-                       ) : (
-                         // FIELDS FOR POST
-                         ['hook', 'desarrollo', 'cta'].map(field => (
-                           <div key={field} className="space-y-1">
-                              <label className="text-[10px] font-bold text-muted-foreground uppercase">
-                                {field === 'desarrollo' ? 'Cuerpo / Beneficios' : field}:
-                              </label>
-                              {isEditingMode ? (
-                                <textarea 
-                                  value={editContent?.[field] || ""} 
-                                  onChange={(e) => setEditContent({ ...editContent, [field]: e.target.value })}
-                                  className="w-full bg-background border rounded-lg p-2 text-sm min-h-[80px]"
-                                />
-                              ) : (
-                                <p className={cn("text-sm leading-relaxed whitespace-pre-wrap", field === 'hook' || field === 'cta' ? "font-bold" : "text-muted-foreground")}>
-                                  {selectedAd.content?.[field] || selectedAd.content?.['body']} 
-                                </p>
-                              )}
-                           </div>
-                         ))
-                       )}
-                    </div>
-                 </div>
-
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-accent/5 p-4 rounded-xl border border-accent/10">
-                       <p className="text-[10px] font-bold text-accent uppercase mb-1">Ángulo</p>
-                       <p className="text-xs font-bold capitalize">{selectedAd.angle}</p>
-                    </div>
-                    <div className="bg-accent/5 p-4 rounded-xl border border-accent/10">
-                       <p className="text-[10px] font-bold text-accent uppercase mb-1">Formato</p>
-                       <p className="text-xs font-bold capitalize">{selectedAd.copy_type}</p>
-                    </div>
-                 </div>
-
-                 <div className="flex gap-2">
-                    {isEditingMode ? (
-                      <>
-                        <Button variant="outline" className="flex-1 font-bold" onClick={() => setIsEditingMode(false)}>
-                          Cancelar
-                        </Button>
-                        <Button className="flex-1 font-bold bg-accent" onClick={handleSaveEdit} disabled={isSaving}>
-                          {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                          Guardar Cambios
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button variant="outline" className="flex-1 font-bold border-accent/20" onClick={() => {
-                          setEditContent(selectedAd.content)
-                          setIsEditingMode(true)
-                        }}>
-                          <Edit2 className="w-4 h-4 mr-2" /> Editar Texto
-                        </Button>
-                        <Button variant="destructive" size="icon" className="h-10 w-10" onClick={() => { setAdToDelete(selectedAd.id); setSelectedAd(null); }}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </>
-                    )}
-                 </div>
-              </div>
+              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <Dialog open={!!adToDelete} onOpenChange={() => setAdToDelete(null)}>
+      {/* Delete Single Variant Confirmation */}
+      <Dialog open={!!variantToDelete} onOpenChange={() => setVariantToDelete(null)}>
         <DialogContent className="border-accent/20">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black">¿Eliminar pieza publicitaria?</DialogTitle>
-            <DialogDescription className="text-balance">
-              Esta acción eliminará el copy y la imagen asociada de tu galería permanentemente.
+            <DialogTitle className="text-xl font-black">¿Eliminar esta Variante?</DialogTitle>
+            <DialogDescription>
+              Se borrará permanentemente este copy y su imagen, conservando las demás variantes del conjunto.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 pt-4">
-            <Button variant="outline" onClick={() => setAdToDelete(null)} className="font-bold">Cancelar</Button>
-            <Button 
-              onClick={handleDelete}
-              disabled={isDeleting}
-              variant="destructive"
-              className="font-bold"
-            >
+            <Button variant="outline" onClick={() => setVariantToDelete(null)}>Cancelar</Button>
+            <Button onClick={handleDeleteVariant} disabled={isDeleting} variant="destructive">
               {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
-              Sí, eliminar
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Group Confirmation */}
+      <Dialog open={!!groupToDelete} onOpenChange={() => setGroupToDelete(null)}>
+        <DialogContent className="border-destructive/20 border-2">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-destructive flex items-center gap-2">
+               <Trash2 className="w-5 h-5" /> ¿Eliminar Conjunto Entero?
+            </DialogTitle>
+            <DialogDescription>
+              Vas a eliminar TODAS las variantes generadas en esta sesión (texto e imágenes HD). Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-4">
+            <Button variant="outline" onClick={() => setGroupToDelete(null)}>Cancelar</Button>
+            <Button onClick={handleDeleteGroup} disabled={isDeleting} variant="destructive">
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : "Sí, eliminar todas"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-function Sparkles(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-      <path d="M5 3v4" />
-      <path d="M19 17v4" />
-      <path d="M3 5h4" />
-      <path d="M17 19h4" />
-    </svg>
   )
 }
