@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { IpcManager } from "@/components/marketing-ia/ipc-manager"
 import { CopyGeneratorFlow } from "@/components/marketing-ia/copy-generator-flow"
 import { MarketingHistory } from "@/components/marketing-ia/marketing-history"
-import { Bot, UserSearch, History, Sparkles } from "lucide-react"
+import { AdGuide } from "@/components/marketing-ia/ad-guide"
+import { Bot, UserSearch, History, Sparkles, BookOpen } from "lucide-react"
 
 export default function MarketingIAPage() {
   const [activeTab, setActiveTab] = useState("copys")
@@ -33,7 +34,7 @@ export default function MarketingIAPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="flex md:grid md:grid-cols-3 h-14 bg-muted/50 p-1 rounded-xl overflow-x-auto scrollbar-none justify-start md:justify-center w-full">
+        <TabsList className="flex md:grid md:grid-cols-4 h-14 bg-muted/50 p-1 rounded-xl overflow-x-auto scrollbar-none justify-start md:justify-center w-full">
           <TabsTrigger value="copys" className="flex-1 md:flex-none text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <Sparkles className="w-4 h-4 mr-2" /> Crear Anuncio
           </TabsTrigger>
@@ -42,6 +43,9 @@ export default function MarketingIAPage() {
           </TabsTrigger>
           <TabsTrigger value="history" className="flex-1 md:flex-none text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <History className="w-4 h-4 mr-2" /> Historial / Galería
+          </TabsTrigger>
+          <TabsTrigger value="guia" className="flex-1 md:flex-none text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
+            <BookOpen className="w-4 h-4 mr-2" /> Guía Mágica
           </TabsTrigger>
         </TabsList>
 
@@ -55,6 +59,10 @@ export default function MarketingIAPage() {
 
         <TabsContent value="history" className="mt-8">
            <MarketingHistory />
+        </TabsContent>
+
+        <TabsContent value="guia" className="mt-8">
+           <AdGuide />
         </TabsContent>
       </Tabs>
     </div>
