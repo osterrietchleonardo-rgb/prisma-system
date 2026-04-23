@@ -2,11 +2,10 @@
 
 import { useState } from "react"
 import {
-  Zap, Target, Megaphone, Filter, RefreshCcw, BarChart2,
-  ChevronDown, ChevronUp, Lightbulb, CheckCircle2, AlertTriangle,
+  Target, Megaphone, Filter, RefreshCcw, BarChart2,
+  ChevronDown, Lightbulb, CheckCircle2, AlertTriangle,
   TrendingUp, Users, DollarSign, Star
 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
@@ -60,7 +59,7 @@ const phases = [
       {
         title: "Contenido que convierte",
         items: [
-          "Usá **videos recorriendo propiedades** (Reels) o vos hablando a cámara sobre un problema real (*"3 errores al tasar tu casa"*).",
+          'Usá **videos recorriendo propiedades** (Reels) o vos hablando a cámara sobre un problema real (*"3 errores al tasar tu casa"*).',
           '⚠️ Cuando subas el video, Meta va a ofrecerte música y filtros automáticos. **Desactivá todo**. Vos elegís el audio —no la IA de Meta.',
           'Usá el botón **"Más información"**: es profesional y genera curiosidad sin presionar.',
         ],
@@ -135,7 +134,7 @@ const phases = [
         title: "Mensaje de re-enganche",
         items: [
           "Creá una campaña nueva enfocada en esta audiencia cálida.",
-          '*"Vimos que te interesó nuestra propuesta. ¿Tenés alguna duda técnica sobre la zona o la rentabilidad? Dejanos tu contacto y te asesoramos personalmente."*',
+          '"Vimos que te interesó nuestra propuesta. ¿Tenés alguna duda técnica sobre la zona o la rentabilidad? Dejanos tu contacto y te asesoramos personalmente."',
           "**Bajá la guardia**: hablales como aliados, no como vendedores.",
         ],
       },
@@ -158,9 +157,9 @@ const phases = [
       {
         title: "Las tres reglas que no podés saltarte",
         items: [
-          '🔥 **Velocidad de respuesta:** Un lead inmobiliario se enfría en **5 minutos**. Llamalo apenas llegue el mail.',
-          '📊 **Mirá el Costo por Lead Calificado:** Un lead a $5 USD no es caro si de 10, dos son tasaciones de $200.000 USD.',
-          '🧹 **Limpieza de datos:** Si entran muchos números falsos, **agregá una pregunta más**. Más fricción = más intención.',
+          "🔥 **Velocidad de respuesta:** Un lead inmobiliario se enfría en **5 minutos**. Llamalo apenas llegue el mail.",
+          "📊 **Mirá el Costo por Lead Calificado:** Un lead a $5 USD no es caro si de 10, dos son tasaciones de $200.000 USD.",
+          "🧹 **Limpieza de datos:** Si entran muchos números falsos, **agregá una pregunta más**. Más fricción = más intención.",
         ],
       },
     ],
@@ -348,11 +347,11 @@ export function AdGuide() {
           <div>
             <p className="text-sm font-bold text-amber-300 mb-1">Consejo Final</p>
             <p className="text-sm text-foreground/80 leading-relaxed">
-              No busques <strong className="text-foreground">volumen</strong>. Buscá <strong className="text-foreground">calidad</strong>. 
+              No busques <strong className="text-foreground">volumen</strong>. Buscá <strong className="text-foreground">calidad</strong>.{" "}
               Es preferible cerrar con 5 personas calificadas por día que
               tener 50 que no saben por qué dejaron sus datos. La IA de Meta en 2026 es una fiera
               buscando gente —pero <em>vos</em> tenés que decirle exactamente qué tipo de{" "}
-              <span className="text-amber-300">"fiera"</span> querés en tu inmobiliaria.
+              <span className="text-amber-300">&quot;fiera&quot;</span> querés en tu inmobiliaria.
             </p>
           </div>
         </div>
