@@ -1,3 +1,6 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { IpcManager } from "@/components/marketing-ia/ipc-manager"
 import { CopyGeneratorFlow } from "@/components/marketing-ia/copy-generator-flow"
@@ -5,6 +8,18 @@ import { MarketingHistory } from "@/components/marketing-ia/marketing-history"
 import { Bot, UserSearch, History, Sparkles } from "lucide-react"
 
 export default function MarketingIAPage() {
+  const [activeTab, setActiveTab] = useState("copys")
+
+  useEffect(() => {
+    const handleGenComplete = (e: any) => {
+      if (e.detail?.origin === 'copy-flow') {
+        setActiveTab("history")
+      }
+    }
+    window.addEventListener('generation-complete', handleGenComplete)
+    return () => window.removeEventListener('generation-complete', handleGenComplete)
+  }, [])
+
   return (
     <div className="container mx-auto py-8 space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col gap-2">
@@ -17,7 +32,7 @@ export default function MarketingIAPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="copys" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 h-14 bg-muted/50 p-1 rounded-xl">
           <TabsTrigger value="copys" className="text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg">
             <Sparkles className="w-4 h-4 mr-2" /> Crear Anuncio

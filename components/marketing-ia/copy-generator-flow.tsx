@@ -118,7 +118,7 @@ export function CopyGeneratorFlow() {
       toast.success("¡3 variantes generadas exitosamente!")
       
       // Attempt to switch tabs automatically or alert user
-      const evt = new CustomEvent("generation-complete");
+      const evt = new CustomEvent("generation-complete", { detail: { sessionId, origin: 'copy-flow' } });
       window.dispatchEvent(evt);
       
       setProgressText("¡Todo listo! Ve a la pestaña 'Mis Generaciones'.")

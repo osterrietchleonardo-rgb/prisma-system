@@ -84,7 +84,10 @@ export function MarketingHistory() {
         if (!groupsMap.has(key)) {
           groupsMap.set(key, { groupId: key, created_at: ad.created_at, variants: [] })
         }
-        groupsMap.get(key)!.variants.push(ad)
+        groupsMap.get(key)!.variants.push({
+          ...ad,
+          angle: ad.angle || 'generico',
+        })
       }
 
       setAdGroups(Array.from(groupsMap.values()))
@@ -98,7 +101,24 @@ export function MarketingHistory() {
   useEffect(() => {
     fetchAds()
     
-    const reloadHandler = () => fetchAds()
+    const reloadHandler = (e: any) => {
+      fetchAds().then(() => {
+        // If an event passed the sessionId, we can optionally select it here, but it's easier to just rely on the new one showing up on top
+        if (e.detail?.sessionId) {
+          // After a timeout to wait for React to flush the state
+          setTimeout(() => {
+            setAdGroups(currentGroups => {
+              const newGroup = currentGroups.find(g => g.groupId === e.detail.sessionId);
+              if (newGroup) {
+                setSelectedGroup(newGroup);
+                setActiveVariantIndex(0);
+              }
+              return currentGroups;
+            });
+          }, 500);
+        }
+      });
+    }
     window.addEventListener('generation-complete', reloadHandler)
     return () => window.removeEventListener('generation-complete', reloadHandler)
   }, [])
@@ -313,7 +333,7 @@ export function MarketingHistory() {
                 <div className="flex flex-wrap gap-1 mt-2">
                     {group.variants.map((v, idx) => (
                       <Badge key={v.id} variant="outline" className="text-[9px] capitalize px-1 py-0 border-accent/20">
-                        V{idx+1} {v.angle.slice(0, 10)}...
+                        V{idx+1} {v.angle?.slice(0, 10)}...
                       </Badge>
                     ))}
                 </div>
@@ -357,7 +377,7 @@ export function MarketingHistory() {
                       setIsEditingMode(false)
                     }}
                   >
-                    Variante {i + 1}: <span className="capitalize ml-1">{v.angle.split('_').join(' ')}</span>
+                    Variante {i + 1}: <span className="capitalize ml-1">{v.angle?.split('_').join(' ')}</span>
                   </Button>
                 ))}
               </div>
