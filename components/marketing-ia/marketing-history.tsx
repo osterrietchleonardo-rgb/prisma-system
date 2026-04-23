@@ -248,7 +248,7 @@ export function MarketingHistory() {
     const searchTerm = search.toLowerCase()
     return grp.variants.some(ad => {
       const hook = renderText(ad.content?.hook).toLowerCase()
-      const angle = (ad.angle || "").toLowerCase()
+      const angle = renderText(ad.angle || "").toLowerCase()
       return hook.includes(searchTerm) || angle.includes(searchTerm)
     })
   })
@@ -304,7 +304,7 @@ export function MarketingHistory() {
                     {group.variants.map((v, i) => (
                       <div key={v.id} className="min-w-full h-full snap-start relative">
                         {v.public_url ? (
-                          <img src={v.public_url} alt={v.angle} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                          <img src={v.public_url} alt={renderText(v.angle)} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground">
                             <ImageIcon className="w-8 h-8 opacity-20 mb-2" />
@@ -312,7 +312,7 @@ export function MarketingHistory() {
                           </div>
                         )}
                         <span className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-md text-white text-[10px] font-bold px-2 py-1 rounded">
-                          V{i+1} : {v.angle}
+                          V{i+1} : {renderText(v.angle)}
                         </span>
                       </div>
                     ))}
@@ -347,7 +347,7 @@ export function MarketingHistory() {
                 <div className="flex flex-wrap gap-1 mt-2">
                     {group.variants.map((v, idx) => (
                       <Badge key={v.id} variant="outline" className="text-[9px] capitalize px-1 py-0 border-accent/20">
-                        V{idx+1} {v.angle?.slice(0, 10)}...
+                        V{idx+1} {renderText(v.angle).slice(0, 10)}...
                       </Badge>
                     ))}
                 </div>
@@ -391,7 +391,7 @@ export function MarketingHistory() {
                       setIsEditingMode(false)
                     }}
                   >
-                    Variante {i + 1}: <span className="capitalize ml-1">{v.angle?.split('_').join(' ')}</span>
+                    Variante {i + 1}: <span className="capitalize ml-1">{renderText(v.angle).split('_').join(' ')}</span>
                   </Button>
                 ))}
               </div>
