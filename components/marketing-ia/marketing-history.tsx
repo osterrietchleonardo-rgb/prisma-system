@@ -57,6 +57,19 @@ export function MarketingHistory() {
   
   const supabase = createClient()
 
+  const formatDateSafe = (dateString?: string) => {
+    if (!dateString) return "Fecha desconocida"
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return "Fecha inválida"
+    return format(date, "d 'de' MMMM, HH:mm", { locale: es })
+  }
+
+  const renderText = (val: any) => {
+    if (!val) return ""
+    if (typeof val === 'object') return JSON.stringify(val)
+    return String(val)
+  }
+
   const fetchAds = async () => {
     setLoading(true)
     try {
@@ -219,13 +232,14 @@ export function MarketingHistory() {
   }
 
   const handleCopyText = (content: any) => {
+    if (!content) { toast.error("Nada que copiar"); return; }
     let txt = ""
-    if (content.hook) txt += content.hook + "\n\n"
-    if (content.problema) txt += content.problema + "\n"
-    if (content.agitacion) txt += content.agitacion + "\n"
-    if (content.solucion) txt += content.solucion + "\n\n"
-    if (content.desarrollo) txt += content.desarrollo + "\n\n"
-    if (content.cta) txt += content.cta
+    if (content.hook) txt += renderText(content.hook) + "\n\n"
+    if (content.problema) txt += renderText(content.problema) + "\n"
+    if (content.agitacion) txt += renderText(content.agitacion) + "\n"
+    if (content.solucion) txt += renderText(content.solucion) + "\n\n"
+    if (content.desarrollo) txt += renderText(content.desarrollo) + "\n\n"
+    if (content.cta) txt += renderText(content.cta)
     
     navigator.clipboard.writeText(txt).then(() => toast.success("Texto copiado al portapapeles"))
   }
@@ -233,8 +247,8 @@ export function MarketingHistory() {
   const filteredGroups = adGroups.filter(grp => {
     const searchTerm = search.toLowerCase()
     return grp.variants.some(ad => {
-      const hook = ad.content?.hook?.toLowerCase() || ""
-      const angle = ad.angle?.toLowerCase() || ""
+      const hook = renderText(ad.content?.hook).toLowerCase()
+      const angle = (ad.angle || "").toLowerCase()
       return hook.includes(searchTerm) || angle.includes(searchTerm)
     })
   })
@@ -324,11 +338,11 @@ export function MarketingHistory() {
                 <div className="flex justify-between items-start">
                   <div className="text-[10px] text-muted-foreground flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
-                    {format(new Date(group.created_at), "d 'de' MMMM, HH:mm", { locale: es })}
+                    {formatDateSafe(group.created_at)}
                   </div>
                 </div>
                 <CardTitle className="text-sm line-clamp-2 leading-relaxed">
-                  {primaryAd.content?.hook || "Generación de Marketing"}
+                  {renderText(primaryAd.content?.hook) || "Generación de Marketing"}
                 </CardTitle>
                 <div className="flex flex-wrap gap-1 mt-2">
                     {group.variants.map((v, idx) => (
@@ -359,7 +373,7 @@ export function MarketingHistory() {
               Conjunto de Variantes 
             </DialogTitle>
             <DialogDescription>
-              Generado el {selectedGroup && format(new Date(selectedGroup.created_at), "PPP 'a las' HH:mm", { locale: es })}
+              Generado el {selectedGroup ? formatDateSafe(selectedGroup.created_at) : ''}
             </DialogDescription>
           </DialogHeader>
 
@@ -430,12 +444,12 @@ export function MarketingHistory() {
                                   <label className="text-[10px] font-bold text-muted-foreground uppercase">{field}:</label>
                                   {isEditingMode ? (
                                     <textarea 
-                                      value={editContent?.[field] || ""} 
+                                      value={renderText(editContent?.[field])} 
                                       onChange={(e) => setEditContent({ ...editContent, [field]: e.target.value })}
                                       className="w-full bg-background border rounded-lg p-2 text-sm min-h-[60px]"
                                     />
                                   ) : (
-                                    <p className="text-sm font-medium leading-relaxed">{selectedGroup.variants[activeVariantIndex].content?.[field]}</p>
+                                    <p className="text-sm font-medium leading-relaxed">{renderText(selectedGroup.variants[activeVariantIndex].content?.[field])}</p>
                                   )}
                               </div>
                             ))
@@ -447,13 +461,13 @@ export function MarketingHistory() {
                                   </label>
                                   {isEditingMode ? (
                                     <textarea 
-                                      value={editContent?.[field] || ""} 
+                                      value={renderText(editContent?.[field])} 
                                       onChange={(e) => setEditContent({ ...editContent, [field]: e.target.value })}
                                       className="w-full bg-background border rounded-lg p-2 text-sm min-h-[80px]"
                                     />
                                   ) : (
                                     <p className={cn("text-sm leading-relaxed whitespace-pre-wrap", field === 'hook' || field === 'cta' ? "font-bold text-foreground" : "text-muted-foreground")}>
-                                      {selectedGroup.variants[activeVariantIndex].content?.[field] || selectedGroup.variants[activeVariantIndex].content?.['body']} 
+                                      {renderText(selectedGroup.variants[activeVariantIndex].content?.[field] || selectedGroup.variants[activeVariantIndex].content?.['body'])} 
                                     </p>
                                   )}
                               </div>
