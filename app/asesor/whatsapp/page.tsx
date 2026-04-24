@@ -5,6 +5,7 @@ import type { Metadata } from "next"
 import { SetupWizard } from "@/components/whatsapp/SetupWizard"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import TemplatesTab from "@/components/whatsapp/TemplatesTab"
+import ContactsTab from "@/components/whatsapp/ContactsTab"
 import { ConnectionIndicator } from "@/components/whatsapp/ConnectionIndicator"
 import type { WhatsAppInstance } from "@/types/whatsapp"
 
@@ -95,6 +96,9 @@ export default async function WhatsAppInboxPage() {
             <TabsTrigger value="plantillas" className="text-xs px-4">
               📋 Plantillas
             </TabsTrigger>
+            <TabsTrigger value="contactos" className="text-xs px-4">
+              👥 Contactos
+            </TabsTrigger>
           </TabsList>
           <ConnectionIndicator instanceId={instance.id} initialStatus={instance.status} />
         </div>
@@ -111,6 +115,13 @@ export default async function WhatsAppInboxPage() {
           className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden"
         >
           <TemplatesTab instance={instance as WhatsAppInstance} />
+        </TabsContent>
+
+        <TabsContent
+          value="contactos"
+          className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden"
+        >
+          <ContactsTab instance={instance as WhatsAppInstance} />
         </TabsContent>
       </Tabs>
     </div>

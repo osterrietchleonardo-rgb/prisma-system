@@ -40,6 +40,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
   const [file, setFile] = useState<File | null>(null)
   const [parsedData, setParsedData] = useState<any[]>([])
   const [columns, setColumns] = useState<string[]>([])
+  const [contactStatuses, setContactStatuses] = useState<Record<number, "pendiente" | "enviado" | "error" | "salteado">>({})
   
   // Selection state
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("")
@@ -55,6 +56,21 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
   const [progress, setProgress] = useState(0)
   const [results, setResults] = useState<{success: number, error: number, skipped: number, total: number}>({ success: 0, error: 0, skipped: 0, total: 0 })
   const abortControllerRef = useRef<AbortController | null>(null)
+
+  const getMessagingLimitNumber = (tier: string | null | undefined): number => {
+    if (!tier) return 250; // default Meta limit
+    switch (tier) {
+      case 'TIER_50': return 50;
+      case 'TIER_250': return 250;
+      case 'TIER_1K': return 1000;
+      case 'TIER_10K': return 10000;
+      case 'TIER_100K': return 100000;
+      case 'TIER_UNLIMITED': return Infinity;
+      default: return 250;
+    }
+  }
+
+  const limitNumber = getMessagingLimitNumber(instance?.messaging_limit_tier);
 
   const supabase = createClient()
 
@@ -213,6 +229,10 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
     setColumns(cols)
     setParsedData(data)
     
+    const initialStatuses: Record<number, "pendiente"> = {}
+    data.forEach((_, i) => initialStatuses[i] = "pendiente")
+    setContactStatuses(initialStatuses)
+    
     // Setting these automatically avoids the useEffect auto-detection which is redundant now
     setTimeout(() => {
         setPhoneColumn(pCol)
@@ -228,6 +248,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
     setNameColumn("")
     setVariableMap({})
     setVariableMode({})
+    setContactStatuses({})
     setProgress(0)
     setResults({ success: 0, error: 0, skipped: 0, total: 0 })
     const fileInput = document.getElementById('file_upload') as HTMLInputElement
@@ -317,6 +338,16 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
          break;
        }
 
+       if (contactStatuses[i] && contactStatuses[i] !== "pendiente") {
+         // Skip contacts already processed
+         continue;
+       }
+
+       if (s >= limitNumber) {
+         toast.error(`Has alcanzado tu límite de ${limitNumber} envíos permitidos en esta sesión. El resto ha quedado pendiente.`);
+         break;
+       }
+
        const row = parsedData[i];
        const phone = row[phoneColumn] ? String(row[phoneColumn]) : ""
        const name = row[nameColumn] ? String(row[nameColumn]) : "Lead"
@@ -324,6 +355,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
        // Esto técnicamente ya no se arrojará debido a la pre-validación estricta de arriba
        if (!phone || phone.replace(/\D/g, '').length < 8) {
           e++;
+          setContactStatuses(prev => ({...prev, [i]: "error"}))
           setResults(prev => ({ ...prev, error: e }))
           setProgress(Math.round(((i + 1) / parsedData.length) * 100))
           continue;
@@ -368,15 +400,19 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
            // @ts-ignore
            if (res.warning === 'skipped_duplicate') {
              skipCount++;
+             setContactStatuses(prev => ({...prev, [i]: "salteado"}))
            } else {
              s++;
+             setContactStatuses(prev => ({...prev, [i]: "enviado"}))
            }
          } else {
            e++;
+           setContactStatuses(prev => ({...prev, [i]: "error"}))
            console.error("Error envío fila", i, res.error)
          }
        } catch (err) {
          e++;
+         setContactStatuses(prev => ({...prev, [i]: "error"}))
        }
 
        setResults(prev => ({ ...prev, success: s, error: e, skipped: skipCount }))
@@ -445,10 +481,18 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                    <Input id="file_upload" type="file" accept=".csv, .xls, .xlsx" className="hidden" onChange={handleFileUpload} disabled={isSending} />
                  </Label>
                  
+                 <div className="text-xs text-muted-foreground flex items-center gap-2 mt-2 bg-muted/30 p-2 rounded-md">
+                   <Info className="w-4 h-4 text-primary"/>
+                   <span>
+                     Límite de envíos por campaña: <strong>{limitNumber === Infinity ? 'Ilimitado' : limitNumber} contactos</strong>.
+                     (Según tu estado actual de Meta).
+                   </span>
+                 </div>
+
                  {parsedData.length > 0 && (
-                   <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/10 p-3 rounded-md">
+                   <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/10 p-3 rounded-md mt-2">
                      <CheckCircle2 className="w-4 h-4" />
-                     {parsedData.length} registros detectados.
+                     {parsedData.length} registros detectados y validados listos para enviar.
                    </div>
                  )}
                </div>
@@ -633,6 +677,56 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
         </div>
 
       </div>
+
+      {parsedData.length > 0 && (
+        <Card className="mt-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Contactos Procesados</CardTitle>
+            <CardDescription>Visualiza el estado de cada contacto. El sistema respetará tu límite de envío de forma automática.</CardDescription>
+          </CardHeader>
+          <CardContent>
+             <ScrollArea className="h-[300px] rounded-md border bg-card">
+               <table className="w-full text-sm">
+                 <thead className="bg-muted sticky top-0 z-10">
+                   <tr>
+                     <th className="p-3 text-left font-medium text-muted-foreground w-16">#</th>
+                     <th className="p-3 text-left font-medium text-muted-foreground">Nombre</th>
+                     <th className="p-3 text-left font-medium text-muted-foreground">Teléfono</th>
+                     <th className="p-3 text-right font-medium text-muted-foreground w-32">Estado</th>
+                   </tr>
+                 </thead>
+                 <tbody>
+                   {parsedData.map((row, i) => {
+                      const name = nameColumn ? row[nameColumn] : "Lead"
+                      const phone = phoneColumn ? row[phoneColumn] : ""
+                      const status = contactStatuses[i] || "pendiente"
+                      
+                      return (
+                        <tr key={i} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+                           <td className="p-3 text-muted-foreground">{i + 1}</td>
+                           <td className="p-3 font-medium">{String(name)}</td>
+                           <td className="p-3">{String(phone)}</td>
+                           <td className="p-3 text-right">
+                             <Badge 
+                               variant={
+                                  status === "enviado" ? "default" :
+                                  status === "salteado" ? "secondary" :
+                                  status === "error" ? "destructive" : "outline"
+                               }
+                               className={status === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" : ""}
+                             >
+                               {status.toUpperCase()}
+                             </Badge>
+                           </td>
+                        </tr>
+                      )
+                   })}
+                 </tbody>
+               </table>
+             </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

@@ -29,6 +29,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "./EmptyState"
 import { toast } from "sonner"
+import { Info } from "lucide-react"
 
 interface TemplatesTabProps {
   instance: any
@@ -109,11 +110,27 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
     const result = await syncTemplatesFromMeta()
     if (result.success) {
       toast.success(`Sincronización exitosa. ${result.count || 0} plantillas procesadas.`)
+      if (result.messaging_limit_tier) {
+        instance.messaging_limit_tier = result.messaging_limit_tier
+      }
       await loadTemplates()
     } else {
       toast.error(result.error || "Error al sincronizar plantillas.")
     }
     setSyncing(false)
+  }
+
+  const formatMessagingLimit = (tier: string | null | undefined) => {
+    if (!tier) return "Desconocido"
+    const tiers: Record<string, string> = {
+      'TIER_50': '50 / día',
+      'TIER_250': '250 / día',
+      'TIER_1K': '1.000 / día',
+      'TIER_10K': '10.000 / día',
+      'TIER_100K': '100.000 / día',
+      'TIER_UNLIMITED': 'Ilimitado',
+    }
+    return tiers[tier] || tier
   }
 
   const handleNameChange = (val: string) => {
@@ -543,9 +560,28 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
       </div>
 
       <div className="border rounded-md">
-        <div className="grid grid-cols-12 gap-4 border-b bg-muted/40 p-4 text-sm font-medium text-muted-foreground">
-          <div className="col-span-5">Nombre</div>
-          <div className="col-span-3">Categoría</div>
+        <div className="grid grid-cols-12 gap-4 border-b bg-muted/40 p-4 text-sm font-medium text-muted-foreground items-center">
+          <div className="col-span-4">Nombre</div>
+          <div className="col-span-2">Categoría</div>
+          <div className="col-span-2 flex items-center gap-1">
+            Límite (24hs)
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <Info className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-sm">
+                  <p>Es la cantidad máxima de conversaciones (con plantilla) que puedes iniciar en 24 horas.</p>
+                  <p className="mt-2 font-medium">¿Cómo aumentarlo?</p>
+                  <ul className="list-disc pl-4 mt-1">
+                    <li>Verifica tu empresa en el administrador comercial de Meta.</li>
+                    <li>Mantén una calificación de calidad alta.</li>
+                    <li>Inicia conversaciones con nuevos usuarios frecuentemente. Meta aumentará el límite de forma automática.</li>
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <div className="col-span-2">Estado</div>
           <div className="col-span-2 text-right">Acciones</div>
         </div>
@@ -555,8 +591,9 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
             <div className="flex flex-col w-full">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="grid grid-cols-12 gap-4 p-4 border-b">
-                  <div className="col-span-5"><Skeleton className="h-5 w-[200px]" /></div>
-                  <div className="col-span-3"><Skeleton className="h-5 w-[100px]" /></div>
+                  <div className="col-span-4"><Skeleton className="h-5 w-[150px]" /></div>
+                  <div className="col-span-2"><Skeleton className="h-5 w-[80px]" /></div>
+                  <div className="col-span-2"><Skeleton className="h-5 w-[60px]" /></div>
                   <div className="col-span-2"><Skeleton className="h-5 w-[80px]" /></div>
                   <div className="col-span-2 flex justify-end"><Skeleton className="h-8 w-8 rounded-md" /></div>
                 </div>
@@ -573,8 +610,11 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
           )}
           {templates.map(t => (
             <div key={t.id} className="grid grid-cols-12 gap-4 p-4 text-sm items-center hover:bg-muted/10 transition-colors">
-              <div className="col-span-5 font-medium">{t.template_name}</div>
-              <div className="col-span-3 text-muted-foreground">{t.category}</div>
+              <div className="col-span-4 font-medium break-words">{t.template_name}</div>
+              <div className="col-span-2 text-muted-foreground">{t.category}</div>
+              <div className="col-span-2 font-mono text-xs bg-muted/30 px-2 py-1 rounded-md w-fit">
+                {formatMessagingLimit(instance.messaging_limit_tier)}
+              </div>
               <div className="col-span-2">
                 {getStatusBadge(t.status, t.rejection_reason)}
               </div>

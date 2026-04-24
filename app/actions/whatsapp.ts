@@ -606,14 +606,14 @@ export async function createTemplate(
 // Action 8: Sincronizar templates desde Meta
 // =============================================
 
-export async function syncTemplatesFromMeta(): Promise<WhatsAppActionResult & { count?: number }> {
+export async function syncTemplatesFromMeta(): Promise<WhatsAppActionResult & { count?: number, messaging_limit_tier?: string | null }> {
   try {
     const { agency_id } = await getDirectorProfile()
     const supabase = createClient()
 
     const { data: instance, error: instanceError } = await supabase
       .from('whatsapp_instances')
-      .select('token, business_id')
+      .select('id, token, business_id, phone_number_id')
       .eq('agency_id', agency_id)
       .limit(1)
       .single()
@@ -634,8 +634,33 @@ export async function syncTemplatesFromMeta(): Promise<WhatsAppActionResult & { 
       return { success: false, error: result.error?.message || 'Error al sincronizar templates' }
     }
 
+    // Intentar también obtener el límite de mensajes si hay un phone_number_id
+    let limitTier = null;
+    if (instance.phone_number_id) {
+      try {
+        const limitRes = await fetch(`https://graph.facebook.com/v19.0/${instance.phone_number_id}?fields=messaging_limit_tier`, {
+          headers: {
+            'Authorization': `Bearer ${instance.token}`,
+          },
+        })
+        if (limitRes.ok) {
+          const limitData = await limitRes.json()
+          if (limitData.messaging_limit_tier) {
+            limitTier = limitData.messaging_limit_tier
+            // Guardar el límite en la instancia
+            await supabase
+              .from('whatsapp_instances')
+              .update({ messaging_limit_tier: limitTier })
+              .eq('id', instance.id)
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching messaging limit tier:', e)
+      }
+    }
+
     const templates = result.data || []
-    if (templates.length === 0) return { success: true, count: 0 }
+    if (templates.length === 0) return { success: true, count: 0, messaging_limit_tier: limitTier }
 
     const upsertData = templates.map((t: Record<string, any>) => ({
       agency_id,
@@ -656,7 +681,7 @@ export async function syncTemplatesFromMeta(): Promise<WhatsAppActionResult & { 
       return { success: false, error: `Error actualizando templates: ${upsertError.message}` }
     }
 
-    return { success: true, count: templates.length }
+    return { success: true, count: templates.length, messaging_limit_tier: limitTier }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido'
     return { success: false, error: message }
@@ -1100,6 +1125,79 @@ export async function sendCampaignMessage(
       })
 
     return { success: true, data: insertedMsg }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
+
+// =============================================
+// Contacts Management (Campañas / Agenda)
+// =============================================
+
+export async function importContacts(
+  contacts: Array<{ phone: string; name: string; metadata: Record<string, any>; tags?: string[] }>
+): Promise<WhatsAppActionResult> {
+  try {
+    const { agency_id } = await getAgencyProfile()
+    const supabase = createClient()
+
+    const formattedContacts = contacts.map((c) => ({
+      agency_id,
+      phone: c.phone,
+      name: c.name,
+      metadata: c.metadata,
+      tags: c.tags || [],
+    }))
+
+    // Upsert conflicts on agency_id and phone
+    const { error } = await supabase
+      .from('wa_contacts')
+      .upsert(formattedContacts, {
+        onConflict: 'agency_id, phone',
+        ignoreDuplicates: false, // update if exists
+      })
+
+    if (error) {
+      console.error("Error upserting contacts:", error)
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
+
+export async function updateContactCampaignStatus(
+  contactIds: string[],
+  status: string,
+  templateName: string | null = null
+): Promise<WhatsAppActionResult> {
+  try {
+    const { agency_id } = await getAgencyProfile()
+    const supabase = createClient()
+
+    const updateData: any = {
+      last_campaign_status: status,
+      last_campaign_sent_at: new Date().toISOString()
+    }
+    if (templateName) {
+      updateData.last_campaign_template = templateName
+    }
+
+    const { error } = await supabase
+      .from('wa_contacts')
+      .update(updateData)
+      .eq('agency_id', agency_id)
+      .in('id', contactIds)
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    return { success: true }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido'
     return { success: false, error: message }

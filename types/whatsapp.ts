@@ -28,6 +28,7 @@ export interface WhatsAppInstance {
   business_id: string
   status: InstanceStatus
   phone_display: string | null
+  messaging_limit_tier: string | null
   created_at: string
   updated_at: string
 }
@@ -70,6 +71,20 @@ export interface WATemplate {
   components: unknown[]
   rejection_reason: string | null
   meta_template_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface WAContact {
+  id: string
+  agency_id: string
+  phone: string
+  name: string | null
+  metadata: Record<string, unknown>
+  tags: string[]
+  last_campaign_status: string | null
+  last_campaign_template: string | null
+  last_campaign_sent_at: string | null
   created_at: string
   updated_at: string
 }
