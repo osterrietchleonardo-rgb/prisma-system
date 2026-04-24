@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { sendCampaignMessage } from "@/app/actions/whatsapp"
-import type { WATemplate } from "@/types/whatsapp"
+import { sendCampaignMessage, updateContactCampaignStatus } from "@/app/actions/whatsapp"
+import type { WATemplate, WAContact } from "@/types/whatsapp"
+import { CampaignState } from "./CampaignState"
 import { 
   Megaphone, 
   Upload, 
@@ -36,13 +37,11 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
   const [templates, setTemplates] = useState<WATemplate[]>([])
   const [loading, setLoading] = useState(true)
   
-  // File state
-  const [file, setFile] = useState<File | null>(null)
+  // Selection state
+  const [selectedContactsList, setSelectedContactsList] = useState<WAContact[]>([])
   const [parsedData, setParsedData] = useState<any[]>([])
   const [columns, setColumns] = useState<string[]>([])
   const [contactStatuses, setContactStatuses] = useState<Record<number, "pendiente" | "enviado" | "error" | "salteado">>({})
-  
-  // Selection state
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("")
   
   // Mapping state
@@ -76,6 +75,41 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
 
   useEffect(() => {
     loadApprovedTemplates()
+    
+    const sync = (c: WAContact[]) => {
+      setSelectedContactsList(c)
+      if (c.length === 0) {
+        setParsedData([])
+        setColumns([])
+        setContactStatuses({})
+        return
+      }
+      
+      const convertedData = c.map(contact => ({
+         _id: contact.id,
+         celular: contact.phone,
+         nombre: contact.name,
+         ...(contact.metadata || {})
+      }))
+      
+      setParsedData(convertedData)
+      
+      const allCols = new Set(["celular", "nombre"])
+      c.forEach(contact => {
+        if (contact.metadata) Object.keys(contact.metadata).forEach(k => allCols.add(k))
+      })
+      setColumns(Array.from(allCols))
+      
+      setPhoneColumn("celular")
+      setNameColumn("nombre")
+      
+      const initialStatuses: Record<number, "pendiente"> = {}
+      c.forEach((_, i) => initialStatuses[i] = "pendiente")
+      setContactStatuses(initialStatuses)
+    }
+    
+    sync(CampaignState.getContacts())
+    return CampaignState.subscribe(sync)
   }, [])
 
   const loadApprovedTemplates = async () => {
@@ -118,182 +152,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
     return { headerVars, bodyVars }
   }
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
-    const fileExt = file.name.split('.').pop()?.toLowerCase()
-    
-    clearFile()
-    setFile(file)
-
-    if (fileExt === 'csv') {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          if (results.data.length > 0) {
-            processAndValidateData(results.data)
-          } else {
-            toast.error("El archivo CSV está vacío.")
-            clearFile()
-          }
-        },
-        error: (error) => {
-          toast.error("Error al leer el CSV: " + error.message)
-          clearFile()
-        }
-      })
-    } else if (fileExt === 'xls' || fileExt === 'xlsx') {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer)
-          const workbook = XLSX.read(data, { type: 'array' })
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet)
-          if (jsonData.length > 0) {
-            processAndValidateData(jsonData)
-          } else {
-            toast.error("El archivo Excel está vacío.")
-            clearFile()
-          }
-        } catch (error) {
-          toast.error("Error al procesar el Excel. Asegúrate de que sea válido.")
-          clearFile()
-        }
-      }
-      reader.readAsArrayBuffer(file)
-    } else {
-      toast.error("Formato no soportado. Por favor sube un CSV o Excel.")
-      clearFile()
-    }
-  }
-
-  const processAndValidateData = (data: any[]) => {
-    // Validar headers y buscar dinámicamente el del celular/telefono
-    const cols = Object.keys(data[0] as object)
-    const lowerCols = cols.map(c => c.toLowerCase().trim())
-    
-    let pCol = ""
-    if (lowerCols.includes('celular')) pCol = cols[lowerCols.indexOf('celular')]
-    else if (lowerCols.includes('telefono')) pCol = cols[lowerCols.indexOf('telefono')]
-    else if (lowerCols.includes('teléfono')) pCol = cols[lowerCols.indexOf('teléfono')]
-    else if (lowerCols.includes('phone')) pCol = cols[lowerCols.indexOf('phone')]
-
-    if (!pCol) {
-       toast.error("❌ Archivo Inválido: Debe contener una columna exactamente llamada 'celular' o 'telefono'.")
-       return clearFile()
-    }
-
-    let nCol = ""
-    if (lowerCols.includes('nombre')) nCol = cols[lowerCols.indexOf('nombre')]
-    else if (lowerCols.includes('name')) nCol = cols[lowerCols.indexOf('name')]
-
-    if (!nCol) {
-       toast.error("❌ Archivo Inválido: Debe contener una columna exactamente llamada 'nombre'.")
-       return clearFile()
-    }
-
-    // Now strict validation for the entire dataset
-    const seenPhones = new Set<string>()
-    let errorMsg = ""
-
-    for (let i = 0; i < data.length; i++) {
-        const row = data[i]
-        const phoneRaw = row[pCol] ? String(row[pCol]) : ""
-        const phone = phoneRaw.replace(/\D/g, '')
-        const name = row[nCol] ? String(row[nCol]) : ""
-
-        if (!phone || phone.length < 8) {
-           errorMsg = `Fila ${i + 2}: Teléfono inválido o vacío para el contacto "${name || 'sin nombre'}".`
-           break;
-        }
-        if (!name.trim()) {
-           errorMsg = `Fila ${i + 2}: Nombre vacío (Teléfono: ${phone}).`
-           break;
-        }
-        if (seenPhones.has(phone)) {
-           errorMsg = `Fila ${i + 2}: El teléfono ${phone} está duplicado en la lista.`
-           break;
-        }
-        seenPhones.add(phone)
-    }
-
-    if (errorMsg) {
-       toast.error("❌ No se permite cargar la lista con errores: " + errorMsg)
-       return clearFile()
-    }
-
-    // Passed validation
-    setColumns(cols)
-    setParsedData(data)
-    
-    const initialStatuses: Record<number, "pendiente"> = {}
-    data.forEach((_, i) => initialStatuses[i] = "pendiente")
-    setContactStatuses(initialStatuses)
-    
-    // Setting these automatically avoids the useEffect auto-detection which is redundant now
-    setTimeout(() => {
-        setPhoneColumn(pCol)
-        setNameColumn(nCol)
-    }, 0)
-  }
-
-    const clearFile = () => {
-    setFile(null)
-    setParsedData([])
-    setColumns([])
-    setPhoneColumn("")
-    setNameColumn("")
-    setVariableMap({})
-    setVariableMode({})
-    setContactStatuses({})
-    setProgress(0)
-    setResults({ success: 0, error: 0, skipped: 0, total: 0 })
-    const fileInput = document.getElementById('file_upload') as HTMLInputElement
-    if (fileInput) fileInput.value = ''
-
-    const fileExt = file.name.split('.').pop()?.toLowerCase()
-
-    if (fileExt === 'csv') {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          if (results.data.length > 0) {
-            setColumns(Object.keys(results.data[0] as object))
-            setParsedData(results.data)
-          }
-        },
-        error: (error) => {
-          toast.error("Error al leer el CSV: " + error.message)
-        }
-      })
-    } else if (fileExt === 'xls' || fileExt === 'xlsx') {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target?.result as ArrayBuffer)
-          const workbook = XLSX.read(data, { type: 'array' })
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet)
-          if (jsonData.length > 0) {
-            setColumns(Object.keys(jsonData[0] as object))
-            setParsedData(jsonData)
-          }
-        } catch (error) {
-          toast.error("Error al procesar el Excel. Asegúrate de que sea válido.")
-        }
-      }
-      reader.readAsArrayBuffer(file)
-    } else {
-      toast.error("Formato no soportado. Por favor sube un CSV o Excel.")
-    }
-  }
-
-  // Pre-fill mapping depends entirely on processAndValidateData now.
-  // The useEffect auto-detect logic was replaced to happen INSTANTLY upon upload.
+  // Mapeo automático ya realizado en el state sync
 
   const startCampaign = async () => {
     if (!selectedTemplate || !phoneColumn || !nameColumn || parsedData.length === 0) {
@@ -401,18 +260,22 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
            if (res.warning === 'skipped_duplicate') {
              skipCount++;
              setContactStatuses(prev => ({...prev, [i]: "salteado"}))
+             if (row._id) await updateContactCampaignStatus([row._id], 'salteado', selectedTemplate.template_name)
            } else {
              s++;
              setContactStatuses(prev => ({...prev, [i]: "enviado"}))
+             if (row._id) await updateContactCampaignStatus([row._id], 'enviado', selectedTemplate.template_name)
            }
          } else {
            e++;
            setContactStatuses(prev => ({...prev, [i]: "error"}))
+           if (row._id) await updateContactCampaignStatus([row._id], 'error', selectedTemplate.template_name)
            console.error("Error envío fila", i, res.error)
          }
        } catch (err) {
          e++;
          setContactStatuses(prev => ({...prev, [i]: "error"}))
+         if (row._id) await updateContactCampaignStatus([row._id], 'error', selectedTemplate.template_name)
        }
 
        setResults(prev => ({ ...prev, success: s, error: e, skipped: skipCount }))
@@ -465,22 +328,13 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
       <div className="grid md:grid-cols-2 gap-6 h-full pb-8">
         {/* Left Column: Config */}
         <div className="space-y-6">
-           <Card>
+            <Card>
              <CardHeader className="pb-3">
-               <CardTitle className="text-lg">1. Cargar Base de Contactos</CardTitle>
-               <CardDescription>Formatos soportados: .csv, .xls, .xlsx</CardDescription>
+               <CardTitle className="text-lg">1. Contactos Seleccionados</CardTitle>
+               <CardDescription>Los contactos provienen de la pestaña de Contactos.</CardDescription>
              </CardHeader>
              <CardContent>
                <div className="flex flex-col gap-4">
-                 <Label htmlFor="file_upload" className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-                   <Upload className="w-8 h-8 text-muted-foreground mb-4" />
-                   <div className="text-sm font-medium">Seleccionar Archivo</div>
-                   <div className="text-xs text-muted-foreground mt-1">
-                     {file ? file.name : 'Haz clic para explorar'}
-                   </div>
-                   <Input id="file_upload" type="file" accept=".csv, .xls, .xlsx" className="hidden" onChange={handleFileUpload} disabled={isSending} />
-                 </Label>
-                 
                  <div className="text-xs text-muted-foreground flex items-center gap-2 mt-2 bg-muted/30 p-2 rounded-md">
                    <Info className="w-4 h-4 text-primary"/>
                    <span>
@@ -489,10 +343,15 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                    </span>
                  </div>
 
-                 {parsedData.length > 0 && (
+                 {parsedData.length > 0 ? (
                    <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/10 p-3 rounded-md mt-2">
                      <CheckCircle2 className="w-4 h-4" />
-                     {parsedData.length} registros detectados y validados listos para enviar.
+                     {parsedData.length} contactos cargados listos para enviar.
+                   </div>
+                 ) : (
+                   <div className="flex items-center gap-2 text-sm text-yellow-600 bg-yellow-500/10 p-3 rounded-md mt-2">
+                     <AlertCircle className="w-4 h-4" />
+                     Ve a la pestaña Contactos y selecciona a quienes deseas enviar.
                    </div>
                  )}
                </div>

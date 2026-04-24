@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { importContacts, sendCampaignMessage, updateContactCampaignStatus } from "@/app/actions/whatsapp"
 import type { WATemplate, WAContact } from "@/types/whatsapp"
+import { CampaignState } from "./CampaignState"
 import { 
   Upload, 
   CheckCircle2, 
@@ -40,6 +41,7 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
   
   // Contacts State
   const [contacts, setContacts] = useState<WAContact[]>([])
+  const [templates, setTemplates] = useState<WATemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set())
@@ -47,18 +49,8 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
   // Import State
   const [isImporting, setIsImporting] = useState(false)
   
-  // Campaign Dialog State
-  const [isCampaignDialogOpen, setIsCampaignDialogOpen] = useState(false)
-  const [templates, setTemplates] = useState<WATemplate[]>([])
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("")
-  const [variableMap, setVariableMap] = useState<Record<string, string>>({})
-  const [variableMode, setVariableMode] = useState<Record<string, "metadata" | "manual">>({})
-  
-  // Execution State
-  const [isSending, setIsSending] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [results, setResults] = useState<{success: number, error: number, skipped: number, total: number}>({ success: 0, error: 0, skipped: 0, total: 0 })
-  const abortControllerRef = useRef<AbortController | null>(null)
+  // Campaign Redirect State
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   const getMessagingLimitNumber = (tier: string | null | undefined): number => {
     if (!tier) return 250;
@@ -76,41 +68,34 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
   const limitNumber = getMessagingLimitNumber(instance?.messaging_limit_tier);
 
   useEffect(() => {
-    fetchContacts()
-    loadApprovedTemplates()
+    fetchData()
   }, [])
 
-  const fetchContacts = async () => {
+  const fetchData = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('wa_contacts')
-        .select('*')
-        .eq('agency_id', instance.agency_id)
-        .order('created_at', { ascending: false })
+      const [{ data: contactsData, error: contactsError }, { data: templatesData, error: templatesError }] = await Promise.all([
+        supabase
+          .from('wa_contacts')
+          .select('*')
+          .eq('agency_id', instance.agency_id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('wa_templates')
+          .select('*')
+          .eq('agency_id', instance.agency_id)
+      ])
       
-      if (error) throw error
-      if (data) setContacts(data as WAContact[])
+      if (contactsError) throw contactsError
+      if (templatesError) throw templatesError
+      
+      if (contactsData) setContacts(contactsData as WAContact[])
+      if (templatesData) setTemplates(templatesData as WATemplate[])
     } catch (err) {
       console.error(err)
-      toast.error("Error al cargar los contactos")
+      toast.error("Error al cargar los datos")
     } finally {
       setLoading(false)
-    }
-  }
-
-  const loadApprovedTemplates = async () => {
-    try {
-      const { data } = await supabase
-        .from('wa_templates')
-        .select('*')
-        .eq('agency_id', instance.agency_id)
-        .eq('status', 'APPROVED')
-        .order('created_at', { ascending: false })
-      
-      if (data) setTemplates(data)
-    } catch (err) {
-      console.error(err)
     }
   }
 
@@ -227,7 +212,7 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
     const res = await importContacts(newContacts)
     if (res.success) {
       toast.success(`${newContacts.length} contactos procesados exitosamente.`, { id: "import-toast" })
-      await fetchContacts()
+      await fetchData()
     } else {
       toast.error(`Error al importar: ${res.error}`, { id: "import-toast" })
     }
@@ -253,166 +238,22 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
     setSelectedContactIds(newSet)
   }
 
-  const openCampaignDialog = () => {
+
+  const handleGoToCampaigns = () => {
     if (selectedContactIds.size === 0) {
       toast.error("Debes seleccionar al menos un contacto.")
       return
     }
-    setIsCampaignDialogOpen(true)
-  }
-
-  const getTemplateVars = (template: WATemplate) => {
-    let headerVars: string[] = []
-    let bodyVars: string[] = []
+    const selected = contacts.filter(c => selectedContactIds.has(c.id))
+    CampaignState.setContacts(selected)
     
-    if (template.components && Array.isArray(template.components)) {
-      template.components.forEach((c: any) => {
-        if (c.type === 'HEADER' && c.text) {
-          const matches = c.text.match(/\{\{(\d+)\}\}/g) || []
-          headerVars = Array.from(new Set(matches.map((m: string) => m.replace(/\D/g, ''))))
-        }
-        if (c.type === 'BODY' && c.text) {
-           const matches = c.text.match(/\{\{(\d+)\}\}/g) || []
-           bodyVars = Array.from(new Set(matches.map((m: string) => m.replace(/\D/g, ''))))
-        }
-      })
+    // Switch to campanas tab
+    const campanasTab = document.querySelector<HTMLButtonElement>('button[role="tab"][value="campanas"]')
+    if (campanasTab) {
+      campanasTab.click()
+    } else {
+      toast.error("No se encontró la pestaña de Campañas.")
     }
-    return { headerVars, bodyVars }
-  }
-
-  const selectedTemplate = templates.find(t => t.id === selectedTemplateId)
-  const { headerVars, bodyVars } = selectedTemplate ? getTemplateVars(selectedTemplate) : { headerVars: [], bodyVars: [] }
-  
-  // Extraer todas las claves posibles de metadata de los contactos seleccionados para el mapeo
-  const selectedContactsList = contacts.filter(c => selectedContactIds.has(c.id))
-  const availableMetadataKeys = new Set<string>()
-  selectedContactsList.forEach(c => {
-    if (c.metadata) {
-      Object.keys(c.metadata).forEach(k => availableMetadataKeys.add(k))
-    }
-  })
-  const metadataKeysArray = Array.from(availableMetadataKeys)
-
-  const startCampaign = async () => {
-    if (!selectedTemplate || selectedContactIds.size === 0) {
-      toast.error("Faltan configurar campos o seleccionar la plantilla.")
-      return
-    }
-
-    let missingMap = false;
-    headerVars.forEach(v => {
-       const m = variableMode[`header_${v}`] || "metadata"
-       if (!variableMap[`header_${v}`]) missingMap = true
-    })
-    bodyVars.forEach(v => {
-       const m = variableMode[`body_${v}`] || "metadata"
-       if (!variableMap[`body_${v}`]) missingMap = true
-    })
-    
-    if (missingMap) {
-      toast.error("Falta mapear o rellenar una o más variables de la plantilla.")
-      return
-    }
-
-    setIsSending(true)
-    setProgress(0)
-    setResults({ success: 0, error: 0, skipped: 0, total: selectedContactIds.size })
-    
-    abortControllerRef.current = new AbortController()
-
-    let s = 0;
-    let e = 0;
-    let skipCount = 0;
-    let processed = 0;
-
-    for (const contact of selectedContactsList) {
-       if (abortControllerRef.current.signal.aborted) {
-         toast.info("Campaña detenida por el usuario.")
-         break;
-       }
-
-       if (s >= limitNumber) {
-         toast.error(`Has alcanzado tu límite de ${limitNumber} envíos permitidos en esta sesión.`);
-         break;
-       }
-
-       // Armar variables
-       const headerParams = headerVars.map(v => {
-           const mode = variableMode[`header_${v}`] || "metadata"
-           if (mode === "metadata") return String(contact.metadata?.[variableMap[`header_${v}`]] || "")
-           return variableMap[`header_${v}`] || ""
-       })
-       
-       const bodyParams = bodyVars.map(v => {
-           const mode = variableMode[`body_${v}`] || "metadata"
-           if (mode === "metadata") return String(contact.metadata?.[variableMap[`body_${v}`]] || "")
-           return variableMap[`body_${v}`] || ""
-       })
-
-       let fullText = ""
-       selectedTemplate.components?.forEach((c: any) => {
-         if (c.type === 'BODY' && c.text) {
-            let t = c.text
-            bodyVars.forEach((v, idx) => {
-               t = t.replace(`{{${v}}}`, bodyParams[idx])
-            })
-            fullText += t + "\n\n"
-         }
-       })
-
-       try {
-         const res = await sendCampaignMessage({
-           instance_id: instance.id,
-           phone: contact.phone,
-           name: contact.name || 'Lead',
-           template_name: selectedTemplate.template_name,
-           template_language: selectedTemplate.language || "es_AR",
-           header_variables: headerParams.length > 0 ? headerParams : undefined,
-           body_variables: bodyParams,
-           template_full_text: fullText.trim() || `[Plantilla enviada: ${selectedTemplate.template_name}]`
-         })
-
-         if (res.success) {
-           // @ts-ignore
-           if (res.warning === 'skipped_duplicate') {
-             skipCount++;
-             await updateContactCampaignStatus([contact.id], 'salteado', selectedTemplate.template_name)
-           } else {
-             s++;
-             await updateContactCampaignStatus([contact.id], 'enviado', selectedTemplate.template_name)
-           }
-         } else {
-           e++;
-           await updateContactCampaignStatus([contact.id], 'error', selectedTemplate.template_name)
-           console.error("Error envío", res.error)
-         }
-       } catch (err) {
-         e++;
-         await updateContactCampaignStatus([contact.id], 'error', selectedTemplate.template_name)
-       }
-
-       processed++
-       setResults(prev => ({ ...prev, success: s, error: e, skipped: skipCount }))
-       setProgress(Math.round((processed / selectedContactsList.length) * 100))
-       
-       // Retraso para no saturar Meta
-       await new Promise(r => setTimeout(r, 600))
-    }
-
-    setIsSending(false)
-    if (!abortControllerRef.current.signal.aborted) {
-       toast.success("Campaña finalizada.")
-    }
-    
-    // Refresh table to show updated statuses
-    fetchContacts()
-  }
-
-  const stopCampaign = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
-    setIsSending(false)
   }
 
   const filteredContacts = contacts.filter(c => 
@@ -437,16 +278,16 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
             <Label htmlFor="contact_upload" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 px-4 py-2 text-sm font-medium transition-colors cursor-pointer w-full sm:w-auto">
               {isImporting ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
               Importar Contactos
-              <Input id="contact_upload" type="file" accept=".csv, .xls, .xlsx" className="hidden" onChange={handleFileUpload} disabled={isImporting || isSending} />
+              <Input id="contact_upload" type="file" accept=".csv, .xls, .xlsx" className="hidden" onChange={handleFileUpload} disabled={isImporting} />
             </Label>
             
             <Button 
               className="w-full sm:w-auto"
-              disabled={selectedContactIds.size === 0 || isSending} 
-              onClick={openCampaignDialog}
+              disabled={selectedContactIds.size === 0} 
+              onClick={handleGoToCampaigns}
             >
               <MessageSquare className="w-4 h-4 mr-2" />
-              Lanzar Campaña ({selectedContactIds.size})
+              Configurar Campaña ({selectedContactIds.size})
             </Button>
          </div>
       </div>
@@ -488,9 +329,12 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
                   </th>
                   <th className="p-3 text-left font-medium text-muted-foreground">Nombre</th>
                   <th className="p-3 text-left font-medium text-muted-foreground">Teléfono</th>
-                  <th className="p-3 text-left font-medium text-muted-foreground">Última Plantilla</th>
-                  <th className="p-3 text-center font-medium text-muted-foreground">Último Estado</th>
-                  <th className="p-3 text-right font-medium text-muted-foreground">Fecha</th>
+                  {templates.map(tmpl => (
+                    <th key={tmpl.id} className="p-3 text-center font-medium text-muted-foreground">
+                      {tmpl.template_name}
+                    </th>
+                  ))}
+                  <th className="p-3 text-right font-medium text-muted-foreground">Último Envío</th>
                 </tr>
               </thead>
               <tbody>
@@ -504,31 +348,39 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
                      </td>
                      <td className="p-3 font-medium">{contact.name || "Sin nombre"}</td>
                      <td className="p-3">{contact.phone}</td>
-                     <td className="p-3">
-                       {contact.last_campaign_template ? (
-                         <span className="truncate max-w-[150px] inline-block" title={contact.last_campaign_template}>
-                           {contact.last_campaign_template}
-                         </span>
-                       ) : (
-                         <span className="text-muted-foreground">-</span>
-                       )}
-                     </td>
-                     <td className="p-3 text-center">
-                       {contact.last_campaign_status ? (
-                         <Badge 
-                           variant={
-                              contact.last_campaign_status === "enviado" ? "default" :
-                              contact.last_campaign_status === "salteado" ? "secondary" :
-                              contact.last_campaign_status === "error" ? "destructive" : "outline"
-                           }
-                           className={contact.last_campaign_status === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" : ""}
-                         >
-                           {contact.last_campaign_status.toUpperCase()}
-                         </Badge>
-                       ) : (
-                         <span className="text-muted-foreground text-xs">Sin actividad</span>
-                       )}
-                     </td>
+                     {templates.map(tmpl => {
+                       const campaignData = contact.campaign_statuses?.[tmpl.template_name]
+                       
+                       // Backward compatibility: might be a string if sent before this update
+                       const status = typeof campaignData === 'string' ? campaignData : campaignData?.status
+                       const sentAt = typeof campaignData === 'object' && campaignData?.sent_at ? campaignData.sent_at : null
+                       
+                       return (
+                         <td key={tmpl.id} className="p-3 text-center">
+                           {status ? (
+                             <div className="flex flex-col items-center gap-1">
+                               <Badge 
+                                 variant={
+                                    status === "enviado" ? "default" :
+                                    status === "salteado" ? "secondary" :
+                                    status === "error" ? "destructive" : "outline"
+                                 }
+                                 className={status === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" : ""}
+                               >
+                                 {status.toUpperCase()}
+                               </Badge>
+                               {sentAt && (
+                                 <span className="text-[10px] text-muted-foreground">
+                                   {new Date(sentAt).toLocaleDateString()}
+                                 </span>
+                               )}
+                             </div>
+                           ) : (
+                             <span className="text-muted-foreground text-xs">-</span>
+                           )}
+                         </td>
+                       )
+                     })}
                      <td className="p-3 text-right text-muted-foreground text-xs">
                        {contact.last_campaign_sent_at ? new Date(contact.last_campaign_sent_at).toLocaleDateString() : '-'}
                      </td>
@@ -539,143 +391,6 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
           )}
         </div>
       </Card>
-
-      <Dialog open={isCampaignDialogOpen} onOpenChange={(open) => !isSending && setIsCampaignDialogOpen(open)}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Lanzar Campaña</DialogTitle>
-            <DialogDescription>
-              Se enviará una plantilla a los {selectedContactIds.size} contactos seleccionados.
-            </DialogDescription>
-          </DialogHeader>
-
-          {isSending || progress > 0 ? (
-             <div className="flex-1 overflow-y-auto py-6">
-                <div className="space-y-6">
-                   <div className="space-y-2">
-                     <div className="flex justify-between text-sm font-medium">
-                       <span>Progreso de envíos</span>
-                       <span>{progress}% ({results.success + results.error + results.skipped}/{results.total})</span>
-                     </div>
-                     <Progress value={progress} className="h-3" />
-                   </div>
-                   
-                   <div className="grid grid-cols-3 gap-3">
-                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex flex-col items-center">
-                       <CheckCircle2 className="w-6 h-6 text-green-500 mb-1" />
-                       <span className="text-xl font-bold text-green-700 dark:text-green-400">{results.success}</span>
-                       <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Enviados</span>
-                     </div>
-                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex flex-col items-center">
-                       <Info className="w-6 h-6 text-yellow-500 mb-1" />
-                       <span className="text-xl font-bold text-yellow-700 dark:text-yellow-400">{results.skipped}</span>
-                       <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Salteados</span>
-                     </div>
-                     <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex flex-col items-center">
-                       <AlertCircle className="w-6 h-6 text-red-500 mb-1" />
-                       <span className="text-xl font-bold text-red-700 dark:text-red-400">{results.error}</span>
-                       <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Errores</span>
-                     </div>
-                   </div>
-                 </div>
-             </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto py-4 space-y-6 pr-2">
-              <div className="space-y-3">
-                <Label>Seleccionar Plantilla Aprobada</Label>
-                <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Elige la plantilla de envío" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates.map(t => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.template_name} ({t.category})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedTemplate && (headerVars.length > 0 || bodyVars.length > 0) && (
-                <div className="space-y-4 pt-4 border-t">
-                  <h4 className="font-medium text-sm">Mapeo de Variables</h4>
-                  <p className="text-xs text-muted-foreground">Asigna las variables de tu plantilla a las columnas extra del Excel subido o escribe un texto fijo.</p>
-                  
-                  {headerVars.map(v => (
-                    <div key={`header_${v}`} className="space-y-2 p-3 bg-muted/30 rounded-lg border">
-                      <div className="flex justify-between items-center mb-2">
-                        <Label className="text-xs font-medium">Variable Header {`{{${v}}}`}</Label>
-                        <Select value={variableMode[`header_${v}`] || "metadata"} onValueChange={val => setVariableMode(p => ({...p, [`header_${v}`]: val as "metadata" | "manual"}))}>
-                          <SelectTrigger className="h-7 w-[130px] text-xs"><SelectValue/></SelectTrigger>
-                          <SelectContent>
-                             <SelectItem value="metadata">Dato del Excel</SelectItem>
-                             <SelectItem value="manual">Texto fijo</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      {(variableMode[`header_${v}`] || "metadata") === "metadata" ? (
-                        <Select value={variableMap[`header_${v}`] || ""} onValueChange={val => setVariableMap(p => ({...p, [`header_${v}`]: val}))}>
-                          <SelectTrigger><SelectValue placeholder="Selecciona la columna..." /></SelectTrigger>
-                          <SelectContent>{metadataKeysArray.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                        </Select>
-                      ) : (
-                        <Input value={variableMap[`header_${v}`] || ""} onChange={e => setVariableMap(p => ({...p, [`header_${v}`]: e.target.value}))} placeholder="Texto para todos..." />
-                      )}
-                    </div>
-                  ))}
-                  
-                  {bodyVars.map(v => (
-                    <div key={`body_${v}`} className="space-y-2 p-3 bg-muted/30 rounded-lg border">
-                      <div className="flex justify-between items-center mb-2">
-                        <Label className="text-xs font-medium">Variable Body {`{{${v}}}`}</Label>
-                        <Select value={variableMode[`body_${v}`] || "metadata"} onValueChange={val => setVariableMode(p => ({...p, [`body_${v}`]: val as "metadata" | "manual"}))}>
-                          <SelectTrigger className="h-7 w-[130px] text-xs"><SelectValue/></SelectTrigger>
-                          <SelectContent>
-                             <SelectItem value="metadata">Dato del Excel</SelectItem>
-                             <SelectItem value="manual">Texto fijo</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {(variableMode[`body_${v}`] || "metadata") === "metadata" ? (
-                        <Select value={variableMap[`body_${v}`] || ""} onValueChange={val => setVariableMap(p => ({...p, [`body_${v}`]: val}))}>
-                          <SelectTrigger><SelectValue placeholder="Selecciona la columna..." /></SelectTrigger>
-                          <SelectContent>{metadataKeysArray.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                        </Select>
-                      ) : (
-                        <Input value={variableMap[`body_${v}`] || ""} onChange={e => setVariableMap(p => ({...p, [`body_${v}`]: e.target.value}))} placeholder="Texto para todos..." />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <DialogFooter className="mt-4 border-t pt-4">
-            {!isSending ? (
-               <div className="w-full flex gap-3">
-                 <Button variant="outline" className="w-full" onClick={() => setIsCampaignDialogOpen(false)} disabled={progress > 0 && progress < 100}>
-                   Cerrar
-                 </Button>
-                 <Button 
-                   className="w-full" 
-                   onClick={startCampaign}
-                   disabled={!selectedTemplate || (progress > 0 && progress < 100)}
-                 >
-                   <Play className="w-4 h-4 mr-2" /> Enviar
-                 </Button>
-               </div>
-            ) : (
-              <Button variant="destructive" className="w-full" onClick={stopCampaign}>
-                <StopCircle className="w-4 h-4 mr-2" /> Detener envíos
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

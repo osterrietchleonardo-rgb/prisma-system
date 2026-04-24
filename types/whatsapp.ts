@@ -85,6 +85,7 @@ export interface WAContact {
   last_campaign_status: string | null
   last_campaign_template: string | null
   last_campaign_sent_at: string | null
+  campaign_statuses: Record<string, { status: string; sent_at: string }> // Updated field
   created_at: string
   updated_at: string
 }

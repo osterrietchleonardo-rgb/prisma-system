@@ -1179,24 +1179,47 @@ export async function updateContactCampaignStatus(
     const { agency_id } = await getAgencyProfile()
     const supabase = createClient()
 
-    const updateData: any = {
-      last_campaign_status: status,
-      last_campaign_sent_at: new Date().toISOString()
-    }
-    if (templateName) {
-      updateData.last_campaign_template = templateName
-    }
-
-    const { error } = await supabase
+    // Primero obtenemos los contactos para actualizar su jsonb de campaign_statuses
+    const { data: contactsData, error: fetchError } = await supabase
       .from('wa_contacts')
-      .update(updateData)
+      .select('id, campaign_statuses')
       .eq('agency_id', agency_id)
       .in('id', contactIds)
 
-    if (error) {
-      return { success: false, error: error.message }
+    if (fetchError) {
+      return { success: false, error: fetchError.message }
     }
 
+    // Actualizamos cada contacto por separado para mergear correctamente el JSONB
+    for (const contact of contactsData) {
+      const currentStatuses = contact.campaign_statuses || {}
+      
+      const updateData: any = {
+        last_campaign_status: status,
+        last_campaign_sent_at: new Date().toISOString()
+      }
+      
+      if (templateName) {
+        updateData.last_campaign_template = templateName
+        updateData.campaign_statuses = {
+          ...currentStatuses,
+          [templateName]: {
+            status,
+            sent_at: updateData.last_campaign_sent_at
+          }
+        }
+      }
+
+      const { error } = await supabase
+        .from('wa_contacts')
+        .update(updateData)
+        .eq('id', contact.id)
+        
+      if (error) {
+        console.error(`Error updating contact ${contact.id}:`, error)
+      }
+    }
+    
     return { success: true }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido'
