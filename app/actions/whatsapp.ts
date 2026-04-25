@@ -72,7 +72,7 @@ export async function connectWhatsApp(
     // UUID completo como instanceName = 100% único por agencia, imposible de repetir
     const instance_name = `prisma-${agency_id}`
     const evolutionUrl = process.env.EVOLUTION_API_URL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    const appUrl = process.env.APP_URL
     // AUTHENTICATION_API_KEY global del servidor Evolution (no por instancia)
     const evolutionKey = process.env.EVOLUTION_API_KEY
 

@@ -252,7 +252,7 @@ export async function POST(req: Request) {
           })),
 
         // URL donde n8n POST-ea la respuesta de la IA
-        reply_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/n8n/reply`,
+        reply_url: `${process.env.APP_URL}/api/n8n/reply`,
       }
 
       // Llamada a n8n esperando la respuesta para evitar que Vercel cancele el request

@@ -187,7 +187,7 @@ export async function signInWithGoogle(origin: string, role?: string, inviteCode
   if (agencyName) queryParams.set('agencyName', agencyName)
   
   // Prioridad: 1. Origin del browser, 2. Env Var de Vercel, 3. URL Hardcoded oficial
-  const baseOrigin = origin || process.env.NEXT_PUBLIC_SITE_URL || 'https://prisma.vakdor.com'
+  const baseOrigin = origin || process.env.APP_URL || 'https://prisma.vakdor.com'
   const redirectTo = `${baseOrigin}/auth/callback${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
 
   const { data, error } = await supabase.auth.signInWithOAuth({

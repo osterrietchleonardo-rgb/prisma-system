@@ -188,7 +188,7 @@ export async function POST(req: Request) {
                             at: m.created_at,
                         })),
                         // URL a la que n8n debe hacer POST para guardar la respuesta y enviarla al lead
-                        reply_url: `${process.env.NEXT_PUBLIC_APP_URL}/api/n8n/reply`,
+                        reply_url: `${process.env.APP_URL}/api/n8n/reply`,
                     }
 
                     fetch(process.env.N8N_WEBHOOK_URL, {
