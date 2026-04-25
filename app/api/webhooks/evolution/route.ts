@@ -62,6 +62,8 @@ export async function POST(req: Request) {
       .select('id, agency_id, evo_instance_name')
       .or(`evo_instance_name.eq.${resolvedName},instance_name.eq.${resolvedName}`)
       .maybeSingle()
+    
+    console.log(`[Evolution Webhook] Instancia encontrada: ${instance?.id || 'NO ENCONTRADA'} para nombre: ${resolvedName}`)
 
     if (!instance) {
       console.warn(`[Evolution Webhook] Instancia no encontrada: ${resolvedName}`)
