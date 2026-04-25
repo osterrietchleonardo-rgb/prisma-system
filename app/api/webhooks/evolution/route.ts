@@ -16,6 +16,7 @@ export async function POST(req: Request) {
     )
 
     const payload = await req.json()
+    console.log(`[Evolution Webhook] Evento recibido: ${payload.event} para instancia: ${payload.instance}`)
 
     // Solo procesar mensajes entrantes del lead
     if (payload.event !== 'messages.upsert') {
@@ -209,6 +210,7 @@ export async function POST(req: Request) {
 
     // 4. Disparar n8n con payload enriquecido (bot activo)
     if (process.env.N8N_WEBHOOK_URL) {
+      console.log(`[Evolution Webhook] Intentando disparar n8n para conv: ${conversation_id} en URL: ${process.env.N8N_WEBHOOK_URL}`)
 
       const enrichedPayload = {
         debug_v: '5.1_final_manual_mode', // Versión de debug
