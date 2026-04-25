@@ -24,7 +24,22 @@ export async function POST(req: Request) {
     )
 
     const body = await req.json()
-    const { conversation_id, reply, secret, update_score, add_etiquetas, instance_name, media_url, media_type } = body
+    const { conversation_id, reply, secret, update_score, add_etiquetas, instance_name, media_url } = body
+
+    // Normalizar media_type: corregir typos comunes (ej: "imege" → "image")
+    const rawMediaType: string = (body.media_type || 'image').toLowerCase().trim()
+    const VALID_MEDIA_TYPES = ['image', 'video', 'audio', 'document']
+    const media_type = VALID_MEDIA_TYPES.includes(rawMediaType)
+      ? rawMediaType
+      : rawMediaType.startsWith('im') ? 'image'
+      : rawMediaType.startsWith('vid') ? 'video'
+      : rawMediaType.startsWith('aud') ? 'audio'
+      : rawMediaType.startsWith('doc') ? 'document'
+      : 'image' // fallback seguro
+
+    if (rawMediaType !== media_type) {
+      console.warn(`[n8n reply] media_type corregido: "${rawMediaType}" → "${media_type}"`)
+    }
 
     // Seguridad: verificar secret compartido con n8n
     const expectedSecret = process.env.N8N_REPLY_SECRET
@@ -109,11 +124,32 @@ export async function POST(req: Request) {
 
       if (media_url) {
         endpoint = `${evolutionUrl}/message/sendMedia/${instance.evo_instance_name}`;
-        evoPayload.mediatype = media_type || 'image'; // image, video, audio, document
-        evoPayload.media = media_url;
-        if (reply?.trim()) {
-          evoPayload.caption = reply;
+
+        // Detectar mimetype y fileName desde la URL
+        const urlPath = media_url.split('?')[0] // Quitar query params
+        const urlExt = urlPath.split('.').pop()?.toLowerCase() || ''
+        const mimeMap: Record<string, string> = {
+          jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+          gif: 'image/gif', webp: 'image/webp', mp4: 'video/mp4',
+          mp3: 'audio/mpeg', ogg: 'audio/ogg', pdf: 'application/pdf',
+          doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         }
+        const typeDefaultMime: Record<string, string> = {
+          image: 'image/jpeg', video: 'video/mp4',
+          audio: 'audio/mpeg', document: 'application/pdf',
+        }
+        const mimetype = mimeMap[urlExt] || typeDefaultMime[media_type] || 'image/jpeg'
+        const fileName = urlPath.split('/').pop() || `media.${urlExt || 'jpg'}`
+
+        evoPayload.mediatype = media_type
+        evoPayload.mimetype = mimetype
+        evoPayload.media = media_url
+        evoPayload.fileName = fileName
+        if (reply?.trim()) {
+          evoPayload.caption = reply.trim()
+        }
+
+        console.log(`[n8n reply] sendMedia → type=${media_type}, mime=${mimetype}, file=${fileName}`)
       } else {
         evoPayload.text = reply;
       }
