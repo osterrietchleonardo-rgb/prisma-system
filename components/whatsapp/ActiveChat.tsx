@@ -675,18 +675,83 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
 }
 
 // =============================================
+// Media renderer
+// =============================================
+
+function MediaContent({ msg }: { msg: WAMessage }) {
+  const mediaUrl: string | undefined =
+    (msg.metadata as any)?.media_url ||
+    (msg.message_type !== 'text' && msg.message_type !== 'other' ? msg.content : undefined)
+
+  if (!mediaUrl) return null
+
+  if (msg.message_type === 'image') {
+    return (
+      <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="block">
+        <img
+          src={mediaUrl}
+          alt="Imagen"
+          className="rounded-xl max-w-full max-h-64 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+          onError={(e) => {
+            // Si la imagen no carga, mostrar enlace
+            (e.target as HTMLImageElement).style.display = 'none'
+          }}
+        />
+      </a>
+    )
+  }
+
+  if (msg.message_type === 'video') {
+    return (
+      <video
+        src={mediaUrl}
+        controls
+        className="rounded-xl max-w-full max-h-64 object-cover"
+      />
+    )
+  }
+
+  if (msg.message_type === 'audio') {
+    return (
+      <audio src={mediaUrl} controls className="w-full" />
+    )
+  }
+
+  // document u otros: enlace
+  return (
+    <a
+      href={mediaUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-xs underline text-accent truncate block"
+    >
+      📎 Ver archivo adjunto
+    </a>
+  )
+}
+
+// =============================================
 // Message Bubble
 // =============================================
 
 function MessageBubble({ msg }: { msg: WAMessage }) {
   const time = formatTime(msg.created_at)
+  const isMedia = ['image', 'video', 'audio', 'document'].includes(msg.message_type || '')
 
   if (msg.role === "lead") {
     return (
       <div className="flex justify-end">
         <div className="max-w-[70%]">
-          <div className="bg-neutral-100 dark:bg-neutral-800 rounded-2xl rounded-br-sm px-4 py-2.5">
-            <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+          <div className="bg-neutral-100 dark:bg-neutral-800 rounded-2xl rounded-br-sm overflow-hidden">
+            {isMedia && <div className="p-1"><MediaContent msg={msg} /></div>}
+            {msg.content && msg.content !== (msg.metadata as any)?.media_url && (
+              <p className={`text-sm whitespace-pre-wrap break-words ${
+                isMedia ? 'px-4 pb-2.5 pt-1' : 'px-4 py-2.5'
+              }`}>{msg.content}</p>
+            )}
+            {!isMedia && !msg.content && (
+              <p className="text-sm px-4 py-2.5 text-muted-foreground italic">Mensaje multimedia</p>
+            )}
           </div>
           <p className="text-[10px] text-muted-foreground mt-1 text-right">{time}</p>
         </div>
@@ -700,12 +765,18 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
         <div className="max-w-[70%]">
           <div className="flex items-center gap-1.5 mb-1">
             <Bot className="w-3 h-3 text-accent" />
-            <span className="text-xs font-semibold text-accent">
-              Asesor IA
-            </span>
+            <span className="text-xs font-semibold text-accent">Asesor IA</span>
           </div>
-          <div className="bg-accent/5 dark:bg-accent/10 border border-accent/20 rounded-2xl rounded-bl-sm px-4 py-2.5">
-            <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+          <div className="bg-accent/5 dark:bg-accent/10 border border-accent/20 rounded-2xl rounded-bl-sm overflow-hidden">
+            {isMedia && <div className="p-1"><MediaContent msg={msg} /></div>}
+            {msg.content && msg.content !== (msg.metadata as any)?.media_url && (
+              <p className={`text-sm whitespace-pre-wrap break-words ${
+                isMedia ? 'px-4 pb-2.5 pt-1' : 'px-4 py-2.5'
+              }`}>{msg.content}</p>
+            )}
+            {!isMedia && !msg.content && (
+              <p className="text-sm px-4 py-2.5 text-muted-foreground italic">Mensaje multimedia</p>
+            )}
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">{time}</p>
         </div>
@@ -719,9 +790,7 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
         <div className="max-w-[70%]">
           <div className="flex items-center gap-1.5 mb-1">
             <User className="w-3 h-3 text-primary" />
-            <span className="text-xs font-semibold text-primary">
-              Director
-            </span>
+            <span className="text-xs font-semibold text-primary">Director</span>
           </div>
           <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl rounded-bl-sm px-4 py-2.5">
             <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
