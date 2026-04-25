@@ -85,8 +85,11 @@ export async function POST(req: Request) {
 
     const conv = convs && convs.length > 0 ? convs[0] : null
 
+    // Declarar fuera del bloque para que sea accesible globalmente
+    let newConv: typeof conv = null
+
     if (!conv) {
-      const { data: newConv, error: newConvErr } = await supabase
+      const { data: createdConv, error: newConvErr } = await supabase
         .from('wa_conversations')
         .insert({
           agency_id: instance.agency_id,
@@ -104,17 +107,19 @@ export async function POST(req: Request) {
         .select()
         .single()
 
-      if (newConvErr || !newConv) {
+      if (newConvErr || !createdConv) {
         console.error('[Evolution Webhook] Error creando conversación:', newConvErr)
         return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 })
       }
-      conversation_id = newConv.id
+      newConv = createdConv
+      conversation_id = createdConv.id
+      botIsActive = true // Conversación nueva → bot activo por defecto
     } else {
       conversation_id = conv.id
       botIsActive = conv.bot_active
     }
 
-    const activeConv = conv || newConv
+    const activeConv = conv ?? newConv
 
     // Ejecutar queries lentas de BD en paralelo para acelerar trigger a n8n
     const promises: Promise<any>[] = []
@@ -259,23 +264,36 @@ export async function POST(req: Request) {
         reply_url: `${process.env.APP_URL}/api/n8n/reply`,
       }
 
-      // Llamada a n8n esperando la respuesta para evitar que Vercel cancele el request
-      try {
-        const n8nRes = await fetch(process.env.N8N_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(enrichedPayload),
-        });
+      // Fire-and-forget con timeout: NO bloqueamos la respuesta a Evolution.
+      // Si await-eamos n8n y tarda, Vercel corta la función antes del return →
+      // Evolution no recibe 200 → reintenta o descarta el mensaje.
+      // Solución: disparar la fetch en background y responder de inmediato.
+      const controller = new AbortController()
+      const n8nTimeout = setTimeout(() => controller.abort(), 25000) // 25s max
 
-        if (!n8nRes.ok) {
-          const errBody = await n8nRes.text().catch(() => '')
-          console.error(`[Evolution Webhook] n8n respondió ${n8nRes.status}: ${errBody}`)
-        } else {
-          console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
-        }
-      } catch (n8nErr) {
-        console.error('[Evolution Webhook] Error llamando a n8n:', n8nErr)
-      }
+      fetch(process.env.N8N_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(enrichedPayload),
+        signal: controller.signal,
+      })
+        .then(async (n8nRes) => {
+          clearTimeout(n8nTimeout)
+          if (!n8nRes.ok) {
+            const errBody = await n8nRes.text().catch(() => '')
+            console.error(`[Evolution Webhook] n8n respondió ${n8nRes.status}: ${errBody}`)
+          } else {
+            console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
+          }
+        })
+        .catch((n8nErr: Error) => {
+          clearTimeout(n8nTimeout)
+          if (n8nErr.name === 'AbortError') {
+            console.error(`[Evolution Webhook] n8n timeout (>25s) — conv: ${conversation_id}`)
+          } else {
+            console.error('[Evolution Webhook] Error llamando a n8n:', n8nErr)
+          }
+        })
     } // end if n8n configured
 
     return NextResponse.json({ success: true })
