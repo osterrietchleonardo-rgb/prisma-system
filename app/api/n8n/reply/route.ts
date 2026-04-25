@@ -116,10 +116,18 @@ export async function POST(req: Request) {
       // Clean phone number (remove +, spaces, etc)
       const cleanPhone = conv.contact_phone.replace(/\D/g, "");
 
+      // Delay dinámico basado en longitud del mensaje: simula velocidad de escritura humana
+      // ~40ms por carácter, mínimo 800ms, máximo 4000ms
+      const replyLength = reply?.trim().length || 50
+      const typingDelay = Math.min(Math.max(replyLength * 40, 800), 4000)
+
       let endpoint = `${evolutionUrl}/message/sendText/${instance.evo_instance_name}`;
       let evoPayload: any = {
         number: cleanPhone,
-        delay: 1200, // Opciones de delay para parecer más humano (ms)
+        delay: typingDelay,
+        options: {
+          presence: 'composing', // Muestra el indicador "escribiendo..." en WhatsApp
+        },
       };
 
       if (media_url) {
