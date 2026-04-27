@@ -236,7 +236,7 @@ export default function AsesorCalendarioPage() {
                            <div className="flex items-center gap-4 bg-accent/5 p-4 rounded-xl border border-accent/10">
                               <MapPin className="h-10 w-10 text-accent bg-accent/10 p-2 rounded-full" />
                               <div>
-                                 <h4 className="font-bold text-lg">{visit.propiedad_id || 'Propiedad sin ID'}</h4>
+                                 <h4 className="font-bold text-lg">{visit.propiedad_titulo || 'Propiedad sin título'}</h4>
                                  <p className="text-sm text-muted-foreground">{visit.zona_propiedad || 'Zona no especificada'}</p>
                               </div>
                            </div>
@@ -254,8 +254,8 @@ export default function AsesorCalendarioPage() {
                                  <span className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
                                    <CalendarIcon className="h-3 w-3" /> Fecha y Hora
                                  </span>
-                                 <p className="font-bold">{format(parseISO(visit.fecha_visita), "PPP", { locale: es })}</p>
-                                 <p className="text-xs font-bold text-accent">{visit.hora_visita.substring(0, 5)} hs</p>
+                                 <p className="font-bold">{format(parseISO(visit.fecha_visita), "dd/MM/yyyy", { locale: es })}</p>
+                                 <p className="text-xs font-bold text-accent">{visit.hora_visita} hs</p>
                               </div>
                            </div>
 

@@ -260,11 +260,11 @@ export default function CalendarioPage() {
                           <div className="flex items-center justify-between gap-1 mb-1 font-bold">
                             <div className="flex items-center gap-1">
                               <Clock className="h-2 w-2" />
-                              {visit.hora_visita?.substring(0, 5) || '00:00'} - {visit.nombre_completo}
+                              {visit.hora_visita} - {visit.nombre_completo}
                             </div>
                           </div>
                           <div className="truncate text-muted-foreground group-hover:text-foreground">
-                            {visit.zona_propiedad || visit.propiedad_id}
+                            {visit.zona_propiedad || visit.propiedad_titulo}
                           </div>
                         </div>
                       </DialogTrigger>
@@ -290,7 +290,7 @@ export default function CalendarioPage() {
                            <div className="flex items-center gap-4 bg-accent/5 p-4 rounded-xl border border-accent/10">
                               <MapPin className="h-10 w-10 text-accent bg-accent/10 p-2 rounded-full" />
                               <div>
-                                 <h4 className="font-bold text-lg">{visit.propiedad_id || 'Propiedad sin ID'}</h4>
+                                 <h4 className="font-bold text-lg">{visit.propiedad_titulo || 'Propiedad sin título'}</h4>
                                  <p className="text-sm text-muted-foreground">{visit.zona_propiedad || 'Zona no especificada'}</p>
                               </div>
                            </div>
@@ -317,6 +317,16 @@ export default function CalendarioPage() {
                                     </Avatar>
                                     <p className="font-bold text-sm">{visit.agent?.full_name || 'Sin asignar'}</p>
                                  </div>
+                              </div>
+                           </div>
+
+                           <div className="bg-card/50 p-3 rounded-lg border border-accent/5">
+                              <span className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                                <CalendarIcon className="h-3 w-3" /> Fecha y Hora
+                              </span>
+                              <div className="flex justify-between items-center mt-1">
+                                <p className="font-bold">{format(parseISO(visit.fecha_visita), "dd/MM/yyyy", { locale: es })}</p>
+                                <p className="text-xs font-bold text-accent">{visit.hora_visita} hs</p>
                               </div>
                            </div>
 

@@ -70,7 +70,7 @@ export function NewVisitDialog({
     email: "",
     fecha_visita: "",
     hora_visita: "",
-    propiedad_id: "",
+    propiedad_titulo: "",
     zona_propiedad: "",
     tipo_operacion: "compra",
     presupuesto: "",
@@ -116,7 +116,7 @@ export function NewVisitDialog({
     if (property) {
       let updatedData = {
         ...formData,
-        propiedad_id: property.title,
+        propiedad_titulo: property.title,
         zona_propiedad: property.city || property.address || ""
       }
 
@@ -161,6 +161,7 @@ export function NewVisitDialog({
         .from("scheduled_visits")
         .insert({
           ...formData,
+          lead_id: formData.telefono, // Usar celular como ID de lead
           agency_id: agencyId,
           score_bant: parseInt(formData.score_bant.toString()) || 0
         })
@@ -177,7 +178,7 @@ export function NewVisitDialog({
         email: "",
         fecha_visita: "",
         hora_visita: "",
-        propiedad_id: "",
+        propiedad_titulo: "",
         zona_propiedad: "",
         tipo_operacion: "compra",
         presupuesto: "",
@@ -282,7 +283,7 @@ export function NewVisitDialog({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="propiedad_id">Seleccionar Propiedad (Tokko)</Label>
+                <Label htmlFor="propiedad_titulo">Seleccionar Propiedad (Tokko)</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -290,7 +291,7 @@ export function NewVisitDialog({
                       role="combobox"
                       className="w-full justify-between bg-accent/5 border-accent/10 h-10 font-normal"
                     >
-                      {formData.propiedad_id || "Seleccionar propiedad..."}
+                      {formData.propiedad_titulo || "Seleccionar propiedad..."}
                       <Briefcase className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
@@ -318,7 +319,7 @@ export function NewVisitDialog({
                             type="button"
                             className={cn(
                               "w-full text-left p-2 rounded-sm text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5",
-                              formData.propiedad_id === prop.title && "bg-accent/10"
+                              formData.propiedad_titulo === prop.title && "bg-accent/10"
                             )}
                             onClick={() => handlePropertyChange(prop.id)}
                           >

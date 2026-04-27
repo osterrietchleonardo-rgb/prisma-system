@@ -21,7 +21,7 @@ export const openaiIA = {
       const response = await openai.chat.completions.create({
         model: "gpt-4.1-mini",
         messages: messages,
-        temperature: 0.7,
+        temperature: 0.5,
         max_tokens: 2048,
       });
 
