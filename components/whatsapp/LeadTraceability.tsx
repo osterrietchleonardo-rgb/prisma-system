@@ -113,10 +113,23 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
   // Section 4: Scheduled Visit
   const [visit, setVisit] = useState<any>(null)
   const [visitLoading, setVisitLoading] = useState(true)
+  const [assignedAgent, setAssignedAgent] = useState<string | null>(null)
   
   useEffect(() => {
-    async function fetchVisit() {
+    async function fetchData() {
       try {
+        // 0. Fetch assigned agent name if exists
+        if (conversation.agent_id) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", conversation.agent_id)
+            .maybeSingle()
+          if (profile) setAssignedAgent(profile.full_name)
+        } else {
+          setAssignedAgent(null)
+        }
+
         // 1. Find the lead by phone
         const cleanPhone = conversation.contact_phone.replace(/\D/g, "");
         const { data: lead } = await supabase
@@ -148,8 +161,8 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
         setVisitLoading(false)
       }
     }
-    fetchVisit()
-  }, [conversation.id, supabase])
+    fetchData()
+  }, [conversation.id, conversation.agent_id, supabase])
 
   // Section 5: Stats
   const leadMessagesCount = messages.filter(m => m.role === 'lead').length
@@ -239,6 +252,16 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
               />
             </div>
           </div>
+
+          {assignedAgent && (
+            <div className="space-y-1 pt-1 border-t mt-2">
+              <div className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Atendido por</div>
+              <div className="text-sm flex items-center gap-2 text-primary font-medium">
+                <User className="w-3.5 h-3.5" />
+                {assignedAgent}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

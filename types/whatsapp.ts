@@ -39,6 +39,7 @@ export interface WAConversation {
   instance_id: string | null
   contact_phone: string
   contact_name: string | null
+  agent_id: string | null
   last_message_at: string
   last_inbound_at: string | null
   bot_active: boolean
