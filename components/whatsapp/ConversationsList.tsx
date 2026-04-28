@@ -229,8 +229,6 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
 
       return true
     })
-
-    return filtered
   }, [conversations, search, tab, filterAgentEmail])
 
   return (
@@ -253,10 +251,11 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             const supabase = createClient()
             supabase
               .from("wa_conversations")
-              .select("*, agent:profiles(email)")
+              .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
               .eq("instance_id", instance.id)
               .order("last_message_at", { ascending: false })
-              .then(({ data }) => {
+              .then(({ data, error }) => {
+                if (error) console.error("Refresh error:", error)
                 if (data) setConversations(data as any[])
                 setLoading(false)
               })

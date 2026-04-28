@@ -47,7 +47,7 @@ export default async function AsesorIAWhatsAppPage() {
     .single()
 
   if (!profile || profile.role !== "director") {
-    redirect("/dashboard")
+    redirect("/")
   }
 
   // Check if agency has a WhatsApp instance configured

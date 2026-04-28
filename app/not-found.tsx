@@ -33,9 +33,9 @@ export default function NotFound() {
           <Button asChild className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-white gap-2 shadow-lg shadow-accent/20">
             {/* The user wants to verify auth and redirect, but this is a purely server-rendered or static-friendly 404. 
                 We use /dashboard as a generic redirect point that the mid-level auth handles. */}
-            <Link href="/dashboard">
-              <LayoutDashboard className="h-4 w-4" />
-              Ir al Dashboard
+            <Link href="/">
+              <LayoutDashboard className="h-4 h-4" />
+              Ir al Inicio
             </Link>
           </Button>
         </div>
