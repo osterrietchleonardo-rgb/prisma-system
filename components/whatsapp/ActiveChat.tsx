@@ -153,9 +153,9 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
               }, 50)
             }
           } else if (payload.eventType === "DELETE") {
-             setMessages(prev => prev.filter(m => m.id !== (payload.old as any).id))
+            setMessages(prev => prev.filter(m => m.id !== (payload.old as any).id))
           } else if (payload.eventType === "UPDATE") {
-             setMessages(prev => prev.map(m => m.id === (payload.new as any).id ? (payload.new as WAMessage) : m))
+            setMessages(prev => prev.map(m => m.id === (payload.new as any).id ? (payload.new as WAMessage) : m))
           }
         }
       )
@@ -259,7 +259,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     if (!msgText.trim() || sending) return
     const text = msgText.trim()
     setSending(true)
-    
+
     // Optimistic insert
     const tempId = crypto.randomUUID()
     const optimisticMsg: WAMessage = {
@@ -291,7 +291,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     if (!noteText.trim() || sendingNote) return
     const text = noteText.trim()
     setSendingNote(true)
-    
+
     // Optimistic insert
     const tempId = crypto.randomUUID()
     const optimisticNote: WAMessage = {
@@ -348,16 +348,16 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     conv.score < 40
       ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
       : conv.score < 70
-      ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300"
-      : "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300"
+        : "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
 
   // Status badge
   const statusColor =
     conv.status === "active"
       ? "bg-green-500"
       : conv.status === "pending"
-      ? "bg-yellow-500"
-      : "bg-neutral-400"
+        ? "bg-yellow-500"
+        : "bg-neutral-400"
 
   const initial = (conv.contact_name || conv.contact_phone || "?")
     .charAt(0)
@@ -368,307 +368,307 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
       {/* ====== CHAT COLUMN ====== */}
       <div className={`flex-col flex-1 min-w-0 h-full lg:flex ${activeTab === 'info' ? 'hidden' : 'flex'}`}>
         {/* ====== HEADER ====== */}
-      <div className="px-4 py-3 border-b bg-card/50 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          {/* Back button (mobile) */}
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="md:hidden p-1.5 rounded-lg hover:bg-muted transition-colors"
+        <div className="px-4 py-3 border-b bg-card/50 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            {/* Back button (mobile) */}
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="md:hidden p-1.5 rounded-lg hover:bg-muted transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+            )}
+
+            {/* Avatar */}
+            <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-sm flex-shrink-0">
+              {initial}
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm truncate">
+                  {conv.contact_name || conv.contact_phone}
+                </span>
+                <div className={`w-2 h-2 rounded-full ${statusColor}`} />
+              </div>
+              <p className="text-xs text-muted-foreground">{conv.contact_phone}</p>
+            </div>
+
+            <div
+              className={`px-2 py-1 rounded-md text-xs font-bold ${scoreColor}`}
             >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-          )}
-
-          {/* Avatar */}
-          <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-sm flex-shrink-0">
-            {initial}
-          </div>
-
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm truncate">
-                {conv.contact_name || conv.contact_phone}
-              </span>
-              <div className={`w-2 h-2 rounded-full ${statusColor}`} />
+              {conv.score}pts
             </div>
-            <p className="text-xs text-muted-foreground">{conv.contact_phone}</p>
-          </div>
 
-          <div
-            className={`px-2 py-1 rounded-md text-xs font-bold ${scoreColor}`}
-          >
-            {conv.score}pts
-          </div>
-
-          {/* Refresh button for messages */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleRefreshMessages}
-            disabled={loading}
-            className="h-8 w-8 text-muted-foreground hover:text-accent"
-            title="Sincronizar mensajes"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
-
-          {/* Bot toggle */}
-          <div className="hidden sm:flex items-center gap-2 border-r pr-3 mr-1">
-            <div className="text-right">
-              <p className="text-xs font-semibold">Asesor IA</p>
-              <p className="text-[10px] text-muted-foreground">
-                {conv.bot_active ? "IA respondiendo" : "Control manual"}
-              </p>
-            </div>
-            <Switch
-              checked={conv.bot_active}
-              onCheckedChange={handleToggleBot}
-              disabled={switchingBot}
-              className="data-[state=checked]:bg-green-500"
-            />
-          </div>
-
-          {/* Close chat button (Desktop) */}
-          {onBack && (
+            {/* Refresh button for messages */}
             <Button
               variant="ghost"
               size="icon"
-              onClick={onBack}
-              className="h-8 w-8 text-muted-foreground hover:text-destructive hidden md:flex flex-shrink-0"
-              title="Cerrar chat"
+              onClick={handleRefreshMessages}
+              disabled={loading}
+              className="h-8 w-8 text-muted-foreground hover:text-accent"
+              title="Sincronizar mensajes"
             >
-              <X className="w-5 h-5" />
+              <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
+
+            {/* Bot toggle */}
+            <div className="hidden sm:flex items-center gap-2 border-r pr-3 mr-1">
+              <div className="text-right">
+                <p className="text-xs font-semibold">Asesor IA</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {conv.bot_active ? "IA respondiendo" : "Control manual"}
+                </p>
+              </div>
+              <Switch
+                checked={conv.bot_active}
+                onCheckedChange={handleToggleBot}
+                disabled={switchingBot}
+                className="data-[state=checked]:bg-green-500"
+              />
+            </div>
+
+            {/* Close chat button (Desktop) */}
+            {onBack && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onBack}
+                className="h-8 w-8 text-muted-foreground hover:text-destructive hidden md:flex flex-shrink-0"
+                title="Cerrar chat"
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            )}
+          </div>
+
+          {/* Tags row */}
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            {conv.etiquetas.map((tag) => (
+              <Badge
+                key={tag}
+                variant="secondary"
+                className="text-xs px-2 py-0.5 gap-1 cursor-pointer hover:bg-destructive/10"
+              >
+                {tag}
+                <X
+                  className="w-3 h-3 text-muted-foreground hover:text-destructive"
+                  onClick={() => handleRemoveTag(tag)}
+                />
+              </Badge>
+            ))}
+            <Popover open={tagOpen} onOpenChange={setTagOpen}>
+              <PopoverTrigger asChild>
+                <button className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent/20 transition-colors">
+                  <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-2" align="start">
+                <div className="space-y-1">
+                  {ALL_TAGS.filter((t) => !conv.etiquetas.includes(t)).map(
+                    (tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => handleAddTag(tag)}
+                        className="w-full text-left text-sm px-2 py-1.5 rounded-md hover:bg-muted transition-colors"
+                      >
+                        {tag}
+                      </button>
+                    )
+                  )}
+                  {ALL_TAGS.every((t) => conv.etiquetas.includes(t)) && (
+                    <p className="text-xs text-muted-foreground px-2 py-1">
+                      Todas asignadas
+                    </p>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Mobile bot toggle */}
+            <div className="sm:hidden flex items-center gap-2 ml-auto">
+              <span className="text-[10px] text-muted-foreground">
+                {conv.bot_active ? "IA ON" : "Manual"}
+              </span>
+              <Switch
+                checked={conv.bot_active}
+                onCheckedChange={handleToggleBot}
+                disabled={switchingBot}
+                className="data-[state=checked]:bg-green-500 scale-90"
+              />
+            </div>
+
+            {/* Info toggle (mobile) */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="lg:hidden ml-1 h-7 px-2 text-xs"
+              onClick={() => setActiveTab('info')}
+            >
+              <Info className="w-3.5 h-3.5 mr-1" />
+              Info
+            </Button>
+          </div>
+        </div>
+
+        {/* ====== MESSAGES ====== */}
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-4 py-4"
+        >
+          {loading ? (
+            <div className="flex flex-col gap-4 py-8 px-2 max-w-md mx-auto w-full">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className={`flex w-full ${i % 2 === 0 ? "justify-end" : "justify-start"}`}
+                >
+                  <div className={`space-y-2 ${i % 2 === 0 ? "items-end" : "items-start"}`}>
+                    <Skeleton className="h-14 w-[250px] rounded-2xl" />
+                    <Skeleton className="h-3 w-12" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              {hasMore && (
+                <div className="text-center mb-4">
+                  <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
+                    <ChevronUp className="w-3 h-3 mr-1" />
+                    Cargar anteriores
+                  </Button>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {messages.map((msg, idx) => {
+                  // Date separator
+                  const showDate =
+                    idx === 0 ||
+                    formatDate(msg.created_at) !==
+                    formatDate(messages[idx - 1].created_at)
+
+                  return (
+                    <div key={msg.id}>
+                      {showDate && (
+                        <div className="flex items-center justify-center my-4">
+                          <span className="text-[10px] text-muted-foreground bg-muted/50 px-3 py-1 rounded-full font-medium">
+                            {formatDate(msg.created_at)}
+                          </span>
+                        </div>
+                      )}
+                      <MessageBubble msg={msg} />
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div ref={bottomRef} />
+            </>
           )}
         </div>
 
-        {/* Tags row */}
-        <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-          {conv.etiquetas.map((tag) => (
-            <Badge
-              key={tag}
-              variant="secondary"
-              className="text-xs px-2 py-0.5 gap-1 cursor-pointer hover:bg-destructive/10"
-            >
-              {tag}
-              <X
-                className="w-3 h-3 text-muted-foreground hover:text-destructive"
-                onClick={() => handleRemoveTag(tag)}
-              />
-            </Badge>
-          ))}
-          <Popover open={tagOpen} onOpenChange={setTagOpen}>
-            <PopoverTrigger asChild>
-              <button className="w-6 h-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent/20 transition-colors">
-                <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="w-48 p-2" align="start">
-              <div className="space-y-1">
-                {ALL_TAGS.filter((t) => !conv.etiquetas.includes(t)).map(
-                  (tag) => (
-                    <button
-                      key={tag}
-                      onClick={() => handleAddTag(tag)}
-                      className="w-full text-left text-sm px-2 py-1.5 rounded-md hover:bg-muted transition-colors"
-                    >
-                      {tag}
-                    </button>
-                  )
-                )}
-                {ALL_TAGS.every((t) => conv.etiquetas.includes(t)) && (
-                  <p className="text-xs text-muted-foreground px-2 py-1">
-                    Todas asignadas
-                  </p>
-                )}
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          {/* Mobile bot toggle */}
-          <div className="sm:hidden flex items-center gap-2 ml-auto">
-            <span className="text-[10px] text-muted-foreground">
-              {conv.bot_active ? "IA ON" : "Manual"}
-            </span>
-            <Switch
-              checked={conv.bot_active}
-              onCheckedChange={handleToggleBot}
-              disabled={switchingBot}
-              className="data-[state=checked]:bg-green-500 scale-90"
-            />
-          </div>
-
-          {/* Info toggle (mobile) */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="lg:hidden ml-1 h-7 px-2 text-xs"
-            onClick={() => setActiveTab('info')}
-          >
-            <Info className="w-3.5 h-3.5 mr-1" />
-            Info
-          </Button>
-        </div>
-      </div>
-
-      {/* ====== MESSAGES ====== */}
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto px-4 py-4"
-      >
-        {loading ? (
-          <div className="flex flex-col gap-4 py-8 px-2 max-w-md mx-auto w-full">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className={`flex w-full ${i % 2 === 0 ? "justify-end" : "justify-start"}`}
-              >
-                <div className={`space-y-2 ${i % 2 === 0 ? "items-end" : "items-start"}`}>
-                  <Skeleton className="h-14 w-[250px] rounded-2xl" />
-                  <Skeleton className="h-3 w-12" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <>
-            {hasMore && (
-              <div className="text-center mb-4">
-                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
-                  <ChevronUp className="w-3 h-3 mr-1" />
-                  Cargar anteriores
-                </Button>
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {messages.map((msg, idx) => {
-                // Date separator
-                const showDate =
-                  idx === 0 ||
-                  formatDate(msg.created_at) !==
-                    formatDate(messages[idx - 1].created_at)
-
-                return (
-                  <div key={msg.id}>
-                    {showDate && (
-                      <div className="flex items-center justify-center my-4">
-                        <span className="text-[10px] text-muted-foreground bg-muted/50 px-3 py-1 rounded-full font-medium">
-                          {formatDate(msg.created_at)}
-                        </span>
-                      </div>
-                    )}
-                    <MessageBubble msg={msg} />
-                  </div>
-                )
-              })}
-            </div>
-
-            <div ref={bottomRef} />
-          </>
-        )}
-      </div>
-
-      {/* ====== BOTTOM INPUT ZONE ====== */}
-      <div className="border-t bg-card/50 flex-shrink-0">
-        {conv.bot_active ? (
-          /* Bot active banner */
-          <div className="flex items-center justify-between px-4 py-3 bg-green-50 dark:bg-green-950/20">
-            <div className="flex items-center gap-2">
-              <Bot className="w-4 h-4 text-green-600" />
-              <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                Asesor IA respondiendo
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleToggleBot}
-              disabled={switchingBot}
-              className="text-xs border-green-300 text-green-700 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-950"
-            >
-              <Pause className="w-3 h-3 mr-1" />
-              Pausar y tomar control
-            </Button>
-          </div>
-        ) : (
-          /* Manual mode: message + note inputs */
-          <div className="p-3 space-y-3">
-            {/* Direct message */}
-            <div className="flex gap-2">
-              <Textarea
-                value={msgText}
-                aria-label="Mensaje al lead"
-                onChange={(e) => setMsgText(e.target.value)}
-                placeholder="Escribe un mensaje al lead..."
-                rows={2}
-                className="resize-none text-sm flex-1"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSendMessage()
-                  }
-                }}
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={!msgText.trim() || sending}
-                className="bg-accent hover:bg-accent/90 text-white self-end h-10 w-10 p-0"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-
-            <Separator />
-
-            {/* Internal note */}
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-yellow-600" />
-                <Input
-                  value={noteText}
-                  aria-label="Nota interna"
-                  onChange={(e) => setNoteText(e.target.value)}
-                  placeholder="Nota interna (solo visible para el equipo)..."
-                  className="pl-9 text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault()
-                      handleAddNote()
-                    }
-                  }}
-                />
+        {/* ====== BOTTOM INPUT ZONE ====== */}
+        <div className="border-t bg-card/50 flex-shrink-0">
+          {conv.bot_active ? (
+            /* Bot active banner */
+            <div className="flex items-center justify-between px-4 py-3 bg-green-50 dark:bg-green-950/20">
+              <div className="flex items-center gap-2">
+                <Bot className="w-4 h-4 text-green-600" />
+                <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                  Asesor IA respondiendo
+                </span>
               </div>
               <Button
                 variant="outline"
-                onClick={handleAddNote}
-                disabled={!noteText.trim() || sendingNote}
-                className="text-xs gap-1 border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400"
+                size="sm"
+                onClick={handleToggleBot}
+                disabled={switchingBot}
+                className="text-xs border-green-300 text-green-700 hover:bg-green-100 dark:text-green-400 dark:hover:bg-green-950"
               >
-                <Lock className="w-3 h-3" />
-                Agregar
+                <Pause className="w-3 h-3 mr-1" />
+                Pausar y tomar control
               </Button>
             </div>
-          </div>
-        )}
-      </div></div>
+          ) : (
+            /* Manual mode: message + note inputs */
+            <div className="p-3 space-y-3">
+              {/* Direct message */}
+              <div className="flex gap-2">
+                <Textarea
+                  value={msgText}
+                  aria-label="Mensaje al lead"
+                  onChange={(e) => setMsgText(e.target.value)}
+                  placeholder="Escribe un mensaje al lead..."
+                  rows={2}
+                  className="resize-none text-sm flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSendMessage()
+                    }
+                  }}
+                />
+                <Button
+                  onClick={handleSendMessage}
+                  disabled={!msgText.trim() || sending}
+                  className="bg-accent hover:bg-accent/90 text-white self-end h-10 w-10 p-0"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <Separator />
+
+              {/* Internal note */}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-yellow-600" />
+                  <Input
+                    value={noteText}
+                    aria-label="Nota interna"
+                    onChange={(e) => setNoteText(e.target.value)}
+                    placeholder="Nota interna (solo visible para el equipo)..."
+                    className="pl-9 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        handleAddNote()
+                      }
+                    }}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleAddNote}
+                  disabled={!noteText.trim() || sendingNote}
+                  className="text-xs gap-1 border-yellow-300 text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400"
+                >
+                  <Lock className="w-3 h-3" />
+                  Agregar
+                </Button>
+              </div>
+            </div>
+          )}
+        </div></div>
 
       {/* ====== INFO COLUMN (LeadTraceability) ====== */}
       <div className={`lg:w-[280px] lg:min-w-[280px] xl:w-[320px] xl:min-w-[320px] bg-card/30 flex-col h-full overflow-y-auto border-l lg:flex ${activeTab === 'chat' ? 'hidden' : 'flex flex-1 w-full min-w-0'}`}>
-         {/* Mobile info header */}
-         <div className="lg:hidden flex-shrink-0 px-4 py-3 border-b bg-card/50 flex flex-row items-center justify-between sticky top-0 z-10">
-           <span className="font-semibold text-sm flex items-center gap-2"><Info className="w-4 h-4 text-accent"/> Info del Lead</span>
-           <Button variant="ghost" size="sm" onClick={() => setActiveTab('chat')} className="h-8">
-             <ArrowLeft className="w-4 h-4 mr-1" />
-             Volver al chat
-           </Button>
-         </div>
-         <ScrollArea className="flex-1">
-           <LeadTraceability conversation={conv} messages={messages} onDeleteChat={onDeleteChat} />
-         </ScrollArea>
+        {/* Mobile info header */}
+        <div className="lg:hidden flex-shrink-0 px-4 py-3 border-b bg-card/50 flex flex-row items-center justify-between sticky top-0 z-10">
+          <span className="font-semibold text-sm flex items-center gap-2"><Info className="w-4 h-4 text-accent" /> Info del Lead</span>
+          <Button variant="ghost" size="sm" onClick={() => setActiveTab('chat')} className="h-8">
+            <ArrowLeft className="w-4 h-4 mr-1" />
+            Volver al chat
+          </Button>
+        </div>
+        <ScrollArea className="flex-1">
+          <LeadTraceability conversation={conv} messages={messages} onDeleteChat={onDeleteChat} />
+        </ScrollArea>
       </div>
     </div>
   )
@@ -745,9 +745,8 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
           <div className="bg-neutral-100 dark:bg-neutral-800 rounded-2xl rounded-br-sm overflow-hidden">
             {isMedia && <div className="p-1"><MediaContent msg={msg} /></div>}
             {msg.content && msg.content !== (msg.metadata as any)?.media_url && (
-              <p className={`text-sm whitespace-pre-wrap break-words ${
-                isMedia ? 'px-4 pb-2.5 pt-1' : 'px-4 py-2.5'
-              }`}>{msg.content}</p>
+              <p className={`text-sm whitespace-pre-wrap break-words ${isMedia ? 'px-4 pb-2.5 pt-1' : 'px-4 py-2.5'
+                }`}>{msg.content}</p>
             )}
             {!isMedia && !msg.content && (
               <p className="text-sm px-4 py-2.5 text-muted-foreground italic">Mensaje multimedia</p>
@@ -770,9 +769,8 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
           <div className="bg-accent/5 dark:bg-accent/10 border border-accent/20 rounded-2xl rounded-bl-sm overflow-hidden">
             {isMedia && <div className="p-1"><MediaContent msg={msg} /></div>}
             {msg.content && msg.content !== (msg.metadata as any)?.media_url && (
-              <p className={`text-sm whitespace-pre-wrap break-words ${
-                isMedia ? 'px-4 pb-2.5 pt-1' : 'px-4 py-2.5'
-              }`}>{msg.content}</p>
+              <p className={`text-sm whitespace-pre-wrap break-words ${isMedia ? 'px-4 pb-2.5 pt-1' : 'px-4 py-2.5'
+                }`}>{msg.content}</p>
             )}
             {!isMedia && !msg.content && (
               <p className="text-sm px-4 py-2.5 text-muted-foreground italic">Mensaje multimedia</p>

@@ -40,6 +40,7 @@ export interface WAConversation {
   contact_phone: string
   contact_name: string | null
   agent_id: string | null
+  assigned_agent?: { email: string } | null // Joined from profiles
   last_message_at: string
   last_inbound_at: string | null
   bot_active: boolean

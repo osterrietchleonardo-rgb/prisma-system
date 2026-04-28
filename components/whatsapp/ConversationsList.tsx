@@ -286,16 +286,16 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
           </Tabs>
           
           <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
-            <SelectTrigger className="w-full sm:w-[150px] h-8 text-[10px] font-medium bg-muted/50 border-none focus:ring-0">
+            <SelectTrigger className="w-full sm:w-[180px] h-8 text-xs font-medium bg-muted/50 border-none focus:ring-0">
               <SelectValue placeholder="Filtrar por asesor" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="text-[10px]">Todos los asesores</SelectItem>
+              <SelectItem value="all" className="text-xs">Todos los asesores</SelectItem>
               {agentEmails.length === 0 && (
-                <SelectItem value="none" disabled className="text-[10px]">Sin asesores con chats</SelectItem>
+                <SelectItem value="none" disabled className="text-xs">Sin asesores con chats</SelectItem>
               )}
               {agentEmails.map(email => (
-                <SelectItem key={email} value={email} className="text-[10px]">
+                <SelectItem key={email} value={email} className="text-xs">
                   {email}
                 </SelectItem>
               ))}
