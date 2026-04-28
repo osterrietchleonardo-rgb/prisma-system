@@ -63,13 +63,20 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
     const supabase = createClient()
 
     async function load() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("wa_conversations")
-        .select("*, agent:profiles(email)")
+        .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
         .eq("instance_id", instance.id)
         .order("last_message_at", { ascending: false })
 
-      if (data) setConversations(data as any[])
+      if (error) {
+        console.error("Error loading conversations with agents:", error)
+      }
+      
+      if (data) {
+        console.log("Loaded conversations:", data.length, "First item assigned_agent:", (data[0] as any)?.assigned_agent)
+        setConversations(data as any[])
+      }
       setLoading(false)
     }
 
@@ -191,7 +198,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   const agentEmails = useMemo(() => {
     const emails = new Set<string>()
     conversations.forEach((c) => {
-      const agentData = (c as any).agent;
+      const agentData = (c as any).assigned_agent;
       const email = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
       if (email) emails.add(email)
     })
@@ -215,7 +222,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
 
       // Filtro por agente
       if (filterAgentEmail !== "all") {
-        const agentData = (c as any).agent;
+        const agentData = (c as any).assigned_agent;
         const email = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
         if (email !== filterAgentEmail) return false;
       }
@@ -279,21 +286,22 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             </TabsList>
           </Tabs>
           
-          {agentEmails.length > 0 && (
-            <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
-              <SelectTrigger className="w-[110px] h-8 text-[10px] font-medium bg-muted/50 border-none focus:ring-0">
-                <SelectValue placeholder="Asesor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-[10px]">Todos los asesores</SelectItem>
-                {agentEmails.map(email => (
-                  <SelectItem key={email} value={email} className="text-[10px]">
-                    {email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
+            <SelectTrigger className="w-[110px] h-8 text-[10px] font-medium bg-muted/50 border-none focus:ring-0">
+              <SelectValue placeholder="Asesor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-[10px]">Todos los asesores</SelectItem>
+              {agentEmails.length === 0 && (
+                <SelectItem value="none" disabled className="text-[10px]">Sin asesores</SelectItem>
+              )}
+              {agentEmails.map(email => (
+                <SelectItem key={email} value={email} className="text-[10px]">
+                  {email}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -371,7 +379,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                         {conv.contact_name || conv.contact_phone}
                         {/* Email del asesor asignado */}
                         {(() => {
-                          const agentData = (conv as any).agent;
+                          const agentData = (conv as any).assigned_agent;
                           const agentEmail = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
                           
                           if (agentEmail) {
