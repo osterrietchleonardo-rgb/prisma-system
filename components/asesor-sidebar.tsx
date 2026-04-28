@@ -17,7 +17,9 @@ import {
   BookOpen,
   TrendingUp,
   FileSignature,
-  MessageSquare
+  MessageSquare,
+  GraduationCap,
+  ShieldCheck
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -34,8 +36,8 @@ const navItems = [
   { name: "Marketing IA", href: "/asesor/marketing-ia", icon: Bot },
   { name: "Contratos IA", href: "/asesor/contratos-ia", icon: FileSignature },
   { name: "Mi Calendario", href: "/asesor/calendario", icon: Calendar },
-  { name: "Tutor IA", href: "/asesor/tutor", icon: Bot },
-  { name: "Consultor IA", href: "/asesor/consultor", icon: Search },
+  { name: "Tutor IA", href: "/asesor/tutor-ia", icon: GraduationCap },
+  { name: "Consultor IA", href: "/asesor/consultor-ia", icon: ShieldCheck },
   { name: "Tasaciones", href: "/asesor/tasaciones", icon: Calculator },
   { name: "Biblioteca", href: "/asesor/documentos", icon: BookOpen },
   { name: "Configuración", href: "/asesor/configuracion", icon: Settings },

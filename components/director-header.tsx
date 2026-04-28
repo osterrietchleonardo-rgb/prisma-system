@@ -41,7 +41,7 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole }: Di
   // Simple breadcrumb logic
   const segments = pathname.split('/').filter(Boolean)
   const lastSegment = segments[segments.length - 1] || 'Dashboard'
-  const pageTitle = customTitle || (lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1))
+  const pageTitle = customTitle || (lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' '))
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

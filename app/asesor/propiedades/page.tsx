@@ -63,7 +63,6 @@ export default function AsesorPropiedadesPage() {
         setProperties(data || [])
       } catch (_error) {
         console.error("Error fetching properties:", _error)
-        toast.error("Error al cargar mis propiedades")
       } finally {
         setLoading(false)
       }

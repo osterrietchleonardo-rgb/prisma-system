@@ -96,7 +96,7 @@ export default function AsesorCalendarioPage() {
       if (error) throw error
       setVisits(data || [])
     } catch (_error) {
-      toast.error("Error al cargar mis visitas")
+      console.error("Error fetching visits:", _error)
     }
   }
 

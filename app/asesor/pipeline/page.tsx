@@ -38,7 +38,6 @@ export default function AsesorPipelinePage() {
         setLeads(leadsData as unknown as Lead[])
       } catch (_error) {
         console.error("Error loading pipeline data:", _error)
-        toast.error("Error al cargar los leads")
       } finally {
         setLoading(false)
       }

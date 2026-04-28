@@ -69,7 +69,7 @@ export default function AsesorDocumentosPage() {
       if (error) throw error
       setDocuments(data || [])
     } catch (_error) {
-      toast.error("Error al cargar biblioteca")
+      console.error("Error fetching library:", _error)
     } finally {
       setLoading(false)
     }

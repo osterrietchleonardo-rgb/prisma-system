@@ -79,7 +79,7 @@ export default function AsesorLeadsPage() {
       const leadsData = await getAsesorLeads(session.user.id)
       setLeads(leadsData || [])
     } catch (_error) {
-      toast.error("Error al cargar mis leads")
+      console.error("Error fetching leads:", _error)
     } finally {
       setLoading(false)
     }
