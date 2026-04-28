@@ -393,7 +393,21 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                 </span>
                 <div className={`w-2 h-2 rounded-full ${statusColor}`} />
               </div>
+            <div className="flex items-center gap-2 flex-wrap">
               <p className="text-xs text-muted-foreground">{conv.contact_phone}</p>
+              {(() => {
+                const agentData = (conv as any).assigned_agent;
+                const agentEmail = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
+                if (agentEmail) {
+                  return (
+                    <span className="text-[10px] text-accent/70 bg-accent/5 px-1.5 py-0.5 rounded border border-accent/10 font-medium">
+                      Asesor: {agentEmail}
+                    </span>
+                  );
+                }
+                return null;
+              })()}
+            </div>
             </div>
 
             <div

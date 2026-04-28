@@ -286,7 +286,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
           </Tabs>
           
           <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
-            <SelectTrigger className="w-full sm:w-[180px] h-8 text-xs font-medium bg-muted/50 border-none focus:ring-0">
+            <SelectTrigger className="w-full sm:w-[220px] h-8 text-xs font-medium bg-muted/50 border-none focus:ring-0">
               <SelectValue placeholder="Filtrar por asesor" />
             </SelectTrigger>
             <SelectContent>
