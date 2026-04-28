@@ -11,6 +11,14 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "./EmptyState"
 import { toast } from "sonner"
+import { markConversationRead, deleteConversation } from "@/app/actions/whatsapp"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { useRef } from "react"
 
 interface ConversationsListProps {
@@ -37,6 +45,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   const [conversations, setConversations] = useState<WAConversation[]>([])
   const [search, setSearch] = useState("")
   const [tab, setTab] = useState("all")
+  const [filterAgentEmail, setFilterAgentEmail] = useState("all")
   const [loading, setLoading] = useState(true)
 
   const activeIdRef = useRef(activeId)
@@ -57,11 +66,11 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
     async function load() {
       const { data } = await supabase
         .from("wa_conversations")
-        .select("*")
+        .select("*, agent:profiles(email)")
         .eq("instance_id", instance.id)
         .order("last_message_at", { ascending: false })
 
-      if (data) setConversations(data as WAConversation[])
+      if (data) setConversations(data as any[])
       setLoading(false)
     }
 
@@ -176,13 +185,25 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
     }
   };
 
-  // Filter by search + tab
+  const agentEmails = useMemo(() => {
+    const emails = conversations
+      .map(c => (c as any).agent?.email)
+      .filter((email): email is string => !!email)
+    return Array.from(new Set(emails)).sort()
+  }, [conversations])
+
+  // Filter by search + tab + agent
   const filtered = useMemo(() => {
     let result = conversations
 
     // Tab filter
     if (tab === "bot") result = result.filter((c) => c.bot_active)
     else if (tab === "paused") result = result.filter((c) => !c.bot_active)
+
+    // Agent filter
+    if (filterAgentEmail !== "all") {
+      result = result.filter((c) => (c as any).agent?.email === filterAgentEmail)
+    }
 
     // Search filter
     if (search.trim()) {
@@ -195,7 +216,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
     }
 
     return result
-  }, [conversations, search, tab])
+  }, [conversations, search, tab, filterAgentEmail])
 
   return (
     <div className="flex flex-col h-full">
@@ -217,11 +238,11 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             const supabase = createClient()
             supabase
               .from("wa_conversations")
-              .select("*")
+              .select("*, agent:profiles(email)")
               .eq("instance_id", instance.id)
               .order("last_message_at", { ascending: false })
               .then(({ data }) => {
-                if (data) setConversations(data as WAConversation[])
+                if (data) setConversations(data as any[])
                 setLoading(false)
               })
           }}
@@ -233,21 +254,39 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
         </button>
       </div>
 
-      {/* Tabs */}
+      {/* Tabs & Filter */}
       <div className="px-3 py-2 border-b">
-        <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="w-full h-8 bg-muted/50">
-            <TabsTrigger value="all" className="flex-1 text-xs font-semibold">
-              Todos
-            </TabsTrigger>
-            <TabsTrigger value="bot" className="flex-1 text-xs font-semibold">
-              Bot activo
-            </TabsTrigger>
-            <TabsTrigger value="paused" className="flex-1 text-xs font-semibold">
-              Pausados
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="flex items-center gap-2">
+          <Tabs value={tab} onValueChange={setTab} className="flex-1">
+            <TabsList className="w-full h-8 bg-muted/50">
+              <TabsTrigger value="all" className="flex-1 text-xs font-semibold">
+                Todos
+              </TabsTrigger>
+              <TabsTrigger value="bot" className="flex-1 text-xs font-semibold">
+                Bot activo
+              </TabsTrigger>
+              <TabsTrigger value="paused" className="flex-1 text-xs font-semibold">
+                Pausados
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          {agentEmails.length > 0 && (
+            <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
+              <SelectTrigger className="w-[110px] h-8 text-[10px] font-medium bg-muted/50 border-none focus:ring-0">
+                <SelectValue placeholder="Asesor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-[10px]">Todos los asesores</SelectItem>
+                {agentEmails.map(email => (
+                  <SelectItem key={email} value={email} className="text-[10px]">
+                    {email}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       {/* List */}
@@ -320,9 +359,14 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-sm truncate">
+                      <span className="font-semibold text-sm truncate flex-1">
                         {conv.contact_name || conv.contact_phone}
                       </span>
+                      {(conv as any).agent?.email && (
+                        <span className="text-[10px] text-accent/70 font-medium truncate max-w-[100px] ml-1">
+                          {(conv as any).agent.email}
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-end gap-1">
                         <span className="whitespace-nowrap">{timeAgo(conv.last_message_at)}</span>
                         {conv.unread_count > 0 && !isActive ? (
