@@ -140,9 +140,13 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             }
 
               setConversations((currentPrev) => {
+                const existingItem = currentPrev.find((c) => c.id === updatedItem.id)
+                // Preservar el objeto agent unido si existía en el estado local
+                const mergedItem = existingItem ? { ...existingItem, ...updatedItem } : updatedItem;
+                
                 const otherConversations = currentPrev.filter((c) => c.id !== updatedItem.id)
                 // Siempre al principio en el UPDATE (last message moved it)
-                return [updatedItem, ...otherConversations]
+                return [mergedItem, ...otherConversations]
               })
           } else if (payload.eventType === "DELETE") {
             setConversations((prev) =>
@@ -185,36 +189,41 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   };
 
   const agentEmails = useMemo(() => {
-    const emails = conversations
-      .map(c => (c as any).agent?.email)
-      .filter((email): email is string => !!email)
-    return Array.from(new Set(emails)).sort()
+    const emails = new Set<string>()
+    conversations.forEach((c) => {
+      const agentData = (c as any).agent;
+      const email = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
+      if (email) emails.add(email)
+    })
+    return Array.from(emails).sort()
   }, [conversations])
 
   // Filter by search + tab + agent
   const filtered = useMemo(() => {
-    let result = conversations
+    return conversations.filter((c) => {
+      // Búsqueda por nombre o teléfono
+      const searchTerm = search.toLowerCase()
+      const matchesSearch = 
+        c.contact_phone.toLowerCase().includes(searchTerm) || 
+        (c.contact_name || "").toLowerCase().includes(searchTerm)
+      
+      if (!matchesSearch) return false
 
-    // Tab filter
-    if (tab === "bot") result = result.filter((c) => c.bot_active)
-    else if (tab === "paused") result = result.filter((c) => !c.bot_active)
+      // Filtro por tab (bot/pausado/etc)
+      if (tab === "bot" && !c.bot_active) return false
+      if (tab === "paused" && c.bot_active) return false
 
-    // Agent filter
-    if (filterAgentEmail !== "all") {
-      result = result.filter((c) => (c as any).agent?.email === filterAgentEmail)
-    }
+      // Filtro por agente
+      if (filterAgentEmail !== "all") {
+        const agentData = (c as any).agent;
+        const email = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
+        if (email !== filterAgentEmail) return false;
+      }
 
-    // Search filter
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      result = result.filter(
-        (c) =>
-          (c.contact_name?.toLowerCase().includes(q)) ||
-          c.contact_phone.includes(q)
-      )
-    }
+      return true
+    })
 
-    return result
+    return filtered
   }, [conversations, search, tab, filterAgentEmail])
 
   return (
@@ -360,12 +369,21 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-sm truncate flex-1">
                         {conv.contact_name || conv.contact_phone}
+                        {/* Email del asesor asignado */}
+                        {(() => {
+                          const agentData = (conv as any).agent;
+                          const agentEmail = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
+                          
+                          if (agentEmail) {
+                            return (
+                              <span className="text-[10px] text-accent/70 font-medium truncate max-w-[100px] ml-1 bg-accent/5 px-1 rounded border border-accent/10">
+                                {agentEmail}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </span>
-                      {(conv as any).agent?.email && (
-                        <span className="text-[10px] text-accent/70 font-medium truncate max-w-[100px] ml-1">
-                          {(conv as any).agent.email}
-                        </span>
-                      )}
                       <span className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-end gap-1">
                         <span className="whitespace-nowrap">{timeAgo(conv.last_message_at)}</span>
                         {conv.unread_count > 0 && !isActive ? (
