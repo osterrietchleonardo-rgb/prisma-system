@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { 
   Search, 
   LayoutGrid, 
@@ -150,7 +151,8 @@ export default function AsesorPropiedadesPage() {
           {view === "grid" ? (
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {filteredProperties.map((prop) => (
-                <Card key={prop.id} className="group overflow-hidden border-accent/10 bg-card/50 backdrop-blur-sm transition-all hover:border-accent/40 hover:shadow-xl">
+                <Link key={prop.id} href={`/asesor/propiedades/${prop.id}`}>
+                  <Card className="group h-full overflow-hidden border-accent/10 bg-card/50 backdrop-blur-sm transition-all hover:border-accent/40 hover:shadow-xl cursor-pointer">
                   <div className="relative aspect-video overflow-hidden">
                     <Image 
                       src={prop.images?.[0] || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=400'} 
@@ -209,7 +211,8 @@ export default function AsesorPropiedadesPage() {
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </CardFooter>
-                </Card>
+                  </Card>
+                </Link>
               ))}
             </div>
           ) : (
@@ -251,7 +254,9 @@ export default function AsesorPropiedadesPage() {
                         {new Intl.NumberFormat('es-AR', { style: 'currency', currency: prop.currency }).format(prop.price)}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">Detalle</Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/asesor/propiedades/${prop.id}`}>Detalle</Link>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
