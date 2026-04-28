@@ -269,28 +269,28 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       </div>
 
       {/* Tabs & Filter */}
-      <div className="px-3 pb-3 border-b">
-        <ScrollArea className="w-full h-11" orientation="horizontal">
-          <div className="flex items-center gap-3 w-max min-w-full pb-2">
-            <Tabs value={tab} onValueChange={setTab} className="flex-none">
-              <TabsList className="h-8 bg-muted/30 flex-nowrap">
-                <TabsTrigger value="all" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
-                  Todos
-                </TabsTrigger>
-                <TabsTrigger value="bot" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
-                  Bot activo
-                </TabsTrigger>
-                <TabsTrigger value="paused" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
-                  Pausados
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-            
+      <div className="px-3 pb-1 border-b overflow-hidden">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-3 pt-1">
+          <Tabs value={tab} onValueChange={setTab} className="shrink-0">
+            <TabsList className="h-8 bg-muted/30 flex-nowrap">
+              <TabsTrigger value="all" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
+                Todos
+              </TabsTrigger>
+              <TabsTrigger value="bot" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
+                Bot activo
+              </TabsTrigger>
+              <TabsTrigger value="paused" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
+                Pausados
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          <div className="shrink-0">
             <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
-              <SelectTrigger className="w-[200px] sm:w-[320px] h-8 text-xs font-medium bg-muted/50 border-none focus:ring-0 flex-none">
+              <SelectTrigger className="w-[180px] sm:w-[260px] h-8 text-xs font-medium bg-muted/50 border-none focus:ring-0">
                 <SelectValue placeholder="Asesor..." />
               </SelectTrigger>
-              <SelectContent className="max-h-[300px] w-[320px]">
+              <SelectContent className="max-h-[300px] w-[260px]">
                 <ScrollArea className="h-[250px] w-full">
                   <SelectItem value="all" className="text-xs">Todos los asesores</SelectItem>
                   {agentEmails.length === 0 && (
@@ -305,7 +305,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
               </SelectContent>
             </Select>
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* List */}
