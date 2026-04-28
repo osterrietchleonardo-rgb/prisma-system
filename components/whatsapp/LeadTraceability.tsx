@@ -122,10 +122,10 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
         if (conversation.agent_id) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("full_name")
+            .select("full_name, email")
             .eq("id", conversation.agent_id)
             .maybeSingle()
-          if (profile) setAssignedAgent(profile.full_name)
+          if (profile) setAssignedAgent(`${profile.full_name} (${profile.email})`)
         } else {
           setAssignedAgent(null)
         }
