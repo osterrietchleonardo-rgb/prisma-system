@@ -34,6 +34,8 @@ export async function POST(req: Request) {
     }
 
     // Recorrer el batch de cambios
+    const n8nTriggers: Promise<any>[] = []
+
     for (const entry of payload.entry) {
        for (const change of entry.changes) {
           const val = change.value
@@ -191,14 +193,20 @@ export async function POST(req: Request) {
                         reply_url: `${process.env.APP_URL}/api/n8n/reply`,
                     }
 
-                    fetch(process.env.N8N_WEBHOOK_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(enrichedPayload)
-                    }).catch(e => console.error('Error triggering n8n from meta webhook:', e))
+                    // No await aquí mismo, sino coleccionar para Promise.all
+                    n8nTriggers.push(
+                        fetch(process.env.N8N_WEBHOOK_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(enrichedPayload),
+                            signal: AbortSignal.timeout(25000)
+                        }).then(r => {
+                            if (!r.ok) console.error(`[Meta Webhook] n8n error: ${r.status}`)
+                            else console.log(`[Meta Webhook] n8n triggered OK for conv: ${conversation_id}`)
+                        }).catch(e => console.error('Error triggering n8n from meta webhook:', e))
+                    )
                 } else if (!botIsActive) {
                     // Bot apagado (modo manual): guardar mensaje del lead en n8n_chat_histories
-                    // con await para que Vercel no corte la función antes de completar
                     const fechaManual = new Date().toLocaleString('es-AR', {
                         timeZone: 'America/Argentina/Buenos_Aires',
                         day: '2-digit', month: '2-digit', year: 'numeric',
@@ -222,6 +230,11 @@ export async function POST(req: Request) {
              }
           }
        }
+    }
+
+    // Esperar a que todos los webhooks a n8n se envíen ANTES de responder a Meta
+    if (n8nTriggers.length > 0) {
+        await Promise.all(n8nTriggers)
     }
 
     return NextResponse.json({ success: true })

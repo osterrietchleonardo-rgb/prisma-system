@@ -49,6 +49,16 @@
 
 ## 🔄 ENTRADAS DE PROGRESO
 
+### 2026-04-27 | P8 — WhatsApp: RLS Security & Webhook Reliability
+- **RLS Modernization**:
+  - Reemplazo de políticas basadas en subqueries por el patrón `EXISTS` en `wa_conversations`, `wa_messages` y `wa_contacts` para máxima fiabilidad.
+  - Resolución del problema de "Bandeja Vacía" para Directores: Acceso explícito a toda la agencia garantizado.
+  - Actualización de `whatsapp_instances`: Permite lectura a todos los miembros de la agencia, estabilizando la navegación en "Modo Asesor".
+- **Webhook Reliability**:
+  - Refactorización de handlers `evolution` y `meta` para utilizar **`await fetch`** en llamadas a n8n.
+  - Eliminación del efecto "buffering" (mensajes que solo llegaban al enviar un segundo mensaje) causado por la suspensión de procesos en Vercel.
+  - Implementación de `Promise.all` en el loop de Meta para procesar batches de mensajes con persistencia garantizada.
+
 ### 2026-04-07 | P7 — WhatsApp Module: Webhook UI Polish & UX
 - **Refactor `SetupWizard.tsx`**:
   - Mejora de los pasos 5 y 6 con instrucciones simplificadas para usuarios no técnicos.

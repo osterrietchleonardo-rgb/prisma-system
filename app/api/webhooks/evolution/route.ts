@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { waitUntil } from '@vercel/functions'
 
 /**
  * POST /api/webhooks/evolution
@@ -265,33 +264,28 @@ export async function POST(req: Request) {
         reply_url: `${process.env.APP_URL}/api/n8n/reply`,
       }
 
-      // waitUntil: le dice a Vercel que mantenga la función viva hasta que
-      // esta promesa resuelva, AUNQUE ya hayamos enviado el return 200 abajo.
-      // Sin esto, Vercel mata el proceso en cuanto sale el return y el fetch
-      // a n8n nunca llega — especialmente con mensajes individuales.
-      waitUntil(
-        fetch(process.env.N8N_WEBHOOK_URL, {
+      // IMPORTANTE: Awaited fetch para evitar que Vercel mate el proceso antes de enviar
+      try {
+        const n8nRes = await fetch(process.env.N8N_WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(enrichedPayload),
           signal: AbortSignal.timeout(25000), // 25s max
         })
-          .then(async (n8nRes) => {
-            if (!n8nRes.ok) {
-              const errBody = await n8nRes.text().catch(() => '')
-              console.error(`[Evolution Webhook] n8n respondió ${n8nRes.status}: ${errBody}`)
-            } else {
-              console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
-            }
-          })
-          .catch((n8nErr: Error) => {
-            if (n8nErr.name === 'AbortError' || n8nErr.name === 'TimeoutError') {
-              console.error(`[Evolution Webhook] n8n timeout (>25s) — conv: ${conversation_id}`)
-            } else {
-              console.error('[Evolution Webhook] Error llamando a n8n:', n8nErr)
-            }
-          })
-      )
+
+        if (!n8nRes.ok) {
+          const errBody = await n8nRes.text().catch(() => '')
+          console.error(`[Evolution Webhook] n8n respondió ${n8nRes.status}: ${errBody}`)
+        } else {
+          console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
+        }
+      } catch (n8nErr: any) {
+        if (n8nErr.name === 'AbortError' || n8nErr.name === 'TimeoutError') {
+          console.error(`[Evolution Webhook] n8n timeout (>25s) — conv: ${conversation_id}`)
+        } else {
+          console.error('[Evolution Webhook] Error llamando a n8n:', n8nErr)
+        }
+      }
     } // end if n8n configured
 
     return NextResponse.json({ success: true })
