@@ -269,43 +269,43 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       </div>
 
       {/* Tabs & Filter */}
-      <div className="px-3 pb-3 border-b space-y-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <Tabs value={tab} onValueChange={setTab} className="w-full sm:w-auto">
-            <ScrollArea className="w-full h-10" orientation="horizontal">
-              <TabsList className="w-max h-8 bg-muted/30 flex-nowrap mb-2">
-                <TabsTrigger value="all" className="text-[10px] sm:text-xs font-semibold px-4">
+      <div className="px-3 pb-3 border-b">
+        <ScrollArea className="w-full h-11" orientation="horizontal">
+          <div className="flex items-center gap-3 w-max min-w-full pb-2">
+            <Tabs value={tab} onValueChange={setTab} className="flex-none">
+              <TabsList className="h-8 bg-muted/30 flex-nowrap">
+                <TabsTrigger value="all" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
                   Todos
                 </TabsTrigger>
-                <TabsTrigger value="bot" className="text-[10px] sm:text-xs font-semibold px-4">
+                <TabsTrigger value="bot" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
                   Bot activo
                 </TabsTrigger>
-                <TabsTrigger value="paused" className="text-[10px] sm:text-xs font-semibold px-4">
+                <TabsTrigger value="paused" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
                   Pausados
                 </TabsTrigger>
               </TabsList>
-            </ScrollArea>
-          </Tabs>
-          
-          <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
-            <SelectTrigger className="w-full sm:w-[320px] h-8 text-xs font-medium bg-muted/50 border-none focus:ring-0">
-              <SelectValue placeholder="Filtrar por asesor" />
-            </SelectTrigger>
-            <SelectContent className="max-h-[300px] w-[320px]">
-              <ScrollArea className="h-[250px] w-full">
-              <SelectItem value="all" className="text-xs">Todos los asesores</SelectItem>
-              {agentEmails.length === 0 && (
-                <SelectItem value="none" disabled className="text-xs">Sin asesores con chats</SelectItem>
-              )}
-              {agentEmails.map(email => (
-                <SelectItem key={email} value={email} className="text-xs">
-                  {email}
-                </SelectItem>
-              ))}
-              </ScrollArea>
-            </SelectContent>
-          </Select>
-        </div>
+            </Tabs>
+            
+            <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
+              <SelectTrigger className="w-[200px] sm:w-[320px] h-8 text-xs font-medium bg-muted/50 border-none focus:ring-0 flex-none">
+                <SelectValue placeholder="Asesor..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px] w-[320px]">
+                <ScrollArea className="h-[250px] w-full">
+                  <SelectItem value="all" className="text-xs">Todos los asesores</SelectItem>
+                  {agentEmails.length === 0 && (
+                    <SelectItem value="none" disabled className="text-xs">Sin asesores con chats</SelectItem>
+                  )}
+                  {agentEmails.map(email => (
+                    <SelectItem key={email} value={email} className="text-xs">
+                      {email}
+                    </SelectItem>
+                  ))}
+                </ScrollArea>
+              </SelectContent>
+            </Select>
+          </div>
+        </ScrollArea>
       </div>
 
       {/* List */}
