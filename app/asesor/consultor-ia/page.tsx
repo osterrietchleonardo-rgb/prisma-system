@@ -23,6 +23,11 @@ interface Property {
   bathrooms: number
   total_area: number
   images: string[]
+  assigned_agent?: {
+    name: string
+    email: string
+    avatar_url?: string
+  }
   similarity: number
 }
 
@@ -54,6 +59,7 @@ export default function AdvisorConsultorIAPage() {
   const [renamingTitle, setRenamingTitle] = useState("")
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [agencyId, setAgencyId] = useState<string>("")
+  const [userEmail, setUserEmail] = useState<string>("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
   
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -86,6 +92,7 @@ export default function AdvisorConsultorIAPage() {
         
         if (profile?.agency_id) {
           setAgencyId(profile.agency_id)
+          setUserEmail(user.email || "")
           fetchSessions(profile.agency_id)
         }
       }
@@ -425,10 +432,20 @@ export default function AdvisorConsultorIAPage() {
                         {message.matchedProperties.map((prop) => {
                           const currentImgIdx = activeImageIndices[prop.id] || 0;
                           const images = prop.images && prop.images.length > 0 ? prop.images : ['https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=400'];
+                          const isOwn = prop.assigned_agent?.email === userEmail;
+                          const agentName = prop.assigned_agent?.name || prop.assigned_agent?.email || "Sin asignar";
                           
                           return (
-                            <Card key={prop.id} className="overflow-hidden border-accent/10 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm group hover:border-accent/30 transition-all shadow-lg hover:shadow-xl">
-                              <div className="relative aspect-video overflow-hidden">
+                            <Card key={prop.id} className="overflow-hidden border-accent/10 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm group hover:border-accent/30 transition-all shadow-lg hover:shadow-xl relative">
+                              {/* Agent Badge - New Vistoso Title */}
+                              <div className={cn(
+                                "absolute top-0 left-0 right-0 z-20 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-center shadow-md",
+                                isOwn ? "bg-accent text-accent-foreground" : "bg-zinc-800 text-zinc-300"
+                              )}>
+                                {isOwn ? "✨ Propiedad Propia" : `📍 Agente: ${agentName}`}
+                              </div>
+
+                              <div className="relative aspect-video overflow-hidden mt-6">
                                 <img src={images[currentImgIdx]} alt={prop.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                 
                                 <div className="absolute top-2 right-2 flex gap-1">

@@ -109,9 +109,10 @@ export async function POST(req: Request) {
         .eq('id', currentSessionId);
 
       propertyContext = newMatchedProperties.length > 0
-        ? newMatchedProperties.map((p: any) => 
-            `- ID: ${p.id}, Titulo: ${p.title}, Tipo: ${p.property_type}, Precio: ${p.currency} ${p.price}, Direccion: ${p.address}, Dormitorios: ${p.bedrooms}`
-          ).join('\n')
+        ? newMatchedProperties.map((p: any) => {
+            const agentName = p.assigned_agent?.name || "Sin asignar";
+            return `- ID: ${p.id}, Titulo: ${p.title}, Tipo: ${p.property_type}, Precio: ${p.currency} ${p.price}, Direccion: ${p.address}, Dormitorios: ${p.bedrooms}, Agente: ${agentName}`;
+          }).join('\n')
         : "No se encontraron nuevas propiedades coincidiendo exactamente. Sugiere alternativas.";
     }
 
