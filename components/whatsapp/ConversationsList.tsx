@@ -270,30 +270,30 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       </div>
 
       {/* Tabs & Filter */}
-      <div className="px-3 py-2 border-b">
-        <div className="flex items-center gap-2">
-          <Tabs value={tab} onValueChange={setTab} className="flex-1">
-            <TabsList className="w-full h-8 bg-muted/50">
-              <TabsTrigger value="all" className="flex-1 text-xs font-semibold">
+      <div className="px-3 pb-3 border-b space-y-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <Tabs value={tab} onValueChange={setTab} className="w-full sm:w-auto">
+            <TabsList className="w-full sm:w-auto h-8 bg-muted/30">
+              <TabsTrigger value="all" className="flex-1 sm:flex-none text-[10px] sm:text-xs font-semibold px-3">
                 Todos
               </TabsTrigger>
-              <TabsTrigger value="bot" className="flex-1 text-xs font-semibold">
+              <TabsTrigger value="bot" className="flex-1 sm:flex-none text-[10px] sm:text-xs font-semibold px-3">
                 Bot activo
               </TabsTrigger>
-              <TabsTrigger value="paused" className="flex-1 text-xs font-semibold">
+              <TabsTrigger value="paused" className="flex-1 sm:flex-none text-[10px] sm:text-xs font-semibold px-3">
                 Pausados
               </TabsTrigger>
             </TabsList>
           </Tabs>
           
           <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
-            <SelectTrigger className="w-[110px] h-8 text-[10px] font-medium bg-muted/50 border-none focus:ring-0">
-              <SelectValue placeholder="Asesor" />
+            <SelectTrigger className="w-full sm:w-[150px] h-8 text-[10px] font-medium bg-muted/50 border-none focus:ring-0">
+              <SelectValue placeholder="Filtrar por asesor" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all" className="text-[10px]">Todos los asesores</SelectItem>
               {agentEmails.length === 0 && (
-                <SelectItem value="none" disabled className="text-[10px]">Sin asesores</SelectItem>
+                <SelectItem value="none" disabled className="text-[10px]">Sin asesores con chats</SelectItem>
               )}
               {agentEmails.map(email => (
                 <SelectItem key={email} value={email} className="text-[10px]">
