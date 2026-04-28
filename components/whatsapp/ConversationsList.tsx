@@ -272,19 +272,19 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       <div className="px-3 pb-3 border-b space-y-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <Tabs value={tab} onValueChange={setTab} className="w-full sm:w-auto">
-            <div className="overflow-x-auto no-scrollbar -mx-1 px-1">
-              <TabsList className="w-max sm:w-auto h-8 bg-muted/30 flex-nowrap">
-                <TabsTrigger value="all" className="text-[10px] sm:text-xs font-semibold px-3 whitespace-nowrap">
+            <ScrollArea className="w-full h-10" orientation="horizontal">
+              <TabsList className="w-max h-8 bg-muted/30 flex-nowrap mb-2">
+                <TabsTrigger value="all" className="text-[10px] sm:text-xs font-semibold px-4">
                   Todos
                 </TabsTrigger>
-                <TabsTrigger value="bot" className="text-[10px] sm:text-xs font-semibold px-3 whitespace-nowrap">
+                <TabsTrigger value="bot" className="text-[10px] sm:text-xs font-semibold px-4">
                   Bot activo
                 </TabsTrigger>
-                <TabsTrigger value="paused" className="text-[10px] sm:text-xs font-semibold px-3 whitespace-nowrap">
+                <TabsTrigger value="paused" className="text-[10px] sm:text-xs font-semibold px-4">
                   Pausados
                 </TabsTrigger>
               </TabsList>
-            </div>
+            </ScrollArea>
           </Tabs>
           
           <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>

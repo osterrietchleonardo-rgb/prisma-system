@@ -348,25 +348,29 @@ export default function AsesoresPage() {
               <Card className="bg-accent/5 border-accent/10 shadow-none">
                 <CardHeader className="p-4 pb-0">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center justify-between">
-                    Total Ventas
+                    Cierres Totales
                     <TrendingUp className="h-3 w-3 text-green-500" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <p className="text-3xl font-bold">$125.4k</p>
-                  <p className="text-[10px] text-green-500 mt-1">+8% vs anterior</p>
+                  <p className="text-3xl font-bold">{selectedAgent?.closings?.[0]?.count || 0}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Ventas finalizadas</p>
                 </CardContent>
               </Card>
               <Card className="bg-accent/5 border-accent/10 shadow-none">
                 <CardHeader className="p-4 pb-0">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center justify-between">
-                    Eficiencia
+                    Conversión
                     <Target className="h-3 w-3 text-accent" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <p className="text-3xl font-bold">84%</p>
-                  <p className="text-[10px] text-accent mt-1">Nivel: Senior</p>
+                  <p className="text-3xl font-bold">
+                    {selectedAgent?.assigned_leads?.[0]?.count && selectedAgent?.closings?.[0]?.count 
+                      ? Math.round((selectedAgent.closings[0].count / selectedAgent.assigned_leads[0].count) * 100)
+                      : 0}%
+                  </p>
+                  <p className="text-[10px] text-accent mt-1">Ratio de eficiencia</p>
                 </CardContent>
               </Card>
             </div>
@@ -377,13 +381,8 @@ export default function AsesoresPage() {
                 Propiedades Asignadas
               </h4>
               <div className="space-y-2">
-                <div className="bg-background/50 p-3 rounded-lg border border-accent/10 flex items-center justify-between text-xs">
-                  <span>Dpto Puerto Madero, 3 Amb...</span>
-                  <Badge variant="outline">Venta</Badge>
-                </div>
-                <div className="bg-background/50 p-3 rounded-lg border border-accent/10 flex items-center justify-between text-xs">
-                  <span>Casa San Isidro Park, Piscina</span>
-                  <Badge variant="outline">Alquiler</Badge>
+                <div className="py-8 text-center bg-accent/5 rounded-xl border border-dashed border-accent/20">
+                  <p className="text-xs text-muted-foreground">No hay propiedades vinculadas actualmente.</p>
                 </div>
               </div>
             </div>
