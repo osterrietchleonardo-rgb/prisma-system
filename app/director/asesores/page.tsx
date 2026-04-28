@@ -92,8 +92,7 @@ export default function AsesoresPage() {
         .select(`
           *,
           assigned_leads:leads(count),
-          closings:closings(count),
-          assigned_properties:properties(count)
+          closings:closings(count)
         `)
         .eq("agency_id", agencyId)
         .eq("role", "asesor")
@@ -299,7 +298,7 @@ export default function AsesoresPage() {
                   </div>
                   <div className="flex flex-col items-center p-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Props</span>
-                    <span className="font-bold text-blue-500">{agent.assigned_properties?.[0]?.count || 0}</span>
+                    <span className="font-bold text-blue-500">0</span>
                   </div>
                 </div>
                 

@@ -272,17 +272,19 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       <div className="px-3 pb-3 border-b space-y-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <Tabs value={tab} onValueChange={setTab} className="w-full sm:w-auto">
-            <TabsList className="w-full sm:w-auto h-8 bg-muted/30">
-              <TabsTrigger value="all" className="flex-1 sm:flex-none text-[10px] sm:text-xs font-semibold px-3">
-                Todos
-              </TabsTrigger>
-              <TabsTrigger value="bot" className="flex-1 sm:flex-none text-[10px] sm:text-xs font-semibold px-3">
-                Bot activo
-              </TabsTrigger>
-              <TabsTrigger value="paused" className="flex-1 sm:flex-none text-[10px] sm:text-xs font-semibold px-3">
-                Pausados
-              </TabsTrigger>
-            </TabsList>
+            <div className="overflow-x-auto no-scrollbar -mx-1 px-1">
+              <TabsList className="w-max sm:w-auto h-8 bg-muted/30 flex-nowrap">
+                <TabsTrigger value="all" className="text-[10px] sm:text-xs font-semibold px-3 whitespace-nowrap">
+                  Todos
+                </TabsTrigger>
+                <TabsTrigger value="bot" className="text-[10px] sm:text-xs font-semibold px-3 whitespace-nowrap">
+                  Bot activo
+                </TabsTrigger>
+                <TabsTrigger value="paused" className="text-[10px] sm:text-xs font-semibold px-3 whitespace-nowrap">
+                  Pausados
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </Tabs>
           
           <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
