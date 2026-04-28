@@ -39,7 +39,6 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 7)}sem`
 }
 
-import { markConversationRead, deleteConversation } from "@/app/actions/whatsapp"
 
 export function ConversationsList({ instance, activeId, onSelect }: ConversationsListProps) {
   const [conversations, setConversations] = useState<WAConversation[]>([])
