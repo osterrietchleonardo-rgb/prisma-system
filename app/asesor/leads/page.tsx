@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { 
   Plus, 
@@ -53,6 +53,18 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
 export default function AsesorLeadsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-full w-full items-center justify-center p-20">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    }>
+      <AsesorLeadsPageContent />
+    </Suspense>
+  )
+}
+
+function AsesorLeadsPageContent() {
   const [leads, setLeads] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")

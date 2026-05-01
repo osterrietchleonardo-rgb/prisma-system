@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { RefreshCcw, Loader2, Users, Database } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +13,18 @@ import { useTokkoTagCatalog } from "./components/useTokkoTagCatalog"
 import { LeadModal } from "./lead-modal"
 
 export default function CRMLeadsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex h-full w-full items-center justify-center p-20">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    }>
+      <CRMLeadsPageContent />
+    </Suspense>
+  )
+}
+
+function CRMLeadsPageContent() {
   const [syncing, setSyncing] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { tagsByGroup, loading: loadingTags } = useTokkoTagCatalog()
