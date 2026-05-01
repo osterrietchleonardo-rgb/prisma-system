@@ -15,12 +15,9 @@ import {
   Phone, 
   Mail, 
   User, 
-  Calendar, 
   MessageSquare, 
   Clock,
   Trash2,
-  BrainCircuit,
-  UserPlus,
   FileText
 } from "lucide-react"
 import { Lead, KANBAN_STAGES } from "./types"
@@ -93,30 +90,7 @@ export function LeadDetailSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="mt-8 flex flex-wrap gap-3">
-          {!isAdvisor && onAssignAgent && (
-            <Button variant="outline" size="sm" className="flex-1 min-w-[120px] gap-2" onClick={() => onAssignAgent(lead.id)}>
-              <UserPlus className="h-4 w-4" />
-              Asignar
-            </Button>
-          )}
-          <Button variant="outline" size="sm" className="flex-1 min-w-[120px] gap-2" onClick={() => onLogActivity(lead.id)}>
-            <MessageSquare className="h-4 w-4" />
-            Actividad
-          </Button>
-          <Button variant="outline" size="sm" className="flex-1 min-w-[120px] gap-2" onClick={() => onScheduleVisit(lead.id)}>
-            <Calendar className="h-4 w-4" />
-            Visita
-          </Button>
-          <Button variant="secondary" size="sm" className="gap-2 bg-accent/10 hover:bg-accent/20 text-accent border-none h-9">
-            <BrainCircuit className="h-4 w-4" />
-            Análisis IA
-          </Button>
-        </div>
-
-        <Separator className="my-8 opacity-40" />
-
-        <ScrollArea className="h-[calc(100vh-280px)] pr-4">
+        <ScrollArea className="h-[calc(100vh-180px)] mt-6 pr-4">
           <div className="space-y-8 pb-8">
             {/* Contact Info */}
             <section className="space-y-4">

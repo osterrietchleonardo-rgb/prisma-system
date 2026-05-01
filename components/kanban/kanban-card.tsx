@@ -105,7 +105,7 @@ export function KanbanCard({ lead, onClick, detailsUrl = "/director/leads" }: Ka
           {lead.phone && (
             <div className="flex items-center text-[10px] text-muted-foreground">
               <Phone className="h-3 w-3 mr-1" />
-              {lead.phone.slice(-4)}
+              {lead.phone}
             </div>
           )}
         </div>
