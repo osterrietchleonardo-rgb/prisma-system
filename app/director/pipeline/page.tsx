@@ -46,6 +46,11 @@ export default function PipelinePage() {
         const supabase = createClient()
         
         const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.user) {
+          setLoading(false)
+          return
+        }
+
         const { data: profile } = await supabase
           .from('profiles')
           .select('agency_id')

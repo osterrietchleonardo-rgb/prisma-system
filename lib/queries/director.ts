@@ -35,6 +35,7 @@ export async function getAgencyLeads(options: AgencyLeadsOptions) {
       status,
       source,
       created_at,
+      updated_at,
       tokko_created_date,
       tokko_property_title,
       tokko_property_price,
