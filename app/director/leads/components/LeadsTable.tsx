@@ -23,6 +23,9 @@ import { Label } from "@/components/ui/label";
 import { NormalizedLead, TokkoTag } from "./tokko-leads-utils";
 import { CHANNEL_COLORS, CLIENT_TYPE_COLORS, OPERATION_COLORS, STATUS_COLORS } from "./tags.config";
 import { cn } from "@/lib/utils";
+import { KANBAN_STAGES } from "@/components/kanban/types";
+import { updateLeadStage } from "@/lib/queries/director";
+import { toast } from "sonner";
 
 interface LeadsTableProps {
   leads: NormalizedLead[];
@@ -53,6 +56,16 @@ export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<NormalizedLead | null>(null);
+
+  const handleStageChange = async (leadId: string, newStage: string) => {
+    try {
+      await updateLeadStage(leadId, newStage);
+      toast.success("Etapa del pipeline actualizada");
+      router.refresh();
+    } catch (error) {
+      toast.error("Error al actualizar la etapa");
+    }
+  };
 
   const activeAgents = useMemo(() => {
     const agentsMap = new Map();
@@ -311,6 +324,9 @@ export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
                   <TableHead className="font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('lead_status')}>
                      Estado {getSortIcon('lead_status')}
                   </TableHead>
+                  <TableHead className="font-bold text-[10px] uppercase">
+                     Etapa Pipeline
+                  </TableHead>
                   <TableHead className="hidden lg:table-cell font-bold text-[10px] uppercase cursor-pointer" onClick={() => toggleSort('tipo_cliente')}>
                      Tipo de Cliente {getSortIcon('tipo_cliente')}
                   </TableHead>
@@ -411,6 +427,24 @@ export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
                               <Badge className={cn("text-[10px] font-bold px-2 py-0 border-none", STATUS_COLORS[lead.lead_status] || "bg-accent/10 text-accent")}>
                                 {lead.lead_status || "Sin estado"}
                               </Badge>
+                           </TableCell>
+
+                           <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Select 
+                                defaultValue={lead.pipeline_stage || "nuevo"} 
+                                onValueChange={(v) => handleStageChange(lead.id, v)}
+                              >
+                                <SelectTrigger className="h-7 text-[10px] bg-background/50 border-accent/10 w-[140px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {KANBAN_STAGES.map(stage => (
+                                    <SelectItem key={stage.id} value={stage.id} className="text-[10px]">
+                                      {stage.title}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                            </TableCell>
 
                            <TableCell className="hidden lg:table-cell">

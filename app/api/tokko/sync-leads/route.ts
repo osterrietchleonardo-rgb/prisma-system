@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export const dynamic = "force-dynamic";
 import { fetchTokko } from "@/lib/tokko"
@@ -82,14 +83,28 @@ function mapTokkoContact(c: any, agencyId: string) {
   const location = c.location?.name || prop?.location?.name || null
   const operation = c.operation?.name || (tags.find(t => t === "Alquiler") ? "Alquiler" : (tags.find(t => t === "Venta") ? "Venta" : null))
 
+  // Mapping Tokko Lead Status to PRISMA Pipeline Stage
+  let pipelineStage = "nuevo";
+  const tokkoStatus = c.lead_status?.toLowerCase();
+  
+  if (tokkoStatus) {
+    if (tokkoStatus.includes("nuevo")) pipelineStage = "nuevo";
+    else if (tokkoStatus.includes("contacto") || tokkoStatus.includes("respondido")) pipelineStage = "contacto";
+    else if (tokkoStatus.includes("visita")) pipelineStage = "visita_realizada";
+    else if (tokkoStatus.includes("propuesta") || tokkoStatus.includes("reserva")) pipelineStage = "propuesta";
+    else if (tokkoStatus.includes("negociación")) pipelineStage = "negociacion";
+    else if (tokkoStatus.includes("cerrado") || tokkoStatus.includes("vendido") || tokkoStatus.includes("alquilado")) pipelineStage = "cerrado";
+    else if (tokkoStatus.includes("perdido") || tokkoStatus.includes("descartado")) pipelineStage = "perdido";
+  }
+
   return {
     agency_id:              agencyId,
     full_name:              fullName,
     email:                  c.email          || null,
     phone:                  c.phone || c.cellphone || c.mobile || null,
     source:                 c.source_name || c.origin || "Tokko Broker",
-    pipeline_stage:         "nuevo",
-    status:                 "active",
+    pipeline_stage:         pipelineStage,
+    status:                 c.is_active === false ? "inactive" : "active",
     notes:                  noteParts.join("\n\n") || null,
 
     // Tokko-specific columns
@@ -205,6 +220,7 @@ export async function GET(_req: NextRequest) {
 // ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const supabase = createClient()
+  const adminClient = createAdminClient()
 
   try {
     const { data: { session } } = await supabase.auth.getSession()
@@ -263,7 +279,7 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < rows.length; i += BATCH) {
       const batch = rows.slice(i, i + BATCH)
-      const { data, error } = await supabase
+      const { data, error } = await adminClient
         .from("leads")
         .upsert(batch, {
           onConflict: "tokko_contact_id",

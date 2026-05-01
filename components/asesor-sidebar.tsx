@@ -31,7 +31,7 @@ const navItems = [
   { name: "Mi Pipeline", href: "/asesor/pipeline", icon: LayoutGrid },
   { name: "Mis Propiedades", href: "/asesor/propiedades", icon: Building },
   { name: "Tracking Performance", href: "/asesor/tracking-performance", icon: TrendingUp },
-  { name: "Mis Leads", href: "/asesor/leads", icon: Users },
+  { name: "Leads Tokko", href: "/asesor/leads", icon: Users },
   { name: "WhatsApp Bandeja", href: "/asesor/whatsapp", icon: MessageSquare },
   { name: "Marketing IA", href: "/asesor/marketing-ia", icon: Bot },
   { name: "Contratos IA", href: "/asesor/contratos-ia", icon: FileSignature },

@@ -29,7 +29,7 @@ const navItems = [
   { name: "Pipeline", href: "/director/pipeline", icon: LayoutGrid },
   { name: "Propiedades", href: "/director/propiedades", icon: Building },
   { name: "Tracking Performance", href: "/director/tracking-performance", icon: TrendingUp },
-  { name: "Leads", href: "/director/leads", icon: Users },
+  { name: "Leads Tokko", href: "/director/leads", icon: Users },
   { name: "Asesor IA WhatsApp", href: "/director/asesor-ia-whatsapp", icon: MessageSquare },
   { name: "Marketing IA", href: "/director/marketing-ia", icon: Sparkles },
   { name: "Contratos IA", href: "/director/contratos-ia", icon: FileSignature },

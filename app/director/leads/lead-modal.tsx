@@ -69,7 +69,10 @@ export function LeadModal({ isOpen, setIsOpen, onSuccess }: LeadModalProps) {
     email: "",
     source: "Manual",
     assigned_agent_id: "",
-    notes: ""
+    notes: "",
+    tokko_property_operation: "",
+    tokko_property_type: "",
+    tokko_lead_status: "Nuevo"
   })
 
   const handleSubmitManual = async (e: React.FormEvent) => {
@@ -82,10 +85,18 @@ export function LeadModal({ isOpen, setIsOpen, onSuccess }: LeadModalProps) {
       const { data: profile } = await supabase
         .from("profiles").select("agency_id").eq("id", session.user.id).single()
 
+      // Map Tokko status to PRISMA pipeline stage
+      let pipelineStage = "nuevo";
+      const status = formData.tokko_lead_status.toLowerCase();
+      if (status.includes("nuevo")) pipelineStage = "nuevo";
+      else if (status.includes("contacto")) pipelineStage = "contacto";
+      else if (status.includes("calificado")) pipelineStage = "calificado";
+      else if (status.includes("negociación") || status.includes("negociacion")) pipelineStage = "negociacion";
+
       const { error } = await supabase.from("leads").insert([{
         ...formData,
         agency_id: profile?.agency_id,
-        pipeline_stage: "nuevo",
+        pipeline_stage: pipelineStage,
         status: "active"
       }])
       if (error) throw error
@@ -100,7 +111,10 @@ export function LeadModal({ isOpen, setIsOpen, onSuccess }: LeadModalProps) {
         email: "",
         source: "Manual",
         assigned_agent_id: "",
-        notes: ""
+        notes: "",
+        tokko_property_operation: "",
+        tokko_property_type: "",
+        tokko_lead_status: "Nuevo"
       })
       setAiAnalysis(null)
     } catch (_error) {
@@ -193,6 +207,46 @@ export function LeadModal({ isOpen, setIsOpen, onSuccess }: LeadModalProps) {
                   <SelectTrigger><SelectValue placeholder="Seleccionar asesor" /></SelectTrigger>
                   <SelectContent>
                     {agents.map((a: any) => <SelectItem key={a.id} value={a.id}>{a.full_name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo de Operación</Label>
+                <Select value={formData.tokko_property_operation} onValueChange={(v) => setFormData({...formData, tokko_property_operation: v})}>
+                  <SelectTrigger><SelectValue placeholder="Venta / Alquiler..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Venta">Venta</SelectItem>
+                    <SelectItem value="Alquiler">Alquiler</SelectItem>
+                    <SelectItem value="Alquiler Temporario">Alquiler Temporario</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo de Propiedad</Label>
+                <Select value={formData.tokko_property_type} onValueChange={(v) => setFormData({...formData, tokko_property_type: v})}>
+                  <SelectTrigger><SelectValue placeholder="Casa / Depto..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Departamento">Departamento</SelectItem>
+                    <SelectItem value="Casa">Casa</SelectItem>
+                    <SelectItem value="Ph">PH</SelectItem>
+                    <SelectItem value="Terreno">Terreno</SelectItem>
+                    <SelectItem value="Oficina">Oficina</SelectItem>
+                    <SelectItem value="Local">Local</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Estado Inicial (CRM)</Label>
+                <Select value={formData.tokko_lead_status} onValueChange={(v) => setFormData({...formData, tokko_lead_status: v})}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar estado" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Nuevo">Nuevo</SelectItem>
+                    <SelectItem value="En contacto">En contacto</SelectItem>
+                    <SelectItem value="Calificado">Calificado</SelectItem>
+                    <SelectItem value="En negociación">En negociación</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

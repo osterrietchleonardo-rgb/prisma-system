@@ -47,8 +47,8 @@ export default function CRMLeadsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex flex-wrap items-center gap-3">
-            CRM: Leads Comerciales
-            <Badge variant="outline" className="text-[10px] md:text-xs">Tokko Sync</Badge>
+            Leads Tokko
+            <Badge variant="outline" className="text-[10px] md:text-xs">CRM Sincronizado</Badge>
             {leads.length > 0 && !isLoading && (
               <Badge variant="secondary" className="text-[10px] md:text-xs bg-accent/10 text-accent border-accent/20">
                 {leads.length} {leads.length === 1 ? 'lead' : 'leads'}

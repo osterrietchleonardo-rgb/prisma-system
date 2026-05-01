@@ -99,9 +99,9 @@ export default function AsesorLeadsPage() {
     <div className="flex flex-col h-full space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight text-foreground">Mis Leads</h2>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground">Leads Tokko</h2>
           <p className="text-muted-foreground mt-1">
-            Administra tus prospectos y consultas asignadas.
+            Administra tus prospectos y consultas asignadas de Tokko Broker.
           </p>
         </div>
         <div className="flex items-center gap-2">

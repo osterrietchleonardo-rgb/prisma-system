@@ -39,6 +39,7 @@ export interface TokkoLead {
 
 export interface NormalizedLead extends TokkoLead {
   dias_en_sistema: number;
+  pipeline_stage: string;
   tiempo_de_cierre: number | null;
   tiempo_de_cierre_horas: number | null;
   telefono_principal: string | null;
@@ -141,6 +142,7 @@ export const normalizeLead = (lead: TokkoLead): NormalizedLead => {
   return {
     ...lead,
     dias_en_sistema,
+    pipeline_stage: (lead as any).pipeline_stage || "nuevo",
     tiempo_de_cierre,
     tiempo_de_cierre_horas,
     telefono_principal,
