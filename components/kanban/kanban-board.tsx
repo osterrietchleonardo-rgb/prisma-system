@@ -108,6 +108,7 @@ export function KanbanBoard({ initialLeads, onCardClick, detailsUrl = "/director
   }
 
   const onDragEnd = async (event: DragEndEvent) => {
+    const originalStage = activeLead?.pipeline_stage
     setActiveLead(null)
     const { active, over } = event
     if (!over) return
@@ -115,20 +116,16 @@ export function KanbanBoard({ initialLeads, onCardClick, detailsUrl = "/director
     const activeId = active.id as string
     const overId = over.id as string
 
-    // Find the lead and the final stage
-    const lead = leads.find(l => l.id === activeId)
-    if (!lead) return
-
     const finalStage = KANBAN_STAGES.some(s => s.id === overId) 
       ? overId 
       : leads.find(l => l.id === overId)?.pipeline_stage
 
-    if (finalStage && lead.pipeline_stage !== finalStage) {
+    if (finalStage && originalStage !== finalStage) {
       try {
-        await updateLeadStage(activeId, finalStage)
+        await updateLeadStage(activeId, finalStage as string)
         setLeads(prev => prev.map(l => 
           l.id === activeId 
-            ? { ...l, pipeline_stage: finalStage, updated_at: new Date().toISOString() } 
+            ? { ...l, pipeline_stage: finalStage as string, updated_at: new Date().toISOString() } 
             : l
         ))
         toast.success(`Lead movido a ${KANBAN_STAGES.find(s => s.id === finalStage)?.title}`)
