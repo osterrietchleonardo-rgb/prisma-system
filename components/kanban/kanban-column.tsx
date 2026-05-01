@@ -22,8 +22,14 @@ export function KanbanColumn({ id, title, icon: Icon, color, leads, onClickCard,
     id,
   })
 
-  // Calcular valor potencial (mock logic: sum of prop views or fixed value per lead)
-  const totalValue = leads.length * 150000 // Placeholder: 150k avg
+  // Calcular valor potencial real basado en los precios de las propiedades de Tokko
+  const totalValue = leads.reduce((acc, lead) => {
+    if (!lead.tokko_property_price) return acc;
+    // Extraer solo números de strings como "USD 250.000" o "250000"
+    const priceMatch = lead.tokko_property_price.replace(/[^0-9]/g, "");
+    const price = parseInt(priceMatch, 10);
+    return isNaN(price) ? acc : acc + price;
+  }, 0)
 
   return (
     <div className="flex flex-col w-[300px] shrink-0 h-full bg-accent/5 rounded-xl border border-accent/10">

@@ -32,6 +32,7 @@ export interface Lead {
   phone: string
   source: string
   pipeline_stage: string
+  notes?: string
   assigned_agent_id?: string
   created_at: string
   updated_at: string

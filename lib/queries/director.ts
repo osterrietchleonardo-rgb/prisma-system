@@ -32,6 +32,7 @@ export async function getAgencyLeads(options: AgencyLeadsOptions) {
       email,
       phone,
       pipeline_stage,
+      notes,
       status,
       source,
       created_at,

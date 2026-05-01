@@ -27,6 +27,10 @@ import { Lead, KANBAN_STAGES } from "./types"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
+import { useState, useEffect } from "react"
+import { getLeadActivities } from "@/lib/queries/director"
+import { Skeleton } from "@/components/ui/skeleton"
+
 interface LeadDetailSheetProps {
   lead: Lead | null
   isOpen: boolean
@@ -46,6 +50,26 @@ export function LeadDetailSheet({
   onLogActivity,
   isAdvisor = false
 }: LeadDetailSheetProps) {
+  const [activities, setActivities] = useState<any[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (isOpen && lead?.id) {
+      const loadActivities = async () => {
+        try {
+          setLoading(true)
+          const data = await getLeadActivities(lead.id)
+          setActivities(data || [])
+        } catch (error) {
+          console.error("Error loading activities:", error)
+        } finally {
+          setLoading(false)
+        }
+      }
+      loadActivities()
+    }
+  }, [isOpen, lead?.id])
+
   if (!lead) return null
 
   const stage = KANBAN_STAGES.find(s => s.id === lead.pipeline_stage)
@@ -144,12 +168,28 @@ export function LeadDetailSheet({
                   <p className="text-sm font-medium mt-1">Lead creado</p>
                   <p className="text-xs text-muted-foreground mt-0.5">Origen: {lead.source}</p>
                 </div>
-                {/* Mock activities */}
-                <div className="relative opacity-60">
-                  <div className="absolute -left-5 top-1 h-2 w-2 rounded-full bg-accent/40" />
-                  <p className="text-xs text-muted-foreground">Ayer | 14:20 hs</p>
-                  <p className="text-sm font-medium mt-1">Llamada saliente sin respuesta</p>
-                </div>
+                
+                {loading ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                  </div>
+                ) : activities.length > 0 ? (
+                  activities.map((activity, index) => (
+                    <div key={activity.id || index} className="relative">
+                      <div className="absolute -left-5 top-1 h-2 w-2 rounded-full bg-accent/40" />
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(activity.created_at), "dd/MM | HH:mm 'hs'", { locale: es })}
+                      </p>
+                      <p className="text-sm font-medium mt-1">{activity.description}</p>
+                      {activity.agent?.full_name && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Por: {activity.agent.full_name}</p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">No hay actividades registradas adicionalmente.</p>
+                )}
               </div>
             </section>
 
@@ -159,9 +199,15 @@ export function LeadDetailSheet({
                 <FileText className="h-4 w-4" />
                 Notas internas
               </h4>
-              <div className="p-4 bg-accent/5 rounded-xl italic text-sm border-l-4 border-accent/30">
-                &quot;Busca departamento de 3 ambientes en Palermo o Colegiales. Presupuesto máx USD 250k. Vende propiedad actual para comprar.&quot;
-              </div>
+              {lead.notes ? (
+                <div className="p-4 bg-accent/5 rounded-xl text-sm border-l-4 border-accent/30 whitespace-pre-wrap">
+                  {lead.notes}
+                </div>
+              ) : (
+                <div className="p-4 bg-muted/20 rounded-xl italic text-sm text-muted-foreground border-l-4 border-muted/30">
+                  Sin notas internas registradas.
+                </div>
+              )}
             </section>
           </div>
         </ScrollArea>
