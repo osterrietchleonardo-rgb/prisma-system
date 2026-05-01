@@ -299,10 +299,17 @@ export async function POST(req: NextRequest) {
       throw new Error(`Error en base de datos: ${errors[0].message}`);
     }
 
-    return NextResponse.json({
-      success:  true,
-      imported: totalUpserted,
-      total:    rows.length,
+    // Fetch NEW total count after sync to return to UI
+    const { count: finalTotal } = await adminClient
+      .from("leads")
+      .select("*", { count: "exact", head: true })
+      .eq("agency_id", profile.agency_id)
+
+    return NextResponse.json({ 
+      success: true, 
+      imported: finalTotal || totalUpserted, // Return the actual total in DB
+      added: totalUpserted,
+      errors: errors.length > 0 ? errors : undefined 
     })
   } catch (error: any) {
     console.error("Tokko import error details:", error)

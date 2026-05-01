@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { 
   Plus, 
   Search, 
@@ -57,6 +58,11 @@ export default function AsesorLeadsPage() {
   const [search, setSearch] = useState("")
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [sessionData, setSessionData] = useState<{ id: string, agencyId: string } | null>(null)
+  const [selectedLead, setSelectedLead] = useState<any | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
+  
+  const searchParams = useSearchParams()
+  const leadIdFromUrl = searchParams.get("leadId")
 
   const supabase = createClient()
 
@@ -88,6 +94,17 @@ export default function AsesorLeadsPage() {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Handle leadId from URL
+  useEffect(() => {
+    if (leadIdFromUrl && leads.length > 0) {
+      const lead = leads.find(l => l.id.toString() === leadIdFromUrl)
+      if (lead) {
+        setSelectedLead(lead)
+        setIsDetailOpen(true)
+      }
+    }
+  }, [leadIdFromUrl, leads])
 
   const filteredLeads = leads.filter(l => 
     l.full_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -213,7 +230,15 @@ export default function AsesorLeadsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-card border-accent/20">
-                        <DropdownMenuItem className="cursor-pointer">Ver detalle</DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="cursor-pointer"
+                          onClick={() => {
+                            setSelectedLead(lead)
+                            setIsDetailOpen(true)
+                          }}
+                        >
+                          Ver detalle
+                        </DropdownMenuItem>
                         <DropdownMenuItem className="cursor-pointer text-destructive">Eliminar</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -224,6 +249,87 @@ export default function AsesorLeadsPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Detail Dialog */}
+      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <DialogContent className="max-w-2xl bg-card border-accent/20">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <User className="h-5 w-5 text-accent" />
+              Detalle del Lead
+            </DialogTitle>
+            <DialogDescription>
+              Información completa y gestión del contacto.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedLead && (
+            <div className="space-y-6 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Nombre Completo</Label>
+                  <p className="font-semibold text-lg">{selectedLead.full_name}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Etapa Pipeline</Label>
+                  <div>
+                    <Badge variant="secondary" className="bg-accent/10 text-accent capitalize">
+                      {selectedLead.pipeline_stage?.replace("_", " ") || "nuevo"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Email</Label>
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span>{selectedLead.email || "—"}</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Teléfono</Label>
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>{selectedLead.phone || "—"}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Origen</Label>
+                  <p>{selectedLead.source || selectedLead.tokko_origin || "Web"}</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wider">Fecha de Ingreso</Label>
+                  <p>{format(new Date(selectedLead.created_at), "d 'de' MMMM, yyyy", { locale: es })}</p>
+                </div>
+              </div>
+
+              {selectedLead.tokko_property_title && (
+                <div className="p-4 rounded-xl bg-accent/5 border border-accent/10 space-y-2">
+                  <Label className="text-[10px] text-accent font-bold uppercase tracking-widest">Propiedad de Interés (Tokko)</Label>
+                  <h5 className="font-bold">{selectedLead.tokko_property_title}</h5>
+                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <span>{selectedLead.tokko_property_type}</span>
+                    <span>{selectedLead.tokko_property_price}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-accent/10">
+                <Button variant="outline" onClick={() => setIsDetailOpen(false)}>Cerrar</Button>
+                <Button className="bg-accent hover:bg-accent/90 gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Ir al Chat
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

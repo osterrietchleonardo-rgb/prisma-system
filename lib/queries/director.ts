@@ -48,6 +48,7 @@ export async function getAgencyLeads(options: AgencyLeadsOptions) {
       tokko_property_location,
       tokko_property_type,
       tokko_raw,
+      assigned_agent_id,
       assigned_agent:profiles(id, full_name, avatar_url)
     `, { count: "exact" })
     .eq("agency_id", agencyId)

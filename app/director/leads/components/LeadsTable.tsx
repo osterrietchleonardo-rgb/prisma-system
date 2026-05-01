@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { 
@@ -56,6 +56,18 @@ export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
 
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<NormalizedLead | null>(null);
+  const searchParams = useSearchParams();
+  const leadIdFromUrl = searchParams.get("leadId");
+
+  // Handle leadId from URL to open the modal
+  useEffect(() => {
+    if (leadIdFromUrl && leads.length > 0) {
+      const lead = leads.find(l => l.id.toString() === leadIdFromUrl);
+      if (lead) {
+        setSelectedLead(lead);
+      }
+    }
+  }, [leadIdFromUrl, leads]);
 
   const handleStageChange = async (leadId: string, newStage: string) => {
     try {

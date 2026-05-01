@@ -30,9 +30,10 @@ import { toast } from "sonner"
 interface KanbanBoardProps {
   initialLeads: Lead[]
   onCardClick: (lead: Lead) => void
+  detailsUrl?: string
 }
 
-export function KanbanBoard({ initialLeads, onCardClick }: KanbanBoardProps) {
+export function KanbanBoard({ initialLeads, onCardClick, detailsUrl = "/director/leads" }: KanbanBoardProps) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
   const [activeLead, setActiveLead] = useState<Lead | null>(null)
   
@@ -159,6 +160,7 @@ export function KanbanBoard({ initialLeads, onCardClick }: KanbanBoardProps) {
               color={stage.color}
               leads={leads.filter((l) => l.pipeline_stage === stage.id)}
               onClickCard={onCardClick}
+              detailsUrl={detailsUrl}
             />
           ))}
         </SortableContext>

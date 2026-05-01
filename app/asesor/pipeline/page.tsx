@@ -80,10 +80,6 @@ export default function AsesorPipelinePage() {
               Mi Agenda
             </a>
           </Button>
-          <Button className="bg-accent hover:bg-accent/90 gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Lead
-          </Button>
         </div>
       </div>
 
@@ -121,7 +117,11 @@ export default function AsesorPipelinePage() {
             ))}
           </div>
         ) : (
-          <KanbanBoard initialLeads={filteredLeads} onCardClick={handleOpenDetail} />
+          <KanbanBoard 
+            initialLeads={filteredLeads} 
+            onCardClick={handleOpenDetail} 
+            detailsUrl="/asesor/leads"
+          />
         )}
       </div>
 

@@ -31,7 +31,7 @@ export default function CRMLeadsPage() {
       if (!res.ok) throw new Error(data.error || "Error de sincronización");
       
       await refetch();
-      toast.success(`✅ ${data.imported || 0} leads sincronizados/actualizados`, { id: toastId });
+      toast.success(`✅ Total de ${data.imported || 0} leads sincronizados en CRM`, { id: toastId });
     } catch (err: any) {
       toast.error(err.message || "Error al sincronizar leads", { id: toastId })
     } finally {

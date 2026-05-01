@@ -60,12 +60,12 @@ export default function PipelinePage() {
         }
 
         if (finalAgencyId) {
-          const [leadsData, agentsData] = await Promise.all([
-            getAgencyLeads({ agencyId: finalAgencyId }).catch(() => []),
+          const [leadsResponse, agentsData] = await Promise.all([
+            getAgencyLeads({ agencyId: finalAgencyId, pageSize: 100 }).catch(() => ({ data: [], count: 0 })),
             getAgencyAgents({ agencyId: finalAgencyId }).catch(() => [])
           ])
           
-          setLeads(leadsData as unknown as Lead[])
+          setLeads((leadsResponse.data || []) as unknown as Lead[])
           setAgents(agentsData)
         }
       } catch (error) {
@@ -120,10 +120,6 @@ export default function PipelinePage() {
           <Button variant="outline" size="sm" className="hidden sm:flex gap-2 h-9 text-xs md:text-sm">
             <Download className="h-4 w-4" />
             Exportar
-          </Button>
-          <Button className="flex-1 sm:flex-none bg-accent hover:bg-accent/90 gap-2 h-9 text-xs md:text-sm">
-            <Plus className="h-4 w-4" />
-            <span className="inline sm:inline">Nuevo Lead</span>
           </Button>
         </div>
       </div>
@@ -184,7 +180,11 @@ export default function PipelinePage() {
             ))}
           </div>
         ) : (
-          <KanbanBoard initialLeads={filteredLeads} onCardClick={handleOpenDetail} />
+          <KanbanBoard 
+            initialLeads={filteredLeads} 
+            onCardClick={handleOpenDetail} 
+            detailsUrl="/director/leads"
+          />
         )}
       </div>
 

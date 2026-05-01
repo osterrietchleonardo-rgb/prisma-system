@@ -35,6 +35,12 @@ export interface Lead {
   assigned_agent_id?: string
   created_at: string
   updated_at: string
+  tokko_property_title?: string
+  tokko_property_price?: string
+  tokko_property_type?: string
+  tokko_property_operation?: string
+  tokko_property_location?: string
+  tokko_lead_status?: string
   assigned_agent?: {
     id: string
     full_name: string

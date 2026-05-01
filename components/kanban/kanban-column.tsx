@@ -14,9 +14,10 @@ interface KanbanColumnProps {
   color: string
   leads: Lead[]
   onClickCard: (lead: Lead) => void
+  detailsUrl?: string
 }
 
-export function KanbanColumn({ id, title, icon: Icon, color, leads, onClickCard }: KanbanColumnProps) {
+export function KanbanColumn({ id, title, icon: Icon, color, leads, onClickCard, detailsUrl }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id,
   })
@@ -64,7 +65,7 @@ export function KanbanColumn({ id, title, icon: Icon, color, leads, onClickCard 
       >
         <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
           {leads.map((lead) => (
-            <KanbanCard key={lead.id} lead={lead} onClick={onClickCard} />
+            <KanbanCard key={lead.id} lead={lead} onClick={onClickCard} detailsUrl={detailsUrl} />
           ))}
         </SortableContext>
         

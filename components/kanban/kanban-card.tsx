@@ -2,6 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import Link from "next/link"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -14,9 +15,10 @@ import { Lead } from "./types"
 interface KanbanCardProps {
   lead: Lead
   onClick: (lead: Lead) => void
+  detailsUrl?: string
 }
 
-export function KanbanCard({ lead, onClick }: KanbanCardProps) {
+export function KanbanCard({ lead, onClick, detailsUrl = "/director/leads" }: KanbanCardProps) {
   const {
     attributes,
     listeners,
@@ -73,16 +75,23 @@ export function KanbanCard({ lead, onClick }: KanbanCardProps) {
           <h4 className="font-semibold text-sm line-clamp-1 group-hover:text-accent transition-colors">
             {lead.full_name}
           </h4>
-          <button 
-            className="p-1 hover:bg-accent/10 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => {
-              e.stopPropagation()
-              onClick(lead)
-            }}
-          >
-            <ExternalLink className="h-3 w-3 text-muted-foreground" />
-          </button>
-        </div>
+            <Link 
+              href={`${detailsUrl}?leadId=${lead.id}`}
+              className="p-1 hover:bg-accent/10 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ExternalLink className="h-3 w-3 text-muted-foreground" />
+            </Link>
+          </div>
+          
+          {lead.tokko_lead_status && (
+            <div className="flex items-center gap-1 mt-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+              <span className="text-[10px] font-medium text-muted-foreground italic">
+                {lead.tokko_lead_status}
+              </span>
+            </div>
+          )}
 
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 bg-accent/5">
@@ -94,6 +103,53 @@ export function KanbanCard({ lead, onClick }: KanbanCardProps) {
               {lead.phone.slice(-4)}
             </div>
           )}
+        </div>
+
+        {lead.tokko_property_title && (
+          <div className="bg-accent/5 rounded-md p-1.5 border border-accent/10 space-y-1">
+            <div className="flex items-center justify-between">
+               <p className="text-[10px] font-semibold line-clamp-1 text-accent">
+                {lead.tokko_property_title}
+              </p>
+            </div>
+            
+            <div className="flex items-center justify-between gap-2">
+              {lead.tokko_property_price && (
+                <p className="text-[9px] text-muted-foreground font-bold">
+                  {lead.tokko_property_price}
+                </p>
+              )}
+              <div className="flex gap-1">
+                {lead.tokko_property_type && (
+                  <Badge variant="secondary" className="text-[7px] h-3 px-1 bg-accent/10 text-accent border-none">
+                    {lead.tokko_property_type}
+                  </Badge>
+                )}
+                {lead.tokko_property_operation && (
+                  <Badge variant="outline" className="text-[8px] h-3.5 px-1 bg-background border-accent/20">
+                    {lead.tokko_property_operation}
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {lead.tokko_property_location && (
+              <p className="text-[8px] text-muted-foreground flex items-center gap-1">
+                <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                {lead.tokko_property_location}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Informacion de Contacto Rapida */}
+        <div className="flex items-center gap-3 pt-1 border-t border-accent/5">
+           {lead.email && (
+             <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+               <Mail className="h-2.5 w-2.5" />
+               <span className="truncate max-w-[80px]">{lead.email}</span>
+             </div>
+           )}
         </div>
 
         <div className="flex items-center justify-between pt-1">
