@@ -81,7 +81,7 @@ export function AsesorSidebar({ className, agencyName, userName, userRole, onSel
       <ScrollArea className="flex-1 px-4">
         <nav className="space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href)
+            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
             return (
               <Link
                 key={item.href}

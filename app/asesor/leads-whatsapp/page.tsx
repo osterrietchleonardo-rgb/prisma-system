@@ -28,7 +28,7 @@ export default async function AsesorLeadsWhatsappPage() {
     .select('*, assigned_agent:profiles!wa_conversations_agent_id_fkey(full_name, email, avatar_url)')
     .eq('agency_id', profile.agency_id)
     .eq('agent_id', user.id)
-    .order('updated_at', { ascending: false })
+    .order('last_message_at', { ascending: false })
 
   if (error) {
     console.error('Error al obtener los leads de whatsapp del asesor:', error)

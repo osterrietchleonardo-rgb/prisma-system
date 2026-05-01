@@ -30,7 +30,7 @@ export default async function LeadsWhatsappPage() {
     .from('wa_conversations')
     .select('*, assigned_agent:profiles!wa_conversations_agent_id_fkey(full_name, email, avatar_url)')
     .eq('agency_id', agency_id)
-    .order('updated_at', { ascending: false })
+    .order('last_message_at', { ascending: false })
 
   if (error) {
     console.error('Error al obtener los leads de whatsapp:', error)
