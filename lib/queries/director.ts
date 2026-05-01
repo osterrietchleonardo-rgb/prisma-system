@@ -69,7 +69,13 @@ export async function getAgencyLeads(options: AgencyLeadsOptions) {
     .range(from, to)
 
   if (error) throw error
-  return { data, count }
+  
+  const sanitizedData = data.map(lead => ({
+    ...lead,
+    pipeline_stage: lead.pipeline_stage || "nuevo"
+  }))
+
+  return { data: sanitizedData, count }
 }
 
 export async function updateLeadStage(leadId: string, stage: string) {

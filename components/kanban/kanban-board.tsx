@@ -126,6 +126,11 @@ export function KanbanBoard({ initialLeads, onCardClick, detailsUrl = "/director
     if (finalStage && lead.pipeline_stage !== finalStage) {
       try {
         await updateLeadStage(activeId, finalStage)
+        setLeads(prev => prev.map(l => 
+          l.id === activeId 
+            ? { ...l, pipeline_stage: finalStage, updated_at: new Date().toISOString() } 
+            : l
+        ))
         toast.success(`Lead movido a ${KANBAN_STAGES.find(s => s.id === finalStage)?.title}`)
       } catch (error) {
         toast.error("Error al actualizar la etapa")

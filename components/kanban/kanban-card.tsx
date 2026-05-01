@@ -10,7 +10,7 @@ import { Clock, MessageSquare, Phone, User, ExternalLink, Mail } from "lucide-re
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
-import { Lead } from "./types"
+import { Lead, KANBAN_STAGES } from "./types"
 
 interface KanbanCardProps {
   lead: Lead
@@ -19,6 +19,8 @@ interface KanbanCardProps {
 }
 
 export function KanbanCard({ lead, onClick, detailsUrl = "/director/leads" }: KanbanCardProps) {
+  const stage = KANBAN_STAGES.find(s => s.id === lead.pipeline_stage) || KANBAN_STAGES[0]
+  
   const {
     attributes,
     listeners,
@@ -72,26 +74,29 @@ export function KanbanCard({ lead, onClick, detailsUrl = "/director/leads" }: Ka
     >
       <CardContent className="p-3 space-y-3">
         <div className="flex items-start justify-between gap-2">
-          <h4 className="font-semibold text-sm line-clamp-1 group-hover:text-accent transition-colors">
-            {lead.full_name}
-          </h4>
-            <Link 
-              href={`${detailsUrl}?leadId=${lead.id}`}
-              className="p-1 hover:bg-accent/10 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ExternalLink className="h-3 w-3 text-muted-foreground" />
-            </Link>
-          </div>
-          
-          {lead.tokko_lead_status && (
-            <div className="flex items-center gap-1 mt-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-accent" />
-              <span className="text-[10px] font-medium text-muted-foreground italic">
-                {lead.tokko_lead_status}
-              </span>
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-sm line-clamp-1 group-hover:text-accent transition-colors">
+              {lead.full_name}
+            </h4>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <Badge className={cn("text-[9px] h-3.5 px-1.5 py-0 border-none font-medium", stage.color)}>
+                {stage.title}
+              </Badge>
+              {lead.tokko_lead_status && (
+                <span className="text-[9px] text-muted-foreground italic truncate">
+                  • {lead.tokko_lead_status}
+                </span>
+              )}
             </div>
-          )}
+          </div>
+          <Link 
+            href={`${detailsUrl}?leadId=${lead.id}`}
+            className="p-1 hover:bg-accent/10 rounded opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+          </Link>
+        </div>
 
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4 bg-accent/5">
