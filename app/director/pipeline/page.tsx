@@ -46,18 +46,13 @@ export default function PipelinePage() {
         const supabase = createClient()
         
         const { data: { session } } = await supabase.auth.getSession()
-        const userAgencyId = session?.user?.user_metadata?.agency_id || session?.user?.email // Fallback or improved logic
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('agency_id')
+          .eq('id', session.user.id)
+          .single()
         
-        // Let's also try to get it from profile if not in metadata
-        let finalAgencyId = userAgencyId
-        if (!finalAgencyId && session?.user?.id) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('agency_id')
-            .eq('id', session.user.id)
-            .single()
-          finalAgencyId = profile?.agency_id
-        }
+        const finalAgencyId = profile?.agency_id || session?.user?.user_metadata?.agency_id
 
         if (finalAgencyId) {
           const [leadsResponse, agentsData] = await Promise.all([

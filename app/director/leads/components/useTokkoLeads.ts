@@ -5,9 +5,15 @@ import { createClient } from "@/lib/supabase/client";
 // Helper to normalize a single DB lead (extracted from the loop for performance/cleanliness)
 const normalizeDbLead = (dbLead: any): NormalizedLead | null => {
   try {
+    let norm: NormalizedLead;
+
     // 1. Si el lead viene de Tokko y tiene su JSON original, lo mapeamos
     if (dbLead.tokko_raw) {
-      const raw = { ...dbLead.tokko_raw };
+      // Merge DB fields into the raw data for normalization
+      const raw = { 
+        ...dbLead.tokko_raw,
+        pipeline_stage: dbLead.pipeline_stage 
+      };
       
       if (dbLead.assigned_agent) {
          raw.agent = {
@@ -24,58 +30,57 @@ const normalizeDbLead = (dbLead: any): NormalizedLead | null => {
       // Ensure original tokko date is used for dias_en_sistema and created_at
       raw.created_at = dbLead.tokko_created_date || raw.created_at || raw.created_date || raw.date || dbLead.created_at;
 
-      let norm = normalizeLead(raw);
-      norm.id = dbLead.id; // Clave: usamos el UUID de Supabase para la url!
-      return norm;
+      norm = normalizeLead(raw);
+    } else {
+      // 2. Si es un lead manual de Supabase (creado en la interfaz), construimos un TokkoLead compatible
+      const validPhones = [dbLead.phone].filter(Boolean);
+      const mapStatus = (stage: string) => {
+        if (stage === "perdido") return "Perdido";
+        if (stage === "ganado") return "Cerrado";
+        if (stage === "nuevo") return "Activo";
+        return "En negociación";
+      };
+
+      const manualTokko: TokkoLead = {
+        id: dbLead.id,
+        name: dbLead.full_name || "Sin nombre",
+        email: dbLead.email || "",
+        other_email: "",
+        work_email: "",
+        phone: validPhones[0] || "",
+        cellphone: validPhones[0] || "",
+        other_phone: "",
+        birthdate: null,
+        document_number: "",
+        work_name: "",
+        work_position: "",
+        lead_status: mapStatus(dbLead.pipeline_stage),
+        is_owner: false,
+        is_company: false,
+        created_at: dbLead.created_at,
+        deleted_at: null,
+        tags: [],
+        related_to_companies: []
+      };
+      
+      if (dbLead.assigned_agent) {
+           manualTokko.agent = {
+             id: dbLead.assigned_agent.id as any,
+             name: dbLead.assigned_agent.full_name,
+             email: dbLead.assigned_agent.email || "",
+             phone: dbLead.assigned_agent.phone || "",
+             cellphone: dbLead.assigned_agent.phone || "",
+             picture: dbLead.assigned_agent.avatar_url || "",
+             position: ""
+           };
+      }
+      
+      norm = normalizeLead(manualTokko);
+      if (dbLead.source) norm.origen = dbLead.source;
     }
 
-    // 2. Si es un lead manual de Supabase (creado en la interfaz), construimos un TokkoLead compatible
-    const validPhones = [dbLead.phone].filter(Boolean);
-    const mapStatus = (stage: string) => {
-      if (stage === "perdido") return "Perdido";
-      if (stage === "ganado") return "Cerrado";
-      if (stage === "nuevo") return "Activo";
-      return "En negociación";
-    };
-
-    const manualTokko: TokkoLead = {
-      id: dbLead.id,
-      name: dbLead.full_name || "Sin nombre",
-      email: dbLead.email || "",
-      other_email: "",
-      work_email: "",
-      phone: validPhones[0] || "",
-      cellphone: validPhones[0] || "",
-      other_phone: "",
-      birthdate: null,
-      document_number: "",
-      work_name: "",
-      work_position: "",
-      lead_status: mapStatus(dbLead.pipeline_stage),
-      is_owner: false,
-      is_company: false,
-      created_at: dbLead.created_at,
-      deleted_at: null,
-      tags: [],
-      related_to_companies: []
-    };
-    
-    if (dbLead.assigned_agent) {
-         manualTokko.agent = {
-           id: dbLead.assigned_agent.id as any,
-           name: dbLead.assigned_agent.full_name,
-           email: dbLead.assigned_agent.email || "",
-           phone: dbLead.assigned_agent.phone || "",
-           cellphone: dbLead.assigned_agent.phone || "",
-           picture: dbLead.assigned_agent.avatar_url || "",
-           position: ""
-         };
-    }
-    
-    const norm = normalizeLead(manualTokko);
+    // Always ensure the Supabase UUID is the ID used in the UI
     norm.id = dbLead.id;
-    
-    if (dbLead.source) norm.origen = dbLead.source;
     return norm;
   } catch (e) {
     console.error("Failed to normalize lead:", dbLead.id, e);
@@ -89,10 +94,12 @@ export const useTokkoLeads = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
 
-  const fetchLeads = useCallback(async (force = false) => {
+  const fetchLeads = useCallback(async (isRefetch = false) => {
     setLoading(true);
     setError(null);
-    if (force) setLeads([]); // Reset on manual refresh
+    if (isRefetch) setLeads([]); // Reset on manual refresh
+
+    let allLeads: NormalizedLead[] = [];
 
     try {
       const supabase = createClient();
@@ -107,7 +114,7 @@ export const useTokkoLeads = () => {
       
       if (!profile?.agency_id) throw new Error("Sin agencia");
 
-      const CHUNK_SIZE = 100; 
+      const CHUNK_SIZE = 500; 
       let currentOffset = 0;
       let hasMore = true;
       let firstBatchDone = false;
@@ -128,18 +135,11 @@ export const useTokkoLeads = () => {
 
         if (dbLeadsChunk && dbLeadsChunk.length > 0) {
           const chunkNormalized = dbLeadsChunk.map(dbLead => normalizeDbLead(dbLead)).filter(Boolean) as NormalizedLead[];
-
-          setLeads(prev => {
-            const existingIds = new Set(prev.map(l => l.id));
-            const uniqueNew = chunkNormalized.filter(l => !existingIds.has(l.id));
-            const updated = [...prev, ...uniqueNew];
-            // Safe sort using Date objects
-            return updated.sort((a,b) => {
-               const dateA = new Date(a.created_at).getTime();
-               const dateB = new Date(b.created_at).getTime();
-               return dateB - dateA;
-            });
-          });
+          
+          allLeads = [...allLeads, ...chunkNormalized];
+          
+          // Incremental update to keep UI responsive
+          setLeads([...allLeads]);
           
           if (!firstBatchDone) {
              setLoading(false); 
@@ -157,9 +157,11 @@ export const useTokkoLeads = () => {
       }
 
       setLastSync(new Date());
+      return allLeads;
     } catch (err: any) {
       console.error("useTokkoLeads DB error:", err.message);
       setError(err.message || "Error al obtener leads");
+      return allLeads;
     } finally {
       setLoading(false);
     }

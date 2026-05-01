@@ -42,8 +42,8 @@ function CRMLeadsPageContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error de sincronización");
       
-      await refetch();
-      toast.success(`✅ Total de ${data.imported || 0} leads sincronizados en CRM`, { id: toastId });
+      const updatedLeads = await refetch();
+      toast.success(`✅ Total de ${updatedLeads?.length || 0} leads sincronizados en CRM`, { id: toastId });
     } catch (err: any) {
       toast.error(err.message || "Error al sincronizar leads", { id: toastId })
     } finally {
@@ -101,7 +101,14 @@ function CRMLeadsPageContent() {
 
       {/* Main Table */}
       <div className="mt-6">
-        <LeadsTable leads={leads} loading={isLoading} tagsByGroup={tagsByGroup} />
+        <LeadsTable 
+          leads={leads} 
+          loading={isLoading} 
+          tagsByGroup={tagsByGroup} 
+          onRefresh={async () => {
+            await refetch();
+          }}
+        />
       </div>
     </div>
   )

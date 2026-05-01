@@ -31,9 +31,10 @@ interface LeadsTableProps {
   leads: NormalizedLead[];
   loading: boolean;
   tagsByGroup: Record<string, TokkoTag[]>;
+  onRefresh?: () => Promise<void>;
 }
 
-export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
+export function LeadsTable({ leads, loading, tagsByGroup, onRefresh }: LeadsTableProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const itemsPerPage = 25;
@@ -73,7 +74,11 @@ export function LeadsTable({ leads, loading, tagsByGroup }: LeadsTableProps) {
     try {
       await updateLeadStage(leadId, newStage);
       toast.success("Etapa del pipeline actualizada");
-      router.refresh();
+      if (onRefresh) {
+        await onRefresh();
+      } else {
+        router.refresh();
+      }
     } catch (error) {
       toast.error("Error al actualizar la etapa");
     }
