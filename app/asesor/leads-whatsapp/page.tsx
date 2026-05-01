@@ -36,7 +36,7 @@ export default async function AsesorLeadsWhatsappPage() {
 
   const { data: leadsData } = await supabase
     .from('leads')
-    .select('phone, pipeline_stage')
+    .select('id, phone, pipeline_stage')
     .eq('agency_id', profile.agency_id)
     .eq('source', 'WhatsApp')
 
@@ -44,6 +44,7 @@ export default async function AsesorLeadsWhatsappPage() {
     const matchedLead = (leadsData || []).find((l: any) => l.phone === conv.contact_phone)
     return {
       ...conv,
+      lead_id: matchedLead ? matchedLead.id : null,
       pipeline_stage: matchedLead ? matchedLead.pipeline_stage : null
     }
   })

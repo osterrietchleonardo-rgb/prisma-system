@@ -39,7 +39,7 @@ export default async function LeadsWhatsappPage() {
   // Fetchear los leads en pipeline de esta agencia que provengan de WhatsApp
   const { data: leadsData } = await supabase
     .from('leads')
-    .select('phone, pipeline_stage')
+    .select('id, phone, pipeline_stage')
     .eq('agency_id', agency_id)
     .eq('source', 'WhatsApp')
 
@@ -48,6 +48,7 @@ export default async function LeadsWhatsappPage() {
     const matchedLead = (leadsData || []).find((l: any) => l.phone === conv.contact_phone)
     return {
       ...conv,
+      lead_id: matchedLead ? matchedLead.id : null,
       pipeline_stage: matchedLead ? matchedLead.pipeline_stage : null
     }
   })
