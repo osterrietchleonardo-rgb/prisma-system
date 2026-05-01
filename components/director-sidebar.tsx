@@ -31,6 +31,7 @@ const navItems = [
   { name: "Tracking Performance", href: "/director/tracking-performance", icon: TrendingUp },
   { name: "Leads Tokko", href: "/director/leads", icon: Users },
   { name: "Asesor IA WhatsApp", href: "/director/asesor-ia-whatsapp", icon: MessageSquare },
+  { name: "Leads WhatsApp", href: "/director/leads-whatsapp", icon: MessageSquare },
   { name: "Marketing IA", href: "/director/marketing-ia", icon: Sparkles },
   { name: "Contratos IA", href: "/director/contratos-ia", icon: FileSignature },
   { name: "Asesores", href: "/director/asesores", icon: UserCircle },

@@ -33,6 +33,7 @@ const navItems = [
   { name: "Tracking Performance", href: "/asesor/tracking-performance", icon: TrendingUp },
   { name: "Leads Tokko", href: "/asesor/leads", icon: Users },
   { name: "WhatsApp Bandeja", href: "/asesor/whatsapp", icon: MessageSquare },
+  { name: "Leads WhatsApp", href: "/asesor/leads-whatsapp", icon: MessageSquare },
   { name: "Marketing IA", href: "/asesor/marketing-ia", icon: Bot },
   { name: "Contratos IA", href: "/asesor/contratos-ia", icon: FileSignature },
   { name: "Mi Calendario", href: "/asesor/calendario", icon: Calendar },

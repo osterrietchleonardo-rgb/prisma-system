@@ -1226,3 +1226,57 @@ export async function updateContactCampaignStatus(
     return { success: false, error: message }
   }
 }
+
+// =============================================
+// Action 17: Enviar lead a Pipeline (Kanban)
+// =============================================
+
+export async function sendToPipeline(
+  conversation_id: string
+): Promise<WhatsAppActionResult> {
+  try {
+    const { agency_id } = await getAgencyProfile()
+    const supabase = createClient()
+
+    // Obtener la conversación
+    const { data: conv, error: convError } = await supabase
+      .from('wa_conversations')
+      .select('contact_name, contact_phone')
+      .eq('id', conversation_id)
+      .single()
+
+    if (convError || !conv) {
+      return { success: false, error: 'Conversación no encontrada.' }
+    }
+
+    // Insertar en la tabla leads
+    const { data: lead, error: insertError } = await supabase
+      .from('leads')
+      .insert({
+        agency_id,
+        full_name: conv.contact_name || 'Sin nombre (WhatsApp)',
+        phone: conv.contact_phone,
+        source: 'WhatsApp',
+        status: 'new',
+        pipeline_stage: 'lead',
+        notes: `Generado desde Asesor IA WhatsApp. Conversación ID: ${conversation_id}`
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      return { success: false, error: `Error al crear el lead: ${insertError.message}` }
+    }
+
+    // Opcionalmente se podría agregar una etiqueta a la conversación para indicar que ya está en el pipeline
+    await supabase.rpc('array_append_etiqueta', { 
+      conv_id: conversation_id, 
+      nueva_etiqueta: 'En Pipeline' 
+    }).catch(() => {}) // Fallback silencioso si no existe la función
+
+    return { success: true, data: lead }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}

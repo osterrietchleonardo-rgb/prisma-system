@@ -22,6 +22,7 @@ export default function AsesorPipelinePage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [sourceFilter, setSourceFilter] = useState("all")
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
 
@@ -47,9 +48,13 @@ export default function AsesorPipelinePage() {
   }, [])
 
   const filteredLeads = leads.filter(lead => {
-    return lead.full_name.toLowerCase().includes(search.toLowerCase()) || 
-           (lead.email && lead.email.toLowerCase().includes(search.toLowerCase())) ||
-           (lead.phone && lead.phone.includes(search))
+    const matchesSearch = lead.full_name.toLowerCase().includes(search.toLowerCase()) || 
+                          (lead.email && lead.email.toLowerCase().includes(search.toLowerCase())) ||
+                          (lead.phone && lead.phone.includes(search))
+    
+    const matchesSource = sourceFilter === "all" || lead.source === sourceFilter
+
+    return matchesSearch && matchesSource
   })
 
   const handleOpenDetail = (lead: Lead) => {
@@ -97,10 +102,18 @@ export default function AsesorPipelinePage() {
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Filtros
-            </Button>
+            <div className="flex items-center gap-2 w-full lg:min-w-[150px]">
+              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <select 
+                className="h-9 w-full bg-background/50 border border-accent/10 rounded-md text-xs md:text-sm px-3 py-1 focus-visible:ring-1 focus-visible:ring-accent/30 outline-none"
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value)}
+              >
+                <option value="all">Todos los orígenes</option>
+                <option value="WhatsApp">WhatsApp</option>
+                <option value="Tokko Broker">Tokko Broker</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

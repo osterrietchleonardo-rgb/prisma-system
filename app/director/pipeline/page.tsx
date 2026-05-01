@@ -33,6 +33,7 @@ export default function PipelinePage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [agentFilter, setAgentFilter] = useState("all")
+  const [sourceFilter, setSourceFilter] = useState("all")
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
 
@@ -91,8 +92,9 @@ export default function PipelinePage() {
                           phone.includes(search)
     
     const matchesAgent = agentFilter === "all" || lead.assigned_agent_id === agentFilter
+    const matchesSource = sourceFilter === "all" || lead.source === sourceFilter
     
-    return matchesSearch && matchesAgent
+    return matchesSearch && matchesAgent && matchesSource
   }) || []
 
   const handleOpenDetail = (lead: Lead) => {
@@ -138,6 +140,20 @@ export default function PipelinePage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+            <div className="flex items-center gap-2 w-full lg:min-w-[150px]">
+              <ListFilter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                <SelectTrigger className="h-9 bg-background/50 border-accent/10 text-xs md:text-sm">
+                  <SelectValue placeholder="Filtrar por origen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los orígenes</SelectItem>
+                  <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                  <SelectItem value="Tokko Broker">Tokko Broker</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="flex items-center gap-2 w-full lg:min-w-[200px]">
               <ListFilter className="h-4 w-4 text-muted-foreground shrink-0" />
               <Select value={agentFilter} onValueChange={setAgentFilter}>
