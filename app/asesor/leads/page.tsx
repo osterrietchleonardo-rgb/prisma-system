@@ -46,7 +46,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
-import { createClient } from "@/lib/supabase"
+import { createClient } from "@/lib/supabase/client"
 import { getAsesorLeads } from "@/lib/queries/asesor"
 import { createLead } from "@/lib/queries/director" // Reusing createLead which is generic
 import { format } from "date-fns"
