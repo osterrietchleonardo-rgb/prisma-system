@@ -38,7 +38,6 @@ export default async function AsesorLeadsWhatsappPage() {
     .from('leads')
     .select('id, phone, pipeline_stage')
     .eq('agency_id', profile.agency_id)
-    .eq('source', 'WhatsApp')
 
   const enrichedConversations = (conversations || []).map((conv: any) => {
     const matchedLead = (leadsData || []).find((l: any) => l.phone === conv.contact_phone)

@@ -41,7 +41,6 @@ export default async function LeadsWhatsappPage() {
     .from('leads')
     .select('id, phone, pipeline_stage')
     .eq('agency_id', agency_id)
-    .eq('source', 'WhatsApp')
 
   // Cruzar la información para pasarle el `pipeline_stage` a cada lead de whatsapp
   const enrichedConversations = (conversations || []).map((conv: any) => {
