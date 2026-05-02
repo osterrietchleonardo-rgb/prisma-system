@@ -202,22 +202,28 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
     let skipCount = 0;
 
     for (let i = 0; i < parsedData.length; i++) {
-       if (abortControllerRef.current.signal.aborted) {
-         toast.info("Campaña detenida por el usuario.")
-         break;
-       }
+      if (abortControllerRef.current.signal.aborted) {
+        toast.info("Campaña detenida por el usuario.")
+        break;
+      }
 
-       if (contactStatuses[i] && contactStatuses[i] !== "pendiente") {
-         // Skip contacts already processed
-         continue;
-       }
+      const row = parsedData[i];
+      
+      // 2. NUEVA VALIDACIÓN: Si ya se envió esta plantilla, saltear.
+      const campaignData = row.campaign_statuses?.[selectedTemplate.template_name]
+      const currentStatus = typeof campaignData === 'string' ? campaignData : campaignData?.status
+      
+      if (currentStatus === "enviado") {
+        skipCount++;
+        setContactStatuses(prev => ({...prev, [i]: "salteado"}))
+        setResults(prev => ({ ...prev, skipped: skipCount }))
+        continue;
+      }
 
-       if (s >= limitNumber) {
-         toast.error(`Has alcanzado tu límite de ${limitNumber} envíos permitidos en esta sesión. El resto ha quedado pendiente.`);
-         break;
-       }
-
-       const row = parsedData[i];
+      if (s >= limitNumber) {
+        toast.error(`Has alcanzado tu límite de ${limitNumber} envíos permitidos en esta sesión. El resto ha quedado pendiente.`);
+        break;
+      }
        const phone = getRowValue(row, phoneColumn)
        const name = getRowValue(row, nameColumn)
 
@@ -500,7 +506,6 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                     </div>
                   )}
                 </div>
-
                 <div className="pt-6 border-t mt-6">
                   <Button 
                     className="w-full h-12 text-lg font-bold shadow-lg shadow-primary/20" 
@@ -511,19 +516,60 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                     {isSending ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Enviando ({results.success + results.error + results.skipped}/{results.total})...
+                        Enviando...
                       </>
                     ) : (
                       <>
                         <Send className="mr-2 h-5 w-5" />
-                        Lanzar Campaña para {parsedData.length} contactos
+                        {progress === 100 ? "Volver a Iniciar Campaña" : `Lanzar Campaña para ${parsedData.length} contactos`}
                       </>
                     )}
                   </Button>
-                  <p className="text-[10px] text-center text-muted-foreground mt-2">
-                    Respeta los límites de Meta para evitar bloqueos.
+                  <p className="text-[10px] text-center text-muted-foreground mt-2 font-medium">
+                    {isSending ? "Procesando cola de envíos..." : "Respeta los límites de Meta para evitar bloqueos."}
                   </p>
                 </div>
+
+                {/* Progreso de Ejecución integrado en la columna principal */}
+                {(isSending || progress > 0) && (
+                  <div className="mt-8 pt-6 border-t space-y-6">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm font-medium">
+                        <span>Progreso de envíos</span>
+                        <span>{progress}% ({results.success + results.error + results.skipped}/{results.total})</span>
+                      </div>
+                      <Progress value={progress} className="h-3" />
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex flex-col items-center">
+                        <CheckCircle2 className="w-6 h-6 text-green-500 mb-1" />
+                        <span className="text-xl font-bold text-green-700 dark:text-green-400">{results.success}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Enviados</span>
+                      </div>
+                      <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex flex-col items-center">
+                        <Info className="w-6 h-6 text-yellow-500 mb-1" />
+                        <span className="text-xl font-bold text-yellow-700 dark:text-yellow-400">{results.skipped}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Salteados</span>
+                      </div>
+                      <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex flex-col items-center">
+                        <AlertCircle className="w-6 h-6 text-red-500 mb-1" />
+                        <span className="text-xl font-bold text-red-700 dark:text-red-400">{results.error}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Errores</span>
+                      </div>
+                    </div>
+                    
+                    {isSending && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full border-destructive text-destructive hover:bg-destructive/10" 
+                        onClick={stopCampaign}
+                      >
+                        <StopCircle className="w-4 h-4 mr-2" /> Detener Proceso
+                      </Button>
+                    )}
+                  </div>
+                )}
              </CardContent>
            </Card>
         </div>
@@ -565,76 +611,6 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
             </Card>
           )}
 
-          <Card className="shadow-md border-primary/10">
-             <CardHeader>
-               <CardTitle className="text-lg">Ejecución de Campaña</CardTitle>
-             </CardHeader>
-             <CardContent className="flex-1 flex flex-col">
-               
-               {isSending || progress > 0 ? (
-                 <div className="space-y-6 mt-4">
-                   <div className="space-y-2">
-                     <div className="flex justify-between text-sm font-medium">
-                       <span>Progreso de envíos</span>
-                       <span>{progress}% ({results.success + results.error + results.skipped}/{results.total})</span>
-                     </div>
-                     <Progress value={progress} className="h-3" />
-                   </div>
-                   
-                   <div className="grid grid-cols-3 gap-3">
-                     <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex flex-col items-center">
-                       <CheckCircle2 className="w-6 h-6 text-green-500 mb-1" />
-                       <span className="text-xl font-bold text-green-700 dark:text-green-400">{results.success}</span>
-                       <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Enviados</span>
-                     </div>
-                     <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex flex-col items-center">
-                       <Info className="w-6 h-6 text-yellow-500 mb-1" />
-                       <span className="text-xl font-bold text-yellow-700 dark:text-yellow-400">{results.skipped}</span>
-                       <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Salteados</span>
-                     </div>
-                     <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex flex-col items-center">
-                       <AlertCircle className="w-6 h-6 text-red-500 mb-1" />
-                       <span className="text-xl font-bold text-red-700 dark:text-red-400">{results.error}</span>
-                       <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Errores</span>
-                     </div>
-                   </div>
-
-                   <p className="text-xs text-muted-foreground text-center">
-                     Los leads exitosos se cargarán automáticamente en el Inbox y quedarán con el IA activo. Los "Salteados" ya recibieron esta plantilla previamente.
-                   </p>
-                 </div>
-               ) : (
-                 <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-muted/20 border rounded-lg">
-                   <Megaphone className="w-12 h-12 text-muted-foreground mb-4" />
-                   <h3 className="font-semibold text-lg">Listo para enviar</h3>
-                   <p className="text-sm text-muted-foreground max-w-sm mt-2">
-                     Configura el archivo, la plantilla y presiona Enviar para comenzar a notificar a todos los leads detectados.
-                   </p>
-                 </div>
-               )}
-
-             </CardContent>
-             <CardFooter className="flex gap-4 border-t pt-6 bg-muted/10">
-               {!isSending ? (
-                 <Button 
-                   className="w-full bg-accent hover:bg-accent/90 text-white" 
-                   size="lg" 
-                   onClick={startCampaign}
-                   disabled={progress > 0 && progress < 100} // Disable if it finished or didn't reset
-                 >
-                   <Play className="w-5 h-5 mr-2" /> {progress === 100 ? "Volver a Iniciar" : "Lanzar Campaña"}
-                 </Button>
-               ) : (
-                 <Button 
-                   className="w-full bg-destructive hover:bg-destructive/90 text-white" 
-                   size="lg" 
-                   onClick={stopCampaign}
-                 >
-                   <StopCircle className="w-5 h-5 mr-2" /> Detener envíos
-                 </Button>
-               )}
-             </CardFooter>
-           </Card>
         </div>
 
       </div>
