@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { fetchDolares } from "@/lib/mercado/fetchDolares"
 import { fetchBarrios } from "@/lib/mercado/fetchBarrios"
 import { fetchICC } from "@/lib/mercado/fetchICC"
