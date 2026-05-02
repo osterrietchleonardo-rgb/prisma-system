@@ -90,10 +90,9 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
       }
       
       const convertedData = c.map(contact => ({
-         id: contact.id,
+         _id: contact.id,
          celular: contact.phone,
          nombre: contact.name,
-         campaign_statuses: contact.campaign_statuses,
          ...(contact.metadata || {})
       }))
       
@@ -211,10 +210,11 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
       const row = parsedData[i];
       
       // 2. NUEVA VALIDACIÓN: Si ya se envió esta plantilla, saltear.
-      const campaignData = row.campaign_statuses?.[selectedTemplate.template_name]
-      const currentStatus = typeof campaignData === 'string' ? campaignData : campaignData?.status
+      const campaignStatuses = typeof row.campaign_statuses === 'string' ? JSON.parse(row.campaign_statuses) : row.campaign_statuses;
+      const campaignData = campaignStatuses?.[selectedTemplate.template_name]
+      const currentStatus = (typeof campaignData === 'string' ? campaignData : campaignData?.status || "") as string
       
-      if (currentStatus === "enviado") {
+      if (currentStatus.toLowerCase() === "enviado" || currentStatus.toLowerCase() === "sent") {
         skipCount++;
         setContactStatuses(prev => ({...prev, [i]: "salteado"}))
         setResults(prev => ({ ...prev, skipped: skipCount }))
@@ -638,15 +638,16 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                       const name = nameColumn ? row[nameColumn] : "Lead"
                       const phone = phoneColumn ? row[phoneColumn] : ""
                                              let status = contactStatuses[i]
-                       if (!status && selectedTemplate) {
-                         const campaignData = row.campaign_statuses?.[selectedTemplate.template_name]
-                         const currentStatus = typeof campaignData === 'string' ? campaignData : campaignData?.status
-                         if (currentStatus === "enviado") {
-                           status = "salteado"
-                         } else {
-                           status = "pendiente"
-                         }
-                       } else if (!status) {
+                        if (!status && selectedTemplate) {
+                          const campaignStatuses = typeof row.campaign_statuses === 'string' ? JSON.parse(row.campaign_statuses) : row.campaign_statuses;
+                          const campaignData = campaignStatuses?.[selectedTemplate.template_name]
+                          const currentStatus = (typeof campaignData === 'string' ? campaignData : campaignData?.status || "") as string
+                          if (currentStatus.toLowerCase() === "enviado" || currentStatus.toLowerCase() === "sent") {
+                            status = "salteado"
+                          } else {
+                            status = "pendiente"
+                          }
+                        } else if (!status) {
                          status = "pendiente"
                        }
 
