@@ -247,10 +247,9 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
     const selected = contacts.filter(c => selectedContactIds.has(c.id))
     CampaignState.setContacts(selected)
     
-    // Switch to campanas tab
-    const campanasTab = document.querySelector<HTMLButtonElement>('button[role="tab"][data-value="campanas"]') || 
-                      Array.from(document.querySelectorAll<HTMLButtonElement>('button[role="tab"]'))
-                        .find(btn => btn.textContent?.includes('Campañas'))
+    // Switch to campanas tab using ID or fallback to selector
+    const campanasTab = document.getElementById('trigger-campanas') as HTMLButtonElement || 
+                        document.querySelector<HTMLButtonElement>('button[role="tab"][data-value="campanas"]')
                         
     if (campanasTab) {
       campanasTab.click()

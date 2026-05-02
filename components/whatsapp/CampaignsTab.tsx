@@ -272,22 +272,22 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
            if (res.warning === 'skipped_duplicate') {
              skipCount++;
              setContactStatuses(prev => ({...prev, [i]: "salteado"}))
-             if (row._id) await updateContactCampaignStatus([row._id], 'salteado', selectedTemplate.template_name)
+             if (row.id) await updateContactCampaignStatus([row.id], 'salteado', selectedTemplate.template_name)
            } else {
              s++;
              setContactStatuses(prev => ({...prev, [i]: "enviado"}))
-             if (row._id) await updateContactCampaignStatus([row._id], 'enviado', selectedTemplate.template_name)
+             if (row.id) await updateContactCampaignStatus([row.id], 'enviado', selectedTemplate.template_name)
            }
          } else {
            e++;
            setContactStatuses(prev => ({...prev, [i]: "error"}))
-           if (row._id) await updateContactCampaignStatus([row._id], 'error', selectedTemplate.template_name)
+           if (row.id) await updateContactCampaignStatus([row.id], 'error', selectedTemplate.template_name)
            console.error("Error envío fila", i, res.error)
          }
        } catch (err) {
          e++;
          setContactStatuses(prev => ({...prev, [i]: "error"}))
-         if (row._id) await updateContactCampaignStatus([row._id], 'error', selectedTemplate.template_name)
+          if (row.id) await updateContactCampaignStatus([row.id], 'error', selectedTemplate.template_name)
        }
 
        setResults(prev => ({ ...prev, success: s, error: e, skipped: skipCount }))
@@ -511,7 +511,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                     {isSending ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Enviando ({sentCount}/{parsedData.length})...
+                        Enviando ({results.success + results.error + results.skipped}/{results.total})...
                       </>
                     ) : (
                       <>

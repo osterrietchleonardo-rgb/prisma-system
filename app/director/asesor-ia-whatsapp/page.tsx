@@ -69,7 +69,7 @@ export default async function AsesorIAWhatsAppPage() {
               <TabsTrigger value="chat" className="text-xs px-4">💬 Chat</TabsTrigger>
               <TabsTrigger value="plantillas" className="text-xs px-4">📋 Plantillas</TabsTrigger>
               <TabsTrigger value="contactos" className="text-xs px-4">👥 Contactos</TabsTrigger>
-              <TabsTrigger value="campanas" className="text-xs px-4">📣 Campañas</TabsTrigger>
+              <TabsTrigger id="trigger-campanas" value="campanas" data-value="campanas" className="text-xs px-4">📣 Campañas</TabsTrigger>
               <TabsTrigger value="config" className="text-xs px-4">⚙️ Configuración IA</TabsTrigger>
             </TabsList>
             <ConnectionIndicator instanceId={instance.id} initialStatus={instance.status} />
