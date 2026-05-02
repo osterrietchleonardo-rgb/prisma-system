@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic'
 
+import { createClient } from "@/lib/supabase/server"
+
 import { fetchDolares } from "@/lib/mercado/fetchDolares"
 import { fetchBarrios } from "@/lib/mercado/fetchBarrios"
 import { fetchICC } from "@/lib/mercado/fetchICC"
