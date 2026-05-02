@@ -9,6 +9,7 @@ import TemplatesTab from "./TemplatesTab"
 import AiSettingsTab from "./AiSettingsTab"
 import CampaignsTab from "./CampaignsTab"
 import ContactsTab from "./ContactsTab"
+import { RefreshCw } from "lucide-react"
 
 const ChatInterface = dynamic(
   () => import("./ChatInterface").then((m) => m.default),
@@ -30,11 +31,14 @@ interface WhatsAppTabsWrapperProps {
 
 export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
   const [activeTab, setActiveTab] = useState("chat")
+  // Lazy mount: only mount CampaignsTab after first visit to avoid premature renders
+  const [hasMountedCampanas, setHasMountedCampanas] = useState(false)
 
   useEffect(() => {
     // Sync with CampaignState
     const unsubscribe = CampaignState.subscribeToTab((tab) => {
       setActiveTab(tab)
+      if (tab === "campanas") setHasMountedCampanas(true)
     })
     return unsubscribe
   }, [])
@@ -42,6 +46,7 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
   const handleTabChange = (value: string) => {
     setActiveTab(value)
     CampaignState.setActiveTab(value)
+    if (value === "campanas") setHasMountedCampanas(true)
   }
 
   return (
@@ -73,7 +78,13 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
         <ContactsTab instance={instance} />
       </TabsContent>
       <TabsContent value="campanas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-        <CampaignsTab instance={instance} />
+        {hasMountedCampanas ? (
+          <CampaignsTab instance={instance} />
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+          </div>
+        )}
       </TabsContent>
     </Tabs>
   )

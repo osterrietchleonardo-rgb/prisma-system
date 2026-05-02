@@ -175,6 +175,10 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
   const loadApprovedTemplates = async () => {
     setLoading(true)
     try {
+      if (!instance?.agency_id) {
+        setLoading(false)
+        return
+      }
       const { data } = await supabase
         .from('wa_templates')
         .select('*')
