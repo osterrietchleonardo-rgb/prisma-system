@@ -16,13 +16,20 @@ export function RefreshButton() {
     setState("loading")
 
     try {
+      // 1. Disparar el Worker de Sincronización (DB)
+      const syncRes = await fetch("/api/mercado/sync")
+      const syncData = await syncRes.json()
+      console.log("[Sync Worker Output]:", syncData)
+
+      // 2. Limpiar la caché de Next.js
       const res = await fetch("/api/mercado/refresh", { method: "POST" })
       if (!res.ok) throw new Error("Refresh failed")
 
       setState("success")
       router.refresh()
       setTimeout(() => setState("idle"), 2000)
-    } catch {
+    } catch (error) {
+      console.error("Sync/Refresh error:", error)
       setState("error")
       setTimeout(() => setState("idle"), 3000)
     }
