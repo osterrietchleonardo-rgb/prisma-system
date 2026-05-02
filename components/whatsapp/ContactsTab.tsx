@@ -247,15 +247,8 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
     const selected = contacts.filter(c => selectedContactIds.has(c.id))
     CampaignState.setContacts(selected)
     
-    // Switch to campanas tab using ID or fallback to selector
-    const campanasTab = document.getElementById('trigger-campanas') as HTMLButtonElement || 
-                        document.querySelector<HTMLButtonElement>('button[role="tab"][data-value="campanas"]')
-                        
-    if (campanasTab) {
-      campanasTab.click()
-    } else {
-      toast.error("No se encontró la pestaña de Campañas.")
-    }
+    // Switch to campanas tab using React state (synced via CampaignState)
+    CampaignState.setActiveTab('campanas')
   }
 
   const filteredContacts = contacts.filter(c => 
