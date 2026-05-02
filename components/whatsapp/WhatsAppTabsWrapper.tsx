@@ -7,9 +7,12 @@ import { ConnectionIndicator } from "./ConnectionIndicator"
 import dynamic from "next/dynamic"
 import TemplatesTab from "./TemplatesTab"
 import AiSettingsTab from "./AiSettingsTab"
-import CampaignsTab from "./CampaignsTab"
-import ContactsTab from "./ContactsTab"
-import { RefreshCw } from "lucide-react"
+
+const LoadingSpinner = () => (
+  <div className="h-full flex items-center justify-center">
+    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+  </div>
+)
 
 const ChatInterface = dynamic(
   () => import("./ChatInterface").then((m) => m.default),
@@ -25,6 +28,16 @@ const ChatInterface = dynamic(
   }
 )
 
+const CampaignsTab = dynamic(
+  () => import("./CampaignsTab").then((m) => m.default),
+  { loading: () => <LoadingSpinner /> }
+)
+
+const ContactsTab = dynamic(
+  () => import("./ContactsTab").then((m) => m.default),
+  { loading: () => <LoadingSpinner /> }
+)
+
 interface WhatsAppTabsWrapperProps {
   instance: any;
 }
@@ -35,7 +48,6 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
   const [hasMountedCampanas, setHasMountedCampanas] = useState(false)
 
   useEffect(() => {
-    // Sync with CampaignState
     const unsubscribe = CampaignState.subscribeToTab((tab) => {
       setActiveTab(tab)
       if (tab === "campanas") setHasMountedCampanas(true)
@@ -82,7 +94,7 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
           <CampaignsTab instance={instance} />
         ) : (
           <div className="h-full flex items-center justify-center">
-            <RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Seleccioná contactos desde la pestaña Contactos para iniciar.</p>
           </div>
         )}
       </TabsContent>
