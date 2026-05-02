@@ -80,20 +80,42 @@ export async function fetchBarrios(): Promise<BarriosResult> {
       defval: '',
     })
 
-    // ── Parse column headers ─────────────────────────────────────────────────
-    // Row 1 (index 1): year numbers (2006, 2007, … 2026) spread across merged cells
-    // Row 2 (index 2): quarter labels ("1er. trim.", "2do. trim.", …)
-    const yearRow = rows[1] ?? []
-    const qRow = rows[2] ?? []
+    // ── Scanning for Header Row ──────────────────────────────────────────────
+    // We look for the row that contains "1er. trim." or "2do. trim."
+    let headerRowIdx = -1
+    for (let i = 0; i < Math.min(20, rows.length); i++) {
+      if (rows[i]?.some(cell => String(cell).includes("trim."))) {
+        headerRowIdx = i
+        break
+      }
+    }
+
+    if (headerRowIdx === -1) {
+      throw new Error('No se pudo encontrar la fila de encabezados (trimestres) en el XLSX')
+    }
+
+    const qRow = rows[headerRowIdx]
+    const yearRow = rows[headerRowIdx - 1] || []
 
     // Build ordered list of { colIndex, year, quarter, label, periodKey }
     interface ColDef { col: number; year: number; q: number; label: string; key: string }
     const colDefs: ColDef[] = []
 
     let currentYear = 0
-    for (let c = 1; c < yearRow.length; c++) {
+    for (let c = 1; c < qRow.length; c++) {
+      // If the cell above has a year, update currentYear
       const y = yearRow[c]
       if (typeof y === 'number' && y > 2000) currentYear = y
+      // If we don't have a year yet, try to find the nearest one to the left
+      if (currentYear === 0) {
+        for (let prevC = c - 1; prevC >= 1; prevC--) {
+          const py = yearRow[prevC]
+          if (typeof py === 'number' && py > 2000) {
+            currentYear = py
+            break
+          }
+        }
+      }
 
       const qStr = String(qRow[c] ?? '')
       let q = 0
@@ -114,35 +136,43 @@ export async function fetchBarrios(): Promise<BarriosResult> {
     }
 
     if (colDefs.length === 0) {
-      throw new Error('No se pudieron identificar columnas de trimestres en el XLSX')
+      throw new Error('No se pudieron identificar columnas de trimestres válidas')
     }
 
-    // Most recent quarter column (last valid colDef)
     const latestCol = colDefs[colDefs.length - 1]
     const latestPeriod = `T${latestCol.q} ${latestCol.year}`
 
-    // ── Parse barrio rows (rows 3+) ──────────────────────────────────────────
-    const SKIP = ['', 'Barrio', 'Total', 'Fuente', '*']
-    const barrioRows = rows.slice(3).filter((r) => {
-      const name = String(r[0] ?? '').trim()
-      return name.length > 1 && !SKIP.some((s) => name.startsWith(s))
-    })
-
-    const barrios: BarrioData[] = barrioRows.map((row) => {
-      const barrio = String(row[0]).trim()
-      const rawVal = row[latestCol.col]
-      const precio_m2_usd =
-        typeof rawVal === 'number' && rawVal > 0 ? Math.round(rawVal) : null
-      return { barrio, precio_m2_usd, period: latestPeriod }
-    })
-
-    // CABA average from "Total" row (row index 2 = rows[2] after slice(3) offset, actually row 2 overall)
-    const totalRow = rows.find(
-      (r) => String(r[0] ?? '').trim().toLowerCase() === 'total'
-    )
+    // ── Parse Data Rows ──────────────────────────────────────────────────────
+    // Find the "Total" row to get CABA average
+    const totalRowIdx = rows.findIndex(r => String(r[0] ?? '').trim().toLowerCase() === 'total')
+    const totalRow = totalRowIdx !== -1 ? rows[totalRowIdx] : null
     const totalVal = totalRow ? totalRow[latestCol.col] : null
-    const promedio_caba_usd =
-      typeof totalVal === 'number' && totalVal > 0 ? Math.round(totalVal) : null
+    const promedio_caba_usd = typeof totalVal === 'number' && totalVal > 0 ? Math.round(totalVal) : null
+
+    // Barrios are usually after the header and "Total" rows
+    // We start from headerRowIdx + 1 and look for rows that have a name in Col 0 and a number in latestCol.col
+    const SKIP = ['', 'Barrio', 'Total', 'Fuente', '*', 'Nota', 'Ciudad de Buenos Aires']
+    const barrios: BarrioData[] = []
+
+    for (let i = headerRowIdx + 1; i < rows.length; i++) {
+      const row = rows[i]
+      const name = String(row[0] ?? '').trim()
+      
+      // Basic validation: name exists, isn't in SKIP, and isn't just metadata
+      if (name.length > 1 && !SKIP.some(s => name.startsWith(s))) {
+        const rawVal = row[latestCol.col]
+        const precio = typeof rawVal === 'number' && rawVal > 0 ? Math.round(rawVal) : null
+        
+        // If we found a numeric value, it's definitely a barrio data row
+        if (precio !== null) {
+          barrios.push({
+            barrio: name,
+            precio_m2_usd: precio,
+            period: latestPeriod
+          })
+        }
+      }
+    }
 
     // ── Build historical series (last N quarters, from "Total" row) ──────────
     const recentCols = colDefs.slice(-HISTORY_QUARTERS)
