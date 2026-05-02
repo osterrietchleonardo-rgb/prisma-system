@@ -7,13 +7,14 @@ import { WAConversation } from "@/types/whatsapp"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import { Bot, User, AlertTriangle } from "lucide-react"
+import { Bot, User, AlertTriangle, Eye } from "lucide-react"
 import { toast } from "sonner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { KANBAN_STAGES } from "@/components/kanban/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { updateLeadStage } from "@/lib/queries/director"
+import Link from "next/link"
 
 function formatPhone(phone: string | null | undefined): string {
   if (!phone) return "Sin teléfono";
@@ -27,9 +28,11 @@ function formatPhone(phone: string | null | undefined): string {
 }
 
 export default function LeadsWhatsappClient({
-  initialConversations
+  initialConversations,
+  basePath
 }: {
   initialConversations: (WAConversation & { lead_id?: string | null, pipeline_stage?: string | null })[]
+  basePath: string
 }) {
   const router = useRouter()
   const [conversations, setConversations] = useState(initialConversations)
@@ -82,6 +85,7 @@ export default function LeadsWhatsappClient({
             <TableHead className="font-bold text-[10px] uppercase">Etapa Pipeline</TableHead>
             <TableHead className="hidden md:table-cell font-bold text-[10px] uppercase">Agente</TableHead>
             <TableHead className="hidden md:table-cell font-bold text-[10px] uppercase">Último Mensaje</TableHead>
+            <TableHead className="font-bold text-[10px] uppercase text-right">Ficha</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -188,6 +192,15 @@ export default function LeadsWhatsappClient({
                       {formatDistanceToNow(new Date(conv.updated_at || conv.last_message_at), { addSuffix: true, locale: es })}
                     </span>
                   </div>
+                </TableCell>
+
+                <TableCell className="text-right">
+                  <Link 
+                    href={`${basePath}/${conv.id}`}
+                    className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-8 w-8 text-muted-foreground"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Link>
                 </TableCell>
 
               </TableRow>

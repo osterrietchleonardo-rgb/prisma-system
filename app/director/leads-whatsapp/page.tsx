@@ -63,7 +63,7 @@ export default async function LeadsWhatsappPage() {
         </p>
       </div>
 
-      <LeadsWhatsappClient initialConversations={enrichedConversations} />
+      <LeadsWhatsappClient initialConversations={enrichedConversations} basePath="/director/leads-whatsapp" />
     </div>
   )
 }
