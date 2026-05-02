@@ -90,9 +90,10 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
       }
       
       const convertedData = c.map(contact => ({
-         _id: contact.id,
+         id: contact.id,
          celular: contact.phone,
          nombre: contact.name,
+         campaign_statuses: contact.campaign_statuses,
          ...(contact.metadata || {})
       }))
       
