@@ -17,7 +17,8 @@ async function fetchZonaprop(): Promise<{ zonas: ZonaResult[]; error: boolean }>
     // Call our own API route which handles PDF downloading and parsing
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
     const res = await fetch(`${baseUrl}/api/mercado/zonaprop`, {
-      next: { revalidate: 86400, tags: ["mercado"] },
+      next: { revalidate: 0 },
+      cache: 'no-store'
     })
     if (!res.ok) return { zonas: [], error: true }
     const zonas: ZonaResult[] = await res.json()

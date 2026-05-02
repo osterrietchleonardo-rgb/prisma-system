@@ -16,7 +16,7 @@ async function fetchZonaprop(): Promise<{ zonas: ZonaResult[]; error: boolean }>
   try {
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
     const res = await fetch(`${baseUrl}/api/mercado/zonaprop`, {
-      next: { revalidate: 86400, tags: ["mercado"] },
+      cache: "no-store",
     })
     if (!res.ok) return { zonas: [], error: true }
     const zonas: ZonaResult[] = await res.json()
