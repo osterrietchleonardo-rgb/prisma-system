@@ -1,0 +1,19 @@
+name: PRISMA Market Sync Worker
+
+on:
+  schedule:
+    # Se ejecuta todos los lunes a las 06:00 UTC (03:00 AM hora Argentina)
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    # Permite dispararlo manualmente desde GitHub UI
+
+jobs:
+  sync-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Market Sync API
+        run: |
+          # Reemplaza 'https://tu-dominio.com' con tu URL real de Vercel cuando la tengas.
+          # Usamos un secreto para la seguridad.
+          curl -X GET "https://${{ secrets.SITE_DOMAIN }}/api/mercado/sync?secret=${{ secrets.CRON_SECRET }}" \
+               -H "Content-Type: application/json"
