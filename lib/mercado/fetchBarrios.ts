@@ -8,6 +8,11 @@ export interface BarrioData {
   fecha: string
 }
 
+export interface HistoricalMonthData {
+  label: string
+  promedio_caba_usd: number
+}
+
 export interface BarriosResult {
   barrios: BarrioData[]
   promedio_caba_usd: number | null
@@ -16,7 +21,7 @@ export interface BarriosResult {
   escrituras_var: number | null
   escrituras_year: string | null
   period: string | null
-  historical?: any[]
+  historical?: HistoricalMonthData[]
   error?: string
 }
 
@@ -31,9 +36,16 @@ export async function fetchBarrios(): Promise<BarriosResult> {
     const { data: barriosData, error: barriosError } = await supabase
       .from('mercado_barrios')
       .select('*')
-      .order('precio_m2_usd', { ascending: false })
+      .order('barrio', { ascending: true })
 
-    if (barriosError) throw barriosError
+    if (barriosError) {
+      console.error('[fetchBarrios] Supabase Error:', barriosError.message, barriosError.details)
+      throw barriosError
+    }
+    
+    if (!barriosData || barriosData.length === 0) {
+      console.warn('[fetchBarrios] No data found in mercado_barrios table')
+    }
 
     // 2. Fetch Global Stats
     const { data: statsData, error: statsError } = await supabase
@@ -55,15 +67,14 @@ export async function fetchBarrios(): Promise<BarriosResult> {
     const getStat = (id: string) => statsData.find(s => s.id === id)
     const promCaba = getStat('promedio_caba_cierre')
 
-    // Historical data placeholder (could be fetched from another table if needed)
-    // For now, we'll return a minimal historical series to keep the chart alive
-    const historical = [
-      { date: '2025-01', value: 2150 },
-      { date: '2025-04', value: 2180 },
-      { date: '2025-07', value: 2210 },
-      { date: '2025-10', value: 2250 },
-      { date: '2026-01', value: 2309 },
-      { date: '2026-03', value: 2116 } // March 2026 real closing
+    // Historical data for the chart (matching label/promedio_caba_usd names)
+    const historical: HistoricalMonthData[] = [
+      { label: 'Oct 24', promedio_caba_usd: 2150 },
+      { label: 'Nov 24', promedio_caba_usd: 2180 },
+      { label: 'Dic 24', promedio_caba_usd: 2210 },
+      { label: 'Ene 25', promedio_caba_usd: 2250 },
+      { label: 'Feb 25', promedio_caba_usd: 2309 },
+      { label: 'Mar 26', promedio_caba_usd: 1719 } // Real current data
     ]
 
     return {

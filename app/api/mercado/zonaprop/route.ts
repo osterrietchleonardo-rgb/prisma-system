@@ -39,7 +39,7 @@ export async function GET() {
       precio_alquiler_2amb_ars: z.precio_alquiler_2amb_ars ? Number(z.precio_alquiler_2amb_ars) : null,
       precio_alquiler_3amb_ars: z.precio_alquiler_3amb_ars ? Number(z.precio_alquiler_3amb_ars) : null,
       barrios: [], // Detailed neighborhood data is now in the main BarriosTable
-      fuente: 'zonaprop',
+      fuente: 'zonaprop' as const,
       parseado_ok: true
     }))
 
