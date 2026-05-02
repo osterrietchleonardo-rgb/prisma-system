@@ -636,7 +636,19 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                    {parsedData.map((row, i) => {
                       const name = nameColumn ? row[nameColumn] : "Lead"
                       const phone = phoneColumn ? row[phoneColumn] : ""
-                      const status = contactStatuses[i] || "pendiente"
+                                             let status = contactStatuses[i]
+                       if (!status && selectedTemplate) {
+                         const campaignData = row.campaign_statuses?.[selectedTemplate.template_name]
+                         const currentStatus = typeof campaignData === 'string' ? campaignData : campaignData?.status
+                         if (currentStatus === "enviado") {
+                           status = "salteado"
+                         } else {
+                           status = "pendiente"
+                         }
+                       } else if (!status) {
+                         status = "pendiente"
+                       }
+
                       
                       return (
                         <tr key={i} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
@@ -650,9 +662,12 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                                   status === "salteado" ? "secondary" :
                                   status === "error" ? "destructive" : "outline"
                                }
-                               className={status === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" : ""}
+                               className={
+                                  status === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" : 
+                                  status === "salteado" ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30" : ""
+                                }
                              >
-                               {status.toUpperCase()}
+                               {status === "salteado" ? "SALTEADO" : status.toUpperCase()}
                              </Badge>
                            </td>
                         </tr>
