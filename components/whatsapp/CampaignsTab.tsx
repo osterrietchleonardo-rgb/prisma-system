@@ -54,6 +54,60 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
   const [variableMap, setVariableMap] = useState<Record<string, string>>({}) // e.g. "body_1": "ColumnName" OR "body_1": "Static text"
   const [variableMode, setVariableMode] = useState<Record<string, "column" | "manual">>({}) // e.g. "body_1": "manual"
 
+  // Preflight stats
+  const [preflightStats, setPreflightStats] = useState({ total: 0, toSend: 0, toSkip: 0 });
+
+  // Helper function to robustly check if a row was already sent the selected template
+  const isRowSkipped = (row: any, templateName: string | undefined): boolean => {
+    if (!templateName || !row.campaign_statuses) return false;
+    
+    let statuses = row.campaign_statuses;
+    if (typeof statuses === 'string') {
+      try {
+        statuses = JSON.parse(statuses);
+      } catch (e) {
+        return false;
+      }
+    }
+    
+    if (typeof statuses !== 'object' || statuses === null) return false;
+
+    let campaignData = statuses[templateName];
+    if (!campaignData) {
+      // Loose match fallback
+      const key = Object.keys(statuses).find(
+        k => k.toLowerCase() === templateName.toLowerCase() || 
+             k.replace(/\s+/g, '') === templateName.replace(/\s+/g, '')
+      );
+      if (key) campaignData = statuses[key];
+    }
+
+    const currentStatus = (typeof campaignData === 'string' ? campaignData : campaignData?.status || "") as string;
+    const lowerStatus = currentStatus.toLowerCase();
+    
+    return lowerStatus === "enviado" || lowerStatus === "sent" || lowerStatus === "salteado";
+  };
+
+  useEffect(() => {
+    if (!parsedData || parsedData.length === 0 || !selectedTemplate) {
+       setPreflightStats({ total: parsedData?.length || 0, toSend: parsedData?.length || 0, toSkip: 0 });
+       return;
+    }
+
+    let skipCount = 0;
+    parsedData.forEach(row => {
+       if (isRowSkipped(row, selectedTemplate.template_name)) {
+          skipCount++;
+       }
+    });
+
+    setPreflightStats({
+       total: parsedData.length,
+       toSkip: skipCount,
+       toSend: parsedData.length - skipCount
+    });
+  }, [parsedData, selectedTemplate]);
+
   // Execution state
   const [isSending, setIsSending] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -90,9 +144,10 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
       }
       
       const convertedData = c.map(contact => ({
-         _id: contact.id,
+         id: contact.id,
          celular: contact.phone,
          nombre: contact.name,
+         campaign_statuses: contact.campaign_statuses,
          ...(contact.metadata || {})
       }))
       
@@ -210,11 +265,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
       const row = parsedData[i];
       
       // 2. NUEVA VALIDACIÓN: Si ya se envió esta plantilla, saltear.
-      const campaignStatuses = typeof row.campaign_statuses === 'string' ? JSON.parse(row.campaign_statuses) : row.campaign_statuses;
-      const campaignData = campaignStatuses?.[selectedTemplate.template_name]
-      const currentStatus = (typeof campaignData === 'string' ? campaignData : campaignData?.status || "") as string
-      
-      if (currentStatus.toLowerCase() === "enviado" || currentStatus.toLowerCase() === "sent") {
+      if (isRowSkipped(row, selectedTemplate.template_name)) {
         skipCount++;
         setContactStatuses(prev => ({...prev, [i]: "salteado"}))
         setResults(prev => ({ ...prev, skipped: skipCount }))
@@ -508,6 +559,29 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                   )}
                 </div>
                 <div className="pt-6 border-t mt-6">
+                  {selectedTemplate && parsedData.length > 0 && (
+                    <div className="mb-4 p-4 bg-muted/40 rounded-lg border border-border/50">
+                      <h4 className="font-semibold text-sm mb-3 text-primary flex items-center gap-2">
+                        <Info className="w-4 h-4"/> Resumen de Ejecución
+                      </h4>
+                      <div className="flex flex-col gap-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Total seleccionados:</span>
+                          <span className="font-medium">{preflightStats.total}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-blue-600 dark:text-blue-400">
+                          <span className="flex items-center gap-2"><Send className="w-4 h-4"/> Se enviarán:</span>
+                          <span className="font-bold">{preflightStats.toSend}</span>
+                        </div>
+                        {preflightStats.toSkip > 0 && (
+                          <div className="flex items-center justify-between text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 p-2 rounded -mx-2 px-2">
+                            <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4"/> Se saltearán (ya enviados):</span>
+                            <span className="font-bold">{preflightStats.toSkip}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <Button 
                     className="w-full h-12 text-lg font-bold shadow-lg shadow-primary/20" 
                     size="lg"
@@ -639,10 +713,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                       const phone = phoneColumn ? row[phoneColumn] : ""
                                              let status = contactStatuses[i]
                         if (!status && selectedTemplate) {
-                          const campaignStatuses = typeof row.campaign_statuses === 'string' ? JSON.parse(row.campaign_statuses) : row.campaign_statuses;
-                          const campaignData = campaignStatuses?.[selectedTemplate.template_name]
-                          const currentStatus = (typeof campaignData === 'string' ? campaignData : campaignData?.status || "") as string
-                          if (currentStatus.toLowerCase() === "enviado" || currentStatus.toLowerCase() === "sent") {
+                          if (isRowSkipped(row, selectedTemplate.template_name)) {
                             status = "salteado"
                           } else {
                             status = "pendiente"
