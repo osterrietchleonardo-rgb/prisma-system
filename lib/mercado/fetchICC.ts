@@ -15,10 +15,13 @@ export interface ICCResult {
   error?: string
 }
 
+// INDEC — Índice Costo de Construcción (base 1993)
+// Real column names: icc_1993_nivel_general, icc_1993_materiales, etc.
 const ICC_URL =
   'https://infra.datos.gob.ar/catalog/sspm/dataset/109/distribution/109.3/download/indice-costo-construccion-base-1993-mensual.csv'
 
-function parseNum(val: string): number {
+function parseNum(val: string | undefined): number {
+  if (!val) return 0
   return parseFloat(val.replace(',', '.').trim()) || 0
 }
 
@@ -38,14 +41,22 @@ export async function fetchICC(): Promise<ICCResult> {
     }
 
     const text = await res.text()
-    const lines = text.trim().split('\n').filter((l) => l.trim().length > 0)
+    const lines = text
+      .trim()
+      .split('\n')
+      .filter((l) => l.trim().length > 0)
 
     if (lines.length < 3) {
-      throw new Error('CSV has too few rows')
+      throw new Error('ICC CSV has too few rows')
     }
 
-    // Header row
-    const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/"/g, ''))
+    // Header row — actual columns from datos.gob.ar:
+    // indice_tiempo,icc_1993_nivel_general,icc_1993_materiales,icc_1993_mano_obra,
+    // icc_1993_gastos_generales,icc_1993_mano_obra_materiales,
+    // icc_1993_nivel_general_variacion_mensual,icc_1993_nivel_general_variacion_anual
+    const headers = lines[0].split(',').map((h) =>
+      h.trim().toLowerCase().replace(/"/g, '').replace(/^\uFEFF/, '')
+    )
 
     const parseRow = (line: string): Record<string, string> => {
       const vals = line.split(',').map((v) => v.trim().replace(/"/g, ''))
@@ -54,18 +65,36 @@ export async function fetchICC(): Promise<ICCResult> {
       return row
     }
 
-    const lastRow = parseRow(lines[lines.length - 1])
-    const prevRow = parseRow(lines[lines.length - 2])
+    // Skip empty lines to get last two valid data rows
+    const dataLines = lines.slice(1).filter((l) => l.trim() && !l.match(/^,+$/))
+    if (dataLines.length < 2) throw new Error('Not enough ICC data rows')
 
-    const ng = parseNum(lastRow['icc_nivel_general'] ?? '')
-    const mat = parseNum(lastRow['icc_materiales'] ?? '')
-    const mo = parseNum(lastRow['icc_mano_obra'] ?? '')
-    const gg = parseNum(lastRow['icc_gastos_generales'] ?? '')
+    const lastRow = parseRow(dataLines[dataLines.length - 1])
+    const prevRow = parseRow(dataLines[dataLines.length - 2])
 
-    const ng_p = parseNum(prevRow['icc_nivel_general'] ?? '')
-    const mat_p = parseNum(prevRow['icc_materiales'] ?? '')
-    const mo_p = parseNum(prevRow['icc_mano_obra'] ?? '')
-    const gg_p = parseNum(prevRow['icc_gastos_generales'] ?? '')
+    // Column lookup helpers — try both prefixed and short names
+    const getCol = (row: Record<string, string>, ...candidates: string[]): string => {
+      for (const c of candidates) {
+        if (row[c] !== undefined && row[c] !== '') return row[c]
+      }
+      return ''
+    }
+
+    const ng  = parseNum(getCol(lastRow, 'icc_1993_nivel_general', 'icc_nivel_general'))
+    const mat = parseNum(getCol(lastRow, 'icc_1993_materiales', 'icc_materiales'))
+    const mo  = parseNum(getCol(lastRow, 'icc_1993_mano_obra', 'icc_mano_obra'))
+    const gg  = parseNum(getCol(lastRow, 'icc_1993_gastos_generales', 'icc_gastos_generales'))
+
+    const ng_p  = parseNum(getCol(prevRow, 'icc_1993_nivel_general', 'icc_nivel_general'))
+    const mat_p = parseNum(getCol(prevRow, 'icc_1993_materiales', 'icc_materiales'))
+    const mo_p  = parseNum(getCol(prevRow, 'icc_1993_mano_obra', 'icc_mano_obra'))
+    const gg_p  = parseNum(getCol(prevRow, 'icc_1993_gastos_generales', 'icc_gastos_generales'))
+
+    // Validate: we should have real non-zero values
+    if (ng === 0) {
+      console.error('[fetchICC] nivel_general is 0. Headers found:', headers.join(','))
+      throw new Error('ICC nivel_general parsed as 0 — column mismatch')
+    }
 
     return {
       data: {
@@ -82,6 +111,6 @@ export async function fetchICC(): Promise<ICCResult> {
     }
   } catch (error) {
     console.error('[fetchICC] Error:', error)
-    return { data: null, error: 'No se pudo obtener el índice ICC' }
+    return { data: null, error: 'No se pudo obtener el índice ICC de INDEC' }
   }
 }

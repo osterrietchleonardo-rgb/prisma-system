@@ -32,7 +32,7 @@ export default async function AsesorMercadoPage() {
   ])
 
   const dolares = dolaresResult.status === "fulfilled" ? dolaresResult.value : { oficial: null, mep: null, blue: null, ccl: null, error: "Error al cargar" }
-  const barrios = barriosResult.status === "fulfilled" ? barriosResult.value : { barrios: [], promedio_caba_usd: null, escrituras_count: null, period: null, error: "Error al cargar" }
+  const barrios = barriosResult.status === "fulfilled" ? barriosResult.value : { barrios: [], promedio_caba_usd: null, escrituras_count: null, period: null, historical: [], error: "Error al cargar" }
   const icc = iccResult.status === "fulfilled" ? iccResult.value : { data: null, error: "Error al cargar" }
   const zonapropData = zonapropResult.status === "fulfilled" ? zonapropResult.value : { zonas: [], error: true }
 
