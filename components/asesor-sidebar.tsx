@@ -19,7 +19,8 @@ import {
   FileSignature,
   MessageSquare,
   GraduationCap,
-  ShieldCheck
+  ShieldCheck,
+  BarChart2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -28,6 +29,7 @@ import BrandLogo from "./brand-logo"
 
 const navItems = [
   { name: "Mi Dashboard", href: "/asesor/dashboard", icon: Home },
+  { name: "Pulso de Mercado", href: "/asesor/mercado", icon: BarChart2 },
   { name: "Mi Pipeline", href: "/asesor/pipeline", icon: LayoutGrid },
   { name: "Mis Propiedades", href: "/asesor/propiedades", icon: Building },
   { name: "Tracking Performance", href: "/asesor/tracking-performance", icon: TrendingUp },

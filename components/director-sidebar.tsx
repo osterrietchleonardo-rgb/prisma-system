@@ -17,7 +17,8 @@ import {
   Sparkles,
   TrendingUp,
   FileSignature,
-  MessageSquare
+  MessageSquare,
+  BarChart2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -26,6 +27,7 @@ import BrandLogo from "./brand-logo"
 
 const navItems = [
   { name: "Dashboard", href: "/director/dashboard", icon: Home },
+  { name: "Pulso de Mercado", href: "/director/mercado", icon: BarChart2 },
   { name: "Pipeline", href: "/director/pipeline", icon: LayoutGrid },
   { name: "Propiedades", href: "/director/propiedades", icon: Building },
   { name: "Tracking Performance", href: "/director/tracking-performance", icon: TrendingUp },
