@@ -12,7 +12,7 @@ interface BarriosTableProps {
   hasError: boolean
 }
 
-type SortKey = "barrio" | "precio_m2_usd_2amb" | "precio_m2_usd_3amb"
+type SortKey = "barrio" | "precio_m2_usd"
 type SortDir = "asc" | "desc"
 
 const PAGE_SIZE = 15
@@ -68,8 +68,7 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
 
   const cols: { key: SortKey; label: string }[] = [
     { key: "barrio", label: "Barrio" },
-    { key: "precio_m2_usd_2amb", label: "2 Amb (USD/m²)" },
-    { key: "precio_m2_usd_3amb", label: "3 Amb (USD/m²)" },
+    { key: "precio_m2_usd", label: "USD/m² (2 amb. a estrenar)" },
   ]
 
   return (
@@ -78,14 +77,14 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
       <div className="p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider">
-            Precios por Barrio CABA
+            Precio m² por Barrio · CABA
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {period ? `Período: ${period}` : "Último mes disponible"}
+            {period ? `Período: ${period}` : "Último trimestre disponible"} · Dpto. 2 amb. a estrenar · Publicación
             {hasError && (
               <span className="ml-2 inline-flex items-center gap-1 text-amber-400">
                 <AlertTriangle className="w-3 h-3" />
-                ⚠ Sin datos disponibles · data.buenosaires.gob.ar
+                ⚠ Sin datos disponibles · estadisticaciudad.gob.ar
               </span>
             )}
           </p>
@@ -123,7 +122,7 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
           <tbody>
             {pageItems.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-4 py-10 text-center text-xs text-muted-foreground">
+                <td colSpan={2} className="px-4 py-10 text-center text-xs text-muted-foreground">
                   {hasError
                     ? "No se pudo cargar la tabla de barrios"
                     : filter
@@ -140,11 +139,8 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
                   }`}
                 >
                   <td className="px-4 py-3 font-medium text-sm">{b.barrio}</td>
-                  <td className={`px-4 py-3 text-sm tabular-nums ${b.precio_m2_usd_2amb ? "text-violet-400 font-semibold" : "text-muted-foreground"}`}>
-                    {fmt(b.precio_m2_usd_2amb)}
-                  </td>
-                  <td className={`px-4 py-3 text-sm tabular-nums ${b.precio_m2_usd_3amb ? "text-violet-400 font-semibold" : "text-muted-foreground"}`}>
-                    {fmt(b.precio_m2_usd_3amb)}
+                  <td className={`px-4 py-3 text-sm tabular-nums ${b.precio_m2_usd ? "text-violet-400 font-semibold" : "text-muted-foreground"}`}>
+                    {fmt(b.precio_m2_usd)}
                   </td>
                 </tr>
               ))
@@ -184,7 +180,7 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
 
       <div className="px-4 py-2 border-t">
         <p className="text-[10px] text-muted-foreground/50">
-          Fuente: DGEyC-GCBA / Argenprop · data.buenosaires.gob.ar · CC-BY 2.5 AR
+          Fuente: IDECBA / GCBA sobre base Argenprop · estadisticaciudad.gob.ar · CC-BY 2.5 AR
         </p>
       </div>
     </div>

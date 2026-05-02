@@ -18,6 +18,8 @@ interface KpiCardDef {
   title: string
   value: string
   sub: string
+  badge?: string | null
+  badgeColor?: string
   icon: React.ReactNode
   accent: string
   bg: string
@@ -51,23 +53,31 @@ export function KpiCards({ dolares, barrios, icc }: KpiCardsProps) {
       title: "Índice ICC General",
       value: fmt(icc.data?.icc_nivel_general ?? null),
       sub: icc.data
-        ? `Var. mensual: ${icc.data.var_nivel_general_pct >= 0 ? "+" : ""}${icc.data.var_nivel_general_pct}%`
-        : "Base 1993=100",
+        ? `Var. mensual: ${icc.data.var_nivel_general_pct >= 0 ? "+" : ""}${icc.data.var_nivel_general_pct}% · i.a.: +${icc.data.var_anual_pct}%`
+        : "Base 2012=100 · IDECBA",
+      badge: icc.data ? `${icc.data.indice_tiempo}` : null,
+      badgeColor: "text-amber-400/80",
       icon: <HardHat className="w-5 h-5" />,
       accent: "text-amber-400",
       bg: "from-amber-500/10 to-amber-500/5 border-amber-500/20",
       hasError: !!icc.error || icc.data === null,
-      errorSource: "datos.gob.ar",
+      errorSource: "estadisticaciudad.gob.ar",
     },
     {
       title: "Escrituras CABA",
-      value: fmt(barrios.escrituras_count),
-      sub: "Último mes disponible",
+      value: barrios.escrituras_count ? `${barrios.escrituras_count.toLocaleString("es-AR")}` : "—",
+      sub: barrios.escrituras_count
+        ? `Actos compraventa ${barrios.escrituras_year ?? ""}`
+        : "Sin datos disponibles",
+      badge: barrios.escrituras_var != null
+        ? `${barrios.escrituras_var >= 0 ? "+" : ""}${barrios.escrituras_var}% i.a.`
+        : null,
+      badgeColor: (barrios.escrituras_var ?? 0) >= 0 ? "text-emerald-400" : "text-red-400",
       icon: <FileText className="w-5 h-5" />,
       accent: "text-emerald-400",
       bg: "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20",
       hasError: barrios.escrituras_count === null,
-      errorSource: "data.buenosaires.gob.ar",
+      errorSource: "estadisticaciudad.gob.ar",
     },
   ]
 
@@ -97,6 +107,11 @@ export function KpiCards({ dolares, barrios, icc }: KpiCardsProps) {
           <p className={`text-2xl font-bold tracking-tight ${card.hasError ? "text-muted-foreground" : "text-foreground"}`}>
             {card.value}
           </p>
+          {card.badge && (
+            <span className={`text-xs font-semibold mt-0.5 ${card.badgeColor ?? "text-muted-foreground"}`}>
+              {card.badge}
+            </span>
+          )}
           <p className="text-xs text-muted-foreground mt-1">
             {card.hasError ? `⚠ Sin datos disponibles · ${card.errorSource}` : card.sub}
           </p>

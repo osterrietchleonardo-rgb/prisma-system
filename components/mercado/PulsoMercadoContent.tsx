@@ -98,10 +98,10 @@ export function PulsoMercadoContent({
 
         {/* ── Global Attributions ── */}
         <div className="border-t pt-4 pb-2 space-y-1">
-          <p className="text-[10px] text-muted-foreground/40">
-            Tipo de cambio: Fuente: dolarapi.com ·
-            Precios m² CABA: DGEyC-GCBA / Argenprop · data.buenosaires.gob.ar · CC-BY 2.5 AR ·
-            ICC INDEC: datos.gob.ar · CC-BY 4.0 ·
+          <p className="text-[10px] text-muted-foreground/40 leading-relaxed">
+            Tipo de cambio: Fuente: dolarapi.com · 
+            Precios m² y Escrituras CABA: IDECBA (GCBA) / Argenprop · estadisticaciudad.gob.ar · 
+            ICC: IDECBA (CABA) · base 2012=100 · 
             Reportes de mercado: Zonaprop · zonaprop.com.ar
           </p>
         </div>

@@ -1,17 +1,22 @@
+// ──────────────────────────────────────────────────────────────────────────────
+// fetchBarrios.ts
+// Source: IDECBA / GCBA — Precio promedio de publicación del m² (USD)
+//         Departamentos en venta 2 ambientes a estrenar, por barrio CABA
+// URL: https://www.estadisticaciudad.gob.ar/eyc/wp-content/uploads/2025/12/MI_DVP_AX01.xlsx
+// Coverage: Q4 2006 → Q1 2026  (updated ~quarterly)
+// ──────────────────────────────────────────────────────────────────────────────
+import * as XLSX from 'xlsx'
+
 export interface BarrioData {
   barrio: string
-  precio_m2_usd_2amb: number | null
-  precio_m2_usd_3amb: number | null
-  anio: number
-  trimestre: number
+  precio_m2_usd: number | null
+  /** e.g. "Q1 2026" */
+  period: string
 }
 
 export interface HistoricalMonthData {
-  /** "YYYY-QN" */
-  period: string
-  /** Short label for chart axis, e.g. "T1 '24" */
-  label: string
-  /** Average USD/m² across all CABA barrios for that quarter */
+  period: string   // "YYYY-QN"
+  label: string    // "T1 '26"
   promedio_caba_usd: number
 }
 
@@ -19,254 +24,157 @@ export interface BarriosResult {
   barrios: BarrioData[]
   promedio_caba_usd: number | null
   escrituras_count: number | null
+  escrituras_year?: number | null
+  escrituras_var?: number | null
   period: string | null
-  /** Last 16 quarters of real CABA averages, sorted oldest → newest */
   historical: HistoricalMonthData[]
   error?: string
 }
 
-// Verified CDN URL — direct CSV from BA Data CDN (no redirect needed)
-// Resource: "Precio de venta de departamentos" — dataset mercado-inmobiliario
-const BARRIOS_CSV_URL =
-  'https://cdn.buenosaires.gob.ar/datosabiertos/datasets/instituto-de-vivienda/mercado-inmobiliario/precio-venta-deptos.csv'
+const XLSX_URL =
+  'https://www.estadisticaciudad.gob.ar/eyc/wp-content/uploads/2025/12/MI_DVP_AX01.xlsx'
 
-// NOTE: No public CSV exists for escrituras CABA (Colegio de Escribanos).
-// The BA Data "actividad inmobiliaria" CSV is actually DDJJ de funcionarios (wrong resource).
-// Escrituras count will be null until a valid public endpoint is available.
+// How many of the most-recent quarters to include in the chart
+const HISTORY_QUARTERS = 16
 
-function tryParseFloat(val: string): number | null {
-  if (!val || val.trim() === '' || val.trim() === '-') return null
-  const n = parseFloat(val.replace(',', '.').trim())
-  return isNaN(n) ? null : n
-}
-
-function decodeText(buffer: ArrayBuffer): string {
-  // Try UTF-8 first, fall back to latin-1
-  let text: string
-  try {
-    text = new TextDecoder('utf-8').decode(buffer)
-  } catch {
-    text = new TextDecoder('iso-8859-1').decode(buffer)
-  }
-  // Fix common double-encoding artifacts (Windows-1252 through latin1)
-  return text
-    .replace(/\uFFFD/g, '')
-    .replace(/Ã³/g, 'ó')
-    .replace(/Ã©/g, 'é')
-    .replace(/Ã¡/g, 'á')
-    .replace(/Ã­/g, 'í')
-    .replace(/Ãº/g, 'ú')
-    .replace(/Ã±/g, 'ñ')
-    .replace(/Ã\x80/g, 'À')
-}
-
-function buildLabel(anio: number, trimestre: number): string {
-  return `T${trimestre} '${String(anio).slice(-2)}`
-}
-
-async function fetchCSV(url: string): Promise<string | null> {
+async function fetchBuffer(url: string): Promise<ArrayBuffer | null> {
   try {
     const res = await fetch(url, {
-      // Cache 24 hours, revalidate on-demand
       next: { revalidate: 86400, tags: ['mercado'] },
-      headers: {
-        Accept: 'text/csv,application/csv,text/plain,*/*',
-        'User-Agent': 'Mozilla/5.0 (compatible; PRISMA-System/1.0)',
-      },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PRISMA-System/1.0)' },
       redirect: 'follow',
     })
     if (!res.ok) {
-      console.error(`[fetchCSV] HTTP ${res.status} for ${url}`)
+      console.error(`[fetchBarrios] HTTP ${res.status} for ${url}`)
       return null
     }
-    const ct = res.headers.get('content-type') ?? ''
-    // If we accidentally got HTML, bail out
-    if (ct.includes('text/html')) {
-      console.error(`[fetchCSV] Received HTML instead of CSV from ${url}`)
-      return null
-    }
-    const buffer = await res.arrayBuffer()
-    return decodeText(buffer)
+    return res.arrayBuffer()
   } catch (err) {
-    console.error(`[fetchCSV] Network error for ${url}:`, err)
+    console.error('[fetchBarrios] Network error:', err)
     return null
   }
 }
 
+function trimLabel(q: number, y: number): string {
+  return `T${q} '${String(y).slice(-2)}`
+}
+
 export async function fetchBarrios(): Promise<BarriosResult> {
-  // Only fetch the barrios CSV — escrituras has no valid public CSV endpoint
-  const barriosCsv = await fetchCSV(BARRIOS_CSV_URL)
-  const escriturasCsv: string | null = null
-
-  // ── Aggregators ──────────────────────────────────────────────────────────
-  // Per barrio for the LAST quarter
-  const barriosMap: Record<string, { sum2: number; count2: number; sum3: number; count3: number }> = {}
-  // Per quarter across ALL history: "YYYY-QN" → { sum, count }
-  const quarterlyMap: Record<string, { sum: number; count: number }> = {}
-
-  let lastAnio = 0
-  let lastTrimestre = 0
-  let parseError: string | undefined
-
-  if (!barriosCsv) {
-    parseError = 'No se pudo obtener el CSV de barrios de BA Data'
-  } else {
-    const lines = barriosCsv
-      .trim()
-      .split('\n')
-      .filter((l) => l.trim() && !l.startsWith('#'))
-
-    if (lines.length < 2) {
-      parseError = 'CSV de barrios vacío o con formato incorrecto'
-    } else {
-      // BA Data uses semicolons as separator
-      const sep = lines[0].includes(';') ? ';' : ','
-      const rawHeaders = lines[0].split(sep).map((h) =>
-        h.trim().toLowerCase().replace(/"/g, '').replace(/^\uFEFF/, '')
-      )
-
-      // Expected columns: barrio;año;trimestre;precio_prom;ambientes;estado;comuna
-      const iBarrio    = rawHeaders.findIndex((h) => h.includes('barrio'))
-      // "año" may arrive with encoding artifacts — match any 2-4 char header starting with 'a', ending with 'o'
-      const iAnio      = rawHeaders.findIndex((h) =>
-        /^a.{0,2}o$/.test(h) || h === 'anio' || h.startsWith('a\xf1o') || h.startsWith('a\ufffd')
-      )
-      const iTrimestre = rawHeaders.findIndex((h) => h.includes('trimestre'))
-      const iPrecio    = rawHeaders.findIndex((h) => h.includes('precio'))
-      const iAmbientes = rawHeaders.findIndex((h) => h.includes('ambiente'))
-
-      if (iBarrio < 0 || iAnio < 0 || iTrimestre < 0 || iPrecio < 0) {
-        parseError = `Columnas no encontradas en CSV de barrios. Headers: ${rawHeaders.join(',')}`
-        console.error('[fetchBarrios]', parseError)
-      } else {
-        const dataRows = lines.slice(1).map((l) =>
-          l.split(sep).map((v) => v.trim().replace(/"/g, ''))
-        )
-
-        // First pass: find the most recent quarter
-        dataRows.forEach((row) => {
-          const a = parseInt(row[iAnio] ?? '0')
-          const t = parseInt(row[iTrimestre] ?? '0')
-          if (!a || !t) return
-          if (a > lastAnio || (a === lastAnio && t > lastTrimestre)) {
-            lastAnio = a
-            lastTrimestre = t
-          }
-        })
-
-        // Second pass: aggregate both quarterly history and per-barrio snapshot
-        dataRows.forEach((row) => {
-          const a = parseInt(row[iAnio] ?? '0')
-          const t = parseInt(row[iTrimestre] ?? '0')
-          if (!a || !t) return
-
-          const precio = tryParseFloat(row[iPrecio] ?? '')
-          if (precio === null || precio <= 0) return
-
-          // ── Quarterly historical aggregate ──
-          const key = `${a}-Q${t}`
-          if (!quarterlyMap[key]) quarterlyMap[key] = { sum: 0, count: 0 }
-          quarterlyMap[key].sum += precio
-          quarterlyMap[key].count++
-
-          // ── Per-barrio aggregate (only last quarter) ──
-          if (a !== lastAnio || t !== lastTrimestre) return
-          const barrio = (row[iBarrio] ?? '').trim()
-          if (!barrio) return
-
-          const ambStr = (row[iAmbientes] ?? '').toLowerCase()
-          const is2amb = ambStr.includes('2')
-          const is3amb = ambStr.includes('3')
-
-          if (!barriosMap[barrio]) barriosMap[barrio] = { sum2: 0, count2: 0, sum3: 0, count3: 0 }
-          if (is2amb) { barriosMap[barrio].sum2 += precio; barriosMap[barrio].count2++ }
-          else if (is3amb) { barriosMap[barrio].sum3 += precio; barriosMap[barrio].count3++ }
-        })
-      }
+  const buffer = await fetchBuffer(XLSX_URL)
+  if (!buffer) {
+    return {
+      barrios: [],
+      promedio_caba_usd: null,
+      escrituras_count: null,
+      period: null,
+      historical: [],
+      error: 'No se pudo descargar el archivo XLSX de IDECBA',
     }
   }
 
-  // ── Build barrios array (last quarter) ────────────────────────────────────
-  const barrios: BarrioData[] = Object.entries(barriosMap).map(([barrio, v]) => ({
-    barrio,
-    precio_m2_usd_2amb: v.count2 > 0 ? Math.round(v.sum2 / v.count2) : null,
-    precio_m2_usd_3amb: v.count3 > 0 ? Math.round(v.sum3 / v.count3) : null,
-    anio: lastAnio,
-    trimestre: lastTrimestre,
-  }))
-
-  // CABA average (last quarter)
-  const validPrices = barrios
-    .map((b) => b.precio_m2_usd_2amb ?? b.precio_m2_usd_3amb)
-    .filter((p): p is number => p !== null)
-  const promedio_caba_usd =
-    validPrices.length > 0
-      ? Math.round(validPrices.reduce((a, b) => a + b, 0) / validPrices.length)
-      : null
-
-  // ── Build historical array ───────────────────────────────────────────────
-  // Sort quarters: "2023-Q1", "2023-Q2", ... then take last 16 (= 4 years)
-  const sortedQuarters = Object.keys(quarterlyMap).sort((a, b) => {
-    const [ay, aq] = a.split('-Q').map(Number)
-    const [by, bq] = b.split('-Q').map(Number)
-    return ay !== by ? ay - by : aq - bq
-  })
-  const last16 = sortedQuarters.slice(-16)
-
-  const historical: HistoricalMonthData[] = last16
-    .filter((key) => quarterlyMap[key].count > 0)
-    .map((key) => {
-      const [yyyy, qStr] = key.split('-Q')
-      const anio = parseInt(yyyy)
-      const trimestre = parseInt(qStr)
-      return {
-        period: key,
-        label: buildLabel(anio, trimestre),
-        promedio_caba_usd: Math.round(quarterlyMap[key].sum / quarterlyMap[key].count),
-      }
+  try {
+    const wb = XLSX.read(Buffer.from(buffer), { type: 'buffer' })
+    const sheet = wb.Sheets[wb.SheetNames[0]]
+    const rows: (string | number)[][] = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: '',
     })
 
-  // ── Parse escrituras CSV ─────────────────────────────────────────────────
-  let escrituras_count: number | null = null
-  if (escriturasCsv) {
-    try {
-      const lines = escriturasCsv.trim().split('\n').filter((l) => l.trim())
-      if (lines.length >= 2) {
-        const sep = lines[0].includes(';') ? ';' : ','
-        const headers = lines[0].split(sep).map((h) =>
-          h.trim().toLowerCase().replace(/"/g, '').replace(/^\uFEFF/, '')
-        )
-        const colCantidad = headers.findIndex(
-          (h) => h.includes('cantidad') || h.includes('actos') || h.includes('escrituras') || h.includes('total')
-        )
-        // Try the last non-empty line
-        for (let i = lines.length - 1; i >= 1; i--) {
-          const parts = lines[i].split(sep)
-          if (colCantidad >= 0 && parts[colCantidad]) {
-            const val = tryParseFloat(parts[colCantidad])
-            if (val !== null && val > 0) {
-              escrituras_count = Math.round(val)
-              break
-            }
-          }
-        }
+    // ── Parse column headers ─────────────────────────────────────────────────
+    // Row 1 (index 1): year numbers (2006, 2007, … 2026) spread across merged cells
+    // Row 2 (index 2): quarter labels ("1er. trim.", "2do. trim.", …)
+    const yearRow = rows[1] ?? []
+    const qRow = rows[2] ?? []
+
+    // Build ordered list of { colIndex, year, quarter, label, periodKey }
+    interface ColDef { col: number; year: number; q: number; label: string; key: string }
+    const colDefs: ColDef[] = []
+
+    let currentYear = 0
+    for (let c = 1; c < yearRow.length; c++) {
+      const y = yearRow[c]
+      if (typeof y === 'number' && y > 2000) currentYear = y
+
+      const qStr = String(qRow[c] ?? '')
+      let q = 0
+      if (qStr.includes('1er')) q = 1
+      else if (qStr.includes('2do')) q = 2
+      else if (qStr.includes('3er')) q = 3
+      else if (qStr.includes('4to')) q = 4
+
+      if (currentYear > 0 && q > 0) {
+        colDefs.push({
+          col: c,
+          year: currentYear,
+          q,
+          label: trimLabel(q, currentYear),
+          key: `${currentYear}-Q${q}`,
+        })
       }
-    } catch (err) {
-      console.error('[fetchBarrios] Escrituras parse error:', err)
     }
-  }
 
-  const period =
-    lastAnio > 0
-      ? `T${lastTrimestre} ${lastAnio}`
-      : null
+    if (colDefs.length === 0) {
+      throw new Error('No se pudieron identificar columnas de trimestres en el XLSX')
+    }
 
-  return {
-    barrios: barrios.sort((a, b) => a.barrio.localeCompare(b.barrio)),
-    promedio_caba_usd,
-    escrituras_count,
-    period,
-    historical,
-    error: parseError,
+    // Most recent quarter column (last valid colDef)
+    const latestCol = colDefs[colDefs.length - 1]
+    const latestPeriod = `T${latestCol.q} ${latestCol.year}`
+
+    // ── Parse barrio rows (rows 3+) ──────────────────────────────────────────
+    const SKIP = ['', 'Barrio', 'Total', 'Fuente', '*']
+    const barrioRows = rows.slice(3).filter((r) => {
+      const name = String(r[0] ?? '').trim()
+      return name.length > 1 && !SKIP.some((s) => name.startsWith(s))
+    })
+
+    const barrios: BarrioData[] = barrioRows.map((row) => {
+      const barrio = String(row[0]).trim()
+      const rawVal = row[latestCol.col]
+      const precio_m2_usd =
+        typeof rawVal === 'number' && rawVal > 0 ? Math.round(rawVal) : null
+      return { barrio, precio_m2_usd, period: latestPeriod }
+    })
+
+    // CABA average from "Total" row (row index 2 = rows[2] after slice(3) offset, actually row 2 overall)
+    const totalRow = rows.find(
+      (r) => String(r[0] ?? '').trim().toLowerCase() === 'total'
+    )
+    const totalVal = totalRow ? totalRow[latestCol.col] : null
+    const promedio_caba_usd =
+      typeof totalVal === 'number' && totalVal > 0 ? Math.round(totalVal) : null
+
+    // ── Build historical series (last N quarters, from "Total" row) ──────────
+    const recentCols = colDefs.slice(-HISTORY_QUARTERS)
+    const historical: HistoricalMonthData[] = recentCols
+      .filter((c) => {
+        const v = totalRow ? totalRow[c.col] : null
+        return typeof v === 'number' && v > 0
+      })
+      .map((c) => ({
+        period: c.key,
+        label: c.label,
+        promedio_caba_usd: Math.round((totalRow![c.col] as number)),
+      }))
+
+    return {
+      barrios: barrios
+        .filter((b) => b.precio_m2_usd !== null)
+        .sort((a, b) => a.barrio.localeCompare(b.barrio)),
+      promedio_caba_usd,
+      escrituras_count: null, // fetched separately via fetchEscrituras
+      period: latestPeriod,
+      historical,
+    }
+  } catch (err) {
+    console.error('[fetchBarrios] Parse error:', err)
+    return {
+      barrios: [],
+      promedio_caba_usd: null,
+      escrituras_count: null,
+      period: null,
+      historical: [],
+      error: `Error al procesar datos de IDECBA: ${err}`,
+    }
   }
 }

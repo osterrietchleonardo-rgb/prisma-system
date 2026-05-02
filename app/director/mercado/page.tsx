@@ -1,6 +1,7 @@
 import { fetchDolares } from "@/lib/mercado/fetchDolares"
 import { fetchBarrios } from "@/lib/mercado/fetchBarrios"
 import { fetchICC } from "@/lib/mercado/fetchICC"
+import { fetchEscrituras } from "@/lib/mercado/fetchEscrituras"
 import { ZonaResult } from "@/app/api/mercado/zonaprop/route"
 import { PulsoMercadoContent } from "@/components/mercado/PulsoMercadoContent"
 
@@ -25,15 +26,19 @@ async function fetchZonaprop(): Promise<{ zonas: ZonaResult[]; error: boolean }>
 }
 
 export default async function DirectorMercadoPage() {
-  const [dolaresResult, barriosResult, iccResult, zonapropResult] = await Promise.allSettled([
+  const [dolaresResult, barriosResult, iccResult, zonapropResult, escriturasResult] = await Promise.allSettled([
     fetchDolares(),
     fetchBarrios(),
     fetchICC(),
     fetchZonaprop(),
+    fetchEscrituras(),
   ])
 
   const dolares = dolaresResult.status === "fulfilled" ? dolaresResult.value : { oficial: null, mep: null, blue: null, ccl: null, error: "Error al cargar" }
-  const barrios = barriosResult.status === "fulfilled" ? barriosResult.value : { barrios: [], promedio_caba_usd: null, escrituras_count: null, period: null, historical: [], error: "Error al cargar" }
+  const barriosRaw = barriosResult.status === "fulfilled" ? barriosResult.value : { barrios: [], promedio_caba_usd: null, escrituras_count: null, period: null, historical: [], error: "Error al cargar" }
+  const escrituras = escriturasResult.status === "fulfilled" ? escriturasResult.value : { cantidad_anual: null, year: null, var_anual_pct: null }
+  // Merge escrituras into barrios result
+  const barrios = { ...barriosRaw, escrituras_count: escrituras.cantidad_anual, escrituras_year: escrituras.year, escrituras_var: escrituras.var_anual_pct }
   const icc = iccResult.status === "fulfilled" ? iccResult.value : { data: null, error: "Error al cargar" }
   const zonapropData = zonapropResult.status === "fulfilled" ? zonapropResult.value : { zonas: [], error: true }
 
