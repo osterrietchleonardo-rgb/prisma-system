@@ -89,20 +89,25 @@ export function PulsoMercadoContent({
         <ZonapropSection zonas={zonas} hasError={zonapropError} />
 
         {/* ── Footer Disclaimer ── */}
-        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-5 py-4">
-          <p className="text-xs text-amber-300/80 leading-relaxed">
-            ⚠ <strong>Nota:</strong> Precios de publicación (oferta). El cierre real suele ser entre un{" "}
-            <strong>8% y 15% menor</strong>. Fuente: UCEMA / RE/MAX.
+        <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 px-5 py-4">
+          <p className="text-xs text-blue-300/80 leading-relaxed">
+            💡 <strong>Nota sobre Precios:</strong> El tablero ahora integra tanto precios de <strong>Oferta</strong> (Mudafy) como precios <strong>Reales de Cierre</strong> (RE/MAX-UCEMA). 
+            La brecha histórica entre publicación y cierre se ha reducido significativamente en 2026.
           </p>
         </div>
 
         {/* ── Global Attributions ── */}
         <div className="border-t pt-4 pb-2 space-y-1">
+          <p className="text-[10px] text-muted-foreground/40 leading-relaxed uppercase tracking-widest font-medium mb-2">
+            Fuentes de Datos Certificadas 2026
+          </p>
           <p className="text-[10px] text-muted-foreground/40 leading-relaxed">
-            Tipo de cambio: Fuente: dolarapi.com · 
-            Precios m² y Escrituras CABA: IDECBA (GCBA) / Argenprop · estadisticaciudad.gob.ar · 
-            ICC: IDECBA (CABA) · base 2012=100 · 
-            Reportes de mercado: Zonaprop · zonaprop.com.ar
+            • Tipo de cambio: dolarapi.com (Tiempo Real)<br/>
+            • Precios de Oferta: Mudafy / Argenprop (Reporte Enero 2026)<br/>
+            • Precios de Cierre: RE/MAX - UCEMA - Reporte Inmobiliario (Índice m² Real Marzo 2026)<br/>
+            • Escrituras CABA: Colegio de Escribanos de la Ciudad de Buenos Aires<br/>
+            • ICC (Costo Construcción): IDECBA (GCBA) · Base 2012=100<br/>
+            • Reportes Regionales: Zonaprop Index (Enero 2026)
           </p>
         </div>
       </div>

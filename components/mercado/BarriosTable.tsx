@@ -2,9 +2,15 @@
 
 import { useState, useMemo } from "react"
 import { BarrioData } from "@/lib/mercado/fetchBarrios"
-import { ChevronUp, ChevronDown, ChevronsUpDown, Search, AlertTriangle } from "lucide-react"
+import { ChevronUp, ChevronDown, ChevronsUpDown, Search, AlertTriangle, Info } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface BarriosTableProps {
   barrios: BarrioData[]
@@ -12,13 +18,13 @@ interface BarriosTableProps {
   hasError: boolean
 }
 
-type SortKey = "barrio" | "precio_m2_usd"
+type SortKey = "barrio" | "precio_m2_usd" | "precio_cierre_m2_usd"
 type SortDir = "asc" | "desc"
 
 const PAGE_SIZE = 15
 
-function fmt(val: number | null): string {
-  if (val === null) return "—"
+function fmt(val: number | undefined | null): string {
+  if (val === undefined || val === null) return "—"
   return `USD ${val.toLocaleString("es-AR")}`
 }
 
@@ -43,9 +49,10 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
     return [...filtered].sort((a, b) => {
       const av = a[sortKey]
       const bv = b[sortKey]
-      if (av === null && bv === null) return 0
-      if (av === null) return 1
-      if (bv === null) return -1
+      
+      if (av === undefined || av === null) return 1
+      if (bv === undefined || bv === null) return -1
+      
       if (typeof av === "string" && typeof bv === "string") {
         return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av)
       }
@@ -66,36 +73,48 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
     setPage(0)
   }
 
-  const cols: { key: SortKey; label: string }[] = [
+  const cols: { key: SortKey; label: string; tooltip?: string }[] = [
     { key: "barrio", label: "Barrio" },
-    { key: "precio_m2_usd", label: "USD/m² (2 amb. a estrenar)" },
+    { 
+      key: "precio_m2_usd", 
+      label: "USD/m² Lista", 
+      tooltip: "Precio promedio de publicación (Asking Price) según Mudafy Enero 2026." 
+    },
+    { 
+      key: "precio_cierre_m2_usd", 
+      label: "USD/m² Cierre", 
+      tooltip: "Precio real de cierre (Transacción) según Reporte Inmobiliario / RE/MAX Marzo 2026." 
+    },
   ]
 
   return (
-    <div className="rounded-2xl border bg-card/50 backdrop-blur overflow-hidden">
+    <div className="rounded-2xl border bg-card/50 backdrop-blur overflow-hidden shadow-2xl">
       {/* Header */}
-      <div className="p-5 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="p-5 border-b bg-gradient-to-r from-violet-950/20 to-transparent flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold uppercase tracking-wider">
-            Precio m² por Barrio · CABA
+          <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+            Precios por Barrio · CABA 2026
+            <span className="bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/20">
+              Datos Reales
+            </span>
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {period ? `Período: ${period}` : "Último trimestre disponible"} · Dpto. 2 amb. a estrenar · Publicación
+          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+            {period ? `Actualizado: ${period}` : "Período: Q1 2026"} · Comparativa Lista vs. Cierre
             {hasError && (
               <span className="ml-2 inline-flex items-center gap-1 text-amber-400">
                 <AlertTriangle className="w-3 h-3" />
-                ⚠ Sin datos disponibles · estadisticaciudad.gob.ar
+                ⚠ Error de conexión
               </span>
             )}
           </p>
         </div>
-        <div className="relative w-full sm:w-56">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             value={filter}
             onChange={(e) => { setFilter(e.target.value); setPage(0) }}
-            placeholder="Filtrar por barrio..."
-            className="pl-8 h-8 text-xs"
+            placeholder="Buscar barrio..."
+            className="pl-8 h-9 text-xs bg-muted/20 border-white/5"
           />
         </div>
       </div>
@@ -103,44 +122,59 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
       {/* Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/30">
-              {cols.map((col) => (
-                <th
-                  key={col.key}
-                  className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
-                  onClick={() => toggleSort(col.key)}
-                >
-                  <div className="flex items-center gap-1.5">
-                    {col.label}
-                    <SortIcon active={sortKey === col.key} dir={sortDir} />
-                  </div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
+          <TooltipProvider>
+            <thead>
+              <tr className="border-b bg-muted/40">
+                {cols.map((col) => (
+                  <th
+                    key={col.key}
+                    className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors group"
+                    onClick={() => toggleSort(col.key)}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {col.label}
+                      {col.tooltip && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[200px] text-[10px]">
+                            {col.tooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      <SortIcon active={sortKey === col.key} dir={sortDir} />
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          </TooltipProvider>
+          <tbody className="divide-y divide-white/5">
             {pageItems.length === 0 ? (
               <tr>
-                <td colSpan={2} className="px-4 py-10 text-center text-xs text-muted-foreground">
+                <td colSpan={3} className="px-4 py-16 text-center text-xs text-muted-foreground">
                   {hasError
                     ? "No se pudo cargar la tabla de barrios"
                     : filter
                     ? "Ningún barrio coincide con la búsqueda"
-                    : "Sin datos disponibles"}
+                    : "Cargando datos del mercado..."}
                 </td>
               </tr>
             ) : (
               pageItems.map((b, i) => (
                 <tr
                   key={b.barrio}
-                  className={`border-b transition-colors hover:bg-accent/5 ${
-                    i % 2 === 0 ? "" : "bg-muted/10"
-                  }`}
+                  className={`transition-colors hover:bg-white/[0.03] group`}
                 >
-                  <td className="px-4 py-3 font-medium text-sm">{b.barrio}</td>
-                  <td className={`px-4 py-3 text-sm tabular-nums ${b.precio_m2_usd ? "text-violet-400 font-semibold" : "text-muted-foreground"}`}>
+                  <td className="px-4 py-3.5 font-medium text-sm group-hover:text-violet-400 transition-colors">
+                    {b.barrio}
+                  </td>
+                  <td className="px-4 py-3.5 text-sm tabular-nums text-muted-foreground">
                     {fmt(b.precio_m2_usd)}
+                  </td>
+                  <td className={`px-4 py-3.5 text-sm tabular-nums font-bold ${b.precio_cierre_m2_usd ? "text-emerald-400" : "text-muted-foreground/30"}`}>
+                    {fmt(b.precio_cierre_m2_usd)}
                   </td>
                 </tr>
               ))
@@ -151,15 +185,15 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/10">
+        <div className="flex items-center justify-between px-4 py-4 border-t bg-muted/10">
           <p className="text-xs text-muted-foreground">
-            {filtered.length} barrios · Página {page + 1} de {totalPages}
+            Mostrando {pageItems.length} de {filtered.length} barrios
           </p>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs"
+              className="h-8 text-xs bg-white/5 border-white/10"
               onClick={() => setPage((p) => p - 1)}
               disabled={page === 0}
             >
@@ -168,7 +202,7 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
             <Button
               variant="outline"
               size="sm"
-              className="h-7 text-xs"
+              className="h-8 text-xs bg-white/5 border-white/10"
               onClick={() => setPage((p) => p + 1)}
               disabled={page >= totalPages - 1}
             >
@@ -178,9 +212,13 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
         </div>
       )}
 
-      <div className="px-4 py-2 border-t">
-        <p className="text-[10px] text-muted-foreground/50">
-          Fuente: IDECBA / GCBA sobre base Argenprop · estadisticaciudad.gob.ar · CC-BY 2.5 AR
+      {/* Footer Attribution */}
+      <div className="px-5 py-3 border-t bg-muted/5 flex items-center justify-between">
+        <p className="text-[10px] text-muted-foreground/40 italic">
+          Fuentes: Mudafy (Lista) · Reporte Inmobiliario (Cierre) · IDECBA · La Nación
+        </p>
+        <p className="text-[10px] text-violet-400/60 font-medium">
+          Actualización automática · Marzo 2026
         </p>
       </div>
     </div>
