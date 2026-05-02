@@ -14,16 +14,31 @@ export const metadata = {
 
 async function fetchZonaprop(): Promise<{ zonas: ZonaResult[]; error: boolean }> {
   try {
-    // Call our own API route which handles PDF downloading and parsing
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-    const res = await fetch(`${baseUrl}/api/mercado/zonaprop`, {
-      next: { revalidate: 0 },
-      cache: 'no-store'
-    })
-    if (!res.ok) return { zonas: [], error: true }
-    const zonas: ZonaResult[] = await res.json()
+    const supabase = await createClient()
+    const { data: zonasData, error: zonasError } = await supabase
+      .from('mercado_zonas')
+      .select('*')
+      .order('zona', { ascending: true })
+
+    if (zonasError) throw zonasError
+
+    const zonas = (zonasData || []).map(z => ({
+      zona: z.zona,
+      mes_reporte: z.mes_reporte,
+      url_pdf: z.url_pdf,
+      precio_m2_venta_usd: z.precio_m2_venta_usd ? Number(z.precio_m2_venta_usd) : null,
+      variacion_mensual_pct: z.variacion_mensual_pct ? Number(z.variacion_mensual_pct) : null,
+      variacion_anual_pct: z.variacion_anual_pct ? Number(z.variacion_anual_pct) : null,
+      precio_alquiler_2amb_ars: z.precio_alquiler_2amb_ars ? Number(z.precio_alquiler_2amb_ars) : null,
+      precio_alquiler_3amb_ars: z.precio_alquiler_3amb_ars ? Number(z.precio_alquiler_3amb_ars) : null,
+      barrios: [], 
+      fuente: 'zonaprop' as const,
+      parseado_ok: true
+    }))
+
     return { zonas, error: false }
-  } catch {
+  } catch (error) {
+    console.error('[Market Page] Error loading Zonaprop:', error)
     return { zonas: [], error: true }
   }
 }
