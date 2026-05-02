@@ -248,7 +248,10 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
     CampaignState.setContacts(selected)
     
     // Switch to campanas tab
-    const campanasTab = document.querySelector<HTMLButtonElement>('button[role="tab"][value="campanas"]')
+    const campanasTab = document.querySelector<HTMLButtonElement>('button[role="tab"][data-value="campanas"]') || 
+                      Array.from(document.querySelectorAll<HTMLButtonElement>('button[role="tab"]'))
+                        .find(btn => btn.textContent?.includes('Campañas'))
+                        
     if (campanasTab) {
       campanasTab.click()
     } else {

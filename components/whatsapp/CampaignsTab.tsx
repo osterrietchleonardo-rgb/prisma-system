@@ -2,9 +2,6 @@
 
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { sendCampaignMessage, updateContactCampaignStatus } from "@/app/actions/whatsapp"
-import type { WATemplate, WAContact } from "@/types/whatsapp"
-import { CampaignState } from "./CampaignState"
 import { 
   Megaphone, 
   Upload, 
@@ -14,7 +11,10 @@ import {
   Play, 
   StopCircle,
   RefreshCw,
-  Info
+  Info,
+  Eye,
+  Loader2,
+  Send
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -26,6 +26,10 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { EmptyState } from "./EmptyState"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
+import { syncTemplatesFromMeta, sendCampaignMessage, updateContactCampaignStatus } from "@/app/actions/whatsapp"
+import type { WATemplate, WAContact } from "@/types/whatsapp"
+import { CampaignState } from "./CampaignState"
 import Papa from "papaparse"
 import * as XLSX from "xlsx"
 
@@ -154,7 +158,13 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
 
   // Mapeo automático ya realizado en el state sync
 
-  const startCampaign = async () => {
+    const getRowValue = (row: any, col: string) => {
+      if (row[col] !== undefined && row[col] !== null) return String(row[col])
+      if (row.metadata && row.metadata[col] !== undefined && row.metadata[col] !== null) return String(row.metadata[col])
+      return ""
+    }
+
+    const startCampaign = async () => {
     if (!selectedTemplate || !phoneColumn || !nameColumn || parsedData.length === 0) {
       toast.error("Faltan configurar campos o seleccionar la plantilla.")
       return
@@ -208,8 +218,8 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
        }
 
        const row = parsedData[i];
-       const phone = row[phoneColumn] ? String(row[phoneColumn]) : ""
-       const name = row[nameColumn] ? String(row[nameColumn]) : "Lead"
+       const phone = getRowValue(row, phoneColumn)
+       const name = getRowValue(row, nameColumn)
 
        // Esto técnicamente ya no se arrojará debido a la pre-validación estricta de arriba
        if (!phone || phone.replace(/\D/g, '').length < 8) {
@@ -222,14 +232,16 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
 
        // Armar construct variables
        const headerParams = headerVars.map(v => {
-           const mode = variableMode[`header_${v}`] || "column"
-           if (mode === "column") return String(row[variableMap[`header_${v}`]] || "")
-           return variableMap[`header_${v}`] || ""
+           const key = `header_${v}`
+           const mode = variableMode[key] || "column"
+           const mapVal = variableMap[key]
+           return mode === "column" ? getRowValue(row, mapVal) : mapVal
        })
        const bodyParams = bodyVars.map(v => {
-           const mode = variableMode[`body_${v}`] || "column"
-           if (mode === "column") return String(row[variableMap[`body_${v}`]] || "")
-           return variableMap[`body_${v}`] || ""
+           const key = `body_${v}`
+           const mode = variableMode[key] || "column"
+           const mapVal = variableMap[key]
+           return mode === "column" ? getRowValue(row, mapVal) : mapVal
        })
 
        let fullText = ""
@@ -325,7 +337,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
          </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-6 h-full pb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pb-20">
         {/* Left Column: Config */}
         <div className="space-y-6">
             <Card>
@@ -358,32 +370,61 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
              </CardContent>
            </Card>
 
-           <Card className={parsedData.length === 0 ? 'opacity-50 pointer-events-none' : ''}>
+            <Card className={cn("shadow-md border-primary/10", parsedData.length === 0 ? 'opacity-50 pointer-events-none' : '')}>
              <CardHeader className="pb-3">
                <CardTitle className="text-lg">2. Seleccionar Plantilla Aprobada</CardTitle>
              </CardHeader>
-             <CardContent>
-                <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId} disabled={isSending}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Elige la plantilla de envío" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templates.map(t => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.template_name} ({t.category})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-             </CardContent>
+              <CardContent className="space-y-4">
+                 <div className="flex items-center gap-2">
+                   <div className="flex-1">
+                     <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId} disabled={isSending}>
+                       <SelectTrigger>
+                         <SelectValue placeholder="Elige la plantilla de envío" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {templates.length === 0 ? (
+                           <div className="p-2 text-sm text-muted-foreground text-center">No hay plantillas aprobadas.</div>
+                         ) : (
+                           templates.map(t => (
+                             <SelectItem key={t.id} value={t.id}>
+                               {t.template_name} {t.category ? `(${t.category})` : ""}
+                             </SelectItem>
+                           ))
+                         )}
+                       </SelectContent>
+                     </Select>
+                   </div>
+                   <Button 
+                     variant="outline" 
+                     size="icon" 
+                     onClick={async () => {
+                        const res = await syncTemplatesFromMeta()
+                        if (res.success) {
+                          toast.success("Plantillas sincronizadas")
+                          // Forzar recarga (el useEffect de templates lo hará si cambia el estado)
+                          window.location.reload()
+                        } else {
+                          toast.error(res.error || "Error al sincronizar")
+                        }
+                     }}
+                     disabled={isSending}
+                     title="Sincronizar de Meta"
+                   >
+                     <RefreshCw className={cn("w-4 h-4", isSending && "animate-spin")} />
+                   </Button>
+                 </div>
+                 <p className="text-[10px] text-muted-foreground">
+                   Solo aparecen plantillas con estado <b>APPROVED</b> en Meta.
+                 </p>
+              </CardContent>
            </Card>
 
-           <Card className={!selectedTemplate || parsedData.length === 0 ? 'opacity-50 pointer-events-none' : ''}>
+            <Card className={cn("shadow-md border-primary/10", !selectedTemplate || parsedData.length === 0 ? 'opacity-50 pointer-events-none' : '')}>
              <CardHeader className="pb-3">
                <CardTitle className="text-lg">3. Mapeo de Columnas</CardTitle>
                <CardDescription>Asigna las columnas de tu Excel a las variables necesarias.</CardDescription>
              </CardHeader>
-             <CardContent className="space-y-4">
+              <CardContent className="space-y-4 max-h-[600px] overflow-y-auto">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-destructive font-medium">Teléfono (Celular) *</Label>
@@ -453,17 +494,78 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                       )}
                     </div>
                   ))}
-                  {headerVars.length === 0 && bodyVars.length === 0 && selectedTemplate && (
-                    <p className="text-sm text-muted-foreground"><Info className="w-4 h-4 inline mr-1"/>Esta plantilla no requiere variables adicionales.</p>
+                  {headerVars.length === 0 && bodyVars.length === 0 && (
+                    <div className="text-center py-6 text-muted-foreground bg-muted/20 rounded-lg border border-dashed">
+                      <p className="text-sm">Esta plantilla no requiere variables adicionales.</p>
+                    </div>
                   )}
+                </div>
+
+                <div className="pt-6 border-t mt-6">
+                  <Button 
+                    className="w-full h-12 text-lg font-bold shadow-lg shadow-primary/20" 
+                    size="lg"
+                    onClick={startCampaign}
+                    disabled={isSending || parsedData.length === 0 || !selectedTemplate}
+                  >
+                    {isSending ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Enviando ({sentCount}/{parsedData.length})...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-2 h-5 w-5" />
+                        Lanzar Campaña para {parsedData.length} contactos
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-[10px] text-center text-muted-foreground mt-2">
+                    Respeta los límites de Meta para evitar bloqueos.
+                  </p>
                 </div>
              </CardContent>
            </Card>
         </div>
 
-        {/* Right Column: Execution */}
-        <div className="space-y-6">
-           <Card className="h-full flex flex-col">
+        {/* Columna Derecha: Vista Previa y Estado */}
+        <div className="flex flex-col gap-6">
+          {selectedTemplate && (
+            <Card className="shadow-md border-primary/10 bg-gradient-to-br from-background to-muted/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-primary" />
+                  Vista Previa del Mensaje
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="bg-emerald-50 dark:bg-emerald-950/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/30 relative shadow-sm">
+                  <div className="absolute top-2 left-[-8px] w-0 h-0 border-t-[8px] border-t-transparent border-r-[12px] border-r-emerald-50 dark:border-r-emerald-950/20 border-b-[8px] border-b-transparent"></div>
+                  
+                  {selectedTemplate.components?.map((c: any, i: number) => {
+                    if (c.type === 'HEADER' && c.text) {
+                      return <div key={i} className="font-bold text-sm mb-1 text-emerald-900 dark:text-emerald-100 border-b border-emerald-100 dark:border-emerald-800 pb-1 mb-2">{c.text}</div>
+                    }
+                    if (c.type === 'BODY' && c.text) {
+                      return <div key={i} className="text-sm whitespace-pre-wrap text-foreground">{c.text}</div>
+                    }
+                    if (c.type === 'FOOTER' && c.text) {
+                      return <div key={i} className="text-[10px] text-muted-foreground mt-2 uppercase tracking-wider">{c.text}</div>
+                    }
+                    return null
+                  })}
+                </div>
+                <div className="mt-4 flex flex-col gap-2">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    Las variables se reemplazarán automáticamente al enviar.
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="shadow-md border-primary/10">
              <CardHeader>
                <CardTitle className="text-lg">Ejecución de Campaña</CardTitle>
              </CardHeader>
