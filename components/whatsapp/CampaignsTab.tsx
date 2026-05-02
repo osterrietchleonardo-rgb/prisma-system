@@ -59,7 +59,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
 
   // Helper function to robustly check if a row was already sent the selected template
   const isRowSkipped = (row: any, templateName: string | undefined): boolean => {
-    if (!templateName || !row.campaign_statuses) return false;
+    if (!row || !templateName || !row.campaign_statuses) return false;
     
     let statuses = row.campaign_statuses;
     if (typeof statuses === 'string') {
@@ -72,17 +72,18 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
     
     if (typeof statuses !== 'object' || statuses === null) return false;
 
-    let campaignData = statuses[templateName];
+    const safeTemplateName = String(templateName);
+    let campaignData = statuses[safeTemplateName];
     if (!campaignData) {
       // Loose match fallback
       const key = Object.keys(statuses).find(
-        k => k.toLowerCase() === templateName.toLowerCase() || 
-             k.replace(/\s+/g, '') === templateName.replace(/\s+/g, '')
+        k => String(k).toLowerCase() === safeTemplateName.toLowerCase() || 
+             String(k).replace(/\s+/g, '') === safeTemplateName.replace(/\s+/g, '')
       );
       if (key) campaignData = statuses[key];
     }
 
-    const currentStatus = (typeof campaignData === 'string' ? campaignData : campaignData?.status || "") as string;
+    const currentStatus = String(typeof campaignData === 'string' ? campaignData : campaignData?.status || "");
     const lowerStatus = currentStatus.toLowerCase();
     
     return lowerStatus === "enviado" || lowerStatus === "sent" || lowerStatus === "salteado";
@@ -713,7 +714,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                       const phone = phoneColumn ? row[phoneColumn] : ""
                                              let status = contactStatuses[i]
                         if (!status && selectedTemplate) {
-                          if (isRowSkipped(row, selectedTemplate.template_name)) {
+                          if (isRowSkipped(row, selectedTemplate?.template_name)) {
                             status = "salteado"
                           } else {
                             status = "pendiente"
@@ -722,25 +723,26 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                          status = "pendiente"
                        }
 
+                      const safeStatus = String(status || "pendiente");
                       
                       return (
                         <tr key={i} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                            <td className="p-3 text-muted-foreground">{i + 1}</td>
-                           <td className="p-3 font-medium">{String(name)}</td>
-                           <td className="p-3">{String(phone)}</td>
+                           <td className="p-3 font-medium">{String(name || "Lead")}</td>
+                           <td className="p-3">{String(phone || "")}</td>
                            <td className="p-3 text-right">
                              <Badge 
                                variant={
-                                  status === "enviado" ? "default" :
-                                  status === "salteado" ? "secondary" :
-                                  status === "error" ? "destructive" : "outline"
+                                  safeStatus === "enviado" ? "default" :
+                                  safeStatus === "salteado" ? "secondary" :
+                                  safeStatus === "error" ? "destructive" : "outline"
                                }
                                className={
-                                  status === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" : 
-                                  status === "salteado" ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30" : ""
+                                  safeStatus === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" : 
+                                  safeStatus === "salteado" ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30" : ""
                                 }
                              >
-                               {status === "salteado" ? "SALTEADO" : status.toUpperCase()}
+                               {safeStatus === "salteado" ? "SALTEADO" : safeStatus.toUpperCase()}
                              </Badge>
                            </td>
                         </tr>
