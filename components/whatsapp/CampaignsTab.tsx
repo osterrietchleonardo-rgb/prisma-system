@@ -38,139 +38,63 @@ interface CampaignsTabProps {
 }
 
 export default function CampaignsTab({ instance }: CampaignsTabProps) {
+  // ─── Supabase client (must be at top, before hooks) ───
+  const supabase = createClient()
+
+  // ─── State ───
   const [templates, setTemplates] = useState<WATemplate[]>([])
   const [loading, setLoading] = useState(true)
-  
-  // Selection state
   const [selectedContactsList, setSelectedContactsList] = useState<WAContact[]>([])
   const [parsedData, setParsedData] = useState<any[]>([])
   const [columns, setColumns] = useState<string[]>([])
   const [contactStatuses, setContactStatuses] = useState<Record<number, "pendiente" | "enviado" | "error" | "salteado">>({})
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("")
-  
-  // Mapping state
   const [phoneColumn, setPhoneColumn] = useState<string>("")
   const [nameColumn, setNameColumn] = useState<string>("")
-  const [variableMap, setVariableMap] = useState<Record<string, string>>({}) // e.g. "body_1": "ColumnName" OR "body_1": "Static text"
-  const [variableMode, setVariableMode] = useState<Record<string, "column" | "manual">>({}) // e.g. "body_1": "manual"
-
-  // Preflight stats
-  const [preflightStats, setPreflightStats] = useState({ total: 0, toSend: 0, toSkip: 0 });
-
-  // Helper function to robustly check if a row was already sent the selected template
-  const isRowSkipped = (row: any, templateName: string | undefined): boolean => {
-    if (!row || !templateName || !row.campaign_statuses) return false;
-    
-    let statuses = row.campaign_statuses;
-    if (typeof statuses === 'string') {
-      try {
-        statuses = JSON.parse(statuses);
-      } catch (e) {
-        return false;
-      }
-    }
-    
-    if (typeof statuses !== 'object' || statuses === null) return false;
-
-    const safeTemplateName = String(templateName);
-    let campaignData = statuses[safeTemplateName];
-    if (!campaignData) {
-      // Loose match fallback
-      const key = Object.keys(statuses).find(
-        k => String(k).toLowerCase() === safeTemplateName.toLowerCase() || 
-             String(k).replace(/\s+/g, '') === safeTemplateName.replace(/\s+/g, '')
-      );
-      if (key) campaignData = statuses[key];
-    }
-
-    const currentStatus = String(typeof campaignData === 'string' ? campaignData : campaignData?.status || "");
-    const lowerStatus = currentStatus.toLowerCase();
-    
-    return lowerStatus === "enviado" || lowerStatus === "sent" || lowerStatus === "salteado";
-  };
-
-  useEffect(() => {
-    if (!parsedData || parsedData.length === 0 || !selectedTemplate) {
-       setPreflightStats({ total: parsedData?.length || 0, toSend: parsedData?.length || 0, toSkip: 0 });
-       return;
-    }
-
-    let skipCount = 0;
-    parsedData.forEach(row => {
-       if (isRowSkipped(row, selectedTemplate.template_name)) {
-          skipCount++;
-       }
-    });
-
-    setPreflightStats({
-       total: parsedData.length,
-       toSkip: skipCount,
-       toSend: parsedData.length - skipCount
-    });
-  }, [parsedData, selectedTemplate]);
-
-  // Execution state
+  const [variableMap, setVariableMap] = useState<Record<string, string>>({})
+  const [variableMode, setVariableMode] = useState<Record<string, "column" | "manual">>({})
+  const [preflightStats, setPreflightStats] = useState({ total: 0, toSend: 0, toSkip: 0 })
   const [isSending, setIsSending] = useState(false)
   const [progress, setProgress] = useState(0)
   const [results, setResults] = useState<{success: number, error: number, skipped: number, total: number}>({ success: 0, error: 0, skipped: 0, total: 0 })
   const abortControllerRef = useRef<AbortController | null>(null)
 
+  // ─── Helpers (must be defined BEFORE any useEffect that uses them) ───
   const getMessagingLimitNumber = (tier: string | null | undefined): number => {
-    if (!tier) return 250; // default Meta limit
+    if (!tier) return 250
     switch (tier) {
-      case 'TIER_50': return 50;
-      case 'TIER_250': return 250;
-      case 'TIER_1K': return 1000;
-      case 'TIER_10K': return 10000;
-      case 'TIER_100K': return 100000;
-      case 'TIER_UNLIMITED': return Infinity;
-      default: return 250;
+      case 'TIER_50': return 50
+      case 'TIER_250': return 250
+      case 'TIER_1K': return 1000
+      case 'TIER_10K': return 10000
+      case 'TIER_100K': return 100000
+      case 'TIER_UNLIMITED': return Infinity
+      default: return 250
     }
   }
 
-  const limitNumber = getMessagingLimitNumber(instance?.messaging_limit_tier);
+  const limitNumber = getMessagingLimitNumber(instance?.messaging_limit_tier)
 
-  const supabase = createClient()
-
-  useEffect(() => {
-    loadApprovedTemplates()
-    
-    const sync = (c: WAContact[]) => {
-      setSelectedContactsList(c)
-      if (c.length === 0) {
-        setParsedData([])
-        setColumns([])
-        setContactStatuses({})
-        return
-      }
-      
-      const convertedData = c.map(contact => ({
-         id: contact.id,
-         celular: contact.phone,
-         nombre: contact.name,
-         campaign_statuses: contact.campaign_statuses,
-         ...(contact.metadata || {})
-      }))
-      
-      setParsedData(convertedData)
-      
-      const allCols = new Set(["celular", "nombre"])
-      c.forEach(contact => {
-        if (contact.metadata) Object.keys(contact.metadata).forEach(k => allCols.add(k))
-      })
-      setColumns(Array.from(allCols))
-      
-      setPhoneColumn("celular")
-      setNameColumn("nombre")
-      
-      const initialStatuses: Record<number, "pendiente"> = {}
-      c.forEach((_, i) => initialStatuses[i] = "pendiente")
-      setContactStatuses(initialStatuses)
+  const isRowSkipped = (row: any, templateName: string | undefined): boolean => {
+    if (!row || !templateName || !row.campaign_statuses) return false
+    let statuses = row.campaign_statuses
+    if (typeof statuses === 'string') {
+      try { statuses = JSON.parse(statuses) } catch { return false }
     }
-    
-    sync(CampaignState.getContacts())
-    return CampaignState.subscribe(sync)
-  }, [])
+    if (typeof statuses !== 'object' || statuses === null) return false
+    const safeTemplateName = String(templateName)
+    let campaignData = statuses[safeTemplateName]
+    if (!campaignData) {
+      const key = Object.keys(statuses).find(
+        k => String(k).toLowerCase() === safeTemplateName.toLowerCase() ||
+             String(k).replace(/\s+/g, '') === safeTemplateName.replace(/\s+/g, '')
+      )
+      if (key) campaignData = statuses[key]
+    }
+    const currentStatus = String(typeof campaignData === 'string' ? campaignData : campaignData?.status || "")
+    const lowerStatus = currentStatus.toLowerCase()
+    return lowerStatus === "enviado" || lowerStatus === "sent" || lowerStatus === "salteado"
+  }
 
   const loadApprovedTemplates = async () => {
     setLoading(true)
@@ -185,7 +109,6 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
         .eq('agency_id', instance.agency_id)
         .eq('status', 'APPROVED')
         .order('created_at', { ascending: false })
-      
       if (data) setTemplates(data)
     } catch (err) {
       console.error(err)
@@ -194,9 +117,56 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
     }
   }
 
+  // ─── Derived state ───
   const selectedTemplate = templates.find(t => t.id === selectedTemplateId)
 
-  // Extract variables
+  // ─── Effects ───
+  useEffect(() => {
+    loadApprovedTemplates()
+    const sync = (c: WAContact[]) => {
+      setSelectedContactsList(c)
+      if (c.length === 0) {
+        setParsedData([])
+        setColumns([])
+        setContactStatuses({})
+        return
+      }
+      const convertedData = c.map(contact => ({
+        id: contact.id,
+        celular: contact.phone,
+        nombre: contact.name,
+        campaign_statuses: contact.campaign_statuses,
+        ...(contact.metadata || {})
+      }))
+      setParsedData(convertedData)
+      const allCols = new Set(["celular", "nombre"])
+      c.forEach(contact => {
+        if (contact.metadata) Object.keys(contact.metadata).forEach(k => allCols.add(k))
+      })
+      setColumns(Array.from(allCols))
+      setPhoneColumn("celular")
+      setNameColumn("nombre")
+      const initialStatuses: Record<number, "pendiente"> = {}
+      c.forEach((_, i) => initialStatuses[i] = "pendiente")
+      setContactStatuses(initialStatuses)
+    }
+    sync(CampaignState.getContacts())
+    return CampaignState.subscribe(sync)
+  }, [])
+
+  useEffect(() => {
+    if (!parsedData || parsedData.length === 0 || !selectedTemplate) {
+      setPreflightStats({ total: parsedData?.length || 0, toSend: parsedData?.length || 0, toSkip: 0 })
+      return
+    }
+    let skipCount = 0
+    parsedData.forEach(row => {
+      if (isRowSkipped(row, selectedTemplate.template_name)) skipCount++
+    })
+    setPreflightStats({ total: parsedData.length, toSkip: skipCount, toSend: parsedData.length - skipCount })
+  }, [parsedData, selectedTemplateId])
+
+  // ─── Template variable extraction ───
   const getTemplateVars = (template: WATemplate) => {
     let headerVars: string[] = []
     let bodyVars: string[] = []
