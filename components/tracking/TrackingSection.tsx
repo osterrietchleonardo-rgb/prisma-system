@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { getLeads } from "@/lib/tracking/queries";
+import { getPerformanceLogs } from "@/lib/tracking/queries";
 import { calculateKPIs } from "@/lib/tracking/kpiCalculations";
-import { DashboardFilters, Lead } from "@/lib/tracking/types";
+import { DashboardFilters, PerformanceLog } from "@/lib/tracking/types";
 import { TrackingKPIs } from "./TrackingKPIs";
 import { TrackingCharts } from "./TrackingCharts";
 import { TrackingAlerts } from "./TrackingAlerts";
@@ -16,7 +16,7 @@ interface Props {
 }
 
 export function TrackingSection({ isDirector }: Props) {
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState<DashboardFilters>({
     period: "month",
@@ -25,7 +25,7 @@ export function TrackingSection({ isDirector }: Props) {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getLeads();
+      const data = await getPerformanceLogs();
       setLeads(data);
     } catch (err) {
       console.error(err);
