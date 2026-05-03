@@ -55,5 +55,5 @@ export async function savePerformanceLog(payload: any) {
   revalidatePath("/director/dashboard");
   revalidatePath("/asesor/dashboard");
 
-  return data;
+  return log;
 }

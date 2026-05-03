@@ -17,6 +17,9 @@ export async function getDashboardData(agencyId: string) {
     .eq("id", agencyId)
     .single();
 
+  const { data: perfLogs } = await supabase
+    .from("performance_logs")
+    .select("*")
     .eq("agency_id", agencyId);
 
   // 1.2. Get all advisors/profiles for this agency to link properties
