@@ -74,27 +74,18 @@ export default async function DashboardPage({
   return (
     <div className="space-y-8 animate-in fade-in duration-300 px-4 md:px-8 py-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Performance Advisor</h2>
-          <p className="text-xs md:text-sm text-muted-foreground">
-            Métricas de actividad, captación y transacciones globales.
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-accent to-accent/60 bg-clip-text text-transparent">
+            Performance Advisor
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Seguimiento de métricas comerciales y evolución de asesores.
           </p>
         </div>
         <DashboardHeaderActions data={dashboardData} />
       </div>
 
-      <PerformanceKpis data={dashboardData.kpis} />
-
-      <div className="grid gap-6 lg:grid-cols-7">
-        <div className="lg:col-span-7">
-          <PerformanceLeaderboard advisors={dashboardData.advisors} />
-        </div>
-      </div>
-
-      <PerformanceCharts data={dashboardData.charts.performanceEvolution} />
-
-      
-      {/* Filters Bar */}
+      {/* Filters Bar at the TOP */}
       <div className="flex flex-col gap-4 p-4 rounded-xl border border-accent/10 bg-card/30 backdrop-blur-sm sm:flex-row sm:items-center">
         <AdvisorFilter advisors={dashboardData.advisors.map(a => ({ id: a.id, name: a.name }))} />
         
@@ -121,6 +112,16 @@ export default async function DashboardPage({
           <Button variant="ghost" size="sm" className="text-xs text-accent font-semibold hover:bg-accent/10">
             Limpiar Filtros
           </Button>
+        </div>
+      </div>
+
+      <PerformanceKpis data={dashboardData.kpis} />
+      
+      <PerformanceCharts data={dashboardData.charts.performanceEvolution} />
+
+      <div className="grid gap-6 lg:grid-cols-7">
+        <div className="lg:col-span-7">
+          <PerformanceLeaderboard advisors={dashboardData.advisors} />
         </div>
       </div>
 
