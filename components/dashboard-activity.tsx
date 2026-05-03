@@ -1,8 +1,6 @@
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar"
+"use client"
+
+import { Activity, Key, MessageSquare, TrendingUp } from "lucide-react"
 import {
   Card,
   CardContent,
@@ -10,24 +8,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import { 
-  Key, 
-  TrendingUp, 
-  MessageSquare, 
-  Activity,
-  Briefcase
-} from "lucide-react"
-import { AdvisorFilter } from "./dashboard/advisor-filter"
 
 interface DashboardActivityProps {
   data: any[]
-  advisors?: { id: string, name: string }[]
 }
 
-export function DashboardActivity({ data, advisors = [] }: DashboardActivityProps) {
+export function DashboardActivity({ data }: DashboardActivityProps) {
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'captacion':
@@ -57,9 +47,9 @@ export function DashboardActivity({ data, advisors = [] }: DashboardActivityProp
   const getActivityLabel = (type: string) => {
     switch (type) {
       case 'captacion':
-        return 'Nueva Captación'
+        return 'Captación'
       case 'transaccion':
-        return 'Cierre / Venta'
+        return 'Cierre'
       case 'lead_seguimiento':
         return 'Seguimiento'
       default:
@@ -69,48 +59,29 @@ export function DashboardActivity({ data, advisors = [] }: DashboardActivityProp
 
   return (
     <Card className="border-accent/10 bg-card/40 backdrop-blur-md h-full shadow-xl shadow-black/20">
-      <CardHeader className="pb-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
-              Movimientos Recientes
-            </CardTitle>
-            <CardDescription className="text-muted-foreground/70">
-              Actividad concreta de tus asesores en tiempo real.
-            </CardDescription>
-          </div>
-          <div className="flex items-center gap-3">
-            {advisors.length > 0 && (
-              <div className="hidden md:block">
-                <AdvisorFilter advisors={advisors} />
-              </div>
-            )}
-            <div className="p-2 bg-accent/5 rounded-full border border-accent/10">
-              <Activity className="h-5 w-5 text-accent" />
-            </div>
-          </div>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div className="space-y-1">
+          <CardTitle className="text-xl font-bold tracking-tight">Movimientos Recientes</CardTitle>
+          <CardDescription className="text-muted-foreground/60">
+            Actividad en tiempo real de los asesores
+          </CardDescription>
         </div>
-        {/* Mobile Filter */}
-        {advisors.length > 0 && (
-          <div className="mt-4 md:hidden">
-            <AdvisorFilter advisors={advisors} />
-          </div>
-        )}
+        <Activity className="h-5 w-5 text-accent opacity-50" />
       </CardHeader>
-      <CardContent>
-        <div className="space-y-5">
-          {data.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-12 h-12 rounded-full bg-accent/5 flex items-center justify-center mb-3">
-                <Briefcase className="h-6 w-6 text-muted-foreground/40" />
-              </div>
-              <p className="text-sm text-muted-foreground">No se registran movimientos recientes.</p>
+      <CardContent className="p-0">
+        {data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="h-12 w-12 rounded-full bg-accent/5 flex items-center justify-center mb-4">
+              <Activity className="h-6 w-6 text-accent/20" />
             </div>
-          ) : (
-            data.map((activity, index) => (
+            <p className="text-sm text-muted-foreground">No hay actividad reciente</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-accent/5">
+            {data.map((activity, index) => (
               <div 
-                key={activity.id} 
-                className="group relative flex items-start p-3 rounded-xl transition-all duration-300 hover:bg-accent/5 border border-transparent hover:border-accent/10"
+                key={activity.id || index} 
+                className="group flex items-start p-4 transition-colors hover:bg-accent/5 cursor-default"
               >
                 <div className="relative">
                   <Avatar className="h-10 w-10 border-2 border-background ring-2 ring-accent/10">
@@ -139,8 +110,7 @@ export function DashboardActivity({ data, advisors = [] }: DashboardActivityProp
                       {getActivityLabel(activity.type)}
                     </Badge>
                     <p className="text-sm text-muted-foreground line-clamp-1">
-                      {activity.type === 'transaccion' ? 'Cierre con ' : activity.type === 'captacion' ? 'Nueva propiedad de ' : 'Gestión para '}
-                      <span className="text-white/80 font-medium">{activity.nombre_cliente}</span>
+                      {activity.nombre_cliente}
                     </p>
                   </div>
 
@@ -160,11 +130,10 @@ export function DashboardActivity({ data, advisors = [] }: DashboardActivityProp
                   )}
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )
 }
-

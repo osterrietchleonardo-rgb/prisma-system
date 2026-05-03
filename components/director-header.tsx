@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/sheet"
 import { DirectorSidebar } from "@/components/director-sidebar"
 import { usePathname } from "next/navigation"
+import { GlobalSearch } from "@/components/shared/global-search"
+import { NotificationPopover } from "@/components/shared/notification-popover"
 
 interface DirectorHeaderProps {
   userName?: string
@@ -28,6 +30,7 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole }: Di
   const pathname = usePathname()
   const [customTitle, setCustomTitle] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   
   // Listen for custom title updates (e.g. from dynamic pages)
   useEffect(() => {
@@ -72,16 +75,18 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole }: Di
         </div>
 
         <div className="flex items-center gap-2 md:gap-4">
-          <Button variant="ghost" size="icon" className="text-muted-foreground hidden sm:flex h-12 w-12 md:h-9 md:w-9">
-            <Search className="h-5 w-5 md:h-4 md:w-4" />
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-muted-foreground hidden sm:flex h-10 w-10 hover:text-accent transition-colors"
+            onClick={() => setSearchOpen(true)}
+          >
+            <Search className="h-5 w-5" />
           </Button>
           
-          <div className="relative">
-            <Button variant="ghost" size="icon" className="text-muted-foreground w-10 h-10 md:w-9 md:h-9">
-              <Bell className="h-5 w-5 md:h-4 md:h-4" />
-            </Button>
-            <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-accent rounded-full border-2 border-background"></span>
-          </div>
+          <NotificationPopover />
+          
+          <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
           
           <div className="flex items-center gap-3">
             <ModeToggle />

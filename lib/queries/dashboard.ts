@@ -39,7 +39,8 @@ export async function getDashboardData(agencyId: string, agentId?: string) {
     .from("properties")
     .select("assigned_agent")
     .eq("agency_id", agencyId)
-    .eq("status", "Active");
+    .eq("status", "Active")
+    .not("assigned_agent", "is", null);
 
   const inventoryPerEmail: Record<string, number> = {};
   properties?.forEach(p => {
@@ -254,7 +255,7 @@ export async function getDashboardData(agencyId: string, agentId?: string) {
   // Calculate monthly deltas first
   const deltas: Record<string, { captaciones: number, transacciones: number, facturacion: number }> = {};
   perfLogs?.forEach(l => {
-    const date = new Date(l.date);
+    const date = new Date(l.fecha_actividad || l.created_at);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     if (!deltas[key]) deltas[key] = { captaciones: 0, transacciones: 0, facturacion: 0 };
     

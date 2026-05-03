@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/sheet"
 import { AsesorSidebar } from "@/components/asesor-sidebar"
 import { usePathname } from "next/navigation"
+import { GlobalSearch } from "@/components/shared/global-search"
+import { NotificationPopover } from "@/components/shared/notification-popover"
 
 interface AsesorHeaderProps {
   userName?: string
@@ -25,6 +27,7 @@ export function AsesorHeader({ userName, userEmail, agencyName, userRole }: Ases
   const pathname = usePathname()
   const [customTitle, setCustomTitle] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   
   // Listen for custom title updates
   useEffect(() => {
@@ -33,6 +36,18 @@ export function AsesorHeader({ userName, userEmail, agencyName, userRole }: Ases
     }
     window.addEventListener('prisma-header-title', handleUpdateTitle)
     return () => window.removeEventListener('prisma-header-title', handleUpdateTitle)
+  }, [])
+  
+  // Keyboard shortcut for search
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setSearchOpen((open) => !open)
+      }
+    }
+    document.addEventListener("keydown", down)
+    return () => document.removeEventListener("keydown", down)
   }, [])
 
   // Simple breadcrumb logic
@@ -70,13 +85,14 @@ export function AsesorHeader({ userName, userEmail, agencyName, userRole }: Ases
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="hidden lg:flex relative w-64">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar..."
-              className="pl-9 h-9 bg-muted/50 border-none focus-visible:ring-accent/30"
-            />
+          <div className="hidden lg:flex relative w-64 group cursor-pointer" onClick={() => setSearchOpen(true)}>
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground group-hover:text-accent transition-colors" />
+            <div className="flex items-center justify-between pl-9 pr-2 h-9 w-full bg-muted/50 rounded-md text-sm text-muted-foreground border border-transparent group-hover:border-accent/20 transition-all">
+              <span>Buscar...</span>
+              <kbd className="pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </div>
           </div>
           
           <div className="hidden items-center gap-2 md:flex">
@@ -86,10 +102,9 @@ export function AsesorHeader({ userName, userEmail, agencyName, userRole }: Ases
              </Badge>
           </div>
           
-          <Button variant="ghost" size="icon" className="relative text-muted-foreground">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-accent rounded-full border-2 border-background"></span>
-          </Button>
+          <NotificationPopover />
+
+          <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
 
           <UserNav 
             userName={userName} 
