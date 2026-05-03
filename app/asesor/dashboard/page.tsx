@@ -50,7 +50,7 @@ export default async function AsesorDashboardPage() {
     <div id="dashboard-content" className="space-y-8 animate-in fade-in duration-500 px-4 md:px-8 py-8 bg-background">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight">Mi Performance</h1>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Mi Performance</h1>
           <p className="text-muted-foreground italic">
             Tu rendimiento personal y posición en el ranking de la inmobiliaria.
           </p>
