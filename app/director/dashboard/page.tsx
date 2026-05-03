@@ -29,13 +29,20 @@ import { getPropertiesDashboardData } from "@/lib/queries/properties-dashboard"
 import { redirect } from "next/navigation"
 import { DashboardLeadsSection } from "./components/DashboardLeadsSection"
 import { DashboardPropertiesSection } from "./components/DashboardPropertiesSection"
+import { PerformanceCharts } from "@/components/performance-charts"
+import { AdvisorFilter } from "@/components/dashboard/advisor-filter"
 
 const DashboardCharts = dynamic(() => import("@/components/dashboard-charts").then(m => m.DashboardCharts), {
   ssr: false,
   loading: () => <Skeleton className="h-[400px] w-full rounded-2xl" />
 })
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams
+}: {
+  searchParams: { agentId?: string }
+}) {
+  const agentId = searchParams.agentId
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -60,7 +67,7 @@ export default async function DashboardPage() {
   }
 
   const [dashboardData, propertiesData] = await Promise.all([
-    getDashboardData(profile.agency_id),
+    getDashboardData(profile.agency_id, agentId),
     getPropertiesDashboardData(profile.agency_id)
   ])
 
@@ -84,24 +91,14 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      <PerformanceCharts data={dashboardData.charts.performanceEvolution} />
+
       
       {/* Filters Bar */}
       <div className="flex flex-col gap-4 p-4 rounded-xl border border-accent/10 bg-card/30 backdrop-blur-sm sm:flex-row sm:items-center">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Filtros</span>
-        </div>
+        <AdvisorFilter advisors={dashboardData.advisors.map(a => ({ id: a.id, name: a.name }))} />
         
-        <div className="grid grid-cols-1 sm:flex sm:items-center sm:gap-4 flex-1 gap-2">
-          <Select defaultValue="all">
-            <SelectTrigger className="w-full sm:w-[180px] h-10 md:h-9 text-xs">
-              <SelectValue placeholder="Asesor" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los asesores</SelectItem>
-            </SelectContent>
-          </Select>
- 
+        <div className="ml-auto flex items-center gap-4">
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -120,11 +117,11 @@ export default async function DashboardPage() {
               />
             </PopoverContent>
           </Popover>
-        </div>
 
-        <Button variant="ghost" size="sm" className="text-xs text-accent font-semibold hover:bg-accent/10 ml-auto">
-          Limpiar Filtros
-        </Button>
+          <Button variant="ghost" size="sm" className="text-xs text-accent font-semibold hover:bg-accent/10">
+            Limpiar Filtros
+          </Button>
+        </div>
       </div>
 
       <DashboardLeadsSection />

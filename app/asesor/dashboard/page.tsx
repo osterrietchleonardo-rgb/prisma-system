@@ -1,215 +1,121 @@
-"use client"
-
-import { useAsesorDashboard } from "@/hooks/useAsesorDashboard"
-import { createClient } from "@/lib/supabase"
-import { useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/server"
+import { redirect } from "next/navigation"
+import { getDashboardData } from "@/lib/queries/dashboard"
+import { PerformanceKpis } from "@/components/performance-kpis"
+import { PerformanceLeaderboard } from "@/components/performance-leaderboard"
+import { PerformanceCharts } from "@/components/performance-charts"
 import { 
   Card, 
   CardContent, 
   CardHeader, 
-  CardTitle,
+  CardTitle, 
   CardDescription 
 } from "@/components/ui/card"
 import { 
   Users, 
-  MessageSquare, 
-  CheckCircle2, 
-  Calculator, 
-  TrendingUp,
   Calendar,
-  Eye
+  Eye,
+  TrendingUp
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
 import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import dynamic from "next/dynamic"
 
-const EvolutionChart = dynamic(() => import("@/components/asesor-charts").then(m => m.EvolutionChart), {
-  ssr: false,
-  loading: () => <Skeleton className="h-full w-full rounded-xl" />
-})
-
-export default function AsesorDashboard() {
-  const [session, setSession] = useState<Record<string, any> | null>(null)
+export default async function AsesorDashboardPage() {
   const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-    })
-  }, [supabase.auth])
+  if (!user) {
+    redirect("/auth/login")
+  }
 
-  const { data, loading } = useAsesorDashboard(session?.user?.id)
+  // Get user profile to find agency_id
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("agency_id")
+    .eq("id", user.id)
+    .single()
 
-  if (loading) return <DashboardSkeleton />
+  if (!profile?.agency_id) {
+    return <div>Inmobiliaria no configurada</div>
+  }
 
-  const kpis = [
-    { 
-      title: "Leads Recibidos", 
-      value: data?.kpis?.totalLeads || 0, 
-      icon: Users, 
-      description: "Asignados hoy",
-    },
-    { 
-      title: "Consultas Activas", 
-      value: data?.kpis?.activeConsultations || 0, 
-      icon: MessageSquare, 
-      description: "Leads en seguimiento",
-    },
-    { 
-      title: "Cierres", 
-      value: data?.kpis?.totalClosings || 0, 
-      icon: CheckCircle2, 
-      description: "Ventas finalizadas",
-    },
-    { 
-      title: "Conversión", 
-      value: `${data?.kpis?.conversionRate?.toFixed(1) || 0}%`, 
-      icon: TrendingUp, 
-      description: "Tasa lead-a-cierre",
-    },
-    { 
-      title: "Tasaciones", 
-      value: data?.kpis?.totalValuations || 0, 
-      icon: Calculator, 
-      description: "AVM generadas",
-    },
-  ]
+  // Fetch full dashboard data but filtered for this agent's KPIs
+  // and the full agency leaderboard for motivation
+  const dashboardData = await getDashboardData(profile.agency_id, user.id)
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 px-4 md:px-8 py-8">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Mi Dashboard</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Mi Performance</h1>
         <p className="text-muted-foreground italic">
-          Bienvenido de nuevo. Aquí tienes un resumen de tu actividad comercial real.
+          Tu rendimiento personal y posición en el ranking de la inmobiliaria.
         </p>
       </div>
 
+      <PerformanceKpis data={dashboardData.kpis} />
 
-      <div className="grid gap-8 md:grid-cols-7">
-        {/* Evolution Chart */}
-        <Card className="md:col-span-4 border-accent/10 bg-card/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle>Evolución de Rendimiento</CardTitle>
-            <CardDescription>Comparativa de Leads vs Cierres (últimos 6 meses)</CardDescription>
-          </CardHeader>
-          <CardContent className="h-[350px] flex items-center justify-center">
-            {data?.leadsEvolution?.length > 0 ? (
-              <EvolutionChart data={data?.leadsEvolution} />
-            ) : (
-              <div className="text-center text-muted-foreground text-sm py-20">
-                <TrendingUp className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                No hay datos históricos para graficar la evolución.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-
-        {/* Sidebar Widgets */}
-        <div className="md:col-span-3 space-y-8">
-          {/* Upcoming Visits */}
-          <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg">Próximas Visitas</CardTitle>
-                <CardDescription>Tus citas para hoy y mañana</CardDescription>
-              </div>
-              <Calendar className="h-5 w-5 text-accent opacity-50" />
+      <div className="grid gap-8 lg:grid-cols-7">
+        <div className="lg:col-span-4 space-y-8">
+           <PerformanceCharts data={dashboardData.charts.performanceEvolution} />
+           
+           {/* Recent Activity */}
+           <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle>Actividad Reciente</CardTitle>
+              <CardDescription>Tus últimos registros y captaciones</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {data?.upcomingVisits?.length > 0 ? (
-                  data.upcomingVisits.map((visit: Record<string, any>, i: number) => (
-                    <div key={i} className="flex items-center gap-4 p-3 rounded-lg bg-accent/5 border border-accent/10 hover:bg-accent/10 transition-colors">
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold">{visit.lead?.full_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{visit.property?.title}</p>
-                        <p className="text-[10px] text-accent font-bold mt-1 uppercase">
-                          {format(new Date(visit.visit_date), "HH:mm 'hs' — d 'de' MMMM", { locale: es })}
-                        </p>
-                      </div>
-                      <Badge variant={visit.status === 'confirmed' ? 'default' : 'outline'}>
-                        {visit.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}
-                      </Badge>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-center py-4 text-muted-foreground">No tienes visitas agendadas próximamente.</p>
-                )}
-              </div>
-              <Button asChild variant="link" className="w-full mt-4 text-accent p-0">
-                <Link href="/asesor/calendario">Ver calendario completo</Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Recent Leads */}
-          <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg">Leads Recientes</CardTitle>
-                <CardDescription>Últimos contactos asignados</CardDescription>
-              </div>
-              <Users className="h-5 w-5 text-accent opacity-50" />
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {data?.recentLeads?.length > 0 ? (
-                  data.recentLeads.map((lead: Record<string, any>, i: number) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/5 transition-colors">
+                {dashboardData.activity?.length > 0 ? (
+                  dashboardData.activity.map((act: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between p-3 rounded-lg hover:bg-accent/5 transition-colors border border-transparent hover:border-accent/10">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold text-xs">
-                          {lead.full_name.charAt(0)}
+                        <div className="p-2 bg-accent/10 rounded-lg">
+                          <TrendingUp className="h-4 w-4 text-accent" />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold">{lead.full_name}</p>
-                          <p className="text-[10px] text-muted-foreground uppercase">{lead.pipeline_stage}</p>
+                          <p className="text-sm font-semibold">{act.description}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase">
+                            {format(new Date(act.created_at), "d 'de' MMMM, HH:mm", { locale: es })}
+                          </p>
                         </div>
                       </div>
-                      <Button size="icon" variant="ghost" className="h-8 w-8 text-accent" asChild>
-                        <Link href={`/asesor/pipeline?lead=${lead.id}`}>
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                      </Button>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-center py-4 text-muted-foreground">No hay leads nuevos asignados.</p>
+                  <p className="text-sm text-center py-4 text-muted-foreground">No hay actividad reciente registrada.</p>
                 )}
               </div>
-              <Button asChild variant="link" className="w-full mt-4 text-accent p-0">
-                <Link href="/asesor/pipeline">Gestionar en Pipeline</Link>
-              </Button>
             </CardContent>
           </Card>
         </div>
-      </div>
 
-    </div>
-  )
-}
-
-function DashboardSkeleton() {
-  return (
-    <div className="space-y-8 animate-pulse">
-      <div className="space-y-2">
-        <Skeleton className="h-10 w-64" />
-        <Skeleton className="h-4 w-96" />
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-28 w-full" />
-        ))}
-      </div>
-      <div className="grid gap-8 md:grid-cols-7">
-        <Skeleton className="md:col-span-4 h-[450px] w-full" />
-        <div className="md:col-span-3 space-y-8">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 w-full" />
+        <div className="lg:col-span-3 space-y-8">
+          <PerformanceLeaderboard advisors={dashboardData.advisors} />
+          
+          {/* Quick Links */}
+          <Card className="border-accent/10 bg-card/50 backdrop-blur-sm border-dashed">
+            <CardHeader>
+              <CardTitle className="text-lg">Acciones Rápidas</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-4">
+               <Button asChild variant="outline" className="h-20 flex-col gap-2">
+                  <Link href="/asesor/tracking-performance">
+                    <TrendingUp className="h-5 w-5" />
+                    <span>Subir Log</span>
+                  </Link>
+               </Button>
+               <Button asChild variant="outline" className="h-20 flex-col gap-2">
+                  <Link href="/asesor/propiedades">
+                    <Eye className="h-5 w-5" />
+                    <span>Mi Cartera</span>
+                  </Link>
+               </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

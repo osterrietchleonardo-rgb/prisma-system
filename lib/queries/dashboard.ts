@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 
-export async function getDashboardData(agencyId: string) {
+export async function getDashboardData(agencyId: string, agentId?: string) {
   const supabase = createClient()
   
   // 1. KPIs Base (from leads/closings/valuations)
@@ -17,10 +17,16 @@ export async function getDashboardData(agencyId: string) {
     .eq("id", agencyId)
     .single();
 
-  const { data: perfLogs } = await supabase
+  let logsQuery = supabase
     .from("performance_logs")
     .select("*")
     .eq("agency_id", agencyId);
+
+  if (agentId) {
+    logsQuery = logsQuery.eq("agent_id", agentId);
+  }
+
+  const { data: perfLogs } = await logsQuery;
 
   // 1.2. Get all advisors/profiles for this agency to link properties
   const { data: agencyProfiles } = await supabase
@@ -220,6 +226,35 @@ export async function getDashboardData(agencyId: string) {
     .map(([label, count]) => ({ label, count }))
     .sort((a,b) => b.count - a.count)
 
+  // 5. Evolución Mensual (Performance)
+  const monthlyStats: Record<string, any> = {};
+  const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  
+  // Initialize last 6 months
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    monthlyStats[key] = {
+      name: monthNames[d.getMonth()],
+      captaciones: 0,
+      transacciones: 0,
+      facturacion: 0
+    };
+  }
+
+  perfLogs?.forEach(l => {
+    const date = new Date(l.date);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    if (monthlyStats[key]) {
+      if (l.type === 'captacion') monthlyStats[key].captaciones++;
+      if (l.type === 'transaccion') monthlyStats[key].transacciones++;
+      monthlyStats[key].facturacion += Number(l.comision_generada) || 0;
+    }
+  });
+
+  const performanceEvolution = Object.values(monthlyStats);
+
   return {
     kpis: {
       newLeads: newLeadsCount || 0,
@@ -235,7 +270,8 @@ export async function getDashboardData(agencyId: string) {
     },
     charts: {
       channels: chartDataChannels,
-      pipeline: chartDataPipeline || []
+      pipeline: chartDataPipeline || [],
+      performanceEvolution
     },
     advisors,
     activity: recentActivity || []
