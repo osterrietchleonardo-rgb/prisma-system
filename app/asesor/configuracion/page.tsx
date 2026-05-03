@@ -25,7 +25,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
 
+import { useSearchParams } from "next/navigation"
+
 export default function AsesorConfiguracionPage() {
+  const searchParams = useSearchParams()
+  const defaultTab = searchParams.get('tab') || 'perfil'
+
   const [loading, setLoading] = useState(false)
   const [profile, setProfile] = useState<{ full_name: string; email: string; avatar_url: string; agency_name: string }>({
     full_name: "",
@@ -102,7 +107,7 @@ export default function AsesorConfiguracionPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="perfil" className="space-y-6">
+      <Tabs defaultValue={defaultTab} className="space-y-6">
         <TabsList className="bg-card border border-accent/10">
           <TabsTrigger value="perfil" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
             <User className="h-4 w-4" /> Perfil

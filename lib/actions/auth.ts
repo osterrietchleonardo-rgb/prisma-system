@@ -207,4 +207,5 @@ export async function signInWithGoogle(origin: string, role?: string, inviteCode
 export async function logout() {
   const supabase = createClient()
   await supabase.auth.signOut()
+  redirect("/auth/login")
 }

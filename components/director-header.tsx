@@ -41,6 +41,18 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole }: Di
     return () => window.removeEventListener('prisma-header-title', handleUpdateTitle)
   }, [])
 
+  // Keyboard shortcut for search
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setSearchOpen((open) => !open)
+      }
+    }
+    document.addEventListener("keydown", down)
+    return () => document.removeEventListener("keydown", down)
+  }, [])
+
   // Simple breadcrumb logic
   const segments = pathname.split('/').filter(Boolean)
   const lastSegment = segments[segments.length - 1] || 'Dashboard'
