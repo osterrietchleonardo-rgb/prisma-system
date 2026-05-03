@@ -72,7 +72,7 @@ export default async function DashboardPage({
   ])
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300 px-4 md:px-8 py-8">
+    <div id="dashboard-content" className="space-y-8 animate-in fade-in duration-300 px-4 md:px-8 py-8 bg-background">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-accent to-accent/60 bg-clip-text text-transparent">
