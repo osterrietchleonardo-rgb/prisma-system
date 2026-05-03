@@ -226,34 +226,57 @@ export async function getDashboardData(agencyId: string, agentId?: string) {
     .map(([label, count]) => ({ label, count }))
     .sort((a,b) => b.count - a.count)
 
-  // 5. Evolución Mensual (Performance)
+  // 5. Evolución Mensual (Performance & Rotación)
   const monthlyStats: Record<string, any> = {};
   const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   
-  // Initialize last 6 months
-  for (let i = 5; i >= 0; i--) {
+  // Reconstruct portfolio backwards
+  // Start with current total portfolio from advisorStats
+  let currentRunningInv = Object.values(advisorStats).reduce((acc: number, s: any) => acc + s.cartera_activa, 0);
+
+  // Initialize last 6 months in reverse order to reconstruct inventory
+  const months = [];
+  for (let i = 0; i < 6; i++) {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    monthlyStats[key] = {
-      name: monthNames[d.getMonth()],
-      captaciones: 0,
-      transacciones: 0,
-      facturacion: 0
-    };
+    months.push({ key, name: monthNames[d.getMonth()] });
   }
 
+  // Calculate monthly deltas first
+  const deltas: Record<string, { captaciones: number, transacciones: number, facturacion: number }> = {};
   perfLogs?.forEach(l => {
     const date = new Date(l.date);
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    if (monthlyStats[key]) {
-      if (l.type === 'captacion') monthlyStats[key].captaciones++;
-      if (l.type === 'transaccion') monthlyStats[key].transacciones++;
-      monthlyStats[key].facturacion += Number(l.comision_generada) || 0;
-    }
+    if (!deltas[key]) deltas[key] = { captaciones: 0, transacciones: 0, facturacion: 0 };
+    
+    if (l.type === 'captacion') deltas[key].captaciones++;
+    if (l.type === 'transaccion') deltas[key].transacciones++;
+    deltas[key].facturacion += Number(l.comision_generada) || 0;
   });
 
-  const performanceEvolution = Object.values(monthlyStats);
+  // Reconstruct and fill monthlyStats
+  const performanceEvolution = months.map(m => {
+    const d = deltas[m.key] || { captaciones: 0, transacciones: 0, facturacion: 0 };
+    
+    const invFinal = currentRunningInv;
+    // Cartera Inicial = Cartera Final - Captaciones + Ventas
+    const invInicial = Math.max(0, invFinal - d.captaciones + d.transacciones);
+    const invPromedio = (invInicial + invFinal) / 2;
+    const rotacion = invPromedio > 0 ? (d.transacciones / invPromedio) * 100 : 0;
+
+    // Update running inventory for the next (previous) month
+    currentRunningInv = invInicial;
+
+    return {
+      name: m.name,
+      captaciones: d.captaciones,
+      transacciones: d.transacciones,
+      facturacion: d.facturacion,
+      invPromedio: Number(invPromedio.toFixed(1)),
+      rotacion: Number(rotacion.toFixed(1))
+    };
+  }).reverse(); // Back to chronological order
 
   return {
     kpis: {
