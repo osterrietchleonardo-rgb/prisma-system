@@ -133,7 +133,10 @@ export default async function DashboardPage({
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         <div className="lg:col-span-7">
-          <DashboardActivity data={dashboardData.activity} />
+          <DashboardActivity 
+            data={dashboardData.activity} 
+            advisors={dashboardData.advisors.map(a => ({ id: a.id, name: a.name }))} 
+          />
         </div>
       </div>
     </div>

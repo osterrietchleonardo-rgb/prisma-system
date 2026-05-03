@@ -18,15 +18,16 @@ import {
   TrendingUp, 
   MessageSquare, 
   Activity,
-  DollarSign,
   Briefcase
 } from "lucide-react"
+import { AdvisorFilter } from "./dashboard/advisor-filter"
 
 interface DashboardActivityProps {
   data: any[]
+  advisors?: { id: string, name: string }[]
 }
 
-export function DashboardActivity({ data }: DashboardActivityProps) {
+export function DashboardActivity({ data, advisors = [] }: DashboardActivityProps) {
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'captacion':
@@ -69,7 +70,7 @@ export function DashboardActivity({ data }: DashboardActivityProps) {
   return (
     <Card className="border-accent/10 bg-card/40 backdrop-blur-md h-full shadow-xl shadow-black/20">
       <CardHeader className="pb-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle className="text-xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
               Movimientos Recientes
@@ -78,10 +79,23 @@ export function DashboardActivity({ data }: DashboardActivityProps) {
               Actividad concreta de tus asesores en tiempo real.
             </CardDescription>
           </div>
-          <div className="p-2 bg-accent/5 rounded-full border border-accent/10">
-            <Activity className="h-5 w-5 text-accent" />
+          <div className="flex items-center gap-3">
+            {advisors.length > 0 && (
+              <div className="hidden md:block">
+                <AdvisorFilter advisors={advisors} />
+              </div>
+            )}
+            <div className="p-2 bg-accent/5 rounded-full border border-accent/10">
+              <Activity className="h-5 w-5 text-accent" />
+            </div>
           </div>
         </div>
+        {/* Mobile Filter */}
+        {advisors.length > 0 && (
+          <div className="mt-4 md:hidden">
+            <AdvisorFilter advisors={advisors} />
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div className="space-y-5">
