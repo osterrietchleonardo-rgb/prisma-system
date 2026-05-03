@@ -23,14 +23,12 @@ import {
 } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import dynamic from "next/dynamic"
-import { Skeleton } from "@/components/ui/skeleton"
 import { createClient } from "@/lib/supabase/server"
 import { getDashboardData } from "@/lib/queries/dashboard"
 import { getPropertiesDashboardData } from "@/lib/queries/properties-dashboard"
 import { redirect } from "next/navigation"
 import { DashboardLeadsSection } from "./components/DashboardLeadsSection"
 import { DashboardPropertiesSection } from "./components/DashboardPropertiesSection"
-import { TrackingSection } from "@/components/tracking/TrackingSection"
 
 const DashboardCharts = dynamic(() => import("@/components/dashboard-charts").then(m => m.DashboardCharts), {
   ssr: false,
@@ -86,7 +84,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <TrackingSection isDirector={true} />
       
       {/* Filters Bar */}
       <div className="flex flex-col gap-4 p-4 rounded-xl border border-accent/10 bg-card/30 backdrop-blur-sm sm:flex-row sm:items-center">

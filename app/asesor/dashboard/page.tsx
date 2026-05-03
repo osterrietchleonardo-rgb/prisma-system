@@ -26,7 +26,6 @@ import Link from "next/link"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import dynamic from "next/dynamic"
-import { TrackingSection } from "@/components/tracking/TrackingSection"
 
 const EvolutionChart = dynamic(() => import("@/components/asesor-charts").then(m => m.EvolutionChart), {
   ssr: false,
@@ -89,7 +88,6 @@ export default function AsesorDashboard() {
         </p>
       </div>
 
-      <TrackingSection isDirector={false} />
 
       <div className="grid gap-8 md:grid-cols-7">
         {/* Evolution Chart */}
