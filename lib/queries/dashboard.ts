@@ -3,12 +3,105 @@ import { createClient } from "@/lib/supabase/server"
 export async function getDashboardData(agencyId: string) {
   const supabase = createClient()
   
-  // 1. KPIs
+  // 1. KPIs Base (from leads/closings/valuations)
   const { count: newLeadsCount } = await supabase
     .from("leads")
     .select("*", { count: 'exact', head: true })
     .eq("agency_id", agencyId)
     .eq("status", "nuevo")
+
+  // 1.1. Performance Metrics & Classification
+  const { data: agency } = await supabase
+    .from("agencies")
+    .select("performance_config")
+    .eq("id", agencyId)
+    .single();
+
+    .eq("agency_id", agencyId);
+
+  // 1.2. Get all advisors/profiles for this agency to link properties
+  const { data: agencyProfiles } = await supabase
+    .from("profiles")
+    .select("id, email, full_name")
+    .eq("agency_id", agencyId);
+
+  // 1.3. Get active properties count per advisor email
+  const { data: properties } = await supabase
+    .from("properties")
+    .select("assigned_agent")
+    .eq("agency_id", agencyId)
+    .eq("status", "Active");
+
+  const inventoryPerEmail: Record<string, number> = {};
+  properties?.forEach(p => {
+    const email = (p.assigned_agent as any)?.email;
+    if (email) {
+      inventoryPerEmail[email] = (inventoryPerEmail[email] || 0) + 1;
+    }
+  });
+
+  // Group stats by agent
+  const advisorStats: Record<string, any> = {};
+  
+  // Initialize with all agency profiles
+  agencyProfiles?.forEach(p => {
+    advisorStats[p.id] = {
+      id: p.id,
+      name: p.full_name || "Asesor Sin Nombre",
+      email: p.email,
+      captaciones: 0,
+      transacciones: 0,
+      facturacion: 0,
+      cartera_activa: inventoryPerEmail[p.email || ""] || 0,
+      rotacion: 0
+    };
+  });
+
+  perfLogs?.forEach(l => {
+    const agentId = l.agent_id;
+    if (advisorStats[agentId]) {
+      if (l.type === 'captacion') advisorStats[agentId].captaciones++;
+      if (l.type === 'transaccion') advisorStats[agentId].transacciones++;
+      advisorStats[agentId].facturacion += Number(l.comision_generada) || 0;
+    }
+  });
+
+  // Calculate rotation per advisor using the formula:
+  // Cartera Inicial = Cartera Final - Captaciones + Ventas
+  // Inventario Promedio = (Inicial + Final) / 2
+  // Rotación = (Ventas / Promedio) * 100
+  Object.values(advisorStats).forEach((s: any) => {
+    const finalInv = s.cartera_activa;
+    const initialInv = Math.max(0, finalInv - s.captaciones + s.transacciones);
+    const avgInv = (initialInv + finalInv) / 2;
+    
+    s.rotacion = avgInv > 0 ? (s.transacciones / avgInv) * 100 : 0;
+  });
+
+  // Calculate overall KPIs from logs
+  const captacionesCount = perfLogs?.filter(l => l.type === 'captacion').length || 0;
+  const transaccionesCount = perfLogs?.filter(l => l.type === 'transaccion').length || 0;
+  const totalFacturacion = perfLogs?.reduce((acc, l) => acc + (Number(l.comision_generada) || 0), 0) || 0;
+
+  // 1.2. Rotación de Cartera (Global)
+  const totalCaptaciones = Object.values(advisorStats).reduce((acc: number, s: any) => acc + s.captaciones, 0);
+  const totalTransacciones = Object.values(advisorStats).reduce((acc: number, s: any) => acc + s.transacciones, 0);
+  const totalFinalInv = Object.values(advisorStats).reduce((acc: number, s: any) => acc + s.cartera_activa, 0);
+  const totalInitialInv = Math.max(0, totalFinalInv - totalCaptaciones + totalTransacciones);
+  const totalAvgInv = (totalInitialInv + totalFinalInv) / 2;
+  
+  const rotacionCartera = totalAvgInv > 0 ? (totalTransacciones / totalAvgInv) * 100 : 0;
+
+  // AI Classification per Advisor
+  const { classifyAdvisor } = await import("@/lib/tracking/performance-evaluator");
+  const advisors = await Promise.all(Object.values(advisorStats).map(async (stats: any) => {
+    const classification = await classifyAdvisor(stats, agency?.performance_config);
+    return {
+      ...stats,
+      classification: classification.category,
+      classificationReason: classification.reason
+    };
+  }));
 
   const { data: agencyLeads } = await supabase
     .from("leads")
@@ -29,13 +122,6 @@ export async function getDashboardData(agencyId: string) {
     .select("*", { count: 'exact', head: true })
     .eq("agency_id", agencyId)
 
-  const { data: closings } = await supabase
-    .from("closings")
-    .select("closing_price")
-    .eq("agency_id", agencyId)
-
-  const totalSalesVolume = closings?.reduce((acc, c) => acc + (Number(c.closing_price) || 0), 0) || 0
-
   // 2. Leads Data Processing (Sources, Operations, Types)
   const { data: allLeads } = await supabase
     .from("leads")
@@ -47,20 +133,17 @@ export async function getDashboardData(agencyId: string) {
   const typeCounts: Record<string, number> = {}
 
   allLeads?.forEach(lead => {
-    // 1. FUENTE (Logic matching Leads page)
     const sourceTag = lead.tokko_raw?.tags?.find((t: any) => t.group_name === "Origen de contacto")?.name 
       || lead.tokko_origin 
       || lead.source 
       || "Sin fuente";
     sourceCounts[sourceTag] = (sourceCounts[sourceTag] || 0) + 1;
 
-    // 2. OPERACIÓN
     const operation = lead.tokko_property_operation 
       || lead.tokko_raw?.tags?.find((t: any) => t.name === "Alquiler" || t.name === "Venta")?.name
       || "Búsqueda";
     operationCounts[operation] = (operationCounts[operation] || 0) + 1;
 
-    // 3. TIPO (Logic matching Leads page regex-like)
     const tags = lead.tokko_raw?.tags || [];
     let propertyType = lead.tokko_property_type;
     
@@ -139,7 +222,10 @@ export async function getDashboardData(agencyId: string) {
       newLeads: newLeadsCount || 0,
       pendingVisits: pendingVisitsCount || 0,
       valuations: valuationsCount || 0,
-      salesVolume: totalSalesVolume || 0,
+      captaciones: captacionesCount,
+      transacciones: transaccionesCount,
+      facturacion: totalFacturacion,
+      rotacion: rotacionCartera,
       sourceDistribution,
       operationDistribution,
       typeDistribution
@@ -148,7 +234,7 @@ export async function getDashboardData(agencyId: string) {
       channels: chartDataChannels,
       pipeline: chartDataPipeline || []
     },
+    advisors,
     activity: recentActivity || []
   }
 }
-

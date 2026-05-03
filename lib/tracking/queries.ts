@@ -1,47 +1,17 @@
 import { createClient } from "@/lib/supabase/client";
-import { Lead } from "./types";
+import { PerformanceLog } from "./types";
 
-export async function getLeads(): Promise<Lead[]> {
+export async function getPerformanceLogs(): Promise<PerformanceLog[]> {
   const supabase = createClient();
   const { data, error } = await supabase
-    .from("leads")
+    .from("performance_logs")
     .select("*")
-    .order("fecha_primer_contacto", { ascending: false });
+    .order("fecha_actividad", { ascending: false });
 
   if (error) {
-    console.error("Error fetching leads", error);
+    console.error("Error fetching performance logs", error);
     return [];
   }
-  return data as Lead[];
+  return data as PerformanceLog[];
 }
 
-export async function insertLead(payload: any): Promise<any> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("leads")
-    .insert([payload])
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error inserting lead:", error);
-    throw new Error(error.message);
-  }
-  return data;
-}
-
-export async function updateLead(id: string, payload: any): Promise<any> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("leads")
-    .update(payload)
-    .eq("id", id)
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error updating lead:", error);
-    throw new Error(error.message);
-  }
-  return data;
-}

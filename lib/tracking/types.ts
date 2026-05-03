@@ -34,75 +34,57 @@ export interface WAAnalysis {
   resumen: string;
 }
 
-export interface Lead extends WAMetrics, Partial<WAAnalysis> {
+export type ActivityType = 'captacion' | 'transaccion' | 'lead_seguimiento' | 'otro';
+
+export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
   id: string;
   created_at: string;
   updated_at: string;
-  user_id: string;
-  organization_id: string;
-
-  nombre_lead: string;
-  telefono: string | null;
-  canal_origen: "whatsapp" | "portal" | "referido" | "redes" | "llamada" | "presencial" | null;
-  fecha_primer_contacto: string;
-  estado: "activo" | "visita_agendada" | "en_negociacion" | "cerrado" | "perdido";
-  notas: string | null;
-
-  visita_realizada: boolean;
-  fecha_visita: string | null;
-  propuesta_enviada: boolean;
-  propiedad_ofrecida: string | null;
-
-  tipo_operacion: "venta" | "alquiler" | "temporal" | null;
-  precio_operacion: number | null;
+  agent_id: string;
+  agency_id: string;
+  
+  type: ActivityType;
+  nombre_cliente: string;
+  propiedad_ref: string | null;
+  monto_operacion: number | null;
   comision_generada: number | null;
-  dias_hasta_cierre: number | null;
-
-  wa_score_general?: number | null;
-  wa_resumen?: string | null;
-  wa_analisis_pendiente: boolean;
-  seguimiento_activo?: boolean;
+  fecha_actividad: string;
+  fecha_cierre: string | null;
+  
+  wa_metrics?: any;
+  wa_analysis?: any;
+  ai_rating: number | null;
+  ai_feedback: string | null;
 }
 
-export const leadFormSchema = z.object({
-  nombre_lead: z.string().min(1, "El nombre es requerido"),
-  telefono: z.string().optional(),
-  canal_origen: z.enum(["whatsapp", "portal", "referido", "redes", "llamada", "presencial"]).optional().nullable(),
-  fecha_primer_contacto: z.string(), // YYYY-MM-DD
-  estado: z.enum(["activo", "visita_agendada", "en_negociacion", "cerrado", "perdido"]),
-  notas: z.string().optional().nullable(),
-
-  visita_realizada: z.boolean().default(false),
-  fecha_visita: z.string().optional().nullable(),
-  propuesta_enviada: z.boolean().default(false),
-  propiedad_ofrecida: z.string().optional().nullable(),
-
-  tipo_operacion: z.enum(["venta", "alquiler", "temporal"]).optional().nullable(),
-  precio_operacion: z.number().optional().nullable(),
+export const performanceLogSchema = z.object({
+  type: z.enum(['captacion', 'transaccion', 'lead_seguimiento', 'otro']),
+  nombre_cliente: z.string().min(1, "El nombre del cliente es requerido"),
+  propiedad_ref: z.string().optional().nullable(),
+  monto_operacion: z.number().optional().nullable(),
   comision_generada: z.number().optional().nullable(),
-  
-  // Para mandar el JSON de wa metrics the API call
+  fecha_actividad: z.string(),
+  fecha_cierre: z.string().optional().nullable(),
+  // WhatsApp data
   waMetrics: z.any().optional(),
   waAnalysis: z.any().optional(),
-  wa_analisis_pendiente: z.boolean().optional(),
 });
 
-export type LeadFormData = z.infer<typeof leadFormSchema>;
+export type PerformanceLogFormData = z.infer<typeof performanceLogSchema>;
 
-export interface KPIData {
-  leadsCaptadosActual: number;
-  leadsCaptadosAnterior: number;
-  leadsCaptadosVar: number;
-
-  operacionesActual: number;
-  operacionesAnterior: number;
-  operacionesVar: number;
-
-  comisionActual: number;
-  comisionAnterior: number;
-  comisionVar: number;
-
-  scorePromedioActual: number;
-  scorePromedioAnterior: number;
-  scorePromedioVar: number;
+export interface PerformanceMetric {
+  target: number;
+  weight: number;
+  description: string;
 }
+
+export interface AgencyPerformanceConfig {
+  metrics: {
+    captacion: PerformanceMetric;
+    transaccion: PerformanceMetric;
+    facturacion: PerformanceMetric;
+    rotacion: PerformanceMetric;
+  };
+  custom_instructions?: string;
+}
+

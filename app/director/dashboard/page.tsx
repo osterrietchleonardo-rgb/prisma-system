@@ -1,4 +1,6 @@
 import { DashboardKpis } from "@/components/dashboard-kpis"
+import { PerformanceKpis } from "@/components/performance-kpis"
+import { PerformanceLeaderboard } from "@/components/performance-leaderboard"
 import { DashboardActivity } from "@/components/dashboard-activity"
 import { Button } from "@/components/ui/button"
 import { DashboardHeaderActions } from "@/components/dashboard-header-actions"
@@ -68,12 +70,20 @@ export default async function DashboardPage() {
     <div className="space-y-8 animate-in fade-in duration-300 px-4 md:px-8 py-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Dashboard Overview</h2>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">Performance Advisor</h2>
           <p className="text-xs md:text-sm text-muted-foreground">
-            Bienvenido al centro de control de tu inmobiliaria.
+            Métricas de actividad, captación y transacciones globales.
           </p>
         </div>
         <DashboardHeaderActions data={dashboardData} />
+      </div>
+
+      <PerformanceKpis data={dashboardData.kpis} />
+
+      <div className="grid gap-6 lg:grid-cols-7">
+        <div className="lg:col-span-7">
+          <PerformanceLeaderboard advisors={dashboardData.advisors} />
+        </div>
       </div>
 
       <TrackingSection isDirector={true} />
