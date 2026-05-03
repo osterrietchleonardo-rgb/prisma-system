@@ -198,20 +198,28 @@ export async function getDashboardData(agencyId: string, agentId?: string) {
     value: stageCounts[stage] || 0
   }))
 
-  // 4. Actividad Reciente
-  const { data: recentActivity } = await supabase
-    .from("lead_activities")
+  // 4. Actividad Reciente (Concrete Movements)
+  let activityQuery = supabase
+    .from("performance_logs")
     .select(`
       id,
-      activity_type,
-      description,
+      type,
+      nombre_cliente,
+      propiedad_ref,
+      comision_generada,
+      monto_operacion,
       created_at,
-      profiles:agent_id(full_name, avatar_url),
-      leads:lead_id(full_name)
+      profiles:agent_id(full_name, avatar_url)
     `)
-    .in("lead_id", leadIds)
+    .eq("agency_id", agencyId)
     .order("created_at", { ascending: false })
-    .limit(10)
+    .limit(10);
+
+  if (agentId) {
+    activityQuery = activityQuery.eq("agent_id", agentId);
+  }
+
+  const { data: recentActivity } = await activityQuery;
 
   // Get distributions sorted by count
   const sourceDistribution = Object.entries(sourceCounts)
