@@ -13,8 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { logout } from "@/lib/actions/auth"
-import { User, Settings, LogOut, Shield, ChevronDown, HelpCircle, Command } from "lucide-react"
-import { toast } from "sonner"
+import { Settings, LogOut, Shield, ChevronDown } from "lucide-react"
 
 interface UserNavProps {
   userName?: string
@@ -25,23 +24,6 @@ interface UserNavProps {
 export function UserNav({ userName, userEmail, userRole }: UserNavProps) {
   const initials = userName ? userName.split(" ").map(n => n[0]).join("").toUpperCase() : "U"
   const rolePath = userRole?.toLowerCase() === 'director' ? 'director' : 'asesor'
-
-  const showShortcuts = () => {
-    toast.info("Atajos de Teclado", {
-      description: (
-        <div className="flex flex-col gap-2 pt-2">
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-muted-foreground">Buscador Global</span>
-            <kbd className="px-1.5 py-0.5 bg-muted rounded border border-accent/20 font-mono text-[10px]">⌘ + K</kbd>
-          </div>
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-muted-foreground">Notificaciones</span>
-            <kbd className="px-1.5 py-0.5 bg-muted rounded border border-accent/20 font-mono text-[10px]">N</kbd>
-          </div>
-        </div>
-      )
-    })
-  }
 
   return (
     <DropdownMenu>
@@ -80,32 +62,12 @@ export function UserNav({ userName, userEmail, userRole }: UserNavProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-accent/10" />
         <DropdownMenuGroup className="p-1">
-          <Link href={`/${rolePath}/configuracion?tab=perfil`}>
-            <DropdownMenuItem className="gap-2 rounded-lg py-2 cursor-pointer focus:bg-accent/10 focus:text-accent transition-colors">
-              <User className="h-4 w-4" />
-              <span className="font-bold text-xs uppercase tracking-widest">Mi Perfil</span>
-            </DropdownMenuItem>
-          </Link>
           <Link href={`/${rolePath}/configuracion`}>
             <DropdownMenuItem className="gap-2 rounded-lg py-2 cursor-pointer focus:bg-accent/10 focus:text-accent transition-colors">
               <Settings className="h-4 w-4" />
               <span className="font-bold text-xs uppercase tracking-widest">Configuración</span>
             </DropdownMenuItem>
           </Link>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator className="bg-accent/10" />
-        <DropdownMenuGroup className="p-1">
-          <DropdownMenuItem 
-            className="gap-2 rounded-lg py-2 cursor-pointer focus:bg-accent/10 focus:text-accent transition-colors"
-            onClick={showShortcuts}
-          >
-            <Command className="h-4 w-4" />
-            <span className="font-bold text-xs uppercase tracking-widest">Atajos</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 rounded-lg py-2 cursor-pointer focus:bg-accent/10 focus:text-accent transition-colors">
-            <HelpCircle className="h-4 w-4" />
-            <span className="font-bold text-xs uppercase tracking-widest">Ayuda</span>
-          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator className="bg-accent/10" />
         <DropdownMenuItem 
