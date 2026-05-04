@@ -44,6 +44,7 @@ const navItems = [
   { name: "Tasaciones", href: "/asesor/tasaciones", icon: Calculator },
   { name: "Biblioteca", href: "/asesor/documentos", icon: BookOpen },
   { name: "Configuración", href: "/asesor/configuracion", icon: Settings },
+  { name: "Sugerencias", href: "/asesor/feedback", icon: MessageSquare },
 ]
 
 interface AsesorSidebarProps {

@@ -43,6 +43,7 @@ const navItems = [
   { name: "Tutor IA", href: "/director/tutor", icon: Sparkles },
   { name: "Consultor IA", href: "/director/consultor", icon: Sparkles },
   { name: "Configuración", href: "/director/configuracion", icon: Settings },
+  { name: "Sugerencias", href: "/director/feedback", icon: MessageSquare },
 ]
 
 interface DirectorSidebarProps {
