@@ -102,7 +102,7 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole }: Di
           
           <div className="flex items-center gap-3">
             <ModeToggle />
-            <UserNav userName={userName} userEmail={userEmail} />
+            <UserNav userName={userName} userEmail={userEmail} userRole={userRole} />
           </div>
         </div>
       </div>
