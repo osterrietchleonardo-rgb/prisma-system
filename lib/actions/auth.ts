@@ -19,151 +19,148 @@ const loginSchema = z.object({
   password: z.string().min(6, "Mínimo 6 caracteres"),
 })
 
-export async function register(rawData: z.infer<typeof registerSchema>) {
-  const data = registerSchema.parse(rawData)
-  const supabase = createClient()
-  const adminClient = createAdminClient()
+function getFriendlyErrorMessage(message: string): string {
+  if (message.includes("Invalid login credentials")) return "Email o contraseña incorrectos."
+  if (message.includes("Email not confirmed")) return "Debes confirmar tu email antes de ingresar. Revisa tu casilla de correo."
+  if (message.includes("already registered") || message.includes("already exists")) return "Este email ya se encuentra registrado."
+  if (message.includes("rate limit") || message.includes("too many requests")) return "Demasiados intentos. Por favor espera unos minutos."
+  if (message.includes("Password should be at least")) return "La contraseña debe tener al menos 6 caracteres."
+  if (message.includes("User not found")) return "No encontramos una cuenta con ese email."
   
-  // 1. Crear usuario con signUp para que Supabase maneje el envío del email de confirmación
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email: data.email,
-    password: data.password,
-    options: {
-      data: {
-        full_name: data.fullName,
-        role: data.role,
-      },
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
-    }
-  })
+  console.error("Auth Error:", message)
+  return "Ocurrió un problema. Por favor intenta de nuevo."
+}
 
-  if (authError) {
-    if (authError.message.includes("already registered") || authError.message.includes("already exists")) {
-       throw new Error("El usuario ya se encuentra registrado.")
-    } else {
-      throw new Error(`Error de autenticación: ${authError.message}`)
-    }
-  }
-
-  if (!authData.user) throw new Error("No se pudo crear el usuario")
-  const userId = authData.user.id
-
-  // --- Lógica de Creación de Perfil (Sin necesidad de tantos reintentos ahora) ---
-  const { error: profileError } = await adminClient
-    .from('profiles')
-    .upsert({
-      id: userId,
+export async function register(rawData: z.infer<typeof registerSchema>) {
+  try {
+    const data = registerSchema.parse(rawData)
+    const supabase = createClient()
+    const adminClient = createAdminClient()
+    
+    // 1. Crear usuario con signUp para que Supabase maneje el envío del email de confirmación
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email,
-      role: data.role,
-      full_name: data.fullName,
-    }, { onConflict: 'id' })
-
-  if (profileError) {
-      // Un último intento de espera solo por precaución física de la DB
-      await new Promise(res => setTimeout(res, 500))
-      const { error: retryProfile } = await adminClient
-        .from('profiles')
-        .upsert({
-          id: userId,
-          email: data.email,
-          role: data.role,
+      password: data.password,
+      options: {
+        data: {
           full_name: data.fullName,
-        }, { onConflict: 'id' })
-      if (retryProfile) throw new Error("Error perfil: " + retryProfile.message)
-  }
+          role: data.role,
+        },
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      }
+    })
 
-    // 2. Lógica específica por Rol
-  if (data.role === 'director') {
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+    if (authError) return { error: getFriendlyErrorMessage(authError.message) }
+    if (!authData.user) return { error: "No se pudo crear el usuario" }
     
-    // Crear Agencia
-    const { data: agency, error: agencyError } = await adminClient
-      .from('agencies')
-      .insert({
-        name: data.agencyName || 'Mi Inmobiliaria',
-        owner_id: userId,
-        invite_code: inviteCode, // Mantenemos por ahora para retrocompatibilidad
-      })
-      .select()
-      .single()
+    const userId = authData.user.id
 
-    if (agencyError) throw new Error("Error inmobiliaria: " + agencyError.message)
-
-    // Crear primera invitación oficial de un solo uso
-    await adminClient
-      .from('agency_invites')
-      .insert({
-        agency_id: agency.id,
-        code: inviteCode,
-        is_used: false
-      })
-
-    // Vincular perfil
-    const { error: linkError } = await adminClient
+    // Crear Perfil
+    const { error: profileError } = await adminClient
       .from('profiles')
-      .update({ agency_id: agency.id })
-      .eq('id', userId)
+      .upsert({
+        id: userId,
+        email: data.email,
+        role: data.role,
+        full_name: data.fullName,
+      }, { onConflict: 'id' })
 
-    if (linkError) throw new Error("Error vinculación: " + linkError.message)
-
-  } else {
-    // Asesor: Validar Código de Invitación de Un Solo Uso
-    if (!data.inviteCode) throw new Error("Inválido: Código obligatorio")
-
-    const { data: invite, error: findError } = await adminClient
-      .from('agency_invites')
-      .select('agency_id, is_used')
-      .eq('code', data.inviteCode)
-      .single()
-
-    if (findError || !invite) throw new Error("Código de invitación inexistente")
-    if (invite.is_used) throw new Error("Este código de invitación ya ha sido utilizado")
-
-    const { error: asesorLinkError } = await adminClient
-      .from('profiles')
-      .update({ agency_id: invite.agency_id, role: 'asesor', full_name: data.fullName })
-      .eq('id', userId)
-    
-    if (asesorLinkError) throw new Error("Error vinculación asesor: " + asesorLinkError.message)
-
-    // Marcar invitación como usada
-    await adminClient
-      .from('agency_invites')
-      .update({ 
-        is_used: true, 
-        used_at: new Date().toISOString(),
-        used_by: userId 
-      })
-      .eq('code', data.inviteCode)
-  }
-
-  // 4. Sincronizar metadatos de Auth (para que el JWT tenga el rol y agency_id de inmediato)
-  if (data.role === 'director' || (data.role === 'asesor')) {
-     await adminClient.auth.admin.updateUserById(userId, {
-        user_metadata: { 
+    if (profileError) {
+        await adminClient
+          .from('profiles')
+          .upsert({
+            id: userId,
+            email: data.email,
             role: data.role,
             full_name: data.fullName,
-            // Si es director, ya tenemos la agencia, podemos intentar pre-cargarla
-            // aunque el perfil sea el source of truth.
-        }
-     })
-  }
+          }, { onConflict: 'id' })
+    }
 
-  return { success: true, message: "Registro exitoso. Por favor revisá tu email para confirmar tu cuenta." }
+    if (data.role === 'director') {
+      const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
+      
+      const { data: agency, error: agencyError } = await adminClient
+        .from('agencies')
+        .insert({
+          name: data.agencyName || 'Mi Inmobiliaria',
+          owner_id: userId,
+          invite_code: inviteCode, 
+        })
+        .select()
+        .single()
+
+      if (agencyError) return { error: "Error al crear la agencia." }
+
+      await adminClient
+        .from('agency_invites')
+        .insert({
+          agency_id: agency.id,
+          code: inviteCode,
+          is_used: false
+        })
+
+      await adminClient
+        .from('profiles')
+        .update({ agency_id: agency.id })
+        .eq('id', userId)
+
+    } else {
+      if (!data.inviteCode) return { error: "Código de invitación obligatorio" }
+
+      const { data: invite, error: findError } = await adminClient
+        .from('agency_invites')
+        .select('agency_id, is_used')
+        .eq('code', data.inviteCode)
+        .single()
+
+      if (findError || !invite) return { error: "Código de invitación inexistente" }
+      if (invite.is_used) return { error: "Este código ya fue utilizado" }
+
+      const { error: asesorLinkError } = await adminClient
+        .from('profiles')
+        .update({ agency_id: invite.agency_id, role: 'asesor', full_name: data.fullName })
+        .eq('id', userId)
+      
+      if (asesorLinkError) return { error: "Error al vincular asesor." }
+
+      await adminClient
+        .from('agency_invites')
+        .update({ 
+          is_used: true, 
+          used_at: new Date().toISOString(),
+          used_by: userId 
+        })
+        .eq('code', data.inviteCode)
+    }
+
+    await adminClient.auth.admin.updateUserById(userId, {
+      user_metadata: { 
+          role: data.role,
+          full_name: data.fullName,
+      }
+    })
+
+    return { success: true, message: "Registro exitoso. Por favor revisá tu email para confirmar tu cuenta." }
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Error desconocido" }
+  }
 }
 
 export async function login(rawData: z.infer<typeof loginSchema>) {
-  const data = loginSchema.parse(rawData)
-  const supabase = createClient()
-  const { data: authData, error } = await supabase.auth.signInWithPassword({
-    email: data.email,
-    password: data.password,
-  })
+  try {
+    const data = loginSchema.parse(rawData)
+    const supabase = createClient()
+    const { data: authData, error } = await supabase.auth.signInWithPassword({
+      email: data.email,
+      password: data.password,
+    })
 
-  if (error) throw new Error(error.message)
-  
-  // Role based redirect happens in the component or middleware
-  return { user: authData.user }
+    if (error) return { error: getFriendlyErrorMessage(error.message) }
+    
+    return { user: authData.user }
+  } catch (err) {
+    return { error: "Error al iniciar sesión. Intenta de nuevo." }
+  }
 }
 
 export async function signInWithGoogle(origin: string, role?: string, inviteCode?: string, agencyName?: string) {
@@ -174,7 +171,6 @@ export async function signInWithGoogle(origin: string, role?: string, inviteCode
   if (inviteCode) queryParams.set('inviteCode', inviteCode)
   if (agencyName) queryParams.set('agencyName', agencyName)
   
-  // Prioridad: 1. Origin del browser, 2. Env Var de Vercel, 3. URL Hardcoded oficial
   const baseOrigin = origin || process.env.APP_URL || 'https://prisma.vakdor.com'
   const redirectTo = `${baseOrigin}/auth/callback${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
 
@@ -182,7 +178,7 @@ export async function signInWithGoogle(origin: string, role?: string, inviteCode
     provider: 'google',
     options: {
       redirectTo,
-      skipBrowserRedirect: true, // Crucial para Server Actions
+      skipBrowserRedirect: true,
     }
   })
 
@@ -199,21 +195,30 @@ export async function logout() {
 }
 
 export async function resetPassword(email: string) {
-  const supabase = createClient()
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/auth/reset-password`,
-  })
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/auth/reset-password`,
+    })
 
-  if (error) throw new Error(error.message)
-  return { success: true }
+    if (error) return { error: getFriendlyErrorMessage(error.message) }
+    return { success: true }
+  } catch (err) {
+    return { error: "Error al enviar el correo de recuperación." }
+  }
 }
 
 export async function updatePassword(password: string) {
-  const supabase = createClient()
-  const { error } = await supabase.auth.updateUser({
-    password: password
-  })
+  try {
+    const supabase = createClient()
+    const { error } = await supabase.auth.updateUser({
+      password: password
+    })
 
-  if (error) throw new Error(error.message)
-  return { success: true }
+    if (error) return { error: getFriendlyErrorMessage(error.message) }
+    return { success: true }
+  } catch (err) {
+    return { error: "Error al actualizar la contraseña." }
+  }
 }
+

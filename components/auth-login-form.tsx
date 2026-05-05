@@ -25,7 +25,15 @@ export default function LoginForm() {
     const password = formData.get("password") as string
 
     try {
-      const { user } = await login({ email, password })
+      const result = await login({ email, password })
+      
+      if (result.error) {
+        setError(result.error)
+        setLoading(false)
+        return
+      }
+
+      const { user } = result
       const role = user?.user_metadata?.role
 
       if (role === "director") {

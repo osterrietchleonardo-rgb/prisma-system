@@ -24,10 +24,14 @@ export default function ForgotPasswordPage() {
     const email = formData.get("email") as string
 
     try {
-      await resetPassword(email)
-      setSuccess(true)
+      const result = await resetPassword(email)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setSuccess(true)
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al enviar el email")
+      setError("Error al enviar el email. Intenta de nuevo.")
     } finally {
       setLoading(false)
     }

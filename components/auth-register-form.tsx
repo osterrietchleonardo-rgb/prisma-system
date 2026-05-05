@@ -42,17 +42,18 @@ export default function RegisterForm() {
         inviteCode: role === 'asesor' ? inviteCode : undefined,
       })
       
+      if (result.error) {
+        setError(result.error)
+        setLoading(false)
+        return
+      }
+
       if (result.success) {
-        // Mostramos el mensaje de confirmación
         setSuccess(true)
         return
       }
       
-      if (result.redirectTo) {
-        router.push(result.redirectTo)
-      } else {
-        router.push(role === 'director' ? '/director/dashboard' : '/asesor/dashboard')
-      }
+      router.push(role === 'director' ? '/director/dashboard' : '/asesor/dashboard')
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear cuenta")
