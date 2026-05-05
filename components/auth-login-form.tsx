@@ -60,7 +60,15 @@ export default function LoginForm() {
             <Input id="email" name="email" type="email" placeholder="nombre@ejemplo.com" required disabled={loading} className="bg-background/50" />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="password">Contraseña</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Contraseña</Label>
+              <Link
+                href="/auth/forgot-password"
+                className="text-xs text-accent hover:underline underline-offset-4"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
             <Input id="password" name="password" type="password" required disabled={loading} className="bg-background/50" />
           </div>
           {error && <p className="text-sm text-destructive font-medium">{error}</p>}

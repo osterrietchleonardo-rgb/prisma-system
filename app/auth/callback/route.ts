@@ -88,6 +88,11 @@ export async function GET(request: Request) {
       }
 
       // Final redirect
+      const next = searchParams.get('next')
+      if (next) {
+        return NextResponse.redirect(`${origin}${next}`)
+      }
+
       const { data: finalProfile } = await supabase
         .from('profiles')
         .select('role')

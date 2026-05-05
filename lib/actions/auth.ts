@@ -21,24 +21,25 @@ const loginSchema = z.object({
 
 export async function register(rawData: z.infer<typeof registerSchema>) {
   const data = registerSchema.parse(rawData)
+  const supabase = createClient()
   const adminClient = createAdminClient()
   
-  // 1. Crear usuario directamente vía Admin API
-  // Esto asegura que la fila en auth.users exista ANTES de cualquier operación SQL
-  const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
+  // 1. Crear usuario con signUp para que Supabase maneje el envío del email de confirmación
+  const { data: authData, error: authError } = await supabase.auth.signUp({
     email: data.email,
     password: data.password,
-    email_confirm: true, // Auto-confirmar para estas pruebas/registro inicial
-    user_metadata: {
-      full_name: data.fullName,
-      role: data.role,
+    options: {
+      data: {
+        full_name: data.fullName,
+        role: data.role,
+      },
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
     }
   })
 
-  // Si el usuario ya existe, intentamos recuperarlo o lanzamos error
   if (authError) {
     if (authError.message.includes("already registered") || authError.message.includes("already exists")) {
-       // Si el usuario ya existe en Auth, intentamos ver si tiene perfil
+       throw new Error("El usuario ya se encuentra registrado.")
     } else {
       throw new Error(`Error de autenticación: ${authError.message}`)
     }
@@ -148,20 +149,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
      })
   }
 
-  // 5. Iniciar sesión automáticamente para el cliente (browser)
-  const clientSupabase = createClient()
-  const { error: signInError } = await clientSupabase.auth.signInWithPassword({
-    email: data.email,
-    password: data.password,
-  })
-
-  if (signInError) {
-    console.error("Error al iniciar sesión tras registro:", signInError.message)
-  }
-
-  const redirectTo = data.role === 'director' ? '/director/dashboard' : '/asesor/dashboard'
-
-  return { success: true, redirectTo }
+  return { success: true, message: "Registro exitoso. Por favor revisá tu email para confirmar tu cuenta." }
 }
 
 export async function login(rawData: z.infer<typeof loginSchema>) {
@@ -208,4 +196,24 @@ export async function logout() {
   const supabase = createClient()
   await supabase.auth.signOut()
   redirect("/auth/login")
+}
+
+export async function resetPassword(email: string) {
+  const supabase = createClient()
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/auth/reset-password`,
+  })
+
+  if (error) throw new Error(error.message)
+  return { success: true }
+}
+
+export async function updatePassword(password: string) {
+  const supabase = createClient()
+  const { error } = await supabase.auth.updateUser({
+    password: password
+  })
+
+  if (error) throw new Error(error.message)
+  return { success: true }
 }

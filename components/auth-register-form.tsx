@@ -42,6 +42,12 @@ export default function RegisterForm() {
         inviteCode: role === 'asesor' ? inviteCode : undefined,
       })
       
+      if (result.success) {
+        // Mostramos el mensaje de confirmación
+        setSuccess(true)
+        return
+      }
+      
       if (result.redirectTo) {
         router.push(result.redirectTo)
       } else {
@@ -53,6 +59,30 @@ export default function RegisterForm() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const [success, setSuccess] = useState(false)
+
+  if (success) {
+    return (
+      <Card className="w-full max-w-lg border-accent/20 bg-card/50 backdrop-blur-sm">
+        <CardHeader className="space-y-1 items-center text-center">
+          <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center mb-4">
+            <Info className="w-8 h-8" />
+          </div>
+          <CardTitle className="text-2xl font-bold tracking-tight text-white">¡Revisá tu email!</CardTitle>
+          <CardDescription className="text-neutral-300 text-lg mt-2">
+            Hemos enviado un enlace de confirmación a tu casilla de correo. 
+            Confirmá tu email para activar tu cuenta en PRISMA IA.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="text-center pb-8">
+          <Button asChild className="bg-accent hover:bg-accent/90 px-8">
+            <Link href="/auth/login">Volver al inicio</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
