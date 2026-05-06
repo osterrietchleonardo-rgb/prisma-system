@@ -250,7 +250,7 @@ export default function LandingPage() {
                   <div className="absolute inset-0 bg-gradient-to-tr from-accent/20 to-transparent"></div>
                 </div>
                 {/* Decorative floating stats */}
-                <div className="absolute -top-6 -right-6 p-6 glass rounded-2xl shadow-xl animate-bounce duration-[3000ms]">
+                <div className="absolute -top-6 -right-6 p-6 glass rounded-2xl shadow-xl animate-bounce [animation-duration:3000ms]">
                   <TrendingUp className="text-accent w-8 h-8 mb-2" />
                   <div className="text-2xl font-black">+32%</div>
                   <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Conversión</div>
