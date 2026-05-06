@@ -10,16 +10,44 @@ import {
   Phone, 
   MapPin,
   Send,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from "lucide-react";
+import { createBrowserClient } from "@/lib/supabase";
 
 export default function ContactPage() {
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submitted, setSubmitted] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSubmitted(true);
-    // In a real app, this would send data to an API
+    setIsSubmitting(true);
+    setError(null);
+
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get("name") as string;
+    const agency = formData.get("agency") as string;
+    const email = formData.get("email") as string;
+    const message = formData.get("message") as string;
+
+    try {
+      const supabase = createBrowserClient();
+      const { error: submitError } = await supabase
+        .from("contact_submissions")
+        .insert([
+          { name, agency, email, message }
+        ]);
+
+      if (submitError) throw submitError;
+      
+      setSubmitted(true);
+    } catch (err: any) {
+      console.error("Error submitting form:", err);
+      setError("Hubo un problema al enviar tu consulta. Por favor, reintentá o contactanos por WhatsApp.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -43,7 +71,7 @@ export default function ContactPage() {
                 <Mail className="w-5 h-5" />
               </div>
               <h3 className="font-bold">Escribinos</h3>
-              <p className="text-sm text-muted-foreground">hola@prisma-ia.com.ar</p>
+              <p className="text-sm text-muted-foreground">business@vakdor.com</p>
             </div>
 
             <div className="p-6 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm flex flex-col gap-3">
@@ -51,7 +79,7 @@ export default function ContactPage() {
                 <MessageSquare className="w-5 h-5" />
               </div>
               <h3 className="font-bold">WhatsApp VIP</h3>
-              <p className="text-sm text-muted-foreground">+54 11 1234-5678</p>
+              <p className="text-sm text-muted-foreground">+54 9 221 308-9334</p>
             </div>
 
             <div className="p-6 rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-sm flex flex-col gap-3">
@@ -102,27 +130,44 @@ export default function ContactPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="flex flex-col gap-2">
                       <label htmlFor="name" className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">Nombre Completo</label>
-                      <Input id="name" placeholder="Ej: Leonardo Osterrietch" className="bg-white/5 border-white/10 rounded-xl focus:border-accent/50" required />
+                      <Input id="name" name="name" placeholder="Ej: Leonardo Osterrietch" className="bg-white/5 border-white/10 rounded-xl focus:border-accent/50" required />
                     </div>
                     <div className="flex flex-col gap-2">
                       <label htmlFor="agency" className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">Agencia / Inmobiliaria</label>
-                      <Input id="agency" placeholder="Ej: Prisma Propiedades" className="bg-white/5 border-white/10 rounded-xl focus:border-accent/50" required />
+                      <Input id="agency" name="agency" placeholder="Ej: Prisma Propiedades" className="bg-white/5 border-white/10 rounded-xl focus:border-accent/50" required />
                     </div>
                   </div>
 
                   <div className="flex flex-col gap-2">
                     <label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">Email Profesional</label>
-                    <Input id="email" type="email" placeholder="leo@tuagencia.com" className="bg-white/5 border-white/10 rounded-xl focus:border-accent/50" required />
+                    <Input id="email" name="email" type="email" placeholder="leo@tuagencia.com" className="bg-white/5 border-white/10 rounded-xl focus:border-accent/50" required />
                   </div>
 
                   <div className="flex flex-col gap-2">
                     <label htmlFor="message" className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">¿Cómo podemos ayudarte?</label>
-                    <Textarea id="message" placeholder="Contanos sobre tu desafío actual..." className="bg-white/5 border-white/10 rounded-xl focus:border-accent/50 min-h-[120px]" required />
+                    <Textarea id="message" name="message" placeholder="Contanos sobre tu desafío actual..." className="bg-white/5 border-white/10 rounded-xl focus:border-accent/50 min-h-[120px]" required />
                   </div>
 
-                  <Button type="submit" className="w-full bg-accent hover:bg-accent/90 text-white h-14 rounded-xl font-black text-lg shadow-lg shadow-accent/20 group">
-                    Enviar Consulta
-                    <Send className="w-5 h-5 ml-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                  {error && (
+                    <p className="text-xs font-bold text-destructive animate-in fade-in zoom-in-95">{error}</p>
+                  )}
+
+                  <Button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="w-full bg-accent hover:bg-accent/90 text-white h-14 rounded-xl font-black text-lg shadow-lg shadow-accent/20 group"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        Enviar Consulta
+                        <Send className="w-5 h-5 ml-2 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                      </>
+                    )}
                   </Button>
                   
                   <p className="text-[10px] text-center text-muted-foreground uppercase tracking-widest opacity-50">

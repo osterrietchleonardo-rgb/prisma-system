@@ -87,7 +87,7 @@ export default function TermsPage() {
 
           <div className="p-8 rounded-3xl bg-accent/5 border border-accent/10 text-center flex flex-col gap-4">
             <h3 className="text-xl font-bold">Aceptación de Términos</h3>
-            <p className="text-muted-foreground">Al registrarte en PRISMA-SYSTEM, declarás haber leído y aceptado íntegramente estas condiciones.</p>
+            <p className="text-muted-foreground">Al registrarte en PRISMA-SYSTEM, declarás haber leído y aceptado íntegramente estas condiciones. Para consultas legales: business@vakdor.com</p>
           </div>
         </div>
       </div>

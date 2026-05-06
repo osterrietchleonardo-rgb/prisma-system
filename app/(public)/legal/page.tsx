@@ -94,7 +94,7 @@ export default function PrivacyPage() {
 
           <div className="p-8 rounded-3xl bg-accent/5 border border-accent/10 text-center flex flex-col gap-4">
             <h3 className="text-xl font-bold">¿Tenés dudas sobre tu privacidad?</h3>
-            <p className="text-muted-foreground">Escribinos a privacy@prisma-ia.com.ar y nuestro equipo legal te responderá a la brevedad.</p>
+            <p className="text-muted-foreground">Escribinos a business@vakdor.com y nuestro equipo legal te responderá a la brevedad.</p>
           </div>
         </div>
       </div>
