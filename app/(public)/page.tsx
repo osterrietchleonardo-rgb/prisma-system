@@ -37,7 +37,7 @@ export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-background selection:bg-accent/30">
       {/* HEADER FLOTANTE */}
-      <div className="sticky top-0 md:top-4 z-[100] px-0 md:px-6 w-full pointer-events-none">
+      <div className="fixed top-0 md:top-6 z-[100] px-0 md:px-6 w-full pointer-events-none">
         <header className="container mx-auto pointer-events-auto border-b md:border bg-background/95 md:bg-background/80 backdrop-blur-xl md:rounded-2xl shadow-lg md:shadow-accent/5 border-accent/10">
           <div className="flex h-16 items-center justify-between px-6">
             <Link href="/" className="hover:opacity-80 transition-opacity">
