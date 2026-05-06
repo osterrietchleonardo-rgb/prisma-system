@@ -22,13 +22,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import BrandLogo from "@/components/brand-logo";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { Menu } from "lucide-react";
 import Image from "next/image";
+import WhatsAppSimulation from "@/components/simulations/WhatsAppSimulation";
+import MarketPulseSimulation from "@/components/simulations/MarketPulseSimulation";
+import DashboardSimulation from "@/components/simulations/DashboardSimulation";
 
 export default function LandingPage() {
   return (
@@ -115,16 +113,10 @@ export default function LandingPage() {
               </Button>
             </div>
 
-            {/* Dashboard Mockup Visual */}
-            <div className="mt-16 md:mt-24 w-full max-w-6xl mx-auto rounded-2xl border border-accent/20 overflow-hidden shadow-2xl shadow-accent/10 relative animate-in fade-in zoom-in-95 duration-1000 delay-500">
+            {/* Dashboard Mockup Visual — Replaced with Simulation */}
+            <div className="mt-16 md:mt-24 w-full max-w-6xl mx-auto rounded-3xl border border-accent/20 overflow-hidden shadow-2xl shadow-accent/10 relative animate-in fade-in zoom-in-95 duration-1000 delay-500 bg-card/50 backdrop-blur-sm">
               <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-transparent z-10"></div>
-              <Image 
-                src="/prisma_director_dashboard_mockup_1778034969409.png" 
-                alt="Prisma Director Dashboard" 
-                width={1200} 
-                height={675}
-                className="w-full h-auto object-cover opacity-90"
-              />
+              <DashboardSimulation />
               <div className="absolute top-4 left-4 flex gap-1.5 z-20">
                 <div className="w-3 h-3 rounded-full bg-red-500/50"></div>
                 <div className="w-3 h-3 rounded-full bg-yellow-500/50"></div>
@@ -241,25 +233,20 @@ export default function LandingPage() {
 
               <div className="flex-1 relative w-full aspect-square md:aspect-video lg:aspect-square">
                 <div className="absolute inset-0 border border-accent/20 rounded-3xl overflow-hidden shadow-2xl bg-card">
-                  <Image 
-                    src="/prisma_director_dashboard_mockup_1778034969409.png" 
-                    alt="Prisma Analytics" 
-                    fill 
-                    className="object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-tr from-accent/20 to-transparent"></div>
+                  <MarketPulseSimulation />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-accent/10 to-transparent pointer-events-none"></div>
                 </div>
                 {/* Decorative floating stats */}
-                <div className="absolute -top-6 -right-6 p-6 glass rounded-2xl shadow-xl animate-bounce [animation-duration:3000ms]">
+                <div className="absolute -top-6 -right-6 p-6 glass rounded-2xl shadow-xl animate-bounce [animation-duration:3000ms] z-20">
                   <TrendingUp className="text-accent w-8 h-8 mb-2" />
-                  <div className="text-2xl font-black">+32%</div>
+                  <div className="text-2xl font-black text-foreground">+32%</div>
                   <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Conversión</div>
                 </div>
-                <div className="absolute -bottom-8 -left-8 p-6 glass rounded-2xl shadow-xl animate-pulse">
+                <div className="absolute -bottom-8 -left-8 p-6 glass rounded-2xl shadow-xl animate-pulse z-20">
                   <div className="flex items-center gap-3">
                     <Users className="text-accent w-6 h-6" />
                     <div>
-                      <div className="text-sm font-bold">Equipo Activo</div>
+                      <div className="text-sm font-bold text-foreground">Equipo Activo</div>
                       <div className="text-[10px] text-muted-foreground uppercase">12 Asesores Online</div>
                     </div>
                   </div>
@@ -305,16 +292,8 @@ export default function LandingPage() {
               </div>
 
               <div className="flex-1 w-full max-w-sm lg:max-w-md">
-                <div className="relative aspect-[9/16] border-[12px] border-foreground/10 rounded-[48px] overflow-hidden shadow-2xl bg-card">
-                  <Image 
-                    src="/prisma_ai_assistant_whatsapp_1778034987934.png" 
-                    alt="Prisma AI Mobile" 
-                    fill 
-                    className="object-cover"
-                  />
-                  <div className="absolute top-0 inset-x-0 h-10 bg-black/10 backdrop-blur-md flex items-center justify-center">
-                    <div className="w-20 h-4 bg-black/20 rounded-full"></div>
-                  </div>
+                <div className="relative aspect-[9/16] rounded-[3rem] overflow-hidden shadow-2xl bg-card">
+                  <WhatsAppSimulation />
                 </div>
               </div>
             </div>
@@ -346,8 +325,8 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* CTA FINAL */}
-        <section className="py-32 bg-foreground text-background relative overflow-hidden">
+        {/* CTA FINAL — HARDCODED DARK THEME FOR CONTRAST */}
+        <section className="py-32 bg-[#020617] text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-accent/20 rounded-full blur-[180px] -z-0 translate-x-1/2 -translate-y-1/2"></div>
           
           <div className="container relative z-10 flex flex-col items-center gap-12">
