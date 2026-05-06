@@ -1,4 +1,21 @@
-import { Menu, ArrowDownCircle, CheckCircle2, ShieldCheck, Zap } from "lucide-react";
+import { 
+  Menu, 
+  ArrowDownCircle, 
+  CheckCircle2, 
+  ShieldCheck, 
+  Zap, 
+  ChevronRight, 
+  AlertCircle, 
+  Target, 
+  Layers, 
+  TrendingUp, 
+  Brain, 
+  Users, 
+  Calendar,
+  MessageSquare
+} from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import WhatsAppSimulation from "@/components/simulations/WhatsAppSimulation";
 import MarketPulseSimulation from "@/components/simulations/MarketPulseSimulation";

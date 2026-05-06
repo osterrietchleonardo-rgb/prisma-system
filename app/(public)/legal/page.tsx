@@ -1,5 +1,4 @@
-import React from "react";
-import { Shield, Lock, Eye, FileText, Globe, UserCheck } from "lucide-react";
+import { Shield, Lock, Eye, FileText, Globe, UserCheck, MessageSquare } from "lucide-react";
 
 export default function PrivacyPage() {
   return (
