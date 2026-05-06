@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   Settings2, 
   Target, 
@@ -8,13 +8,16 @@ import {
   Sparkles, 
   Info,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  TrendingUp,
+  DollarSign
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { AgencyPerformanceConfig } from "@/lib/tracking/types";
 import { savePerformanceConfig } from "@/actions/tracking/savePerformanceConfig";
@@ -33,6 +36,12 @@ export function PerformanceScaleEditor({ initialConfig }: PerformanceScaleEditor
     },
     custom_instructions: ""
   });
+
+  useEffect(() => {
+    if (initialConfig) {
+      setConfig(initialConfig);
+    }
+  }, [initialConfig]);
 
   const [loading, setLoading] = useState(false);
 
@@ -116,7 +125,7 @@ export function PerformanceScaleEditor({ initialConfig }: PerformanceScaleEditor
 "Clasificá como 'Elite' si el asesor supera las 5 captaciones o $10,000 en facturación.
 Clasificá como 'Sólido' si tiene entre 2 y 4 captaciones.
 Si tiene 0 captaciones, marcalo como 'Requiere Atención'."`}
-                value={config.custom_instructions}
+                value={config.custom_instructions || ""}
                 onChange={(e) => setConfig(prev => ({ ...prev, custom_instructions: e.target.value }))}
                 className="min-h-[250px] bg-background/30 border-accent/10 focus:border-accent/30 transition-all text-sm leading-relaxed p-4 rounded-xl resize-none shadow-inner"
               />
