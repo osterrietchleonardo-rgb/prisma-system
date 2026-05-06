@@ -61,7 +61,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" suppressHydrationWarning className="scroll-smooth">
       <body className={`${jakarta.variable} ${outfit.variable} font-sans antialiased selection:bg-accent/20 selection:text-accent`}>
         <ThemeProvider
           attribute="class"

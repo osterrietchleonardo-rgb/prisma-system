@@ -36,49 +36,51 @@ import DashboardSimulation from "@/components/simulations/DashboardSimulation";
 export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-background selection:bg-accent/30">
-      {/* HEADER */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md">
-        <div className="container flex h-16 items-center justify-between px-4">
-          <Link href="/">
-            <BrandLogo />
-          </Link>
-          
-          <nav className="hidden md:flex gap-8 text-sm font-medium text-muted-foreground">
-            <Link href="#director" className="hover:text-foreground transition-colors">Directores</Link>
-            <Link href="#asesor" className="hover:text-foreground transition-colors">Asesores</Link>
-            <Link href="#metricas" className="hover:text-foreground transition-colors">Resultados</Link>
-          </nav>
-          
-          <div className="flex items-center gap-2 md:gap-4">
-            <ModeToggle />
-            <div className="hidden sm:flex items-center gap-4">
-              <Link href="/auth/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Ingresar</Link>
-              <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-white border-0 px-6">
-                <Link href="/auth/register">Prueba Gratis</Link>
-              </Button>
-            </div>
+      {/* HEADER FLOTANTE */}
+      <div className="sticky top-0 md:top-4 z-[100] px-0 md:px-6 w-full pointer-events-none">
+        <header className="container mx-auto pointer-events-auto border-b md:border bg-background/95 md:bg-background/80 backdrop-blur-xl md:rounded-2xl shadow-lg md:shadow-accent/5 border-accent/10">
+          <div className="flex h-16 items-center justify-between px-6">
+            <Link href="/" className="hover:opacity-80 transition-opacity">
+              <BrandLogo />
+            </Link>
             
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Menu</span>
+            <nav className="hidden md:flex gap-10 text-sm font-bold text-muted-foreground uppercase tracking-widest">
+              <Link href="#director" className="hover:text-accent transition-colors">Directores</Link>
+              <Link href="#asesor" className="hover:text-accent transition-colors">Asesores</Link>
+              <Link href="#metricas" className="hover:text-accent transition-colors">Resultados</Link>
+            </nav>
+            
+            <div className="flex items-center gap-2 md:gap-4">
+              <ModeToggle />
+              <div className="hidden sm:flex items-center gap-6">
+                <Link href="/auth/login" className="text-sm font-bold text-muted-foreground hover:text-accent transition-colors uppercase tracking-widest">Ingresar</Link>
+                <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-white border-0 px-8 rounded-full font-black uppercase tracking-tighter">
+                  <Link href="/auth/register">Prueba Gratis</Link>
                 </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="flex flex-col gap-8 pt-12">
-                <div className="flex flex-col gap-4 text-lg font-medium">
-                  <Link href="#director" className="hover:text-accent transition-colors">Directores</Link>
-                  <Link href="#asesor" className="hover:text-accent transition-colors">Asesores</Link>
-                  <Link href="#metricas" className="hover:text-accent transition-colors">Resultados</Link>
-                  <hr className="border-accent/10" />
-                  <Link href="/auth/login" className="hover:text-accent transition-colors">Ingresar</Link>
-                  <Link href="/auth/register" className="text-accent underline underline-offset-4">Empezar gratis</Link>
-                </div>
-              </SheetContent>
-            </Sheet>
+              </div>
+              
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="md:hidden text-accent">
+                    <Menu className="h-6 w-6" />
+                    <span className="sr-only">Menu</span>
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="flex flex-col gap-8 pt-16 bg-background/98 backdrop-blur-xl border-accent/20">
+                  <div className="flex flex-col gap-6 text-xl font-black uppercase tracking-tighter">
+                    <Link href="#director" className="hover:text-accent transition-colors">Directores</Link>
+                    <Link href="#asesor" className="hover:text-accent transition-colors">Asesores</Link>
+                    <Link href="#metricas" className="hover:text-accent transition-colors">Resultados</Link>
+                    <hr className="border-accent/20" />
+                    <Link href="/auth/login" className="hover:text-accent transition-colors">Ingresar</Link>
+                    <Link href="/auth/register" className="text-accent underline underline-offset-8">Empezar gratis</Link>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      </div>
 
       <main className="flex-1">
         {/* HERO */}
