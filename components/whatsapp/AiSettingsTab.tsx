@@ -4,9 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { 
   Bot, 
-  User, 
   Settings2, 
-  Save, 
   Clock, 
   MapPin, 
   Globe, 
@@ -40,17 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useRouter } from "next/navigation"
 import { removeInstance } from "@/app/actions/whatsapp"
 
@@ -77,14 +65,11 @@ interface AiSetting {
 }
 
 export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
-  const [agents, setAgents] = useState<any[]>([])
-  const [tokkoAgents, setTokkoAgents] = useState<any[]>([])
   const [settings, setSettings] = useState<AiSetting[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [selectedSetting, setSelectedSetting] = useState<AiSetting | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [search, setSearch] = useState("")
   const [uploading, setUploading] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
 
@@ -94,32 +79,21 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      // Load agency profiles (PRISMA users)
-      const { data: agentsData, error: agentsError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('agency_id', instance.agency_id)
-      
-      if (agentsError) throw agentsError
-      setAgents(agentsData || [])
-
-      // Load Tokko agents
-      const { data: tokkoData, error: tokkoError } = await supabase
-        .from('tokko_agents')
-        .select('*')
-        .eq('agency_id', instance.agency_id)
-      
-      if (tokkoError) throw tokkoError
-      setTokkoAgents(tokkoData || [])
-
-      // Load AI settings
+      // Load only the global AI settings (agent_id is null)
       const { data: settingsData, error: settingsError } = await supabase
         .from('whatsapp_ai_settings')
         .select('*')
         .eq('agency_id', instance.agency_id)
+        .is('agent_id', null)
+        .maybeSingle()
       
       if (settingsError) throw settingsError
-      setSettings(settingsData || [])
+      
+      if (settingsData) {
+        setSettings([settingsData])
+      } else {
+        setSettings([])
+      }
     } catch (err: any) {
       toast.error("Error al cargar configuración: " + err.message)
     } finally {
@@ -131,90 +105,25 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
     loadData()
   }, [loadData])
 
-  // Merge PRISMA profiles and Tokko agents for display
-  const combinedAgentsList = (() => {
-    const list: any[] = []
-    
-    // Add Tokko agents as base
-    tokkoAgents.forEach(ta => {
-      // Find matching PRISMA profile
-      const profile = agents.find(p => p.email?.toLowerCase() === ta.email?.toLowerCase())
-      list.push({
-        id: profile?.id || null,
-        tokko_id: ta.tokko_id,
-        full_name: ta.full_name,
-        email: ta.email,
-        avatar_url: ta.avatar_url,
-        is_prisma_user: !!profile,
-        source: 'Tokko'
-      })
-    })
-
-    // Add PRISMA profiles that don't match any Tokko agent
-    agents.forEach(p => {
-      if (!tokkoAgents.some(ta => ta.email?.toLowerCase() === p.email?.toLowerCase())) {
-        list.push({
-          id: p.id,
-          tokko_id: null,
-          full_name: p.full_name,
-          email: p.email,
-          avatar_url: p.avatar_url,
-          is_prisma_user: true,
-          source: 'PRISMA'
-        })
-      }
-    })
-
-    return list
-  })()
-
-  const getAgentSetting = (agentId: string | null, tokkoId?: string | null) => {
-    // Try to find by profile ID first
-    if (agentId) {
-      const s = settings.find(s => s.agent_id === agentId)
-      if (s) return s
-    }
-    // Then try by Tokko ID
-    if (tokkoId) {
-      const s = settings.find(s => s.tokko_agent_id === tokkoId)
-      if (s) return s
-    }
-    
-    // Default fallback
-    return {
-      agency_id: instance.agency_id,
-      agent_id: agentId || null,
-      tokko_agent_id: tokkoId || null,
-      bot_name: "Valentina",
-      company_name: "",
-      language: "Español rioplatense",
-      tone: "Cálido, profesional y cercano",
-      personality: "Empática, directa, entusiasta pero sin presionar",
-      geographic_zone: "CABA y GBA Norte, Argentina",
-      currency: "USD",
-      working_hours: "Lunes a Sábado 9–19 h",
-      property_types: "departamentos, casas, PH, locales comerciales",
-      min_anticipation_hours: 4,
-      cancelation_deadline_hours: 2,
-    }
+  const agencySetting = settings[0] || {
+    agency_id: instance.agency_id,
+    agent_id: null,
+    tokko_agent_id: null,
+    bot_name: "Valentina",
+    company_name: "",
+    language: "Español rioplatense",
+    tone: "Cálido, profesional y cercano",
+    personality: "Empática, directa, entusiasta pero sin presionar",
+    geographic_zone: "CABA y GBA Norte, Argentina",
+    currency: "USD",
+    working_hours: "Lunes a Sábado 9–19 h",
+    property_types: "departamentos, casas, PH, locales comerciales",
+    min_anticipation_hours: 4,
+    cancelation_deadline_hours: 2,
   }
 
-  const handleEdit = (agentData: any | null) => {
-    const setting = agentData === null 
-      ? getAgentSetting(null) 
-      : getAgentSetting(agentData.id, agentData.tokko_id)
-
-    if (!setting.id && agentData !== null) {
-      const agencyDefault = getAgentSetting(null)
-      setSelectedSetting({
-        ...agencyDefault,
-        id: undefined,
-        agent_id: agentData.id,
-        tokko_agent_id: agentData.tokko_id
-      })
-    } else {
-      setSelectedSetting(setting)
-    }
+  const handleEdit = () => {
+    setSelectedSetting(agencySetting)
     setIsModalOpen(true)
   }
 
@@ -328,12 +237,7 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
     }
   }
 
-  const filteredAgents = combinedAgentsList.filter(a => 
-    a.full_name?.toLowerCase().includes(search.toLowerCase()) || 
-    a.email?.toLowerCase().includes(search.toLowerCase())
-  )
 
-  const agencySetting = getAgentSetting(null)
 
   return (
     <div className="flex flex-col gap-8 pb-12">
@@ -359,149 +263,126 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Summary Card */}
-        <Card className="lg:col-span-1 border-accent/10 bg-accent/5 backdrop-blur-sm shadow-xl">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-accent" />
-              Estado Global
-            </CardTitle>
-            <CardDescription>Resumen de la configuración por defecto de la inmobiliaria.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Nombre del Bot:</span>
-                <span className="font-bold text-accent">{agencySetting.bot_name}</span>
+      <div className="grid grid-cols-1 gap-8">
+        {/* Main Configuration Card */}
+        <Card className="border-accent/10 shadow-xl overflow-hidden">
+          <div className="bg-accent/5 border-b border-accent/10 p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center text-accent shadow-inner">
+                  <Bot className="w-10 h-10" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold flex items-center gap-2">
+                    {agencySetting.bot_name || "Valentina"}
+                    <Badge className="bg-accent/20 text-accent border-none text-[10px] uppercase tracking-wider">Bot Oficial</Badge>
+                  </h3>
+                  <p className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
+                    <Building2 className="w-4 h-4" />
+                    Configuración única para toda la inmobiliaria
+                  </p>
+                </div>
               </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Tono:</span>
-                <Badge variant="outline" className="border-accent/20 text-accent bg-accent/5">{agencySetting.tone}</Badge>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Moneda:</span>
-                <span className="font-medium">{agencySetting.currency}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-muted-foreground">Horario:</span>
-                <span className="text-xs">{agencySetting.working_hours}</span>
-              </div>
+              <Button 
+                size="lg" 
+                className="bg-accent hover:bg-accent/90 shadow-lg shadow-accent/20 gap-2 px-8" 
+                onClick={() => handleEdit(null)}
+              >
+                <Settings2 className="w-5 h-5" />
+                Configurar Identidad y Reglas
+              </Button>
             </div>
-            
-            <div className="pt-4 border-t border-accent/10">
-              <h4 className="text-xs font-bold uppercase text-muted-foreground mb-3 tracking-wider text-center">Prompt para n8n</h4>
-              <div className="bg-black/80 rounded-lg p-3 text-[10px] font-mono text-green-400 overflow-hidden line-clamp-6 opacity-80">
-                # ZONA DE CONFIGURACIÓN<br/>
-                NOMBRE_INMOBILIARIA = "{agencySetting.company_name}"<br/>
-                NOMBRE_AGENTE_IA = "{agencySetting.bot_name}"<br/>
-                TONO = "{agencySetting.tone}"<br/>
-                ZONA = "{agencySetting.geographic_zone}"
-              </div>
-              <p className="text-[10px] text-center text-muted-foreground mt-2 italic">
-                Usa el nodo Postgres de n8n para inyectar estos valores dinámicamente.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Advisors Table */}
-        <Card className="lg:col-span-2 border-accent/10 shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <CardTitle className="text-lg">Configuración por Asesor</CardTitle>
-              <CardDescription>Personaliza el bot para cada miembro del equipo.</CardDescription>
-            </div>
-            <div className="relative w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar asesor..."
-                className="pl-9 h-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-2">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+          <CardContent className="p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-accent font-semibold text-sm uppercase tracking-wider">
+                  <Sparkles className="w-4 h-4" />
+                  Personalidad
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase">Tono</Label>
+                    <p className="text-sm font-medium">{agencySetting.tone}</p>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase">Identidad</Label>
+                    <p className="text-sm text-muted-foreground line-clamp-3 italic">"{agencySetting.personality}"</p>
+                  </div>
+                </div>
               </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-accent/10">
-                    <TableHead className="w-[200px]">Asesor</TableHead>
-                    <TableHead>Bot Name</TableHead>
-                    <TableHead>Identidad</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow className="bg-accent/5 font-medium border-accent/20">
-                    <TableCell className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white">
-                        <Building2 className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold">Global / Por Defecto</p>
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Inmobiliaria</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{agencySetting.bot_name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="bg-background text-[10px]">{agencySetting.personality.substring(0, 20)}...</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" className="text-accent hover:text-accent hover:bg-accent/10" onClick={() => handleEdit(null)}>
-                        Configurar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                  {filteredAgents.map((agent) => {
-                    const agentSetting = getAgentSetting(agent.id, agent.tokko_id)
-                    const hasCustomSetting = !!agentSetting.id
-                    return (
-                      <TableRow key={agent.id || agent.tokko_id} className="group border-accent/5">
-                        <TableCell className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={agent.avatar_url} />
-                            <AvatarFallback className="text-[10px]">{agent.full_name?.substring(0, 2).toUpperCase()}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium">{agent.full_name}</p>
-                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-muted/30">
-                                {agent.source}
-                              </Badge>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground">{agent.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {hasCustomSetting ? <span className="text-accent font-medium">{agentSetting.bot_name}</span> : <span className="text-muted-foreground italic text-xs">Global</span>}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                             <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                               <Sparkles className="w-3 h-3" /> {agentSetting.tone}
-                             </div>
-                             <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-mono italic">
-                               <User className="w-3 h-3" /> Asesor: {agentSetting.human_advisor_name || agent.full_name}
-                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" className="group-hover:bg-accent/5 group-hover:text-accent transition-all" onClick={() => handleEdit(agent)}>
-                            {hasCustomSetting ? "Editar" : "Personalizar"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            )}
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-accent font-semibold text-sm uppercase tracking-wider">
+                  <Calendar className="w-4 h-4" />
+                  Operación
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase">Horarios</Label>
+                    <p className="text-sm font-medium">{agencySetting.working_hours}</p>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase">Zona</Label>
+                    <p className="text-sm font-medium">{agencySetting.geographic_zone}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-accent font-semibold text-sm uppercase tracking-wider">
+                  <Globe className="w-4 h-4" />
+                  Negocio
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase">Moneda</Label>
+                    <p className="text-sm font-medium font-mono">{agencySetting.currency}</p>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase">Tipos de Propiedad</Label>
+                    <p className="text-sm font-medium">{agencySetting.property_types}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-accent font-semibold text-sm uppercase tracking-wider">
+                  <FileText className="w-4 h-4" />
+                  Conocimiento
+                </div>
+                <div className="bg-accent/5 rounded-xl p-4 border border-accent/10">
+                  {agencySetting.knowledge_text ? (
+                    <div className="flex items-center gap-2 text-green-500 font-medium text-sm">
+                      <CheckCircle2 className="w-4 h-4" /> 
+                      <span>Cargado (RAG Activo)</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm italic">
+                      <Info className="w-4 h-4" />
+                      <span>Sin base de datos</span>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-muted-foreground mt-2 leading-tight">
+                    El bot utiliza esta información para responder preguntas específicas sobre la empresa.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-10 pt-8 border-t border-accent/5">
+              <div className="flex items-start gap-4 p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10 max-w-2xl">
+                <Info className="w-6 h-6 text-blue-400 shrink-0 mt-1" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-blue-200">Consistencia de Marca Garantizada</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Esta configuración se aplica automáticamente a todos los asesores (Tokko y PRISMA). No es necesario configurar uno por uno. 
+                    Cualquier cambio realizado aquí se reflejará instantáneamente en todas las conversaciones de WhatsApp.
+                  </p>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -545,7 +426,7 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
               <Settings2 className="w-6 h-6 text-accent" />
-              Configuración de {selectedSetting?.agent_id ? "Asesor Individual" : "General Inmobiliaria"}
+              Configuración Global del Chatbot
             </DialogTitle>
             <DialogDescription>
               Completa todos los detalles para que la IA tenga el contexto correcto en WhatsApp.
