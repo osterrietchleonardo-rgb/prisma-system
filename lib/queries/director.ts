@@ -93,7 +93,6 @@ export async function getAgencyWaLeads(agencyId: string) {
       score,
       etiquetas,
       created_at,
-      updated_at,
       last_message_at,
       agent_id,
       assigned_agent:profiles!wa_conversations_agent_id_fkey(id, full_name, avatar_url)
@@ -115,7 +114,7 @@ export async function getAgencyWaLeads(agencyId: string) {
     notes: undefined,
     assigned_agent_id: conv.agent_id || undefined,
     created_at: conv.created_at,
-    updated_at: conv.updated_at || conv.last_message_at || conv.created_at,
+    updated_at: conv.last_message_at || conv.created_at,
     // WhatsApp-specific: estos campos de Tokko van vacíos
     tokko_property_title: undefined,
     tokko_property_price: undefined,

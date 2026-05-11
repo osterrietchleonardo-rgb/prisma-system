@@ -24,7 +24,7 @@ import { KanbanColumn } from "./kanban-column"
 import { KanbanCard } from "./kanban-card"
 import { Lead, KanbanStage, KANBAN_STAGES } from "./types"
 import { createPortal } from "react-dom"
-import { updateLeadStage } from "@/lib/queries/director"
+import { updateLeadStage, updateWaConversationStage } from "@/lib/queries/director"
 import { toast } from "sonner"
 
 interface KanbanBoardProps {
@@ -122,7 +122,12 @@ export function KanbanBoard({ initialLeads, onCardClick, detailsUrl = "/director
 
     if (finalStage && originalStage !== finalStage) {
       try {
-        await updateLeadStage(activeId, finalStage as string)
+        if (activeLead?.source === "WhatsApp") {
+          await updateWaConversationStage(activeId, finalStage as string)
+        } else {
+          await updateLeadStage(activeId, finalStage as string)
+        }
+        
         setLeads(prev => prev.map(l => 
           l.id === activeId 
             ? { ...l, pipeline_stage: finalStage as string, updated_at: new Date().toISOString() } 
