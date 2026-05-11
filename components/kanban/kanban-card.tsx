@@ -43,6 +43,8 @@ export function KanbanCard({ lead, onClick, detailsUrl = "/director/leads" }: Ka
 
   const agentInitials = lead.assigned_agent?.full_name
     ? lead.assigned_agent.full_name.split(" ").map(n => n[0]).join("").toUpperCase()
+    : lead.tokko_agent_name
+    ? lead.tokko_agent_name.split(" ").map((n: string) => n[0]).join("").toUpperCase()
     : "?"
 
   const updatedAtDate = lead.updated_at ? new Date(lead.updated_at) : null
@@ -171,6 +173,14 @@ export function KanbanCard({ lead, onClick, detailsUrl = "/director/leads" }: Ka
                   <AvatarFallback className="text-[8px] bg-accent/20">{agentInitials}</AvatarFallback>
                 </Avatar>
                 <span className="text-[9px] font-medium">{lead.assigned_agent.full_name.split(" ")[0]}</span>
+              </div>
+            ) : lead.tokko_agent_name ? (
+              <div className="flex items-center gap-1 border rounded-full px-1.5 py-0.5 bg-muted/30">
+                <Avatar className="h-4 w-4">
+                  <AvatarImage src={lead.tokko_agent_picture} />
+                  <AvatarFallback className="text-[8px] bg-accent/20">{agentInitials}</AvatarFallback>
+                </Avatar>
+                <span className="text-[9px] font-medium">{lead.tokko_agent_name.split(" ")[0]}</span>
               </div>
             ) : (
               <div className="flex items-center gap-1 text-[10px] text-amber-500 font-medium">

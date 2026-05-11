@@ -179,35 +179,7 @@ export async function POST(req: Request) {
       })()
     )
 
-    // 4. Promesa: Sincronizar automáticamente con el Pipeline (Tabla leads)
-    promises.push(
-      (async () => {
-        const { data: existingLead } = await supabase
-          .from('leads')
-          .select('id')
-          .eq('agency_id', instance.agency_id)
-          .eq('phone', contactPhone)
-          .maybeSingle()
-        
-        if (!existingLead) {
-          // Obtener agent_id de la conversación si es que ya tiene (raro al inicio, pero por las dudas)
-          const agentId = activeConv?.agent_id || null
-
-          await supabase.from('leads').insert({
-            agency_id: instance.agency_id,
-            phone: contactPhone,
-            full_name: contactName || 'Sin nombre (WhatsApp)',
-            source: 'WhatsApp',
-            status: 'new',
-            pipeline_stage: 'lead',
-            assigned_agent_id: agentId,
-            notes: `Generado automáticamente desde WhatsApp`
-          })
-        }
-      })()
-    )
-
-    // 5. Promesa: GET history
+    // 4. Promesa: GET history
     if (process.env.N8N_WEBHOOK_URL) {
       promises.push(
         supabase
@@ -222,7 +194,7 @@ export async function POST(req: Request) {
     }
 
     // Esperar todas juntas (~66% de reducción en latencia de BD)
-    const [ _, insertResult, waContactResult, leadSyncResult, historyResult ] = await Promise.all(promises)
+    const [ _, insertResult, waContactResult, historyResult ] = await Promise.all(promises)
     const { data: insertedMsg, error: insertError } = insertResult
     const { data: recentMessages } = historyResult
 

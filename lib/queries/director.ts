@@ -15,7 +15,7 @@ export async function getAgencyLeads(options: AgencyLeadsOptions) {
     agencyId, 
     page = 0, 
     pageSize = 20, 
-    orderBy = "tokko_created_date",
+    orderBy = "created_at",
     orderAsc = false,
     stage,
     source
@@ -78,6 +78,58 @@ export async function getAgencyLeads(options: AgencyLeadsOptions) {
   return { data: sanitizedData, count }
 }
 
+/** Obtiene leads de WhatsApp desde wa_conversations, mapeados al formato Lead del kanban */
+export async function getAgencyWaLeads(agencyId: string) {
+  const supabase = createClient()
+
+  const { data, error } = await supabase
+    .from("wa_conversations")
+    .select(`
+      id,
+      contact_name,
+      contact_phone,
+      pipeline_stage,
+      status,
+      score,
+      etiquetas,
+      created_at,
+      updated_at,
+      last_message_at,
+      agent_id,
+      assigned_agent:profiles!wa_conversations_agent_id_fkey(id, full_name, avatar_url)
+    `)
+    .eq("agency_id", agencyId)
+    .order("last_message_at", { ascending: false })
+
+  if (error) throw error
+
+  // Mapear al tipo Lead del kanban
+  return (data || []).map(conv => ({
+    id: conv.id,
+    agency_id: agencyId,
+    full_name: conv.contact_name || conv.contact_phone || "Sin nombre",
+    email: "",
+    phone: conv.contact_phone,
+    source: "WhatsApp" as const,
+    pipeline_stage: conv.pipeline_stage || "nuevo",
+    notes: undefined,
+    assigned_agent_id: conv.agent_id || undefined,
+    created_at: conv.created_at,
+    updated_at: conv.updated_at || conv.last_message_at || conv.created_at,
+    // WhatsApp-specific: estos campos de Tokko van vacíos
+    tokko_property_title: undefined,
+    tokko_property_price: undefined,
+    tokko_property_type: undefined,
+    tokko_property_operation: undefined,
+    tokko_property_location: undefined,
+    tokko_lead_status: undefined,
+    tokko_agent_name: undefined,
+    tokko_agent_picture: undefined,
+    assigned_agent: conv.assigned_agent as any ?? undefined,
+  }))
+}
+
+
 export async function updateLeadStage(leadId: string, stage: string) {
   const supabase = createClient()
   
@@ -97,6 +149,17 @@ export async function updateLeadStage(leadId: string, stage: string) {
     activity_type: "stage_change",
     description: `Cambio de etapa a: ${stage}`
   })
+}
+
+export async function updateWaConversationStage(convId: string, stage: string) {
+  const supabase = createClient()
+  
+  const { error } = await supabase
+    .from("wa_conversations")
+    .update({ pipeline_stage: stage })
+    .eq("id", convId)
+
+  if (error) throw error
 }
 
 export async function getAgencyAgents(options: { agencyId: string }) {

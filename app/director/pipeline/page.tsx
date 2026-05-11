@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getAgencyLeads, getAgencyAgents } from "@/lib/queries/director"
+import { getAgencyLeads, getAgencyAgents, getAgencyWaLeads } from "@/lib/queries/director"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -61,12 +61,18 @@ export default function PipelinePage() {
         const finalAgencyId = profile?.agency_id || session?.user?.user_metadata?.agency_id
 
         if (finalAgencyId) {
-          const [leadsResponse, agentsData] = await Promise.all([
-            getAgencyLeads({ agencyId: finalAgencyId, pageSize: 100 }).catch(() => ({ data: [], count: 0 })),
+          const [leadsResponse, waLeads, agentsData] = await Promise.all([
+            getAgencyLeads({ agencyId: finalAgencyId, pageSize: 500 }).catch(() => ({ data: [], count: 0 })),
+            getAgencyWaLeads(finalAgencyId).catch(() => []),
             getAgencyAgents({ agencyId: finalAgencyId }).catch(() => [])
           ])
           
-          setLeads((leadsResponse.data || []) as unknown as Lead[])
+          // Combinar ambas fuentes: Tokko + WhatsApp
+          const allLeads = [
+            ...((leadsResponse.data || []) as unknown as Lead[]),
+            ...(waLeads as unknown as Lead[])
+          ]
+          setLeads(allLeads)
           setAgents(agentsData)
         }
       } catch (error) {

@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { KANBAN_STAGES } from "@/components/kanban/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { updateLeadStage } from "@/lib/queries/director"
+import { updateWaConversationStage } from "@/lib/queries/director"
 import Link from "next/link"
 
 function formatPhone(phone: string | null | undefined): string {
@@ -31,20 +31,15 @@ export default function LeadsWhatsappClient({
   initialConversations,
   basePath
 }: {
-  initialConversations: (WAConversation & { lead_id?: string | null, pipeline_stage?: string | null })[]
+  initialConversations: WAConversation[]
   basePath: string
 }) {
   const router = useRouter()
   const [conversations, setConversations] = useState(initialConversations)
 
-  const handleStageChange = async (leadId: string | null | undefined, convId: string, newStage: string) => {
-    if (!leadId) {
-      toast.error("Este chat de WhatsApp aún no está vinculado a un lead en el sistema.")
-      return
-    }
-
+  const handleStageChange = async (convId: string, newStage: string) => {
     try {
-      await updateLeadStage(leadId, newStage)
+      await updateWaConversationStage(convId, newStage)
       
       // Update local state to reflect the change immediately
       setConversations(prev => prev.map(conv => {
@@ -155,7 +150,7 @@ export default function LeadsWhatsappClient({
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <Select 
                     defaultValue={conv.pipeline_stage || "nuevo"} 
-                    onValueChange={(v) => handleStageChange(conv.lead_id, conv.id, v)}
+                    onValueChange={(v) => handleStageChange(conv.id, v)}
                   >
                     <SelectTrigger className="h-7 text-[10px] bg-background/50 border-accent/10 w-[140px]">
                       <SelectValue />

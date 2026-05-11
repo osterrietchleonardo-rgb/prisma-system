@@ -40,7 +40,7 @@ export interface WAConversation {
   contact_phone: string
   contact_name: string | null
   agent_id: string | null
-  assigned_agent?: { email: string } | null // Joined from profiles
+  assigned_agent?: { full_name?: string | null; email: string; avatar_url?: string | null } | null // Joined from profiles
   last_message_at: string
   last_inbound_at: string | null
   bot_active: boolean
@@ -48,7 +48,9 @@ export interface WAConversation {
   score: number
   unread_count: number
   etiquetas: string[]
+  pipeline_stage: string  // NOW a native column in wa_conversations
   created_at: string
+  updated_at?: string
 }
 
 export interface WAMessage {

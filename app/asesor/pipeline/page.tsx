@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { createClient } from "@/lib/supabase"
-import { getAsesorLeads } from "@/lib/queries/asesor"
+import { getAsesorLeads, getAsesorWaLeads } from "@/lib/queries/asesor"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 
@@ -35,8 +35,17 @@ export default function AsesorPipelinePage() {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) return
         
-        const leadsData = await getAsesorLeads(session.user.id)
-        setLeads(leadsData as unknown as Lead[])
+        const [tokkoLeads, waLeads] = await Promise.all([
+          getAsesorLeads(session.user.id),
+          getAsesorWaLeads(session.user.id),
+        ])
+
+        // Combinar ambas fuentes: Tokko + WhatsApp
+        const allLeads = [
+          ...(tokkoLeads as unknown as Lead[]),
+          ...(waLeads as unknown as Lead[])
+        ]
+        setLeads(allLeads)
       } catch (_error) {
         console.error("Error loading pipeline data:", _error)
       } finally {

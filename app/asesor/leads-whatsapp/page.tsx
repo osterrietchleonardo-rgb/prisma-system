@@ -34,20 +34,6 @@ export default async function AsesorLeadsWhatsappPage() {
     console.error('Error al obtener los leads de whatsapp del asesor:', error)
   }
 
-  const { data: leadsData } = await supabase
-    .from('leads')
-    .select('id, phone, pipeline_stage')
-    .eq('agency_id', profile.agency_id)
-
-  const enrichedConversations = (conversations || []).map((conv: any) => {
-    const matchedLead = (leadsData || []).find((l: any) => l.phone === conv.contact_phone)
-    return {
-      ...conv,
-      lead_id: matchedLead ? matchedLead.id : null,
-      pipeline_stage: matchedLead ? matchedLead.pipeline_stage : null
-    }
-  })
-
   return (
     <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
       <div>
@@ -59,7 +45,7 @@ export default async function AsesorLeadsWhatsappPage() {
         </p>
       </div>
 
-      <LeadsWhatsappClient initialConversations={enrichedConversations} basePath="/asesor/leads-whatsapp" />
+      <LeadsWhatsappClient initialConversations={conversations || []} basePath="/asesor/leads-whatsapp" />
     </div>
   )
 }

@@ -36,22 +36,6 @@ export default async function LeadsWhatsappPage() {
     console.error('Error al obtener los leads de whatsapp:', error)
   }
 
-  // Fetchear los leads en pipeline de esta agencia que provengan de WhatsApp
-  const { data: leadsData } = await supabase
-    .from('leads')
-    .select('id, phone, pipeline_stage')
-    .eq('agency_id', agency_id)
-
-  // Cruzar la información para pasarle el `pipeline_stage` a cada lead de whatsapp
-  const enrichedConversations = (conversations || []).map((conv: any) => {
-    const matchedLead = (leadsData || []).find((l: any) => l.phone === conv.contact_phone)
-    return {
-      ...conv,
-      lead_id: matchedLead ? matchedLead.id : null,
-      pipeline_stage: matchedLead ? matchedLead.pipeline_stage : null
-    }
-  })
-
   return (
     <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
       <div>
@@ -63,7 +47,7 @@ export default async function LeadsWhatsappPage() {
         </p>
       </div>
 
-      <LeadsWhatsappClient initialConversations={enrichedConversations} basePath="/director/leads-whatsapp" />
+      <LeadsWhatsappClient initialConversations={conversations || []} basePath="/director/leads-whatsapp" />
     </div>
   )
 }
