@@ -1017,7 +1017,59 @@ export async function sendCampaignMessage(
       }
     }
 
-    // 3. Enviar a Meta directamente
+    // 3. CHEQUEO ANTI-DUPLICADO — ANTES de enviar a Meta.
+    //    Si se detecta duplicado, retorna sin tocar Meta, wa_messages ni n8n_chat_histories.
+    const { data: preCheckConv } = await supabase
+      .from('wa_conversations')
+      .select('id')
+      .eq('agency_id', agency_id)
+      .eq('contact_phone', cleanPhone)
+      .maybeSingle()
+
+    if (preCheckConv) {
+      // Barrera 1: mismo texto exacto en wa_messages
+      const { data: alreadySentMsg } = await supabase
+        .from('wa_messages')
+        .select('id')
+        .eq('conversation_id', preCheckConv.id)
+        .eq('content', input.template_full_text)
+        .limit(1)
+        .maybeSingle()
+
+      if (alreadySentMsg) {
+        return { success: true, warning: 'skipped_duplicate' }
+      }
+
+      // Barrera 2: campaign_statuses en wa_contacts indica "enviado"
+      const { data: contactRecord } = await supabase
+        .from('wa_contacts')
+        .select('campaign_statuses')
+        .eq('agency_id', agency_id)
+        .eq('phone', cleanPhone)
+        .maybeSingle()
+
+      if (contactRecord?.campaign_statuses) {
+        let statuses = contactRecord.campaign_statuses
+        if (typeof statuses === 'string') {
+          try { statuses = JSON.parse(statuses) } catch { /* ignorar error de parse */ }
+        }
+        if (typeof statuses === 'object' && statuses !== null) {
+          const templateKey = Object.keys(statuses).find(
+            (k: string) => k.toLowerCase() === input.template_name.toLowerCase() ||
+                           k.replace(/\s+/g, '') === input.template_name.replace(/\s+/g, '')
+          )
+          if (templateKey) {
+            const entry = (statuses as Record<string, any>)[templateKey]
+            const entryStatus = String(typeof entry === 'string' ? entry : entry?.status || '').toLowerCase()
+            if (entryStatus === 'enviado' || entryStatus === 'sent') {
+              return { success: true, warning: 'skipped_duplicate' }
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Enviar a Meta (solo si no es duplicado)
     const res = await fetch(`https://graph.facebook.com/v20.0/${instance.phone_number_id}/messages`, {
       method: "POST",
       headers: {
@@ -1033,9 +1085,9 @@ export async function sendCampaignMessage(
       return { success: false, error: result.error?.message || 'Error al enviar template a Meta' }
     }
 
-    // 4. Buscar o crear la conversación
+    // 5. Buscar o crear la conversación (el duplicado ya fue descartado arriba)
     let conversation_id: string;
-    const { data: convData, error: convErr } = await supabase
+    const { data: convData } = await supabase
       .from('wa_conversations')
       .select('id')
       .eq('agency_id', agency_id)
@@ -1044,25 +1096,11 @@ export async function sendCampaignMessage(
 
     if (convData) {
       conversation_id = convData.id;
-      // Actualizar a bot_active = true para que responda la IA cuando el lead conteste
+      // Activar bot para que la IA responda cuando el lead conteste
       await supabase
         .from('wa_conversations')
         .update({ bot_active: true })
         .eq('id', conversation_id)
-
-      // CHEQUEO ANTI-DUPLICADO DE CAMPAÑA
-      const { data: alreadySent } = await supabase
-        .from('wa_messages')
-        .select('id')
-        .eq('conversation_id', conversation_id)
-        .eq('content', input.template_full_text)
-        .limit(1)
-        .maybeSingle()
-
-      if (alreadySent) {
-         // Ya se envió exactamente el mismo texto a este lead (probablemente se pausó la campaña y reanudó)
-         return { success: true, warning: 'skipped_duplicate' }
-      }
     } else {
       const { data: newConv, error: createConvErr } = await supabase
         .from('wa_conversations')
@@ -1070,7 +1108,7 @@ export async function sendCampaignMessage(
           agency_id,
           contact_phone: cleanPhone,
           contact_name: input.name,
-          bot_active: true, // Listo para la IA
+          bot_active: true,
           unread_count: 0
         })
         .select('id')
@@ -1082,7 +1120,7 @@ export async function sendCampaignMessage(
       conversation_id = newConv.id;
     }
 
-    // 5. Guardar en wa_messages
+    // 6. Guardar en wa_messages
     const { data: insertedMsg, error: insertError } = await supabase
       .from('wa_messages')
       .insert({
@@ -1095,7 +1133,7 @@ export async function sendCampaignMessage(
       .select()
       .single()
 
-    // 6. Guardar en n8n_chat_histories
+    // 7. Guardar en n8n_chat_histories
     const fecha = new Date().toLocaleString('es-AR', { 
       timeZone: 'America/Argentina/Buenos_Aires',
       day: '2-digit', month: '2-digit', year: 'numeric',

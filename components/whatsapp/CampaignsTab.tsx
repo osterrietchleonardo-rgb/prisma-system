@@ -687,7 +687,10 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                       const name = nameColumn ? row[nameColumn] : "Lead"
                       const phone = phoneColumn ? row[phoneColumn] : ""
                                              let status = contactStatuses[i]
-                        if (!status && selectedTemplate) {
+                        // Si el status es "pendiente" (inicial) o no está seteado,
+                        // verificar si el contacto ya recibió esta plantilla → mostrarlo como "salteado".
+                        // No sobreescribir estados finales ("enviado", "error") seteados durante la ejecución.
+                        if ((!status || status === "pendiente") && selectedTemplate) {
                           if (isRowSkipped(row, selectedTemplate?.template_name)) {
                             status = "salteado"
                           } else {
