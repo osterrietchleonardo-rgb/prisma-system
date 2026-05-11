@@ -5,14 +5,10 @@ import { createClient } from "@/lib/supabase/client"
 import { 
   Bot, 
   Settings2, 
+  Save,
   Clock, 
-  MapPin, 
   Globe, 
-  Languages,
-  MessageSquare,
   Sparkles,
-  Search,
-  ChevronRight,
   Info,
   Building2,
   Calendar,
@@ -238,6 +234,34 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
   }
 
 
+
+  if (loading) {
+    return (
+      <div className="space-y-6 p-4">
+        <div className="flex items-center gap-4 border-b pb-6">
+          <Skeleton className="h-12 w-12 rounded-2xl" />
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+        </div>
+        <Card className="border-accent/10">
+          <CardHeader className="p-6">
+            <Skeleton className="h-[100px] w-full rounded-2xl" />
+          </CardHeader>
+          <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="space-y-3">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-8 pb-12">
