@@ -434,7 +434,3 @@ export default function AsesorDocumentosPage() {
     </div>
   )
 }
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(" ")
-}
