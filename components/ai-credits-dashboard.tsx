@@ -156,6 +156,26 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
         </Card>
       </div>
 
+      {/* Resumen por Módulo */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Object.entries(
+          transactions.reduce((acc, tx) => {
+            acc[tx.feature] = (acc[tx.feature] || 0) + tx.credits_consumed
+            return acc
+          }, {} as Record<string, number>)
+        ).map(([feature, total]) => (
+          <Card key={feature} className="border-accent/10 bg-accent/5 backdrop-blur-sm">
+            <CardContent className="pt-4 flex items-center justify-between">
+              <div className="space-y-0.5">
+                <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">{feature.replace('_ia', ' IA')}</p>
+                <p className="text-xl font-bold">{total} <span className="text-xs font-normal text-muted-foreground">créditos</span></p>
+              </div>
+              <Activity className="w-8 h-8 text-accent/20" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
       {/* Historial de Transacciones */}
       <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
         <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -193,26 +213,51 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((tx) => (
-                    <tr key={tx.id} className="hover:bg-accent/5 transition-colors">
+                  Object.entries(
+                    transactions.reduce((acc, tx) => {
+                      const key = `${tx.feature}-${tx.profiles?.id || tx.user_id}`
+                      if (!acc[key]) {
+                        acc[key] = {
+                          feature: tx.feature,
+                          user: tx.profiles,
+                          total_cost: 0,
+                          last_activity: tx.created_at,
+                          count: 0
+                        }
+                      }
+                      acc[key].total_cost += tx.credits_consumed
+                      acc[key].count += 1
+                      if (new Date(tx.created_at) > new Date(acc[key].last_activity)) {
+                        acc[key].last_activity = tx.created_at
+                      }
+                      return acc
+                    }, {} as Record<string, any>)
+                  )
+                  .sort((a, b) => new Date(b[1].last_activity).getTime() - new Date(a[1].last_activity).getTime())
+                  .map(([key, data]) => (
+                    <tr key={key} className="hover:bg-accent/5 transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap">
-                        {format(new Date(tx.created_at), "d MMM, HH:mm", { locale: es })}
+                        <div className="text-xs text-muted-foreground">Último uso:</div>
+                        {format(new Date(data.last_activity), "d MMM, HH:mm", { locale: es })}
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-foreground">
-                          {tx.profiles?.full_name || "Sistema Automático"}
+                          {data.user?.full_name || "Sistema Automático"}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {tx.profiles?.email || "-"}
+                          {data.user?.email || "-"}
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant="outline" className="bg-background border-accent/20 text-accent">
-                          {tx.feature}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="bg-background border-accent/20 text-accent">
+                            {data.feature}
+                          </Badge>
+                          <span className="text-[10px] text-muted-foreground">({data.count} ops)</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-medium text-destructive">
-                        -{tx.credits_consumed}
+                        -{data.total_cost}
                       </td>
                     </tr>
                   ))
