@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prismaIA } from "@/lib/gemini"
 import { createClient } from "@/lib/supabase/server"
+import { consumeAiCredits } from "@/lib/auth/tenant-validation"
 import { rateLimit, LIMITS } from "@/lib/rate-limiter"
 import { z } from "zod"
 
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest) {
     if (!rl.success) {
       return NextResponse.json({ error: rl.errorMessage }, { status: 429 })
     }
+
+    // Consume 1 credit for valuation
+    await consumeAiCredits("tasador_ia", 1, `Valuation: ${propertyInfo.type} in ${propertyInfo.location}`);
 
     const prompt = `
       Eres un tasador inmobiliario experto en el mercado Argentino.

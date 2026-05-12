@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prismaIA } from "@/lib/gemini"
 import { parseWhatsAppChat } from "@/lib/whatsapp-parser"
 import { createClient } from "@/lib/supabase/server"
+import { consumeAiCredits } from "@/lib/auth/tenant-validation"
 import { rateLimit, LIMITS } from "@/lib/rate-limiter"
 import { z } from "zod"
 
@@ -37,6 +38,9 @@ export async function POST(req: NextRequest) {
 
     const chatText = result_zod.data.chatText
     const cleanedChat = parseWhatsAppChat(chatText)
+    
+    // Consume 1 credit for chat analysis
+    await consumeAiCredits("analisis_chat_ia", 1, `Analyze Chat: ${cleanedChat.substring(0, 50)}...`);
 
     // 4. Gemini Prompt
     const prompt = `
