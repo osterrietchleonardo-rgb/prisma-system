@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { AiCreditBadge } from "@/components/ai-credit-badge"
 
 interface Message {
   role: "user" | "assistant"
@@ -350,6 +351,7 @@ export default function AdvisorTutorIAPage() {
           </div>
           
           <div className="flex items-center gap-3">
+            <AiCreditBadge className="w-fit" />
             <Button variant="outline" size="sm" onClick={handleEvaluate} disabled={isLoading} className="gap-2 border-accent/20 hover:bg-accent/5 text-accent">
               <GraduationCap className="h-4 w-4" />
               <span className="hidden sm:inline">Evaluar mis conocimientos</span>

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
+import { AiCreditBadge } from "@/components/ai-credit-badge"
 
 interface Property {
   id: string
@@ -365,6 +366,7 @@ export default function ConsultorIAPage() {
               </div>
             </div>
           </div>
+          <AiCreditBadge className="w-fit" />
         </header>
 
         <ScrollArea className="flex-1 p-4 md:p-8" ref={scrollRef}>

@@ -11,6 +11,7 @@ import { interpolateTemplate } from "@/lib/contratos/template-interpolator"
 import { generateContratoPDF, generatePDFFilename } from "@/lib/contratos/pdf-generator"
 import { TIPO_CONTRATO_LABELS } from "@/types/contratos"
 import { toast } from "sonner"
+import { AiCreditBadge } from "@/components/ai-credit-badge"
 
 export function ContratosIAPage() {
   const [activeTab, setActiveTab] = useState("nuevo")
@@ -44,14 +45,17 @@ export function ContratosIAPage() {
 
   return (
     <div className="w-full px-4 md:px-8 py-8 space-y-8 animate-in fade-in duration-700">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-          <FileSignature className="w-8 h-8 text-accent" />
-          Contratos IA
-        </h2>
-        <p className="text-muted-foreground text-lg max-w-2xl">
-          Genera contratos inmobiliarios profesionales, gestiona plantillas y firma digitalmente tus documentos.
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
+            <FileSignature className="w-8 h-8 text-accent" />
+            Contratos IA
+          </h2>
+          <p className="text-muted-foreground text-lg max-w-2xl">
+            Genera contratos inmobiliarios profesionales, gestiona plantillas y firma digitalmente tus documentos.
+          </p>
+        </div>
+        <AiCreditBadge className="w-fit" />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

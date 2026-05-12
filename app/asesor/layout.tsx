@@ -35,11 +35,16 @@ export default async function AsesorLayout({
     console.error("Error fetching profile:", error)
   }
 
-  // Fetch AI Credits
-  let { data: aiCredits } = await supabase
-    .from("agency_ai_credits")
-    .select("allocated_credits, consumed_credits")
-    .single();
+  // Fetch AI Credits for the specific agency
+  let aiCredits = null;
+  if (profile?.agency_id) {
+    const { data } = await supabase
+      .from("agency_ai_credits")
+      .select("allocated_credits, consumed_credits")
+      .eq("agency_id", profile.agency_id)
+      .maybeSingle();
+    aiCredits = data;
+  }
 
   // If agency exists but no credits row, auto-initialize real credits via admin
   if (!aiCredits && profile?.agency_id) {

@@ -7,6 +7,7 @@ import { CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
+import { AiCreditBadge } from "@/components/ai-credit-badge"
 
 interface Message {
   role: "user" | "assistant"
@@ -346,6 +347,7 @@ export default function TutorIAPage() {
           </div>
           
           <div className="flex items-center gap-3">
+            <AiCreditBadge className="w-fit" />
             <div className="hidden lg:flex items-center gap-4 text-[10px] font-bold uppercase tracking-tighter text-muted-foreground/60 mr-4">
               <div className="flex items-center gap-1.5"><BrainCircuit className="w-3.5 h-3.5" /> Analítica de Temas</div>
               <div className="flex items-center gap-1.5"><History className="w-3.5 h-3.5" /> Sesiones Persistentes</div>

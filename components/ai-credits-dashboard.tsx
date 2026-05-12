@@ -47,11 +47,17 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
         const { data: creditsData } = await supabase
           .from("agency_ai_credits")
           .select("allocated_credits, consumed_credits")
-          .single()
+          .eq("agency_id", agencyId)
+          .maybeSingle()
         
-        if (creditsData) setCredits(creditsData)
+        if (creditsData) {
+          setCredits(creditsData)
+        } else {
+          // If no credits row, it might be auto-initialized soon or handle fallback
+          setCredits({ allocated_credits: 10000, consumed_credits: 0 })
+        }
 
-        // Fetch recent transactions (last 50)
+        // Fetch recent transactions (last 50) scoped to agency
         const { data: txData } = await supabase
           .from("ai_credit_transactions")
           .select(`
@@ -64,6 +70,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
               email
             )
           `)
+          .eq("agency_id", agencyId)
           .order("created_at", { ascending: false })
           .limit(50)
 
