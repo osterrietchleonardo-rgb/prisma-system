@@ -183,7 +183,7 @@ export default function DirectorConfiguracionPage() {
         </p>
       </div>
 
-      <Tabs defaultValue={defaultTab} className="space-y-6">
+      <Tabs defaultValue={defaultTab} className="space-y-6 min-h-[600px]">
         <TabsList className="bg-card border border-accent/10">
           <TabsTrigger value="perfil" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
             <User className="h-4 w-4" /> Mi Perfil
@@ -199,7 +199,7 @@ export default function DirectorConfiguracionPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="perfil">
+        <TabsContent value="perfil" className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
           <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
             <CardHeader>
               <CardTitle>Información Personal</CardTitle>
@@ -252,7 +252,7 @@ export default function DirectorConfiguracionPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="agencia" className="space-y-6">
+        <TabsContent value="agencia" className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
           <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
             <CardHeader>
               <CardTitle>Detalles Inmobiliaria</CardTitle>
@@ -350,7 +350,7 @@ export default function DirectorConfiguracionPage() {
 
         </TabsContent>
 
-        <TabsContent value="creditos">
+        <TabsContent value="creditos" className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
           {profile.agency_id ? (
             <AiCreditsDashboard agencyId={profile.agency_id} />
           ) : (
@@ -360,7 +360,7 @@ export default function DirectorConfiguracionPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="seguridad">
+        <TabsContent value="seguridad" className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
           <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
             <CardHeader>
               <CardTitle>Acceso a la Organización</CardTitle>
