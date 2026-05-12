@@ -212,9 +212,13 @@ export async function GET(req: Request) {
       .select('*')
       .eq('agency_id', agencyId || authAgencyId)
       .eq('user_id', userId)
-    .order('created_at', { ascending: false }); // Usamos created_at como fallback más seguro
+      .order('created_at', { ascending: false }); // Usamos created_at como fallback más seguro
 
-  return NextResponse.json(sessions);
+    return NextResponse.json(sessions);
+  } catch (error: any) {
+    console.error("Error fetching sessions:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: Request) {
@@ -227,7 +231,6 @@ export async function DELETE(req: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // First delete messages if there's no cascade
-  const supabase = await createClient();
   await supabase.from('consultor_chat_messages').delete().eq('session_id', sessionId);
   
   const { error } = await supabase

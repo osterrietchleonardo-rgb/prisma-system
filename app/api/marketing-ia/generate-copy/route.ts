@@ -137,6 +137,7 @@ export async function POST(req: Request) {
     const propertyId = reqPropertyId || ipc.propiedad_tokko_id || (ipc.flow_data as any).propiedad_tokko_id;
 
     if (propertyId) {
+      try {
         if (agencyId) {
           const { data: agency } = await supabase
             .from("agencies")
