@@ -36,14 +36,14 @@ export function AiCreditBadge({ className, showLabel = true }: AiCreditBadgeProp
       if (profile?.agency_id) {
         const { data } = await supabase
           .from("agency_ai_credits")
-          .select("allocated_credits, consumed_credits")
+          .select("credits_total, credits_used")
           .eq("agency_id", profile.agency_id)
           .maybeSingle()
 
         if (data) {
           setCredits({
-            allocated: data.allocated_credits,
-            consumed: data.consumed_credits
+            allocated: data.credits_total,
+            consumed: data.credits_used
           })
         }
       }

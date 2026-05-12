@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { consumeAiCredits } from "@/lib/auth/tenant-validation"
 
 export const dynamic = "force-dynamic"
 
@@ -14,6 +15,9 @@ export async function POST(req: Request) {
     if (!contrato_id) {
       return NextResponse.json({ error: "contrato_id is required" }, { status: 400 })
     }
+
+    // Consume 5 credits for professional AI contract generation/finalization
+    await consumeAiCredits("contrato_ia", 5, `Finalizing Contract ID: ${contrato_id}`);
 
     // Get the contrato
     const { data: contrato, error: contratoError } = await supabase
