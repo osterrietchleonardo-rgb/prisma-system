@@ -58,7 +58,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
         }
 
         // Fetch recent transactions (last 50) scoped to agency
-        const { data: txData } = await supabase
+        const { data: txData, error: txError } = await supabase
           .from("ai_credit_transactions")
           .select(`
             id,
@@ -74,9 +74,11 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
           .order("created_at", { ascending: false })
           .limit(50)
 
+        if (txError) throw txError
         if (txData) setTransactions(txData as any[])
 
-      } catch (error) {
+      } catch (error: any) {
+        toast.error("Error al cargar historial: " + (error.message || "Error desconocido"))
         console.error("Error fetching AI credits data:", error)
       } finally {
         setLoading(false)
@@ -84,6 +86,14 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
     }
 
     fetchCreditsData()
+
+    // Listen for refresh events
+    const handleRefresh = () => fetchCreditsData()
+    window.addEventListener("prisma-refresh-credits", handleRefresh)
+    
+    return () => {
+      window.removeEventListener("prisma-refresh-credits", handleRefresh)
+    }
   }, [agencyId])
 
   if (!agencyId) return null
