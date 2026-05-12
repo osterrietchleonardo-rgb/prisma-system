@@ -120,6 +120,8 @@ export function CopyGeneratorFlow() {
       // Attempt to switch tabs automatically or alert user
       const evt = new CustomEvent("generation-complete", { detail: { sessionId, origin: 'copy-flow' } });
       window.dispatchEvent(evt);
+      // Auto-refresh credit badge
+      window.dispatchEvent(new CustomEvent('prisma-refresh-credits'));
       
       setProgressText("¡Todo listo! Ve a la pestaña 'Mis Generaciones'.")
 
@@ -277,7 +279,7 @@ export function CopyGeneratorFlow() {
           </div>
         </div>
       </CardContent>
-      <CardFooter className="bg-accent/5 pt-6 pb-6">
+      <CardFooter className="bg-accent/5 pt-6 pb-4 flex flex-col gap-2">
         <Button 
           className="w-full bg-accent shadow-lg shadow-accent/20 h-14 text-lg font-bold" 
           onClick={handleGenerateBatch}
@@ -286,6 +288,10 @@ export function CopyGeneratorFlow() {
           <Sparkles className="mr-2 h-6 w-6" /> 
           Generar 3 Variantes Automáticamente
         </Button>
+        <p className="text-[10px] text-muted-foreground/50 text-center flex items-center justify-center gap-1">
+          <Sparkles className="w-3 h-3" />
+          Cada generación consume <span className="font-semibold text-muted-foreground/70">1 crédito IA</span>
+        </p>
       </CardFooter>
     </Card>
   )

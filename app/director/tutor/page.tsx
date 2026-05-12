@@ -166,6 +166,8 @@ export default function TutorIAPage() {
         sources: data.sources 
       }])
 
+      // Auto-refresh credit badge after consumption
+      window.dispatchEvent(new CustomEvent('prisma-refresh-credits'))
       // Always refresh sessions list to catch title/summary updates
       fetchSessions()
     } catch (error) {
@@ -476,6 +478,10 @@ export default function TutorIAPage() {
               <Send className="w-5 h-5 ml-0.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </Button>
           </form>
+          <p className="text-[10px] text-muted-foreground/40 text-center w-full flex items-center justify-center gap-1 mt-2">
+            <Sparkles className="w-3 h-3" />
+            Cada respuesta consume <span className="font-semibold text-muted-foreground/60">1 crédito IA</span>
+          </p>
         </CardFooter>
       </div>
     </div>

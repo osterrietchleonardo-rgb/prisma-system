@@ -3,7 +3,7 @@
 import { useMemo, useCallback, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, ArrowRight, Check, Eye, Loader2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, Check, Eye, Loader2, Sparkles } from "lucide-react"
 import { getGruposOrdenados, getCamposPorGrupo } from "@/lib/contratos/placeholder-helpers"
 import { CampoFormularioDinamico } from "./CampoFormularioDinamico"
 import { ContratoPreview } from "./ContratoPreview"
@@ -152,6 +152,9 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
 
       toast.success("Contrato finalizado exitosamente")
       
+      // Auto-refresh credit badge after 5-credit consumption
+      window.dispatchEvent(new CustomEvent('prisma-refresh-credits'))
+      
       // Auto-download PDF
       const { downloadContractFromId } = await import("@/lib/contratos/download-helper")
       await downloadContractFromId(wizardState.contrato_guardado_id!)
@@ -276,14 +279,20 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
           </Button>
         )}
         {currentStep === allSteps.length - 1 && (
-          <Button
-            onClick={handleFinalize}
-            className="bg-green-600 hover:bg-green-700 text-white"
-            disabled={saving}
-          >
-            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Finalizar y generar PDF firmado
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            <Button
+              onClick={handleFinalize}
+              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Finalizar y generar PDF firmado
+            </Button>
+            <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1">
+              <Sparkles className="w-3 h-3" />
+              Esta acción consume <span className="font-semibold">5 créditos IA</span>
+            </p>
+          </div>
         )}
       </div>
     </div>

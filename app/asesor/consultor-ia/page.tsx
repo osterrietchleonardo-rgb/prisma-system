@@ -212,6 +212,8 @@ export default function AdvisorConsultorIAPage() {
         matchedProperties: data.matchedProperties
       }])
 
+      // Auto-refresh credit badge after consumption
+      window.dispatchEvent(new CustomEvent('prisma-refresh-credits'))
       fetchSessions()
     } catch (error) {
       console.error("Error:", error)
@@ -529,6 +531,10 @@ export default function AdvisorConsultorIAPage() {
               <Send className="w-5 h-5" />
             </Button>
           </form>
+          <p className="text-[10px] text-muted-foreground/40 text-center w-full flex items-center justify-center gap-1 mt-2">
+            <Sparkles className="w-3 h-3" />
+            Cada respuesta consume <span className="font-semibold text-muted-foreground/60">1 crédito IA</span>
+          </p>
         </CardFooter>
       </div>
     </div>
