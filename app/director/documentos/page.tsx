@@ -247,12 +247,12 @@ export default function DocumentosPage() {
 
     try {
       setIsUpdatingFolder(true)
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from("agency_documents")
         .update({ folder_id: folderId === "none" ? null : folderId })
         .eq("id", movingDoc.id)
 
-      if (error) throw error
+      if (updateError) throw updateError
 
       toast.success("Documento movido correctamente")
       setIsMoveModalOpen(false)
@@ -273,7 +273,7 @@ export default function DocumentosPage() {
     
     if (activeTab === "all") return matchesSearch && matchesFolder
     return matchesSearch && matchesFolder && d.visibility === activeTab
-  })
+  });
 
   return (
     <div className="flex flex-col h-full space-y-4 p-4 md:p-8 pt-6 overflow-hidden">
@@ -390,261 +390,250 @@ export default function DocumentosPage() {
                 Nuevo Recurso
               </Button>
             </DialogTrigger>
-          <DialogContent className="bg-card border-accent/20 sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                {uploadType === "file" ? <FileText className="text-accent" /> : <Video className="text-red-500" />}
-                Agregar Recurso
-              </DialogTitle>
-              <DialogDescription>
-                Los documentos y videos serán analizados por IA para permitir consultas inteligentes.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <Tabs value={uploadType} onValueChange={(v) => setUploadType(v as any)} className="w-full mt-4">
-              <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1">
-                <TabsTrigger value="file" className="data-[state=active]:bg-card data-[state=active]:text-accent">
-                  <Upload className="h-4 w-4 mr-2" /> Archivo
-                </TabsTrigger>
-                <TabsTrigger value="youtube" className="data-[state=active]:bg-card data-[state=active]:text-red-500">
-                  <Video className="h-4 w-4 mr-2" /> YouTube
-                </TabsTrigger>
-              </TabsList>
+            <DialogContent className="bg-card border-accent/20 sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+                  {uploadType === "file" ? <FileText className="text-accent" /> : <Video className="text-red-500" />}
+                  Agregar Recurso
+                </DialogTitle>
+                <DialogDescription>
+                  Los documentos y videos serán analizados por IA para permitir consultas inteligentes.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <Tabs value={uploadType} onValueChange={(v) => setUploadType(v as any)} className="w-full mt-4">
+                <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1">
+                  <TabsTrigger value="file" className="data-[state=active]:bg-card data-[state=active]:text-accent">
+                    <Upload className="h-4 w-4 mr-2" /> Archivo
+                  </TabsTrigger>
+                  <TabsTrigger value="youtube" className="data-[state=active]:bg-card data-[state=active]:text-red-500">
+                    <Video className="h-4 w-4 mr-2" /> YouTube
+                  </TabsTrigger>
+                </TabsList>
 
-              <form onSubmit={handleProcess} className="space-y-5 py-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold flex items-center gap-2">
-                    Título del Recurso
-                  </label>
-                  <Input name="title" placeholder="Ej: Protocolo de Captación 2024" required />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={handleProcess} className="space-y-5 py-6">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold">Visibilidad</label>
-                    <Select name="visibility" defaultValue="asesor">
-                      <SelectTrigger className="bg-muted/30">
-                        <SelectValue placeholder="Seleccionar visibilidad" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="director">
-                          <div className="flex items-center gap-2">
-                            <Lock className="h-4 w-4 text-orange-500" />
-                            <span>Privado</span>
-                          </div>
-                        </SelectItem>
-                        <SelectItem value="asesor">
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-accent" />
-                            <span>Público</span>
-                          </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <label className="text-sm font-semibold flex items-center gap-2">
+                      Título del Recurso
+                    </label>
+                    <Input name="title" placeholder="Ej: Protocolo de Captación 2024" required />
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Carpeta</label>
-                    <Select name="folderId" defaultValue="none">
-                      <SelectTrigger className="bg-muted/30">
-                        <SelectValue placeholder="Ninguna" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin carpeta</SelectItem>
-                        {folders.map(f => (
-                          <SelectItem key={f.id} value={f.id}>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Visibilidad</label>
+                      <Select name="visibility" defaultValue="asesor">
+                        <SelectTrigger className="bg-muted/30">
+                          <SelectValue placeholder="Seleccionar visibilidad" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="director">
                             <div className="flex items-center gap-2">
-                              <Folder className="h-4 w-4 text-accent/60" />
-                              <span>{f.name}</span>
+                              <Lock className="h-4 w-4 text-orange-500" />
+                              <span>Privado</span>
                             </div>
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
+                          <SelectItem value="asesor">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-accent" />
+                              <span>Público</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                {uploadType === "file" ? (
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Archivo (.pdf, .doc, .csv)</label>
-                    <div className={cn(
-                      "flex items-center justify-center border-2 border-dashed rounded-2xl p-10 hover:bg-accent/5 transition-all cursor-pointer relative group",
-                      selectedFile ? "border-accent/40 bg-accent/5" : "border-accent/20"
-                    )}>
-                      <input 
-                        type="file" 
-                        name="file" 
-                        accept=".pdf,.docx,.doc,.csv" 
-                        className="absolute inset-0 opacity-0 cursor-pointer" 
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                      />
-                      <div className="flex flex-col items-center">
-                        <div className={cn(
-                          "w-12 h-12 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform",
-                          selectedFile ? "bg-accent/20 scale-110" : "bg-accent/10"
-                        )}>
-                          {selectedFile ? <FileCheck className="h-6 w-6 text-accent" /> : <Upload className="h-6 w-6 text-accent" />}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Carpeta</label>
+                      <Select name="folderId" defaultValue="none">
+                        <SelectTrigger className="bg-muted/30">
+                          <SelectValue placeholder="Ninguna" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin carpeta</SelectItem>
+                          {folders.map(f => (
+                            <SelectItem key={f.id} value={f.id}>
+                              <div className="flex items-center gap-2">
+                                <Folder className="h-4 w-4 text-accent/60" />
+                                <span>{f.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {uploadType === "file" ? (
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Archivo (.pdf, .doc, .csv)</label>
+                      <div className={cn(
+                        "flex items-center justify-center border-2 border-dashed rounded-2xl p-10 hover:bg-accent/5 transition-all cursor-pointer relative group",
+                        selectedFile ? "border-accent/40 bg-accent/5" : "border-accent/20"
+                      )}>
+                        <input 
+                          type="file" 
+                          name="file" 
+                          accept=".pdf,.docx,.doc,.csv" 
+                          className="absolute inset-0 opacity-0 cursor-pointer" 
+                          onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        />
+                        <div className="flex flex-col items-center">
+                          <div className={cn(
+                            "w-12 h-12 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform",
+                            selectedFile ? "bg-accent/20 scale-110" : "bg-accent/10"
+                          )}>
+                            {selectedFile ? <FileCheck className="h-6 w-6 text-accent" /> : <Upload className="h-6 w-6 text-accent" />}
+                          </div>
+                          {selectedFile ? (
+                            <>
+                              <p className="text-sm font-semibold text-accent">{selectedFile.name}</p>
+                              <p className="text-xs text-muted-foreground mt-1">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB - Listo para subir</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-sm font-medium">Click o arrastra para subir</p>
+                              <p className="text-xs text-muted-foreground mt-1">PDF, Word o CSV hasta 15MB</p>
+                            </>
+                          )}
                         </div>
-                        {selectedFile ? (
-                          <>
-                            <p className="text-sm font-semibold text-accent">{selectedFile.name}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB - Listo para subir</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="text-sm font-medium">Click o arrastra para subir</p>
-                            <p className="text-xs text-muted-foreground mt-1">PDF, Word o CSV hasta 15MB</p>
-                          </>
-                        )}
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">URL del Video de YouTube</label>
-                    <div className="relative">
-                      <Video className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                      <Input name="youtubeUrl" placeholder="https://youtube.com/watch?v=..." className="pl-10" required />
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">URL del Video de YouTube</label>
+                      <div className="relative">
+                        <Video className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input name="youtubeUrl" placeholder="https://youtube.com/watch?v=..." className="pl-10" required />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">La IA transcribirá el contenido para indexarlo.</p>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">La IA transcribirá el contenido para indexarlo.</p>
-                  </div>
-                )}
+                  )}
 
-                <DialogFooter className="pt-2">
-                  <Button variant="ghost" type="button" onClick={() => setIsUploadOpen(false)} className="hover:bg-muted">
-                    Cancelar
-                  </Button>
-                  <Button type="submit" className="bg-accent px-8 shadow-md shadow-accent/10" disabled={uploading}>
-                    {uploading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Procesando con IA...
-                      </>
-                    ) : "Confirmar y Subir"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Tabs>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="flex flex-col md:flex-row gap-4 items-center">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-          <TabsList className="bg-muted/40 p-1 rounded-xl">
-            <TabsTrigger value="all" className="rounded-lg px-6">Todo</TabsTrigger>
-            <TabsTrigger value="director" className="rounded-lg px-6 flex items-center gap-2">
-              <Lock className="h-3 w-3" /> Mis Documentos
-            </TabsTrigger>
-            <TabsTrigger value="asesor" className="rounded-lg px-6 flex items-center gap-2">
-              <Users className="h-3 w-3" /> Compartidos
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Buscar por título, contenido o IA tags..." 
-            className="pl-10 bg-card/40 border-accent/10 focus-visible:ring-accent/30 rounded-xl h-11"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+                  <DialogFooter className="pt-2">
+                    <Button variant="ghost" type="button" onClick={() => setIsUploadOpen(false)} className="hover:bg-muted">
+                      Cancelar
+                    </Button>
+                    <Button type="submit" className="bg-accent px-8 shadow-md shadow-accent/10" disabled={uploading}>
+                      {uploading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Procesando con IA...
+                        </>
+                      ) : "Confirmar y Subir"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </Tabs>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
-      {/* Folders Navigation */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 pt-1 custom-scrollbar no-scrollbar">
-        <Button
-          variant={selectedFolderId === "all" ? "secondary" : "ghost"}
-          size="sm"
-          className={cn(
-            "rounded-xl h-10 px-4 whitespace-nowrap gap-2",
-            selectedFolderId === "all" ? "bg-accent/10 text-accent hover:bg-accent/20" : "text-muted-foreground"
-          )}
-          onClick={() => setSelectedFolderId("all")}
-        >
-          {selectedFolderId === "all" ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
-          Todos los Archivos
-        </Button>
-        {folders.map(folder => (
-          <Button
-            key={folder.id}
-            variant={selectedFolderId === folder.id ? "secondary" : "ghost"}
-            size="sm"
-            className={cn(
-              "rounded-xl h-10 px-4 whitespace-nowrap gap-2",
-              selectedFolderId === folder.id ? "bg-accent/10 text-accent hover:bg-accent/20" : "text-muted-foreground hover:bg-accent/5 hover:text-accent/80"
-            )}
-            onClick={() => setSelectedFolderId(folder.id)}
-          >
-            {selectedFolderId === folder.id ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
-            {folder.name}
-            <Badge variant="outline" className="ml-1 px-1.5 h-5 bg-background/50 border-none text-[10px]">
-              {documents.filter(d => d.folder_id === folder.id).length}
-            </Badge>
-          </Button>
-        ))}
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4 py-2 border-y border-accent/10 bg-accent/5 -mx-4 md:-mx-8 px-4 md:px-8">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por título o tipo..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 bg-card/50 border-accent/20 focus:border-accent/40 rounded-xl h-10 w-full md:max-w-md"
+          />
+        </div>
+        
+        <div className="flex items-center gap-4 w-full md:w-auto">
+          <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-xl border border-accent/10">
+            <Button
+              variant={selectedFolderId === "all" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setSelectedFolderId("all")}
+              className="rounded-lg h-8 px-3 text-xs"
+            >
+              Todos
+            </Button>
+            {folders.map(f => (
+              <Button
+                key={f.id}
+                variant={selectedFolderId === f.id ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setSelectedFolderId(f.id)}
+                className="rounded-lg h-8 px-3 text-xs gap-2"
+              >
+                <Folder className="h-3 w-3" />
+                {f.name}
+              </Button>
+            ))}
+          </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="bg-muted/50 p-1 rounded-xl border border-accent/10">
+            <TabsList className="bg-transparent h-8 p-0 gap-1">
+              <TabsTrigger value="all" className="rounded-lg px-3 h-7 text-xs">Todos</TabsTrigger>
+              <TabsTrigger value="asesor" className="rounded-lg px-3 h-7 text-xs">Públicos</TabsTrigger>
+              <TabsTrigger value="director" className="rounded-lg px-3 h-7 text-xs">Privados</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-10">
+      <main className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
         {loading ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {[1,2,3,4,5,6,7,8].map(i => <Skeleton key={i} className="h-44 rounded-2xl w-full" />)}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-48 rounded-3xl bg-muted/50" />
+            ))}
           </div>
         ) : filteredDocs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-32 bg-card/20 rounded-[2rem] border-2 border-dashed border-accent/5">
-            <div className="w-20 h-20 rounded-full bg-accent/5 flex items-center justify-center mb-6">
-              <FileBadge className="h-10 w-10 text-muted-foreground/30" />
+          <div className="flex flex-col items-center justify-center h-[400px] text-center bg-muted/20 rounded-3xl border-2 border-dashed border-accent/10">
+            <div className="w-20 h-20 bg-accent/5 rounded-full flex items-center justify-center mb-4">
+              <BookOpen className="h-10 w-10 text-accent/40" />
             </div>
-            <p className="text-xl font-medium text-foreground">Sin resultados</p>
-            <p className="text-sm text-muted-foreground mt-2">No hemos encontrado recursos que coincidan con tu búsqueda.</p>
-            <Button variant="outline" className="mt-8 border-accent/20 hover:bg-accent/5" onClick={() => setSearch("")}>
-              Limpiar filtros
+            <h3 className="text-xl font-semibold text-foreground">No se encontraron recursos</h3>
+            <p className="text-muted-foreground mt-2 max-w-sm">
+              Sube tus primeros manuales, protocolos o videos para comenzar a nutrir tu biblioteca digital.
+            </p>
+            <Button variant="outline" className="mt-6 border-accent/20" onClick={() => setIsUploadOpen(true)}>
+              Empezar ahora
             </Button>
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-8">
             {filteredDocs.map((doc) => (
-              <Card key={doc.id} className="group border-accent/10 bg-card/30 backdrop-blur-xl hover:border-accent/40 transition-all hover:shadow-2xl hover:shadow-accent/5 overflow-hidden flex flex-col rounded-2xl">
-                <CardHeader className="p-5 pb-0">
+              <Card key={doc.id} className="group relative bg-card border-accent/10 hover:border-accent/30 hover:shadow-2xl hover:shadow-accent/5 transition-all duration-500 rounded-3xl overflow-hidden flex flex-col h-full">
+                <CardHeader className="pb-3 relative">
                   <div className="flex justify-between items-start">
                     <div className={cn(
-                      "p-2.5 rounded-xl",
-                      doc.type === "youtube" ? "bg-red-500/10 text-red-500" : "bg-accent/10 text-accent"
+                      "p-3 rounded-2xl transition-colors",
+                      doc.type?.includes("youtube") ? "bg-red-500/10 text-red-500" : "bg-accent/10 text-accent"
                     )}>
-                      {doc.type === "youtube" ? <Video className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                      {doc.type?.includes("youtube") ? <Video className="h-6 w-6" /> : <FileText className="h-6 w-6" />}
                     </div>
-                    {doc.visibility === "director" ? (
-                      <Badge variant="outline" className="bg-orange-500/5 text-orange-500 border-none px-2 py-0 h-6 flex items-center gap-1">
-                        <Lock className="h-3 w-3" /> Privado
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="bg-accent/5 text-accent border-none px-2 py-0 h-6 flex items-center gap-1">
-                        <Users className="h-3 w-3" /> Compartido
+                    <Badge variant="outline" className={cn(
+                      "rounded-lg px-2 py-0 text-[10px] uppercase font-bold tracking-wider",
+                      doc.visibility === "director" ? "border-orange-500/20 text-orange-500 bg-orange-500/5" : "border-accent/20 text-accent bg-accent/5"
+                    )}>
+                      {doc.visibility === "director" ? "Privado" : "Público"}
+                    </Badge>
+                  </div>
+                  <CardTitle className="mt-4 line-clamp-2 text-lg font-bold group-hover:text-accent transition-colors">
+                    {doc.title}
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-2 mt-1 font-medium">
+                    <FileBadge className="h-3.5 w-3.5" />
+                    {doc.type?.split("/")[1]?.toUpperCase() || "RECURSO"} • {format(new Date(doc.created_at), "dd MMM yyyy", { locale: es })}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col pt-0">
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {doc.folder_id && (
+                      <Badge variant="secondary" className="bg-accent/5 text-accent border-accent/10 flex items-center gap-1.5 py-1 px-3 rounded-xl text-[10px]">
+                        <Folder className="h-3 w-3" />
+                        {folders.find(f => f.id === doc.folder_id)?.name || "Carpeta"}
                       </Badge>
                     )}
                   </div>
-                  <CardTitle className="mt-5 text-base font-bold line-clamp-2 leading-tight min-h-[40px] group-hover:text-accent transition-colors duration-300">
-                    {doc.title}
-                  </CardTitle>
-                  <CardDescription className="text-[11px] flex items-center gap-2 mt-2 font-medium">
-                    {format(new Date(doc.created_at), "d MMM, yyyy", { locale: es })}
-                    <span>•</span>
-                    <span className="uppercase text-accent font-bold tracking-wider">
-                      {doc.type === "youtube" ? "VIDEO" : doc.file_url?.split(".").pop()?.toUpperCase() || "DOC"}
-                    </span>
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-5 flex-1 flex flex-col">
-                  {doc.content_text && (
-                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground bg-muted/30 p-2 rounded-lg line-clamp-2 italic">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
-                      Indexado por IA
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between gap-2 mt-6 pt-4 border-t border-accent/5">
-                    <div className="flex gap-1">
+                  
+                  <div className="mt-auto pt-4 flex items-center justify-between border-t border-accent/5">
+                    <div className="flex items-center gap-1">
                       <Button 
                         variant="ghost" 
                         size="icon" 
@@ -682,5 +671,3 @@ export default function DocumentosPage() {
     </div>
   )
 }
-
-
