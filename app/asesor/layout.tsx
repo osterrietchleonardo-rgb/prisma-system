@@ -56,7 +56,13 @@ export default async function AsesorLayout({
 
     if (!insertError && newCredits) {
       aiCredits = newCredits
+    } else {
+      console.error("Failed to auto-initialize credits. Missing Service Role Key?", insertError)
+      // Provide a fallback so UI never breaks
+      aiCredits = { allocated_credits: 10000, consumed_credits: 0 }
     }
+  } else if (!aiCredits) {
+     aiCredits = { allocated_credits: 10000, consumed_credits: 0 }
   }
 
   // Double check role: ONLY redirect if we are SURE it's the wrong role
