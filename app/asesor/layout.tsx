@@ -70,7 +70,7 @@ export default async function AsesorLayout({
           userEmail={profile?.email || ""}
           agencyName={agencyName}
           userRole="Asesor"
-          aiCredits={aiCredits ? { allocated: aiCredits.allocated_credits, consumed: aiCredits.consumed_credits } : null}
+          aiCredits={aiCredits ? { allocated: aiCredits.allocated_credits, consumed: aiCredits.consumed_credits } : { allocated: 10000, consumed: 0 }}
         />
         <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-accent/20 flex flex-col min-h-0">
           {children}
