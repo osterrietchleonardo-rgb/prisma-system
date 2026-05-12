@@ -99,7 +99,7 @@ export default function AsesorConfiguracionPage() {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-6 p-4 md:p-8 pt-6 max-w-5xl mx-auto">
+    <div className="flex flex-col h-full space-y-6 p-4 md:p-8 pt-6 w-full animate-in fade-in duration-150">
       <div>
         <h2 className="text-3xl font-bold tracking-tight text-foreground">Configuración</h2>
         <p className="text-muted-foreground mt-1">
@@ -107,7 +107,7 @@ export default function AsesorConfiguracionPage() {
         </p>
       </div>
 
-      <Tabs defaultValue={defaultTab} className="space-y-6 min-h-[500px]">
+      <Tabs defaultValue={defaultTab} className="space-y-6">
         <TabsList className="bg-card border border-accent/10">
           <TabsTrigger value="perfil" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
             <User className="h-4 w-4" /> Perfil
