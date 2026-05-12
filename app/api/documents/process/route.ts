@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     let fileUrl = ""
     let videoUrl = ""
     let type = "document"
+    let folderId: string | null = null
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData()
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
       title = formData.get("title") as string
       visibility = formData.get("visibility") as string || "asesor"
       const agencyId = formData.get("agencyId") as string
+      folderId = formData.get("folder_id") as string || null
 
       if (!file || !agencyId) {
         return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 })
@@ -64,6 +66,7 @@ export async function POST(req: NextRequest) {
       title = body.title
       visibility = body.visibility || "asesor"
       const agencyId = body.agencyId
+      folderId = body.folder_id || null
 
       if (!videoUrl || !agencyId) {
         return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 })
@@ -77,7 +80,6 @@ export async function POST(req: NextRequest) {
         console.error("YouTube Transcript Error:", err)
         contentText = "No se pudo obtener la transcripción automáticamente. El contenido se analizará mediante metadatos."
       }
-
       type = "youtube"
     }
 
@@ -100,6 +102,7 @@ export async function POST(req: NextRequest) {
         content_text: contentText,
         embedding: embedding,
         visibility: visibility,
+        folder_id: folderId,
         processing_status: "completed"
       })
 
