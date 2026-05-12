@@ -35,6 +35,12 @@ export default async function DirectorLayout({
     // Optional: redirect to error or setup profile
   }
 
+  // Fetch AI Credits
+  const { data: aiCredits } = await supabase
+    .from("agency_ai_credits")
+    .select("allocated_credits, consumed_credits")
+    .single();
+
   // Double check role: ONLY redirect if we are SURE it's the wrong role
   if (profile?.role === "asesor") {
     redirect("/asesor/dashboard")
@@ -66,6 +72,7 @@ export default async function DirectorLayout({
           userEmail={profile?.email || ""}
           agencyName={agencyName}
           userRole="Director"
+          aiCredits={aiCredits ? { allocated: aiCredits.allocated_credits, consumed: aiCredits.consumed_credits } : null}
         />
         <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-accent/20 flex flex-col min-h-0">
           {children}

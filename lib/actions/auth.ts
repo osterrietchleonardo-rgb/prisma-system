@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { z } from "zod"
 import { redirect } from "next/navigation"
+import { headers } from "next/headers"
+import { loginRateLimit } from "@/lib/rate-limit"
 
 const registerSchema = z.object({
   fullName: z.string().min(3, "Mínimo 3 caracteres"),
@@ -20,12 +22,11 @@ const loginSchema = z.object({
 })
 
 function getFriendlyErrorMessage(message: string): string {
-  if (message.includes("Invalid login credentials")) return "Email o contraseña incorrectos."
+  if (message.includes("Invalid login credentials") || message.includes("User not found")) return "Email o contraseña incorrectos."
   if (message.includes("Email not confirmed")) return "Debes confirmar tu email antes de ingresar. Revisa tu casilla de correo."
   if (message.includes("already registered") || message.includes("already exists")) return "Este email ya se encuentra registrado."
   if (message.includes("rate limit") || message.includes("too many requests")) return "Demasiados intentos. Por favor espera unos minutos."
   if (message.includes("Password should be at least")) return "La contraseña debe tener al menos 6 caracteres."
-  if (message.includes("User not found")) return "No encontramos una cuenta con ese email."
   
   console.error("Auth Error:", message)
   return "Ocurrió un problema. Por favor intenta de nuevo."
@@ -148,6 +149,16 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
 
 export async function login(rawData: z.infer<typeof loginSchema>) {
   try {
+    const headersList = headers();
+    const ip = headersList.get('x-forwarded-for') || '127.0.0.1';
+    
+    if (loginRateLimit) {
+      const { success } = await loginRateLimit.limit(ip);
+      if (!success) {
+        return { error: "Demasiados intentos. Por favor espera unos minutos." };
+      }
+    }
+
     const data = loginSchema.parse(rawData)
     const supabase = createClient()
     const { data: authData, error } = await supabase.auth.signInWithPassword({

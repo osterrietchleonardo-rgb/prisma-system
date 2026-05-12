@@ -11,7 +11,8 @@ import {
   Key,
   Users,
   Copy,
-  Plus
+  Plus,
+  Sparkles
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -38,6 +39,7 @@ import {
 } from "@/lib/queries/director"
 
 import { useSearchParams } from "next/navigation"
+import { AiCreditsDashboard } from "@/components/ai-credits-dashboard"
 
 export default function DirectorConfiguracionPage() {
   const searchParams = useSearchParams()
@@ -188,6 +190,9 @@ export default function DirectorConfiguracionPage() {
           </TabsTrigger>
           <TabsTrigger value="agencia" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
             <Building2 className="h-4 w-4" /> Inmobiliaria
+          </TabsTrigger>
+          <TabsTrigger value="creditos" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+            <Sparkles className="h-4 w-4" /> Créditos IA
           </TabsTrigger>
           <TabsTrigger value="seguridad" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
             <Lock className="h-4 w-4" /> Accesso & Seguridad
@@ -343,6 +348,16 @@ export default function DirectorConfiguracionPage() {
             </CardContent>
           </Card>
 
+        </TabsContent>
+
+        <TabsContent value="creditos">
+          {profile.agency_id ? (
+            <AiCreditsDashboard agencyId={profile.agency_id} />
+          ) : (
+            <div className="flex items-center justify-center h-64 text-muted-foreground">
+              Cargando información de agencia...
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="seguridad">

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { generateImage } from "@/lib/gemini";
+import { consumeAiCredits, requireTenant } from "@/lib/auth/tenant-validation";
 import { GenerateImagePayload } from "@/types/marketing-ia";
 
 const buildImagePrompt = (payload: GenerateImagePayload): string => {
@@ -56,11 +57,12 @@ ${payload.extra_prompt ? `INSTRUCCIONES ADICIONALES: ${payload.extra_prompt}` : 
 export async function POST(req: Request) {
   try {
     const payload: GenerateImagePayload = await req.json();
+    const { userId, agencyId } = await requireTenant();
     const supabase = await createClient();
     const supabaseAdmin = createAdminClient();
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Consume AI Credits
+    await consumeAiCredits("marketing_ia", 1, `Generate Image: ${payload.format}`);
 
     const finalPrompt = buildImagePrompt(payload);
     const { draft_id, style, format, extra_prompt } = payload;
@@ -93,7 +95,7 @@ export async function POST(req: Request) {
     }
 
     // Upload to Storage using Admin Client
-    const fileName = `${user.id}/${draft_id}/${Date.now()}.jpg`;
+    const fileName = `${userId}/${draft_id}/${Date.now()}.jpg`;
     console.log('[DEBUG] Uploading to bucket: marketing-images, file:', fileName);
     
     const { error: uploadError } = await supabaseAdmin.storage
@@ -122,7 +124,7 @@ export async function POST(req: Request) {
     const { data: savedImage, error: dbError } = await supabaseAdmin
       .from('generated_images')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         draft_id,
         format,
         style,

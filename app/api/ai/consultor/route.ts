@@ -3,40 +3,26 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { generateEmbedding } from "@/lib/gemini";
 import { openaiIA } from "@/lib/openai";
 import { NextResponse } from "next/server";
+import { consumeAiCredits, requireTenant } from "@/lib/auth/tenant-validation";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    const { message, sessionId, agencyId, history } = await req.json();
+    const { message, sessionId, history } = await req.json();
+    const { userId, agencyId } = await requireTenant();
     console.log("Consultor IA Request:", { message, sessionId, agencyId });
     const supabase = await createClient();
 
-    // 1. Get User Profile
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    // Fetch profile to get agencyId if missing
-    let finalAgencyId = agencyId;
-    if (!finalAgencyId) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('agency_id')
-        .eq('id', user.id)
-        .single();
-      finalAgencyId = profile?.agency_id;
-    }
-
-    if (!finalAgencyId) {
-      return NextResponse.json({ error: "No se encontró el ID de la agencia." }, { status: 400 });
-    }
+    // Consume credits before starting processing
+    await consumeAiCredits("consultor_ia", 1, `Consultor: ${message.substring(0, 50)}`);
 
     // 2. Manage Session
     let currentSessionId = sessionId;
     if (!currentSessionId) {
       const { data: session } = await supabase
         .from('consultor_chat_sessions')
-        .insert({ user_id: user.id, agency_id: finalAgencyId })
+        .insert({ user_id: userId, agency_id: agencyId })
         .select()
         .single();
       currentSessionId = session.id;
@@ -77,7 +63,7 @@ export async function POST(req: Request) {
         query_embedding: queryEmbedding,
         match_threshold: 0.25, // Lowered for better recall
         match_count: 8,
-        p_agency_id: finalAgencyId
+        p_agency_id: agencyId
       });
 
       if (rpcError) {
@@ -218,14 +204,14 @@ export async function GET(req: Request) {
     return NextResponse.json(messages);
   }
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { userId, agencyId: authAgencyId } = await requireTenant();
 
-  const { data: sessions } = await supabase
-    .from('consultor_chat_sessions')
-    .select('*')
-    .eq('agency_id', agencyId)
-    .eq('user_id', user.id)
+    const { data: sessions } = await supabase
+      .from('consultor_chat_sessions')
+      .select('*')
+      .eq('agency_id', agencyId || authAgencyId)
+      .eq('user_id', userId)
     .order('created_at', { ascending: false }); // Usamos created_at como fallback más seguro
 
   return NextResponse.json(sessions);
@@ -241,13 +227,14 @@ export async function DELETE(req: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // First delete messages if there's no cascade
+  const supabase = await createClient();
   await supabase.from('consultor_chat_messages').delete().eq('session_id', sessionId);
   
   const { error } = await supabase
     .from('consultor_chat_sessions')
     .delete()
     .eq('id', sessionId)
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
@@ -255,15 +242,14 @@ export async function DELETE(req: Request) {
 
 export async function PATCH(req: Request) {
   const { sessionId, title } = await req.json();
+  const { userId } = await requireTenant();
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { error } = await supabase
     .from('consultor_chat_sessions')
     .update({ title })
     .eq('id', sessionId)
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { consumeAiCredits, requireTenant } from "@/lib/auth/tenant-validation"
 import { generateEmbedding } from "@/lib/gemini"
 import { openaiIA } from "@/lib/openai"
 
@@ -9,14 +10,12 @@ export async function POST(req: NextRequest) {
   const supabase = createClient()
   
   try {
-    const { data: { session: authSession } } = await supabase.auth.getSession()
-    if (!authSession) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
-
-    const { message, history, sessionId } = await req.json()
+    const { userId, agencyId } = await requireTenant();
     
-    // 1. Get Agency ID
-    const { data: profile } = await supabase.from("profiles").select("agency_id, role").eq("id", authSession.user.id).single()
-    if (!profile?.agency_id) return NextResponse.json({ error: "Perfil no encontrado" }, { status: 404 })
+    const { message, history, sessionId } = await req.json()
+
+    // Consume credits before processing
+    await consumeAiCredits("tutor_ia", 1, `Tutor Message: ${message.substring(0, 50)}`);
 
     // 2. Session Management
     let currentSessionId = sessionId
@@ -24,8 +23,8 @@ export async function POST(req: NextRequest) {
       const { data: newSession, error: sessionError } = await supabase
         .from("tutor_chat_sessions")
         .insert({
-          user_id: authSession.user.id,
-          agency_id: profile.agency_id,
+          user_id: userId,
+          agency_id: agencyId,
           title: "Nueva Conversación"
         })
         .select()
@@ -67,7 +66,7 @@ export async function POST(req: NextRequest) {
         query_embedding: queryEmbedding,
         match_threshold: 0.15, // Un poco más estricto pero efectivo
         match_count: 5,
-        p_agency_id: profile.agency_id
+        p_agency_id: agencyId
       })
 
       if (!rpcError && dbDocs) {
@@ -182,7 +181,7 @@ export async function GET(req: NextRequest) {
       const { data: sessions, error } = await supabase
         .from("tutor_chat_sessions")
         .select("*")
-        .eq("user_id", authSession.user.id)
+        .eq("user_id", userId)
         .order("updated_at", { ascending: false })
 
       if (error) throw error
@@ -197,8 +196,7 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const supabase = createClient()
   try {
-    const { data: { session: authSession } } = await supabase.auth.getSession()
-    if (!authSession) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+    const { userId } = await requireTenant();
 
     const { sessionId, title } = await req.json()
     if (!sessionId || !title) return NextResponse.json({ error: "Faltan datos" }, { status: 400 })
@@ -207,7 +205,7 @@ export async function PATCH(req: NextRequest) {
       .from("tutor_chat_sessions")
       .update({ title })
       .eq("id", sessionId)
-      .eq("user_id", authSession.user.id)
+      .eq("user_id", userId)
 
     if (error) throw error
     return NextResponse.json({ success: true })
@@ -222,8 +220,7 @@ export async function DELETE(req: NextRequest) {
   const sessionId = searchParams.get("sessionId")
 
   try {
-    const { data: { session: authSession } } = await supabase.auth.getSession()
-    if (!authSession) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+    const { userId } = await requireTenant();
 
     if (!sessionId) return NextResponse.json({ error: "Faltan datos" }, { status: 400 })
 
@@ -231,7 +228,7 @@ export async function DELETE(req: NextRequest) {
       .from("tutor_chat_sessions")
       .delete()
       .eq("id", sessionId)
-      .eq("user_id", authSession.user.id)
+      .eq("user_id", userId)
 
     if (error) throw error
     return NextResponse.json({ success: true })

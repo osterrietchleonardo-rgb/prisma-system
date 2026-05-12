@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { consumeAiCredits, requireTenant } from "@/lib/auth/tenant-validation"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import mammoth from "mammoth"
 
@@ -29,9 +30,7 @@ Responde ÚNICAMENTE con el JSON, sin texto adicional ni backticks.`
 
 export async function POST(req: Request) {
   try {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { userId, agencyId } = await requireTenant()
 
     const formData = await req.formData()
     const file = formData.get("file") as File | null
@@ -65,6 +64,9 @@ export async function POST(req: Request) {
     if (!extractedText || extractedText.trim().length < 100) {
       return NextResponse.json({ error: "No se pudo extraer suficiente texto del archivo" }, { status: 400 })
     }
+
+    // Consume AI Credits
+    await consumeAiCredits("contratos_ia", 1, `Convert template: ${fileName}`);
 
     // Call Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { prismaIA } from "@/lib/gemini";
 import { NextResponse } from "next/server";
+import { consumeAiCredits, requireTenant } from "@/lib/auth/tenant-validation";
 import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
 
 export const dynamic = "force-dynamic";
@@ -132,16 +133,17 @@ Respondé ÚNICAMENTE en JSON válido. El JSON debe ser estrictamente un ARRAY d
 export async function POST(req: Request) {
   try {
     const payload: GenerateBatchPayload = await req.json();
+    const { userId, agencyId } = await requireTenant();
     const supabase = await createClient();
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Consume AI Credits
+    await consumeAiCredits("marketing_ia", 1, `Generate Batch: ${payload.copy_type}`);
 
     const { data: ipc, error: ipcError } = await supabase
       .from('ipc_profiles')
       .select('*')
       .eq('id', payload.ipc_id)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (ipcError || !ipc) {
@@ -153,9 +155,8 @@ export async function POST(req: Request) {
 
     if (propertyId) {
       try {
-        const { data: profile } = await supabase.from("profiles").select("agency_id").eq("id", user.id).single();
-        if (profile?.agency_id) {
-          const { data: agency } = await supabase.from("agencies").select("tokko_api_key").eq("id", profile.agency_id).single();
+        if (agencyId) {
+          const { data: agency } = await supabase.from("agencies").select("tokko_api_key").eq("id", agencyId).single();
           const TOKKO_API_KEY = agency?.tokko_api_key || process.env.TOKKO_API_KEY;
           if (TOKKO_API_KEY) {
             const tokkoRes = await fetch(`https://tokkobroker.com/api/v1/property/${propertyId}/?key=${TOKKO_API_KEY}&format=json`);

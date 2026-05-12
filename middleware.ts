@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { aiRateLimit } from '@/lib/rate-limit'
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
@@ -9,6 +10,23 @@ export async function middleware(request: NextRequest) {
   })
 
   try {
+    const ip = request.ip ?? request.headers.get('x-forwarded-for') ?? '127.0.0.1'
+    const isAiEndpoint = request.nextUrl.pathname.startsWith('/api/ai/') || 
+                         request.nextUrl.pathname.startsWith('/api/marketing-ia/') || 
+                         request.nextUrl.pathname.startsWith('/api/contratos/');
+                         
+    if (isAiEndpoint && request.method === 'POST') {
+      if (aiRateLimit) {
+        const { success, reset } = await aiRateLimit.limit(ip)
+        if (!success) {
+          return NextResponse.json(
+            { error: 'Demasiadas peticiones. Por favor, intenta de nuevo más tarde.' }, 
+            { status: 429, headers: { 'Retry-After': reset.toString() } }
+          )
+        }
+      }
+    }
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

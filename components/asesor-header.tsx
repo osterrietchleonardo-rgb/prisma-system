@@ -3,9 +3,16 @@
 import { useState, useEffect } from "react"
 import { UserNav } from "@/components/user-nav"
 import { Badge } from "@/components/ui/badge"
-import { Bell, Search, Menu } from "lucide-react"
+import { Bell, Search, Menu, Sparkles } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   Sheet,
   SheetContent,
@@ -21,9 +28,10 @@ interface AsesorHeaderProps {
   userEmail?: string
   agencyName?: string
   userRole?: string
+  aiCredits?: { allocated: number; consumed: number } | null
 }
 
-export function AsesorHeader({ userName, userEmail, agencyName, userRole }: AsesorHeaderProps) {
+export function AsesorHeader({ userName, userEmail, agencyName, userRole, aiCredits }: AsesorHeaderProps) {
   const pathname = usePathname()
   const [customTitle, setCustomTitle] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -50,10 +58,15 @@ export function AsesorHeader({ userName, userEmail, agencyName, userRole }: Ases
     return () => document.removeEventListener("keydown", down)
   }, [])
 
-  // Simple breadcrumb logic
   const segments = pathname.split('/').filter(Boolean)
   const lastSegment = segments[segments.length - 1] || 'Dashboard'
   const pageTitle = customTitle || (lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' '))
+
+  // AI Credits calculations
+  const remainingCredits = aiCredits ? aiCredits.allocated - aiCredits.consumed : 0;
+  const creditsPercentage = aiCredits ? Math.min(100, Math.max(0, (aiCredits.consumed / aiCredits.allocated) * 100)) : 0;
+  const isCreditsWarning = creditsPercentage > 80;
+  const isCreditsDanger = creditsPercentage > 95;
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -100,6 +113,37 @@ export function AsesorHeader({ userName, userEmail, agencyName, userRole }: Ases
                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
                {agencyName}
              </Badge>
+             
+             {aiCredits && (
+               <TooltipProvider delayDuration={100}>
+                 <Tooltip>
+                   <TooltipTrigger asChild>
+                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/5 border border-accent/10 hover:bg-accent/10 transition-colors cursor-default select-none">
+                       <Sparkles className={`w-4 h-4 ${isCreditsDanger ? 'text-destructive' : isCreditsWarning ? 'text-yellow-500' : 'text-accent'}`} />
+                       <span className="text-xs font-semibold text-muted-foreground">
+                         {remainingCredits.toLocaleString()} <span className="hidden lg:inline">créditos</span>
+                       </span>
+                     </div>
+                   </TooltipTrigger>
+                   <TooltipContent side="bottom" align="end" className="w-64 p-4 bg-card border-accent/20">
+                     <div className="space-y-2">
+                       <div className="flex justify-between items-center">
+                         <span className="text-sm font-semibold">Créditos IA</span>
+                         <span className="text-xs font-bold text-accent">{creditsPercentage.toFixed(1)}% consumido</span>
+                       </div>
+                       <Progress value={creditsPercentage} className={`h-2 ${isCreditsDanger ? '*:[background-color:hsl(var(--destructive))]' : isCreditsWarning ? '*:[background-color:#eab308]' : '*:[background-color:hsl(var(--accent))]'}`} />
+                       <div className="flex justify-between text-xs text-muted-foreground pt-1">
+                         <span>{aiCredits.consumed.toLocaleString()} usados</span>
+                         <span>{aiCredits.allocated.toLocaleString()} total</span>
+                       </div>
+                       <p className="text-[10px] text-muted-foreground/70 mt-2 text-center border-t border-accent/10 pt-2">
+                         Los créditos se comparten con toda la agencia.
+                       </p>
+                     </div>
+                   </TooltipContent>
+                 </Tooltip>
+               </TooltipProvider>
+             )}
           </div>
           
           <NotificationPopover />
