@@ -16,8 +16,8 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
 interface AiCredits {
-  allocated_credits: number
-  consumed_credits: number
+  credits_total: number
+  credits_used: number
 }
 
 interface Transaction {
@@ -46,7 +46,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
         // Fetch global balance
         const { data: creditsData } = await supabase
           .from("agency_ai_credits")
-          .select("allocated_credits, consumed_credits")
+          .select("credits_total, credits_used")
           .eq("agency_id", agencyId)
           .maybeSingle()
         
@@ -54,7 +54,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
           setCredits(creditsData)
         } else {
           // If no credits row, it might be auto-initialized soon or handle fallback
-          setCredits({ allocated_credits: 10000, consumed_credits: 0 })
+          setCredits({ credits_total: 10000, credits_used: 0 })
         }
 
         // Fetch recent transactions (last 50) scoped to agency
@@ -88,8 +88,8 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
 
   if (!agencyId) return null
 
-  const remaining = credits ? credits.allocated_credits - credits.consumed_credits : 0
-  const percentage = credits ? Math.min(100, Math.max(0, (credits.consumed_credits / credits.allocated_credits) * 100)) : 0
+  const remaining = credits ? credits.credits_total - credits.credits_used : 0
+  const percentage = credits ? Math.min(100, Math.max(0, (credits.credits_used / credits.credits_total) * 100)) : 0
   const isDanger = percentage > 95
   const isWarning = percentage > 80
 
@@ -115,7 +115,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
               {loading ? "..." : remaining.toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              de {credits?.allocated_credits.toLocaleString() || "0"} totales
+              de {credits?.credits_total.toLocaleString() || "0"} totales
             </p>
           </CardContent>
         </Card>

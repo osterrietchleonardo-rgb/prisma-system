@@ -41,7 +41,7 @@ export default async function DirectorLayout({
   if (profile?.agency_id) {
     const { data } = await supabase
       .from("agency_ai_credits")
-      .select("allocated_credits, consumed_credits")
+      .select("credits_total, credits_used")
       .eq("agency_id", profile.agency_id)
       .maybeSingle();
     aiCredits = data;
@@ -54,10 +54,10 @@ export default async function DirectorLayout({
       .from("agency_ai_credits")
       .insert({
         agency_id: profile.agency_id,
-        allocated_credits: 10000,
-        consumed_credits: 0
+        credits_total: 10000,
+        credits_used: 0
       })
-      .select("allocated_credits, consumed_credits")
+      .select("credits_total, credits_used")
       .single()
 
     if (!insertError && newCredits) {
@@ -65,10 +65,10 @@ export default async function DirectorLayout({
     } else {
       console.error("Failed to auto-initialize credits. Missing Service Role Key?", insertError)
       // Provide a fallback so UI never breaks
-      aiCredits = { allocated_credits: 10000, consumed_credits: 0 }
+      aiCredits = { credits_total: 10000, credits_used: 0 }
     }
   } else if (!aiCredits) {
-     aiCredits = { allocated_credits: 10000, consumed_credits: 0 }
+     aiCredits = { credits_total: 10000, credits_used: 0 }
   }
 
   // Double check role: ONLY redirect if we are SURE it's the wrong role
@@ -102,7 +102,7 @@ export default async function DirectorLayout({
           userEmail={profile?.email || ""}
           agencyName={agencyName}
           userRole="Director"
-          aiCredits={aiCredits ? { allocated: aiCredits.allocated_credits, consumed: aiCredits.consumed_credits } : null}
+          aiCredits={aiCredits ? { allocated: aiCredits.credits_total, consumed: aiCredits.credits_used } : null}
         />
         <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-accent/20 flex flex-col min-h-0">
           {children}
