@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     }
 
     // Consume 5 credits for professional AI contract generation/finalization
-    await consumeAiCredits("contrato_ia", 5, `Finalizing Contract ID: ${contrato_id}`);
+    await consumeAiCredits("contratos_ia", 5, `Finalizing Contract ID: ${contrato_id}`);
 
     // Get the contrato
     const { data: contrato, error: contratoError } = await supabase

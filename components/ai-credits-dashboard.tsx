@@ -23,8 +23,8 @@ interface AiCredits {
 interface Transaction {
   id: string
   created_at: string
-  action_type: string
-  cost: number
+  feature: string
+  credits_consumed: number
   profiles: {
     full_name: string
     email: string
@@ -63,8 +63,8 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
           .select(`
             id,
             created_at,
-            action_type,
-            cost,
+            feature,
+            credits_consumed,
             profiles (
               full_name,
               email
@@ -198,11 +198,11 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
                       </td>
                       <td className="px-4 py-3">
                         <Badge variant="outline" className="bg-background border-accent/20 text-accent">
-                          {tx.action_type}
+                          {tx.feature}
                         </Badge>
                       </td>
                       <td className="px-4 py-3 text-right font-mono font-medium text-destructive">
-                        -{tx.cost}
+                        -{tx.credits_consumed}
                       </td>
                     </tr>
                   ))
