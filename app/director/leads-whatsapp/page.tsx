@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
 import LeadsWhatsappClient from "./LeadsWhatsappClient"
+import { Badge } from "@/components/ui/badge"
 
 export const metadata = {
   title: 'Leads WhatsApp - Prisma System',
@@ -37,17 +38,27 @@ export default async function LeadsWhatsappPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2 bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
-          Leads de WhatsApp
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          Gestiona los leads que te han contactado por WhatsApp y envíalos al Pipeline.
-        </p>
+    <div className="flex flex-col h-full space-y-6 pt-6 container max-w-[1600px] mx-auto pb-10 px-4 md:px-8 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex flex-wrap items-center gap-3">
+            Leads de WhatsApp
+            <Badge variant="outline" className="text-[10px] md:text-xs">Canal Directo</Badge>
+            {conversations && conversations.length > 0 && (
+              <Badge variant="secondary" className="text-[10px] md:text-xs bg-accent/10 text-accent border-accent/20">
+                {conversations.length} {conversations.length === 1 ? 'lead' : 'leads'}
+              </Badge>
+            )}
+          </h2>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Gestión inteligente de leads provenientes de WhatsApp y asignación al Pipeline.
+          </p>
+        </div>
       </div>
 
-      <LeadsWhatsappClient initialConversations={conversations || []} basePath="/director/leads-whatsapp" />
+      <div className="mt-6">
+        <LeadsWhatsappClient initialConversations={conversations || []} basePath="/director/leads-whatsapp" />
+      </div>
     </div>
   )
 }
