@@ -49,6 +49,18 @@
 
 ## 🔄 ENTRADAS DE PROGRESO
 
+### 2026-05-12 | P9 — Database Security: RLS Audit & Granular Isolation
+- **Security Audit**:
+  - Identificación de 3 tablas con RLS habilitado pero sin políticas activas (`lead_activities`, `visits`, `valuations`), lo que bloqueaba el acceso legítimo desde la App.
+  - Detección de política insegura en `n8n_chat_histories` que permitía visibilidad global a cualquier usuario autenticado.
+- **RLS Implementation**:
+  - **Aislamiento Multi-tenant**: Creación de políticas basadas en `agency_id` (vía `get_my_agency_id()`) para `valuations`, `lead_activities` y `visits`.
+  - **Jerarquía de Roles**: Los Directores mantienen acceso total a la agencia; los Asesores están restringidos a sus propios registros o leads asignados.
+  - **Chat Privacy**: Refactorización de `n8n_chat_histories` para filtrar mensajes por `session_id` vinculado a conversaciones de la agencia del usuario.
+- **Mantenibilidad**:
+  - Creación de migración SQL (`20260512123000_secure_rls_and_chat_histories.sql`) para sincronización del repositorio.
+  - Verificación técnica del cast `UUID::text` para compatibilidad de joins en políticas de historial.
+
 ### 2026-04-27 | P8 — WhatsApp: RLS Security & Webhook Reliability
 - **RLS Modernization**:
   - Reemplazo de políticas basadas en subqueries por el patrón `EXISTS` en `wa_conversations`, `wa_messages` y `wa_contacts` para máxima fiabilidad.
