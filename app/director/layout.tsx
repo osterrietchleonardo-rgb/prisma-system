@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DirectorSidebar } from "@/components/director-sidebar"
 import { DirectorHeader } from "@/components/director-header"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export default async function DirectorLayout({
   children,
@@ -36,10 +37,28 @@ export default async function DirectorLayout({
   }
 
   // Fetch AI Credits
-  const { data: aiCredits } = await supabase
+  let { data: aiCredits } = await supabase
     .from("agency_ai_credits")
     .select("allocated_credits, consumed_credits")
     .single();
+
+  // If agency exists but no credits row, auto-initialize real credits via admin
+  if (!aiCredits && profile?.agency_id) {
+    const adminSupabase = createAdminClient()
+    const { data: newCredits, error: insertError } = await adminSupabase
+      .from("agency_ai_credits")
+      .insert({
+        agency_id: profile.agency_id,
+        allocated_credits: 10000,
+        consumed_credits: 0
+      })
+      .select("allocated_credits, consumed_credits")
+      .single()
+
+    if (!insertError && newCredits) {
+      aiCredits = newCredits
+    }
+  }
 
   // Double check role: ONLY redirect if we are SURE it's the wrong role
   if (profile?.role === "asesor") {
@@ -72,7 +91,7 @@ export default async function DirectorLayout({
           userEmail={profile?.email || ""}
           agencyName={agencyName}
           userRole="Director"
-          aiCredits={aiCredits ? { allocated: aiCredits.allocated_credits, consumed: aiCredits.consumed_credits } : { allocated: 10000, consumed: 0 }}
+          aiCredits={aiCredits ? { allocated: aiCredits.allocated_credits, consumed: aiCredits.consumed_credits } : null}
         />
         <main className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-accent/20 flex flex-col min-h-0">
           {children}
