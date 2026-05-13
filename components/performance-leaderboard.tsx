@@ -13,7 +13,8 @@ import {
   Home,
   Target,
   DollarSign,
-  Briefcase
+  Briefcase,
+  Zap
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +96,7 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
                 <MetricHeader icon={Search} label="Comp." tooltip="Compradores Calificados" />
                 <MetricHeader icon={Home} label="Capt." tooltip="Propiedades Captadas" />
                 <MetricHeader icon={Target} label="Res." tooltip="Reservas Logradas" />
+                <MetricHeader icon={Zap} label="Cierre" tooltip="Cierres Totales" />
                 <MetricHeader icon={Briefcase} label="Cart." tooltip="Cartera Activa (Tokko)" />
                 <MetricHeader icon={Percent} label="Rot." tooltip="% Rotación Anualizada" />
                 <MetricHeader icon={DollarSign} label="Fact." tooltip="GCI (Facturación Bruta)" />
@@ -132,6 +134,9 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
                   </td>
                   <td className="px-3 py-4 text-center">
                     <span className="font-bold text-orange-400/90">{advisor.reservas}</span>
+                  </td>
+                  <td className="px-3 py-4 text-center">
+                    <span className="font-bold text-red-400/90">{advisor.transacciones}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
                     <Badge variant="secondary" className="bg-slate-500/10 text-slate-400 border-none font-mono text-[10px]">
