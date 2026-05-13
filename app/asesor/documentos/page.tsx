@@ -18,7 +18,9 @@ import {
   ChevronRight,
   FolderOpen,
   Plus,
-  Loader2
+  Loader2,
+  Pencil,
+  Trash2
 } from "lucide-react"
 import { 
   Dialog,
@@ -56,6 +58,8 @@ export default function AsesorDocumentosPage() {
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [selectedFolderId, setSelectedFolderId] = useState<string | "all">("all")
+  const [folderToEdit, setFolderToEdit] = useState<Record<string, any> | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<string | null>(null)
   
   // Folder Management State
   const [movingDoc, setMovingDoc] = useState<Record<string, any> | null>(null)
@@ -162,6 +166,67 @@ export default function AsesorDocumentosPage() {
     }
   }
 
+  const handleUpdateFolder = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!agencyId || !folderToEdit) return
+
+    const formData = new FormData(e.currentTarget)
+    const name = formData.get("name") as string
+    const description = formData.get("description") as string
+
+    try {
+      setCreatingFolder(true)
+      const { error } = await supabase
+        .from("document_folders")
+        .update({
+          name,
+          description
+        })
+        .eq("id", folderToEdit.id)
+
+      if (error) throw error
+
+      toast.success("Carpeta actualizada correctamente")
+      setIsFolderModalOpen(false)
+      setFolderToEdit(null)
+      fetchFolders(agencyId)
+    } catch (error: any) {
+      toast.error("Error al actualizar carpeta: " + error.message)
+    } finally {
+      setCreatingFolder(false)
+    }
+  }
+
+  const handleDeleteFolder = async (id: string) => {
+    if (!confirm("¿Estás seguro de eliminar esta carpeta? Los documentos no se borrarán, solo quedarán sin carpeta.") || !agencyId) return
+
+    try {
+      setDeletingFolder(id)
+      
+      // First, null out folder_id for documents in this folder
+      await supabase
+        .from("agency_documents")
+        .update({ folder_id: null })
+        .eq("folder_id", id)
+
+      // Then delete the folder
+      const { error } = await supabase
+        .from("document_folders")
+        .delete()
+        .eq("id", id)
+
+      if (error) throw error
+
+      toast.success("Carpeta eliminada")
+      if (selectedFolderId === id) setSelectedFolderId("all")
+      fetchFolders(agencyId)
+    } catch (error: any) {
+      toast.error("Error al eliminar carpeta: " + error.message)
+    } finally {
+      setDeletingFolder(null)
+    }
+  }
+
   const handleMoveToFolder = async (folderId: string) => {
     if (!movingDoc || !agencyId) return
 
@@ -217,29 +282,32 @@ export default function AsesorDocumentosPage() {
             <DialogContent className="bg-card border-accent/20 sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                  <FolderPlus className="text-accent" />
-                  Crear Nueva Carpeta
+                  {folderToEdit ? <Folder className="text-accent" /> : <FolderPlus className="text-accent" />}
+                  {folderToEdit ? "Editar Carpeta" : "Crear Nueva Carpeta"}
                 </DialogTitle>
                 <DialogDescription>
-                  Organiza los recursos compartidos en carpetas personalizadas.
+                  {folderToEdit ? "Modifica el nombre o descripción de la carpeta." : "Organiza los recursos compartidos en carpetas personalizadas."}
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleCreateFolder} className="space-y-4 py-4">
+              <form onSubmit={folderToEdit ? handleUpdateFolder : handleCreateFolder} className="space-y-4 py-4">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">Nombre de la Carpeta</label>
-                  <Input name="name" placeholder="Ej: Manuales de Venta" required />
+                  <Input name="name" placeholder="Ej: Manuales de Venta" defaultValue={folderToEdit?.name || ""} required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">Descripción (Opcional)</label>
-                  <Input name="description" placeholder="Ej: Guías paso a paso para asesores" />
+                  <Input name="description" placeholder="Ej: Guías paso a paso para asesores" defaultValue={folderToEdit?.description || ""} />
                 </div>
                 <DialogFooter className="pt-4">
-                  <Button variant="ghost" type="button" onClick={() => setIsFolderModalOpen(false)}>
+                  <Button variant="ghost" type="button" onClick={() => {
+                    setIsFolderModalOpen(false)
+                    setFolderToEdit(null)
+                  }}>
                     Cancelar
                   </Button>
                   <Button type="submit" className="bg-accent" disabled={creatingFolder}>
                     {creatingFolder ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Crear Carpeta
+                    {folderToEdit ? "Guardar Cambios" : "Crear Carpeta"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -331,22 +399,47 @@ export default function AsesorDocumentosPage() {
           Todos los Archivos
         </Button>
         {folders.map(folder => (
-          <Button
-            key={folder.id}
-            variant={selectedFolderId === folder.id ? "secondary" : "ghost"}
-            size="sm"
-            className={cn(
-              "rounded-xl h-10 px-4 whitespace-nowrap gap-2",
-              selectedFolderId === folder.id ? "bg-accent/10 text-accent hover:bg-accent/20" : "text-muted-foreground hover:bg-accent/5 hover:text-accent/80"
+          <div key={folder.id} className="flex items-center gap-1 group">
+            <Button
+              variant={selectedFolderId === folder.id ? "secondary" : "ghost"}
+              size="sm"
+              className={cn(
+                "rounded-xl h-10 px-4 whitespace-nowrap gap-2",
+                selectedFolderId === folder.id ? "bg-accent/10 text-accent hover:bg-accent/20" : "text-muted-foreground hover:bg-accent/5 hover:text-accent/80"
+              )}
+              onClick={() => setSelectedFolderId(folder.id)}
+            >
+              {selectedFolderId === folder.id ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
+              {folder.name}
+              <Badge variant="outline" className="ml-1 px-1.5 h-5 bg-background/50 border-none text-[10px]">
+                {documents.filter(d => d.folder_id === folder.id).length}
+              </Badge>
+            </Button>
+            {selectedFolderId === folder.id && (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-accent"
+                  onClick={() => {
+                    setFolderToEdit(folder)
+                    setIsFolderModalOpen(true)
+                  }}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                  onClick={() => handleDeleteFolder(folder.id)}
+                  disabled={deletingFolder === folder.id}
+                >
+                  {deletingFolder === folder.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                </Button>
+              </div>
             )}
-            onClick={() => setSelectedFolderId(folder.id)}
-          >
-            {selectedFolderId === folder.id ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
-            {folder.name}
-            <Badge variant="outline" className="ml-1 px-1.5 h-5 bg-background/50 border-none text-[10px]">
-              {documents.filter(d => d.folder_id === folder.id).length}
-            </Badge>
-          </Button>
+          </div>
         ))}
       </div>
 

@@ -22,7 +22,8 @@ import {
   FolderPlus,
   Folder,
   ChevronRight,
-  FolderOpen
+  FolderOpen,
+  Pencil
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -78,6 +79,8 @@ export default function DocumentosPage() {
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [selectedFolderId, setSelectedFolderId] = useState<string | "all">("all")
+  const [folderToEdit, setFolderToEdit] = useState<Record<string, any> | null>(null)
+  const [deletingFolder, setDeletingFolder] = useState<string | null>(null)
   
   const supabase = createClient()
 
@@ -227,6 +230,67 @@ export default function DocumentosPage() {
     }
   }
 
+  const handleUpdateFolder = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!agencyId || !folderToEdit) return
+
+    const formData = new FormData(e.currentTarget)
+    const name = formData.get("name") as string
+    const description = formData.get("description") as string
+
+    try {
+      setCreatingFolder(true)
+      const { error } = await supabase
+        .from("document_folders")
+        .update({
+          name,
+          description
+        })
+        .eq("id", folderToEdit.id)
+
+      if (error) throw error
+
+      toast.success("Carpeta actualizada correctamente")
+      setIsFolderModalOpen(false)
+      setFolderToEdit(null)
+      fetchFolders(agencyId)
+    } catch (error: any) {
+      toast.error("Error al actualizar carpeta: " + error.message)
+    } finally {
+      setCreatingFolder(false)
+    }
+  }
+
+  const handleDeleteFolder = async (id: string) => {
+    if (!confirm("¿Estás seguro de eliminar esta carpeta? Los documentos no se borrarán, solo quedarán sin carpeta.") || !agencyId) return
+
+    try {
+      setDeletingFolder(id)
+      
+      // First, null out folder_id for documents in this folder
+      await supabase
+        .from("agency_documents")
+        .update({ folder_id: null })
+        .eq("folder_id", id)
+
+      // Then delete the folder
+      const { error } = await supabase
+        .from("document_folders")
+        .delete()
+        .eq("id", id)
+
+      if (error) throw error
+
+      toast.success("Carpeta eliminada")
+      if (selectedFolderId === id) setSelectedFolderId("all")
+      fetchFolders(agencyId)
+    } catch (error: any) {
+      toast.error("Error al eliminar carpeta: " + error.message)
+    } finally {
+      setDeletingFolder(null)
+    }
+  }
+
   const handleDelete = async (id: string, path?: string) => {
     if (!confirm("¿Estás seguro de eliminar este recurso?") || !agencyId) return
 
@@ -299,29 +363,32 @@ export default function DocumentosPage() {
             <DialogContent className="bg-card border-accent/20 sm:max-w-[425px]">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                  <FolderPlus className="text-accent" />
-                  Crear Nueva Carpeta
+                  {folderToEdit ? <Folder className="text-accent" /> : <FolderPlus className="text-accent" />}
+                  {folderToEdit ? "Editar Carpeta" : "Crear Nueva Carpeta"}
                 </DialogTitle>
                 <DialogDescription>
-                  Organiza tus documentos en carpetas personalizadas.
+                  {folderToEdit ? "Modifica el nombre o descripción de la carpeta." : "Organiza tus documentos en carpetas personalizadas."}
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleCreateFolder} className="space-y-4 py-4">
+              <form onSubmit={folderToEdit ? handleUpdateFolder : handleCreateFolder} className="space-y-4 py-4">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">Nombre de la Carpeta</label>
-                  <Input name="name" placeholder="Ej: Legajos de Venta" required />
+                  <Input name="name" placeholder="Ej: Legajos de Venta" defaultValue={folderToEdit?.name || ""} required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold">Descripción (Opcional)</label>
-                  <Input name="description" placeholder="Ej: Documentación necesaria para cierres" />
+                  <Input name="description" placeholder="Ej: Documentación necesaria para cierres" defaultValue={folderToEdit?.description || ""} />
                 </div>
                 <DialogFooter className="pt-4">
-                  <Button variant="ghost" type="button" onClick={() => setIsFolderModalOpen(false)}>
+                  <Button variant="ghost" type="button" onClick={() => {
+                    setIsFolderModalOpen(false)
+                    setFolderToEdit(null)
+                  }}>
                     Cancelar
                   </Button>
                   <Button type="submit" className="bg-accent" disabled={creatingFolder}>
                     {creatingFolder ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Crear Carpeta
+                    {folderToEdit ? "Guardar Cambios" : "Crear Carpeta"}
                   </Button>
                 </DialogFooter>
               </form>
@@ -552,16 +619,41 @@ export default function DocumentosPage() {
               Todos
             </Button>
             {folders.map(f => (
-              <Button
-                key={f.id}
-                variant={selectedFolderId === f.id ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setSelectedFolderId(f.id)}
-                className="rounded-lg h-8 px-3 text-xs gap-2"
-              >
-                <Folder className="h-3 w-3" />
-                {f.name}
-              </Button>
+              <div key={f.id} className="flex items-center gap-1 group">
+                <Button
+                  variant={selectedFolderId === f.id ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setSelectedFolderId(f.id)}
+                  className="rounded-lg h-8 px-3 text-xs gap-2"
+                >
+                  <Folder className="h-3 w-3" />
+                  {f.name}
+                </Button>
+                {selectedFolderId === f.id && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-accent"
+                      onClick={() => {
+                        setFolderToEdit(f)
+                        setIsFolderModalOpen(true)
+                      }}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteFolder(f.id)}
+                      disabled={deletingFolder === f.id}
+                    >
+                      {deletingFolder === f.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
 
