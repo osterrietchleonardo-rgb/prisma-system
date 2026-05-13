@@ -13,8 +13,11 @@ import {
   Home,
   QrCode,
   Share2,
-  RefreshCcw
+  RefreshCcw,
+  Zap,
+  Briefcase
 } from "lucide-react"
+import { getAgentPerformanceAction } from "@/app/actions/performance"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -61,6 +64,8 @@ export default function AsesoresPage() {
   const [inviteCode, setInviteCode] = useState("")
   const [copied, setCopied] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState<Record<string, any> | null>(null)
+  const [agentKpis, setAgentKpis] = useState<any>(null)
+  const [loadingKpis, setLoadingKpis] = useState(false)
   
   const supabase = createClient()
   const [agencyId, setAgencyId] = useState<string | null>(null)
@@ -122,6 +127,25 @@ export default function AsesoresPage() {
   useEffect(() => {
     fetchAgents()
   }, [fetchAgents])
+
+  useEffect(() => {
+    const fetchAgentPerformance = async () => {
+      if (!selectedAgent) {
+        setAgentKpis(null)
+        return
+      }
+      try {
+        setLoadingKpis(true)
+        const kpis = await getAgentPerformanceAction(selectedAgent.id)
+        setAgentKpis(kpis)
+      } catch (error) {
+        console.error("Error fetching agent performance:", error)
+      } finally {
+        setLoadingKpis(false)
+      }
+    }
+    fetchAgentPerformance()
+  }, [selectedAgent])
 
   const generateInviteCode = async () => {
     if (!agencyId) return
@@ -344,6 +368,7 @@ export default function AsesoresPage() {
           </SheetHeader>
           
           <div className="space-y-6 mt-8">
+          <div className="space-y-6 mt-8 overflow-y-auto max-h-[calc(100vh-250px)] pr-2">
             <div className="grid grid-cols-2 gap-4">
               <Card className="bg-accent/5 border-accent/10 shadow-none">
                 <CardHeader className="p-4 pb-0">
@@ -353,35 +378,101 @@ export default function AsesoresPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <p className="text-3xl font-bold">{selectedAgent?.closings?.[0]?.count || 0}</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">Ventas finalizadas</p>
+                  {loadingKpis ? <Skeleton className="h-8 w-16" /> : (
+                    <>
+                      <p className="text-3xl font-bold">{agentKpis?.transacciones || 0}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">Ventas finalizadas</p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
               <Card className="bg-accent/5 border-accent/10 shadow-none">
                 <CardHeader className="p-4 pb-0">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center justify-between">
-                    Conversión
-                    <Target className="h-3 w-3 text-accent" />
+                    Rotación
+                    <Zap className="h-3 w-3 text-yellow-500" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
-                  <p className="text-3xl font-bold">
-                    {selectedAgent?.assigned_leads?.[0]?.count && selectedAgent?.closings?.[0]?.count 
-                      ? Math.round((selectedAgent.closings[0].count / selectedAgent.assigned_leads[0].count) * 100)
-                      : 0}%
-                  </p>
-                  <p className="text-[10px] text-accent mt-1">Ratio de eficiencia</p>
+                  {loadingKpis ? <Skeleton className="h-8 w-16" /> : (
+                    <>
+                      <p className="text-3xl font-bold">{agentKpis?.rotacion.toFixed(1) || 0}%</p>
+                      <p className="text-[10px] text-accent mt-1">Eficiencia de stock</p>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
 
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold flex items-center gap-2">
-                <Home className="h-4 w-4 text-accent" />
-                Propiedades Asignadas
+            {/* Conversion Ratios Section */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                <Target className="h-4 w-4 text-accent" />
+                Embudo de Conversión
               </h4>
+              <div className="grid gap-3">
+                {loadingKpis ? [1,2,3].map(i => <Skeleton key={i} className="h-12 w-full rounded-xl" />) : (
+                  <>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-card border border-accent/10">
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">WhatsApp / Cierre</p>
+                        <p className="text-xs font-medium">Calidad de Consultas</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold">1:{agentKpis?.ratioWaCierre.toFixed(1) || "0.0"}</p>
+                        <p className="text-[10px] text-accent font-bold">
+                          {agentKpis?.ratioWaCierre > 0 ? (100 / agentKpis.ratioWaCierre).toFixed(1) : "0"}%
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-card border border-accent/10">
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Prospección / Cierre</p>
+                        <p className="text-xs font-medium">Efectividad Activa</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold">1:{agentKpis?.ratioProspCierre.toFixed(1) || "0.0"}</p>
+                        <p className="text-[10px] text-accent font-bold">
+                          {agentKpis?.ratioProspCierre > 0 ? (100 / agentKpis.ratioProspCierre).toFixed(1) : "0"}%
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-accent/5 border border-accent/20 shadow-inner">
+                      <div className="space-y-0.5">
+                        <p className="text-[10px] font-bold text-accent uppercase">Conversión Total</p>
+                        <p className="text-xs font-medium">Global Funnel</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-accent">1:{agentKpis?.ratioTotalLeadsCierre.toFixed(1) || "0.0"}</p>
+                        <p className="text-[10px] text-accent font-bold">
+                          {agentKpis?.ratioTotalLeadsCierre > 0 ? (100 / agentKpis.ratioTotalLeadsCierre).toFixed(1) : "0"}%
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="text-sm font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+                <Briefcase className="h-4 w-4 text-accent" />
+                Cartera y Stock
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-card border border-accent/10">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">Inventario Activo</p>
+                  <p className="text-lg font-bold mt-1">{agentKpis?.carteraActiva || 0}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-card border border-accent/10">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase">Días en Cartera</p>
+                  <p className="text-lg font-bold mt-1">~{agentKpis?.dom || 45}</p>
+                </div>
+              </div>
+              
               <div className="space-y-2">
-                <div className="py-8 text-center bg-accent/5 rounded-xl border border-dashed border-accent/20">
+                <h5 className="text-[10px] font-bold text-muted-foreground uppercase px-1">Últimas Propiedades</h5>
+                <div className="py-6 text-center bg-accent/5 rounded-xl border border-dashed border-accent/20">
                   <p className="text-xs text-muted-foreground">No hay propiedades vinculadas actualmente.</p>
                 </div>
               </div>
