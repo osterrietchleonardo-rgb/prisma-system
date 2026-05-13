@@ -207,22 +207,13 @@ export default function AsesoresPage() {
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold">Invitar al equipo</DialogTitle>
                 <DialogDescription>
-                  Comparte este código o enlace con los nuevos asesores para que se vinculen a tu inmobiliaria.
+                  Comparte este código con los nuevos asesores para que se vinculen a tu inmobiliaria.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-6 py-4">
                 {inviteCode ? (
                   <div className="space-y-4">
-                    <div className="flex flex-col items-center justify-center p-6 bg-white rounded-2xl border border-accent/10 shadow-inner">
-                      <QRCodeSVG 
-                        value={`${window.location.origin}/auth/register?code=${inviteCode}`} 
-                        size={180}
-                        fgColor="#020617"
-                      />
-                      <p className="mt-4 text-xs font-bold text-slate-400 uppercase tracking-widest">Escanear para registrarse</p>
-                    </div>
-                    
                     <div className="flex items-center gap-2">
                       <div className="flex-1 bg-accent/5 p-3 rounded-xl border border-accent/20 font-mono text-center text-lg font-bold tracking-widest text-accent">
                         {inviteCode}
