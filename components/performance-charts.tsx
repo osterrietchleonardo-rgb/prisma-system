@@ -16,7 +16,8 @@ import {
   Legend,
   Cell,
   Pie,
-  PieChart
+  PieChart,
+  ComposedChart
 } from "recharts"
 
 interface Props {
@@ -131,6 +132,39 @@ export function PerformanceCharts({ data, channels }: { data: any[], channels?: 
               />
               <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
             </PieChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Conversion Evolution Chart */}
+      <Card className="md:col-span-2 lg:col-span-2 border-accent/10 bg-card/50 backdrop-blur-sm">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold">Evolución de Conversión</CardTitle>
+          <CardDescription>Volúmenes vs Eficacia de Cierre</CardDescription>
+        </CardHeader>
+        <CardContent className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(212, 163, 115, 0.1)" />
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 10 }} />
+              <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 10 }} name="Cantidades" />
+              <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 10 }} tickFormatter={(v) => `${v.toFixed(1)}%`} name="Eficiencia" />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(212, 163, 115, 0.2)', borderRadius: '12px' }}
+                itemStyle={{ fontSize: '12px' }}
+              />
+              <Legend verticalAlign="top" align="center" iconType="circle" wrapperStyle={{ fontSize: '10px', paddingBottom: '20px' }} />
+              
+              {/* Bars for Quantities */}
+              <Bar yAxisId="left" dataKey="waChats" name="Consultas WA" fill="#60a5fa" opacity={0.6} radius={[4, 4, 0, 0]} barSize={25} />
+              <Bar yAxisId="left" dataKey="prospeccion" name="Prospección" fill="#f97316" opacity={0.6} radius={[4, 4, 0, 0]} barSize={25} />
+              <Bar yAxisId="left" dataKey="transacciones" name="Cierres" fill="#4ade80" opacity={0.8} radius={[4, 4, 0, 0]} barSize={25} />
+              
+              {/* Lines for Percentages */}
+              <Line yAxisId="right" type="monotone" dataKey="effWaCierre" name="% WA / Cierre" stroke="#60a5fa" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#1a1a1a' }} activeDot={{ r: 6 }} />
+              <Line yAxisId="right" type="monotone" dataKey="effProspCierre" name="% Prosp / Cierre" stroke="#f97316" strokeWidth={3} dot={{ r: 4, strokeWidth: 2, fill: '#1a1a1a' }} activeDot={{ r: 6 }} />
+              <Line yAxisId="right" type="monotone" dataKey="effTotalCierre" name="% Total / Cierre" stroke="#4ade80" strokeWidth={4} dot={{ r: 5, strokeWidth: 2, fill: '#1a1a1a' }} activeDot={{ r: 7 }} />
+            </ComposedChart>
           </ResponsiveContainer>
         </CardContent>
       </Card>

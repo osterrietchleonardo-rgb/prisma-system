@@ -292,11 +292,32 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
         const date = new Date(l.fecha_actividad || l.created_at);
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` === m.key;
     }) || [];
-    
+
+    const mWaChats = (waCounts || []).filter(c => {
+        const date = new Date(c.created_at);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` === m.key;
+    }).length;
+
+    const mProspeccion = mLogs.filter(l => l.type === 'prospeccion').length;
+    const mTransacciones = mLogs.filter(l => l.type === 'cierre').reduce((acc, l) => {
+        const part = l.metadata?.participacion;
+        if (part === 'Ambas puntas') return acc + 1;
+        if (part === 'Solo Comprador' || part === 'Solo Vendedor') return acc + 0.5;
+        return acc + 1;
+    }, 0);
+
     return {
       name: m.name,
       captaciones: mLogs.filter(l => l.type === 'captacion').length,
-      transacciones: mLogs.filter(l => l.type === 'cierre').length,
+      transacciones: mTransacciones,
+      waChats: mWaChats,
+      prospeccion: mProspeccion,
+      ratioWaCierre: mTransacciones > 0 ? (mWaChats / mTransacciones) : 0,
+      ratioProspCierre: mTransacciones > 0 ? (mProspeccion / mTransacciones) : 0,
+      ratioTotalLeadsCierre: mTransacciones > 0 ? ((mWaChats + mProspeccion) / mTransacciones) : 0,
+      effWaCierre: mWaChats > 0 ? (mTransacciones / mWaChats) * 100 : 0,
+      effProspCierre: mProspeccion > 0 ? (mTransacciones / mProspeccion) * 100 : 0,
+      effTotalCierre: (mWaChats + mProspeccion) > 0 ? (mTransacciones / (mWaChats + mProspeccion)) * 100 : 0,
       gci: mLogs.filter(l => l.type === 'cierre').reduce((acc, l) => {
         const valor = Number(l.monto_operacion) || 0;
         const hon = Number(l.comision_generada) || 0;
