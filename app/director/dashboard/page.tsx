@@ -32,6 +32,7 @@ import { DashboardLeadsSection } from "./components/DashboardLeadsSection"
 import { DashboardPropertiesSection } from "./components/DashboardPropertiesSection"
 import { PerformanceCharts } from "@/components/performance-charts"
 import { AdvisorFilter } from "@/components/dashboard/advisor-filter"
+import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter"
 
 const DashboardCharts = dynamic(() => import("@/components/dashboard-charts").then(m => m.DashboardCharts), {
   ssr: false,
@@ -41,9 +42,11 @@ const DashboardCharts = dynamic(() => import("@/components/dashboard-charts").th
 export default async function DashboardPage({
   searchParams
 }: {
-  searchParams: { agentId?: string }
+  searchParams: { agentId?: string; from?: string; to?: string }
 }) {
   const agentId = searchParams.agentId
+  const from = searchParams.from
+  const to = searchParams.to
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -68,7 +71,7 @@ export default async function DashboardPage({
   }
 
   const [dashboardData, propertiesData] = await Promise.all([
-    getDashboardData(profile.agency_id, agentId),
+    getDashboardData(profile.agency_id, agentId, from, to),
     getPropertiesDashboardData(profile.agency_id)
   ])
 
@@ -91,27 +94,15 @@ export default async function DashboardPage({
         <AdvisorFilter advisors={dashboardData.advisors.map(a => ({ id: a.id, name: a.name }))} />
         
         <div className="ml-auto flex items-center gap-4">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={"w-full sm:w-[240px] h-10 md:h-9 text-xs justify-start text-left font-normal border-input hover:bg-accent/5"}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                <span>Últimos 30 días</span>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                initialFocus
-                mode="range"
-                numberOfMonths={1}
-              />
-            </PopoverContent>
-          </Popover>
-
-          <Button variant="ghost" size="sm" className="text-xs text-accent font-semibold hover:bg-accent/10">
-            Limpiar Filtros
+          <DatePeriodFilter />
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-xs text-accent font-semibold hover:bg-accent/10"
+            asChild
+          >
+            <a href="?">Limpiar Filtros</a>
           </Button>
         </div>
       </div>

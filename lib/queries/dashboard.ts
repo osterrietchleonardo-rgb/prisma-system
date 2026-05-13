@@ -1,13 +1,18 @@
 import { createClient } from "@/lib/supabase/server"
 
-export async function getDashboardData(agencyId: string, agentId?: string) {
+export async function getDashboardData(agencyId: string, agentId?: string, startDate?: string, endDate?: string) {
   const supabase = createClient()
   
   // 1. WhatsApp Conversations (Top of Funnel)
-  const { data: waCounts } = await supabase
+  let waBaseQuery = supabase
     .from("wa_conversations")
-    .select("agent_id")
+    .select("agent_id, created_at")
     .eq("agency_id", agencyId);
+
+  if (startDate) waBaseQuery = waBaseQuery.gte("created_at", startDate);
+  if (endDate) waBaseQuery = waBaseQuery.lte("created_at", endDate);
+
+  const { data: waCounts } = await waBaseQuery;
 
   const waCountsByAgent = (waCounts || []).reduce((acc: any, curr: any) => {
     if (curr.agent_id) {
@@ -28,9 +33,9 @@ export async function getDashboardData(agencyId: string, agentId?: string) {
     .select("*")
     .eq("agency_id", agencyId);
 
-  if (agentId) {
-    logsQuery = logsQuery.eq("agent_id", agentId);
-  }
+  if (agentId) logsQuery = logsQuery.eq("agent_id", agentId);
+  if (startDate) logsQuery = logsQuery.gte("fecha_actividad", startDate);
+  if (endDate) logsQuery = logsQuery.lte("fecha_actividad", endDate);
 
   const { data: perfLogs } = await logsQuery;
 
