@@ -160,9 +160,21 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
         icon={Zap}
         color="red-500"
         metrics={[
-          { label: "WA / Cierre", value: `1:${kpis.ratioWaCierre.toFixed(1)}` },
-          { label: "Prosp / Cierre", value: `1:${kpis.ratioProspCierre.toFixed(1)}` },
-          { label: "Total / Cierre", value: `1:${kpis.ratioTotalLeadsCierre.toFixed(1)}` },
+          { 
+            label: "WA / Cierre", 
+            value: `1:${kpis.ratioWaCierre.toFixed(1)}`,
+            subValue: kpis.ratioWaCierre > 0 ? formatPercent(100 / kpis.ratioWaCierre) : "0%"
+          },
+          { 
+            label: "Prosp / Cierre", 
+            value: `1:${kpis.ratioProspCierre.toFixed(1)}`,
+            subValue: kpis.ratioProspCierre > 0 ? formatPercent(100 / kpis.ratioProspCierre) : "0%"
+          },
+          { 
+            label: "Total / Cierre", 
+            value: `1:${kpis.ratioTotalLeadsCierre.toFixed(1)}`,
+            subValue: kpis.ratioTotalLeadsCierre > 0 ? formatPercent(100 / kpis.ratioTotalLeadsCierre) : "0%"
+          },
         ]}
       />
     </div>
