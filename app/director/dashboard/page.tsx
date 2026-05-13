@@ -1,6 +1,7 @@
 import { DashboardKpis } from "@/components/dashboard-kpis"
 import { PerformanceKpis } from "@/components/performance-kpis"
 import { PerformanceLeaderboard } from "@/components/performance-leaderboard"
+import { PerformanceMetricsGrid } from "@/components/dashboard/PerformanceMetricsGrid"
 import { DashboardActivity } from "@/components/dashboard-activity"
 import { Button } from "@/components/ui/button"
 import { DashboardHeaderActions } from "@/components/dashboard-header-actions"
@@ -115,9 +116,12 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <PerformanceKpis data={dashboardData.kpis} />
+      <PerformanceMetricsGrid kpis={dashboardData.kpis} />
       
-      <PerformanceCharts data={dashboardData.charts.performanceEvolution} />
+      <PerformanceCharts 
+        data={dashboardData.charts.performanceEvolution} 
+        channels={dashboardData.charts.channelDistribution}
+      />
 
       <div className="grid gap-6 lg:grid-cols-7">
         <div className="lg:col-span-7">
