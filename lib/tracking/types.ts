@@ -34,7 +34,7 @@ export interface WAAnalysis {
   resumen: string;
 }
 
-export type ActivityType = 'captacion' | 'transaccion' | 'lead_seguimiento' | 'otro';
+export type ActivityType = 'prospeccion' | 'prelisting' | 'prebuying' | 'captacion' | 'reserva' | 'cierre';
 
 export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
   id: string;
@@ -44,13 +44,13 @@ export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
   agency_id: string;
   
   type: ActivityType;
-  nombre_cliente: string;
   propiedad_ref: string | null;
   monto_operacion: number | null;
   comision_generada: number | null;
   fecha_actividad: string;
   fecha_cierre: string | null;
   
+  metadata: Record<string, any>;
   wa_metrics?: any;
   wa_analysis?: any;
   ai_rating: number | null;
@@ -58,13 +58,13 @@ export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
 }
 
 export const performanceLogSchema = z.object({
-  type: z.enum(['captacion', 'transaccion', 'lead_seguimiento', 'otro']),
-  nombre_cliente: z.string().min(1, "El nombre del cliente es requerido"),
+  type: z.enum(['prospeccion', 'prelisting', 'prebuying', 'captacion', 'reserva', 'cierre']),
   propiedad_ref: z.string().optional().nullable(),
   monto_operacion: z.number().optional().nullable(),
   comision_generada: z.number().optional().nullable(),
   fecha_actividad: z.string(),
   fecha_cierre: z.string().optional().nullable(),
+  metadata: z.record(z.any()).default({}),
   // WhatsApp data
   waMetrics: z.any().optional(),
   waAnalysis: z.any().optional(),

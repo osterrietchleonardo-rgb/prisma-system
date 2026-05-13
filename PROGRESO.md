@@ -14,6 +14,23 @@
 
 ---
 
+## 🛡️ REGLAS DE SEGURIDAD (Supabase Data API)
+> [!IMPORTANT]
+> **Actualización Supabase 2026:** A partir del 30 de Mayo (proyectos nuevos) y 30 de Octubre (proyectos existentes), Supabase NO expone tablas en el esquema `public` por defecto.
+> 
+> **MANDATORIO para cada nueva tabla o migración:**
+> Siempre incluir sentencias `GRANT` explícitas para permitir el acceso vía `supabase-js` (PostgREST/GraphQL).
+> 
+> ```sql
+> -- Ejemplo obligatorio en cada migración de tabla nueva:
+> GRANT SELECT, INSERT, UPDATE, DELETE ON public.mi_tabla TO authenticated;
+> GRANT SELECT ON public.mi_tabla TO anon;
+> GRANT ALL ON public.mi_tabla TO service_role;
+> ```
+
+
+---
+
 ## ✅ LO QUE SE USA (decisiones confirmadas)
 - Next.js 14 App Router (NO Pages Router)
 - Supabase para DB, Auth y Storage

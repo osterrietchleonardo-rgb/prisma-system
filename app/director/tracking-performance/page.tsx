@@ -28,7 +28,7 @@ export default function TrackingPerformancePage() {
   const [agencyConfig, setAgencyConfig] = useState<AgencyPerformanceConfig | null>(null);
   
   // Filters
-  const [filter, setFilter] = useState<"todos" | "captaciones" | "transacciones">("todos");
+  const [filter, setFilter] = useState<"todos" | "prospeccion" | "prelisting" | "prebuying" | "captacion" | "reserva" | "cierre">("todos");
   const [search, setSearch] = useState("");
 
   const fetchLogs = useCallback(async () => {
@@ -74,15 +74,14 @@ export default function TrackingPerformancePage() {
   }, [fetchLogs, fetchAgencyConfig]);
 
   const filteredLogs = logs.filter(log => {
-    const matchesFilter = 
-      filter === "todos" || 
-      (filter === "captaciones" && log.type === "captacion") ||
-      (filter === "transacciones" && log.type === "transaccion");
+    const matchesFilter = filter === "todos" || log.type === filter;
     
     const matchesSearch = 
       !search || 
-      log.nombre_cliente?.toLowerCase().includes(search.toLowerCase()) ||
-      log.propiedad_ref?.toLowerCase().includes(search.toLowerCase());
+      log.propiedad_ref?.toLowerCase().includes(search.toLowerCase()) ||
+      Object.values(log.metadata || {}).some(val => 
+        val?.toString().toLowerCase().includes(search.toLowerCase())
+      );
 
     return matchesFilter && matchesSearch;
   });
@@ -131,16 +130,22 @@ export default function TrackingPerformancePage() {
                       Todos
                     </button>
                     <button 
-                      onClick={() => setFilter("captaciones")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'captaciones' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                      onClick={() => setFilter("prospeccion")} 
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prospeccion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
                     >
-                      Captaciones
+                      Prospección
                     </button>
                     <button 
-                      onClick={() => setFilter("transacciones")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'transacciones' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                      onClick={() => setFilter("captacion")} 
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'captacion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
                     >
-                      Transacciones
+                      Captación
+                    </button>
+                    <button 
+                      onClick={() => setFilter("cierre")} 
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'cierre' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                    >
+                      Cierre
                     </button>
                 </div>
               </div>
