@@ -4,16 +4,23 @@ export async function getDashboardData(agencyId: string, agentId?: string) {
   const supabase = createClient()
   
   // 1. WhatsApp Conversations (Top of Funnel)
-  let waQuery = supabase
+  const { data: waCounts } = await supabase
     .from("wa_conversations")
-    .select("id, agent_id", { count: 'exact' })
+    .select("agent_id")
     .eq("agency_id", agencyId);
 
-  if (agentId) {
-    waQuery = waQuery.eq("agent_id", agentId);
-  }
+  const waCountsByAgent = (waCounts || []).reduce((acc: any, curr: any) => {
+    if (curr.agent_id) {
+        acc[curr.agent_id] = (acc[curr.agent_id] || 0) + 1;
+    }
+    return acc;
+  }, {});
 
-  const { count: waChatsCount } = await waQuery;
+  const { count: waChatsCount } = await supabase
+    .from("wa_conversations")
+    .select("id", { count: 'exact' })
+    .eq("agency_id", agencyId)
+    .filter(agentId ? 'agent_id' : 'id', agentId ? 'eq' : 'not.is', agentId || null);
 
   // 2. Performance Logs (The main source for business metrics)
   let logsQuery = supabase
@@ -201,6 +208,10 @@ export async function getDashboardData(agencyId: string, agentId?: string) {
     const pLogs = perfLogs?.filter(l => l.agent_id === p.id) || [];
     const pProps = properties?.filter(prop => (prop.assigned_agent as any)?.email === p.email) || [];
     
+    const waChats = waChatsCount && p.id === agentId ? waChatsCount : 0; // This is a bit tricky since waChatsCount is already filtered
+    // Actually, waChatsCount at the top is already filtered by agentId if provided.
+    // Let's do it better:
+    
     const caps = pLogs.filter(l => l.type === 'captacion').length;
     const trans = pLogs.filter(l => l.type === 'cierre').reduce((acc, l) => {
         const part = l.metadata?.participacion;
@@ -208,6 +219,11 @@ export async function getDashboardData(agencyId: string, agentId?: string) {
         if (part === 'Solo Comprador' || part === 'Solo Vendedor') return acc + 0.5;
         return acc + 1;
     }, 0);
+    
+    const tasaciones = pLogs.filter(l => l.type === 'prelisting').length;
+    const compradores = pLogs.filter(l => l.type === 'prebuying').length;
+    const reservas = pLogs.filter(l => l.type === 'reserva').length;
+    const prospeccion = pLogs.filter(l => l.type === 'prospeccion').length;
     
     const finalInv = pProps.filter(prop => prop.status === 'Active').length;
     const initialInv = Math.max(0, finalInv - caps + trans);
@@ -219,7 +235,12 @@ export async function getDashboardData(agencyId: string, agentId?: string) {
       name: p.full_name || "Asesor Sin Nombre",
       email: p.email,
       avatar_url: p.avatar_url,
+      wa_chats: waCountsByAgent[p.id] || 0,
+      prospeccion,
+      tasaciones,
+      compradores,
       captaciones: caps,
+      reservas,
       transacciones: trans,
       facturacion: pLogs.filter(l => l.type === 'cierre').reduce((acc, l) => {
         const valor = Number(l.monto_operacion) || 0;

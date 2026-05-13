@@ -6,7 +6,14 @@ import {
   Sparkles,
   Percent,
   TrendingUp,
-  LayoutDashboard
+  LayoutDashboard,
+  MessageSquare,
+  FileText,
+  Search,
+  Home,
+  Target,
+  DollarSign,
+  Briefcase
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +22,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 interface AdvisorSummary {
   id: string;
   name: string;
+  wa_chats: number;
+  prospeccion: number;
+  tasaciones: number;
+  compradores: number;
   captaciones: number;
+  reservas: number;
   transacciones: number;
   facturacion: number;
   cartera_activa: number;
@@ -40,6 +52,22 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
     return "bg-slate-500/20 text-slate-400 border-slate-500/50";
   };
 
+  const MetricHeader = ({ icon: Icon, label, tooltip }: { icon: any, label: string, tooltip: string }) => (
+    <th className="px-3 py-4 font-bold text-center">
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger className="flex flex-col items-center gap-1 mx-auto group">
+            <Icon className="h-4 w-4 text-muted-foreground group-hover:text-accent transition-colors" />
+            <span className="text-[9px] uppercase tracking-tighter opacity-70 group-hover:opacity-100">{label}</span>
+          </TooltipTrigger>
+          <TooltipContent className="bg-popover/95 backdrop-blur-md border-accent/20">
+            <p className="text-xs font-semibold">{tooltip}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </th>
+  );
+
   return (
     <Card className="border-accent/10 bg-card/30 backdrop-blur-sm overflow-hidden shadow-2xl">
       <CardHeader className="border-b border-accent/5">
@@ -50,59 +78,77 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
             </div>
             <div>
               <CardTitle className="text-lg">Ranking de Asesores</CardTitle>
-              <CardDescription>Performance consolidada con clasificación IA y rotación.</CardDescription>
+              <CardDescription>Métricas detalladas por etapa del embudo comercial.</CardDescription>
             </div>
           </div>
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-muted/30 text-[10px] uppercase tracking-widest text-muted-foreground/70">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full text-sm text-left min-w-[1000px]">
+            <thead className="bg-muted/30 text-muted-foreground/70 border-b border-accent/5">
               <tr>
-                <th className="px-6 py-4 font-bold">Asesor</th>
-                <th className="px-6 py-4 font-bold text-center">Captaciones</th>
-                <th className="px-6 py-4 font-bold text-center">Cierres</th>
-                <th className="px-6 py-4 font-bold text-center">Inventario</th>
-                <th className="px-6 py-4 font-bold text-center">Rotación</th>
-                <th className="px-6 py-4 font-bold text-center">Facturación</th>
+                <th className="px-6 py-4 font-bold min-w-[200px]">Asesor</th>
+                <MetricHeader icon={MessageSquare} label="Chats" tooltip="WhatsApp Recibidos" />
+                <MetricHeader icon={TrendingUp} label="Prosp." tooltip="Prospección Activa" />
+                <MetricHeader icon={FileText} label="Tasac." tooltip="Tasaciones Realizadas" />
+                <MetricHeader icon={Search} label="Comp." tooltip="Compradores Calificados" />
+                <MetricHeader icon={Home} label="Capt." tooltip="Propiedades Captadas" />
+                <MetricHeader icon={Target} label="Res." tooltip="Reservas Logradas" />
+                <MetricHeader icon={Briefcase} label="Cart." tooltip="Cartera Activa (Tokko)" />
+                <MetricHeader icon={Percent} label="Rot." tooltip="% Rotación Anualizada" />
+                <MetricHeader icon={DollarSign} label="Fact." tooltip="GCI (Facturación Bruta)" />
                 <th className="px-6 py-4 font-bold text-right">Clasificación IA</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-accent/5">
               {sortedAdvisors.map((advisor, index) => (
                 <tr key={advisor.id} className="group hover:bg-accent/5 transition-all duration-200">
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 sticky left-0 bg-card/80 backdrop-blur-md z-10">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-accent/10 flex items-center justify-center text-[10px] font-bold text-accent ring-1 ring-accent/20">
                         {advisor.name.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-semibold text-white/90">{advisor.name}</span>
+                        <span className="font-semibold text-white/90 truncate max-w-[120px]">{advisor.name}</span>
                         <span className="text-[10px] text-muted-foreground">Posición #{index + 1}</span>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="font-bold text-white/80">{advisor.captaciones}</span>
+                  <td className="px-3 py-4 text-center">
+                    <span className="font-medium text-blue-400/80">{advisor.wa_chats}</span>
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="font-bold text-white/80">{advisor.transacciones}</span>
+                  <td className="px-3 py-4 text-center">
+                    <span className="font-medium text-indigo-400/80">{advisor.prospeccion}</span>
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="font-bold text-muted-foreground/80">{advisor.cartera_activa}</span>
+                  <td className="px-3 py-4 text-center">
+                    <span className="font-medium text-amber-400/80">{advisor.tasaciones}</span>
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    <Badge variant="outline" className={cn(
-                      "font-mono text-[10px] border-none px-2",
-                      advisor.rotacion >= 10 ? "text-green-400 bg-green-400/5" : 
-                      advisor.rotacion >= 5 ? "text-blue-400 bg-blue-400/5" : "text-orange-400 bg-orange-400/5"
-                    )}>
-                      {advisor.rotacion.toFixed(1)}%
+                  <td className="px-3 py-4 text-center">
+                    <span className="font-medium text-purple-400/80">{advisor.compradores}</span>
+                  </td>
+                  <td className="px-3 py-4 text-center">
+                    <span className="font-bold text-emerald-400/90">{advisor.captaciones}</span>
+                  </td>
+                  <td className="px-3 py-4 text-center">
+                    <span className="font-bold text-orange-400/90">{advisor.reservas}</span>
+                  </td>
+                  <td className="px-3 py-4 text-center">
+                    <Badge variant="secondary" className="bg-slate-500/10 text-slate-400 border-none font-mono text-[10px]">
+                      {advisor.cartera_activa}
                     </Badge>
                   </td>
-                  <td className="px-6 py-4 text-center">
-                    <span className="font-bold text-accent">
+                  <td className="px-3 py-4 text-center">
+                    <span className={cn(
+                      "font-mono text-[11px] font-bold",
+                      advisor.rotacion >= 10 ? "text-green-400" : 
+                      advisor.rotacion >= 5 ? "text-blue-400" : "text-orange-400"
+                    )}>
+                      {advisor.rotacion.toFixed(1)}%
+                    </span>
+                  </td>
+                  <td className="px-3 py-4 text-center">
+                    <span className="font-bold text-accent whitespace-nowrap">
                       {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(advisor.facturacion)}
                     </span>
                   </td>
@@ -112,7 +158,7 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
                         <TooltipTrigger asChild>
                           <Badge variant="outline" className={`${getBadgeColor(advisor.classification)} gap-1.5 cursor-help py-1 px-3 border-accent/20 shadow-sm transition-transform active:scale-95`}>
                             <Sparkles className="h-3 w-3" />
-                            {advisor.classification || "Sin Clasificar"}
+                            <span className="whitespace-nowrap">{advisor.classification || "Sin Clasificar"}</span>
                           </Badge>
                         </TooltipTrigger>
                         <TooltipContent side="left" className="max-w-[280px] bg-card/95 border-accent/20 backdrop-blur-xl p-4 shadow-2xl">
@@ -133,7 +179,7 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
               ))}
               {sortedAdvisors.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center">
+                  <td colSpan={11} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
                       <LayoutDashboard className="h-10 w-10 opacity-20" />
                       <p className="italic text-sm font-light">No hay actividad registrada en este período.</p>
