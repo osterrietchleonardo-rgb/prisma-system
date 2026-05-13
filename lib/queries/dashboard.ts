@@ -165,6 +165,8 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
     channelDistribution: Object.entries(metrics.prospeccion.channels).map(([label, count]) => ({ label, count })),
     
     // Prelisting
+    consultasWa: metrics.prospeccion.waChats,
+    prospeccionActiva: metrics.prospeccion.active,
     tasaciones: metrics.prelisting.volumen,
     pipelineCaptacion: metrics.prelisting.pipeline,
     ticketPromedioTasacion,

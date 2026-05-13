@@ -409,6 +409,7 @@ export default function AsesoresPage() {
                         <p className="text-xs font-medium">Calidad de Consultas</p>
                       </div>
                       <div className="text-right">
+                        <p className="text-[10px] text-muted-foreground font-medium mb-1">Total: {agentKpis?.consultasWa || 0}</p>
                         <p className="text-sm font-bold">1:{agentKpis?.ratioWaCierre.toFixed(1) || "0.0"}</p>
                         <p className="text-[10px] text-accent font-bold">
                           {agentKpis?.ratioWaCierre > 0 ? (100 / agentKpis.ratioWaCierre).toFixed(1) : "0"}%
@@ -421,6 +422,7 @@ export default function AsesoresPage() {
                         <p className="text-xs font-medium">Efectividad Activa</p>
                       </div>
                       <div className="text-right">
+                        <p className="text-[10px] text-muted-foreground font-medium mb-1">Total: {agentKpis?.prospeccionActiva || 0}</p>
                         <p className="text-sm font-bold">1:{agentKpis?.ratioProspCierre.toFixed(1) || "0.0"}</p>
                         <p className="text-[10px] text-accent font-bold">
                           {agentKpis?.ratioProspCierre > 0 ? (100 / agentKpis.ratioProspCierre).toFixed(1) : "0"}%
@@ -433,6 +435,7 @@ export default function AsesoresPage() {
                         <p className="text-xs font-medium">Global Funnel</p>
                       </div>
                       <div className="text-right">
+                        <p className="text-[10px] text-muted-foreground font-medium mb-1">Total: {(agentKpis?.consultasWa || 0) + (agentKpis?.prospeccionActiva || 0)}</p>
                         <p className="text-sm font-bold text-accent">1:{agentKpis?.ratioTotalLeadsCierre.toFixed(1) || "0.0"}</p>
                         <p className="text-[10px] text-accent font-bold">
                           {agentKpis?.ratioTotalLeadsCierre > 0 ? (100 / agentKpis.ratioTotalLeadsCierre).toFixed(1) : "0"}%
