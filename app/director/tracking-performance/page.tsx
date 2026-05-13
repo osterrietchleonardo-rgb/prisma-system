@@ -136,10 +136,28 @@ export default function TrackingPerformancePage() {
                       Prospección
                     </button>
                     <button 
+                      onClick={() => setFilter("prelisting")} 
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prelisting' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                    >
+                      Prelisting
+                    </button>
+                    <button 
+                      onClick={() => setFilter("prebuying")} 
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prebuying' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                    >
+                      Prebuying
+                    </button>
+                    <button 
                       onClick={() => setFilter("captacion")} 
                       className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'captacion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
                     >
                       Captación
+                    </button>
+                    <button 
+                      onClick={() => setFilter("reserva")} 
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'reserva' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                    >
+                      Reserva
                     </button>
                     <button 
                       onClick={() => setFilter("cierre")} 
