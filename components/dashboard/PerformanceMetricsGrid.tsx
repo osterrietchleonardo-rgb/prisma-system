@@ -156,13 +156,13 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
 
       {/* 8. EFICIENCIA GLOBAL */}
       <MetricGroup 
-        title="Eficiencia"
+        title="Conversión"
         icon={Zap}
         color="red-500"
         metrics={[
-          { label: "Ratio Lead/Cierre", value: `1:${kpis.ratioConsultasCierres.toFixed(0)}` },
-          { label: "Conversión Global", value: formatPercent(kpis.tasaConversionGlobal) },
-          { label: "Nivel Actividad", value: "Óptimo", subValue: "Basado en metas" },
+          { label: "WA / Cierre", value: `1:${kpis.ratioWaCierre.toFixed(1)}` },
+          { label: "Prosp / Cierre", value: `1:${kpis.ratioProspCierre.toFixed(1)}` },
+          { label: "Total / Cierre", value: `1:${kpis.ratioTotalLeadsCierre.toFixed(1)}` },
         ]}
       />
     </div>

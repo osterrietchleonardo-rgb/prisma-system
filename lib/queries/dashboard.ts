@@ -204,7 +204,12 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
     
     // Global
     ratioConsultasCierres,
-    tasaConversionGlobal
+    tasaConversionGlobal,
+    
+    // Ratios específicos (Leads / Cierre)
+    ratioWaCierre: metrics.cierre.transacciones > 0 ? kpis.waChats / metrics.cierre.transacciones : 0,
+    ratioProspCierre: metrics.cierre.transacciones > 0 ? kpis.prospeccionActiva / metrics.cierre.transacciones : 0,
+    ratioTotalLeadsCierre: metrics.cierre.transacciones > 0 ? (kpis.waChats + kpis.prospeccionActiva) / metrics.cierre.transacciones : 0,
   };
 
   // Re-calculate rotation using the better formula for global/leaderboard
