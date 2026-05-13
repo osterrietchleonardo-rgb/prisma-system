@@ -367,7 +367,6 @@ export default function AsesoresPage() {
             </div>
           </SheetHeader>
           
-          <div className="space-y-6 mt-8">
           <div className="space-y-6 mt-8 overflow-y-auto max-h-[calc(100vh-250px)] pr-2">
             <div className="grid grid-cols-2 gap-4">
               <Card className="bg-accent/5 border-accent/10 shadow-none">
