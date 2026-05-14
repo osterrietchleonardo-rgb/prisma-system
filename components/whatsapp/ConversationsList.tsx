@@ -301,7 +301,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                 <SelectValue placeholder="Asesor..." />
               </SelectTrigger>
               <SelectContent className="max-h-[300px] w-[260px]">
-                <ScrollArea className="h-[250px] w-full">
+                <div className="h-[250px] w-full overflow-y-auto">
                   <SelectItem value="all" className="text-xs">Todos los asesores</SelectItem>
                   {agentEmails.length === 0 && (
                     <SelectItem value="none" disabled className="text-xs">Sin asesores con chats</SelectItem>
@@ -311,7 +311,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                       {email}
                     </SelectItem>
                   ))}
-                </ScrollArea>
+                </div>
               </SelectContent>
             </Select>
           </div>
