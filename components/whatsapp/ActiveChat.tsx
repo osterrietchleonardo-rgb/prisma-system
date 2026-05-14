@@ -83,6 +83,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   const [sending, setSending] = useState(false)
   const [sendingNote, setSendingNote] = useState(false)
   const [switchingBot, setSwitchingBot] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   // Tag popover
   const [tagOpen, setTagOpen] = useState(false)
@@ -98,6 +99,10 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   useEffect(() => {
     setConv(initialConv)
   }, [initialConv])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Load messages
   useEffect(() => {
@@ -562,9 +567,9 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                 {messages.map((msg, idx) => {
                   // Date separator
                   const showDate =
-                    idx === 0 ||
+                    mounted && (idx === 0 ||
                     formatDate(msg.created_at) !==
-                    formatDate(messages[idx - 1].created_at)
+                    formatDate(messages[idx - 1].created_at))
 
                   return (
                     <div key={msg.id}>
@@ -748,8 +753,8 @@ function MediaContent({ msg }: { msg: WAMessage }) {
 // Message Bubble
 // =============================================
 
-function MessageBubble({ msg }: { msg: WAMessage }) {
-  const time = formatTime(msg.created_at)
+ function MessageBubble({ msg }: { msg: WAMessage }) {
+  const time = mounted ? formatTime(msg.created_at) : ""
   const isMedia = ['image', 'video', 'audio', 'document'].includes(msg.message_type || '')
 
   if (msg.role === "lead") {

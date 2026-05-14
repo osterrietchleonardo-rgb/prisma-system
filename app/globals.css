@@ -272,6 +272,21 @@
       max-width: 100%;
       height: auto;
     }
+
+    /* --- AUDIT TABLE MOBILE --- */
+    .audit-table-container table {
+      min-width: 600px;
+    }
   }
 }
+
+/* Scrollbar hide utility */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 

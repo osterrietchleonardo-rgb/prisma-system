@@ -366,7 +366,7 @@ export function MarketingHistory() {
           setEditContent(null)
         }
       }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto border-accent/20 scrollbar-hide">
+        <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95vh] overflow-y-auto border-accent/20 scrollbar-hide p-4 md:p-6">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black flex items-center gap-3">
               <Sparkles className="w-6 h-6 text-accent" />
@@ -399,7 +399,7 @@ export function MarketingHistory() {
               {selectedGroup.variants[activeVariantIndex] && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in zoom-in-95 duration-300">
                   <div className="space-y-4">
-                    <div className="aspect-[4/5] md:aspect-auto md:h-[500px] w-full bg-muted rounded-3xl overflow-hidden shadow-2xl relative border border-accent/10">
+                    <div className="aspect-square md:aspect-auto md:h-[500px] w-full bg-muted rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl relative border border-accent/10">
                       {selectedGroup.variants[activeVariantIndex].public_url ? (
                         <img 
                           src={selectedGroup.variants[activeVariantIndex].public_url} 
