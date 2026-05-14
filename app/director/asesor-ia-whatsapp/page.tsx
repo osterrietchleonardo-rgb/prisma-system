@@ -9,11 +9,20 @@ export default async function AsesorIAWhatsAppPage() {
 
   if (!user) return null
 
-  // Obtenemos la instancia directamente en el servidor (más rápido y seguro)
+  // 1. Obtenemos el perfil para saber a qué agencia pertenece el usuario
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("agency_id")
+    .eq("id", user.id)
+    .single()
+
+  if (!profile?.agency_id) return null
+
+  // 2. Obtenemos la instancia usando el agency_id del perfil
   const { data: instance } = await supabase
     .from("whatsapp_instances")
     .select("*")
-    .eq("agency_id", user.id)
+    .eq("agency_id", profile.agency_id)
     .maybeSingle()
 
   return (
