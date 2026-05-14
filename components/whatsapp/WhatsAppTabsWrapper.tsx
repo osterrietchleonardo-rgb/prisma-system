@@ -75,7 +75,7 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
           <TabsTrigger value="campanas" className="text-xs px-4">📣 Campañas</TabsTrigger>
           <TabsTrigger value="config" className="text-xs px-4">⚙️ Configuración IA</TabsTrigger>
         </TabsList>
-        <ConnectionIndicator instanceId={instance?.id || ""} initialStatus={instance?.status || "disconnected"} />
+        <ConnectionIndicator instanceId={instance.id} initialStatus={instance.status} />
       </div>
       <TabsContent value="chat" className="flex-1 min-h-0 m-0 border-none p-0 outline-none data-[state=inactive]:hidden flex flex-col">
         <ChatInterface instance={instance} />
