@@ -281,11 +281,19 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       {/* Tabs & Filter */}
       <div className="px-3 pb-1 border-b overflow-hidden">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-3 pt-1">
-          <div style={{display:'flex', gap:'8px', shrink: 0}}>
-            <button className="px-3 py-1 bg-muted rounded text-[10px] font-semibold" onClick={() => setTab('all')}>Todos</button>
-            <button className="px-3 py-1 bg-muted rounded text-[10px] font-semibold" onClick={() => setTab('bot')}>Bot activo</button>
-            <button className="px-3 py-1 bg-muted rounded text-[10px] font-semibold" onClick={() => setTab('paused')}>Pausados</button>
-          </div>
+          <Tabs value={tab} onValueChange={setTab} className="shrink-0">
+            <TabsList className="h-8 bg-muted/30 flex-nowrap">
+              <TabsTrigger value="all" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
+                Todos
+              </TabsTrigger>
+              <TabsTrigger value="bot" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
+                Bot activo
+              </TabsTrigger>
+              <TabsTrigger value="paused" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
+                Pausados
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
           
           <div className="shrink-0">
             <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
@@ -337,103 +345,9 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             />
           )
         ) : (
-          <div className="p-1.5">
-            {filtered
-              .filter((conv, index, self) =>
-                index === self.findIndex((t) => t.contact_phone === conv.contact_phone)
-              )
-              .map((conv) => {
-              const isActive = activeId === conv.id
-              const initial = (conv.contact_name || conv.contact_phone || "?")
-                .charAt(0)
-                .toUpperCase()
-
-              return (
-                <button
-                  key={conv.id}
-                  onClick={() => {
-                    onSelect(conv)
-                    if (conv.unread_count > 0) {
-                       setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c))
-                       markConversationRead(conv.id)
-                    }
-                  }}
-                  className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors mb-0.5 group/item relative ${
-                    isActive
-                      ? "bg-accent/5 dark:bg-accent/10 border border-accent/20"
-                      : "hover:bg-muted/50"
-                  }`}
-                >
-                  {/* Delete Button (on hover) */}
-                  <button
-                    onClick={(e) => handleDelete(e, conv.id)}
-                    className="absolute right-2 top-2 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover/item:opacity-100 z-10"
-                    title="Eliminar chat"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                  {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-sm flex-shrink-0">
-                    {initial}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-sm truncate flex-1">
-                        {conv.contact_name || conv.contact_phone}
-                        {/* Email del asesor asignado */}
-                        {(() => {
-                          const agentData = (conv as any).assigned_agent;
-                          const agentEmail = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
-                          
-                          if (agentEmail) {
-                            return (
-                              <span className="text-[10px] text-accent/70 font-medium truncate max-w-[100px] ml-1 bg-accent/5 px-1 rounded border border-accent/10">
-                                {agentEmail}
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </span>
-                      <span className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-end gap-1">
-                        <span className="whitespace-nowrap">{timeAgo(conv.last_message_at)}</span>
-                        {conv.unread_count > 0 && !isActive ? (
-                          <div className="flex items-center justify-center">
-                             <Badge className="bg-red-500 hover:bg-red-600 text-white border-none text-[10px] font-bold h-[18px] min-w-[18px] px-1 flex items-center justify-center rounded-full leading-none shadow-sm">
-                               {conv.unread_count > 99 ? "99+" : conv.unread_count}
-                             </Badge>
-                          </div>
-                        ) : null}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {conv.contact_phone}
-                    </p>
-
-                    {/* Bottom row: bot icon + tags */}
-                    <div className="flex items-center gap-1.5 mt-1.5">
-                      {conv.bot_active ? (
-                        <Bot className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
-                      ) : (
-                        <BotOff className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
-                      )}
-                      {conv.etiquetas?.slice(0, 2).map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="text-[10px] px-1.5 py-0 h-4 font-medium"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
+          <div className="p-8 text-center" style={{backgroundColor: 'purple', color: 'white'}}>
+            <p className="text-xl font-bold">{filtered.length} conversaciones encontradas</p>
+            <p className="text-sm mt-2">Si ves esto, el problema está en el renderizado de los items.</p>
           </div>
         )}
       </div>
