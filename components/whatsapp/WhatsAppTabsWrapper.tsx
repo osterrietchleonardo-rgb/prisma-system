@@ -45,9 +45,7 @@ interface WhatsAppTabsWrapperProps {
 
 export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
   const [activeTab, setActiveTab] = useState("chat")
-  // Lazy mount: only mount CampaignsTab after first visit to avoid premature renders
   const [hasMountedCampanas, setHasMountedCampanas] = useState(false)
-
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -107,7 +105,7 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
             <CampaignsTab instance={instance} />
           ) : (
             <div className="h-full flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">Seleccioná contactos desde la pestaña Contactos para iniciar.</p>
+              <p className="text-sm text-muted-foreground">Selecciona contactos desde la pestaña Contactos para iniciar.</p>
             </div>
           )}
         </TabsContent>

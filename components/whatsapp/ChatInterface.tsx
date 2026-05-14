@@ -49,10 +49,11 @@ export default function ChatInterface({ instance }: ChatInterfaceProps) {
         ) : (
           <EmptyState 
             icon={MessageSquare} 
-            title="Seleccioná una conversación" 
-            subtitle="Elegí un contacto de la lista para ver los mensajes e interactuar." 
+            title="Selecciona una conversacion" 
+            subtitle="Elegi un contacto de la lista para ver los mensajes e interactuar." 
           />
         )}
+      </div>
       </div>
     </ErrorBoundary>
   )

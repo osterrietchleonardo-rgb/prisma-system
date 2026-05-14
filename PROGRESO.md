@@ -72,9 +72,11 @@
   - **Seguridad en UUIDs**: Reemplazado `crypto.randomUUID()` por `safeUUID()` con fallback matemático para contextos no seguros o navegadores antiguos.
   - **Viewport Resilience**: Añadido fallback de `100vh` junto a `100dvh` en `ChatInterface` para garantizar que el layout no colapse en versiones de iOS con barras dinámicas.
   - **Hydration Guards**: Reforzado el patrón de `mounted` state y añadido `try/catch` en suscripciones a eventos globales en `WhatsAppTabsWrapper`.
+  - **Global Error Containment**: Implementado `ErrorBoundary` a nivel de módulo (`WhatsAppTabsWrapper`) y sub-módulo (`ChatInterface`) para interceptar excepciones en tiempo de ejecución y permitir recuperación sin recarga total.
 - **ConversationsList**: Optimizado el ordenamiento de conversaciones para manejar tiempos nulos o inválidos sin interrumpir el renderizado.
 - **LeadTraceability**: Protegidos los cálculos de latencia y antigüedad para devolver valores seguros (0) en caso de datos de mensaje corruptos.
 - **Sincronización**: Cambios commiteados y pusheados a la rama principal de GitHub.
+
 
 ### 2026-05-14 | UI/UX — Soporte Mobile & Tablet Completo (Análisis Inicial)
 - **Responsividad Global**: 
