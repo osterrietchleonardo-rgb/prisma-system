@@ -65,7 +65,7 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
     <Tabs 
       value={activeTab} 
       onValueChange={handleTabChange}
-      className="flex-1 flex flex-col h-full min-h-0 bg-background"
+      className="flex-1 flex flex-col h-full min-h-[400px] bg-background border-2 border-red-500/10"
     >
       <div className="border-b px-2 md:px-6 py-2 bg-background flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
         <TabsList className="bg-muted h-9 flex-shrink-0">

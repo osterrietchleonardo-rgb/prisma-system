@@ -40,7 +40,15 @@ export default async function AsesorIAWhatsAppPage() {
     .maybeSingle()
 
   return (
-    <div id="whatsapp-ia-page" className="flex-1 flex flex-col min-h-0 whatsapp-page-container">
+    <div id="whatsapp-ia-page" className="flex-1 flex flex-col min-h-0 whatsapp-page-container bg-background">
+      {/* Banner de Diagnóstico (Solo visible durante debug) */}
+      <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-1 flex items-center justify-between">
+        <span className="text-[10px] font-mono text-yellow-600">
+          DEBUG: ID={instance?.id?.substring(0,8) || "NULL"} | AG={instance?.agency_id?.substring(0,8) || "NULL"} | ST={instance?.status || "UNK"}
+        </span>
+        <span className="text-[10px] font-mono text-green-600 animate-pulse">● LIVE</span>
+      </div>
+
       {!instance ? (
         <SetupWizard />
       ) : (
