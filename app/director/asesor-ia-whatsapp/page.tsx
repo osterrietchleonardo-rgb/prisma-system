@@ -8,6 +8,8 @@ export const metadata: Metadata = {
   title: "Asesor IA en WhatsApp | PRISMA",
 }
 
+import { WhatsAppErrorBoundary } from "@/components/whatsapp/WhatsAppErrorBoundary"
+
 export default async function AsesorIAWhatsAppPage() {
   const supabase = createClient()
 
@@ -42,7 +44,9 @@ export default async function AsesorIAWhatsAppPage() {
       {!instance ? (
         <SetupWizard />
       ) : (
-        <WhatsAppTabsWrapper instance={instance} />
+        <WhatsAppErrorBoundary>
+          <WhatsAppTabsWrapper instance={instance} />
+        </WhatsAppErrorBoundary>
       )}
     </div>
   )

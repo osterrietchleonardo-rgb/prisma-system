@@ -67,15 +67,17 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
       onValueChange={handleTabChange}
       className="flex-1 flex flex-col h-full min-h-0 bg-background"
     >
-      <div className="border-b px-4 md:px-6 py-2 bg-background flex items-center justify-between">
-        <TabsList className="bg-muted h-9">
-          <TabsTrigger value="chat" className="text-xs px-4">💬 Chat</TabsTrigger>
-          <TabsTrigger value="plantillas" className="text-xs px-4">📋 Plantillas</TabsTrigger>
-          <TabsTrigger value="contactos" className="text-xs px-4">👥 Contactos</TabsTrigger>
-          <TabsTrigger value="campanas" className="text-xs px-4">📣 Campañas</TabsTrigger>
-          <TabsTrigger value="config" className="text-xs px-4">⚙️ Configuración IA</TabsTrigger>
+      <div className="border-b px-2 md:px-6 py-2 bg-background flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+        <TabsList className="bg-muted h-9 flex-shrink-0">
+          <TabsTrigger value="chat" className="text-[10px] md:text-xs px-2 md:px-4">💬 Chat</TabsTrigger>
+          <TabsTrigger value="plantillas" className="text-[10px] md:text-xs px-2 md:px-4">📋 <span className="hidden md:inline">Plantillas</span><span className="md:hidden">Plant.</span></TabsTrigger>
+          <TabsTrigger value="contactos" className="text-[10px] md:text-xs px-2 md:px-4">👥 <span className="hidden md:inline">Contactos</span><span className="md:hidden">Cont.</span></TabsTrigger>
+          <TabsTrigger value="campanas" className="text-[10px] md:text-xs px-2 md:px-4">📣 <span className="hidden md:inline">Campañas</span><span className="md:hidden">Camp.</span></TabsTrigger>
+          <TabsTrigger value="config" className="text-[10px] md:text-xs px-2 md:px-4">⚙️ <span className="hidden md:inline">Configuración IA</span><span className="md:hidden">IA</span></TabsTrigger>
         </TabsList>
-        <ConnectionIndicator instanceId={instance.id} initialStatus={instance.status} />
+        <div className="flex-shrink-0">
+          <ConnectionIndicator instanceId={instance?.id || ""} initialStatus={instance?.status || "disconnected"} />
+        </div>
       </div>
       <TabsContent value="chat" className="flex-1 min-h-0 m-0 border-none p-0 outline-none data-[state=inactive]:hidden flex flex-col">
         <ChatInterface instance={instance} />
