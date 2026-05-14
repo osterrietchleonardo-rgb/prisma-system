@@ -88,36 +88,36 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
     }, 5 * 1000)
 
     // Realtime subscription
+    const instanceId = instance?.id
+    const agencyId = instance?.agency_id
+
+    if (!instanceId) return
+
     const channel = supabase
-      .channel(`wa_conversations:instance_id=eq.${instance.id}`)
+      .channel(`wa_conversations:instance_id=eq.${instanceId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "wa_conversations",
-          filter: `instance_id=eq.${instance.id}`,
+          filter: `instance_id=eq.${instanceId}`,
         },
         (payload) => {
+          // ... (keep internal logic)
           if (payload.eventType === "INSERT") {
             const newItem = payload.new as WAConversation
             
-            // Si inserta una nueva y no es la activa, notificar
             if (activeIdRef.current !== newItem.id) {
               toast.info(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
             } else {
-              // Si la recibimos mientras la tenemos activa, la marcamos como leida auto
               markConversationRead(newItem.id)
             }
             
             setConversations((prev) => {
-              // Prevenir duplicados visuales en RT
               if (prev.some(c => c.id === newItem.id)) return prev;
-
               const unshiftList = [newItem, ...prev];
               unshiftList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
-              
-              // Filter by contact_phone to deduplicate orphaned duplicates
               return unshiftList.filter((c, index, self) => 
                 index === self.findIndex((t) => t.contact_phone === c.contact_phone)
               );
@@ -126,35 +126,27 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             const updatedItem = payload.new as WAConversation
             const prev = convRef.current
             const oldItem = prev.find((c) => c.id === updatedItem.id)
-
-            // Detectamos si es un mensaje de lead comprobando si cambió el last_inbound_at
-            // Si el item no estaba cargado (no estaba en los primeros 50), asumimos que si last_inbound_at 
-            // es muy reciente (hace menos de 10 seg), debe ser nuevo, para poder lanzar el toast igual.
             let isInbound = false;
             if (oldItem) {
               isInbound = !!oldItem.last_inbound_at && !!updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
             } else if (updatedItem.last_inbound_at) {
                const diff = Date.now() - new Date(updatedItem.last_inbound_at).getTime();
-               isInbound = diff < 10000; // Recibido en los ultimos 10 segundos
+               isInbound = diff < 10000;
             }
 
             if (isInbound && activeIdRef.current !== updatedItem.id) {
               toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
             } else if (isInbound && activeIdRef.current === updatedItem.id && updatedItem.unread_count > 0) {
-               // Si estamos viendo el chat y entra mensaje nuevo, lo marcamos leído localmente y en BD
                updatedItem.unread_count = 0
                markConversationRead(updatedItem.id)
             }
 
-              setConversations((currentPrev) => {
-                const existingItem = currentPrev.find((c) => c.id === updatedItem.id)
-                // Preservar el objeto agent unido si existía en el estado local
-                const mergedItem = existingItem ? { ...existingItem, ...updatedItem } : updatedItem;
-                
-                const otherConversations = currentPrev.filter((c) => c.id !== updatedItem.id)
-                // Siempre al principio en el UPDATE (last message moved it)
-                return [mergedItem, ...otherConversations]
-              })
+            setConversations((currentPrev) => {
+              const existingItem = currentPrev.find((c) => c.id === updatedItem.id)
+              const mergedItem = existingItem ? { ...existingItem, ...updatedItem } : updatedItem;
+              const otherConversations = currentPrev.filter((c) => c.id !== updatedItem.id)
+              return [mergedItem, ...otherConversations]
+            })
           } else if (payload.eventType === "DELETE") {
             setConversations((prev) =>
               prev.filter((c) => c.id !== (payload.old as { id: string }).id)
@@ -164,23 +156,23 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       )
       .subscribe()
 
-    const broadcastChannel = supabase
-      .channel(`agency-${instance.agency_id}`)
-      .on(
-        "broadcast",
-        { event: "refresh-whatsapp" },
-        (payload) => {
-          load()
-        }
-      )
-      .subscribe()
+    const broadcastChannel = agencyId 
+      ? supabase
+          .channel(`agency-${agencyId}`)
+          .on(
+            "broadcast",
+            { event: "refresh-whatsapp" },
+            (payload) => { load() }
+          )
+          .subscribe()
+      : null
 
     return () => {
       clearInterval(interval)
       supabase.removeChannel(channel)
-      supabase.removeChannel(broadcastChannel)
+      if (broadcastChannel) supabase.removeChannel(broadcastChannel)
     }
-  }, [instance.id, instance.agency_id])
+  }, [instance?.id, instance?.agency_id])
 
   const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
     e.stopPropagation();
