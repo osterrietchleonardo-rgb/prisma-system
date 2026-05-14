@@ -8,8 +8,6 @@ export const metadata: Metadata = {
   title: "Asesor IA en WhatsApp | PRISMA",
 }
 
-import { SimpleErrorCatcher } from "@/components/whatsapp/SimpleErrorCatcher"
-
 export default async function AsesorIAWhatsAppPage() {
   const supabase = createClient()
 
@@ -44,9 +42,7 @@ export default async function AsesorIAWhatsAppPage() {
       {!instance ? (
         <SetupWizard />
       ) : (
-        <SimpleErrorCatcher>
-          <WhatsAppTabsWrapper instance={instance} />
-        </SimpleErrorCatcher>
+        <WhatsAppTabsWrapper instance={instance} />
       )}
     </div>
   )
