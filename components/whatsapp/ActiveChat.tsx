@@ -68,7 +68,11 @@ function formatDate(dateStr: string): string {
 
   if (d.toDateString() === today.toDateString()) return "Hoy"
   if (d.toDateString() === yesterday.toDateString()) return "Ayer"
-  return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
+  try {
+    return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
+  } catch (e) {
+    return ""
+  }
 }
 
 export function ActiveChat({ conversation: initialConv, instance, onBack, onDeleteChat }: ActiveChatProps) {
@@ -325,7 +329,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   }
 
   const handleRemoveTag = async (tag: string) => {
-    const newTags = conv.etiquetas.filter((t) => t !== tag)
+    const newTags = (conv.etiquetas || []).filter((t) => t !== tag)
     // Optimistic
     setConv((prev) => ({ ...prev, etiquetas: newTags }))
     const result = await updateEtiquetas(conv.id, newTags)
@@ -336,8 +340,8 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   }
 
   const handleAddTag = async (tag: string) => {
-    if (conv.etiquetas.includes(tag)) return
-    const newTags = [...conv.etiquetas, tag]
+    if ((conv.etiquetas || []).includes(tag)) return
+    const newTags = [...(conv.etiquetas || []), tag]
     // Optimistic
     setConv((prev) => ({ ...prev, etiquetas: newTags }))
     setTagOpen(false)
@@ -465,7 +469,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
 
           {/* Tags row */}
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-            {conv.etiquetas.map((tag) => (
+            {(conv.etiquetas || []).map((tag) => (
               <Badge
                 key={tag}
                 variant="secondary"
@@ -486,7 +490,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
               </PopoverTrigger>
               <PopoverContent className="w-48 p-2" align="start">
                 <div className="space-y-1">
-                  {ALL_TAGS.filter((t) => !conv.etiquetas.includes(t)).map(
+                  {ALL_TAGS.filter((t) => !(conv.etiquetas || []).includes(t)).map(
                     (tag) => (
                       <button
                         key={tag}
@@ -497,10 +501,10 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                       </button>
                     )
                   )}
-                  {ALL_TAGS.every((t) => conv.etiquetas.includes(t)) && (
-                    <p className="text-xs text-muted-foreground px-2 py-1">
-                      Todas asignadas
-                    </p>
+                  {ALL_TAGS.every((t) => (conv.etiquetas || []).includes(t)) && (
+                    <div className="text-center py-2 text-[10px] text-muted-foreground">
+                      Todas las etiquetas aplicadas
+                    </div>
                   )}
                 </div>
               </PopoverContent>
@@ -576,11 +580,11 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                       {showDate && (
                         <div className="flex items-center justify-center my-4">
                           <span className="text-[10px] text-muted-foreground bg-muted/50 px-3 py-1 rounded-full font-medium">
-                            {formatDate(msg.created_at)}
+                            {mounted ? formatDate(msg.created_at) : ""}
                           </span>
                         </div>
                       )}
-                      <MessageBubble msg={msg} />
+                      <MessageBubble msg={msg} mounted={mounted} />
                     </div>
                   )
                 })}
@@ -753,7 +757,7 @@ function MediaContent({ msg }: { msg: WAMessage }) {
 // Message Bubble
 // =============================================
 
- function MessageBubble({ msg }: { msg: WAMessage }) {
+ function MessageBubble({ msg, mounted }: { msg: WAMessage, mounted: boolean }) {
   const time = mounted ? formatTime(msg.created_at) : ""
   const isMedia = ['image', 'video', 'audio', 'document'].includes(msg.message_type || '')
 

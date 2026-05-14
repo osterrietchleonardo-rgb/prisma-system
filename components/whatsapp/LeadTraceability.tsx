@@ -24,6 +24,11 @@ interface LeadTraceabilityProps {
 export default function LeadTraceability({ conversation, messages, onDeleteChat }: LeadTraceabilityProps) {
   const supabase = createClient()
   const [isDeleting, setIsDeleting] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   
   // Section 1: Phone Copy
   const [copied, setCopied] = useState(false)
@@ -168,7 +173,9 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
   const leadMessagesCount = messages.filter(m => m.role === 'lead').length
   
   const firstContact = messages.length > 0 ? new Date(messages[0].created_at) : new Date()
-  const daysSinceFirstContact = Math.floor((new Date().getTime() - firstContact.getTime()) / (1000 * 3600 * 24))
+  const daysSinceFirstContact = mounted 
+    ? Math.floor((new Date().getTime() - firstContact.getTime()) / (1000 * 3600 * 24))
+    : 0
   
   // Calculate avg bot response time
   let totalBotResponseMs = 0
@@ -297,7 +304,7 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold">{roleTexts[msg.role]}</span>
                     <span className="text-[10px] text-muted-foreground">
-                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}
+                      {mounted ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }) : ""}
                     </span>
                   </div>
                   <p className="text-muted-foreground truncate" title={msg.content}>
@@ -340,7 +347,7 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold">
-                  {new Date(visit.scheduled_at).toLocaleDateString()} - {new Date(visit.scheduled_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                  {mounted ? `${new Date(visit.scheduled_at).toLocaleDateString()} - ${new Date(visit.scheduled_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : ""}
                 </div>
                 <Badge variant="outline" className={visit.status === 'confirmed' ? "text-green-600 border-green-200 bg-green-50" : "text-yellow-600 border-yellow-200 bg-yellow-50"}>
                   {visit.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}

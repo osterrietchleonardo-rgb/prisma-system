@@ -45,6 +45,7 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set())
+  const [mounted, setMounted] = useState(false)
   
   // Import State
   const [isImporting, setIsImporting] = useState(false)
@@ -68,6 +69,7 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
   const limitNumber = getMessagingLimitNumber(instance?.messaging_limit_tier);
 
   useEffect(() => {
+    setMounted(true)
     fetchData()
   }, [])
 
@@ -366,7 +368,7 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
                                </Badge>
                                {sentAt && (
                                  <span className="text-[10px] text-muted-foreground">
-                                   {new Date(sentAt).toLocaleDateString()}
+                                   {mounted ? new Date(sentAt).toLocaleDateString() : ""}
                                  </span>
                                )}
                              </div>
@@ -377,7 +379,7 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
                        )
                      })}
                      <td className="p-3 text-right text-muted-foreground text-xs">
-                       {contact.last_campaign_sent_at ? new Date(contact.last_campaign_sent_at).toLocaleDateString() : '-'}
+                       {mounted && contact.last_campaign_sent_at ? new Date(contact.last_campaign_sent_at).toLocaleDateString() : '-'}
                      </td>
                   </tr>
                 ))}

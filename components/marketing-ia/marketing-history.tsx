@@ -397,9 +397,9 @@ export function MarketingHistory() {
               </div>
 
               {selectedGroup.variants[activeVariantIndex] && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in zoom-in-95 duration-300">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 animate-in fade-in zoom-in-95 duration-300">
                   <div className="space-y-4">
-                    <div className="aspect-square md:aspect-auto md:h-[500px] w-full bg-muted rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl relative border border-accent/10">
+                    <div className="aspect-auto h-[300px] md:h-[500px] w-full bg-muted rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl relative border border-accent/10">
                       {selectedGroup.variants[activeVariantIndex].public_url ? (
                         <img 
                           src={selectedGroup.variants[activeVariantIndex].public_url} 
@@ -436,8 +436,8 @@ export function MarketingHistory() {
                        </div>
                     </div>
 
-                    <div className="flex-1">
-                        <div className="bg-muted/30 p-6 rounded-2xl border border-muted space-y-4 h-full">
+                    <div className="flex-1 min-h-0">
+                        <div className="bg-muted/30 p-4 md:p-6 rounded-2xl border border-muted space-y-4 h-full">
                           {selectedGroup.variants[activeVariantIndex].copy_type === 'video' ? (
                             ['hook', 'problema', 'agitacion', 'solucion', 'cta'].map(field => (
                               <div key={field} className="space-y-1">
@@ -476,27 +476,27 @@ export function MarketingHistory() {
                         </div>
                     </div>
 
-                    <div className="flex gap-2 mt-auto pt-2">
+                    <div className="flex flex-col sm:flex-row gap-2 mt-auto pt-2">
                         {isEditingMode ? (
                           <>
-                            <Button variant="outline" className="flex-1 font-bold" onClick={() => setIsEditingMode(false)}>
+                            <Button variant="outline" className="w-full sm:flex-1 font-bold" onClick={() => setIsEditingMode(false)}>
                               Cancelar
                             </Button>
-                            <Button className="flex-1 font-bold bg-accent hover:bg-accent/90" onClick={handleSaveEdit} disabled={isSaving}>
+                            <Button className="w-full sm:flex-1 font-bold bg-accent hover:bg-accent/90" onClick={handleSaveEdit} disabled={isSaving}>
                               {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
-                              Guardar Cambios
+                              Guardar
                             </Button>
                           </>
                         ) : (
                           <>
-                            <Button variant="outline" className="flex-1 font-bold border-accent/20" onClick={() => {
+                            <Button variant="outline" className="w-full sm:flex-1 font-bold border-accent/20" onClick={() => {
                               setEditContent(selectedGroup.variants[activeVariantIndex].content)
                               setIsEditingMode(true)
                             }}>
-                              <Edit2 className="w-4 h-4 mr-2" /> Editar Variante
+                              <Edit2 className="w-4 h-4 mr-2" /> Editar
                             </Button>
-                            <Button variant="destructive" className="font-bold flex-1" onClick={() => setVariantToDelete(selectedGroup.variants[activeVariantIndex].id)}>
-                              <Trash2 className="w-4 h-4 mr-2" /> Borrar Variante
+                            <Button variant="destructive" className="font-bold w-full sm:flex-1" onClick={() => setVariantToDelete(selectedGroup.variants[activeVariantIndex].id)}>
+                              <Trash2 className="w-4 h-4 mr-2" /> Borrar
                             </Button>
                           </>
                         )}

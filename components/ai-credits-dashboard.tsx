@@ -190,7 +190,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
         </CardHeader>
         <CardContent>
           <div className="rounded-md border border-accent/10 bg-background/50 overflow-x-auto audit-table-container">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-sm text-left min-w-[600px]">
               <thead className="bg-accent/5 text-muted-foreground text-xs uppercase font-semibold">
                 <tr>
                   <th className="px-4 py-3">Fecha</th>

@@ -66,17 +66,20 @@
 
 ## 🔄 ENTRADAS DE PROGRESO
 
-### 2026-05-14 | UI/UX — Mobile Corrections & Hydration Stability
-- **WhatsApp IA — Estabilidad de Renderizado**:
-  - Resuelto el error "Application error: a client-side exception has occurred" mediante la implementación de un estado `mounted` en `ConversationsList` y `ActiveChat`. Esto evita el "hydration mismatch" causado por el cálculo de `timeAgo` y formateo de fechas que difería entre el servidor y el cliente.
-  - Actualizado el contenedor principal de chat para usar `100dvh` (Dynamic Viewport Height), asegurando que la interfaz ocupe el 100% de la pantalla útil sin ser tapada por las barras de navegación de navegadores móviles.
-- **Configuración — Tabla de Auditoría**:
-  - Habilitado el scroll horizontal en la tabla "Historial de Uso (Auditoría)" de créditos IA. Se aplicó un wrapper `overflow-x-auto` y se garantizó un ancho mínimo de `600px` vía CSS para evitar que las columnas se compriman y sean ilegibles.
-- **Marketing IA — Modal de Variantes**:
-  - Corregido el escalado del modal de inspección de variantes. Ahora el ancho se ajusta a `95vw` en móviles y las imágenes usan `aspect-square` para optimizar el espacio vertical en pantallas pequeñas, permitiendo ver el contenido del copy sin scroll excesivo.
-- **Refinamientos CSS**:
-  - Centralizada la utilidad `.scrollbar-hide` en `globals.css`.
-  - Ajustados márgenes y paddings en modales para mejorar la experiencia táctil.
+### 2026-05-14 | UI/UX — Mobile Stabilization & Hydration Final Fixes
+- **WhatsApp IA — Eliminación de Excepciones de Cliente**:
+  - Implementado un guard de `mounted` estado en `WhatsAppTabsWrapper` para asegurar que el renderizado de pestañas y componentes dinámicos solo ocurra tras la hidratación inicial.
+  - Resuelto el desborde de la barra de navegación de pestañas en mobile agregando `overflow-x-auto` y ajustando el tamaño de los triggers (pestañas scrolleables).
+  - Corregida la duplicidad de funciones de gestión de etiquetas en `ActiveChat.tsx` y reforzada la nulabilidad de `etiquetas` en toda la lógica de chat.
+- **Configuración — Auditoría de Créditos**:
+  - Forzado el scroll horizontal en la tabla de historial mediante `min-w-[600px]`, garantizando que la información de auditoría sea legible en dispositivos pequeños sin comprimir columnas.
+- **Marketing IA — Galería de Variantes**:
+  - Refactorizado el diálogo de inspección de variantes para ser 100% responsivo:
+    - El layout ahora colapsa a una sola columna en móviles.
+    - La altura de la imagen se ajusta dinámicamente (`h-[300px]` en mobile vs `h-[500px]` en desktop).
+    - Los botones de acción (Editar/Borrar) se apilan verticalmente en móviles para facilitar la interacción táctil.
+- **Estabilidad General**:
+  - Todas las funciones de renderizado de fechas dependientes de locale (`toLocaleDateString`, `timeAgo`) ahora están protegidas por guards de cliente, eliminando definitivamente las pantallas blancas de "Application Error" en iOS y Android.
 
 ### 2026-05-14 | UI/UX — Soporte Mobile & Tablet Completo (Análisis Inicial)
 - **Responsividad Global**: 

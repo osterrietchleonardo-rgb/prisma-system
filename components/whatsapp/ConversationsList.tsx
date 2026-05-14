@@ -423,7 +423,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                       ) : (
                         <BotOff className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
                       )}
-                      {conv.etiquetas.slice(0, 2).map((tag) => (
+                      {conv.etiquetas?.slice(0, 2).map((tag) => (
                         <Badge
                           key={tag}
                           variant="secondary"
