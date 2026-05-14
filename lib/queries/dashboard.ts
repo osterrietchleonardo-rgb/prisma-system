@@ -326,6 +326,85 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
     };
   }).reverse();
 
+  // 5. Response Time Analytics (New)
+  let msgQuery = supabase
+    .from("wa_messages")
+    .select("conversation_id, role, created_at, wa_conversations!inner(agent_id)")
+    .eq("agency_id", agencyId)
+    .order("created_at", { ascending: true });
+
+  if (agentId) msgQuery = msgQuery.eq("wa_conversations.agent_id", agentId);
+  if (startDate) msgQuery = msgQuery.gte("created_at", startDate);
+  if (endDate) msgQuery = msgQuery.lte("created_at", endDate);
+
+  const { data: messages } = await msgQuery;
+
+  const respTimes = {
+    bot: { first: [] as number[], between: [] as number[] },
+    human: { first: [] as number[], between: [] as number[] }
+  };
+
+  const convThreads: Record<string, any[]> = {};
+  messages?.forEach((m: any) => {
+    if (!convThreads[m.conversation_id]) convThreads[m.conversation_id] = [];
+    convThreads[m.conversation_id].push(m);
+  });
+
+  Object.values(convThreads).forEach(thread => {
+    let firstLeadMsgInConv: any = null;
+    let pendingLeadMsg: any = null;
+    let hasBotResponded = false;
+    let hasHumanResponded = false;
+
+    thread.forEach(m => {
+      if (m.role === 'lead') {
+        if (!firstLeadMsgInConv) firstLeadMsgInConv = m;
+        if (!pendingLeadMsg) pendingLeadMsg = m;
+      } else if (m.role === 'bot') {
+        if (pendingLeadMsg) {
+          const diff = new Date(m.created_at).getTime() - new Date(pendingLeadMsg.created_at).getTime();
+          if (!hasBotResponded && pendingLeadMsg === firstLeadMsgInConv) {
+            respTimes.bot.first.push(diff);
+            hasBotResponded = true;
+          } else {
+            respTimes.bot.between.push(diff);
+          }
+          pendingLeadMsg = null;
+        }
+      } else if (m.role === 'human') {
+        if (pendingLeadMsg) {
+          const diff = new Date(m.created_at).getTime() - new Date(pendingLeadMsg.created_at).getTime();
+          if (!hasHumanResponded && pendingLeadMsg === firstLeadMsgInConv) {
+            respTimes.human.first.push(diff);
+            hasHumanResponded = true;
+          } else {
+            respTimes.human.between.push(diff);
+          }
+          pendingLeadMsg = null;
+        }
+      }
+    });
+  });
+
+  const calculateAvg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  const formatDuration = (ms: number) => {
+    if (ms <= 0) return "---";
+    const sec = Math.floor(ms / 1000);
+    if (sec < 60) return `${sec}s`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ${sec % 60}s`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ${min % 60}m`;
+    return `${Math.floor(hr/24)}d ${hr%24}h`;
+  };
+
+  kpis.responseTime = {
+    botFirst: formatDuration(calculateAvg(respTimes.bot.first)),
+    botBetween: formatDuration(calculateAvg(respTimes.bot.between)),
+    humanFirst: formatDuration(calculateAvg(respTimes.human.first)),
+    humanBetween: formatDuration(calculateAvg(respTimes.human.between))
+  };
+
   return {
     kpis,
     charts: {

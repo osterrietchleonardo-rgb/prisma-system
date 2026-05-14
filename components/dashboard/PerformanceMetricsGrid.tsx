@@ -177,6 +177,19 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
           },
         ]}
       />
+
+      {/* 9. TIEMPOS DE RESPUESTA */}
+      <MetricGroup 
+        title="Tiempos Respuesta"
+        icon={Clock}
+        color="cyan-500"
+        metrics={[
+          { label: "1er Msg (BOT)", value: kpis.responseTime?.botFirst || "---" },
+          { label: "Entre Msg (BOT)", value: kpis.responseTime?.botBetween || "---" },
+          { label: "1er Msg (ASESOR)", value: kpis.responseTime?.humanFirst || "---" },
+          { label: "Entre Msg (ASESOR)", value: kpis.responseTime?.humanBetween || "---" },
+        ]}
+      />
     </div>
   );
 }
