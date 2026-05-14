@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampaignState } from "./CampaignState"
 import { ConnectionIndicator } from "./ConnectionIndicator"
-import { WhatsAppErrorBoundary } from "./WhatsAppErrorBoundary"
 import dynamic from "next/dynamic"
+
 
 const LoadingSpinner = () => (
   <div className="h-full flex items-center justify-center">
@@ -16,7 +16,6 @@ const LoadingSpinner = () => (
 const ChatInterface = dynamic(
   () => import("./ChatInterface").then((m) => m.default),
   {
-    ssr: false,
     loading: () => (
       <div className="flex-1 flex items-center justify-center p-12">
         <div className="flex flex-col items-center gap-4 animate-pulse">
@@ -30,15 +29,15 @@ const ChatInterface = dynamic(
 
 const CampaignsTab = dynamic(
   () => import("./CampaignsTab").then((m) => m.default),
-  { ssr: false, loading: () => <LoadingSpinner /> }
+  { loading: () => <LoadingSpinner /> }
 )
 
-const TemplatesTab = dynamic(() => import("./TemplatesTab"), { ssr: false, loading: () => <LoadingSpinner /> })
-const AiSettingsTab = dynamic(() => import("./AiSettingsTab"), { ssr: false, loading: () => <LoadingSpinner /> })
+const TemplatesTab = dynamic(() => import("./TemplatesTab"), { loading: () => <LoadingSpinner /> })
+const AiSettingsTab = dynamic(() => import("./AiSettingsTab"), { loading: () => <LoadingSpinner /> })
 
 const ContactsTab = dynamic(
   () => import("./ContactsTab").then((m) => m.default),
-  { ssr: false, loading: () => <LoadingSpinner /> }
+  { loading: () => <LoadingSpinner /> }
 )
 
 interface WhatsAppTabsWrapperProps {
@@ -46,25 +45,14 @@ interface WhatsAppTabsWrapperProps {
 }
 
 export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
-  const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState("chat")
-  
-  // Lazy mount guards for each tab
-  const [hasMountedChat, setHasMountedChat] = useState(true) // Chat starts true because it's default
-  const [hasMountedPlantillas, setHasMountedPlantillas] = useState(false)
-  const [hasMountedContactos, setHasMountedContactos] = useState(false)
+  // Lazy mount: only mount CampaignsTab after first visit to avoid premature renders
   const [hasMountedCampanas, setHasMountedCampanas] = useState(false)
-  const [hasMountedConfig, setHasMountedConfig] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
     const unsubscribe = CampaignState.subscribeToTab((tab) => {
       setActiveTab(tab)
       if (tab === "campanas") setHasMountedCampanas(true)
-      if (tab === "chat") setHasMountedChat(true)
-      if (tab === "plantillas") setHasMountedPlantillas(true)
-      if (tab === "contactos") setHasMountedContactos(true)
-      if (tab === "config") setHasMountedConfig(true)
     })
     return unsubscribe
   }, [])
@@ -72,14 +60,8 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
   const handleTabChange = (value: string) => {
     setActiveTab(value)
     CampaignState.setActiveTab(value)
-    if (value === "chat") setHasMountedChat(true)
-    if (value === "plantillas") setHasMountedPlantillas(true)
-    if (value === "contactos") setHasMountedContactos(true)
     if (value === "campanas") setHasMountedCampanas(true)
-    if (value === "config") setHasMountedConfig(true)
   }
-
-  if (!mounted) return <div className="flex-1 bg-background" />
 
   return (
     <Tabs 
@@ -97,25 +79,18 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
         </TabsList>
         <ConnectionIndicator instanceId={instance.id} initialStatus={instance.status} />
       </div>
-
-      <TabsContent value="chat" className="m-0 border-none p-0 outline-none data-[state=inactive]:hidden">
-        <WhatsAppErrorBoundary>
-          {hasMountedChat && <ChatInterface instance={instance} />}
-        </WhatsAppErrorBoundary>
+      <TabsContent value="chat" className="flex-1 min-h-0 m-0 border-none p-0 outline-none data-[state=inactive]:hidden flex flex-col">
+        <ChatInterface instance={instance} />
       </TabsContent>
-
       <TabsContent value="plantillas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-        {hasMountedPlantillas && <TemplatesTab instance={instance} />}
+        <TemplatesTab instance={instance} />
       </TabsContent>
-
       <TabsContent value="config" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-        {hasMountedConfig && <AiSettingsTab instance={instance} />}
+        <AiSettingsTab instance={instance} />
       </TabsContent>
-
       <TabsContent value="contactos" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-        {hasMountedContactos && <ContactsTab instance={instance} />}
+        <ContactsTab instance={instance} />
       </TabsContent>
-
       <TabsContent value="campanas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
         {hasMountedCampanas ? (
           <CampaignsTab instance={instance} />
