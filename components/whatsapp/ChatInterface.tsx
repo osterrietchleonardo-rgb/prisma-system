@@ -23,41 +23,6 @@ export default function ChatInterface({ instance }: ChatInterfaceProps) {
   if (!mounted) return <div className="flex-1 bg-background" />
 
   return (
-    <div className="flex flex-row flex-1 min-h-0 overflow-hidden">
-      {/* Desktop: List always visible / Mobile: visible only when no active chat */}
-      <div
-        className={`w-full md:w-[300px] md:flex-shrink-0 md:border-r md:block ${
-          activeConversation ? "hidden" : "block"
-        }`}
-      >
-        <ConversationsList
-          instance={instance}
-          activeId={activeConversation?.id ?? null}
-          onSelect={(conv) => setActiveConversation(conv)}
-        />
-      </div>
-
-      {/* Desktop: Chat always visible / Mobile: visible only when chat active */}
-      <div
-        className={`flex-1 flex-col min-w-0 ${
-          activeConversation ? "flex" : "hidden md:flex"
-        }`}
-      >
-        {activeConversation ? (
-          <ActiveChat
-            conversation={activeConversation}
-            instance={instance}
-            onBack={() => setActiveConversation(null)}
-            onDeleteChat={() => setActiveConversation(null)}
-          />
-        ) : (
-          <EmptyState 
-            icon={MessageSquare} 
-            title="Seleccioná una conversación" 
-            subtitle="Elegí un contacto de la lista para ver los mensajes e interactuar." 
-          />
-        )}
-      </div>
-    </div>
+    <div style={{color:'white', padding:'20px', backgroundColor: 'blue', height: '100%'}}>CHATINTERFACE OK</div>
   )
 }
