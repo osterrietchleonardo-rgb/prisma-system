@@ -25,8 +25,7 @@ export default function ChatInterface({ instance }: ChatInterfaceProps) {
   if (!mounted) return <div className="flex-1 bg-background" />
 
   return (
-    <ErrorBoundary>
-      <div className="flex flex-row h-[calc(100vh-64px)] h-[calc(100dvh-64px)]">
+    <div className="flex flex-row h-[calc(100vh-64px)] overflow-hidden">
       {/* Desktop: List always visible / Mobile: visible only when no active chat */}
       <div
         className={`w-full md:w-[300px] md:flex-shrink-0 md:border-r md:block ${
@@ -48,20 +47,22 @@ export default function ChatInterface({ instance }: ChatInterfaceProps) {
       >
         {activeConversation ? (
           <ActiveChat
+            key={activeConversation.id}
             conversation={activeConversation}
             instance={instance}
             onBack={() => setActiveConversation(null)}
             onDeleteChat={() => setActiveConversation(null)}
           />
         ) : (
-          <EmptyState 
-            icon={MessageSquare} 
-            title="Selecciona una conversacion" 
-            subtitle="Elegi un contacto de la lista para ver los mensajes e interactuar." 
-          />
+          <div className="flex-1 flex items-center justify-center bg-muted/10">
+            <EmptyState 
+              icon={MessageSquare} 
+              title="Seleccioná una conversación" 
+              subtitle="Elegí un contacto de la lista para ver los mensajes e interactuar." 
+            />
+          </div>
         )}
       </div>
-      </div>
-    </ErrorBoundary>
+    </div>
   )
 }
