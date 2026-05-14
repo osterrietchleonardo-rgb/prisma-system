@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { WAConversation, WhatsAppInstance } from "@/types/whatsapp"
 import { ConversationsList } from "./ConversationsList"
 import { ActiveChat } from "./ActiveChat"
