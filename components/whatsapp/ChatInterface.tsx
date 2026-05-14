@@ -14,6 +14,13 @@ interface ChatInterfaceProps {
 export default function ChatInterface({ instance }: ChatInterfaceProps) {
   const [activeConversation, setActiveConversation] =
     useState<WAConversation | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return <div className="flex-1 bg-background" />
 
   return (
     <div className="flex flex-row h-[calc(100vh-64px)] h-[calc(100dvh-64px)] overflow-hidden">

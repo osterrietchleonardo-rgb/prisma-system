@@ -8,9 +8,10 @@ export function ConnectionIndicator({ instanceId, initialStatus }: { instanceId:
   const [status, setStatus] = useState(initialStatus)
 
   useEffect(() => {
+    if (!instanceId) return;
+    
     let interval: NodeJS.Timeout
     async function check() {
-      if (!instanceId) return;
       const res = await getInstanceStatus(instanceId)
       if (res.success && res.data?.state) {
         setStatus(res.data.state)

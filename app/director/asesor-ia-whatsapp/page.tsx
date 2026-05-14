@@ -1,28 +1,41 @@
+import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
-import { WhatsAppErrorBoundary } from "@/components/whatsapp/WhatsAppErrorBoundary"
+import type { Metadata } from "next"
 import { SetupWizard } from "@/components/whatsapp/SetupWizard"
 import { WhatsAppTabsWrapper } from "@/components/whatsapp/WhatsAppTabsWrapper"
+import { WhatsAppErrorBoundary } from "@/components/whatsapp/WhatsAppErrorBoundary"
+
+export const metadata: Metadata = {
+  title: "Asesor IA en WhatsApp | PRISMA",
+}
 
 export default async function AsesorIAWhatsAppPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const supabase = createClient()
 
-  if (!user) return null
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  // 1. Obtenemos el perfil para saber a qué agencia pertenece el usuario
+  if (!user) {
+    redirect("/auth/login")
+  }
+
   const { data: profile } = await supabase
     .from("profiles")
-    .select("agency_id")
+    .select("agency_id, role")
     .eq("id", user.id)
     .single()
 
-  if (!profile?.agency_id) return null
+  if (!profile || profile.role !== "director") {
+    redirect("/")
+  }
 
-  // 2. Obtenemos la instancia usando el agency_id del perfil
+  // Check if agency has a WhatsApp instance configured
   const { data: instance } = await supabase
     .from("whatsapp_instances")
     .select("*")
     .eq("agency_id", profile.agency_id)
+    .limit(1)
     .maybeSingle()
 
   return (
