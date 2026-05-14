@@ -320,7 +320,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   }
 
   const handleRemoveTag = async (tag: string) => {
-    const newTags = conv.etiquetas.filter((t) => t !== tag)
+    const newTags = (conv.etiquetas || []).filter((t) => t !== tag)
     // Optimistic
     setConv((prev) => ({ ...prev, etiquetas: newTags }))
     const result = await updateEtiquetas(conv.id, newTags)
@@ -331,8 +331,8 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   }
 
   const handleAddTag = async (tag: string) => {
-    if (conv.etiquetas.includes(tag)) return
-    const newTags = [...conv.etiquetas, tag]
+    if ((conv.etiquetas || []).includes(tag)) return
+    const newTags = [...(conv.etiquetas || []), tag]
     // Optimistic
     setConv((prev) => ({ ...prev, etiquetas: newTags }))
     setTagOpen(false)
@@ -458,9 +458,8 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
             )}
           </div>
 
-          {/* Tags row */}
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-            {conv.etiquetas.map((tag) => (
+            {(conv.etiquetas || []).map((tag) => (
               <Badge
                 key={tag}
                 variant="secondary"
@@ -481,7 +480,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
               </PopoverTrigger>
               <PopoverContent className="w-48 p-2" align="start">
                 <div className="space-y-1">
-                  {ALL_TAGS.filter((t) => !conv.etiquetas.includes(t)).map(
+                  {ALL_TAGS.filter((t) => !(conv.etiquetas || []).includes(t)).map(
                     (tag) => (
                       <button
                         key={tag}
@@ -492,7 +491,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                       </button>
                     )
                   )}
-                  {ALL_TAGS.every((t) => conv.etiquetas.includes(t)) && (
+                  {ALL_TAGS.every((t) => (conv.etiquetas || []).includes(t)) && (
                     <p className="text-xs text-muted-foreground px-2 py-1">
                       Todas asignadas
                     </p>

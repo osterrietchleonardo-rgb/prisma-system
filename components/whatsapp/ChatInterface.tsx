@@ -14,9 +14,16 @@ interface ChatInterfaceProps {
 export default function ChatInterface({ instance }: ChatInterfaceProps) {
   const [activeConversation, setActiveConversation] =
     useState<WAConversation | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return <div className="flex-1 bg-background" />
 
   return (
-    <div className="flex flex-row h-[calc(100vh-64px)]">
+    <div className="flex flex-row h-[calc(100vh-64px)] h-[calc(100dvh-64px)] overflow-hidden">
       {/* Desktop: List always visible / Mobile: visible only when no active chat */}
       <div
         className={`w-full md:w-[300px] md:flex-shrink-0 md:border-r md:block ${

@@ -198,20 +198,22 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   const agentEmails = useMemo(() => {
     const emails = new Set<string>()
     conversations.forEach((c) => {
+      if (!c) return;
       const agentData = (c as any).assigned_agent;
       const email = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
       if (email) emails.add(email)
     })
-    return Array.from(emails).sort()
+    return Array.from(emails)
   }, [conversations])
 
   // Filter by search + tab + agent
   const filtered = useMemo(() => {
     return conversations.filter((c) => {
+      if (!c) return false;
       // Búsqueda por nombre o teléfono
       const searchTerm = search.toLowerCase()
       const matchesSearch = 
-        c.contact_phone.toLowerCase().includes(searchTerm) || 
+        (c.contact_phone || "").toLowerCase().includes(searchTerm) || 
         (c.contact_name || "").toLowerCase().includes(searchTerm)
       
       if (!matchesSearch) return false
@@ -418,7 +420,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                       ) : (
                         <BotOff className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
                       )}
-                      {conv.etiquetas.slice(0, 2).map((tag) => (
+                      {conv.etiquetas?.slice(0, 2).map((tag) => (
                         <Badge
                           key={tag}
                           variant="secondary"
