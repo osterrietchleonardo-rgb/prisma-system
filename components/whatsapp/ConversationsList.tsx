@@ -46,6 +46,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   const [tab, setTab] = useState("all")
   const [filterAgentEmail, setFilterAgentEmail] = useState("all")
   const [loading, setLoading] = useState(true)
+  const [debugError, setDebugError] = useState<string | null>(null)
 
   const activeIdRef = useRef(activeId)
   const convRef = useRef(conversations)
@@ -63,21 +64,27 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
     const supabase = createClient()
 
     async function load() {
-      const { data, error } = await supabase
-        .from("wa_conversations")
-        .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
-        .eq("instance_id", instance.id)
-        .order("last_message_at", { ascending: false })
+      try {
+        const { data, error } = await supabase
+          .from("wa_conversations")
+          .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
+          .eq("instance_id", instance.id)
+          .order("last_message_at", { ascending: false })
 
-      if (error) {
-        console.error("Error loading conversations with agents:", error)
+        if (error) {
+          console.error("Error loading conversations with agents:", error)
+          setDebugError(error.message)
+        }
+        
+        if (data) {
+          console.log("Loaded conversations:", data.length, "First item assigned_agent:", (data[0] as any)?.assigned_agent)
+          setConversations(data as any[])
+        }
+        setLoading(false)
+      } catch (e: any) {
+        setDebugError(e.message)
+        setLoading(false)
       }
-      
-      if (data) {
-        console.log("Loaded conversations:", data.length, "First item assigned_agent:", (data[0] as any)?.assigned_agent)
-        setConversations(data as any[])
-      }
-      setLoading(false)
     }
 
     load()
@@ -233,8 +240,10 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
     })
   }, [conversations, search, tab, filterAgentEmail])
 
+  if (debugError) return <div style={{color:'red',padding:'20px',fontSize:'18px', backgroundColor: 'white', border: '2px solid red'}}>DEBUG ERROR: {debugError}</div>
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-background overflow-hidden relative">
       {/* Search & Refresh */}
       <div className="p-3 border-b flex items-center gap-2">
         <div className="relative flex-1">
