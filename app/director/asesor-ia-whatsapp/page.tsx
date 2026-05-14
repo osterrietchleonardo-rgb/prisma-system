@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server"
 import type { Metadata } from "next"
 import { SetupWizard } from "@/components/whatsapp/SetupWizard"
 import { WhatsAppTabsWrapper } from "@/components/whatsapp/WhatsAppTabsWrapper"
-import { WhatsAppErrorBoundary } from "@/components/whatsapp/WhatsAppErrorBoundary"
 
 export const metadata: Metadata = {
   title: "Asesor IA en WhatsApp | PRISMA",
@@ -39,14 +38,12 @@ export default async function AsesorIAWhatsAppPage() {
     .maybeSingle()
 
   return (
-    <div id="whatsapp-ia-page" className="flex-1 flex flex-col min-h-0 whatsapp-page-container p-4">
-      <WhatsAppErrorBoundary>
-        {!instance ? (
-          <SetupWizard />
-        ) : (
-          <WhatsAppTabsWrapper instance={instance} />
-        )}
-      </WhatsAppErrorBoundary>
+    <div id="whatsapp-ia-page" className="flex-1 flex flex-col min-h-0 whatsapp-page-container">
+      {!instance ? (
+        <SetupWizard />
+      ) : (
+        <WhatsAppTabsWrapper instance={instance} />
+      )}
     </div>
   )
 }

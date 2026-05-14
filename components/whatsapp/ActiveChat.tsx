@@ -300,7 +300,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     setSendingNote(true)
 
     // Optimistic insert
-    const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2)
+    const tempId = crypto.randomUUID()
     const optimisticNote: WAMessage = {
       id: tempId,
       conversation_id: conv.id,
