@@ -37,6 +37,12 @@ import {
 } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+import { 
+  safeFormatDate, 
+  safeFormatTime, 
+  safeUUID, 
+  safeScrollIntoView 
+} from "./SafeUtils"
 
 const ALL_TAGS = [
   "caliente",
@@ -55,40 +61,7 @@ interface ActiveChatProps {
   onDeleteChat?: () => void
 }
 
-function formatTime(dateStr: string): string {
-  try {
-    const d = new Date(dateStr)
-    if (isNaN(d.getTime())) return ""
-    return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
-  } catch (e) {
-    return ""
-  }
-}
-
-function formatDate(dateStr: string): string {
-  try {
-    const d = new Date(dateStr)
-    if (isNaN(d.getTime())) return ""
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-
-    if (d.toDateString() === today.toDateString()) return "Hoy"
-    if (d.toDateString() === yesterday.toDateString()) return "Ayer"
-    return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
-  } catch (e) {
-    return ""
-  }
-}
-
-function safeUUID() {
-  try {
-    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-      return crypto.randomUUID()
-    }
-  } catch (e) {}
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-}
+// Usar SafeUtils
 
 export function ActiveChat({ conversation: initialConv, instance, onBack, onDeleteChat }: ActiveChatProps) {
   const [conv, setConv] = useState<WAConversation>(initialConv)
@@ -144,11 +117,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
 
       // Auto-scroll to bottom on initial load
       setTimeout(() => {
-        try {
-          bottomRef.current?.scrollIntoView({ behavior: "auto" })
-        } catch (e) {
-          console.warn("Scroll error:", e)
-        }
+        safeScrollIntoView(bottomRef.current)
       }, 100)
     }
 
@@ -177,11 +146,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
             // Auto-scroll if near bottom
             if (shouldAutoScroll.current) {
               setTimeout(() => {
-                try {
-                  bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-                } catch (e) {
-                   try { bottomRef.current?.scrollIntoView() } catch(e2) {}
-                }
+                safeScrollIntoView(bottomRef.current, "smooth")
               }, 50)
             }
           } else if (payload.eventType === "DELETE") {
@@ -240,11 +205,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
         // Auto-scroll if near bottom
         if (shouldAutoScroll.current) {
           setTimeout(() => {
-            try {
-              bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-            } catch (e) {
-              try { bottomRef.current?.scrollIntoView() } catch(e2) {}
-            }
+            safeScrollIntoView(bottomRef.current, "smooth")
           }, 50)
         }
       }
@@ -284,7 +245,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
       setMessages(data as WAMessage[])
       // Auto-scroll to bottom
       setTimeout(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "auto" })
+        safeScrollIntoView(bottomRef.current)
       }, 100)
     }
     setLoading(false)
@@ -607,7 +568,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                       {showDate && (
                         <div className="flex items-center justify-center my-4">
                           <span className="text-[10px] text-muted-foreground bg-muted/50 px-3 py-1 rounded-full font-medium">
-                            {mounted ? formatDate(msg.created_at) : ""}
+                            {mounted ? safeFormatDate(msg.created_at, { day: "numeric", month: "short" }) : ""}
                           </span>
                         </div>
                       )}
@@ -785,7 +746,7 @@ function MediaContent({ msg }: { msg: WAMessage }) {
 // =============================================
 
  function MessageBubble({ msg, mounted }: { msg: WAMessage, mounted: boolean }) {
-  const time = mounted ? formatTime(msg.created_at) : ""
+  const time = mounted ? safeFormatTime(msg.created_at) : ""
   const isMedia = ['image', 'video', 'audio', 'document'].includes(msg.message_type || '')
 
   if (msg.role === "lead") {

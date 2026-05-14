@@ -20,13 +20,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useRef } from "react"
+import { 
+  safeFormatDate, 
+  safeFormatTime, 
+  safeUUID, 
+  safeScrollIntoView 
+} from "./SafeUtils"
 
-interface ConversationsListProps {
-  instance: WhatsAppInstance
-  activeId: string | null
-  onSelect: (conv: WAConversation) => void
-}
-
+// Función para calcular tiempo relativo de forma segura
 function timeAgo(dateStr: string): string {
   try {
     const date = new Date(dateStr)
@@ -44,6 +45,14 @@ function timeAgo(dateStr: string): string {
     return ""
   }
 }
+
+interface ConversationsListProps {
+  instance: WhatsAppInstance
+  activeId: string | null
+  onSelect: (conv: WAConversation) => void
+}
+
+// Local timeAgo is now defined after imports
 
 
 export function ConversationsList({ instance, activeId, onSelect }: ConversationsListProps) {
@@ -127,9 +136,9 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
 
               const unshiftList = [newItem, ...prev];
               unshiftList.sort((a, b) => {
-                const timeB = new Date(b.last_message_at).getTime() || 0;
-                const timeA = new Date(a.last_message_at).getTime() || 0;
-                return timeB - timeA;
+                const timeB = a.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+                const timeA = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+                return (timeB || 0) - (timeA || 0);
               });
               
               // Filter by contact_phone to deduplicate orphaned duplicates
@@ -149,7 +158,8 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             if (oldItem) {
               isInbound = !!oldItem.last_inbound_at && !!updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
             } else if (updatedItem.last_inbound_at) {
-               const diff = Date.now() - new Date(updatedItem.last_inbound_at).getTime();
+               const inboundDate = new Date(updatedItem.last_inbound_at);
+               const diff = isNaN(inboundDate.getTime()) ? Infinity : Date.now() - inboundDate.getTime();
                isInbound = diff < 10000; // Recibido en los ultimos 10 segundos
             }
 

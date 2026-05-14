@@ -14,6 +14,12 @@ import { toast } from "sonner"
 
 import { deleteConversation } from "@/app/actions/whatsapp"
 import { Button } from "@/components/ui/button"
+import { 
+  safeFormatDate, 
+  safeFormatTime, 
+  safeUUID, 
+  safeScrollIntoView 
+} from "./SafeUtils"
 
 interface LeadTraceabilityProps {
   conversation: WAConversation
@@ -172,9 +178,10 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
   // Section 5: Stats
   const leadMessagesCount = messages.filter(m => m.role === 'lead').length
   
-  const firstContactDate = messages.length > 0 ? new Date(messages[0].created_at) : new Date()
-  const daysSinceFirstContact = mounted && !isNaN(firstContactDate.getTime())
-    ? Math.floor((new Date().getTime() - firstContactDate.getTime()) / (1000 * 3600 * 24))
+  const firstContactDateStr = messages.length > 0 ? messages[0].created_at : null
+  const firstContactDate = firstContactDateStr ? new Date(firstContactDateStr) : null
+  const daysSinceFirstContact = mounted && firstContactDate && !isNaN(firstContactDate.getTime())
+    ? Math.floor((Date.now() - firstContactDate.getTime()) / (1000 * 3600 * 24))
     : 0
   
   // Calculate avg bot response time
@@ -307,7 +314,7 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold">{roleTexts[msg.role]}</span>
                     <span className="text-[10px] text-muted-foreground">
-                      {mounted ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' }) : ""}
+                      {mounted ? safeFormatTime(msg.created_at) : ""}
                     </span>
                   </div>
                   <p className="text-muted-foreground truncate" title={msg.content}>
@@ -350,7 +357,7 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold">
-                  {mounted ? `${new Date(visit.scheduled_at).toLocaleDateString()} - ${new Date(visit.scheduled_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : ""}
+                  {mounted ? `${safeFormatDate(visit.scheduled_at)} - ${safeFormatTime(visit.scheduled_at)}` : ""}
                 </div>
                 <Badge variant="outline" className={visit.status === 'confirmed' ? "text-green-600 border-green-200 bg-green-50" : "text-yellow-600 border-yellow-200 bg-yellow-50"}>
                   {visit.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}

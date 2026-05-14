@@ -66,20 +66,15 @@
 
 ## 🔄 ENTRADAS DE PROGRESO
 
-### 2026-05-14 | UI/UX — Mobile Stabilization & Hydration Final Fixes
-- **WhatsApp IA — Eliminación de Excepciones de Cliente**:
-  - Implementado un guard de `mounted` estado en `WhatsAppTabsWrapper` para asegurar que el renderizado de pestañas y componentes dinámicos solo ocurra tras la hidratación inicial.
-  - Resuelto el desborde de la barra de navegación de pestañas en mobile agregando `overflow-x-auto` y ajustando el tamaño de los triggers (pestañas scrolleables).
-  - Corregida la duplicidad de funciones de gestión de etiquetas en `ActiveChat.tsx` y reforzada la nulabilidad de `etiquetas` en toda la lógica de chat.
-- **Configuración — Auditoría de Créditos**:
-  - Forzado el scroll horizontal en la tabla de historial mediante `min-w-[600px]`, garantizando que la información de auditoría sea legible en dispositivos pequeños sin comprimir columnas.
-- **Marketing IA — Galería de Variantes**:
-  - Refactorizado el diálogo de inspección de variantes para ser 100% responsivo:
-    - El layout ahora colapsa a una sola columna en móviles.
-    - La altura de la imagen se ajusta dinámicamente (`h-[300px]` en mobile vs `h-[500px]` en desktop).
-    - Los botones de acción (Editar/Borrar) se apilan verticalmente en móviles para facilitar la interacción táctil.
-- **Estabilidad General**:
-  - Todas las funciones de renderizado de fechas dependientes de locale (`toLocaleDateString`, `timeAgo`) ahora están protegidas por guards de cliente, eliminando definitivamente las pantallas blancas de "Application Error" en iOS y Android.
+### 2026-05-14 | UI/UX — Mobile Stabilization & Ultra-Defensive Hardening (Final)
+- **WhatsApp IA — Estabilización Crítica iPhone/Safari**:
+  - **Hardening de Fechas**: Implementado `try/catch` y validación `isNaN` en todos los componentes de WhatsApp (`ActiveChat`, `ConversationsList`, `LeadTraceability`) para evitar crashes por fechas malformadas o falta de locale en móviles.
+  - **Seguridad en UUIDs**: Reemplazado `crypto.randomUUID()` por `safeUUID()` con fallback matemático para contextos no seguros o navegadores antiguos.
+  - **Viewport Resilience**: Añadido fallback de `100vh` junto a `100dvh` en `ChatInterface` para garantizar que el layout no colapse en versiones de iOS con barras dinámicas.
+  - **Hydration Guards**: Reforzado el patrón de `mounted` state y añadido `try/catch` en suscripciones a eventos globales en `WhatsAppTabsWrapper`.
+- **ConversationsList**: Optimizado el ordenamiento de conversaciones para manejar tiempos nulos o inválidos sin interrumpir el renderizado.
+- **LeadTraceability**: Protegidos los cálculos de latencia y antigüedad para devolver valores seguros (0) en caso de datos de mensaje corruptos.
+- **Sincronización**: Cambios commiteados y pusheados a la rama principal de GitHub.
 
 ### 2026-05-14 | UI/UX — Soporte Mobile & Tablet Completo (Análisis Inicial)
 - **Responsividad Global**: 
