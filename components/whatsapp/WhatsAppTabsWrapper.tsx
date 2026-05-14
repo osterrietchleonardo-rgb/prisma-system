@@ -5,8 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampaignState } from "./CampaignState"
 import { ConnectionIndicator } from "./ConnectionIndicator"
 import dynamic from "next/dynamic"
-import TemplatesTab from "./TemplatesTab"
-import AiSettingsTab from "./AiSettingsTab"
+
 
 const LoadingSpinner = () => (
   <div className="h-full flex items-center justify-center">
@@ -32,6 +31,9 @@ const CampaignsTab = dynamic(
   () => import("./CampaignsTab").then((m) => m.default),
   { loading: () => <LoadingSpinner /> }
 )
+
+const TemplatesTab = dynamic(() => import("./TemplatesTab"), { loading: () => <LoadingSpinner /> })
+const AiSettingsTab = dynamic(() => import("./AiSettingsTab"), { loading: () => <LoadingSpinner /> })
 
 const ContactsTab = dynamic(
   () => import("./ContactsTab").then((m) => m.default),
