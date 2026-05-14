@@ -1,12 +1,14 @@
 "use client"
 
-import { useState, useEffect, useMemo, useRef } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import type { WAConversation, WhatsAppInstance } from "@/types/whatsapp"
 import { Search, Bot, BotOff, MessageSquare, RefreshCw, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "./EmptyState"
 import { toast } from "sonner"
 import { markConversationRead, deleteConversation } from "@/app/actions/whatsapp"
@@ -17,24 +19,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useRef } from "react"
+import { 
+  safeFormatDate, 
+  safeFormatTime, 
+  safeUUID, 
+  safeScrollIntoView 
+} from "./SafeUtils"
 
 // Función para calcular tiempo relativo de forma segura
-function timeAgo(dateStr: any): string {
-  if (!dateStr) return ""
+function timeAgo(dateStr: string): string {
   try {
     const date = new Date(dateStr)
     if (isNaN(date.getTime())) return ""
     const diff = Date.now() - date.getTime()
-    const seconds = Math.floor(diff / 1000)
-    const minutes = Math.floor(seconds / 60)
-    const hours = Math.floor(minutes / 60)
-    const days = Math.floor(hours / 24)
-
-    if (days > 7) return date.toLocaleDateString('es-AR')
-    if (days > 0) return `${days}d`
-    if (hours > 0) return `${hours}h`
-    if (minutes > 0) return `${minutes}m`
-    return "ahora"
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return "ahora"
+    if (mins < 60) return `${mins}m`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h`
+    const days = Math.floor(hrs / 24)
+    if (days < 7) return `${days}d`
+    return `${Math.floor(days / 7)}sem`
   } catch (e) {
     return ""
   }
@@ -46,6 +52,9 @@ interface ConversationsListProps {
   onSelect: (conv: WAConversation) => void
 }
 
+// Local timeAgo is now defined after imports
+
+
 export function ConversationsList({ instance, activeId, onSelect }: ConversationsListProps) {
   const [conversations, setConversations] = useState<WAConversation[]>([])
   const [search, setSearch] = useState("")
@@ -54,40 +63,53 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
+  const activeIdRef = useRef(activeId)
+  const convRef = useRef(conversations)
+
+  useEffect(() => {
+    activeIdRef.current = activeId
+  }, [activeId])
+
+  useEffect(() => {
+    convRef.current = conversations
+  }, [conversations])
+
   useEffect(() => {
     setMounted(true)
   }, [])
 
   // Initial load & Polling
   useEffect(() => {
-    if (!instance?.id) return
-
     const supabase = createClient()
-    async function load() {
-      try {
-        const { data, error } = await supabase
-          .from("wa_conversations")
-          .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
-          .eq("instance_id", instance.id)
-          .order("last_message_at", { ascending: false })
 
-        if (!error && data) {
-          setConversations(data as any[])
-        }
-      } catch (err) {
-        console.error("Load fail:", err)
-      } finally {
-        setLoading(false)
+    async function load() {
+      const { data, error } = await supabase
+        .from("wa_conversations")
+        .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
+        .eq("instance_id", instance.id)
+        .order("last_message_at", { ascending: false })
+
+      if (error) {
+        console.error("Error loading conversations with agents:", error)
       }
+      
+      if (data) {
+        console.log("Loaded conversations:", data.length, "First item assigned_agent:", (data[0] as any)?.assigned_agent)
+        setConversations(data as any[])
+      }
+      setLoading(false)
     }
 
     load()
 
-    const interval = setInterval(load, 10000)
+    // Refresh param: Auto-refresh cada 5 segundos
+    const interval = setInterval(() => {
+      load()
+    }, 5 * 1000)
 
-    // Realtime
+    // Realtime subscription
     const channel = supabase
-      .channel(`list_${instance.id}`)
+      .channel(`wa_conversations:instance_id=eq.${instance.id}`)
       .on(
         "postgres_changes",
         {
@@ -97,21 +119,87 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
           filter: `instance_id=eq.${instance.id}`,
         },
         (payload) => {
-          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+          if (payload.eventType === "INSERT") {
             const newItem = payload.new as WAConversation
-            if (!newItem) return
-
+            
+            // Si inserta una nueva y no es la activa, notificar
+            if (activeIdRef.current !== newItem.id) {
+              toast.info(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
+            } else {
+              // Si la recibimos mientras la tenemos activa, la marcamos como leida auto
+              try {
+                markConversationRead(newItem.id)
+              } catch (e) {
+                console.error("Error auto-marking as read:", e)
+              }
+            }
+            
             setConversations((prev) => {
-              const others = prev.filter(c => c.id !== newItem.id)
-              const newList = [newItem, ...others]
-              newList.sort((a, b) => {
-                const tA = a.last_message_at ? new Date(a.last_message_at).getTime() : 0
-                const tB = b.last_message_at ? new Date(b.last_message_at).getTime() : 0
-                return (isNaN(tB) ? 0 : tB) - (isNaN(tA) ? 0 : tA)
-              })
-              return newList
+              // Prevenir duplicados visuales en RT
+              if (prev.some(c => c.id === newItem.id)) return prev;
+
+              const unshiftList = [newItem, ...prev];
+              unshiftList.sort((a, b) => {
+                const timeB = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+                const timeA = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+                return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+              });
+              
+              // Filter by contact_phone to deduplicate orphaned duplicates
+              return unshiftList.filter((c, index, self) => 
+                index === self.findIndex((t) => t.contact_phone === c.contact_phone)
+              );
             })
+          } else if (payload.eventType === "UPDATE") {
+            const updatedItem = payload.new as WAConversation
+            const prev = convRef.current
+            const oldItem = prev.find((c) => c.id === updatedItem.id)
+
+            // Detectamos si es un mensaje de lead comprobando si cambió el last_inbound_at
+            // Si el item no estaba cargado (no estaba en los primeros 50), asumimos que si last_inbound_at 
+            // es muy reciente (hace menos de 10 seg), debe ser nuevo, para poder lanzar el toast igual.
+            let isInbound = false;
+            if (oldItem) {
+              isInbound = !!oldItem.last_inbound_at && !!updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
+            } else if (updatedItem.last_inbound_at) {
+               const inboundDate = new Date(updatedItem.last_inbound_at);
+               const diff = isNaN(inboundDate.getTime()) ? Infinity : Date.now() - inboundDate.getTime();
+               isInbound = diff < 10000; // Recibido en los ultimos 10 segundos
+            }
+
+            if (isInbound && activeIdRef.current !== updatedItem.id) {
+              toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
+            } else if (isInbound && activeIdRef.current === updatedItem.id && updatedItem.unread_count > 0) {
+               // Si estamos viendo el chat y entra mensaje nuevo, lo marcamos leído localmente y en BD
+               updatedItem.unread_count = 0
+               markConversationRead(updatedItem.id)
+            }
+
+              setConversations((currentPrev) => {
+                const existingItem = currentPrev.find((c) => c.id === updatedItem.id)
+                // Preservar el objeto agent unido si existía en el estado local
+                const mergedItem = existingItem ? { ...existingItem, ...updatedItem } : updatedItem;
+                
+                const otherConversations = currentPrev.filter((c) => c.id !== updatedItem.id)
+                // Siempre al principio en el UPDATE (last message moved it)
+                return [mergedItem, ...otherConversations]
+              })
+          } else if (payload.eventType === "DELETE") {
+            setConversations((prev) =>
+              prev.filter((c) => c.id !== (payload.old as { id: string }).id)
+            )
           }
+        }
+      )
+      .subscribe()
+
+    const broadcastChannel = supabase
+      .channel(`agency-${instance.agency_id}`)
+      .on(
+        "broadcast",
+        { event: "refresh-whatsapp" },
+        (payload) => {
+          load()
         }
       )
       .subscribe()
@@ -119,49 +207,55 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
     return () => {
       clearInterval(interval)
       supabase.removeChannel(channel)
+      supabase.removeChannel(broadcastChannel)
     }
-  }, [instance?.id])
+  }, [instance.id, instance.agency_id])
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    if (!window.confirm("¿Eliminar chat?")) return
-    try {
-      const res = await deleteConversation(id)
-      if (res.success) {
-        setConversations(prev => prev.filter(c => c.id !== id))
-        toast.success("Eliminado")
-      }
-    } catch (err) {}
-  }
+  const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
+    e.stopPropagation();
+    if (!window.confirm("¿Seguro que querés eliminar esta conversación?")) return;
+    
+    const res = await deleteConversation(conversationId);
+    if (res.success) {
+      toast.success("Conversación eliminada");
+      setConversations(prev => prev.filter(c => c.id !== conversationId));
+    } else {
+      toast.error(res.error || "Error al eliminar");
+    }
+  };
 
   const agentEmails = useMemo(() => {
-    const s = new Set<string>()
-    conversations.forEach(c => {
-      if (!c) return
-      const agent = (c as any).assigned_agent
-      const email = Array.isArray(agent) ? agent[0]?.email : agent?.email
-      if (email) s.add(email)
+    const emails = new Set<string>()
+    conversations.forEach((c) => {
+      const agentData = (c as any).assigned_agent;
+      const email = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
+      if (email) emails.add(email)
     })
-    return Array.from(s).sort()
+    return Array.from(emails).sort()
   }, [conversations])
 
+  // Filter by search + tab + agent
   const filtered = useMemo(() => {
-    return conversations.filter(c => {
-      if (!c) return false
-      if (search) {
-        const query = search.toLowerCase()
-        const name = (c.contact_name || "").toLowerCase()
-        const phone = (c.contact_phone || "")
-        if (!name.includes(query) && !phone.includes(query)) return false
-      }
-      if (tab === "bot" && !c.bot_active) return false
-      if (tab === "human" && c.bot_active) return false
+    return conversations.filter((c) => {
+      // Búsqueda por nombre o teléfono
+      const searchTerm = search.toLowerCase()
+      const matchesSearch = 
+        c.contact_phone.toLowerCase().includes(searchTerm) || 
+        (c.contact_name || "").toLowerCase().includes(searchTerm)
       
+      if (!matchesSearch) return false
+
+      // Filtro por tab (bot/pausado/etc)
+      if (tab === "bot" && !c.bot_active) return false
+      if (tab === "paused" && c.bot_active) return false
+
+      // Filtro por agente
       if (filterAgentEmail !== "all") {
-        const agent = (c as any).assigned_agent
-        const email = Array.isArray(agent) ? agent[0]?.email : agent?.email
-        if (!email || email !== filterAgentEmail) return false
+        const agentData = (c as any).assigned_agent;
+        const email = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
+        if (email !== filterAgentEmail) return false;
       }
+
       return true
     })
   }, [conversations, search, tab, filterAgentEmail])
@@ -169,130 +263,209 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   if (!mounted) return <div className="flex-1 bg-background" />
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      {/* Search */}
+    <div className="flex flex-col h-full">
+      {/* Search & Refresh */}
       <div className="p-3 border-b flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             value={search}
+            aria-label="Buscar contacto"
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar..."
-            className="pl-9 h-9 text-sm border-none bg-muted/50 focus-visible:ring-1"
+            placeholder="Buscar contacto..."
+            className="pl-9 h-9 text-sm"
           />
         </div>
-        <button 
-          onClick={() => setLoading(true)}
-          className="p-2 hover:bg-muted rounded-full transition-colors"
+        <button
+          onClick={() => {
+            setLoading(true)
+            const supabase = createClient()
+            supabase
+              .from("wa_conversations")
+              .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
+              .eq("instance_id", instance.id)
+              .order("last_message_at", { ascending: false })
+              .then(({ data, error }) => {
+                if (error) console.error("Refresh error:", error)
+                if (data) setConversations(data as any[])
+                setLoading(false)
+              })
+          }}
+          disabled={loading}
+          title="Actualizar chats"
+          className="w-9 h-9 flex items-center justify-center rounded-md border bg-background hover:bg-muted text-muted-foreground transition-colors disabled:opacity-50 flex-shrink-0"
         >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
         </button>
       </div>
 
-      {/* Tabs & Agent Filter */}
-      <div className="px-3 py-2 border-b space-y-2">
-        <Tabs value={tab} onValueChange={setTab} className="w-full">
-          <TabsList className="grid grid-cols-3 h-8 bg-muted/30">
-            <TabsTrigger value="all" className="text-[10px]">Todos</TabsTrigger>
-            <TabsTrigger value="bot" className="text-[10px]">Bot</TabsTrigger>
-            <TabsTrigger value="human" className="text-[10px]">Humano</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
-          <SelectTrigger className="h-8 text-[10px] bg-muted/30 border-none">
-            <SelectValue placeholder="Asesor..." />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los asesores</SelectItem>
-            {agentEmails.map(email => (
-              <SelectItem key={email} value={email}>{email}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Tabs & Filter */}
+      <div className="px-3 pb-1 border-b overflow-hidden">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-3 pt-1">
+          <Tabs value={tab} onValueChange={setTab} className="shrink-0">
+            <TabsList className="h-8 bg-muted/30 flex-nowrap">
+              <TabsTrigger value="all" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
+                Todos
+              </TabsTrigger>
+              <TabsTrigger value="bot" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
+                Bot activo
+              </TabsTrigger>
+              <TabsTrigger value="paused" className="text-[10px] sm:text-xs font-semibold px-4 whitespace-nowrap">
+                Pausados
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          <div className="shrink-0">
+            <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
+              <SelectTrigger className="w-[180px] sm:w-[260px] h-8 text-xs font-medium bg-muted/50 border-none focus:ring-0">
+                <SelectValue placeholder="Asesor..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px] w-[260px]">
+                <ScrollArea className="h-[250px] w-full">
+                  <SelectItem value="all" className="text-xs">Todos los asesores</SelectItem>
+                  {agentEmails.length === 0 && (
+                    <SelectItem value="none" disabled className="text-xs">Sin asesores con chats</SelectItem>
+                  )}
+                  {agentEmails.map(email => (
+                    <SelectItem key={email} value={email} className="text-xs">
+                      {email}
+                    </SelectItem>
+                  ))}
+                </ScrollArea>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </div>
 
-      {/* List Content */}
-      <div className="flex-1 overflow-y-auto no-scrollbar">
-        {loading && conversations.length === 0 ? (
-          <div className="p-8 text-center text-xs text-muted-foreground animate-pulse">Cargando chats...</div>
-        ) : filtered.length === 0 ? (
-          <div className="p-8 text-center">
-            <MessageSquare className="w-8 h-8 text-muted-foreground/20 mx-auto mb-2" />
-            <p className="text-xs text-muted-foreground">No hay conversaciones</p>
+      {/* List */}
+      <ScrollArea className="flex-1">
+        {loading ? (
+          <div className="p-4 space-y-4">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex items-center gap-3 w-full">
+                <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+            ))}
           </div>
+        ) : filtered.length === 0 ? (
+          search ? (
+            <div className="p-8 text-center">
+              <p className="text-sm text-muted-foreground">Sin resultados</p>
+            </div>
+          ) : (
+            <EmptyState 
+              icon={MessageSquare} 
+              title="Aún no hay conversaciones" 
+              subtitle="Cuando un lead escriba a tu número, aparecerá aquí." 
+            />
+          )
         ) : (
-          <div className="p-2 space-y-1">
-            {filtered.map(conv => {
-              if (!conv || !conv.id) return null
+          <div className="p-1.5">
+            {filtered
+              .filter((conv, index, self) =>
+                index === self.findIndex((t) => t.contact_phone === conv.contact_phone)
+              )
+              .map((conv) => {
               const isActive = activeId === conv.id
-              const agent = (conv as any).assigned_agent
-              const agentEmail = Array.isArray(agent) ? agent[0]?.email : agent?.email
+              const initial = (conv.contact_name || conv.contact_phone || "?")
+                .charAt(0)
+                .toUpperCase()
 
               return (
                 <button
                   key={conv.id}
-                  onClick={() => onSelect(conv)}
-                  className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all group relative ${
-                    isActive ? "bg-accent/10 border-accent/20 shadow-sm" : "hover:bg-muted/50"
+                  onClick={() => {
+                    onSelect(conv)
+                    if (conv.unread_count > 0) {
+                       setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c))
+                       markConversationRead(conv.id)
+                    }
+                  }}
+                  className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-colors mb-0.5 group/item relative ${
+                    isActive
+                      ? "bg-accent/5 dark:bg-accent/10 border border-accent/20"
+                      : "hover:bg-muted/50"
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-sm flex-shrink-0">
-                    {(conv.contact_name || conv.contact_phone || "?").charAt(0).toUpperCase()}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="font-semibold text-sm truncate">
-                        {conv.contact_name || conv.contact_phone}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                        {timeAgo(conv.last_message_at)}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between mt-1">
-                      <p className="text-[10px] text-muted-foreground truncate flex-1">
-                        {conv.contact_phone}
-                        {agentEmail && (
-                          <span className="ml-1 text-accent opacity-70">({agentEmail})</span>
-                        )}
-                      </p>
-                      {conv.unread_count > 0 && !isActive && (
-                        <Badge className="bg-red-500 hover:bg-red-500 text-white border-none text-[8px] h-4 min-w-4 px-1 rounded-full">
-                          {conv.unread_count}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1.5 mt-2">
-                      {conv.bot_active ? (
-                        <Bot className="w-3 h-3 text-green-500" />
-                      ) : (
-                        <BotOff className="w-3 h-3 text-red-400" />
-                      )}
-                      <div className="flex gap-1 overflow-hidden">
-                        {(conv.etiquetas || []).slice(0, 2).map(tag => (
-                          <span key={tag} className="text-[9px] bg-muted px-1.5 py-0.5 rounded text-muted-foreground truncate max-w-[60px]">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
+                  {/* Delete Button (on hover) */}
                   <button
                     onClick={(e) => handleDelete(e, conv.id)}
-                    className="absolute right-2 top-2 p-1 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                    className="absolute right-2 top-2 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all opacity-0 group-hover/item:opacity-100 z-10"
+                    title="Eliminar chat"
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
+                  {/* Avatar */}
+                  <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-sm flex-shrink-0">
+                    {initial}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-sm truncate flex-1">
+                        {conv.contact_name || conv.contact_phone}
+                        {/* Email del asesor asignado */}
+                        {(() => {
+                          const agentData = (conv as any).assigned_agent;
+                          const agentEmail = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
+                          
+                          if (agentEmail) {
+                            return (
+                              <span className="text-[10px] text-accent/70 font-medium truncate max-w-[100px] ml-1 bg-accent/5 px-1 rounded border border-accent/10">
+                                {agentEmail}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-end gap-1">
+                        <span className="whitespace-nowrap">{mounted ? timeAgo(conv.last_message_at) : ""}</span>
+                        {conv.unread_count > 0 && !isActive ? (
+                          <div className="flex items-center justify-center">
+                             <Badge className="bg-red-500 hover:bg-red-600 text-white border-none text-[10px] font-bold h-[18px] min-w-[18px] px-1 flex items-center justify-center rounded-full leading-none shadow-sm">
+                               {conv.unread_count > 99 ? "99+" : conv.unread_count}
+                             </Badge>
+                          </div>
+                        ) : null}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {conv.contact_phone}
+                    </p>
+
+                    {/* Bottom row: bot icon + tags */}
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      {conv.bot_active ? (
+                        <Bot className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                      ) : (
+                        <BotOff className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                      )}
+                      {conv.etiquetas?.slice(0, 2).map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="secondary"
+                          className="text-[10px] px-1.5 py-0 h-4 font-medium"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
                 </button>
               )
             })}
           </div>
         )}
-      </div>
+      </ScrollArea>
     </div>
   )
 }

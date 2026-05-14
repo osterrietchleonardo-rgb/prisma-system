@@ -40,7 +40,6 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
   const [copied, setCopied] = useState(false)
   
   const handleCopyPhone = () => {
-    if (!conversation.contact_phone) return
     navigator.clipboard.writeText(conversation.contact_phone)
     setCopied(true)
     setTimeout(() => setCopied(false), 1000)
@@ -143,11 +142,7 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
         }
 
         // 1. Find the lead by phone
-        const cleanPhone = (conversation.contact_phone || "").replace(/\D/g, "");
-        if (!cleanPhone) {
-          setVisitLoading(false);
-          return;
-        }
+        const cleanPhone = conversation.contact_phone.replace(/\D/g, "");
         const { data: lead } = await supabase
           .from("leads")
           .select("id")
@@ -322,8 +317,8 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
                       {mounted ? safeFormatTime(msg.created_at) : ""}
                     </span>
                   </div>
-                  <p className="text-muted-foreground truncate" title={msg.content || ""}>
-                    {msg.content && msg.content.length > 40 ? msg.content.substring(0, 40) + "..." : (msg.content || "")}
+                  <p className="text-muted-foreground truncate" title={msg.content}>
+                    {msg.content.length > 40 ? msg.content.substring(0, 40) + "..." : msg.content}
                   </p>
                 </div>
               </div>
