@@ -296,24 +296,8 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
           </Tabs>
           
           <div className="shrink-0">
-            <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
-              <SelectTrigger className="w-[180px] sm:w-[260px] h-8 text-xs font-medium bg-muted/50 border-none focus:ring-0">
-                <SelectValue placeholder="Asesor..." />
-              </SelectTrigger>
-              <SelectContent className="max-h-[300px] w-[260px]">
-                <div className="h-[250px] w-full overflow-y-auto">
-                  <SelectItem value="all" className="text-xs">Todos los asesores</SelectItem>
-                  {agentEmails.length === 0 && (
-                    <SelectItem value="none" disabled className="text-xs">Sin asesores con chats</SelectItem>
-                  )}
-                  {agentEmails.map(email => (
-                    <SelectItem key={email} value={email} className="text-xs">
-                      {email}
-                    </SelectItem>
-                  ))}
-                </div>
-              </SelectContent>
-            </Select>
+            {/* SELECT REMOVIDO TEMPORALMENTE PARA TESTEO MÓVIL */}
+            <div className="w-[100px] h-8 bg-gray-100 rounded flex items-center justify-center text-[10px]">Filtro OFF</div>
           </div>
         </div>
       </div>

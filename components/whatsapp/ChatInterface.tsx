@@ -30,7 +30,11 @@ export default function ChatInterface({ instance }: ChatInterfaceProps) {
           activeConversation ? "hidden" : "block"
         }`}
       >
-        <div style={{color:'white', background:'green', padding:'20px', height: '100%'}}>CONVERSATIONSLIST OK</div>
+        <ConversationsList
+          instance={instance}
+          activeId={activeConversation?.id ?? null}
+          onSelect={(conv) => setActiveConversation(conv)}
+        />
       </div>
 
       {/* Desktop: Chat always visible / Mobile: visible only when chat active */}
