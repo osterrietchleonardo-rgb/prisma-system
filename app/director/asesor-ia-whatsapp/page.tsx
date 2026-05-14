@@ -38,7 +38,7 @@ export default async function AsesorIAWhatsAppPage() {
     .maybeSingle()
 
   return (
-    <div id="whatsapp-ia-page" className="flex-1 flex flex-col min-h-0 whatsapp-page-container">
+    <div id="whatsapp-ia-page" className="flex-1 flex flex-col min-h-0 bg-background overflow-hidden">
       {!instance ? (
         <SetupWizard />
       ) : (
