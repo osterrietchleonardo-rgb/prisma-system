@@ -172,9 +172,9 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
   // Section 5: Stats
   const leadMessagesCount = messages.filter(m => m.role === 'lead').length
   
-  const firstContact = messages.length > 0 ? new Date(messages[0].created_at) : new Date()
-  const daysSinceFirstContact = mounted 
-    ? Math.floor((new Date().getTime() - firstContact.getTime()) / (1000 * 3600 * 24))
+  const firstContactDate = messages.length > 0 ? new Date(messages[0].created_at) : new Date()
+  const daysSinceFirstContact = mounted && !isNaN(firstContactDate.getTime())
+    ? Math.floor((new Date().getTime() - firstContactDate.getTime()) / (1000 * 3600 * 24))
     : 0
   
   // Calculate avg bot response time
@@ -182,9 +182,12 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
   let botResponseCount = 0
   for (let i = 1; i < messages.length; i++) {
     if (messages[i].role === 'bot' && messages[i-1].role === 'lead') {
-      const respTime = new Date(messages[i].created_at).getTime() - new Date(messages[i-1].created_at).getTime()
-      totalBotResponseMs += respTime
-      botResponseCount++
+      const timeBot = new Date(messages[i].created_at).getTime()
+      const timeLead = new Date(messages[i-1].created_at).getTime()
+      if (!isNaN(timeBot) && !isNaN(timeLead)) {
+        totalBotResponseMs += (timeBot - timeLead)
+        botResponseCount++
+      }
     }
   }
   const avgBotResponseMin = botResponseCount > 0 ? Math.round(totalBotResponseMs / botResponseCount / 60000) : 0

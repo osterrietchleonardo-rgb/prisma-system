@@ -56,23 +56,38 @@ interface ActiveChatProps {
 }
 
 function formatTime(dateStr: string): string {
-  const d = new Date(dateStr)
-  return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
+  try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return ""
+    return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
+  } catch (e) {
+    return ""
+  }
 }
 
 function formatDate(dateStr: string): string {
-  const d = new Date(dateStr)
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-
-  if (d.toDateString() === today.toDateString()) return "Hoy"
-  if (d.toDateString() === yesterday.toDateString()) return "Ayer"
   try {
+    const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return ""
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+
+    if (d.toDateString() === today.toDateString()) return "Hoy"
+    if (d.toDateString() === yesterday.toDateString()) return "Ayer"
     return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
   } catch (e) {
     return ""
   }
+}
+
+function safeUUID() {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID()
+    }
+  } catch (e) {}
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
 }
 
 export function ActiveChat({ conversation: initialConv, instance, onBack, onDeleteChat }: ActiveChatProps) {
@@ -129,7 +144,11 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
 
       // Auto-scroll to bottom on initial load
       setTimeout(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "auto" })
+        try {
+          bottomRef.current?.scrollIntoView({ behavior: "auto" })
+        } catch (e) {
+          console.warn("Scroll error:", e)
+        }
       }, 100)
     }
 
@@ -158,7 +177,11 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
             // Auto-scroll if near bottom
             if (shouldAutoScroll.current) {
               setTimeout(() => {
-                bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+                try {
+                  bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+                } catch (e) {
+                   try { bottomRef.current?.scrollIntoView() } catch(e2) {}
+                }
               }, 50)
             }
           } else if (payload.eventType === "DELETE") {
@@ -217,7 +240,11 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
         // Auto-scroll if near bottom
         if (shouldAutoScroll.current) {
           setTimeout(() => {
-            bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+            try {
+              bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+            } catch (e) {
+              try { bottomRef.current?.scrollIntoView() } catch(e2) {}
+            }
           }, 50)
         }
       }
@@ -270,7 +297,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     setSending(true)
 
     // Optimistic insert
-    const tempId = crypto.randomUUID()
+    const tempId = safeUUID()
     const optimisticMsg: WAMessage = {
       id: tempId,
       conversation_id: conv.id,
@@ -302,7 +329,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     setSendingNote(true)
 
     // Optimistic insert
-    const tempId = crypto.randomUUID()
+    const tempId = safeUUID()
     const optimisticNote: WAMessage = {
       id: tempId,
       conversation_id: conv.id,

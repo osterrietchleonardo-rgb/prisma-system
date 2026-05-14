@@ -28,15 +28,21 @@ interface ConversationsListProps {
 }
 
 function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return "ahora"
-  if (mins < 60) return `${mins}m`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h`
-  const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days}d`
-  return `${Math.floor(days / 7)}sem`
+  try {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return ""
+    const diff = Date.now() - date.getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return "ahora"
+    if (mins < 60) return `${mins}m`
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 24) return `${hrs}h`
+    const days = Math.floor(hrs / 24)
+    if (days < 7) return `${days}d`
+    return `${Math.floor(days / 7)}sem`
+  } catch (e) {
+    return ""
+  }
 }
 
 
@@ -120,7 +126,11 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
               if (prev.some(c => c.id === newItem.id)) return prev;
 
               const unshiftList = [newItem, ...prev];
-              unshiftList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+              unshiftList.sort((a, b) => {
+                const timeB = new Date(b.last_message_at).getTime() || 0;
+                const timeA = new Date(a.last_message_at).getTime() || 0;
+                return timeB - timeA;
+              });
               
               // Filter by contact_phone to deduplicate orphaned duplicates
               return unshiftList.filter((c, index, self) => 

@@ -51,11 +51,15 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
 
   useEffect(() => {
     setMounted(true)
-    const unsubscribe = CampaignState.subscribeToTab((tab) => {
-      setActiveTab(tab)
-      if (tab === "campanas") setHasMountedCampanas(true)
-    })
-    return unsubscribe
+    try {
+      const unsubscribe = CampaignState.subscribeToTab((tab) => {
+        setActiveTab(tab)
+        if (tab === "campanas") setHasMountedCampanas(true)
+      })
+      return unsubscribe
+    } catch (e) {
+      console.error("Tab subscription error:", e)
+    }
   }, [])
 
   if (!mounted) return <div className="flex-1 bg-background" />

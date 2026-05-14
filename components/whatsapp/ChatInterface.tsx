@@ -16,7 +16,7 @@ export default function ChatInterface({ instance }: ChatInterfaceProps) {
     useState<WAConversation | null>(null)
 
   return (
-    <div className="flex flex-row h-[calc(100dvh-64px)]">
+    <div className="flex flex-row h-[calc(100vh-64px)] h-[calc(100dvh-64px)]">
       {/* Desktop: List always visible / Mobile: visible only when no active chat */}
       <div
         className={`w-full md:w-[300px] md:flex-shrink-0 md:border-r md:block ${
