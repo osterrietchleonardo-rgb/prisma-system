@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { WAConversation, WhatsAppInstance } from "@/types/whatsapp"
 import { ConversationsList } from "./ConversationsList"
 import { ActiveChat } from "./ActiveChat"
@@ -16,6 +16,13 @@ interface ChatInterfaceProps {
 export default function ChatInterface({ instance }: ChatInterfaceProps) {
   const [activeConversation, setActiveConversation] =
     useState<WAConversation | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return <div className="flex-1 bg-background" />
 
   return (
     <ErrorBoundary>

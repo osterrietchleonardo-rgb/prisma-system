@@ -127,7 +127,11 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
               toast.info(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
             } else {
               // Si la recibimos mientras la tenemos activa, la marcamos como leida auto
-              markConversationRead(newItem.id)
+              try {
+                markConversationRead(newItem.id)
+              } catch (e) {
+                console.error("Error auto-marking as read:", e)
+              }
             }
             
             setConversations((prev) => {
@@ -136,9 +140,9 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
 
               const unshiftList = [newItem, ...prev];
               unshiftList.sort((a, b) => {
-                const timeB = a.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+                const timeB = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
                 const timeA = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
-                return (timeB || 0) - (timeA || 0);
+                return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
               });
               
               // Filter by contact_phone to deduplicate orphaned duplicates
@@ -255,6 +259,8 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       return true
     })
   }, [conversations, search, tab, filterAgentEmail])
+
+  if (!mounted) return <div className="flex-1 bg-background" />
 
   return (
     <div className="flex flex-col h-full">

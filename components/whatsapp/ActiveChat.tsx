@@ -96,6 +96,8 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     setMounted(true)
   }, [])
 
+  if (!mounted) return <div className="flex-1 bg-background" />
+
   // Load messages
   useEffect(() => {
     const supabase = createClient()

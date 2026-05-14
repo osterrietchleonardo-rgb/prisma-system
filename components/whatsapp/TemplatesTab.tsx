@@ -559,116 +559,118 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
         </div>
       </div>
 
-      <div className="border rounded-md">
-        <div className="grid grid-cols-12 gap-4 border-b bg-muted/40 p-4 text-sm font-medium text-muted-foreground items-center">
-          <div className="col-span-4">Nombre</div>
-          <div className="col-span-2">Categoría</div>
-          <div className="col-span-2 flex items-center gap-1">
-            Límite (24hs)
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Info className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs text-sm">
-                  <p>Es la cantidad máxima de conversaciones (con plantilla) que puedes iniciar en 24 horas.</p>
-                  <p className="mt-2 font-medium">¿Cómo aumentarlo?</p>
-                  <ul className="list-disc pl-4 mt-1">
-                    <li>Verifica tu empresa en el administrador comercial de Meta.</li>
-                    <li>Mantén una calificación de calidad alta.</li>
-                    <li>Inicia conversaciones con nuevos usuarios frecuentemente. Meta aumentará el límite de forma automática.</li>
-                  </ul>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          <div className="col-span-2">Estado</div>
-          <div className="col-span-2 text-right">Acciones</div>
-        </div>
-
-        <div className="divide-y relative">
-          {loading && (
-            <div className="flex flex-col w-full">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="grid grid-cols-12 gap-4 p-4 border-b">
-                  <div className="col-span-4"><Skeleton className="h-5 w-[150px]" /></div>
-                  <div className="col-span-2"><Skeleton className="h-5 w-[80px]" /></div>
-                  <div className="col-span-2"><Skeleton className="h-5 w-[60px]" /></div>
-                  <div className="col-span-2"><Skeleton className="h-5 w-[80px]" /></div>
-                  <div className="col-span-2 flex justify-end"><Skeleton className="h-8 w-8 rounded-md" /></div>
-                </div>
-              ))}
+      <div className="border rounded-md overflow-x-auto no-scrollbar">
+        <div className="min-w-[800px] md:min-w-full">
+          <div className="grid grid-cols-12 gap-4 border-b bg-muted/40 p-4 text-sm font-medium text-muted-foreground items-center">
+            <div className="col-span-4">Nombre</div>
+            <div className="col-span-2">Categoría</div>
+            <div className="col-span-2 flex items-center gap-1">
+              Límite (24hs)
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Info className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-sm">
+                    <p>Es la cantidad máxima de conversaciones (con plantilla) que puedes iniciar en 24 horas.</p>
+                    <p className="mt-2 font-medium">¿Cómo aumentarlo?</p>
+                    <ul className="list-disc pl-4 mt-1">
+                      <li>Verifica tu empresa en el administrador comercial de Meta.</li>
+                      <li>Mantén una calificación de calidad alta.</li>
+                      <li>Inicia conversaciones con nuevos usuarios frecuentemente. Meta aumentará el límite de forma automática.</li>
+                    </ul>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
-          )}
-          {!loading && templates.length === 0 && (
-            <EmptyState 
-              icon={MessageSquare} 
-              title="No tenés plantillas todavía." 
-              subtitle="Las plantillas de WhatsApp son necesarias para iniciar conversaciones con tus clientes." 
-              action={{ label: "Crear primera plantilla", onClick: () => setShowBuilder(true) }}
-            />
-          )}
-          {templates.map(t => (
-            <div key={t.id} className="grid grid-cols-12 gap-4 p-4 text-sm items-center hover:bg-muted/10 transition-colors">
-              <div className="col-span-4 font-medium break-words">{t.template_name}</div>
-              <div className="col-span-2 text-muted-foreground">{t.category}</div>
-              <div className="col-span-2 font-mono text-xs bg-muted/30 px-2 py-1 rounded-md w-fit">
-                {formatMessagingLimit(instance.messaging_limit_tier)}
+            <div className="col-span-2">Estado</div>
+            <div className="col-span-2 text-right">Acciones</div>
+          </div>
+
+          <div className="divide-y relative min-w-[800px] md:min-w-full">
+            {loading && (
+              <div className="flex flex-col w-full">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="grid grid-cols-12 gap-4 p-4 border-b">
+                    <div className="col-span-4"><Skeleton className="h-5 w-[150px]" /></div>
+                    <div className="col-span-2"><Skeleton className="h-5 w-[80px]" /></div>
+                    <div className="col-span-2"><Skeleton className="h-5 w-[60px]" /></div>
+                    <div className="col-span-2"><Skeleton className="h-5 w-[80px]" /></div>
+                    <div className="col-span-2 flex justify-end"><Skeleton className="h-8 w-8 rounded-md" /></div>
+                  </div>
+                ))}
               </div>
-              <div className="col-span-2">
-                {getStatusBadge(t.status, t.rejection_reason)}
-              </div>
-              <div className="col-span-2 flex items-center justify-end gap-2">
-                {t.meta_template_id && (
+            )}
+            {!loading && templates.length === 0 && (
+              <EmptyState 
+                icon={MessageSquare} 
+                title="No tenés plantillas todavía." 
+                subtitle="Las plantillas de WhatsApp son necesarias para iniciar conversaciones con tus clientes." 
+                action={{ label: "Crear primera plantilla", onClick: () => setShowBuilder(true) }}
+              />
+            )}
+            {templates.map(t => (
+              <div key={t.id} className="grid grid-cols-12 gap-4 p-4 text-sm items-center hover:bg-muted/10 transition-colors">
+                <div className="col-span-4 font-medium break-words">{t.template_name}</div>
+                <div className="col-span-2 text-muted-foreground">{t.category}</div>
+                <div className="col-span-2 font-mono text-xs bg-muted/30 px-2 py-1 rounded-md w-fit">
+                  {formatMessagingLimit(instance.messaging_limit_tier)}
+                </div>
+                <div className="col-span-2">
+                  {getStatusBadge(t.status, t.rejection_reason)}
+                </div>
+                <div className="col-span-2 flex items-center justify-end gap-2">
+                  {t.meta_template_id && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-muted-foreground hover:text-accent hover:bg-accent/10"
+                      onClick={() => handleEdit(t)}
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </Button>
+                  )}
+                  
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-8 w-8 text-muted-foreground hover:text-accent hover:bg-accent/10"
-                    onClick={() => handleEdit(t)}
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => handleDelete(t)}
+                    disabled={deletingId === t.id}
                   >
-                    <Edit3 className="w-4 h-4" />
+                    {deletingId === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                   </Button>
-                )}
-                
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => handleDelete(t)}
-                  disabled={deletingId === t.id}
-                >
-                  {deletingId === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                </Button>
 
-                <Drawer>
-                  <DrawerTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                  </DrawerTrigger>
-                  <DrawerContent>
-                    <div className="mx-auto w-full max-w-md">
-                      <DrawerHeader>
-                        <DrawerTitle>{t.template_name}</DrawerTitle>
-                      </DrawerHeader>
-                      <div className="p-4 pb-8">
-                        <div className="bg-[#ECE5DD] p-6 rounded-2xl">
-                          <div className="bg-white rounded-lg p-4 shadow-sm">
-                            {t.components?.map((c: any, idx: number) => {
-                               if (c.type === 'HEADER') return <p key={idx} className="font-bold text-black text-sm mb-2">{c.text}</p>
-                               if (c.type === 'BODY') return <p key={idx} className="text-sm text-neutral-800 whitespace-pre-wrap">{c.text}</p>
-                               if (c.type === 'FOOTER') return <p key={idx} className="text-xs text-neutral-500 mt-2">{c.text}</p>
-                               return null
-                            })}
+                  <Drawer>
+                    <DrawerTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </DrawerTrigger>
+                    <DrawerContent>
+                      <div className="mx-auto w-full max-w-md">
+                        <DrawerHeader>
+                          <DrawerTitle>{t.template_name}</DrawerTitle>
+                        </DrawerHeader>
+                        <div className="p-4 pb-8">
+                          <div className="bg-[#ECE5DD] p-6 rounded-2xl">
+                            <div className="bg-white rounded-lg p-4 shadow-sm">
+                              {t.components?.map((c: any, idx: number) => {
+                                if (c.type === 'HEADER') return <p key={idx} className="font-bold text-black text-sm mb-2">{c.text}</p>
+                                if (c.type === 'BODY') return <p key={idx} className="text-sm text-neutral-800 whitespace-pre-wrap">{c.text}</p>
+                                if (c.type === 'FOOTER') return <p key={idx} className="text-xs text-neutral-500 mt-2">{c.text}</p>
+                                return null
+                              })}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </DrawerContent>
-                </Drawer>
+                    </DrawerContent>
+                  </Drawer>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>
