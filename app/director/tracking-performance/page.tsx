@@ -87,7 +87,7 @@ export default function TrackingPerformancePage() {
   });
 
   return (
-    <div className="w-full p-4 md:p-8 flex flex-col gap-6 md:gap-8 pb-32">
+    <div id="tracking-performance-page" className="w-full p-4 md:p-8 flex flex-col gap-6 md:gap-8 pb-32">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 mb-8">
           <div className="space-y-1">
@@ -122,7 +122,7 @@ export default function TrackingPerformancePage() {
           <Card className="bg-card/30 border-accent/10 backdrop-blur-md p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-2">
-                <div className="flex bg-muted/30 p-1 rounded-xl border border-white/5">
+                <div className="tracking-tabs-list flex bg-muted/30 p-1 rounded-xl border border-white/5">
                     <button 
                       onClick={() => setFilter("todos")} 
                       className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'todos' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}

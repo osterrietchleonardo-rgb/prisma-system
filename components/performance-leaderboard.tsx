@@ -70,7 +70,7 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
   );
 
   return (
-    <Card className="border-accent/10 bg-card/30 backdrop-blur-sm overflow-hidden shadow-2xl">
+    <Card className="performance-leaderboard-container border-accent/10 bg-card/30 backdrop-blur-sm overflow-hidden shadow-2xl">
       <CardHeader className="border-b border-accent/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">

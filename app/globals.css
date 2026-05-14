@@ -120,9 +120,107 @@
     }
 
     /* --- AJUSTES DE ALTURA Y VIEWPORT --- */
-    /* Soporte para barra de navegación dinámica en iOS Safari */
     .h-\[calc\(100vh-64px\)\] {
       height: calc(100dvh - 64px) !important;
+    }
+
+    /* --- DASHBOARD FIXES --- */
+    #dashboard-content .ml-auto.flex.items-center.gap-4 {
+        margin-left: 0;
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    /* Fix "Limpiar filtros" button overflow */
+    #dashboard-content button.text-xs.text-accent.font-semibold {
+        font-size: 10px !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+        height: 2rem !important;
+    }
+
+    /* Ranking de asesores table scroll */
+    [data-testid="performance-leaderboard"], 
+    .performance-leaderboard-container {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* --- TRACKING PERFORMANCE FIXES --- */
+    /* Horizontal scroll for Tabs */
+    .tracking-performance-tabs [role="tablist"],
+    .tracking-tabs-list {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        justify-content: flex-start !important;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+        background-color: transparent !important;
+    }
+
+    .tracking-performance-tabs [role="tablist"]::-webkit-scrollbar,
+    .tracking-tabs-list::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tracking-performance-tabs [role="tab"],
+    .tracking-tabs-list [role="tab"] {
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
+    }
+
+    /* --- MARKETING IA FIXES --- */
+    /* "Generar 3 variantes" button text size */
+    .marketing-ia-generator-button {
+        font-size: 0.875rem !important;
+        line-height: 1.25rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+
+    /* Gallery cards containment */
+    .marketing-history-grid .card-container {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    /* --- WHATSAPP IA FIXES --- */
+    /* Fix page error/height on mobile */
+    .whatsapp-page-container {
+        height: calc(100dvh - 64px) !important;
+        min-height: -webkit-fill-available;
+        overflow: hidden;
+    }
+
+    /* Fix chat list overflow */
+    .conversations-list-container {
+        height: calc(100dvh - 160px) !important;
+    }
+
+    /* --- CONFIGURATION FIXES --- */
+    /* Horizontal scroll for Settings Tabs */
+    .settings-tabs-list,
+    [role="tablist"] {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        justify-content: flex-start !important;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .settings-tabs-list::-webkit-scrollbar,
+    [role="tablist"]::-webkit-scrollbar {
+        display: none;
+    }
+
+    .settings-tabs-list [role="tab"],
+    [role="tablist"] [role="tab"] {
+        flex-shrink: 0 !important;
+        white-space: nowrap !important;
     }
 
     /* --- GRÁFICOS (RECHARTS) --- */

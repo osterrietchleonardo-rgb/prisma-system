@@ -281,7 +281,7 @@ export function CopyGeneratorFlow() {
       </CardContent>
       <CardFooter className="bg-accent/5 pt-6 pb-4 flex flex-col gap-2">
         <Button 
-          className="w-full bg-accent shadow-lg shadow-accent/20 h-14 text-lg font-bold" 
+          className="marketing-ia-generator-button w-full bg-accent shadow-lg shadow-accent/20 h-14 text-lg font-bold" 
           onClick={handleGenerateBatch}
           disabled={!selectedIpcId || isGenerating}
         >

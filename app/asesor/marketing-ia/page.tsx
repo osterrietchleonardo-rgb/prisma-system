@@ -23,7 +23,7 @@ export default function MarketingIAPage() {
   }, [])
 
   return (
-    <div className="container mx-auto py-8 space-y-8 animate-in fade-in duration-700">
+    <div id="marketing-ia-page" className="container mx-auto py-8 space-y-8 animate-in fade-in duration-700">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex flex-col gap-2">
             <h1 className="text-4xl font-black tracking-tight flex items-center gap-3 text-emerald-600">

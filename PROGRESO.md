@@ -66,16 +66,27 @@
 
 ## 🔄 ENTRADAS DE PROGRESO
 
-### 2026-05-14 | UI/UX — Soporte Mobile & Tablet Completo
+### 2026-05-14 | UI/UX — Soporte Mobile & Tablet Completo (Correcciones Finales)
 - **Responsividad Global**: 
   - Se inyectaron reglas CSS responsivas en `app/globals.css` a través de bloques `@media (max-width: 1024px)` y `(max-width: 767px)`.
   - Enfoque aditivo: Cero refactorización de código TSX para preservar la integridad funcional de los componentes actuales.
 - **Solución a Problemas de Interfaz**:
   - **iOS Auto-zoom**: Inputs, selects y textareas forzados a `font-size: 16px !important` para impedir el zoom automático en Safari/iOS.
   - **Viewport en Móviles**: Utilización de `100dvh` sobre los `100vh` existentes (ej. `h-[calc(100vh-64px)]`) para prevenir ocultamiento por barras de navegación dinámicas.
-  - **Chat de WhatsApp**: Refinado del grid y layouts (width/max-width) para adaptar fluidamente en pantallas menores a 767px sin mutar el control condicional original basado en JS/estado.
-  - **Tablas y Gráficos (Recharts)**: Leaderboards envueltos en `overflow-x: auto` con scroll suave (`-webkit-overflow-scrolling: touch`). Componentes `Recharts` limitados estructuralmente (`max-width: 100%`) respetando su configuración de instancia.
-  - **Componentes Delicados (Drag & Drop)**: El tablero Kanban mantiene integridad táctil con scroll lateral global sin estrangular o romper las dimensiones originales de sus columnas.
+  - **Scroll Horizontal Nativo**:
+    - **Tracking Performance**: Implementado scroll suave en las solapas de filtro (Todos, Prospección, etc.) mediante la clase `.tracking-tabs-list`.
+    - **Ranking de Asesores**: La tabla de líderes ahora posee scroll horizontal interno contenido mediante `.performance-leaderboard-container`, evitando desbordes del viewport.
+    - **Configuración**: Las solapas de configuración ahora permiten scroll lateral táctil.
+  - **Dashboard Polish**:
+    - Ajustado el botón "Limpiar filtros" para prevenir el desborde del texto en pantallas pequeñas.
+    - Los gráficos de Recharts ahora se ajustan al 100% del ancho del contenedor sin romper el layout.
+  - **Marketing IA**:
+    - Optimizado el tamaño de fuente y padding del botón "Generar 3 variantes" para legibilidad en mobile.
+    - Las tarjetas de historial (galería) ahora respetan el ancho máximo del viewport (`100vw`).
+  - **WhatsApp IA**:
+    - Corregido error de altura en móviles ajustando el contenedor principal a `calc(100dvh - 64px)`.
+    - Ajustada la altura de la lista de conversaciones para asegurar que el input de chat sea accesible.
+- **Identificadores de Control**: Se añadieron IDs únicos (`#dashboard-content`, `#tracking-performance-page`, `#marketing-ia-page`, `#whatsapp-ia-page`) a los contenedores principales para permitir personalización CSS granular sin afectar la lógica de React.
 ### 2026-05-12 | P9 — Database Security: RLS Audit & Granular Isolation
 - **Security Audit**:
   - Identificación de 3 tablas con RLS habilitado pero sin políticas activas (`lead_activities`, `visits`, `valuations`), lo que bloqueaba el acceso legítimo desde la App.
