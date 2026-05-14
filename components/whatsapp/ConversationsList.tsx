@@ -7,7 +7,6 @@ import { Search, Bot, BotOff, MessageSquare, RefreshCw, Trash2 } from "lucide-re
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "./EmptyState"
 import { toast } from "sonner"
@@ -320,7 +319,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       </div>
 
       {/* List */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto min-h-0">
         {loading ? (
           <div className="p-4 space-y-4">
             {[1, 2, 3, 4, 5].map((i) => (
@@ -445,7 +444,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             })}
           </div>
         )}
-      </ScrollArea>
+      </div>
     </div>
   )
 }
