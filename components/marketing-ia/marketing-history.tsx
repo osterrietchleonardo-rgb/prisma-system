@@ -366,13 +366,13 @@ export function MarketingHistory() {
           setEditContent(null)
         }
       }}>
-        <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95vh] overflow-y-auto border-accent/20 scrollbar-hide p-4 md:p-6">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black flex items-center gap-3">
+        <DialogContent className="max-w-4xl w-full sm:w-[95vw] md:w-full max-h-[95dvh] overflow-y-auto border-accent/20 p-4 md:p-6">
+          <DialogHeader className="pr-8">
+            <DialogTitle className="text-xl md:text-2xl font-black flex items-center gap-3">
               <Sparkles className="w-6 h-6 text-accent" />
               Conjunto de Variantes 
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs md:text-sm">
               Generado el {selectedGroup ? formatDateSafe(selectedGroup.created_at) : ''}
             </DialogDescription>
           </DialogHeader>
