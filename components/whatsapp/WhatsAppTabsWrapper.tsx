@@ -4,39 +4,11 @@ import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampaignState } from "./CampaignState"
 import { ConnectionIndicator } from "./ConnectionIndicator"
-import dynamic from "next/dynamic"
+import ChatInterface from "./ChatInterface"
+import CampaignsTab from "./CampaignsTab"
+import ContactsTab from "./ContactsTab"
 import TemplatesTab from "./TemplatesTab"
 import AiSettingsTab from "./AiSettingsTab"
-
-const LoadingSpinner = () => (
-  <div className="h-full flex items-center justify-center">
-    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-  </div>
-)
-
-const ChatInterface = dynamic(
-  () => import("./ChatInterface").then((m) => m.default),
-  {
-    loading: () => (
-      <div className="flex-1 flex items-center justify-center p-12">
-        <div className="flex flex-col items-center gap-4 animate-pulse">
-          <div className="w-16 h-16 rounded-full bg-accent/20" />
-          <p className="text-muted-foreground text-sm">Cargando chat...</p>
-        </div>
-      </div>
-    ),
-  }
-)
-
-const CampaignsTab = dynamic(
-  () => import("./CampaignsTab").then((m) => m.default),
-  { loading: () => <LoadingSpinner /> }
-)
-
-const ContactsTab = dynamic(
-  () => import("./ContactsTab").then((m) => m.default),
-  { loading: () => <LoadingSpinner /> }
-)
 
 interface WhatsAppTabsWrapperProps {
   instance: any;
@@ -44,7 +16,6 @@ interface WhatsAppTabsWrapperProps {
 
 export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
   const [activeTab, setActiveTab] = useState("chat")
-  // Lazy mount: only mount CampaignsTab after first visit to avoid premature renders
   const [hasMountedCampanas, setHasMountedCampanas] = useState(false)
 
   useEffect(() => {
@@ -62,44 +33,50 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
   }
 
   return (
-    <Tabs 
-      value={activeTab} 
-      onValueChange={handleTabChange}
-      className="flex-1 flex flex-col h-full min-h-[400px] bg-background border-2 border-red-500/10"
-    >
-      <div className="border-b px-2 md:px-6 py-2 bg-background flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-        <TabsList className="bg-muted h-9 flex-shrink-0">
-          <TabsTrigger value="chat" className="text-[10px] md:text-xs px-2 md:px-4">💬 Chat</TabsTrigger>
-          <TabsTrigger value="plantillas" className="text-[10px] md:text-xs px-2 md:px-4">📋 <span className="hidden md:inline">Plantillas</span><span className="md:hidden">Plant.</span></TabsTrigger>
-          <TabsTrigger value="contactos" className="text-[10px] md:text-xs px-2 md:px-4">👥 <span className="hidden md:inline">Contactos</span><span className="md:hidden">Cont.</span></TabsTrigger>
-          <TabsTrigger value="campanas" className="text-[10px] md:text-xs px-2 md:px-4">📣 <span className="hidden md:inline">Campañas</span><span className="md:hidden">Camp.</span></TabsTrigger>
-          <TabsTrigger value="config" className="text-[10px] md:text-xs px-2 md:px-4">⚙️ <span className="hidden md:inline">Configuración IA</span><span className="md:hidden">IA</span></TabsTrigger>
-        </TabsList>
-        <div className="flex-shrink-0">
-          <ConnectionIndicator instanceId={instance?.id || ""} initialStatus={instance?.status || "disconnected"} />
-        </div>
+    <div className="flex-1 flex flex-col bg-background min-h-[500px]">
+      <div className="bg-purple-600 p-1 text-white text-[10px] font-bold text-center">
+        ESTADO: WRAPPER MONTADO | TAB: {activeTab}
       </div>
-      <TabsContent value="chat" className="flex-1 min-h-0 m-0 border-none p-0 outline-none data-[state=inactive]:hidden flex flex-col">
-        <ChatInterface instance={instance} />
-      </TabsContent>
-      <TabsContent value="plantillas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-        <TemplatesTab instance={instance} />
-      </TabsContent>
-      <TabsContent value="config" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-        <AiSettingsTab instance={instance} />
-      </TabsContent>
-      <TabsContent value="contactos" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-        <ContactsTab instance={instance} />
-      </TabsContent>
-      <TabsContent value="campanas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-        {hasMountedCampanas ? (
-          <CampaignsTab instance={instance} />
-        ) : (
-          <div className="h-full flex items-center justify-center">
-            <p className="text-sm text-muted-foreground">Seleccioná contactos desde la pestaña Contactos para iniciar.</p>
+      
+      <Tabs 
+        value={activeTab} 
+        onValueChange={handleTabChange}
+        className="flex-1 flex flex-col"
+      >
+        <div className="border-b px-2 md:px-6 py-2 bg-background flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+          <TabsList className="bg-muted h-9 flex-shrink-0">
+            <TabsTrigger value="chat" className="text-[10px] md:text-xs px-2 md:px-4">💬 Chat</TabsTrigger>
+            <TabsTrigger value="plantillas" className="text-[10px] md:text-xs px-2 md:px-4">📋 <span className="hidden md:inline">Plantillas</span><span className="md:hidden">Plant.</span></TabsTrigger>
+            <TabsTrigger value="contactos" className="text-[10px] md:text-xs px-2 md:px-4">👥 <span className="hidden md:inline">Contactos</span><span className="md:hidden">Cont.</span></TabsTrigger>
+            <TabsTrigger value="campanas" className="text-[10px] md:text-xs px-2 md:px-4">📣 <span className="hidden md:inline">Campañas</span><span className="md:hidden">Camp.</span></TabsTrigger>
+            <TabsTrigger value="config" className="text-[10px] md:text-xs px-2 md:px-4">⚙️ <span className="hidden md:inline">Configuración IA</span><span className="md:hidden">IA</span></TabsTrigger>
+          </TabsList>
+          <div className="flex-shrink-0">
+            <ConnectionIndicator instanceId={instance?.id || ""} initialStatus={instance?.status || "disconnected"} />
           </div>
-        )}
-      </TabsContent>
-    </Tabs>
+        </div>
+        <TabsContent value="chat" className="flex-1 min-h-0 m-0 border-none p-0 outline-none data-[state=inactive]:hidden flex flex-col">
+          <ChatInterface instance={instance} />
+        </TabsContent>
+        <TabsContent value="plantillas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
+          <TemplatesTab instance={instance} />
+        </TabsContent>
+        <TabsContent value="config" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
+          <AiSettingsTab instance={instance} />
+        </TabsContent>
+        <TabsContent value="contactos" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
+          <ContactsTab instance={instance} />
+        </TabsContent>
+        <TabsContent value="campanas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
+          {hasMountedCampanas ? (
+            <CampaignsTab instance={instance} />
+          ) : (
+            <div className="h-full flex items-center justify-center">
+              <p className="text-sm text-muted-foreground">Seleccioná contactos desde la pestaña Contactos para iniciar.</p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }
