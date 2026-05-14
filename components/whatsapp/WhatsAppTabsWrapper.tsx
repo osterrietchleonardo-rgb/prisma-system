@@ -4,11 +4,14 @@ import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampaignState } from "./CampaignState"
 import { ConnectionIndicator } from "./ConnectionIndicator"
-import ChatInterface from "./ChatInterface"
-import CampaignsTab from "./CampaignsTab"
-import ContactsTab from "./ContactsTab"
-import TemplatesTab from "./TemplatesTab"
-import AiSettingsTab from "./AiSettingsTab"
+import dynamic from "next/dynamic"
+
+// Cargamos los componentes pesados solo en el cliente para evitar errores de hidratación (pantalla blanca)
+const ChatInterface = dynamic(() => import("./ChatInterface"), { ssr: false })
+const CampaignsTab = dynamic(() => import("./CampaignsTab"), { ssr: false })
+const ContactsTab = dynamic(() => import("./ContactsTab"), { ssr: false })
+const TemplatesTab = dynamic(() => import("./TemplatesTab"), { ssr: false })
+const AiSettingsTab = dynamic(() => import("./AiSettingsTab"), { ssr: false })
 
 interface WhatsAppTabsWrapperProps {
   instance: any;
