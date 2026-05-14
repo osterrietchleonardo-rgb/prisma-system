@@ -261,7 +261,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     setSending(true)
 
     // Optimistic insert
-    const tempId = crypto.randomUUID()
+    const tempId = Date.now().toString() + Math.random().toString(36).substring(2, 9)
     const optimisticMsg: WAMessage = {
       id: tempId,
       conversation_id: conv.id,
