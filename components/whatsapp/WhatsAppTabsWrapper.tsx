@@ -98,7 +98,7 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
         <ConnectionIndicator instanceId={instance.id} initialStatus={instance.status} />
       </div>
 
-      <TabsContent value="chat" className="flex-1 min-h-0 m-0 border-none p-0 outline-none data-[state=inactive]:hidden flex flex-col">
+      <TabsContent value="chat" className="m-0 border-none p-0 outline-none data-[state=inactive]:hidden">
         <WhatsAppErrorBoundary>
           {hasMountedChat && <ChatInterface instance={instance} />}
         </WhatsAppErrorBoundary>
