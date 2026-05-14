@@ -243,7 +243,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   if (debugError) return <div style={{color:'red',padding:'20px',fontSize:'18px', backgroundColor: 'white', border: '2px solid red'}}>DEBUG ERROR: {debugError}</div>
 
   return (
-    <div className="flex flex-col h-full bg-background overflow-hidden relative">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       {/* Search & Refresh */}
       <div className="p-3 border-b flex items-center gap-2">
         <div className="relative flex-1">
