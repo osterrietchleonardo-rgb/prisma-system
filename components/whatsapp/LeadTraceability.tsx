@@ -317,8 +317,8 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
                       {mounted ? safeFormatTime(msg.created_at) : ""}
                     </span>
                   </div>
-                  <p className="text-muted-foreground truncate" title={msg.content}>
-                    {msg.content.length > 40 ? msg.content.substring(0, 40) + "..." : msg.content}
+                  <p className="text-muted-foreground truncate" title={msg.content || ""}>
+                    {(msg.content || "").length > 40 ? (msg.content || "").substring(0, 40) + "..." : (msg.content || "")}
                   </p>
                 </div>
               </div>

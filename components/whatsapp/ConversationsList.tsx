@@ -138,10 +138,10 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
               // Prevenir duplicados visuales en RT
               if (prev.some(c => c.id === newItem.id)) return prev;
 
-              const unshiftList = [newItem, ...prev];
+              const unshiftList = [newItem, ...prev].filter(Boolean);
               unshiftList.sort((a, b) => {
-                const timeB = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
-                const timeA = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
+                const timeB = (b && b.last_message_at) ? new Date(b.last_message_at).getTime() : 0;
+                const timeA = (a && a.last_message_at) ? new Date(a.last_message_at).getTime() : 0;
                 return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
               });
               
@@ -227,6 +227,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   const agentEmails = useMemo(() => {
     const emails = new Set<string>()
     conversations.forEach((c) => {
+      if (!c) return;
       const agentData = (c as any).assigned_agent;
       const email = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
       if (email) emails.add(email)
@@ -237,10 +238,11 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   // Filter by search + tab + agent
   const filtered = useMemo(() => {
     return conversations.filter((c) => {
+      if (!c) return false;
       // Búsqueda por nombre o teléfono
       const searchTerm = search.toLowerCase()
       const matchesSearch = 
-        c.contact_phone.toLowerCase().includes(searchTerm) || 
+        (c.contact_phone || "").toLowerCase().includes(searchTerm) || 
         (c.contact_name || "").toLowerCase().includes(searchTerm)
       
       if (!matchesSearch) return false
@@ -368,9 +370,10 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
         ) : (
           <div className="p-1.5">
             {filtered
-              .filter((conv, index, self) =>
-                index === self.findIndex((t) => t.contact_phone === conv.contact_phone)
-              )
+              .filter((conv, index, self) => {
+                if (!conv) return false;
+                return index === self.findIndex((t) => t && t.contact_phone === conv.contact_phone);
+              })
               .map((conv) => {
               const isActive = activeId === conv.id
               const initial = (conv.contact_name || conv.contact_phone || "?")
