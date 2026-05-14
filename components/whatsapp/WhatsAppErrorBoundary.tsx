@@ -1,7 +1,7 @@
 "use client"
 
 import React, { Component, ErrorInfo, ReactNode } from "react"
-import { AlertCircle, RefreshCcw } from "lucide-react"
+import { AlertCircle, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface Props {
@@ -11,7 +11,7 @@ interface Props {
 interface State {
   hasError: boolean
   error: Error | null
-  errorInfo: string | null
+  errorInfo: ErrorInfo | null
 }
 
 export class WhatsAppErrorBoundary extends Component<Props, State> {
@@ -26,40 +26,27 @@ export class WhatsAppErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("WhatsApp Error:", error, errorInfo)
-    this.setState({
-      errorInfo: errorInfo.componentStack
-    })
-  }
-
-  private handleReset = () => {
-    this.setState({ hasError: false, error: null, errorInfo: null })
-    window.location.reload()
+    console.error("WhatsApp Runtime Error:", error, errorInfo)
+    this.setState({ errorInfo })
   }
 
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center bg-destructive/5 rounded-xl border border-destructive/20 m-4">
-          <AlertCircle className="w-12 h-12 text-destructive mb-4" />
-          <h2 className="text-lg font-bold text-destructive mb-2">Algo salió mal en el Chat</h2>
-          <p className="text-sm text-muted-foreground mb-4 max-w-md">
-            Se produjo un error al cargar los datos de WhatsApp. Esto puede deberse a la conexión o a un dato corrupto.
-          </p>
-          
-          <div className="w-full bg-black/5 dark:bg-white/5 rounded-md p-4 mb-6 overflow-auto text-left">
-            <p className="text-xs font-mono text-red-500 mb-2">
-              Error: {this.state.error?.message || "Error desconocido"}
-            </p>
-            {this.state.errorInfo && (
-              <pre className="text-[10px] font-mono text-muted-foreground leading-tight">
-                {this.state.errorInfo.split("\n").slice(0, 5).join("\n")}
-              </pre>
-            )}
-          </div>
-
-          <Button onClick={this.handleReset} variant="outline" className="gap-2">
-            <RefreshCcw className="w-4 h-4" />
+        <div className="flex-1 flex flex-col items-center justify-center p-6 bg-destructive/5 text-destructive min-h-[300px]">
+          <AlertCircle className="w-12 h-12 mb-4" />
+          <h2 className="text-lg font-bold mb-2">Algo salió mal en el Chat</h2>
+          <pre className="text-xs bg-background p-4 rounded border max-w-full overflow-auto mb-4 font-mono text-foreground">
+            {this.state.error?.message}
+            {"\n\n"}
+            {this.state.error?.stack?.split("\n").slice(0, 3).join("\n")}
+          </pre>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.reload()}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
             Recargar página
           </Button>
         </div>

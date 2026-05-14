@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CampaignState } from "./CampaignState"
 import { ConnectionIndicator } from "./ConnectionIndicator"
+import { WhatsAppErrorBoundary } from "./WhatsAppErrorBoundary"
 import dynamic from "next/dynamic"
 
 const LoadingSpinner = () => (
@@ -98,7 +99,9 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
       </div>
 
       <TabsContent value="chat" className="flex-1 min-h-0 m-0 border-none p-0 outline-none data-[state=inactive]:hidden flex flex-col">
-        {hasMountedChat && <ChatInterface instance={instance} />}
+        <WhatsAppErrorBoundary>
+          {hasMountedChat && <ChatInterface instance={instance} />}
+        </WhatsAppErrorBoundary>
       </TabsContent>
 
       <TabsContent value="plantillas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
