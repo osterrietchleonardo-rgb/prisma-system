@@ -100,3 +100,80 @@
 ::-webkit-scrollbar-thumb {
   @apply bg-accent/20 rounded-full hover:bg-accent/40 transition-colors;
 }
+
+/* ==========================================================================
+   RESPONSIVE OVERRIDES (MOBILE & TABLET)
+   ========================================================================== */
+
+@layer utilities {
+  /* =========================================
+     TABLET & MOBILE (max-width: 1024px)
+     ========================================= */
+  @media (max-width: 1024px) {
+    /* --- NAVEGACIÓN Y COMPONENTES TÁCTILES --- */
+    input[type="text"], input[type="email"], input[type="number"], input[type="password"], input[type="search"], input[type="tel"], select, textarea {
+      font-size: 16px !important; /* Previene auto-zoom en iOS */
+    }
+    
+    button, a.btn, [role="button"], .select-trigger {
+      min-height: 44px; /* Tamaño táctil mínimo accesible */
+    }
+
+    /* --- AJUSTES DE ALTURA Y VIEWPORT --- */
+    /* Soporte para barra de navegación dinámica en iOS Safari */
+    .h-\[calc\(100vh-64px\)\] {
+      height: calc(100dvh - 64px) !important;
+    }
+
+    /* --- GRÁFICOS (RECHARTS) --- */
+    .recharts-responsive-container, .recharts-wrapper {
+      max-width: 100% !important;
+      width: 100% !important;
+      overflow: hidden;
+    }
+  }
+
+  /* =========================================
+     MOBILE (max-width: 767px)
+     ========================================= */
+  @media (max-width: 767px) {
+    /* --- TABLAS RESPONSIVE --- */
+    /* Envolver la tabla en scroll horizontal */
+    table.min-w-\[1000px\] {
+      display: block;
+      width: 100%;
+      overflow-x: auto;
+      white-space: nowrap;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* --- DRAG & DROP / KANBAN BOARD --- */
+    /* Limitar un poco el ancho de las tarjetas pero mantener estructura */
+    .w-\[300px\] {
+      max-width: 85vw;
+    }
+    
+    /* --- WHATSAPP CHAT INTERFACE --- */
+    .md\:w-\[300px\] {
+      width: 100% !important; /* Lista de chats a ancho completo */
+    }
+    
+    /* Burbujas de chat más legibles en pantallas pequeñas */
+    .max-w-\[70\%\], .max-w-\[80\%\], .max-w-\[85\%\] {
+      max-width: 92% !important; 
+    }
+
+    /* --- MODALES Y DRAWERS --- */
+    .sm\:max-w-\[560px\] {
+      max-width: 100vw !important;
+      width: 100vw !important;
+    }
+    
+    /* --- IMÁGENES --- */
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+  }
+}
+
