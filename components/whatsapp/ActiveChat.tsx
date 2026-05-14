@@ -134,9 +134,6 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     load()
 
     // Realtime subscription for ALL changes in this conversation's messages
-    const agencyId = instance?.agency_id
-    if (!conv.id) return
-
     const channel = supabase
       .channel(`chat_messages_${conv.id}`)
       .on(
@@ -175,27 +172,25 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
         }
       })
 
-    const broadcastChannel = agencyId
-      ? supabase
-          .channel(`active-agency-${agencyId}`)
-          .on(
-            "broadcast",
-            { event: "refresh-whatsapp" },
-            (payload) => {
-              // If the broadcast is for THIS conversation, force a refresh
-              if (payload.payload?.conversation_id === conv.id) {
-                load()
-              }
-            }
-          )
-          .subscribe()
-      : null
+    const broadcastChannel = supabase
+      .channel(`active-agency-${instance.agency_id}`)
+      .on(
+        "broadcast",
+        { event: "refresh-whatsapp" },
+        (payload) => {
+          // If the broadcast is for THIS conversation, force a refresh
+          if (payload.payload?.conversation_id === conv.id) {
+            load()
+          }
+        }
+      )
+      .subscribe()
 
     return () => {
       supabase.removeChannel(channel)
-      if (broadcastChannel) supabase.removeChannel(broadcastChannel)
+      supabase.removeChannel(broadcastChannel)
     }
-  }, [conv.id, instance?.agency_id])
+  }, [conv.id, instance.agency_id])
 
   // Track scroll position for auto-scroll
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -304,15 +299,12 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     const text = noteText.trim()
     setSendingNote(true)
 
-    // Safe ID generation for mobile
-    const tempId = (typeof crypto !== 'undefined' && crypto.randomUUID) 
-      ? crypto.randomUUID() 
-      : Date.now().toString() + Math.random().toString(36).substring(2, 9);
-
+    // Optimistic insert
+    const tempId = crypto.randomUUID()
     const optimisticNote: WAMessage = {
       id: tempId,
       conversation_id: conv.id,
-      agency_id: instance?.agency_id,
+      agency_id: instance.agency_id,
       content: text,
       role: 'internal',
       message_type: 'text',
