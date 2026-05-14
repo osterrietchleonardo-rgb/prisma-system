@@ -7,7 +7,6 @@ import { ConnectionIndicator } from "./ConnectionIndicator"
 import dynamic from "next/dynamic"
 import TemplatesTab from "./TemplatesTab"
 import AiSettingsTab from "./AiSettingsTab"
-import ErrorBoundary from "./ErrorBoundary"
 
 const LoadingSpinner = () => (
   <div className="h-full flex items-center justify-center">
@@ -45,23 +44,16 @@ interface WhatsAppTabsWrapperProps {
 
 export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
   const [activeTab, setActiveTab] = useState("chat")
+  // Lazy mount: only mount CampaignsTab after first visit to avoid premature renders
   const [hasMountedCampanas, setHasMountedCampanas] = useState(false)
-  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-    try {
-      const unsubscribe = CampaignState.subscribeToTab((tab) => {
-        setActiveTab(tab)
-        if (tab === "campanas") setHasMountedCampanas(true)
-      })
-      return unsubscribe
-    } catch (e) {
-      console.error("Tab subscription error:", e)
-    }
+    const unsubscribe = CampaignState.subscribeToTab((tab) => {
+      setActiveTab(tab)
+      if (tab === "campanas") setHasMountedCampanas(true)
+    })
+    return unsubscribe
   }, [])
-
-  if (!mounted) return <div className="flex-1 bg-background" />
 
   const handleTabChange = (value: string) => {
     setActiveTab(value)
@@ -70,46 +62,42 @@ export function WhatsAppTabsWrapper({ instance }: WhatsAppTabsWrapperProps) {
   }
 
   return (
-    <ErrorBoundary>
-      <Tabs 
-        value={activeTab} 
-        onValueChange={handleTabChange}
-        className="flex-1 flex flex-col h-full min-h-0 bg-background"
-      >
-        <div className="border-b px-2 md:px-6 py-2 bg-background flex items-center justify-between gap-2 overflow-x-auto no-scrollbar pb-3 pt-1">
-          <TabsList className="bg-muted h-9 flex-shrink-0">
-            <TabsTrigger value="chat" className="text-[10px] md:text-xs px-2 md:px-4">💬 Chat</TabsTrigger>
-            <TabsTrigger value="plantillas" className="text-[10px] md:text-xs px-2 md:px-4">📋 Plantillas</TabsTrigger>
-            <TabsTrigger value="contactos" className="text-[10px] md:text-xs px-2 md:px-4">👥 Contactos</TabsTrigger>
-            <TabsTrigger value="campanas" className="text-[10px] md:text-xs px-2 md:px-4">📣 Campañas</TabsTrigger>
-            <TabsTrigger value="config" className="text-[10px] md:text-xs px-2 md:px-4">⚙️ Config</TabsTrigger>
-          </TabsList>
-          <div className="flex-shrink-0">
-            <ConnectionIndicator instanceId={instance.id} initialStatus={instance.status} />
+    <Tabs 
+      value={activeTab} 
+      onValueChange={handleTabChange}
+      className="flex-1 flex flex-col h-full min-h-0 bg-background"
+    >
+      <div className="border-b px-4 md:px-6 py-2 bg-background flex items-center justify-between">
+        <TabsList className="bg-muted h-9">
+          <TabsTrigger value="chat" className="text-xs px-4">💬 Chat</TabsTrigger>
+          <TabsTrigger value="plantillas" className="text-xs px-4">📋 Plantillas</TabsTrigger>
+          <TabsTrigger value="contactos" className="text-xs px-4">👥 Contactos</TabsTrigger>
+          <TabsTrigger value="campanas" className="text-xs px-4">📣 Campañas</TabsTrigger>
+          <TabsTrigger value="config" className="text-xs px-4">⚙️ Configuración IA</TabsTrigger>
+        </TabsList>
+        <ConnectionIndicator instanceId={instance.id} initialStatus={instance.status} />
+      </div>
+      <TabsContent value="chat" className="flex-1 min-h-0 m-0 border-none p-0 outline-none data-[state=inactive]:hidden flex flex-col">
+        <ChatInterface instance={instance} />
+      </TabsContent>
+      <TabsContent value="plantillas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
+        <TemplatesTab instance={instance} />
+      </TabsContent>
+      <TabsContent value="config" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
+        <AiSettingsTab instance={instance} />
+      </TabsContent>
+      <TabsContent value="contactos" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
+        <ContactsTab instance={instance} />
+      </TabsContent>
+      <TabsContent value="campanas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
+        {hasMountedCampanas ? (
+          <CampaignsTab instance={instance} />
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <p className="text-sm text-muted-foreground">Seleccioná contactos desde la pestaña Contactos para iniciar.</p>
           </div>
-        </div>
-        <TabsContent value="chat" className="flex-1 min-h-0 m-0 border-none p-0 outline-none data-[state=inactive]:hidden flex flex-col">
-          <ChatInterface instance={instance} />
-        </TabsContent>
-        <TabsContent value="plantillas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-          <TemplatesTab instance={instance} />
-        </TabsContent>
-        <TabsContent value="config" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-          <AiSettingsTab instance={instance} />
-        </TabsContent>
-        <TabsContent value="contactos" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-          <ContactsTab instance={instance} />
-        </TabsContent>
-        <TabsContent value="campanas" className="flex-1 overflow-y-auto p-4 md:p-6 outline-none data-[state=inactive]:hidden">
-          {hasMountedCampanas ? (
-            <CampaignsTab instance={instance} />
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <p className="text-sm text-muted-foreground">Selecciona contactos desde la pestaña Contactos para iniciar.</p>
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-    </ErrorBoundary>
+        )}
+      </TabsContent>
+    </Tabs>
   )
 }

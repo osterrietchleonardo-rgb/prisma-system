@@ -1,13 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import type { WAConversation, WhatsAppInstance } from "@/types/whatsapp"
 import { ConversationsList } from "./ConversationsList"
 import { ActiveChat } from "./ActiveChat"
 import { EmptyState } from "./EmptyState"
 import { MessageSquare } from "lucide-react"
-
-import ErrorBoundary from "./ErrorBoundary"
 
 interface ChatInterfaceProps {
   instance: WhatsAppInstance
@@ -16,16 +14,9 @@ interface ChatInterfaceProps {
 export default function ChatInterface({ instance }: ChatInterfaceProps) {
   const [activeConversation, setActiveConversation] =
     useState<WAConversation | null>(null)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) return <div className="flex-1 bg-background" />
 
   return (
-    <div className="flex flex-row h-[calc(100vh-64px)] overflow-hidden">
+    <div className="flex flex-row h-[calc(100vh-64px)]">
       {/* Desktop: List always visible / Mobile: visible only when no active chat */}
       <div
         className={`w-full md:w-[300px] md:flex-shrink-0 md:border-r md:block ${
@@ -47,20 +38,17 @@ export default function ChatInterface({ instance }: ChatInterfaceProps) {
       >
         {activeConversation ? (
           <ActiveChat
-            key={activeConversation.id}
             conversation={activeConversation}
             instance={instance}
             onBack={() => setActiveConversation(null)}
             onDeleteChat={() => setActiveConversation(null)}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center bg-muted/10">
-            <EmptyState 
-              icon={MessageSquare} 
-              title="Seleccioná una conversación" 
-              subtitle="Elegí un contacto de la lista para ver los mensajes e interactuar." 
-            />
-          </div>
+          <EmptyState 
+            icon={MessageSquare} 
+            title="Seleccioná una conversación" 
+            subtitle="Elegí un contacto de la lista para ver los mensajes e interactuar." 
+          />
         )}
       </div>
     </div>

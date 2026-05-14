@@ -14,12 +14,6 @@ import { toast } from "sonner"
 
 import { deleteConversation } from "@/app/actions/whatsapp"
 import { Button } from "@/components/ui/button"
-import { 
-  safeFormatDate, 
-  safeFormatTime, 
-  safeUUID, 
-  safeScrollIntoView 
-} from "./SafeUtils"
 
 interface LeadTraceabilityProps {
   conversation: WAConversation
@@ -30,11 +24,6 @@ interface LeadTraceabilityProps {
 export default function LeadTraceability({ conversation, messages, onDeleteChat }: LeadTraceabilityProps) {
   const supabase = createClient()
   const [isDeleting, setIsDeleting] = useState(false)
-  const [mounted, setMounted] = useState(false)
-  
-  useEffect(() => {
-    setMounted(true)
-  }, [])
   
   // Section 1: Phone Copy
   const [copied, setCopied] = useState(false)
@@ -178,23 +167,17 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
   // Section 5: Stats
   const leadMessagesCount = messages.filter(m => m.role === 'lead').length
   
-  const firstContactDateStr = messages.length > 0 ? messages[0].created_at : null
-  const firstContactDate = firstContactDateStr ? new Date(firstContactDateStr) : null
-  const daysSinceFirstContact = mounted && firstContactDate && !isNaN(firstContactDate.getTime())
-    ? Math.floor((Date.now() - firstContactDate.getTime()) / (1000 * 3600 * 24))
-    : 0
+  const firstContact = messages.length > 0 ? new Date(messages[0].created_at) : new Date()
+  const daysSinceFirstContact = Math.floor((new Date().getTime() - firstContact.getTime()) / (1000 * 3600 * 24))
   
   // Calculate avg bot response time
   let totalBotResponseMs = 0
   let botResponseCount = 0
   for (let i = 1; i < messages.length; i++) {
     if (messages[i].role === 'bot' && messages[i-1].role === 'lead') {
-      const timeBot = new Date(messages[i].created_at).getTime()
-      const timeLead = new Date(messages[i-1].created_at).getTime()
-      if (!isNaN(timeBot) && !isNaN(timeLead)) {
-        totalBotResponseMs += (timeBot - timeLead)
-        botResponseCount++
-      }
+      const respTime = new Date(messages[i].created_at).getTime() - new Date(messages[i-1].created_at).getTime()
+      totalBotResponseMs += respTime
+      botResponseCount++
     }
   }
   const avgBotResponseMin = botResponseCount > 0 ? Math.round(totalBotResponseMs / botResponseCount / 60000) : 0
@@ -314,11 +297,11 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
                   <div className="flex items-center justify-between mb-1">
                     <span className="font-semibold">{roleTexts[msg.role]}</span>
                     <span className="text-[10px] text-muted-foreground">
-                      {mounted ? safeFormatTime(msg.created_at) : ""}
+                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit' })}
                     </span>
                   </div>
-                  <p className="text-muted-foreground truncate" title={msg.content || ""}>
-                    {(msg.content || "").length > 40 ? (msg.content || "").substring(0, 40) + "..." : (msg.content || "")}
+                  <p className="text-muted-foreground truncate" title={msg.content}>
+                    {msg.content.length > 40 ? msg.content.substring(0, 40) + "..." : msg.content}
                   </p>
                 </div>
               </div>
@@ -357,7 +340,7 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-xs font-semibold">
-                  {mounted ? `${safeFormatDate(visit.scheduled_at)} - ${safeFormatTime(visit.scheduled_at)}` : ""}
+                  {new Date(visit.scheduled_at).toLocaleDateString()} - {new Date(visit.scheduled_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </div>
                 <Badge variant="outline" className={visit.status === 'confirmed' ? "text-green-600 border-green-200 bg-green-50" : "text-yellow-600 border-yellow-200 bg-yellow-50"}>
                   {visit.status === 'confirmed' ? 'Confirmada' : 'Pendiente'}

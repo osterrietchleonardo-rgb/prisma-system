@@ -20,31 +20,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useRef } from "react"
-import { 
-  safeFormatDate, 
-  safeFormatTime, 
-  safeUUID, 
-  safeScrollIntoView 
-} from "./SafeUtils"
-
-// Función para calcular tiempo relativo de forma segura
-function timeAgo(dateStr: string): string {
-  try {
-    const date = new Date(dateStr)
-    if (isNaN(date.getTime())) return ""
-    const diff = Date.now() - date.getTime()
-    const mins = Math.floor(diff / 60000)
-    if (mins < 1) return "ahora"
-    if (mins < 60) return `${mins}m`
-    const hrs = Math.floor(mins / 60)
-    if (hrs < 24) return `${hrs}h`
-    const days = Math.floor(hrs / 24)
-    if (days < 7) return `${days}d`
-    return `${Math.floor(days / 7)}sem`
-  } catch (e) {
-    return ""
-  }
-}
 
 interface ConversationsListProps {
   instance: WhatsAppInstance
@@ -52,7 +27,17 @@ interface ConversationsListProps {
   onSelect: (conv: WAConversation) => void
 }
 
-// Local timeAgo is now defined after imports
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "ahora"
+  if (mins < 60) return `${mins}m`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return `${days}d`
+  return `${Math.floor(days / 7)}sem`
+}
 
 
 export function ConversationsList({ instance, activeId, onSelect }: ConversationsListProps) {
@@ -61,7 +46,6 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   const [tab, setTab] = useState("all")
   const [filterAgentEmail, setFilterAgentEmail] = useState("all")
   const [loading, setLoading] = useState(true)
-  const [mounted, setMounted] = useState(false)
 
   const activeIdRef = useRef(activeId)
   const convRef = useRef(conversations)
@@ -73,10 +57,6 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   useEffect(() => {
     convRef.current = conversations
   }, [conversations])
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // Initial load & Polling
   useEffect(() => {
@@ -127,23 +107,15 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
               toast.info(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
             } else {
               // Si la recibimos mientras la tenemos activa, la marcamos como leida auto
-              try {
-                markConversationRead(newItem.id)
-              } catch (e) {
-                console.error("Error auto-marking as read:", e)
-              }
+              markConversationRead(newItem.id)
             }
             
             setConversations((prev) => {
               // Prevenir duplicados visuales en RT
               if (prev.some(c => c.id === newItem.id)) return prev;
 
-              const unshiftList = [newItem, ...prev].filter(Boolean);
-              unshiftList.sort((a, b) => {
-                const timeB = (b && b.last_message_at) ? new Date(b.last_message_at).getTime() : 0;
-                const timeA = (a && a.last_message_at) ? new Date(a.last_message_at).getTime() : 0;
-                return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
-              });
+              const unshiftList = [newItem, ...prev];
+              unshiftList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
               
               // Filter by contact_phone to deduplicate orphaned duplicates
               return unshiftList.filter((c, index, self) => 
@@ -162,8 +134,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             if (oldItem) {
               isInbound = !!oldItem.last_inbound_at && !!updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
             } else if (updatedItem.last_inbound_at) {
-               const inboundDate = new Date(updatedItem.last_inbound_at);
-               const diff = isNaN(inboundDate.getTime()) ? Infinity : Date.now() - inboundDate.getTime();
+               const diff = Date.now() - new Date(updatedItem.last_inbound_at).getTime();
                isInbound = diff < 10000; // Recibido en los ultimos 10 segundos
             }
 
@@ -227,7 +198,6 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   const agentEmails = useMemo(() => {
     const emails = new Set<string>()
     conversations.forEach((c) => {
-      if (!c) return;
       const agentData = (c as any).assigned_agent;
       const email = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
       if (email) emails.add(email)
@@ -238,11 +208,10 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
   // Filter by search + tab + agent
   const filtered = useMemo(() => {
     return conversations.filter((c) => {
-      if (!c) return false;
       // Búsqueda por nombre o teléfono
       const searchTerm = search.toLowerCase()
       const matchesSearch = 
-        (c.contact_phone || "").toLowerCase().includes(searchTerm) || 
+        c.contact_phone.toLowerCase().includes(searchTerm) || 
         (c.contact_name || "").toLowerCase().includes(searchTerm)
       
       if (!matchesSearch) return false
@@ -261,8 +230,6 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       return true
     })
   }, [conversations, search, tab, filterAgentEmail])
-
-  if (!mounted) return <div className="flex-1 bg-background" />
 
   return (
     <div className="flex flex-col h-full">
@@ -370,10 +337,9 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
         ) : (
           <div className="p-1.5">
             {filtered
-              .filter((conv, index, self) => {
-                if (!conv) return false;
-                return index === self.findIndex((t) => t && t.contact_phone === conv.contact_phone);
-              })
+              .filter((conv, index, self) =>
+                index === self.findIndex((t) => t.contact_phone === conv.contact_phone)
+              )
               .map((conv) => {
               const isActive = activeId === conv.id
               const initial = (conv.contact_name || conv.contact_phone || "?")
@@ -430,7 +396,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                         })()}
                       </span>
                       <span className="text-xs text-muted-foreground flex-shrink-0 flex flex-col items-end gap-1">
-                        <span className="whitespace-nowrap">{mounted ? timeAgo(conv.last_message_at) : ""}</span>
+                        <span className="whitespace-nowrap">{timeAgo(conv.last_message_at)}</span>
                         {conv.unread_count > 0 && !isActive ? (
                           <div className="flex items-center justify-center">
                              <Badge className="bg-red-500 hover:bg-red-600 text-white border-none text-[10px] font-bold h-[18px] min-w-[18px] px-1 flex items-center justify-center rounded-full leading-none shadow-sm">
@@ -452,7 +418,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                       ) : (
                         <BotOff className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
                       )}
-                      {conv.etiquetas?.slice(0, 2).map((tag) => (
+                      {conv.etiquetas.slice(0, 2).map((tag) => (
                         <Badge
                           key={tag}
                           variant="secondary"

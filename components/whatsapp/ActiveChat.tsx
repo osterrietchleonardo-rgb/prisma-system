@@ -37,12 +37,6 @@ import {
 } from "@/components/ui/popover"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
-import { 
-  safeFormatDate, 
-  safeFormatTime, 
-  safeUUID, 
-  safeScrollIntoView 
-} from "./SafeUtils"
 
 const ALL_TAGS = [
   "caliente",
@@ -61,7 +55,21 @@ interface ActiveChatProps {
   onDeleteChat?: () => void
 }
 
-// Usar SafeUtils
+function formatTime(dateStr: string): string {
+  const d = new Date(dateStr)
+  return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })
+}
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  if (d.toDateString() === today.toDateString()) return "Hoy"
+  if (d.toDateString() === yesterday.toDateString()) return "Ayer"
+  return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" })
+}
 
 export function ActiveChat({ conversation: initialConv, instance, onBack, onDeleteChat }: ActiveChatProps) {
   const [conv, setConv] = useState<WAConversation>(initialConv)
@@ -75,7 +83,6 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   const [sending, setSending] = useState(false)
   const [sendingNote, setSendingNote] = useState(false)
   const [switchingBot, setSwitchingBot] = useState(false)
-  const [mounted, setMounted] = useState(false)
 
   // Tag popover
   const [tagOpen, setTagOpen] = useState(false)
@@ -91,12 +98,6 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   useEffect(() => {
     setConv(initialConv)
   }, [initialConv])
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) return <div className="flex-1 bg-background" />
 
   // Load messages
   useEffect(() => {
@@ -119,7 +120,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
 
       // Auto-scroll to bottom on initial load
       setTimeout(() => {
-        safeScrollIntoView(bottomRef.current)
+        bottomRef.current?.scrollIntoView({ behavior: "auto" })
       }, 100)
     }
 
@@ -148,7 +149,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
             // Auto-scroll if near bottom
             if (shouldAutoScroll.current) {
               setTimeout(() => {
-                safeScrollIntoView(bottomRef.current, "smooth")
+                bottomRef.current?.scrollIntoView({ behavior: "smooth" })
               }, 50)
             }
           } else if (payload.eventType === "DELETE") {
@@ -207,7 +208,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
         // Auto-scroll if near bottom
         if (shouldAutoScroll.current) {
           setTimeout(() => {
-            safeScrollIntoView(bottomRef.current, "smooth")
+            bottomRef.current?.scrollIntoView({ behavior: "smooth" })
           }, 50)
         }
       }
@@ -247,7 +248,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
       setMessages(data as WAMessage[])
       // Auto-scroll to bottom
       setTimeout(() => {
-        safeScrollIntoView(bottomRef.current)
+        bottomRef.current?.scrollIntoView({ behavior: "auto" })
       }, 100)
     }
     setLoading(false)
@@ -260,7 +261,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     setSending(true)
 
     // Optimistic insert
-    const tempId = safeUUID()
+    const tempId = crypto.randomUUID()
     const optimisticMsg: WAMessage = {
       id: tempId,
       conversation_id: conv.id,
@@ -292,7 +293,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     setSendingNote(true)
 
     // Optimistic insert
-    const tempId = safeUUID()
+    const tempId = crypto.randomUUID()
     const optimisticNote: WAMessage = {
       id: tempId,
       conversation_id: conv.id,
@@ -319,7 +320,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   }
 
   const handleRemoveTag = async (tag: string) => {
-    const newTags = (conv.etiquetas || []).filter((t) => t !== tag)
+    const newTags = conv.etiquetas.filter((t) => t !== tag)
     // Optimistic
     setConv((prev) => ({ ...prev, etiquetas: newTags }))
     const result = await updateEtiquetas(conv.id, newTags)
@@ -330,8 +331,8 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   }
 
   const handleAddTag = async (tag: string) => {
-    if ((conv.etiquetas || []).includes(tag)) return
-    const newTags = [...(conv.etiquetas || []), tag]
+    if (conv.etiquetas.includes(tag)) return
+    const newTags = [...conv.etiquetas, tag]
     // Optimistic
     setConv((prev) => ({ ...prev, etiquetas: newTags }))
     setTagOpen(false)
@@ -459,7 +460,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
 
           {/* Tags row */}
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-            {(conv.etiquetas || []).map((tag) => (
+            {conv.etiquetas.map((tag) => (
               <Badge
                 key={tag}
                 variant="secondary"
@@ -480,7 +481,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
               </PopoverTrigger>
               <PopoverContent className="w-48 p-2" align="start">
                 <div className="space-y-1">
-                  {ALL_TAGS.filter((t) => !(conv.etiquetas || []).includes(t)).map(
+                  {ALL_TAGS.filter((t) => !conv.etiquetas.includes(t)).map(
                     (tag) => (
                       <button
                         key={tag}
@@ -491,10 +492,10 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                       </button>
                     )
                   )}
-                  {ALL_TAGS.every((t) => (conv.etiquetas || []).includes(t)) && (
-                    <div className="text-center py-2 text-[10px] text-muted-foreground">
-                      Todas las etiquetas aplicadas
-                    </div>
+                  {ALL_TAGS.every((t) => conv.etiquetas.includes(t)) && (
+                    <p className="text-xs text-muted-foreground px-2 py-1">
+                      Todas asignadas
+                    </p>
                   )}
                 </div>
               </PopoverContent>
@@ -561,20 +562,20 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                 {messages.map((msg, idx) => {
                   // Date separator
                   const showDate =
-                    mounted && (idx === 0 ||
+                    idx === 0 ||
                     formatDate(msg.created_at) !==
-                    formatDate(messages[idx - 1].created_at))
+                    formatDate(messages[idx - 1].created_at)
 
                   return (
                     <div key={msg.id}>
                       {showDate && (
                         <div className="flex items-center justify-center my-4">
                           <span className="text-[10px] text-muted-foreground bg-muted/50 px-3 py-1 rounded-full font-medium">
-                            {mounted ? safeFormatDate(msg.created_at, { day: "numeric", month: "short" }) : ""}
+                            {formatDate(msg.created_at)}
                           </span>
                         </div>
                       )}
-                      <MessageBubble msg={msg} mounted={mounted} />
+                      <MessageBubble msg={msg} />
                     </div>
                   )
                 })}
@@ -747,8 +748,8 @@ function MediaContent({ msg }: { msg: WAMessage }) {
 // Message Bubble
 // =============================================
 
- function MessageBubble({ msg, mounted }: { msg: WAMessage, mounted: boolean }) {
-  const time = mounted ? safeFormatTime(msg.created_at) : ""
+function MessageBubble({ msg }: { msg: WAMessage }) {
+  const time = formatTime(msg.created_at)
   const isMedia = ['image', 'video', 'audio', 'document'].includes(msg.message_type || '')
 
   if (msg.role === "lead") {
