@@ -35,6 +35,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 
@@ -444,6 +451,31 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
               />
             </div>
 
+            {/* Info button (Sheet) */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-accent"
+                  title="Información del contacto"
+                >
+                  <Info className="w-5 h-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent className="w-full sm:max-w-[450px] p-0 overflow-hidden flex flex-col">
+                <SheetHeader className="p-4 border-b">
+                  <SheetTitle className="text-sm font-bold flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Información del Lead
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="flex-1 overflow-y-auto">
+                  <LeadTraceability conversation={conv} messages={messages} onDeleteChat={onDeleteChat} />
+                </div>
+              </SheetContent>
+            </Sheet>
+
             {/* Close chat button (Desktop) */}
             {onBack && (
               <Button
@@ -667,21 +699,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
               </div>
             </div>
           )}
-        </div></div>
-
-      {/* ====== INFO COLUMN (LeadTraceability) ====== */}
-      <div className={`lg:w-[280px] lg:min-w-[280px] xl:w-[320px] xl:min-w-[320px] bg-card/30 flex-col h-full overflow-y-auto border-l lg:flex ${activeTab === 'chat' ? 'hidden' : 'flex flex-1 w-full min-w-0'}`}>
-        {/* Mobile info header */}
-        <div className="lg:hidden flex-shrink-0 px-4 py-3 border-b bg-card/50 flex flex-row items-center justify-between sticky top-0 z-10">
-          <span className="font-semibold text-sm flex items-center gap-2"><Info className="w-4 h-4 text-accent" /> Info del Lead</span>
-          <Button variant="ghost" size="sm" onClick={() => setActiveTab('chat')} className="h-8">
-            <ArrowLeft className="w-4 h-4 mr-1" />
-            Volver al chat
-          </Button>
         </div>
-        <ScrollArea className="flex-1">
-          <LeadTraceability conversation={conv} messages={messages} onDeleteChat={onDeleteChat} />
-        </ScrollArea>
       </div>
     </div>
   )
