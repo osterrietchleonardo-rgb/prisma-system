@@ -11,7 +11,8 @@ import {
   User,
   CheckCircle2,
   Clock3,
-  CalendarPlus
+  CalendarPlus,
+  ChevronDown
 } from "lucide-react"
 import { NewVisitDialog } from "@/components/calendar/NewVisitDialog"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,13 @@ import {
   DialogTrigger 
 } from "@/components/ui/dialog"
 import { 
+  Popover, 
+  PopoverContent, 
+  PopoverTrigger 
+} from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { DateRange } from "react-day-picker"
+import { 
   addMonths, 
   subMonths, 
   format, 
@@ -35,7 +43,9 @@ import {
   eachDayOfInterval, 
   isSameMonth, 
   isSameDay, 
-  parseISO
+  parseISO,
+  startOfDay,
+  endOfDay
 } from "date-fns"
 import { es } from "date-fns/locale"
 import { createClient } from "@/lib/supabase"
@@ -48,6 +58,7 @@ export default function AsesorCalendarioPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [agencyId, setAgencyId] = useState<string | null>(null)
   const [isNewVisitOpen, setIsNewVisitOpen] = useState(false)
+  const [date, setDate] = useState<DateRange | undefined>()
   
   const supabase = createClient()
 
@@ -77,12 +88,12 @@ export default function AsesorCalendarioPage() {
       fetchData()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentDate, userId])
+  }, [currentDate, userId, date])
 
   const fetchData = async () => {
     try {
-      const start = startOfMonth(currentDate)
-      const end = endOfMonth(currentDate)
+      const start = date?.from ? startOfDay(date.from) : startOfMonth(currentDate)
+      const end = date?.to ? endOfDay(date.to) : (date?.from ? endOfDay(date.from) : endOfMonth(currentDate))
       
       const { data, error } = await supabase
         .from("scheduled_visits")
@@ -149,15 +160,68 @@ export default function AsesorCalendarioPage() {
 
       <Card className="border-accent/10 bg-card/30 backdrop-blur-md shadow-2xl overflow-hidden">
         {/* Calendar Header */}
-        <div className="p-4 flex items-center justify-between border-b border-accent/10 bg-accent/5">
-          <div className="flex items-center gap-4">
-             <h3 className="text-xl font-black capitalize text-foreground min-w-[150px]">
-               {format(currentDate, "MMMM yyyy", { locale: es })}
-             </h3>
-             <div className="flex bg-background/50 rounded-lg p-1 border border-accent/10">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={prevMonth}><ChevronLeft className="h-4 w-4" /></Button>
-                <Button variant="ghost" className="h-8 text-xs font-bold" onClick={() => setCurrentDate(new Date())}>Hoy</Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={nextMonth}><ChevronRight className="h-4 w-4" /></Button>
+        <div className="p-4 flex flex-wrap items-center justify-between border-b border-accent/10 bg-accent/5 gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+             <Popover>
+               <PopoverTrigger asChild>
+                 <Button variant="ghost" className="p-0 hover:bg-transparent h-auto group">
+                   <h3 className="text-xl font-black capitalize text-foreground min-w-[150px] flex items-center gap-2 group-hover:text-accent transition-colors">
+                     {date?.from ? (
+                        date.to ? (
+                          `${format(date.from, "dd MMM")} - ${format(date.to, "dd MMM")}`
+                        ) : (
+                          format(date.from, "dd MMM yyyy", { locale: es })
+                        )
+                     ) : (
+                        format(currentDate, "MMMM yyyy", { locale: es })
+                     )}
+                     <ChevronDown className="h-4 w-4 opacity-50 group-hover:opacity-100 group-hover:text-accent transition-all" />
+                   </h3>
+                 </Button>
+               </PopoverTrigger>
+               <PopoverContent className="w-auto p-0 border-accent/20 shadow-2xl" align="start">
+                  <Calendar
+                    initialFocus
+                    mode="range"
+                    defaultMonth={date?.from || currentDate}
+                    selected={date}
+                    onSelect={(newDate) => {
+                      setDate(newDate)
+                      if (newDate?.from) {
+                        setCurrentDate(newDate.from)
+                      }
+                    }}
+                    numberOfMonths={1}
+                    locale={es}
+                    className="bg-card"
+                  />
+                  <div className="p-3 border-t border-accent/10 flex justify-between bg-accent/5">
+                     <Button variant="ghost" size="sm" className="text-xs hover:bg-red-500/10 hover:text-red-500" onClick={() => {
+                        setDate(undefined)
+                        setCurrentDate(new Date())
+                     }}>Limpiar</Button>
+                     <Button variant="outline" size="sm" className="text-xs bg-background border-accent/20" onClick={() => {
+                       const today = new Date();
+                       setDate({from: today, to: today})
+                       setCurrentDate(today)
+                     }}>Hoy</Button>
+                  </div>
+               </PopoverContent>
+             </Popover>
+
+             <div className="flex bg-background/50 rounded-lg p-1 border border-accent/10 shadow-sm">
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-accent/10" onClick={() => {
+                  prevMonth()
+                  setDate(undefined)
+                }}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="ghost" className="h-8 text-xs font-bold hover:bg-accent/10" onClick={() => {
+                  setCurrentDate(new Date())
+                  setDate(undefined)
+                }}>Hoy</Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-accent/10" onClick={() => {
+                  nextMonth()
+                  setDate(undefined)
+                }}><ChevronRight className="h-4 w-4" /></Button>
              </div>
           </div>
           <div className="flex items-center gap-2">
