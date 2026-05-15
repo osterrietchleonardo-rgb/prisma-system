@@ -163,8 +163,7 @@ export async function GET(req: NextRequest) {
   const sessionId = searchParams.get("sessionId")
 
   try {
-    const { data: { session: authSession } } = await supabase.auth.getSession()
-    if (!authSession) return NextResponse.json({ error: "No autorizado" }, { status: 401 })
+    const { userId } = await requireTenant();
 
     if (sessionId) {
       // Get messages for a session
@@ -177,7 +176,7 @@ export async function GET(req: NextRequest) {
       if (error) throw error
       return NextResponse.json({ messages })
     } else {
-      // Get all sessions
+      // Get all sessions for the current user
       const { data: sessions, error } = await supabase
         .from("tutor_chat_sessions")
         .select("*")
@@ -189,6 +188,7 @@ export async function GET(req: NextRequest) {
     }
 
   } catch (error: any) {
+    console.error("Tutor IA GET Error:", error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

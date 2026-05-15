@@ -96,18 +96,18 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole, aiCr
           
           <div className="flex flex-col">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Panel</span>
-            <span className="text-base md:text-sm font-semibold truncate max-w-[200px]">{pageTitle}</span>
+            <span className="text-base md:text-sm font-semibold truncate max-w-[120px] sm:max-w-[200px]">{pageTitle}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-4">
           <Button 
             variant="ghost" 
             size="icon" 
-            className="text-muted-foreground hidden sm:flex h-10 w-10 hover:text-accent transition-colors"
+            className="text-muted-foreground flex h-9 w-9 sm:h-10 sm:w-10 hover:text-accent transition-colors"
             onClick={() => setSearchOpen(true)}
           >
-            <Search className="h-5 w-5" />
+            <Search className="h-4 w-4 sm:h-5 sm:w-5" />
           </Button>
           
           <NotificationPopover />
@@ -118,9 +118,9 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole, aiCr
             <TooltipProvider delayDuration={100}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/5 border border-accent/10 hover:bg-accent/10 transition-colors cursor-default select-none">
-                    <Sparkles className={`w-4 h-4 ${isCreditsDanger ? 'text-destructive' : isCreditsWarning ? 'text-yellow-500' : 'text-accent'}`} />
-                    <span className="text-xs font-semibold text-muted-foreground">
+                  <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-accent/5 border border-accent/10 hover:bg-accent/10 transition-colors cursor-default select-none">
+                    <Sparkles className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isCreditsDanger ? 'text-destructive' : isCreditsWarning ? 'text-yellow-500' : 'text-accent'}`} />
+                    <span className="text-[10px] sm:text-xs font-semibold text-muted-foreground">
                       {remainingCredits.toLocaleString()} <span className="hidden sm:inline">créditos</span>
                     </span>
                   </div>
@@ -145,7 +145,7 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole, aiCr
             </TooltipProvider>
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3">
             <ModeToggle />
             <UserNav userName={userName} userEmail={userEmail} userRole={userRole} />
           </div>
