@@ -58,8 +58,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
     convRef.current = conversations
   }, [conversations])
 
-  /* 
-  // EFECTO COMENTADO PARA DIAGNÓSTICO
+  // Initial load & Polling
   useEffect(() => {
     const supabase = createClient()
 
@@ -67,17 +66,16 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       try {
         const { data, error } = await supabase
           .from("wa_conversations")
-          .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
+          .select("*")
           .eq("instance_id", instance.id)
           .order("last_message_at", { ascending: false })
 
         if (error) {
-          console.error("Error loading conversations with agents:", error)
+          console.error("Error loading conversations:", error)
           setDebugError(error.message)
         }
         
         if (data) {
-          console.log("Loaded conversations:", data.length, "First item assigned_agent:", (data[0] as any)?.assigned_agent)
           setConversations(data as any[])
         }
         setLoading(false)
@@ -188,7 +186,6 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       supabase.removeChannel(broadcastChannel)
     }
   }, [instance.id, instance.agency_id])
-  */
 
   const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
     e.stopPropagation();
@@ -263,7 +260,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             const supabase = createClient()
             supabase
               .from("wa_conversations")
-              .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
+              .select("*")
               .eq("instance_id", instance.id)
               .order("last_message_at", { ascending: false })
               .then(({ data, error }) => {
