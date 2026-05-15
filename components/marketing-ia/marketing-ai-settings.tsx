@@ -77,22 +77,20 @@ export function MarketingAiSettings() {
 
     setIsUploading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error("No hay sesión activa")
+      const formData = new FormData()
+      formData.append('file', file)
 
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${user.id}/branding/logo_${Date.now()}.${fileExt}`
+      const res = await fetch('/api/marketing-ia/settings/upload-logo', {
+        method: 'POST',
+        body: formData
+      })
 
-      const { data, error } = await supabase.storage
-        .from('marketing-images')
-        .upload(fileName, file)
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || "Error al subir logo")
+      }
 
-      if (error) throw error
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('marketing-images')
-        .getPublicUrl(fileName)
-
+      const { publicUrl } = await res.json()
       setConfig(prev => ({ ...prev, logo_url: publicUrl }))
       toast.success("Logo subido correctamente")
     } catch (error: any) {

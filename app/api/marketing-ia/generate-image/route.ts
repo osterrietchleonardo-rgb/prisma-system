@@ -87,6 +87,8 @@ export async function POST(req: Request) {
     const payload: GenerateImagePayload = await req.json();
     const { userId, agencyId } = await requireTenant();
     const supabase = await createClient();
+    const supabaseAdmin = createAdminClient();
+    
     // Fetch agency branding configuration
     const { data: agency } = await supabaseAdmin
       .from("agencies")
