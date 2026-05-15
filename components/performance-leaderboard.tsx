@@ -70,7 +70,7 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
   );
 
   return (
-    <Card className="performance-leaderboard-container border-accent/10 bg-card/30 backdrop-blur-sm overflow-hidden shadow-2xl">
+    <Card className="performance-leaderboard-container border-accent/10 bg-card/30 backdrop-blur-sm overflow-hidden shadow-2xl w-full">
       <CardHeader className="border-b border-accent/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -85,11 +85,11 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="overflow-x-auto scrollbar-hide">
+        <div className="overflow-x-auto w-full">
           <table className="w-full text-sm text-left min-w-[1000px]">
             <thead className="bg-muted/30 text-muted-foreground/70 border-b border-accent/5">
               <tr>
-                <th className="px-6 py-4 font-bold min-w-[200px]">Asesor</th>
+                <th className="px-6 py-4 font-bold min-w-[200px] sticky left-0 bg-muted/95 backdrop-blur-md z-20 border-r border-accent/10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]">Asesor</th>
                 <MetricHeader icon={MessageSquare} label="Chats" tooltip="WhatsApp Recibidos" />
                 <MetricHeader icon={TrendingUp} label="Prosp." tooltip="Prospección Activa" />
                 <MetricHeader icon={FileText} label="Tasac." tooltip="Tasaciones Realizadas" />
@@ -106,7 +106,7 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
             <tbody className="divide-y divide-accent/5">
               {sortedAdvisors.map((advisor, index) => (
                 <tr key={advisor.id} className="group hover:bg-accent/5 transition-all duration-200">
-                  <td className="px-6 py-4 sticky left-0 bg-card/80 backdrop-blur-md z-10">
+                  <td className="px-6 py-4 sticky left-0 bg-card/95 backdrop-blur-md z-10 border-r border-accent/10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-accent/10 flex items-center justify-center text-[10px] font-bold text-accent ring-1 ring-accent/20">
                         {advisor.name.split(' ').map(n => n[0]).join('')}

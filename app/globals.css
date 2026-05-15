@@ -125,25 +125,10 @@
     }
 
     /* --- DASHBOARD FIXES --- */
-    #dashboard-content .ml-auto.flex.items-center.gap-4 {
-        margin-left: 0;
-        width: 100%;
-        justify-content: space-between;
-    }
+    /* Handled via responsive tailwind classes in components */
 
-    /* Fix "Limpiar filtros" button overflow */
-    #dashboard-content button.text-xs.text-accent.font-semibold {
-        font-size: 10px !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-        height: 2rem !important;
-    }
-
-    /* Ranking de asesores table scroll */
-    [data-testid="performance-leaderboard"], 
     .performance-leaderboard-container {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch;
+        overflow: hidden !important;
     }
 
     /* --- TRACKING PERFORMANCE FIXES --- */
@@ -237,13 +222,13 @@
   @media (max-width: 767px) {
     /* --- TABLAS RESPONSIVE --- */
     /* Envolver la tabla en scroll horizontal */
-    table.min-w-\[1000px\] {
+    /* table.min-w-[1000px] {
       display: block;
       width: 100%;
       overflow-x: auto;
       white-space: nowrap;
       -webkit-overflow-scrolling: touch;
-    }
+    } */
 
     /* --- DRAG & DROP / KANBAN BOARD --- */
     /* Limitar un poco el ancho de las tarjetas pero mantener estructura */

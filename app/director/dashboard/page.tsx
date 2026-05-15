@@ -90,16 +90,20 @@ export default async function DashboardPage({
       </div>
 
       {/* Filters Bar at the TOP */}
-      <div className="flex flex-col gap-4 p-4 rounded-xl border border-accent/10 bg-card/30 backdrop-blur-sm sm:flex-row sm:items-center">
-        <AdvisorFilter advisors={dashboardData.advisors.map(a => ({ id: a.id, name: a.name }))} />
+      <div className="flex flex-col gap-6 p-4 rounded-xl border border-accent/10 bg-card/30 backdrop-blur-sm sm:flex-row sm:items-end md:items-center">
+        <div className="flex-1 w-full">
+          <AdvisorFilter advisors={dashboardData.advisors.map(a => ({ id: a.id, name: a.name }))} />
+        </div>
         
-        <div className="ml-auto flex items-center gap-4">
-          <DatePeriodFilter />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+          <div className="flex-1 sm:flex-initial">
+            <DatePeriodFilter />
+          </div>
           
           <Button 
             variant="ghost" 
             size="sm" 
-            className="text-xs text-accent font-semibold hover:bg-accent/10"
+            className="text-xs text-accent font-semibold hover:bg-accent/10 h-10 sm:h-9 border border-accent/10 sm:border-none"
             asChild
           >
             <a href="?">Limpiar Filtros</a>
@@ -115,7 +119,7 @@ export default async function DashboardPage({
       />
 
       <div className="grid gap-6 lg:grid-cols-7">
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-7 w-full overflow-hidden">
           <PerformanceLeaderboard advisors={dashboardData.advisors} />
         </div>
       </div>

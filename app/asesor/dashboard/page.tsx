@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import Link from "next/link"
 import { getDashboardData } from "@/lib/queries/dashboard"
 import { PerformanceKpis } from "@/components/performance-kpis"
 import { PerformanceLeaderboard } from "@/components/performance-leaderboard"
@@ -96,7 +97,7 @@ export default async function AsesorDashboardPage() {
           </Card>
         </div>
 
-        <div className="lg:col-span-3 space-y-8">
+        <div className="lg:col-span-3 space-y-8 overflow-hidden">
           <PerformanceLeaderboard advisors={dashboardData.advisors} />
           
           {/* Quick Links */}

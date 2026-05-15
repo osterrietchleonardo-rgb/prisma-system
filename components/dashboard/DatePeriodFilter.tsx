@@ -101,7 +101,7 @@ export function DatePeriodFilter({ className }: React.HTMLAttributes<HTMLDivElem
             id="date"
             variant={"outline"}
             className={cn(
-              "w-[280px] justify-start text-left font-normal bg-background/50 backdrop-blur-sm border-accent/20 h-9",
+              "w-full sm:w-[280px] justify-start text-left font-normal bg-background/50 backdrop-blur-sm border-accent/20 h-10 sm:h-9",
               !date && "text-muted-foreground"
             )}
           >
