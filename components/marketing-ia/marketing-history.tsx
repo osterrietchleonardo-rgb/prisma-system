@@ -366,21 +366,21 @@ export function MarketingHistory() {
           setEditContent(null)
         }
       }}>
-        <DialogContent className="max-w-4xl w-[95vw] md:w-[90vw] max-h-[92vh] overflow-y-auto border-accent/20 p-3 md:p-8">
-          <DialogHeader>
-            <DialogTitle className="text-xl md:text-2xl font-black flex items-center gap-2 md:gap-3">
-              <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-accent" />
+        <DialogContent className="max-w-4xl w-[calc(100%-1rem)] md:w-[90vw] max-h-[92vh] overflow-y-auto border-accent/20 p-4 md:p-8">
+          <DialogHeader className="w-full overflow-hidden">
+            <DialogTitle className="text-xl md:text-2xl font-black flex items-center gap-2 md:gap-3 break-words">
+              <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-accent shrink-0" />
               Conjunto de Variantes 
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="break-words">
               Generado el {selectedGroup ? formatDateSafe(selectedGroup.created_at) : ''}
             </DialogDescription>
           </DialogHeader>
 
           {selectedGroup && (
-            <div className="space-y-4 py-4">
+            <div className="space-y-4 py-4 w-full overflow-hidden">
               {/* TABS FOR VARIANTS */}
-              <div className="flex gap-2 overflow-x-auto pb-2 border-b border-accent/10">
+              <div className="flex gap-2 overflow-x-auto pb-2 border-b border-accent/10 scrollbar-none">
                 {selectedGroup.variants.map((v, i) => (
                   <Button 
                     key={v.id} 
@@ -397,9 +397,9 @@ export function MarketingHistory() {
               </div>
 
               {selectedGroup.variants[activeVariantIndex] && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in fade-in zoom-in-95 duration-300">
-                  <div className="space-y-4">
-                    <div className="aspect-auto h-[250px] md:h-[500px] w-full bg-muted rounded-xl md:rounded-3xl overflow-hidden shadow-lg md:shadow-2xl relative border border-accent/10">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in fade-in zoom-in-95 duration-300 w-full">
+                  <div className="space-y-4 min-w-0 w-full">
+                    <div className="aspect-auto h-[250px] md:h-[500px] w-full bg-muted rounded-xl md:rounded-3xl overflow-hidden shadow-lg md:shadow-2xl relative border border-accent/10 shrink-0">
                       {selectedGroup.variants[activeVariantIndex].public_url ? (
                         <img 
                           src={selectedGroup.variants[activeVariantIndex].public_url} 
@@ -422,7 +422,9 @@ export function MarketingHistory() {
                     </div>
                   </div>
 
-                  <div className="space-y-6 flex flex-col">
+                  </div>
+ 
+                  <div className="space-y-6 flex flex-col min-w-0 w-full">
                     <div className="flex justify-between items-center bg-accent/5 p-3 rounded-xl border border-accent/10">
                        <div>
                           <p className="text-[10px] font-bold text-accent uppercase">Formato</p>
@@ -436,8 +438,8 @@ export function MarketingHistory() {
                        </div>
                     </div>
 
-                    <div className="flex-1 min-h-0">
-                        <div className="bg-muted/30 p-4 md:p-6 rounded-xl md:rounded-2xl border border-muted space-y-4">
+                    <div className="flex-1 min-w-0 w-full">
+                        <div className="bg-muted/30 p-4 md:p-6 rounded-xl md:rounded-2xl border border-muted space-y-4 w-full overflow-hidden">
                           {selectedGroup.variants[activeVariantIndex].copy_type === 'video' ? (
                             ['hook', 'problema', 'agitacion', 'solucion', 'cta'].map(field => (
                               <div key={field} className="space-y-1">
@@ -449,7 +451,7 @@ export function MarketingHistory() {
                                       className="w-full bg-background border rounded-lg p-2 text-sm min-h-[60px]"
                                     />
                                   ) : (
-                                    <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">{renderText(selectedGroup.variants[activeVariantIndex].content?.[field])}</p>
+                                    <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words w-full overflow-hidden">{renderText(selectedGroup.variants[activeVariantIndex].content?.[field])}</p>
                                   )}
                               </div>
                             ))
@@ -466,7 +468,7 @@ export function MarketingHistory() {
                                       className="w-full bg-background border rounded-lg p-2 text-sm min-h-[80px]"
                                     />
                                   ) : (
-                                    <p className={cn("text-sm leading-relaxed whitespace-pre-wrap break-words", field === 'hook' || field === 'cta' ? "font-bold text-foreground" : "text-muted-foreground")}>
+                                    <p className={cn("text-sm leading-relaxed whitespace-pre-wrap break-words w-full overflow-hidden", field === 'hook' || field === 'cta' ? "font-bold text-foreground" : "text-muted-foreground")}>
                                       {renderText(selectedGroup.variants[activeVariantIndex].content?.[field] || selectedGroup.variants[activeVariantIndex].content?.['body'])} 
                                     </p>
                                   )}
