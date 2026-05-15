@@ -66,12 +66,12 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       try {
         const { data, error } = await supabase
           .from("wa_conversations")
-          .select("*")
+          .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
           .eq("instance_id", instance.id)
           .order("last_message_at", { ascending: false })
 
         if (error) {
-          console.error("Error loading conversations:", error)
+          console.error("Error loading conversations with agents:", error)
           setDebugError(error.message)
         }
         
@@ -92,7 +92,8 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       load()
     }, 5 * 1000)
 
-    // Realtime subscription
+    /*
+    // Realtime subscription COMENTADA PARA DIAGNÓSTICO
     const channel = supabase
       .channel(`wa_conversations:instance_id=eq.${instance.id}`)
       .on(
@@ -107,22 +108,18 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
           if (payload.eventType === "INSERT") {
             const newItem = payload.new as WAConversation
             
-            // Si inserta una nueva y no es la activa, notificar
             if (activeIdRef.current !== newItem.id) {
               toast.info(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
             } else {
-              // Si la recibimos mientras la tenemos activa, la marcamos como leida auto
               markConversationRead(newItem.id)
             }
             
             setConversations((prev) => {
-              // Prevenir duplicados visuales en RT
               if (prev.some(c => c.id === newItem.id)) return prev;
 
               const unshiftList = [newItem, ...prev];
               unshiftList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
               
-              // Filter by contact_phone to deduplicate orphaned duplicates
               return unshiftList.filter((c, index, self) => 
                 index === self.findIndex((t) => t.contact_phone === c.contact_phone)
               );
@@ -132,32 +129,25 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             const prev = convRef.current
             const oldItem = prev.find((c) => c.id === updatedItem.id)
 
-            // Detectamos si es un mensaje de lead comprobando si cambió el last_inbound_at
-            // Si el item no estaba cargado (no estaba en los primeros 50), asumimos que si last_inbound_at 
-            // es muy reciente (hace menos de 10 seg), debe ser nuevo, para poder lanzar el toast igual.
             let isInbound = false;
             if (oldItem) {
               isInbound = !!oldItem.last_inbound_at && !!updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
             } else if (updatedItem.last_inbound_at) {
                const diff = Date.now() - new Date(updatedItem.last_inbound_at).getTime();
-               isInbound = diff < 10000; // Recibido en los ultimos 10 segundos
+               isInbound = diff < 10000;
             }
 
             if (isInbound && activeIdRef.current !== updatedItem.id) {
               toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
             } else if (isInbound && activeIdRef.current === updatedItem.id && updatedItem.unread_count > 0) {
-               // Si estamos viendo el chat y entra mensaje nuevo, lo marcamos leído localmente y en BD
                updatedItem.unread_count = 0
                markConversationRead(updatedItem.id)
             }
 
               setConversations((currentPrev) => {
                 const existingItem = currentPrev.find((c) => c.id === updatedItem.id)
-                // Preservar el objeto agent unido si existía en el estado local
                 const mergedItem = existingItem ? { ...existingItem, ...updatedItem } : updatedItem;
-                
                 const otherConversations = currentPrev.filter((c) => c.id !== updatedItem.id)
-                // Siempre al principio en el UPDATE (last message moved it)
                 return [mergedItem, ...otherConversations]
               })
           } else if (payload.eventType === "DELETE") {
@@ -179,11 +169,12 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
         }
       )
       .subscribe()
+    */
 
     return () => {
       clearInterval(interval)
-      supabase.removeChannel(channel)
-      supabase.removeChannel(broadcastChannel)
+      // supabase.removeChannel(channel)
+      // supabase.removeChannel(broadcastChannel)
     }
   }, [instance.id, instance.agency_id])
 
@@ -260,7 +251,7 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             const supabase = createClient()
             supabase
               .from("wa_conversations")
-              .select("*")
+              .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
               .eq("instance_id", instance.id)
               .order("last_message_at", { ascending: false })
               .then(({ data, error }) => {
