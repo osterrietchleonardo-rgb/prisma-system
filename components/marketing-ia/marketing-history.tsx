@@ -422,8 +422,6 @@ export function MarketingHistory() {
                     </div>
                   </div>
 
-                  </div>
- 
                   <div className="space-y-6 flex flex-col min-w-0 w-full">
                     <div className="flex justify-between items-center bg-accent/5 p-3 rounded-xl border border-accent/10">
                        <div>
