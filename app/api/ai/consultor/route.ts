@@ -226,21 +226,25 @@ export async function DELETE(req: Request) {
   const sessionId = searchParams.get('sessionId');
   if (!sessionId) return NextResponse.json({ error: "SessionId required" }, { status: 400 });
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { userId } = await requireTenant();
+    const supabase = await createClient();
 
-  // First delete messages if there's no cascade
-  await supabase.from('consultor_chat_messages').delete().eq('session_id', sessionId);
-  
-  const { error } = await supabase
-    .from('consultor_chat_sessions')
-    .delete()
-    .eq('id', sessionId)
-    .eq('user_id', userId);
+    // First delete messages if there's no cascade
+    await supabase.from('consultor_chat_messages').delete().eq('session_id', sessionId);
+    
+    const { error } = await supabase
+      .from('consultor_chat_sessions')
+      .delete()
+      .eq('id', sessionId)
+      .eq('user_id', userId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting session:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: Request) {
