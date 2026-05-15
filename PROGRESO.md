@@ -73,6 +73,7 @@
     - Implementada validación de soporte nativo: `typeof window !== 'undefined' && 'WebSocket' in window`.
     - Envoltorio de seguridad `try/catch` en la inicialización de canales para prevenir que fallos de red o de socket bloqueen el hilo principal de ejecución.
     - Garantizado el fallback a **Polling (setInterval)**: El sistema sigue cargando y actualizando datos cada 5 segundos incluso si el Realtime no puede inicializarse.
+  - **Extensión a Interfaz de Chat (Confirmado)**: Se aplicó el mismo blindaje en `ActiveChat.tsx`, eliminando definitivamente la pantalla blanca que ocurría al abrir historiales de mensajes en móviles.
   - **Estabilización de Layout**: Reemplazado `ScrollArea` (Radix) por scroll nativo y ajustadas alturas flexibles (`flex-1 min-h-0`) para prevenir colapsos de contenedor en dispositivos móviles.
   - **Restauración de Funcionalidad**: El sistema mantiene todas las características avanzadas (Joins de asesores, Tabs, Selects) operativas en escritorio y estables en móvil.
 
