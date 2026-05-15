@@ -24,7 +24,8 @@ export default function ForgotPasswordPage() {
     const email = formData.get("email") as string
 
     try {
-      const result = await resetPassword(email)
+      const origin = window.location.origin
+      const result = await resetPassword(email, origin)
       if (result.error) {
         setError(result.error)
       } else {
@@ -56,13 +57,19 @@ export default function ForgotPasswordPage() {
         </CardHeader>
         <CardContent>
           {success ? (
-            <div className="text-center space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Si existe una cuenta asociada a este email, recibirás instrucciones en unos momentos.
+            <div className="text-center space-y-4 bg-accent/5 p-6 rounded-2xl border border-accent/20 animate-in fade-in zoom-in duration-300">
+              <div className="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-2">
+                <Mail className="w-6 h-6 text-accent" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground">¡Email Enviado!</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Revisá tu casilla de correo (y la carpeta de spam). Te enviamos un enlace seguro para restablecer tu contraseña y poder avanzar.
               </p>
-              <Button asChild variant="outline" className="w-full border-accent/20 hover:bg-accent/5">
-                <Link href="/auth/login">Volver al login</Link>
-              </Button>
+              <div className="pt-2">
+                <Button asChild variant="outline" className="w-full border-accent/20 hover:bg-accent/10">
+                  <Link href="/auth/login">Volver al login</Link>
+                </Button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="grid gap-4">

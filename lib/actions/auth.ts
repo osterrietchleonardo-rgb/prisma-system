@@ -205,11 +205,13 @@ export async function logout() {
   redirect("/auth/login")
 }
 
-export async function resetPassword(email: string) {
+export async function resetPassword(email: string, origin?: string) {
   try {
     const supabase = createClient()
+    const baseUrl = origin || process.env.NEXT_PUBLIC_APP_URL || 'https://prisma.vakdor.com'
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/auth/reset-password`,
+      redirectTo: `${baseUrl}/auth/callback?next=/auth/reset-password`,
     })
 
     if (error) return { error: getFriendlyErrorMessage(error.message) }
