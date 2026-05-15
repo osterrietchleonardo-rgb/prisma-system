@@ -66,6 +66,16 @@
 
 ## 🔄 ENTRADAS DE PROGRESO
 
+### 2026-05-14 | UI/UX — Mobile WhatsApp Rendering Failure (Resolved)
+- **WhatsApp IA — Diagnóstico de Pantalla Blanca en Móvil**:
+  - **Identificación del Bloqueo**: Se aisló el error mediante pruebas de exclusión, confirmando que las suscripciones **Supabase Realtime (WebSockets)** provocaban un cuelgue silencioso del renderizado en navegadores móviles (Safari/iOS).
+  - **Fix de Resiliencia Realtime**: 
+    - Implementada validación de soporte nativo: `typeof window !== 'undefined' && 'WebSocket' in window`.
+    - Envoltorio de seguridad `try/catch` en la inicialización de canales para prevenir que fallos de red o de socket bloqueen el hilo principal de ejecución.
+    - Garantizado el fallback a **Polling (setInterval)**: El sistema sigue cargando y actualizando datos cada 5 segundos incluso si el Realtime no puede inicializarse.
+  - **Estabilización de Layout**: Reemplazado `ScrollArea` (Radix) por scroll nativo y ajustadas alturas flexibles (`flex-1 min-h-0`) para prevenir colapsos de contenedor en dispositivos móviles.
+  - **Restauración de Funcionalidad**: El sistema mantiene todas las características avanzadas (Joins de asesores, Tabs, Selects) operativas en escritorio y estables en móvil.
+
 ### 2026-05-14 | UI/UX — Mobile Stabilization & Ultra-Defensive Hardening (Final)
 - **WhatsApp IA — Estabilización Crítica iPhone/Safari**:
   - **Hardening de Fechas**: Implementado `try/catch` y validación `isNaN` en todos los componentes de WhatsApp (`ActiveChat`, `ConversationsList`, `LeadTraceability`) para evitar crashes por fechas malformadas o falta de locale en móviles.
