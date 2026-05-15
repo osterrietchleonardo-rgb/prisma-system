@@ -70,14 +70,26 @@ export const analyzeChat = async (history: string) => {
   return response.text();
 };
 
-export const generateImage = async (prompt: string, quality: 'standard' | 'pro' = 'standard') => {
+export const generateImage = async (prompt: string, quality: 'standard' | 'pro' = 'standard', images: { data: Buffer, mimeType: string }[] = []) => {
   const modelId = quality === 'pro' ? "gemini-3-pro-image-preview" : "gemini-3.1-flash-image-preview";
   const model = genAI.getGenerativeModel({ 
     model: modelId,
   });
 
+  const parts: any[] = [{ text: prompt }];
+  
+  // Add image parts if provided
+  images.forEach(img => {
+    parts.push({
+      inlineData: {
+        data: img.data.toString("base64"),
+        mimeType: img.mimeType
+      }
+    });
+  });
+
   const result = await model.generateContent({
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: [{ role: "user", parts }],
     generationConfig: {
       // @ts-ignore - Image generation modalities for 2026 models
       responseModalities: ["IMAGE"],
@@ -85,7 +97,6 @@ export const generateImage = async (prompt: string, quality: 'standard' | 'pro' 
   });
 
   const response = await result.response;
-  // The response for image modality contains the image data in the parts
   const candidate = response.candidates?.[0];
   const imagePart = candidate?.content.parts.find(p => p.inlineData?.mimeType.startsWith("image/"));
   

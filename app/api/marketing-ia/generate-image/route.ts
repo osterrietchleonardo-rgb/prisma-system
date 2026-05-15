@@ -19,7 +19,10 @@ const buildImagePrompt = (payload: GenerateImagePayload, branding?: any): string
       : '';
     
     const logo = branding.logo_url 
-      ? `INCORPORACIÓN DE LOGO: Hay un logo institucional que debe simularse o reservarse espacio en la posición: ${branding.logo_position}. El tamaño debe ser ${branding.logo_size}.`
+      ? `INCORPORACIÓN DE LOGO: Se ha adjuntado una imagen del logo real de la inmobiliaria. ES OBLIGATORIO integrar EXACTAMENTE este logo en la imagen generada, respetando sus colores y diseño. 
+Posición deseada: ${branding.logo_position}
+Tamaño deseado: ${branding.logo_size}
+Asegurate de que el logo se vea nítido y profesional, como una superposición de marca real.`
       : '';
     
     const fonts = {
@@ -107,8 +110,25 @@ export async function POST(req: Request) {
     
     let imageBuffer: Buffer;
     try {
+      const imageParts: { data: Buffer, mimeType: string }[] = [];
+      
+      // If there's a logo, fetch it and add as reference
+      if (agency?.marketing_ai_config?.logo_url) {
+        try {
+          const logoRes = await fetch(agency.marketing_ai_config.logo_url);
+          if (logoRes.ok) {
+            const logoBuffer = Buffer.from(await logoRes.arrayBuffer());
+            const contentType = logoRes.headers.get('content-type') || 'image/png';
+            imageParts.push({ data: logoBuffer, mimeType: contentType });
+            console.log('[DEBUG] Logo added as reference image part');
+          }
+        } catch (logoFetchError) {
+          console.error("Error fetching logo for prompt reference:", logoFetchError);
+        }
+      }
+
       // Use Nano Banana 2 (Standard/Flash) for efficiency or Pro for higher quality
-      imageBuffer = await generateImage(finalPrompt, 'pro');
+      imageBuffer = await generateImage(finalPrompt, 'pro', imageParts);
     } catch (apiError: any) {
       console.error("Gemini Image Generation Error:", apiError);
       
