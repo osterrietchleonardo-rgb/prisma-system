@@ -134,61 +134,70 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     load()
 
     // Realtime subscription for ALL changes in this conversation's messages
-    const channel = supabase
-      .channel(`chat_messages_${conv.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
-          schema: "public",
-          table: "wa_messages",
-          filter: `conversation_id=eq.${conv.id}`,
-        },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            const newMsg = payload.new as WAMessage
-            setMessages((prev) => {
-              // Dedup
-              if (prev.some((m) => m.id === newMsg.id)) return prev
-              return [...prev, newMsg]
-            })
+    let channel: any = null;
+    let broadcastChannel: any = null;
 
-            // Auto-scroll if near bottom
-            if (shouldAutoScroll.current) {
-              setTimeout(() => {
-                bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-              }, 50)
+    if (typeof window !== 'undefined' && 'WebSocket' in window) {
+      try {
+        channel = supabase
+          .channel(`chat_messages_${conv.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
+              schema: "public",
+              table: "wa_messages",
+              filter: `conversation_id=eq.${conv.id}`,
+            },
+            (payload) => {
+              if (payload.eventType === "INSERT") {
+                const newMsg = payload.new as WAMessage
+                setMessages((prev) => {
+                  // Dedup
+                  if (prev.some((m) => m.id === newMsg.id)) return prev
+                  return [...prev, newMsg]
+                })
+
+                // Auto-scroll if near bottom
+                if (shouldAutoScroll.current) {
+                  setTimeout(() => {
+                    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+                  }, 50)
+                }
+              } else if (payload.eventType === "DELETE") {
+                setMessages(prev => prev.filter(m => m.id !== (payload.old as any).id))
+              } else if (payload.eventType === "UPDATE") {
+                setMessages(prev => prev.map(m => m.id === (payload.new as any).id ? (payload.new as WAMessage) : m))
+              }
             }
-          } else if (payload.eventType === "DELETE") {
-            setMessages(prev => prev.filter(m => m.id !== (payload.old as any).id))
-          } else if (payload.eventType === "UPDATE") {
-            setMessages(prev => prev.map(m => m.id === (payload.new as any).id ? (payload.new as WAMessage) : m))
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          console.log(`[Realtime] Subscribed to messages for conversation ${conv.id}`)
-        }
-      })
+          )
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              console.log(`[Realtime] Subscribed to messages for conversation ${conv.id}`)
+            }
+          })
 
-    const broadcastChannel = supabase
-      .channel(`active-agency-${instance.agency_id}`)
-      .on(
-        "broadcast",
-        { event: "refresh-whatsapp" },
-        (payload) => {
-          // If the broadcast is for THIS conversation, force a refresh
-          if (payload.payload?.conversation_id === conv.id) {
-            load()
-          }
-        }
-      )
-      .subscribe()
+        broadcastChannel = supabase
+          .channel(`active-agency-${instance.agency_id}`)
+          .on(
+            "broadcast",
+            { event: "refresh-whatsapp" },
+            (payload) => {
+              // If the broadcast is for THIS conversation, force a refresh
+              if (payload.payload?.conversation_id === conv.id) {
+                load()
+              }
+            }
+          )
+          .subscribe()
+      } catch (err) {
+        console.error("[Realtime Error] Failed to initialize message channels:", err);
+      }
+    }
 
     return () => {
-      supabase.removeChannel(channel)
-      supabase.removeChannel(broadcastChannel)
+      if (channel) supabase.removeChannel(channel)
+      if (broadcastChannel) supabase.removeChannel(broadcastChannel)
     }
   }, [conv.id, instance.agency_id])
 
