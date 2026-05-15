@@ -368,36 +368,49 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="font-semibold text-sm truncate">
-                      {conv.contact_name || conv.contact_phone}
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <span className="font-bold text-sm truncate">
+                      {conv.contact_name || "Sin nombre"}
                     </span>
                     <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                       {timeAgo(conv.last_message_at)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground truncate flex-1">
-                      {conv.last_message_text || "Sin mensajes"}
-                    </p>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
+
+                  {/* Teléfono y Etiquetas */}
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] text-muted-foreground font-medium tracking-tight">
+                        {conv.contact_phone}
+                      </p>
                       {conv.unread_count > 0 && (
                         <Badge className="h-4 min-w-[16px] px-1 flex items-center justify-center text-[10px] bg-primary hover:bg-primary">
                           {conv.unread_count}
                         </Badge>
                       )}
-                      <button
-                        onClick={(e) => handleDelete(e, conv.id)}
-                        className="p-1.5 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
-                        title="Eliminar conversación"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
                     </div>
+
+                    {conv.etiquetas && conv.etiquetas.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {conv.etiquetas.slice(0, 3).map((tag, idx) => (
+                          <span key={idx} className="text-[8px] bg-primary/10 text-primary px-1 rounded uppercase font-black tracking-tighter border border-primary/20">
+                            {tag.replace(/_/g, ' ')}
+                          </span>
+                        ))}
+                        {conv.etiquetas.length > 3 && (
+                          <span className="text-[8px] text-muted-foreground">+{conv.etiquetas.length - 3}</span>
+                        )}
+                      </div>
+                    )}
+
+                    <p className="text-[11px] text-muted-foreground/80 truncate italic">
+                      {conv.last_message_text || "Conversación iniciada"}
+                    </p>
                   </div>
+
                   {(conv as any).assigned_agent && (
-                     <div className="mt-1">
-                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                     <div className="mt-1.5 flex items-center gap-1 opacity-70">
+                        <span className="text-[9px] text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded-sm border border-border">
                            {(conv as any).assigned_agent.email}
                         </span>
                      </div>
