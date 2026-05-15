@@ -366,10 +366,10 @@ export function MarketingHistory() {
           setEditContent(null)
         }
       }}>
-        <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95vh] overflow-y-auto border-accent/20 scrollbar-hide p-4 md:p-6">
+        <DialogContent className="max-w-4xl w-[95vw] md:w-[90vw] max-h-[92vh] overflow-y-auto border-accent/20 p-3 md:p-8">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black flex items-center gap-3">
-              <Sparkles className="w-6 h-6 text-accent" />
+            <DialogTitle className="text-xl md:text-2xl font-black flex items-center gap-2 md:gap-3">
+              <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-accent" />
               Conjunto de Variantes 
             </DialogTitle>
             <DialogDescription>
@@ -397,9 +397,9 @@ export function MarketingHistory() {
               </div>
 
               {selectedGroup.variants[activeVariantIndex] && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 animate-in fade-in zoom-in-95 duration-300">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in fade-in zoom-in-95 duration-300">
                   <div className="space-y-4">
-                    <div className="aspect-auto h-[300px] md:h-[500px] w-full bg-muted rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl relative border border-accent/10">
+                    <div className="aspect-auto h-[250px] md:h-[500px] w-full bg-muted rounded-xl md:rounded-3xl overflow-hidden shadow-lg md:shadow-2xl relative border border-accent/10">
                       {selectedGroup.variants[activeVariantIndex].public_url ? (
                         <img 
                           src={selectedGroup.variants[activeVariantIndex].public_url} 
@@ -437,7 +437,7 @@ export function MarketingHistory() {
                     </div>
 
                     <div className="flex-1 min-h-0">
-                        <div className="bg-muted/30 p-4 md:p-6 rounded-2xl border border-muted space-y-4 h-full">
+                        <div className="bg-muted/30 p-4 md:p-6 rounded-xl md:rounded-2xl border border-muted space-y-4">
                           {selectedGroup.variants[activeVariantIndex].copy_type === 'video' ? (
                             ['hook', 'problema', 'agitacion', 'solucion', 'cta'].map(field => (
                               <div key={field} className="space-y-1">
@@ -449,7 +449,7 @@ export function MarketingHistory() {
                                       className="w-full bg-background border rounded-lg p-2 text-sm min-h-[60px]"
                                     />
                                   ) : (
-                                    <p className="text-sm font-medium leading-relaxed">{renderText(selectedGroup.variants[activeVariantIndex].content?.[field])}</p>
+                                    <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words">{renderText(selectedGroup.variants[activeVariantIndex].content?.[field])}</p>
                                   )}
                               </div>
                             ))
@@ -466,7 +466,7 @@ export function MarketingHistory() {
                                       className="w-full bg-background border rounded-lg p-2 text-sm min-h-[80px]"
                                     />
                                   ) : (
-                                    <p className={cn("text-sm leading-relaxed whitespace-pre-wrap", field === 'hook' || field === 'cta' ? "font-bold text-foreground" : "text-muted-foreground")}>
+                                    <p className={cn("text-sm leading-relaxed whitespace-pre-wrap break-words", field === 'hook' || field === 'cta' ? "font-bold text-foreground" : "text-muted-foreground")}>
                                       {renderText(selectedGroup.variants[activeVariantIndex].content?.[field] || selectedGroup.variants[activeVariantIndex].content?.['body'])} 
                                     </p>
                                   )}
