@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2, ArrowLeft, Mail } from "lucide-react"
 import AuthHeader from "@/components/auth-header"
+import { toast } from "sonner"
 
 export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false)
@@ -28,11 +29,15 @@ export default function ForgotPasswordPage() {
       const result = await resetPassword(email, origin)
       if (result.error) {
         setError(result.error)
+        toast.error(result.error)
       } else {
         setSuccess(true)
+        toast.success("Email de recuperación enviado con éxito")
       }
     } catch (err) {
-      setError("Error al enviar el email. Intenta de nuevo.")
+      const msg = "Error al enviar el email. Intenta de nuevo."
+      setError(msg)
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
