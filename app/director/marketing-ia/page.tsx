@@ -6,7 +6,8 @@ import { IpcManager } from "@/components/marketing-ia/ipc-manager"
 import { CopyGeneratorFlow } from "@/components/marketing-ia/copy-generator-flow"
 import { MarketingHistory } from "@/components/marketing-ia/marketing-history"
 import { AdGuide } from "@/components/marketing-ia/ad-guide"
-import { Bot, UserSearch, History, Sparkles, BookOpen } from "lucide-react"
+import { MarketingAiSettings } from "@/components/marketing-ia/marketing-ai-settings"
+import { Bot, UserSearch, History, Sparkles, BookOpen, Settings } from "lucide-react"
 import { AiCreditBadge } from "@/components/ai-credit-badge"
 
 export default function MarketingIAPage() {
@@ -38,7 +39,7 @@ export default function MarketingIAPage() {
         </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="flex md:grid md:grid-cols-4 h-14 bg-muted/50 p-1 rounded-xl overflow-x-auto scrollbar-none justify-start md:justify-center w-full">
+        <TabsList className="flex md:grid md:grid-cols-5 h-14 bg-muted/50 p-1 rounded-xl overflow-x-auto scrollbar-none justify-start md:justify-center w-full">
           <TabsTrigger value="copys" className="flex-1 md:flex-none text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <Sparkles className="w-4 h-4 mr-2" /> Crear Anuncio
           </TabsTrigger>
@@ -50,6 +51,9 @@ export default function MarketingIAPage() {
           </TabsTrigger>
           <TabsTrigger value="guia" className="flex-1 md:flex-none text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <BookOpen className="w-4 h-4 mr-2" /> Guía Mágica
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex-1 md:flex-none text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
+            <Settings className="w-4 h-4 mr-2" /> Configuración IA
           </TabsTrigger>
         </TabsList>
 
@@ -67,6 +71,10 @@ export default function MarketingIAPage() {
 
         <TabsContent value="guia" className="mt-8">
            <AdGuide />
+        </TabsContent>
+
+        <TabsContent value="settings" className="mt-8">
+           <MarketingAiSettings />
         </TabsContent>
       </Tabs>
     </div>

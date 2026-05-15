@@ -5,12 +5,37 @@ import { generateImage } from "@/lib/gemini";
 import { consumeAiCredits, requireTenant } from "@/lib/auth/tenant-validation";
 import { GenerateImagePayload } from "@/types/marketing-ia";
 
-const buildImagePrompt = (payload: GenerateImagePayload): string => {
+const buildImagePrompt = (payload: GenerateImagePayload, branding?: any): string => {
   const dimensiones = {
     reels:   '1080x1920, formato vertical 9:16, optimizado para Instagram Reels',
     post:    '1080x1080, formato cuadrado 1:1, optimizado para Instagram Post',
     historia:'1080x1920, formato vertical 9:16, optimizado para Instagram Historia'
   }[payload.format];
+
+  let brandingCtx = '';
+  if (branding) {
+    const colors = branding.brand_colors?.length > 0 
+      ? `PALETA DE COLORES DE MARCA: ${branding.brand_colors.join(', ')}. Usar estos colores para elementos gráficos, acentos y armonía visual.` 
+      : '';
+    
+    const logo = branding.logo_url 
+      ? `INCORPORACIÓN DE LOGO: Hay un logo institucional que debe simularse o reservarse espacio en la posición: ${branding.logo_position}. El tamaño debe ser ${branding.logo_size}.`
+      : '';
+    
+    const fonts = {
+      sans: 'estilo moderno y minimalista (Sans-serif)',
+      serif: 'estilo elegante y sofisticado (Serif)',
+      script: 'estilo manuscrito o artístico (Script/Handwritten)',
+      display: 'estilo de impacto y audaz (Bold/Display)'
+    }[branding.brand_font] || 'moderno';
+
+    brandingCtx = `
+IDENTIDAD DE MARCA (OBLIGATORIO):
+${colors}
+${logo}
+TIPOGRAFÍA PREFERIDA: Usar una tipografía de ${fonts} para cualquier texto en la imagen.
+`;
+  }
 
   const estilos = {
     moderno:     'moderno y minimalista, paleta neutra con acentos cobre, tipografía sans-serif limpia',
@@ -35,6 +60,8 @@ Componer la imagen destacando visualmente las características de esta propiedad
   return `
 Creá una imagen publicitaria profesional para redes sociales de una inmobiliaria argentina.
 
+${brandingCtx}
+
 FORMATO: ${dimensiones}
 ESTILO VISUAL: ${estilos}
 
@@ -46,9 +73,10 @@ ${propiedadCtx}
 REGLAS DE COMPOSICIÓN:
 - El hook del copy debe estar visible y legible en la imagen
 - Composición profesional apta para Instagram y redes sociales
-- Dejar espacio reservado en la esquina inferior para el logo de la inmobiliaria
+- Dejar espacio reservado en la esquina indicada para el logo de la inmobiliaria
 - Sin elementos genéricos ni stock photos de baja calidad
 - Resultado fotorrealista de alta calidad para uso comercial en Argentina
+- Si se especificaron colores de marca, el diseño debe ser coherente con ellos.
 
 ${payload.extra_prompt ? `INSTRUCCIONES ADICIONALES: ${payload.extra_prompt}` : ''}
   `.trim();
@@ -59,12 +87,14 @@ export async function POST(req: Request) {
     const payload: GenerateImagePayload = await req.json();
     const { userId, agencyId } = await requireTenant();
     const supabase = await createClient();
-    const supabaseAdmin = createAdminClient();
+    // Fetch agency branding configuration
+    const { data: agency } = await supabaseAdmin
+      .from("agencies")
+      .select("marketing_ai_config")
+      .eq("id", agencyId)
+      .single();
 
-    // Consume AI Credits
-    await consumeAiCredits("marketing_ia", 1, `Generate Image: ${payload.format}`);
-
-    const finalPrompt = buildImagePrompt(payload);
+    const finalPrompt = buildImagePrompt(payload, agency?.marketing_ai_config);
     const { draft_id, style, format, extra_prompt } = payload;
 
     if (!process.env.GEMINI_API_KEY) {
