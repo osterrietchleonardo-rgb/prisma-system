@@ -295,31 +295,31 @@ export default function AdvisorConsultorIAPage() {
                       )}
                     </div>
                 </div>
-                <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                <div className="absolute top-1/2 -translate-y-1/2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all duration-200 z-20">
                     {deletingId === s.id ? (
-                      <div className="flex gap-1 animate-in zoom-in-95 duration-200">
+                      <div className="flex gap-1 animate-in zoom-in-95 duration-200 bg-background/80 backdrop-blur-sm p-1 rounded-lg border shadow-sm">
                         <Button 
                           size="icon" 
-                          className="h-7 w-7 bg-destructive hover:bg-destructive/90 text-white rounded-md"
+                          className="h-7 w-7 bg-destructive hover:bg-destructive/90 text-white rounded-md shadow-sm"
                           onClick={(e) => handleDelete(s.id, e)}
                         >
-                          <Check className="w-3.5 h-3.5" />
+                          <Check className="w-4 h-4" />
                         </Button>
                         <Button 
-                          variant="secondary"
+                          variant="ghost"
                           size="icon" 
                           className="h-7 w-7 text-muted-foreground hover:bg-muted rounded-md"
                           onClick={(e) => { e.stopPropagation(); setDeletingId(null); }}
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <X className="w-4 h-4" />
                         </Button>
                       </div>
                     ) : (
-                      <>
+                      <div className="flex items-center gap-0.5 bg-background/60 backdrop-blur-sm p-0.5 rounded-lg border border-transparent group-hover:border-border/40 shadow-sm">
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-6 w-6 text-muted-foreground hover:text-accent"
+                          className="h-8 w-8 text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
                           onClick={(e) => { 
                             e.stopPropagation(); 
                             setRenamingId(s.id); 
@@ -327,17 +327,19 @@ export default function AdvisorConsultorIAPage() {
                             setDeletingId(null);
                           }}
                         >
-                          <Pencil className="w-3.5 h-3.5" />
+                          <Pencil className="w-4 h-4" />
+                          <span className="sr-only">Renombrar</span>
                         </Button>
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                           onClick={(e) => { e.stopPropagation(); setDeletingId(s.id); }}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
+                          <span className="sr-only">Eliminar</span>
                         </Button>
-                      </>
+                      </div>
                     )}
                 </div>
               </div>
