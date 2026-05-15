@@ -92,89 +92,96 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
       load()
     }, 5 * 1000)
 
-    /*
-    // Realtime subscription COMENTADA PARA DIAGNÓSTICO
-    const channel = supabase
-      .channel(`wa_conversations:instance_id=eq.${instance.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "wa_conversations",
-          filter: `instance_id=eq.${instance.id}`,
-        },
-        (payload) => {
-          if (payload.eventType === "INSERT") {
-            const newItem = payload.new as WAConversation
-            
-            if (activeIdRef.current !== newItem.id) {
-              toast.info(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
-            } else {
-              markConversationRead(newItem.id)
+    let channel: any = null
+    let broadcastChannel: any = null
+
+    // Safe Realtime subscription for Mobile/Safari compatibility
+    if (typeof window !== 'undefined' && 'WebSocket' in window) {
+      try {
+        channel = supabase
+          .channel(`wa_conversations:instance_id=eq.${instance.id}`)
+          .on(
+            "postgres_changes",
+            {
+              event: "*",
+              schema: "public",
+              table: "wa_conversations",
+              filter: `instance_id=eq.${instance.id}`,
+            },
+            (payload) => {
+              if (payload.eventType === "INSERT") {
+                const newItem = payload.new as WAConversation
+                
+                if (activeIdRef.current !== newItem.id) {
+                  toast.info(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
+                } else {
+                  markConversationRead(newItem.id)
+                }
+                
+                setConversations((prev) => {
+                  if (prev.some(c => c.id === newItem.id)) return prev;
+
+                  const unshiftList = [newItem, ...prev];
+                  unshiftList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+                  
+                  return unshiftList.filter((c, index, self) => 
+                    index === self.findIndex((t) => t.contact_phone === c.contact_phone)
+                  );
+                })
+              } else if (payload.eventType === "UPDATE") {
+                const updatedItem = payload.new as WAConversation
+                const prev = convRef.current
+                const oldItem = prev.find((c) => c.id === updatedItem.id)
+
+                let isInbound = false;
+                if (oldItem) {
+                  isInbound = !!oldItem.last_inbound_at && !!updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
+                } else if (updatedItem.last_inbound_at) {
+                  const diff = Date.now() - new Date(updatedItem.last_inbound_at).getTime();
+                  isInbound = diff < 10000;
+                }
+
+                if (isInbound && activeIdRef.current !== updatedItem.id) {
+                  toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
+                } else if (isInbound && activeIdRef.current === updatedItem.id && updatedItem.unread_count > 0) {
+                  updatedItem.unread_count = 0
+                  markConversationRead(updatedItem.id)
+                }
+
+                setConversations((currentPrev) => {
+                  const existingItem = currentPrev.find((c) => c.id === updatedItem.id)
+                  const mergedItem = existingItem ? { ...existingItem, ...updatedItem } : updatedItem;
+                  const otherConversations = currentPrev.filter((c) => c.id !== updatedItem.id)
+                  return [mergedItem, ...otherConversations]
+                })
+              } else if (payload.eventType === "DELETE") {
+                setConversations((prev) =>
+                  prev.filter((c) => c.id !== (payload.old as { id: string }).id)
+                )
+              }
             }
-            
-            setConversations((prev) => {
-              if (prev.some(c => c.id === newItem.id)) return prev;
+          )
+          .subscribe()
 
-              const unshiftList = [newItem, ...prev];
-              unshiftList.sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
-              
-              return unshiftList.filter((c, index, self) => 
-                index === self.findIndex((t) => t.contact_phone === c.contact_phone)
-              );
-            })
-          } else if (payload.eventType === "UPDATE") {
-            const updatedItem = payload.new as WAConversation
-            const prev = convRef.current
-            const oldItem = prev.find((c) => c.id === updatedItem.id)
-
-            let isInbound = false;
-            if (oldItem) {
-              isInbound = !!oldItem.last_inbound_at && !!updatedItem.last_inbound_at && updatedItem.last_inbound_at !== oldItem.last_inbound_at;
-            } else if (updatedItem.last_inbound_at) {
-               const diff = Date.now() - new Date(updatedItem.last_inbound_at).getTime();
-               isInbound = diff < 10000;
+        broadcastChannel = supabase
+          .channel(`agency-${instance.agency_id}`)
+          .on(
+            "broadcast",
+            { event: "refresh-whatsapp" },
+            (payload) => {
+              load()
             }
-
-            if (isInbound && activeIdRef.current !== updatedItem.id) {
-              toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
-            } else if (isInbound && activeIdRef.current === updatedItem.id && updatedItem.unread_count > 0) {
-               updatedItem.unread_count = 0
-               markConversationRead(updatedItem.id)
-            }
-
-              setConversations((currentPrev) => {
-                const existingItem = currentPrev.find((c) => c.id === updatedItem.id)
-                const mergedItem = existingItem ? { ...existingItem, ...updatedItem } : updatedItem;
-                const otherConversations = currentPrev.filter((c) => c.id !== updatedItem.id)
-                return [mergedItem, ...otherConversations]
-              })
-          } else if (payload.eventType === "DELETE") {
-            setConversations((prev) =>
-              prev.filter((c) => c.id !== (payload.old as { id: string }).id)
-            )
-          }
-        }
-      )
-      .subscribe()
-
-    const broadcastChannel = supabase
-      .channel(`agency-${instance.agency_id}`)
-      .on(
-        "broadcast",
-        { event: "refresh-whatsapp" },
-        (payload) => {
-          load()
-        }
-      )
-      .subscribe()
-    */
+          )
+          .subscribe()
+      } catch (e) {
+        console.error("Critical: Realtime failed to initialize:", e);
+      }
+    }
 
     return () => {
       clearInterval(interval)
-      // supabase.removeChannel(channel)
-      // supabase.removeChannel(broadcastChannel)
+      if (channel) supabase.removeChannel(channel)
+      if (broadcastChannel) supabase.removeChannel(broadcastChannel)
     }
   }, [instance.id, instance.agency_id])
 
