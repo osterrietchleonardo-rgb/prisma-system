@@ -1,9 +1,11 @@
 "use client"
 import { useEffect, useState } from "react"
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar
 } from "recharts"
+import LineChartSVG from "@/components/admin-vakdor/line-chart-svg"
 
 interface Metricas {
   resumen: {
@@ -79,7 +81,7 @@ export default function DashboardClient() {
   const facturacionData = Object.entries(graficos.evolucionFacturacion)
     .sort(([a], [b]) => a.localeCompare(b))
     .slice(-12)
-    .map(([mes, monto]) => ({ mes: mes.substring(5), monto }))
+    .map(([mes, monto]) => ({ label: mes.substring(5), value: monto }))
 
   const agenciasEstadoData = [
     { name: "Activas", value: resumen.agencias.activas },
@@ -138,18 +140,10 @@ export default function DashboardClient() {
 
       {/* Charts Row */}
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 24 }}>
-        {/* Facturación mensual */}
+        {/* Facturación mensual — SVG nativo */}
         <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 20 }}>
           <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Evolución de Facturación</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={facturacionData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-              <XAxis dataKey="mes" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} />
-              <YAxis tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} />
-              <Tooltip contentStyle={{ background: "#1a1f36", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }} />
-              <Bar dataKey="monto" fill="#6366f1" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <LineChartSVG data={facturacionData} color="#B87333" height={200} />
         </div>
 
         {/* Estado de agencias */}
