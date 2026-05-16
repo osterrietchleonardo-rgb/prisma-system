@@ -36,6 +36,23 @@ export default async function DirectorLayout({
     // Optional: redirect to error or setup profile
   }
 
+  // ADMIN VAKDOR: Check account status — pausado/eliminado → force logout
+  if (profile) {
+    if (profile.estado === "pausado" || profile.estado === "eliminado") {
+      await supabase.auth.signOut()
+      redirect("/auth/login?error=account_suspended")
+    }
+    // Check if admin invalidated this session after it was issued
+    if (profile.tokens_invalidos_desde) {
+      const tokenIat = session.user.iat ?? 0 // JWT issued-at (seconds)
+      const invalidSince = Math.floor(new Date(profile.tokens_invalidos_desde).getTime() / 1000)
+      if (tokenIat < invalidSince) {
+        await supabase.auth.signOut()
+        redirect("/auth/login?error=session_revoked")
+      }
+    }
+  }
+
   // Fetch AI Credits for the specific agency
   let aiCredits = null;
   if (profile?.agency_id) {

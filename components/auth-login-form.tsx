@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { login, signInWithGoogle } from "@/lib/actions/auth"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,16 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Show error banners from admin-suspended redirects
+  const errorParam = searchParams.get("error")
+  const suspendedMsg =
+    errorParam === "account_suspended"
+      ? "Tu cuenta ha sido suspendida. Contactá con soporte."
+      : errorParam === "session_revoked"
+      ? "Tu sesión fue revocada por el administrador. Ingresá nuevamente."
+      : null
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -35,6 +45,19 @@ export default function LoginForm() {
 
       const { user } = result
       const role = user?.user_metadata?.role
+
+      // GAP 2 FIX: Check account status before navigating
+      try {
+        const statusRes = await fetch("/api/auth/check-status")
+        const statusData = await statusRes.json()
+        if (statusData.estado === "pausado" || statusData.estado === "eliminado") {
+          setError("Tu cuenta ha sido suspendida. Contactá con soporte.")
+          setLoading(false)
+          return
+        }
+      } catch {
+        // If status check fails, proceed normally — layout is the authoritative check
+      }
 
       if (role === "director") {
         router.push("/director/dashboard")
@@ -62,6 +85,12 @@ export default function LoginForm() {
         <CardDescription>Ingresá tus credenciales para continuar</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
+        {/* Admin-suspended banner */}
+        {suspendedMsg && (
+          <div className="rounded-md bg-destructive/15 border border-destructive/30 px-4 py-3 text-sm text-destructive font-medium">
+            {suspendedMsg}
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
