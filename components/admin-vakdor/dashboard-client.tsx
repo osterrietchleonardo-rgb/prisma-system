@@ -1,11 +1,8 @@
 "use client"
 import { useEffect, useState } from "react"
-import {
-  PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar
-} from "recharts"
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
 import LineChartSVG from "@/components/admin-vakdor/line-chart-svg"
+import BarChartDivs from "@/components/admin-vakdor/bar-chart-divs"
 
 interface Metricas {
   resumen: {
@@ -90,10 +87,10 @@ export default function DashboardClient() {
   ].filter(d => d.value > 0)
 
   const usuariosData = [
-    { tipo: "Directores Activos", count: resumen.directores.activos, fill: "#6366f1" },
-    { tipo: "Dir. Pausados", count: resumen.directores.pausados, fill: "#4b5563" },
-    { tipo: "Asesores Activos", count: resumen.asesores.activos, fill: "#8b5cf6" },
-    { tipo: "As. Pausados", count: resumen.asesores.pausados, fill: "#374151" },
+    { label: "Dir. Activos",  value: resumen.directores.activos,  color: "#6366f1" },
+    { label: "Dir. Pausados", value: resumen.directores.pausados, color: "#4b5563" },
+    { label: "As. Activos",   value: resumen.asesores.activos,    color: "#8b5cf6" },
+    { label: "As. Pausados",  value: resumen.asesores.pausados,   color: "#374151" },
   ]
 
   const ACCION_LABELS: Record<string, string> = {
@@ -169,17 +166,7 @@ export default function DashboardClient() {
       {/* Users chart */}
       <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 20, marginBottom: 24 }}>
         <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Usuarios del Sistema</h3>
-        <ResponsiveContainer width="100%" height={160}>
-          <BarChart data={usuariosData} layout="vertical">
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-            <XAxis type="number" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} />
-            <YAxis type="category" dataKey="tipo" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 11 }} width={130} />
-            <Tooltip contentStyle={{ background: "#1a1f36", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }} />
-            <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-              {usuariosData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        <BarChartDivs data={usuariosData} horizontal height={160} />
       </div>
 
       {/* Activity Log */}
