@@ -1,8 +1,8 @@
 "use client"
 import { useEffect, useState } from "react"
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts"
 import LineChartSVG from "@/components/admin-vakdor/line-chart-svg"
 import BarChartDivs from "@/components/admin-vakdor/bar-chart-divs"
+import DonutChart from "@/components/admin-vakdor/donut-chart"
 
 interface Metricas {
   resumen: {
@@ -81,9 +81,9 @@ export default function DashboardClient() {
     .map(([mes, monto]) => ({ label: mes.substring(5), value: monto }))
 
   const agenciasEstadoData = [
-    { name: "Activas", value: resumen.agencias.activas },
-    { name: "Pausadas", value: resumen.agencias.pausadas },
-    { name: "Eliminadas", value: resumen.agencias.eliminadas },
+    { label: "Activas",   value: resumen.agencias.activas,   color: "#B87333" },
+    { label: "Pausadas",  value: resumen.agencias.pausadas,  color: "rgba(192,192,192,0.6)" },
+    { label: "Eliminadas",value: resumen.agencias.eliminadas,color: "rgba(192,192,192,0.35)" },
   ].filter(d => d.value > 0)
 
   const usuariosData = [
@@ -143,23 +143,13 @@ export default function DashboardClient() {
           <LineChartSVG data={facturacionData} color="#B87333" height={200} />
         </div>
 
-        {/* Estado de agencias */}
+        {/* Estado de agencias — Donut nativo */}
         <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: 20 }}>
           <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Estado de Agencias</h3>
-          {agenciasEstadoData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={160}>
-              <PieChart>
-                <Pie data={agenciasEstadoData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={65} label={({ name, value }) => `${name}: ${value}`}>
-                  {agenciasEstadoData.map((_, i) => (
-                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ background: "#1a1f36", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", paddingTop: 40 }}>Sin agencias</div>
-          )}
+          {agenciasEstadoData.length > 0
+            ? <DonutChart data={agenciasEstadoData} size={180} />
+            : <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", paddingTop: 40 }}>Sin agencias</div>
+          }
         </div>
       </div>
 
