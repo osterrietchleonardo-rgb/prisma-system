@@ -16,12 +16,12 @@ export default async function AdminVakdorLayout({
   const token = cookieStore.get("admin_vakdor_token")?.value
 
   if (!token) {
-    redirect("/admin-vakdor/login")
+    redirect("/admin-login")
   }
 
   const payload = await verifyAdminToken(token)
   if (!payload) {
-    redirect("/admin-vakdor/login")
+    redirect("/admin-login")
   }
 
   return (

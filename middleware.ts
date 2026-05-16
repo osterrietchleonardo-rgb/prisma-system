@@ -12,30 +12,43 @@ export async function middleware(request: NextRequest) {
   const url = request.nextUrl.clone()
 
   // ============================================================
-  // ADMIN VAKDOR — Route Protection (lightweight, no DB query)
+  // ADMIN LOGIN PAGE — public, no auth required
+  // ============================================================
+  if (url.pathname === '/admin-login') {
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+    // If already authenticated, redirect to dashboard
+    const existingToken = request.cookies.get('admin_vakdor_token')?.value
+    if (existingToken) {
+      try {
+        const { verifyAdminToken } = await import('@/lib/admin-vakdor/auth')
+        const p = await verifyAdminToken(existingToken)
+        if (p) return NextResponse.redirect(new URL('/admin-vakdor/dashboard', request.url))
+      } catch { /* invalid token, show login */ }
+    }
+    return response
+  }
+
+  // ============================================================
+  // ADMIN VAKDOR — Protected Routes (lightweight, no DB query)
   // ============================================================
   if (url.pathname.startsWith('/admin-vakdor')) {
     response.headers.set('X-Robots-Tag', 'noindex, nofollow')
 
-    if (url.pathname === '/admin-vakdor/login') {
-      return response
-    }
-
     const adminToken = request.cookies.get('admin_vakdor_token')?.value
     if (!adminToken) {
-      return NextResponse.redirect(new URL('/admin-vakdor/login', request.url))
+      return NextResponse.redirect(new URL('/admin-login', request.url))
     }
 
     try {
       const { verifyAdminToken } = await import('@/lib/admin-vakdor/auth')
       const payload = await verifyAdminToken(adminToken)
       if (!payload) {
-        const res = NextResponse.redirect(new URL('/admin-vakdor/login', request.url))
+        const res = NextResponse.redirect(new URL('/admin-login', request.url))
         res.cookies.set('admin_vakdor_token', '', { maxAge: 0, path: '/' })
         return res
       }
     } catch {
-      return NextResponse.redirect(new URL('/admin-vakdor/login', request.url))
+      return NextResponse.redirect(new URL('/admin-login', request.url))
     }
 
     return response
