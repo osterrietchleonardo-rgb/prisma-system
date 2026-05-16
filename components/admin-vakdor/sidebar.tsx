@@ -32,11 +32,16 @@ export default function AdminSidebar({ adminEmail }: { adminEmail: string }) {
       flexShrink: 0,
     }}>
       {/* Brand */}
-      <div style={{ padding: "0 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+      <div style={{ padding: "16px 16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
         <img
           src="/logo-full.jpg"
           alt="PRISMA IA"
-          style={{ height: 40, objectFit: "contain", display: "block", borderRadius: 6 }}
+          style={{
+            width: "100%",
+            height: "auto",
+            display: "block",
+            borderRadius: 8,
+          }}
         />
       </div>
 

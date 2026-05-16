@@ -51,15 +51,17 @@ export default function AdminVakdorLoginPage() {
         backdropFilter: "blur(12px)",
       }}>
         {/* Brand */}
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
           <img
             src="/logo-full.jpg"
             alt="PRISMA IA"
             style={{
-              height: 56,
-              objectFit: "contain",
-              marginBottom: 16,
-              borderRadius: 8,
+              width: "100%",
+              maxWidth: 260,
+              height: "auto",
+              display: "block",
+              margin: "0 auto 14px",
+              borderRadius: 10,
             }}
           />
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, margin: 0 }}>
