@@ -32,17 +32,34 @@ export default function AdminSidebar({ adminEmail }: { adminEmail: string }) {
       flexShrink: 0,
     }}>
       {/* Brand */}
-      <div style={{ padding: "16px 16px 20px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <img
-          src="/logo-full.jpg"
-          alt="PRISMA IA"
-          style={{
-            width: "100%",
-            height: "auto",
-            display: "block",
-            borderRadius: 8,
-          }}
-        />
+      <div style={{ padding: "18px 16px 18px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 36, height: 36,
+            borderRadius: "50%",
+            overflow: "hidden",
+            background: "#131A2D",
+            border: "1px solid rgba(194,120,60,0.3)",
+            padding: 3,
+            flexShrink: 0,
+          }}>
+            <img src="/logo-icon.png" alt="PRISMA IA" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span style={{
+              fontSize: 15, fontWeight: 700,
+              background: "linear-gradient(90deg, #c2783c, #e29e6d, #c2783c)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              letterSpacing: "-0.03em",
+              lineHeight: 1,
+              textTransform: "uppercase",
+            }}>PRISMA IA</span>
+            <span style={{ fontSize: 8, color: "rgba(255,255,255,0.4)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginTop: 2 }}>
+              REAL ESTATE ✦ SISTEMA
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Nav */}

@@ -50,22 +50,38 @@ export default function AdminVakdorLoginPage() {
         borderRadius: 16,
         backdropFilter: "blur(12px)",
       }}>
-        {/* Brand */}
-        <div style={{ textAlign: "center", marginBottom: 36 }}>
-          <img
-            src="/logo-full.jpg"
-            alt="PRISMA IA"
-            style={{
-              width: "100%",
-              maxWidth: 260,
-              height: "auto",
-              display: "block",
-              margin: "0 auto 14px",
-              borderRadius: 10,
-            }}
-          />
-          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, margin: 0 }}>
-            Acceso restringido — Sistema
+        {/* Brand — equal to BrandLogo component */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 36, gap: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+            <div style={{
+              width: 44, height: 44,
+              borderRadius: "50%",
+              overflow: "hidden",
+              background: "#131A2D",
+              border: "1px solid rgba(194,120,60,0.3)",
+              padding: 4,
+              flexShrink: 0,
+              boxShadow: "0 4px 16px rgba(194,120,60,0.2)",
+            }}>
+              <img src="/logo-icon.png" alt="PRISMA IA" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <span style={{
+                fontSize: 22, fontWeight: 700,
+                background: "linear-gradient(90deg, #c2783c, #e29e6d, #c2783c)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                letterSpacing: "-0.04em",
+                lineHeight: 1,
+                textTransform: "uppercase",
+              }}>PRISMA IA</span>
+              <span style={{ fontSize: 9, color: "rgba(255,255,255,0.45)", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginTop: 3 }}>
+                REAL ESTATE ✦ SISTEMA INTELIGENTE
+              </span>
+            </div>
+          </div>
+          <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, margin: 0 }}>
+            Acceso restringido — Panel Admin
           </p>
         </div>
 
