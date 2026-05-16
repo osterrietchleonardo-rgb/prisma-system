@@ -12,7 +12,6 @@ interface Agency {
   creditos: { total: number; usado: number; disponible: number } | null
   propiedades_tokko: number
   pago_mes_actual: number | null
-  last_sync_at: string | null
   created_at: string
 }
 

@@ -41,7 +41,6 @@ export async function GET(request: NextRequest, { params }: Params) {
     historialCreditos: creditLogRes.data || [],
     tokko: {
       totalPropiedades: (propsRes.data || []).length,
-      ultimaSync: agenciaRes.data.last_sync_at,
       estadoConexion: agenciaRes.data.tokko_api_key ? "activa" : "sin_credenciales",
     },
     pagos: {

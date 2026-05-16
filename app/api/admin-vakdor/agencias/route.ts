@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   let query = db
     .from("agencies")
     .select(`
-      id, name, estado, logo_url, email, phone, address, created_at, deleted_at, last_sync_at,
+      id, name, estado, logo_url, email, phone, address, created_at, deleted_at,
       profiles!profiles_agency_id_fkey(id, role, estado, full_name, email),
       agency_ai_credits(credits_total, credits_used)
     `, { count: "exact" })
@@ -76,7 +76,6 @@ export async function GET(request: NextRequest) {
       creditos: credits ? { total: credits.credits_total, usado: credits.credits_used, disponible: credits.credits_total - credits.credits_used } : null,
       propiedades_tokko: propsMap[agency.id] || 0,
       pago_mes_actual: pagosMesMap.get(agency.id) || null,
-      last_sync_at: agency.last_sync_at,
       created_at: agency.created_at,
     }
   })
