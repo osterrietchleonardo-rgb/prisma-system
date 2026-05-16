@@ -49,7 +49,10 @@ export default function LineChartSVG({ data, color = "#B87333", height = 200 }: 
   const minV = Math.min(...values, 0)
   const range = maxV - minV || 1
 
-  const toX = (i: number) => PAD.left + (i / (data.length - 1)) * innerW
+  const toX = (i: number) =>
+    data.length <= 1
+      ? PAD.left + innerW / 2
+      : PAD.left + (i / (data.length - 1)) * innerW
   const toY = (v: number) => PAD.top + (1 - (v - minV) / range) * innerH
 
   const pts = data.map((d, i) => ({ x: toX(i), y: toY(d.value) }))

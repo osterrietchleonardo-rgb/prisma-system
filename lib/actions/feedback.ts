@@ -47,3 +47,25 @@ export async function submitFeedback(formData: {
   
   return { success: true }
 }
+
+export async function getUserFeedbackHistory(): Promise<{
+  id: string
+  type: string
+  content: string
+  status: string
+  created_at: string
+}[]> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return []
+
+  const { data } = await supabase
+    .from("system_feedback")
+    .select("id, type, content, status, created_at")
+    .eq("user_id", session.user.id)
+    .order("created_at", { ascending: false })
+    .limit(20)
+
+  return data ?? []
+}
+

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { submitFeedback } from "@/lib/actions/feedback"
+import { submitFeedback, getUserFeedbackHistory } from "@/lib/actions/feedback"
 import { cn } from "@/lib/utils"
 
 const feedbackSchema = z.object({
@@ -55,6 +55,17 @@ const feedbackTypes = [
 export function FeedbackForm() {
   const [isPending, setIsPending] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  const [history, setHistory] = useState<Awaited<ReturnType<typeof getUserFeedbackHistory>>>([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+
+  async function loadHistory() {
+    setHistoryLoading(true)
+    const data = await getUserFeedbackHistory()
+    setHistory(data)
+    setHistoryLoading(false)
+  }
+
+  useEffect(() => { loadHistory() }, [])
 
   const form = useForm<FeedbackFormValues>({
     resolver: zodResolver(feedbackSchema),
@@ -73,6 +84,7 @@ export function FeedbackForm() {
           description: "Tu mensaje ha sido enviado correctamente.",
         })
         form.reset()
+        loadHistory()
       } else {
         toast.error("Error al enviar", {
           description: result.error || "Ocurrió un problema inesperado.",
@@ -115,6 +127,7 @@ export function FeedbackForm() {
   const currentType = feedbackTypes.find(t => t.value === selectedType)
 
   return (
+    <>
     <Card className="w-full max-w-2xl mx-auto border-none shadow-2xl bg-gradient-to-b from-card to-card/50 backdrop-blur-sm overflow-hidden">
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent via-primary to-accent opacity-50" />
       <CardHeader className="space-y-1 pb-8">
@@ -209,5 +222,81 @@ export function FeedbackForm() {
         </form>
       </CardContent>
     </Card>
+
+    {/* ── Historial de sugerencias enviadas ── */}
+    <div className="w-full max-w-2xl mx-auto mt-8">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold tracking-tight">Tus sugerencias enviadas</h2>
+        <span className="text-xs text-muted-foreground">{history.length} registro{history.length !== 1 ? "s" : ""}</span>
+      </div>
+
+      {historyLoading ? (
+        <div className="flex items-center gap-2 text-muted-foreground text-sm py-6">
+          <Loader2 className="w-4 h-4 animate-spin" /> Cargando historial...
+        </div>
+      ) : history.length === 0 ? (
+        <div className="text-center text-muted-foreground text-sm py-10 border border-dashed border-muted rounded-xl">
+          Aún no enviaste ninguna sugerencia.
+        </div>
+      ) : (
+        <div className="rounded-xl overflow-hidden border border-border/40">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-muted/30 text-muted-foreground text-xs uppercase tracking-wider">
+                <th className="px-4 py-3 text-left font-semibold">Tipo</th>
+                <th className="px-4 py-3 text-left font-semibold">Contenido</th>
+                <th className="px-4 py-3 text-left font-semibold">Estado</th>
+                <th className="px-4 py-3 text-right font-semibold">Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((item, idx) => {
+                const typeInfo = feedbackTypes.find(t => t.value === item.type)
+                const statusColors: Record<string, string> = {
+                  new: "text-blue-400 bg-blue-400/10",
+                  reviewing: "text-amber-400 bg-amber-400/10",
+                  resolved: "text-emerald-400 bg-emerald-400/10",
+                  rejected: "text-red-400 bg-red-400/10",
+                }
+                const statusLabels: Record<string, string> = {
+                  new: "Nuevo",
+                  reviewing: "En revisión",
+                  resolved: "Resuelto",
+                  rejected: "Descartado",
+                }
+                return (
+                  <tr
+                    key={item.id}
+                    className={cn(
+                      "border-t border-border/30 transition-colors hover:bg-muted/10",
+                      idx % 2 === 0 ? "bg-card/30" : "bg-muted/5"
+                    )}
+                  >
+                    <td className="px-4 py-3">
+                      <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 rounded-full", typeInfo?.bg, typeInfo?.color)}>
+                        {typeInfo && <typeInfo.icon className="w-3 h-3" />}
+                        {typeInfo?.label ?? item.type}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground max-w-[260px]">
+                      <span className="line-clamp-2 leading-relaxed">{item.content}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn("text-xs font-semibold px-2 py-1 rounded-full", statusColors[item.status] ?? "text-muted-foreground bg-muted/20")}>
+                        {statusLabels[item.status] ?? item.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(item.created_at).toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" })}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  </>
   )
 }
