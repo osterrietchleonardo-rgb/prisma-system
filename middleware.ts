@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { aiRateLimit } from '@/lib/rate-limit'
 
@@ -8,6 +8,43 @@ export async function middleware(request: NextRequest) {
       headers: request.headers,
     },
   })
+
+  const url = request.nextUrl.clone()
+
+  // ============================================================
+  // ADMIN VAKDOR — Route Protection (lightweight, no DB query)
+  // ============================================================
+  if (url.pathname.startsWith('/admin-vakdor')) {
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+
+    if (url.pathname === '/admin-vakdor/login') {
+      return response
+    }
+
+    const adminToken = request.cookies.get('admin_vakdor_token')?.value
+    if (!adminToken) {
+      return NextResponse.redirect(new URL('/admin-vakdor/login', request.url))
+    }
+
+    try {
+      const { verifyAdminToken } = await import('@/lib/admin-vakdor/auth')
+      const payload = await verifyAdminToken(adminToken)
+      if (!payload) {
+        const res = NextResponse.redirect(new URL('/admin-vakdor/login', request.url))
+        res.cookies.set('admin_vakdor_token', '', { maxAge: 0, path: '/' })
+        return res
+      }
+    } catch {
+      return NextResponse.redirect(new URL('/admin-vakdor/login', request.url))
+    }
+
+    return response
+  }
+
+  // API Admin Vakdor — noindex
+  if (url.pathname.startsWith('/api/admin-vakdor')) {
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow')
+  }
 
   try {
     const ip = request.ip ?? request.headers.get('x-forwarded-for') ?? '127.0.0.1'
@@ -53,25 +90,18 @@ export async function middleware(request: NextRequest) {
     )
 
     const { data: { user } } = await supabase.auth.getUser()
-    const url = request.nextUrl.clone()
 
-    // 1. PUBLIC ROUTES (Login, Register, Landing) - Basic session check
+    // 1. PUBLIC ROUTES
     if (url.pathname.startsWith('/auth')) {
-      if (user) {
-        // Redirigir a sus áreas respectivas, pero solo si es estrictamente necesario
-        // Dejamos que el layout decida el rol para mayor velocidad aquí
-        return response
-      }
       return response
     }
 
-    // 2. PROTECTED ROUTES - Just check for session
+    // 2. PROTECTED ROUTES
     if (url.pathname.startsWith('/director') || url.pathname.startsWith('/asesor')) {
       if (!user) {
         return NextResponse.redirect(new URL('/auth/login', request.url))
       }
-      // El chequeo de ROL (si es director o asesor) ya está implementado en app/(director|asesor)/layout.tsx
-      // Eliminar la query a base de datos aquí reduce enormemente la latencia de navegación.
+      // Account status (pausado/eliminado) checked in layout.tsx server components
     }
   } catch (e) {
     console.error('Middleware error:', e)
@@ -82,13 +112,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
-     */
     '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 }
