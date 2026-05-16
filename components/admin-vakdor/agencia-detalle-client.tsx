@@ -34,7 +34,8 @@ export default function AgenciaDetalleClient() {
   const [actionLoading, setActionLoading] = useState(false)
   const [creditModal, setCreditModal] = useState(false)
   const [pagoModal, setPagoModal] = useState(false)
-  const [creditForm, setCreditForm] = useState({ accion: "agregar", cantidad: 0, motivo: "" })
+  const [creditForm, setCreditForm] = useState({ credits_total: 0, credits_director: 0, credits_asesores: 0, motivo: "" })
+  const [creditInfo, setCreditInfo] = useState<{ numAsesores: number; creditsPorAsesor: number } | null>(null)
   const [pagoForm, setPagoForm] = useState({ monto: "", moneda: "ARS", periodo_mes: "", notas: "" })
   const [msg, setMsg] = useState("")
 
@@ -72,14 +73,35 @@ export default function AgenciaDetalleClient() {
     setActionLoading(false)
   }
 
+  async function openCreditModal() {
+    const res = await fetch(`/api/admin-vakdor/agencias/${id}/creditos`)
+    const d = await res.json()
+    if (res.ok) {
+      setCreditForm({
+        credits_total:    d.creditos?.credits_total    ?? 0,
+        credits_director: d.creditos?.credits_director ?? 0,
+        credits_asesores: d.creditos?.credits_asesores ?? 0,
+        motivo: "",
+      })
+      setCreditInfo({ numAsesores: d.numAsesores, creditsPorAsesor: d.creditsPorAsesor })
+    }
+    setCreditModal(true)
+  }
+
   async function aplicarCredito() {
     setActionLoading(true)
     const res = await fetch(`/api/admin-vakdor/agencias/${id}/creditos`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(creditForm),
     })
-    if (res.ok) { fetchData(); setCreditModal(false); setMsg("Créditos actualizados") }
-    else { const d = await res.json(); setMsg(d.error) }
+    const d = await res.json()
+    if (res.ok) {
+      fetchData()
+      setCreditModal(false)
+      setMsg(`Créditos actualizados: ${d.creditos.credits_total} total · ${d.creditos.credits_director} director · ${d.creditos.credits_asesores} asesores (${d.creditsPorAsesor} c/u)`)
+    } else {
+      setMsg(d.error)
+    }
     setActionLoading(false)
   }
 
@@ -157,19 +179,36 @@ export default function AgenciaDetalleClient() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         {/* Créditos */}
         <Section title="💰 Créditos">
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 12 }}>
+          {/* Totales */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
             {[
-              { l: "Total", v: creditos?.credits_total ?? "–" },
-              { l: "Usado", v: creditos?.credits_used ?? "–" },
-              { l: "Disponible", v: creditos ? creditos.credits_total - creditos.credits_used : "–" },
-            ].map(({ l, v }) => (
+              { l: "Total mensual", v: creditos?.credits_total ?? "–", c: "#fff" },
+              { l: "Usado",         v: creditos?.credits_used  ?? "–", c: creditos && creditos.credits_used > creditos.credits_total * 0.8 ? "#f87171" : "rgba(255,255,255,0.9)" },
+              { l: "Disponible",    v: creditos ? creditos.credits_total - creditos.credits_used : "–", c: "#34d399" },
+            ].map(({ l, v, c }) => (
               <div key={l} style={{ textAlign: "center", padding: 10, background: "rgba(255,255,255,0.04)", borderRadius: 8 }}>
                 <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>{l}</div>
-                <div style={{ color: "#fff", fontSize: 20, fontWeight: 700 }}>{v}</div>
+                <div style={{ color: c, fontSize: 20, fontWeight: 700 }}>{v}</div>
               </div>
             ))}
           </div>
-          <button onClick={() => setCreditModal(true)} style={btnStyle("primary")}>Ajustar créditos</button>
+          {/* Distribución por rol */}
+          <div style={{ background: "rgba(184,115,51,0.08)", border: "1px solid rgba(184,115,51,0.2)", borderRadius: 8, padding: "10px 14px", marginBottom: 12 }}>
+            <div style={{ color: "rgba(255,255,255,0.45)", fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Distribución mensual</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              <div>
+                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>Director</div>
+                <div style={{ color: "#B87333", fontSize: 16, fontWeight: 700 }}>{creditos?.credits_director ?? 0}</div>
+                <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>usados: {creditos?.credits_used_director ?? 0}</div>
+              </div>
+              <div>
+                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>Pool asesores</div>
+                <div style={{ color: "#B87333", fontSize: 16, fontWeight: 700 }}>{creditos?.credits_asesores ?? 0}</div>
+                <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 11 }}>usados: {creditos?.credits_used_asesores ?? 0}</div>
+              </div>
+            </div>
+          </div>
+          <button onClick={openCreditModal} style={btnStyle("primary")}>Configurar distribución →</button>
           {historialCreditos.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, marginBottom: 6 }}>Últimos movimientos</div>
@@ -330,23 +369,76 @@ export default function AgenciaDetalleClient() {
         </Section>
       )}
 
-      {/* Credit Modal */}
+      {/* Credit Modal — Distribución */}
       {creditModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-          <div style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: 28, width: 380 }}>
-            <h3 style={{ color: "#fff", margin: "0 0 18px" }}>Ajustar Créditos</h3>
-            <select value={creditForm.accion} onChange={e => setCreditForm(f => ({ ...f, accion: e.target.value }))} style={{ ...inputStyle, marginBottom: 10 }}>
-              <option value="agregar">Agregar</option>
-              <option value="restar">Restar</option>
-              <option value="establecer">Establecer en</option>
-            </select>
-            <input type="number" min={0} placeholder="Cantidad" value={creditForm.cantidad}
-              onChange={e => setCreditForm(f => ({ ...f, cantidad: Number(e.target.value) }))} style={{ ...inputStyle, marginBottom: 10 }} />
-            <input placeholder="Motivo *" value={creditForm.motivo}
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
+          <div style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: 28, width: 420 }}>
+            <h3 style={{ color: "#fff", margin: "0 0 6px" }}>Configurar Créditos Mensuales</h3>
+            <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 12, margin: "0 0 20px", lineHeight: 1.5 }}>
+              Los créditos se renuevan el 1° de cada mes sin acumular sobrante.
+            </p>
+
+            {/* Total */}
+            <label style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, display: "block", marginBottom: 4 }}>TOTAL MENSUAL DE AGENCIA</label>
+            <input type="number" min={0} value={creditForm.credits_total}
+              onChange={e => setCreditForm(f => ({ ...f, credits_total: Number(e.target.value) }))}
+              style={{ ...inputStyle, marginBottom: 16, fontSize: 18, fontWeight: 700 }} />
+
+            {/* Validación suma */}
+            {creditForm.credits_director + creditForm.credits_asesores > creditForm.credits_total && (
+              <div style={{ color: "#f87171", fontSize: 12, marginBottom: 10, padding: "6px 10px", background: "rgba(239,68,68,0.1)", borderRadius: 6 }}>
+                ⚠ Director + Asesores ({creditForm.credits_director + creditForm.credits_asesores}) supera el total ({creditForm.credits_total})
+              </div>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              {/* Director */}
+              <div>
+                <label style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, display: "block", marginBottom: 4 }}>CUOTA DIRECTOR</label>
+                <input type="number" min={0} max={creditForm.credits_total} value={creditForm.credits_director}
+                  onChange={e => setCreditForm(f => ({ ...f, credits_director: Number(e.target.value) }))}
+                  style={{ ...inputStyle, color: "#B87333" }} />
+              </div>
+              {/* Asesores */}
+              <div>
+                <label style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, display: "block", marginBottom: 4 }}>POOL ASESORES</label>
+                <input type="number" min={0} max={creditForm.credits_total} value={creditForm.credits_asesores}
+                  onChange={e => setCreditForm(f => ({ ...f, credits_asesores: Number(e.target.value) }))}
+                  style={{ ...inputStyle, color: "#B87333" }} />
+              </div>
+            </div>
+
+            {/* Info por asesor */}
+            {creditInfo && creditInfo.numAsesores > 0 && (
+              <div style={{ padding: "8px 12px", background: "rgba(184,115,51,0.08)", border: "1px solid rgba(184,115,51,0.2)", borderRadius: 8, marginBottom: 14, fontSize: 12 }}>
+                <span style={{ color: "rgba(255,255,255,0.5)" }}>{creditInfo.numAsesores} asesor{creditInfo.numAsesores !== 1 ? "es" : ""} activos → </span>
+                <span style={{ color: "#B87333", fontWeight: 700 }}>
+                  {creditForm.credits_asesores > 0 && creditInfo.numAsesores > 0
+                    ? Math.floor(creditForm.credits_asesores / creditInfo.numAsesores)
+                    : 0}
+                </span>
+                <span style={{ color: "rgba(255,255,255,0.5)" }}> créditos por asesor</span>
+              </div>
+            )}
+
+            {/* Sin asignar */}
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16, padding: "6px 10px", background: "rgba(255,255,255,0.04)", borderRadius: 6, fontSize: 12 }}>
+              <span style={{ color: "rgba(255,255,255,0.4)" }}>Sin asignar:</span>
+              <span style={{ color: creditForm.credits_director + creditForm.credits_asesores > creditForm.credits_total ? "#f87171" : "rgba(255,255,255,0.7)", fontWeight: 600 }}>
+                {Math.max(0, creditForm.credits_total - creditForm.credits_director - creditForm.credits_asesores)}
+              </span>
+            </div>
+
+            <input placeholder="Motivo (opcional)" value={creditForm.motivo}
               onChange={e => setCreditForm(f => ({ ...f, motivo: e.target.value }))} style={{ ...inputStyle, marginBottom: 16 }} />
+
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={aplicarCredito} disabled={!creditForm.motivo || actionLoading} style={{ ...btnStyle("primary"), flex: 1 }}>
-                {actionLoading ? "Guardando..." : "Aplicar"}
+              <button
+                onClick={aplicarCredito}
+                disabled={actionLoading || creditForm.credits_director + creditForm.credits_asesores > creditForm.credits_total}
+                style={{ ...btnStyle("primary"), flex: 1 }}
+              >
+                {actionLoading ? "Guardando..." : "Guardar distribución"}
               </button>
               <button onClick={() => setCreditModal(false)} style={{ ...btnStyle("ghost"), flex: 1 }}>Cancelar</button>
             </div>
