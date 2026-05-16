@@ -34,9 +34,12 @@ if (!email || !password || !secret || !supabaseUrl || !serviceKey) {
   process.exit(1)
 }
 
-// Hash the password (same algorithm as login route)
+// Normalize email first (CRITICAL: must match what login API uses)
+const normalizedEmail = email.toLowerCase().trim()
+
+// Hash: must use normalizedEmail as salt — same as login route does with adminUser.email
 const passwordHash = createHash("sha256")
-  .update(password + email + secret)
+  .update(password + normalizedEmail + secret)
   .digest("hex")
 
 const supabase = createClient(supabaseUrl, serviceKey)
