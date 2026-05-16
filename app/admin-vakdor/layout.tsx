@@ -25,18 +25,11 @@ export default async function AdminVakdorLayout({
   }
 
   return (
-    <html lang="es">
-      <head>
-        <meta name="robots" content="noindex, nofollow" />
-      </head>
-      <body className="bg-[#070B14] text-white antialiased">
-        <div className="flex h-screen overflow-hidden">
-          <AdminSidebar adminEmail={payload.email} />
-          <main className="flex-1 overflow-y-auto">
-            {children}
-          </main>
-        </div>
-      </body>
-    </html>
+    <div className="flex h-screen overflow-hidden bg-[#070B14] text-white antialiased">
+      <AdminSidebar adminEmail={payload.email} />
+      <main className="flex-1 overflow-y-auto">
+        {children}
+      </main>
+    </div>
   )
 }
