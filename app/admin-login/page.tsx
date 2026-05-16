@@ -52,19 +52,18 @@ export default function AdminVakdorLoginPage() {
       }}>
         {/* Brand */}
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{
-            width: 52, height: 52,
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            borderRadius: 14,
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-            fontSize: 24, marginBottom: 16,
-            boxShadow: "0 0 30px rgba(99,102,241,0.4)",
-          }}>⬡</div>
-          <h1 style={{ color: "#fff", fontSize: 20, fontWeight: 700, margin: 0 }}>
-            Panel Administrativo
-          </h1>
-          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, margin: "6px 0 0" }}>
-            Acceso restringido — PRISMA System
+          <img
+            src="/logo-full.jpg"
+            alt="PRISMA IA"
+            style={{
+              height: 56,
+              objectFit: "contain",
+              marginBottom: 16,
+              borderRadius: 8,
+            }}
+          />
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, margin: 0 }}>
+            Acceso restringido — Sistema
           </p>
         </div>
 

@@ -17,7 +17,7 @@ export default function AdminSidebar({ adminEmail }: { adminEmail: string }) {
   async function handleLogout() {
     setLoggingOut(true)
     await fetch("/api/admin-vakdor/logout", { method: "POST" })
-    router.push("/admin-vakdor/login")
+    router.push("/admin-login")
   }
 
   return (
@@ -33,20 +33,11 @@ export default function AdminSidebar({ adminEmail }: { adminEmail: string }) {
     }}>
       {/* Brand */}
       <div style={{ padding: "0 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 34, height: 34,
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 16, boxShadow: "0 0 20px rgba(99,102,241,0.3)"
-          }}>
-            ⬡
-          </div>
-          <div>
-            <div style={{ color: "#fff", fontSize: 12, fontWeight: 700, lineHeight: 1.2 }}>PRISMA</div>
-            <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 10 }}>Sistema</div>
-          </div>
-        </div>
+        <img
+          src="/logo-full.jpg"
+          alt="PRISMA IA"
+          style={{ height: 40, objectFit: "contain", display: "block", borderRadius: 6 }}
+        />
       </div>
 
       {/* Nav */}
