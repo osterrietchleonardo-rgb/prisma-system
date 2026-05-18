@@ -107,7 +107,7 @@ export default async function WhatsAppInboxPage() {
           value="chat"
           className="flex-1 min-h-0 m-0 border-none p-0 outline-none data-[state=inactive]:hidden flex flex-col"
         >
-          <ChatInterface instance={instance as WhatsAppInstance} />
+          <ChatInterface instance={instance as WhatsAppInstance} hideAgentFilter={true} />
         </TabsContent>
 
         <TabsContent

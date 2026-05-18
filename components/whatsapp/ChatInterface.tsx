@@ -9,9 +9,10 @@ import { MessageSquare } from "lucide-react"
 
 interface ChatInterfaceProps {
   instance: WhatsAppInstance
+  hideAgentFilter?: boolean
 }
 
-export default function ChatInterface({ instance }: ChatInterfaceProps) {
+export default function ChatInterface({ instance, hideAgentFilter = false }: ChatInterfaceProps) {
   const [activeConversation, setActiveConversation] =
     useState<WAConversation | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -34,6 +35,7 @@ export default function ChatInterface({ instance }: ChatInterfaceProps) {
           instance={instance}
           activeId={activeConversation?.id ?? null}
           onSelect={(conv) => setActiveConversation(conv)}
+          hideAgentFilter={hideAgentFilter}
         />
       </div>
 
