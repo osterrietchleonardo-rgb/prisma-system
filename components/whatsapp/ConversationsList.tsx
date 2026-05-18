@@ -39,6 +39,42 @@ function timeAgo(dateStr: string): string {
   if (days < 7) return `${days}d`
   return `${Math.floor(days / 7)}sem`
 }
+// Dispara una notificacion del sistema operativo (barra de notificaciones del celular)
+async function fireWhatsappNotification(contactName: string, lastMessage?: string) {
+  if (typeof window === 'undefined') return
+  if (!('Notification' in window)) return
+
+  // Registrar el SW si aun no esta registrado
+  if ('serviceWorker' in navigator) {
+    try {
+      await navigator.serviceWorker.register('/sw.js')
+    } catch {}
+  }
+
+  if (Notification.permission === 'granted') {
+    const name = contactName || 'WhatsApp'
+    const body = lastMessage ? lastMessage.slice(0, 80) : 'Nuevo mensaje entrante'
+
+    // Si hay SW activo, lo usamos (mejor soporte movil)
+    const reg = navigator.serviceWorker?.controller
+      ? await navigator.serviceWorker.ready.catch(() => null)
+      : null
+
+    if (reg) {
+      reg.showNotification(`💬 ${name}`, {
+        body,
+        icon: '/icon-192.png',
+        badge: '/icon-72.png',
+        vibrate: [200, 100, 200],
+        tag: `wa-${contactName}`,
+        renotify: true,
+        data: { url: '/asesor/whatsapp' },
+      } as NotificationOptions)
+    } else {
+      new Notification(`💬 ${name}`, { body, icon: '/icon-192.png' })
+    }
+  }
+}
 
 
 export function ConversationsList({ instance, activeId, onSelect, hideAgentFilter = false }: ConversationsListProps) {
@@ -116,6 +152,10 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
                 
                 if (activeIdRef.current !== newItem.id) {
                   toast.info(`Nuevo mensaje de ${newItem.contact_name || newItem.contact_phone}`)
+                  fireWhatsappNotification(
+                    newItem.contact_name || newItem.contact_phone,
+                    newItem.last_message_text
+                  )
                 } else {
                   markConversationRead(newItem.id)
                 }
@@ -145,6 +185,10 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
 
                 if (isInbound && activeIdRef.current !== updatedItem.id) {
                   toast.info(`Nuevo mensaje de ${updatedItem.contact_name || updatedItem.contact_phone}`)
+                  fireWhatsappNotification(
+                    updatedItem.contact_name || updatedItem.contact_phone,
+                    updatedItem.last_message_text
+                  )
                 } else if (isInbound && activeIdRef.current === updatedItem.id && updatedItem.unread_count > 0) {
                   updatedItem.unread_count = 0
                   markConversationRead(updatedItem.id)
