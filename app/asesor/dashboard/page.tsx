@@ -28,8 +28,12 @@ export default async function AsesorDashboardPage() {
     return <div>Inmobiliaria no configurada</div>
   }
 
-  // Same query as the director but locked to this asesor's ID
-  const dashboardData = await getDashboardData(profile.agency_id, user.id)
+  // Personal KPIs + charts: filtered by this asesor's ID
+  // Agency-wide: all advisors for the leaderboard + recent agency activity
+  const [myData, agencyData] = await Promise.all([
+    getDashboardData(profile.agency_id, user.id),
+    getDashboardData(profile.agency_id),           // no agentId → full agency
+  ])
 
   return (
     <div id="dashboard-content" className="space-y-8 animate-in fade-in duration-500 px-4 md:px-8 py-8 bg-background">
@@ -43,7 +47,7 @@ export default async function AsesorDashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <DashboardHeaderActions data={dashboardData} />
+          <DashboardHeaderActions data={myData} />
           <Button asChild variant="outline" size="sm" className="h-9 gap-2">
             <Link href="/asesor/tracking-performance">
               <TrendingUp className="h-4 w-4" />
@@ -59,22 +63,24 @@ export default async function AsesorDashboardPage() {
         </div>
       </div>
 
-      {/* Full metrics grid — same 9 cards as director */}
-      <PerformanceMetricsGrid kpis={dashboardData.kpis} />
+      {/* Personal metrics — 9 cards filtered to this asesor */}
+      <PerformanceMetricsGrid kpis={myData.kpis} />
 
-      {/* Evolution + Channel charts */}
+      {/* Personal evolution + channel charts */}
       <PerformanceCharts
-        data={dashboardData.charts.performanceEvolution}
-        channels={dashboardData.charts.channelDistribution}
+        data={myData.charts.performanceEvolution}
+        channels={myData.charts.channelDistribution}
       />
 
-      {/* Leaderboard: asesor can see where they rank in the agency */}
-      <PerformanceLeaderboard advisors={dashboardData.advisors} />
+      {/* Leaderboard: full agency ranking so the asesor can see their position */}
+      <PerformanceLeaderboard advisors={agencyData.advisors} />
 
-      {/* Recent activity (rich component with avatars and badges) */}
-      <DashboardActivity
-        data={dashboardData.activity}
-      />
+      {/* Recent agency activity — capped height with internal scroll */}
+      <div className="max-h-[480px] overflow-y-auto rounded-xl scrollbar-thin scrollbar-thumb-accent/20">
+        <DashboardActivity
+          data={agencyData.activity}
+        />
+      </div>
 
     </div>
   )
