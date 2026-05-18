@@ -35,12 +35,12 @@ export default async function AsesorLeadsWhatsappPage() {
   }
 
   return (
-    <div className="p-6 md:p-8 space-y-8 animate-in fade-in duration-500 max-w-7xl mx-auto">
+    <div className="flex flex-col h-full space-y-6 pt-6 container max-w-[1600px] mx-auto pb-10 px-4 md:px-8 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight mb-2 bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
           Mis Leads de WhatsApp
         </h1>
-        <p className="text-muted-foreground text-lg">
+        <p className="text-muted-foreground mt-1 text-sm">
           Revisa el estado de tus contactos asignados desde WhatsApp y su fase en el Pipeline.
         </p>
       </div>
