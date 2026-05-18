@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { 
   User, 
   Lock, 
@@ -10,7 +10,9 @@ import {
   Building,
   Zap,
   TrendingUp,
-  Clock
+  Clock,
+  Smartphone,
+  CheckCircle2
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -55,6 +57,7 @@ export default function AsesorConfiguracionPage() {
   const defaultTab = searchParams.get('tab') || 'perfil'
 
   const [loading, setLoading] = useState(false)
+  const [passwordLoading, setPasswordLoading] = useState(false)
   const [profile, setProfile] = useState<{ full_name: string; email: string; avatar_url: string; agency_name: string }>({
     full_name: "",
     email: "",
@@ -64,6 +67,13 @@ export default function AsesorConfiguracionPage() {
   const [userId, setUserId] = useState<string | null>(null)
   const [creditData, setCreditData] = useState<CreditData | null>(null)
   const [creditLoading, setCreditLoading] = useState(false)
+
+  // Notification prefs
+  const [notifPrefs, setNotifPrefs] = useState({ new_leads: true, visit_reminders: true })
+  const [notifLoading, setNotifLoading] = useState(false)
+  const [pushSupported, setPushSupported] = useState(false)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
 
   const supabase = createClient()
 
@@ -75,12 +85,7 @@ export default function AsesorConfiguracionPage() {
       
       const { data: profileData } = await supabase
         .from('profiles')
-        .select(`
-          full_name,
-          email,
-          avatar_url,
-          agency_id
-        `)
+        .select(`full_name, email, avatar_url, agency_id, notification_prefs`)
         .eq('id', session.user.id)
         .single()
         
@@ -89,14 +94,31 @@ export default function AsesorConfiguracionPage() {
           ...p,
           full_name: profileData.full_name || "",
           email: profileData.email || session.user.email || "",
-          avatar_url: profileData.avatar_url || ""
+          avatar_url: profileData.avatar_url || "",
+          agency_name: "Inmobiliaria Vinculada"
         }))
-        
-        // Fetch agency name (mocked as PRISMA for now since we don't have an agencies table standard yet or we use auth.users metadata)
-        setProfile(p => ({ ...p, agency_name: "Inmobiliaria Vinculada" }))
+        if (profileData.notification_prefs) {
+          setNotifPrefs({
+            new_leads: profileData.notification_prefs.new_leads ?? true,
+            visit_reminders: profileData.notification_prefs.visit_reminders ?? true,
+          })
+        }
       }
     }
     fetchProfile()
+  }, [])
+
+  // Detectar soporte de Web Push y si ya está suscripto
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+      setPushSupported(true)
+      // Registrar service worker
+      navigator.serviceWorker.register('/sw.js').then(reg => {
+        reg.pushManager.getSubscription().then(sub => {
+          setPushEnabled(!!sub)
+        })
+      }).catch(() => {})
+    }
   }, [])
 
   useEffect(() => {
@@ -135,8 +157,99 @@ export default function AsesorConfiguracionPage() {
     }
   }
 
-  const handlePasswordReset = () => {
-    toast.success("Se ha enviado un email para restablecer la contraseña")
+  const handlePasswordReset = async () => {
+    if (!profile.email) return
+    try {
+      setPasswordLoading(true)
+      const { error } = await supabase.auth.resetPasswordForEmail(profile.email, {
+        redirectTo: `${window.location.origin}/auth/update-password`,
+      })
+      if (error) throw error
+      toast.success(`Email de restablecimiento enviado a ${profile.email}`)
+    } catch (_err) {
+      toast.error("Error al enviar el email. Intentá de nuevo.")
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
+
+  const handleSaveNotifPrefs = async (newPrefs: typeof notifPrefs) => {
+    if (!userId) return
+    setNotifLoading(true)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ notification_prefs: newPrefs })
+        .eq('id', userId)
+      if (error) throw error
+      toast.success('Preferencias guardadas')
+    } catch {
+      toast.error('Error al guardar preferencias')
+    } finally {
+      setNotifLoading(false)
+    }
+  }
+
+  const handleToggleNotif = (key: keyof typeof notifPrefs) => {
+    const updated = { ...notifPrefs, [key]: !notifPrefs[key] }
+    setNotifPrefs(updated)
+    handleSaveNotifPrefs(updated)
+  }
+
+  const handleTogglePush = async () => {
+    if (!pushSupported) return
+    setPushLoading(true)
+    try {
+      const reg = await navigator.serviceWorker.ready
+      if (pushEnabled) {
+        // Desuscribir
+        const sub = await reg.pushManager.getSubscription()
+        if (sub) {
+          await fetch('/api/push/subscribe', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: sub.endpoint }),
+          })
+          await sub.unsubscribe()
+        }
+        setPushEnabled(false)
+        toast.success('Notificaciones push desactivadas')
+      } else {
+        // Pedir permiso y suscribir
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') {
+          toast.error('Permiso denegado. Activálo desde la configuración del navegador.')
+          return
+        }
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapidKey),
+        })
+        const subJson = sub.toJSON()
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(subJson),
+        })
+        setPushEnabled(true)
+        toast.success('¡Notificaciones activadas! Te llegarán en tu celular.')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('Error al configurar notificaciones push')
+    } finally {
+      setPushLoading(false)
+    }
+  }
+
+  function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const rawData = window.atob(base64)
+    const outputArray = new Uint8Array(rawData.length)
+    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i)
+    return outputArray
   }
 
   return (
@@ -233,8 +346,8 @@ export default function AsesorConfiguracionPage() {
                     <h4 className="font-semibold">Contraseña</h4>
                     <p className="text-sm text-muted-foreground">Te enviaremos un link seguro para actualizarla.</p>
                   </div>
-                  <Button variant="outline" onClick={handlePasswordReset}>
-                    Restablecer Contraseña
+                  <Button variant="outline" onClick={handlePasswordReset} disabled={passwordLoading}>
+                    {passwordLoading ? "Enviando..." : "Restablecer Contraseña"}
                   </Button>
                 </div>
               </div>
@@ -246,16 +359,46 @@ export default function AsesorConfiguracionPage() {
           <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
             <CardHeader>
               <CardTitle>Preferencias de Notificación</CardTitle>
-              <CardDescription>Mantente al tanto de tus leads y visitas.</CardDescription>
+              <CardDescription>Recibiás alertas en tu celular cuando sucedan estos eventos.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Push al celular */}
+              {pushSupported && (
+                <div className="flex items-center justify-between p-4 rounded-xl border border-accent/20 bg-accent/5">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-accent/10">
+                      <Smartphone className="h-5 w-5 text-accent" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-sm">Notificaciones en el celular</h4>
+                      <p className="text-xs text-muted-foreground">
+                        {pushEnabled ? '✅ Activadas — te llegarán en la barra de notificaciones' : 'Actívalas para recibir alertas instantáneas'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={pushEnabled ? "outline" : "default"}
+                    className={pushEnabled ? "" : "bg-accent hover:bg-accent/90"}
+                    onClick={handleTogglePush}
+                    disabled={pushLoading}
+                  >
+                    {pushLoading ? 'Un momento...' : pushEnabled ? 'Desactivar' : 'Activar Push'}
+                  </Button>
+                </div>
+              )}
+
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="font-semibold">Nuevos Leads</h4>
-                    <p className="text-sm text-muted-foreground">Recibir email cuando se te asigne un lead.</p>
+                    <p className="text-sm text-muted-foreground">Notificación cuando se te asigne un lead.</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch
+                    checked={notifPrefs.new_leads}
+                    onCheckedChange={() => handleToggleNotif('new_leads')}
+                    disabled={notifLoading}
+                  />
                 </div>
                 <div className="w-full h-px bg-border/50" />
                 <div className="flex items-center justify-between">
@@ -263,17 +406,19 @@ export default function AsesorConfiguracionPage() {
                     <h4 className="font-semibold">Recordatorios de Visitas</h4>
                     <p className="text-sm text-muted-foreground">Aviso 24hs antes de una visita programada.</p>
                   </div>
-                  <Switch defaultChecked />
-                </div>
-                <div className="w-full h-px bg-border/50" />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-semibold">Mensajes de IA</h4>
-                    <p className="text-sm text-muted-foreground">Notificar insights semanales del Consultor IA.</p>
-                  </div>
-                  <Switch />
+                  <Switch
+                    checked={notifPrefs.visit_reminders}
+                    onCheckedChange={() => handleToggleNotif('visit_reminders')}
+                    disabled={notifLoading}
+                  />
                 </div>
               </div>
+
+              {!pushSupported && (
+                <p className="text-xs text-muted-foreground border border-dashed border-border rounded-lg p-3">
+                  💡 Para recibir notificaciones en tu celular, abrí esta app desde Chrome o Safari e instalála en tu pantalla de inicio.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
