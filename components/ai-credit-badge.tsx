@@ -1,8 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import { Sparkles, Loader2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import {
   Tooltip,
@@ -11,6 +9,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { Progress } from "@/components/ui/progress"
+import { useAsesorCreditos } from "@/hooks/use-asesor-creditos"
 
 interface AiCreditBadgeProps {
   className?: string
@@ -18,56 +17,7 @@ interface AiCreditBadgeProps {
 }
 
 export function AiCreditBadge({ className, showLabel = true }: AiCreditBadgeProps) {
-  const [credits, setCredits] = useState<{ allocated: number; consumed: number } | null>(null)
-  const [loading, setLoading] = useState(true)
-  const supabase = createClient()
-
-  const fetchCredits = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("agency_id")
-        .eq("id", user.id)
-        .single()
-
-      if (profile?.agency_id) {
-        const { data } = await supabase
-          .from("agency_ai_credits")
-          .select("credits_total, credits_used")
-          .eq("agency_id", profile.agency_id)
-          .maybeSingle()
-
-        if (data) {
-          setCredits({
-            allocated: data.credits_total,
-            consumed: data.credits_used
-          })
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching credits for badge:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchCredits()
-
-    // Listen for custom events that indicate credit consumption
-    const handleRefresh = () => fetchCredits()
-    window.addEventListener('prisma-refresh-credits', handleRefresh)
-    // Also refresh on generation completion
-    window.addEventListener('generation-complete', handleRefresh)
-    
-    return () => {
-      window.removeEventListener('prisma-refresh-credits', handleRefresh)
-      window.removeEventListener('generation-complete', handleRefresh)
-    }
-  }, [])
+  const { data: credits, loading } = useAsesorCreditos()
 
   if (loading) {
     return (
@@ -80,10 +30,8 @@ export function AiCreditBadge({ className, showLabel = true }: AiCreditBadgeProp
 
   if (!credits) return null
 
-  const remaining = credits.allocated - credits.consumed
-  const percentage = Math.min(100, Math.max(0, (credits.consumed / credits.allocated) * 100))
-  const isWarning = percentage > 80
-  const isDanger = percentage > 95
+  const isWarning = credits.porcentaje > 80
+  const isDanger  = credits.porcentaje > 95
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -99,35 +47,68 @@ export function AiCreditBadge({ className, showLabel = true }: AiCreditBadgeProp
             )} />
             {showLabel && (
               <span className="text-xs font-bold text-foreground">
-                {remaining.toLocaleString()} <span className="text-[10px] text-muted-foreground font-medium ml-0.5">créditos</span>
+                {credits.disponible.toLocaleString()}{" "}
+                <span className="text-[10px] text-muted-foreground font-medium ml-0.5">créditos</span>
               </span>
             )}
           </div>
         </TooltipTrigger>
-        <TooltipContent side="bottom" align="end" className="w-64 p-4 bg-card border-accent/20 shadow-2xl z-[100]">
-          <div className="space-y-2">
+        <TooltipContent side="bottom" align="end" className="w-72 p-4 bg-card border-accent/20 shadow-2xl z-[100]">
+          <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold">Bolsa de Créditos</span>
+              <span className="text-sm font-semibold">Mis Créditos IA</span>
               <span className={cn(
                 "text-xs font-bold",
                 isDanger ? "text-destructive" : isWarning ? "text-yellow-500" : "text-accent"
               )}>
-                {percentage.toFixed(1)}% usado
+                {credits.porcentaje}% usado
               </span>
             </div>
-            <Progress 
-              value={percentage} 
+
+            {/* Barra de progreso */}
+            <Progress
+              value={credits.porcentaje}
               className={cn(
                 "h-2",
-                isDanger ? "*:[background-color:hsl(var(--destructive))]" : isWarning ? "*:[background-color:#eab308]" : "*:[background-color:hsl(var(--accent))]"
-              )} 
+                isDanger  ? "*:[background-color:hsl(var(--destructive))]"
+                : isWarning ? "*:[background-color:#eab308]"
+                :             "*:[background-color:hsl(var(--accent))]"
+              )}
             />
-            <div className="flex justify-between text-[10px] text-muted-foreground pt-1">
-              <span>{credits.consumed.toLocaleString()} consumidos</span>
-              <span>{credits.allocated.toLocaleString()} totales</span>
+
+            {/* Métricas */}
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="rounded-lg bg-background/60 p-2">
+                <div className="text-xs text-muted-foreground">Límite</div>
+                <div className="text-sm font-bold">{credits.limiteMensual.toLocaleString()}</div>
+              </div>
+              <div className="rounded-lg bg-yellow-500/10 p-2">
+                <div className="text-xs text-muted-foreground">Usados</div>
+                <div className={`text-sm font-bold ${isWarning ? "text-yellow-400" : ""}`}>
+                  {credits.consumidoMes.toLocaleString()}
+                </div>
+              </div>
+              <div className="rounded-lg bg-emerald-500/10 p-2">
+                <div className="text-xs text-muted-foreground">Quedan</div>
+                <div className="text-sm font-bold text-emerald-400">{credits.disponible.toLocaleString()}</div>
+              </div>
             </div>
-            <p className="text-[10px] text-muted-foreground/70 mt-2 text-center border-t border-accent/10 pt-2 italic">
-              Actualizado en tiempo real
+
+            {/* Desglose por módulo */}
+            {credits.desglosePorFeature.length > 0 && (
+              <div className="space-y-1.5 border-t border-accent/10 pt-2">
+                <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Por módulo este mes</p>
+                {credits.desglosePorFeature.slice(0, 4).map(({ feature, total }) => (
+                  <div key={feature} className="flex justify-between text-xs">
+                    <span className="text-muted-foreground capitalize">{feature}</span>
+                    <span className="font-medium">{total}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="text-[10px] text-muted-foreground/70 text-center border-t border-accent/10 pt-2 italic">
+              Cuota personal · {credits.mesActual} · se renueva el 1°
             </p>
           </div>
         </TooltipContent>
