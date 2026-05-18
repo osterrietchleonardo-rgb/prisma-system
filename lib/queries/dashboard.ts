@@ -39,11 +39,12 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
 
   const { data: perfLogs } = await logsQuery;
 
-  // 3. Profiles for context
+  // 3. Profiles — only asesores (directors are excluded from the leaderboard)
   const { data: agencyProfiles } = await supabase
     .from("profiles")
     .select("id, email, full_name, avatar_url")
-    .eq("agency_id", agencyId);
+    .eq("agency_id", agencyId)
+    .eq("role", "asesor");
 
   // 4. Inventory (Tokko Properties)
   const { data: properties } = await supabase
