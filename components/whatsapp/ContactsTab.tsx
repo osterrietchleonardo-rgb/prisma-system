@@ -34,9 +34,11 @@ import * as XLSX from "xlsx"
 
 interface ContactsTabProps {
   instance: any;
+  /** Si es true, oculta las acciones de campaña (para rol asesor) */
+  hideActions?: boolean;
 }
 
-export default function ContactsTab({ instance }: ContactsTabProps) {
+export default function ContactsTab({ instance, hideActions = false }: ContactsTabProps) {
   const supabase = createClient()
   
   // Contacts State
@@ -268,7 +270,9 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
          <div>
            <h2 className="text-2xl font-semibold tracking-tight">Contactos y Base de Datos</h2>
            <p className="text-sm text-muted-foreground mt-1">
-             Sube tus leads, gestiona tu base y lanza campañas personalizadas de WhatsApp con trazabilidad.
+             {hideActions
+               ? "Tu lista de contactos. Importá y gestioná tus leads de WhatsApp."
+               : "Sube tus leads, gestiona tu base y lanza campañas personalizadas de WhatsApp con trazabilidad."}
            </p>
          </div>
          <div className="flex gap-2 w-full sm:w-auto">
@@ -278,14 +282,16 @@ export default function ContactsTab({ instance }: ContactsTabProps) {
               <Input id="contact_upload" type="file" accept=".csv, .xls, .xlsx" className="hidden" onChange={handleFileUpload} disabled={isImporting} />
             </Label>
             
-            <Button 
-              className="w-full sm:w-auto"
-              disabled={selectedContactIds.size === 0} 
-              onClick={handleGoToCampaigns}
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Configurar Campaña ({selectedContactIds.size})
-            </Button>
+            {!hideActions && (
+              <Button 
+                className="w-full sm:w-auto"
+                disabled={selectedContactIds.size === 0} 
+                onClick={handleGoToCampaigns}
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Configurar Campaña ({selectedContactIds.size})
+              </Button>
+            )}
          </div>
       </div>
 
