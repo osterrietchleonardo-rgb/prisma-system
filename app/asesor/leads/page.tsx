@@ -59,6 +59,7 @@ function AsesorLeadsPageContent() {
         leads={leads}
         loading={isLoading}
         tagsByGroup={tagsByGroup}
+        basePath="/asesor/leads"
         onRefresh={async () => { await refetch() }}
       />
     </div>

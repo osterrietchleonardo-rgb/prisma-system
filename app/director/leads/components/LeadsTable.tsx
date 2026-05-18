@@ -32,9 +32,11 @@ interface LeadsTableProps {
   loading: boolean;
   tagsByGroup: Record<string, TokkoTag[]>;
   onRefresh?: () => Promise<void>;
+  /** Base path for the lead detail page. Defaults to '/director/leads' */
+  basePath?: string;
 }
 
-export function LeadsTable({ leads, loading, tagsByGroup, onRefresh }: LeadsTableProps) {
+export function LeadsTable({ leads, loading, tagsByGroup, onRefresh, basePath = '/director/leads' }: LeadsTableProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const itemsPerPage = 25;
@@ -383,7 +385,7 @@ export function LeadsTable({ leads, loading, tagsByGroup, onRefresh }: LeadsTabl
                      return (
                         <TableRow key={lead.id} className={cn("hover:bg-accent/5 cursor-pointer h-14", 
                            isNoName && "bg-yellow-500/5 hover:bg-yellow-500/10"
-                        )} onClick={() => router.push(`/director/leads/${lead.id}`)}>
+                        )} onClick={() => router.push(`${basePath}/${lead.id}`)}>
                            <TableCell className="px-4">
                               <div className="flex items-center gap-3">
                                  <Avatar className="h-9 w-9 border border-accent/10">
@@ -534,7 +536,7 @@ export function LeadsTable({ leads, loading, tagsByGroup, onRefresh }: LeadsTabl
                                        <TooltipTrigger asChild>
                                           <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-accent" onClick={e => {
                                              e.stopPropagation();
-                                             router.push(`/director/leads/${lead.id}`);
+                                             router.push(`${basePath}/${lead.id}`);
                                           }}>
                                              <Eye className="h-3.5 w-3.5" />
                                           </Button>
