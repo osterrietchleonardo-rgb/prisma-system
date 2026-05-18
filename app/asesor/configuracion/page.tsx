@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { 
   User, 
   Lock, 
@@ -11,8 +11,7 @@ import {
   Zap,
   TrendingUp,
   Clock,
-  Smartphone,
-  CheckCircle2
+  Smartphone
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"

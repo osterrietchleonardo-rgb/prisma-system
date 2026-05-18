@@ -71,7 +71,7 @@ async function fireWhatsappNotification(contactName: string, lastMessage?: strin
         data: { url: '/asesor/whatsapp' },
       } as NotificationOptions)
     } else {
-      new Notification(`💬 ${name}`, { body, icon: '/icon-192.png' })
+      void new Notification(`💬 ${name}`, { body, icon: '/icon-192.png' })
     }
   }
 }
