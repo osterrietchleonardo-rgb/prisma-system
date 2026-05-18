@@ -103,38 +103,40 @@ export function PerformanceCharts({ data, channels }: { data: any[], channels?: 
           </ResponsiveContainer>
         </CardContent>
       </Card>
-      {/* Channel Distribution */}
-      <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="text-lg">Orígenes de Leads</CardTitle>
-          <CardDescription>Rendimiento por Canal</CardDescription>
-        </CardHeader>
-        <CardContent className="h-[250px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={channels}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={5}
-                dataKey="count"
-                nameKey="label"
-              >
-                {channels?.map((entry: any, index: number) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(212, 163, 115, 0.2)', borderRadius: '12px' }}
-                itemStyle={{ color: '#fff' }}
-              />
-              <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
-            </PieChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      {/* Channel Distribution — only render if there's data */}
+      {channels && channels.length > 0 ? (
+        <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-lg">Orígenes de Leads</CardTitle>
+            <CardDescription>Rendimiento por Canal</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[250px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={channels}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="count"
+                  nameKey="label"
+                >
+                  {channels.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(212, 163, 115, 0.2)', borderRadius: '12px' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Conversion Evolution Chart */}
       <Card className="md:col-span-2 lg:col-span-2 border-accent/10 bg-card/50 backdrop-blur-sm">
