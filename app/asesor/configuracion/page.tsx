@@ -199,9 +199,8 @@ export default function AsesorConfiguracionPage() {
     if (!pushSupported) return
     setPushLoading(true)
     try {
-      const reg = await navigator.serviceWorker.ready
       if (pushEnabled) {
-        // Desuscribir
+        const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.getSubscription()
         if (sub) {
           await fetch('/api/push/subscribe', {
@@ -214,28 +213,36 @@ export default function AsesorConfiguracionPage() {
         setPushEnabled(false)
         toast.success('Notificaciones push desactivadas')
       } else {
-        // Pedir permiso y suscribir
+        // 1. Permiso primero
         const permission = await Notification.requestPermission()
         if (permission !== 'granted') {
-          toast.error('Permiso denegado. Activálo desde la configuración del navegador.')
+          toast.error('Permiso denegado. Activalo desde la configuracion del navegador.')
           return
         }
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+        // 2. Verificar VAPID key
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+        if (!vapidKey) {
+          toast.error('Configuracion incompleta. Contacta al administrador.')
+          console.error('[Push] NEXT_PUBLIC_VAPID_PUBLIC_KEY no configurada.')
+          return
+        }
+        // 3. Suscribir
+        const reg = await navigator.serviceWorker.ready
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(vapidKey),
         })
-        const subJson = sub.toJSON()
-        await fetch('/api/push/subscribe', {
+        const res = await fetch('/api/push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(subJson),
+          body: JSON.stringify(sub.toJSON()),
         })
+        if (!res.ok) throw new Error('Error al guardar suscripcion en servidor')
         setPushEnabled(true)
-        toast.success('¡Notificaciones activadas! Te llegarán en tu celular.')
+        toast.success('Notificaciones activadas! Te llegaran en tu celular.')
       }
     } catch (err) {
-      console.error(err)
+      console.error('[Push] Error:', err)
       toast.error('Error al configurar notificaciones push')
     } finally {
       setPushLoading(false)
