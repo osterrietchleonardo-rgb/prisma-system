@@ -53,7 +53,11 @@ export async function logSecurityAlert(action: string, details?: Record<string, 
   }
 }
 
-export async function consumeAiCredits(feature: string, amount: number = 1, promptSummary?: string) {
+export async function consumeAiCredits(
+  feature: string,
+  amount: number = 1,
+  promptSummary?: string
+): Promise<string | null> {
   const { userId, agencyId } = await requireTenant();
   const supabase = createClient();
 
@@ -70,5 +74,32 @@ export async function consumeAiCredits(feature: string, amount: number = 1, prom
     throw new Error(error.message || "Insufficient AI credits");
   }
 
-  return true;
+  // data is now the uuid of the created transaction row
+  return data as string | null;
+}
+
+/**
+ * Updates an ai_credit_transactions row with the REAL token counts and USD cost
+ * obtained from the model's usageMetadata after the API call completes.
+ * Fire-and-forget: failures are logged but never re-thrown.
+ */
+export async function updateAiTransactionCost(
+  transactionId: string | null,
+  inputTokens: number,
+  outputTokens: number,
+  usdCost: number
+): Promise<void> {
+  if (!transactionId) return;
+  try {
+    const supabase = createClient();
+    const { error } = await supabase.rpc("update_ai_transaction_cost", {
+      p_transaction_id: transactionId,
+      p_input_tokens: Math.round(inputTokens),
+      p_output_tokens: Math.round(outputTokens),
+      p_usd_cost: usdCost,
+    });
+    if (error) console.error("update_ai_transaction_cost failed:", error.message);
+  } catch (e) {
+    console.error("update_ai_transaction_cost exception:", e);
+  }
 }

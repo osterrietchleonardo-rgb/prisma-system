@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { generateImage } from "@/lib/gemini";
-import { consumeAiCredits, requireTenant } from "@/lib/auth/tenant-validation";
+import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
 import { GenerateImagePayload } from "@/types/marketing-ia";
 
 const buildImagePrompt = (payload: GenerateImagePayload, branding?: any): string => {
@@ -102,9 +102,10 @@ export async function POST(req: Request) {
     const finalPrompt = buildImagePrompt(payload, agency?.marketing_ai_config);
     const { draft_id, style, format, extra_prompt } = payload;
 
-    if (!process.env.GEMINI_API_KEY) {
-      return NextResponse.json({ error: "Gemini API Key not configured" }, { status: 500 });
-    }
+    // Consume AI Credits (returns transaction ID for cost tracking)
+    // Images cost is per-image, not per-token. We record prompt tokens as input,
+    // output_tokens = 0 (it's an image, not text), and USD = cost per image.
+    const txId = await consumeAiCredits("marketing_ia", 2, `Generate Image: ${payload.format} ${payload.style}`);
 
     console.log('[DEBUG] Generating image with Gemini (Nano Banana) for draft:', draft_id);
     
@@ -129,6 +130,13 @@ export async function POST(req: Request) {
 
       // Use Nano Banana 2 (Standard/Flash) for efficiency or Pro for higher quality
       imageBuffer = await generateImage(finalPrompt, 'pro', imageParts);
+
+      // ─── Record image cost ──────────────────────────────────────────
+      // Imagen 3 Pro @ 1024x1024: ~$0.04/image (standard) / ~$0.06/image (pro)
+      // We store prompt length as input_tokens (approx), output_tokens = 0
+      const promptTokensEst = Math.ceil(finalPrompt.length / 4); // ~4 chars/token
+      const imageUsd = 0.06; // pro quality
+      updateAiTransactionCost(txId, promptTokensEst, 0, imageUsd);
     } catch (apiError: any) {
       console.error("Gemini Image Generation Error:", apiError);
       

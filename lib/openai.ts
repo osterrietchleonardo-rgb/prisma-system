@@ -26,10 +26,18 @@ export const openaiIA = {
       });
 
       const textOutput = response.choices[0].message.content || "";
+      const usageData = response.usage;
 
       return {
         response: {
           text: () => textOutput,
+          // Expose usage for cost tracking (maps to Gemini-style usageMetadata)
+          usageMetadata: usageData
+            ? {
+                promptTokenCount: usageData.prompt_tokens ?? 0,
+                candidatesTokenCount: usageData.completion_tokens ?? 0,
+              }
+            : null,
         },
       };
     } catch (error) {

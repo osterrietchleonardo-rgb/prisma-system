@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { generateEmbedding } from "@/lib/gemini";
 import { openaiIA } from "@/lib/openai";
 import { NextResponse } from "next/server";
-import { consumeAiCredits, requireTenant } from "@/lib/auth/tenant-validation";
+import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +14,8 @@ export async function POST(req: Request) {
     console.log("Consultor IA Request:", { message, sessionId, agencyId });
     const supabase = await createClient();
 
-    // Consume credits before starting processing
-    await consumeAiCredits("consultor_ia", 1, `Consultor: ${message.substring(0, 50)}`);
+    // Consume credits before starting processing (returns txId for real cost tracking)
+    const txId = await consumeAiCredits("consultor_ia", 1, `Consultor: ${message.substring(0, 50)}`);
 
     // 2. Manage Session
     let currentSessionId = sessionId;
@@ -133,6 +133,16 @@ export async function POST(req: Request) {
     });
 
     const assistantContent = chatResult.response.text();
+
+    // ─── Record real token usage (input + output) ─────────────────────────
+    // openaiIA usa GPT-4.1-mini: $0.40/M input, $1.60/M output
+    const consultor_usage = chatResult.response.usageMetadata;
+    if (consultor_usage) {
+      const inputTk = consultor_usage.promptTokenCount ?? 0;
+      const outputTk = consultor_usage.candidatesTokenCount ?? 0;
+      const usd = (inputTk / 1_000_000) * 0.40 + (outputTk / 1_000_000) * 1.60;
+      updateAiTransactionCost(txId, inputTk, outputTk, usd);
+    }
 
     // 6. Save Assistant Message with Metadata
     await supabase

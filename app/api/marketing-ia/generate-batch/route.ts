@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { prismaIA } from "@/lib/gemini";
 import { NextResponse } from "next/server";
-import { consumeAiCredits, requireTenant } from "@/lib/auth/tenant-validation";
+import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
 import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
 
 export const dynamic = "force-dynamic";
@@ -136,8 +136,8 @@ export async function POST(req: Request) {
     const { userId, agencyId } = await requireTenant();
     const supabase = await createClient();
 
-    // Consume AI Credits
-    await consumeAiCredits("marketing_ia", 1, `Generate Batch: ${payload.copy_type}`);
+    // Consume AI Credits (returns transaction ID for cost tracking)
+    const txId = await consumeAiCredits("marketing_ia", 1, `Generate Batch: ${payload.copy_type}`);
 
     const { data: ipc, error: ipcError } = await supabase
       .from('ipc_profiles')
@@ -191,6 +191,16 @@ export async function POST(req: Request) {
     // We can use pro model for better complex JSON adherence
     const result = await prismaIA.generateContent(prompt);
     const rawResponse = result.response.text();
+
+    // ─── Record real token usage ───────────────────────────────
+    // gemini-2.0-flash: $0.10/M input, $0.40/M output
+    const usage = result.response.usageMetadata;
+    if (usage) {
+      const inputTk = usage.promptTokenCount ?? 0;
+      const outputTk = usage.candidatesTokenCount ?? 0;
+      const usd = (inputTk / 1_000_000) * 0.10 + (outputTk / 1_000_000) * 0.40;
+      updateAiTransactionCost(txId, inputTk, outputTk, usd);
+    }
     
     let cleanResponse = rawResponse;
     const jsonMatch = rawResponse.match(/\[[\s\S]*\]/);

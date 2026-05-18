@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
-import { consumeAiCredits, requireTenant } from "@/lib/auth/tenant-validation"
+import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import mammoth from "mammoth"
 
@@ -65,8 +65,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No se pudo extraer suficiente texto del archivo" }, { status: 400 })
     }
 
-    // Consume AI Credits
-    await consumeAiCredits("contratos_ia", 1, `Convert template: ${fileName}`);
+    // Consume AI Credits (returns txId for real-cost tracking)
+    const txId = await consumeAiCredits("contratos_ia", 1, `Convert template: ${fileName}`);
 
     // Call Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
@@ -78,6 +78,16 @@ export async function POST(req: Request) {
     ])
 
     const responseText = result.response.text()
+
+    // ─── Record real token usage ───────────────────────────────────────
+    // gemini-2.0-flash: $0.10/M input, $0.40/M output
+    const contratos_usage = result.response.usageMetadata;
+    if (contratos_usage) {
+      const inputTk = contratos_usage.promptTokenCount ?? 0;
+      const outputTk = contratos_usage.candidatesTokenCount ?? 0;
+      const usd = (inputTk / 1_000_000) * 0.10 + (outputTk / 1_000_000) * 0.40;
+      updateAiTransactionCost(txId, inputTk, outputTk, usd);
+    }
     const cleanJson = responseText.replace(/```json|```/g, "").trim()
 
     try {

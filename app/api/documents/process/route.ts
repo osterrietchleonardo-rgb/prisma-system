@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { generateEmbedding, extractTextFromDocument } from "@/lib/gemini"
+import { consumeAiCredits, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
 import { YoutubeTranscript } from "youtube-transcript"
 import mammoth from "mammoth"
 import Papa from "papaparse"
@@ -84,7 +85,16 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Generate Embedding
-    const embedding = await generateEmbedding(contentText.substring(0, 5000)) // Limit for stability
+    // ─── Embeddings: API solo cobra Input. Output = $0 (resultado son vectores, no texto)
+    // gemini-embedding-001: $0.02/M input tokens
+    const textForEmbedding = contentText.substring(0, 5000);
+    const embeddingInputTokens = Math.ceil(textForEmbedding.length / 4); // est. ~4 chars/token
+    const embeddingUsd = (embeddingInputTokens / 1_000_000) * 0.02;
+
+    // Consume credit + get txId for documents_ia feature
+    const txId = await consumeAiCredits("documentos_ia", 1, `Embed: ${title.substring(0, 50)}`);
+    const embedding = await generateEmbedding(textForEmbedding);
+    updateAiTransactionCost(txId, embeddingInputTokens, 0, embeddingUsd); // fire-and-forget
 
     // 4. Save to DB
     const { data: { user } } = await supabase.auth.getUser()
