@@ -346,7 +346,16 @@ export function ConversationsList({ instance, activeId, onSelect }: Conversation
             {filtered.map((conv) => (
               <div
                 key={conv.id}
-                onClick={() => onSelect(conv)}
+                onClick={() => {
+                  // Marcar como leído al abrir la conversación
+                  if (conv.unread_count > 0) {
+                    setConversations(prev =>
+                      prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c)
+                    )
+                    markConversationRead(conv.id)
+                  }
+                  onSelect(conv)
+                }}
                 className={`
                   flex items-center gap-3 p-3 cursor-pointer transition-colors relative
                   ${activeId === conv.id ? "bg-muted" : "hover:bg-muted/50"}
