@@ -7,7 +7,10 @@ import {
   Bell, 
   Camera,
   Save,
-  Building
+  Building,
+  Zap,
+  TrendingUp,
+  Clock
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -27,6 +30,26 @@ import { createClient } from "@/lib/supabase"
 
 import { useSearchParams } from "next/navigation"
 
+interface CreditData {
+  limiteMensual: number
+  consumidoMes: number
+  disponible: number
+  porcentaje: number
+  desglosePorFeature: { feature: string; total: number }[]
+  mesActual: string
+  numAsesoresAgencia: number
+  creditsAsesoresTotal: number
+}
+
+const FEATURE_LABELS: Record<string, string> = {
+  tutor: "Tutor IA",
+  consultor: "Consultor IA",
+  marketing: "Marketing IA",
+  contratos: "Contratos IA",
+  tasacion: "Tasación IA",
+  general: "General",
+}
+
 export default function AsesorConfiguracionPage() {
   const searchParams = useSearchParams()
   const defaultTab = searchParams.get('tab') || 'perfil'
@@ -39,6 +62,8 @@ export default function AsesorConfiguracionPage() {
     agency_name: "Cargando..."
   })
   const [userId, setUserId] = useState<string | null>(null)
+  const [creditData, setCreditData] = useState<CreditData | null>(null)
+  const [creditLoading, setCreditLoading] = useState(false)
 
   const supabase = createClient()
 
@@ -72,6 +97,22 @@ export default function AsesorConfiguracionPage() {
       }
     }
     fetchProfile()
+  }, [])
+
+  useEffect(() => {
+    async function fetchCredits() {
+      setCreditLoading(true)
+      try {
+        const res = await fetch("/api/asesor/creditos")
+        if (res.ok) {
+          const d = await res.json()
+          setCreditData(d)
+        }
+      } finally {
+        setCreditLoading(false)
+      }
+    }
+    fetchCredits()
   }, [])
 
   const handleSaveProfile = async () => {
@@ -117,6 +158,9 @@ export default function AsesorConfiguracionPage() {
           </TabsTrigger>
           <TabsTrigger value="notificaciones" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
             <Bell className="h-4 w-4" /> Notificaciones
+          </TabsTrigger>
+          <TabsTrigger value="creditos" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+            <Zap className="h-4 w-4" /> Créditos IA
           </TabsTrigger>
         </TabsList>
 
@@ -233,6 +277,144 @@ export default function AsesorConfiguracionPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {/* ── CRÉDITOS IA ── */}
+        <TabsContent value="creditos" className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+          <div className="space-y-4">
+            {creditLoading ? (
+              <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-center h-32 text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 animate-pulse" />
+                      Cargando créditos...
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : creditData ? (
+              <>
+                {/* Resumen principal */}
+                <Card className="border-accent/10 bg-card/30 backdrop-blur-md overflow-hidden">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-accent" />
+                      Mis Créditos IA
+                    </CardTitle>
+                    <CardDescription>
+                      Cuota mensual personal · {creditData.mesActual}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-5">
+                    {/* Tres métricas */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-xl border border-accent/10 bg-background/40 p-4 text-center">
+                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Límite mensual</div>
+                        <div className="text-2xl font-bold text-foreground">{creditData.limiteMensual}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">créditos</div>
+                      </div>
+                      <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4 text-center">
+                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Consumidos</div>
+                        <div className={`text-2xl font-bold ${creditData.porcentaje >= 80 ? "text-red-400" : "text-yellow-400"}`}>
+                          {creditData.consumidoMes}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{creditData.porcentaje}% del límite</div>
+                      </div>
+                      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
+                        <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Disponibles</div>
+                        <div className="text-2xl font-bold text-emerald-400">{creditData.disponible}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">créditos</div>
+                      </div>
+                    </div>
+
+                    {/* Barra de progreso */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Uso del mes</span>
+                        <span>{creditData.porcentaje}%</span>
+                      </div>
+                      <div className="h-3 bg-background/60 rounded-full overflow-hidden border border-accent/10">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{
+                            width: `${creditData.porcentaje}%`,
+                            background: creditData.porcentaje >= 80
+                              ? "linear-gradient(90deg, #f87171, #ef4444)"
+                              : creditData.porcentaje >= 50
+                              ? "linear-gradient(90deg, #fbbf24, #f59e0b)"
+                              : "linear-gradient(90deg, #34d399, #10b981)",
+                          }}
+                        />
+                      </div>
+                      {creditData.porcentaje >= 80 && (
+                        <p className="text-xs text-red-400 flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3" />
+                          Estás cerca de tu límite mensual. Usá los créditos con cuidado.
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Desglose por feature */}
+                {creditData.desglosePorFeature.length > 0 && (
+                  <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-accent" />
+                        Detalle por módulo
+                      </CardTitle>
+                      <CardDescription>Créditos consumidos este mes por funcionalidad</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {creditData.desglosePorFeature.map(({ feature, total }) => {
+                          const pct = creditData.limiteMensual > 0 ? Math.round((total / creditData.limiteMensual) * 100) : 0
+                          return (
+                            <div key={feature} className="space-y-1">
+                              <div className="flex justify-between items-center text-sm">
+                                <span className="font-medium">{FEATURE_LABELS[feature] ?? feature}</span>
+                                <span className="text-muted-foreground">{total} créditos</span>
+                              </div>
+                              <div className="h-1.5 bg-background/60 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-accent/60 rounded-full transition-all duration-500"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Info contextual */}
+                <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
+                  <CardContent className="pt-5">
+                    <div className="flex items-start gap-3 text-sm text-muted-foreground">
+                      <Zap className="h-4 w-4 text-accent shrink-0 mt-0.5" />
+                      <p>
+                        Tu cuota mensual es <strong className="text-foreground">{creditData.limiteMensual} créditos</strong>, calculada
+                        como el pool de asesores de tu agencia ({creditData.creditsAsesoresTotal} créditos) dividido entre
+                        los {creditData.numAsesoresAgencia} asesores activos. Los créditos se renuevan el 1° de cada mes.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
+                    No se pudo cargar la información de créditos.
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
       </Tabs>
     </div>
   )
