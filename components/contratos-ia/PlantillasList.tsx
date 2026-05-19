@@ -169,11 +169,9 @@ export function PlantillasList() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      {!t.is_system_default && (
-                        <Button variant="ghost" size="sm" onClick={() => setEditingTemplate(t)} title="Editar">
-                          <Edit className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
+                      <Button variant="ghost" size="sm" onClick={() => setEditingTemplate(t)} title="Editar">
+                        <Edit className="w-3.5 h-3.5" />
+                      </Button>
                       {!t.is_active && (
                         <Button variant="ghost" size="sm" onClick={() => handleActivate(t.id)} title="Activar">
                           <Power className="w-3.5 h-3.5" />
@@ -182,11 +180,9 @@ export function PlantillasList() {
                       <Button variant="ghost" size="sm" onClick={() => handleDuplicate(t)} title="Duplicar">
                         <Copy className="w-3.5 h-3.5" />
                       </Button>
-                      {!t.is_system_default && (
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(t.id)} title="Eliminar" className="hover:text-destructive">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(t.id)} title="Eliminar" className="hover:text-destructive">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

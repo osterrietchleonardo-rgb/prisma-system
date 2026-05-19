@@ -39,10 +39,7 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
 
     if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-    // System defaults cannot be edited directly
-    if (current.is_system_default) {
-      return NextResponse.json({ error: "No se pueden editar plantillas del sistema" }, { status: 403 })
-    }
+    // We removed the is_system_default check because each agency gets their own copy of the defaults.
 
     const newVersion = (current.version || 1) + 1
 
