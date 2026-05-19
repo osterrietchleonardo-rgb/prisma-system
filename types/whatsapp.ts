@@ -49,6 +49,7 @@ export interface WAConversation {
   unread_count: number
   etiquetas: string[]
   pipeline_stage: string  // NOW a native column in wa_conversations
+  metricas?: Record<string, unknown>
   created_at: string
   updated_at?: string
 }
