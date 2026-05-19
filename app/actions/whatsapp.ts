@@ -333,10 +333,10 @@ export async function sendDirectMessage(
       }
     }
 
-    // Obtener contact_phone de la conversación
+    // Obtener contact_phone y last_inbound_at de la conversación
     const { data: conversation, error: convError } = await supabase
       .from('wa_conversations')
-      .select('contact_phone')
+      .select('contact_phone, last_inbound_at')
       .eq('id', conversation_id)
       .single()
 
@@ -344,6 +344,25 @@ export async function sendDirectMessage(
       return {
         success: false,
         error: 'Conversación no encontrada.',
+      }
+    }
+
+    // Validación de ventana de 24 horas (Reglas de Meta)
+    if (conversation.last_inbound_at) {
+      const inboundTime = new Date(conversation.last_inbound_at).getTime()
+      const now = new Date().getTime()
+      const diffInHours = (now - inboundTime) / (1000 * 60 * 60)
+      if (diffInHours > 24) {
+        return {
+          success: false,
+          error: 'No se puede enviar mensaje manual: pasaron más de 24hs desde el último mensaje del cliente.',
+        }
+      }
+    } else {
+      // Si no hay last_inbound_at, no se puede enviar mensaje libre
+      return {
+        success: false,
+        error: 'No se puede enviar mensaje manual: el cliente aún no ha respondido.',
       }
     }
 

@@ -711,29 +711,41 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
             /* Manual mode: message + note inputs */
             <div className="p-3 space-y-3">
               {/* Direct message */}
-              <div className="flex gap-2">
-                <Textarea
-                  value={msgText}
-                  aria-label="Mensaje al lead"
-                  onChange={(e) => setMsgText(e.target.value)}
-                  placeholder="Escribe un mensaje al lead..."
-                  rows={2}
-                  className="resize-none text-sm flex-1"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault()
-                      handleSendMessage()
-                    }
-                  }}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={!msgText.trim() || sending}
-                  className="bg-accent hover:bg-accent/90 text-white self-end h-10 w-10 p-0"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-              </div>
+              {(() => {
+                const is24hWindowOpen = conv.last_inbound_at 
+                  ? (new Date().getTime() - new Date(conv.last_inbound_at).getTime()) / (1000 * 60 * 60) <= 24
+                  : false;
+
+                return is24hWindowOpen ? (
+                  <div className="flex gap-2">
+                    <Textarea
+                      value={msgText}
+                      aria-label="Mensaje al lead"
+                      onChange={(e) => setMsgText(e.target.value)}
+                      placeholder="Escribe un mensaje al lead..."
+                      rows={2}
+                      className="resize-none text-sm flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault()
+                          handleSendMessage()
+                        }
+                      }}
+                    />
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={!msgText.trim() || sending}
+                      className="bg-accent hover:bg-accent/90 text-white self-end h-10 w-10 p-0"
+                    >
+                      <Send className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-md text-xs text-center border border-red-100 dark:border-red-900/50">
+                    <span className="font-semibold">Ventana de 24hs cerrada.</span> No podés enviar mensajes de texto libre porque pasaron más de 24hs desde el último mensaje del cliente. Podés usar plantillas.
+                  </div>
+                );
+              })()}
 
               <Separator />
 
