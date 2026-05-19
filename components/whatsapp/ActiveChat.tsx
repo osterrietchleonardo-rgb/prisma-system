@@ -83,6 +83,8 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   const [messages, setMessages] = useState<WAMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(false)
+  const [page, setPage] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
 
   // Input states
   const [msgText, setMsgText] = useState("")
@@ -116,12 +118,13 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
         .from("wa_messages")
         .select("*", { count: "exact" })
         .eq("conversation_id", conv.id)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .range(0, 49)
 
       if (data) {
-        setMessages(data as WAMessage[])
+        setMessages((data as WAMessage[]).reverse())
         setHasMore((count ?? 0) > 50)
+        setPage(0)
       }
       setLoading(false)
 
@@ -216,17 +219,26 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
         .from("wa_messages")
         .select("*")
         .eq("conversation_id", conv.id)
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: false })
         .range(0, 49)
 
       if (data) {
-        setMessages(data as WAMessage[])
-        // Auto-scroll if near bottom
-        if (shouldAutoScroll.current) {
-          setTimeout(() => {
-            bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-          }, 50)
-        }
+        const reversed = (data as WAMessage[]).reverse()
+        setMessages((prev) => {
+          // Solamente agregamos los nuevos que no existan para no borrar los cargados de páginas anteriores
+          const existingIds = new Set(prev.map(m => m.id))
+          const newMsgs = reversed.filter(m => !existingIds.has(m.id))
+          if (newMsgs.length === 0) return prev
+          
+          // Mantenemos el scroll si autoScroll está activo
+          if (shouldAutoScroll.current) {
+            setTimeout(() => {
+              bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+            }, 50)
+          }
+          
+          return [...prev, ...newMsgs]
+        })
       }
     }, 5000)
 
@@ -253,15 +265,17 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   const handleRefreshMessages = async () => {
     const supabase = createClient()
     setLoading(true)
-    const { data } = await supabase
+    const { data, count } = await supabase
       .from("wa_messages")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("conversation_id", conv.id)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
       .range(0, 49)
 
     if (data) {
-      setMessages(data as WAMessage[])
+      setMessages((data as WAMessage[]).reverse())
+      setHasMore((count ?? 0) > 50)
+      setPage(0)
       // Auto-scroll to bottom
       setTimeout(() => {
         bottomRef.current?.scrollIntoView({ behavior: "auto" })
@@ -269,6 +283,45 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
     }
     setLoading(false)
     toast.success("Mensajes actualizados")
+  }
+
+  const handleLoadMore = async () => {
+    if (loadingMore) return
+    setLoadingMore(true)
+    
+    // Guardamos la altura actual antes de cargar para mantener el scroll
+    const scrollContainer = scrollRef.current
+    const prevScrollHeight = scrollContainer?.scrollHeight || 0
+    
+    const nextPage = page + 1
+    const from = nextPage * 50
+    const to = from + 49
+    
+    const supabase = createClient()
+    const { data, count } = await supabase
+      .from("wa_messages")
+      .select("*", { count: "exact" })
+      .eq("conversation_id", conv.id)
+      .order("created_at", { ascending: false })
+      .range(from, to)
+      
+    if (data && data.length > 0) {
+      const olderMessages = (data as WAMessage[]).reverse()
+      setMessages(prev => [...olderMessages, ...prev])
+      setPage(nextPage)
+      setHasMore((count ?? 0) > to + 1)
+      
+      // Restauramos la posición del scroll
+      setTimeout(() => {
+        if (scrollContainer) {
+          const newScrollHeight = scrollContainer.scrollHeight
+          scrollContainer.scrollTop = newScrollHeight - prevScrollHeight
+        }
+      }, 50)
+    } else {
+      setHasMore(false)
+    }
+    setLoadingMore(false)
   }
 
   const handleSendMessage = async () => {
@@ -591,9 +644,15 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
             <>
               {hasMore && (
                 <div className="text-center mb-4">
-                  <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
-                    <ChevronUp className="w-3 h-3 mr-1" />
-                    Cargar anteriores
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-xs text-muted-foreground"
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                  >
+                    <ChevronUp className={`w-3 h-3 mr-1 ${loadingMore ? "animate-pulse" : ""}`} />
+                    {loadingMore ? "Cargando..." : "Cargar anteriores"}
                   </Button>
                 </div>
               )}
