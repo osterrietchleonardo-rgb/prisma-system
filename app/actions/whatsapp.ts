@@ -1318,3 +1318,62 @@ export async function sendToPipeline(
     return { success: false, error: message }
   }
 }
+
+// =============================================
+// Action 18: Obtener Costos de Meta (Director)
+// =============================================
+
+export async function getWhatsAppCosts(
+  startDate: string,
+  endDate: string,
+  granularity: string = 'DAILY'
+): Promise<WhatsAppActionResult & { data?: any }> {
+  try {
+    const { agency_id } = await getDirectorProfile()
+    const supabase = createClient()
+
+    const { data: instance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('token, business_id')
+      .eq('agency_id', agency_id)
+      .limit(1)
+      .single()
+
+    if (instanceError || !instance) {
+      return { success: false, error: 'Instancia no configurada.' }
+    }
+
+    if (!instance.business_id || !instance.token) {
+       return { success: false, error: 'Faltan credenciales de Meta (WABA ID o Token).' }
+    }
+
+    // Transform dates to unix timestamps (Meta expects seconds)
+    const startUnix = Math.floor(new Date(startDate).getTime() / 1000)
+    // Add one day to endDate to include the whole day if they are the same
+    const endDateObj = new Date(endDate)
+    endDateObj.setHours(23, 59, 59, 999)
+    const endUnix = Math.floor(endDateObj.getTime() / 1000)
+
+    const url = `https://graph.facebook.com/v20.0/${instance.business_id}/pricing_analytics?start=${startUnix}&end=${endUnix}&granularity=${granularity}&metric_types=COST,VOLUME&dimensions=PRICING_CATEGORY,PRICING_TYPE`
+    
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${instance.token}`,
+      },
+    })
+
+    const result = await res.json()
+    console.log("============= META API RESULT =============")
+    console.log(JSON.stringify(result, null, 2))
+    console.log("===========================================")
+
+    if (!res.ok) {
+      return { success: false, error: result.error?.message || 'Error al obtener costos de Meta' }
+    }
+
+    return { success: true, data: result.data }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}

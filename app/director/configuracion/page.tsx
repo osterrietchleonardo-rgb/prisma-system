@@ -12,7 +12,8 @@ import {
   Users,
   Copy,
   Plus,
-  Sparkles
+  Sparkles,
+  BarChart3
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -40,6 +41,7 @@ import {
 
 import { useSearchParams } from "next/navigation"
 import { AiCreditsDashboard } from "@/components/ai-credits-dashboard"
+import { WhatsAppCostsDashboard } from "@/components/whatsapp-costs-dashboard"
 
 export default function DirectorConfiguracionPage() {
   const searchParams = useSearchParams()
@@ -193,6 +195,9 @@ export default function DirectorConfiguracionPage() {
           </TabsTrigger>
           <TabsTrigger value="creditos" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
             <Sparkles className="h-4 w-4" /> Créditos IA
+          </TabsTrigger>
+          <TabsTrigger value="costos" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+            <BarChart3 className="h-4 w-4" /> Costos Meta
           </TabsTrigger>
           <TabsTrigger value="seguridad" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
             <Lock className="h-4 w-4" /> Accesso & Seguridad
@@ -358,6 +363,10 @@ export default function DirectorConfiguracionPage() {
               Cargando información de agencia...
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="costos" className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+          <WhatsAppCostsDashboard />
         </TabsContent>
 
         <TabsContent value="seguridad" className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
