@@ -13,7 +13,7 @@ import { TIPO_CONTRATO_LABELS } from "@/types/contratos"
 import { toast } from "sonner"
 import { AiCreditBadge } from "@/components/ai-credit-badge"
 
-export function ContratosIAPage() {
+export function ContratosIAPage({ role = "director" }: { role?: "director" | "asesor" }) {
   const [activeTab, setActiveTab] = useState("nuevo")
   const [wizardState, setWizardState] = useState<ContratoWizardState>({
     tipo: null,
@@ -59,16 +59,18 @@ export function ContratosIAPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 h-14 bg-muted/50 p-1 rounded-xl">
+        <TabsList className={`grid w-full h-14 bg-muted/50 p-1 rounded-xl ${role === "director" ? "grid-cols-3" : "grid-cols-2"}`}>
           <TabsTrigger value="nuevo" className="text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg">
             <FilePlus className="w-4 h-4 mr-2" /> Nuevo Contrato
           </TabsTrigger>
           <TabsTrigger value="contratos" className="text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg">
             <FileText className="w-4 h-4 mr-2" /> Mis Contratos
           </TabsTrigger>
-          <TabsTrigger value="plantillas" className="text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg">
-            <Layout className="w-4 h-4 mr-2" /> Mis Plantillas
-          </TabsTrigger>
+          {role === "director" && (
+            <TabsTrigger value="plantillas" className="text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg">
+              <Layout className="w-4 h-4 mr-2" /> Mis Plantillas
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="nuevo" className="mt-8">
@@ -87,9 +89,11 @@ export function ContratosIAPage() {
           <MisContratos />
         </TabsContent>
 
-        <TabsContent value="plantillas" className="mt-8">
-          <PlantillasList />
-        </TabsContent>
+        {role === "director" && (
+          <TabsContent value="plantillas" className="mt-8">
+            <PlantillasList />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )

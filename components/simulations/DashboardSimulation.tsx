@@ -4,14 +4,22 @@ import React, { useEffect, useState } from "react";
 import { Users, Target, Activity, Star } from "lucide-react";
 
 export default function DashboardSimulation() {
+  const [mounted, setMounted] = useState(false);
   const [active, setActive] = useState(0);
 
   useEffect(() => {
+    setMounted(true);
     const interval = setInterval(() => {
       setActive((a) => (a + 1) % 3);
     }, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  if (!mounted) {
+    return (
+      <div className="w-full bg-card border border-accent/20 rounded-3xl p-8 shadow-2xl relative overflow-hidden h-[400px]" />
+    );
+  }
 
   const advisors = [
     { name: "Julian Rossi", sales: 4, leads: 24, status: "Activo" },

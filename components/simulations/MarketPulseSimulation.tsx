@@ -4,12 +4,20 @@ import React, { useEffect, useState } from "react";
 import { TrendingUp, MapPin, Building2, ArrowUpRight } from "lucide-react";
 
 export default function MarketPulseSimulation() {
+  const [mounted, setMounted] = useState(false);
   const [percent, setPercent] = useState(0);
 
   useEffect(() => {
+    setMounted(true);
     const timeout = setTimeout(() => setPercent(84), 500);
     return () => clearTimeout(timeout);
   }, []);
+
+  if (!mounted) {
+    return (
+      <div className="w-full aspect-video md:aspect-square bg-card border border-accent/20 rounded-3xl p-6 shadow-2xl relative overflow-hidden" />
+    );
+  }
 
   return (
     <div className="w-full aspect-video md:aspect-square bg-card border border-accent/20 rounded-3xl p-6 shadow-2xl relative overflow-hidden group">
@@ -37,7 +45,7 @@ export default function MarketPulseSimulation() {
         {[40, 60, 55, 80, 70, 90, 85].map((h, i) => (
           <div key={i} className="flex-1 bg-accent/20 rounded-t-lg relative group/bar transition-all duration-1000" style={{ height: `${percent > 0 ? h : 0}%` }}>
             <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-accent text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover/bar:opacity-100 transition-opacity">
-              ${(h * 100).toLocaleString()}
+              ${(h * 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")}
             </div>
           </div>
         ))}

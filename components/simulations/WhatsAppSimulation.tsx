@@ -4,10 +4,12 @@ import React, { useEffect, useState } from "react";
 import { User, Brain, CheckCheck, Mic, Plus, Paperclip, Smile, Send } from "lucide-react";
 
 export default function WhatsAppSimulation() {
+  const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(0);
   const [typing, setTyping] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const sequence = async () => {
       // Step 0: Initial state (Empty)
       setStep(0);
@@ -37,6 +39,12 @@ export default function WhatsAppSimulation() {
 
     sequence();
   }, []);
+
+  if (!mounted) {
+    return (
+      <div className="w-full h-full bg-[#f0f2f5] dark:bg-[#0b141a] flex flex-col relative shadow-2xl overflow-hidden" />
+    );
+  }
 
   return (
     <div className="w-full h-full bg-[#f0f2f5] dark:bg-[#0b141a] flex flex-col relative shadow-2xl overflow-hidden group">
