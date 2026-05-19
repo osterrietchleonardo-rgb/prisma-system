@@ -29,6 +29,7 @@ import { getDashboardData } from "@/lib/queries/dashboard"
 import { getPropertiesDashboardData } from "@/lib/queries/properties-dashboard"
 import { redirect } from "next/navigation"
 import { DashboardLeadsSection } from "./components/DashboardLeadsSection"
+import { ConversationalIntelligence } from "./components/conversational/ConversationalIntelligence"
 import { DashboardPropertiesSection } from "./components/DashboardPropertiesSection"
 import { PerformanceCharts } from "@/components/performance-charts"
 import { AdvisorFilter } from "@/components/dashboard/advisor-filter"
@@ -123,6 +124,8 @@ export default async function DashboardPage({
           <PerformanceLeaderboard advisors={dashboardData.advisors} />
         </div>
       </div>
+
+      <ConversationalIntelligence />
 
       <DashboardLeadsSection />
 
