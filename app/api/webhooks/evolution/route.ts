@@ -77,7 +77,7 @@ export async function POST(req: Request) {
 
     const { data: convs } = await supabase
       .from('wa_conversations')
-      .select('id, bot_active, etiquetas, score, status, unread_count')
+      .select('id, bot_active, etiquetas, score, status, unread_count, funnel_status, next_follow_up_at, follow_ups_sent, opt_out')
       .eq('instance_id', instance.id)
       .eq('contact_phone', contactPhone)
       .order('last_message_at', { ascending: false })
@@ -130,6 +130,14 @@ export async function POST(req: Request) {
 
     // 1. Promesa: UPDATE wa_conversations (Solo si la conv ya existía)
     if (conv) {
+      const currentFunnelStatus = (conv as any).funnel_status as string | undefined
+      // Al recibir un mensaje nuevo, siempre resetear el reloj de seguimiento 24h
+      // y reabrir la conversación si estaba snoozed o cerrada como perdida
+      const updatedFunnelStatus =
+        currentFunnelStatus === 'snoozed' || currentFunnelStatus === 'closed_lost'
+          ? 'open'
+          : currentFunnelStatus ?? 'open'
+
       promises.push(
         supabase
           .from('wa_conversations')
@@ -138,11 +146,12 @@ export async function POST(req: Request) {
             last_message_at: new Date().toISOString(),
             last_inbound_at: new Date().toISOString(),
             unread_count: (conv.unread_count || 0) + 1,
+            // Resetear reloj: siempre 24h desde este mensaje entrante
             next_follow_up_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
             requires_follow_up: true,
+            // Resetear contador de intentos porque el cliente contestó
             follow_ups_sent: 0,
-            // Si el estado era snoozed o closed_lost, al responder vuelve a open
-            funnel_status: (conv as any).funnel_status === 'snoozed' || (conv as any).funnel_status === 'closed_lost' ? 'open' : undefined,
+            funnel_status: updatedFunnelStatus,
           })
           .eq('id', conversation_id)
       )
