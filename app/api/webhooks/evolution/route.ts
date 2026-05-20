@@ -103,6 +103,10 @@ export async function POST(req: Request) {
           etiquetas: [],
           last_message_at: new Date().toISOString(),
           last_inbound_at: new Date().toISOString(),
+          next_follow_up_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          requires_follow_up: true,
+          follow_ups_sent: 0,
+          funnel_status: 'open',
         })
         .select()
         .single()
@@ -134,6 +138,11 @@ export async function POST(req: Request) {
             last_message_at: new Date().toISOString(),
             last_inbound_at: new Date().toISOString(),
             unread_count: (conv.unread_count || 0) + 1,
+            next_follow_up_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            requires_follow_up: true,
+            follow_ups_sent: 0,
+            // Si el estado era snoozed o closed_lost, al responder vuelve a open
+            funnel_status: (conv as any).funnel_status === 'snoozed' || (conv as any).funnel_status === 'closed_lost' ? 'open' : undefined,
           })
           .eq('id', conversation_id)
       )

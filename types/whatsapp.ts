@@ -15,6 +15,10 @@ export type TemplateStatus = 'APPROVED' | 'PENDING' | 'REJECTED' | 'PAUSED'
 
 export type TemplateCategory = 'MARKETING' | 'UTILITY' | 'AUTHENTICATION'
 
+export type FunnelStatus = 'open' | 'snoozed' | 'closed_lost' | 'closed_won'
+
+export type VisitStatus = 'none' | 'scheduled' | 'confirmed' | 'rescheduling' | 'cancelled' | 'attended' | 'no_show'
+
 // --- Interfaces ---
 
 export interface WhatsAppInstance {
@@ -29,6 +33,8 @@ export interface WhatsAppInstance {
   status: InstanceStatus
   phone_display: string | null
   messaging_limit_tier: string | null
+  templates_status: string // 'pending' | 'approved' | 'rejected'
+  flows_active: boolean
   created_at: string
   updated_at: string
 }
@@ -49,6 +55,26 @@ export interface WAConversation {
   unread_count: number
   etiquetas: string[]
   pipeline_stage: string  // NOW a native column in wa_conversations
+  
+  // Motor Inactividad
+  funnel_status: FunnelStatus
+  requires_follow_up: boolean
+  next_follow_up_at: string | null
+  opt_out: boolean
+  follow_ups_sent: number
+  follow_ups_history: any[]
+  
+  // Analítica
+  recovery_stage: string
+  dropoff_reason: string | null
+  
+  // Motor Citas / Visitas
+  visit_status: VisitStatus
+  visit_scheduled_at: string | null
+  visit_reminder_24h_sent: boolean
+  visit_reminder_3h_sent: boolean
+  visit_reminder_1h_sent: boolean
+
   metricas?: Record<string, unknown>
   created_at: string
   updated_at?: string

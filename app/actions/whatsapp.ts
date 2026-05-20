@@ -7,6 +7,7 @@ import type {
   InstanceStatusResult,
   CreateTemplateInput,
 } from '@/types/whatsapp'
+import { injectCoreTemplates } from './whatsapp-templates'
 
 // =============================================
 // Helper: Director-only access guard
@@ -157,6 +158,11 @@ export async function connectWhatsApp(
         if (error) return { success: false, error: `Error guardando instancia: ${error.message}` }
       }
 
+      // Inyectar plantillas core en background
+      injectCoreTemplates(agency_id, input.business_id, input.token).catch(e => {
+        console.error('Error background injectCoreTemplates (Evolution):', e)
+      })
+
       return { success: true }
     }
 
@@ -211,6 +217,11 @@ export async function connectWhatsApp(
         .insert(metaPayload)
       if (error) return { success: false, error: `Error guardando instancia: ${error.message}` }
     }
+
+    // Inyectar plantillas core en background
+    injectCoreTemplates(agency_id, input.business_id, input.token).catch(e => {
+      console.error('Error background injectCoreTemplates (Meta):', e)
+    })
 
     return { success: true }
   } catch (err) {
