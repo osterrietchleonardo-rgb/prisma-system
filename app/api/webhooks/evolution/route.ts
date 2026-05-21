@@ -145,8 +145,16 @@ export async function POST(req: Request) {
         at: new Date().toISOString(),
         content_preview: content?.substring(0, 120) || '',
         message_type: messageType,
-        previous_funnel_status: currentFunnelStatus ?? 'open',
-        follow_ups_sent_at_response: (conv as any).follow_ups_sent ?? 0,
+        // Snapshot del estado ANTES de que Prisma lo resetee
+        snapshot: {
+          funnel_status:      currentFunnelStatus                   ?? 'open',
+          follow_ups_sent:    (conv as any).follow_ups_sent         ?? 0,
+          requires_follow_up: (conv as any).requires_follow_up      ?? true,
+          next_follow_up_at:  (conv as any).next_follow_up_at       ?? null,
+          visit_status:       (conv as any).visit_status            ?? 'none',
+          opt_out:            (conv as any).opt_out                 ?? false,
+          recovery_stage:     (conv as any).recovery_stage          ?? 'direct',
+        },
       }
 
       promises.push(

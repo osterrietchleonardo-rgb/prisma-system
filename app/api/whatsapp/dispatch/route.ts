@@ -161,17 +161,27 @@ export async function POST(req: Request) {
     // 6. Registrar evento en follow_ups_history (log inmutable de trazabilidad)
     const { data: convSnap } = await supabase
       .from('wa_conversations')
-      .select('follow_ups_history')
+      .select('follow_ups_history, funnel_status, follow_ups_sent, requires_follow_up, visit_status, recovery_stage, next_follow_up_at, opt_out')
       .eq('id', conversation_id)
       .single()
 
     const currentHistory = (convSnap?.follow_ups_history as Record<string, unknown>[] | null) ?? []
     const historyEvent = {
-      type: template_name,           // sufijo limpio: "seg_f1_seguimiento", "visita_recordatorio_24h", etc.
-      template: finalTemplateName,   // nombre completo con prefijo en Meta
+      type: template_name,
+      template: finalTemplateName,
       at: new Date().toISOString(),
       variables: variables || [],
       wamid: wamid || null,
+      // Snapshot del estado en el momento del envío
+      snapshot: {
+        funnel_status:      convSnap?.funnel_status      ?? null,
+        follow_ups_sent:    convSnap?.follow_ups_sent    ?? 0,
+        requires_follow_up: convSnap?.requires_follow_up ?? true,
+        visit_status:       convSnap?.visit_status       ?? 'none',
+        recovery_stage:     convSnap?.recovery_stage     ?? 'direct',
+        next_follow_up_at:  convSnap?.next_follow_up_at  ?? null,
+        opt_out:            convSnap?.opt_out             ?? false,
+      },
     }
 
     await supabase
