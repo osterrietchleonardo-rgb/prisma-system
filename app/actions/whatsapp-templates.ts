@@ -18,24 +18,18 @@ export async function injectCoreTemplates(agency_id: string, business_id: string
       template_name: `${prefix}_seg_f1_seguimiento`,
       category: 'MARKETING',
       language: 'es_AR',
-      body: "Hola {{1}}, vimos que nos contactaste por una propiedad y quedó la conversación pendiente. ¿Pudiste evaluarlo? ¿En qué podemos ayudarte a avanzar?",
-      body_examples: ["Juan"],
-      buttons: [
-        { type: "QUICK_REPLY", text: "Quiero agendar visita" },
-        { type: "QUICK_REPLY", text: "Tengo otra consulta" }
-      ]
+      body: "Hola {{1}}, vimos que quedó pendiente tu consulta sobre la propiedad. {{2}}",
+      body_examples: ["Juan", "¿Pudiste hablar con tu pareja sobre el depto de Villa Crespo? Si querés retomamos desde ahí."],
+      buttons: []
     },
     // 2. Seguimiento Inactividad F2 (Día 3)
     {
       template_name: `${prefix}_seg_f2_valor`,
       category: 'MARKETING',
       language: 'es_AR',
-      body: "Hola {{1}}, te escribimos para contarte que ingresaron nuevas oportunidades similares a la que consultaste o bien hubo cambios de precio. ¿Te gustaría que te enviemos algunas opciones?",
-      body_examples: ["Juan"],
-      buttons: [
-        { type: "QUICK_REPLY", text: "Sí, envíame opciones" },
-        { type: "QUICK_REPLY", text: "Ya resolví, gracias" }
-      ]
+      body: "Hola {{1}}, hay novedades relacionadas con lo que estabas buscando. {{2}}",
+      body_examples: ["Juan", "Bajó el precio del depto de Villa Crespo que viste, quedó en 172k. Sé que tu techo era 180k, ¿lo coordinamos?"],
+      buttons: []
     },
     // 3. Seguimiento Breakup F3 (Día 7)
     {
