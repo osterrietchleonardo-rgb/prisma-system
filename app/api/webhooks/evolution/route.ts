@@ -77,7 +77,7 @@ export async function POST(req: Request) {
 
     const { data: convs } = await supabase
       .from('wa_conversations')
-      .select('id, bot_active, etiquetas, score, status, unread_count, funnel_status, next_follow_up_at, follow_ups_sent, opt_out')
+      .select('id, bot_active, etiquetas, score, status, unread_count, funnel_status, next_follow_up_at, follow_ups_sent, opt_out, follow_ups_history')
       .eq('instance_id', instance.id)
       .eq('contact_phone', contactPhone)
       .order('last_message_at', { ascending: false })
@@ -138,6 +138,17 @@ export async function POST(req: Request) {
           ? 'open'
           : currentFunnelStatus ?? 'open'
 
+      // Registrar evento en follow_ups_history (fire-and-forget, no bloquea el flujo)
+      const currentHistory = ((conv as any).follow_ups_history as Record<string, unknown>[] | null) ?? []
+      const responseEvent = {
+        type: 'client_responded',
+        at: new Date().toISOString(),
+        content_preview: content?.substring(0, 120) || '',
+        message_type: messageType,
+        previous_funnel_status: currentFunnelStatus ?? 'open',
+        follow_ups_sent_at_response: (conv as any).follow_ups_sent ?? 0,
+      }
+
       promises.push(
         supabase
           .from('wa_conversations')
@@ -152,6 +163,7 @@ export async function POST(req: Request) {
             // Resetear contador de intentos porque el cliente contestó
             follow_ups_sent: 0,
             funnel_status: updatedFunnelStatus,
+            follow_ups_history: [...currentHistory, responseEvent],
           })
           .eq('id', conversation_id)
       )

@@ -158,7 +158,28 @@ export async function POST(req: Request) {
       }
     })
 
-    // 6. Broadcast Realtime
+    // 6. Registrar evento en follow_ups_history (log inmutable de trazabilidad)
+    const { data: convSnap } = await supabase
+      .from('wa_conversations')
+      .select('follow_ups_history')
+      .eq('id', conversation_id)
+      .single()
+
+    const currentHistory = (convSnap?.follow_ups_history as Record<string, unknown>[] | null) ?? []
+    const historyEvent = {
+      type: template_name,           // sufijo limpio: "seg_f1_seguimiento", "visita_recordatorio_24h", etc.
+      template: finalTemplateName,   // nombre completo con prefijo en Meta
+      at: new Date().toISOString(),
+      variables: variables || [],
+      wamid: wamid || null,
+    }
+
+    await supabase
+      .from('wa_conversations')
+      .update({ follow_ups_history: [...currentHistory, historyEvent] })
+      .eq('id', conversation_id)
+
+    // 7. Broadcast Realtime
     supabase.channel(`agency-${agency_id}`).send({
       type: 'broadcast',
       event: 'refresh-whatsapp',
