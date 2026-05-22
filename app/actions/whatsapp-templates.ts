@@ -27,8 +27,8 @@ export async function injectCoreTemplates(agency_id: string, business_id: string
       template_name: `${prefix}_seg_f2_valor`,
       category: 'MARKETING',
       language: 'es_AR',
-      body: "Hola {{1}}, hay novedades relacionadas con lo que estabas buscando. {{2}}",
-      body_examples: ["Juan", "Bajó el precio del depto de Villa Crespo que viste, quedó en 172k. Sé que tu techo era 180k, ¿lo coordinamos?"],
+      body: "Hola {{1}}, seguimos trabajando en tu búsqueda de propiedades para enviarte opciones precisas. {{2}}",
+      body_examples: ["Juan", "Ingresó una unidad nueva en Caballito que quizás te encaje, ¿querés verla?"],
       buttons: []
     },
     // 3. Seguimiento Breakup F3 (Día 7)
