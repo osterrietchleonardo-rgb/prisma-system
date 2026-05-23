@@ -64,7 +64,11 @@ export async function GET(request: NextRequest) {
 
   const enriched = (data || []).map((agency) => {
     const profiles = (agency.profiles as Array<{ role: string; estado: string; full_name: string }>) || []
-    const credits = (agency.agency_ai_credits as Array<{ credits_total: number; credits_used: number }> | null)?.[0] || null
+    
+    // Soportar tanto si Supabase retorna un array como un objeto directo por la relación 1-1
+    const rawCredits = agency.agency_ai_credits as any
+    const credits = Array.isArray(rawCredits) ? rawCredits[0] : (rawCredits || null)
+
     return {
       id: agency.id,
       name: agency.name,
