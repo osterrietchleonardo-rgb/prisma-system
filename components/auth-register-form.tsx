@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { register, signInWithGoogle } from "@/lib/actions/auth"
+import { register } from "@/lib/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -150,35 +150,6 @@ export default function RegisterForm() {
             {role === 'director' ? 'Crear Agencia' : 'Unirse a Agencia'}
           </Button>
         </form>
-        
-          {role === 'director' && (
-            <>
-              <div className="relative mt-2">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">O continuar con</span>
-                </div>
-              </div>
-              
-              <Button 
-                variant="outline" 
-                type="button" 
-                disabled={loading} 
-                onClick={() => {
-                  const formData = new FormData(document.querySelector('form') as HTMLFormElement)
-                  const agencyName = formData.get("agencyName") as string
-                  const inviteCode = formData.get("inviteCode") as string
-                  signInWithGoogle(window.location.origin, role, inviteCode, agencyName)
-                }} 
-                className="border-accent/20 hover:bg-accent/5 w-full"
-              >
-                <Google className="mr-2 h-4 w-4" />
-                Google
-              </Button>
-            </>
-          )}
       </CardContent>
       <CardFooter className="flex flex-wrap items-center justify-center gap-2 border-t p-6">
         <span className="text-sm text-muted-foreground">¿Ya tenés cuenta?</span>
