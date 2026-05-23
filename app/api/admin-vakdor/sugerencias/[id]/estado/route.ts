@@ -17,10 +17,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Estado inválido" }, { status: 400 })
   }
 
+  const STATUS_MAP: Record<string, string> = {
+    pendiente: "new",
+    en_revision: "reviewing",
+    resuelta: "resolved",
+    descartada: "rejected",
+  }
+  const status = STATUS_MAP[estado] || "new"
+
   const { data, error } = await db
     .from("system_feedback")
     .update({
       estado,
+      status,
       respuesta: respuesta || null,
       respondida_por: auth.payload.sub,
       updated_at: new Date().toISOString(),

@@ -280,6 +280,11 @@ export function FeedbackForm() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground max-w-[260px]">
                       <span className="line-clamp-2 leading-relaxed">{item.content}</span>
+                      {item.respuesta && (
+                        <div className="mt-1 text-[11px] text-indigo-400 font-medium bg-indigo-500/5 border border-indigo-500/10 rounded px-2 py-0.5 inline-block">
+                          Respuesta: {item.respuesta}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={cn("text-xs font-semibold px-2 py-1 rounded-full", statusColors[item.status] ?? "text-muted-foreground bg-muted/20")}>

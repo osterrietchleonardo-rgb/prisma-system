@@ -35,6 +35,7 @@ export async function submitFeedback(formData: {
     type: formData.type,
     content: formData.content,
     status: "new",
+    estado: "pendiente",
   })
 
   if (error) {
@@ -53,6 +54,8 @@ export async function getUserFeedbackHistory(): Promise<{
   type: string
   content: string
   status: string
+  estado?: string
+  respuesta?: string | null
   created_at: string
 }[]> {
   const supabase = createClient()
@@ -61,7 +64,7 @@ export async function getUserFeedbackHistory(): Promise<{
 
   const { data } = await supabase
     .from("system_feedback")
-    .select("id, type, content, status, created_at")
+    .select("id, type, content, status, estado, respuesta, created_at")
     .eq("user_id", session.user.id)
     .order("created_at", { ascending: false })
     .limit(20)
