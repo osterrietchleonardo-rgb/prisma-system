@@ -1,7 +1,6 @@
 "use client"
 import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { generateDirectorInvite } from "@/lib/actions/admin"
 
 interface Agency {
   id: string
@@ -30,9 +29,6 @@ export default function AgenciasClient() {
   const [q, setQ] = useState("")
   const [estado, setEstado] = useState("")
   const [page, setPage] = useState(1)
-  
-  const [generatingInvite, setGeneratingInvite] = useState(false)
-  const [newInviteCode, setNewInviteCode] = useState<string | null>(null)
 
   const fetchAgencias = useCallback(async () => {
     setLoading(true)
@@ -59,64 +55,11 @@ export default function AgenciasClient() {
 
   return (
     <div style={{ padding: "28px 32px" }}>
-      <div style={{ marginBottom: 24, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <div>
-          <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0 }}>Agencias</h1>
-          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, margin: "4px 0 0" }}>
-            {total} agencias registradas
-          </p>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-          <button
-            disabled={generatingInvite}
-            onClick={async () => {
-              setGeneratingInvite(true)
-              setNewInviteCode(null)
-              const res = await generateDirectorInvite()
-              if (res.success && res.code) {
-                setNewInviteCode(res.code)
-              } else {
-                alert(res.error || "Error al generar código")
-              }
-              setGeneratingInvite(false)
-            }}
-            style={{
-              padding: "8px 16px",
-              background: "#6366f1",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: generatingInvite ? "not-allowed" : "pointer",
-              opacity: generatingInvite ? 0.7 : 1
-            }}
-          >
-            {generatingInvite ? "Generando..." : "+ Generar Invitación de Director"}
-          </button>
-          {newInviteCode && (
-            <div style={{
-              background: "rgba(16,185,129,0.15)",
-              color: "#34d399",
-              padding: "8px 12px",
-              borderRadius: 6,
-              fontSize: 13,
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              border: "1px solid rgba(52,211,153,0.3)"
-            }}>
-              <span>Código generado: {newInviteCode}</span>
-              <button 
-                onClick={() => navigator.clipboard.writeText(newInviteCode)}
-                style={{ background: "transparent", border: "none", color: "#34d399", cursor: "pointer", textDecoration: "underline", fontSize: 12 }}
-              >
-                Copiar
-              </button>
-            </div>
-          )}
-        </div>
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0 }}>Agencias</h1>
+        <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, margin: "4px 0 0" }}>
+          {total} agencias registradas
+        </p>
       </div>
 
       {/* Filters */}
