@@ -3,26 +3,35 @@
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { performanceLogSchema, PerformanceLogFormData } from "@/lib/tracking/types";
+import { performanceLogSchema, PerformanceLogFormData, PerformanceLog } from "@/lib/tracking/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { savePerformanceLog } from "@/actions/tracking/savePerformanceLog";
+import { updatePerformanceLog } from "@/actions/tracking/updatePerformanceLog";
 import { toast } from "sonner";
 import { Loader2, Briefcase, TrendingUp, Sparkles, MapPin, DollarSign, Percent } from "lucide-react";
 
 interface Props {
   onSuccess: () => void;
+  logToEdit?: PerformanceLog | null;
 }
 
-export function PerformanceLogForm({ onSuccess }: Props) {
+export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<PerformanceLogFormData>({
     resolver: zodResolver(performanceLogSchema) as any,
-    defaultValues: {
+    defaultValues: logToEdit ? {
+      type: logToEdit.type,
+      propiedad_ref: logToEdit.propiedad_ref || "",
+      monto_operacion: logToEdit.monto_operacion || 0,
+      comision_generada: logToEdit.comision_generada || 0,
+      fecha_actividad: logToEdit.fecha_actividad ? logToEdit.fecha_actividad.split("T")[0] : new Date().toISOString().split("T")[0],
+      metadata: logToEdit.metadata || {},
+    } : {
       type: "prospeccion",
       propiedad_ref: "",
       monto_operacion: 0,
@@ -44,8 +53,13 @@ export function PerformanceLogForm({ onSuccess }: Props) {
   const onSubmit = async (values: PerformanceLogFormData) => {
     setIsSubmitting(true);
     try {
-      await savePerformanceLog(values);
-      toast.success("Registro guardado correctamente");
+      if (logToEdit) {
+        await updatePerformanceLog(logToEdit.id, values);
+        toast.success("Registro actualizado correctamente");
+      } else {
+        await savePerformanceLog(values);
+        toast.success("Registro guardado correctamente");
+      }
       onSuccess();
     } catch (err) {
       console.error(err);
@@ -73,7 +87,7 @@ export function PerformanceLogForm({ onSuccess }: Props) {
               setValue("metadata", {}); // Reset metadata on type change
               setValue("monto_operacion", 0);
               setValue("comision_generada", 0);
-            }} defaultValue={watch("type")}>
+            }} value={watch("type")}>
               <SelectTrigger className="h-12 text-base">
                 <SelectValue placeholder="Seleccionar actividad..." />
               </SelectTrigger>
@@ -100,7 +114,7 @@ export function PerformanceLogForm({ onSuccess }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-left-2">
             <div className="space-y-2">
               <Label>Origen</Label>
-              <Select onValueChange={(v) => handleMetadataChange("origen", v)}>
+              <Select onValueChange={(v) => handleMetadataChange("origen", v)} value={watch("metadata")?.origen || ""}>
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Seleccionar origen..." />
                 </SelectTrigger>
@@ -115,7 +129,7 @@ export function PerformanceLogForm({ onSuccess }: Props) {
             </div>
             <div className="space-y-2">
               <Label>Tipo de Lead</Label>
-              <Select onValueChange={(v) => handleMetadataChange("tipo_lead", v)}>
+              <Select onValueChange={(v) => handleMetadataChange("tipo_lead", v)} value={watch("metadata")?.tipo_lead || ""}>
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Seleccionar tipo..." />
                 </SelectTrigger>
@@ -169,7 +183,7 @@ export function PerformanceLogForm({ onSuccess }: Props) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-left-2">
             <div className="space-y-2 col-span-1 md:col-span-2">
               <Label>Condición de Captación</Label>
-              <Select onValueChange={(v) => handleMetadataChange("condicion_captacion", v)}>
+              <Select onValueChange={(v) => handleMetadataChange("condicion_captacion", v)} value={watch("metadata")?.condicion_captacion || ""}>
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Seleccionar condición..." />
                 </SelectTrigger>
@@ -216,7 +230,8 @@ export function PerformanceLogForm({ onSuccess }: Props) {
                   type="number" 
                   placeholder="0.00" 
                   className="pl-10 h-11"
-                  onChange={(e) => handleMetadataChange("valor_publicacion_actual", parseFloat(e.target.value))}
+                  value={watch("metadata")?.valor_publicacion_actual ?? ""}
+                  onChange={(e) => handleMetadataChange("valor_publicacion_actual", parseFloat(e.target.value) || 0)}
                 />
                 <DollarSign className="w-4 h-4 absolute left-3 top-3.5 opacity-40" />
               </div>
@@ -240,7 +255,8 @@ export function PerformanceLogForm({ onSuccess }: Props) {
                   type="number" 
                   placeholder="0.00" 
                   className="pl-10 h-11"
-                  onChange={(e) => handleMetadataChange("monto_reserva", parseFloat(e.target.value))}
+                  value={watch("metadata")?.monto_reserva ?? ""}
+                  onChange={(e) => handleMetadataChange("monto_reserva", parseFloat(e.target.value) || 0)}
                 />
                 <DollarSign className="w-4 h-4 absolute left-3 top-3.5 opacity-40" />
               </div>
@@ -277,7 +293,7 @@ export function PerformanceLogForm({ onSuccess }: Props) {
             </div>
             <div className="space-y-2 col-span-1 md:col-span-2">
               <Label>Participación</Label>
-              <Select onValueChange={(v) => handleMetadataChange("participacion", v)}>
+              <Select onValueChange={(v) => handleMetadataChange("participacion", v)} value={watch("metadata")?.participacion || ""}>
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Seleccionar participación..." />
                 </SelectTrigger>

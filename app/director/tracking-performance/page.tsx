@@ -7,7 +7,9 @@ import {
   Search, 
   Loader2, 
   LayoutDashboard,
-  Filter
+  Filter,
+  Trash2,
+  Edit2
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -19,13 +21,28 @@ import { PerformanceLogDrawer } from "@/components/tracking/PerformanceLogDrawer
 import { createClient } from "@/lib/supabase/client";
 import { getPerformanceLogs } from "@/lib/tracking/queries";
 import { AgencyPerformanceConfig, PerformanceLog } from "@/lib/tracking/types";
+import { deletePerformanceLog } from "@/actions/tracking/deletePerformanceLog";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function TrackingPerformancePage() {
   const [activeTab, setActiveTab] = useState("actividad");
   const [logs, setLogs] = useState<PerformanceLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [logToEdit, setLogToEdit] = useState<PerformanceLog | null>(null);
   const [agencyConfig, setAgencyConfig] = useState<AgencyPerformanceConfig | null>(null);
+  
+  // Deletion states
+  const [logToDelete, setLogToDelete] = useState<PerformanceLog | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Filters
   const [filter, setFilter] = useState<"todos" | "prospeccion" | "prelisting" | "prebuying" | "captacion" | "reserva" | "cierre">("todos");
@@ -42,6 +59,22 @@ export default function TrackingPerformancePage() {
       setIsLoading(false);
     }
   }, []);
+
+  const handleDeleteConfirm = async () => {
+    if (!logToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deletePerformanceLog(logToDelete.id);
+      toast.success("Registro de actividad eliminado correctamente");
+      setLogToDelete(null);
+      fetchLogs();
+    } catch (error: any) {
+      console.error(error);
+      toast.error("Ocurrió un error al intentar eliminar el registro");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const fetchAgencyConfig = useCallback(async () => {
     const supabase = createClient();
@@ -108,7 +141,10 @@ export default function TrackingPerformancePage() {
             
             {activeTab === "actividad" && (
               <Button 
-                onClick={() => setIsDrawerOpen(true)}
+                onClick={() => {
+                  setLogToEdit(null);
+                  setIsDrawerOpen(true);
+                }}
                 className="bg-accent hover:bg-accent/90 text-white font-bold h-10 px-6 rounded-xl shadow-lg shadow-accent/20 gap-2 transition-all active:scale-95"
               >
                 <Plus className="w-4 h-4" />
@@ -186,7 +222,17 @@ export default function TrackingPerformancePage() {
                <p className="font-medium tracking-wide">Analizando historial de performance...</p>
             </div>
           ) : (
-            <PerformanceHistoryList logs={filteredLogs} onRefresh={fetchLogs} />
+            <PerformanceHistoryList 
+              logs={filteredLogs} 
+              onRefresh={fetchLogs} 
+              onEdit={(log) => {
+                setLogToEdit(log);
+                setIsDrawerOpen(true);
+              }}
+              onDelete={(log) => {
+                setLogToDelete(log);
+              }}
+            />
           )}
         </TabsContent>
 
@@ -197,9 +243,66 @@ export default function TrackingPerformancePage() {
 
       <PerformanceLogDrawer 
         open={isDrawerOpen} 
-        onOpenChange={setIsDrawerOpen}
+        onOpenChange={(open) => {
+          setIsDrawerOpen(open);
+          if (!open) setLogToEdit(null);
+        }}
         onSuccess={fetchLogs}
+        logToEdit={logToEdit}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!logToDelete} onOpenChange={(open) => !open && setLogToDelete(null)}>
+        <DialogContent className="border-destructive/20 border-2 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black text-destructive flex items-center gap-2">
+               <Trash2 className="w-5 h-5" /> ¿Eliminar Actividad?
+            </DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que quieres eliminar este registro de actividad? Esta acción no se puede deshacer y afectará a las métricas del pipeline.
+            </DialogDescription>
+          </DialogHeader>
+          {logToDelete && (
+            <div className="bg-muted/30 p-4 rounded-xl space-y-2 border">
+              <p className="text-xs text-muted-foreground">Detalles del registro:</p>
+              <div className="grid grid-cols-2 gap-y-1 text-xs">
+                <span className="font-semibold text-muted-foreground">Fecha:</span>
+                <span className="font-medium text-white/95">{new Date(logToDelete.fecha_actividad).toLocaleDateString()}</span>
+                <span className="font-semibold text-muted-foreground">Tipo:</span>
+                <span className="capitalize font-medium text-white/95">{logToDelete.type}</span>
+                {logToDelete.propiedad_ref && (
+                  <>
+                    <span className="font-semibold text-muted-foreground">Referencia:</span>
+                    <span className="font-medium text-white/95 truncate">{logToDelete.propiedad_ref}</span>
+                  </>
+                )}
+                {logToDelete.monto_operacion !== null && logToDelete.monto_operacion > 0 && (
+                  <>
+                    <span className="font-semibold text-muted-foreground">Monto:</span>
+                    <span className="font-medium text-white/95">USD {logToDelete.monto_operacion.toLocaleString()}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2 pt-4">
+            <Button variant="outline" onClick={() => setLogToDelete(null)} disabled={isDeleting}>Cancelar</Button>
+            <Button onClick={handleDeleteConfirm} disabled={isDeleting} variant="destructive">
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Confirmar Eliminar
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

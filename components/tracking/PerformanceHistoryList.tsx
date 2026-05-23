@@ -26,7 +26,9 @@ import {
   DollarSign,
   Briefcase,
   Layers,
-  ArrowDownCircle
+  ArrowDownCircle,
+  Edit2,
+  Trash2
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -40,9 +42,11 @@ import { es } from "date-fns/locale";
 interface Props {
   logs: PerformanceLog[];
   onRefresh: () => void;
+  onEdit?: (log: PerformanceLog) => void;
+  onDelete?: (log: PerformanceLog) => void;
 }
 
-export function PerformanceHistoryList({ logs, onRefresh }: Props) {
+export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const getTypeBadge = (type: string) => {
@@ -153,9 +157,25 @@ export function PerformanceHistoryList({ logs, onRefresh }: Props) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="gap-2">
+                        <DropdownMenuItem className="gap-2" onClick={() => setExpandedRow(expandedRow === log.id ? null : log.id)}>
                           <Eye className="w-4 h-4" /> Ver Detalles
                         </DropdownMenuItem>
+                        {onEdit && (
+                          <DropdownMenuItem className="gap-2" onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit(log);
+                          }}>
+                            <Edit2 className="w-4 h-4" /> Editar Actividad
+                          </DropdownMenuItem>
+                        )}
+                        {onDelete && (
+                          <DropdownMenuItem className="gap-2 text-destructive focus:text-destructive focus:bg-destructive/10" onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(log);
+                          }}>
+                            <Trash2 className="w-4 h-4" /> Eliminar Actividad
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
