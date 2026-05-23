@@ -129,7 +129,7 @@ export default function AgenciasClient() {
                 </td>
                 <td style={{ padding: "12px 16px" }}>
                   <span style={{ color: a.creditos && a.creditos.disponible < 10 ? "#f87171" : "rgba(255,255,255,0.7)", fontSize: 13 }}>
-                    {a.creditos ? `${a.creditos.disponible} disp.` : "–"}
+                    {a.creditos ? `${a.creditos.total}` : "–"}
                   </span>
                 </td>
                 <td style={{ padding: "12px 16px", color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
