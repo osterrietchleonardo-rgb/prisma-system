@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState, useCallback } from "react"
-import { generateDirectorInvite } from "@/lib/actions/admin"
+import { generateDirectorInvite, deleteDirectorInvite } from "@/lib/actions/admin"
+import { Trash2 } from "lucide-react"
 
 interface Invite {
   id: string
@@ -101,7 +102,7 @@ export default function InvitacionesClient() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-              {["Código", "Estado", "Fecha Creación", "Fecha Uso", "Email Usuario"].map(h => (
+              {["Código", "Estado", "Fecha Creación", "Fecha Uso", "Email Usuario", "Acciones"].map(h => (
                 <th key={h} style={{ padding: "12px 16px", textAlign: "left", color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   {h}
                 </th>
@@ -110,9 +111,9 @@ export default function InvitacionesClient() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={5} style={{ padding: 32, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Cargando...</td></tr>
+              <tr><td colSpan={6} style={{ padding: 32, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Cargando...</td></tr>
             ) : invites.length === 0 ? (
-              <tr><td colSpan={5} style={{ padding: 32, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>No hay invitaciones generadas</td></tr>
+              <tr><td colSpan={6} style={{ padding: 32, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>No hay invitaciones generadas</td></tr>
             ) : invites.map(i => (
               <tr
                 key={i.id}
@@ -136,6 +137,23 @@ export default function InvitacionesClient() {
                 </td>
                 <td style={{ padding: "12px 16px", color: "rgba(255,255,255,0.7)", fontSize: 13 }}>
                   {i.used_by_email || "—"}
+                </td>
+                <td style={{ padding: "12px 16px" }}>
+                  <button 
+                    onClick={async () => {
+                      if (!confirm(`¿Estás seguro que deseas eliminar el código ${i.code}?`)) return
+                      const res = await deleteDirectorInvite(i.id)
+                      if (res.success) {
+                        fetchInvites()
+                      } else {
+                        alert(res.error || "Error al eliminar código")
+                      }
+                    }}
+                    style={{ background: "transparent", border: "none", cursor: "pointer", color: "rgba(239,68,68,0.7)", display: "flex", alignItems: "center", justifyContent: "center", padding: 4 }}
+                    title="Eliminar código"
+                  >
+                    <Trash2 className="w-4 h-4 hover:text-red-500 transition-colors" />
+                  </button>
                 </td>
               </tr>
             ))}

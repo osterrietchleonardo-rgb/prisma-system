@@ -24,3 +24,23 @@ export async function generateDirectorInvite() {
     return { error: "Error desconocido al generar código." }
   }
 }
+
+export async function deleteDirectorInvite(id: string) {
+  try {
+    const adminClient = createAdminClient()
+    
+    const { error } = await adminClient
+      .from('director_invites')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error("Error deleting director invite:", error)
+      return { error: "No se pudo eliminar el código." }
+    }
+
+    return { success: true }
+  } catch (err) {
+    return { error: "Error desconocido al eliminar código." }
+  }
+}
