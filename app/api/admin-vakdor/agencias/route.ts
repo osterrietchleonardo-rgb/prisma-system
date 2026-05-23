@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdminVakdor, isNextResponse } from "@/lib/admin-vakdor/guard"
 import { getAdminDb } from "@/lib/admin-vakdor/logger"
 
+export const dynamic = "force-dynamic"
+
 export async function GET(request: NextRequest) {
   const auth = await requireAdminVakdor(request)
   if (isNextResponse(auth)) return auth
