@@ -78,6 +78,17 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
     }
 
     if (data.role === 'director') {
+      if (!data.inviteCode) return { error: "Código de autorización obligatorio para directores" }
+
+      const { data: adminInvite, error: findAdminError } = await adminClient
+        .from('director_invites')
+        .select('id, is_used')
+        .eq('code', data.inviteCode)
+        .single()
+
+      if (findAdminError || !adminInvite) return { error: "Código de autorización inexistente" }
+      if (adminInvite.is_used) return { error: "Este código ya fue utilizado" }
+
       const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
       
       const { data: agency, error: agencyError } = await adminClient
@@ -104,6 +115,16 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
         .from('profiles')
         .update({ agency_id: agency.id })
         .eq('id', userId)
+
+      await adminClient
+        .from('director_invites')
+        .update({
+          is_used: true,
+          used_at: new Date().toISOString(),
+          used_by: userId,
+          agency_id: agency.id
+        })
+        .eq('id', adminInvite.id)
 
     } else {
       if (!data.inviteCode) return { error: "Código de invitación obligatorio" }

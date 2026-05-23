@@ -120,10 +120,19 @@ export default function RegisterForm() {
           </div>
 
           {role === 'director' ? (
-            <div className="grid gap-2">
-              <Label htmlFor="agencyName">Nombre de la Inmobiliaria</Label>
-              <Input id="agencyName" name="agencyName" placeholder="Pérez Propiedades" required disabled={loading} className="bg-background/50" />
-            </div>
+            <>
+              <div className="grid gap-2">
+                <Label htmlFor="agencyName">Nombre de la Inmobiliaria</Label>
+                <Input id="agencyName" name="agencyName" placeholder="Pérez Propiedades" required disabled={loading} className="bg-background/50" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="inviteCode">Código de Autorización</Label>
+                <Input id="inviteCode" name="inviteCode" placeholder="ABC123" required disabled={loading} className="bg-background/50" />
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Info className="w-3 h-3" /> Proveído por el equipo de PRISMA.
+                </p>
+              </div>
+            </>
           ) : (
             <div className="grid gap-2">
               <Label htmlFor="inviteCode">Código de Inmobiliaria</Label>
@@ -160,7 +169,8 @@ export default function RegisterForm() {
                 onClick={() => {
                   const formData = new FormData(document.querySelector('form') as HTMLFormElement)
                   const agencyName = formData.get("agencyName") as string
-                  signInWithGoogle(window.location.origin, role, undefined, agencyName)
+                  const inviteCode = formData.get("inviteCode") as string
+                  signInWithGoogle(window.location.origin, role, inviteCode, agencyName)
                 }} 
                 className="border-accent/20 hover:bg-accent/5 w-full"
               >
