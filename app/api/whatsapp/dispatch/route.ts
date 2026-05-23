@@ -38,6 +38,44 @@ export async function POST(req: Request) {
     // Lo ideal es que n8n mande "seg_f1_seguimiento" y nosotros lo completamos.
     const finalTemplateName = template_name.startsWith(prefix) ? template_name : `${prefix}_${template_name}`
 
+    // 2b. Resolver el texto REAL de la plantilla desde wa_templates
+    //     (igual que hace CampaignsTab al construir fullText)
+    const { data: templateRow } = await supabase
+      .from('wa_templates')
+      .select('components')
+      .eq('agency_id', agency_id)
+      .eq('template_name', finalTemplateName)
+      .maybeSingle()
+
+    function buildFullText(components: any[], vars: string[]): string {
+      let text = ''
+      for (const c of components || []) {
+        if (c.type === 'HEADER' && c.text) {
+          let t: string = c.text
+          ;(vars || []).forEach((v, i) => { t = t.replace(`{{${i + 1}}}`, v) })
+          text += t + '\n'
+        }
+        if (c.type === 'BODY' && c.text) {
+          let t: string = c.text
+          ;(vars || []).forEach((v, i) => { t = t.replace(`{{${i + 1}}}`, v) })
+          text += t + '\n'
+        }
+        if (c.type === 'FOOTER' && c.text) {
+          text += `\n${c.text}`
+        }
+      }
+      return text.trim()
+    }
+
+    const resolvedText = templateRow?.components
+      ? buildFullText(templateRow.components as any[], variables || [])
+      : null
+
+    // Si la plantilla no está en BD (ej: entorno de prueba sin plantillas reales),
+    // usamos un fallback legible en lugar del placeholder feo anterior.
+    const messageContent = resolvedText
+      || `[Plantilla: ${finalTemplateName}] ${(variables || []).join(' | ')}`
+
     let wamid: string | null = null
     const cleanPhone = contact_phone.replace(/\D/g, "")
 
@@ -121,20 +159,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No hay método de envío configurado' }, { status: 500 })
     }
 
-    // 4. Guardar en wa_messages (Para UI Realtime del Director)
-    const previewContent = `[Plantilla enviada: ${finalTemplateName}] ${variables ? variables.join(' | ') : ''}`
-    
+    // 4. Guardar en wa_messages (texto real de la plantilla con variables sustituidas)
     await supabase.from('wa_messages').insert({
       conversation_id,
       agency_id,
-      content: previewContent,
+      content: messageContent,
       role: 'bot',
       message_type: 'template',
       wamid,
       metadata: { template_name: finalTemplateName, variables }
     })
 
-    // 5. Guardar en n8n_chat_histories (Para la Memoria IA de n8n)
+    // 5. Guardar en n8n_chat_histories (el agente IA de n8n lee el texto real)
     const fecha = new Date().toLocaleString('es-AR', { 
       timeZone: 'America/Argentina/Buenos_Aires',
       day: '2-digit', month: '2-digit', year: 'numeric',
@@ -144,10 +180,10 @@ export async function POST(req: Request) {
     await supabase.from('n8n_chat_histories').insert({
       session_id: conversation_id,
       message: {
-        type: 'ai', // AI type significa salida hacia el lead
+        type: 'ai',
         content: JSON.stringify({
           output: {
-            Mensaje: previewContent,
+            Mensaje: messageContent,
             Fecha: fecha
           }
         }),
