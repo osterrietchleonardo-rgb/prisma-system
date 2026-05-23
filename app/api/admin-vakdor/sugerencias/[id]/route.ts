@@ -22,3 +22,20 @@ export async function GET(request: NextRequest, { params }: Params) {
   if (error || !data) return NextResponse.json({ error: "No encontrado" }, { status: 404 })
   return NextResponse.json(data)
 }
+
+export async function DELETE(request: NextRequest, { params }: Params) {
+  const auth = await requireAdminVakdor(request)
+  if (isNextResponse(auth)) return auth
+
+  const db = getAdminDb()
+  const { error } = await db
+    .from("system_feedback")
+    .delete()
+    .eq("id", params.id)
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
+}

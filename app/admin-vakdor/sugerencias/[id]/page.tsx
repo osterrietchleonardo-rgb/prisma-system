@@ -18,6 +18,7 @@ export default function SugerenciaDetalleClient() {
   const [estado, setEstado] = useState("")
   const [respuesta, setRespuesta] = useState("")
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [msg, setMsg] = useState("")
 
   useEffect(() => {
@@ -40,6 +41,21 @@ export default function SugerenciaDetalleClient() {
     if (res.ok) setMsg("Guardado correctamente")
     else { const d = await res.json(); setMsg(d.error || "Error") }
     setSaving(false)
+  }
+
+  async function eliminar() {
+    if (!confirm("¿Está seguro de que desea eliminar este reporte/sugerencia de forma permanente?")) return
+    setDeleting(true)
+    const res = await fetch(`/api/admin-vakdor/sugerencias/${id}`, {
+      method: "DELETE",
+    })
+    if (res.ok) {
+      router.push("/admin-vakdor/sugerencias")
+    } else {
+      const d = await res.json()
+      setMsg(d.error || "Error al eliminar")
+      setDeleting(false)
+    }
   }
 
   if (loading) return <div style={{ padding: 40, color: "rgba(255,255,255,0.4)" }}>Cargando...</div>
@@ -124,10 +140,17 @@ export default function SugerenciaDetalleClient() {
           />
         </div>
 
-        <button onClick={save} disabled={saving}
-          style={{ padding: "10px 24px", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", border: "none", borderRadius: 8, color: "#fff", fontSize: 14, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
-          {saving ? "Guardando..." : "Guardar cambios"}
-        </button>
+        <div style={{ display: "flex", gap: 12 }}>
+          <button onClick={save} disabled={saving || deleting}
+            style={{ padding: "10px 24px", background: "linear-gradient(135deg, #6366f1, #8b5cf6)", border: "none", borderRadius: 8, color: "#fff", fontSize: 14, fontWeight: 600, cursor: (saving || deleting) ? "not-allowed" : "pointer", opacity: (saving || deleting) ? 0.7 : 1 }}>
+            {saving ? "Guardando..." : "Guardar cambios"}
+          </button>
+          
+          <button onClick={eliminar} disabled={saving || deleting}
+            style={{ padding: "10px 24px", background: "rgba(239, 68, 68, 0.12)", border: "1px solid rgba(239, 68, 68, 0.3)", borderRadius: 8, color: "#f87171", fontSize: 14, fontWeight: 600, cursor: (saving || deleting) ? "not-allowed" : "pointer", opacity: (saving || deleting) ? 0.7 : 1, marginLeft: "auto" }}>
+            {deleting ? "Eliminando..." : "Eliminar"}
+          </button>
+        </div>
       </div>
     </div>
   )
