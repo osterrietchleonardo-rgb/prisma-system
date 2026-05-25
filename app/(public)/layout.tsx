@@ -35,6 +35,7 @@ export default function PublicLayout({
               <nav className="hidden md:flex gap-10 text-sm font-bold text-muted-foreground uppercase tracking-widest">
                 <Link href="/#metodologia" className="hover:text-accent transition-colors">Metodología</Link>
                 <Link href="/#activacion" className="hover:text-accent transition-colors">Activación</Link>
+                <Link href="/#ser-socio" className="hover:text-accent transition-colors">Ser Socio</Link>
               </nav>
               
               <div className="flex items-center gap-2 md:gap-4">
@@ -57,6 +58,7 @@ export default function PublicLayout({
                     <div className="flex flex-col gap-6 text-xl font-black uppercase tracking-tighter">
                       <Link href="/#metodologia" className="hover:text-accent transition-colors">Metodología</Link>
                       <Link href="/#activacion" className="hover:text-accent transition-colors">Activación</Link>
+                      <Link href="/#ser-socio" className="hover:text-accent transition-colors">Ser Socio</Link>
                       <hr className="border-accent/20" />
                       <Link href="/auth/login" className="hover:text-accent transition-colors">Acceso Socios</Link>
                       <Link href="/agendar" className="text-accent underline underline-offset-8">Postular Agencia</Link>

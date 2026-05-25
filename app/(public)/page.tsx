@@ -233,7 +233,7 @@ export default function LandingPage() {
         </section>
 
         {/* CTA FINAL */}
-        <section className="py-32 bg-[#020617] relative overflow-hidden">
+        <section id="ser-socio" className="py-32 bg-[#020617] relative overflow-hidden">
           <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-[#B87333]/10 rounded-full blur-[180px] -z-0 translate-x-1/2 -translate-y-1/2"></div>
           
           <div className="container relative z-10 flex flex-col items-center gap-12">
@@ -251,9 +251,9 @@ export default function LandingPage() {
                 <ShieldCheck className="w-16 h-16 text-[#B87333]" />
                 <h3 className="text-3xl font-black text-white font-serif">Aplica para unirte a PRISMA</h3>
                 <ul className="space-y-4 text-[#C0C0C0] text-left mx-auto">
-                  <li className="flex gap-3 items-center"><CheckCircle2 className="w-5 h-5 text-[#B87333]" /> Entrevista estratégica sin costo (30 min)</li>
-                  <li className="flex gap-3 items-center"><CheckCircle2 className="w-5 h-5 text-[#B87333]" /> Evaluación técnica de tu flujo Tokko Broker</li>
-                  <li className="flex gap-3 items-center"><CheckCircle2 className="w-5 h-5 text-[#B87333]" /> Generación de código único si hay "match"</li>
+                  <li className="flex gap-3 items-start"><CheckCircle2 className="w-5 h-5 text-[#B87333] shrink-0 mt-0.5" /> <span>Entrevista estratégica sin costo (30 min)</span></li>
+                  <li className="flex gap-3 items-start"><CheckCircle2 className="w-5 h-5 text-[#B87333] shrink-0 mt-0.5" /> <span>Análisis de problemáticas, estructura operativa y disposición a escalar</span></li>
+                  <li className="flex gap-3 items-start"><CheckCircle2 className="w-5 h-5 text-[#B87333] shrink-0 mt-0.5" /> <span>Generación de código único si hay "match"</span></li>
                 </ul>
                 <Button asChild size="lg" className="mt-4 bg-[#B87333] hover:bg-[#B87333]/90 text-white border-0 h-16 px-12 text-lg font-bold w-full sm:w-auto shadow-xl shadow-[#B87333]/20 hover:scale-105 transition-all">
                   <Link href="/agendar">Postular mi Agencia</Link>
