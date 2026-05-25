@@ -130,30 +130,38 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
           setAssignedAgent(null)
         }
 
-        // 1. Find the lead by phone
+        // 1. Clean the phone number to match against scheduled_visits
         const cleanPhone = conversation.contact_phone.replace(/\D/g, "");
-        const { data: lead } = await supabase
-          .from("leads")
-          .select("id")
-          .ilike("phone", `%${cleanPhone.slice(-10)}%`) // Match last 10 digits to handle local variations
-          .maybeSingle();
 
-        if (!lead) {
-            setVisitLoading(false);
-            return;
-        }
-
-        // 2. Fetch the latest visit for this lead
+        // 2. Fetch the latest visit from scheduled_visits
+        // En scheduled_visits, el lead_id guarda el teléfono del contacto.
         const { data, error } = await supabase
-          .from("visits")
+          .from("scheduled_visits")
           .select("*")
-          .eq("lead_id", lead.id)
-          .order("scheduled_at", { ascending: false })
+          .ilike("lead_id", `%${cleanPhone.slice(-10)}%`)
+          .order("fecha_visita", { ascending: false })
+          .order("hora_visita", { ascending: false })
           .limit(1)
           .maybeSingle();
           
         if (!error && data) {
-          setVisit(data)
+          // Obtener el nombre del asesor si existe agent_id
+          let advisorName = null;
+          if (data.agent_id) {
+             const { data: profile } = await supabase
+               .from("profiles")
+               .select("full_name")
+               .eq("id", data.agent_id)
+               .maybeSingle();
+             if (profile) advisorName = profile.full_name;
+          }
+
+          setVisit({
+            scheduled_at: `${data.fecha_visita}T${data.hora_visita}`,
+            status: 'pendiente', // Usamos pendiente por defecto o puedes mapearlo si agregas columna de estado
+            property_name: data.propiedad_titulo || data.zona_propiedad,
+            advisor_name: advisorName
+          });
         }
       } catch (err) {
         console.error("Error fetching lead/visit for traceability:", err);
