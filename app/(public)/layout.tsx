@@ -33,17 +33,16 @@ export default function PublicLayout({
               </Link>
               
               <nav className="hidden md:flex gap-10 text-sm font-bold text-muted-foreground uppercase tracking-widest">
-                <Link href="/#director" className="hover:text-accent transition-colors">Directores</Link>
-                <Link href="/#asesor" className="hover:text-accent transition-colors">Asesores</Link>
-                <Link href="/#metricas" className="hover:text-accent transition-colors">Resultados</Link>
+                <Link href="/#metodologia" className="hover:text-accent transition-colors">Metodología</Link>
+                <Link href="/#activacion" className="hover:text-accent transition-colors">Activación</Link>
               </nav>
               
               <div className="flex items-center gap-2 md:gap-4">
                 <ModeToggle />
                 <div className="hidden sm:flex items-center gap-6">
-                  <Link href="/auth/login" className="text-sm font-bold text-muted-foreground hover:text-accent transition-colors uppercase tracking-widest">Ingresar</Link>
+                  <Link href="/auth/login" className="text-sm font-bold text-muted-foreground hover:text-accent transition-colors uppercase tracking-widest">Acceso Socios</Link>
                   <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-white border-0 px-8 rounded-full font-black uppercase tracking-tighter">
-                    <Link href="/auth/register">Comenzá hoy</Link>
+                    <Link href="/agendar">Postular Agencia</Link>
                   </Button>
                 </div>
                 
@@ -56,12 +55,11 @@ export default function PublicLayout({
                   </SheetTrigger>
                   <SheetContent side="right" className="flex flex-col gap-8 pt-16 bg-background/98 backdrop-blur-xl border-accent/20">
                     <div className="flex flex-col gap-6 text-xl font-black uppercase tracking-tighter">
-                      <Link href="/#director" className="hover:text-accent transition-colors">Directores</Link>
-                      <Link href="/#asesor" className="hover:text-accent transition-colors">Asesores</Link>
-                      <Link href="/#metricas" className="hover:text-accent transition-colors">Resultados</Link>
+                      <Link href="/#metodologia" className="hover:text-accent transition-colors">Metodología</Link>
+                      <Link href="/#activacion" className="hover:text-accent transition-colors">Activación</Link>
                       <hr className="border-accent/20" />
-                      <Link href="/auth/login" className="hover:text-accent transition-colors">Ingresar</Link>
-                      <Link href="/auth/register" className="text-accent underline underline-offset-8">Comenzá hoy</Link>
+                      <Link href="/auth/login" className="hover:text-accent transition-colors">Acceso Socios</Link>
+                      <Link href="/agendar" className="text-accent underline underline-offset-8">Postular Agencia</Link>
                     </div>
                   </SheetContent>
                 </Sheet>
