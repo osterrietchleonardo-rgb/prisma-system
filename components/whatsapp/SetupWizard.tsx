@@ -428,12 +428,27 @@ export function SetupWizard() {
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl bg-green-500/5 border border-green-500/20 flex gap-3">
-                <Check className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-bold text-foreground">Webhook automatizado</p>
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                    PRISMA configurará y suscribirá Automáticamente los Webhooks en Meta por ti, para que empieces a recibir mensajes de inmediato. Evita tocar los campos de webhook en Meta.
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+                    <p className="text-sm font-bold text-amber-900 dark:text-amber-400">Configuración Obligatoria del Webhook</p>
+                  </div>
+                  <p className="text-xs text-amber-900/80 dark:text-amber-200/80 mb-4 leading-relaxed">
+                    Para que PRISMA pueda recibir los mensajes de tus clientes, debes configurar el Webhook manualmente en el panel de Meta (en la sección Configuración de la API). Copia y pega estos datos:
+                  </p>
+                  <div className="space-y-3">
+                    <CopyButton 
+                      label="URL de devolución de llamada" 
+                      value="https://prisma.vakdor.com/api/webhooks/meta" 
+                    />
+                    <CopyButton 
+                      label="Identificador de verificación" 
+                      value="PrismaSaaS2026_Verificacion!" 
+                    />
+                  </div>
+                  <p className="text-[11px] text-amber-900/80 dark:text-amber-200/80 mt-4 leading-relaxed font-medium">
+                    Luego haz clic en "Verificar y guardar". Finalmente, en "Campos de webhook" abajo, haz clic en Administrar y asegúrate de suscribirte a los campos <span className="font-bold">messages</span> y <span className="font-bold">message_template_status_update</span>.
                   </p>
                 </div>
               </div>
