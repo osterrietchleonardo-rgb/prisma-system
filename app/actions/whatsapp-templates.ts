@@ -18,7 +18,7 @@ export async function injectCoreTemplates(agency_id: string, business_id: string
       template_name: `${prefix}_seg_f1_seguimiento`,
       category: 'MARKETING',
       language: 'es_AR',
-      body: "Hola {{1}}, vimos que quedó pendiente tu consulta sobre la propiedad. {{2}}",
+      body: "Hola {{1}}, vimos que quedó pendiente tu consulta sobre la propiedad. {{2}} Aguardamos tus comentarios.",
       body_examples: ["Juan", "¿Pudiste hablar con tu pareja sobre el depto de Villa Crespo? Si querés retomamos desde ahí."],
       buttons: []
     },
@@ -27,7 +27,7 @@ export async function injectCoreTemplates(agency_id: string, business_id: string
       template_name: `${prefix}_seg_f2_valor`,
       category: 'MARKETING',
       language: 'es_AR',
-      body: "Hola {{1}}, seguimos trabajando en tu búsqueda de propiedades para enviarte opciones precisas. {{2}}",
+      body: "Hola {{1}}, seguimos trabajando en tu búsqueda de propiedades para enviarte opciones precisas. {{2}} Quedamos a tu disposición.",
       body_examples: ["Juan", "Ingresó una unidad nueva en Caballito que quizás te encaje, ¿querés verla?"],
       buttons: []
     },
