@@ -75,6 +75,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
         data: {
           full_name: data.fullName,
           role: data.role,
+          invite_code: data.inviteCode,
         },
         emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
       }

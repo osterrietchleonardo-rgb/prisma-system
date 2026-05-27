@@ -14,7 +14,8 @@ export async function GET(request: Request) {
       const user = session.user
       const roleFromUrl = searchParams.get('role') as 'director' | 'asesor' | null
       const role = roleFromUrl || user.user_metadata?.role || 'director'
-      const inviteCode = searchParams.get('inviteCode')
+      const inviteCodeFromUrl = searchParams.get('inviteCode')
+      const inviteCode = inviteCodeFromUrl || user.user_metadata?.invite_code
       const agencyName = searchParams.get('agencyName')
 
       // Check if profile exists
