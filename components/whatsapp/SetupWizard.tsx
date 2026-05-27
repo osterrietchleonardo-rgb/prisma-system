@@ -133,7 +133,7 @@ export function SetupWizard() {
   const progress = (currentStep / steps.length) * 100
 
   return (
-    <div className="flex flex-col h-full space-y-8 p-4 md:p-8 pt-6">
+    <div className="flex flex-col h-full space-y-8 p-4 md:p-8 pt-6 overflow-y-auto">
       {/* Header & Progress */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
