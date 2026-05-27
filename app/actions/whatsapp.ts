@@ -816,9 +816,9 @@ export async function removeInstance(): Promise<WhatsAppActionResult> {
       .from('whatsapp_instances')
       .update({
         status: 'disconnected',
-        token: null,
-        phone_number_id: null,
-        business_id: null,
+        token: '',
+        phone_number_id: '',
+        business_id: '',
         evo_instance_id: null,
         evo_instance_name: null
       })
