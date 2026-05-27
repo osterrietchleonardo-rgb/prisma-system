@@ -809,14 +809,23 @@ export async function removeInstance(): Promise<WhatsAppActionResult> {
       })
     }
 
-    // 3. Eliminar el registro en la base de datos (whatsapp_instances)
-    const { error: deleteError } = await supabase
+    // 3. Actualizar el registro en la base de datos (whatsapp_instances) en lugar de eliminarlo
+    // Esto evita el error de foreign key con wa_conversations y permite que al volver a vincular,
+    // se re-utilice el mismo ID de instancia manteniendo el historial intacto.
+    const { error: updateError } = await supabase
       .from('whatsapp_instances')
-      .delete()
+      .update({
+        status: 'disconnected',
+        token: null,
+        phone_number_id: null,
+        business_id: null,
+        evo_instance_id: null,
+        evo_instance_name: null
+      })
       .eq('id', instance.id)
 
-    if (deleteError) {
-      return { success: false, error: `Error al eliminar la instancia local: ${deleteError.message}` }
+    if (updateError) {
+      return { success: false, error: `Error al actualizar la instancia local: ${updateError.message}` }
     }
 
     return { success: true }
