@@ -39,7 +39,7 @@ export default async function AsesorIAWhatsAppPage() {
 
   return (
     <div id="whatsapp-ia-page" className="flex-1 flex flex-col min-h-0 bg-background overflow-hidden">
-      {!instance ? (
+      {!instance || instance.status === 'disconnected' ? (
         <SetupWizard />
       ) : (
         <WhatsAppTabsWrapper instance={instance} />
