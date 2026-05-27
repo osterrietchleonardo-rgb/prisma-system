@@ -66,6 +66,17 @@
 
 ## 🔄 ENTRADAS DE PROGRESO
 
+### 2026-05-27 | P10 — WhatsApp: Bug Fixes (Disconnect, Templates & UX)
+- **Desconexión Segura**:
+  - Modificada la función `removeInstance` para evitar violaciones de clave foránea (`foreign key constraint`) con el historial de `wa_conversations`.
+  - Al desconectar un número, el sistema ahora actualiza el estado a `disconnected` conservando la instancia, lo que permite que al re-conectar se herede todo el historial de chats sin interrupciones.
+- **Flujo Visual (SetupWizard)**:
+  - Condicionada la vista del Director para forzar el paso por el `SetupWizard` cuando la instancia actual está en estado `disconnected`, ocultando temporalmente la bandeja de entrada.
+  - Agregado scroll interno (`overflow-y-auto`) al contenedor del Wizard para resolver un bug donde el footer (con los botones de Siguiente) quedaba oculto en pantallas pequeñas.
+- **Plantillas y Webhooks**:
+  - Corregido el rechazo de Meta para las plantillas *Seguimiento F1* y *Seguimiento F2* (se agregó texto de cierre para cumplir con las políticas anti-spam que prohíben finalizar con variables `{{2}}`).
+  - Corrección crítica en las instrucciones del Webhook: Se reemplazó el texto ilusorio "Webhook automatizado" por advertencias y componentes visuales para que el usuario configure la URL y el Token manualmente, resolviendo la imposibilidad técnica de hacerlo vía API sin pedir el App Secret.
+
 ### 2026-05-14 | UI/UX — Mobile WhatsApp Rendering Failure (Resolved)
 - **WhatsApp IA — Diagnóstico de Pantalla Blanca en Móvil**:
   - **Identificación del Bloqueo**: Se aisló el error mediante pruebas de exclusión, confirmando que las suscripciones **Supabase Realtime (WebSockets)** provocaban un cuelgue silencioso del renderizado en navegadores móviles (Safari/iOS).
