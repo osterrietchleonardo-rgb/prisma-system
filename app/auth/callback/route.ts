@@ -12,7 +12,8 @@ export async function GET(request: Request) {
     if (!error && session?.user) {
       console.log('Auth Callback Success: User logged in', session.user.email)
       const user = session.user
-      const role = searchParams.get('role') as 'director' | 'asesor'
+      const roleFromUrl = searchParams.get('role') as 'director' | 'asesor' | null
+      const role = roleFromUrl || user.user_metadata?.role || 'director'
       const inviteCode = searchParams.get('inviteCode')
       const agencyName = searchParams.get('agencyName')
 
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
             id: user.id,
             email: user.email,
             full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-            role: role || 'director'
+            role: role
           })
 
         if (role === 'director') {

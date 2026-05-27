@@ -242,6 +242,7 @@ export async function updateAgencySettings(agencyId: string, settings: any) {
   if (error) throw error
 }
 
+
 export async function getAgencyInvites(agencyId: string) {
   const supabase = createClient()
   

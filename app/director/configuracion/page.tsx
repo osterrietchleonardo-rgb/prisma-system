@@ -34,10 +34,10 @@ import { Badge } from "@/components/ui/badge"
 
 import { 
   getAgencySettings, 
-  updateAgencySettings, 
   getAgencyInvites, 
   generateAgencyInvite 
 } from "@/lib/queries/director"
+import { createAgencyAction, updateAgencyAction } from "@/app/actions/agency"
 
 import { useSearchParams } from "next/navigation"
 import { AiCreditsDashboard } from "@/components/ai-credits-dashboard"
@@ -139,14 +139,26 @@ export default function DirectorConfiguracionPage() {
   }
 
   const handleSaveAgency = async () => {
-    if (!profile.agency_id) return
     try {
       setLoading(true)
-      await updateAgencySettings(profile.agency_id, {
-        name: agencySettings.name,
-        tokko_api_key: agencySettings.tokko_api_key
-      })
-      toast.success("Configuración de inmobiliaria guardada")
+      if (profile.agency_id) {
+        await updateAgencyAction(profile.agency_id, {
+          name: agencySettings.name,
+          tokko_api_key: agencySettings.tokko_api_key
+        })
+        toast.success("Configuración de inmobiliaria guardada")
+      } else {
+        if (!userId) {
+          toast.error("Usuario no identificado")
+          return
+        }
+        const newAgency = await createAgencyAction(userId, {
+          name: agencySettings.name,
+          tokko_api_key: agencySettings.tokko_api_key
+        })
+        setProfile(p => ({ ...p, agency_id: newAgency.id }))
+        toast.success("Inmobiliaria creada y configurada exitosamente")
+      }
     } catch (_error) {
       toast.error("Error al guardar la configuración")
     } finally {

@@ -37,7 +37,36 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
     const data = registerSchema.parse(rawData)
     const supabase = createClient()
     const adminClient = createAdminClient()
-    
+    // 0. Validar códigos de invitación ANTES de crear el usuario para evitar enviar emails prematuros
+    let validAdminInvite = null;
+    let validAgencyInvite = null;
+
+    if (data.role === 'director') {
+      if (!data.inviteCode) return { error: "Código de autorización obligatorio para directores" }
+
+      const { data: invite, error: findAdminError } = await adminClient
+        .from('director_invites')
+        .select('id, is_used')
+        .eq('code', data.inviteCode)
+        .single()
+
+      if (findAdminError || !invite) return { error: "Código de autorización inexistente" }
+      if (invite.is_used) return { error: "Este código ya fue utilizado" }
+      validAdminInvite = invite;
+    } else {
+      if (!data.inviteCode) return { error: "Código de invitación obligatorio" }
+
+      const { data: invite, error: findError } = await adminClient
+        .from('agency_invites')
+        .select('agency_id, is_used')
+        .eq('code', data.inviteCode)
+        .single()
+
+      if (findError || !invite) return { error: "Código de invitación inexistente" }
+      if (invite.is_used) return { error: "Este código ya fue utilizado" }
+      validAgencyInvite = invite;
+    }
+
     // 1. Crear usuario con signUp para que Supabase maneje el envío del email de confirmación
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email,
@@ -67,6 +96,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
       }, { onConflict: 'id' })
 
     if (profileError) {
+        // Reintentar si hubo un delay en la replicación
         await adminClient
           .from('profiles')
           .upsert({
@@ -77,18 +107,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
           }, { onConflict: 'id' })
     }
 
-    if (data.role === 'director') {
-      if (!data.inviteCode) return { error: "Código de autorización obligatorio para directores" }
-
-      const { data: adminInvite, error: findAdminError } = await adminClient
-        .from('director_invites')
-        .select('id, is_used')
-        .eq('code', data.inviteCode)
-        .single()
-
-      if (findAdminError || !adminInvite) return { error: "Código de autorización inexistente" }
-      if (adminInvite.is_used) return { error: "Este código ya fue utilizado" }
-
+    if (data.role === 'director' && validAdminInvite) {
       const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
       
       const { data: agency, error: agencyError } = await adminClient
@@ -124,23 +143,12 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
           used_by: userId,
           agency_id: agency.id
         })
-        .eq('id', adminInvite.id)
+        .eq('id', validAdminInvite.id)
 
-    } else {
-      if (!data.inviteCode) return { error: "Código de invitación obligatorio" }
-
-      const { data: invite, error: findError } = await adminClient
-        .from('agency_invites')
-        .select('agency_id, is_used')
-        .eq('code', data.inviteCode)
-        .single()
-
-      if (findError || !invite) return { error: "Código de invitación inexistente" }
-      if (invite.is_used) return { error: "Este código ya fue utilizado" }
-
+    } else if (data.role === 'asesor' && validAgencyInvite) {
       const { error: asesorLinkError } = await adminClient
         .from('profiles')
-        .update({ agency_id: invite.agency_id, role: 'asesor', full_name: data.fullName })
+        .update({ agency_id: validAgencyInvite.agency_id, role: 'asesor', full_name: data.fullName })
         .eq('id', userId)
       
       if (asesorLinkError) return { error: "Error al vincular asesor." }
