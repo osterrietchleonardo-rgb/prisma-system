@@ -164,8 +164,8 @@ export async function POST() {
       count: propertiesToUpsert.length 
     })
 
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error)
+  } catch (error: any) {
+    const message = error?.message || (typeof error === 'string' ? error : JSON.stringify(error));
     console.error("Tokko Sync Error:", message)
     return NextResponse.json({ 
       error: message || "Error interno durante la sincronización con Tokko" 

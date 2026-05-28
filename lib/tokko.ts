@@ -51,8 +51,23 @@ export const syncPropertiesFromTokko = async (apiKey: string) => {
 };
 
 export const syncAgentsFromTokko = async (apiKey: string) => {
-  const data = await fetchTokko('/user/', apiKey, { method: 'GET' });
-  return data.objects || [];
+  const endpoints = ['/user/', '/employee/', '/agent/'];
+  let lastError: any;
+
+  for (const endpoint of endpoints) {
+    try {
+      const data = await fetchTokko(endpoint, apiKey, { method: 'GET' });
+      if (data && data.objects) {
+        return data.objects;
+      }
+    } catch (error) {
+      lastError = error;
+      console.warn(`Tokko endpoint ${endpoint} failed, trying next...`);
+    }
+  }
+
+  console.warn("All Tokko agent endpoints failed, falling back to empty agent list.", lastError);
+  return [];
 };
 
 export const getLeadConsultas = async (apiKey: string, _daysBack: number = 7) => {
