@@ -31,7 +31,7 @@ export async function createAgencyAction(userId: string, settings: { name: strin
   return agency
 }
 
-export async function updateAgencyAction(agencyId: string, settings: { name: string, tokko_api_key?: string }) {
+export async function updateAgencyAction(agencyId: string, settings: { name: string, tokko_api_key?: string, logo_url?: string }) {
   const admin = createAdminClient()
 
   const { error } = await admin

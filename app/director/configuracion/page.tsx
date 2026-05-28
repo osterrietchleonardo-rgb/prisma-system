@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { 
   User, 
   Lock, 
@@ -62,6 +62,8 @@ export default function DirectorConfiguracionPage() {
     logo_url: "",
     tokko_api_key: ""
   })
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   // Real Invite codes
   const [inviteCodes, setInviteCodes] = useState<any[]>([])
@@ -138,12 +140,54 @@ export default function DirectorConfiguracionPage() {
     toast.success("Se ha enviado un email para restablecer la contraseña")
   }
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate size (2MB max) and type
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("El logo no puede superar los 2MB")
+      return
+    }
+    if (!file.type.startsWith("image/")) {
+      toast.error("Solo se permiten imágenes (PNG, JPG, SVG)")
+      return
+    }
+
+    setIsUploadingLogo(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const res = await fetch("/api/marketing-ia/settings/upload-logo", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Error al subir el logo")
+      }
+
+      const { publicUrl } = await res.json()
+      setAgencySettings(prev => ({ ...prev, logo_url: publicUrl }))
+      toast.success("Logo subido. Guardá los ajustes para confirmar.")
+    } catch (err: any) {
+      toast.error("Error al subir el logo: " + err.message)
+    } finally {
+      setIsUploadingLogo(false)
+      // Reset input so same file can be re-selected if needed
+      if (logoInputRef.current) logoInputRef.current.value = ""
+    }
+  }
+
   const handleSaveAgency = async () => {
     try {
       setLoading(true)
       if (profile.agency_id) {
         await updateAgencyAction(profile.agency_id, {
           name: agencySettings.name,
+          logo_url: agencySettings.logo_url || undefined,
           tokko_api_key: agencySettings.tokko_api_key
         })
         toast.success("Configuración de inmobiliaria guardada")
@@ -301,11 +345,63 @@ export default function DirectorConfiguracionPage() {
 
                 <div className="space-y-4">
                   <Label>Logo de Agencia</Label>
-                  <div className="h-32 border-2 border-dashed border-accent/20 bg-accent/5 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-accent/10 transition-colors">
-                    <Camera className="h-6 w-6 text-accent mb-2" />
-                    <span className="text-sm font-semibold text-accent">Subir nuevo logo</span>
-                    <span className="text-[10px] text-muted-foreground">PNG, JPG hasta 2MB</span>
-                  </div>
+                  {/* Hidden file input */}
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                    disabled={isUploadingLogo}
+                  />
+
+                  {agencySettings.logo_url ? (
+                    /* Preview mode */
+                    <div className="h-32 border border-accent/20 bg-card/50 rounded-2xl flex items-center justify-between px-4 gap-4">
+                      <img
+                        src={agencySettings.logo_url}
+                        alt="Logo agencia"
+                        className="h-20 w-auto max-w-[140px] object-contain rounded-lg"
+                      />
+                      <div className="flex flex-col gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-accent/20 text-accent hover:bg-accent/10 gap-2 text-xs"
+                          onClick={() => logoInputRef.current?.click()}
+                          disabled={isUploadingLogo}
+                        >
+                          <Camera className="h-3 w-3" />
+                          {isUploadingLogo ? "Subiendo..." : "Cambiar"}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 text-xs"
+                          onClick={() => setAgencySettings(prev => ({ ...prev, logo_url: "" }))}
+                          disabled={isUploadingLogo}
+                        >
+                          Quitar logo
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Upload prompt */
+                    <button
+                      type="button"
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={isUploadingLogo}
+                      className="w-full h-32 border-2 border-dashed border-accent/20 bg-accent/5 rounded-2xl flex flex-col items-center justify-center hover:bg-accent/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Camera className="h-6 w-6 text-accent mb-2" />
+                      <span className="text-sm font-semibold text-accent">
+                        {isUploadingLogo ? "Subiendo..." : "Subir logo"}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">PNG, JPG, SVG hasta 2MB</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

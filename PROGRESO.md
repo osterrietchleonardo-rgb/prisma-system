@@ -1,5 +1,5 @@
-# 📋 PROGRESO — PRISMA IA (v1.0.1)
-> Estado: Sincronización completa. Correcciones de build (dependencies, tsconfig, JSX) aplicadas.
+# 📋 PROGRESO — PRISMA IA (v1.0.4)
+> Estado: Producción activa. Primer cliente real onboardeado (MaxRE Inmobiliaria). Bugs corregidos.
 > Actualizar al finalizar cada tarea, prompt o sesión de trabajo.
 
 ---
@@ -8,9 +8,9 @@
 - Nombre: PRISMA IA
 - Stack: Next.js 14 · Supabase · Gemini API · Tokko API · TypeScript · Tailwind · shadcn/ui
 - Repo GitHub: [URL del repo]
-- Supabase Project: [URL del proyecto]
-- Versión actual: v1.0.0 (Sistema Completo - Producción)
-- Último deploy: 2026-03-22 (Validación final exitosa)
+- Supabase Project: `vutopjvdrwmvrkgnrfno` (prisma) — región `sa-east-1`
+- Versión actual: v1.0.4
+- Último deploy: 2026-05-28
 
 ---
 
@@ -35,13 +35,14 @@
 - Next.js 14 App Router (NO Pages Router)
 - Supabase para DB, Auth y Storage
 - Gemini API (gemini-2.0-flash) para todos los bots e IA
-- Tokko Broker API para sync de propiedades
+- Tokko Broker API para sync de propiedades y contactos
 - @dnd-kit para el Kanban
 - Recharts para gráficos
 - next-themes para dark/light mode
 - Zod para validación de inputs
 - date-fns para manejo de fechas
 - MCP de GitHub para todos los deploys
+- Admin Vakdor: JWT propio (HS256) independiente de Supabase Auth
 
 ## ❌ LO QUE NO SE USA (decisiones explícitas)
 - Pages Router
@@ -53,18 +54,78 @@
 
 ---
 
-## 📦 HISTORIAL DE VERSIONES
-| Versión | Fecha | Qué incluye |
-|---------|-------|-------------|
-| v0.1.0  | 2026-03-21 | Fundación técnica: Next.js 14, Supabase (9 tablas), RLS, Middleware, Libs. |
-| v0.2.0  | 2026-03-21 | Landing Page & Auth: Landing premium, registro roles (Director/Asesor), Google OAuth. |
-| v0.3.0  | 2026-03-21 | Director Layout & Dashboard: Sidebar, Header, KPIs, Recharts, Actividad, Mobile UX. |
-| v0.7.0  | 2026-03-22 | Bots IA (Tutor/Consultor), Leads avanzados, Tasaciones y Configuración de Agencia. |
-| v1.0.0  | 2026-03-22 | CIERRE PRODUCCIÓN: Seguridad robusta, Rate Limiting, UI Polish, SEO y 404 custom. |
+## 🗄️ BASE DE DATOS — TABLAS PRINCIPALES
+| Tabla | Propósito |
+|---|---|
+| `profiles` | Usuarios (director / asesor). Cols: id, role, full_name, email, phone, avatar_url, agency_id, estado, deleted_at, tokens_invalidos_desde, notification_prefs |
+| `agencies` | Inmobiliarias. Cols: id, name, logo_url, tokko_api_key, address, phone, email, invite_code, owner_id, performance_config, marketing_ai_config, estado, deleted_at, **last_sync_at** |
+| `agency_ai_credits` | Créditos IA por agencia. Cols: agency_id, feature, credits_total, credits_used, credits_director, credits_asesores, credits_used_director, credits_used_asesores, period_start, period_end, reset_interval |
+| `leads` | Pipeline de leads. upsert por `tokko_contact_id` |
+| `properties` | Propiedades Tokko. upsert por `tokko_id` |
+| `tokko_agents` | Agentes de Tokko. upsert por `tokko_id` |
+| `admin_vakdor_users` | Admins de Vakdor (sistema separado de auth) |
+| `admin_vakdor_activity_log` | Auditoría de acciones admin |
+| `log_creditos_admin` | Historial de cambios de créditos por admin |
+| `pagos_agencia` | Pagos registrados por mes. Col ID: `agencia_id`, `fecha_registro` |
+| `agency_invites` | Códigos de invitación para asesores |
+| `director_invites` | Códigos de invitación para directores |
+| `whatsapp_instances` | Instancias de WhatsApp por agencia |
+| `wa_conversations`, `wa_messages`, `wa_templates`, `wa_contacts` | Módulo WhatsApp |
+| `performance_logs` | Actividades de desempeño de asesores |
 
 ---
 
-## 🔄 ENTRADAS DE PROGRESO
+## 🪣 STORAGE — BUCKETS
+| Bucket | Público | Uso |
+|---|---|---|
+| `logos` | ✅ | Logos generales (avatares, etc.) |
+| `documents` | ✅ | Documentos de agencia |
+| `marketing-images` | ✅ | Imágenes generadas por Marketing IA + logos de agencia |
+
+> **Logo de Agencia**: se sube vía `POST /api/marketing-ia/settings/upload-logo` (usa adminClient, ruta: `{userId}/branding/logo_{timestamp}.{ext}`). La URL pública se guarda en `agencies.logo_url` al guardar ajustes.
+
+---
+
+## 📦 HISTORIAL DE VERSIONES
+| Versión | Fecha | Qué incluye |
+|---------|-------|-------------|
+| v0.1.0 | 2026-03-21 | Fundación técnica: Next.js 14, Supabase (9 tablas), RLS, Middleware, Libs. |
+| v0.2.0 | 2026-03-21 | Landing Page & Auth: Landing premium, registro roles (Director/Asesor), Google OAuth. |
+| v0.3.0 | 2026-03-21 | Director Layout & Dashboard: Sidebar, Header, KPIs, Recharts, Actividad, Mobile UX. |
+| v0.7.0 | 2026-03-22 | Bots IA (Tutor/Consultor), Leads avanzados, Tasaciones y Configuración de Agencia. |
+| v1.0.0 | 2026-03-22 | CIERRE PRODUCCIÓN: Seguridad robusta, Rate Limiting, UI Polish, SEO y 404 custom. |
+| v1.0.1 | 2026-04-06 | WhatsApp Module completo: Schema, RLS, Realtime, Chat Interface, Plantillas, Webhooks. |
+| v1.0.2 | 2026-05-12 | RLS Audit: aislamiento multi-tenant, seguridad granular en 3 tablas. |
+| v1.0.3 | 2026-05-27 | WhatsApp: desconexión segura sin FK violation, bugs de plantillas y webhook UX. |
+| v1.0.4 | 2026-05-28 | Primer cliente real (MaxRE). Bug `last_sync_at` corregido. Logo upload implementado. |
+
+---
+
+### 2026-05-28 | v1.0.4 — Auditoría cliente real + Bug fixes + Logo upload
+
+#### 🔍 Auditoría: MaxRE Inmobiliaria (primer cliente real)
+- Analizado en profundidad el estado de la cuenta del cliente Kevin Arlandi (`kevinarlandi@maxre.com.ar`).
+- **Profile ID**: `bfa01079-06f9-4d8d-ae8b-b41ed441b392` | **Agency ID**: `4962bf85-a92c-4c33-ba07-380686bbab76`
+- Estado verificado: perfil director activo, agencia activa, API Key de Tokko presente, créditos distribuidos (5,000: 1k director + 4k asesores), pago USD 1,500 registrado en mayo.
+- Panel Admin Vakdor operativo: control de créditos, pagos, tokko stats y log de auditoría funcionando correctamente.
+- Pendientes del cliente: ejecutar primera sincronización Tokko, invitar asesores (código `589C15`), completar logo/dirección.
+
+#### 🐛 Bug Fix: columna `last_sync_at` faltante en `agencies`
+- **Problema**: el endpoint `POST /api/tokko/sync` actualizaba `agencies.last_sync_at` al finalizar la sync, pero esa columna no existía en la tabla → error silencioso, el timestamp nunca se guardaba.
+- **Solución**: migración aplicada directamente en Supabase:
+  ```sql
+  ALTER TABLE agencies ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMPTZ NULL;
+  ```
+- La columna ahora aparece correctamente documentada en el esquema de `agencies`.
+- **Nota**: la entrada de la Fase 4 (2026-03-21) mencionaba `last_sync_at` como creada, pero en realidad no existía. Corregido el registro histórico.
+
+#### ✨ Feature: Upload real de logo en Configuración de Agencia
+- **Problema**: la sección "Logo de Agencia" en `/director/configuracion` (tab Inmobiliaria) era un div decorativo sin funcionalidad real. El campo `agencies.logo_url` siempre quedaba `null`.
+- **Solución** (2 archivos modificados):
+  - `app/director/configuracion/page.tsx`: agregado `useRef` para input file oculto, estado `isUploadingLogo`, función `handleLogoUpload` que llama al endpoint existente `/api/marketing-ia/settings/upload-logo`. UI con 2 modos: prompt de upload (sin logo) y preview con botones "Cambiar" / "Quitar logo". `handleSaveAgency` ahora incluye `logo_url`.
+  - `app/actions/agency.ts`: `updateAgencyAction` acepta `logo_url?: string` → se persiste en `agencies.logo_url` vía Supabase admin client.
+- El endpoint de upload ya existía y funcionaba; solo estaba desconectado de esta página.
+- Validaciones: tamaño máx 2MB, solo tipos `image/*`.
 
 ### 2026-05-27 | P10 — WhatsApp: Bug Fixes (Disconnect, Templates & UX)
 - **Desconexión Segura**:
@@ -263,7 +324,7 @@
 - **Detalle de Lead**: Panel lateral dinámico con historial de actividad y acciones de gestión.
 - **Sincronización Tokko**: API Route `/api/tokko/sync` con rate limiting (5 min) y mapeo automático de propiedades.
 - **Catálogo Propiedades**: Vista dual (Grid/Lista) con filtros por tipo y búsqueda en tiempo real.
-- **Esquema DB**: Actualizado con `last_sync_at` en `agencies` y tabla `properties` vinculada.
+- **Esquema DB**: Tabla `properties` vinculada. ⚠️ Nota: el código referenciaba `last_sync_at` en `agencies` pero la columna nunca fue creada en este punto — fue corregida el 2026-05-28.
 - **Build**: Verificación de producción exitosa (0 errores).
 
 ### 2026-03-21 | Fase 3: Director Layout & Dashboard Implementation
