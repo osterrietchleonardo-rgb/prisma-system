@@ -11,7 +11,7 @@ const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
 // Fetch ALL contacts from Tokko with pagination + rate-limit respect
 // ─────────────────────────────────────────────────────────────
 async function fetchAllTokkoContacts(apiKey: string) {
-  const MAX_CONTACTS = 10000
+  const MAX_CONTACTS = 1000
   const LIMIT        = 100
   const DELAY_MS     = 350
 
@@ -246,6 +246,7 @@ export async function POST(req: NextRequest) {
     const { mode = "all", leads: selectedLeads, assigned_agent_id } = body
 
     let contactsToImport: any[] = []
+    let totalTokko = 0;
 
     if (mode === "all") {
       const { data: agency } = await supabase
@@ -258,8 +259,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "API Key de Tokko no configurada." }, { status: 400 })
       }
 
-      const { contacts } = await fetchAllTokkoContacts(agency.tokko_api_key)
+      const { contacts, total } = await fetchAllTokkoContacts(agency.tokko_api_key)
       contactsToImport = contacts
+      totalTokko = total
     } else {
       contactsToImport = selectedLeads || []
     }
@@ -308,6 +310,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       imported: finalTotal || totalUpserted, // Return the actual total in DB
+      tokko_total: totalTokko,
       added: totalUpserted,
       errors: errors.length > 0 ? errors : undefined 
     })
