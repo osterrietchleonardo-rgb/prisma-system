@@ -51,7 +51,7 @@ export const syncPropertiesFromTokko = async (apiKey: string) => {
 };
 
 export const syncAgentsFromTokko = async (apiKey: string) => {
-  const data = await fetchTokko('/agent/', apiKey, { method: 'GET' });
+  const data = await fetchTokko('/user/', apiKey, { method: 'GET' });
   return data.objects || [];
 };
 

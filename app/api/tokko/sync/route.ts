@@ -141,7 +141,7 @@ export async function POST() {
       full_name: a.name,
       email: a.email,
       phone: a.cellphone || a.phone,
-      avatar_url: a.image,
+      avatar_url: a.picture || a.image,
       updated_at: new Date().toISOString()
     }))
 
