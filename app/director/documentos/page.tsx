@@ -165,9 +165,35 @@ export default function DocumentosPage() {
       
       let res;
       if (uploadType === "file") {
+        const file = selectedFile
+        if (!file) {
+          toast.error("Seleccioná un archivo primero")
+          return
+        }
+
+        // ── STEP 1: Upload directly to Supabase Storage (bypasses Vercel 4.5MB limit) ──
+        const storagePath = `${agencyId}/${Date.now()}-${file.name}`
+        const { error: storageError } = await supabase.storage
+          .from("documents")
+          .upload(storagePath, file, { upsert: false })
+
+        if (storageError) throw storageError
+
+        // ── STEP 2: Tell API to process the already-uploaded file ──
+        const processFormData = new FormData()
+        processFormData.append("agencyId", agencyId)
+        processFormData.append("title", formData.get("title") as string)
+        processFormData.append("visibility", formData.get("visibility") as string || "asesor")
+        processFormData.append("filePath", storagePath)
+        processFormData.append("fileType", file.type)
+        processFormData.append("fileName", file.name)
+        if (folderId && folderId !== "none") {
+          processFormData.append("folder_id", folderId as string)
+        }
+
         res = await fetch("/api/documents/process", {
           method: "POST",
-          body: formData
+          body: processFormData
         })
       } else {
         const body = {
@@ -188,6 +214,7 @@ export default function DocumentosPage() {
 
       toast.success(uploadType === "file" ? "Archivo procesado y guardado" : "Video transcrito y guardado")
       setIsUploadOpen(false)
+      setSelectedFile(null)
       fetchDocs(agencyId)
     } catch (error: any) {
       toast.error("Error al procesar: " + error.message)
@@ -195,6 +222,7 @@ export default function DocumentosPage() {
       setUploading(false)
     }
   }
+
 
   const handleCreateFolder = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -560,7 +588,7 @@ export default function DocumentosPage() {
                           ) : (
                             <>
                               <p className="text-sm font-medium">Click o arrastra para subir</p>
-                              <p className="text-xs text-muted-foreground mt-1">PDF, Word o CSV hasta 15MB</p>
+                              <p className="text-xs text-muted-foreground mt-1">PDF, Word o CSV — sin límite de tamaño</p>
                             </>
                           )}
                         </div>
@@ -585,7 +613,7 @@ export default function DocumentosPage() {
                       {uploading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Procesando con IA...
+                          {selectedFile ? "Subiendo archivo..." : "Procesando con IA..."}
                         </>
                       ) : "Confirmar y Subir"}
                     </Button>

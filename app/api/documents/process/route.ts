@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { generateEmbedding, extractTextFromDocument } from "@/lib/gemini"
 import { consumeAiCredits, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
 import { YoutubeTranscript } from "youtube-transcript"
@@ -8,6 +9,7 @@ import Papa from "papaparse"
 
 export async function POST(req: NextRequest) {
   const supabase = createClient()
+  const adminClient = createAdminClient()
   
   try {
     const { data: { session } } = await supabase.auth.getSession()
@@ -24,42 +26,79 @@ export async function POST(req: NextRequest) {
     let folderId: string | null = null
 
     if (contentType.includes("multipart/form-data")) {
+      // ── LEGACY PATH: small files sent directly (kept for backwards compat) ──
       const formData = await req.formData()
-      const file = formData.get("file") as File
+      const file = formData.get("file") as File | null
+      const filePath = formData.get("filePath") as string | null  // NEW: path already in storage
+      const fileType = formData.get("fileType") as string | null  // NEW: mime type
+      const fileName = formData.get("fileName") as string | null  // NEW: original name
+
       title = formData.get("title") as string
       visibility = formData.get("visibility") as string || "asesor"
       const agencyId = formData.get("agencyId") as string
       folderId = formData.get("folder_id") as string || null
 
-      if (!file || !agencyId) {
+      if (!agencyId) {
         return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 })
       }
 
-      // 1. Upload to Storage
-      const fileName = `${agencyId}/${Date.now()}-${file.name}`
-      const { data: storageData, error: storageError } = await supabase.storage
-        .from("documents")
-        .upload(fileName, file)
+      if (filePath && fileType) {
+        // ── NEW PATH: file already uploaded to Storage by the client ──
+        fileUrl = filePath
 
-      if (storageError) throw storageError
-      fileUrl = storageData.path
+        // Download the file from storage to extract text
+        const { data: fileData, error: downloadError } = await adminClient.storage
+          .from("documents")
+          .download(filePath)
 
-      // 2. Extract Text
-      const buffer = Buffer.from(await file.arrayBuffer())
-      
-      if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-        const result = await mammoth.extractRawText({ buffer })
-        contentText = result.value
-      } else if (file.type === "text/csv") {
-        const text = buffer.toString("utf-8")
-        const parsed = Papa.parse(text, { header: true })
-        contentText = JSON.stringify(parsed.data)
+        if (downloadError) throw downloadError
+
+        const buffer = Buffer.from(await fileData.arrayBuffer())
+        const mimeType = fileType
+
+        if (mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+          const result = await mammoth.extractRawText({ buffer })
+          contentText = result.value
+        } else if (mimeType === "text/csv") {
+          const text = buffer.toString("utf-8")
+          const parsed = Papa.parse(text, { header: true })
+          contentText = JSON.stringify(parsed.data)
+        } else {
+          // Use Gemini for PDF, images, etc.
+          contentText = await extractTextFromDocument(buffer, mimeType)
+        }
+
+        type = fileName?.toLowerCase().endsWith(".csv") ? "text/csv"
+             : fileName?.toLowerCase().endsWith(".docx") || fileName?.toLowerCase().endsWith(".doc") ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+             : "file"
+
+      } else if (file) {
+        // ── LEGACY: file sent in body (only works for small files <4.5MB) ──
+        const storageFileName = `${agencyId}/${Date.now()}-${file.name}`
+        const { data: storageData, error: storageError } = await supabase.storage
+          .from("documents")
+          .upload(storageFileName, file)
+
+        if (storageError) throw storageError
+        fileUrl = storageData.path
+
+        const buffer = Buffer.from(await file.arrayBuffer())
+        
+        if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+          const result = await mammoth.extractRawText({ buffer })
+          contentText = result.value
+        } else if (file.type === "text/csv") {
+          const text = buffer.toString("utf-8")
+          const parsed = Papa.parse(text, { header: true })
+          contentText = JSON.stringify(parsed.data)
+        } else {
+          contentText = await extractTextFromDocument(buffer, file.type)
+        }
+        
+        type = "file"
       } else {
-        // Use Gemini for PDF, images, etc.
-        contentText = await extractTextFromDocument(buffer, file.type)
+        return NextResponse.json({ error: "Falta el archivo" }, { status: 400 })
       }
-      
-      type = "file"
 
     } else {
       const body = await req.json()
@@ -73,7 +112,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 })
       }
 
-      // 1. Get YouTube Transcript
       try {
         const transcriptItems = await YoutubeTranscript.fetchTranscript(videoUrl)
         contentText = transcriptItems.map(i => i.text).join(" ")
@@ -85,16 +123,13 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Generate Embedding
-    // ─── Embeddings: API solo cobra Input. Output = $0 (resultado son vectores, no texto)
-    // gemini-embedding-001: $0.02/M input tokens
-    const textForEmbedding = contentText.substring(0, 5000);
-    const embeddingInputTokens = Math.ceil(textForEmbedding.length / 4); // est. ~4 chars/token
-    const embeddingUsd = (embeddingInputTokens / 1_000_000) * 0.02;
+    const textForEmbedding = contentText.substring(0, 5000)
+    const embeddingInputTokens = Math.ceil(textForEmbedding.length / 4)
+    const embeddingUsd = (embeddingInputTokens / 1_000_000) * 0.02
 
-    // Consume credit + get txId for documents_ia feature
-    const txId = await consumeAiCredits("documentos_ia", 1, `Embed: ${title.substring(0, 50)}`);
-    const embedding = await generateEmbedding(textForEmbedding);
-    updateAiTransactionCost(txId, embeddingInputTokens, 0, embeddingUsd); // fire-and-forget
+    const txId = await consumeAiCredits("documentos_ia", 1, `Embed: ${title.substring(0, 50)}`)
+    const embedding = await generateEmbedding(textForEmbedding)
+    updateAiTransactionCost(txId, embeddingInputTokens, 0, embeddingUsd)
 
     // 4. Save to DB
     const { data: { user } } = await supabase.auth.getUser()
