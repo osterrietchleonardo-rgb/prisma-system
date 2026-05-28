@@ -126,11 +126,13 @@ export async function POST() {
       }
     })
 
-    const { error: upsertError } = await supabase
-      .from("properties")
-      .upsert(propertiesToUpsert, { onConflict: "tokko_id" })
+    if (propertiesToUpsert.length > 0) {
+      const { error: upsertError } = await supabase
+        .from("properties")
+        .upsert(propertiesToUpsert, { onConflict: "tokko_id" })
 
-    if (upsertError) throw upsertError
+      if (upsertError) throw upsertError
+    }
 
     // 5.5 Mapear y Upsert Agents
     const agentsToUpsert = tokkoAgents.map((a: any) => ({
@@ -166,7 +168,7 @@ export async function POST() {
     const message = error instanceof Error ? error.message : String(error)
     console.error("Tokko Sync Error:", message)
     return NextResponse.json({ 
-      error: "Error interno durante la sincronización con Tokko" 
+      error: message || "Error interno durante la sincronización con Tokko" 
     }, { status: 500 })
   }
 }
