@@ -191,6 +191,28 @@ export default function DirectorConfiguracionPage() {
           tokko_api_key: agencySettings.tokko_api_key
         })
         toast.success("Configuración de inmobiliaria guardada")
+
+        // Disparar sincronización automática en background si hay API Key
+        if (agencySettings.tokko_api_key) {
+          toast.promise(
+            (async () => {
+              const resProps = await fetch("/api/tokko/sync", { method: "POST" })
+              if (!resProps.ok) throw new Error("Error en propiedades")
+              
+              const resLeads = await fetch("/api/tokko/sync-leads", { 
+                method: "POST", 
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mode: "all" }) 
+              })
+              if (!resLeads.ok) throw new Error("Error en leads")
+            })(),
+            {
+              loading: 'Sincronizando Tokko en segundo plano...',
+              success: '¡Inmobiliaria sincronizada con éxito!',
+              error: 'Error de sincronización. Verifica que tu API Key sea correcta.'
+            }
+          )
+        }
       } else {
         if (!userId) {
           toast.error("Usuario no identificado")
@@ -202,6 +224,27 @@ export default function DirectorConfiguracionPage() {
         })
         setProfile(p => ({ ...p, agency_id: newAgency.id }))
         toast.success("Inmobiliaria creada y configurada exitosamente")
+
+        if (agencySettings.tokko_api_key) {
+          toast.promise(
+            (async () => {
+              const resProps = await fetch("/api/tokko/sync", { method: "POST" })
+              if (!resProps.ok) throw new Error("Error en propiedades")
+              
+              const resLeads = await fetch("/api/tokko/sync-leads", { 
+                method: "POST", 
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ mode: "all" }) 
+              })
+              if (!resLeads.ok) throw new Error("Error en leads")
+            })(),
+            {
+              loading: 'Sincronizando Tokko en segundo plano...',
+              success: '¡Inmobiliaria sincronizada con éxito!',
+              error: 'Error de sincronización. Verifica que tu API Key sea correcta.'
+            }
+          )
+        }
       }
     } catch (_error) {
       toast.error("Error al guardar la configuración")
