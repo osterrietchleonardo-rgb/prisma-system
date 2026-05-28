@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -12,7 +12,9 @@ import {
   Rocket, 
   Send, 
   CheckCircle2,
-  Loader2
+  Loader2,
+  ImagePlus,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -57,6 +59,9 @@ export function FeedbackForm() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [history, setHistory] = useState<Awaited<ReturnType<typeof getUserFeedbackHistory>>>([])
   const [historyLoading, setHistoryLoading] = useState(true)
+  const [evidenceFiles, setEvidenceFiles] = useState<File[]>([])
+  const [evidencePreviews, setEvidencePreviews] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function loadHistory() {
     setHistoryLoading(true)
@@ -74,16 +79,36 @@ export function FeedbackForm() {
     },
   })
 
+  function handleEvidenceChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || [])
+    const remaining = 2 - evidenceFiles.length
+    const toAdd = files.slice(0, remaining)
+    const newFiles = [...evidenceFiles, ...toAdd]
+    setEvidenceFiles(newFiles)
+    const newPreviews = newFiles.map(f => URL.createObjectURL(f))
+    setEvidencePreviews(newPreviews)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  function removeEvidence(idx: number) {
+    const newFiles = evidenceFiles.filter((_, i) => i !== idx)
+    const newPreviews = evidencePreviews.filter((_, i) => i !== idx)
+    setEvidenceFiles(newFiles)
+    setEvidencePreviews(newPreviews)
+  }
+
   async function onSubmit(data: FeedbackFormValues) {
     setIsPending(true)
     try {
-      const result = await submitFeedback(data)
+      const result = await submitFeedback({ ...data, evidenceFiles })
       if (result.success) {
         setIsSuccess(true)
         toast.success("¡Gracias por tu feedback!", {
           description: "Tu mensaje ha sido enviado correctamente.",
         })
         form.reset()
+        setEvidenceFiles([])
+        setEvidencePreviews([])
         loadHistory()
       } else {
         toast.error("Error al enviar", {
@@ -197,6 +222,57 @@ export function FeedbackForm() {
             )}
           </div>
 
+          {/* ── Evidence Photos ── */}
+          <div className="space-y-3">
+            <Label className="text-sm font-semibold flex items-center gap-2">
+              <ImagePlus className="w-4 h-4 text-muted-foreground" />
+              Evidencia visual
+              <span className="text-xs text-muted-foreground font-normal">(opcional · máx. 2 fotos)</span>
+            </Label>
+
+            <div className="flex items-start gap-3 flex-wrap">
+              {evidencePreviews.map((src, idx) => (
+                <div key={idx} className="relative w-24 h-24 rounded-xl overflow-hidden border border-accent/20 group">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={src} alt={`Evidencia ${idx + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeEvidence(idx)}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+
+              {evidenceFiles.length < 2 && (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-24 h-24 rounded-xl border-2 border-dashed border-accent/20 hover:border-accent/50 hover:bg-accent/5 flex flex-col items-center justify-center gap-1.5 transition-all text-muted-foreground hover:text-accent"
+                >
+                  <ImagePlus className="w-5 h-5" />
+                  <span className="text-[10px] font-medium">Agregar foto</span>
+                </button>
+              )}
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                multiple
+                className="hidden"
+                onChange={handleEvidenceChange}
+              />
+            </div>
+
+            {evidenceFiles.length > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                {evidenceFiles.length}/2 foto{evidenceFiles.length !== 1 ? "s" : ""} seleccionada{evidenceFiles.length !== 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
+
           <Button 
             type="submit" 
             disabled={isPending}
@@ -245,6 +321,7 @@ export function FeedbackForm() {
               <tr className="bg-muted/30 text-muted-foreground text-xs uppercase tracking-wider">
                 <th className="px-4 py-3 text-left font-semibold">Tipo</th>
                 <th className="px-4 py-3 text-left font-semibold">Contenido</th>
+                <th className="px-4 py-3 text-left font-semibold">Fotos</th>
                 <th className="px-4 py-3 text-left font-semibold">Estado</th>
                 <th className="px-4 py-3 text-right font-semibold">Fecha</th>
               </tr>
@@ -278,12 +355,26 @@ export function FeedbackForm() {
                         {typeInfo?.label ?? item.type}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground max-w-[260px]">
+                    <td className="px-4 py-3 text-muted-foreground max-w-[200px]">
                       <span className="line-clamp-2 leading-relaxed">{item.content}</span>
                       {item.respuesta && (
                         <div className="mt-1 text-[11px] text-indigo-400 font-medium bg-indigo-500/5 border border-indigo-500/10 rounded px-2 py-0.5 inline-block">
                           Respuesta: {item.respuesta}
                         </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {item.evidence_urls && item.evidence_urls.length > 0 ? (
+                        <div className="flex gap-1.5">
+                          {item.evidence_urls.map((url, i) => (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={url} alt={`Evidencia ${i + 1}`} className="w-9 h-9 rounded-lg object-cover border border-accent/20 hover:scale-110 transition-transform" />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/40">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">

@@ -87,16 +87,16 @@ export default function SugerenciasClient() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-              {["Tipo", "Contenido", "Agencia", "Estado", "Fecha", ""].map(h => (
+              {["Tipo", "Contenido", "Agencia", "Fotos", "Estado", "Fecha", ""].map(h => (
                 <th key={h} style={{ padding: "10px 14px", textAlign: "left", color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 600, textTransform: "uppercase" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ padding: 28, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Cargando...</td></tr>
+              <tr><td colSpan={7} style={{ padding: 28, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Cargando...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: 28, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Sin resultados</td></tr>
+              <tr><td colSpan={7} style={{ padding: 28, textAlign: "center", color: "rgba(255,255,255,0.3)" }}>Sin resultados</td></tr>
             ) : items.map((item) => (
               <tr key={item.id}
                 style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: "pointer" }}
@@ -113,6 +113,15 @@ export default function SugerenciasClient() {
                 </td>
                 <td style={{ padding: "10px 14px", color: "rgba(255,255,255,0.4)", fontSize: 12 }}>
                   {(item.agencies as any)?.name || "–"}
+                </td>
+                <td style={{ padding: "10px 14px" }}>
+                  {item.evidence_urls && item.evidence_urls.length > 0 ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 20, background: "rgba(99,102,241,0.12)", color: "#a5b4fc", fontSize: 11, fontWeight: 600 }}>
+                      📷 {item.evidence_urls.length}
+                    </span>
+                  ) : (
+                    <span style={{ color: "rgba(255,255,255,0.2)", fontSize: 12 }}>—</span>
+                  )}
                 </td>
                 <td style={{ padding: "10px 14px" }}>{badge(item.estado || "pendiente")}</td>
                 <td style={{ padding: "10px 14px", color: "rgba(255,255,255,0.3)", fontSize: 12 }}>

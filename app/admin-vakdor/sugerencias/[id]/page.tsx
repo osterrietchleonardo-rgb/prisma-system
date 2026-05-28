@@ -108,6 +108,27 @@ export default function SugerenciaDetalleClient() {
             <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 13 }}>{(data.profiles as any)?.role || "–"}</div>
           </div>
         </div>
+
+        {/* Evidence images */}
+        {data.evidence_urls && data.evidence_urls.length > 0 && (
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, marginBottom: 10 }}>EVIDENCIA VISUAL</div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {(data.evidence_urls as string[]).map((url, i) => (
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                  style={{ display: "block", borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.1)", transition: "transform 0.2s" }}
+                  onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.03)")}
+                  onMouseLeave={e => (e.currentTarget.style.transform = "scale(1)")}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`Evidencia ${i + 1}`} style={{ width: 160, height: 120, objectFit: "cover", display: "block" }} />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+
       </div>
 
       {/* Management */}
