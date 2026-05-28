@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { syncPropertiesFromTokko, syncAgentsFromTokko } from "@/lib/tokko"
 
 export const dynamic = "force-dynamic";
@@ -57,6 +58,12 @@ export async function POST() {
     if (!agency?.tokko_api_key) {
       return NextResponse.json({ error: "API Key de Tokko no configurada" }, { status: 400 })
     }
+
+    // 3.5 Crear admin client para bypass RLS en inserciones
+    const adminClient = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
 
     // 4. Sync from Tokko
     const [tokkoProperties, tokkoAgents] = await Promise.all([
@@ -127,7 +134,7 @@ export async function POST() {
     })
 
     if (propertiesToUpsert.length > 0) {
-      const { error: upsertError } = await supabase
+      const { error: upsertError } = await adminClient
         .from("properties")
         .upsert(propertiesToUpsert, { onConflict: "tokko_id" })
 
@@ -146,7 +153,7 @@ export async function POST() {
     }))
 
     if (agentsToUpsert.length > 0) {
-      const { error: agentsUpsertError } = await supabase
+      const { error: agentsUpsertError } = await adminClient
         .from("tokko_agents")
         .upsert(agentsToUpsert, { onConflict: "tokko_id" })
       
@@ -154,7 +161,7 @@ export async function POST() {
     }
 
     // 6. Actualizar última sync
-    await supabase
+    await adminClient
       .from("agencies")
       .update({ last_sync_at: new Date().toISOString() })
       .eq("id", profile.agency_id)
