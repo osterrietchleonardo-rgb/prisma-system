@@ -12,7 +12,7 @@ const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
 // ─────────────────────────────────────────────────────────────
 async function fetchAllTokkoContacts(apiKey: string) {
   const MAX_CONTACTS = 1000
-  const LIMIT        = 100
+  const LIMIT        = 50
   const DELAY_MS     = 350
 
   let all: any[]         = []
