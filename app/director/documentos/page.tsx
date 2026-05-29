@@ -23,7 +23,8 @@ import {
   Folder,
   ChevronRight,
   FolderOpen,
-  Pencil
+  Pencil,
+  Sparkles
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -68,6 +69,11 @@ export default function DocumentosPage() {
   const [activeTab, setActiveTab] = useState("all")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadType, setUploadType] = useState<"file" | "youtube">("file")
+  
+  // AI toggle state
+  const [uploadVisibility, setUploadVisibility] = useState<"asesor" | "director">("asesor")
+  const [uploadAiEnabled, setUploadAiEnabled] = useState(false)
+  const [togglingAi, setTogglingAi] = useState<string | null>(null)
   
   // Folder Management State
   const [movingDoc, setMovingDoc] = useState<Record<string, any> | null>(null)
@@ -183,7 +189,8 @@ export default function DocumentosPage() {
         const processFormData = new FormData()
         processFormData.append("agencyId", agencyId)
         processFormData.append("title", formData.get("title") as string)
-        processFormData.append("visibility", formData.get("visibility") as string || "asesor")
+        processFormData.append("visibility", uploadVisibility)
+        processFormData.append("ai_enabled", String(uploadVisibility === "director" && uploadAiEnabled))
         processFormData.append("filePath", storagePath)
         processFormData.append("fileType", file.type)
         processFormData.append("fileName", file.name)
@@ -199,7 +206,8 @@ export default function DocumentosPage() {
         const body = {
           youtubeUrl: formData.get("youtubeUrl"),
           title: formData.get("title"),
-          visibility: formData.get("visibility"),
+          visibility: uploadVisibility,
+          ai_enabled: uploadVisibility === "director" && uploadAiEnabled,
           folder_id: folderId && folderId !== "none" ? folderId : null,
           agencyId
         }
@@ -215,6 +223,8 @@ export default function DocumentosPage() {
       toast.success(uploadType === "file" ? "Archivo procesado y guardado" : "Video transcrito y guardado")
       setIsUploadOpen(false)
       setSelectedFile(null)
+      setUploadVisibility("asesor")
+      setUploadAiEnabled(false)
       fetchDocs(agencyId)
     } catch (error: any) {
       toast.error("Error al procesar: " + error.message)
@@ -517,7 +527,10 @@ export default function DocumentosPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-semibold">Visibilidad</label>
-                      <Select name="visibility" defaultValue="asesor">
+                      <Select name="visibility" value={uploadVisibility} onValueChange={(v) => {
+                        setUploadVisibility(v as "asesor" | "director")
+                        if (v === "asesor") setUploadAiEnabled(false)
+                      }}>
                         <SelectTrigger className="bg-muted/30">
                           <SelectValue placeholder="Seleccionar visibilidad" />
                         </SelectTrigger>
@@ -558,6 +571,35 @@ export default function DocumentosPage() {
                       </Select>
                     </div>
                   </div>
+
+                  {uploadVisibility === "director" && (
+                    <div 
+                      onClick={() => setUploadAiEnabled(!uploadAiEnabled)}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-300 select-none",
+                        uploadAiEnabled 
+                          ? "border-violet-500/40 bg-violet-500/10" 
+                          : "border-accent/10 bg-muted/20 hover:border-accent/20"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-10 h-5 rounded-full relative transition-all duration-300 shrink-0",
+                        uploadAiEnabled ? "bg-violet-500" : "bg-muted-foreground/30"
+                      )}>
+                        <div className={cn(
+                          "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-all duration-300",
+                          uploadAiEnabled ? "left-[22px]" : "left-0.5"
+                        )} />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <Sparkles className={cn("h-3.5 w-3.5", uploadAiEnabled ? "text-violet-400" : "text-muted-foreground")} />
+                          <span className={cn("text-sm font-medium", uploadAiEnabled ? "text-violet-300" : "text-muted-foreground")}>Permitir consulta via Tutor IA</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Los asesores podrán consultar este contenido con la IA, sin poder ver ni descargar el archivo.</p>
+                      </div>
+                    </div>
+                  )}
 
                   {uploadType === "file" ? (
                     <div className="space-y-2">
@@ -727,12 +769,19 @@ export default function DocumentosPage() {
                     )}>
                       {doc.type?.includes("youtube") ? <Video className="h-6 w-6" /> : <FileText className="h-6 w-6" />}
                     </div>
-                    <Badge variant="outline" className={cn(
-                      "rounded-lg px-2 py-0 text-[10px] uppercase font-bold tracking-wider",
-                      doc.visibility === "director" ? "border-orange-500/20 text-orange-500 bg-orange-500/5" : "border-accent/20 text-accent bg-accent/5"
-                    )}>
-                      {doc.visibility === "director" ? "Privado" : "Público"}
-                    </Badge>
+                    <div className="flex flex-col items-end gap-1">
+                      <Badge variant="outline" className={cn(
+                        "rounded-lg px-2 py-0 text-[10px] uppercase font-bold tracking-wider",
+                        doc.visibility === "director" ? "border-orange-500/20 text-orange-500 bg-orange-500/5" : "border-accent/20 text-accent bg-accent/5"
+                      )}>
+                        {doc.visibility === "director" ? "Privado" : "Público"}
+                      </Badge>
+                      {doc.visibility === "director" && doc.ai_enabled && (
+                        <Badge variant="outline" className="rounded-lg px-2 py-0 text-[10px] uppercase font-bold tracking-wider border-violet-500/20 text-violet-400 bg-violet-500/5 gap-1">
+                          <Sparkles className="h-2.5 w-2.5" /> IA
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <CardTitle className="mt-4 line-clamp-2 text-lg font-bold group-hover:text-accent transition-colors">
                     {doc.title}
@@ -765,6 +814,39 @@ export default function DocumentosPage() {
                       >
                         <FolderPlus className="h-5 w-5" />
                       </Button>
+                      {doc.visibility === "director" && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className={cn(
+                            "h-9 w-9 rounded-lg transition-colors",
+                            doc.ai_enabled 
+                              ? "text-violet-400 bg-violet-500/10 hover:bg-violet-500/20" 
+                              : "text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400"
+                          )}
+                          disabled={togglingAi === doc.id}
+                          onClick={async () => {
+                            try {
+                              setTogglingAi(doc.id)
+                              const newValue = !doc.ai_enabled
+                              const { error } = await supabase
+                                .from("agency_documents")
+                                .update({ ai_enabled: newValue })
+                                .eq("id", doc.id)
+                              if (error) throw error
+                              setDocuments(prev => prev.map(d => d.id === doc.id ? { ...d, ai_enabled: newValue } : d))
+                              toast.success(newValue ? "Consulta IA habilitada para asesores" : "Consulta IA deshabilitada")
+                            } catch {
+                              toast.error("Error al actualizar")
+                            } finally {
+                              setTogglingAi(null)
+                            }
+                          }}
+                          title={doc.ai_enabled ? "Deshabilitar consulta IA para asesores" : "Habilitar consulta IA para asesores"}
+                        >
+                          {togglingAi === doc.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors" onClick={() => handleDelete(doc.id, doc.file_url)}>
                         <Trash2 className="h-5 w-5" />
                       </Button>

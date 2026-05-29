@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
     
     let title = ""
     let visibility = "asesor"
+    let aiEnabled = false
     let contentText = ""
     let fileUrl = ""
     let videoUrl = ""
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
 
       title = formData.get("title") as string
       visibility = formData.get("visibility") as string || "asesor"
+      aiEnabled = formData.get("ai_enabled") === "true"
       const agencyId = formData.get("agencyId") as string
       folderId = formData.get("folder_id") as string || null
 
@@ -105,6 +107,7 @@ export async function POST(req: NextRequest) {
       videoUrl = body.youtubeUrl
       title = body.title
       visibility = body.visibility || "asesor"
+      aiEnabled = body.ai_enabled === true
       const agencyId = body.agencyId
       folderId = body.folder_id || null
 
@@ -147,6 +150,7 @@ export async function POST(req: NextRequest) {
         content_text: contentText,
         embedding: embedding,
         visibility: visibility,
+        ai_enabled: aiEnabled,
         folder_id: folderId,
         processing_status: "completed"
       })

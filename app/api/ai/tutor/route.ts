@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
   const supabase = createClient()
   
   try {
-    const { userId, agencyId } = await requireTenant();
+    const { userId, agencyId, role } = await requireTenant();
     
     const { message, history, sessionId } = await req.json()
 
@@ -66,7 +66,8 @@ export async function POST(req: NextRequest) {
         query_embedding: queryEmbedding,
         match_threshold: 0.15, // Un poco más estricto pero efectivo
         match_count: 5,
-        p_agency_id: agencyId
+        p_agency_id: agencyId,
+        p_user_role: role
       })
 
       if (!rpcError && dbDocs) {
