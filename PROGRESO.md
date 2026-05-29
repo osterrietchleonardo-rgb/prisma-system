@@ -98,8 +98,258 @@
 | v1.0.2 | 2026-05-12 | RLS Audit: aislamiento multi-tenant, seguridad granular en 3 tablas. |
 | v1.0.3 | 2026-05-27 | WhatsApp: desconexión segura sin FK violation, bugs de plantillas y webhook UX. |
 | v1.0.4 | 2026-05-28 | Primer cliente real (MaxRE). Bug `last_sync_at` corregido. Logo upload implementado. |
+| v1.0.5 | 2026-05-29 | Documentación completa del módulo Marketing IA. Skill `vakdor-video` creado. |
 
 ---
+
+## 🎨 MÓDULO: MARKETING IA PRO (`/director/marketing-ia`)
+
+> Módulo end-to-end de generación de contenido publicitario para inmobiliarias argentinas. Permite a directores y asesores crear anuncios de alto impacto (copy + imagen HD) en segundos, sin conocimientos de diseño ni copywriting.
+
+### Flujo completo del sistema
+
+```
+IPC Manager → IPC Form (5 pasos) → Copy Generator Flow → API generate-batch (Gemini) → API generate-image (Gemini Imagen) → Marketing History (Galería)
+```
+
+### Tabs de la página
+
+| Tab | Componente | Función |
+|-----|-----------|---------|
+| Crear Anuncio | `CopyGeneratorFlow` | Multi-generador IA: 3 variantes (copy + imagen) con un clic |
+| Clientes Ideales (IPC) | `IpcManager` | CRUD de perfiles de cliente ideal |
+| Historial / Galería | `MarketingHistory` | Galería de todo el contenido generado |
+| Guía Mágica | `AdGuide` | Guía de Meta Ads 2026 integrada |
+| Configuración IA | `MarketingAiSettings` | Identidad visual de la agencia para las imágenes |
+
+---
+
+### 📋 IPC Manager (`ipc-manager.tsx`)
+
+Panel de gestión de perfiles IPC (Ideal Client Profile). Funcionalidades:
+- Grid de cards con todos los IPCs del usuario (cargados de `ipc_profiles`)
+- Búsqueda por nombre y tipo en tiempo real
+- Filtros: Todos · Captación (barra ámbar) · Comercialización (barra verde)
+- Cada card muestra: nombre, objetivo, formato preferido, tipo de lead, zona geográfica
+- Acciones por card: **Editar** (abre IpcForm) · **Eliminar** (confirmación destructiva) · **Ver detalles**
+- Estado vacío educativo con CTA para crear primer IPC
+
+---
+
+### 📋 IPC Form (`ipc-form.tsx`) — El núcleo del sistema
+
+**Pantalla inicial:** El usuario elige entre dos workflows completamente distintos:
+- 🏠 **IPC para CAPTAR** → Atraer propietarios que quieren vender
+- 🏷️ **IPC para VENDER** → Atraer compradores para una propiedad específica
+
+#### FLOW A — CAPTAR PROPIETARIOS (5 pasos)
+
+| Paso | Nombre | Campos principales |
+|------|--------|--------------------|
+| 1 | Objetivo | Nombre del perfil · Objetivo de captación (atraer/reactivar/referidos) · Zona · Tipo de inmueble (multi) · Rango de precio |
+| 2 | Perfil | Tipo de propietario · Motivo real de venta · Etapa actual (solo pensando / buscando tasación / ya publicado sin éxito) · Dependencia de la venta para comprar (Sí/No) |
+| 3 | Psicología | Preocupaciones multi-select (quema de prop / cobrar menos / inseguridad en visitas / trámites / honorarios caros / demora) · Objeción principal vs inmobiliarias · Mayor freno hoy · Miedo más frecuente · Logro esperado |
+| 4 | Estrategia | Prioridad (velocidad / precio máx / seguridad / tranquilidad) · Tipo de inmobiliaria en la que confía · **Ángulo de marketing (8 opciones)** · Tono de comunicación |
+| 5 | Resumen | Nivel de conciencia (Eugene Schwartz, 5 niveles) · Resumen del IPC en una frase · Promesa central · CTA recomendado |
+
+#### FLOW B — VENDER PROPIEDAD (5 pasos)
+
+| Paso | Nombre | Campos principales |
+|------|--------|--------------------|
+| 1 | Propiedad | **Integración Tokko Broker** — busca propiedades reales de la cartera. Auto-popula nombre, zona, tipo, precio. También permite configuración manual. |
+| 2 | Comprador | Tipo de comprador ideal (primer vivienda / inversor renta / upgrade / familia / downsize) · Situación de vida · Necesidad concreta · Problema que resuelve el inmueble |
+| 3 | Atractivos | Multi-select: Luminosidad · Vista abierta · Balcón/Terraza · Bajas expensas · Cerca del subte · Cochera · Silencioso · Oportunidad de precio · Objeción común de compradores |
+| 4 | Estrategia | **8 ángulos de copy** · Tono · Promesa central · **"¿Qué NO mostrar/mencionar?"** (exclusión estratégica) |
+| 5 | Resumen | Nivel de conciencia (Eugene Schwartz) · Resumen comprador · Mensaje central · CTA |
+
+#### Los 8 Ángulos de Marketing disponibles
+
+1. Necesidad/Problema (PAS)
+2. Emoción/Deseo (Transformación)
+3. Exclusividad/Estatus (Aspiracional)
+4. Comparación/Competencia (Autoridad)
+5. Autoridad/Prueba Social (Social Proof)
+6. Dolor/Miedo (Agitación)
+7. Inmediatez/Escasez (Urgencia)
+8. Beneficio Lógico/Pragmático (Datos)
+
+#### Niveles de Conciencia (Eugene Schwartz) — 5 niveles
+- **1. Inconsciente**: No sabe que tiene un problema
+- **2. Consciente del Problema**: Siente la necesidad pero no sabe por dónde empezar
+- **3. Consciente de la Solución**: Busca inmobiliarias o ayuda
+- **4. Consciente del Producto**: Te conoce y te evalúa vs. competencia
+- **5. Muy Consciente**: Listo para contratar. Solo necesita el empujón final
+
+---
+
+### 📋 Copy Generator Flow (`copy-generator-flow.tsx`) — El Multi-Generador IA
+
+**Un solo botón genera 3 variantes completas (copy + imagen) automáticamente.**
+
+#### Campos de configuración del usuario
+
+1. **Selección de IPC** — dropdown con todos sus perfiles (🏠 captar / 🏷️ vender)
+2. **Tipo de Copy**: Video/Reel (guión estructurado) o Post/Texto (estructura directa)
+3. **Contexto extra** — textarea opcional para urgencias, descuentos, novedades
+4. **Formato de imagen**: Reels 9:16 · Post 1:1 · Historia 9:16
+5. **Estilo visual**: Moderno · Lujoso · Cálido · Corporativo · Vibrante
+
+#### Flujo de generación (un solo botón, consumo: 1 crédito IA)
+
+1. `POST /api/marketing-ia/generate-batch` → Gemini genera 3 variantes JSON con ángulos distintos (PAS / Transformación / Autoridad o Datos)
+2. Inserta 3 drafts en `copy_drafts` con mismo `session_id`
+3. Para cada draft: `POST /api/marketing-ia/generate-image` (en serie, con fault tolerance — si una falla, continúa con las demás)
+4. Dispara evento `generation-complete` → auto-navega a la galería
+5. Dispara evento `prisma-refresh-credits` → actualiza badge de créditos en tiempo real
+6. Progreso visible: "Generando copys..." → "Se está generando la imagen..." → "¡Todo listo!"
+
+**Formato del copy generado:**
+- **Video/Reel**: `{ hook, problema, agitacion, solucion, cta }`
+- **Post/Texto**: `{ hook, desarrollo, cta }`
+
+---
+
+### 📋 Property Selector (`property-selector.tsx`)
+
+Integración directa con Tokko Broker para buscar propiedades reales de la cartera.
+- Búsqueda por dirección, barrio o referencia
+- Filtros: Tipo (Todos/Departamento/Casa/PH) · Operación (Venta/Alquiler)
+- Vista de cada propiedad: foto thumbnail · título · dirección+zona · superficie m² · ambientes · baños · precio con moneda
+- Al seleccionar: auto-popula todos los campos del IPC
+- Botón "Saltar este paso" disponible
+
+---
+
+### 📋 Marketing History / Galería (`marketing-history.tsx`)
+
+Galería de todos los creativos generados, agrupados por sesión.
+
+**Vista principal (cards de sesión):**
+- Thumbnails de las 3 variantes (carrusel deslizable)
+- Badge "N VARIANTES" por sesión
+- Fecha y hora en español
+- Hook del copy como título
+- Badges de ángulos por variante
+
+**Dialog fullscreen al inspeccionar (click "Ver variantes"):**
+- Tabs por variante: "Variante 1: PAS · Variante 2: Transformación · Variante 3: Autoridad"
+- Imagen HD (500px height desktop) con overlay "Descargar HD"
+- Panel de copy estructurado con labels: HOOK / PROBLEMA / AGITACIÓN / SOLUCIÓN / CTA (video) o HOOK / Desarrollo / CTA (post)
+- Botón **"Copiar Todo"** — copia al portapapeles en un clic
+- **Edición inline** — edita cualquier campo del copy, guarda en Supabase
+- **Descargar HD** — PNG con nombre `prisma-v{n}-{id}.png`
+
+**Eliminación granular:**
+- Eliminar variante individual (borra copy_draft + imagen)
+- Eliminar conjunto completo de sesión (con confirmación destructiva en rojo)
+
+**Auto-reload:** escucha evento `generation-complete` → recarga y selecciona automáticamente el grupo recién generado.
+
+---
+
+### 📋 Ad Guide (`ad-guide.tsx`) — "Guía Maestra 2026"
+
+**Título:** "Guía Maestra 2026 — Captación de Leads de Alta Calidad"
+
+5 fases colapsables de educación sobre publicidad en Meta Ads para inmobiliarias:
+
+| Fase | Color | Presupuesto | Contenido clave |
+|------|-------|-------------|-----------------|
+| 1 — Preparando el Terreno | Azul | **75% del budget** | Campaña "Clientes Potenciales" en Meta, segmentación MANUAL (no automática), ciudad + rango etario 30-65 años, 3-4 intereses (Inversiones inmobiliarias / Real Estate / Propiedades de lujo), activar "Segmentación Detallada Advantage" |
+| 2 — El Anuncio / La Vidriera | Violeta | — | Videos Reels de recorrido o hablando a cámara, botón "Más información". ⚠️ NUNCA dejar que Meta elija la música automáticamente |
+| 3 — El Formulario "Filtro de Oro" | Ámbar | — | Tipo "Mayor grado de intención" (deslizador de confirmación). **Para captaciones (vendedores):** zona · urgencia (< 3 meses / urgente) · ¿ya está tasada? **Para compradores/inversores:** presupuesto con rangos reales · ¿capital propio o financiación? · ¿para vivir o renta? + Lógica Condicional para descartar no calificados |
+| 4 — Retargeting | Verde | **25% del budget** | Re-engagement de quienes vieron el video pero no completaron el form. Hablar como aliados, no como vendedores |
+| 5 — Medición y Seguimiento | Rosa | — | **3 Reglas de Oro:** 🔥 Un lead inmobiliario se enfría en **5 minutos** · 📊 Mirar Costo por Lead **Calificado** (no total) · 🧹 Si entran muchos números falsos, agregar una pregunta más |
+
+**Consejo final integrado:** "No busques volumen. Buscá calidad. Es preferible cerrar con 5 personas calificadas por día que tener 50 que no saben por qué dejaron sus datos."
+
+---
+
+### 📋 Marketing AI Settings (`marketing-ai-settings.tsx`)
+
+Configura la **identidad visual de la agencia** aplicada a TODAS las imágenes generadas.
+
+| Configuración | Detalle |
+|---------------|---------|
+| Colores de Marca | Hasta 3 colores (color picker + input hex), con vista previa |
+| Logo de la Empresa | Upload PNG transparente (mín 500×500px recomendado). Almacenado en bucket `marketing-images` |
+| Posición del Logo | 4 opciones: Arriba Izq · Arriba Der · Abajo Izq · Abajo Der |
+| Tamaño del Logo | Chico (Sutil) / Mediano (Estándar) / Grande (Prominente) — con preview animado |
+| Tipografía de Marca | Moderna/Sans · Elegante/Serif · Manuscrita/Script · Impacto/Bold |
+
+> ⚠️ **Solo directores pueden modificar la configuración de marca.** Validado en cliente y en API (`role === 'director'`). Se guarda en `agencies.marketing_ai_config` (JSONB).
+
+---
+
+### 🤖 APIs de Inteligencia Artificial
+
+#### `POST /api/marketing-ia/generate-batch`
+- **Modelo**: Gemini 2.0 Flash (`prismaIA`)
+- **Costo real**: $0.10/M tokens input + $0.40/M tokens output
+- **Consume**: 1 crédito IA por llamada
+- **Genera**: 3 variantes con ángulos narrativos distintos (PAS / Transformación / Autoridad)
+- **Inyecta datos reales de Tokko** si el IPC es tipo "vender" y tiene propiedad asociada (dirección, precio, m², ambientes, baños, descripción)
+- **Idioma**: 100% rioplatense (voseo) — especificado en el prompt del sistema
+
+#### `POST /api/marketing-ia/generate-image`
+- **Modelo**: Gemini Imagen (llamado internamente "Nano Banana Pro 2") — calidad `pro`
+- **Costo estimado**: ~$0.06 USD por imagen
+- **Consume**: 2 créditos IA por imagen
+- **Incluye branding completo**: colores, logo (enviado como imagen multi-part), tipografía, posición del logo
+- **Resolución**: 1080×1920 px (Reels/Historia) · 1080×1080 px (Post)
+- **Pipeline post-generación**: sube a Supabase Storage (`marketing-images/{userId}/{draft_id}/{timestamp}.jpg`) → inserta en `generated_images` → retorna URL pública
+
+#### `GET/POST /api/marketing-ia/settings`
+- Lectura y escritura de `agencies.marketing_ai_config`
+- Escritura solo para `role === 'director'`
+
+#### `POST /api/marketing-ia/settings/upload-logo`
+- Upload de logo al bucket `marketing-images` vía `adminClient`
+- Ruta: `{userId}/branding/logo_{timestamp}.{ext}`
+- URL pública guardada en `agencies.logo_url`
+
+---
+
+### 🗄️ Tablas de Base de Datos — Módulo Marketing IA
+
+| Tabla | Propósito |
+|-------|-----------|
+| `ipc_profiles` | Perfiles de cliente ideal. Cols: `id · user_id · nombre_perfil · tipo_ipc · objetivo · tipo_inmueble[] · zona_principal · rango_valor_precio · propiedad_tokko_id · flow_data (JSONB) · created_at · updated_at` |
+| `copy_drafts` | Borradores de copy generados. Cols: `id · user_id · ipc_id · copy_type · angle · consciousness_level · extra_context · content (JSONB) · session_id · created_at` |
+| `generated_images` | Imágenes generadas por IA. Cols: `id · user_id · draft_id · format · style · storage_path · public_url · width · height · extra_prompt · created_at` |
+
+---
+
+### 📊 Métricas y números clave del módulo
+
+| Dato | Valor |
+|------|-------|
+| Variantes generadas por sesión | **3 siempre** |
+| Créditos por generación de texto (batch) | **1 crédito IA** |
+| Créditos por imagen | **2 créditos IA** |
+| Formatos de imagen disponibles | Reels 9:16 · Post 1:1 · Historia 9:16 |
+| Resolución Reels/Historia | **1080×1920 px** |
+| Resolución Post | **1080×1080 px** |
+| Ángulos de marketing disponibles | **8 ángulos** |
+| Niveles de conciencia (Eugene Schwartz) | **5 niveles** (0 a 4) |
+| Colores de marca máximos | **3 colores** |
+| Tiempo de enfriamiento de un lead (Ad Guide) | **5 minutos** |
+| Distribución de presupuesto ads sugerida | **75% tráfico frío / 25% retargeting** |
+| Segmentación etaria sugerida | **30 a 65 años** |
+| Ejemplo de ROI citado en Ad Guide | Lead a $5 USD → 2 de 10 son tasaciones de **$200.000 USD** |
+
+---
+
+### 🔑 Detalles técnicos importantes
+
+- **Fault tolerance en imágenes**: Si una imagen falla durante el batch, el loop continúa con las otras 2 variantes. El proceso nunca falla completo por una imagen.
+- **Integración Tokko multitenancy**: Cada agencia usa su propia `tokko_api_key` almacenada en `agencies`.
+- **Logo como imagen de referencia multimodal**: El logo de la agencia se descarga en el servidor y se envía como `imagePart` multimodal al modelo Gemini para que lo integre exactamente en la imagen generada.
+- **Cost tracking real**: Cada llamada a la IA registra `input_tokens`, `output_tokens` y costo USD real (fire-and-forget vía `updateAiTransactionCost()`).
+- **Comunicación entre tabs via eventos**: `generation-complete` y `prisma-refresh-credits` — `window.dispatchEvent()`.
+- **Seguridad**: Settings de marca solo modificables por `role === 'director'`, validado tanto en cliente como en API route.
+
+
 
 ### 2026-05-28 | v1.0.4 — Auditoría cliente real + Bug fixes + Logo upload
 
