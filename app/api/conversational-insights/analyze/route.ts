@@ -3,91 +3,53 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { GoogleGenerativeAI } from "@google/generative-ai"
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY || "")
-
-// ─── LLM Prompt ────────────────────────────────────────────────────────────
-const ANALYSIS_PROMPT = `Analiza esta conversación de WhatsApp de una inmobiliaria. Extrae la información en JSON estricto. Si no hay dato suficiente, usa null o [] según corresponda.
-
-CONVERSACIÓN:
-{CONVERSATION_TEXT}
-
-Responde ÚNICAMENTE con JSON válido (sin markdown):
-{
-  "barrio_consultado": null,
-  "zona": null,
-  "tipo_operacion": null,
-  "tipo_propiedad": null,
-  "ambientes_buscados": null,
-  "presupuesto_min": null,
-  "presupuesto_max": null,
-  "moneda_presupuesto": null,
-  "composicion_familiar": null,
-  "experiencia_compradora": null,
-  "motivo_busqueda": null,
-  "intereses": [],
-  "necesidades": [],
-  "apto_credito": null,
-  "necesita_vender_primero": null,
-  "visita_agendada": false,
-  "reserva_confirmada": false,
-  "urgencia": null,
-  "es_inversor": null,
-  "tiene_preaprobacion_credito": null,
-  "motivo_no_avance": null,
-  "solicito_hablar_con_humano": false,
-  "fue_derivado_a_humano": false,
-  "cantidad_mensajes_lead": 0,
-  "expreso_objecion_precio": false,
-  "expreso_objecion_ubicacion": false,
-  "expreso_objecion_tamanio": false,
-  "expreso_objecion_documentacion": false,
-  "nivel_compromiso": null
+// ─── Types ────────────────────────────────────────────────────────────────────
+interface ConvMetricas {
+  zona?: string | null
+  urgencia?: string | null
+  intereses?: string[]
+  es_inversor?: boolean | null
+  necesidades?: string[]
+  apto_credito?: boolean | null
+  tipo_operacion?: string | null
+  tipo_propiedad?: string | null
+  motivo_busqueda?: string | null
+  presupuesto_max?: number | null
+  presupuesto_min?: number | null
+  visita_agendada?: boolean | null
+  motivo_no_avance?: string | null
+  barrio_consultado?: string | null
+  ambientes_buscados?: number | null
+  moneda_presupuesto?: string | null
+  reserva_confirmada?: boolean | null
+  composicion_familiar?: string | null
+  amenities_consultados?: string[]
+  fue_derivado_a_humano?: boolean | null
+  servicios_consultados?: string[]
+  experiencia_compradora?: string | null
+  necesita_vender_primero?: boolean | null
+  cantidad_seguimientos_ia?: number | null
+  solicito_hablar_con_humano?: boolean | null
+  tiene_preaprobacion_credito?: boolean | null
+  nivel_compromiso?: string | null
+  superficie_min_m2?: number | null
+  superficie_max_m2?: number | null
 }
 
-Reglas:
-- tipo_operacion: "compra"|"alquiler"|"inversion"|null
-- tipo_propiedad: "departamento"|"casa"|"ph"|"duplex"|"local_comercial"|"terreno"|"oficina"|"country"|null
-- moneda_presupuesto: "USD"|"ARS"|null
-- composicion_familiar: "pareja_sin_hijos"|"familia_con_hijos"|"soltero"|"adulto_mayor_solo"|"adultos_mayores_pareja"|null
-- experiencia_compradora: "primera_vez"|"con_experiencia"|null
-- urgencia: "inmediata"|"corto_plazo"|"medio_plazo"|"explorando"|null
-- nivel_compromiso: "alto"|"medio"|"bajo"|null (alto=preguntó muchos detalles/quiere visita, bajo=preguntó 1 cosa y no siguió)`
-
-interface ConvAnalysis {
-  barrio_consultado: string | null
-  zona: string | null
-  tipo_operacion: string | null
-  tipo_propiedad: string | null
-  ambientes_buscados: number | null
-  presupuesto_min: number | null
-  presupuesto_max: number | null
-  moneda_presupuesto: string | null
-  composicion_familiar: string | null
-  experiencia_compradora: string | null
-  motivo_busqueda: string | null
-  intereses: string[]
-  necesidades: string[]
-  apto_credito: boolean | null
-  necesita_vender_primero: boolean | null
-  visita_agendada: boolean
-  reserva_confirmada: boolean
-  urgencia: string | null
-  es_inversor: boolean | null
-  tiene_preaprobacion_credito: boolean | null
-  motivo_no_avance: string | null
-  solicito_hablar_con_humano: boolean
-  fue_derivado_a_humano: boolean
-  cantidad_mensajes_lead: number
-  expreso_objecion_precio: boolean
-  expreso_objecion_ubicacion: boolean
-  expreso_objecion_tamanio: boolean
-  expreso_objecion_documentacion: boolean
-  nivel_compromiso: string | null
+interface ConvRow {
+  id: string
+  created_at: string
+  last_message_at: string | null
+  bot_active: boolean | null
+  pipeline_stage: string | null
+  follow_ups_sent: number | null
+  funnel_status: string | null
+  visit_status: string | null
+  metricas: ConvMetricas | null
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function countItems(arr: (string | null | undefined)[]) {
   const counts: Record<string, number> = {}
   for (const item of arr) {
@@ -99,22 +61,24 @@ function countItems(arr: (string | null | undefined)[]) {
     .map(([label, count]) => ({ label, count, pct: Math.round((count / total) * 100) }))
 }
 
-function countBoolean(arr: (boolean | null)[]) {
+function countTrue(arr: (boolean | null | undefined)[]) {
   return arr.filter(v => v === true).length
 }
 
-function avgNumber(arr: (number | null)[]) {
-  const vals = arr.filter(v => v !== null) as number[]
+function avgNum(arr: (number | null | undefined)[]) {
+  const vals = arr.filter(v => v !== null && v !== undefined) as number[]
   return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null
 }
 
-// ─── Temporal analysis from raw timestamps (no LLM needed) ──────────────
-interface MsgTimestamp { conversation_id: string; role: string; created_at: string }
+function safeMin(vals: number[]) { return vals.length > 0 ? Math.min(...vals) : null }
+function safeMax(vals: number[]) { return vals.length > 0 ? Math.max(...vals) : null }
 
-function buildTemporalAnalysis(messages: MsgTimestamp[], conversations: Array<{ id: string; created_at: string; last_message_at: string | null; bot_active: boolean | null }>) {
-  // Hour distribution (0–23), day distribution (0=Sun…6=Sat)
+// ─── Temporal analysis (from wa_messages timestamps — no AI needed) ───────────
+interface MsgRow { conversation_id: string; role: string; created_at: string }
+
+function buildTemporalAnalysis(messages: MsgRow[], convRows: ConvRow[]) {
   const hourDist = Array(24).fill(0) as number[]
-  const dayDist = Array(7).fill(0) as number[]
+  const dayDist  = Array(7).fill(0) as number[]
   const leadMsgs = messages.filter(m => m.role === "lead")
 
   for (const m of leadMsgs) {
@@ -124,30 +88,23 @@ function buildTemporalAnalysis(messages: MsgTimestamp[], conversations: Array<{ 
   }
 
   const peakHour = hourDist.indexOf(Math.max(...hourDist))
-  const peakDay = dayDist.indexOf(Math.max(...dayDist))
+  const peakDay  = dayDist.indexOf(Math.max(...dayDist))
   const dayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
 
-  // Bot-active vs human-attended
-  const botActive = conversations.filter(c => c.bot_active).length
-  const humanAttended = conversations.filter(c => !c.bot_active).length
-
-  // Avg conversation duration (first msg → last msg per conv)
-  const convDurations: number[] = []
+  // Avg conversation duration
   const convMsgMap: Record<string, Date[]> = {}
   for (const m of messages) {
     if (!convMsgMap[m.conversation_id]) convMsgMap[m.conversation_id] = []
     convMsgMap[m.conversation_id].push(new Date(m.created_at))
   }
+  const durations: number[] = []
   for (const dates of Object.values(convMsgMap)) {
     if (dates.length >= 2) {
       dates.sort((a, b) => a.getTime() - b.getTime())
-      const durMin = (dates[dates.length - 1].getTime() - dates[0].getTime()) / 60000
-      if (durMin > 0 && durMin < 10080) convDurations.push(durMin) // < 1 week
+      const dur = (dates[dates.length - 1].getTime() - dates[0].getTime()) / 60000
+      if (dur > 0 && dur < 10080) durations.push(dur)
     }
   }
-  const avgDurationMin = convDurations.length
-    ? Math.round(convDurations.reduce((a, b) => a + b, 0) / convDurations.length)
-    : null
 
   return {
     hour_distribution: hourDist.map((count, hour) => ({ hour, count })),
@@ -156,176 +113,182 @@ function buildTemporalAnalysis(messages: MsgTimestamp[], conversations: Array<{ 
     peak_day: peakDay,
     peak_day_name: dayNames[peakDay],
     total_lead_messages: leadMsgs.length,
-    bot_active_count: botActive,
-    human_attended_count: humanAttended,
-    avg_duration_min: avgDurationMin,
-    // Heatmap: day × hour matrix [day][hour] = count
+    bot_active_count: convRows.filter(c => c.bot_active).length,
+    human_attended_count: convRows.filter(c => !c.bot_active).length,
+    avg_duration_min: durations.length
+      ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
+      : null,
     heatmap: Array.from({ length: 7 }, (_, day) => ({
       day,
       day_name: dayNames[day],
-      hours: Array.from({ length: 24 }, (__, hour) => {
-        const c = messages.filter(m => {
+      hours: Array.from({ length: 24 }, (__, hour) => ({
+        hour,
+        count: messages.filter(m => {
           const d = new Date(m.created_at)
           return m.role === "lead" && d.getDay() === day && d.getHours() === hour
-        }).length
-        return { hour, count: c }
-      }),
+        }).length,
+      })),
     })),
   }
 }
 
-// ─── Aggregate all LLM results into 6 blocks ────────────────────────────
-function aggregateAll(results: ConvAnalysis[], total: number, temporalData: ReturnType<typeof buildTemporalAnalysis>, convRows: any[]) {
+// ─── Core aggregation — reads metricas, does all math, returns 6 blocks ───────
+function aggregateFromMetricas(
+  convRows: ConvRow[],
+  temporalData: ReturnType<typeof buildTemporalAnalysis>
+) {
+  const total = convRows.length
+  // Use rows that have metricas for per-lead analytics; native columns for all rows
+  const ms = convRows.map(c => c.metricas).filter(Boolean) as ConvMetricas[]
   const pctOf = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0
 
-  // ── Block 1: KPIs ──
-  const visitas = countBoolean(results.map(r => r.visita_agendada))
-  const reservas = countBoolean(results.map(r => r.reserva_confirmada))
-  const pidioHumano = countBoolean(results.map(r => r.solicito_hablar_con_humano))
-  const derivados = countBoolean(results.map(r => r.fue_derivado_a_humano))
-  const aptoCr = countBoolean(results.map(r => r.apto_credito))
-  const necesitaVender = countBoolean(results.map(r => r.necesita_vender_primero))
-  const calificados = results.filter(r => r.tipo_operacion || r.tipo_propiedad || r.presupuesto_min).length
+  // ── Derived counts from metricas ──
+  const visitas          = countTrue(ms.map(m => m.visita_agendada))
+  const reservas         = countTrue(ms.map(m => m.reserva_confirmada))
+  const pidioHumano      = countTrue(ms.map(m => m.solicito_hablar_con_humano))
+  const derivados        = countTrue(ms.map(m => m.fue_derivado_a_humano))
+  const aptoCr           = countTrue(ms.map(m => m.apto_credito))
+  const necesitaVender   = countTrue(ms.map(m => m.necesita_vender_primero))
+  const calificados      = ms.filter(m => m.tipo_operacion || m.tipo_propiedad || m.presupuesto_min).length
+  // follow_ups_sent comes from native column (always accurate)
+  const seguimientosIA   = convRows.reduce((acc, c) => acc + (c.follow_ups_sent || 0), 0)
 
+  // ── Block 1: KPIs generales ──
   const kpis = {
-    chats_unicos: total,
-    leads_calificados: calificados,
-    visitas_agendadas: visitas,
-    reservas_confirmadas: reservas,
-    solicitudes_humano: pidioHumano,
-    derivados_a_humano: derivados,
-    apto_credito: aptoCr,
+    chats_unicos:           total,
+    leads_calificados:      calificados,
+    visitas_agendadas:      visitas,
+    reservas_confirmadas:   reservas,
+    solicitudes_humano:     pidioHumano,
+    derivados_a_humano:     derivados,
+    apto_credito:           aptoCr,
     necesitan_vender_antes: necesitaVender,
-    tasa_consulta_visita: pctOf(visitas),
-    tasa_visita_reserva: visitas > 0 ? Math.round((reservas / visitas) * 100) : 0,
-    tasa_calificacion: pctOf(calificados),
+    seguimientos_ia:        seguimientosIA,
+    tasa_consulta_visita:   pctOf(visitas),
+    tasa_visita_reserva:    visitas > 0 ? Math.round((reservas / visitas) * 100) : 0,
+    tasa_calificacion:      pctOf(calificados),
     tasa_derivacion_efectiva: pidioHumano > 0 ? Math.round((derivados / pidioHumano) * 100) : null,
-    compromisos_alto: results.filter(r => r.nivel_compromiso === "alto").length,
-    compromisos_medio: results.filter(r => r.nivel_compromiso === "medio").length,
-    compromisos_bajo: results.filter(r => r.nivel_compromiso === "bajo").length,
-    inversores: countBoolean(results.map(r => r.es_inversor)),
-    con_preaprobacion: countBoolean(results.map(r => r.tiene_preaprobacion_credito)),
-    seguimientos_ia: convRows.reduce((acc, c) => acc + (c.follow_ups_sent || 0), 0),
+    compromisos_alto:       ms.filter(m => m.nivel_compromiso === "alto").length,
+    compromisos_medio:      ms.filter(m => m.nivel_compromiso === "medio").length,
+    compromisos_bajo:       ms.filter(m => m.nivel_compromiso === "bajo").length,
+    inversores:             countTrue(ms.map(m => m.es_inversor)),
+    con_preaprobacion:      countTrue(ms.map(m => m.tiene_preaprobacion_credito)),
+    // Native columns
+    chats_bot_activo:       convRows.filter(c => c.bot_active).length,
+    chats_opt_out:          0, // could add if needed
+    visitas_confirmadas:    convRows.filter(c => c.visit_status === "confirmed" || c.visit_status === "attended").length,
   }
 
-  // ── Block 2: Funnel ──
+  // ── Block 2: Funnel de conversión ──
   const funnel = {
-    chats_recibidos: { count: total, pct: 100 },
-    leads_calificados: { count: calificados, pct: pctOf(calificados) },
-    visita_agendada: { count: visitas, pct: pctOf(visitas) },
-    reserva_confirmada: { count: reservas, pct: pctOf(reservas) },
+    chats_recibidos:    { count: total,      pct: 100 },
+    leads_calificados:  { count: calificados, pct: pctOf(calificados) },
+    visita_agendada:    { count: visitas,     pct: pctOf(visitas) },
+    reserva_confirmada: { count: reservas,    pct: pctOf(reservas) },
   }
 
-  // ── Block 3: Lead Profile ──
+  // ── Block 3: Perfil del lead buscador ──
   const lead_profile = {
-    tipo_operacion: countItems(results.map(r => r.tipo_operacion)).slice(0, 5),
-    tipo_propiedad: countItems(results.map(r => r.tipo_propiedad)).slice(0, 8),
-    ambientes: countItems(results.map(r => r.ambientes_buscados?.toString() ?? null)).slice(0, 6),
-    composicion_familiar: countItems(results.map(r => r.composicion_familiar)).slice(0, 6),
-    urgencia: countItems(results.map(r => r.urgencia)).slice(0, 5),
-    experiencia: countItems(results.map(r => r.experiencia_compradora)).slice(0, 3),
-    presupuesto_compra_avg_usd: avgNumber(
-      results.filter(r => r.tipo_operacion === "compra" && r.moneda_presupuesto === "USD")
-        .map(r => r.presupuesto_max || r.presupuesto_min)
+    tipo_operacion:    countItems(ms.map(m => m.tipo_operacion)).slice(0, 5),
+    tipo_propiedad:    countItems(ms.map(m => m.tipo_propiedad)).slice(0, 8),
+    ambientes:         countItems(ms.map(m => m.ambientes_buscados?.toString() ?? null)).slice(0, 6),
+    composicion_familiar: countItems(ms.map(m => m.composicion_familiar)).slice(0, 6),
+    urgencia:          countItems(ms.map(m => m.urgencia)).slice(0, 5),
+    experiencia:       countItems(ms.map(m => m.experiencia_compradora)).slice(0, 3),
+    inversores:        countTrue(ms.map(m => m.es_inversor)),
+    con_preaprobacion: countTrue(ms.map(m => m.tiene_preaprobacion_credito)),
+    primera_vez:       ms.filter(m => m.experiencia_compradora === "primera_vez").length,
+    top_intereses:     countItems(ms.flatMap(m => m.intereses || [])).slice(0, 10),
+    top_necesidades:   countItems(ms.flatMap(m => m.necesidades || [])).slice(0, 10),
+    top_amenities:     countItems(ms.flatMap(m => m.amenities_consultados || [])).slice(0, 8),
+    top_motivos:       countItems(ms.map(m => m.motivo_busqueda)).slice(0, 8),
+    top_barrios:       countItems(ms.map(m => m.barrio_consultado)).slice(0, 10),
+    causas_no_avance:  countItems(ms.map(m => m.motivo_no_avance)).slice(0, 8),
+    presupuesto_compra_avg_usd: avgNum(
+      ms.filter(m => m.tipo_operacion === "compra" && m.moneda_presupuesto === "USD")
+        .map(m => m.presupuesto_max || m.presupuesto_min)
     ),
-    presupuesto_alquiler_avg_ars: avgNumber(
-      results.filter(r => r.tipo_operacion === "alquiler" && r.moneda_presupuesto === "ARS")
-        .map(r => r.presupuesto_max || r.presupuesto_min)
+    presupuesto_alquiler_avg_ars: avgNum(
+      ms.filter(m => m.tipo_operacion === "alquiler" && m.moneda_presupuesto === "ARS")
+        .map(m => m.presupuesto_max || m.presupuesto_min)
     ),
-    inversores: countBoolean(results.map(r => r.es_inversor)),
-    con_preaprobacion: countBoolean(results.map(r => r.tiene_preaprobacion_credito)),
-    primera_vez: results.filter(r => r.experiencia_compradora === "primera_vez").length,
-    top_intereses: countItems(results.flatMap(r => r.intereses || [])).slice(0, 10),
-    top_necesidades: countItems(results.flatMap(r => r.necesidades || [])).slice(0, 10),
-    top_motivos: countItems(results.map(r => r.motivo_busqueda)).slice(0, 8),
-    top_barrios: countItems(results.map(r => r.barrio_consultado)).slice(0, 10),
-    causas_no_avance: countItems(results.map(r => r.motivo_no_avance)).slice(0, 8),
   }
 
-  // ── Block 4: Demand Analysis ──
-  // Tasa de visita por tipo de propiedad
+  // ── Block 4: Análisis de demanda ──
   const propTypes = ["departamento", "casa", "ph", "duplex", "local_comercial", "terreno", "oficina", "country"]
   const tasa_visita_por_tipo = propTypes.map(tp => {
-    const group = results.filter(r => r.tipo_propiedad === tp)
-    const visitasGroup = group.filter(r => r.visita_agendada).length
-    return {
-      label: tp,
-      total: group.length,
-      visitas: visitasGroup,
-      tasa: group.length > 0 ? Math.round((visitasGroup / group.length) * 100) : 0,
-    }
+    const g = ms.filter(m => m.tipo_propiedad === tp)
+    const v = g.filter(m => m.visita_agendada).length
+    return { label: tp, total: g.length, visitas: v, tasa: g.length > 0 ? Math.round((v / g.length) * 100) : 0 }
   }).filter(x => x.total > 0)
 
   const tasa_visita_por_operacion = ["compra", "alquiler", "inversion"].map(op => {
-    const group = results.filter(r => r.tipo_operacion === op)
-    const visitasGroup = group.filter(r => r.visita_agendada).length
-    return {
-      label: op,
-      total: group.length,
-      visitas: visitasGroup,
-      tasa: group.length > 0 ? Math.round((visitasGroup / group.length) * 100) : 0,
-    }
+    const g = ms.filter(m => m.tipo_operacion === op)
+    const v = g.filter(m => m.visita_agendada).length
+    return { label: op, total: g.length, visitas: v, tasa: g.length > 0 ? Math.round((v / g.length) * 100) : 0 }
   }).filter(x => x.total > 0)
 
+  const usdRows = ms.filter(m => m.moneda_presupuesto === "USD")
+  const arsRows = ms.filter(m => m.moneda_presupuesto === "ARS")
+
   const demand_analysis = {
-    top_zonas: countItems(results.map(r => r.zona)).slice(0, 10),
-    top_barrios: countItems(results.map(r => r.barrio_consultado)).slice(0, 10),
-    tipo_propiedad_demanda: countItems(results.map(r => r.tipo_propiedad)).slice(0, 8),
-    tipo_operacion_demanda: countItems(results.map(r => r.tipo_operacion)).slice(0, 5),
-    ambientes_demanda: countItems(results.map(r => r.ambientes_buscados?.toString() ?? null)).slice(0, 6),
+    top_zonas:              countItems(ms.map(m => m.zona)).slice(0, 10),
+    top_barrios:            countItems(ms.map(m => m.barrio_consultado)).slice(0, 10),
+    tipo_propiedad_demanda: countItems(ms.map(m => m.tipo_propiedad)).slice(0, 8),
+    tipo_operacion_demanda: countItems(ms.map(m => m.tipo_operacion)).slice(0, 5),
+    ambientes_demanda:      countItems(ms.map(m => m.ambientes_buscados?.toString() ?? null)).slice(0, 6),
     tasa_visita_por_tipo_propiedad: tasa_visita_por_tipo,
     tasa_visita_por_operacion,
     presupuesto_compra_usd: {
-      avg: avgNumber(results.filter(r => r.moneda_presupuesto === "USD").map(r => r.presupuesto_max || r.presupuesto_min)),
-      min: (() => {
-        const vals = results.filter(r => r.moneda_presupuesto === "USD" && r.presupuesto_min).map(r => r.presupuesto_min!)
-        return vals.length > 0 ? Math.min(...vals) : null
-      })(),
-      max: (() => {
-        const vals = results.filter(r => r.moneda_presupuesto === "USD" && r.presupuesto_max).map(r => r.presupuesto_max!)
-        return vals.length > 0 ? Math.max(...vals) : null
-      })(),
+      avg: avgNum(usdRows.map(m => m.presupuesto_max || m.presupuesto_min)),
+      min: safeMin(usdRows.filter(m => m.presupuesto_min).map(m => m.presupuesto_min!)),
+      max: safeMax(usdRows.filter(m => m.presupuesto_max).map(m => m.presupuesto_max!)),
     },
     presupuesto_alquiler_ars: {
-      avg: avgNumber(results.filter(r => r.moneda_presupuesto === "ARS").map(r => r.presupuesto_max || r.presupuesto_min)),
+      avg: avgNum(arsRows.map(m => m.presupuesto_max || m.presupuesto_min)),
+      min: safeMin(arsRows.filter(m => m.presupuesto_min).map(m => m.presupuesto_min!)),
+      max: safeMax(arsRows.filter(m => m.presupuesto_max).map(m => m.presupuesto_max!)),
     },
   }
 
-  // ── Block 5: Temporal Behavior ──
+  // ── Block 5: Comportamiento temporal ──
   const temporal = {
     ...temporalData,
-    urgencia_breakdown: countItems(results.map(r => r.urgencia)),
-    nivel_compromiso: countItems(results.map(r => r.nivel_compromiso)),
+    urgencia_breakdown:  countItems(ms.map(m => m.urgencia)),
+    nivel_compromiso:    countItems(ms.map(m => m.nivel_compromiso)),
   }
 
-  // ── Block 6: Attention Quality ──
-  const objeciones = {
-    precio: countBoolean(results.map(r => r.expreso_objecion_precio)),
-    ubicacion: countBoolean(results.map(r => r.expreso_objecion_ubicacion)),
-    tamanio: countBoolean(results.map(r => r.expreso_objecion_tamanio)),
-    documentacion: countBoolean(results.map(r => r.expreso_objecion_documentacion)),
-  }
-  const totalObjeciones = Object.values(objeciones).reduce((a, b) => a + b, 0)
+  // ── Block 6: Calidad de atención ──
+  // Detect objections from motivo_no_avance text (since metricas doesn't have explicit flags)
+  const motivosText = ms.map(m => (m.motivo_no_avance || "").toLowerCase())
+  const objPrecio     = motivosText.filter(t => /precio|presupuesto|caro|costoso|valor/.test(t)).length
+  const objUbicacion  = motivosText.filter(t => /ubicaci|zona|lejos|barrio|distancia/.test(t)).length
+  const objTamanio    = motivosText.filter(t => /ambiente|m2|peque|grande|tamaño|superficie/.test(t)).length
+  const objCredito    = motivosText.filter(t => /cr[eé]dito|banco|aprob|documentaci|tr[aá]mite/.test(t)).length
+  const objPareja     = motivosText.filter(t => /pareja|esposa|esposo|familiar|decisi/.test(t)).length
+
+  const objeciones_frecuencia = [
+    { label: "Precio / presupuesto",     count: objPrecio,    pct: pctOf(objPrecio) },
+    { label: "Ubicación / zona",         count: objUbicacion, pct: pctOf(objUbicacion) },
+    { label: "Tamaño / ambientes",       count: objTamanio,   pct: pctOf(objTamanio) },
+    { label: "Crédito / documentación",  count: objCredito,   pct: pctOf(objCredito) },
+    { label: "Decisión en pareja/familia", count: objPareja,  pct: pctOf(objPareja) },
+  ].filter(x => x.count > 0).sort((a, b) => b.count - a.count)
 
   const attention = {
-    tasa_resolucion_bot: pctOf(total - pidioHumano), // nunca pidieron humano = bot lo resolvió
-    tasa_solicitud_humano: pctOf(pidioHumano),
-    tasa_derivacion_efectiva: pidioHumano > 0 ? Math.round((derivados / pidioHumano) * 100) : null,
-    objeciones_frecuencia: [
-      { label: "Precio / presupuesto", count: objeciones.precio, pct: pctOf(objeciones.precio) },
-      { label: "Ubicación / zona", count: objeciones.ubicacion, pct: pctOf(objeciones.ubicacion) },
-      { label: "Tamaño / ambientes", count: objeciones.tamanio, pct: pctOf(objeciones.tamanio) },
-      { label: "Documentación / trámites", count: objeciones.documentacion, pct: pctOf(objeciones.documentacion) },
-    ].filter(x => x.count > 0).sort((a, b) => b.count - a.count),
-    total_objeciones_detectadas: totalObjeciones,
-    causas_no_avance: countItems(results.map(r => r.motivo_no_avance)).slice(0, 8),
-    avg_mensajes_lead: avgNumber(results.map(r => r.cantidad_mensajes_lead || null)),
+    tasa_resolucion_bot:       pctOf(total - pidioHumano),
+    tasa_solicitud_humano:     pctOf(pidioHumano),
+    tasa_derivacion_efectiva:  pidioHumano > 0 ? Math.round((derivados / pidioHumano) * 100) : null,
+    objeciones_frecuencia,
+    total_objeciones_detectadas: objeciones_frecuencia.reduce((a, b) => a + b.count, 0),
+    causas_no_avance:          countItems(ms.map(m => m.motivo_no_avance)).slice(0, 8),
+    avg_mensajes_lead:         avgNum(ms.map(m => m.cantidad_seguimientos_ia)),
     compromisos: {
-      alto: results.filter(r => r.nivel_compromiso === "alto").length,
-      medio: results.filter(r => r.nivel_compromiso === "medio").length,
-      bajo: results.filter(r => r.nivel_compromiso === "bajo").length,
+      alto:  ms.filter(m => m.nivel_compromiso === "alto").length,
+      medio: ms.filter(m => m.nivel_compromiso === "medio").length,
+      bajo:  ms.filter(m => m.nivel_compromiso === "bajo").length,
     },
-    bot_handled: total - pidioHumano,
+    bot_handled:     total - pidioHumano,
     human_escalated: pidioHumano,
     avg_duration_min: temporalData.avg_duration_min,
   }
@@ -333,21 +296,7 @@ function aggregateAll(results: ConvAnalysis[], total: number, temporalData: Retu
   return { kpis, funnel, lead_profile, demand_analysis, temporal, attention }
 }
 
-// ─── LLM call per conversation ────────────────────────────────────────────
-async function analyzeConversation(text: string): Promise<ConvAnalysis | null> {
-  try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
-    const raw = (await model.generateContent(
-      ANALYSIS_PROMPT.replace("{CONVERSATION_TEXT}", text.slice(0, 6000))
-    )).response.text().trim()
-    const clean = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim()
-    return JSON.parse(clean) as ConvAnalysis
-  } catch {
-    return null
-  }
-}
-
-// ─── Route handler ────────────────────────────────────────────────────────
+// ─── Route handler ────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const supabase = createClient()
@@ -361,24 +310,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const body = await req.json()
-    const { period, from: fromRaw, to: toRaw, force } = body as { period: string; from?: string; to?: string; force?: boolean }
+    const { period, from: fromRaw, to: toRaw, force } = body as {
+      period: string; from?: string; to?: string; force?: boolean
+    }
 
+    // ── Compute date range ──
     const now = new Date()
     let periodStart: Date
     let periodEnd = new Date(now)
 
-    if (period === "7d") periodStart = new Date(now.getTime() - 7 * 86400000)
-    else if (period === "90d") periodStart = new Date(now.getTime() - 90 * 86400000)
+    if (period === "7d")        periodStart = new Date(now.getTime() - 7 * 86400000)
+    else if (period === "90d")  periodStart = new Date(now.getTime() - 90 * 86400000)
     else if (period === "custom" && fromRaw && toRaw) {
       periodStart = new Date(fromRaw); periodEnd = new Date(toRaw)
     } else {
-      periodStart = new Date(now.getTime() - 30 * 86400000)
+      periodStart = new Date(now.getTime() - 30 * 86400000) // default: 30d
     }
 
     const agencyId = profile.agency_id
-    const admin = createAdminClient()
+    const admin    = createAdminClient()
 
-    // Cache freshness check (6h)
+    // ── Cache freshness check (skip if force=true) ──
     const { data: existing } = await admin
       .from("dashboard_conversational_insights")
       .select("id, status, analyzed_at")
@@ -395,104 +347,71 @@ export async function POST(req: NextRequest) {
       if (ageH < 6) return NextResponse.json({ message: "cache_fresh", id: existing.id, analyzed_at: existing.analyzed_at })
     }
 
-    // Fetch wa_conversations scoped to agency + period
-    // Use last_message_at to capture ANY conversation active during this period, even if created months ago
-    const { data: convRows } = await admin
+    // ── Fetch wa_conversations in range (all native columns + metricas) ──
+    const { data: convRows, error: convErr } = await admin
       .from("wa_conversations")
-      .select("id, created_at, last_message_at, bot_active, pipeline_stage, follow_ups_sent, metricas")
+      .select("id, created_at, last_message_at, bot_active, pipeline_stage, follow_ups_sent, funnel_status, visit_status, metricas")
       .eq("agency_id", agencyId)
       .gte("last_message_at", periodStart.toISOString())
       .lte("last_message_at", periodEnd.toISOString())
-      .limit(500)
+      .order("last_message_at", { ascending: false })
+      .limit(2000) // safe upper bound — pure SQL, no AI
 
-    const convIds = (convRows || []).map(c => c.id)
+    if (convErr) {
+      console.error("[insights] convRows error:", convErr)
+      return NextResponse.json({ error: "Database error" }, { status: 500 })
+    }
 
-    let msgRows: Array<{ conversation_id: string; role: string; content: string; created_at: string }> = []
+    const rows = (convRows || []) as ConvRow[]
+    const totalSessions = rows.length
+
+    // ── Fetch wa_messages timestamps for temporal analysis (no content needed) ──
+    const convIds = rows.map(c => c.id)
+    let msgRows: MsgRow[] = []
     if (convIds.length > 0) {
       const { data } = await admin
         .from("wa_messages")
-        .select("conversation_id, role, content, created_at")
+        .select("conversation_id, role, created_at")
         .in("conversation_id", convIds)
         .order("created_at", { ascending: true })
-      msgRows = data || []
+      msgRows = (data || []) as MsgRow[]
     }
 
-    // Group messages by conversation
-    const convTextMap: Record<string, string[]> = {}
-    for (const m of msgRows) {
-      if (!convTextMap[m.conversation_id]) convTextMap[m.conversation_id] = []
-      const label = m.role === "lead" ? "[Lead]" : m.role === "bot" ? "[Bot]" : "[Asesor]"
-      convTextMap[m.conversation_id].push(`${label}: ${m.content}`)
-    }
+    // ── Build temporal data (timestamps only, no AI) ──
+    const temporalData = buildTemporalAnalysis(msgRows, rows)
 
-    const allConvs = Object.entries(convTextMap)
-      .filter(([, lines]) => lines.length >= 2)
-      .map(([id, lines]) => ({ id, text: lines.join("\n") }))
+    // ── Aggregate all 6 blocks from metricas ──
+    const { kpis, funnel, lead_profile, demand_analysis, temporal, attention } =
+      aggregateFromMetricas(rows, temporalData)
 
-    const totalSessions = allConvs.length
-
-    // Upsert processing record
+    // ── Save / upsert result ──
     const { data: record } = await admin
       .from("dashboard_conversational_insights")
       .upsert({
-        agency_id: agencyId,
-        period_start: periodStart.toISOString(),
-        period_end: periodEnd.toISOString(),
-        analyzed_at: new Date().toISOString(),
+        agency_id:          agencyId,
+        period_start:       periodStart.toISOString(),
+        period_end:         periodEnd.toISOString(),
+        analyzed_at:        new Date().toISOString(),
         conversations_count: totalSessions,
-        total_sessions: totalSessions,
-        status: "processing",
-        processed_sessions: 0,
-        failed_sessions: 0,
-        kpis: {}, funnel: {}, lead_profile: {},
-        demand_analysis: {}, temporal: {}, attention: {},
+        total_sessions:     totalSessions,
+        processed_sessions: totalSessions, // all processed instantly
+        failed_sessions:    0,
+        status:             "complete",
+        kpis, funnel, lead_profile, demand_analysis, temporal, attention,
       }, { onConflict: "agency_id,period_start,period_end" })
-      .select("id").single()
+      .select("id")
+      .single()
 
-    const recordId = record?.id
-
-    // Build temporal data from raw timestamps (no LLM)
-    const temporalData = buildTemporalAnalysis(msgRows, convRows || [])
-
-    // ── Synchronous batch processing (fire-and-forget was killed by serverless) ──
-    const results: ConvAnalysis[] = []
-    let processed = 0, failed = 0
-    const BATCH = 5
-
-    for (let i = 0; i < allConvs.length; i += BATCH) {
-      const batch = allConvs.slice(i, i + BATCH)
-      const batchResults = await Promise.all(batch.map(c => analyzeConversation(c.text)))
-      for (const r of batchResults) {
-        if (r) { results.push(r); processed++ } else failed++
-      }
-      // Update progress mid-batch so polling sees it
-      if (recordId) {
-        await admin.from("dashboard_conversational_insights")
-          .update({ processed_sessions: processed, failed_sessions: failed })
-          .eq("id", recordId)
-      }
-    }
-
-    const { kpis, funnel, lead_profile, demand_analysis, temporal, attention } =
-      aggregateAll(results, totalSessions, temporalData, convRows || [])
-
-    await admin.from("dashboard_conversational_insights").update({
-      kpis, funnel, lead_profile, demand_analysis, temporal, attention,
-      status: "complete",
-      analyzed_at: new Date().toISOString(),
-      processed_sessions: processed,
-      failed_sessions: failed,
-    }).eq("id", recordId)
-
-    // Return the complete data directly so the client doesn't need to poll
+    // ── Return complete data directly ──
     return NextResponse.json({
-      message: "complete",
-      id: recordId,
-      total_sessions: totalSessions,
-      processed_sessions: processed,
-      status: "complete",
-      kpis, funnel, lead_profile, demand_analysis, temporal, attention,
+      message:            "complete",
+      id:                 record?.id,
+      status:             "complete",
       conversations_count: totalSessions,
+      total_sessions:     totalSessions,
+      processed_sessions: totalSessions,
+      analyzed_at:        new Date().toISOString(),
+      kpis, funnel, lead_profile, demand_analysis, temporal, attention,
     })
 
   } catch (err) {
