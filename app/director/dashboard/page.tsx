@@ -25,12 +25,13 @@ import {
 import { Calendar } from "@/components/ui/calendar"
 import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/server"
-import { getDashboardData } from "@/lib/queries/dashboard"
+import { getDashboardData, getPipelineDashboardData } from "@/lib/queries/dashboard"
 import { getPropertiesDashboardData } from "@/lib/queries/properties-dashboard"
 import { redirect } from "next/navigation"
 import { DashboardLeadsSection } from "./components/DashboardLeadsSection"
 import { ConversationalIntelligence } from "./components/conversational/ConversationalIntelligence"
 import { DashboardPropertiesSection } from "./components/DashboardPropertiesSection"
+import { DashboardPipelineSection } from "./components/DashboardPipelineSection"
 import { PerformanceCharts } from "@/components/performance-charts"
 import { AdvisorFilter } from "@/components/dashboard/advisor-filter"
 import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter"
@@ -71,9 +72,10 @@ export default async function DashboardPage({
     )
   }
 
-  const [dashboardData, propertiesData] = await Promise.all([
+  const [dashboardData, propertiesData, pipelineData] = await Promise.all([
     getDashboardData(profile.agency_id, agentId, from, to),
-    getPropertiesDashboardData(profile.agency_id)
+    getPropertiesDashboardData(profile.agency_id),
+    getPipelineDashboardData(profile.agency_id),
   ])
 
   return (
@@ -126,6 +128,11 @@ export default async function DashboardPage({
       </div>
 
       <ConversationalIntelligence />
+
+      <DashboardPipelineSection
+        stages={pipelineData.stages}
+        summary={pipelineData.summary}
+      />
 
       <DashboardLeadsSection />
 

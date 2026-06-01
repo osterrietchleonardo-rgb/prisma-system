@@ -419,3 +419,94 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
     })) || []
   }
 }
+
+// ------------------------------------ Pipeline Dashboard Data ------------------------------------
+// Lee pipeline_stage de AMBAS tablas (leads + wa_conversations) por agency_id
+// Solo agencia del director logueado. Nunca mezcla agencias.
+export async function getPipelineDashboardData(agencyId: string) {
+  const supabase = createClient()
+
+  const [leadsRes, waRes] = await Promise.all([
+    supabase
+      .from("leads")
+      .select("pipeline_stage, source")
+      .eq("agency_id", agencyId),
+    supabase
+      .from("wa_conversations")
+      .select("pipeline_stage, funnel_status")
+      .eq("agency_id", agencyId),
+  ])
+
+  const STAGES = [
+    "nuevo", "contacto", "calificado", "visita_agendada",
+    "visita_realizada", "propuesta", "negociacion", "cerrado", "perdido",
+  ] as const
+
+  type Stage = typeof STAGES[number]
+
+  // Contar leads (Tokko + manual)
+  const leadsByStage: Record<string, { total: number; bySource: Record<string, number> }> = {}
+  for (const row of (leadsRes.data || [])) {
+    const stage = (row.pipeline_stage || "nuevo") as string
+    if (!leadsByStage[stage]) leadsByStage[stage] = { total: 0, bySource: {} }
+    leadsByStage[stage].total++
+    const src = row.source || "Manual"
+    leadsByStage[stage].bySource[src] = (leadsByStage[stage].bySource[src] || 0) + 1
+  }
+
+  // Contar wa_conversations
+  // Importante: si funnel_status = closed_lost → efectivamente están en "perdido"
+  const waByStage: Record<string, number> = {}
+  for (const row of (waRes.data || [])) {
+    const stage = row.funnel_status === "closed_lost"
+      ? "perdido"
+      : row.funnel_status === "closed_won"
+        ? "cerrado"
+        : (row.pipeline_stage || "nuevo")
+    waByStage[stage] = (waByStage[stage] || 0) + 1
+  }
+
+  // Unificar por etapa
+  const allStages = new Set([...Object.keys(leadsByStage), ...Object.keys(waByStage)])
+  const stages = STAGES.filter(s => allStages.has(s)).map(s => {
+    const leads = leadsByStage[s]?.total || 0
+    const whatsapp = waByStage[s] || 0
+    return {
+      id: s,
+      leads_total: leads,
+      leads_whatsapp: whatsapp,
+      leads_tokko: leadsByStage[s]?.bySource?.["Tokko Broker"] || 0,
+      leads_manual: (leads) - (leadsByStage[s]?.bySource?.["Tokko Broker"] || 0),
+      total: leads + whatsapp,
+    }
+  })
+
+  // Totales generales
+  const total = stages.reduce((acc, s) => acc + s.total, 0)
+  const totalCerrado = (leadsByStage["cerrado"]?.total || 0) + (waByStage["cerrado"] || 0)
+  const totalPerdido = (leadsByStage["perdido"]?.total || 0) + (waByStage["perdido"] || 0)
+  const totalCerradosMasPerdidos = totalCerrado + totalPerdido
+  const tasaCierreReal = totalCerradosMasPerdidos > 0
+    ? Math.round((totalCerrado / totalCerradosMasPerdidos) * 100)
+    : null
+
+  // Leads activos (excluye cerrado y perdido)
+  const totalActivos = stages
+    .filter(s => s.id !== "cerrado" && s.id !== "perdido")
+    .reduce((acc, s) => acc + s.total, 0)
+
+  return {
+    stages,
+    summary: {
+      total,
+      total_activos: totalActivos,
+      total_cerrado: totalCerrado,
+      total_perdido: totalPerdido,
+      tasa_cierre_real: tasaCierreReal,
+      // Por origen
+      total_whatsapp: stages.reduce((acc, s) => acc + s.leads_whatsapp, 0),
+      total_tokko: stages.reduce((acc, s) => acc + s.leads_tokko, 0),
+      total_manual: stages.reduce((acc, s) => acc + s.leads_manual, 0),
+    }
+  }
+}
