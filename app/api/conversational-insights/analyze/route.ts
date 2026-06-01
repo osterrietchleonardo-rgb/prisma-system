@@ -360,7 +360,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
     const body = await req.json()
-    const { period, from: fromRaw, to: toRaw } = body as { period: string; from?: string; to?: string }
+    const { period, from: fromRaw, to: toRaw, force } = body as { period: string; from?: string; to?: string; force?: boolean }
 
     const now = new Date()
     let periodStart: Date
@@ -389,7 +389,7 @@ export async function POST(req: NextRequest) {
     if (existing?.status === "processing")
       return NextResponse.json({ message: "already_processing", id: existing.id })
 
-    if (existing?.status === "complete" && existing.analyzed_at) {
+    if (!force && existing?.status === "complete" && existing.analyzed_at) {
       const ageH = (Date.now() - new Date(existing.analyzed_at).getTime()) / 3600000
       if (ageH < 6) return NextResponse.json({ message: "cache_fresh", id: existing.id, analyzed_at: existing.analyzed_at })
     }

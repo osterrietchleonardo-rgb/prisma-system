@@ -99,13 +99,13 @@ export function ConversationalIntelligence() {
 
   useEffect(() => { fetchCached("30d"); return stopPolling }, [fetchCached])
 
-  const handleAnalyze = async (period: string, from?: string, to?: string) => {
+  const handleAnalyze = async (period: string, from?: string, to?: string, force: boolean = false) => {
     setIsProcessing(true); stopPolling()
     try {
       const res = await fetch("/api/conversational-insights/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ period, from, to }),
+        body: JSON.stringify({ period, from, to, force }),
       })
       const data = await res.json()
       if (data.message === "cache_fresh") { await fetchCached(period, from, to); setIsProcessing(false); return }

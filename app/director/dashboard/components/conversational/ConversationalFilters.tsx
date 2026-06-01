@@ -11,7 +11,7 @@ import { es } from "date-fns/locale"
 import type { DateRange } from "react-day-picker"
 
 interface ConversationalFiltersProps {
-  onAnalyze: (period: string, from?: string, to?: string) => void
+  onAnalyze: (period: string, from?: string, to?: string, force?: boolean) => void
   isProcessing: boolean
   lastAnalyzedAt: string | null
   processedSessions: number
@@ -43,9 +43,9 @@ export function ConversationalFilters({
 
   const handleAnalyze = () => {
     if (period === "custom" && dateRange?.from && dateRange?.to) {
-      onAnalyze("custom", dateRange.from.toISOString(), dateRange.to.toISOString())
+      onAnalyze("custom", dateRange.from.toISOString(), dateRange.to.toISOString(), true)
     } else {
-      onAnalyze(period)
+      onAnalyze(period, undefined, undefined, true)
     }
   }
 
