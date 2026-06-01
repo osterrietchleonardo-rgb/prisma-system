@@ -99,6 +99,7 @@
 | v1.0.3 | 2026-05-27 | WhatsApp: desconexión segura sin FK violation, bugs de plantillas y webhook UX. |
 | v1.0.4 | 2026-05-28 | Primer cliente real (MaxRE). Bug `last_sync_at` corregido. Logo upload implementado. |
 | v1.0.5 | 2026-05-29 | Documentación completa del módulo Marketing IA. Skill `vakdor-video` creado. |
+| v1.0.6 | 2026-06-01 | Reescritura Landing Page (Framework Vakdor) con foco High-Ticket y Multi-Audiencia. Análisis exhaustivo de 36 herramientas. |
 
 ---
 
@@ -350,6 +351,22 @@ Configura la **identidad visual de la agencia** aplicada a TODAS las imágenes g
 - **Seguridad**: Settings de marca solo modificables por `role === 'director'`, validado tanto en cliente como en API route.
 
 
+
+### 2026-06-01 | v1.0.6 — Reescritura Estratégica de Landing Page (High-Ticket)
+
+#### 🔍 Análisis Previo de Magnitud
+Se realizó un análisis profundo del sistema completo para contabilizar el volumen real de la plataforma, identificando **36+ herramientas/funcionalidades**:
+- **19 Módulos para Director:** Dashboard KPIs, Leaderboard, Conversational Intelligence, CRM Leads, CRM Propiedades, Marketing IA Hub, Generador de Contratos Admin, Inbox WhatsApp, Market Pulse Directivo, etc.
+- **17 Módulos para Asesor:** Dashboard Personal, Pulso de Mercado local, Kanban Propio, Tutor IA, Generador Copy de Propiedades, Análisis de Demanda IA, Ranking de posición, Buscador semántico, etc.
+
+#### ✨ Implementación en Landing Page (`app/(public)/page.tsx`)
+Se reestructuró la página bajo los principios de la skill **Vakdor-Copywriter** con un enfoque multi-audiencia (Directores/Dueños IPC2, Inversores y Partners):
+- **Barra de Impacto:** 4 métricas core (<2 min, 36+ herramientas, 72hs, 24/7) para elevar el valor percibido tecnológico.
+- **El Ecosistema Completo:** Grid de 6 áreas operativas comunicando que no es un bot, sino un "Sistema Operativo".
+- **Agitación del Dolor (3 Fracturas):** Copy enfocado en la hemorragia de oportunidades, anarquía comercial y ceguera de gobernanza.
+- **Antes vs Después:** Tabla visual comparativa resaltando el ROI.
+- **Suscripción Integral (Software + Consultoría):** Posicionamiento explícito como **Partner Tecnológico** (acompañamiento VIP directivo y estratégico) asegurando que no se contrata solo software, sino un aliado de negocio.
+- **Integridad Técnica:** Se mantuvieron intactas las simulaciones interactivas originales (`DashboardSimulation`, `MarketPulseSimulation`, `WhatsAppSimulation`) sin romper layouts ni estilos globales.
 
 ### 2026-05-28 | v1.0.4 — Auditoría cliente real + Bug fixes + Logo upload
 
