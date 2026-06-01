@@ -108,11 +108,28 @@ export function ConversationalIntelligence() {
         body: JSON.stringify({ period, from, to, force }),
       })
       const data = await res.json()
-      if (data.message === "cache_fresh") { await fetchCached(period, from, to); setIsProcessing(false); return }
+
+      // Cache hit: load from status endpoint
+      if (data.message === "cache_fresh") {
+        await fetchCached(period, from, to)
+        setIsProcessing(false)
+        return
+      }
+
+      // Synchronous complete: data is already in the response
+      if (data.message === "complete" && data.status === "complete") {
+        setInsights(data as InsightsRecord)
+        setIsProcessing(false)
+        return
+      }
+
+      // Fallback: polling mode (legacy / already_processing)
       if (data.id) {
         recordIdRef.current = data.id
         pollingRef.current = setInterval(() => { if (recordIdRef.current) pollStatus(recordIdRef.current) }, 3000)
         pollStatus(data.id)
+      } else {
+        setIsProcessing(false)
       }
     } catch { setIsProcessing(false) }
   }

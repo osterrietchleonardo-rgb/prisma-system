@@ -454,42 +454,46 @@ export async function POST(req: NextRequest) {
     // Build temporal data from raw timestamps (no LLM)
     const temporalData = buildTemporalAnalysis(msgRows, convRows || [])
 
-    // Background batch processing
-    const processPromise = (async () => {
-      const results: ConvAnalysis[] = []
-      let processed = 0, failed = 0
-      const BATCH = 5
+    // ── Synchronous batch processing (fire-and-forget was killed by serverless) ──
+    const results: ConvAnalysis[] = []
+    let processed = 0, failed = 0
+    const BATCH = 5
 
-      for (let i = 0; i < allConvs.length; i += BATCH) {
-        const batch = allConvs.slice(i, i + BATCH)
-        const batchResults = await Promise.all(batch.map(c => analyzeConversation(c.text)))
-        for (const r of batchResults) {
-          if (r) { results.push(r); processed++ } else failed++
-        }
+    for (let i = 0; i < allConvs.length; i += BATCH) {
+      const batch = allConvs.slice(i, i + BATCH)
+      const batchResults = await Promise.all(batch.map(c => analyzeConversation(c.text)))
+      for (const r of batchResults) {
+        if (r) { results.push(r); processed++ } else failed++
+      }
+      // Update progress mid-batch so polling sees it
+      if (recordId) {
         await admin.from("dashboard_conversational_insights")
           .update({ processed_sessions: processed, failed_sessions: failed })
           .eq("id", recordId)
       }
+    }
 
-      const { kpis, funnel, lead_profile, demand_analysis, temporal, attention } =
-        aggregateAll(results, totalSessions, temporalData, convRows || [])
+    const { kpis, funnel, lead_profile, demand_analysis, temporal, attention } =
+      aggregateAll(results, totalSessions, temporalData, convRows || [])
 
-      await admin.from("dashboard_conversational_insights").update({
-        kpis, funnel, lead_profile, demand_analysis, temporal, attention,
-        status: "complete",
-        analyzed_at: new Date().toISOString(),
-        processed_sessions: processed,
-        failed_sessions: failed,
-      }).eq("id", recordId)
-    })()
+    await admin.from("dashboard_conversational_insights").update({
+      kpis, funnel, lead_profile, demand_analysis, temporal, attention,
+      status: "complete",
+      analyzed_at: new Date().toISOString(),
+      processed_sessions: processed,
+      failed_sessions: failed,
+    }).eq("id", recordId)
 
-    processPromise.catch(async err => {
-      console.error("[insights] batch error:", err)
-      if (recordId) await admin.from("dashboard_conversational_insights")
-        .update({ status: "error", error_message: String(err) }).eq("id", recordId)
+    // Return the complete data directly so the client doesn't need to poll
+    return NextResponse.json({
+      message: "complete",
+      id: recordId,
+      total_sessions: totalSessions,
+      processed_sessions: processed,
+      status: "complete",
+      kpis, funnel, lead_profile, demand_analysis, temporal, attention,
+      conversations_count: totalSessions,
     })
-
-    return NextResponse.json({ message: "processing_started", id: recordId, total_sessions: totalSessions }, { status: 202 })
 
   } catch (err) {
     console.error("[insights] error:", err)
