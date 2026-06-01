@@ -177,6 +177,19 @@ function aggregateFromMetricas(
   // cantidad_seguimientos_ia (en metricas) = seguimientos que n8n registró en esa conversación
   const avg_seguimientos_ia_por_conv = avgNum(ms.map(m => m.cantidad_seguimientos_ia))
 
+  // ── funnel_status (columna nativa — estado real marcado en el sistema) ──
+  // open: activo / en conversación
+  // snoozed: en pausa, esperando seguimiento
+  // closed_lost: lead perdido / no avanzó
+  // closed_won: conversión exitosa (reserva/venta cerrada)
+  const funnel_open        = convRows.filter(c => c.funnel_status === "open").length
+  const funnel_snoozed     = convRows.filter(c => c.funnel_status === "snoozed").length
+  const funnel_closed_lost = convRows.filter(c => c.funnel_status === "closed_lost").length
+  const funnel_closed_won  = convRows.filter(c => c.funnel_status === "closed_won").length
+  // Tasa de cierre real = closed_won / (closed_won + closed_lost)
+  const totalCerrados = funnel_closed_won + funnel_closed_lost
+  const tasa_cierre_real = totalCerrados > 0 ? Math.round((funnel_closed_won / totalCerrados) * 100) : null
+
   // ── Compromiso derivado (nivel_compromiso no existe en metricas) ──
   const compromisos = ms.reduce(
     (acc, m) => { acc[derivarCompromiso(m)]++; return acc },
@@ -207,14 +220,29 @@ function aggregateFromMetricas(
     visitas_confirmadas:      convRows.filter(c =>
       c.visit_status === "confirmed" || c.visit_status === "attended"
     ).length,
+    // funnel_status — estado real del lead (columna nativa, más confiable que metricas)
+    funnel_open,
+    funnel_snoozed,
+    funnel_closed_lost,
+    funnel_closed_won,
+    tasa_cierre_real,
   }
 
   // ── Block 2: Funnel de conversión ──
   const funnel = {
-    chats_recibidos:    { count: total,       pct: 100 },
-    leads_calificados:  { count: calificados,  pct: pctOf(calificados) },
-    visita_agendada:    { count: visitas,      pct: pctOf(visitas) },
-    reserva_confirmada: { count: reservas,     pct: pctOf(reservas) },
+    // Etapas del funnel de conversación (inferidas desde metricas)
+    chats_recibidos:    { count: total,             pct: 100 },
+    leads_calificados:  { count: calificados,        pct: pctOf(calificados) },
+    visita_agendada:    { count: visitas,            pct: pctOf(visitas) },
+    reserva_confirmada: { count: reservas,           pct: pctOf(reservas) },
+    // Estado real del pipeline (desde funnel_status — columna nativa)
+    funnel_status: {
+      open:        { count: funnel_open,        pct: pctOf(funnel_open) },
+      snoozed:     { count: funnel_snoozed,     pct: pctOf(funnel_snoozed) },
+      closed_lost: { count: funnel_closed_lost, pct: pctOf(funnel_closed_lost) },
+      closed_won:  { count: funnel_closed_won,  pct: pctOf(funnel_closed_won) },
+      tasa_cierre_real,
+    },
   }
 
   // ── Block 3: Perfil del lead buscador ──
