@@ -177,7 +177,7 @@ export async function POST(req: Request) {
       hour: '2-digit', minute: '2-digit', second: '2-digit'
     }).replace(',', '')
 
-    await supabase.from('n8n_chat_histories').insert({
+    const { error: n8nError } = await supabase.from('n8n_chat_histories').insert({
       session_id: conversation_id,
       message: {
         type: 'ai',
@@ -187,12 +187,22 @@ export async function POST(req: Request) {
             Fecha: fecha
           }
         }),
+        tool_calls: [],
         additional_kwargs: { 
           is_template: true, 
           template_name: finalTemplateName 
-        }
+        },
+        response_metadata: {
+          source: 'system_dispatch',
+          agent_role: 'follow_up_bot'
+        },
+        invalid_tool_calls: []
       }
     })
+    
+    if (n8nError) {
+      console.error('[Dispatch] Error guardando en n8n_chat_histories:', n8nError)
+    }
 
     // 6. Registrar evento en follow_ups_history (log inmutable de trazabilidad)
     const { data: convSnap } = await supabase
