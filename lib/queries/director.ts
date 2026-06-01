@@ -89,6 +89,7 @@ export async function getAgencyWaLeads(agencyId: string) {
       contact_name,
       contact_phone,
       pipeline_stage,
+      funnel_status,
       status,
       score,
       etiquetas,
@@ -103,29 +104,38 @@ export async function getAgencyWaLeads(agencyId: string) {
   if (error) throw error
 
   // Mapear al tipo Lead del kanban
-  return (data || []).map(conv => ({
-    id: conv.id,
-    agency_id: agencyId,
-    full_name: conv.contact_name || conv.contact_phone || "Sin nombre",
-    email: "",
-    phone: conv.contact_phone,
-    source: "WhatsApp" as const,
-    pipeline_stage: conv.pipeline_stage || "nuevo",
-    notes: undefined,
-    assigned_agent_id: conv.agent_id || undefined,
-    created_at: conv.created_at,
-    updated_at: conv.last_message_at || conv.created_at,
-    // WhatsApp-specific: estos campos de Tokko van vacíos
-    tokko_property_title: undefined,
-    tokko_property_price: undefined,
-    tokko_property_type: undefined,
-    tokko_property_operation: undefined,
-    tokko_property_location: undefined,
-    tokko_lead_status: undefined,
-    tokko_agent_name: undefined,
-    tokko_agent_picture: undefined,
-    assigned_agent: conv.assigned_agent as any ?? undefined,
-  }))
+  return (data || []).map(conv => {
+    // Si n8n marcó esta conversación como closed_lost (lead descartado automáticamente),
+    // la mostramos en la columna "Perdido" del pipeline sin importar su pipeline_stage.
+    const effectiveStage =
+      conv.funnel_status === "closed_lost"
+        ? "perdido"
+        : conv.pipeline_stage || "nuevo"
+
+    return {
+      id: conv.id,
+      agency_id: agencyId,
+      full_name: conv.contact_name || conv.contact_phone || "Sin nombre",
+      email: "",
+      phone: conv.contact_phone,
+      source: "WhatsApp" as const,
+      pipeline_stage: effectiveStage,
+      notes: undefined,
+      assigned_agent_id: conv.agent_id || undefined,
+      created_at: conv.created_at,
+      updated_at: conv.last_message_at || conv.created_at,
+      // WhatsApp-specific: estos campos de Tokko van vacíos
+      tokko_property_title: undefined,
+      tokko_property_price: undefined,
+      tokko_property_type: undefined,
+      tokko_property_operation: undefined,
+      tokko_property_location: undefined,
+      tokko_lead_status: undefined,
+      tokko_agent_name: undefined,
+      tokko_agent_picture: undefined,
+      assigned_agent: conv.assigned_agent as any ?? undefined,
+    }
+  })
 }
 
 
@@ -152,10 +162,24 @@ export async function updateLeadStage(leadId: string, stage: string) {
 
 export async function updateWaConversationStage(convId: string, stage: string) {
   const supabase = createClient()
-  
+
+  // Campos a actualizar: siempre pipeline_stage
+  // funnel_status se sincroniza SOLO al mover a "cerrado" o "perdido".
+  // Cualquier otra etapa no toca funnel_status (no revertir lo que puso n8n).
+  const updatePayload: Record<string, string> = {
+    pipeline_stage: stage,
+  }
+
+  if (stage === "cerrado") {
+    updatePayload.funnel_status = "closed_won"
+  } else if (stage === "perdido") {
+    updatePayload.funnel_status = "closed_lost"
+  }
+  // otros stages → NO se toca funnel_status
+
   const { error } = await supabase
     .from("wa_conversations")
-    .update({ pipeline_stage: stage })
+    .update(updatePayload)
     .eq("id", convId)
 
   if (error) throw error
