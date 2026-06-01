@@ -175,7 +175,7 @@ function buildTemporalAnalysis(messages: MsgTimestamp[], conversations: Array<{ 
 }
 
 // ─── Aggregate all LLM results into 6 blocks ────────────────────────────
-function aggregateAll(results: ConvAnalysis[], total: number, temporalData: ReturnType<typeof buildTemporalAnalysis>) {
+function aggregateAll(results: ConvAnalysis[], total: number, temporalData: ReturnType<typeof buildTemporalAnalysis>, convRows: any[]) {
   const pctOf = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0
 
   // ── Block 1: KPIs ──
@@ -205,6 +205,7 @@ function aggregateAll(results: ConvAnalysis[], total: number, temporalData: Retu
     compromisos_bajo: results.filter(r => r.nivel_compromiso === "bajo").length,
     inversores: countBoolean(results.map(r => r.es_inversor)),
     con_preaprobacion: countBoolean(results.map(r => r.tiene_preaprobacion_credito)),
+    seguimientos_ia: convRows.reduce((acc, c) => acc + (c.follow_ups_sent || 0), 0),
   }
 
   // ── Block 2: Funnel ──
@@ -395,12 +396,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch wa_conversations scoped to agency + period
+    // Use last_message_at to capture ANY conversation active during this period, even if created months ago
     const { data: convRows } = await admin
       .from("wa_conversations")
-      .select("id, created_at, last_message_at, bot_active, pipeline_stage")
+      .select("id, created_at, last_message_at, bot_active, pipeline_stage, follow_ups_sent, metricas")
       .eq("agency_id", agencyId)
-      .gte("created_at", periodStart.toISOString())
-      .lte("created_at", periodEnd.toISOString())
+      .gte("last_message_at", periodStart.toISOString())
+      .lte("last_message_at", periodEnd.toISOString())
       .limit(500)
 
     const convIds = (convRows || []).map(c => c.id)
@@ -470,7 +472,7 @@ export async function POST(req: NextRequest) {
       }
 
       const { kpis, funnel, lead_profile, demand_analysis, temporal, attention } =
-        aggregateAll(results, totalSessions, temporalData)
+        aggregateAll(results, totalSessions, temporalData, convRows || [])
 
       await admin.from("dashboard_conversational_insights").update({
         kpis, funnel, lead_profile, demand_analysis, temporal, attention,
