@@ -81,19 +81,19 @@ export default function LandingPage() {
         <section className="py-8 border-y border-white/5 bg-[#020617]/80 backdrop-blur-md relative z-20">
           <div className="container">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4 divide-x-0 md:divide-x divide-white/10 text-center">
-              <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-[600ms]">
+              <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-4 duration-1000" style={{ animationDelay: '600ms', animationFillMode: 'both' }}>
                 <div className="text-3xl md:text-5xl font-black text-white font-serif tracking-tighter">&lt; 2 min</div>
                 <div className="text-[#C0C0C0] text-xs md:text-sm font-bold uppercase tracking-widest">Tiempo de primer contacto</div>
               </div>
-              <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-[700ms]">
+              <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-4 duration-1000" style={{ animationDelay: '700ms', animationFillMode: 'both' }}>
                 <div className="text-3xl md:text-5xl font-black text-[#B87333] font-serif tracking-tighter">36+</div>
                 <div className="text-[#C0C0C0] text-xs md:text-sm font-bold uppercase tracking-widest">Herramientas en 1 Ecosistema</div>
               </div>
-              <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-[800ms]">
+              <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-4 duration-1000" style={{ animationDelay: '800ms', animationFillMode: 'both' }}>
                 <div className="text-3xl md:text-5xl font-black text-white font-serif tracking-tighter">72 hs</div>
                 <div className="text-[#C0C0C0] text-xs md:text-sm font-bold uppercase tracking-widest">Activación total sin frenar tu operación</div>
               </div>
-              <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-[900ms]">
+              <div className="flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-4 duration-1000" style={{ animationDelay: '900ms', animationFillMode: 'both' }}>
                 <div className="text-3xl md:text-5xl font-black text-white font-serif tracking-tighter">24/7</div>
                 <div className="text-[#C0C0C0] text-xs md:text-sm font-bold uppercase tracking-widest">Inteligencia Artificial Operativa</div>
               </div>
