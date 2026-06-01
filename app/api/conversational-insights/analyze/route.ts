@@ -276,8 +276,14 @@ function aggregateAll(results: ConvAnalysis[], total: number, temporalData: Retu
     tasa_visita_por_operacion,
     presupuesto_compra_usd: {
       avg: avgNumber(results.filter(r => r.moneda_presupuesto === "USD").map(r => r.presupuesto_max || r.presupuesto_min)),
-      min: results.filter(r => r.moneda_presupuesto === "USD" && r.presupuesto_min).reduce((m, r) => Math.min(m, r.presupuesto_min!), Infinity) || null,
-      max: results.filter(r => r.moneda_presupuesto === "USD" && r.presupuesto_max).reduce((m, r) => Math.max(m, r.presupuesto_max!), 0) || null,
+      min: (() => {
+        const vals = results.filter(r => r.moneda_presupuesto === "USD" && r.presupuesto_min).map(r => r.presupuesto_min!)
+        return vals.length > 0 ? Math.min(...vals) : null
+      })(),
+      max: (() => {
+        const vals = results.filter(r => r.moneda_presupuesto === "USD" && r.presupuesto_max).map(r => r.presupuesto_max!)
+        return vals.length > 0 ? Math.max(...vals) : null
+      })(),
     },
     presupuesto_alquiler_ars: {
       avg: avgNumber(results.filter(r => r.moneda_presupuesto === "ARS").map(r => r.presupuesto_max || r.presupuesto_min)),
