@@ -41,6 +41,8 @@ const DashboardCharts = dynamic(() => import("@/components/dashboard-charts").th
   loading: () => <Skeleton className="h-[400px] w-full rounded-2xl" />
 })
 
+export const revalidate = 0;
+
 export default async function DashboardPage({
   searchParams
 }: {

@@ -120,7 +120,7 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole, aiCr
                 <TooltipTrigger asChild>
                   <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-accent/5 border border-accent/10 hover:bg-accent/10 transition-colors cursor-default select-none">
                     <Sparkles className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isCreditsDanger ? 'text-destructive' : isCreditsWarning ? 'text-yellow-500' : 'text-accent'}`} />
-                    <span className="text-[10px] sm:text-xs font-semibold text-muted-foreground">
+                    <span suppressHydrationWarning className="text-[10px] sm:text-xs font-semibold text-muted-foreground">
                       {remainingCredits.toLocaleString()} <span className="hidden sm:inline">créditos</span>
                     </span>
                   </div>
@@ -129,12 +129,12 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole, aiCr
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-semibold">Créditos IA</span>
-                      <span className="text-xs font-bold text-accent">{creditsPercentage.toFixed(1)}% consumido</span>
+                      <span suppressHydrationWarning className="text-xs font-bold text-accent">{creditsPercentage.toFixed(1)}% consumido</span>
                     </div>
                     <Progress value={creditsPercentage} className={`h-2 ${isCreditsDanger ? '*:[background-color:hsl(var(--destructive))]' : isCreditsWarning ? '*:[background-color:#eab308]' : '*:[background-color:hsl(var(--accent))]'}`} />
                     <div className="flex justify-between text-xs text-muted-foreground pt-1">
-                      <span>{aiCredits.consumed.toLocaleString()} usados</span>
-                      <span>{aiCredits.allocated.toLocaleString()} total</span>
+                      <span suppressHydrationWarning>{aiCredits.consumed.toLocaleString()} usados</span>
+                      <span suppressHydrationWarning>{aiCredits.allocated.toLocaleString()} total</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground/70 mt-2 text-center border-t border-accent/10 pt-2">
                       Renovación automática el día 1 de cada mes

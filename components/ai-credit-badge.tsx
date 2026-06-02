@@ -46,7 +46,7 @@ export function AiCreditBadge({ className, showLabel = true }: AiCreditBadgeProp
               isDanger ? "text-destructive" : isWarning ? "text-yellow-500" : "text-accent"
             )} />
             {showLabel && (
-              <span className="text-xs font-bold text-foreground">
+              <span suppressHydrationWarning className="text-xs font-bold text-foreground">
                 {credits.disponible.toLocaleString()}{" "}
                 <span className="text-[10px] text-muted-foreground font-medium ml-0.5">créditos</span>
               </span>
@@ -80,17 +80,17 @@ export function AiCreditBadge({ className, showLabel = true }: AiCreditBadgeProp
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="rounded-lg bg-background/60 p-2">
                 <div className="text-xs text-muted-foreground">Límite</div>
-                <div className="text-sm font-bold">{credits.limiteMensual.toLocaleString()}</div>
+                <div suppressHydrationWarning className="text-sm font-bold">{credits.limiteMensual.toLocaleString()}</div>
               </div>
               <div className="rounded-lg bg-yellow-500/10 p-2">
                 <div className="text-xs text-muted-foreground">Usados</div>
-                <div className={`text-sm font-bold ${isWarning ? "text-yellow-400" : ""}`}>
+                <div suppressHydrationWarning className={`text-sm font-bold ${isWarning ? "text-yellow-400" : ""}`}>
                   {credits.consumidoMes.toLocaleString()}
                 </div>
               </div>
               <div className="rounded-lg bg-emerald-500/10 p-2">
                 <div className="text-xs text-muted-foreground">Quedan</div>
-                <div className="text-sm font-bold text-emerald-400">{credits.disponible.toLocaleString()}</div>
+                <div suppressHydrationWarning className="text-sm font-bold text-emerald-400">{credits.disponible.toLocaleString()}</div>
               </div>
             </div>
 

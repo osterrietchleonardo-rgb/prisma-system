@@ -3,7 +3,7 @@ import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export const prismaIA = genAI.getGenerativeModel({ 
-  model: "gemini-2.0-flash",
+  model: "gemini-3.5-flash",
   generationConfig: {
     temperature: 0.7,
     topK: 1,
@@ -42,7 +42,7 @@ export const generateEmbedding = async (text: string) => {
 };
 
 export const extractTextFromDocument = async (fileBuffer: Buffer, mimeType: string) => {
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
   
   const result = await model.generateContent([
     {
