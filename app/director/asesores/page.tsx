@@ -168,12 +168,10 @@ export default function AsesoresPage() {
   }
 
   const copyToClipboard = () => {
-    // Replace with real registration URL
-    const url = `${window.location.origin}/auth/register?code=${inviteCode}`
-    navigator.clipboard.writeText(url)
+    navigator.clipboard.writeText(inviteCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-    toast.success("Enlace de registro copiado")
+    toast.success("Código copiado")
   }
 
   const filteredAgents = agents.filter(a => 
