@@ -37,12 +37,23 @@ export async function POST(req: Request) {
     const intentCheck = await openaiIA.generateContent({
       contents: [{ 
         role: "user", 
-        parts: [{ text: `Analiza si el siguiente mensaje requiere buscar o recomendar propiedades de una inmobiliaria o si es una charla general (saludo, agradecimiento, pregunta sobre el clima, charla casual).
-        Responde SOLO con una palabra: 'RETRIEVAL' o 'GENERAL'.
+        parts: [{ text: `Analiza el mensaje del usuario. Determina si requiere buscar propiedades en la base de datos ('RETRIEVAL') o es una charla general ('GENERAL').
+        Si es RETRIEVAL, extrae las palabras clave de búsqueda (ej: barrios, ciudades, "departamento", "piso", "casa", "alquiler", "venta").
+        Responde ÚNICAMENTE con un JSON con este formato exacto: {"intent": "RETRIEVAL" | "GENERAL", "keywords": ["palabra1", "palabra2"]}
         Mensaje: "${message}"` }]
       }]
     });
-    const isRetrieval = intentCheck.response.text().toUpperCase().includes("RETRIEVAL");
+    
+    const intentResText = intentCheck.response.text().replace(/```json|```/g, "").trim();
+    let isRetrieval = false;
+    let searchKeywords: string[] = [];
+    try {
+        const parsed = JSON.parse(intentResText);
+        isRetrieval = parsed.intent === 'RETRIEVAL';
+        searchKeywords = parsed.keywords || [];
+    } catch(e) {
+        isRetrieval = intentResText.toUpperCase().includes("RETRIEVAL");
+    }
 
     let newMatchedProperties = [];
     let propertyContext = "";
@@ -58,31 +69,53 @@ export async function POST(req: Request) {
         .single();
       const seenIds = (sessionData?.metadata as any)?.seen_property_ids || [];
 
-      console.log("Querying Supabase match_properties RPC (lower threshold)...");
+      console.log("Querying Supabase match_properties RPC (Vector Search)...");
       const { data: matchedProperties, error: rpcError } = await supabase.rpc('match_properties', {
         query_embedding: queryEmbedding,
-        match_threshold: 0.25, // Lowered for better recall
-        match_count: 8,
+        match_threshold: 0.15, // Bajamos el threshold para traer más
+        match_count: 20, // Subimos el límite
         p_agency_id: agencyId
       });
 
       if (rpcError) {
         console.error("RPC Error:", rpcError);
-        throw rpcError;
       }
 
-      // Filter and Re-rank
-      const filteredProperties = matchedProperties?.filter((p: any) => !seenIds.includes(p.id)) || [];
-      const searchTerms = message.toLowerCase().split(/\s+/).filter((t: string) => t.length > 2);
-      
-      const rerankedProperties = filteredProperties.sort((a: any, b: any) => {
-        const aScore = searchTerms.filter((t: string) => a.address?.toLowerCase().includes(t) || a.title?.toLowerCase().includes(t)).length;
-        const bScore = searchTerms.filter((t: string) => b.address?.toLowerCase().includes(t) || b.title?.toLowerCase().includes(t)).length;
-        if (aScore !== bScore) return bScore - aScore;
-        return b.similarity - a.similarity;
+      console.log("Querying Supabase Full Text Search (Fallback)...");
+      let textMatchedProperties: any[] = [];
+      const validKeywords = searchKeywords.filter(k => k.length > 2);
+      if (validKeywords.length > 0) {
+        let query = supabase.from('properties')
+          .select('id, title, address, property_type, price, currency, bedrooms')
+          .eq('agency_id', agencyId);
+        
+        const orConditions = validKeywords.map(k => `address.ilike.%${k}%,title.ilike.%${k}%,property_type.ilike.%${k}%`).join(',');
+        const { data: keywordProps } = await query.or(orConditions).limit(20);
+        if (keywordProps) textMatchedProperties = keywordProps;
+      }
+
+      // Merge and deduplicate
+      const allPropsMap = new Map();
+      (matchedProperties || []).forEach((p: any) => allPropsMap.set(p.id, p));
+      textMatchedProperties.forEach((p: any) => {
+        if (!allPropsMap.has(p.id)) {
+            // Assign a fake similarity score so text matches don't get buried
+            allPropsMap.set(p.id, { ...p, similarity: 0.5 });
+        }
       });
       
-      newMatchedProperties = rerankedProperties.slice(0, 3);
+      const allProperties = Array.from(allPropsMap.values());
+      const filteredProperties = allProperties.filter((p: any) => !seenIds.includes(p.id));
+      
+      // Re-rank based on explicit keyword hits
+      const rerankedProperties = filteredProperties.sort((a: any, b: any) => {
+        const aScore = validKeywords.filter((t: string) => a.address?.toLowerCase().includes(t.toLowerCase()) || a.title?.toLowerCase().includes(t.toLowerCase()) || a.property_type?.toLowerCase().includes(t.toLowerCase())).length;
+        const bScore = validKeywords.filter((t: string) => b.address?.toLowerCase().includes(t.toLowerCase()) || b.title?.toLowerCase().includes(t.toLowerCase()) || b.property_type?.toLowerCase().includes(t.toLowerCase())).length;
+        if (aScore !== bScore) return bScore - aScore;
+        return (b.similarity || 0) - (a.similarity || 0);
+      });
+      
+      newMatchedProperties = rerankedProperties.slice(0, 10); // Return up to 10 as requested
       
       // Update metadata
       const updatedSeenIds = Array.from(new Set([...seenIds, ...newMatchedProperties.map((p: any) => p.id)]));
@@ -99,7 +132,7 @@ export async function POST(req: Request) {
             const agentName = p.assigned_agent?.name || "Sin asignar";
             return `- ID: ${p.id}, Titulo: ${p.title}, Tipo: ${p.property_type}, Precio: ${p.currency} ${p.price}, Direccion: ${p.address}, Dormitorios: ${p.bedrooms}, Agente: ${agentName}`;
           }).join('\n')
-        : "No se encontraron nuevas propiedades coincidiendo exactamente. Sugiere alternativas.";
+        : "No se encontraron nuevas propiedades coincidiendo exactamente. Informa esto amablemente y sugiere alternativas.";
     }
 
     // 5. Generate Assistant Response with Context & History
