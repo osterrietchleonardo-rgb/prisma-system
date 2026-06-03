@@ -91,7 +91,7 @@ export async function POST() {
     // Obtener perfiles de la agencia para matcheo por email
     const { data: agencyProfiles } = await supabase
       .from("profiles")
-      .select("id, email")
+      .select("id, email, full_name")
       .eq("agency_id", profile.agency_id)
 
     const propertiesToUpsert = tokkoProperties.map((p: any) => {
@@ -99,9 +99,11 @@ export async function POST() {
       const rawStatus = p.operations?.[0]?.operation_type || "Venta"
       const producerEmail = p.producer?.email?.toLowerCase()
       
-      const matchedProfile = agencyProfiles?.find(ap => 
-        ap.email?.toLowerCase() === producerEmail
-      )
+      const matchedProfile = agencyProfiles?.find(ap => {
+        const emailMatches = ap.email?.toLowerCase() === producerEmail
+        const nameMatches = ap.full_name && p.producer?.name && ap.full_name.toLowerCase().trim() === p.producer.name.toLowerCase().trim()
+        return emailMatches || nameMatches
+      })
 
       // Buscar el primer precio que sea mayor a 0
       const activeOperation = p.operations?.[0];
