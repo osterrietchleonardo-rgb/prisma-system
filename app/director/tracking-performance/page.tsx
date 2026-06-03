@@ -32,7 +32,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-export default function TrackingPerformancePage() {
+interface TrackingPerformancePageProps {
+  isDirector?: boolean;
+}
+
+export default function TrackingPerformancePage({ isDirector = true }: TrackingPerformancePageProps) {
   const [activeTab, setActiveTab] = useState("actividad");
   const [logs, setLogs] = useState<PerformanceLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -136,7 +140,9 @@ export default function TrackingPerformancePage() {
           <div className="flex items-center gap-4">
             <TabsList className="bg-muted/30 p-1 rounded-xl border border-white/5 backdrop-blur-sm">
               <TabsTrigger value="actividad" className="text-xs md:text-sm px-4">Actividad</TabsTrigger>
-              <TabsTrigger value="configuracion" className="text-xs md:text-sm px-4">Configuración IA</TabsTrigger>
+              {isDirector && (
+                <TabsTrigger value="configuracion" className="text-xs md:text-sm px-4">Configuración IA</TabsTrigger>
+              )}
             </TabsList>
             
             {activeTab === "actividad" && (
@@ -236,9 +242,11 @@ export default function TrackingPerformancePage() {
           )}
         </TabsContent>
 
-        <TabsContent value="configuracion" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <PerformanceScaleEditor initialConfig={agencyConfig} />
-        </TabsContent>
+        {isDirector && (
+          <TabsContent value="configuracion" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <PerformanceScaleEditor initialConfig={agencyConfig} />
+          </TabsContent>
+        )}
       </Tabs>
 
       <PerformanceLogDrawer 

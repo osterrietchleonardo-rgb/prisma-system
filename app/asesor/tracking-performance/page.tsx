@@ -3,5 +3,5 @@
 import TrackingPerformancePage from "@/app/director/tracking-performance/page";
 
 export default function AsesorTrackingPerformancePage() {
-  return <TrackingPerformancePage />;
+  return <TrackingPerformancePage isDirector={false} />;
 }
