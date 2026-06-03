@@ -33,33 +33,76 @@ export async function POST(req: Request) {
       .from('consultor_chat_messages')
       .insert({ session_id: currentSessionId, role: 'user', content: message });
 
-    // 4. Intent Analysis: Is it property search or general chat?
+    // 4. Intent Analysis + Keyword Extraction
+    // Argentine real-estate slang mapper — always resolved BEFORE searching
+    const SLANG_MAP: Record<string, string[]> = {
+      piso:         ["departamento", "apartment"],
+      depto:        ["departamento"],
+      duplex:       ["duplex", "departamento"],
+      ph:           ["PH", "planta baja"],
+      monoambiente: ["monoambiente", "departamento"],
+      local:        ["local comercial", "comercial"],
+      galpon:       ["galpón", "industrial"],
+      terreno:      ["terreno", "lote"],
+      lote:         ["terreno", "lote"],
+      casa:         ["casa", "chalet"],
+      chalet:       ["casa", "chalet"],
+      oficina:      ["oficina"],
+    };
+
     const intentCheck = await openaiIA.generateContent({
       contents: [{ 
         role: "user", 
-        parts: [{ text: `Analiza el mensaje del usuario. Determina si requiere buscar propiedades en la base de datos ('RETRIEVAL') o es una charla general ('GENERAL').
-        Si es RETRIEVAL, extrae las palabras clave de búsqueda (ej: barrios, ciudades, "departamento", "piso", "casa", "alquiler", "venta").
-        Responde ÚNICAMENTE con un JSON con este formato exacto: {"intent": "RETRIEVAL" | "GENERAL", "keywords": ["palabra1", "palabra2"]}
+        parts: [{ text: `Eres un analizador de búsquedas inmobiliarias para Argentina.
+        Analiza el mensaje y responde ÚNICAMENTE con un JSON con este formato:
+        {
+          "intent": "RETRIEVAL" | "GENERAL",
+          "location_keywords": ["barrio1", "ciudad2"],
+          "type_keywords": ["tipo de propiedad si se menciona"],
+          "price_max": número o null,
+          "price_min": número o null,
+          "bedrooms": número o null
+        }
+        IMPORTANTE: "piso", "depto", "propiedad" son jergas genéricas, NO las pongas en type_keywords a menos que sea muy específico.
+        Si el usuario dice "piso en Belgrano" → location_keywords: ["Belgrano"], type_keywords: ["departamento"].
+        Si dice "departamentos en Palermo" → location_keywords: ["Palermo"], type_keywords: ["departamento"].
+        Si dice "algo en zona norte" → location_keywords: ["zona norte"], type_keywords: [].
         Mensaje: "${message}"` }]
       }]
     });
     
     const intentResText = intentCheck.response.text().replace(/```json|```/g, "").trim();
     let isRetrieval = false;
-    let searchKeywords: string[] = [];
+    let locationKeywords: string[] = [];
+    let typeKeywords: string[] = [];
+    let priceMax: number | null = null;
+    let priceMin: number | null = null;
+    let bedroomsFilter: number | null = null;
+
     try {
         const parsed = JSON.parse(intentResText);
         isRetrieval = parsed.intent === 'RETRIEVAL';
-        searchKeywords = parsed.keywords || [];
+        locationKeywords = (parsed.location_keywords || []).filter((k: string) => k.length > 2);
+        // Expand slang type keywords to real values
+        const rawTypes: string[] = parsed.type_keywords || [];
+        typeKeywords = rawTypes.flatMap((t: string) => {
+          const lower = t.toLowerCase().trim();
+          return SLANG_MAP[lower] || [t];
+        });
+        priceMax = parsed.price_max || null;
+        priceMin = parsed.price_min || null;
+        bedroomsFilter = parsed.bedrooms || null;
     } catch(e) {
         isRetrieval = intentResText.toUpperCase().includes("RETRIEVAL");
     }
 
-    let newMatchedProperties = [];
+    console.log("Search params:", { isRetrieval, locationKeywords, typeKeywords, priceMax, priceMin, bedroomsFilter });
+
+    let newMatchedProperties: any[] = [];
     let propertyContext = "";
 
     if (isRetrieval) {
-      console.log("Generating embedding for search...");
+      // --- Vector Search (Semantic) ---
       const queryEmbedding = await generateEmbedding(message);
       
       const { data: sessionData } = await supabase
@@ -69,89 +112,111 @@ export async function POST(req: Request) {
         .single();
       const seenIds = (sessionData?.metadata as any)?.seen_property_ids || [];
 
-      console.log("Querying Supabase match_properties RPC (Vector Search)...");
-      const { data: matchedProperties, error: rpcError } = await supabase.rpc('match_properties', {
+      const { data: vectorProps } = await supabase.rpc('match_properties', {
         query_embedding: queryEmbedding,
-        match_threshold: 0.15, // Bajamos el threshold para traer más
-        match_count: 20, // Subimos el límite
+        match_threshold: 0.12,
+        match_count: 30,
         p_agency_id: agencyId
       });
 
-      if (rpcError) {
-        console.error("RPC Error:", rpcError);
+      // --- Full Text Search on location (most reliable for barrio/ciudad) ---
+      // Fetch full fields needed by the property card UI
+      const FULL_SELECT = 'id, title, address, property_type, price, currency, bedrooms, bathrooms, total_area, status, images, description';
+      let textProps: any[] = [];
+      if (locationKeywords.length > 0) {
+        // Build OR conditions only for address/title/neighborhood using LOCATION keywords
+        const locConditions = locationKeywords
+          .map(k => `address.ilike.%${k}%,title.ilike.%${k}%`)
+          .join(',');
+        let locQuery = supabase.from('properties')
+          .select(FULL_SELECT)
+          .eq('agency_id', agencyId)
+          .or(locConditions);
+        if (priceMax) locQuery = locQuery.lte('price', priceMax);
+        if (priceMin) locQuery = locQuery.gte('price', priceMin);
+        if (bedroomsFilter) locQuery = locQuery.gte('bedrooms', bedroomsFilter);
+        const { data: lp } = await locQuery.limit(20);
+        if (lp) textProps = lp;
       }
 
-      console.log("Querying Supabase Full Text Search (Fallback)...");
-      let textMatchedProperties: any[] = [];
-      const validKeywords = searchKeywords.filter(k => k.length > 2);
-      if (validKeywords.length > 0) {
-        let query = supabase.from('properties')
-          .select('id, title, address, property_type, price, currency, bedrooms')
-          .eq('agency_id', agencyId);
-        
-        const orConditions = validKeywords.map(k => `address.ilike.%${k}%,title.ilike.%${k}%,property_type.ilike.%${k}%`).join(',');
-        const { data: keywordProps } = await query.or(orConditions).limit(20);
-        if (keywordProps) textMatchedProperties = keywordProps;
+      // If we have type keywords too, do an additional cross-filter on type inside the location results
+      if (typeKeywords.length > 0 && textProps.length > 0) {
+        const typeFiltered = textProps.filter((p: any) =>
+          typeKeywords.some(t => p.property_type?.toLowerCase().includes(t.toLowerCase()) || p.title?.toLowerCase().includes(t.toLowerCase()))
+        );
+        // Only restrict to type filter if results still exist; otherwise keep all location results
+        if (typeFiltered.length > 0) textProps = typeFiltered;
       }
 
-      // Merge and deduplicate
-      const allPropsMap = new Map();
-      (matchedProperties || []).forEach((p: any) => allPropsMap.set(p.id, p));
-      textMatchedProperties.forEach((p: any) => {
-        if (!allPropsMap.has(p.id)) {
-            // Assign a fake similarity score so text matches don't get buried
-            allPropsMap.set(p.id, { ...p, similarity: 0.5 });
+      // --- Merge & Deduplicate ---
+      const allPropsMap = new Map<string, any>();
+      // Enrich vector results with missing full fields by fetching them
+      const vectorIds = (vectorProps || []).map((p: any) => p.id);
+      let enrichedVector: any[] = [];
+      if (vectorIds.length > 0) {
+        const { data: enriched } = await supabase
+          .from('properties')
+          .select(FULL_SELECT)
+          .in('id', vectorIds);
+        enrichedVector = enriched || [];
+      }
+      // Map vector similarity scores onto enriched data
+      const vectorSimilarityMap = new Map((vectorProps || []).map((p: any) => [p.id, p.similarity]));
+      enrichedVector.forEach((p: any) => allPropsMap.set(p.id, { ...p, similarity: vectorSimilarityMap.get(p.id) || 0.3 }));
+      textProps.forEach((p: any) => {
+        if (!allPropsMap.has(p.id)) allPropsMap.set(p.id, { ...p, similarity: 0.6 }); // Text match is very confident
+        else {
+          // Boost score for properties found in both searches
+          const existing = allPropsMap.get(p.id);
+          allPropsMap.set(p.id, { ...existing, similarity: Math.min(1, (existing.similarity || 0) + 0.3) });
         }
       });
-      
-      const allProperties = Array.from(allPropsMap.values());
-      const filteredProperties = allProperties.filter((p: any) => !seenIds.includes(p.id));
-      
-      // Re-rank based on explicit keyword hits
-      const rerankedProperties = filteredProperties.sort((a: any, b: any) => {
-        const aScore = validKeywords.filter((t: string) => a.address?.toLowerCase().includes(t.toLowerCase()) || a.title?.toLowerCase().includes(t.toLowerCase()) || a.property_type?.toLowerCase().includes(t.toLowerCase())).length;
-        const bScore = validKeywords.filter((t: string) => b.address?.toLowerCase().includes(t.toLowerCase()) || b.title?.toLowerCase().includes(t.toLowerCase()) || b.property_type?.toLowerCase().includes(t.toLowerCase())).length;
-        if (aScore !== bScore) return bScore - aScore;
+
+      const allProperties = Array.from(allPropsMap.values()).filter((p: any) => !seenIds.includes(p.id));
+
+      // --- Re-rank: Location hits first, then by similarity ---
+      const reranked = allProperties.sort((a: any, b: any) => {
+        const aLocScore = locationKeywords.filter(k =>
+          a.address?.toLowerCase().includes(k.toLowerCase()) || a.title?.toLowerCase().includes(k.toLowerCase())
+        ).length;
+        const bLocScore = locationKeywords.filter(k =>
+          b.address?.toLowerCase().includes(k.toLowerCase()) || b.title?.toLowerCase().includes(k.toLowerCase())
+        ).length;
+        if (aLocScore !== bLocScore) return bLocScore - aLocScore;
         return (b.similarity || 0) - (a.similarity || 0);
       });
-      
-      newMatchedProperties = rerankedProperties.slice(0, 10); // Return up to 10 as requested
-      
-      // Update metadata
+
+      newMatchedProperties = reranked.slice(0, 10);
+
+      // Update session seen IDs
       const updatedSeenIds = Array.from(new Set([...seenIds, ...newMatchedProperties.map((p: any) => p.id)]));
-      await supabase
-        .from('consultor_chat_sessions')
-        .update({ 
-          metadata: { seen_property_ids: updatedSeenIds },
-          updated_at: new Date().toISOString()
-        })
+      await supabase.from('consultor_chat_sessions')
+        .update({ metadata: { seen_property_ids: updatedSeenIds }, updated_at: new Date().toISOString() })
         .eq('id', currentSessionId);
 
       propertyContext = newMatchedProperties.length > 0
-        ? newMatchedProperties.map((p: any) => {
-            const agentName = p.assigned_agent?.name || "Sin asignar";
-            return `- ID: ${p.id}, Titulo: ${p.title}, Tipo: ${p.property_type}, Precio: ${p.currency} ${p.price}, Direccion: ${p.address}, Dormitorios: ${p.bedrooms}, Agente: ${agentName}`;
-          }).join('\n')
-        : "No se encontraron nuevas propiedades coincidiendo exactamente. Informa esto amablemente y sugiere alternativas.";
+        ? `Se encontraron ${newMatchedProperties.length} propiedades. Las tarjetas se mostrarán automáticamente en la UI. Haz un resumen conversacional breve indicando cuántas encontraste y en qué zonas, sin listarlas en texto ya que el usuario las verá en las tarjetas de abajo.`
+        : "No se encontraron propiedades con esos criterios. Informa cordialmente y sugiere ampliar la búsqueda (zona más amplia, otro tipo de propiedad, rango de precio).";
     }
 
-    // 5. Generate Assistant Response with Context & History
-    const systemPrompt = `Eres el "Consultor IA" de la inmobiliaria PRISMA. Tu misión es ser el asistente ejecutivo corporativo para encontrar propiedades en la cartera de la agencia.
-    
+    // 5. Generate Assistant Response
+    const systemPrompt = `Eres el "Consultor IA" de la inmobiliaria PRISMA. Sos el asistente experto para buscar propiedades en la cartera de la agencia.
+
+    IMPORTANTE: Cuando el sistema te informe que se encontraron propiedades, las tarjetas visuales con fotos, precio y detalles se muestran automáticamente en la interfaz. 
+    Por eso:
+    - NO listes las propiedades en texto (no pongas "- Dirección: X", "- Precio: Y", etc.).
+    - SÍ hacé un resumen conversacional breve: cuántas encontraste, en qué zona, y si el usuario quiere filtrar más.
+    - Si el usuario pide más detalles de una propiedad específica, ahí sí podés describirla.
+
     PERSONALIDAD Y TONO:
-    - Eres un consultor inmobiliario experto, formal y altamente profesional. Utilizas español de Argentina con respeto y seriedad (voseo formal).
-    - Evita por completo coloquialismos ("che", "dale", "mirá", "onda"). Mantén una postura corporativa.
-    - Tienes iniciativa ejecutiva. Si el usuario realiza una solicitud vaga, solicita con cortesía los detalles técnicos necesarios (zona, presupuesto, tipo de propiedad).
-    - Utiliza introducciones formales como "He revisado la cartera de propiedades y he encontrado las siguientes opciones:" o "Para poder brindarte una mejor recomendación, por favor detalla...".
+    - Profesional y cordial. Voseo formal ("tenés", "podés", "mirá"), sin coloquialismos excesivos.
+    - Siempre mostrarte dispuesto a refinar la búsqueda: por precio, ambientes, amenities, etc.
+    - Si no se encontró nada, explicá por qué puede ser y sugerí alternativas concretas.
 
-    INSTRUCCIONES DE USO:
-    - Solo si el sistema te proporciona "PROPIEDADES ENCONTRADAS", utilízalas para tus recomendaciones.
-    - Si no hay propiedades que coincidan en el contexto, informa cordialmente que actualmente no hay disponibilidad exacta y sugiere alternativas o ampliar los parámetros de búsqueda.
-    - Mantén respuestas estructuradas, precisas y enfocadas en los negocios.
+    CONTEXTO DE BÚSQUEDA ACTUAL:
+    ${isRetrieval ? propertyContext : 'El usuario no está buscando propiedades en este mensaje.'}
 
-    ${isRetrieval ? `PROPIEDADES ENCONTRADAS:\n${propertyContext}` : 'Charla General: No se requiere búsqueda en este turno.'}
-    
-    Responde SIEMPRE con un nivel ejecutivo en español de Argentina.`;
+    Responde SIEMPRE en español de Argentina.`;
 
 
     const chatResult = await openaiIA.generateContent({
