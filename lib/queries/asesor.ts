@@ -83,6 +83,7 @@ export async function getAsesorProperties(agentId: string) {
     .from("properties")
     .select("*")
     .eq("assigned_agent_id", agentId)
+    .eq("is_active", true)
     .order("created_at", { ascending: false })
 
   if (error) throw error

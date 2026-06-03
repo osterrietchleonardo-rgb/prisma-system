@@ -97,6 +97,7 @@ export default function PropiedadesPage() {
       let query = supabase
         .from("properties")
         .select(`*`, { count: 'exact' })
+        .eq("is_active", true)
 
       if (search) {
         query = query.or(`title.ilike.%${search}%,address.ilike.%${search}%`)

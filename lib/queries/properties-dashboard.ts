@@ -7,6 +7,7 @@ export async function getPropertiesDashboardData(agencyId: string) {
     .from("properties")
     .select("*")
     .eq("agency_id", agencyId)
+    .eq("is_active", true)
 
   if (!properties || properties.length === 0) {
     return null

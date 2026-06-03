@@ -50,7 +50,8 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
   const { data: properties } = await supabase
     .from("properties")
     .select("assigned_agent, price, created_at, status")
-    .eq("agency_id", agencyId);
+    .eq("agency_id", agencyId)
+    .eq("is_active", true);
 
   // Group metrics by category
   const metrics: any = {

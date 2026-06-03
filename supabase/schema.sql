@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS public.properties (
     covered_area decimal,
     images jsonb DEFAULT '[]',
     tokko_data jsonb DEFAULT '{}',
+    is_active boolean DEFAULT true,
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now()
 );

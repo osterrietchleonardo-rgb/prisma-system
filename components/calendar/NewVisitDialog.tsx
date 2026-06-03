@@ -95,6 +95,7 @@ export function NewVisitDialog({
           .from("properties")
           .select("id, title, address, assigned_agent, city")
           .eq("agency_id", agencyId)
+          .eq("is_active", true)
           .order("title")
         
         if (propsData) setProperties(propsData)

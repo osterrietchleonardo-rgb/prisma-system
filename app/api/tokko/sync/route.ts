@@ -130,6 +130,7 @@ export async function POST() {
         covered_area: p.surface || 0,
         images: p.photos?.map((f: { image: string }) => f.image) || [],
         tokko_data: p,
+        is_active: true,
         updated_at: new Date().toISOString()
       }
     })
@@ -140,6 +141,32 @@ export async function POST() {
         .upsert(propertiesToUpsert, { onConflict: "tokko_id" })
 
       if (upsertError) throw upsertError
+    }
+
+    // 5.2 Desactivar propiedades que ya no están en Tokko
+    const currentTokkoIds = propertiesToUpsert.map(p => p.tokko_id)
+    if (currentTokkoIds.length > 0) {
+      const { data: existingProps } = await adminClient
+        .from("properties")
+        .select("id, tokko_id")
+        .eq("agency_id", profile.agency_id)
+        .eq("is_active", true)
+
+      const idsToDeactivate = existingProps
+        ?.filter(p => p.tokko_id && !currentTokkoIds.includes(p.tokko_id))
+        .map(p => p.id) || []
+
+      if (idsToDeactivate.length > 0) {
+        // Actualizar en lotes por seguridad
+        const chunkSize = 100;
+        for (let i = 0; i < idsToDeactivate.length; i += chunkSize) {
+          const chunk = idsToDeactivate.slice(i, i + chunkSize);
+          await adminClient
+            .from("properties")
+            .update({ is_active: false, updated_at: new Date().toISOString() })
+            .in("id", chunk)
+        }
+      }
     }
 
     // 5.5 Mapear y Upsert Agents
