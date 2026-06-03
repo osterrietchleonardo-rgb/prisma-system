@@ -16,6 +16,7 @@ interface Property {
   id: string
   title: string
   address: string
+  city?: string
   price: number
   currency: string
   property_type: string
@@ -23,8 +24,14 @@ interface Property {
   bedrooms: number
   bathrooms: number
   total_area: number
+  covered_area?: number
   images: string[]
+  description?: string
   similarity: number
+  amenity_matches?: {
+    matched: string[]
+    missing: string[]
+  }
 }
 
 interface Message {
@@ -485,7 +492,23 @@ export default function ConsultorIAPage() {
                                 <div className="flex items-center gap-1"><Bath className="w-3 h-3 text-accent" /> {prop.bathrooms} Baños</div>
                                 <div className="flex items-center gap-1"><Maximize className="w-3 h-3 text-accent" /> {prop.total_area}m²</div>
                               </CardContent>
-                              
+
+                              {/* Amenity match badges (only shown when user filtered by amenities) */}
+                              {prop.amenity_matches && (prop.amenity_matches.matched.length > 0 || prop.amenity_matches.missing.length > 0) && (
+                                <div className="px-4 pb-2 flex flex-wrap gap-1.5">
+                                  {prop.amenity_matches.matched.map((a: string) => (
+                                    <span key={a} className="inline-flex items-center gap-0.5 text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
+                                      ✓ {a}
+                                    </span>
+                                  ))}
+                                  {prop.amenity_matches.missing.map((a: string) => (
+                                    <span key={a} className="inline-flex items-center gap-0.5 text-[10px] bg-orange-500/10 text-orange-500 dark:text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded-full font-semibold">
+                                      ✗ {a}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
                               <CardFooter className="p-3 bg-muted/5 transition-colors group-hover:bg-accent/5">
                                 <Button variant="ghost" className="w-full text-xs gap-2 h-8 group-hover:text-accent" asChild>
                                   <a href={`/director/propiedades/${prop.id}`} target="_blank">
