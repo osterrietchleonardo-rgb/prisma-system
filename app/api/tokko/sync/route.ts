@@ -99,11 +99,9 @@ export async function POST() {
       const rawStatus = p.operations?.[0]?.operation_type || "Venta"
       const producerEmail = p.producer?.email?.toLowerCase()
       
-      const matchedProfile = agencyProfiles?.find(ap => {
-        const emailMatches = ap.email?.toLowerCase() === producerEmail
-        const nameMatches = ap.full_name && p.producer?.name && ap.full_name.toLowerCase().trim() === p.producer.name.toLowerCase().trim()
-        return emailMatches || nameMatches
-      })
+      const matchedProfile = agencyProfiles?.find(ap => 
+        ap.email?.toLowerCase() === producerEmail
+      )
 
       // Buscar el primer precio que sea mayor a 0
       const activeOperation = p.operations?.[0];
