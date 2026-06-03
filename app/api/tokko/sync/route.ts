@@ -110,6 +110,7 @@ export async function POST() {
       return {
         tokko_id: p.id.toString(),
         agency_id: profile.agency_id,
+        assigned_agent_id: matchedProfile?.id || null,
         assigned_agent: {
           name: p.producer?.name || "Sin asignar",
           email: p.producer?.email || "",
