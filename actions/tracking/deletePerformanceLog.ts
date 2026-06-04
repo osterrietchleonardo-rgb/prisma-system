@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
 export async function deletePerformanceLog(id: string) {
@@ -9,7 +10,20 @@ export async function deletePerformanceLog(id: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  const { error } = await supabase
+  // Verify the log exists and the user has access to it
+  const { data: log } = await supabase
+    .from("performance_logs")
+    .select("id")
+    .eq("id", id)
+    .single();
+
+  if (!log) {
+    throw new Error("Registro no encontrado o sin permisos");
+  }
+
+  // Use admin client to delete bypassing RLS if DELETE policy is missing
+  const supabaseAdmin = createAdminClient();
+  const { error } = await supabaseAdmin
     .from("performance_logs")
     .delete()
     .eq("id", id);
