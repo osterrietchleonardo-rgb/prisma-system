@@ -44,9 +44,10 @@ interface Props {
   onRefresh: () => void;
   onEdit?: (log: PerformanceLog) => void;
   onDelete?: (log: PerformanceLog) => void;
+  isDirector?: boolean;
 }
 
-export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete }: Props) {
+export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete, isDirector = false }: Props) {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
   const getTypeBadge = (type: string) => {
@@ -91,18 +92,20 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete }: Pr
         <TableHeader className="bg-muted/30">
           <TableRow>
             <TableHead className="w-10"></TableHead>
+            {isDirector && <TableHead>Asesor</TableHead>}
             <TableHead>Fecha</TableHead>
             <TableHead>Actividad</TableHead>
             <TableHead>Referencia</TableHead>
             <TableHead className="text-right">Monto / Valor</TableHead>
             <TableHead className="text-center">Métrica Clave</TableHead>
+            {isDirector && <TableHead className="text-center">Estado</TableHead>}
             <TableHead className="text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {logs.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
+              <TableCell colSpan={isDirector ? 9 : 7} className="h-48 text-center text-muted-foreground">
                 <div className="flex flex-col items-center gap-2">
                   <Activity className="w-8 h-8 opacity-20" />
                   <p>No hay registros de actividad aún.</p>
@@ -119,6 +122,14 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete }: Pr
                   <TableCell>
                     {expandedRow === log.id ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
                   </TableCell>
+                  {isDirector && (
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold truncate max-w-[150px]">{log.profiles?.full_name || "-"}</span>
+                        <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">{log.profiles?.email || ""}</span>
+                      </div>
+                    </TableCell>
+                  )}
                   <TableCell className="text-xs font-medium">
                     {format(new Date(log.fecha_actividad), "dd MMM yyyy", { locale: es })}
                   </TableCell>
@@ -149,6 +160,16 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete }: Pr
                       <span className="text-[10px] uppercase font-bold text-blue-500">{log.metadata?.origen}</span>
                     )}
                   </TableCell>
+                  {isDirector && (
+                    <TableCell className="text-center">
+                      <Badge 
+                        variant={log.status === 'eliminada' ? 'destructive' : log.status === 'modificada' ? 'default' : 'outline'}
+                        className="uppercase text-[10px] tracking-wider"
+                      >
+                        {log.status || 'original'}
+                      </Badge>
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
@@ -245,6 +266,15 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete }: Pr
                            </div>
                         </div>
                       </div>
+                      
+                      {log.status_reason && log.status !== 'original' && (
+                        <div className="mt-4 p-4 bg-muted/30 border rounded-lg">
+                          <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 flex items-center gap-2">
+                            <Activity className="w-3 h-3" /> Motivo ({log.status})
+                          </h4>
+                          <p className="text-sm text-foreground/80">{log.status_reason}</p>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 )}

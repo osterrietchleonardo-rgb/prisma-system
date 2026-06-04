@@ -67,24 +67,19 @@ export async function fetchBarrios(): Promise<BarriosResult> {
     const getStat = (id: string) => statsData.find(s => s.id === id)
     const promCaba = getStat('promedio_caba_cierre')
 
-    // Historical data for the chart (matching label/promedio_caba_usd names)
-    const historical: HistoricalMonthData[] = [
-      { label: 'Oct 24', promedio_caba_usd: 2150 },
-      { label: 'Nov 24', promedio_caba_usd: 2180 },
-      { label: 'Dic 24', promedio_caba_usd: 2210 },
-      { label: 'Ene 25', promedio_caba_usd: 2250 },
-      { label: 'Feb 25', promedio_caba_usd: 2309 },
-      { label: 'Mar 26', promedio_caba_usd: 1719 } // Real current data
-    ]
+    // Serie histórica: no hay tabla real de histórico todavía (requiere
+    // `mercado_historico`). Sin datos inventados → vacío hasta tener fuente real.
+    const historical: HistoricalMonthData[] = []
 
     return {
       barrios,
       promedio_caba_usd: barrios.length > 0 ? Math.round(barrios.reduce((acc, b) => acc + b.precio_m2_usd, 0) / barrios.length) : null,
       promedio_cierre_usd: promCaba ? Number(promCaba.valor) : null,
-      escrituras_count: 69490, // Static for 2025 total as per latest report
-      escrituras_var: 26.79,
-      escrituras_year: '2025',
-      period: 'Q1 2026',
+      // escrituras_* las resuelve la page con fetchEscrituras() (dato real de DB).
+      escrituras_count: null,
+      escrituras_var: null,
+      escrituras_year: null,
+      period: null,
       historical,
     }
   } catch (error) {

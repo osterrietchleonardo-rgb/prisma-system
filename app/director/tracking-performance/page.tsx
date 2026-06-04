@@ -14,7 +14,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { PerformanceScaleEditor } from "@/components/tracking/PerformanceScaleEditor";
 import { PerformanceHistoryList } from "@/components/tracking/PerformanceHistoryList";
 import { PerformanceLogDrawer } from "@/components/tracking/PerformanceLogDrawer";
@@ -47,9 +49,11 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
   // Deletion states
   const [logToDelete, setLogToDelete] = useState<PerformanceLog | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
   
   // Filters
   const [filter, setFilter] = useState<"todos" | "prospeccion" | "prelisting" | "prebuying" | "captacion" | "reserva" | "cierre">("todos");
+  const [statusFilter, setStatusFilter] = useState<"todos" | "original" | "modificada" | "eliminada">("todos");
   const [search, setSearch] = useState("");
 
   const fetchLogs = useCallback(async () => {
@@ -66,11 +70,17 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
 
   const handleDeleteConfirm = async () => {
     if (!logToDelete) return;
+    if (!deleteReason || deleteReason.trim() === '') {
+        toast.error("Debes ingresar un motivo para eliminar este registro");
+        return;
+    }
+
     setIsDeleting(true);
     try {
-      await deletePerformanceLog(logToDelete.id);
+      await deletePerformanceLog(logToDelete.id, deleteReason);
       toast.success("Registro de actividad eliminado correctamente");
       setLogToDelete(null);
+      setDeleteReason("");
       fetchLogs();
     } catch (error: any) {
       console.error(error);
@@ -112,6 +122,7 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
 
   const filteredLogs = logs.filter(log => {
     const matchesFilter = filter === "todos" || log.type === filter;
+    const matchesStatus = statusFilter === "todos" || log.status === statusFilter || (statusFilter === "original" && !log.status);
     
     const matchesSearch = 
       !search || 
@@ -120,7 +131,7 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
         val?.toString().toLowerCase().includes(search.toLowerCase())
       );
 
-    return matchesFilter && matchesSearch;
+    return matchesFilter && matchesSearch && matchesStatus;
   });
 
   return (
@@ -208,6 +219,14 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
                       Cierre
                     </button>
                 </div>
+                {isDirector && (
+                  <div className="tracking-tabs-list flex bg-muted/30 p-1 rounded-xl border border-white/5 ml-2">
+                    <button onClick={() => setStatusFilter("todos")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'todos' ? 'bg-white/20 text-white shadow-sm' : 'text-muted-foreground hover:text-white'}`}>Todos</button>
+                    <button onClick={() => setStatusFilter("original")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'original' ? 'bg-white/20 text-white shadow-sm' : 'text-muted-foreground hover:text-white'}`}>Originales</button>
+                    <button onClick={() => setStatusFilter("modificada")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'modificada' ? 'bg-white/20 text-white shadow-sm' : 'text-muted-foreground hover:text-white'}`}>Modificadas</button>
+                    <button onClick={() => setStatusFilter("eliminada")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'eliminada' ? 'bg-white/20 text-white shadow-sm' : 'text-muted-foreground hover:text-white'}`}>Eliminadas</button>
+                  </div>
+                )}
               </div>
 
               <div className="relative w-full md:w-[320px]">
@@ -231,12 +250,14 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
             <PerformanceHistoryList 
               logs={filteredLogs} 
               onRefresh={fetchLogs} 
+              isDirector={isDirector}
               onEdit={(log) => {
                 setLogToEdit(log);
                 setIsDrawerOpen(true);
               }}
               onDelete={(log) => {
                 setLogToDelete(log);
+                setDeleteReason("");
               }}
             />
           )}
@@ -260,7 +281,12 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
       />
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={!!logToDelete} onOpenChange={(open) => !open && setLogToDelete(null)}>
+      <Dialog open={!!logToDelete} onOpenChange={(open) => {
+        if (!open) {
+          setLogToDelete(null);
+          setDeleteReason("");
+        }
+      }}>
         <DialogContent className="border-destructive/20 border-2 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-black text-destructive flex items-center gap-2">
@@ -293,6 +319,17 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
               </div>
             </div>
           )}
+          <div className="space-y-2 mt-4">
+            <Label htmlFor="delete-reason" className="text-destructive font-semibold">Motivo de la eliminación *</Label>
+            <Textarea 
+              id="delete-reason" 
+              value={deleteReason} 
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="Explica brevemente por qué estás eliminando este registro..." 
+              className="min-h-[80px]"
+              required
+            />
+          </div>
           <DialogFooter className="gap-2 pt-4">
             <Button variant="outline" onClick={() => setLogToDelete(null)} disabled={isDeleting}>Cancelar</Button>
             <Button onClick={handleDeleteConfirm} disabled={isDeleting} variant="destructive">

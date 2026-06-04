@@ -21,13 +21,20 @@ export interface ZonaResult {
 export async function GET() {
   try {
     const supabase = createClient()
-    
-    const { data, error } = await supabase
+
+    // Histórico: varias filas por zona. Nos quedamos con la más reciente de cada una.
+    const { data: raw, error } = await supabase
       .from('mercado_zonas')
       .select('*')
-      .order('id', { ascending: true })
+      .order('mes_reporte', { ascending: false })
 
     if (error) throw error
+
+    const latestPorZona = new Map<string, (typeof raw)[number]>()
+    for (const row of raw || []) {
+      if (!latestPorZona.has(row.zona)) latestPorZona.set(row.zona, row)
+    }
+    const data = Array.from(latestPorZona.values()).sort((a, b) => a.zona.localeCompare(b.zona))
 
     const results: ZonaResult[] = (data || []).map(z => ({
       zona: z.zona,

@@ -6,6 +6,7 @@ import { fetchDolares } from "@/lib/mercado/fetchDolares"
 import { fetchBarrios } from "@/lib/mercado/fetchBarrios"
 import { fetchICC } from "@/lib/mercado/fetchICC"
 import { fetchEscrituras } from "@/lib/mercado/fetchEscrituras"
+import { fetchLastUpdated } from "@/lib/mercado/fetchLastUpdated"
 import { ZonaResult } from "@/app/api/mercado/zonaprop/route"
 import { PulsoMercadoContent } from "@/components/mercado/PulsoMercadoContent"
 
@@ -17,12 +18,19 @@ export const metadata = {
 async function fetchZonaprop(): Promise<{ zonas: ZonaResult[]; error: boolean }> {
   try {
     const supabase = await createClient()
-    const { data: zonasData, error: zonasError } = await supabase
+    // Histórico: puede haber varias filas por zona. Tomamos la más reciente de cada una.
+    const { data: zonasRaw, error: zonasError } = await supabase
       .from('mercado_zonas')
       .select('*')
-      .order('zona', { ascending: true })
+      .order('mes_reporte', { ascending: false })
 
     if (zonasError) throw zonasError
+
+    const latestPorZona = new Map<string, (typeof zonasRaw)[number]>()
+    for (const row of zonasRaw || []) {
+      if (!latestPorZona.has(row.zona)) latestPorZona.set(row.zona, row)
+    }
+    const zonasData = Array.from(latestPorZona.values()).sort((a, b) => a.zona.localeCompare(b.zona))
 
     const zonas = (zonasData || []).map(z => ({
       zona: z.zona,
@@ -46,20 +54,22 @@ async function fetchZonaprop(): Promise<{ zonas: ZonaResult[]; error: boolean }>
 }
 
 export default async function AsesorMercadoPage() {
-  const [dolaresResult, barriosResult, iccResult, zonapropResult, escriturasResult] = await Promise.allSettled([
+  const [dolaresResult, barriosResult, iccResult, zonapropResult, escriturasResult, lastUpdatedResult] = await Promise.allSettled([
     fetchDolares(),
     fetchBarrios(),
     fetchICC(),
     fetchZonaprop(),
     fetchEscrituras(),
+    fetchLastUpdated(),
   ])
 
   const dolares = dolaresResult.status === "fulfilled" ? dolaresResult.value : { oficial: null, mep: null, blue: null, ccl: null, error: "Error al cargar" }
-  const barriosRaw = barriosResult.status === "fulfilled" ? barriosResult.value : { barrios: [], promedio_caba_usd: null, escrituras_count: null, period: null, historical: [], error: "Error al cargar" }
+  const barriosRaw = barriosResult.status === "fulfilled" ? barriosResult.value : { barrios: [], promedio_caba_usd: null, promedio_cierre_usd: null, escrituras_count: null, escrituras_var: null, escrituras_year: null, period: null, historical: [], error: "Error al cargar" }
   const escrituras = escriturasResult.status === "fulfilled" ? escriturasResult.value : { cantidad_anual: null, year: null, var_anual_pct: null }
   const barrios = { ...barriosRaw, escrituras_count: escrituras.cantidad_anual, escrituras_year: escrituras.year, escrituras_var: escrituras.var_anual_pct }
   const icc = iccResult.status === "fulfilled" ? iccResult.value : { data: null, error: "Error al cargar" }
   const zonapropData = zonapropResult.status === "fulfilled" ? zonapropResult.value : { zonas: [], error: true }
+  const lastUpdated = lastUpdatedResult.status === "fulfilled" ? lastUpdatedResult.value : null
 
   return (
     <PulsoMercadoContent
@@ -68,7 +78,7 @@ export default async function AsesorMercadoPage() {
       icc={icc}
       zonas={zonapropData.zonas}
       zonapropError={zonapropData.error}
-      lastUpdated={new Date().toISOString()}
+      lastUpdated={lastUpdated}
     />
   )
 }

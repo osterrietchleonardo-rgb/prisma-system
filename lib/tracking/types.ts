@@ -55,6 +55,12 @@ export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
   wa_analysis?: any;
   ai_rating: number | null;
   ai_feedback: string | null;
+  status?: 'original' | 'modificada' | 'eliminada';
+  status_reason?: string | null;
+  profiles?: {
+    full_name: string;
+    email: string;
+  } | null;
 }
 
 export const performanceLogSchema = z.object({

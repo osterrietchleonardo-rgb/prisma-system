@@ -4,7 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
-export async function deletePerformanceLog(id: string) {
+export async function deletePerformanceLog(id: string, reason: string) {
+  if (!reason || reason.trim() === '') {
+    throw new Error("Se requiere un motivo para eliminar la actividad");
+  }
+
   const supabase = createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -21,11 +25,15 @@ export async function deletePerformanceLog(id: string) {
     throw new Error("Registro no encontrado o sin permisos");
   }
 
-  // Use admin client to delete bypassing RLS if DELETE policy is missing
+  // Use admin client to soft delete bypassing RLS if UPDATE policy is missing
   const supabaseAdmin = createAdminClient();
   const { error } = await supabaseAdmin
     .from("performance_logs")
-    .delete()
+    .update({ 
+      status: 'eliminada', 
+      status_reason: reason,
+      updated_at: new Date().toISOString()
+    })
     .eq("id", id);
 
   if (error) {

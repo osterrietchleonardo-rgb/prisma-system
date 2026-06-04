@@ -51,15 +51,15 @@ export function EvolutionChart({ historical }: EvolutionChartProps) {
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
-            Evolución Precio m² CABA — Histórico real
+            Evolución Precio m² CABA
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Promedio USD/m² departamentos por mes · Fuente: data.buenosaires.gob.ar
+            Promedio USD/m² departamentos por mes
           </p>
         </div>
         {hasData && (
           <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full shrink-0">
-            {historical.length} meses reales
+            {historical.length} meses
           </span>
         )}
       </div>
@@ -67,7 +67,7 @@ export function EvolutionChart({ historical }: EvolutionChartProps) {
       {!hasData ? (
         <div className="flex items-center gap-3 h-[200px] justify-center text-sm text-muted-foreground">
           <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          Sin suficientes datos históricos del CSV para graficar
+          Sin datos históricos disponibles
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={280}>
@@ -111,9 +111,11 @@ export function EvolutionChart({ historical }: EvolutionChartProps) {
         </ResponsiveContainer>
       )}
 
-      <p className="text-[10px] text-muted-foreground/50 mt-2 text-right">
-        Fuente: DGEyC-GCBA · data.buenosaires.gob.ar · CC-BY 2.5 AR
-      </p>
+      {hasData && (
+        <p className="text-[10px] text-muted-foreground/50 mt-2 text-right">
+          Serie histórica acumulada por sincronización
+        </p>
+      )}
     </div>
   )
 }

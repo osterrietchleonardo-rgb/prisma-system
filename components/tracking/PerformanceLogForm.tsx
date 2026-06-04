@@ -7,6 +7,7 @@ import { performanceLogSchema, PerformanceLogFormData, PerformanceLog } from "@/
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { savePerformanceLog } from "@/actions/tracking/savePerformanceLog";
@@ -21,6 +22,7 @@ interface Props {
 
 export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reason, setReason] = useState("");
 
   const form = useForm<PerformanceLogFormData>({
     resolver: zodResolver(performanceLogSchema) as any,
@@ -54,7 +56,12 @@ export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
     setIsSubmitting(true);
     try {
       if (logToEdit) {
-        await updatePerformanceLog(logToEdit.id, values);
+        if (!reason || reason.trim() === '') {
+          toast.error("Debes ingresar un motivo para guardar la modificación.");
+          setIsSubmitting(false);
+          return;
+        }
+        await updatePerformanceLog(logToEdit.id, values, reason);
         toast.success("Registro actualizado correctamente");
       } else {
         await savePerformanceLog(values);
@@ -326,6 +333,29 @@ export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
             <Input id="fecha_actividad" type="date" {...register("fecha_actividad")} className="h-11" />
           </div>
         </div>
+        
+        {logToEdit && (
+          <>
+            <Separator />
+            <div className="space-y-4">
+              <header className="flex items-center gap-2 text-accent/70 font-semibold">
+                <Briefcase className="w-4 h-4" />
+                <h3 className="text-xs uppercase tracking-wider">Auditoría</h3>
+              </header>
+              <div className="space-y-2">
+                <Label htmlFor="reason" className="text-destructive font-semibold">Motivo de la modificación *</Label>
+                <Textarea 
+                  id="reason" 
+                  value={reason} 
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Explica brevemente por qué estás modificando este registro..." 
+                  className="min-h-[80px]"
+                  required
+                />
+              </div>
+            </div>
+          </>
+        )}
 
       </section>
 

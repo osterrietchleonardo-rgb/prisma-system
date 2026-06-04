@@ -1,17 +1,34 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 
-export async function updatePerformanceLog(id: string, payload: any) {
+export async function updatePerformanceLog(id: string, payload: any, reason: string) {
+  if (!reason || reason.trim() === '') {
+    throw new Error("Se requiere un motivo para modificar la actividad");
+  }
+
   const supabase = createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
+  // Verify the log exists and the user has access to it
+  const { data: existingLog } = await supabase
+    .from("performance_logs")
+    .select("id")
+    .eq("id", id)
+    .single();
+
+  if (!existingLog) {
+    throw new Error("Registro no encontrado o sin permisos");
+  }
+
   const { waMetrics, waAnalysis, ...baseData } = payload;
 
-  const { data: log, error } = await supabase
+  const supabaseAdmin = createAdminClient();
+  const { data: log, error } = await supabaseAdmin
     .from("performance_logs")
     .update({
       ...baseData,
@@ -19,6 +36,8 @@ export async function updatePerformanceLog(id: string, payload: any) {
       wa_analysis: waAnalysis || {},
       ai_rating: null,
       ai_feedback: null,
+      status: 'modificada',
+      status_reason: reason,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)

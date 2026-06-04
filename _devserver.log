@@ -1,0 +1,75 @@
+
+> prisma-ia@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+  - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 2.7s
+ ✓ Compiled /middleware in 327ms (129 modules)
+ ○ Compiling /director/tracking-performance ...
+ ✓ Compiled /director/tracking-performance in 6.9s (2619 modules)
+ ✓ Compiled in 704ms (1199 modules)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ POST /director/tracking-performance 200 in 8967ms
+ POST /director/tracking-performance 200 in 159ms
+ POST /director/tracking-performance 200 in 278ms
+ ○ Compiling /api/mercado/sync ...
+ ✓ Compiled /api/mercado/sync in 3.3s (1462 modules)
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+(node:35176) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ POST /director/tracking-performance 200 in 311ms
+ POST /director/tracking-performance 200 in 612ms
+ GET /api/mercado/sync 200 in 120005ms
+ POST /director/tracking-performance 200 in 233ms
+ ✓ Compiled in 627ms (2605 modules)
+ ✓ Compiled in 448ms (1199 modules)
+ POST /director/tracking-performance 200 in 1067ms
+ ✓ Compiled in 424ms (1199 modules)
+ POST /director/tracking-performance 200 in 659ms
+ POST /director/tracking-performance 200 in 743ms
+ ✓ Compiled /api/mercado/sync in 377ms (1462 modules)
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+ POST /director/tracking-performance 200 in 218ms
+ POST /director/tracking-performance 200 in 516ms
+ GET /api/mercado/sync 200 in 90000ms
+ POST /director/tracking-performance 200 in 485ms
+ POST /director/tracking-performance 200 in 476ms
+ POST /director/tracking-performance 200 in 596ms
+ POST /director/tracking-performance 200 in 455ms
+ POST /director/tracking-performance 200 in 294ms
+ POST /director/tracking-performance 200 in 351ms
+ ✓ Compiled in 969ms (2619 modules)
+ POST /director/tracking-performance 200 in 374ms
+ ✓ Compiled in 417ms (1199 modules)
+ ✓ Compiled in 430ms (1199 modules)
+ ✓ Compiled in 384ms (1199 modules)
+ POST /director/tracking-performance 200 in 858ms
+ ✓ Compiled /api/mercado/sync in 337ms (1462 modules)
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+ GET /api/mercado/sync 200 in 46503ms
+ POST /director/tracking-performance 200 in 317ms
+ ✓ Compiled in 930ms (2619 modules)
+ ✓ Compiled /api/mercado/sync in 212ms (1462 modules)
+ POST /director/tracking-performance 200 in 641ms
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+ GET /api/mercado/sync 200 in 43537ms
+ POST /director/tracking-performance 200 in 404ms
+ POST /director/tracking-performance 200 in 340ms
+ POST /director/tracking-performance 200 in 425ms
+ POST /director/tracking-performance 200 in 801ms
+ ✓ Compiled in 791ms (2619 modules)
+ POST /director/tracking-performance 200 in 695ms
+ ✓ Compiled in 372ms (1199 modules)
+ POST /director/tracking-performance 200 in 430ms
+ ✓ Compiled /api/mercado/sync in 486ms (1462 modules)
+Warning: TT: undefined function: 32
+Warning: TT: undefined function: 32
+ GET /api/mercado/sync 200 in 12896ms
