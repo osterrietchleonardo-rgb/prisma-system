@@ -14,7 +14,7 @@ export async function getPerformanceLogs(): Promise<PerformanceLog[]> {
 
   let query = supabase
     .from("performance_logs")
-    .select("*, profiles(full_name, email)")
+    .select("*, profiles(full_name, email), properties(id, title, address, tokko_id), leads(id, full_name), wa_contacts(id, name, phone)")
     .order("fecha_actividad", { ascending: false });
 
   if (profile?.role === "director") {

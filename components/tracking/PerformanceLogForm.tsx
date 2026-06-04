@@ -10,10 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { SearchableSelect, Option } from "@/components/ui/searchable-select";
 import { savePerformanceLog } from "@/actions/tracking/savePerformanceLog";
 import { updatePerformanceLog } from "@/actions/tracking/updatePerformanceLog";
+import { getTrackingOptions } from "@/actions/tracking/getTrackingOptions";
 import { toast } from "sonner";
-import { Loader2, Briefcase, TrendingUp, Sparkles, MapPin, DollarSign, Percent } from "lucide-react";
+import { Loader2, Briefcase, TrendingUp, Sparkles, MapPin, DollarSign, Percent, User } from "lucide-react";
 
 interface Props {
   onSuccess: () => void;
@@ -36,12 +38,37 @@ export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
     } : {
       type: "prospeccion",
       propiedad_ref: "",
+      property_id: null,
+      lead_id: null,
+      wa_contact_id: null,
       monto_operacion: 0,
       comision_generada: 0,
       fecha_actividad: new Date().toISOString().split("T")[0],
       metadata: {},
     },
   });
+
+  const [trackingOptions, setTrackingOptions] = useState<{
+    properties: any[];
+    leads: any[];
+    waContacts: any[];
+  }>({ properties: [], leads: [], waContacts: [] });
+
+  const [clientType, setClientType] = useState<"ninguno" | "tokko" | "whatsapp">("ninguno");
+
+  useEffect(() => {
+    getTrackingOptions().then(data => {
+      setTrackingOptions(data);
+    }).catch(err => console.error("Error fetching tracking options", err));
+  }, []);
+
+  // Set initial client type if editing
+  useEffect(() => {
+    if (logToEdit) {
+      if (logToEdit.lead_id) setClientType("tokko");
+      else if (logToEdit.wa_contact_id) setClientType("whatsapp");
+    }
+  }, [logToEdit]);
 
   const { watch, setValue, register, formState: { errors } } = form;
   const activityType = watch("type");
@@ -314,23 +341,102 @@ export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
           </div>
         )}
 
-        {/* Campos comunes (opcionales) */}
+        {/* Campos de Vinculación */}
         <Separator />
         <div className="space-y-4">
           <header className="flex items-center gap-2 text-accent/70 font-semibold">
              <MapPin className="w-4 h-4" />
-             <h3 className="text-xs uppercase tracking-wider">Referencia (Opcional)</h3>
+             <h3 className="text-xs uppercase tracking-wider">Activos Vinculados (Opcional)</h3>
           </header>
-          <div className="space-y-2">
-            <Label htmlFor="propiedad_ref">Referencia de Propiedad (Dirección o ID)</Label>
-            <div className="relative">
-              <Input id="propiedad_ref" placeholder="Ej: Av. Santa Fe 1234" {...register("propiedad_ref")} className="pl-10" />
-              <MapPin className="w-4 h-4 absolute left-3 top-3.5 opacity-40" />
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Propiedad (Desde Tokko)</Label>
+              <SearchableSelect 
+                options={trackingOptions.properties.map(p => ({
+                  label: p.title || p.address || 'Sin título',
+                  value: p.id,
+                  description: p.tokko_id ? `ID: ${p.tokko_id}` : undefined
+                }))}
+                value={watch("property_id") || undefined}
+                onChange={(val) => {
+                  setValue("property_id", val);
+                  // Opcional: autocompletar propiedad_ref si está vacío
+                  const prop = trackingOptions.properties.find(p => p.id === val);
+                  if (prop && !watch("propiedad_ref")) {
+                    setValue("propiedad_ref", prop.title || prop.address || prop.tokko_id);
+                  }
+                }}
+                placeholder="Buscar propiedad..."
+                emptyMessage="No se encontraron propiedades."
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="propiedad_ref">Referencia en Texto (Alternativo)</Label>
+              <div className="relative">
+                <Input id="propiedad_ref" placeholder="Ej: Av. Santa Fe 1234" {...register("propiedad_ref")} className="pl-10" />
+                <MapPin className="w-4 h-4 absolute left-3 top-3.5 opacity-40" />
+              </div>
             </div>
           </div>
-          <div className="space-y-2">
+
+          <div className="space-y-4 p-4 border border-white/5 rounded-2xl bg-white/5">
+            <div className="flex items-center gap-2 mb-2">
+              <User className="w-4 h-4 text-accent" />
+              <Label className="text-sm font-medium">Vincular Cliente</Label>
+            </div>
+            
+            <Select value={clientType} onValueChange={(v: any) => {
+              setClientType(v);
+              if (v !== "tokko") setValue("lead_id", null);
+              if (v !== "whatsapp") setValue("wa_contact_id", null);
+            }}>
+              <SelectTrigger className="w-full md:w-[200px] h-10">
+                <SelectValue placeholder="Tipo de cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ninguno">Ninguno</SelectItem>
+                <SelectItem value="tokko">Lead (Tokko / Web)</SelectItem>
+                <SelectItem value="whatsapp">Contacto WhatsApp</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {clientType === "tokko" && (
+              <div className="animate-in fade-in slide-in-from-top-2">
+                <SearchableSelect 
+                  options={trackingOptions.leads.map(l => ({
+                    label: l.full_name || 'Sin nombre',
+                    value: l.id
+                  }))}
+                  value={watch("lead_id") || undefined}
+                  onChange={(val) => setValue("lead_id", val)}
+                  placeholder="Buscar Lead de Tokko..."
+                  emptyMessage="No se encontraron leads."
+                />
+              </div>
+            )}
+
+            {clientType === "whatsapp" && (
+              <div className="animate-in fade-in slide-in-from-top-2">
+                <SearchableSelect 
+                  options={trackingOptions.waContacts.map(w => ({
+                    label: w.name || w.phone,
+                    value: w.id,
+                    description: w.phone
+                  }))}
+                  value={watch("wa_contact_id") || undefined}
+                  onChange={(val) => setValue("wa_contact_id", val)}
+                  placeholder="Buscar Contacto de WA..."
+                  emptyMessage="No se encontraron contactos."
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2 mt-4">
             <Label htmlFor="fecha_actividad">Fecha de Actividad</Label>
-            <Input id="fecha_actividad" type="date" {...register("fecha_actividad")} className="h-11" />
+            <Input id="fecha_actividad" type="date" {...register("fecha_actividad")} className="h-11 w-full md:w-1/2" />
           </div>
         </div>
         

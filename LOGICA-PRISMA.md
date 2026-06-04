@@ -1488,6 +1488,95 @@ n8n determina que un lead necesita seguimiento
 
 ---
 
+## 27. Arquitectura del Frontend y Lógica de Interfaz de Usuario (UI/UX)
+
+El frontend está construido con **Next.js 15 (App Router)**, **React 19**, y **Tailwind CSS**. La biblioteca principal de componentes UI es **shadcn/ui** (Radix UI), complementada con animaciones de `lucide-react` y estado gestionado mayormente por hooks de React estándar (`useState`, `useEffect`, `useCallback`) y `zustand` en componentes complejos como el Kanban.
+
+La aplicación se divide en dos grandes "layouts" protegidos por middleware: `/director` y `/asesor`.
+
+### 27.1 Módulo del Director (`app/director/`)
+
+El Director tiene acceso total a la configuración de la agencia (tenant), estadísticas globales, facturación y gestión de asesores. A continuación, el desglose funcional de cada página:
+
+#### 1. Dashboard (`/director/dashboard`)
+- **Objetivo:** Vista panorámica del rendimiento comercial.
+- **Componentes Clave:**
+  - `PerformanceMetricsGrid`: Tarjetas (KPIs) con leads, captaciones, reservas y cierres (total y variación porcentual).
+  - `PerformanceCharts`: Gráfico de evolución temporal (barras) y distribución por canal de origen (dona).
+  - `PerformanceLeaderboard`: Ranking de los asesores de la agencia.
+  - `DashboardActivity`: Feed en tiempo real de los últimos eventos (ej. nuevo lead, propiedad sincronizada, etc.).
+- **Datos:** Llama a `getDashboardData(agency_id)` sin filtrar por asesor.
+
+#### 2. Pipeline / CRM (`/director/pipeline`)
+- **Objetivo:** Gestión visual (Kanban) de los leads y oportunidades.
+- **Lógica Interna:**
+  - Une dos fuentes de datos: `leads` (provenientes de Tokko) y `wa_conversations` (provenientes de WhatsApp).
+  - Mapea ambas fuentes a una interfaz común `Lead`.
+  - El componente `PipelineClient` maneja el *drag & drop* entre columnas (Nuevo, Contactado, Visita, Negociación, Reserva, etc.).
+
+#### 3. Propiedades (`/director/propiedades`)
+- **Objetivo:** Catálogo de la cartera inmobiliaria de la agencia.
+- **Lógica Interna:**
+  - `page.tsx`: Muestra la grilla o lista (`view_toggle`) de la tabla `properties`. Permite filtrar por texto y tipo (Casa, Depto, etc.).
+  - `[id]/page.tsx` (Detalle): Ficha hiper-detallada. Incluye carrusel de imágenes, ficha técnica (ambientes, m²), descripción, y datos comerciales (responsable interno asignado, creador original en Tokko, comentarios internos, precios). Cuenta con un botón oculto para desplegar el `JSON crudo` de Tokko para diagnóstico.
+
+#### 4. Leads y WhatsApp Leads (`/director/leads` y `/director/leads-whatsapp`)
+- **Objetivo:** Gestión de contactos individuales.
+- **Lógica Interna `leads/[id]`:** Ficha 360 del cliente.
+  - Muestra datos de contacto, propiedad consultada, etiquetas de Tokko y el ID de contacto Tokko.
+  - Integra el **Análisis de Chat de PRISMA IA** (si existe), mostrando la actitud del lead, intención de búsqueda y recomendación del próximo paso.
+  - Muestra el historial cronológico de actividades (`getLeadActivities`).
+- **Lógica Interna `leads-whatsapp/[id]`:** Renderiza la interfaz de chat en vivo `ActiveChat` utilizando WebSockets para mensajería bidireccional.
+
+#### 5. Configuración y Asesores (`/director/configuracion`, `/director/asesores`)
+- **Objetivo:** Setup inicial y gestión del equipo.
+- **Lógica Interna:**
+  - **Asesores:** Invitar nuevos asesores mediante links o códigos, asignarles límites, y pausar/activar sus cuentas.
+  - **Configuración:** Token de Tokko, Instancia de WhatsApp, Branding (logo y colores para Marketing IA), y facturación.
+
+#### 6. Herramientas IA (Marketing, Contratos, Tasaciones)
+- **Marketing IA (`/director/marketing-ia`):** Permite generar "Copy" creando perfiles IPC (Ideal Prospect Client), ya sea para "Vender" (buscando prop en la base) o "Captar". Permite generación simple o "En Lote" (Batch) para múltiples ángulos a la vez. También genera imágenes con Gemini Imagen 3 integrando el branding de la agencia.
+- **Tasaciones (`/director/tasaciones`):** Formulario de características de la propiedad que consulta a la IA para emitir un valor mínimo, máximo y sugerido, con análisis del mercado. Consume 1 crédito.
+- **Contratos (`/director/contratos-ia`):** Gestión de plantillas y conversión a contratos formales con firma digital incorporada. Consume 5 créditos por contrato.
+
+#### 7. Tracking Performance (`/director/tracking-performance`)
+- **Objetivo:** Registrar actividad comercial diaria (llamadas, prelistings, captaciones, etc.) para nutrir el Dashboard.
+- **Lógica Interna:** Utiliza tabs para ver historial y para editar la "Configuración IA" de las escalas de performance (qué puntaje da cada acción).
+
+#### 8. Asistentes Conversacionales (Tutor y Consultor IA)
+- **Tutor IA (`/director/tutor`):** Chat interactivo para hacer preguntas sobre manuales o documentos internos subidos a la base de conocimiento (RAG). Consume 1 crédito por mensaje. Usa el modelo configurado y retorna las "sources" (fuentes) utilizadas.
+- **Consultor IA (`/director/consultor`):** Buscador conversacional de propiedades. Un agente IA que entiende la consulta (ej. "Busco un 3 ambientes en zona norte por menos de 250k"), hace un Vector Search + Filter Search en la DB, y retorna tarjetas visuales (carrousel) de las propiedades que coinciden (incluyendo tags de *amenities* que coinciden o faltan). Consume 1 crédito.
+
+#### 9. Calendario y Pulso de Mercado (`/director/calendario`, `/director/mercado`)
+- **Calendario:** Visualiza `scheduled_visits`. Permite filtrar por asesor, cambiar vistas de mes/semana, y hacer click en una visita para ver un modal detallado (BANT score, objeciones, decisores, lead info).
+- **Mercado:** Tablero de comando del mercado real. Muestra cotizaciones (Dólar, ICC, Zonaprop), cantidad de escrituras (Colegio de Escribanos) y rentabilidad promedio. Datos extraídos de fuentes públicas (`/api/mercado/sync`).
+
+---
+
+### 27.2 Módulo del Asesor (`app/asesor/`)
+
+El módulo del asesor hereda y reutiliza gran parte de los componentes de UI del director, pero con una capa estricta de filtros aplicada a nivel base de datos (y reforzada en UI) para garantizar que el Asesor solo vea **su propia información** o información compartida públicamente por la agencia.
+
+#### 1. Dashboard Asesor (`/asesor/dashboard`)
+- **Diferencia con Director:** Llama a `getDashboardData(agency_id, user.id)`. Solo muestra los KPIs y gráficos de las propiedades, leads y actividades asignadas a este asesor en particular. Sin embargo, muestra el ranking global (`PerformanceLeaderboard`) para que el asesor conozca su posición en la agencia.
+
+#### 2. Pipeline Asesor (`/asesor/pipeline`)
+- Mismo Kanban visual (`PipelineClient`), pero la consulta SQL de carga inicial se restringe estrictamente a `assigned_agent_id = user.id`.
+
+#### 3. Propiedades Asesor (`/asesor/propiedades`)
+- Catálogo personal. Muestra solo las propiedades que el asesor está manejando (captaciones propias o asignadas por el director para la venta). Incluye botones de acción rápida para "Recomendar a Lead" o compartir ficha.
+
+#### 4. WhatsApp / Inbox Asesor (`/asesor/whatsapp`)
+- **Objetivo:** Bandeja de entrada de mensajes asignados.
+- **Lógica Interna:** 
+  - Renderiza `ChatInterface`. Si el director no configuró WhatsApp, muestra un *blank state* de "WhatsApp no configurado" (no le permite configurar la instancia a él).
+  - El inbox lista solo las conversaciones donde el asesor es el responsable. 
+
+#### 5. Restricciones en Herramientas IA
+Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idéntica manera visualmente, pero debitan créditos de la "bolsa general de la agencia" (Tenant). El asesor no puede recargar créditos, y si la agencia se queda sin saldo, la UI se bloquea para el asesor informando que debe contactar al director.
+
+---
+
 ## APÉNDICE: Mapa Completo de API Routes
 
 | Ruta | Método(s) | Auth | Descripción |

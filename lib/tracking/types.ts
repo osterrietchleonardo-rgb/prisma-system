@@ -45,6 +45,9 @@ export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
   
   type: ActivityType;
   propiedad_ref: string | null;
+  property_id?: string | null;
+  lead_id?: string | null;
+  wa_contact_id?: string | null;
   monto_operacion: number | null;
   comision_generada: number | null;
   fecha_actividad: string;
@@ -61,11 +64,29 @@ export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
     full_name: string;
     email: string;
   } | null;
+  properties?: {
+    id: string;
+    title: string;
+    address: string;
+    tokko_id: string;
+  } | null;
+  leads?: {
+    id: string;
+    full_name: string;
+  } | null;
+  wa_contacts?: {
+    id: string;
+    name: string;
+    phone: string;
+  } | null;
 }
 
 export const performanceLogSchema = z.object({
   type: z.enum(['prospeccion', 'prelisting', 'prebuying', 'captacion', 'reserva', 'cierre']),
   propiedad_ref: z.string().optional().nullable(),
+  property_id: z.string().uuid().optional().nullable(),
+  lead_id: z.string().uuid().optional().nullable(),
+  wa_contact_id: z.string().uuid().optional().nullable(),
   monto_operacion: z.number().optional().nullable(),
   comision_generada: z.number().optional().nullable(),
   fecha_actividad: z.string(),

@@ -95,7 +95,7 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete, isDi
             {isDirector && <TableHead>Asesor</TableHead>}
             <TableHead>Fecha</TableHead>
             <TableHead>Actividad</TableHead>
-            <TableHead>Referencia</TableHead>
+            <TableHead>Activos Vinculados</TableHead>
             <TableHead className="text-right">Monto / Valor</TableHead>
             <TableHead className="text-center">Métrica Clave</TableHead>
             {isDirector && <TableHead className="text-center">Estado</TableHead>}
@@ -135,9 +135,29 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete, isDi
                   </TableCell>
                   <TableCell>{getTypeBadge(log.type)}</TableCell>
                   <TableCell>
-                    <span className="text-sm font-medium text-foreground/70 truncate max-w-[200px]">
-                      {log.propiedad_ref || "-"}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      {log.properties ? (
+                        <span className="text-sm font-medium text-foreground/90 truncate max-w-[200px] flex items-center gap-1" title={log.properties.title || log.properties.address}>
+                          <Home className="w-3 h-3 text-accent" /> {log.properties.title || log.properties.address || "Propiedad vinculada"}
+                        </span>
+                      ) : log.propiedad_ref ? (
+                        <span className="text-sm font-medium text-foreground/70 truncate max-w-[200px]">
+                          {log.propiedad_ref}
+                        </span>
+                      ) : (
+                        <span className="text-sm font-medium text-muted-foreground">-</span>
+                      )}
+                      
+                      {log.leads ? (
+                        <span className="text-[10px] text-blue-400 font-semibold truncate max-w-[200px] flex items-center gap-1" title={log.leads.full_name}>
+                          👤 {log.leads.full_name}
+                        </span>
+                      ) : log.wa_contacts ? (
+                        <span className="text-[10px] text-emerald-500 font-semibold truncate max-w-[200px] flex items-center gap-1" title={log.wa_contacts.name || log.wa_contacts.phone}>
+                          💬 {log.wa_contacts.name || log.wa_contacts.phone}
+                        </span>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right font-mono text-xs font-semibold">
                     {log.monto_operacion ? `USD ${log.monto_operacion.toLocaleString()}` : "-"}
