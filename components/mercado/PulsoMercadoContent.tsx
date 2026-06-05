@@ -89,27 +89,7 @@ export function PulsoMercadoContent({
         {/* ── Zonaprop Section ── */}
         <ZonapropSection zonas={zonas} hasError={zonapropError} />
 
-        {/* ── Footer Disclaimer ── */}
-        <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 px-5 py-4">
-          <p className="text-xs text-blue-300/80 leading-relaxed">
-            💡 <strong>Nota sobre Precios:</strong> El tablero integra precios de <strong>Oferta</strong> (Mudafy) y, cuando hay reporte disponible, precios <strong>Reales de Cierre</strong> (RE/MAX-UCEMA). Cada indicador muestra su fecha real de actualización; las fuentes se sincronizan con el botón <strong>“Actualizar datos”</strong>.
-          </p>
-        </div>
 
-        {/* ── Global Attributions ── */}
-        <div className="border-t pt-4 pb-2 space-y-1">
-          <p className="text-[10px] text-muted-foreground/40 leading-relaxed uppercase tracking-widest font-medium mb-2">
-            Fuentes de Datos
-          </p>
-          <p className="text-[10px] text-muted-foreground/40 leading-relaxed">
-            • Tipo de cambio: dolarapi.com (tiempo real)<br/>
-            • Precios de oferta por barrio: Mudafy<br/>
-            • Precios de cierre: RE/MAX · UCEMA · Reporte Inmobiliario<br/>
-            • Escrituras CABA: Colegio de Escribanos de la Ciudad de Buenos Aires<br/>
-            • ICC (costo construcción): IDECBA (GCBA) · base 2012=100<br/>
-            • Reportes regionales: Zonaprop Index
-          </p>
-        </div>
       </div>
     </div>
   )
