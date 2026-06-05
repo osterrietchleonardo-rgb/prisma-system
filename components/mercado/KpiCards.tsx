@@ -67,7 +67,7 @@ export function KpiCards({ dolares, barrios, icc }: KpiCardsProps) {
       title: "Escrituras CABA",
       value: barrios.escrituras_count ? `${barrios.escrituras_count.toLocaleString("es-AR")}` : "—",
       sub: barrios.escrituras_count
-        ? `Actos compraventa ${barrios.escrituras_year ?? ""}`
+        ? `Actos compraventa · ${barrios.escrituras_year ?? ""}${barrios.escrituras_ytd ? ` · Acum. año: ${barrios.escrituras_ytd.toLocaleString("es-AR")}` : ""}`
         : "Sin datos disponibles",
       badge: barrios.escrituras_var != null
         ? `${barrios.escrituras_var >= 0 ? "+" : ""}${barrios.escrituras_var}% i.a.`
@@ -77,7 +77,7 @@ export function KpiCards({ dolares, barrios, icc }: KpiCardsProps) {
       accent: "text-emerald-400",
       bg: "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20",
       hasError: barrios.escrituras_count === null,
-      errorSource: "estadisticaciudad.gob.ar",
+      errorSource: "colegio-escribanos.org.ar",
     },
   ]
 

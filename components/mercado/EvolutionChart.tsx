@@ -54,7 +54,7 @@ export function EvolutionChart({ historical }: EvolutionChartProps) {
             Evolución Precio m² CABA
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Promedio USD/m² departamentos por mes
+            Precio m² venta (USD) · CABA · Zonaprop Index
           </p>
         </div>
         {hasData && (

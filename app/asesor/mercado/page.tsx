@@ -64,9 +64,9 @@ export default async function AsesorMercadoPage() {
   ])
 
   const dolares = dolaresResult.status === "fulfilled" ? dolaresResult.value : { oficial: null, mep: null, blue: null, ccl: null, error: "Error al cargar" }
-  const barriosRaw = barriosResult.status === "fulfilled" ? barriosResult.value : { barrios: [], promedio_caba_usd: null, promedio_cierre_usd: null, escrituras_count: null, escrituras_var: null, escrituras_year: null, period: null, historical: [], error: "Error al cargar" }
-  const escrituras = escriturasResult.status === "fulfilled" ? escriturasResult.value : { cantidad_anual: null, year: null, var_anual_pct: null }
-  const barrios = { ...barriosRaw, escrituras_count: escrituras.cantidad_anual, escrituras_year: escrituras.year, escrituras_var: escrituras.var_anual_pct }
+  const barriosRaw = barriosResult.status === "fulfilled" ? barriosResult.value : { barrios: [], promedio_caba_usd: null, promedio_cierre_usd: null, escrituras_count: null, escrituras_var: null, escrituras_year: null, escrituras_ytd: null, period: null, historical: [], error: "Error al cargar" }
+  const escrituras = escriturasResult.status === "fulfilled" ? escriturasResult.value : { cantidad_mensual: null, label: null, var_anual_pct: null, ytd_count: null }
+  const barrios = { ...barriosRaw, escrituras_count: escrituras.cantidad_mensual, escrituras_year: escrituras.label, escrituras_var: escrituras.var_anual_pct, escrituras_ytd: escrituras.ytd_count }
   const icc = iccResult.status === "fulfilled" ? iccResult.value : { data: null, error: "Error al cargar" }
   const zonapropData = zonapropResult.status === "fulfilled" ? zonapropResult.value : { zonas: [], error: true }
   const lastUpdated = lastUpdatedResult.status === "fulfilled" ? lastUpdatedResult.value : null

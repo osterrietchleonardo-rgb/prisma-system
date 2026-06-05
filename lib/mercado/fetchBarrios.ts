@@ -20,9 +20,19 @@ export interface BarriosResult {
   escrituras_count: number | null
   escrituras_var: number | null
   escrituras_year: string | null
+  escrituras_ytd: number | null
   period: string | null
   historical?: HistoricalMonthData[]
   error?: string
+}
+
+const MESES_ABREV = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+/** '2026-01' → 'Ene 26'. */
+function labelMes(periodo: string): string {
+  const m = periodo.match(/(\d{4})-(\d{2})/)
+  if (!m) return periodo
+  return `${MESES_ABREV[Number(m[2]) - 1] ?? m[2]} ${m[1].slice(2)}`
 }
 
 /**
@@ -67,9 +77,18 @@ export async function fetchBarrios(): Promise<BarriosResult> {
     const getStat = (id: string) => statsData.find(s => s.id === id)
     const promCaba = getStat('promedio_caba_cierre')
 
-    // Serie histórica: no hay tabla real de histórico todavía (requiere
-    // `mercado_historico`). Sin datos inventados → vacío hasta tener fuente real.
-    const historical: HistoricalMonthData[] = []
+    // Serie histórica real: precio m² venta CABA por mes desde mercado_zonas
+    // (Zonaprop Index). Crece a medida que el sync ingesta nuevos meses.
+    const { data: serieCaba } = await supabase
+      .from('mercado_zonas')
+      .select('mes_reporte, precio_m2_venta_usd')
+      .eq('zona', 'CABA')
+      .not('mes_reporte', 'is', null)
+      .order('mes_reporte', { ascending: true })
+
+    const historical: HistoricalMonthData[] = (serieCaba ?? [])
+      .filter((r) => r.precio_m2_venta_usd != null)
+      .map((r) => ({ label: labelMes(r.mes_reporte), promedio_caba_usd: Number(r.precio_m2_venta_usd) }))
 
     return {
       barrios,
@@ -79,6 +98,7 @@ export async function fetchBarrios(): Promise<BarriosResult> {
       escrituras_count: null,
       escrituras_var: null,
       escrituras_year: null,
+      escrituras_ytd: null,
       period: null,
       historical,
     }
@@ -91,6 +111,7 @@ export async function fetchBarrios(): Promise<BarriosResult> {
       escrituras_count: null,
       escrituras_var: null,
       escrituras_year: null,
+      escrituras_ytd: null,
       period: null,
       error: 'Database error'
     }

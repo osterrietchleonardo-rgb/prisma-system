@@ -11,15 +11,14 @@ interface SourceStatus {
   status: "ok" | "fallback" | "error"
   periodo?: string
   message?: string
+  barrios_actualizados?: number
 }
 
-interface SyncResponse {
-  timestamp: string
-  results: {
-    icc: SourceStatus
-    zonaprop: Record<string, SourceStatus>
-    mudafy: SourceStatus & { barrios_actualizados?: number }
-  }
+interface AggregatedResults {
+  icc?: SourceStatus
+  zonaprop: Record<string, SourceStatus>
+  mudafy?: SourceStatus
+  escrituras?: SourceStatus
 }
 
 interface RefreshButtonProps {
@@ -39,22 +38,36 @@ function relativeTime(iso: string | null): string {
   return `hace ${d} d`
 }
 
-/** Construye un resumen legible del resultado del sync por fuente. */
-function summarize(r: SyncResponse["results"]): { text: string; allOk: boolean } {
+/** Llama a una fuente del sync. Devuelve su objeto `results` o null si falla. */
+async function syncSource(qs: string): Promise<Record<string, unknown> | null> {
+  try {
+    const r = await fetch(`/api/mercado/sync?${qs}`)
+    if (!r.ok) return null
+    const j = await r.json()
+    return j.results ?? null
+  } catch {
+    return null
+  }
+}
+
+function summarize(r: AggregatedResults): { text: string; allOk: boolean } {
   const zonas = Object.values(r.zonaprop)
   const zonasOk = zonas.filter((z) => z.status === "ok").length
   const parts: string[] = []
 
-  parts.push(`ICC ${r.icc.status === "ok" ? r.icc.periodo ?? "✓" : r.icc.status}`)
-  parts.push(`${zonasOk}/${zonas.length} zonas`)
+  parts.push(`ICC ${r.icc?.status === "ok" ? r.icc.periodo ?? "✓" : r.icc?.status ?? "—"}`)
+  parts.push(`${zonasOk}/${zonas.length || 4} zonas`)
   parts.push(
-    r.mudafy.status === "ok"
-      ? `${r.mudafy.barrios_actualizados ?? ""} barrios`.trim()
-      : `barrios: ${r.mudafy.status}`
+    r.mudafy?.status === "ok" ? `${r.mudafy.barrios_actualizados ?? ""} barrios`.trim() : `barrios: ${r.mudafy?.status ?? "—"}`
   )
+  parts.push(`Escrituras ${r.escrituras?.status === "ok" ? r.escrituras.periodo ?? "✓" : r.escrituras?.status ?? "—"}`)
 
   const allOk =
-    r.icc.status === "ok" && zonasOk === zonas.length && r.mudafy.status === "ok"
+    r.icc?.status === "ok" &&
+    zonas.length > 0 &&
+    zonasOk === zonas.length &&
+    r.mudafy?.status === "ok" &&
+    r.escrituras?.status === "ok"
   return { text: parts.join(" · "), allOk }
 }
 
@@ -65,7 +78,6 @@ export function RefreshButton({ lastUpdated }: RefreshButtonProps) {
   const [, forceTick] = useState(0)
   const router = useRouter()
 
-  // Refresca el "hace X min" cada 60s.
   useEffect(() => {
     const id = setInterval(() => forceTick((n) => n + 1), 60000)
     return () => clearInterval(id)
@@ -77,21 +89,49 @@ export function RefreshButton({ lastUpdated }: RefreshButtonProps) {
     setDetail("")
 
     try {
-      const syncRes = await fetch("/api/mercado/sync")
-      if (!syncRes.ok) throw new Error(`sync HTTP ${syncRes.status}`)
-      const data: SyncResponse = await syncRes.json()
+      // Cada fuente en paralelo → cada request del servidor queda < 10s (Hobby).
+      const [icc, mudafy, escrituras, caba, norte, oeste] = await Promise.all([
+        syncSource("source=icc"),
+        syncSource("source=mudafy"),
+        syncSource("source=escrituras"),
+        syncSource("source=zonaprop&zona=CABA"),
+        syncSource("source=zonaprop&zona=GBA_NORTE"),
+        syncSource("source=zonaprop&zona=GBA_OESTE"),
+      ])
 
-      // Revalidar caché de Next y refrescar la UI con lo recién grabado.
+      // GBA Sur necesita el período publicado (lo da CABA) para barrer un solo mes.
+      const cabaStatus = (caba?.zonaprop as Record<string, SourceStatus> | undefined)?.CABA
+      const periodo = cabaStatus?.periodo
+      const sur = await syncSource(`source=zonaprop&zona=GBA_SUR${periodo ? `&periodo=${encodeURIComponent(periodo)}` : ""}`)
+
+      // Si TODAS las fuentes fallaron a nivel red → error duro.
+      if (![icc, mudafy, escrituras, caba, norte, oeste, sur].some(Boolean)) {
+        throw new Error("sin respuesta del servidor")
+      }
+
+      const zonaprop: Record<string, SourceStatus> = {
+        ...((caba?.zonaprop as Record<string, SourceStatus>) ?? {}),
+        ...((norte?.zonaprop as Record<string, SourceStatus>) ?? {}),
+        ...((oeste?.zonaprop as Record<string, SourceStatus>) ?? {}),
+        ...((sur?.zonaprop as Record<string, SourceStatus>) ?? {}),
+      }
+      const results: AggregatedResults = {
+        icc: icc?.icc as SourceStatus | undefined,
+        zonaprop,
+        mudafy: mudafy?.mudafy as SourceStatus | undefined,
+        escrituras: escrituras?.escrituras as SourceStatus | undefined,
+      }
+
       await fetch("/api/mercado/refresh", { method: "POST" }).catch(() => {})
 
-      const { text, allOk } = summarize(data.results)
+      const { text, allOk } = summarize(results)
       setDetail(text)
-      setSyncedAt(data.timestamp)
+      setSyncedAt(new Date().toISOString())
       setState(allOk ? "success" : "partial")
       router.refresh()
-      setTimeout(() => setState("idle"), 6000)
+      setTimeout(() => setState("idle"), 8000)
     } catch (error) {
-      console.error("Sync/Refresh error:", error)
+      console.error("Sync error:", error)
       setDetail(error instanceof Error ? error.message : "error desconocido")
       setState("error")
       setTimeout(() => setState("idle"), 6000)
@@ -140,9 +180,8 @@ export function RefreshButton({ lastUpdated }: RefreshButtonProps) {
         <span>{label}</span>
       </Button>
 
-      {/* Línea secundaria: detalle por fuente tras sincronizar, o "hace X min". */}
       <span
-        className={`text-[10px] leading-tight text-right ${
+        className={`text-[10px] leading-tight text-right max-w-[280px] ${
           state === "error" ? "text-red-400/80" : "text-muted-foreground/70"
         }`}
       >

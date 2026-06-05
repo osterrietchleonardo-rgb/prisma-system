@@ -96,7 +96,9 @@ async function syncICC(supabase: ReturnType<typeof createAdminClient>): Promise<
       const mm = String(d.getMonth() + 1).padStart(2, '0')
       urls.push(`https://www.estadisticaciudad.gob.ar/eyc/wp-content/uploads/${d.getFullYear()}/${mm}/EE_ICC_01-16.xlsx`)
     }
-    const buffers = await Promise.all(urls.map((u) => tryFetch(u)))
+    // Timeout corto: las carpetas de meses inexistentes cuelgan; el archivo válido
+    // responde en ~200ms. 5s mantiene la función < 10s (Vercel Hobby).
+    const buffers = await Promise.all(urls.map((u) => tryFetch(u, 5000)))
 
     // Parsear cada archivo encontrado y quedarnos con el período más reciente.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -314,6 +316,20 @@ async function syncZonaprop(
   return out
 }
 
+/** Sincroniza UNA zona (para el endpoint por-fuente, que mantiene cada función <10s). */
+async function syncZonaByKey(
+  supabase: ReturnType<typeof createAdminClient>,
+  key: string,
+  periodo?: string | null
+): Promise<SourceStatus> {
+  if (key === 'GBA_SUR') {
+    return upsertZona(supabase, 'GBA_SUR', 'GBA Sur', await fetchGBASur(periodo))
+  }
+  const z = ZONAS_STANDARD.find((z) => z.key === key)
+  if (!z) return { status: 'error', message: `zona desconocida: ${key}` }
+  return upsertZona(supabase, z.key, z.zona, await fetchZonaStandard(z.slug))
+}
+
 // ════════════════════════════════ 3. MUDAFY ═══════════════════════════════════
 // Fuente: tabla HTML estática "Barrio | Comuna | Valor m2 (USD)". Solo actualiza
 // precio_m2_usd (precio de oferta). No toca precio_cierre_m2_usd (otra fuente).
@@ -366,7 +382,119 @@ async function syncMudafy(
   }
 }
 
+// ════════════════════════════════ 4. ESCRITURAS ═══════════════════════════════
+// Fuente: Colegio de Escribanos CABA. Un post por mes con los actos de compraventa.
+// Esquema mensual en `mercado_escrituras` (requiere migración). Histórico acumulado.
+
+const MESES_NUM: Record<string, string> = {
+  enero: '01', febrero: '02', marzo: '03', abril: '04', mayo: '05', junio: '06',
+  julio: '07', agosto: '08', septiembre: '09', octubre: '10', noviembre: '11', diciembre: '12',
+}
+
+function limpiarHTML(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&#8211;/g, '–')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+interface EscrituraMes {
+  periodo: string
+  label: string
+  cantidad_mensual: number
+  monto_millones_ars: number | null
+  var_mensual_pct: number | null
+  var_anual_pct: number | null
+}
+
+function parsearArticuloEscrituras(url: string, html: string): EscrituraMes | null {
+  const mesU = url.match(/realizadas-en-([a-z]+)-(\d{4})/i)
+  if (!mesU || !MESES_NUM[mesU[1].toLowerCase()]) return null
+  const periodo = `${mesU[2]}-${MESES_NUM[mesU[1].toLowerCase()]}`
+  const label = `${mesU[1][0].toUpperCase()}${mesU[1].slice(1).toLowerCase()} ${mesU[2]}`
+
+  const txt = limpiarHTML(html)
+  const actos = parseEntero((txt.match(/Actos de escrituras de compraventa\s+([\d.]+)/i) || [])[1])
+  if (actos === null) return null // sin el dato central, no se graba
+
+  const monto = parseEntero((txt.match(/\$\s*([\d.]+)\s*millones/i) || [])[1])
+
+  // Var mensual: "los actos bajaron/subieron un 2,1%"
+  let varMensual: number | null = null
+  const vm = txt.match(/actos\s+(bajaron|subieron|cayeron|aumentaron|crecieron)\s+(?:un\s+)?([\d,]+)\s*%/i)
+  if (vm) varMensual = (/bajaron|cayeron/i.test(vm[1]) ? -1 : 1) * (parsePct(vm[2]) ?? 0)
+
+  // Var interanual: "empate" → 0 ; o explícito junto a "interanual".
+  let varAnual: number | null = null
+  const ia = txt.match(/interanual[^%\d]{0,40}(suba|baja|aument\w+|ca[ií]da|cay\w+)?\s*(?:de\s+)?([\d,]+)\s*%/i)
+  if (ia) {
+    const b = parsePct(ia[2]) ?? 0
+    varAnual = /baja|ca[ií]da|cay/i.test(ia[1] || '') ? -b : b
+  } else if (/empate|empatad/i.test(txt)) {
+    varAnual = 0
+  }
+
+  return { periodo, label, cantidad_mensual: actos, monto_millones_ars: monto, var_mensual_pct: varMensual, var_anual_pct: varAnual }
+}
+
+async function syncEscrituras(supabase: ReturnType<typeof createAdminClient>): Promise<SourceStatus> {
+  try {
+    const catRes = await fetch(
+      'https://www.colegio-escribanos.org.ar/category/estadisticas-de-escrituras/',
+      { headers: BROWSER_HEADERS, cache: 'no-store', signal: AbortSignal.timeout(8000) }
+    )
+    if (!catRes.ok) return { status: 'fallback', message: `categoría HTTP ${catRes.status}; se conserva la DB` }
+    const catHtml = await catRes.text()
+
+    const links = Array.from(
+      new Set(
+        Array.from(
+          catHtml.matchAll(/href="([^"]+cantidad-de-escrituras-de-compraventa[^"]+)"/gi)
+        ).map((m) => m[1])
+      )
+    ).slice(0, 8) // últimos ~8 meses; idempotente, acumula histórico
+
+    if (links.length === 0) return { status: 'fallback', message: 'sin artículos; se conserva la DB' }
+
+    const meses: EscrituraMes[] = []
+    for (let i = 0; i < links.length; i += 6) {
+      const chunk = links.slice(i, i + 6)
+      const htmls = await Promise.all(
+        chunk.map(async (u) => {
+          const r = await fetch(u, { headers: BROWSER_HEADERS, cache: 'no-store', signal: AbortSignal.timeout(8000) })
+          return r.ok ? { u, html: await r.text() } : null
+        })
+      )
+      for (const h of htmls) {
+        if (!h) continue
+        const parsed = parsearArticuloEscrituras(h.u, h.html)
+        if (parsed) meses.push(parsed)
+      }
+    }
+
+    if (meses.length === 0) return { status: 'fallback', message: 'no se pudo parsear ningún mes; se conserva la DB' }
+
+    const stamp = new Date().toISOString()
+    const { error } = await supabase.from('mercado_escrituras').upsert(
+      meses.map((m) => ({ ...m, fuente: 'Colegio de Escribanos CABA', fecha_actualizacion: stamp })),
+      { onConflict: 'periodo' }
+    )
+    if (error) return { status: 'error', message: error.message }
+
+    const latest = meses.reduce((a, b) => (b.periodo > a.periodo ? b : a))
+    return { status: 'ok', periodo: latest.label, message: `${meses.length} meses · ${latest.label}: ${latest.cantidad_mensual}` }
+  } catch (err) {
+    return { status: 'error', message: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 // ════════════════════════════════ ENDPOINT ════════════════════════════════════
+// Modo por-fuente (?source=) para que cada función quede < 10s (límite Vercel Hobby).
+// El botón "Actualizar" dispara las fuentes en paralelo desde el cliente.
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -376,16 +504,31 @@ export async function GET(req: Request) {
   }
 
   const supabase = createAdminClient()
+  const source = searchParams.get('source')
+  const timestamp = new Date().toISOString()
 
-  // Cada fuente es independiente: el fallo de una no afecta a las demás.
-  const [icc, zonaprop, mudafy] = await Promise.all([
-    syncICC(supabase),
-    syncZonaprop(supabase),
-    syncMudafy(supabase),
-  ])
-
-  return NextResponse.json({
-    timestamp: new Date().toISOString(),
-    results: { icc, zonaprop, mudafy },
-  })
+  switch (source) {
+    case 'icc':
+      return NextResponse.json({ timestamp, results: { icc: await syncICC(supabase) } })
+    case 'mudafy':
+      return NextResponse.json({ timestamp, results: { mudafy: await syncMudafy(supabase) } })
+    case 'escrituras':
+      return NextResponse.json({ timestamp, results: { escrituras: await syncEscrituras(supabase) } })
+    case 'zonaprop': {
+      const zona = searchParams.get('zona') ?? 'CABA'
+      const periodo = searchParams.get('periodo')
+      const status = await syncZonaByKey(supabase, zona, periodo)
+      return NextResponse.json({ timestamp, results: { zonaprop: { [zona]: status } } })
+    }
+    default: {
+      // Modo "todo" (cron). Lento; no usado por el botón en Hobby.
+      const [icc, zonaprop, mudafy, escrituras] = await Promise.all([
+        syncICC(supabase),
+        syncZonaprop(supabase),
+        syncMudafy(supabase),
+        syncEscrituras(supabase),
+      ])
+      return NextResponse.json({ timestamp, results: { icc, zonaprop, mudafy, escrituras } })
+    }
+  }
 }
