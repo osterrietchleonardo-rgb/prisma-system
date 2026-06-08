@@ -7,6 +7,7 @@ interface Message {
   content: string
   role: string // bot | human | lead | internal
   message_type: string
+  metadata: Record<string, any> | null
   created_at: string
 }
 
@@ -54,6 +55,37 @@ function roleLabel(role: string): string {
     case "lead": return "Cliente"
     default: return role
   }
+}
+
+const MEDIA_TYPES = ["image", "video", "audio", "document"]
+
+// Resuelve la URL del adjunto: prioriza metadata.media_url; si no, y el tipo es media,
+// usa el content (algunos mensajes guardan la URL directo en content).
+function getMediaUrl(m: Message): string | null {
+  const fromMeta = m.metadata?.media_url
+  if (typeof fromMeta === "string" && fromMeta) return fromMeta
+  if (MEDIA_TYPES.includes(m.message_type) && /^https?:\/\//.test(m.content || "")) return m.content
+  return null
+}
+
+// Convierte URLs sueltas dentro del texto en enlaces clicables (p.ej. "Ficha completa: https://...")
+function renderTextWithLinks(text: string): React.ReactNode {
+  const parts = text.split(/(https?:\/\/[^\s]+)/g)
+  return parts.map((part, i) =>
+    /^https?:\/\//.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: "#a5b4fc", textDecoration: "underline", wordBreak: "break-all" }}
+      >
+        {part}
+      </a>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  )
 }
 
 export default function BandejaDetalleClient({ conversationId }: { conversationId: string }) {
@@ -133,6 +165,9 @@ export default function BandejaDetalleClient({ conversationId }: { conversationI
         ) : messages.map((m) => {
           const out = isOutgoing(m.role)
           const internal = m.role === "internal"
+          const mediaUrl = getMediaUrl(m)
+          // Evitamos repetir el texto si el content es exactamente la URL del adjunto
+          const showText = m.content && m.content !== mediaUrl
           return (
             <div key={m.id} style={{ display: "flex", justifyContent: out ? "flex-end" : "flex-start" }}>
               <div style={{
@@ -151,9 +186,37 @@ export default function BandejaDetalleClient({ conversationId }: { conversationI
                 <div style={{ fontSize: 10, fontWeight: 600, color: internal ? "#fbbf24" : out ? "#a5b4fc" : "rgba(255,255,255,0.45)", marginBottom: 3, textTransform: "uppercase", letterSpacing: "0.03em" }}>
                   {roleLabel(m.role)}
                 </div>
-                <div style={{ color: "rgba(255,255,255,0.92)", fontSize: 13.5, whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.45 }}>
-                  {m.content}
-                </div>
+
+                {/* Adjunto multimedia */}
+                {mediaUrl && (
+                  <div style={{ marginBottom: showText ? 8 : 4 }}>
+                    {m.message_type === "image" ? (
+                      <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+                        <img
+                          src={mediaUrl}
+                          alt="Imagen"
+                          style={{ maxWidth: "100%", maxHeight: 280, borderRadius: 10, objectFit: "cover", display: "block", cursor: "pointer" }}
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+                        />
+                      </a>
+                    ) : m.message_type === "video" ? (
+                      <video src={mediaUrl} controls style={{ maxWidth: "100%", maxHeight: 280, borderRadius: 10 }} />
+                    ) : m.message_type === "audio" ? (
+                      <audio src={mediaUrl} controls style={{ width: "100%" }} />
+                    ) : (
+                      <a href={mediaUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#a5b4fc", fontSize: 12, textDecoration: "underline" }}>
+                        📎 Ver archivo adjunto
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {showText && (
+                  <div style={{ color: "rgba(255,255,255,0.92)", fontSize: 13.5, whiteSpace: "pre-wrap", wordBreak: "break-word", lineHeight: 1.45 }}>
+                    {renderTextWithLinks(m.content)}
+                  </div>
+                )}
+
                 <div style={{ fontSize: 10, color: "rgba(255,255,255,0.3)", marginTop: 4, textAlign: "right" }}>
                   {formatTime(m.created_at)}
                 </div>
