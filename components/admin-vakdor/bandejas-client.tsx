@@ -15,7 +15,6 @@ interface Conversation {
   etiquetas: string[]
   agent_name: string | null
   last_message_at: string | null
-  updated_at: string | null
 }
 
 interface AgencyOption {

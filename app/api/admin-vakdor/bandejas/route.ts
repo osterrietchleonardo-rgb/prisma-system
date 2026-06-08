@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   let query = db
     .from("wa_conversations")
     .select(
-      "id, agency_id, agent_id, contact_name, contact_phone, status, bot_active, unread_count, pipeline_stage, etiquetas, last_message_at, updated_at, created_at",
+      "id, agency_id, agent_id, contact_name, contact_phone, status, bot_active, unread_count, pipeline_stage, etiquetas, last_message_at, created_at",
       { count: "exact" }
     )
     .order("last_message_at", { ascending: false, nullsFirst: false })
@@ -73,7 +73,6 @@ export async function GET(request: NextRequest) {
       etiquetas: c.etiquetas || [],
       agent_name: agent?.full_name || agent?.email || null,
       last_message_at: c.last_message_at,
-      updated_at: c.updated_at,
     }
   })
 
