@@ -88,7 +88,35 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
       if (settingsData) {
         setSettings([settingsData])
       } else {
-        setSettings([])
+        // If not found, insert the global default configuration automatically
+        const defaultSettings = {
+          agency_id: instance.agency_id,
+          bot_name: "Valentina",
+          company_name: "",
+          language: "Español rioplatense",
+          tone: "Cálido, profesional y cercano",
+          personality: "Empática, directa, entusiasta pero sin presionar",
+          geographic_zone: "CABA y GBA Norte, Argentina",
+          currency: "USD",
+          working_hours: "Lunes a Sábado 9–19 h",
+          property_types: "departamentos, casas, PH, locales comerciales",
+          min_anticipation_hours: 4,
+          cancelation_deadline_hours: 2,
+        }
+
+        const { data: newSettings, error: insertError } = await supabase
+          .from('whatsapp_ai_settings')
+          .insert(defaultSettings)
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error("Error creating default settings:", insertError)
+          // Fallback to local state if insert fails
+          setSettings([{ ...defaultSettings, agent_id: null } as AiSetting])
+        } else {
+          setSettings([newSettings])
+        }
       }
     } catch (err: any) {
       toast.error("Error al cargar configuración: " + err.message)
