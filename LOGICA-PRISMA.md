@@ -64,7 +64,7 @@ PRISMA es un SaaS **multi-tenant** para inmobiliarias argentinas. Cada inmobilia
 │  /api/messages/*    → Bot reply (legacy)                │
 │  /api/contratos/*   → CRUD + PDF + Signatures           │
 │  /api/valuation/*   → Tasaciones IA                     │
-│  /api/mercado/*     → Sync ICC, ZonaProp, Refresh       │
+│  /api/mercado/*     → Sync mercado + Refresh            │
 │  /api/documents/*   → Upload, Extract, Process          │
 │  /api/conversational-insights/* → Analytics agregado    │
 │  /api/push/*        → Push notification subscriptions   │
@@ -256,7 +256,7 @@ Endpoint que los layouts consultan para verificar si la cuenta sigue activa. Ret
 | Sección | Ruta | Descripción |
 |---|---|---|
 | Dashboard | `/director/dashboard` | KPIs, métricas, resumen |
-| Pulso de Mercado | `/director/mercado` | Datos ICC + ZonaProp |
+| Pulso de Mercado | `/director/mercado` | Dólar, ICC, Zonaprop, barrios, escrituras |
 | Pipeline | `/director/pipeline` | Tablero Kanban de leads |
 | Propiedades | `/director/propiedades` | Cartera de propiedades (Tokko) |
 | Tracking Performance | `/director/tracking-performance` | Rendimiento de asesores |
@@ -339,8 +339,11 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 - **`contract_signatures`** — Firmas digitales
 
 #### Mercado
-- **`mercado_icc`** — Índice de Costo de Construcción
-- **`mercado_zonas`** — Datos de precios por zona (ZonaProp)
+- **`mercado_icc`** — Índice de Costo de Construcción (IDECBA). 1 fila (`id=1`)
+- **`mercado_zonas`** — Precios por zona (Zonaprop), histórico por `(zona, mes_reporte)`
+- **`mercado_barrios`** — Precio m² por barrio: oferta (`precio_m2_usd`, Mudafy) y cierre (`precio_cierre_m2_usd`)
+- **`mercado_escrituras`** — Escrituras CABA mensual (`periodo` PK, Colegio de Escribanos)
+- **`mercado_stats`** — Estadísticas agregadas de cierre (Reporte Inmobiliario)
 
 #### Analytics
 - **`dashboard_conversational_insights`** — Cache de análisis conversacional agregado
@@ -934,47 +937,79 @@ CRUD de firmas digitales asociadas a un contrato.
 
 ## 16. Módulo Pulso de Mercado
 
-### 16.1 Sincronización ICC (Índice Costo de Construcción)
+**Archivo principal:** `app/api/mercado/sync/route.ts`
 
-**Endpoint:** `GET /api/mercado/sync?secret=xxx`  
-**Archivo:** `app/api/mercado/sync/route.ts`
+### Principios
 
-**Fuente:** Estadísticas del Gobierno de la Ciudad de Buenos Aires
-```
-GET https://www.estadisticaciudad.gob.ar/eyc/wp-content/uploads/{año}/{mes}/EE_ICC_01-16.xlsx
-```
+- **Cero datos hardcodeados / inventados.** Si una fuente no devuelve dato real, se
+  graba `null` y la UI muestra "Sin datos disponibles". Una fuente que falla devuelve
+  `fallback` y **nunca pisa** lo que ya hay en DB.
+- **Único dato en tiempo real:** el dólar (`dolarapi.com`, vía `fetchDolares`). El
+  resto son reportes oficiales con su fecha real de actualización.
+- **Escritura con service-role** (`createAdminClient`): el cliente anon es bloqueado
+  por RLS en silencio. La lectura pública va con anon (políticas `SELECT`).
+- **Sync partido por fuente** (`?source=`): cada request del servidor queda < 10s
+  para respetar el límite de **Vercel Hobby**. El botón "Actualizar" dispara las
+  fuentes en paralelo desde el cliente (`components/mercado/RefreshButton.tsx`).
 
-**Flujo:**
-1. Prueba los últimos 3 meses hasta encontrar el archivo más reciente
-2. Descarga el archivo Excel
-3. Parsea con `xlsx` para extraer: ICC nivel general, materiales, mano de obra, gastos generales, variación mensual, variación anual
-4. Upsert en `mercado_icc`
+### Endpoint de sync
 
-### 16.2 Sincronización ZonaProp
+`GET /api/mercado/sync?source=<fuente>` (modo por-fuente, usado por el botón):
 
-**Fuente:** Reportes PDF de ZonaProp
-```
-GET https://www.zonaprop.com.ar/blog/wp-content/uploads/{año}/{mes}/INDEX_CABA_REPORTE_{año}-{mes}.pdf
-```
+| `?source=` | Hace |
+|---|---|
+| `icc` | Sincroniza ICC |
+| `zonaprop&zona=CABA\|GBA_NORTE\|GBA_OESTE` | Una zona estándar |
+| `zonaprop&zona=GBA_SUR&periodo=YYYY-MM` | GBA Sur (barre día del mes dado) |
+| `mudafy` | Precios de oferta por barrio |
+| `escrituras` | Escrituras CABA |
+| _(sin `source`)_ | Modo "todo" (cron); lento, no usado por el botón en Hobby |
 
-**Flujo:**
-1. Descarga el PDF del reporte más reciente
-2. Parsea con `pdf-parse-fork`
-3. Extrae precio USD/m² con regex
-4. Upsert en `mercado_zonas`
+En producción requiere `?secret=CRON_SECRET` solo cuando se pasa secret (cron).
 
-### 16.3 Lectura de Datos ZonaProp
+### 16.1 ICC (Índice Costo de Construcción) → `mercado_icc`
 
-**Endpoint:** `GET /api/mercado/zonaprop`  
-**Archivo:** `app/api/mercado/zonaprop/route.ts`
+**Fuente:** `estadisticaciudad.gob.ar` (XLSX mensual).
+1. Prueba 6 carpetas (`/{año}/{mes}/EE_ICC_01-16.xlsx`) **en paralelo** (timeout 5s).
+   La carpeta de WordPress NO coincide con el mes del reporte, por eso se lee el
+   período del propio archivo (`rows[0][0]`) y se elige el más reciente.
+2. Parsea con `xlsx`: nivel general, materiales, mano de obra, gastos + sus
+   variaciones mensual e interanual. `UPDATE` de la fila `id=1`.
 
-Lee de `mercado_zonas` y retorna datos formateados con cache de 24 horas.
+### 16.2 Zonaprop (4 zonas) → `mercado_zonas`
 
-### 16.4 Refresh Manual
+**Fuente:** PDFs zpindex. **Regla de URL:** los datos del mes N se publican en la
+carpeta del mes **N+1**: `.../{N+1 año}/{N+1 mes}/{slug}_{N año}-{N mes}.pdf`.
+- Zonas: `CABA`, `GBA Norte`, `GBA Oeste` (slug directo) y `GBA Sur` (el nombre
+  incluye el día de creación → se barre día 1–28 en paralelo, solo del período ya
+  confirmado por las estándar).
+- Parser conservador (`pdf-parse-fork`): precio USD/m², variación interanual con
+  signo, alquileres 2/3 amb. Lo no inequívoco → `null`.
+- **Histórico:** upsert por `(zona, mes_reporte)` → una fila por mes (constraint
+  `mercado_zonas_zona_mes_unique`). Los consumidores leen el último mes por zona.
 
-**Endpoint:** `GET /api/mercado/refresh`
+### 16.3 Mudafy (precios de oferta por barrio) → `mercado_barrios`
 
-Trigger manual de sincronización.
+**Fuente:** tabla HTML estática de `mudafy.com.ar` (Barrio · Comuna · Valor m² USD).
+`UPDATE` por barrio de `precio_m2_usd` (45 barrios). No toca `precio_cierre_m2_usd`
+(precios de cierre, dato real cargado aparte).
+
+### 16.4 Escrituras CABA → `mercado_escrituras`
+
+**Fuente:** Colegio de Escribanos CABA (un post por mes). **Esquema mensual**
+(`periodo` PK, histórico). Scrapea los últimos ~8 artículos de la categoría, parsea
+actos, monto, variación mensual/interanual y upsert por `periodo`. El acumulado
+anual (YTD) se calcula en query, no se almacena.
+
+### 16.5 Lectura / consumo
+
+- `GET /api/mercado/zonaprop` y los pages → último `mes_reporte` por zona.
+- `lib/mercado/fetchBarrios.ts` → barrios + **serie histórica del gráfico** (precio
+  m² CABA por mes desde `mercado_zonas`, crece con cada sync).
+- `lib/mercado/fetchEscrituras.ts` → último mes + acumulado YTD.
+- `lib/mercado/fetchLastUpdated.ts` → `max(fecha_actualizacion)` real (no la hora de
+  render) para "Datos de mercado actualizados".
+- `GET /api/mercado/refresh` → revalida la caché (`revalidateTag('mercado')`).
 
 ---
 
@@ -1549,7 +1584,7 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 
 #### 9. Calendario y Pulso de Mercado (`/director/calendario`, `/director/mercado`)
 - **Calendario:** Visualiza `scheduled_visits`. Permite filtrar por asesor, cambiar vistas de mes/semana, y hacer click en una visita para ver un modal detallado (BANT score, objeciones, decisores, lead info).
-- **Mercado:** Tablero de comando del mercado real. Muestra cotizaciones (Dólar, ICC, Zonaprop), cantidad de escrituras (Colegio de Escribanos) y rentabilidad promedio. Datos extraídos de fuentes públicas (`/api/mercado/sync`).
+- **Mercado:** Tablero de comando del mercado real. Muestra cotización del dólar (tiempo real), ICC, precios Zonaprop por zona, precios m² por barrio (Mudafy) y escrituras CABA (Colegio de Escribanos). Cada fuente con su fecha real de actualización; sin datos inventados (si falta, "Sin datos"). Sincronización por el botón "Actualizar" (`/api/mercado/sync?source=...`, una fuente por request para respetar el límite de Vercel Hobby).
 
 ---
 
@@ -1628,7 +1663,7 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 | `/api/marketing-ia/settings/upload-logo` | POST | Tenant | Subir logo |
 | `/api/marketing-ia/tokko-search` | GET | Tenant | Buscar propiedades |
 | `/api/mercado/refresh` | GET | Sesión | Refresh datos |
-| `/api/mercado/sync` | GET | CRON_SECRET | Sync ICC + ZonaProp |
+| `/api/mercado/sync` | GET | Sesión / CRON_SECRET | Sync por fuente (`?source=icc\|zonaprop\|mudafy\|escrituras`) |
 | `/api/mercado/zonaprop` | GET | Sesión | Datos ZonaProp |
 | `/api/messages/bot-reply` | POST | BOT_REPLY_SECRET | Bot reply legacy |
 | `/api/n8n/reply` | POST | N8N_REPLY_SECRET | Reply desde n8n |

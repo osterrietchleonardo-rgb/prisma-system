@@ -37,7 +37,8 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
   if (startDate) logsQuery = logsQuery.gte("fecha_actividad", startDate);
   if (endDate) logsQuery = logsQuery.lte("fecha_actividad", endDate);
 
-  const { data: perfLogs } = await logsQuery;
+  const { data: rawLogs } = await logsQuery;
+  const perfLogs = rawLogs?.filter(l => l.status !== 'eliminada') || [];
 
   // 3. Profiles — only asesores (directors are excluded from the leaderboard)
   const { data: agencyProfiles } = await supabase
