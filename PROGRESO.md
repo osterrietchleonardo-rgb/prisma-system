@@ -571,7 +571,7 @@ Se reestructuró la página bajo los principios de la skill **Vakdor-Copywriter*
 - **TypeScript**: 0 errores en archivos WhatsApp.
 
 ### 2026-03-22 | Fase 7: Operativa Avanzada y Configuración (v0.7.0)
-- **Bots de IA (Asesor)**: Tutor IA entrenado con documentos y Consultor IA para matchear propiedades vía Gemini.
+- **Bots de IA (Asesor)**: Tutor IA entrenado con documentos y Buscador IA para matchear propiedades vía Gemini.
 - **Leads Asesor**: Carga manual, importación IA vía captura de WhatsApp y Sync con Tokko completados.
 - **Tasaciones AVM**: Módulo reutilizado para el Asesor para generar análisis comerciales instantáneos.
 - **Configuración (Asesor y Director)**: Actualización de perfiles, logo, credenciales (Tokko API) y generación de códigos de invitación (Director).

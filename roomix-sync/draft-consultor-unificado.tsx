@@ -1,5 +1,5 @@
 // ============================================================================
-// BORRADOR v2: Consultor IA con Búsqueda Vectorial Unificada (3 Niveles)
+// BORRADOR v2: Buscador IA con Búsqueda Vectorial Unificada (3 Niveles)
 // ============================================================================
 // Estructura:
 //   PARTE 1 — Endpoint backend: respuesta con { propias, agencia, roomix }

@@ -65,7 +65,7 @@ export default function TermsPage() {
             </div>
             <div className="prose prose-invert max-w-none text-muted-foreground leading-relaxed space-y-4">
               <p>
-                PRISMA-SYSTEM es una herramienta de asistencia basada en Inteligencia Artificial. Si bien buscamos la máxima precisión, los resultados del "Tasador Rápido" y las recomendaciones del "Consultor IA" deben ser validados por un profesional matriculado antes de ser utilizados en operaciones vinculantes.
+                PRISMA-SYSTEM es una herramienta de asistencia basada en Inteligencia Artificial. Si bien buscamos la máxima precisión, los resultados del "Tasador Rápido" y las recomendaciones del "Buscador IA" deben ser validados por un profesional matriculado antes de ser utilizados en operaciones vinculantes.
               </p>
               <p>
                 PRISMA IA no se responsabiliza por decisiones comerciales tomadas basadas exclusivamente en sugerencias automatizadas del sistema.

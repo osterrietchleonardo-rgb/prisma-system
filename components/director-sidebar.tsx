@@ -41,7 +41,7 @@ const navItems = [
   { name: "Tasaciones", href: "/director/tasaciones", icon: Calculator },
   { name: "Calendario", href: "/director/calendario", icon: Calendar },
   { name: "Tutor IA", href: "/director/tutor", icon: Sparkles },
-  { name: "Consultor IA", href: "/director/consultor", icon: Sparkles },
+  { name: "Buscador IA", href: "/director/consultor", icon: Sparkles },
   { name: "Configuración", href: "/director/configuracion", icon: Settings },
   { name: "Sugerencias", href: "/director/feedback", icon: MessageSquare },
 ]

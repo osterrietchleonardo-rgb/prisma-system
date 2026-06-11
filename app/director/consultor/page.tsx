@@ -51,7 +51,7 @@ export default function ConsultorIAPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "¡Hola! Soy tu Consultor IA. Estoy listo para ayudarte a encontrar la propiedad ideal en tu cartera. ¿Qué estás buscando hoy? (Ej: 'Busco un 3 ambientes en zona norte por menos de 250k')"
+      content: "¡Hola! Soy tu Buscador IA. Estoy listo para ayudarte a encontrar la propiedad ideal en tu cartera. ¿Qué estás buscando hoy? (Ej: 'Busco un 3 ambientes en zona norte por menos de 250k')"
     }
   ])
   const [input, setInput] = useState("")
@@ -135,7 +135,7 @@ export default function ConsultorIAPage() {
     setCurrentSessionId(null)
     setMessages([{
       role: "assistant",
-      content: "¡Hola! Soy tu Consultor IA. Estoy listo para ayudarte a encontrar la propiedad ideal en tu cartera. ¿Qué estás buscando hoy?"
+      content: "¡Hola! Soy tu Buscador IA. Estoy listo para ayudarte a encontrar la propiedad ideal en tu cartera. ¿Qué estás buscando hoy?"
     }])
   }
 
@@ -368,7 +368,7 @@ export default function ConsultorIAPage() {
               <Bot className="w-6 h-6 text-accent" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Consultor IA</h1>
+              <h1 className="text-xl font-bold tracking-tight">Buscador IA</h1>
               <div className="flex items-center gap-2 mt-0.5">
                 <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                 <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Buscador Inteligente de Propiedades</span>

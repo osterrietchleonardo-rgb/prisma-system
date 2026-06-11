@@ -44,7 +44,7 @@ interface CreditData {
 
 const FEATURE_LABELS: Record<string, string> = {
   tutor: "Tutor IA",
-  consultor: "Consultor IA",
+  consultor: "Buscador IA",
   marketing: "Marketing IA",
   contratos: "Contratos IA",
   tasacion: "Tasación IA",

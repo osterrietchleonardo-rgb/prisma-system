@@ -51,7 +51,7 @@ const MODULES: Record<string, { name: string; icon: string; color: string }> = {
   marketing_ia:  { name: "Marketing IA",  icon: "📣", color: "#6366f1" },
   contratos_ia:  { name: "Contratos IA",  icon: "📄", color: "#8b5cf6" },
   tutor_ia:      { name: "Tutor IA",      icon: "🎓", color: "#06b6d4" },
-  consultor_ia:  { name: "Consultor IA",  icon: "🏠", color: "#10b981" },
+  consultor_ia:  { name: "Buscador IA",  icon: "🏠", color: "#10b981" },
   documentos_ia: { name: "Documentos IA", icon: "📚", color: "#f59e0b" },
 }
 const MODULE_COLORS = ["#6366f1","#8b5cf6","#06b6d4","#10b981","#f59e0b","#ef4444"]

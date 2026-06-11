@@ -40,7 +40,7 @@ const navItems = [
   { name: "Contratos IA", href: "/asesor/contratos-ia", icon: FileSignature },
   { name: "Mi Calendario", href: "/asesor/calendario", icon: Calendar },
   { name: "Tutor IA", href: "/asesor/tutor-ia", icon: GraduationCap },
-  { name: "Consultor IA", href: "/asesor/consultor-ia", icon: ShieldCheck },
+  { name: "Buscador IA", href: "/asesor/consultor-ia", icon: ShieldCheck },
   { name: "Tasaciones", href: "/asesor/tasaciones", icon: Calculator },
   { name: "Biblioteca", href: "/asesor/documentos", icon: BookOpen },
   { name: "Configuración", href: "/asesor/configuracion", icon: Settings },

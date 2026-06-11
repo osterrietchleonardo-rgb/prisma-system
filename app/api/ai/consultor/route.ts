@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   try {
     const { message, sessionId, history } = await req.json();
     const { userId, agencyId } = await requireTenant();
-    console.log("Consultor IA Request:", { message, sessionId, agencyId });
+    console.log("Buscador IA Request:", { message, sessionId, agencyId });
     const supabase = await createClient();
 
     // Consume credits before starting processing (returns txId for real cost tracking)
@@ -364,7 +364,7 @@ Respondé con un resumen MUY BREVE (2-4 oraciones): cuántas encontraste y ofrec
     }
 
     // 5. Generate Assistant Response
-    const systemPrompt = `Eres el "Consultor IA" de la inmobiliaria PRISMA. Sos el asistente experto para buscar propiedades en la cartera de la agencia.
+    const systemPrompt = `Eres el "Buscador IA" de la inmobiliaria PRISMA. Sos el asistente experto para buscar propiedades en la cartera de la agencia.
 
     FORMATO DE RESPUESTA CRÍTICO:
     - Las propiedades encontradas se muestran automáticamente como tarjetas visuales con fotos, precio y detalles. NO las listes en texto.

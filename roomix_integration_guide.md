@@ -214,9 +214,9 @@ Resiliencia (Backoff): Si una URL devuelve 429 (Too Many Requests) o 500, el scr
 
 Checkpoints: El script debe guardar su progreso localmente (ej. un archivo JSON con los IDs procesados) para poder reanudar desde donde se quedó si el proceso falla en la descarga inicial masiva.
 
-7. Integración con Frontend: Consultor IA
+7. Integración con Frontend: Buscador IA
 
-El objetivo final es consumir esta base de datos en una interfaz conversacional/búsqueda llamada "Consultor IA".
+El objetivo final es consumir esta base de datos en una interfaz conversacional/búsqueda llamada "Buscador IA".
 
 7.1 Lógica de Búsqueda (Backend)
 
