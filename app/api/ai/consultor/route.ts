@@ -99,6 +99,7 @@ export async function POST(req: Request) {
         Analiza el mensaje y responde ÚNICAMENTE con este JSON (sin texto extra):
         {
           "intent": "RETRIEVAL" | "GENERAL",
+          "operation": "venta" | "alquiler" | "ambas",
           "location_keywords": ["barrio o ciudad si se menciona, si no: []"],
           "type_keywords": ["tipo de propiedad si se menciona explícitamente, si no: []"],
           "amenity_keywords": ["lista de amenidades/características: parrilla, pileta, balcón, terraza, quincho, cochera, sum, gimnasio, jardín, etc. Si no hay: []"],
@@ -109,22 +110,15 @@ export async function POST(req: Request) {
         }
 
         REGLAS CRÍTICAS:
-        - "piso" en Argentina = departamento que ocupa TODA LA PLANTA del edificio (no es sinónimo de departamento genérico). Si dice "piso" → type_keywords: ["piso"]
+        - "operation": Si dice "en alquiler" o "para alquilar" → "alquiler". Si dice "comprar" o "en venta" → "venta". Si no especifica → "ambas".
+        - "piso" en Argentina = departamento que ocupa TODA LA PLANTA del edificio. Si dice "piso" → type_keywords: ["piso"]
         - "depto", "departamento", "departamentos" → type_keywords: ["departamento"]
         - "3 ambientes" → bedrooms: 3 (en AR los ambientes incluyen el living)
         - "menos de 100 mil" o "hasta 100.000" → price_max: 100000
         - location_keywords SOLO si menciona una zona/barrio/ciudad específica. Si no hay zona → []
         - amenity_keywords: extraé TODAS las características mencionadas
-        - Si el mensaje es muy general ("qué tenés?", "mostrá propiedades", "tenés algo?") → intent: RETRIEVAL, todo null/[]
-        - Si es saludo, charla o claramente no busca propiedades → intent: GENERAL
-
-        Ejemplos:
-        - "piso en Belgrano" → {"intent":"RETRIEVAL","location_keywords":["Belgrano"],"type_keywords":["piso"],"amenity_keywords":[],"price_max":null,"price_min":null,"bedrooms":null,"bathrooms":null}
-        - "departamentos en Palermo" → {"intent":"RETRIEVAL","location_keywords":["Palermo"],"type_keywords":["departamento"],"amenity_keywords":[],"price_max":null,"price_min":null,"bedrooms":null,"bathrooms":null}
-        - "qué tenés menos de 100 mil?" → {"intent":"RETRIEVAL","location_keywords":[],"type_keywords":[],"amenity_keywords":[],"price_max":100000,"price_min":null,"bedrooms":null,"bathrooms":null}
-        - "deptos con parrilla y pileta" → {"intent":"RETRIEVAL","location_keywords":[],"type_keywords":["departamento"],"amenity_keywords":["parrilla","pileta"],"price_max":null,"price_min":null,"bedrooms":null,"bathrooms":null}
-        - "3 ambientes con cochera en zona norte" → {"intent":"RETRIEVAL","location_keywords":["zona norte"],"type_keywords":[],"amenity_keywords":["cochera"],"price_max":null,"price_min":null,"bedrooms":3,"bathrooms":null}
-        - "qué tenés?" → {"intent":"RETRIEVAL","location_keywords":[],"type_keywords":[],"amenity_keywords":[],"price_max":null,"price_min":null,"bedrooms":null,"bathrooms":null}
+        - Si el mensaje es muy general ("qué tenés?", "mostrá propiedades") → intent: RETRIEVAL, todo null/[]/ambas
+        - Si es saludo, charla o no busca propiedades → intent: GENERAL
 
         Mensaje: "${message}"` }]
       }]
@@ -132,6 +126,7 @@ export async function POST(req: Request) {
 
     const intentResText = intentCheck.response.text().replace(/```json|```/g, "").trim();
     let isRetrieval = false;
+    let operation = "ambas";
     let locationKeywords: string[] = [];
     let typeKeywords: string[] = [];
     let amenityKeywords: string[] = [];
@@ -143,6 +138,7 @@ export async function POST(req: Request) {
     try {
       const parsed = JSON.parse(intentResText);
       isRetrieval = parsed.intent === 'RETRIEVAL';
+      operation = parsed.operation || "ambas";
       locationKeywords = (parsed.location_keywords || []).filter((k: string) => k.length > 2);
       amenityKeywords = (parsed.amenity_keywords || []).map((a: string) => a.toLowerCase().trim());
       const rawTypes: string[] = parsed.type_keywords || [];
@@ -158,14 +154,13 @@ export async function POST(req: Request) {
       isRetrieval = intentResText.toUpperCase().includes("RETRIEVAL");
     }
 
-    console.log("Search params:", { isRetrieval, locationKeywords, typeKeywords, amenityKeywords, priceMax, priceMin, bedroomsFilter, bathroomsFilter });
+    console.log("Search params:", { isRetrieval, operation, locationKeywords, typeKeywords, amenityKeywords, priceMax, priceMin, bedroomsFilter, bathroomsFilter });
     let newMatchedProperties: any[] = [];
     let propertyContext = "";
-    let pisoFallback = false; // Flag: searched for "piso" but fell back to departamentos
+    let pisoFallback = false; 
 
     if (isRetrieval) {
-      // All fields needed by the frontend property card
-      const FULL_SELECT = 'id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, description, tokko_data';
+      const FULL_SELECT = 'id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, description, tokko_data, assigned_agent_id, assigned_agent:profiles(full_name, email)';
 
       const { data: sessionData } = await supabase
         .from('consultor_chat_sessions')
@@ -174,171 +169,197 @@ export async function POST(req: Request) {
         .single();
       const seenIds = (sessionData?.metadata as any)?.seen_property_ids || [];
 
-      // --- Vector Search (Semantic) ---
-      const queryEmbedding = await generateEmbedding(message);
-      const { data: vectorProps } = await supabase.rpc('match_properties', {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.12,
-        match_count: 30,
-        p_agency_id: agencyId
-      });
+      // ─── STRICT SQL FILTERING ───
 
-      // --- Text / Filter Search (3 branches) ---
-      let textProps: any[] = [];
+      // 1. Properties (Own & Agency)
+      let genQuery = supabase.from('properties')
+        .select(FULL_SELECT)
+        .eq('agency_id', agencyId);
+
+      if (operation === 'venta') genQuery = genQuery.eq('status', 'Venta');
+      else if (operation === 'alquiler') genQuery = genQuery.eq('status', 'Alquiler');
+
+      if (priceMax) genQuery = genQuery.lte('price', priceMax);
+      if (priceMin) genQuery = genQuery.gte('price', priceMin);
+      if (bedroomsFilter) genQuery = genQuery.gte('bedrooms', bedroomsFilter);
+      if (bathroomsFilter) genQuery = genQuery.gte('bathrooms', bathroomsFilter);
 
       if (locationKeywords.length > 0) {
-        // Branch A: Location-based search + optional attribute filters
-        const locConditions = locationKeywords
-          .map(k => `address.ilike.%${k}%,title.ilike.%${k}%,city.ilike.%${k}%`)
-          .join(',');
-        let locQuery = supabase.from('properties')
-          .select(FULL_SELECT)
-          .eq('agency_id', agencyId)
-          .or(locConditions);
-        if (priceMax)       locQuery = locQuery.lte('price', priceMax);
-        if (priceMin)       locQuery = locQuery.gte('price', priceMin);
-        if (bedroomsFilter) locQuery = locQuery.gte('bedrooms', bedroomsFilter);
-        if (bathroomsFilter) locQuery = locQuery.gte('bathrooms', bathroomsFilter);
-        const { data: lp } = await locQuery.limit(25);
-        if (lp) textProps = lp;
-
-      } else if (priceMax || priceMin || bedroomsFilter || bathroomsFilter || typeKeywords.length > 0 || amenityKeywords.length > 0) {
-        // Branch B: No location, but has specific filters → broad DB query with those filters
-        let genQuery = supabase.from('properties')
-          .select(FULL_SELECT)
-          .eq('agency_id', agencyId);
-        if (priceMax)       genQuery = genQuery.lte('price', priceMax);
-        if (priceMin)       genQuery = genQuery.gte('price', priceMin);
-        if (bedroomsFilter) genQuery = genQuery.gte('bedrooms', bedroomsFilter);
-        if (bathroomsFilter) genQuery = genQuery.gte('bathrooms', bathroomsFilter);
-        const { data: gp } = await genQuery.limit(30);
-        if (gp) textProps = gp;
-
-      } else {
-        // Branch C: Completely open query ("qué tenés?") → show latest from portfolio
-        const { data: gp } = await supabase.from('properties')
-          .select(FULL_SELECT)
-          .eq('agency_id', agencyId)
-          .order('updated_at', { ascending: false })
-          .limit(20);
-        if (gp) textProps = gp;
+        const locConditions = locationKeywords.map(k => `address.ilike.%${k}%,title.ilike.%${k}%,city.ilike.%${k}%`).join(',');
+        genQuery = genQuery.or(locConditions);
       }
 
-      // --- Type filtering ---
-      if (typeKeywords.length > 0 && textProps.length > 0) {
+      if (typeKeywords.length > 0) {
         const isPisoSearch = typeKeywords.includes("piso");
-
         if (isPisoSearch) {
-          // "piso" in Tokko is stored as "Apartment" property_type, but should have "piso" in title/description
-          const pisoMatches = textProps.filter((p: any) =>
-            p.title?.toLowerCase().includes("piso") ||
-            p.description?.toLowerCase().includes("piso completo") ||
-            p.description?.toLowerCase().includes("planta completa")
-          );
-          if (pisoMatches.length > 0) {
-            textProps = pisoMatches;
-          } else {
-            // Fallback: search for departamentos/apartments instead and flag it
-            const deptMatches = textProps.filter((p: any) =>
-              p.property_type?.toLowerCase().includes("apartment") ||
-              p.property_type?.toLowerCase().includes("departamento") ||
-              p.title?.toLowerCase().includes("departamento") ||
-              p.title?.toLowerCase().includes("depto")
-            );
-            if (deptMatches.length > 0) {
-              textProps = deptMatches;
-              pisoFallback = true;
-            }
-            // If no depts either, keep all textProps (don't return empty)
-          }
+          genQuery = genQuery.or('title.ilike.%piso%,description.ilike.%piso completo%,description.ilike.%planta completa%');
         } else {
-          // Normal type filter: property_type, title or description
-          const typeFiltered = textProps.filter((p: any) =>
-            typeKeywords.some(t =>
-              p.property_type?.toLowerCase().includes(t.toLowerCase()) ||
-              p.title?.toLowerCase().includes(t.toLowerCase()) ||
-              p.description?.toLowerCase().includes(t.toLowerCase())
-            )
-          );
-          if (typeFiltered.length > 0) textProps = typeFiltered;
-          // If no type match, keep all (don't be too restrictive)
+          const typeConditions = typeKeywords.map(t => `property_type.ilike.%${t}%,title.ilike.%${t}%`).join(',');
+          genQuery = genQuery.or(typeConditions);
         }
       }
 
-      // --- Merge & Deduplicate (Vector + Text) ---
-      const allPropsMap = new Map<string, any>();
-      const vectorIds = (vectorProps || []).map((p: any) => p.id);
-      let enrichedVector: any[] = [];
-      if (vectorIds.length > 0) {
-        const { data: enriched } = await supabase
-          .from('properties')
-          .select(FULL_SELECT)
-          .in('id', vectorIds);
-        enrichedVector = enriched || [];
+      const { data: dbPropsData } = await genQuery.order('updated_at', { ascending: false }).limit(200);
+      let allProperties = (dbPropsData || []).filter((p: any) => !seenIds.includes(p.id));
+
+      // 2. Roomix Properties
+      let rmQuery = supabase.from('roomix_properties').select('*');
+      
+      if (operation === 'venta') rmQuery = rmQuery.eq('operation', 'sale');
+      else if (operation === 'alquiler') rmQuery = rmQuery.eq('operation', 'rent');
+
+      if (priceMax) rmQuery = rmQuery.lte('price', priceMax);
+      if (priceMin) rmQuery = rmQuery.gte('price', priceMin);
+      
+      if (bedroomsFilter) {
+        // Roomix often has null rooms, so we fallback to title and slug text match
+        const amb = bedroomsFilter;
+        const dorms = bedroomsFilter > 1 ? bedroomsFilter - 1 : 1;
+        const dormWords = ['cero', 'un', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+        const dormWord = dormWords[dorms] || dorms.toString();
+        rmQuery = rmQuery.or(
+          `rooms.gte.${amb},bedrooms.gte.${amb},` +
+          `title.ilike.%${amb} amb%,title.ilike.%${amb}amb%,` +
+          `title.ilike.%${dorms} dorm%,title.ilike.%${dorms}dorm%,` +
+          `title.ilike.%${dormWord} dorm%,` +
+          `slug.ilike.%${amb}-ambientes%,slug.ilike.%${amb}-amb%,slug.ilike.%${dorms}-dorm%`
+        );
       }
-      const vectorSimilarityMap = new Map((vectorProps || []).map((p: any) => [p.id, p.similarity]));
-      enrichedVector.forEach((p: any) => allPropsMap.set(p.id, { ...p, similarity: vectorSimilarityMap.get(p.id) || 0.3 }));
-      textProps.forEach((p: any) => {
-        if (!allPropsMap.has(p.id)) allPropsMap.set(p.id, { ...p, similarity: 0.6 });
-        else {
-          const existing = allPropsMap.get(p.id);
-          allPropsMap.set(p.id, { ...existing, similarity: Math.min(1, (existing.similarity || 0) + 0.3) });
+      if (bathroomsFilter) {
+        rmQuery = rmQuery.or(`bathrooms.gte.${bathroomsFilter},title.ilike.%${bathroomsFilter} baño%,title.ilike.%${bathroomsFilter} bano%`);
+      }
+
+      if (locationKeywords.length > 0) {
+        const rmLoc = locationKeywords.map(k => `neighborhood.ilike.%${k}%,address.ilike.%${k}%`).join(',');
+        rmQuery = rmQuery.or(rmLoc);
+      }
+
+      if (typeKeywords.length > 0) {
+        const isPisoSearch = typeKeywords.includes("piso");
+        if (isPisoSearch) {
+          rmQuery = rmQuery.or('title.ilike.%piso%,description.ilike.%piso completo%,description.ilike.%planta completa%');
+        } else {
+          // Translate Spanish types to Schema.org English types used by Roomix
+          const roomixTypeMap: Record<string, string[]> = {
+            'departamento': ['Apartment', 'Accommodation'],
+            'casa': ['House', 'SingleFamilyResidence'],
+            'oficina': ['Office'],
+            'lote': ['Land'],
+            'terreno': ['Land'],
+            'local': ['Commercial', 'Store']
+          };
+          const allTypes = [...typeKeywords];
+          typeKeywords.forEach(t => {
+            const mapped = roomixTypeMap[t.toLowerCase()];
+            if (mapped) allTypes.push(...mapped);
+          });
+          const rmType = allTypes.map(t => `property_type.ilike.%${t}%,title.ilike.%${t}%`).join(',');
+          rmQuery = rmQuery.or(rmType);
         }
+      }
+
+      const { data: rmPropsData, error: rmError } = await rmQuery.order('lastmod', { ascending: false }).limit(200);
+      if (rmError) console.error("Roomix Query Error:", rmError);
+      console.log("Roomix Query match count:", rmPropsData?.length);
+      let rawRoomix = (rmPropsData || []).map(p => ({ ...p, id: p.slug }));
+      console.log("First Roomix matched:", rawRoomix[0]?.title);
+
+      // --- Amenity scoring & ranking ---
+      allProperties = allProperties.map((p: any) => {
+        const { matched, missing } = matchAmenities(p, amenityKeywords);
+        const score = amenityKeywords.length > 0 ? matched.length / amenityKeywords.length : 1;
+        return { ...p, amenity_matches: { matched, missing }, amenity_score: score };
       });
 
-      let allProperties = Array.from(allPropsMap.values()).filter((p: any) => !seenIds.includes(p.id));
+      allProperties.sort((a: any, b: any) => {
+        if ((b.amenity_score || 0) !== (a.amenity_score || 0)) return (b.amenity_score || 0) - (a.amenity_score || 0);
+        return 0; // Maintain SQL recency ordering
+      });
 
-      // --- Amenity scoring & filtering ---
-      if (amenityKeywords.length > 0) {
-        allProperties = allProperties.map((p: any) => {
-          const { matched, missing } = matchAmenities(p, amenityKeywords);
-          const score = matched.length / amenityKeywords.length;
-          return { ...p, amenity_matches: { matched, missing }, amenity_score: score };
-        });
-        // Sort: full match first → partial → no match
-        allProperties.sort((a: any, b: any) => {
-          if ((b.amenity_score || 0) !== (a.amenity_score || 0)) return (b.amenity_score || 0) - (a.amenity_score || 0);
-          return (b.similarity || 0) - (a.similarity || 0);
-        });
-        // Show properties with at least one amenity match, if any exist
-        const withSomeMatch = allProperties.filter((p: any) => (p.amenity_score || 0) > 0);
-        if (withSomeMatch.length > 0) allProperties = withSomeMatch;
-      } else {
-        // No amenity filter → add empty amenity_matches and rank by location + similarity
-        allProperties = allProperties.map((p: any) => ({ ...p, amenity_matches: { matched: [], missing: [] } }));
-        allProperties.sort((a: any, b: any) => {
-          const aLocScore = locationKeywords.filter(k =>
-            a.address?.toLowerCase().includes(k.toLowerCase()) ||
-            a.city?.toLowerCase().includes(k.toLowerCase()) ||
-            a.title?.toLowerCase().includes(k.toLowerCase())
-          ).length;
-          const bLocScore = locationKeywords.filter(k =>
-            b.address?.toLowerCase().includes(k.toLowerCase()) ||
-            b.city?.toLowerCase().includes(k.toLowerCase()) ||
-            b.title?.toLowerCase().includes(k.toLowerCase())
-          ).length;
-          if (aLocScore !== bLocScore) return bLocScore - aLocScore;
-          return (b.similarity || 0) - (a.similarity || 0);
-        });
-      }
+      // ─── Nivel 1 y 2: Propias y Agencia ───
+      const propias = allProperties
+        .filter((p: any) => p.assigned_agent_id === userId)
+        .slice(0, 10)
+        .map((p: any) => ({
+          ...p,
+          source: 'own',
+          agent_name: p.assigned_agent?.full_name || 'Sin asignar',
+          agent_email: p.assigned_agent?.email || ''
+        }));
 
-      newMatchedProperties = allProperties.slice(0, 10);
+      const agencia = allProperties
+        .filter((p: any) => p.assigned_agent_id !== userId)
+        .slice(0, 10)
+        .map((p: any) => ({
+          ...p,
+          source: 'agency',
+          agent_name: p.assigned_agent?.full_name || 'Sin asignar',
+          agent_email: p.assigned_agent?.email || ''
+        }));
+
+      // ─── Nivel 3: Red de Colaboración (Roomix) ───
+      let roomix = rawRoomix.map((rp: any) => ({
+        id: `roomix_${rp.id}`,
+        title: rp.title,
+        address: rp.address || rp.neighborhood || '',
+        city: rp.neighborhood,
+        property_type: rp.property_type || '',
+        price: rp.price ? Number(rp.price) : 0,
+        currency: rp.currency || 'USD',
+        bedrooms: rp.bedrooms || rp.rooms || 0,
+        bathrooms: rp.bathrooms || 0,
+        total_area: rp.area_m2 ? Number(rp.area_m2) : 0,
+        status: rp.operation === 'rent' ? 'Alquiler' : 'Venta',
+        images: rp.images || [],
+        description: rp.description || '',
+        amenities: rp.amenities || [],
+        source: 'roomix',
+        roomix_agency_name: rp.roomix_agency_name || 'Inmobiliaria colaboradora',
+        roomix_agency_logo: rp.roomix_agency_logo,
+        roomix_agency_source_url: rp.roomix_agency_source_url,
+        canonical_url: rp.canonical_url,
+        agent_name: rp.roomix_agency_name || 'Inmobiliaria colaboradora',
+        agent_email: '',
+      }));
+
+      roomix = roomix.map((p: any) => {
+        const pSearchable = (p.amenities.join(' ') + ' ' + p.description).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const matched: string[] = [];
+        const missing: string[] = [];
+        if (amenityKeywords.length > 0) {
+          for (const amenity of amenityKeywords) {
+            const a = amenity.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const terms = AMENITY_SYNONYMS[amenity.toLowerCase()] || AMENITY_SYNONYMS[a] || [a];
+            if (terms.some((term: string) => pSearchable.includes(term))) matched.push(amenity);
+            else missing.push(amenity);
+          }
+        }
+        const score = amenityKeywords.length > 0 ? matched.length / amenityKeywords.length : 1;
+        return { ...p, amenity_matches: { matched, missing }, amenity_score: score };
+      });
+
+      roomix.sort((a: any, b: any) => {
+        if ((b.amenity_score || 0) !== (a.amenity_score || 0)) return (b.amenity_score || 0) - (a.amenity_score || 0);
+        return 0; // Maintain SQL recency ordering
+      });
+
+      roomix = roomix.slice(0, 10);
+
+      newMatchedProperties = { propias, agencia, roomix } as any;
+      const allNewProps = [...propias, ...agencia, ...roomix];
 
       // Update session seen IDs
-      const updatedSeenIds = Array.from(new Set([...seenIds, ...newMatchedProperties.map((p: any) => p.id)]));
+      const updatedSeenIds = Array.from(new Set([...seenIds, ...allNewProps.map((p: any) => p.id)]));
       await supabase.from('consultor_chat_sessions')
         .update({ metadata: { seen_property_ids: updatedSeenIds }, updated_at: new Date().toISOString() })
         .eq('id', currentSessionId);
 
       // Build context for the AI (concise and instructional)
-      const fullAmenityCount  = amenityKeywords.length > 0 ? newMatchedProperties.filter((p: any) => p.amenity_score === 1).length : 0;
-      const partialAmenityCount = amenityKeywords.length > 0 ? newMatchedProperties.filter((p: any) => (p.amenity_score || 0) > 0 && (p.amenity_score || 0) < 1).length : 0;
-
-      propertyContext = newMatchedProperties.length > 0
-        ? `Se encontraron ${newMatchedProperties.length} propiedades que se muestran como tarjetas en la UI.
+      const totalResults = allNewProps.length;
+      propertyContext = totalResults > 0
+        ? `Se encontraron ${totalResults} propiedades (${propias.length} propias, ${agencia.length} de la agencia, ${roomix.length} de colaboración Roomix). Se muestran agrupadas en 3 secciones en la UI.
 ${pisoFallback ? `AVISO IMPORTANTE: El usuario buscó un "piso" (depto planta completa) pero no se encontró ninguno. Se muestran departamentos como alternativa. Comunicale esto claramente al INICIO de tu respuesta.` : ''}
-${amenityKeywords.length > 0 ? `Amenities solicitados: [${amenityKeywords.join(', ')}]. ${fullAmenityCount} propiedades los tienen TODOS. ${partialAmenityCount} tienen ALGUNOS (las tarjetas muestran badges ✓/✗ de qué tiene y qué falta cada propiedad).` : ''}
-Respondé con un resumen MUY BREVE (2-4 oraciones): cuántas encontraste, destacá novedades sobre amenities o el fallback de piso, y ofrecé refinar la búsqueda.`
+Respondé con un resumen MUY BREVE (2-4 oraciones): cuántas encontraste y ofrecé refinar la búsqueda.`
         : `No se encontraron propiedades con esos criterios.${pisoFallback ? ' Tampoco se encontraron departamentos.' : ''} Explicá cordialmente y sugerí alternativas concretas (ampliar zona, cambiar precio, quitar algún filtro).`;
     }
 

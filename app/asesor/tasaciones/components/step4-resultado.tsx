@@ -120,7 +120,7 @@ export function Step4Resultado({
           </div>
           
           {/* Card Medio / Sugerido */}
-          <div className="bg-accent/10 p-8 rounded-3xl border border-accent flex flex-col items-center justify-center text-center shadow-[0_0_40px_-10px] shadow-accent/20 scale-105 z-10">
+          <div className="bg-accent/10 p-8 rounded-3xl border border-accent flex flex-col items-center justify-center text-center shadow-[0_0_40px_-10px] shadow-accent/20 md:scale-105 z-10">
             <div className="bg-accent text-accent-foreground text-[10px] uppercase font-bold px-3 py-1 rounded-full mb-3 shadow-md inline-flex items-center gap-1">
               <Tag className="w-3 h-3" /> Sugerido Venta
             </div>

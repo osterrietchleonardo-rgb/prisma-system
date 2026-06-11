@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { AiCreditBadge } from "@/components/ai-credit-badge"
-
+import { ConsultorResultsSection, MatchedPropertiesResponse, UnifiedProperty } from "@/components/shared/consultor-results"
 interface Property {
   id: string
   title: string
@@ -37,7 +37,7 @@ interface Property {
 interface Message {
   role: "user" | "assistant"
   content: string
-  matchedProperties?: Property[]
+  matchedProperties?: MatchedPropertiesResponse | UnifiedProperty[]
 }
 
 interface Session {
@@ -442,84 +442,8 @@ export default function ConsultorIAPage() {
                     })}
 
                     {/* Matched Properties after all bubbles */}
-                    {message.matchedProperties && message.matchedProperties.length > 0 && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full animate-in fade-in slide-in-from-top-4 duration-700 mt-4">
-                        {message.matchedProperties.map((prop) => {
-                          const currentImgIdx = activeImageIndices[prop.id] || 0;
-                          const images = prop.images && prop.images.length > 0 ? prop.images : ['https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=400'];
-                          
-                          return (
-                            <Card key={prop.id} className="overflow-hidden border-accent/10 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm group hover:border-accent/30 transition-all shadow-lg hover:shadow-xl">
-                              <div className="relative aspect-video overflow-hidden">
-                                <img src={images[currentImgIdx]} alt={prop.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
-                                
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                
-                                <div className="absolute top-2 right-2 flex gap-1">
-                                  <Badge className="bg-black/60 text-[8px] uppercase">{prop.status}</Badge>
-                                  <Badge className="bg-accent text-[8px] uppercase">{prop.property_type}</Badge>
-                                </div>
-
-                                {images.length > 1 && (
-                                  <>
-                                    <button onClick={(e) => { e.stopPropagation(); prevImage(prop.id, images.length); }} className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/50">
-                                      <ChevronLeft className="w-4 h-4" />
-                                    </button>
-                                    <button onClick={(e) => { e.stopPropagation(); nextImage(prop.id, images.length); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/50">
-                                      <ChevronRight className="w-4 h-4" />
-                                    </button>
-                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-                                      {images.slice(0, 5).map((_, idx) => (
-                                        <div key={idx} className={cn("w-1.5 h-1.5 rounded-full", idx === currentImgIdx ? "bg-accent" : "bg-white/40")} />
-                                      ))}
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                              
-                              <CardHeader className="p-4 pb-2">
-                                <div className="flex justify-between items-start">
-                                  <h4 className="font-bold text-sm line-clamp-1 flex-1">{prop.title}</h4>
-                                  <span className="text-accent font-bold text-sm whitespace-nowrap ml-2">{prop.currency} {new Intl.NumberFormat().format(prop.price)}</span>
-                                </div>
-                                <div className="flex items-center text-[10px] text-muted-foreground gap-1 mt-1">
-                                  <MapPin className="h-3 w-3" /> {prop.address}
-                                </div>
-                              </CardHeader>
-                              
-                              <CardContent className="p-4 pt-2 pb-2 flex items-center justify-between text-[11px] font-medium text-muted-foreground border-b border-border/10">
-                                <div className="flex items-center gap-1"><BedDouble className="w-3 h-3 text-accent" /> {prop.bedrooms} Dorm.</div>
-                                <div className="flex items-center gap-1"><Bath className="w-3 h-3 text-accent" /> {prop.bathrooms} Baños</div>
-                                <div className="flex items-center gap-1"><Maximize className="w-3 h-3 text-accent" /> {prop.total_area}m²</div>
-                              </CardContent>
-
-                              {/* Amenity match badges (only shown when user filtered by amenities) */}
-                              {prop.amenity_matches && (prop.amenity_matches.matched.length > 0 || prop.amenity_matches.missing.length > 0) && (
-                                <div className="px-4 pb-2 flex flex-wrap gap-1.5">
-                                  {prop.amenity_matches.matched.map((a: string) => (
-                                    <span key={a} className="inline-flex items-center gap-0.5 text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-semibold">
-                                      ✓ {a}
-                                    </span>
-                                  ))}
-                                  {prop.amenity_matches.missing.map((a: string) => (
-                                    <span key={a} className="inline-flex items-center gap-0.5 text-[10px] bg-orange-500/10 text-orange-500 dark:text-orange-400 border border-orange-500/20 px-2 py-0.5 rounded-full font-semibold">
-                                      ✗ {a}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-
-                              <CardFooter className="p-3 bg-muted/5 transition-colors group-hover:bg-accent/5">
-                                <Button variant="ghost" className="w-full text-xs gap-2 h-8 group-hover:text-accent" asChild>
-                                  <a href={`/director/propiedades/${prop.id}`} target="_blank">
-                                    Ver Ficha Completa <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                </Button>
-                              </CardFooter>
-                            </Card>
-                          )
-                        })}
-                      </div>
+                    {message.matchedProperties && (
+                      <ConsultorResultsSection results={message.matchedProperties} />
                     )}
                   </div>
                 </div>

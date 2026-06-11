@@ -132,12 +132,12 @@ export function Step2Comparables({ comparables, onChange, onNext, onPrev }: Step
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-      <div className="flex justify-between items-center border-b border-accent/10 pb-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 border-b border-accent/10 pb-4">
         <div>
           <h3 className="text-xl font-black">Comparables de Mercado</h3>
           <p className="text-sm text-muted-foreground">Debes agregar al menos 3 comparables para la homogeneización.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 shrink-0">
           {/* TOKKO BUTTON */}
           <Dialog open={modalTokkoOpen} onOpenChange={(open) => {
             setModalTokkoOpen(open);
@@ -177,7 +177,7 @@ export function Step2Comparables({ comparables, onChange, onNext, onPrev }: Step
                   </div>
                 ) : (
                   tokkoResults.map(p => (
-                     <div key={p.id} className="p-3 border border-accent/10 rounded-xl bg-card/50 flex justify-between items-center transition-all hover:border-accent/40">
+                     <div key={p.id} className="p-3 border border-accent/10 rounded-xl bg-card/50 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 transition-all hover:border-accent/40">
                        <div>
                          <p className="font-bold text-sm bg-accent/10 text-accent px-2 rounded w-max mb-1 uppercase text-[10px]">Tokko ID: {p.reference_code}</p>
                          <p className="font-semibold">{p.fake_address || p.address}</p>
@@ -215,7 +215,7 @@ export function Step2Comparables({ comparables, onChange, onNext, onPrev }: Step
               <DialogHeader>
                 <DialogTitle>Nuevo Comparable Manual</DialogTitle>
               </DialogHeader>
-              <div className="grid grid-cols-2 gap-4 py-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
                 <div className="space-y-2">
                   <Label>Fuente</Label>
                   <Select value={newComp.fuente} onValueChange={(v: any) => setNewComp({...newComp, fuente: v})}>
