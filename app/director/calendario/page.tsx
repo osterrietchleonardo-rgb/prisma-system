@@ -335,10 +335,17 @@ export default function CalendarioPage() {
                       <DialogContent className="bg-card border-accent/20 max-w-2xl max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                           <div className="flex justify-between items-start">
-                             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                               <Clock className="h-5 w-5 text-accent" />
-                               Detalle de Visita
-                             </DialogTitle>
+                             <div className="flex flex-col gap-1">
+                               <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                                 <Clock className="h-5 w-5 text-accent" />
+                                 Detalle de Visita
+                               </DialogTitle>
+                               {visit.motivo_cambio && visit.estado_visita === 'agendada' && (
+                                 <Badge variant="outline" className="w-fit text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/20">
+                                   Modificada
+                                 </Badge>
+                               )}
+                             </div>
                              <Badge className={cn(
                                "border-none px-3 capitalize",
                                visit.estado_visita === 'agendada' ? "bg-accent/10 text-accent" : 
@@ -394,7 +401,7 @@ export default function CalendarioPage() {
                               </div>
                            </div>
 
-                           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                               <div className="space-y-1">
                                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Operación</span>
                                  <Badge variant="outline" className="block text-center border-accent/20 capitalize">{visit.tipo_operacion || '-'}</Badge>
@@ -413,10 +420,6 @@ export default function CalendarioPage() {
                                  )}>
                                    {visit.calificacion_lead || '-'}
                                  </Badge>
-                              </div>
-                              <div className="space-y-1">
-                                 <span className="text-[10px] uppercase font-bold text-muted-foreground">Score BANT</span>
-                                 <p className="text-sm font-bold">{visit.score_bant}/12</p>
                               </div>
                            </div>
                            
@@ -439,6 +442,20 @@ export default function CalendarioPage() {
                                 <span className="text-[10px] uppercase font-bold text-muted-foreground">Resumen Conversación</span>
                                 <p className="text-xs text-muted-foreground">{visit.resumen_conversacion || 'Sin resumen'}</p>
                               </div>
+                              {visit.motivo_cambio && (
+                                <div className={cn(
+                                  "p-4 rounded-xl border space-y-2",
+                                  visit.estado_visita === 'cancelada' ? "bg-red-500/5 border-red-500/20" : "bg-amber-500/5 border-amber-500/20"
+                                )}>
+                                  <span className={cn(
+                                    "text-[10px] uppercase font-bold",
+                                    visit.estado_visita === 'cancelada' ? "text-red-500" : "text-amber-500"
+                                  )}>
+                                    {visit.estado_visita === 'cancelada' ? 'Motivo de Cancelación' : 'Motivo de Modificación'}
+                                  </span>
+                                  <p className="text-xs text-foreground italic">{visit.motivo_cambio}</p>
+                                </div>
+                              )}
                            </div>
                         </div>
                       </DialogContent>
