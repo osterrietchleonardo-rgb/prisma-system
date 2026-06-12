@@ -30,6 +30,10 @@ import {
   PopoverContent, 
   PopoverTrigger 
 } from "@/components/ui/popover"
+import { EditVisitDialog } from "@/components/calendar/EditVisitDialog"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
 import { DateRange } from "react-day-picker"
 import { 
@@ -60,7 +64,50 @@ export default function AsesorCalendarioPage() {
   const [isNewVisitOpen, setIsNewVisitOpen] = useState(false)
   const [date, setDate] = useState<DateRange | undefined>()
   
+  const [editingVisit, setEditingVisit] = useState<any>(null)
+  const [cancelingVisit, setCancelingVisit] = useState<any>(null)
+  const [cancelReason, setCancelReason] = useState("")
+  const [isCanceling, setIsCanceling] = useState(false)
+  
   const supabase = createClient()
+
+  const isFutureVisit = (dateStr: string, timeStr: string) => {
+    try {
+      const visitDate = parseISO(`${dateStr}T${timeStr || '00:00'}`)
+      return visitDate > new Date()
+    } catch {
+      return false
+    }
+  }
+
+  const handleCancelSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!cancelReason.trim()) {
+      toast.error("Debes ingresar un motivo de cancelación")
+      return
+    }
+    try {
+      setIsCanceling(true)
+      const { error } = await supabase
+        .from("scheduled_visits")
+        .update({ 
+          estado_visita: 'cancelada', 
+          motivo_cambio: cancelReason 
+        })
+        .eq("id", cancelingVisit.id)
+
+      if (error) throw error
+
+      toast.success("Visita cancelada")
+      setCancelingVisit(null)
+      setCancelReason("")
+      fetchData()
+    } catch (error: any) {
+      toast.error("Error al cancelar: " + error.message)
+    } finally {
+      setIsCanceling(false)
+    }
+  }
 
   useEffect(() => {
     async function loadUser() {
@@ -157,6 +204,45 @@ export default function AsesorCalendarioPage() {
         agencyId={agencyId || ""}
         userId={userId || ""}
       />
+
+      <EditVisitDialog 
+        visit={editingVisit}
+        open={!!editingVisit}
+        onOpenChange={(open) => !open && setEditingVisit(null)}
+        onSuccess={fetchData}
+        agencyId={agencyId || ""}
+      />
+
+      <Dialog open={!!cancelingVisit} onOpenChange={(open) => !open && setCancelingVisit(null)}>
+        <DialogContent className="bg-card border-red-500/20 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-500 font-bold text-xl">Confirmar Cancelación</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              ¿Estás seguro de que deseas cancelar la visita de <span className="font-bold">{cancelingVisit?.nombre_completo}</span>?
+            </p>
+            <div className="space-y-2">
+              <Label className="text-red-400">Motivo de la cancelación *</Label>
+              <Textarea 
+                placeholder="Por favor, indica por qué se cancela la visita..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="bg-accent/5 border-red-500/30"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="ghost" onClick={() => {
+                setCancelingVisit(null)
+                setCancelReason("")
+              }}>Atrás</Button>
+              <Button variant="destructive" disabled={isCanceling} onClick={handleCancelSubmit}>
+                {isCanceling ? "Cancelando..." : "Confirmar Cancelación"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Card className="border-accent/10 bg-card/30 backdrop-blur-md shadow-2xl overflow-hidden">
         {/* Calendar Header */}
@@ -281,10 +367,17 @@ export default function AsesorCalendarioPage() {
                       <DialogContent className="bg-card border-accent/20 max-w-2xl max-h-[90vh] overflow-y-auto">
                         <DialogHeader>
                           <div className="flex justify-between items-start">
-                             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                               <Clock className="h-5 w-5 text-accent" />
-                               Detalle de Visita
-                             </DialogTitle>
+                             <div className="flex flex-col gap-1">
+                               <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                                 <Clock className="h-5 w-5 text-accent" />
+                                 Detalle de Visita
+                               </DialogTitle>
+                               {visit.motivo_cambio && visit.estado_visita === 'agendada' && (
+                                 <Badge variant="outline" className="w-fit text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/20">
+                                   Modificada
+                                 </Badge>
+                               )}
+                             </div>
                              <Badge className={cn(
                                "border-none px-3 capitalize",
                                visit.estado_visita === 'agendada' ? "bg-accent/10 text-accent" : 
@@ -323,7 +416,7 @@ export default function AsesorCalendarioPage() {
                               </div>
                            </div>
 
-                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                               <div className="space-y-1">
                                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Operación</span>
                                  <Badge variant="outline" className="block text-center border-accent/20 capitalize">{visit.tipo_operacion || '-'}</Badge>
@@ -342,10 +435,6 @@ export default function AsesorCalendarioPage() {
                                  )}>
                                    {visit.calificacion_lead || '-'}
                                  </Badge>
-                              </div>
-                              <div className="space-y-1">
-                                 <span className="text-[10px] uppercase font-bold text-muted-foreground">Score BANT</span>
-                                 <p className="text-sm font-bold">{visit.score_bant}/12</p>
                               </div>
                            </div>
                            
@@ -368,7 +457,45 @@ export default function AsesorCalendarioPage() {
                                 <span className="text-[10px] uppercase font-bold text-muted-foreground">Resumen Conversación</span>
                                 <p className="text-xs text-muted-foreground">{visit.resumen_conversacion || 'Sin resumen'}</p>
                               </div>
+                              {visit.motivo_cambio && (
+                                <div className={cn(
+                                  "p-4 rounded-xl border space-y-2",
+                                  visit.estado_visita === 'cancelada' ? "bg-red-500/5 border-red-500/20" : "bg-amber-500/5 border-amber-500/20"
+                                )}>
+                                  <span className={cn(
+                                    "text-[10px] uppercase font-bold",
+                                    visit.estado_visita === 'cancelada' ? "text-red-500" : "text-amber-500"
+                                  )}>
+                                    {visit.estado_visita === 'cancelada' ? 'Motivo de Cancelación' : 'Motivo de Modificación'}
+                                  </span>
+                                  <p className="text-xs text-foreground italic">{visit.motivo_cambio}</p>
+                                </div>
+                              )}
                            </div>
+
+                           {/* Action Buttons */}
+                           {visit.estado_visita === 'agendada' && isFutureVisit(visit.fecha_visita, visit.hora_visita) ? (
+                              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-accent/10">
+                                <Button 
+                                  variant="destructive" 
+                                  className="w-full sm:w-auto"
+                                  onClick={() => setCancelingVisit(visit)}
+                                >
+                                  Cancelar Visita
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  className="w-full sm:w-auto border-accent/20 hover:bg-accent/10"
+                                  onClick={() => setEditingVisit(visit)}
+                                >
+                                  Reprogramar / Editar
+                                </Button>
+                              </div>
+                           ) : (
+                              <div className="pt-4 border-t border-accent/10 text-xs italic text-muted-foreground text-center">
+                                Esta visita ya no puede ser modificada.
+                              </div>
+                           )}
                         </div>
                       </DialogContent>
                     </Dialog>

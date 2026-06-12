@@ -109,7 +109,7 @@ export function NotificationPopover() {
                     </div>
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center justify-between">
-                        <p className={`text-sm font-bold tracking-tight ${!notification.read ? 'text-white' : 'text-muted-foreground'}`}>
+                        <p className={`text-sm font-bold tracking-tight ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
                           {notification.title}
                         </p>
                         <span className="text-[9px] font-bold text-muted-foreground/40 uppercase">

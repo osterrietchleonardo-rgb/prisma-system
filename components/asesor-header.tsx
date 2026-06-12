@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { ModeToggle } from "@/components/mode-toggle"
 import { UserNav } from "@/components/user-nav"
 import { Badge } from "@/components/ui/badge"
 import { Search, Menu } from "lucide-react"
@@ -118,6 +119,8 @@ export function AsesorHeader({ userName, userEmail, agencyName, userRole }: Ases
           <NotificationPopover />
 
           <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
+
+          <ModeToggle />
 
           <UserNav
             userName={userName}

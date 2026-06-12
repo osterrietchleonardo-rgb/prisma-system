@@ -39,6 +39,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
+import { SearchableSelect } from "@/components/ui/searchable-select"
+import { getTrackingOptions } from "@/actions/tracking/getTrackingOptions"
+import { createManualContact } from "@/actions/whatsapp/createManualContact"
 
 interface NewVisitDialogProps {
   open: boolean
@@ -72,6 +75,7 @@ export function NewVisitDialog({
     hora_visita: "",
     propiedad_titulo: "",
     zona_propiedad: "",
+    propiedad_colaboracion: "",
     tipo_operacion: "compra",
     presupuesto: "",
     calificacion_lead: "WARM",
@@ -83,6 +87,13 @@ export function NewVisitDialog({
     resumen_conversacion: "",
     agent_id: isAdmin ? "" : userId
   })
+
+  const [trackingOptions, setTrackingOptions] = useState<{
+    leads: any[];
+    waContacts: any[];
+  }>({ leads: [], waContacts: [] });
+  const [clientType, setClientType] = useState<"manual" | "tokko" | "whatsapp">("manual");
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
 
   const supabase = createClient()
 
@@ -107,6 +118,10 @@ export function NewVisitDialog({
           .eq("agency_id", agencyId)
         
         if (profiles) setAllAgencyProfiles(profiles)
+
+        // Fetch tracking options for leads and WA contacts
+        const options = await getTrackingOptions()
+        setTrackingOptions(options)
       }
       fetchData()
     }
@@ -138,34 +153,100 @@ export function NewVisitDialog({
     }
   }
 
-  const filteredProperties = properties.filter(p => 
-    p.title.toLowerCase().includes(propertySearch.toLowerCase()) ||
-    p.address?.toLowerCase().includes(propertySearch.toLowerCase())
-  )
+  const activeAgentId = isAdmin ? formData.agent_id : userId;
+  const activeProfile = allAgencyProfiles.find(p => p.id === activeAgentId);
+
+  const filteredProperties = properties.filter(p => {
+    const searchMatch = p.title.toLowerCase().includes(propertySearch.toLowerCase()) ||
+                        p.address?.toLowerCase().includes(propertySearch.toLowerCase());
+                        
+    // Filter by selected agent's email. If admin hasn't selected an agent, show all.
+    const agentMatch = activeProfile?.email && p.assigned_agent?.email
+      ? p.assigned_agent.email.toLowerCase() === activeProfile.email.toLowerCase()
+      : (isAdmin && !formData.agent_id);
+
+    return searchMatch && agentMatch;
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.fecha_visita || !formData.hora_visita || !formData.nombre_completo) {
-      toast.error("Por favor completa los campos obligatorios")
+
+    let finalPhone = formData.telefono;
+    let finalName = formData.nombre_completo;
+
+    if (clientType === "tokko" && selectedLeadId) {
+      const lead = trackingOptions.leads.find(l => l.id === selectedLeadId);
+      if (lead) {
+        finalPhone = lead.phone || lead.cellphone || "";
+        finalName = lead.full_name || lead.name || "";
+      }
+    } else if (clientType === "whatsapp" && selectedLeadId) {
+      const waContact = trackingOptions.waContacts.find(c => c.id === selectedLeadId);
+      if (waContact) {
+        finalPhone = waContact.phone || "";
+        finalName = waContact.name || "";
+      }
+    }
+
+    if (!formData.fecha_visita || !formData.hora_visita || !finalName || !finalPhone) {
+      toast.error("Por favor completa los campos obligatorios de fecha, hora y cliente (nombre y teléfono)")
       return
     }
 
-    if (isAdmin && !formData.agent_id) {
+    const finalAgentId = isAdmin ? formData.agent_id : userId;
+
+    if (isAdmin && !finalAgentId) {
       toast.error("Por favor selecciona un asesor")
       return
     }
 
     try {
       setLoading(true)
+
+      // Si es manual, creamos el contacto en WA para que quede registrado
+      if (clientType === "manual") {
+        if (!/^\d+$/.test(finalPhone)) {
+          toast.error("El número de celular debe contener solo números (código de país y área, ej: 549...).");
+          setLoading(false);
+          return;
+        }
+
+        const result = await createManualContact({
+          name: finalName,
+          phone: finalPhone,
+          agent_id: finalAgentId
+        });
+        
+        if (!result.success) {
+          toast.error(result.error || "Error al registrar el contacto manual en WhatsApp.");
+          setLoading(false);
+          return;
+        }
+      }
       
+      const insertData: any = {
+        ...formData,
+        nombre_completo: finalName,
+        telefono: finalPhone,
+        lead_id: finalPhone, // Usar celular como ID de lead según requerimiento
+        agency_id: agencyId,
+        agent_id: finalAgentId, // Override for cases where formData.agent_id is empty
+        score_bant: 0 // Hardcoded to 0
+      }
+
+      // Merge prop_colab with title if it's set
+      if (formData.propiedad_colaboracion) {
+        insertData.propiedad_titulo = insertData.propiedad_titulo 
+          ? `${insertData.propiedad_titulo} | Colab: ${formData.propiedad_colaboracion}`
+          : `Colaboración: ${formData.propiedad_colaboracion}`;
+      }
+
+      // Eliminar el campo que no existe en la base de datos
+      delete insertData.propiedad_colaboracion;
+
       const { error } = await supabase
         .from("scheduled_visits")
-        .insert({
-          ...formData,
-          lead_id: formData.telefono, // Usar celular como ID de lead
-          agency_id: agencyId,
-          score_bant: parseInt(formData.score_bant.toString()) || 0
-        })
+        .insert(insertData)
 
       if (error) throw error
 
@@ -181,6 +262,7 @@ export function NewVisitDialog({
         hora_visita: "",
         propiedad_titulo: "",
         zona_propiedad: "",
+        propiedad_colaboracion: "",
         tipo_operacion: "compra",
         presupuesto: "",
         calificacion_lead: "WARM",
@@ -192,6 +274,8 @@ export function NewVisitDialog({
         resumen_conversacion: "",
         agent_id: isAdmin ? "" : userId
       })
+      setClientType("manual");
+      setSelectedLeadId(null);
     } catch (error: any) {
       console.error(error)
       toast.error("Error al agendar visita: " + error.message)
@@ -216,45 +300,102 @@ export function NewVisitDialog({
             <h3 className="text-sm font-black uppercase tracking-widest text-accent flex items-center gap-2">
               <User className="h-4 w-4" /> Información del Lead
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="nombre_completo">Nombre Completo *</Label>
-                <Input 
-                  id="nombre_completo" 
-                  value={formData.nombre_completo}
-                  onChange={(e) => setFormData({...formData, nombre_completo: e.target.value})}
-                  placeholder="Ej: Juan Pérez"
-                  className="bg-accent/5 border-accent/10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="telefono">Teléfono</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="telefono" 
-                    value={formData.telefono}
-                    onChange={(e) => setFormData({...formData, telefono: e.target.value})}
-                    placeholder="+54 11 ..."
-                    className="pl-10 bg-accent/5 border-accent/10"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="email" 
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    placeholder="juan@ejemplo.com"
-                    className="pl-10 bg-accent/5 border-accent/10"
-                  />
-                </div>
-              </div>
+            
+            <div className="mb-4">
+              <Label>Tipo de Cliente</Label>
+              <Select value={clientType} onValueChange={(v: any) => {
+                setClientType(v);
+                setSelectedLeadId(null);
+              }}>
+                <SelectTrigger className="w-full md:w-[300px] h-10 bg-accent/5 border-accent/10">
+                  <SelectValue placeholder="Tipo de cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">Nuevo Contacto (Manual)</SelectItem>
+                  <SelectItem value="tokko">Lead (Tokko / Web)</SelectItem>
+                  <SelectItem value="whatsapp">Contacto WhatsApp</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+
+            {clientType === "manual" && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-2">
+                  <Label htmlFor="nombre_completo">Nombre Completo *</Label>
+                  <Input 
+                    id="nombre_completo" 
+                    value={formData.nombre_completo}
+                    onChange={(e) => setFormData({...formData, nombre_completo: e.target.value})}
+                    placeholder="Ej: Juan Pérez"
+                    className="bg-accent/5 border-accent/10"
+                    required={clientType === "manual"}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="telefono">Teléfono *</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      id="telefono" 
+                      value={formData.telefono}
+                      onChange={(e) => setFormData({...formData, telefono: e.target.value})}
+                      placeholder="Ej: 5491143435555"
+                      className="pl-10 bg-accent/5 border-accent/10"
+                      required={clientType === "manual"}
+                      pattern="^\d+$"
+                      title="Ingresá solo números, con código de país y área (ej: 549...)"
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-tight">Formato internacional completo, sin espacios ni +.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email (Opcional)</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      id="email" 
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      placeholder="juan@ejemplo.com"
+                      className="pl-10 bg-accent/5 border-accent/10"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {clientType === "tokko" && (
+               <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                  <Label>Buscar Lead de Tokko</Label>
+                  <SearchableSelect 
+                    options={trackingOptions.leads.map(l => ({
+                      label: l.full_name || 'Sin nombre',
+                      value: l.id
+                    }))}
+                    value={selectedLeadId || undefined}
+                    onChange={(val) => setSelectedLeadId(val)}
+                    placeholder="Buscar Lead de Tokko..."
+                    emptyMessage="No se encontraron leads."
+                  />
+               </div>
+            )}
+
+            {clientType === "whatsapp" && (
+               <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                  <Label>Buscar Contacto WhatsApp</Label>
+                  <SearchableSelect 
+                    options={trackingOptions.waContacts.map(c => ({
+                      label: `${c.name || 'Sin nombre'} (${c.phone})`,
+                      value: c.id
+                    }))}
+                    value={selectedLeadId || undefined}
+                    onChange={(val) => setSelectedLeadId(val)}
+                    placeholder="Buscar Contacto WhatsApp..."
+                    emptyMessage="No se encontraron contactos."
+                  />
+               </div>
+            )}
           </div>
 
           {/* Detalles de la Visita */}
@@ -334,6 +475,16 @@ export function NewVisitDialog({
                 </Popover>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="propiedad_colaboracion">Propiedad (Colaboración)</Label>
+                <Input 
+                  id="propiedad_colaboracion" 
+                  value={formData.propiedad_colaboracion}
+                  onChange={(e) => setFormData({...formData, propiedad_colaboracion: e.target.value})}
+                  placeholder="Ej: PH Colegiales RE/MAX"
+                  className="bg-accent/5 border-accent/10"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="zona_propiedad">Zona / Barrio</Label>
                 <Input 
                   id="zona_propiedad" 
@@ -393,18 +544,6 @@ export function NewVisitDialog({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="score_bant">Score BANT (0-12)</Label>
-                <Input 
-                  id="score_bant" 
-                  type="number"
-                  min="0"
-                  max="12"
-                  value={formData.score_bant}
-                  onChange={(e) => setFormData({...formData, score_bant: parseInt(e.target.value)})}
-                  className="bg-accent/5 border-accent/10"
-                />
-              </div>
             </div>
           </div>
 
@@ -414,13 +553,10 @@ export function NewVisitDialog({
               <Briefcase className="h-4 w-4" /> Gestión y Asignación
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(isAdmin || formData.agent_id !== userId) && (
+              {isAdmin && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     Asesor Responsable * 
-                    {formData.agent_id !== userId && !isAdmin && (
-                      <span className="text-[10px] bg-accent/20 text-accent px-1.5 py-0.5 rounded uppercase font-bold tracking-tighter">Propiedad Ajena</span>
-                    )}
                   </Label>
                   <Select 
                     value={formData.agent_id} 
@@ -442,12 +578,52 @@ export function NewVisitDialog({
               )}
               <div className="space-y-2">
                 <Label htmlFor="origen_consulta">Origen de Consulta</Label>
-                <Input 
-                  id="origen_consulta" 
-                  value={formData.origen_consulta}
-                  onChange={(e) => setFormData({...formData, origen_consulta: e.target.value})}
-                  className="bg-accent/5 border-accent/10"
-                />
+                <Select 
+                  value={formData.origen_consulta} 
+                  onValueChange={(v) => setFormData({...formData, origen_consulta: v})}
+                >
+                  <SelectTrigger className="bg-accent/5 border-accent/10">
+                    <SelectValue placeholder="Seleccionar origen..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Acciones indirectas">Acciones indirectas</SelectItem>
+                    <SelectItem value="Alianzas Estratégicas (Escribanías / Contadores / Abogados)">Alianzas Estratégicas (Escribanías / Contadores / Abogados)</SelectItem>
+                    <SelectItem value="Argenprop">Argenprop</SelectItem>
+                    <SelectItem value="Arquitectos / Agrimensores">Arquitectos / Agrimensores</SelectItem>
+                    <SelectItem value="Buzoneo / Folletos (Farming Geográfico)">Buzoneo / Folletos (Farming Geográfico)</SelectItem>
+                    <SelectItem value="Chatbot / Asistente Virtual">Chatbot / Asistente Virtual</SelectItem>
+                    <SelectItem value="Cliente Antiguo">Cliente Antiguo</SelectItem>
+                    <SelectItem value="Constructor">Constructor</SelectItem>
+                    <SelectItem value="Dueño Vende">Dueño Vende</SelectItem>
+                    <SelectItem value="Email Marketing / Newsletter">Email Marketing / Newsletter</SelectItem>
+                    <SelectItem value="Eventos / Exposiciones">Eventos / Exposiciones</SelectItem>
+                    <SelectItem value="Facebook">Facebook</SelectItem>
+                    <SelectItem value="Familiar / Amigo">Familiar / Amigo</SelectItem>
+                    <SelectItem value="Google Ads (Buscador pago)">Google Ads (Buscador pago)</SelectItem>
+                    <SelectItem value="Google Mi Negocio (Google Maps)">Google Mi Negocio (Google Maps)</SelectItem>
+                    <SelectItem value="Guardia en Emprendimientos / Showroom">Guardia en Emprendimientos / Showroom</SelectItem>
+                    <SelectItem value="Guardias Captación">Guardias Captación</SelectItem>
+                    <SelectItem value="Instagram">Instagram</SelectItem>
+                    <SelectItem value="Landing Page / Embudos de conversión">Landing Page / Embudos de conversión</SelectItem>
+                    <SelectItem value="Letrero / cartel">Letrero / cartel</SelectItem>
+                    <SelectItem value="Llamadas en frío (Cold Calling / Prospección)">Llamadas en frío (Cold Calling / Prospección)</SelectItem>
+                    <SelectItem value="MercadoLibre">MercadoLibre</SelectItem>
+                    <SelectItem value="Nuevo Contacto">Nuevo Contacto</SelectItem>
+                    <SelectItem value="Oficina (Mail / Llamado / Puerta)">Oficina (Mail / Llamado / Puerta)</SelectItem>
+                    <SelectItem value="Otra inmobiliaria">Otra inmobiliaria</SelectItem>
+                    <SelectItem value="Otro agente">Otro agente</SelectItem>
+                    <SelectItem value="Otro Portal">Otro Portal</SelectItem>
+                    <SelectItem value="Properati / Mudafy">Properati / Mudafy</SelectItem>
+                    <SelectItem value="Referido de colega">Referido de colega</SelectItem>
+                    <SelectItem value="Referido de Contacto">Referido de Contacto</SelectItem>
+                    <SelectItem value="Reubicación">Reubicación</SelectItem>
+                    <SelectItem value="Sitio Web">Sitio Web</SelectItem>
+                    <SelectItem value="TikTok / YouTube">TikTok / YouTube</SelectItem>
+                    <SelectItem value="WhatsApp Business">WhatsApp Business</SelectItem>
+                    <SelectItem value="Zonaprop">Zonaprop</SelectItem>
+                    <SelectItem value="Manual">Manual</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -469,6 +645,26 @@ export function NewVisitDialog({
                   value={formData.resumen_conversacion}
                   onChange={(e) => setFormData({...formData, resumen_conversacion: e.target.value})}
                   placeholder="Contexto relevante..."
+                  className="bg-accent/5 border-accent/10 h-20"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="objeciones_detectadas">Objeciones</Label>
+                <Textarea 
+                  id="objeciones_detectadas" 
+                  value={formData.objeciones_detectadas}
+                  onChange={(e) => setFormData({...formData, objeciones_detectadas: e.target.value})}
+                  placeholder="Ej: Precio alto, zona ruidosa..."
+                  className="bg-accent/5 border-accent/10 h-20"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="decisores">Decisores</Label>
+                <Textarea 
+                  id="decisores" 
+                  value={formData.decisores}
+                  onChange={(e) => setFormData({...formData, decisores: e.target.value})}
+                  placeholder="¿Quién toma la decisión final?"
                   className="bg-accent/5 border-accent/10 h-20"
                 />
               </div>

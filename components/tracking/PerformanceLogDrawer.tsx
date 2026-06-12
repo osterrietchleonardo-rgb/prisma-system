@@ -13,9 +13,10 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   logToEdit?: PerformanceLog | null;
+  isDirector?: boolean;
 }
 
-export function PerformanceLogDrawer({ open, onOpenChange, onSuccess, logToEdit }: Props) {
+export function PerformanceLogDrawer({ open, onOpenChange, onSuccess, logToEdit, isDirector = false }: Props) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-[560px] p-0 border-l border-accent/10">
@@ -40,6 +41,7 @@ export function PerformanceLogDrawer({ open, onOpenChange, onSuccess, logToEdit 
           <ScrollArea className="flex-1 px-6 pt-6">
             <PerformanceLogForm 
               logToEdit={logToEdit}
+              isDirector={isDirector}
               onSuccess={() => {
                 onSuccess();
                 onOpenChange(false);

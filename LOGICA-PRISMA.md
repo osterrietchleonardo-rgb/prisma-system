@@ -17,7 +17,7 @@
 7. [Integración Tokko Broker (CRM)](#7-integración-tokko-broker-crm)
 8. [Integración WhatsApp — Doble Vía](#8-integración-whatsapp--doble-vía)
 9. [Motor de Automatización n8n](#9-motor-de-automatización-n8n)
-10. [Módulo de IA — Consultor](#10-módulo-de-ia--consultor)
+10. [Módulo de IA — Buscador](#10-módulo-de-ia--buscador)
 11. [Módulo de IA — Tutor](#11-módulo-de-ia--tutor)
 12. [Módulo de IA — Análisis de Chat](#12-módulo-de-ia--análisis-de-chat)
 13. [Módulo Marketing IA](#13-módulo-marketing-ia)
@@ -34,6 +34,7 @@
 24. [Configuración de Despliegue (Vercel)](#24-configuración-de-despliegue-vercel)
 25. [Variables de Entorno Completas](#25-variables-de-entorno-completas)
 26. [Diagrama de Flujos Principales](#26-diagrama-de-flujos-principales)
+27. [Sistema de Temas (Claro / Oscuro)](#27-sistema-de-temas-claro--oscuro)
 
 ---
 
@@ -290,7 +291,7 @@ Endpoint que los layouts consultan para verificar si la cuenta sigue activa. Ret
 | Contratos IA | `/asesor/contratos-ia` | Contratos |
 | Mi Calendario | `/asesor/calendario` | Agenda personal |
 | Tutor IA | `/asesor/tutor-ia` | Aprendizaje IA |
-| Consultor IA | `/asesor/consultor-ia` | Búsqueda de propiedades |
+| Buscador IA | `/asesor/consultor-ia` | Búsqueda de propiedades |
 | Tasaciones | `/asesor/tasaciones` | Tasador |
 | Biblioteca | `/asesor/documentos` | Documentos de la agencia |
 | Configuración | `/asesor/configuracion` | Config personal |
@@ -666,7 +667,7 @@ Almacena el historial de conversación en el formato que n8n (LangChain) espera:
 
 ---
 
-## 10. Módulo de IA — Consultor
+## 10. Módulo de IA — Buscador IA (Ex Consultor IA)
 
 **Endpoint:** `POST /api/ai/consultor`  
 **Archivo:** `app/api/ai/consultor/route.ts`  
@@ -674,49 +675,48 @@ Almacena el historial de conversación en el formato que n8n (LangChain) espera:
 
 ### 10.1 Propósito
 
-Asistente de búsqueda de propiedades dentro de la cartera de la agencia. Combina búsqueda vectorial (semántica) con filtros estructurados.
+Asistente avanzado de búsqueda de propiedades. Ahora opera bajo un formato de "Buscador Inteligente", combinando propiedades de la cartera interna (Tokko) y propiedades globales pre-sincronizadas de Roomix.
 
-### 10.2 Flujo Completo
+### 10.2 Arquitectura de Datos (Roomix Crawler)
+
+El Buscador IA se nutre de la tabla `roomix_properties`, la cual es alimentada diariamente por un **Docker Worker Automático** (carpeta `roomix-sync`).
+- **Tecnología del Crawler:** Utiliza Playwright (en modo Stealth) para bypassear bloqueos anti-bot y extrae datos estructurados JSON-LD de las fichas de Roomix.
+- **Worker de Producción:** Se ejecuta como un contenedor Docker en Easypanel, utilizando `node-cron` (disparándose a las 03:00 AM) y `child_process.spawn` para aislar el proceso y evitar fugas de memoria del Chromium.
+- **Despliegue & Health Check:** El Worker levanta un mini servidor HTTP nativo en el puerto 80 (`cron.js`) y ejecuta Node directamente (`CMD ["node", "cron.js"]` en `Dockerfile`) para cumplir con los requerimientos de Health Check de Easypanel, evitando errores de tipo SIGTERM y garantizando que el proceso se mantenga vivo.
+- **Imagen Docker:** `mcr.microsoft.com/playwright:v1.60.0-jammy`
+
+### 10.3 Flujo Completo de Búsqueda
 
 1. **Auth + Créditos:** `requireTenant()` + `consumeAiCredits("consultor_ia", 1)`
 2. **Gestión de Sesión:** Crea o recupera `consultor_chat_sessions`
-3. **Guarda mensaje del usuario** en `consultor_chat_messages`
-4. **Análisis de Intent con IA:**
-   - Envía el mensaje a `openaiIA.generateContent()` con prompt estructurado
-   - Detecta: `intent` (RETRIEVAL/GENERAL), `location_keywords`, `type_keywords`, `amenity_keywords`, `price_max/min`, `bedrooms`, `bathrooms`
-   - **Slang argentino:** Mapea "depto" → "departamento", "piso" → piso real (planta completa), "ph" → ph, etc.
+3. **Análisis de Intent con IA:**
+   - Detecta si el lead busca propiedades (RETRIEVAL) o hace consultas generales (GENERAL).
+   - Identifica filtros duros (precio, ambientes, operación) y filtros blandos (amenities como "luminoso", "pileta").
    
-5. **Si intent === RETRIEVAL:**
+4. **Si intent === RETRIEVAL:**
+   
+   a. **Búsqueda Híbrida Vectorial:**
+   Se generan embeddings del mensaje y se cruzan simultáneamente contra dos fuentes de datos usando funciones RPC de Supabase:
+   - `match_properties` (para propiedades internas de Tokko Broker).
+   - `match_roomix_properties` (para el catálogo global extraído por el Docker Worker).
+   
+   b. **Búsqueda por Filtros Estructurados:**
+   Además de la búsqueda vectorial, se aplican filtros `ILIKE` en direcciones, barrios, precios y conteo de ambientes (extrayendo variables directamente del JSON-LD de Roomix y Tokko).
+   
+   c. **Manejo de Imágenes y CDN:**
+   Las propiedades de Roomix consumen imágenes de alta calidad autorizadas vía `next.config.mjs` (`cdn.roomix.ai`).
+   
+   d. **Deduplicación:** Excluye propiedades ya sugeridas en la sesión actual para no repetir.
 
-   a. **Búsqueda Vectorial:**
-   ```typescript
-   const queryEmbedding = await generateEmbedding(message)
-   supabase.rpc('match_properties', {
-     query_embedding: queryEmbedding,
-     match_threshold: 0.12,
-     match_count: 30,
-     p_agency_id: agencyId
-   })
-   ```
-   
-   b. **Búsqueda por Filtros (3 ramas):**
-   - **Rama A — Con ubicación:** Filtro `address/title/city ILIKE %keyword%` + filtros de precio/ambientes
-   - **Rama B — Sin ubicación, con filtros:** Solo filtros de precio/ambientes/tipo
-   - **Rama C — Abierta:** "qué tenés?" → últimas 20 propiedades por `updated_at`
-   
-   c. **Filtrado por tipo:** Manejo especial de "piso" (busca en título/descripción, fallback a departamentos)
-   
-   d. **Merge + Deduplicación:** Combina resultados vectoriales y de texto, suma similarity scores
-   
-   e. **Scoring de Amenities:** Para cada propiedad, busca amenidades solicitadas en `tokko_data.tags`, `description` y `title` usando sinónimos (pileta→pool→piscina)
-   
-   f. **Excluye propiedades ya vistas** en la sesión actual
+5. **Generación de Respuesta y Renderizado Frontend:**
+   El contexto combinado (Internas + Roomix) se envía a `openaiIA` con el prompt estructurado de "Buscador IA" rioplatense.
+   La IA debe retornar una respuesta amigable, y las tarjetas visuales se renderizan dinámicamente en el frontend basadas en los metadatos inyectados (`consultor-results.tsx`).
+   - **Mapeo de Agentes:** Al mostrar propiedades internas, se intenta hacer JOIN con la tabla `profiles` (`agent_profile`). Si no hay match relacional, se usa como fallback el nombre extraído directamente de la columna JSONB `assigned_agent` traída de Tokko, evitando el estado "Sin asignar".
+   - **Enlaces de Propiedades:** Los botones de "Ver Ficha" de propiedades internas enlazan directamente a la publicación real (`tokko_data.public_url`), mientras que las de la red de Roomix utilizan su respectiva ficha externa (`canonical_url`).
 
-6. **Generación de Respuesta:** Envía contexto + historial a `openaiIA` con prompt de "Consultor IA" rioplatense
-7. **Tracking de costos:** `updateAiTransactionCost()` con tokens reales
-8. **Background analytics:** Genera título y resumen de la sesión asincrónicamente
+6. **Tracking de costos:** `updateAiTransactionCost()` con tokens reales consumidos.
 
-### 10.3 Endpoints Adicionales
+### 10.4 Endpoints Adicionales
 
 - `GET /api/ai/consultor?sessionId=xxx` → Mensajes de una sesión
 - `GET /api/ai/consultor?agencyId=xxx` → Todas las sesiones del usuario
@@ -909,11 +909,11 @@ CRUD de firmas digitales asociadas a un contrato.
 
 ## 15. Módulo de Tasaciones IA
 
-**Endpoint:** `POST /api/valuation/generate`  
-**Archivo:** `app/api/valuation/generate/route.ts`  
-**Modelo:** Gemini 2.0 Flash (`prismaIA`)
+> **Nota (revisión jun-2026):** existen **dos implementaciones** de tasaciones y conviene no confundirlas:
+> - **La que está viva y se usa hoy** es el **Wizard MCM client-side** (ver 15.2) que corre en `/asesor/tasaciones` y `/director/tasaciones`, calcula con `lib/tasacion/calculos.ts` y persiste en la tabla `tasaciones`.
+> - **La de abajo (15.1)** es una implementación **legacy** basada en Gemini (`/api/valuation/generate` + tabla `valuations`). En la revisión no se encontró **ningún** `fetch` ni import del endpoint desde el frontend, por lo que **parece código muerto**. Se documenta y **se conserva por precaución** (no fue eliminada). Lo mismo aplica a la función `getAsesorKPIs` (`lib/queries/asesor.ts`) y al hook `useAsesorDashboard`, que solo consumían esta rama y no están enganchados a ninguna página.
 
-### 15.1 Flujo
+### 15.1 Flujo (LEGACY — posible código muerto, sin uso confirmado en frontend)
 
 1. **Validación Zod:** tipo, ubicación, metros², ambientes, condición, extra
 2. **Rate Limit:** 20 req/hora por agencia
@@ -932,6 +932,32 @@ CRUD de firmas digitales asociadas a un contrato.
    }
    ```
 6. Guarda resultado en `valuations`
+
+> La tabla `valuations` solo era alimentada por este endpoint. Como el endpoint no se invoca desde el frontend, la tabla queda sin alimentar (la métrica que la leía, `getAsesorKPIs`, tampoco se renderiza). **La tabla se mantiene** —no se dropeó— para no arriesgar datos legacy.
+
+### 15.2 Interfaz de Usuario — Wizard MCM (`/asesor/tasaciones`, `/director/tasaciones`)
+
+La pantalla de Tasaciones es un **wizard de 4 pasos** (Método Comparativo de Mercado homogeneizado). Ambas rutas (asesor y director) son **idénticas** e importan los **mismos componentes compartidos** desde `app/asesor/tasaciones/components/`, por lo que cualquier cambio impacta a los dos roles a la vez.
+
+| Paso | Componente | Función |
+|---|---|---|
+| 1 | `step1-sujeto.tsx` | Carga del inmueble a tasar (identificación, superficies, características, amenidades, situación) |
+| 2 | `step2-comparables.tsx` | Alta de comparables (mín. 3): manual o importados desde Tokko (`/api/tokko-proxy/property`) |
+| 3 | `step3-grilla.tsx` | Matriz de homogeneización editable (factores por columna, outliers, exclusiones, ponderado) |
+| 4 | `step4-resultado.tsx` | Informe final: rango min/sugerido/máx, gráfico de dispersión, tabla de testigos, imprimir/PDF |
+
+- El cálculo es **client-side** (`lib/tasacion/calculos.ts`, `lib/tasacion/types.ts`), reactivo vía `useMemo`.
+- Persistencia: tabla `tasaciones` en Supabase (borrador/finalizada) con autoguardado entre pasos e historial (últimas 10 por usuario).
+
+### 15.3 Responsividad móvil (actualización Junio 2026)
+
+Se corrigieron problemas de la vista de celular del wizard (afecta asesor y director por ser componentes compartidos), solo con clases Tailwind responsivas, **sin cambios de lógica**:
+
+- **Step 2 — cabecera:** la fila título + botones (*Buscar en Tokko* / *Agregar Manual*) ahora apila en móvil (`flex-col sm:flex-row`), evitando que los botones se apretaran contra el título.
+- **Step 2 — modal "Agregar Manual":** grid de campos pasa a 1 columna en móvil (`grid-cols-1 sm:grid-cols-2`).
+- **Step 2 — resultados de búsqueda Tokko:** cada fila apila info y precio/botón en móvil (`flex-col sm:flex-row`).
+- **Step 4 — tarjeta central "Sugerido":** el zoom `scale-105` se limitó a `md:scale-105` para que en columna única móvil no desborde ni recorte la sombra.
+- **Step 3 — grilla:** se mantiene con scroll horizontal (`overflow-x-auto`), comportamiento esperado para la matriz ancha de 11 columnas.
 
 ---
 
@@ -1339,6 +1365,30 @@ Sistema de auth **completamente separado** de Supabase Auth:
 | `UPSTASH_REDIS_REST_URL` | URL de Redis para rate limiting |
 | `UPSTASH_REDIS_REST_TOKEN` | Token de Redis |
 
+---
+
+## 27. Sistema de Temas (Claro / Oscuro)
+
+El sistema usa **`next-themes`** con la estrategia `class` (toggle de la clase `.dark` en `<html>`). Los colores se definen como variables CSS HSL en `app/globals.css`, en dos bloques: `:root` (modo claro) y `.dark` (modo oscuro). Todo el UI debe consumir los tokens semánticos (`text-foreground`, `bg-background`, `bg-card`, `text-muted-foreground`, `bg-accent`, etc.) para ser compatible con ambos modos.
+
+### Configuración
+
+- **Provider:** `app/layout.tsx` → `<ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>`.
+  - `defaultTheme="dark"`: el tema por defecto es **oscuro** (usuarios nuevos arrancan en oscuro).
+  - `enableSystem={false}`: **no** se sigue la preferencia del sistema operativo. Solo existen dos temas: claro y oscuro.
+- **Selector:** `components/mode-toggle.tsx` → menú con solo dos opciones: **Claro** y **Oscuro** (botón sol/luna).
+- **Ubicación del selector en el header:**
+  - Director: `components/director-header.tsx` (`<ModeToggle />`).
+  - Asesor: `components/asesor-header.tsx` (`<ModeToggle />`).
+
+### Regla para texto / contraste
+
+Nunca usar `text-white` (ni `text-slate-100`, `text-neutral-300`, etc.) como color de texto **standalone** (encabezados, párrafos, valores) sobre superficies theme-aware: en modo claro la superficie se vuelve blanca y el texto desaparece. Usar siempre `text-foreground` (o `text-foreground/90`, `text-muted-foreground`).
+
+`text-white` **sí** es válido cuando va sobre un fondo de color fijo: botones `bg-accent`/`bg-destructive`, overlays `bg-black/40` sobre imágenes, tabs activas `data-[state=active]:bg-accent`, celdas de gráficos coloreadas, o hovers que pintan fondo (`hover:bg-accent hover:text-white`).
+
+**Excepciones intencionalmente oscuras** (fondo oscuro fijo, su texto blanco es correcto): landing pública (`app/(public)/*`), simulaciones de marketing (`components/simulations/*`), panel super-admin Vakdor (`app/admin-vakdor/*`), drafts Roomix (`roomix-sync/*`).
+
 ### Admin Vakdor
 | Variable | Uso |
 |---|---|
@@ -1671,7 +1721,7 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 | `/api/tokko/sync` | POST | Tenant + Rate limit | Sync propiedades |
 | `/api/tokko/sync-leads` | POST | Tenant + Rate limit | Sync leads |
 | `/api/tokko-proxy/[...path]` | GET | Sesión | Proxy Tokko API |
-| `/api/valuation/generate` | POST | Sesión + Rate limit | Tasación IA |
+| `/api/valuation/generate` | POST | Sesión + Rate limit | Tasación IA ⚠️ **LEGACY / posible código muerto** (sin uso en frontend; ver §15.1). El módulo vivo es el Wizard MCM client-side |
 | `/api/webhooks/evolution` | POST | Público | Webhook Evolution |
 | `/api/webhooks/meta` | GET, POST | Público | Webhook Meta |
 | `/api/whatsapp/ai-settings/knowledge-upload` | POST | Tenant | Knowledge WA bot |

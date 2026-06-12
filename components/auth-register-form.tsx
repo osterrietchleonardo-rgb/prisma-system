@@ -71,8 +71,8 @@ export default function RegisterForm() {
           <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center mb-4">
             <Info className="w-8 h-8" />
           </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-white">¡Revisá tu email!</CardTitle>
-          <CardDescription className="text-neutral-300 text-lg mt-2">
+          <CardTitle className="text-2xl font-bold tracking-tight text-foreground">¡Revisá tu email!</CardTitle>
+          <CardDescription className="text-muted-foreground text-lg mt-2">
             Hemos enviado un enlace de confirmación a tu casilla de correo. 
             Confirmá tu email para activar tu cuenta en PRISMA IA.
           </CardDescription>

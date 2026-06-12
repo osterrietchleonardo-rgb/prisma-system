@@ -37,7 +37,7 @@ export function UserNav({ userName, userEmail, userRole }: UserNavProps) {
             <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-background rounded-full shadow-lg"></div>
           </div>
           <div className="hidden md:flex flex-col items-start gap-0">
-            <span className="text-xs font-black tracking-tight leading-none text-white/90">{userName?.split(' ')[0]}</span>
+            <span className="text-xs font-black tracking-tight leading-none text-foreground/90">{userName?.split(' ')[0]}</span>
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60 leading-tight">
               {userRole}
             </span>
@@ -54,7 +54,7 @@ export function UserNav({ userName, userEmail, userRole }: UserNavProps) {
               </Badge>
               {userRole?.toLowerCase() === 'director' && <Shield className="h-3 w-3 text-accent" />}
             </div>
-            <p className="text-sm font-black leading-none text-white tracking-tight">{userName}</p>
+            <p className="text-sm font-black leading-none text-foreground tracking-tight">{userName}</p>
             <p className="text-xs leading-none text-muted-foreground opacity-70 truncate">
               {userEmail}
             </p>

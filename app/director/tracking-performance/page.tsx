@@ -143,7 +143,7 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
               <TrendingUp className="w-4 h-4" />
               <span className="text-[10px] font-bold uppercase tracking-widest text-accent/70">Gestión de Rendimiento</span>
             </div>
-            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white/90">
+            <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground/90">
               Tracking Performance
             </h2>
           </div>
@@ -178,53 +178,53 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
                 <div className="tracking-tabs-list flex bg-muted/30 p-1 rounded-xl border border-white/5">
                     <button 
                       onClick={() => setFilter("todos")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'todos' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'todos' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Todos
                     </button>
                     <button 
                       onClick={() => setFilter("prospeccion")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prospeccion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prospeccion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Prospección
                     </button>
                     <button 
                       onClick={() => setFilter("prelisting")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prelisting' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prelisting' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Prelisting
                     </button>
                     <button 
                       onClick={() => setFilter("prebuying")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prebuying' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prebuying' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Prebuying
                     </button>
                     <button 
                       onClick={() => setFilter("captacion")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'captacion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'captacion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Captación
                     </button>
                     <button 
                       onClick={() => setFilter("reserva")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'reserva' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'reserva' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Reserva
                     </button>
                     <button 
                       onClick={() => setFilter("cierre")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'cierre' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-white'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'cierre' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Cierre
                     </button>
                 </div>
                 {isDirector && (
                   <div className="tracking-tabs-list flex bg-muted/30 p-1 rounded-xl border border-white/5 ml-2">
-                    <button onClick={() => setStatusFilter("todos")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'todos' ? 'bg-white/20 text-white shadow-sm' : 'text-muted-foreground hover:text-white'}`}>Todos</button>
-                    <button onClick={() => setStatusFilter("original")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'original' ? 'bg-white/20 text-white shadow-sm' : 'text-muted-foreground hover:text-white'}`}>Originales</button>
-                    <button onClick={() => setStatusFilter("modificada")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'modificada' ? 'bg-white/20 text-white shadow-sm' : 'text-muted-foreground hover:text-white'}`}>Modificadas</button>
-                    <button onClick={() => setStatusFilter("eliminada")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'eliminada' ? 'bg-white/20 text-white shadow-sm' : 'text-muted-foreground hover:text-white'}`}>Eliminadas</button>
+                    <button onClick={() => setStatusFilter("todos")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'todos' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Todos</button>
+                    <button onClick={() => setStatusFilter("original")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'original' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Originales</button>
+                    <button onClick={() => setStatusFilter("modificada")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'modificada' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Modificadas</button>
+                    <button onClick={() => setStatusFilter("eliminada")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'eliminada' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Eliminadas</button>
                   </div>
                 )}
               </div>
@@ -278,6 +278,7 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
         }}
         onSuccess={fetchLogs}
         logToEdit={logToEdit}
+        isDirector={isDirector}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -301,19 +302,19 @@ export default function TrackingPerformancePage({ isDirector = true }: TrackingP
               <p className="text-xs text-muted-foreground">Detalles del registro:</p>
               <div className="grid grid-cols-2 gap-y-1 text-xs">
                 <span className="font-semibold text-muted-foreground">Fecha:</span>
-                <span className="font-medium text-white/95">{new Date(logToDelete.fecha_actividad).toLocaleDateString()}</span>
+                <span className="font-medium text-foreground/95">{new Date(logToDelete.fecha_actividad).toLocaleDateString()}</span>
                 <span className="font-semibold text-muted-foreground">Tipo:</span>
-                <span className="capitalize font-medium text-white/95">{logToDelete.type}</span>
+                <span className="capitalize font-medium text-foreground/95">{logToDelete.type}</span>
                 {logToDelete.propiedad_ref && (
                   <>
                     <span className="font-semibold text-muted-foreground">Referencia:</span>
-                    <span className="font-medium text-white/95 truncate">{logToDelete.propiedad_ref}</span>
+                    <span className="font-medium text-foreground/95 truncate">{logToDelete.propiedad_ref}</span>
                   </>
                 )}
                 {logToDelete.monto_operacion !== null && logToDelete.monto_operacion > 0 && (
                   <>
                     <span className="font-semibold text-muted-foreground">Monto:</span>
-                    <span className="font-medium text-white/95">USD {logToDelete.monto_operacion.toLocaleString()}</span>
+                    <span className="font-medium text-foreground/95">USD {logToDelete.monto_operacion.toLocaleString()}</span>
                   </>
                 )}
               </div>

@@ -112,7 +112,7 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
                         {advisor.name.split(' ').map(n => n[0]).join('')}
                       </div>
                       <div className="flex flex-col">
-                        <span className="font-semibold text-white/90 truncate max-w-[120px]">{advisor.name}</span>
+                        <span className="font-semibold text-foreground/90 truncate max-w-[120px]">{advisor.name}</span>
                         <span className="text-[10px] text-muted-foreground">Posición #{index + 1}</span>
                       </div>
                     </div>

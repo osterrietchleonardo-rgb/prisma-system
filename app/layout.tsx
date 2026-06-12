@@ -68,8 +68,8 @@ export default function RootLayout({
       <body className={`${jakarta.variable} ${outfit.variable} font-sans antialiased selection:bg-accent/20 selection:text-accent`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="dark"
+          enableSystem={false}
           disableTransitionOnChange
         >
           <NextTopLoader 

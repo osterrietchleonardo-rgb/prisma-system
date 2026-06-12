@@ -47,9 +47,21 @@ export async function getTrackingOptions() {
     .select("id, name, phone")
     .eq("agency_id", profile.agency_id);
 
+  // Fetch agents if director
+  let agents = null;
+  if (profile.role === "director") {
+    const { data: agentsData } = await supabase
+      .from("profiles")
+      .select("id, full_name")
+      .eq("agency_id", profile.agency_id)
+      .eq("role", "asesor");
+    agents = agentsData;
+  }
+
   return {
     properties: properties || [],
     leads: leads || [],
-    waContacts: waContacts || []
+    waContacts: waContacts || [],
+    agents: agents || []
   };
 }

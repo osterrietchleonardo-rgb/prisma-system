@@ -97,7 +97,7 @@ export function DashboardActivity({ data }: DashboardActivityProps) {
 
                 <div className="ml-4 flex-1 space-y-1">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-white group-hover:text-accent transition-colors">
+                    <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
                       {activity.profiles?.full_name || "Asesor"}
                     </p>
                     <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">

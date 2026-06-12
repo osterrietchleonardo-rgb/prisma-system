@@ -17,12 +17,15 @@ import { getTrackingOptions } from "@/actions/tracking/getTrackingOptions";
 import { toast } from "sonner";
 import { Loader2, Briefcase, TrendingUp, Sparkles, MapPin, DollarSign, Percent, User } from "lucide-react";
 
+import { createManualContact } from "@/actions/whatsapp/createManualContact";
+
 interface Props {
   onSuccess: () => void;
   logToEdit?: PerformanceLog | null;
+  isDirector?: boolean;
 }
 
-export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
+export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reason, setReason] = useState("");
 
@@ -52,9 +55,16 @@ export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
     properties: any[];
     leads: any[];
     waContacts: any[];
-  }>({ properties: [], leads: [], waContacts: [] });
+    agents?: any[];
+  }>({ properties: [], leads: [], waContacts: [], agents: [] });
 
-  const [clientType, setClientType] = useState<"ninguno" | "tokko" | "whatsapp">("ninguno");
+  const [clientType, setClientType] = useState<"ninguno" | "tokko" | "whatsapp" | "manual">("ninguno");
+
+  // Manual contact form state
+  const [manualName, setManualName] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
+  const [manualTags, setManualTags] = useState("");
+  const [manualAgentId, setManualAgentId] = useState("");
 
   useEffect(() => {
     getTrackingOptions().then(data => {
@@ -82,16 +92,49 @@ export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
   const onSubmit = async (values: PerformanceLogFormData) => {
     setIsSubmitting(true);
     try {
+      let finalValues = { ...values };
+
+      // Si seleccionó nuevo contacto manual, lo creamos primero
+      if (clientType === "manual") {
+        if (!manualName.trim() || !manualPhone.trim()) {
+          toast.error("Debes ingresar nombre y celular para el nuevo contacto.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Validación básica formato internacional
+        if (!/^\d+$/.test(manualPhone)) {
+          toast.error("El número de celular debe contener solo números.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        const result = await createManualContact({
+          name: manualName.trim(),
+          phone: manualPhone.trim(),
+          tags: manualTags.trim(),
+          agent_id: isDirector && manualAgentId ? manualAgentId : undefined
+        });
+
+        if (!result.success || !result.wa_contact_id) {
+          toast.error(result.error || "Error al crear el contacto manualmente.");
+          setIsSubmitting(false);
+          return;
+        }
+        
+        finalValues.wa_contact_id = result.wa_contact_id;
+      }
+
       if (logToEdit) {
         if (!reason || reason.trim() === '') {
           toast.error("Debes ingresar un motivo para guardar la modificación.");
           setIsSubmitting(false);
           return;
         }
-        await updatePerformanceLog(logToEdit.id, values, reason);
+        await updatePerformanceLog(logToEdit.id, finalValues, reason);
         toast.success("Registro actualizado correctamente");
       } else {
-        await savePerformanceLog(values);
+        await savePerformanceLog(finalValues);
         toast.success("Registro guardado correctamente");
       }
       onSuccess();
@@ -153,11 +196,41 @@ export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
                   <SelectValue placeholder="Seleccionar origen..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Dueño Directo">Dueño Directo</SelectItem>
-                  <SelectItem value="Portal">Portal</SelectItem>
-                  <SelectItem value="Referido">Referido</SelectItem>
-                  <SelectItem value="Cartel">Cartel</SelectItem>
-                  <SelectItem value="Redes">Redes</SelectItem>
+                  <SelectItem value="Acciones indirectas">Acciones indirectas</SelectItem>
+                  <SelectItem value="Alianzas Estratégicas (Escribanías / Contadores / Abogados)">Alianzas Estratégicas (Escribanías / Contadores / Abogados)</SelectItem>
+                  <SelectItem value="Argenprop">Argenprop</SelectItem>
+                  <SelectItem value="Arquitectos / Agrimensores">Arquitectos / Agrimensores</SelectItem>
+                  <SelectItem value="Buzoneo / Folletos (Farming Geográfico)">Buzoneo / Folletos (Farming Geográfico)</SelectItem>
+                  <SelectItem value="Chatbot / Asistente Virtual">Chatbot / Asistente Virtual</SelectItem>
+                  <SelectItem value="Cliente Antiguo">Cliente Antiguo</SelectItem>
+                  <SelectItem value="Constructor">Constructor</SelectItem>
+                  <SelectItem value="Dueño Vende">Dueño Vende</SelectItem>
+                  <SelectItem value="Email Marketing / Newsletter">Email Marketing / Newsletter</SelectItem>
+                  <SelectItem value="Eventos / Exposiciones">Eventos / Exposiciones</SelectItem>
+                  <SelectItem value="Facebook">Facebook</SelectItem>
+                  <SelectItem value="Familiar / Amigo">Familiar / Amigo</SelectItem>
+                  <SelectItem value="Google Ads (Buscador pago)">Google Ads (Buscador pago)</SelectItem>
+                  <SelectItem value="Google Mi Negocio (Google Maps)">Google Mi Negocio (Google Maps)</SelectItem>
+                  <SelectItem value="Guardia en Emprendimientos / Showroom">Guardia en Emprendimientos / Showroom</SelectItem>
+                  <SelectItem value="Guardias Captación">Guardias Captación</SelectItem>
+                  <SelectItem value="Instagram">Instagram</SelectItem>
+                  <SelectItem value="Landing Page / Embudos de conversión">Landing Page / Embudos de conversión</SelectItem>
+                  <SelectItem value="Letrero / cartel">Letrero / cartel</SelectItem>
+                  <SelectItem value="Llamadas en frío (Cold Calling / Prospección)">Llamadas en frío (Cold Calling / Prospección)</SelectItem>
+                  <SelectItem value="MercadoLibre">MercadoLibre</SelectItem>
+                  <SelectItem value="Nuevo Contacto">Nuevo Contacto</SelectItem>
+                  <SelectItem value="Oficina (Mail / Llamado / Puerta)">Oficina (Mail / Llamado / Puerta)</SelectItem>
+                  <SelectItem value="Otra inmobiliaria">Otra inmobiliaria</SelectItem>
+                  <SelectItem value="Otro agente">Otro agente</SelectItem>
+                  <SelectItem value="Otro Portal">Otro Portal</SelectItem>
+                  <SelectItem value="Properati / Mudafy">Properati / Mudafy</SelectItem>
+                  <SelectItem value="Referido de colega">Referido de colega</SelectItem>
+                  <SelectItem value="Referido de Contacto">Referido de Contacto</SelectItem>
+                  <SelectItem value="Reubicación">Reubicación</SelectItem>
+                  <SelectItem value="Sitio Web">Sitio Web</SelectItem>
+                  <SelectItem value="TikTok / YouTube">TikTok / YouTube</SelectItem>
+                  <SelectItem value="WhatsApp Business">WhatsApp Business</SelectItem>
+                  <SelectItem value="Zonaprop">Zonaprop</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -379,6 +452,34 @@ export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
                 <MapPin className="w-4 h-4 absolute left-3 top-3.5 opacity-40" />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="zona_barrio">Zona/Barrio</Label>
+              <div className="relative">
+                <Input 
+                  id="zona_barrio" 
+                  placeholder="Ej: Palermo Soho" 
+                  value={watch("metadata")?.zona_barrio ?? ""}
+                  onChange={(e) => handleMetadataChange("zona_barrio", e.target.value)}
+                  className="pl-10" 
+                />
+                <MapPin className="w-4 h-4 absolute left-3 top-3.5 opacity-40" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="prop_colab">Propiedad (Colaboración)</Label>
+              <div className="relative">
+                <Input 
+                  id="prop_colab" 
+                  placeholder="Ej: PH Colegiales RE/MAX" 
+                  value={watch("metadata")?.propiedad_colaboracion ?? ""}
+                  onChange={(e) => handleMetadataChange("propiedad_colaboracion", e.target.value)}
+                  className="pl-10" 
+                />
+                <MapPin className="w-4 h-4 absolute left-3 top-3.5 opacity-40" />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-4 p-4 border border-white/5 rounded-2xl bg-white/5">
@@ -399,6 +500,7 @@ export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
                 <SelectItem value="ninguno">Ninguno</SelectItem>
                 <SelectItem value="tokko">Lead (Tokko / Web)</SelectItem>
                 <SelectItem value="whatsapp">Contacto WhatsApp</SelectItem>
+                <SelectItem value="manual">Nuevo Contacto (Manual)</SelectItem>
               </SelectContent>
             </Select>
 
@@ -430,6 +532,63 @@ export function PerformanceLogForm({ onSuccess, logToEdit }: Props) {
                   placeholder="Buscar Contacto de WA..."
                   emptyMessage="No se encontraron contactos."
                 />
+              </div>
+            )}
+
+            {clientType === "manual" && (
+              <div className="animate-in fade-in slide-in-from-top-2 space-y-4 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="manual_name">Nombre Completo *</Label>
+                    <Input 
+                      id="manual_name" 
+                      placeholder="Ej: Juan Pérez" 
+                      value={manualName}
+                      onChange={(e) => setManualName(e.target.value)}
+                      required={clientType === "manual"}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="manual_phone">Celular (Formato Internacional) *</Label>
+                    <Input 
+                      id="manual_phone" 
+                      placeholder="Ej: 5491143435555" 
+                      value={manualPhone}
+                      onChange={(e) => setManualPhone(e.target.value)}
+                      required={clientType === "manual"}
+                      pattern="^\d+$"
+                      title="Ingresá solo números, con código de país y área (ej: 549...)"
+                    />
+                    <p className="text-[10px] text-muted-foreground leading-tight">Sin el signo + ni espacios. Ej: 5492213089334.</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="manual_tags">Etiquetas (Opcional)</Label>
+                  <Input 
+                    id="manual_tags" 
+                    placeholder="Ej: Inversor, Referido Carlos" 
+                    value={manualTags}
+                    onChange={(e) => setManualTags(e.target.value)}
+                  />
+                  <p className="text-[10px] text-muted-foreground">Separadas por comas.</p>
+                </div>
+
+                {isDirector && (
+                  <div className="space-y-2">
+                    <Label>Asesor Asignado</Label>
+                    <Select value={manualAgentId} onValueChange={setManualAgentId}>
+                      <SelectTrigger className="h-10">
+                        <SelectValue placeholder="Asignar a un asesor..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {trackingOptions.agents?.map(a => (
+                          <SelectItem key={a.id} value={a.id}>{a.full_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             )}
           </div>
