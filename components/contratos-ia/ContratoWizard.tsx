@@ -3,35 +3,41 @@
 import { useMemo, useCallback, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, ArrowRight, Check, Eye, Loader2, Sparkles } from "lucide-react"
+import { ArrowLeft, ArrowRight, Check, Eye, Loader2, Sparkles, Save } from "lucide-react"
 import { getGruposOrdenados, getCamposPorGrupo } from "@/lib/contratos/placeholder-helpers"
 import { CampoFormularioDinamico } from "./CampoFormularioDinamico"
 import { ContratoPreview } from "./ContratoPreview"
-import { FirmaVirtualPanel } from "./FirmaVirtualPanel"
-import type { ContratoWizardState, CampoFormulario, FirmanteRol, ContractSignature } from "@/types/contratos"
-import { TIPO_CONTRATO_LABELS, FIRMANTES_POR_TIPO } from "@/types/contratos"
+import type { ContratoWizardState } from "@/types/contratos"
+import { TIPO_CONTRATO_LABELS } from "@/types/contratos"
+import { uploadContractPDF, downloadContractFromId } from "@/lib/contratos/download-helper"
 import { toast } from "sonner"
 
 interface ContratoWizardProps {
   wizardState: ContratoWizardState
   setWizardState: React.Dispatch<React.SetStateAction<ContratoWizardState>>
   onBack: () => void
+  /** En modo edición se actualiza un contrato existente (PUT) en vez de crear uno nuevo. */
+  isEditing?: boolean
+  /** Motivo de la modificación (requerido en modo edición, lo ve el director). */
+  motivoEdicion?: string
+  /** Callback al terminar de editar correctamente. */
+  onSaved?: () => void
 }
 
-export function ContratoWizard({ wizardState, setWizardState, onBack }: ContratoWizardProps) {
+export function ContratoWizard({ wizardState, setWizardState, onBack, isEditing = false, motivoEdicion, onSaved }: ContratoWizardProps) {
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const campos = wizardState.template?.campos_schema || []
   const grupos = useMemo(() => getGruposOrdenados(campos), [campos])
-  
-  // Add "Preview" and "Firmas" as final steps
-  const allSteps = useMemo(() => [...grupos, "PREVIEW", "FIRMAS"], [grupos])
+
+  // El paso final es la vista previa (la firma es presencial, en papel)
+  const allSteps = useMemo(() => [...grupos, "PREVIEW"], [grupos])
   const currentStep = wizardState.paso_actual
   const currentStepName = allSteps[currentStep] || grupos[0]
 
   const currentCampos = useMemo(() => {
-    if (currentStepName === "PREVIEW" || currentStepName === "FIRMAS") return []
+    if (currentStepName === "PREVIEW") return []
     return getCamposPorGrupo(campos, currentStepName)
   }, [campos, currentStepName])
 
@@ -48,8 +54,8 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
   }, [setWizardState])
 
   const validateCurrentStep = useCallback((): boolean => {
-    if (currentStepName === "PREVIEW" || currentStepName === "FIRMAS") return true
-    
+    if (currentStepName === "PREVIEW") return true
+
     const newErrors: Record<string, string> = {}
     for (const campo of currentCampos) {
       if (campo.requerido) {
@@ -81,34 +87,29 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
     }))
   }, [setWizardState])
 
-  const handleSignature = useCallback((rol: FirmanteRol, sig: ContractSignature) => {
-    setWizardState(prev => ({
-      ...prev,
-      firmas: { ...prev.firmas, [rol]: sig },
-    }))
-  }, [setWizardState])
+  const buildNombreRef = useCallback(() => {
+    const apellido = String(
+      wizardState.form_data["LOCATARIO_NOMBRE_COMPLETO"]
+      || wizardState.form_data["COMPRADOR_NOMBRE_COMPLETO"]
+      || wizardState.form_data["OFERENTE_NOMBRE"]
+      || ""
+    )
+    const direccion = String(wizardState.form_data["INMUEBLE_DIRECCION"] || "")
+    return `${TIPO_CONTRATO_LABELS[wizardState.tipo!]} - ${apellido} - ${direccion}`.substring(0, 300)
+  }, [wizardState.form_data, wizardState.tipo])
 
-  const handleSaveContrato = useCallback(async () => {
-    if (!wizardState.tipo) return
+  // Guardar como borrador (modo creación)
+  const handleSaveContrato = useCallback(async (): Promise<string | null> => {
+    if (!wizardState.tipo) return null
     setSaving(true)
     try {
-      // Determine nombre_referencia
-      const apellido = String(
-        wizardState.form_data["LOCATARIO_NOMBRE_COMPLETO"]
-        || wizardState.form_data["COMPRADOR_NOMBRE_COMPLETO"]
-        || wizardState.form_data["OFERENTE_NOMBRE"]
-        || ""
-      )
-      const direccion = String(wizardState.form_data["INMUEBLE_DIRECCION"] || "")
-      const nombreRef = `${TIPO_CONTRATO_LABELS[wizardState.tipo]} - ${apellido} - ${direccion}`.substring(0, 300)
-
       const res = await fetch("/api/contratos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           template_id: wizardState.template?.id?.startsWith("fallback-") ? null : wizardState.template?.id,
           tipo: wizardState.tipo,
-          nombre_referencia: nombreRef,
+          nombre_referencia: buildNombreRef(),
           form_data: wizardState.form_data,
           estado: "borrador",
         }),
@@ -118,52 +119,85 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
       const data = await res.json()
       setWizardState(prev => ({ ...prev, contrato_guardado_id: data.id }))
       toast.success("Contrato guardado como borrador")
+      return data.id as string
     } catch {
       toast.error("Error al guardar el contrato")
+      return null
     } finally {
       setSaving(false)
     }
-  }, [wizardState, setWizardState])
+  }, [wizardState, setWizardState, buildNombreRef])
 
+  // Finalizar (creación): guarda, consume créditos, genera y sube el PDF
   const handleFinalize = useCallback(async () => {
-    if (!wizardState.contrato_guardado_id) {
-      await handleSaveContrato()
+    if (!validateCurrentStep()) {
+      toast.error("Revisá los campos obligatorios antes de generar el contrato")
+      return
     }
-
     setSaving(true)
     try {
-      const signaturesData = Object.values(wizardState.firmas)
-        .filter((s): s is ContractSignature => !!s)
-        .map(s => ({
-          firmante_rol: s.firmante_rol,
-          firmante_nombre: s.firmante_nombre,
-          firmante_dni: s.firmante_dni,
-          firma_imagen_base64: s.firma_imagen_base64,
-        }))
+      let contratoId = wizardState.contrato_guardado_id
+      if (!contratoId) {
+        contratoId = await handleSaveContrato()
+        if (!contratoId) return
+      }
 
+      // Consume créditos y marca el contrato como generado (firma presencial)
       await fetch("/api/contratos/generate-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contrato_id: wizardState.contrato_guardado_id,
-          signatures: signaturesData,
-        }),
+        body: JSON.stringify({ contrato_id: contratoId }),
       })
 
-      toast.success("Contrato finalizado exitosamente")
-      
-      // Auto-refresh credit badge after 5-credit consumption
-      window.dispatchEvent(new CustomEvent('prisma-refresh-credits'))
-      
-      // Auto-download PDF
-      const { downloadContractFromId } = await import("@/lib/contratos/download-helper")
-      await downloadContractFromId(wizardState.contrato_guardado_id!)
+      // Genera el PDF en cliente y lo guarda en Storage (queda accesible por link)
+      await uploadContractPDF(contratoId)
+
+      toast.success("Contrato generado exitosamente")
+      window.dispatchEvent(new CustomEvent("prisma-refresh-credits"))
+
+      // Descarga automática para el usuario
+      await downloadContractFromId(contratoId)
+      onSaved?.()
     } catch {
-      toast.error("Error al finalizar")
+      toast.error("Error al generar el contrato")
     } finally {
       setSaving(false)
     }
-  }, [wizardState, handleSaveContrato])
+  }, [wizardState, handleSaveContrato, validateCurrentStep, onSaved])
+
+  // Guardar cambios (modo edición): PUT con motivo + reemplaza el PDF
+  const handleUpdate = useCallback(async () => {
+    if (!validateCurrentStep()) {
+      toast.error("Revisá los campos obligatorios antes de guardar")
+      return
+    }
+    if (!wizardState.contrato_guardado_id) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/contratos/${wizardState.contrato_guardado_id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          form_data: wizardState.form_data,
+          nombre_referencia: buildNombreRef(),
+          motivo_gestion: motivoEdicion || "Modificación de datos",
+        }),
+      })
+      if (!res.ok) throw new Error("Error al actualizar")
+
+      // Reemplaza el PDF guardado por la nueva versión
+      await uploadContractPDF(wizardState.contrato_guardado_id)
+
+      toast.success("Contrato modificado correctamente")
+      onSaved?.()
+    } catch {
+      toast.error("Error al modificar el contrato")
+    } finally {
+      setSaving(false)
+    }
+  }, [wizardState, motivoEdicion, buildNombreRef, validateCurrentStep, onSaved])
+
+  const isLastStep = currentStep === allSteps.length - 1
 
   return (
     <div className="space-y-6">
@@ -173,7 +207,9 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
           <ArrowLeft className="w-4 h-4 mr-2" /> Volver
         </Button>
         <div>
-          <h2 className="text-2xl font-bold">{wizardState.tipo ? TIPO_CONTRATO_LABELS[wizardState.tipo] : ""}</h2>
+          <h2 className="text-2xl font-bold">
+            {isEditing ? "Modificar: " : ""}{wizardState.tipo ? TIPO_CONTRATO_LABELS[wizardState.tipo] : ""}
+          </h2>
           <p className="text-sm text-muted-foreground">Plantilla: {wizardState.template?.nombre}</p>
         </div>
       </div>
@@ -203,7 +239,7 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
                   {idx + 1}
                 </span>
               )}
-              {step}
+              {step === "PREVIEW" ? "Vista previa" : step}
             </button>
             {idx < allSteps.length - 1 && (
               <div className={`w-4 h-0.5 mx-1 ${idx < currentStep ? "bg-accent" : "bg-muted"}`} />
@@ -218,8 +254,6 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
           <CardTitle className="flex items-center gap-2">
             {currentStepName === "PREVIEW" ? (
               <><Eye className="w-5 h-5 text-accent" /> Vista previa del contrato</>
-            ) : currentStepName === "FIRMAS" ? (
-              <><Check className="w-5 h-5 text-accent" /> Firmas</>
             ) : (
               currentStepName
             )}
@@ -232,18 +266,9 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
               formData={wizardState.form_data}
               tipo={wizardState.tipo!}
               firmas={wizardState.firmas}
-              onSave={handleSaveContrato}
+              onSave={isEditing ? undefined : handleSaveContrato}
               saving={saving}
               saved={!!wizardState.contrato_guardado_id}
-            />
-          ) : currentStepName === "FIRMAS" ? (
-            <FirmaVirtualPanel
-              tipo={wizardState.tipo!}
-              formData={wizardState.form_data}
-              firmas={wizardState.firmas}
-              onSign={handleSignature}
-              onFinalize={handleFinalize}
-              saving={saving}
             />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -270,7 +295,8 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
         >
           <ArrowLeft className="w-4 h-4 mr-2" /> Anterior
         </Button>
-        {currentStep < allSteps.length - 1 && (
+
+        {!isLastStep && (
           <Button
             onClick={handleNext}
             className="bg-accent hover:bg-accent/90 text-accent-foreground"
@@ -278,7 +304,19 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
             Siguiente <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         )}
-        {currentStep === allSteps.length - 1 && (
+
+        {isLastStep && isEditing && (
+          <Button
+            onClick={handleUpdate}
+            className="bg-accent hover:bg-accent/90 text-accent-foreground"
+            disabled={saving}
+          >
+            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            Guardar cambios
+          </Button>
+        )}
+
+        {isLastStep && !isEditing && (
           <div className="flex flex-col items-end gap-1">
             <Button
               onClick={handleFinalize}
@@ -286,7 +324,7 @@ export function ContratoWizard({ wizardState, setWizardState, onBack }: Contrato
               disabled={saving}
             >
               {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              Finalizar y generar PDF firmado
+              Finalizar y generar PDF
             </Button>
             <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1">
               <Sparkles className="w-3 h-3" />

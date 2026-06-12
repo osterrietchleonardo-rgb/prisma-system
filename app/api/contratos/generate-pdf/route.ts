@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const { contrato_id, signatures } = await req.json()
+    const { contrato_id } = await req.json()
 
     if (!contrato_id) {
       return NextResponse.json({ error: "contrato_id is required" }, { status: 400 })
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     // Get the contrato
     const { data: contrato, error: contratoError } = await supabase
       .from("contratos")
-      .select("*, contract_templates(*)")
+      .select("id")
       .eq("id", contrato_id)
       .single()
 
@@ -30,28 +30,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Contract not found" }, { status: 404 })
     }
 
-    // Save signatures if provided
-    if (signatures && Array.isArray(signatures)) {
-      for (const sig of signatures) {
-        await supabase.from("contract_signatures").insert({
-          contrato_id,
-          firmante_rol: sig.firmante_rol,
-          firmante_nombre: sig.firmante_nombre,
-          firmante_dni: sig.firmante_dni || null,
-          firma_imagen_base64: sig.firma_imagen_base64 || null,
-          firmado_at: new Date().toISOString(),
-        })
-      }
-    }
-
-    // Update contrato status
-    const newEstado = signatures && signatures.length > 0 ? "firmado" : "pendiente_firma"
+    // La firma es presencial (en papel): el contrato queda listo para firmar.
     await supabase
       .from("contratos")
-      .update({ estado: newEstado, updated_at: new Date().toISOString() })
+      .update({ estado: "pendiente_firma", updated_at: new Date().toISOString() })
       .eq("id", contrato_id)
 
-    return NextResponse.json({ success: true, estado: newEstado })
+    return NextResponse.json({ success: true, estado: "pendiente_firma" })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error"
     console.error("Generate PDF error:", message)

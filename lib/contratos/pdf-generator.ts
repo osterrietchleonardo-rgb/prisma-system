@@ -11,6 +11,11 @@ interface PDFGeneratorOptions {
     dni: string
     imagenBase64: string | null
   }[]
+  // Espacios de firma presencial (líneas en blanco para firmar en papel)
+  firmanteSlots?: {
+    label: string
+    nombre?: string
+  }[]
   fecha?: string
 }
 
@@ -25,6 +30,7 @@ export function generateContratoPDF(options: PDFGeneratorOptions): jsPDF {
     agencyName = 'PRISMA System',
     agencyMatricula,
     signatures = [],
+    firmanteSlots = [],
     fecha = new Date().toLocaleDateString('es-AR'),
   } = options
 
@@ -197,6 +203,50 @@ export function generateContratoPDF(options: PDFGeneratorOptions): jsPDF {
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(8)
       doc.text(sig.rol.toUpperCase(), xPos, currentY + 42, { align: 'center' })
+    }
+  }
+
+  // ---- Espacios de firma presencial (líneas en blanco) ----
+  if (signatures.length === 0 && firmanteSlots.length > 0) {
+    currentY += 20
+    checkPageBreak(50)
+
+    doc.setDrawColor(184, 115, 51)
+    doc.setLineWidth(0.3)
+    doc.line(marginLeft, currentY - 5, pageWidth - marginRight, currentY - 5)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(11)
+    doc.text('FIRMAS', pageWidth / 2, currentY, { align: 'center' })
+    currentY += 22
+
+    const perRow = Math.min(firmanteSlots.length, 2)
+    const slotWidth = contentWidth / perRow
+
+    for (let i = 0; i < firmanteSlots.length; i++) {
+      const slot = firmanteSlots[i]
+      const col = i % perRow
+      const xCenter = marginLeft + col * slotWidth + slotWidth / 2
+
+      if (col === 0 && i > 0) {
+        currentY += 30
+        checkPageBreak(30)
+      }
+
+      // Línea de firma
+      doc.setDrawColor(80, 80, 80)
+      doc.setLineWidth(0.3)
+      doc.line(xCenter - 30, currentY, xCenter + 30, currentY)
+
+      // Nombre (si se conoce) y rol debajo de la línea
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(9)
+      if (slot.nombre) {
+        doc.text(slot.nombre, xCenter, currentY + 6, { align: 'center' })
+      }
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.text(slot.label.toUpperCase(), xCenter, currentY + (slot.nombre ? 11 : 6), { align: 'center' })
     }
   }
 

@@ -38,8 +38,8 @@ export function UploadContratoModal({ open, onClose, onSaved }: UploadContratoMo
       toast.error("Solo se aceptan archivos .docx o .pdf")
       return
     }
-    if (f.size > 5 * 1024 * 1024) {
-      toast.error("El archivo no puede superar los 5MB")
+    if (f.size > 25 * 1024 * 1024) {
+      toast.error("El archivo no puede superar los 25MB")
       return
     }
     setFile(f)
@@ -91,6 +91,7 @@ export function UploadContratoModal({ open, onClose, onSaved }: UploadContratoMo
           tipo: tipoOverride,
           template_body: editedBody,
           campos_schema: [],
+          archivo_original_url: result?.archivo_original_url || null,
           is_active: false,
         }),
       })
@@ -99,14 +100,16 @@ export function UploadContratoModal({ open, onClose, onSaved }: UploadContratoMo
         onSaved()
         handleReset()
       } else {
-        throw new Error("Error al guardar")
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || "Error al guardar")
       }
-    } catch {
-      toast.error("Error al guardar la plantilla")
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error al guardar la plantilla"
+      toast.error(message)
     } finally {
       setSaving(false)
     }
-  }, [tipoOverride, nombre, editedBody, onSaved])
+  }, [tipoOverride, nombre, editedBody, result, onSaved])
 
   const handleReset = () => {
     setStep("upload")
@@ -137,10 +140,21 @@ export function UploadContratoModal({ open, onClose, onSaved }: UploadContratoMo
 
         {step === "upload" && (
           <div className="space-y-6 py-4">
+            <Card className="border-accent/30 bg-accent/5">
+              <CardContent className="p-4">
+                <p className="text-sm font-semibold text-accent mb-1">💡 Recomendación</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Subí el contrato como <span className="font-medium text-foreground/80">plantilla</span>: dejá los datos a completar
+                  <span className="font-medium text-foreground/80"> en blanco</span>, con <span className="font-mono">rayas (____)</span> o
+                  <span className="font-mono"> puntitos (……)</span> donde luego se cargarán los datos. Así la IA detecta mejor todas las
+                  variables y arma una plantilla precisa.
+                </p>
+              </CardContent>
+            </Card>
             <div className="border-2 border-dashed border-accent/30 rounded-xl p-8 text-center hover:border-accent/50 transition-colors">
               <Upload className="w-10 h-10 mx-auto text-accent/50 mb-3" />
               <p className="text-sm text-muted-foreground mb-4">
-                Arrastrá o seleccioná un archivo .docx o .pdf (máx. 5MB)
+                Arrastrá o seleccioná un archivo .docx o .pdf (máx. 25MB)
               </p>
               <Input
                 type="file"

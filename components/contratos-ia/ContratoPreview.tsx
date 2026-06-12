@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Download, Save, Loader2 } from "lucide-react"
 import { interpolateTemplate } from "@/lib/contratos/template-interpolator"
 import { generateContratoPDF, generatePDFFilename } from "@/lib/contratos/pdf-generator"
-import { TIPO_CONTRATO_LABELS } from "@/types/contratos"
+import { TIPO_CONTRATO_LABELS, FIRMANTES_POR_TIPO } from "@/types/contratos"
 import type { TipoContrato, FirmanteRol, ContractSignature } from "@/types/contratos"
 import { toast } from "sonner"
 
@@ -14,7 +14,7 @@ interface ContratoPreviewProps {
   formData: Record<string, string | number>
   tipo: TipoContrato
   firmas: Partial<Record<FirmanteRol, ContractSignature>>
-  onSave: () => Promise<void>
+  onSave?: (() => Promise<unknown>) | undefined
   saving: boolean
   saved: boolean
 }
@@ -47,12 +47,16 @@ export function ContratoPreview({
       const title = `CONTRATO DE ${TIPO_CONTRATO_LABELS[tipo].toUpperCase()}`
       const agencyName = String(formData["INMOBILIARIA_NOMBRE"] || "PRISMA System")
 
+      // Espacios de firma presencial (líneas en blanco) cuando no hay firmas digitales
+      const firmanteSlots = (FIRMANTES_POR_TIPO[tipo] || []).map(f => ({ label: f.label }))
+
       const doc = generateContratoPDF({
         title,
         body: interpolatedText,
         agencyName,
         agencyMatricula: String(formData["INMOBILIARIA_MATRICULA"] || ""),
         signatures: signaturesForPdf,
+        firmanteSlots,
       })
 
       const apellido = String(
@@ -110,14 +114,16 @@ export function ContratoPreview({
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3">
-        <Button
-          onClick={onSave}
-          variant="outline"
-          disabled={saving || saved}
-        >
-          {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-          {saved ? "Guardado ✓" : "Guardar borrador"}
-        </Button>
+        {onSave && (
+          <Button
+            onClick={() => { void onSave() }}
+            variant="outline"
+            disabled={saving || saved}
+          >
+            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+            {saved ? "Guardado ✓" : "Guardar borrador"}
+          </Button>
+        )}
         <Button
           onClick={handleDownloadPDF}
           className="bg-accent hover:bg-accent/90 text-accent-foreground"

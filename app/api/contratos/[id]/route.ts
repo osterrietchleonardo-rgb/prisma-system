@@ -36,6 +36,12 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     if (body.pdf_url !== undefined) updateData.pdf_url = body.pdf_url
     if (body.nombre_referencia !== undefined) updateData.nombre_referencia = body.nombre_referencia
 
+    // Si se modifica el contenido del contrato, queda marcado como "modificado" con su motivo
+    if (body.form_data !== undefined) {
+      updateData.estado_gestion = "modificado"
+      if (body.motivo_gestion !== undefined) updateData.motivo_gestion = body.motivo_gestion
+    }
+
     const { data, error } = await supabase
       .from("contratos")
       .update(updateData)
@@ -51,15 +57,28 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+    // Soft-delete: se marca como eliminado con motivo (el director mantiene el historial)
+    let motivo: string | null = null
+    try {
+      const body = await req.json()
+      motivo = body?.motivo_gestion ?? null
+    } catch {
+      // sin body
+    }
+
     const { error } = await supabase
       .from("contratos")
-      .delete()
+      .update({
+        estado_gestion: "eliminado",
+        motivo_gestion: motivo,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", params.id)
 
     if (error) throw error

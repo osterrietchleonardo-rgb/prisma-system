@@ -6,6 +6,9 @@ export type TipoContrato =
 
 export type EstadoContrato = 'borrador' | 'pendiente_firma' | 'firmado' | 'anulado'
 
+// Estado de gestión/trazabilidad del contrato generado (req. tabla "Contratos generados")
+export type EstadoGestion = 'original' | 'modificado' | 'eliminado'
+
 export type FirmanteRol = 'locador' | 'locatario' | 'garante' | 'vendedor' | 'comprador'
 
 export interface CampoFormulario {
@@ -33,6 +36,8 @@ export interface ContractTemplate {
   tipo: TipoContrato
   template_body: string
   campos_schema: CampoFormulario[]
+  codigo_unico: string | null
+  archivo_original_url: string | null
   version: number
   is_active: boolean
   is_system_default: boolean
@@ -48,11 +53,19 @@ export interface Contrato {
   tipo: TipoContrato
   nombre_referencia: string | null
   estado: EstadoContrato
+  codigo_unico: string | null
+  estado_gestion: EstadoGestion
+  motivo_gestion: string | null
   form_data: Record<string, string | number>
   pdf_url: string | null
   created_by: string | null
   created_at: string
   updated_at: string
+}
+
+// Fila enriquecida para la tabla "Contratos generados" (incluye nombre del asesor)
+export interface ContratoRow extends Contrato {
+  asesor_nombre?: string | null
 }
 
 export interface ContractSignature {
@@ -82,6 +95,7 @@ export interface ConvertTemplateResponse {
   placeholders_detectados: string[]
   tipo_contrato_detectado: TipoContrato | 'otro'
   advertencias: string[]
+  archivo_original_url?: string | null
 }
 
 export const TIPO_CONTRATO_LABELS: Record<TipoContrato, string> = {

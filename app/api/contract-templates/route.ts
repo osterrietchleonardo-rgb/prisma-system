@@ -77,9 +77,15 @@ export async function GET() {
         }
       ]
 
+      // Cada plantilla nace con su código único (PLT-XXXXXX)
+      const defaultTemplatesWithCode = defaultTemplates.map(t => ({
+        ...t,
+        codigo_unico: `PLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+      }))
+
       const { data: seeded, error: seedError } = await supabase
         .from("contract_templates")
-        .insert(defaultTemplates)
+        .insert(defaultTemplatesWithCode)
         .select()
 
       if (!seedError) {
@@ -95,6 +101,9 @@ export async function GET() {
   }
 }
 
+// Límite de plantillas subidas por agencia (excluye las del sistema)
+const MAX_TEMPLATES_POR_AGENCIA = 50
+
 export async function POST(req: Request) {
   try {
     const body = await req.json()
@@ -104,13 +113,35 @@ export async function POST(req: Request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("agency_id")
+      .select("agency_id, role")
       .eq("id", user.id)
       .single()
 
     if (!profile?.agency_id) {
       return NextResponse.json({ error: "No agency found" }, { status: 403 })
     }
+
+    // Solo los directores pueden subir/crear plantillas (los asesores solo las usan)
+    if (profile.role !== "director") {
+      return NextResponse.json({ error: "Solo los directores pueden subir plantillas" }, { status: 403 })
+    }
+
+    // Enforce el límite de 50 plantillas subidas por agencia (no cuenta las del sistema)
+    const { count } = await supabase
+      .from("contract_templates")
+      .select("id", { count: "exact", head: true })
+      .eq("agency_id", profile.agency_id)
+      .eq("is_system_default", false)
+
+    if ((count ?? 0) >= MAX_TEMPLATES_POR_AGENCIA) {
+      return NextResponse.json(
+        { error: `Alcanzaste el máximo de ${MAX_TEMPLATES_POR_AGENCIA} contratos subidos. Eliminá alguno para subir uno nuevo.` },
+        { status: 400 }
+      )
+    }
+
+    // Generar un código único corto (PLT-XXXXXX)
+    const codigo_unico = `PLT-${crypto.randomUUID().replace(/-/g, "").slice(0, 6).toUpperCase()}`
 
     const { data, error } = await supabase
       .from("contract_templates")
@@ -120,6 +151,8 @@ export async function POST(req: Request) {
         tipo: body.tipo,
         template_body: body.template_body,
         campos_schema: body.campos_schema || [],
+        codigo_unico,
+        archivo_original_url: body.archivo_original_url || null,
         is_active: body.is_active || false,
         created_by: user.id,
       })

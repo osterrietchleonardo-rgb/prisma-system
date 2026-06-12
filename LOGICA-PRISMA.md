@@ -314,7 +314,8 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 - **`properties`** — Propiedades sincronizadas (id, tokko_id, agency_id, assigned_agent_id, title, description, price, currency, property_type, status, address, city, bedrooms, bathrooms, total_area, covered_area, images[], tokko_data, embedding vector(768))
 - **`leads`** — Leads del CRM (id, agency_id, assigned_agent_id, full_name, email, phone, source, status, pipeline_stage, notes, tokko_contact_id, first_response_time, chat_analysis)
 - **`lead_activities`** — Historial de actividades de leads
-- **`visits`** — Visitas agendadas
+- **`scheduled_visits`** — Visitas agendadas (id, agency_id, agent_id, lead_id, nombre_completo, telefono, email, propiedad_titulo, zona_propiedad, fecha_visita, hora_visita, tipo_operacion, presupuesto, calificacion_lead, score_bant, intereses_clave, objeciones_detectadas, decisores, resumen_conversacion, origen_consulta, estado_visita [agendada|cancelada|completada], motivo_cambio, created_at)
+- **`visits`** — Visitas (legacy)
 - **`closings`** — Cierres de operaciones
 
 #### WhatsApp
@@ -868,42 +869,98 @@ Busca propiedades en la cartera Tokko de la agencia para vincular a un IPC de ti
 
 ## 14. Módulo de Contratos IA
 
-### 14.1 CRUD de Contratos
+> **Actualización jun-2026 — Gestión de plantillas y contratos generados.** Se incorporó
+> trazabilidad completa (código único, estado de gestión con motivo), guardado del archivo
+> original y del PDF generado en Storage, y una vista diferenciada por rol (director ve todo
+> el equipo; asesor solo lo suyo). Migración: `supabase/migrations/20260612120000_contratos_ia_gestion.sql`.
 
-**Endpoint:** `GET/POST /api/contratos`  
-**Archivo:** `app/api/contratos/route.ts`
+### 14.0 Cambios de esquema (migración `20260612120000_contratos_ia_gestion`)
 
-- **GET:** Lista contratos de la agencia, ordenados por `created_at DESC`
-- **POST:** Crea nuevo contrato con: `template_id`, `tipo`, `nombre_referencia`, `estado` (default: "borrador"), `form_data` (JSON)
+**`contract_templates`** — nuevas columnas:
+- `codigo_unico text` — código corto identificatorio de la plantilla (`PLT-XXXXXX`).
+- `archivo_original_url text` — URL pública del .docx/.pdf original subido por el director.
+- Índice único parcial `contract_templates_codigo_unico_idx` sobre `(agency_id, codigo_unico)` donde `codigo_unico IS NOT NULL` (permite NULL en plantillas del sistema preexistentes).
 
-### 14.2 Templates de Contratos
+**`contratos`** — nuevas columnas:
+- `codigo_unico text` — **comparte** el código de la plantilla usada, de modo que el código del documento subido por el director coincide con el del contrato que genera el asesor (fallback `CTR-XXXXXX` si el contrato no tiene plantilla persistida). **No es único**: varios contratos generados comparten el código de su plantilla → índice **no único** `contratos_codigo_unico_idx`.
+- `estado_gestion text NOT NULL DEFAULT 'original'` — trazabilidad: `original` | `modificado` | `eliminado` (CHECK constraint `contratos_estado_gestion_check`).
+- `motivo_gestion text` — motivo de la modificación o eliminación (lo exige la UI antes de modificar/borrar).
 
-**Endpoint:** `GET/POST /api/contract-templates`  
-**Endpoint:** `PUT/DELETE /api/contract-templates/[id]`  
-**Endpoint:** `PATCH /api/contract-templates/[id]/activate`
+**Storage:** bucket **`contratos`** (público). Guarda los originales subidos (`{agency_id}/originales/...`) y los PDFs generados (`{agency_id}/generados/{contrato_id}.pdf`). Las escrituras se hacen siempre con `service_role` (`createAdminClient`); la lectura es vía `getPublicUrl`.
 
-Gestión de plantillas reutilizables para contratos.
+### 14.1 Página y navegación por pestañas
 
-### 14.3 Conversión de Template
+**Componente:** `components/contratos-ia/ContratosIAPage.tsx` (rutas `/director/contratos-ia` y `/asesor/contratos-ia`, mismo componente con prop `role`).
 
-**Endpoint:** `POST /api/contratos/convert-template`
+| Pestaña | Visible para | Contenido |
+|---|---|---|
+| **Nuevo Contrato** | director + asesor | `TipoContratoSelector` → `ContratoWizard` (creación o edición) |
+| **Contratos Generados** / **Mis Contratos** | director + asesor | `ContratosGenerados` (tabla) |
+| **Mis Plantillas** | **solo director** | `PlantillasList` |
 
-Convierte una plantilla de contrato a un contrato específico, llenando variables del formulario.
+El wizard se reutiliza para **crear** y para **editar** (modo edición vía `isEditing` + `motivoEdicion`, abierto desde la tabla de contratos generados).
 
-### 14.4 Firma y Finalización
+### 14.2 CRUD de Contratos — visibilidad por rol
 
-**Endpoint:** `POST /api/contratos/generate-pdf`  
-**Archivo:** `app/api/contratos/generate-pdf/route.ts`
+**Endpoint:** `GET/POST /api/contratos` — `app/api/contratos/route.ts`
 
-1. Consume 5 créditos IA
-2. Guarda firmas digitales en `contract_signatures` (nombre, DNI, imagen base64)
-3. Actualiza estado del contrato: "borrador" → "pendiente_firma" → "firmado"
+- **GET:**
+  - **Director:** ve **todos** los contratos de la agencia (incluidos los `eliminado`, con su motivo). Cada fila se enriquece con `asesor_nombre` (JOIN a `profiles` por `created_by`).
+  - **Asesor:** ve **solo los propios** (`created_by = user.id`) y **excluye** los `estado_gestion = 'eliminado'`.
+- **POST:** crea contrato con `template_id`, `tipo`, `nombre_referencia`, `estado` (default `borrador`), `form_data`, `estado_gestion = 'original'`, `created_by`. Resuelve `codigo_unico`:
+  - Si la plantilla ya tiene código → lo hereda.
+  - Si la plantilla aún no tiene código (p.ej. del sistema) → genera `PLT-XXXXXX` y lo **persiste en la plantilla** con `createAdminClient` (un asesor no podría editar plantillas por RLS).
+  - Sin plantilla persistida → genera `CTR-XXXXXX` propio.
 
-### 14.5 Firmas
+**Endpoint:** `GET/PUT/DELETE /api/contratos/[id]` — `app/api/contratos/[id]/route.ts`
+- **PUT (editar):** actualiza `form_data`/`estado`/`pdf_url`/`nombre_referencia`. Si cambió `form_data` → marca `estado_gestion = 'modificado'` y guarda `motivo_gestion`.
+- **DELETE (soft-delete):** **no borra la fila**; marca `estado_gestion = 'eliminado'` + `motivo_gestion`. El director conserva el historial completo.
 
-**Endpoint:** `GET/POST /api/contratos/[id]/signatures`
+### 14.3 Tabla "Contratos generados"
 
-CRUD de firmas digitales asociadas a un contrato.
+**Componente:** `components/contratos-ia/ContratosGenerados.tsx`
+
+Columnas: (Asesor — solo director), Contrato, **Código** (badge mono), Cliente / Propiedad (derivados del `form_data` probando varias convenciones de placeholder), (Estado de gestión + Motivo — solo director), PDF, Acciones.
+
+- **Estado de gestión** con color: `original` (verde), `modificado` (amarillo), `eliminado` (rojo); fila eliminada se atenúa.
+- **PDF:** si hay `pdf_url` → link "Ver" (abre Storage); si no → botón "Descargar" que genera el PDF en cliente.
+- **Modificar / Eliminar:** ambos abren un diálogo que **exige el motivo**. Modificar reabre el wizard en modo edición con el motivo; Eliminar hace `DELETE` con el motivo.
+
+### 14.4 Templates de Contratos
+
+**Endpoint:** `GET/POST /api/contract-templates` — `PUT/DELETE /api/contract-templates/[id]` — `PATCH /api/contract-templates/[id]/activate`
+
+- **GET:** lista plantillas de la agencia + las `is_system_default`. Si la agencia no tiene ninguna, **siembra** las 4 del sistema (Locación Habitacional Ley 27.551/DNU 70/2023, Locación Comercial CCyC, Boleto de Compraventa, Reserva de Venta), cada una con su `codigo_unico` (`PLT-XXXXXX`).
+- **POST (subir plantilla):** **solo directores** (los asesores únicamente las usan). Límite **50 plantillas subidas por agencia** (no cuenta las del sistema). Guarda `codigo_unico` y `archivo_original_url`.
+
+### 14.5 Conversión de documento → plantilla (IA)
+
+**Endpoint:** `POST /api/contratos/convert-template` — `app/api/contratos/convert-template/route.ts`  
+**Modelo:** Gemini (`gemini-3.5-flash`)
+
+1. Recibe un `.docx` o `.pdf` (máx **25 MB**). Extrae texto con `mammoth` (docx) o `pdf-parse-fork` (pdf).
+2. **Sube el archivo original** al bucket `contratos` (`{agency_id}/originales/{uuid}.ext`) → guarda `archivo_original_url`.
+3. Consume **1 crédito IA** (`contratos_ia`) y registra costo real de tokens (`updateAiTransactionCost`).
+4. La IA convierte el contrato en plantilla reutilizable reemplazando todos los datos variables por placeholders `{{PREFIJO_CAMPO}}` (LOCADOR_, LOCATARIO_, INMUEBLE_, PRECIO_, etc.), detectando también campos vacíos (rayas, puntos suspensivos, `[COMPLETAR]`, `XXXX`).
+5. **Output JSON:** `{ template_body, placeholders_detectados, tipo_contrato_detectado, advertencias, archivo_original_url }`.
+
+### 14.6 Generación del PDF y guardado en Storage
+
+**Helper:** `lib/contratos/download-helper.ts`
+- `buildContratoDoc()`: obtiene el contrato + su plantilla, **interpola** el `template_body` con el `form_data` (`interpolateTemplate`) y genera el PDF en **cliente** (`pdf-generator.ts`, jsPDF), agregando las líneas de **firma presencial** según el tipo de contrato (`FIRMANTES_POR_TIPO`).
+- `downloadContractFromId()`: descarga el PDF directamente.
+- `uploadContractPDF()`: genera el PDF y lo **sube a Storage** vía `POST /api/contratos/[id]/pdf`.
+
+**Endpoint:** `POST /api/contratos/[id]/pdf` — guarda el PDF en `{agency_id}/generados/{contrato_id}.pdf` (`upsert`, path estable: al modificar reemplaza el archivo y el link se mantiene) y persiste `pdf_url` con **cache-busting** (`?v=timestamp`). El `ContratoWizard` llama a `uploadContractPDF` tras crear o editar.
+
+### 14.7 Finalización (firma presencial)
+
+**Endpoint:** `POST /api/contratos/generate-pdf` — `app/api/contratos/generate-pdf/route.ts`
+
+1. Consume **5 créditos IA** (`contratos_ia`).
+2. Marca el contrato como `pendiente_firma`. **La firma es presencial (en papel)**: no se almacenan firmas digitales en este flujo; el PDF queda listo para imprimir y firmar.
+
+> La tabla `contract_signatures` (y `GET/POST /api/contratos/[id]/signatures`) se conserva del diseño original pero el flujo vigente usa **firma presencial**, por lo que no se alimenta en la operación normal.
 
 ---
 
@@ -1624,16 +1681,52 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 - **Tasaciones (`/director/tasaciones`):** Formulario de características de la propiedad que consulta a la IA para emitir un valor mínimo, máximo y sugerido, con análisis del mercado. Consume 1 crédito.
 - **Contratos (`/director/contratos-ia`):** Gestión de plantillas y conversión a contratos formales con firma digital incorporada. Consume 5 créditos por contrato.
 
-#### 7. Tracking Performance (`/director/tracking-performance`)
+#### 7. Tracking Performance (`/director/tracking-performance`, `/asesor/tracking-performance`)
 - **Objetivo:** Registrar actividad comercial diaria (llamadas, prelistings, captaciones, etc.) para nutrir el Dashboard.
 - **Lógica Interna:** Utiliza tabs para ver historial y para editar la "Configuración IA" de las escalas de performance (qué puntaje da cada acción).
+- **Formulario de Registro (PerformanceLogForm):**
+  - **Activos Vinculados:**
+    - **Zona/Barrio:** Campo de texto libre para indicar la zona geográfica de la actividad.
+    - **Propiedad (Tokko):** Desplegable con las propiedades de la cartera de Tokko, filtradas por asesor asignado.
+    - **Propiedad (Colaboración):** Campo de texto para registrar actividades con propiedades externas a la cartera de Tokko (ej. una colaboración con otra inmobiliaria).
+    - **Vincular Cliente:** Búsqueda entre leads de Tokko y contactos de WhatsApp asignados al asesor.
+    - **Registro Manual de Lead:** Alternativa para registrar contactos nuevos (amigos, vecinos, referidos) que no existen en la base de datos. Requiere nombre y número de celular (formato internacional: `5492213089334`), etiquetas opcionales. Para el director, muestra un desplegable de asesores; para el asesor, se autocompleta con su cuenta. El lead se crea automáticamente en `wa_conversations` con los datos mínimos correspondientes (nombre, celular, agent_id, agency_id, instance_id, pipeline_stage).
+  - **Origen de Consulta:** Lista exhaustiva de canales: Acciones indirectas, Alianzas Estratégicas, Argenprop, Arquitectos/Agrimensores, Buzoneo/Folletos, Chatbot, Cliente Antiguo, Constructor, Dueño Vende, Email Marketing, Eventos, Facebook, Familiar/Amigo, Google Ads, Google Maps, Guardia, Instagram, Landing Page, Letrero, Llamadas en frío, MercadoLibre, OLX, Open House, Portal propio, Prensa, Radio, Referido colegas, Referido cliente, Redes de contacto, Señalética, Telemarketing, TikTok, Tokko CRM, Voz a voz, WhatsApp orgánico, YouTube, ZonaProp, Otros.
+  - **Server Action:** `actions/whatsapp/createManualContact.ts` — crea el contacto en `wa_conversations` y devuelve el resultado al formulario.
 
 #### 8. Asistentes Conversacionales (Tutor y Consultor IA)
 - **Tutor IA (`/director/tutor`):** Chat interactivo para hacer preguntas sobre manuales o documentos internos subidos a la base de conocimiento (RAG). Consume 1 crédito por mensaje. Usa el modelo configurado y retorna las "sources" (fuentes) utilizadas.
 - **Consultor IA (`/director/consultor`):** Buscador conversacional de propiedades. Un agente IA que entiende la consulta (ej. "Busco un 3 ambientes en zona norte por menos de 250k"), hace un Vector Search + Filter Search en la DB, y retorna tarjetas visuales (carrousel) de las propiedades que coinciden (incluyendo tags de *amenities* que coinciden o faltan). Consume 1 crédito.
 
-#### 9. Calendario y Pulso de Mercado (`/director/calendario`, `/director/mercado`)
-- **Calendario:** Visualiza `scheduled_visits`. Permite filtrar por asesor, cambiar vistas de mes/semana, y hacer click en una visita para ver un modal detallado (BANT score, objeciones, decisores, lead info).
+#### 9. Calendario y Pulso de Mercado (`/director/calendario`, `/asesor/calendario`, `/director/mercado`)
+
+- **Calendario:** Visualiza `scheduled_visits` con vista mensual. Director puede filtrar por asesor; asesor ve solo sus visitas.
+
+  **Formulario "Agendar Visita" (`NewVisitDialog.tsx`):**
+  - **Información del Lead — 3 alternativas:**
+    1. **Buscar desde Tokko:** Desplegable con leads de Tokko asignados al asesor (o todos si es director).
+    2. **Buscar desde WhatsApp:** Desplegable con contactos de `wa_conversations` de la agencia.
+    3. **Carga Manual:** Nombre, teléfono (formato internacional obligatorio), email (opcional). Crea automáticamente un registro en `wa_conversations` via `createManualContact.ts` para mantener la trazabilidad.
+  - **Detalle de la Cita:**
+    - Fecha y hora.
+    - **Propiedad (Tokko):** Desplegable filtrado por las propiedades asignadas al asesor activo (matcheo por email entre `properties.assigned_agent.email` y `profiles.email`). Si es director y selecciona un asesor del desplegable, la lista se filtra automáticamente a las propiedades de ese asesor.
+    - **Propiedad (Colaboración):** Campo de texto alternativo para registrar la dirección de una propiedad externa a la cartera de Tokko. El valor se guarda mergeado en la columna `propiedad_titulo` con prefijo "Colaboración:".
+  - **Calificación y Perfil:** Tipo de operación, presupuesto, calificación (HOT/WARM/COLD), intereses clave, objeciones detectadas, decisores.
+  - **Gestión y Asignación:** Asesor responsable (autocomplete para asesor, desplegable para director), origen de consulta (misma lista exhaustiva que Tracking Performance).
+  - **Score BANT:** Se hardcodea a 0 automáticamente, no se muestra en el formulario.
+
+  **Vista de Detalle de Visita (Dialog):**
+  - Muestra propiedad, lead, fecha/hora, operación, presupuesto, calificación, intereses, objeciones, decisores y resumen de conversación.
+  - **No muestra Score BANT** (oculto tanto en asesor como en director).
+  - Si la visita fue modificada (tiene `motivo_cambio` y sigue en estado `agendada`), muestra una etiqueta **"Modificada"** en ámbar.
+  - Si la visita fue cancelada, muestra el **"Motivo de Cancelación"** en un recuadro rojo.
+  - Si la visita fue modificada sin cancelarse, muestra el **"Motivo de Modificación"** en un recuadro ámbar.
+
+  **Acciones sobre Visitas Futuras (solo si `estado_visita === 'agendada'` y la fecha/hora aún no pasaron):**
+  - **Reprogramar / Editar (`EditVisitDialog.tsx`):** Formulario que precarga los datos actuales (fecha, hora, propiedad, zona). El usuario puede modificar los campos que desee; los no modificados quedan iguales. **Requiere motivo de cambio obligatorio** que se guarda en `motivo_cambio`. Al guardar, si se ingresó una "Propiedad (Colaboración)", se mergea en `propiedad_titulo`.
+  - **Cancelar Visita:** Pop-up de confirmación para evitar toques accidentales. **Requiere motivo de cancelación obligatorio**. Al confirmar, actualiza `estado_visita` a `cancelada` y guarda el motivo en `motivo_cambio`.
+  - **Visitas pasadas:** Los botones de acción no se muestran; aparece el mensaje "Esta visita ya no puede ser modificada."
+
 - **Mercado:** Tablero de comando del mercado real. Muestra cotización del dólar (tiempo real), ICC, precios Zonaprop por zona, precios m² por barrio (Mudafy) y escrituras CABA (Colegio de Escribanos). Cada fuente con su fecha real de actualización; sin datos inventados (si falta, "Sin datos"). Sincronización por el botón "Actualizar" (`/api/mercado/sync?source=...`, una fuente por request para respetar el límite de Vercel Hobby).
 
 ---

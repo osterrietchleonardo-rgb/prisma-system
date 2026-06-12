@@ -73,6 +73,8 @@ export function TipoContratoSelector({ onSelect }: TipoContratoSelectorProps) {
       tipo,
       template_body: DEFAULT_TEMPLATES[tipo],
       campos_schema: CAMPOS_POR_TIPO[tipo],
+      codigo_unico: null,
+      archivo_original_url: null,
       version: 1,
       is_active: true,
       is_system_default: true,

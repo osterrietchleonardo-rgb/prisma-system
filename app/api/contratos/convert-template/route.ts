@@ -1,10 +1,16 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import mammoth from "mammoth"
 
 export const dynamic = "force-dynamic"
+
+// Bucket de Storage para contratos (originales subidos y PDFs generados)
+const CONTRATOS_BUCKET = "contratos"
+// Límite de tamaño: el peso se delega a Storage, pero se mantiene un tope práctico.
+const MAX_FILE_SIZE = 25 * 1024 * 1024
 
 const SYSTEM_PROMPT = `Eres un asistente jurídico especializado en contratos inmobiliarios argentinos. 
 Recibirás el texto de un contrato real. Tu tarea es convertirlo en una plantilla 
@@ -19,6 +25,12 @@ Reglas para los placeholders:
   {{PRECIO_TOTAL}}
 - NO modificar el texto jurídico, cláusulas, ni el estilo del contrato original.
 - Solo reemplazar los datos variables, dejando el resto intacto.
+- IMPORTANTE: Reconocé los campos a completar aunque vengan vacíos, con rayas (___, ____),
+  con puntos suspensivos (……) o con marcadores tipo "[ ]", "[COMPLETAR]", "XXXX".
+  Convertí cada uno de esos espacios en blanco en el placeholder {{...}} que corresponda
+  según el contexto de la cláusula.
+- Detectá TODAS las variables: no dejes ningún dato de las partes, inmueble, fechas ni montos
+  sin convertir en placeholder.
 - Al final, devolver un JSON con:
   {
     "template_body": "<texto con placeholders>",
@@ -39,30 +51,52 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      return NextResponse.json({ error: "El archivo excede el límite de 5MB" }, { status: 400 })
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: "El archivo excede el límite de 25MB" }, { status: 400 })
     }
 
     const fileName = file.name.toLowerCase()
+    const ext = fileName.endsWith(".docx") ? "docx" : fileName.endsWith(".pdf") ? "pdf" : null
+    if (!ext) {
+      return NextResponse.json({ error: "Formato no soportado. Use .docx o .pdf" }, { status: 400 })
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer())
     let extractedText = ""
 
-    if (fileName.endsWith(".docx")) {
-      const buffer = Buffer.from(await file.arrayBuffer())
+    if (ext === "docx") {
       const result = await mammoth.extractRawText({ buffer })
       extractedText = result.value
-    } else if (fileName.endsWith(".pdf")) {
-      const buffer = Buffer.from(await file.arrayBuffer())
+    } else {
       // Dynamic import for pdf-parse-fork (CommonJS module)
       const pdfParse = (await import("pdf-parse-fork")).default
       const pdfData = await pdfParse(buffer)
       extractedText = pdfData.text
-    } else {
-      return NextResponse.json({ error: "Formato no soportado. Use .docx o .pdf" }, { status: 400 })
     }
 
     if (!extractedText || extractedText.trim().length < 100) {
       return NextResponse.json({ error: "No se pudo extraer suficiente texto del archivo" }, { status: 400 })
+    }
+
+    // Subir el archivo original a Storage (el peso ya no importa, queda guardado).
+    let archivo_original_url: string | null = null
+    try {
+      const supabaseAdmin = createAdminClient()
+      const storagePath = `${agencyId}/originales/${crypto.randomUUID()}.${ext}`
+      const contentType = ext === "docx"
+        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        : "application/pdf"
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from(CONTRATOS_BUCKET)
+        .upload(storagePath, buffer, { contentType, upsert: true })
+      if (!uploadError) {
+        archivo_original_url = supabaseAdmin.storage.from(CONTRATOS_BUCKET).getPublicUrl(storagePath).data.publicUrl
+      } else {
+        console.error("Error subiendo original a Storage:", uploadError.message)
+      }
+    } catch (e) {
+      console.error("Storage upload (original) falló:", e)
     }
 
     // Consume AI Credits (returns txId for real-cost tracking)
@@ -70,7 +104,7 @@ export async function POST(req: Request) {
 
     // Call Gemini
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" })
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" })
 
     const result = await model.generateContent([
       SYSTEM_PROMPT,
@@ -80,7 +114,7 @@ export async function POST(req: Request) {
     const responseText = result.response.text()
 
     // ─── Record real token usage ───────────────────────────────────────
-    // gemini-2.0-flash: $0.10/M input, $0.40/M output
+    // gemini-3.5-flash: $0.10/M input, $0.40/M output
     const contratos_usage = result.response.usageMetadata;
     if (contratos_usage) {
       const inputTk = contratos_usage.promptTokenCount ?? 0;
@@ -92,7 +126,7 @@ export async function POST(req: Request) {
 
     try {
       const parsed = JSON.parse(cleanJson)
-      return NextResponse.json(parsed)
+      return NextResponse.json({ ...parsed, archivo_original_url })
     } catch {
       return NextResponse.json({ error: "Error al procesar la respuesta de IA" }, { status: 500 })
     }
