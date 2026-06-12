@@ -30,7 +30,7 @@ Asegurate de que el logo se vea nítido y profesional, como una superposición d
       serif: 'estilo elegante y sofisticado (Serif)',
       script: 'estilo manuscrito o artístico (Script/Handwritten)',
       display: 'estilo de impacto y audaz (Bold/Display)'
-    }[branding.brand_font] || 'moderno';
+    }[branding.brand_font as 'sans' | 'serif' | 'script' | 'display'] || 'moderno';
 
     brandingCtx = `
 IDENTIDAD DE MARCA (OBLIGATORIO):

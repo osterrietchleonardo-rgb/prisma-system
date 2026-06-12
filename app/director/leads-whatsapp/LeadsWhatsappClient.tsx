@@ -226,7 +226,7 @@ export default function LeadsWhatsappClient({
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-2 max-w-[120px]">
                                 <Avatar className="h-6 w-6 border border-accent/10 shadow-sm">
-                                  <AvatarImage src={conv.assigned_agent.avatar_url} />
+                                  <AvatarImage src={conv.assigned_agent.avatar_url ?? undefined} />
                                   <AvatarFallback className="text-[8px] uppercase">
                                     {conv.assigned_agent.full_name?.substring(0,2) || conv.assigned_agent.email?.substring(0,2)}
                                   </AvatarFallback>

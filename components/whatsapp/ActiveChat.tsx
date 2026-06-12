@@ -338,6 +338,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
       content: text,
       role: 'human',
       message_type: 'text',
+      wamid: null,
       created_at: new Date().toISOString(),
       metadata: { optimistic: true }
     }
@@ -370,6 +371,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
       content: text,
       role: 'internal',
       message_type: 'text',
+      wamid: null,
       created_at: new Date().toISOString(),
       metadata: { optimistic: true }
     }

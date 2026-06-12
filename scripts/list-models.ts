@@ -6,7 +6,8 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 async function listModels() {
   try {
-    const modelList = await genAI.getGenerativeModel({ model: "gemini-1.5-flash" }).listModels();
+    // listModels no esta tipado en el SDK; cast para script de diagnostico
+    const modelList = await (genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) as any).listModels();
     console.log(JSON.stringify(modelList, null, 2));
   } catch (error) {
     console.error(error);

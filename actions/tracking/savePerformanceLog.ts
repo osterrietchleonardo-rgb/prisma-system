@@ -16,6 +16,8 @@ export async function savePerformanceLog(payload: any) {
     .eq("id", user.id)
     .single();
 
+  if (!profile) throw new Error("Perfil no encontrado");
+
   const { waMetrics, waAnalysis, ...baseData } = payload;
 
   const fullPayload = {

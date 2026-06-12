@@ -81,7 +81,7 @@ export async function verifyAdminToken(token: string): Promise<AdminVakdorPayloa
     const valid = await crypto.subtle.verify(
       "HMAC",
       key,
-      base64urlDecode(sig),
+      base64urlDecode(sig) as BufferSource,
       new TextEncoder().encode(signingInput)
     )
 

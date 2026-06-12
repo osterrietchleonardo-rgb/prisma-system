@@ -166,7 +166,9 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
     leadsVendedores: metrics.prospeccion.leads.vendedor,
     leadsCompradores: metrics.prospeccion.leads.comprador,
     channelDistribution: Object.entries(metrics.prospeccion.channels).map(([label, count]) => ({ label, count })),
-    
+    // Inicializado aqui para tipar la clave; se sobreescribe mas abajo con los valores reales
+    responseTime: { botFirst: '', botBetween: '', humanFirst: '', humanBetween: '' },
+
     // Prelisting
     consultasWa: metrics.prospeccion.waChats,
     tasaciones: metrics.prelisting.volumen,

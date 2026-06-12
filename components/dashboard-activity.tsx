@@ -15,6 +15,7 @@ import { es } from "date-fns/locale"
 
 interface DashboardActivityProps {
   data: any[]
+  advisors?: { id: any; name: any }[]
 }
 
 export function DashboardActivity({ data }: DashboardActivityProps) {

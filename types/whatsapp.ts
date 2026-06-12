@@ -128,6 +128,7 @@ export interface WhatsAppActionResult {
   success: boolean
   error?: string
   data?: any
+  warning?: string
 }
 
 export interface ConnectWhatsAppInput {

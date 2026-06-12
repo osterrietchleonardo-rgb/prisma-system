@@ -51,7 +51,7 @@ async function seed() {
   const { data: existing } = await supabase
     .from("admin_vakdor_users")
     .select("id, email")
-    .eq("email", email.toLowerCase().trim())
+    .eq("email", normalizedEmail)
     .maybeSingle()
 
   if (existing) {
@@ -72,7 +72,7 @@ async function seed() {
   const { data, error } = await supabase
     .from("admin_vakdor_users")
     .insert({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       password_hash: passwordHash,
       nombre,
       is_active: true,

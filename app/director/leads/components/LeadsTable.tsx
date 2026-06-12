@@ -451,7 +451,7 @@ export function LeadsTable({ leads, loading, tagsByGroup, onRefresh, basePath = 
                            <TableCell onClick={(e) => e.stopPropagation()}>
                               <Select 
                                 defaultValue={lead.pipeline_stage || "nuevo"} 
-                                onValueChange={(v) => handleStageChange(lead.id, v)}
+                                onValueChange={(v) => handleStageChange(String(lead.id), v)}
                               >
                                 <SelectTrigger className="h-7 text-[10px] bg-background/50 border-accent/10 w-[140px]">
                                   <SelectValue />
