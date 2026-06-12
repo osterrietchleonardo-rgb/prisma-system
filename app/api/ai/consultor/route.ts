@@ -160,7 +160,7 @@ export async function POST(req: Request) {
     let pisoFallback = false; 
 
     if (isRetrieval) {
-      const FULL_SELECT = 'id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, description, tokko_data, assigned_agent_id, assigned_agent:profiles(full_name, email)';
+      const FULL_SELECT = 'id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, description, tokko_data, assigned_agent_id, assigned_agent, agent_profile:profiles(full_name, email)';
 
       const { data: sessionData } = await supabase
         .from('consultor_chat_sessions')
@@ -283,8 +283,8 @@ export async function POST(req: Request) {
         .map((p: any) => ({
           ...p,
           source: 'own',
-          agent_name: p.assigned_agent?.full_name || 'Sin asignar',
-          agent_email: p.assigned_agent?.email || ''
+          agent_name: p.agent_profile?.full_name || p.assigned_agent?.name || 'Sin asignar',
+          agent_email: p.agent_profile?.email || p.assigned_agent?.email || ''
         }));
 
       const agencia = allProperties
@@ -293,8 +293,8 @@ export async function POST(req: Request) {
         .map((p: any) => ({
           ...p,
           source: 'agency',
-          agent_name: p.assigned_agent?.full_name || 'Sin asignar',
-          agent_email: p.assigned_agent?.email || ''
+          agent_name: p.agent_profile?.full_name || p.assigned_agent?.name || 'Sin asignar',
+          agent_email: p.agent_profile?.email || p.assigned_agent?.email || ''
         }));
 
       // ─── Nivel 3: Red de Colaboración (Roomix) ───

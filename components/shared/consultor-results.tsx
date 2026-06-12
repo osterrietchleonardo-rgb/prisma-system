@@ -317,7 +317,7 @@ export function UnifiedPropertyDetail({
                   Fuente: {property.roomix_agency_name}
                 </p>
                 <a
-                  href={property.roomix_agency_source_url}
+                  href={property.canonical_url || property.roomix_agency_source_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors"
