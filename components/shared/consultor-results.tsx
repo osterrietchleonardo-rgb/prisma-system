@@ -33,6 +33,9 @@ export interface UnifiedProperty {
   roomix_agency_logo?: string | null
   roomix_agency_source_url?: string | null
   canonical_url?: string
+
+  // Tokko-specific
+  public_url?: string | null
 }
 
 export interface MatchedPropertiesResponse {
@@ -331,14 +334,18 @@ export function UnifiedPropertyDetail({
             ) : (
               <>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  ID Interno: {property.id}
+                  {property.public_url ? 'Ficha pública' : `ID Interno: ${property.id}`}
                 </p>
                 <a
-                  href={`/asesor/propiedades/${property.id}`}
+                  href={property.public_url || `/asesor/propiedades/${property.id}`}
                   target="_blank"
+                  rel="noopener noreferrer"
                   className="px-4 py-2 bg-foreground text-background hover:bg-foreground/90 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors"
                 >
                   Ver Ficha Completa
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
                 </a>
               </>
             )}

@@ -284,7 +284,8 @@ export async function POST(req: Request) {
           ...p,
           source: 'own',
           agent_name: p.agent_profile?.full_name || p.assigned_agent?.name || 'Sin asignar',
-          agent_email: p.agent_profile?.email || p.assigned_agent?.email || ''
+          agent_email: p.agent_profile?.email || p.assigned_agent?.email || '',
+          public_url: p.tokko_data?.public_url || null
         }));
 
       const agencia = allProperties
@@ -294,7 +295,8 @@ export async function POST(req: Request) {
           ...p,
           source: 'agency',
           agent_name: p.agent_profile?.full_name || p.assigned_agent?.name || 'Sin asignar',
-          agent_email: p.agent_profile?.email || p.assigned_agent?.email || ''
+          agent_email: p.agent_profile?.email || p.assigned_agent?.email || '',
+          public_url: p.tokko_data?.public_url || null
         }));
 
       // ─── Nivel 3: Red de Colaboración (Roomix) ───
