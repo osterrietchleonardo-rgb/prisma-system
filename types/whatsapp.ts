@@ -48,7 +48,7 @@ export interface WAConversation {
   agent_id: string | null
   assigned_agent?: { full_name?: string | null; email: string; avatar_url?: string | null } | null // Joined from profiles
   last_message_at: string
-  last_message_text?: string | null // No es columna persistida: preview opcional (cae a fallback en UI/notificación)
+  last_message_text?: string // No es columna persistida: preview opcional (cae a fallback en UI/notificación)
   last_inbound_at: string | null
   bot_active: boolean
   status: ConversationStatus

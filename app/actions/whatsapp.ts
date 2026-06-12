@@ -1346,10 +1346,10 @@ export async function sendToPipeline(
     }
 
     // Opcionalmente se podría agregar una etiqueta a la conversación para indicar que ya está en el pipeline
-    await supabase.rpc('array_append_etiqueta', { 
-      conv_id: conversation_id, 
-      nueva_etiqueta: 'En Pipeline' 
-    }).catch(() => {}) // Fallback silencioso si no existe la función
+    await Promise.resolve(supabase.rpc('array_append_etiqueta', {
+      conv_id: conversation_id,
+      nueva_etiqueta: 'En Pipeline'
+    })).catch(() => {}) // Fallback silencioso si no existe la función
 
     return { success: true, data: lead }
   } catch (err) {

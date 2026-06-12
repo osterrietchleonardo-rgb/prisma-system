@@ -126,7 +126,8 @@ export async function POST(req: Request) {
     const activeConv = conv ?? newConv
 
     // Ejecutar queries lentas de BD en paralelo para acelerar trigger a n8n
-    const promises: Promise<any>[] = []
+    // PostgrestBuilder es thenable (PromiseLike) pero no Promise; Promise.all lo acepta igual.
+    const promises: PromiseLike<any>[] = []
 
     // 1. Promesa: UPDATE wa_conversations (Solo si la conv ya existía)
     if (conv) {

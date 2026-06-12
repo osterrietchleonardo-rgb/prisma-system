@@ -308,7 +308,7 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
             <Clock className="w-4 h-4" />
             Actualizar
           </Button>
-          <Button className="bg-accent hover:bg-accent/90" onClick={() => handleEdit(null)}>
+          <Button className="bg-accent hover:bg-accent/90" onClick={() => handleEdit()}>
             <Settings2 className="w-4 h-4 mr-2" />
             Configuración Global
           </Button>
@@ -338,7 +338,7 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
               <Button 
                 size="lg" 
                 className="bg-accent hover:bg-accent/90 shadow-lg shadow-accent/20 gap-2 px-8" 
-                onClick={() => handleEdit(null)}
+                onClick={() => handleEdit()}
               >
                 <Settings2 className="w-5 h-5" />
                 Configurar Identidad y Reglas

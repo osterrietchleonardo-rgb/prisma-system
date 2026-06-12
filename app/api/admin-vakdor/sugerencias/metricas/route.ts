@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
 
   const { data: todos } = await db
     .from("system_feedback")
-    .select("id, type, estado, created_at, content, agency_id, user_id, profiles!system_feedback_user_id_fkey(full_name, agency_id), agencies!system_feedback_agency_id_fkey(name)")
+    .select("id, type, estado, created_at, updated_at, content, email, agency_id, user_id, profiles!system_feedback_user_id_fkey(full_name, agency_id), agencies!system_feedback_agency_id_fkey(name)")
     .order("created_at", { ascending: false })
 
   const all = todos || []
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
   // Top 5 agencias con más sugerencias
   const porAgencia = all.reduce((acc, f) => {
-    const agName = (f.agencies as { name: string } | null)?.name || f.agency_id || "Sin agencia"
+    const agName = (f.agencies as unknown as { name: string } | null)?.name || f.agency_id || "Sin agencia"
     acc[agName] = (acc[agName] || 0) + 1
     return acc
   }, {} as Record<string, number>)
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
   const porUsuario: Record<string, { nombre: string; cantidad: number }> = {}
   all.forEach((f) => {
     if (f.user_id) {
-      const prof = f.profiles as { full_name: string } | null
+      const prof = f.profiles as unknown as { full_name: string } | null
       const nombre = prof?.full_name || f.email || f.user_id
       if (!porUsuario[f.user_id]) porUsuario[f.user_id] = { nombre, cantidad: 0 }
       porUsuario[f.user_id].cantidad++
@@ -85,8 +85,8 @@ export async function GET(request: NextRequest) {
       .toLowerCase()
       .replace(/[^\w\sáéíóúüñ]/g, " ")
       .split(/\s+/)
-      .filter(w => w.length > 3 && !STOPWORDS_ES.has(w))
-    words.forEach(w => { wordCounts[w] = (wordCounts[w] || 0) + 1 })
+      .filter((w: string) => w.length > 3 && !STOPWORDS_ES.has(w))
+    words.forEach((w: string) => { wordCounts[w] = (wordCounts[w] || 0) + 1 })
   })
   const topPalabras = Object.entries(wordCounts)
     .sort(([,a],[,b]) => b-a)

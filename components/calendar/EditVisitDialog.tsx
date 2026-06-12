@@ -57,10 +57,8 @@ export function EditVisitDialog({ visit, open, onOpenChange, onSuccess, agencyId
 
   useEffect(() => {
     if (open && agencyId) {
-      getTrackingOptions(agencyId).then((res) => {
-        if (res.success && res.data) {
-          setProperties(res.data.properties)
-        }
+      getTrackingOptions().then((res) => {
+        setProperties(res.properties)
       })
     }
   }, [open, agencyId])
