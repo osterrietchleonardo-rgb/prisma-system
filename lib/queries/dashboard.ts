@@ -169,7 +169,6 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
     
     // Prelisting
     consultasWa: metrics.prospeccion.waChats,
-    prospeccionActiva: metrics.prospeccion.active,
     tasaciones: metrics.prelisting.volumen,
     pipelineCaptacion: metrics.prelisting.pipeline,
     ticketPromedioTasacion,

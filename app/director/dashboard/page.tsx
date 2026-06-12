@@ -23,6 +23,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
+import { Skeleton } from "@/components/ui/skeleton"
 import dynamic from "next/dynamic"
 import { createClient } from "@/lib/supabase/server"
 import { getDashboardData, getPipelineDashboardData } from "@/lib/queries/dashboard"

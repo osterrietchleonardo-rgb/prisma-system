@@ -69,13 +69,13 @@ export function DatePeriodFilter({ className }: React.HTMLAttributes<HTMLDivElem
         range = { from: startOfDay(now), to: endOfDay(now) };
         break;
       case 'month':
-        range = { from: startOfOfMonth(now), to: endOfOfMonth(now) };
+        range = { from: startOfMonth(now), to: endOfMonth(now) };
         break;
       case 'quarter':
-        range = { from: startOfOfQuarter(now), to: endOfOfQuarter(now) };
+        range = { from: startOfQuarter(now), to: endOfQuarter(now) };
         break;
       case 'year':
-        range = { from: startOfOfYear(now), to: endOfOfYear(now) };
+        range = { from: startOfYear(now), to: endOfYear(now) };
         break;
       case 'last30':
       default:

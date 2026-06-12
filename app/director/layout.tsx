@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { DirectorSidebar } from "@/components/director-sidebar"
 import { DirectorHeader } from "@/components/director-header"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getTokenIssuedAt } from "@/lib/auth/session"
 
 export default async function DirectorLayout({
   children,
@@ -44,7 +45,7 @@ export default async function DirectorLayout({
     }
     // Check if admin invalidated this session after it was issued
     if (profile.tokens_invalidos_desde) {
-      const tokenIat = session.user.iat ?? 0 // JWT issued-at (seconds)
+      const tokenIat = getTokenIssuedAt(session.access_token) // JWT issued-at (seconds)
       const invalidSince = Math.floor(new Date(profile.tokens_invalidos_desde).getTime() / 1000)
       if (tokenIat < invalidSince) {
         await supabase.auth.signOut()

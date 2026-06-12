@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { AsesorSidebar } from "@/components/asesor-sidebar"
 import { AsesorHeader } from "@/components/asesor-header"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { getTokenIssuedAt } from "@/lib/auth/session"
 
 export default async function AsesorLayout({
   children,
@@ -42,7 +43,7 @@ export default async function AsesorLayout({
       redirect("/auth/login?error=account_suspended")
     }
     if (profile.tokens_invalidos_desde) {
-      const tokenIat = session.user.iat ?? 0
+      const tokenIat = getTokenIssuedAt(session.access_token)
       const invalidSince = Math.floor(new Date(profile.tokens_invalidos_desde).getTime() / 1000)
       if (tokenIat < invalidSince) {
         await supabase.auth.signOut()
