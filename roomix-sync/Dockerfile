@@ -14,5 +14,8 @@ RUN npm ci
 # Copiamos el resto de los archivos del crawler
 COPY . .
 
-# Comando de arranque (inicia el cron que luego dispara el crawler)
-CMD ["npm", "start"]
+# Puerto para el health check de Easypanel
+EXPOSE 80
+
+# Comando de arranque directo (sin npm como intermediario para manejar SIGTERM correctamente)
+CMD ["node", "cron.js"]
