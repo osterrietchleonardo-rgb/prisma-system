@@ -93,13 +93,14 @@ function CRMLeadsPageContent() {
             <RefreshCcw className={cn("h-4 w-4 transition-transform duration-700", isLoading && "animate-spin")} />
             {isLoading ? "Sincronizando..." : "Actualizar Base"}
           </Button>
-          <LeadModal 
-            isOpen={isModalOpen} 
-            setIsOpen={setIsModalOpen} 
+          {/* Botón "Nuevo Lead" oculto por ahora — reactivar descomentando cuando se decida configurarlo */}
+          {/* <LeadModal
+            isOpen={isModalOpen}
+            setIsOpen={setIsModalOpen}
             onSuccess={async () => {
               await refetch()
-            }} 
-          />
+            }}
+          /> */}
         </div>
       </div>
 
