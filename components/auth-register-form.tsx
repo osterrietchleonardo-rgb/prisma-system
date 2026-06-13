@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Globe as Google, Loader2, Info } from "lucide-react"
+import AuthLoadingOverlay from "@/components/auth-loading-overlay"
 
 export default function RegisterForm() {
   const [loading, setLoading] = useState(false)
@@ -87,6 +88,8 @@ export default function RegisterForm() {
   }
 
   return (
+    <>
+    {loading && <AuthLoadingOverlay message="Creando tu cuenta..." />}
     <Card className="w-full max-w-lg border-accent/20 bg-card/50 backdrop-blur-sm">
       <CardHeader className="space-y-1 items-center">
         <div className="w-16 h-16 relative rounded-full overflow-hidden mb-2 shadow-lg shadow-accent/20 bg-[#131A2D] p-1 border border-accent/20">
@@ -158,5 +161,6 @@ export default function RegisterForm() {
         </Link>
       </CardFooter>
     </Card>
+    </>
   )
 }

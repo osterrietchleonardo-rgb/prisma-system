@@ -1,7 +1,7 @@
 "use client";
 
-import TrackingPerformancePage from "@/app/director/tracking-performance/page";
+import { TrackingPerformanceView } from "@/components/tracking/TrackingPerformanceView";
 
 export default function AsesorTrackingPerformancePage() {
-  return <TrackingPerformancePage isDirector={false} />;
+  return <TrackingPerformanceView isDirector={false} />;
 }

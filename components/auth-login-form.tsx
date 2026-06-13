@@ -9,9 +9,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Globe as Google, Loader2 } from "lucide-react"
+import AuthLoadingOverlay from "@/components/auth-loading-overlay"
 
 export default function LoginForm() {
   const [loading, setLoading] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -43,6 +45,9 @@ export default function LoginForm() {
         return
       }
 
+      // Credenciales correctas → mostramos la pantalla de carga mientras entra
+      setRedirecting(true)
+
       const { user } = result
       const role = user?.user_metadata?.role
 
@@ -51,6 +56,7 @@ export default function LoginForm() {
         const statusRes = await fetch("/api/auth/check-status")
         const statusData = await statusRes.json()
         if (statusData.estado === "pausado" || statusData.estado === "eliminado") {
+          setRedirecting(false)
           setError("Tu cuenta ha sido suspendida. Contactá con soporte.")
           setLoading(false)
           return
@@ -69,6 +75,7 @@ export default function LoginForm() {
       
       router.refresh()
     } catch (err) {
+      setRedirecting(false)
       setError(err instanceof Error ? err.message : "Error al iniciar sesión")
     } finally {
       setLoading(false)
@@ -76,6 +83,8 @@ export default function LoginForm() {
   }
 
   return (
+    <>
+    {redirecting && <AuthLoadingOverlay message="Ingresando a tu cuenta..." />}
     <Card className="w-full max-w-md border-accent/20 bg-card/50 backdrop-blur-sm">
       <CardHeader className="space-y-1 items-center">
         <div className="w-16 h-16 relative rounded-full overflow-hidden mb-2 shadow-lg shadow-accent/20 bg-[#131A2D] p-1 border border-accent/20">
@@ -136,5 +145,6 @@ export default function LoginForm() {
         </Link>
       </CardFooter>
     </Card>
+    </>
   )
 }
