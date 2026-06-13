@@ -133,13 +133,18 @@ async function initBrowser() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STEP 2: SITEMAPS (Via Browser)
+// STEP 2: SITEMAPS (Via fetch con cookies CF)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 async function fetchSitemaps(context) {
-  log('📡', `Descargando ${SITEMAP_URLS.length} sitemaps...`);
+  log('📡', `Descargando ${SITEMAP_URLS.length} sitemaps via fetch...`);
+
+  // Extraer cookies del browser context (incluye cf_clearance de Cloudflare)
+  const cookies = await context.cookies('https://roomix.ai');
+  const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+  log('🍪', `Cookies CF extraídas: ${cookies.map(c => c.name).join(', ')}`);
+
   const allEntries = [];
-  const page = await context.newPage();
 
   for (const url of SITEMAP_URLS) {
     const sitemapIdx = url.split('/').pop();
@@ -148,25 +153,35 @@ async function fetchSitemaps(context) {
     for (let attempt = 1; attempt <= SITEMAP_RETRIES; attempt++) {
       try {
         if (attempt > 1) {
-          const backoff = attempt * 10_000; // 10s, 20s, 30s
+          const backoff = attempt * 10_000;
           log('🔄', `Reintentando sitemap ${sitemapIdx} (intento ${attempt}/${SITEMAP_RETRIES}, espera ${backoff/1000}s)...`);
           await sleep(backoff);
         }
 
-        const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: SITEMAP_TIMEOUT });
-        const status = res?.status();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), SITEMAP_TIMEOUT);
 
-        if (status === 403 || status >= 500) {
-          log('⚠️', `Sitemap ${sitemapIdx} → ${status}, saltando`);
-          break; // No reintentar en HTTP errors explícitos
+        const res = await fetch(url, {
+          headers: {
+            'Cookie': cookieHeader,
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/xml, application/xml, text/html, */*',
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          log('⚠️', `Sitemap ${sitemapIdx} → HTTP ${res.status}, saltando`);
+          break;
         }
 
-        await sleep(1000); // Esperar que el navegador renderice el XML
-        const content = await page.content();
-        const xmlMatch = content.match(/<urlset[\s\S]*<\/urlset>/);
+        const text = await res.text();
+        const xmlMatch = text.match(/<urlset[\s\S]*<\/urlset>/);
         if (!xmlMatch) {
-          log('⚠️', `Sitemap ${sitemapIdx} sin XML válido (intento ${attempt})`);
-          if (attempt < SITEMAP_RETRIES) continue; // Reintentar
+          // Puede ser un challenge HTML de Cloudflare
+          log('⚠️', `Sitemap ${sitemapIdx} sin XML válido (intento ${attempt}, ${text.length} chars, posible CF challenge)`);
+          if (attempt < SITEMAP_RETRIES) continue;
           break;
         }
 
@@ -188,20 +203,19 @@ async function fetchSitemaps(context) {
         }
         log('✅', `Sitemap ${sitemapIdx}: ${entries.length} entradas`);
         success = true;
-        break; // Éxito, no reintentar
+        break;
       } catch (err) {
-        log('❌', `Error sitemap ${sitemapIdx} (intento ${attempt}/${SITEMAP_RETRIES}):`, err.message);
+        const msg = err.name === 'AbortError' ? `Timeout ${SITEMAP_TIMEOUT/1000}s` : err.message;
+        log('❌', `Error sitemap ${sitemapIdx} (intento ${attempt}/${SITEMAP_RETRIES}):`, msg);
         if (attempt === SITEMAP_RETRIES) {
           log('💀', `Sitemap ${sitemapIdx} fallido después de ${SITEMAP_RETRIES} intentos`);
         }
       }
     }
 
-    // Pausa entre sitemaps para no triggear rate limits
     if (success) await sleep(2000);
   }
 
-  await page.close();
   log('📊', `Total entradas: ${allEntries.length}`);
   return allEntries;
 }
