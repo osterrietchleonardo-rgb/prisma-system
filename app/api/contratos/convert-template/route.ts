@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
+import { calculateCost } from "@/utils/aiCostCalculator"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import mammoth from "mammoth"
 
@@ -114,13 +115,13 @@ export async function POST(req: Request) {
     const responseText = result.response.text()
 
     // ─── Record real token usage ───────────────────────────────────────
-    // gemini-3.5-flash: $0.10/M input, $0.40/M output
+    // Precio tomado de la tabla central (utils/aiCostCalculator) según el modelo real.
     const contratos_usage = result.response.usageMetadata;
     if (contratos_usage) {
       const inputTk = contratos_usage.promptTokenCount ?? 0;
       const outputTk = contratos_usage.candidatesTokenCount ?? 0;
-      const usd = (inputTk / 1_000_000) * 0.10 + (outputTk / 1_000_000) * 0.40;
-      updateAiTransactionCost(txId, inputTk, outputTk, usd);
+      const { totalCostUSD } = calculateCost({ model: "gemini-3.5-flash", inputTokens: inputTk, outputTokens: outputTk });
+      updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
     }
     const cleanJson = responseText.replace(/```json|```/g, "").trim()
 

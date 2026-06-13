@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { generateEmbedding, extractTextFromDocument } from "@/lib/gemini"
 import { consumeAiCredits, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
+import { calculateCost } from "@/utils/aiCostCalculator"
 import { YoutubeTranscript } from "youtube-transcript"
 import mammoth from "mammoth"
 import Papa from "papaparse"
@@ -128,7 +129,8 @@ export async function POST(req: NextRequest) {
     // 3. Generate Embedding
     const textForEmbedding = contentText.substring(0, 5000)
     const embeddingInputTokens = Math.ceil(textForEmbedding.length / 4)
-    const embeddingUsd = (embeddingInputTokens / 1_000_000) * 0.02
+    // Precio desde la tabla central (utils/aiCostCalculator).
+    const { totalCostUSD: embeddingUsd } = calculateCost({ model: "text-embedding-004", inputTokens: embeddingInputTokens, outputTokens: 0 })
 
     const txId = await consumeAiCredits("documentos_ia", 1, `Embed: ${title.substring(0, 50)}`)
     const embedding = await generateEmbedding(textForEmbedding)

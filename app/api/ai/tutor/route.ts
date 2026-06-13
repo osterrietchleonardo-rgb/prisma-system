@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
+import { calculateCost } from "@/utils/aiCostCalculator"
 import { generateEmbedding } from "@/lib/gemini"
 import { openaiIA } from "@/lib/openai"
 
@@ -116,13 +117,13 @@ export async function POST(req: NextRequest) {
     const responseText = result.response.text()
 
     // ─── Record real token usage (input + output) ──────────────────────────
-    // openaiIA usa GPT-4.1-mini: $0.40/M input, $1.60/M output
+    // openaiIA usa GPT-4.1-mini. Precio desde la tabla central (utils/aiCostCalculator).
     const tutor_usage = result.response.usageMetadata;
     if (tutor_usage) {
       const inputTk = tutor_usage.promptTokenCount ?? 0;
       const outputTk = tutor_usage.candidatesTokenCount ?? 0;
-      const usd = (inputTk / 1_000_000) * 0.40 + (outputTk / 1_000_000) * 1.60;
-      updateAiTransactionCost(txId, inputTk, outputTk, usd);
+      const { totalCostUSD } = calculateCost({ model: "gpt-4.1-mini", inputTokens: inputTk, outputTokens: outputTk });
+      updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
     }
 
     // 6. Save Assistant Message

@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
-import { Loader2, Palette, Upload, Layout, Maximize2, Trash2, Plus, Type } from "lucide-react"
+import { Loader2, Palette, Upload, Layout, Maximize2, Trash2, Plus, Type, Scale, Sparkles } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 
@@ -17,6 +18,8 @@ interface MarketingAiConfig {
   logo_position: string;
   logo_size: string;
   brand_font: string;
+  legal_notice: string;
+  creative_directive: string;
 }
 
 export function MarketingAiSettings() {
@@ -25,7 +28,9 @@ export function MarketingAiSettings() {
     logo_url: null,
     logo_position: 'bottom-right',
     logo_size: 'medium',
-    brand_font: 'sans'
+    brand_font: 'sans',
+    legal_notice: '',
+    creative_directive: ''
   })
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -347,6 +352,52 @@ export function MarketingAiSettings() {
                 </button>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Directiva Creativa del Director */}
+        <Card className="border-accent/10 shadow-lg bg-card/50 backdrop-blur-sm md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-accent" />
+              Directiva Creativa
+            </CardTitle>
+            <CardDescription>
+              Indicaciones de estilo que la IA tendrá en cuenta al crear los copies y las imágenes de todos tus asesores. Por ejemplo: hablar en plural ("escribinos", "contactanos"), evitar emojis, usar un tono formal, etc.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={config.creative_directive}
+              onChange={(e) => setConfig(prev => ({ ...prev, creative_directive: e.target.value }))}
+              placeholder={'Ej: Escribir siempre en plural (ej. "escribinos", "te esperamos"). Tono cercano pero profesional. No usar más de un emoji por copy.'}
+              className="min-h-[120px] resize-none"
+              maxLength={1000}
+            />
+            <p className="text-[10px] text-muted-foreground mt-2 text-right">{config.creative_directive.length}/1000</p>
+          </CardContent>
+        </Card>
+
+        {/* Aviso Legal */}
+        <Card className="border-accent/10 shadow-lg bg-card/50 backdrop-blur-sm md:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Scale className="w-4 h-4 text-accent" />
+              Aviso Legal
+            </CardTitle>
+            <CardDescription>
+              Texto legal que se incluirá en letra pequeña y legible en la parte inferior de cada imagen generada, sin tapar otros elementos. Por ejemplo: matrícula, datos del corredor responsable o aclaraciones obligatorias.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              value={config.legal_notice}
+              onChange={(e) => setConfig(prev => ({ ...prev, legal_notice: e.target.value }))}
+              placeholder={'Ej: Mat. CUCICBA 1234 - Corredor Responsable: Juan Pérez. Valores sujetos a confirmación.'}
+              className="min-h-[90px] resize-none"
+              maxLength={300}
+            />
+            <p className="text-[10px] text-muted-foreground mt-2 text-right">{config.legal_notice.length}/300</p>
           </CardContent>
         </Card>
       </div>

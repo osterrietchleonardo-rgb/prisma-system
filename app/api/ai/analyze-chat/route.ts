@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { prismaIA } from "@/lib/gemini"
 import { parseWhatsAppChat } from "@/lib/whatsapp-parser"
 import { createClient } from "@/lib/supabase/server"
-import { consumeAiCredits } from "@/lib/auth/tenant-validation"
+import { consumeAiCredits, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
+import { calculateCost } from "@/utils/aiCostCalculator"
 import { rateLimit, LIMITS } from "@/lib/rate-limiter"
 import { z } from "zod"
 
@@ -39,8 +40,8 @@ export async function POST(req: NextRequest) {
     const chatText = result_zod.data.chatText
     const cleanedChat = parseWhatsAppChat(chatText)
     
-    // Consume 1 credit for chat analysis
-    await consumeAiCredits("analisis_chat_ia", 1, `Analyze Chat: ${cleanedChat.substring(0, 50)}...`);
+    // Consume 1 credit for chat analysis (txId para registrar el costo real luego)
+    const txId = await consumeAiCredits("analisis_chat_ia", 1, `Analyze Chat: ${cleanedChat.substring(0, 50)}...`);
 
     // 4. Gemini Prompt
     const prompt = `
@@ -72,7 +73,16 @@ export async function POST(req: NextRequest) {
 
     const aiResult = await prismaIA.generateContent(prompt)
     const responseText = aiResult.response.text()
-    
+
+    // ─── Record real token usage (modelo gemini-3.5-flash, precio desde la tabla central) ───
+    const chat_usage = aiResult.response.usageMetadata;
+    if (chat_usage) {
+      const inputTk = chat_usage.promptTokenCount ?? 0;
+      const outputTk = chat_usage.candidatesTokenCount ?? 0;
+      const { totalCostUSD } = calculateCost({ model: "gemini-3.5-flash", inputTokens: inputTk, outputTokens: outputTk });
+      updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
+    }
+
     // Clean potential markdown and parse
     const jsonString = responseText.replace(/```json|```/g, "").trim()
     const analysis = JSON.parse(jsonString)

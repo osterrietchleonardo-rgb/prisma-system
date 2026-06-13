@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { NextResponse } from "next/server";
 import { generateImage } from "@/lib/gemini";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
+import { calculateImageCost } from "@/utils/aiCostCalculator";
 import { GenerateImagePayload } from "@/types/marketing-ia";
 
 const buildImagePrompt = (payload: GenerateImagePayload, branding?: any): string => {
@@ -32,13 +33,25 @@ Asegurate de que el logo se vea nítido y profesional, como una superposición d
       display: 'estilo de impacto y audaz (Bold/Display)'
     }[branding.brand_font as 'sans' | 'serif' | 'script' | 'display'] || 'moderno';
 
+    const directive = branding.creative_directive?.trim()
+      ? `DIRECTIVA CREATIVA DE LA AGENCIA (OBLIGATORIO RESPETAR): ${branding.creative_directive.trim()}`
+      : '';
+
     brandingCtx = `
 IDENTIDAD DE MARCA (OBLIGATORIO):
 ${colors}
 ${logo}
 TIPOGRAFÍA PREFERIDA: Usar una tipografía de ${fonts} para cualquier texto en la imagen.
+${directive}
 `;
   }
+
+  const legalNotice = branding?.legal_notice?.trim()
+    ? `
+AVISO LEGAL (OBLIGATORIO):
+Incluir el siguiente texto legal en la parte INFERIOR de la imagen, en letra PEQUEÑA pero perfectamente LEGIBLE, con buen contraste sobre el fondo y SIN tapar ni chocar contra el logo, el hook ni ningún otro elemento gráfico:
+"${branding.legal_notice.trim()}"`
+    : '';
 
   const estilos = {
     moderno:     'moderno y minimalista, paleta neutra con acentos cobre, tipografía sans-serif limpia',
@@ -72,6 +85,7 @@ TEXTO PRINCIPAL A INCLUIR EN LA IMAGEN:
 "${payload.copy_content.hook}"
 
 ${propiedadCtx}
+${legalNotice}
 
 REGLAS DE COMPOSICIÓN:
 - El hook del copy debe estar visible y legible en la imagen
@@ -80,6 +94,7 @@ REGLAS DE COMPOSICIÓN:
 - Sin elementos genéricos ni stock photos de baja calidad
 - Resultado fotorrealista de alta calidad para uso comercial en Argentina
 - Si se especificaron colores de marca, el diseño debe ser coherente con ellos.
+- Si se especificó un aviso legal, reservar una franja inferior para ese texto en letra pequeña y legible, sin superponerlo con otros elementos.
 
 ${payload.extra_prompt ? `INSTRUCCIONES ADICIONALES: ${payload.extra_prompt}` : ''}
   `.trim();
@@ -132,11 +147,13 @@ export async function POST(req: Request) {
       imageBuffer = await generateImage(finalPrompt, 'pro', imageParts);
 
       // ─── Record image cost ──────────────────────────────────────────
-      // Imagen 3 Pro @ 1024x1024: ~$0.04/image (standard) / ~$0.06/image (pro)
-      // We store prompt length as input_tokens (approx), output_tokens = 0
+      // Precio tomado de la tabla central (utils/aiCostCalculator).
+      // Se usa Nano Banana Pro (gemini-3-pro-image). post=1080x1080 (~1MP) -> 1k; reels/historia=1080x1920 (~2MP) -> 2k.
+      // Guardamos el largo del prompt como input_tokens (aprox), output_tokens = 0.
       const promptTokensEst = Math.ceil(finalPrompt.length / 4); // ~4 chars/token
-      const imageUsd = 0.06; // pro quality
-      updateAiTransactionCost(txId, promptTokensEst, 0, imageUsd);
+      const imageRes = payload.format === 'post' ? '1k' : '2k';
+      const { totalCostUSD } = calculateImageCost({ model: "gemini-3-pro-image", imageCount: 1, resolution: imageRes });
+      updateAiTransactionCost(txId, promptTokensEst, 0, totalCostUSD);
     } catch (apiError: any) {
       console.error("Gemini Image Generation Error:", apiError);
       
