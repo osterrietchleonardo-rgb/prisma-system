@@ -51,6 +51,9 @@ export default function LoginForm() {
       const { user } = result
       const role = user?.user_metadata?.role
 
+      // Garantiza que la pantalla de carga sea visible un instante (corre en paralelo al chequeo)
+      const minDisplay = new Promise((resolve) => setTimeout(resolve, 900))
+
       // GAP 2 FIX: Check account status before navigating
       try {
         const statusRes = await fetch("/api/auth/check-status")
@@ -64,6 +67,9 @@ export default function LoginForm() {
       } catch {
         // If status check fails, proceed normally — layout is the authoritative check
       }
+
+      // Esperamos el mínimo de visibilidad antes de navegar
+      await minDisplay
 
       if (role === "director") {
         router.push("/director/dashboard")
