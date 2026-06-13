@@ -66,6 +66,8 @@ const SITEMAP_URLS = Array.from({ length: 6 }, (_, i) =>
 const CONCURRENCY = 2; // Menos concurrencia para evitar flags
 const BATCH_DELAY_MS = 1500;
 const PAGE_TIMEOUT = 45_000;
+const SITEMAP_TIMEOUT = 90_000; // Los sitemaps son XML pesados, necesitan más tiempo
+const SITEMAP_RETRIES = 3;
 const CHECKPOINT_FILE = resolve(__dirname, 'checkpoint.json');
 const xmlParser = new XMLParser({ ignoreAttributes: false });
 
@@ -140,43 +142,63 @@ async function fetchSitemaps(context) {
   const page = await context.newPage();
 
   for (const url of SITEMAP_URLS) {
-    try {
-      const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
-      const status = res?.status();
+    const sitemapIdx = url.split('/').pop();
+    let success = false;
 
-      if (status === 403 || status >= 500) {
-        log('⚠️', `Sitemap ${url.split('/').pop()} → ${status}, saltando`);
-        continue;
-      }
+    for (let attempt = 1; attempt <= SITEMAP_RETRIES; attempt++) {
+      try {
+        if (attempt > 1) {
+          const backoff = attempt * 10_000; // 10s, 20s, 30s
+          log('🔄', `Reintentando sitemap ${sitemapIdx} (intento ${attempt}/${SITEMAP_RETRIES}, espera ${backoff/1000}s)...`);
+          await sleep(backoff);
+        }
 
-      await sleep(1000); // Esperar que el navegador renderice el XML
-      const content = await page.content();
-      const xmlMatch = content.match(/<urlset[\s\S]*<\/urlset>/);
-      if (!xmlMatch) {
-        log('⚠️', `Sitemap ${url.split('/').pop()} sin XML válido`);
-        continue;
-      }
+        const res = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: SITEMAP_TIMEOUT });
+        const status = res?.status();
 
-      const parsed = xmlParser.parse(xmlMatch[0]);
-      const urlSet = parsed?.urlset?.url;
-      if (!urlSet) continue;
+        if (status === 403 || status >= 500) {
+          log('⚠️', `Sitemap ${sitemapIdx} → ${status}, saltando`);
+          break; // No reintentar en HTTP errors explícitos
+        }
 
-      const entries = Array.isArray(urlSet) ? urlSet : [urlSet];
-      for (const entry of entries) {
-        const loc = entry.loc;
-        if (loc && loc.includes('/propiedad/')) {
-          allEntries.push({
-            loc,
-            lastmod: entry.lastmod ? new Date(entry.lastmod).toISOString() : null,
-            id: extractIdFromUrl(loc),
-            slug: extractSlugFromUrl(loc)
-          });
+        await sleep(1000); // Esperar que el navegador renderice el XML
+        const content = await page.content();
+        const xmlMatch = content.match(/<urlset[\s\S]*<\/urlset>/);
+        if (!xmlMatch) {
+          log('⚠️', `Sitemap ${sitemapIdx} sin XML válido (intento ${attempt})`);
+          if (attempt < SITEMAP_RETRIES) continue; // Reintentar
+          break;
+        }
+
+        const parsed = xmlParser.parse(xmlMatch[0]);
+        const urlSet = parsed?.urlset?.url;
+        if (!urlSet) { break; }
+
+        const entries = Array.isArray(urlSet) ? urlSet : [urlSet];
+        for (const entry of entries) {
+          const loc = entry.loc;
+          if (loc && loc.includes('/propiedad/')) {
+            allEntries.push({
+              loc,
+              lastmod: entry.lastmod ? new Date(entry.lastmod).toISOString() : null,
+              id: extractIdFromUrl(loc),
+              slug: extractSlugFromUrl(loc)
+            });
+          }
+        }
+        log('✅', `Sitemap ${sitemapIdx}: ${entries.length} entradas`);
+        success = true;
+        break; // Éxito, no reintentar
+      } catch (err) {
+        log('❌', `Error sitemap ${sitemapIdx} (intento ${attempt}/${SITEMAP_RETRIES}):`, err.message);
+        if (attempt === SITEMAP_RETRIES) {
+          log('💀', `Sitemap ${sitemapIdx} fallido después de ${SITEMAP_RETRIES} intentos`);
         }
       }
-      log('✅', `Sitemap ${url.split('/').pop()}: ${entries.length} entradas`);
-    } catch (err) {
-      log('❌', `Error sitemap ${url.split('/').pop()}:`, err.message);
     }
+
+    // Pausa entre sitemaps para no triggear rate limits
+    if (success) await sleep(2000);
   }
 
   await page.close();
