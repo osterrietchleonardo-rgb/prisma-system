@@ -140,6 +140,10 @@ async function fetchSitemaps(context) {
   log('📡', `Descargando ${SITEMAP_URLS.length} sitemaps via browser fetch...`);
   const allEntries = [];
   const page = await context.newPage();
+  
+  // Navegar a roomix.ai para tener el origin correcto (evita CORS/Failed to fetch)
+  await page.goto('https://roomix.ai/', { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
+  await sleep(2000);
 
   for (const url of SITEMAP_URLS) {
     const sitemapIdx = url.split('/').pop();
