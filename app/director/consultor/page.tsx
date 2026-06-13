@@ -12,6 +12,8 @@ import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { AiCreditBadge } from "@/components/ai-credit-badge"
 import { ConsultorResultsSection, MatchedPropertiesResponse, UnifiedProperty } from "@/components/shared/consultor-results"
+import { BuscadorNotasSettings } from "@/components/consultor/buscador-notas-settings"
+import { NotebookPen } from "lucide-react"
 interface Property {
   id: string
   title: string
@@ -63,6 +65,7 @@ export default function ConsultorIAPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const [agencyId, setAgencyId] = useState<string>("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [view, setView] = useState<"chat" | "notas">("chat")
   
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -245,7 +248,35 @@ export default function ConsultorIAPage() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-background">
+    <div className="flex flex-col h-full overflow-hidden bg-background">
+      {/* Barra de solapas: Buscador / Notas (Notas solo para el director) */}
+      <div className="flex items-center gap-1 border-b bg-card/30 backdrop-blur-sm px-3">
+        <button
+          onClick={() => setView("chat")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors",
+            view === "chat" ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Bot className="w-4 h-4" /> Buscador
+        </button>
+        <button
+          onClick={() => setView("notas")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors",
+            view === "notas" ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <NotebookPen className="w-4 h-4" /> Notas
+        </button>
+      </div>
+
+      {view === "notas" ? (
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <BuscadorNotasSettings />
+        </div>
+      ) : (
+      <div className="flex flex-1 min-h-0 overflow-hidden">
       {/* Sidebar de Historial */}
       <aside className={cn(
         "bg-muted/50 border-r transition-all duration-300 flex flex-col overflow-hidden",
@@ -485,6 +516,8 @@ export default function ConsultorIAPage() {
           </p>
         </CardFooter>
       </div>
+      </div>
+      )}
     </div>
   )
 }

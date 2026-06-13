@@ -307,7 +307,7 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 
 #### Autenticación y Perfiles
 - **`profiles`** — Perfil de usuario (id, email, full_name, role, agency_id, phone, avatar_url, status, created_at)
-- **`agencies`** — Agencias inmobiliarias (id, name, logo_url, tokko_api_key, address, phone, email, invite_code, owner_id, marketing_ai_config, created_at)
+- **`agencies`** — Agencias inmobiliarias (id, name, logo_url, tokko_api_key, address, phone, email, invite_code, owner_id, performance_config, marketing_ai_config, buscador_ia_config, created_at)
 - **`agency_invites`** — Códigos de invitación (agency_id, code, is_used, used_at, used_by)
 
 #### Propiedades y Leads
@@ -686,36 +686,35 @@ El Buscador IA se nutre de la tabla `roomix_properties`, la cual es alimentada d
 - **Despliegue & Health Check:** El Worker levanta un mini servidor HTTP nativo en el puerto 80 (`cron.js`) y ejecuta Node directamente (`CMD ["node", "cron.js"]` en `Dockerfile`) para cumplir con los requerimientos de Health Check de Easypanel, evitando errores de tipo SIGTERM y garantizando que el proceso se mantenga vivo.
 - **Imagen Docker:** `mcr.microsoft.com/playwright:v1.60.0-jammy`
 
-### 10.3 Flujo Completo de Búsqueda
+### 10.3 Flujo Completo de Búsqueda (rediseño Junio 2026)
 
 1. **Auth + Créditos:** `requireTenant()` + `consumeAiCredits("consultor_ia", 1)`
-2. **Gestión de Sesión:** Crea o recupera `consultor_chat_sessions`
-3. **Análisis de Intent con IA:**
-   - Detecta si el lead busca propiedades (RETRIEVAL) o hace consultas generales (GENERAL).
-   - Identifica filtros duros (precio, ambientes, operación) y filtros blandos (amenities como "luminoso", "pileta").
-   
-4. **Si intent === RETRIEVAL:**
-   
-   a. **Búsqueda Híbrida Vectorial:**
-   Se generan embeddings del mensaje y se cruzan simultáneamente contra dos fuentes de datos usando funciones RPC de Supabase:
-   - `match_properties` (para propiedades internas de Tokko Broker).
-   - `match_roomix_properties` (para el catálogo global extraído por el Docker Worker).
-   
-   b. **Búsqueda por Filtros Estructurados:**
-   Además de la búsqueda vectorial, se aplican filtros `ILIKE` en direcciones, barrios, precios y conteo de ambientes (extrayendo variables directamente del JSON-LD de Roomix y Tokko).
-   
-   c. **Manejo de Imágenes y CDN:**
-   Las propiedades de Roomix consumen imágenes de alta calidad autorizadas vía `next.config.mjs` (`cdn.roomix.ai`).
-   
-   d. **Deduplicación:** Excluye propiedades ya sugeridas en la sesión actual para no repetir.
+2. **Config de la agencia:** lee `agencies.buscador_ia_config` (notas/directivas del director, ver 10.5) y el nombre de la agencia.
+3. **Gestión de Sesión + Memoria por chat:** Crea/recupera `consultor_chat_sessions` y carga **todo** el historial de la sesión (`consultor_chat_messages`). Los últimos 12 turnos previos (`priorTurns`) alimentan tanto la extracción de intención como la respuesta final → cada chat tiene memoria real y sigue el hilo.
+4. **Análisis de Intent con IA (con memoria):** Sobre el último mensaje + la conversación previa, devuelve los criterios **ACUMULADOS y vigentes** (mantiene los filtros anteriores salvo que el usuario los cambie). Extrae: `operation`, `type_keywords`, `location_keywords`, `amenity_keywords`, `agency_keywords` (inmobiliaria), `price_max/min`, `price_currency` (USD/ARS), `bedrooms`, `bathrooms`.
+5. **Si intent === RETRIEVAL — búsqueda en 2 etapas:**
 
-5. **Generación de Respuesta y Renderizado Frontend:**
-   El contexto combinado (Internas + Roomix) se envía a `openaiIA` con el prompt estructurado de "Buscador IA" rioplatense.
-   La IA debe retornar una respuesta amigable, y las tarjetas visuales se renderizan dinámicamente en el frontend basadas en los metadatos inyectados (`consultor-results.tsx`).
-   - **Mapeo de Agentes:** Al mostrar propiedades internas, se intenta hacer JOIN con la tabla `profiles` (`agent_profile`). Si no hay match relacional, se usa como fallback el nombre extraído directamente de la columna JSONB `assigned_agent` traída de Tokko, evitando el estado "Sin asignar".
-   - **Enlaces de Propiedades:** Los botones de "Ver Ficha" de propiedades internas enlazan directamente a la publicación real (`tokko_data.public_url`), mientras que las de la red de Roomix utilizan su respectiva ficha externa (`canonical_url`).
+   a. **Filtro duro (SQL) — solo los grandes reductores:** **operación** (`properties.status`: Venta / Alquiler+Temporary rent; `roomix_properties.operation`: sale/rent) y **tipo de propiedad** (con traducción ES→EN para Roomix: Departamento→Apartment/Accommodation, Casa→House, etc.). Se traen hasta 400 candidatos por tabla, ordenados por recencia.
 
-6. **Tracking de costos:** `updateAiTransactionCost()` con tokens reales consumidos.
+   b. **Interpretación en memoria** sobre el conjunto de columnas (precisión sin perder coincidencias):
+      - **Zona/barrio (prioridad, estricto):** si se pidió zona, la propiedad debe contenerla en sus campos de ubicación (`city`/`neighborhood`/`address`/`title`/ubicación Tokko). Evita el "leak" de otra ciudad (ej: Córdoba cuando se pide La Plata).
+      - **Presupuesto (con moneda):** filtra por `price_max/min` respetando la moneda pedida (`price_currency`); si la moneda del inmueble difiere, no excluye (lo aclara el modelo). No mezcla USD con ARS.
+      - **Ambientes/baños:** tolerante (ambientes ≈ dormitorios + 1; sin dato no excluye).
+      - **Amenities/servicios:** puntúa y ordena (no excluye).
+      - **Inmobiliaria:** si se pide una puntual, filtra la red de colaboración por `roomix_agency_name` (fuzzy, ignorando puntuación/espacios → "remax" matchea "RE/MAX"). Si la inmobiliaria pedida es externa, no muestra cartera interna.
+
+   c. **Sin deduplicación destructiva:** la búsqueda re-muestra coincidencias en cada turno para que el refinamiento ("solo de La Plata") funcione. La continuidad la da la memoria del modelo, no un filtro de "ya vistas" (se eliminó el uso de `metadata.seen_property_ids`).
+
+   d. **Imágenes y CDN:** las propiedades de Roomix consumen imágenes vía `next.config.mjs` (`cdn.roomix.ai`).
+
+6. **Generación de Respuesta y Renderizado Frontend:**
+   El contexto (resumen de resultados + notas del director + lista de recomendadas para cruzar) + los turnos previos van a `openaiIA` con el prompt rioplatense de "Buscador IA". La IA responde breve; las tarjetas se renderizan en `consultor-results.tsx` (3 secciones: propias, agencia, red de colaboración).
+   - **Mapeo de Agentes:** JOIN con `profiles` (`agent_profile`); fallback al JSONB `assigned_agent` de Tokko.
+   - **Enlaces:** propiedades internas → `tokko_data.public_url`; red de colaboración → `canonical_url`.
+
+7. **Tracking de costos:** `updateAiTransactionCost()` con tokens reales, precio desde la tabla central (`utils/aiCostCalculator`).
+
+> **Nota:** la versión anterior describía una búsqueda híbrida vectorial (`match_properties`/`match_roomix_properties` por embeddings). El flujo real ahora es filtro duro SQL + interpretación en memoria; las columnas `embedding` existen pero no se usan en este endpoint.
 
 ### 10.4 Endpoints Adicionales
 
@@ -723,6 +722,13 @@ El Buscador IA se nutre de la tabla `roomix_properties`, la cual es alimentada d
 - `GET /api/ai/consultor?agencyId=xxx` → Todas las sesiones del usuario
 - `DELETE /api/ai/consultor?sessionId=xxx` → Borrar sesión
 - `PATCH /api/ai/consultor` → Renombrar sesión
+
+### 10.5 Notas y directivas del director (`buscador_ia_config`)
+
+**Solapa "Notas"** dentro del Buscador IA del director (`app/director/consultor/page.tsx` + `components/consultor/buscador-notas-settings.tsx`). El asesor no la ve.
+- **Endpoint:** `GET/POST /api/ai/consultor/settings` (POST restringido a `director`).
+- **Almacenamiento:** columna `agencies.buscador_ia_config = { notes }` (jsonb, texto libre). La configura solo el director y **aplica a él y a todos sus asesores** (se lee en cada búsqueda).
+- **Comportamiento:** el modelo interpreta el texto libre. Si una propiedad recomendada —o su inmobiliaria— coincide con un comentario/directiva de las notas, lo comunica al asesor/director como una **consideración/nota** (ej: avisar que conviene evitar cierta inmobiliaria, o que una propiedad acepta permuta). No se expone el origen "Roomix" ni se usa una lista negra estructurada: todo es texto libre interpretado.
 
 ---
 
@@ -810,15 +816,14 @@ Los IPC son perfiles estratégicos de marketing que definen:
 
 **Endpoint:** `POST /api/marketing-ia/generate-copy`  
 **Archivo:** `app/api/marketing-ia/generate-copy/route.ts`  
-**Modelo:** Gemini 2.0 Flash (`prismaIA`)
+**Modelo:** Gemini 3.5 Flash (`prismaIA`, `maxOutputTokens: 8192`)
 
 **Flujo:**
-1. Obtiene IPC del usuario
-2. Si hay `propiedad_tokko_id` → fetch datos reales de Tokko API
-3. Mapea ángulo de marketing: PAS, autoridad, transformación, social_proof, curiosidad, urgencia, aspiracional, datos
-4. Mapea nivel de consciencia: 0 (inconsciente) → 4 (muy consciente)
-5. Genera prompt con toda la estrategia del IPC + datos de propiedad
-6. **Output:**
+1. Obtiene IPC del usuario y la `creative_directive` de la agencia (ver 13.5)
+2. Mapea ángulo de marketing: PAS, autoridad, transformación, social_proof, curiosidad, urgencia, aspiracional, datos
+3. Mapea nivel de consciencia: 0 (inconsciente) → 4 (muy consciente)
+4. Genera prompt con la estrategia del IPC + la **directiva creativa** del director. **No referencia ninguna propiedad puntual** (feature deshabilitada): regla explícita que prohíbe inventar/mencionar direcciones, m², ambientes o precios concretos.
+5. **Output:**
    - Copy tipo `post/historia`: `{ hook, desarrollo, cta }`
    - Copy tipo `video`: `{ hook, problema, agitacion, solucion, cta }`
 
@@ -827,37 +832,38 @@ Los IPC son perfiles estratégicos de marketing que definen:
 **Endpoint:** `POST /api/marketing-ia/generate-batch`  
 **Archivo:** `app/api/marketing-ia/generate-batch/route.ts`
 
-Genera **3 variaciones** simultáneas con ángulos PAS, Transformación y Autoridad/Datos en una sola llamada a Gemini. Output: array de 3 objetos.
+Genera **3 variaciones** simultáneas con ángulos PAS, Transformación y Autoridad/Datos en una sola llamada a Gemini 3.5 Flash. Respeta la **directiva creativa** del director y la misma regla de no inventar propiedades. Output: array de 3 objetos.
 
 ### 13.4 Generación de Imágenes
 
 **Endpoint:** `POST /api/marketing-ia/generate-image`  
 **Archivo:** `app/api/marketing-ia/generate-image/route.ts`  
-**Modelo:** Gemini Imagen 3.0 Generate 002
+**Modelo:** Gemini 3 Pro Image (Nano Banana Pro)
 
 **Flujo:**
-1. Obtiene branding de la agencia (`marketing_ai_config`): colores, logo, tipografía
+1. Obtiene branding de la agencia (`marketing_ai_config`): colores, logo, tipografía, **directiva creativa** y **aviso legal**
 2. Si hay logo → lo descarga y envía como imagen de referencia al modelo
 3. Construye prompt con:
    - Formato: reels (1080x1920), post (1080x1080), historia (1080x1920)
    - Estilo: moderno, lujoso, cálido, corporativo, vibrante
    - Hook del copy a incluir en la imagen
-   - Datos de la propiedad (si aplica)
+   - **Directiva creativa** del director (obligatoria)
+   - **Aviso legal** (si está cargado): texto legal en letra pequeña y legible en la franja inferior, sin tapar otros elementos
 4. Genera imagen via `generateImage(prompt, 'pro', imageParts)`
-5. Sube a Supabase Storage (`marketing-images`)
-6. Guarda registro en `generated_images`
-7. Costo: ~$0.06 USD por imagen (Imagen 3 Pro)
+5. Sube a Supabase Storage (`marketing-images`) y guarda en `generated_images`
+6. Costo desde la tabla central: ~$0.134/imagen (Nano Banana Pro, 1K/2K) · $0.24 (4K)
 
 ### 13.5 Settings de Marketing
 
-**Endpoint:** `GET/POST /api/marketing-ia/settings`  
+**Endpoint:** `GET/POST /api/marketing-ia/settings` (POST restringido a `director`)  
 **Endpoint:** `POST /api/marketing-ia/settings/upload-logo`
 
-Gestiona la configuración de branding de la agencia:
+Gestiona la configuración de branding de la agencia (`marketing_ai_config`):
 - Colores de marca (`brand_colors[]`)
 - Tipografía (`brand_font`: sans, serif, script, display)
-- Logo (URL en Storage)
-- Posición y tamaño del logo
+- Logo (URL en Storage), posición y tamaño
+- **Aviso legal** (`legal_notice`): texto legal para la franja inferior de las imágenes
+- **Directiva creativa** (`creative_directive`): indicaciones de estilo que la IA respeta al crear copies e imágenes; la define el director y aplica a todos sus asesores
 
 ### 13.6 Búsqueda de Propiedades Tokko
 
@@ -1215,17 +1221,22 @@ updateAiTransactionCost(txId, inputTokens, outputTokens, usdCost)
 
 ### 19.2 Features y Costos
 
-| Feature | Créditos | Modelo | Costo Estimado |
+> **Precios centralizados** en `utils/aiCostCalculator.ts` (`AI_PRICING` / `IMAGE_PRICING`). Cada ruta calcula el costo real con `calculateCost` / `calculateImageCost` según el modelo; nunca tiran error (ante un modelo desconocido registran $0 y loguean). Cambiás tarifas en un solo lugar.
+
+| Feature | Créditos | Modelo | Costo (tabla central, por 1M tokens) |
 |---|---|---|---|
-| `consultor_ia` | 1 | GPT-4.1-mini | ~$0.40/M input, $1.60/M output |
-| `tutor_ia` | 1 | GPT-4.1-mini | ~$0.40/M input, $1.60/M output |
-| `marketing_ia` (copy) | 1 | Gemini 2.0 Flash | ~$0.10/M input, $0.40/M output |
-| `marketing_ia` (batch) | 1 | Gemini 2.0 Flash | ~$0.10/M input, $0.40/M output |
-| `marketing_ia` (image) | 2 | Imagen 3 Pro | ~$0.06/image |
-| `contratos_ia` | 5 | — | — |
-| `tasador_ia` | 1 | Gemini 2.0 Flash | ~$0.10/M input |
-| `analisis_chat_ia` | 1 | Gemini 2.0 Flash | — |
-| `documentos_ia` | 1 | Gemini Embedding | ~$0.02/M tokens |
+| `consultor_ia` | 1 | GPT-4.1-mini | $0.40 in / $1.60 out |
+| `tutor_ia` | 1 | GPT-4.1-mini | $0.40 in / $1.60 out |
+| `marketing_ia` (copy) | 1 | Gemini 3.5 Flash | $0.75 in / $4.50 out |
+| `marketing_ia` (batch) | 1 | Gemini 3.5 Flash | $0.75 in / $4.50 out |
+| `marketing_ia` (image) | 2 | Nano Banana Pro | $0.134/img (1K-2K) · $0.24 (4K) |
+| `contratos_ia` (convert-template) | 1 | Gemini 3.5 Flash | $0.75 in / $4.50 out |
+| `contratos_ia` (generate-pdf) | 5 | — | — |
+| `tasador_ia` | 1 | Gemini 3.5 Flash | $0.75 in / $4.50 out |
+| `analisis_chat_ia` | 1 | Gemini 3.5 Flash | $0.75 in / $4.50 out |
+| `documentos_ia` | 1 | Gemini Embedding 004 | $0.02 in |
+
+`analisis_chat_ia` y `tasador_ia` ahora **sí registran** `usd_cost` real (antes solo descontaban crédito). El dashboard de Créditos IA (`components/ai-credits-dashboard.tsx`) muestra los **7 módulos** con nombre e ícono propios.
 
 ---
 

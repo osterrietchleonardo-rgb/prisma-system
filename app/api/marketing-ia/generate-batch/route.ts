@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prismaIA } from "@/lib/gemini";
 import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
+import { calculateCost } from "@/utils/aiCostCalculator";
 import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ interface GenerateBatchPayload {
   propiedad_tokko_id?: number | null;
 }
 
-const buildBatchCopyPrompt = (ipc: IpcProfile, config: GenerateBatchPayload, property?: TokkoProperty | null): string => {
+const buildBatchCopyPrompt = (ipc: IpcProfile, config: GenerateBatchPayload, property?: TokkoProperty | null, directive?: string): string => {
   const nivelDesc = {
     0: "El público no sabe que tiene el problema. Creá el problema en su mente antes de hablar de la solución.",
     1: "Siente que algo no funciona pero no identifica la causa. Ayudalo a ponerle nombre al dolor.",
@@ -65,17 +66,6 @@ PERFIL: VENDER PROPIEDAD
 - Promesa: ${fd.promesa_creible}
 - Mensaje Central: ${fd.mensaje_central}
 - CTA: ${fd.cta}`;
-
-    if (property) {
-      ipcCtx += `\n\nDATOS TÉCNICOS DE LA PROPIEDAD (CONTEXTO REAL):
-- Título: ${property.title}
-- Dirección/Zona: ${property.address}, ${property.zone}
-- Tipo: ${property.property_type}
-- Precio: ${property.currency} ${property.price.toLocaleString()}
-- Superficie: ${property.surface_total}m2 (${property.surface_covered}m2 cubiertos)
-- Ambientes: ${property.rooms} | Baños: ${property.bathrooms}
-- Descripción: ${property.description}`;
-    }
   }
 
   const base = `Sos un experto en copywriting para el sector inmobiliario argentino. Tu misión es persuadir al IPC detallado abajo creando 3 VARIACIONES ÚNICAS del copy basándote en 3 ángulos diferentes.
@@ -84,10 +74,14 @@ ${ipcCtx}
 
 NIVEL DE CONSCIENCIA PARA LAS 3 VARIANTES: Nivel ${config.consciousness_level ?? 1}/4 — ${nivelDesc}
 ${config.extra_context ? `- CONTEXTO EXTRA DEL USUARIO: ${config.extra_context}` : ''}
+${directive?.trim() ? `DIRECTIVA CREATIVA DE LA AGENCIA (OBLIGATORIO RESPETAR EN LAS 3 VARIANTES): ${directive.trim()}` : ''}
 
 REGLA DE ORO / INSTRUCCIÓN CRÍTICA 1:
 ¡Las 3 variantes DEBEN seguir estrictamente las definiciones del IPC! Respetar el ángulo de marketing/copy recomendado, el tono sugerido, la promesa central, las objeciones y el dolor principal definidos en el perfil. Las variantes son solo diferentes formas de presentar este mismo mensaje sin alterar la identidad y el tono elegido.
 TONO: Lenguaje 100% rioplatense (voseo), auténtico, empático y profesional. Nada de "un hogar para vos", hablá de "tu próxima casa", adaptándose a lo que dice el perfil de IPC.
+
+REGLA OBLIGATORIA (NO INVENTAR PROPIEDADES):
+Todavía NO estás trabajando sobre una propiedad puntual. En NINGUNA de las 3 variantes menciones ni inventes direcciones, calles, barrios o ubicaciones exactas, metros cuadrados, cantidad de ambientes o baños, precios, ni datos técnicos concretos de un inmueble específico. Escribí en términos generales, enfocado en el perfil de cliente (IPC) y su deseo/problema, sin datos inventados.
 
 INSTRUCCIÓN CRÍTICA 2:
 Debes generar exactamente 3 variaciones estructurando la narrativa sobre los siguientes 3 esquemas, SIEMPRE aplicando las definiciones del IPC arriba:
@@ -150,14 +144,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "IPC not found" }, { status: 404 });
     }
 
+    // Fetch agency config (Tokko key + creative directive set by the director)
+    let creativeDirective = "";
+    let agencyTokkoKey: string | null = null;
+    if (agencyId) {
+      const { data: agency } = await supabase
+        .from("agencies")
+        .select("tokko_api_key, marketing_ai_config")
+        .eq("id", agencyId)
+        .single();
+      agencyTokkoKey = agency?.tokko_api_key ?? null;
+      creativeDirective = agency?.marketing_ai_config?.creative_directive ?? "";
+    }
+
     let propertyData: TokkoProperty | null = null;
     const propertyId = payload.propiedad_tokko_id || ipc.propiedad_tokko_id || (ipc.flow_data as any).propiedad_tokko_id;
 
     if (propertyId) {
       try {
         if (agencyId) {
-          const { data: agency } = await supabase.from("agencies").select("tokko_api_key").eq("id", agencyId).single();
-          const TOKKO_API_KEY = agency?.tokko_api_key || process.env.TOKKO_API_KEY;
+          const TOKKO_API_KEY = agencyTokkoKey || process.env.TOKKO_API_KEY;
           if (TOKKO_API_KEY) {
             const tokkoRes = await fetch(`https://tokkobroker.com/api/v1/property/${propertyId}/?key=${TOKKO_API_KEY}&format=json`);
             if (tokkoRes.ok) {
@@ -186,20 +192,20 @@ export async function POST(req: Request) {
     }
 
     console.log('[DEBUG] Generating copy batch');
-    const prompt = buildBatchCopyPrompt(ipc as any as IpcProfile, payload, propertyData);
+    const prompt = buildBatchCopyPrompt(ipc as any as IpcProfile, payload, propertyData, creativeDirective);
     
     // We can use pro model for better complex JSON adherence
     const result = await prismaIA.generateContent(prompt);
     const rawResponse = result.response.text();
 
     // ─── Record real token usage ───────────────────────────────
-    // gemini-2.0-flash: $0.10/M input, $0.40/M output
+    // Precio tomado de la tabla central (utils/aiCostCalculator) según el modelo real.
     const usage = result.response.usageMetadata;
     if (usage) {
       const inputTk = usage.promptTokenCount ?? 0;
       const outputTk = usage.candidatesTokenCount ?? 0;
-      const usd = (inputTk / 1_000_000) * 0.10 + (outputTk / 1_000_000) * 0.40;
-      updateAiTransactionCost(txId, inputTk, outputTk, usd);
+      const { totalCostUSD } = calculateCost({ model: "gemini-3.5-flash", inputTokens: inputTk, outputTokens: outputTk });
+      updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
     }
     
     let cleanResponse = rawResponse;

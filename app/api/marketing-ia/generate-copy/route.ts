@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prismaIA } from "@/lib/gemini";
 import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
+import { calculateCost } from "@/utils/aiCostCalculator";
 import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ interface CopyConfig {
   extra_context?: string;
 }
 
-const buildCopyPrompt = (ipc: IpcProfile, config: CopyConfig, property?: TokkoProperty | null): string => {
+const buildCopyPrompt = (ipc: IpcProfile, config: CopyConfig, property?: TokkoProperty | null, directive?: string): string => {
   const nivelDesc = {
     0: "El público no sabe que tiene el problema. Creá el problema en su mente antes de hablar de la solución.",
     1: "Siente que algo no funciona pero no identifica la causa. Ayudalo a ponerle nombre al dolor.",
@@ -81,17 +82,6 @@ PERFIL: VENDER PROPIEDAD
 - Promesa: ${fd.promesa_creible}
 - Mensaje Central: ${fd.mensaje_central}
 - CTA: ${fd.cta}`;
-
-    if (property) {
-      ipcCtx += `\n\nDATOS TÉCNICOS DE LA PROPIEDAD (CONTEXTO REAL):
-- Título: ${property.title}
-- Dirección/Zona: ${property.address}, ${property.zone}
-- Tipo: ${property.property_type}
-- Precio: ${property.currency} ${property.price.toLocaleString()}
-- Superficie: ${property.surface_total}m2 (${property.surface_covered}m2 cubiertos)
-- Ambientes: ${property.rooms} | Baños: ${property.bathrooms}
-- Descripción: ${property.description}`;
-    }
   }
 
   const base = `Sos un experto en copywriting para el sector inmobiliario argentino. Tu misión es persuadir al IPC detallado abajo.
@@ -102,8 +92,13 @@ REGLAS ESTRATÉGICAS:
 - ÁNGULO: ${angleDesc}
 - NIVEL DE CONSCIENCIA: Nivel ${config.consciousness_level}/4 — ${nivelDesc}
 ${config.extra_context ? `- CONTEXTO EXTRA DEL USUARIO: ${config.extra_context}` : ''}
+${directive?.trim() ? `- DIRECTIVA CREATIVA DE LA AGENCIA (OBLIGATORIO RESPETAR): ${directive.trim()}` : ''}
 
 TONO: Usá un lenguaje 100% rioplatense (voseo), auténtico, empático y profesional. Nada de "un hogar para vos", hablá de "tu próxima casa" o "la venta de tu depto".
+
+REGLA OBLIGATORIA (NO INVENTAR PROPIEDADES):
+Todavía NO estás trabajando sobre una propiedad puntual. NO menciones ni inventes direcciones, calles, barrios o ubicaciones exactas, metros cuadrados, cantidad de ambientes o baños, precios, ni ningún dato técnico concreto de un inmueble específico. Escribí el copy en términos generales, enfocado en el perfil de cliente (IPC) y su deseo/problema, sin datos inventados.
+
 Respondé ÚNICAMENTE en JSON válido.`;
 
   if (config.copy_type === 'video') {
@@ -133,19 +128,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "IPC not found" }, { status: 404 });
     }
 
+    // Fetch agency config (Tokko key + creative directive set by the director)
+    let creativeDirective = "";
+    let agencyTokkoKey: string | null = null;
+    if (agencyId) {
+      const { data: agency } = await supabase
+        .from("agencies")
+        .select("tokko_api_key, marketing_ai_config")
+        .eq("id", agencyId)
+        .single();
+      agencyTokkoKey = agency?.tokko_api_key ?? null;
+      creativeDirective = agency?.marketing_ai_config?.creative_directive ?? "";
+    }
+
     let propertyData: TokkoProperty | null = null;
     const propertyId = reqPropertyId || ipc.propiedad_tokko_id || (ipc.flow_data as any).propiedad_tokko_id;
 
     if (propertyId) {
       try {
         if (agencyId) {
-          const { data: agency } = await supabase
-            .from("agencies")
-            .select("tokko_api_key")
-            .eq("id", agencyId)
-            .single();
- 
-          const TOKKO_API_KEY = agency?.tokko_api_key || process.env.TOKKO_API_KEY;
+          const TOKKO_API_KEY = agencyTokkoKey || process.env.TOKKO_API_KEY;
           if (TOKKO_API_KEY) {
             const tokkoRes = await fetch(`https://tokkobroker.com/api/v1/property/${propertyId}/?key=${TOKKO_API_KEY}&format=json`);
             if (tokkoRes.ok) {
@@ -206,24 +208,24 @@ export async function POST(req: Request) {
 
     console.log('[DEBUG] Generating copy with:', { finalAngle, finalLevel, copy_type });
 
-    const prompt = buildCopyPrompt(ipc as any as IpcProfile, { 
-      copy_type, 
-      angle: finalAngle, 
-      consciousness_level: finalLevel, 
-      extra_context 
-    }, propertyData);
+    const prompt = buildCopyPrompt(ipc as any as IpcProfile, {
+      copy_type,
+      angle: finalAngle,
+      consciousness_level: finalLevel,
+      extra_context
+    }, propertyData, creativeDirective);
 
     const result = await prismaIA.generateContent(prompt);
     const rawResponse = result.response.text();
 
     // ─── Record real token usage (input + output) ──────────────────────────
-    // gemini-2.0-flash: $0.10/M input, $0.40/M output
+    // Precio tomado de la tabla central (utils/aiCostCalculator) según el modelo real.
     const usage = result.response.usageMetadata;
     if (usage) {
       const inputTk = usage.promptTokenCount ?? 0;
       const outputTk = usage.candidatesTokenCount ?? 0;
-      const usd = (inputTk / 1_000_000) * 0.10 + (outputTk / 1_000_000) * 0.40;
-      updateAiTransactionCost(txId, inputTk, outputTk, usd); // fire-and-forget
+      const { totalCostUSD } = calculateCost({ model: "gemini-3.5-flash", inputTokens: inputTk, outputTokens: outputTk });
+      updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD); // fire-and-forget
     }
     console.log('[DEBUG] Raw AI Response:', rawResponse);
 

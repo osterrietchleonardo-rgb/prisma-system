@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prismaIA } from "@/lib/gemini"
 import { createClient } from "@/lib/supabase/server"
-import { consumeAiCredits } from "@/lib/auth/tenant-validation"
+import { consumeAiCredits, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
+import { calculateCost } from "@/utils/aiCostCalculator"
 import { rateLimit, LIMITS } from "@/lib/rate-limiter"
 import { z } from "zod"
 
@@ -40,8 +41,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: rl.errorMessage }, { status: 429 })
     }
 
-    // Consume 1 credit for valuation
-    await consumeAiCredits("tasador_ia", 1, `Valuation: ${propertyInfo.type} in ${propertyInfo.location}`);
+    // Consume 1 credit for valuation (txId para registrar el costo real luego)
+    const txId = await consumeAiCredits("tasador_ia", 1, `Valuation: ${propertyInfo.type} in ${propertyInfo.location}`);
 
     const prompt = `
       Eres un tasador inmobiliario experto en el mercado Argentino.
@@ -71,6 +72,16 @@ export async function POST(req: NextRequest) {
     `
 
     const aiResult = await prismaIA.generateContent(prompt)
+
+    // ─── Record real token usage (modelo gemini-3.5-flash, precio desde la tabla central) ───
+    const valuation_usage = aiResult.response.usageMetadata;
+    if (valuation_usage) {
+      const inputTk = valuation_usage.promptTokenCount ?? 0;
+      const outputTk = valuation_usage.candidatesTokenCount ?? 0;
+      const { totalCostUSD } = calculateCost({ model: "gemini-3.5-flash", inputTokens: inputTk, outputTokens: outputTk });
+      updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
+    }
+
     const analysis = JSON.parse(aiResult.response.text().replace(/```json|```/g, "").trim())
 
     // Update in DB
