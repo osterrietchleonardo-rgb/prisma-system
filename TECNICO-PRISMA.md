@@ -124,7 +124,7 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 ### 4.2 Esquema (definido en `supabase/schema.sql` + migraciones)
 
 **Autenticación y perfiles**
-- `profiles` — id, email, full_name, role (`director`/`asesor`), agency_id, phone, avatar_url, status (`activo`/`pausado`/`eliminado`), notification_prefs (jsonb), tokko_agent_id.
+- `profiles` — id, email, full_name, role (`director`/`asesor`), agency_id, phone, avatar_url, `estado` (`activo`/`pausado`/`eliminado`), `tokens_invalidos_desde`, `deleted_at`/`deleted_by`, notification_prefs (jsonb), tokko_agent_id. (El bloqueo de acceso se evalúa por `estado` + `tokens_invalidos_desde` en los guards de layout.)
 - `agencies` — id, name, logo_url, tokko_api_key, invite_code, owner_id, `performance_config`, `marketing_ai_config`, `buscador_ia_config` (todas jsonb).
 - `agency_invites` — agency_id, code, is_used, used_at, used_by.
 
@@ -211,7 +211,7 @@ El cliente Admin se usa solo en operaciones privilegiadas controladas: insercion
 
 - **Registro Director:** `signUp` con metadata `{ role:'director', agency_name, full_name }` → email de confirmación → callback `exchangeCodeForSession` → crea `profiles` + `agencies` (con `invite_code` de 6 chars, usando adminClient) + `agency_invites` → redirige a `/director/dashboard`.
 - **Registro Asesor:** `signUp` con `{ role:'asesor', invite_code }` → callback busca `agency_invites` por código, asocia a la agencia, marca invite usado → `/asesor/dashboard`.
-- **Login:** rate limit → `signInWithPassword` → verifica `status` (`pausado`/`eliminado` bloquean) → redirige según rol.
+- **Login:** rate limit → `signInWithPassword` → redirige según rol. El bloqueo por cuenta (`estado` `pausado`/`eliminado`) lo aplican los **guards de layout** (`app/(director|asesor)/layout.tsx`), que fuerzan logout; un asesor desvinculado por el director (server action `desvincularAsesor`) queda con `estado='eliminado'` + `tokens_invalidos_desde` + email en `emails_bloqueados`.
 - **Google OAuth:** `signInWithOAuth` con state (`role`, `inviteCode`, `agencyName`) → mismo callback.
 - **Guards de layout:** los layouts `(director)`/`(asesor)` revalidan sesión, estado de cuenta/agencia y coincidencia rol↔ruta. Endpoint de apoyo: `GET /api/auth/check-status`.
 
@@ -357,7 +357,7 @@ Rate limit 30 req/h por usuario; validación Zod (10–50000 chars); `parseWhats
 Analytics **sin IA** (agregación pura), solo director. Lee `wa_conversations.metricas` + `wa_messages`; cache en `dashboard_conversational_insights` (refresh > 6 h). Bloques: KPIs, funnel, perfil del lead, demanda, comportamiento temporal, calidad de atención.
 
 ### 10.8 Documentos / base de conocimiento
-`/api/documents/process`: extracción por tipo (PDF/imagen → Gemini; DOCX → mammoth; CSV → papaparse; YouTube → transcript) → `generateEmbedding(texto[:5000])` → `agency_documents` (con `visibility` director/asesor).
+`/api/documents/process`: extracción por tipo → `generateEmbedding(texto[:5000])` → `agency_documents` (con `visibility` director/asesor). El backend soporta PDF/imagen (Gemini), DOCX (mammoth), CSV (papaparse) y YouTube (transcript), pero el **uploader de la UI solo acepta `.pdf/.doc/.docx/.csv` + YouTube** (no permite seleccionar imágenes). Para docs `director` (privados) hay un flag `ai_enabled` que habilita su consulta por Tutor IA sin exponer el archivo. Subida directa a Storage `documents` (evita el límite de 4.5 MB de Vercel).
 
 ---
 
@@ -386,7 +386,7 @@ Carpeta `roomix-sync/`. Alimenta diariamente `roomix_properties` (red de colabor
 | `marketing_ia` (image) | 2 | Nano Banana Pro | $0.134/img (1K-2K) · $0.24 (4K) |
 | `contratos_ia` (convert) | 1 | Gemini 3.5 Flash | $0.75 in / $4.50 out |
 | `contratos_ia` (generate-pdf) | 5 | — | — |
-| `tasador_ia` | 1 | Gemini 3.5 Flash | $0.75 in / $4.50 out |
+| `tasador_ia` (legacy) | 1 | Gemini 3.5 Flash | $0.75 in / $4.50 out — **el tasador vigente (MCM) es client-side y NO consume créditos** |
 | `analisis_chat_ia` | 1 | Gemini 3.5 Flash | $0.75 in / $4.50 out |
 | `documentos_ia` | 1 | Gemini Embedding 004 | $0.02 in |
 

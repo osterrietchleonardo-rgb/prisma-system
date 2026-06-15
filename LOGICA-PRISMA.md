@@ -1697,13 +1697,13 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 #### 5. Configuración y Asesores (`/director/configuracion`, `/director/asesores`)
 - **Objetivo:** Setup inicial y gestión del equipo.
 - **Lógica Interna:**
-  - **Asesores:** Invitar nuevos asesores mediante links o códigos, asignarles límites, y pausar/activar sus cuentas.
+  - **Asesores:** Invitar nuevos asesores mediante códigos. Cada tarjeta muestra performance real (Captaciones/Cierres/Cartera/Rotación, de `getDashboardData`) y un panel con el embudo de conversión. La única acción de gestión es **Desvincular asesor** (server action `desvincularAsesor`): pone `estado='eliminado'` + `tokens_invalidos_desde` y bloquea el email en `emails_bloqueados`, dejándolo sin acceso al sistema.
   - **Configuración:** Token de Tokko, Instancia de WhatsApp, Branding (logo y colores para Marketing IA), y facturación.
 
 #### 6. Herramientas IA (Marketing, Contratos, Tasaciones)
 - **Marketing IA (`/director/marketing-ia`):** Generador de anuncios a partir de perfiles IPC (Ideal Prospect Client) para "Captar" propietarios o "Vender" (atraer compradores). El flujo "Crear Anuncio" genera de una **3 variantes completas (copy + imagen)** con ángulos distintos (no hay "copy simple" en la UI). Las imágenes usan **Nano Banana Pro (Gemini 3 Pro Image)** integrando el branding de la agencia. En el IPC "Vender" se puede vincular una propiedad de Tokko, pero esa función está **reservada a futuro**: hoy el copy no usa sus datos concretos. Ver detalle en §13.
-- **Tasaciones (`/director/tasaciones`):** Formulario de características de la propiedad que consulta a la IA para emitir un valor mínimo, máximo y sugerido, con análisis del mercado. Consume 1 crédito.
-- **Contratos (`/director/contratos-ia`):** Gestión de plantillas y conversión a contratos formales con firma digital incorporada. Consume 5 créditos por contrato.
+- **Tasaciones (`/director/tasaciones`):** Asistente MCM (Método Comparativo de Mercado) de 4 pasos, **cálculo client-side** que emite rango mínimo/sugerido/máximo. **No usa IA generativa y NO consume créditos.**
+- **Contratos (`/director/contratos-ia`):** Gestión de plantillas y conversión a contratos formales. La **firma es presencial (papel)** — se quitó la sección de firma virtual. Consume 5 créditos por contrato finalizado.
 
 #### 7. Tracking Performance (`/director/tracking-performance`, `/asesor/tracking-performance`)
 - **Objetivo:** Registrar actividad comercial diaria (llamadas, prelistings, captaciones, etc.) para nutrir el Dashboard, y fijar los objetivos mensuales del equipo.
