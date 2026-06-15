@@ -8,16 +8,13 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { 
-  Phone, 
-  Mail, 
-  User, 
-  MessageSquare, 
+import {
+  Phone,
+  Mail,
+  User,
+  MessageSquare,
   Clock,
-  Trash2,
   FileText
 } from "lucide-react"
 import { Lead, KANBAN_STAGES } from "./types"
@@ -185,16 +182,6 @@ export function LeadDetailSheet({
             </section>
           </div>
         </ScrollArea>
-
-        <div className="absolute bottom-6 left-6 right-6 flex justify-between">
-          <Button variant="ghost" className="text-rose-500 hover:text-rose-600 hover:bg-rose-50" size="sm">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Eliminar Lead
-          </Button>
-          <Button variant="default" className="bg-accent hover:bg-accent/90" size="sm" onClick={onClose}>
-            Guardar cambios
-          </Button>
-        </div>
       </SheetContent>
     </Sheet>
   )

@@ -125,11 +125,11 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 **Qué es:** tablero Kanban con **todos** los leads y oportunidades de la agencia (la pantalla se titula "Pipeline Global" y está marcada como **Beta**).
 
-**Qué muestra:** une **leads de Tokko** y **conversaciones de WhatsApp** en columnas (Nuevo, Contactado, Visita, Negociación, Reserva, etc.).
+**Qué muestra:** une **leads de Tokko** y **conversaciones de WhatsApp** en 9 columnas: **Nuevo contacto, Primer contacto, Calificado, Visita agendada, Visita realizada, Propuesta enviada, Negociación, Cerrado, Perdido**.
 
 **Cómo usarlo:**
-- **Arrastrá** tarjetas entre columnas para reflejar el avance.
-- Hacé clic en una tarjeta para ver el detalle.
+- **Arrastrá** tarjetas entre columnas para reflejar el avance (el cambio de etapa se guarda al instante).
+- Hacé clic en una tarjeta para abrir un **panel de detalle de solo lectura** (datos de contacto, historial de actividad y notas internas).
 
 > 💡 **Tip:** revisá la columna "Nuevo" para asegurarte de que ningún lead quede sin asignar o sin trabajar.
 
@@ -198,9 +198,9 @@ Vas a ver un **asistente de configuración (Setup Wizard)** que te guía para co
 
 ### Una vez conectado, tenés 5 pestañas:
 - **💬 Chat:** la bandeja de conversaciones en vivo.
-- **📋 Plantillas:** los mensajes de seguimiento automáticos (recordatorios de visita, reactivaciones, follow-ups). PRISMA prepara 8 plantillas; acá ves su estado de aprobación.
+- **📋 Plantillas:** es un **gestor completo de plantillas de WhatsApp**. Además de las **8 plantillas de seguimiento** que PRISMA prepara (recordatorios de visita, reactivaciones, follow-ups) y de ver su **estado de aprobación**, podés **crear tus propias plantillas** (categoría, idioma, encabezado/cuerpo/pie, botones y variables `{{1}}`), **editarlas, eliminarlas** y **sincronizarlas desde Meta**.
 - **👥 Contactos:** la lista de contactos de WhatsApp.
-- **📣 Campañas:** seleccionás contactos (desde la pestaña Contactos) y les enviás un envío masivo.
+- **📣 Campañas:** envíos masivos. Podés cargar los destinatarios de **dos formas**: seleccionándolos desde la pestaña **Contactos**, o **importando un CSV/Excel**. Después elegís una plantilla, **mapeás las columnas** (teléfono, nombre y las variables de la plantilla) y enviás. Vas viendo el **estado por contacto** (pendiente / enviado / error / salteado).
 - **⚙️ Configuración IA:** definís el comportamiento del bot (cómo responde, conocimiento, etc.).
 
 Arriba a la derecha, un **indicador de conexión** te muestra si la instancia está conectada.
