@@ -1353,6 +1353,8 @@ Sistema de auth **completamente separado** de Supabase Auth:
 | `/api/admin-vakdor/asesores/[id]/estado` | PATCH | Pausar/activar asesor |
 | `/api/admin-vakdor/directores/[id]/estado` | PATCH | Pausar/activar director |
 | `/api/admin-vakdor/bloqueados` | GET | Usuarios bloqueados |
+| `/api/admin-vakdor/bandejas` | GET | Monitoreo cross-tenant de conversaciones WhatsApp de todas las agencias (lista paginada con filtros por agencia/estado/texto) |
+| `/api/admin-vakdor/bandejas/[id]` | GET | Detalle de una conversación (mensajes) de cualquier agencia |
 | `/api/admin-vakdor/dashboard/metricas` | GET | Métricas globales del SaaS |
 | `/api/admin-vakdor/invitaciones` | GET | Códigos de invitación |
 | `/api/admin-vakdor/pagos/[pago_id]` | PATCH | Gestionar pago |
@@ -1577,6 +1579,8 @@ Director llena formulario de registro
 
 ### 26.3 Flujo de Consultor IA
 
+> **Nota (jun-2026):** este diagrama refleja el diseño **original** (búsqueda híbrida vectorial + filtros). El flujo **vigente** es el descripto en **§10.3** (filtro duro SQL por operación/tipo + interpretación en memoria de zona/precio/ambientes/amenities, con memoria por chat y datos de Roomix). Se conserva el diagrama abajo como referencia histórica.
+
 ```
 Usuario escribe: "Tenés deptos en Palermo con pileta?"
          │
@@ -1656,9 +1660,10 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 - **Componentes Clave:**
   - `PerformanceMetricsGrid`: Tarjetas (KPIs) con leads, captaciones, reservas y cierres (total y variación porcentual).
   - `PerformanceCharts`: Gráfico de evolución temporal (barras) y distribución por canal de origen (dona).
+  - `ObjectivesDashboard`: Sección "Objetivos vs Alcanzado" (antes del Ranking). Tabla por asesor con 3 filas por mes (Objetivo / Alcanzado / % cumplido) + gráfico `ComposedChart` (barras objetivo vs alcanzado y línea de %). Filtro de año y toggle de métrica (Facturación / Captación). Re-carga al cambiar año vía server action `getObjectivesDashboardForYear`.
   - `PerformanceLeaderboard`: Ranking de los asesores de la agencia.
   - `DashboardActivity`: Feed en tiempo real de los últimos eventos (ej. nuevo lead, propiedad sincronizada, etc.).
-- **Datos:** Llama a `getDashboardData(agency_id)` sin filtrar por asesor.
+- **Datos:** Llama a `getDashboardData(agency_id)` sin filtrar por asesor. Los objetivos se traen con `getObjectivesDashboard(agency_id, año)` (`lib/tracking/objetivos.ts`), que cruza `performance_objectives` (lo planificado) con lo derivado de `performance_logs` (lo alcanzado). Presente en el dashboard de director **y** de asesor.
 
 #### 2. Pipeline / CRM (`/director/pipeline`)
 - **Objetivo:** Gestión visual (Kanban) de los leads y oportunidades.
@@ -1693,8 +1698,14 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 - **Contratos (`/director/contratos-ia`):** Gestión de plantillas y conversión a contratos formales con firma digital incorporada. Consume 5 créditos por contrato.
 
 #### 7. Tracking Performance (`/director/tracking-performance`, `/asesor/tracking-performance`)
-- **Objetivo:** Registrar actividad comercial diaria (llamadas, prelistings, captaciones, etc.) para nutrir el Dashboard.
-- **Lógica Interna:** Utiliza tabs para ver historial y para editar la "Configuración IA" de las escalas de performance (qué puntaje da cada acción).
+- **Objetivo:** Registrar actividad comercial diaria (llamadas, prelistings, captaciones, etc.) para nutrir el Dashboard, y fijar los objetivos mensuales del equipo.
+- **Lógica Interna:** Utiliza tabs. El asesor ve **Actividad**; el director ve además **Objetivos** y **Configuración IA** (escalas de performance: qué puntaje da cada acción).
+- **Tab "Objetivos" (solo director, `PerformanceObjectivesEditor`):**
+  - Matriz asesores × 12 meses para cargar la meta mensual de **Facturación** (USD) y **Captación** (cantidad). Toggle de métrica + filtro de año.
+  - **Edición temporal:** solo el mes en curso y los futuros son editables (`isMonthLocked`); meses cerrados se bloquean y los años anteriores quedan en solo lectura (historial de planificaciones).
+  - **"Aplicar a todos":** copia un valor a todos los meses editables de un asesor.
+  - **Server Actions** (`actions/tracking/objetivos.ts`): `getAgencyAdvisors`, `getObjectivesForEditor(year)` y `saveObjectives({year, cells})`. `saveObjectives` valida `role='director'`, descarta meses cerrados, fuerza el `agency_id` desde el perfil y hace `upsert` con `createAdminClient()` sobre `performance_objectives` (`onConflict: agent_id,year,month,metric`). Revalida los paths del tracking y los dashboards.
+  - **Alcanzado (derivado, no se guarda):** `lib/tracking/objetivos.ts` → `getAchievedByAgentMonth` agrupa `performance_logs` por asesor×mes con la misma fórmula del Dashboard (facturación = Σ monto·comisión/100 sobre cierres; captación = nº de captaciones).
 - **Formulario de Registro (PerformanceLogForm):**
   - **Activos Vinculados:**
     - **Zona/Barrio:** Campo de texto libre para indicar la zona geográfica de la actividad.
@@ -1747,7 +1758,7 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 El módulo del asesor hereda y reutiliza gran parte de los componentes de UI del director, pero con una capa estricta de filtros aplicada a nivel base de datos (y reforzada en UI) para garantizar que el Asesor solo vea **su propia información** o información compartida públicamente por la agencia.
 
 #### 1. Dashboard Asesor (`/asesor/dashboard`)
-- **Diferencia con Director:** Llama a `getDashboardData(agency_id, user.id)`. Solo muestra los KPIs y gráficos de las propiedades, leads y actividades asignadas a este asesor en particular. Sin embargo, muestra el ranking global (`PerformanceLeaderboard`) para que el asesor conozca su posición en la agencia.
+- **Diferencia con Director:** Llama a `getDashboardData(agency_id, user.id)`. Solo muestra los KPIs y gráficos de las propiedades, leads y actividades asignadas a este asesor en particular. Sin embargo, muestra el ranking global (`PerformanceLeaderboard`) y la sección **Objetivos vs Alcanzado** (`ObjectivesDashboard`, a nivel agencia) para que el asesor conozca su posición y las metas del equipo. El asesor **no** puede editar objetivos (la carga es exclusiva del director en Tracking Performance).
 
 #### 2. Pipeline Asesor (`/asesor/pipeline`)
 - Mismo Kanban visual (`PipelineClient`), pero la consulta SQL de carga inicial se restringe estrictamente a `assigned_agent_id = user.id`.
