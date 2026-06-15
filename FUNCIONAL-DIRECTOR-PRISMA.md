@@ -199,7 +199,7 @@ Vas a ver un **asistente de configuración (Setup Wizard)** que te guía para co
 ### Una vez conectado, tenés 5 pestañas:
 - **💬 Chat:** la bandeja de conversaciones en vivo.
 - **📋 Plantillas:** es un **gestor completo de plantillas de WhatsApp**. Además de las **8 plantillas de seguimiento** que PRISMA prepara (recordatorios de visita, reactivaciones, follow-ups) y de ver su **estado de aprobación**, podés **crear tus propias plantillas** (categoría, idioma, encabezado/cuerpo/pie, botones y variables `{{1}}`), **editarlas, eliminarlas** y **sincronizarlas desde Meta**.
-- **👥 Contactos:** la lista de contactos de WhatsApp.
+- **👥 Contactos:** la lista de contactos de WhatsApp, con búsqueda, selección múltiple (para campañas) e **importación de contactos desde CSV/Excel**.
 - **📣 Campañas:** envíos masivos. Podés cargar los destinatarios de **dos formas**: seleccionándolos desde la pestaña **Contactos**, o **importando un CSV/Excel**. Después elegís una plantilla, **mapeás las columnas** (teléfono, nombre y las variables de la plantilla) y enviás. Vas viendo el **estado por contacto** (pendiente / enviado / error / salteado).
 - **⚙️ Configuración IA:** definís el comportamiento del bot (cómo responde, conocimiento, etc.).
 
