@@ -22,7 +22,7 @@ import {
   OBJECTIVE_METRICS,
   isMonthLocked,
   type ObjectiveMetric,
-} from "@/lib/tracking/objetivos";
+} from "@/lib/tracking/objetivos-types";
 
 interface Advisor {
   id: string;

@@ -27,7 +27,7 @@ import {
   OBJECTIVE_METRICS,
   type AdvisorObjectives,
   type ObjectiveMetric,
-} from "@/lib/tracking/objetivos";
+} from "@/lib/tracking/objetivos-types";
 
 interface Props {
   initialData: AdvisorObjectives[];
