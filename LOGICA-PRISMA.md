@@ -1678,7 +1678,7 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 - **Lógica Interna:**
   - Une dos fuentes de datos: `leads` (provenientes de Tokko) y `wa_conversations` (provenientes de WhatsApp).
   - Mapea ambas fuentes a una interfaz común `Lead`.
-  - El componente `PipelineClient` maneja el *drag & drop* entre columnas (Nuevo, Contactado, Visita, Negociación, Reserva, etc.).
+  - El Kanban (`KanbanBoard`) maneja el *drag & drop* entre las 9 etapas reales (`KANBAN_STAGES`): nuevo, contacto, calificado, visita_agendada, visita_realizada, propuesta, negociacion, cerrado, perdido. Al soltar, persiste con `updateLeadStage` (Tokko) o `updateWaConversationStage` (WhatsApp). El click en una tarjeta abre `LeadDetailSheet` (panel de **solo lectura**: contacto, actividades y notas).
 
 #### 3. Propiedades (`/director/propiedades`)
 - **Objetivo:** Catálogo de la cartera inmobiliaria de la agencia.
