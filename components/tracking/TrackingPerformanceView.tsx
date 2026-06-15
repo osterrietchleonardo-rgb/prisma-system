@@ -18,6 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { PerformanceScaleEditor } from "@/components/tracking/PerformanceScaleEditor";
+import { PerformanceObjectivesEditor } from "@/components/tracking/PerformanceObjectivesEditor";
 import { PerformanceHistoryList } from "@/components/tracking/PerformanceHistoryList";
 import { PerformanceLogDrawer } from "@/components/tracking/PerformanceLogDrawer";
 import { createClient } from "@/lib/supabase/client";
@@ -152,6 +153,9 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
             <TabsList className="bg-muted/30 p-1 rounded-xl border border-white/5 backdrop-blur-sm">
               <TabsTrigger value="actividad" className="text-xs md:text-sm px-4">Actividad</TabsTrigger>
               {isDirector && (
+                <TabsTrigger value="objetivos" className="text-xs md:text-sm px-4">Objetivos</TabsTrigger>
+              )}
+              {isDirector && (
                 <TabsTrigger value="configuracion" className="text-xs md:text-sm px-4">Configuración IA</TabsTrigger>
               )}
             </TabsList>
@@ -262,6 +266,12 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
             />
           )}
         </TabsContent>
+
+        {isDirector && (
+          <TabsContent value="objetivos" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <PerformanceObjectivesEditor />
+          </TabsContent>
+        )}
 
         {isDirector && (
           <TabsContent value="configuracion" className="mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
