@@ -4,11 +4,9 @@ import { useState, useEffect } from "react"
 import { KanbanBoard } from "@/components/kanban/kanban-board"
 import { LeadDetailSheet } from "@/components/kanban/lead-detail-sheet"
 import { Lead } from "@/components/kanban/types"
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  Download,
+import {
+  Search,
+  Filter,
   LayoutGrid,
   ListFilter
 } from "lucide-react"
@@ -123,12 +121,6 @@ export default function PipelinePage() {
           <p className="text-xs md:text-sm text-muted-foreground mt-1 line-clamp-1">
             Gestiona el embudo comercial de toda tu inmobiliaria.
           </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" className="hidden sm:flex gap-2 h-9 text-xs md:text-sm">
-            <Download className="h-4 w-4" />
-            Exportar
-          </Button>
         </div>
       </div>
 

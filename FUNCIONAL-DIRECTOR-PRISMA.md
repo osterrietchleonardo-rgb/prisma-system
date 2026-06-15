@@ -80,11 +80,14 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 **Qué es:** la vista panorámica del rendimiento **de toda la agencia**.
 
-**Qué muestra:**
+**Qué muestra:** es una vista larga que reúne varias secciones, en este orden:
 - **Tarjetas (KPIs):** leads, captaciones, reservas y cierres totales, con variación porcentual.
 - **Gráficos:** evolución temporal (barras) y distribución por canal de origen (dona).
 - **Objetivos vs Alcanzado:** la sección de metas mensuales (ver detalle abajo), justo antes del ranking.
 - **Ranking de asesores:** quién rinde más en tu equipo.
+- **Inteligencia Conversacional:** el analytics profundo de WhatsApp (ver sección 22; vive acá adentro, no en el menú).
+- **Embudo (Pipeline):** resumen de leads por etapa.
+- **Leads y Propiedades:** secciones con el detalle de leads recientes y de la cartera.
 - **Actividad en tiempo real:** feed de últimos eventos (nuevo lead, propiedad sincronizada, etc.).
 
 **Cómo usarlo:**
@@ -120,7 +123,7 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 ## 6. Pipeline (CRM)
 
-**Qué es:** tablero Kanban con **todos** los leads y oportunidades de la agencia.
+**Qué es:** tablero Kanban con **todos** los leads y oportunidades de la agencia (la pantalla se titula "Pipeline Global" y está marcada como **Beta**).
 
 **Qué muestra:** une **leads de Tokko** y **conversaciones de WhatsApp** en columnas (Nuevo, Contactado, Visita, Negociación, Reserva, etc.).
 
@@ -270,27 +273,29 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 
 ## 14. Asesores (gestión del equipo)
 
-**Qué es:** donde administrás a tu equipo.
+**Qué es:** donde administrás a tu equipo (la pantalla se titula "Equipo de Asesores").
 
 **Qué podés hacer:**
-- **Invitar asesores:** generá un **código de invitación** o compartí el link. El asesor se registra con ese código y queda vinculado a tu agencia.
-- **Pausar / activar** cuentas de asesores.
-- Ver/gestionar a los miembros del equipo.
+- **Invitar asesores:** generá un **código de invitación**. El asesor se registra con ese código y queda vinculado a tu agencia.
+- **Ver el rendimiento real de cada asesor:** cada tarjeta muestra datos reales tomados de la actividad cargada (Captaciones, Cierres, Cartera activa y % de Rotación), más una etiqueta de estado (Activo / Pausado / Desvinculado). Al hacer clic se abre un panel con su embudo de conversión.
+- **Desvincular un asesor:** lo quita del equipo y **le bloquea el acceso al sistema con ese email** (no podrá volver a ingresar). Es la única acción de gestión disponible desde esta pantalla y pide confirmación.
 
 > 💡 **Tip:** también podés generar códigos desde **Configuración → Inmobiliaria**. Cada código sirve una vez; vas a ver cuáles están "Activos" y cuáles "Usados" (y por quién).
+> ⚠️ "Desvincular" es irreversible desde el panel del director: el email queda bloqueado. Si necesitás reactivarlo, contactá al equipo de PRISMA (Vakdor).
 
 ---
 
 ## 15. Documentos (base de conocimiento)
 
-**Qué es:** la biblioteca de la agencia. Lo que subís acá **alimenta al Tutor IA**.
+**Qué es:** la biblioteca de la agencia (la pantalla se titula "Biblioteca de Conocimiento"). Lo que subís acá **alimenta al Tutor IA**.
 
 **Cómo usarla:**
-1. **Subí documentos:** PDF, Word (.docx), CSV, imágenes o incluso un video de **YouTube** (se extrae la transcripción). PRISMA lee el contenido automáticamente.
+1. **Subí documentos:** **PDF, Word (.docx/.doc) o CSV**, o un video de **YouTube** (se extrae la transcripción). PRISMA lee el contenido automáticamente.
 2. Definí la **visibilidad** de cada documento:
-   - **Director:** solo lo ven los directores.
-   - **Asesor:** lo ve todo el equipo.
-3. Organizá en carpetas.
+   - **Privado:** solo lo ven los directores.
+   - **Público:** lo ve todo el equipo.
+3. Para los documentos **Privados** podés activar **"Permitir consulta vía Tutor IA"**: los asesores podrán preguntarle al Tutor IA sobre ese contenido **sin poder verlo ni descargarlo**.
+4. Organizá en carpetas (crear, editar, mover, eliminar).
 
 > 💡 **Tip:** subí guiones de venta, manejo de objeciones y procedimientos. El Tutor IA los usará para capacitar a tu equipo automáticamente.
 
@@ -298,7 +303,7 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 
 ## 16. Tasaciones
 
-**Qué es:** el tasador con **Método Comparativo de Mercado**, en 4 pasos (idéntico al del asesor).
+**Qué es:** el tasador con **Método Comparativo de Mercado** (pantalla "Módulo de Tasaciones"), en 4 pasos (idéntico al del asesor).
 
 **Cómo usarlo:**
 1. **Paso 1:** datos del inmueble a tasar.
@@ -307,6 +312,7 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 4. **Paso 4:** informe final con rango mínimo/sugerido/máximo, gráfico y testigos. Imprimir o PDF.
 
 > 💡 **Tip:** el cálculo es automático y reactivo; se autoguarda entre pasos. Quedan tus últimas 10 tasaciones en el historial.
+> 💰 La tasación **no consume créditos**: el cálculo es matemático (no usa IA generativa).
 
 ---
 
@@ -364,7 +370,7 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 
 ## 20. Configuración (perfil, agencia, créditos, costos, seguridad)
 
-Tiene 5 pestañas:
+La pantalla se titula "Ajustes Generales". Tiene 5 pestañas:
 
 **1. Mi Perfil**
 - Tu **nombre** visible y foto. El **email** es de solo lectura.
@@ -399,7 +405,7 @@ Tiene 5 pestañas:
 
 ## 22. Analytics conversacional (Conversational Insights)
 
-**Qué es:** un análisis profundo de **todas las conversaciones de WhatsApp** de tu agencia. **Es exclusivo del director.**
+**Qué es:** un análisis profundo de **todas las conversaciones de WhatsApp** de tu agencia. **Es exclusivo del director.** No es una sección aparte del menú: aparece **embebido dentro del Dashboard** (sección "Inteligencia Conversacional").
 
 **Qué muestra (sin costo de créditos, es pura estadística):**
 - **KPIs:** chats únicos, leads calificados, visitas agendadas, reservas, derivaciones a humano, seguimientos enviados, tasas de conversión, etc.
@@ -426,9 +432,8 @@ Tiene 5 pestañas:
 |---|---|
 | Buscador IA | 1 crédito |
 | Tutor IA | 1 crédito |
-| Marketing IA (copy) | 1 crédito |
-| Marketing IA (imagen) | 2 créditos |
-| Tasaciones | 1 crédito |
+| Marketing IA — "Generar 3 Variantes" | ~7 créditos (3 textos + 3 imágenes) |
+| Tasaciones | **0 — no usa IA** |
 | Convertir documento a plantilla | 1 crédito |
 | Contratos (finalizar) | 5 créditos |
 

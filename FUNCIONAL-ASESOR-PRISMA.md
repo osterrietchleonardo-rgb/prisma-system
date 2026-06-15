@@ -292,6 +292,7 @@
 
 > 💡 **Tip:** el cálculo se actualiza **solo** a medida que editás. El trabajo se autoguarda entre pasos y queda en tu historial (últimas 10 tasaciones).
 > 💡 Funciona bien desde el celular (la grilla del Paso 3 se desplaza horizontalmente).
+> 💰 La tasación **no consume créditos**: es un cálculo matemático, no usa IA generativa.
 
 ---
 
@@ -342,7 +343,7 @@ Tiene 4 pestañas:
 
 ## 20. Créditos IA: cómo funcionan para vos
 
-- Las herramientas de IA (Buscador, Tutor, Marketing, Contratos, Tasaciones) consumen **créditos**.
+- Las herramientas de IA (Buscador, Tutor, Marketing, Contratos) consumen **créditos**. **Tasaciones no** (es un cálculo matemático, sin IA).
 - Tenés una **cuota mensual personal**. Se calcula como el **pool de créditos de la agencia dividido entre los asesores activos**, y se **renueva el 1° de cada mes**.
 - En **Configuración → Créditos IA** ves: tu **límite mensual**, lo **consumido** (con %) y lo **disponible**, una barra de progreso y el **detalle por módulo**.
 - Cuando llegás al **80%**, aparece un aviso para que los uses con cuidado.
@@ -353,9 +354,8 @@ Tiene 4 pestañas:
 |---|---|
 | Buscador IA | 1 crédito |
 | Tutor IA | 1 crédito |
-| Marketing IA (copy) | 1 crédito |
-| Marketing IA (imagen) | 2 créditos |
-| Tasaciones | 1 crédito |
+| Marketing IA — "Generar 3 Variantes" | ~7 créditos (3 textos + 3 imágenes) |
+| Tasaciones | **0 — no usa IA** |
 | Contratos (finalizar) | 5 créditos |
 
 ---

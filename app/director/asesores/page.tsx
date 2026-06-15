@@ -12,12 +12,12 @@ import {
   Target, 
   Home,
   QrCode,
-  Share2,
   RefreshCcw,
   Zap,
   Briefcase
 } from "lucide-react"
-import { getAgentPerformanceAction } from "@/app/actions/performance"
+import { getAgentPerformanceAction, getAgencyAdvisorsPerformanceAction } from "@/app/actions/performance"
+import { desvincularAsesor } from "@/app/actions/asesores"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -66,6 +66,8 @@ export default function AsesoresPage() {
   const [selectedAgent, setSelectedAgent] = useState<Record<string, any> | null>(null)
   const [agentKpis, setAgentKpis] = useState<any>(null)
   const [loadingKpis, setLoadingKpis] = useState(false)
+  const [perfMap, setPerfMap] = useState<Record<string, any>>({})
+  const [desvinculando, setDesvinculando] = useState<string | null>(null)
   
   const supabase = createClient()
   const [agencyId, setAgencyId] = useState<string | null>(null)
@@ -117,12 +119,37 @@ export default function AsesoresPage() {
       
       setInviteCode(invite?.code || "")
       setAgents(data || [])
+
+      // Performance real (de performance_logs) para las tarjetas
+      try {
+        const advisors = await getAgencyAdvisorsPerformanceAction()
+        const map: Record<string, any> = {}
+        for (const a of advisors) map[a.id] = a
+        setPerfMap(map)
+      } catch (perfErr) {
+        console.error("Error cargando performance de asesores:", perfErr)
+      }
     } catch (_error) {
       toast.error("Error al cargar asesores")
     } finally {
       setLoading(false)
     }
   }, [supabase, agencyId])
+
+  const handleDesvincular = async (agent: Record<string, any>) => {
+    if (!confirm(`¿Desvincular a ${agent.full_name}? No podrá volver a ingresar al sistema con su email (${agent.email}).`)) return
+    try {
+      setDesvinculando(agent.id)
+      await desvincularAsesor(agent.id)
+      toast.success("Asesor desvinculado. Ya no puede acceder al sistema.")
+      setSelectedAgent(null)
+      fetchAgents()
+    } catch (e: any) {
+      toast.error(e.message || "Error al desvincular asesor")
+    } finally {
+      setDesvinculando(null)
+    }
+  }
 
   useEffect(() => {
     fetchAgents()
@@ -290,7 +317,13 @@ export default function AsesoresPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-card border-accent/20">
-                      <DropdownMenuItem className="text-destructive cursor-pointer">Desvincular asesor</DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive cursor-pointer"
+                        disabled={desvinculando === agent.id}
+                        onClick={(e) => { e.stopPropagation(); handleDesvincular(agent); }}
+                      >
+                        Desvincular asesor
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -302,27 +335,37 @@ export default function AsesoresPage() {
               <CardContent className="p-5 pt-4 space-y-4">
                 <div className="grid grid-cols-3 gap-2">
                   <div className="flex flex-col items-center p-2 rounded-lg bg-accent/5 border border-accent/10">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Leads</span>
-                    <span className="font-bold text-accent">{agent.assigned_leads?.[0]?.count || 0}</span>
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Capt.</span>
+                    <span className="font-bold text-accent">{perfMap[agent.id]?.captaciones ?? 0}</span>
                   </div>
                   <div className="flex flex-col items-center p-2 rounded-lg bg-green-500/5 border border-green-500/10">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Cierres</span>
-                    <span className="font-bold text-green-500">{agent.closings?.[0]?.count || 0}</span>
+                    <span className="font-bold text-green-500">{perfMap[agent.id]?.transacciones ?? 0}</span>
                   </div>
                   <div className="flex flex-col items-center p-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Props</span>
-                    <span className="font-bold text-blue-500">0</span>
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground">Cartera</span>
+                    <span className="font-bold text-blue-500">{perfMap[agent.id]?.cartera_activa ?? 0}</span>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between text-[10px]">
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <Target className="h-3 w-3" />
-                    Conv: <span className="text-foreground font-bold">12%</span>
+                    Rotación: <span className="text-foreground font-bold">{(perfMap[agent.id]?.rotacion ?? 0).toFixed(1)}%</span>
                   </div>
-                  <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/10 border-none px-2 py-0 text-[10px]">
-                    Activo
-                  </Badge>
+                  {agent.estado === "eliminado" ? (
+                    <Badge className="bg-destructive/10 text-destructive hover:bg-destructive/10 border-none px-2 py-0 text-[10px]">
+                      Desvinculado
+                    </Badge>
+                  ) : agent.estado === "pausado" ? (
+                    <Badge className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/10 border-none px-2 py-0 text-[10px]">
+                      Pausado
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/10 border-none px-2 py-0 text-[10px]">
+                      Activo
+                    </Badge>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -346,11 +389,14 @@ export default function AsesoresPage() {
                 <SheetDescription>{selectedAgent?.email}</SheetDescription>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Share2 className="h-3 w-3" /> Compartir
-                </Button>
-                <Button variant="outline" size="sm" className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10">
-                  <XCircle className="h-3 w-3" /> Desactivar
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10"
+                  disabled={desvinculando === selectedAgent?.id}
+                  onClick={() => selectedAgent && handleDesvincular(selectedAgent)}
+                >
+                  <XCircle className="h-3 w-3" /> Desvincular asesor
                 </Button>
               </div>
             </div>
