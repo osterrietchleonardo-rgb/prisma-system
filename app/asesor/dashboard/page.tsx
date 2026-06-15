@@ -5,6 +5,8 @@ import { getDashboardData } from "@/lib/queries/dashboard"
 import { PerformanceMetricsGrid } from "@/components/dashboard/PerformanceMetricsGrid"
 import { PerformanceCharts } from "@/components/performance-charts"
 import { PerformanceLeaderboard } from "@/components/performance-leaderboard"
+import { ObjectivesDashboard } from "@/components/dashboard/ObjectivesDashboard"
+import { getObjectivesDashboard } from "@/lib/tracking/objetivos"
 import { DashboardActivity } from "@/components/dashboard-activity"
 import { DashboardHeaderActions } from "@/components/dashboard-header-actions"
 import { Button } from "@/components/ui/button"
@@ -30,9 +32,11 @@ export default async function AsesorDashboardPage() {
 
   // Personal KPIs + charts: filtered by this asesor's ID
   // Agency-wide: all advisors for the leaderboard + recent agency activity
-  const [myData, agencyData] = await Promise.all([
+  const currentYear = new Date().getFullYear()
+  const [myData, agencyData, objectivesData] = await Promise.all([
     getDashboardData(profile.agency_id, user.id),
     getDashboardData(profile.agency_id),           // no agentId → full agency
+    getObjectivesDashboard(profile.agency_id, currentYear),
   ])
 
   return (
@@ -71,6 +75,9 @@ export default async function AsesorDashboardPage() {
         data={myData.charts.performanceEvolution}
         channels={myData.charts.channelDistribution}
       />
+
+      {/* Objetivos vs alcanzado de la inmobiliaria */}
+      <ObjectivesDashboard initialData={objectivesData} initialYear={currentYear} />
 
       {/* Leaderboard: full agency ranking so the asesor can see their position */}
       <PerformanceLeaderboard advisors={agencyData.advisors} />

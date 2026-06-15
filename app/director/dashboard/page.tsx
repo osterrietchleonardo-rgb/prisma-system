@@ -34,6 +34,8 @@ import { ConversationalIntelligence } from "./components/conversational/Conversa
 import { DashboardPropertiesSection } from "./components/DashboardPropertiesSection"
 import { DashboardPipelineSection } from "./components/DashboardPipelineSection"
 import { PerformanceCharts } from "@/components/performance-charts"
+import { ObjectivesDashboard } from "@/components/dashboard/ObjectivesDashboard"
+import { getObjectivesDashboard } from "@/lib/tracking/objetivos"
 import { AdvisorFilter } from "@/components/dashboard/advisor-filter"
 import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter"
 
@@ -75,10 +77,12 @@ export default async function DashboardPage({
     )
   }
 
-  const [dashboardData, propertiesData, pipelineData] = await Promise.all([
+  const currentYear = new Date().getFullYear()
+  const [dashboardData, propertiesData, pipelineData, objectivesData] = await Promise.all([
     getDashboardData(profile.agency_id, agentId, from, to),
     getPropertiesDashboardData(profile.agency_id),
     getPipelineDashboardData(profile.agency_id),
+    getObjectivesDashboard(profile.agency_id, currentYear),
   ])
 
   return (
@@ -123,6 +127,8 @@ export default async function DashboardPage({
         data={dashboardData.charts.performanceEvolution} 
         channels={dashboardData.charts.channelDistribution}
       />
+
+      <ObjectivesDashboard initialData={objectivesData} initialYear={currentYear} />
 
       <div className="grid gap-6 lg:grid-cols-7">
         <div className="lg:col-span-7 w-full overflow-hidden">
