@@ -236,7 +236,7 @@ Patrón estándar de un endpoint protegido:
 - `POST /api/ai/analyze-chat` — análisis de chat pegado.
 
 **Marketing IA**
-- `POST /api/marketing-ia/generate-copy`, `/generate-batch`, `/generate-image`.
+- `POST /api/marketing-ia/generate-batch`, `/generate-image` (flujo vigente). `POST /api/marketing-ia/generate-copy` existe pero está **sin uso en la UI** (legacy, ver §20).
 - `GET/POST /api/marketing-ia/settings` (POST solo director), `POST /api/marketing-ia/settings/upload-logo`.
 - `GET /api/marketing-ia/tokko-search`.
 
@@ -338,10 +338,12 @@ Mentor con **RAG** sobre `agency_documents`. Intent RETRIEVAL/GENERAL; si RETRIE
 Rate limit 30 req/h por usuario; validación Zod (10–50000 chars); `parseWhatsAppChat()`; output JSON comercial (lead_name, phone, search_intent, response_time_eval, lead_attitude, commercial_process_eval, summary, next_step).
 
 ### 10.4 Marketing IA
-- **Copy** (`/generate-copy`, Gemini 3.5 Flash): usa IPC + `creative_directive`. Regla explícita: **no inventa ni menciona** propiedades/precios/m² concretos. Output por tipo (post/historia: hook/desarrollo/cta; video: hook/problema/agitación/solución/cta).
-- **Batch** (`/generate-batch`): 3 variaciones (PAS, Transformación, Autoridad/Datos) en una llamada.
-- **Imagen** (`/generate-image`, Gemini 3 Pro Image / Nano Banana Pro): integra branding (`marketing_ai_config`: colores, logo de referencia, tipografía), `creative_directive` y `legal_notice` (franja inferior). Sube a Storage `marketing-images` + `generated_images`.
-- **Settings** (`/settings`, POST solo director): branding + directiva creativa + aviso legal.
+- **Flujo vigente — "Crear Anuncio" (`copy-generator-flow.tsx`):** es un **multi-generador todo-en-uno**. El usuario elige IPC + tipo de copy (`video` | `post`) + formato de imagen (`reels`/`post`/`historia`) + estilo, y un único botón orquesta desde el cliente: `POST /generate-batch` (3 copies) → inserta 3 `copy_drafts` → `POST /generate-image` **×3** (una por draft). No hay UI de "copy simple" ni de imagen suelta.
+- **Costo real por "Generar 3 Variantes":** `generate-batch` consume **1** crédito + `generate-image` consume **2** créditos **por imagen** (×3) = **~7 créditos**. ⚠️ El texto al pie del componente ("Cada generación consume 1 crédito IA") solo refleja el batch de textos, no el total — discrepancia de UI a corregir.
+- **Batch** (`/generate-batch`, Gemini 3.5 Flash): 3 variaciones (PAS, Transformación, Autoridad/Datos) en una llamada. Usa IPC + `creative_directive`. Regla explícita: **no inventa ni menciona** propiedades/precios/m² concretos. El `propiedad_tokko_id` del IPC "vender" se puede traer de Tokko pero **no se usa en el copy** (función reservada a futuro).
+- **Copy individual** (`/generate-copy`, Gemini 3.5 Flash): genera 1 copy (post/historia: hook/desarrollo/cta; video: hook/problema/agitación/solución/cta). **Endpoint legacy: ningún componente lo invoca** (ver §20). El flujo actual usa solo `generate-batch`.
+- **Imagen** (`/generate-image`, Gemini 3 Pro Image / Nano Banana Pro): integra branding (`marketing_ai_config`: colores, logo de referencia, tipografía, posición/tamaño de logo), `creative_directive` y `legal_notice` (franja inferior). Sube a Storage `marketing-images` + `generated_images`.
+- **Settings** (`/settings`, POST solo director): branding (hasta 3 colores, logo + posición + tamaño, tipografía) + directiva creativa (≤1000) + aviso legal (≤300). UI en la pestaña "Configuración IA" (solo director; el asesor no la ve). Galería/edición/borrado de anuncios en `marketing-history.tsx` (pestaña Historial). Pestaña "Guía Mágica" (`ad-guide.tsx`): contenido estático de buenas prácticas de Meta Ads, sin backend.
 
 ### 10.5 Contratos IA
 - **Conversión documento→plantilla** (`/convert-template`, Gemini 3.5 Flash): `.docx`/`.pdf` ≤ 25 MB; sube original a bucket `contratos`; reemplaza datos por placeholders `{{PREFIJO_CAMPO}}`; 1 crédito.
@@ -471,6 +473,8 @@ Login (`POST /api/admin-vakdor/login`): rate limit 5/10min; hash SHA-256 con sal
 - **`contract_signatures`:** conservada del diseño de firma digital; el flujo vigente es firma presencial (no se alimenta).
 - **Columnas `embedding`** en `properties`/`roomix_properties`: presentes pero el Buscador IA actual no las usa (búsqueda no vectorial).
 - **`/api/messages/bot-reply`:** endpoint legacy de respuesta (solo Evolution, `BOT_REPLY_SECRET`); el flujo vigente es `/api/n8n/reply`.
+- **`/api/marketing-ia/generate-copy`:** genera 1 copy individual, pero **ningún componente lo llama**; el flujo vigente de "Crear Anuncio" usa `generate-batch` + `generate-image`. **No eliminado** (sirve de base para un futuro modo "copy simple").
+- **Marketing IA — vincular propiedad al IPC "vender":** el `PropertySelector` y el fetch de `propiedad_tokko_id` desde Tokko existen, pero el copy **no usa** los datos concretos de la propiedad (regla anti-invención). Función reservada para un modo futuro.
 - **Endpoints de debug** (`/api/debug/*`): validar que no queden expuestos en producción.
 - **Inconsistencia documental:** el diagrama §26.3 de `LOGICA-PRISMA.md` describe el flujo vectorial original del Consultor; el vigente es el de §10.3 (ya anotado en el doc).
 

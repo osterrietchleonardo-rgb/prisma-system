@@ -812,27 +812,35 @@ Los IPC son perfiles estratégicos de marketing que definen:
   - **Captar:** tipo_propietario, motivo_venta, urgencia, preocupaciones, objeción_principal, angulo_marketing, tono, promesa_central, CTA
   - **Vender:** tipo_comprador_ideal, necesidad_concreta, atractivos_propiedad, angulo_copy, mensaje_central, CTA, propiedad_tokko_id (opcional)
 
-### 13.2 Generación de Copy
+> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Clientes Ideales (IPC) · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (4 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) lista los anuncios generados agrupados por tanda, con ver/editar/descargar/borrar.
+
+### 13.2 Generación de Copy individual (legacy — sin uso en la UI)
 
 **Endpoint:** `POST /api/marketing-ia/generate-copy`  
 **Archivo:** `app/api/marketing-ia/generate-copy/route.ts`  
 **Modelo:** Gemini 3.5 Flash (`prismaIA`, `maxOutputTokens: 8192`)
 
-**Flujo:**
+> ⚠️ **Endpoint legacy:** genera 1 copy individual, pero **ningún componente lo invoca**. El flujo vigente de "Crear Anuncio" usa solo `generate-batch` + `generate-image` (ver 13.3). Se conserva como base para un futuro modo "copy simple".
+
+**Flujo (si se usara):**
 1. Obtiene IPC del usuario y la `creative_directive` de la agencia (ver 13.5)
 2. Mapea ángulo de marketing: PAS, autoridad, transformación, social_proof, curiosidad, urgencia, aspiracional, datos
 3. Mapea nivel de consciencia: 0 (inconsciente) → 4 (muy consciente)
-4. Genera prompt con la estrategia del IPC + la **directiva creativa** del director. **No referencia ninguna propiedad puntual** (feature deshabilitada): regla explícita que prohíbe inventar/mencionar direcciones, m², ambientes o precios concretos.
+4. Genera prompt con la estrategia del IPC + la **directiva creativa** del director. **No referencia ninguna propiedad puntual**: regla explícita que prohíbe inventar/mencionar direcciones, m², ambientes o precios concretos.
 5. **Output:**
    - Copy tipo `post/historia`: `{ hook, desarrollo, cta }`
    - Copy tipo `video`: `{ hook, problema, agitacion, solucion, cta }`
 
-### 13.3 Generación en Batch
+### 13.3 Flujo vigente: "Crear Anuncio" (Batch + 3 imágenes)
 
-**Endpoint:** `POST /api/marketing-ia/generate-batch`  
-**Archivo:** `app/api/marketing-ia/generate-batch/route.ts`
+**Endpoints:** `POST /api/marketing-ia/generate-batch` + `POST /api/marketing-ia/generate-image` (×3)  
+**Componente:** `components/marketing-ia/copy-generator-flow.tsx`
 
-Genera **3 variaciones** simultáneas con ángulos PAS, Transformación y Autoridad/Datos en una sola llamada a Gemini 3.5 Flash. Respeta la **directiva creativa** del director y la misma regla de no inventar propiedades. Output: array de 3 objetos.
+Es un **multi-generador todo-en-uno**. El usuario elige IPC + tipo de copy (`video` | `post`) + formato de imagen (`reels`/`post`/`historia`) + estilo, y un único botón **"Generar 3 Variantes Automáticamente"** orquesta desde el cliente:
+1. `generate-batch` → **3 variaciones** simultáneas (ángulos PAS, Transformación y Autoridad/Datos) en una llamada a Gemini 3.5 Flash. Respeta la **directiva creativa** del director y la regla de no inventar propiedades. Output: array de 3 objetos.
+2. Inserta los 3 `copy_drafts` y llama `generate-image` **una vez por draft** (3 imágenes).
+
+> 💰 **Costo real:** `generate-batch` = 1 crédito + `generate-image` = 2 créditos × 3 = **~7 créditos por tanda**. El cartel "1 crédito" del componente solo refleja el batch de textos (discrepancia de UI a corregir).
 
 ### 13.4 Generación de Imágenes
 
@@ -1693,7 +1701,7 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
   - **Configuración:** Token de Tokko, Instancia de WhatsApp, Branding (logo y colores para Marketing IA), y facturación.
 
 #### 6. Herramientas IA (Marketing, Contratos, Tasaciones)
-- **Marketing IA (`/director/marketing-ia`):** Permite generar "Copy" creando perfiles IPC (Ideal Prospect Client), ya sea para "Vender" (buscando prop en la base) o "Captar". Permite generación simple o "En Lote" (Batch) para múltiples ángulos a la vez. También genera imágenes con Gemini Imagen 3 integrando el branding de la agencia.
+- **Marketing IA (`/director/marketing-ia`):** Generador de anuncios a partir de perfiles IPC (Ideal Prospect Client) para "Captar" propietarios o "Vender" (atraer compradores). El flujo "Crear Anuncio" genera de una **3 variantes completas (copy + imagen)** con ángulos distintos (no hay "copy simple" en la UI). Las imágenes usan **Nano Banana Pro (Gemini 3 Pro Image)** integrando el branding de la agencia. En el IPC "Vender" se puede vincular una propiedad de Tokko, pero esa función está **reservada a futuro**: hoy el copy no usa sus datos concretos. Ver detalle en §13.
 - **Tasaciones (`/director/tasaciones`):** Formulario de características de la propiedad que consulta a la IA para emitir un valor mínimo, máximo y sugerido, con análisis del mercado. Consume 1 crédito.
 - **Contratos (`/director/contratos-ia`):** Gestión de plantillas y conversión a contratos formales con firma digital incorporada. Consume 5 créditos por contrato.
 
@@ -1821,8 +1829,8 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 | `/api/debug/rls-check` | GET | — | Debug RLS |
 | `/api/documents/extract` | POST | Sesión | Extraer texto |
 | `/api/documents/process` | POST | Sesión | Upload + proceso |
-| `/api/marketing-ia/generate-batch` | POST | Tenant | 3 copys a la vez |
-| `/api/marketing-ia/generate-copy` | POST | Tenant | 1 copy |
+| `/api/marketing-ia/generate-batch` | POST | Tenant | 3 copys a la vez (flujo vigente) |
+| `/api/marketing-ia/generate-copy` | POST | Tenant | 1 copy — **legacy, sin uso en la UI** |
 | `/api/marketing-ia/generate-image` | POST | Tenant | Imagen IA |
 | `/api/marketing-ia/settings` | GET, POST | Tenant | Config branding |
 | `/api/marketing-ia/settings/upload-logo` | POST | Tenant | Subir logo |
