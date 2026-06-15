@@ -184,21 +184,24 @@
 
 ## 11. Marketing IA
 
-**Qué es:** un generador de contenido publicitario con inteligencia artificial.
+**Qué es:** un generador de contenido publicitario con inteligencia artificial (la pantalla se titula "Marketing IA Asesor").
+
+**Tiene 4 pestañas:** Crear Anuncio · Clientes Ideales (IPC) · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
 
 **Cómo usarlo paso a paso:**
-1. Creás un **perfil IPC** (Cliente Ideal). Elegís el objetivo:
+1. En **Clientes Ideales (IPC)** creás un **perfil IPC** (Cliente Ideal). Elegís el objetivo:
    - **Captar** (conseguir propietarios que quieran vender), o
    - **Vender** (atraer compradores para una propiedad).
-2. Completás los datos del perfil (motivo, urgencia, ángulo, tono, llamada a la acción, etc.).
-3. Generás:
-   - **Copy simple** (un texto), o
-   - **En Lote (Batch):** 3 variaciones a la vez con ángulos distintos (PAS, Transformación, Autoridad/Datos).
-4. También podés **generar una imagen** que respeta el branding de la agencia (colores, logo, tipografía) y el aviso legal.
+   Después completás los datos del perfil paso a paso (motivo, urgencia, ángulo, tono, llamada a la acción, nivel de conciencia, etc.).
+2. En **Crear Anuncio** elegís: el **IPC**, el **tipo de copy** (Video/Reel o Post), el **formato de imagen** (Reels, Post o Historia) y el **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante).
+3. Apretás **"Generar 3 Variantes Automáticamente"**: la IA te crea de una **3 anuncios completos (texto + imagen)** con ángulos distintos (PAS, Transformación, Autoridad/Datos) para que elijas el mejor.
+4. Los anuncios quedan guardados en **Mis Generaciones**, donde los ves, editás el texto, descargás la imagen o los borrás.
+
+**Guía Mágica:** una guía de lectura (5 fases) con buenas prácticas para hacer campañas de captación en Meta Ads (Facebook/Instagram). No genera nada, es material para aprender.
 
 > 💡 **Tip:** el copy y las imágenes respetan la **directiva creativa** y el **aviso legal** que cargó tu director. No hace falta que los pongas vos.
-> ⚠️ Por política, el generador **no inventa** direcciones, metros, ambientes ni precios concretos. Esos datos los agregás vos después si querés.
-> 💰 Generar copy cuesta 1 crédito; generar imagen cuesta 2 créditos.
+> ⚠️ Por política, el generador **no inventa** direcciones, metros, ambientes ni precios concretos. Habla del perfil de cliente, no de una propiedad puntual.
+> 💰 **Costo:** cada "Generar 3 Variantes" consume **~7 créditos** (1 por los 3 textos + 2 por cada una de las 3 imágenes). El cartel de "1 crédito" en pantalla es solo por los textos, no el total.
 
 ---
 

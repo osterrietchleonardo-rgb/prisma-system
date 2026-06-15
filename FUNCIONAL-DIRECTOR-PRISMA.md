@@ -217,22 +217,31 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 
 ## 12. Marketing IA
 
-**Qué es:** el generador de contenido publicitario con IA, alineado a tu marca.
+**Qué es:** el generador de contenido publicitario con IA, alineado a tu marca (la pantalla se titula "Marketing IA Pro").
 
-**Cómo usarlo:**
-1. Creás un **perfil IPC** (Cliente Ideal): objetivo **Captar** (propietarios) o **Vender** (compradores).
-2. Completás el perfil (motivo, urgencia, ángulo, tono, CTA).
-3. Generás **copy simple** o **En Lote (Batch)** (3 variaciones con ángulos distintos).
-4. Generás **imágenes** que integran tu branding (colores, logo, tipografía).
+**Tiene 5 pestañas:**
+1. **Crear Anuncio:** el generador principal (ver abajo).
+2. **Clientes Ideales (IPC):** donde creás y administrás tus perfiles de cliente ideal.
+3. **Historial / Galería:** todos los anuncios generados, agrupados por tanda. Podés verlos, editar el texto, descargar la imagen y borrarlos.
+4. **Guía Mágica:** una guía práctica de 5 fases para hacer campañas de captación de leads de calidad en Meta (Facebook/Instagram) Ads: segmentación, el anuncio, el formulario "filtro de oro", retargeting y medición. Es material de lectura, no genera nada.
+5. **Configuración IA:** los ajustes de marca de la agencia (solo director, ver abajo).
 
-**Ajustes de Marketing (importante, solo director):**
-- **Branding:** colores de marca, tipografía, logo.
-- **Directiva creativa:** indicaciones de estilo que la IA respeta en todos los copies e imágenes (tuyos y de tus asesores).
-- **Aviso legal:** texto legal que se inserta en la franja inferior de las imágenes.
+**Cómo usarlo (pestaña "Crear Anuncio"):**
+1. Primero creás un **perfil IPC** (Cliente Ideal) en la pestaña de IPC: objetivo **Captar** (propietarios) o **Vender** (compradores). Completás el perfil paso a paso (motivo, urgencia, ángulo, tono, CTA, nivel de conciencia, etc.).
+2. En "Crear Anuncio" elegís: el **IPC**, el **tipo de copy** (Video/Reel o Post), el **formato de imagen** (Reels, Post o Historia) y el **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante).
+3. Apretás **"Generar 3 Variantes Automáticamente"**: en una sola acción la IA crea **3 copies + 3 imágenes** (3 anuncios completos) usando 3 ángulos distintos (PAS, Transformación y Autoridad/Datos), para que elijas el que mejor convierta.
+4. El resultado queda en la pestaña **Historial / Galería**.
+
+**Ajustes de Marca (pestaña "Configuración IA", solo director):**
+- **Colores de marca:** hasta 3 colores.
+- **Logo:** subís el logo, y elegís su **posición** (4 esquinas) y su **tamaño** (chico/mediano/grande).
+- **Tipografía:** moderna/sans, elegante/serif, manuscrita/script o impacto/bold.
+- **Directiva creativa:** indicaciones de estilo (hasta 1000 caracteres) que la IA respeta en todos los copies e imágenes (tuyos y de tus asesores).
+- **Aviso legal:** texto legal (hasta 300 caracteres) que se inserta en la franja inferior de las imágenes.
 
 > 💡 **Tip:** configurá la directiva creativa y el aviso legal una sola vez; aplican a toda la agencia.
-> ⚠️ El generador **no inventa** datos concretos de propiedades (direcciones, m², precios). Es una decisión de diseño.
-> 💰 Copy: 1 crédito · Imagen: 2 créditos.
+> ⚠️ El generador **no inventa** datos concretos de propiedades (direcciones, m², precios). Es una decisión de diseño: los copies hablan del perfil de cliente, no de una propiedad puntual. (En el IPC "Vender" podés vincular una propiedad de Tokko, pero esa función está **reservada para más adelante**: hoy el copy no usa sus datos concretos.)
+> 💰 **Costo real:** cada "Generar 3 Variantes" consume **~7 créditos** (1 por los 3 textos + 2 por cada una de las 3 imágenes). Nota: el cartelito de la pantalla que dice "1 crédito" se refiere solo a la generación de textos, no al total.
 
 ---
 
