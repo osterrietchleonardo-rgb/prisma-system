@@ -227,8 +227,19 @@ async function fetchSitemaps(context) {
 
 async function diffWithSupabase(sitemapEntries) {
   log('🔍', 'Comparando con Supabase...');
-  const { data: existing, error } = await supabase.from('roomix_properties').select('id, lastmod');
-  if (error) { log('❌', 'Error DB:', error.message); return { toExtract: sitemapEntries, toDelete: [] }; }
+  
+  let existing = [];
+  let from = 0;
+  const step = 1000;
+  while (true) {
+    const { data, error } = await supabase.from('roomix_properties').select('id, lastmod').range(from, from + step - 1);
+    if (error) { log('❌', 'Error DB:', error.message); return { toExtract: sitemapEntries, toDelete: [] }; }
+    existing = existing.concat(data || []);
+    if (!data || data.length < step) break;
+    from += step;
+  }
+  
+  log('📦', `Propiedades en BD: ${existing.length}`);
 
   const exMap = new Map((existing || []).map(r => [r.id, r.lastmod]));
   const sMap = new Set(sitemapEntries.map(e => e.id));
