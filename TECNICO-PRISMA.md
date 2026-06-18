@@ -367,6 +367,9 @@ Carpeta `roomix-sync/`. Alimenta diariamente `roomix_properties` (red de colabor
 - **Tecnología:** Playwright en modo *stealth* (bypass anti-bot); extrae JSON-LD de fichas de Roomix.
 - **Producción:** contenedor Docker en **Easypanel**; `node-cron` dispara a las **03:00 AM**; `child_process.spawn` aísla el proceso para evitar fugas de memoria de Chromium.
 - **Health check:** mini servidor HTTP nativo en puerto 80 (`cron.js`, `CMD ["node","cron.js"]`) para satisfacer Easypanel y evitar SIGTERM.
+- **Control de Concurrencia:** El schedule de `cron.js` cuenta con un sistema de lock (`isRunning`) para evitar la ejecución de instancias paralelas si el procesamiento se extiende al día siguiente.
+- **Descarga de Sitemaps:** Evita bloqueos por challenges de Cloudflare ejecutando un `fetch` nativo *dentro* de la instancia del navegador (`page.evaluate`), heredando el fingerprint TLS y las cookies de sesión (`cf_clearance`). Incluye reintentos exponenciales y timeout de 90s.
+- **Sincronización Diferencial:** Consulta a Supabase (`roomix_properties`) mediante paginación explícita (`.range()`) para bypassear el límite estándar de 1.000 filas de PostgREST, garantizando que el *diff* reconozca todo el inventario ya sincronizado.
 - **Imagen:** `mcr.microsoft.com/playwright:v1.60.0-jammy`.
 - **Imágenes/CDN:** consumidas vía `cdn.roomix.ai` (whitelisted en `next.config.mjs`).
 

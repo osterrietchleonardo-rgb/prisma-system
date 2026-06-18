@@ -684,6 +684,9 @@ El Buscador IA se nutre de la tabla `roomix_properties`, la cual es alimentada d
 - **Tecnología del Crawler:** Utiliza Playwright (en modo Stealth) para bypassear bloqueos anti-bot y extrae datos estructurados JSON-LD de las fichas de Roomix.
 - **Worker de Producción:** Se ejecuta como un contenedor Docker en Easypanel, utilizando `node-cron` (disparándose a las 03:00 AM) y `child_process.spawn` para aislar el proceso y evitar fugas de memoria del Chromium.
 - **Despliegue & Health Check:** El Worker levanta un mini servidor HTTP nativo en el puerto 80 (`cron.js`) y ejecuta Node directamente (`CMD ["node", "cron.js"]` en `Dockerfile`) para cumplir con los requerimientos de Health Check de Easypanel, evitando errores de tipo SIGTERM y garantizando que el proceso se mantenga vivo.
+- **Concurrencia Segura (Cron):** Implementa un "semáforo" (lock) en el cron de Node para prevenir la ejecución paralela múltiple en extracciones que duren más de 24 horas, evitando baneos por exceso de requests concurrentes.
+- **Extracción de Sitemaps:** En lugar de navegación directa (que sufre bloqueos de Cloudflare), extrae los sitemaps utilizando `page.evaluate(fetch)` *dentro* del contexto de Chromium, preservando el fingerprint TLS y las cookies `cf_clearance`, con reintentos exponenciales.
+- **Diff con Supabase:** La consulta de comparación contra la base de datos (`diffWithSupabase`) implementa paginación explícita (`.range()`) para evitar el límite por defecto de 1.000 filas de PostgREST, garantizando la correcta deduplicación frente a bases de datos grandes.
 - **Imagen Docker:** `mcr.microsoft.com/playwright:v1.60.0-jammy`
 
 ### 10.3 Flujo Completo de Búsqueda (rediseño Junio 2026)
