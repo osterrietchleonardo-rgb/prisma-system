@@ -141,10 +141,12 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 
 **WhatsApp**
 - `whatsapp_instances` — agency_id, token, phone_number_id, business_id, evo_instance_name, integration_type, templates_status, flows_active, status.
-- `wa_conversations` — agency_id, instance_id, agent_id, contact_phone/name, status, bot_active, unread_count, last_message_at/last_inbound_at, etiquetas[], score, pipeline_stage, funnel_status, visit_status, follow_ups_sent, `follow_ups_history` (jsonb array), requires_follow_up, recovery_stage, next_follow_up_at, opt_out, `metricas` (jsonb).
+- `wa_conversations` — agency_id, instance_id, agent_id, contact_phone/name, status, bot_active, unread_count, last_message_at/last_inbound_at, etiquetas[], `clasificacion` (origen del lead), score, pipeline_stage, funnel_status, visit_status, follow_ups_sent, `follow_ups_history` (jsonb array), requires_follow_up, recovery_stage, next_follow_up_at, opt_out, `metricas` (jsonb).
+- `wa_contacts` — agency_id, phone, name, tags[], `clasificacion` (origen del lead), metadata, campaign_statuses (jsonb), last_campaign_status/template/sent_at. `UNIQUE (agency_id, phone)`. Es la "agenda" para campañas (solapa Contactos); separada de `wa_conversations` (los chats), sincronizada por teléfono.
 - `wa_messages` — conversation_id, agency_id, content, role (`lead`/`bot`/`agent`), message_type, wamid, metadata.
 - `wa_templates` — agency_id, template_name, status, components, rejection_reason, meta_template_id.
 - `n8n_chat_histories` — session_id (= conversation_id), message (jsonb formato LangChain).
+- **Clasificación del lead** (`clasificacion`, migración `20260618120000_add_clasificacion_leads.sql`): columna nullable en `wa_conversations` y `wa_contacts`, con índice `(agency_id, clasificacion)`. Valores: `Whatsapp-Consulta` (entrante por webhook), `Whatsapp-Manual` (alta manual en tracking/calendario vía `createManualContact`), o personalizada en la importación. NULL = "Sin clasificar" (registros previos, sin backfill). Helper único de etiquetas/colores: `lib/whatsapp/clasificacion.ts`.
 
 **IA y documentos**
 - `consultor_chat_sessions` / `consultor_chat_messages` — Buscador IA (memoria por sesión).
@@ -314,6 +316,13 @@ Auth por `DISPATCH_SECRET`. Prefijo por agencia `ag{agency_id[0:6]}_`. 8 templat
 
 ### 9.5 `n8n_chat_histories`
 Formato LangChain: `session_id` = conversation_id; `message` = `{ type:'human'|'ai', content, additional_kwargs, response_metadata, tool_calls, invalid_tool_calls }`.
+
+### 9.6 Gestión de leads y agenda (Leads WhatsApp ↔ Contactos)
+- **Dos tablas, sincronizadas por teléfono:** `wa_conversations` (chats; alimenta "Leads WhatsApp" y la bandeja) y `wa_contacts` (agenda; alimenta la solapa "Contactos" y las campañas).
+- **Editar/Eliminar lead** (`app/actions/whatsapp.ts`): `updateConversationDetails(id, {contact_name, contact_phone, etiquetas, clasificacion})` actualiza la conversación y replica los campos al contacto por teléfono (best-effort). `deleteConversation(id)` borra la conversación (CASCADE en `wa_messages`), limpia `n8n_chat_histories` por `session_id`, y elimina el contacto en `wa_contacts` solo si ninguna otra conversación comparte ese teléfono.
+- **Agenda de Contactos:** `importContacts(contacts, clasificacion?)` deduplica por teléfono dentro del archivo y descarta los que ya existen en la agencia (insert, no upsert) → devuelve `{inserted, skipped}`. `deleteContact(id)` borra solo de `wa_contacts` (no toca chats).
+- **Clasificación automática:** webhooks Evolution/Meta marcan `Whatsapp-Consulta` al crear conversación y contacto; `createManualContact` marca `Whatsapp-Manual`; el import aplica la clasificación del lote (o "Importado"). `sendCampaignMessage`, al crear la conversación de un contacto, hereda su `clasificacion`.
+- **UI:** badge de color (helper `getClasificacionStyle`) con filtro por clasificación en "Leads WhatsApp", "Contactos" y la bandeja (`ConversationsList`).
 
 ---
 

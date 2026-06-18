@@ -753,9 +753,25 @@ export async function deleteConversation(
   conversation_id: string
 ): Promise<WhatsAppActionResult> {
   try {
-    await getAgencyProfile()
+    const { agency_id } = await getAgencyProfile()
     const supabase = createClient()
 
+    // 0. Obtener el teléfono ANTES de borrar (para sincronizar la agenda de contactos).
+    const { data: convRow } = await supabase
+      .from('wa_conversations')
+      .select('contact_phone')
+      .eq('id', conversation_id)
+      .maybeSingle()
+
+    // 1. Limpiar la memoria del bot (n8n_chat_histories) asociada a esta conversación.
+    //    session_id = conversation_id. No tiene FK con CASCADE, así que se borra a mano
+    //    para no dejar registros huérfanos (borrado total).
+    await supabase
+      .from('n8n_chat_histories')
+      .delete()
+      .eq('session_id', conversation_id)
+
+    // 2. Borrar la conversación. wa_messages se borra solo por CASCADE.
     const { error } = await supabase
       .from('wa_conversations')
       .delete()
@@ -763,6 +779,129 @@ export async function deleteConversation(
 
     if (error) {
       return { success: false, error: `Error al eliminar conversación: ${error.message}` }
+    }
+
+    // 3. Sincronizar agenda de contactos (wa_contacts): solo se quita el contacto
+    //    si NINGUNA otra conversación de la agencia comparte ese teléfono.
+    //    Best-effort: si falla, no rompe el borrado del lead (ya hecho).
+    if (convRow?.contact_phone) {
+      const { count } = await supabase
+        .from('wa_conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('agency_id', agency_id)
+        .eq('contact_phone', convRow.contact_phone)
+
+      if (!count || count === 0) {
+        const { error: contactErr } = await supabase
+          .from('wa_contacts')
+          .delete()
+          .eq('agency_id', agency_id)
+          .eq('phone', convRow.contact_phone)
+        if (contactErr) {
+          console.error('Sync wa_contacts (delete) falló:', contactErr.message)
+        }
+      }
+    }
+
+    return { success: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
+
+// =============================================
+// Action 10.5: Editar datos de contacto de la conversación (nombre / teléfono / etiquetas)
+// Usado desde la página "Leads WhatsApp". Impacta directamente en la bandeja de chats.
+// =============================================
+
+export async function updateConversationDetails(
+  conversation_id: string,
+  details: {
+    contact_name?: string | null
+    contact_phone?: string
+    etiquetas?: string[]
+    clasificacion?: string | null
+  }
+): Promise<WhatsAppActionResult> {
+  try {
+    const { agency_id } = await getAgencyProfile()
+    const supabase = createClient()
+
+    // Obtener el teléfono ACTUAL (para localizar el contacto en la agenda, sobre todo
+    // si el teléfono va a cambiar).
+    const { data: currentConv } = await supabase
+      .from('wa_conversations')
+      .select('contact_phone')
+      .eq('id', conversation_id)
+      .eq('agency_id', agency_id)
+      .maybeSingle()
+
+    const updatePayload: Record<string, unknown> = {}
+    let finalName: string | null | undefined
+    let finalPhone: string | undefined
+    let finalClasif: string | null | undefined
+
+    if (details.contact_name !== undefined) {
+      const name = (details.contact_name ?? '').trim()
+      finalName = name === '' ? null : name
+      updatePayload.contact_name = finalName
+    }
+
+    if (details.contact_phone !== undefined) {
+      const cleanPhone = details.contact_phone.replace(/\D/g, '')
+      if (!cleanPhone) {
+        return { success: false, error: 'El teléfono no puede quedar vacío.' }
+      }
+      finalPhone = cleanPhone
+      updatePayload.contact_phone = cleanPhone
+    }
+
+    if (details.etiquetas !== undefined) {
+      updatePayload.etiquetas = details.etiquetas
+    }
+
+    if (details.clasificacion !== undefined) {
+      const c = (details.clasificacion ?? '').trim()
+      finalClasif = c === '' ? null : c
+      updatePayload.clasificacion = finalClasif
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return { success: true }
+    }
+
+    const { error } = await supabase
+      .from('wa_conversations')
+      .update(updatePayload)
+      .eq('id', conversation_id)
+      .eq('agency_id', agency_id)
+
+    if (error) {
+      return { success: false, error: `Error al actualizar el lead: ${error.message}` }
+    }
+
+    // Sincronizar agenda de contactos (wa_contacts) por teléfono (mapeo de campos:
+    // contact_name -> name, contact_phone -> phone, etiquetas -> tags).
+    // Best-effort: si falla (p. ej. el teléfono nuevo choca con otro contacto), no rompe
+    // la edición del lead (que ya se guardó).
+    if (currentConv?.contact_phone) {
+      const contactUpdate: Record<string, unknown> = {}
+      if (details.contact_name !== undefined) contactUpdate.name = finalName
+      if (finalPhone !== undefined) contactUpdate.phone = finalPhone
+      if (details.etiquetas !== undefined) contactUpdate.tags = details.etiquetas
+      if (details.clasificacion !== undefined) contactUpdate.clasificacion = finalClasif
+
+      if (Object.keys(contactUpdate).length > 0) {
+        const { error: contactErr } = await supabase
+          .from('wa_contacts')
+          .update(contactUpdate)
+          .eq('agency_id', agency_id)
+          .eq('phone', currentConv.contact_phone)
+        if (contactErr) {
+          console.error('Sync wa_contacts (update) falló:', contactErr.message)
+        }
+      }
     }
 
     return { success: true }
@@ -1141,6 +1280,15 @@ export async function sendCampaignMessage(
         .update({ bot_active: true })
         .eq('id', conversation_id)
     } else {
+      // Heredar la clasificación del contacto en la agenda (si existe), para que el
+      // chat creado por la campaña aparezca ya clasificado en bandeja y Leads WhatsApp.
+      const { data: contactClasif } = await supabase
+        .from('wa_contacts')
+        .select('clasificacion')
+        .eq('agency_id', agency_id)
+        .eq('phone', cleanPhone)
+        .maybeSingle()
+
       const { data: newConv, error: createConvErr } = await supabase
         .from('wa_conversations')
         .insert({
@@ -1148,7 +1296,8 @@ export async function sendCampaignMessage(
           contact_phone: cleanPhone,
           contact_name: input.name,
           bot_active: true,
-          unread_count: 0
+          unread_count: 0,
+          clasificacion: contactClasif?.clasificacion ?? null
         })
         .select('id')
         .single()
@@ -1213,31 +1362,93 @@ export async function sendCampaignMessage(
 // =============================================
 
 export async function importContacts(
-  contacts: Array<{ phone: string; name: string; metadata: Record<string, any>; tags?: string[] }>
+  contacts: Array<{ phone: string; name: string; metadata: Record<string, any>; tags?: string[] }>,
+  clasificacion?: string | null
 ): Promise<WhatsAppActionResult> {
   try {
     const { agency_id } = await getAgencyProfile()
     const supabase = createClient()
 
-    const formattedContacts = contacts.map((c) => ({
+    // Clasificación del lote: lo que escribió el usuario, o "Importado" por defecto.
+    const clasifValue = (clasificacion ?? '').trim() || 'Importado'
+
+    // 1. Dedupe DENTRO del archivo por teléfono (nos quedamos con la primera aparición).
+    const seen = new Set<string>()
+    const deduped: Array<{ phone: string; name: string; metadata: Record<string, any>; tags?: string[] }> = []
+    for (const c of contacts) {
+      const phone = (c.phone || '').replace(/\D/g, '')
+      if (!phone) continue
+      if (seen.has(phone)) continue
+      seen.add(phone)
+      deduped.push({ ...c, phone })
+    }
+
+    // 2. Filtrar los que YA existen en la agenda (por teléfono) para no resubir repetidos.
+    const phones = deduped.map((c) => c.phone)
+    const existingSet = new Set<string>()
+    // Chunk para no exceder límites de la query .in()
+    for (let i = 0; i < phones.length; i += 500) {
+      const chunk = phones.slice(i, i + 500)
+      const { data: existing } = await supabase
+        .from('wa_contacts')
+        .select('phone')
+        .eq('agency_id', agency_id)
+        .in('phone', chunk)
+      for (const e of existing || []) existingSet.add(e.phone)
+    }
+
+    const toInsert = deduped.filter((c) => !existingSet.has(c.phone))
+    const skipped = deduped.length - toInsert.length
+
+    if (toInsert.length === 0) {
+      return { success: true, data: { inserted: 0, skipped } }
+    }
+
+    const formattedContacts = toInsert.map((c) => ({
       agency_id,
       phone: c.phone,
       name: c.name,
       metadata: c.metadata,
       tags: c.tags || [],
+      clasificacion: clasifValue,
     }))
 
-    // Upsert conflicts on agency_id and phone
     const { error } = await supabase
       .from('wa_contacts')
-      .upsert(formattedContacts, {
-        onConflict: 'agency_id, phone',
-        ignoreDuplicates: false, // update if exists
-      })
+      .insert(formattedContacts)
 
     if (error) {
-      console.error("Error upserting contacts:", error)
+      console.error("Error inserting contacts:", error)
       return { success: false, error: error.message }
+    }
+
+    return { success: true, data: { inserted: toInsert.length, skipped } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
+
+// =============================================
+// Eliminar contacto de la agenda (solapa "Contactos")
+// Borra solo el registro de wa_contacts (no toca conversaciones ni chats).
+// =============================================
+
+export async function deleteContact(
+  contact_id: string
+): Promise<WhatsAppActionResult> {
+  try {
+    const { agency_id } = await getAgencyProfile()
+    const supabase = createClient()
+
+    const { error } = await supabase
+      .from('wa_contacts')
+      .delete()
+      .eq('id', contact_id)
+      .eq('agency_id', agency_id)
+
+    if (error) {
+      return { success: false, error: `Error al eliminar contacto: ${error.message}` }
     }
 
     return { success: true }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { CLASIFICACION_CONSULTA } from '@/lib/whatsapp/clasificacion'
 
 // Para poder verificar el webhook desde la interfaz de Meta, primero hacemos el GET
 export async function GET(req: Request) {
@@ -104,6 +105,7 @@ export async function POST(req: Request) {
                             status: 'active',
                             bot_active: true,
                             unread_count: 1,
+                            clasificacion: CLASIFICACION_CONSULTA,
                             last_message_at: new Date().toISOString(),
                             last_inbound_at: new Date().toISOString(),
                             next_follow_up_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -131,6 +133,33 @@ export async function POST(req: Request) {
                             follow_ups_sent: 0
                         })
                         .eq('id', conversation_id)
+                }
+
+                // Sincronizar con wa_contacts (agenda de la solapa "Contactos") para futuras campañas.
+                // Mismo comportamiento que el webhook de Evolution. Best-effort: no rompe el flujo.
+                try {
+                    const { data: existingContact } = await supabase
+                        .from('wa_contacts')
+                        .select('id, name')
+                        .eq('agency_id', instance.agency_id)
+                        .eq('phone', contactPhone)
+                        .maybeSingle()
+
+                    if (!existingContact) {
+                        await supabase.from('wa_contacts').insert({
+                            agency_id: instance.agency_id,
+                            phone: contactPhone,
+                            name: contactName,
+                            metadata: {},
+                            tags: [],
+                            clasificacion: CLASIFICACION_CONSULTA,
+                        })
+                    } else if (contactName && contactName !== contactPhone && (!existingContact.name || existingContact.name === contactPhone)) {
+                        await supabase.from('wa_contacts').update({ name: contactName })
+                            .eq('id', existingContact.id)
+                    }
+                } catch (contactSyncErr) {
+                    console.error('[Meta Webhook] Sync wa_contacts falló:', contactSyncErr)
                 }
 
                 // Insertar el mensaje

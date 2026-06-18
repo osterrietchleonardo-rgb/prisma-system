@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "./EmptyState"
 import { toast } from "sonner"
 import { markConversationRead, deleteConversation } from "@/app/actions/whatsapp"
+import { getClasificacionStyle } from "@/lib/whatsapp/clasificacion"
 import {
   Select,
   SelectContent,
@@ -82,6 +83,7 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
   const [search, setSearch] = useState("")
   const [tab, setTab] = useState("all")
   const [filterAgentEmail, setFilterAgentEmail] = useState("all")
+  const [filterClasif, setFilterClasif] = useState("all")
   const [loading, setLoading] = useState(true)
   const [debugError, setDebugError] = useState<string | null>(null)
 
@@ -255,6 +257,12 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
     return Array.from(emails)
   }, [conversations])
 
+  const clasifOptions = useMemo(() => {
+    const set = new Set<string>()
+    conversations.forEach((c) => { if (c?.clasificacion) set.add(c.clasificacion) })
+    return Array.from(set).sort()
+  }, [conversations])
+
   // Filter by search + tab + agent
   const filtered = useMemo(() => {
     return conversations.filter((c) => {
@@ -278,9 +286,18 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
         if (email !== filterAgentEmail) return false;
       }
 
+      // Filtro por clasificación
+      if (filterClasif !== "all") {
+        if (filterClasif === "__none__") {
+          if (c.clasificacion) return false;
+        } else if (c.clasificacion !== filterClasif) {
+          return false;
+        }
+      }
+
       return true
     })
-  }, [conversations, search, tab, filterAgentEmail])
+  }, [conversations, search, tab, filterAgentEmail, filterClasif])
 
   if (debugError) return <div style={{color:'red',padding:'20px',fontSize:'18px', backgroundColor: 'white', border: '2px solid red'}}>DEBUG ERROR: {debugError}</div>
 
@@ -338,6 +355,21 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
             </TabsList>
           </Tabs>
           
+          <div className="shrink-0">
+            <Select value={filterClasif} onValueChange={setFilterClasif}>
+              <SelectTrigger className="w-[150px] sm:w-[190px] h-8 text-xs font-medium bg-muted/50 border-none focus:ring-0">
+                <SelectValue placeholder="Clasificación..." />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                <SelectItem value="all" className="text-xs">Todas las clasificaciones</SelectItem>
+                <SelectItem value="__none__" className="text-xs">Sin clasificar</SelectItem>
+                {clasifOptions.map((c) => (
+                  <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {!hideAgentFilter && (
             <div className="shrink-0">
               <Select value={filterAgentEmail} onValueChange={setFilterAgentEmail}>
@@ -446,6 +478,19 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
                         </Badge>
                       )}
                     </div>
+
+                    {conv.clasificacion && (
+                      <div className="flex flex-wrap gap-1">
+                        {(() => {
+                          const cl = getClasificacionStyle(conv.clasificacion)
+                          return (
+                            <span className={`text-[8px] px-1.5 rounded uppercase font-black tracking-tighter border ${cl.className}`}>
+                              {cl.label}
+                            </span>
+                          )
+                        })()}
+                      </div>
+                    )}
 
                     {conv.etiquetas && conv.etiquetas.length > 0 && (
                       <div className="flex flex-wrap gap-1">

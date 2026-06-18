@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+import { getClasificacionStyle } from "@/lib/whatsapp/clasificacion"
 
 const ALL_TAGS = [
   "caliente",
@@ -555,6 +556,14 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
           </div>
 
           <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            {conv.clasificacion && (() => {
+              const cl = getClasificacionStyle(conv.clasificacion)
+              return (
+                <Badge variant="outline" className={`text-xs px-2 py-0.5 font-bold ${cl.className}`}>
+                  {cl.label}
+                </Badge>
+              )
+            })()}
             {(conv.etiquetas || []).map((tag) => (
               <Badge
                 key={tag}

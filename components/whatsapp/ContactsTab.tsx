@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { importContacts, sendCampaignMessage, updateContactCampaignStatus } from "@/app/actions/whatsapp"
+import { importContacts, sendCampaignMessage, updateContactCampaignStatus, deleteContact } from "@/app/actions/whatsapp"
+import { getClasificacionStyle } from "@/lib/whatsapp/clasificacion"
 import type { WATemplate, WAContact } from "@/types/whatsapp"
 import { CampaignState } from "./CampaignState"
 import { 
@@ -16,7 +17,8 @@ import {
   Users,
   Search,
   MessageSquare,
-  Clock
+  Clock,
+  Trash2
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -46,11 +48,14 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
   const [templates, setTemplates] = useState<WATemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [filterClasif, setFilterClasif] = useState("all")
   const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
-  
+
   // Import State
   const [isImporting, setIsImporting] = useState(false)
+  const [importClasif, setImportClasif] = useState("")
+  const [deletingContactId, setDeletingContactId] = useState<string | null>(null)
   
   // Campaign Redirect State
   const [isRedirecting, setIsRedirecting] = useState(false)
@@ -213,9 +218,15 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
 
     toast.loading(`Importando ${newContacts.length} contactos...`, { id: "import-toast" })
     
-    const res = await importContacts(newContacts)
+    const res = await importContacts(newContacts, importClasif)
     if (res.success) {
-      toast.success(`${newContacts.length} contactos procesados exitosamente.`, { id: "import-toast" })
+      const inserted = res.data?.inserted ?? newContacts.length
+      const skipped = res.data?.skipped ?? 0
+      toast.success(
+        `${inserted} contacto(s) nuevo(s) importado(s)${skipped ? ` · ${skipped} omitido(s) por estar repetido(s)` : ''}.`,
+        { id: "import-toast" }
+      )
+      setImportClasif("")
       await fetchData()
     } else {
       toast.error(`Error al importar: ${res.error}`, { id: "import-toast" })
@@ -243,6 +254,27 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
   }
 
 
+  const handleDeleteContact = async (contact: WAContact) => {
+    const label = contact.name || contact.phone
+    if (!window.confirm(`¿Eliminar el contacto "${label}" de la agenda?\n\nSolo se quita de "Contactos" (no borra chats ni conversaciones).`)) {
+      return
+    }
+    setDeletingContactId(contact.id)
+    const res = await deleteContact(contact.id)
+    setDeletingContactId(null)
+    if (res.success) {
+      setContacts(prev => prev.filter(c => c.id !== contact.id))
+      setSelectedContactIds(prev => {
+        const next = new Set(prev)
+        next.delete(contact.id)
+        return next
+      })
+      toast.success("Contacto eliminado de la agenda")
+    } else {
+      toast.error(res.error || "Error al eliminar el contacto")
+    }
+  }
+
   const handleGoToCampaigns = () => {
     if (selectedContactIds.size === 0) {
       toast.error("Debes seleccionar al menos un contacto.")
@@ -255,10 +287,26 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
     CampaignState.setActiveTab('campanas')
   }
 
-  const filteredContacts = contacts.filter(c => 
-    c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.phone.includes(searchTerm)
-  )
+  const clasifOptions = Array.from(
+    new Set(contacts.map(c => c.clasificacion).filter(Boolean) as string[])
+  ).sort()
+
+  const filteredContacts = contacts.filter(c => {
+    if (filterClasif !== "all") {
+      if (filterClasif === "__none__") {
+        if (c.clasificacion) return false
+      } else if (c.clasificacion !== filterClasif) {
+        return false
+      }
+    }
+    const q = searchTerm.toLowerCase()
+    if (!q) return true
+    return (
+      c.name?.toLowerCase().includes(q) ||
+      c.phone.includes(searchTerm) ||
+      (c.clasificacion?.toLowerCase().includes(q) ?? false)
+    )
+  })
 
   if (loading) {
     return <div className="h-full flex items-center justify-center"><RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" /></div>
@@ -275,7 +323,17 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
                : "Sube tus leads, gestiona tu base y lanza campañas personalizadas de WhatsApp con trazabilidad."}
            </p>
          </div>
-         <div className="flex gap-2 w-full sm:w-auto">
+         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <div className="flex flex-col gap-1 w-full sm:w-auto">
+              <Input
+                placeholder="Clasificación del lote (ej: Base Expo 2026)"
+                value={importClasif}
+                onChange={(e) => setImportClasif(e.target.value)}
+                className="h-10 w-full sm:w-[230px] bg-background"
+                disabled={isImporting}
+              />
+              <span className="text-[10px] text-muted-foreground px-1">Se aplica a los contactos del próximo archivo. Si lo dejás vacío: &quot;Importado&quot;.</span>
+            </div>
             <Label htmlFor="contact_upload" className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md bg-secondary text-secondary-foreground hover:bg-secondary/80 px-4 py-2 text-sm font-medium transition-colors cursor-pointer w-full sm:w-auto">
               {isImporting ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
               Importar Contactos
@@ -307,9 +365,21 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <Select value={filterClasif} onValueChange={setFilterClasif}>
+            <SelectTrigger className="w-[220px] bg-background">
+              <SelectValue placeholder="Filtrar por clasificación" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las clasificaciones</SelectItem>
+              <SelectItem value="__none__">Sin clasificar</SelectItem>
+              {clasifOptions.map(c => (
+                <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="text-sm text-muted-foreground flex items-center gap-2 ml-auto">
              <Users className="w-4 h-4" />
-             {contacts.length} contactos totales
+             {filteredContacts.length} / {contacts.length} contactos
           </div>
         </div>
         
@@ -332,12 +402,14 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
                   </th>
                   <th className="p-3 text-left font-medium text-muted-foreground">Nombre</th>
                   <th className="p-3 text-left font-medium text-muted-foreground">Teléfono</th>
+                  <th className="p-3 text-left font-medium text-muted-foreground">Clasificación</th>
                   {templates.map(tmpl => (
                     <th key={tmpl.id} className="p-3 text-center font-medium text-muted-foreground">
                       {tmpl.template_name}
                     </th>
                   ))}
                   <th className="p-3 text-right font-medium text-muted-foreground">Último Envío</th>
+                  <th className="p-3 text-right font-medium text-muted-foreground">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -351,6 +423,16 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
                      </td>
                      <td className="p-3 font-medium">{contact.name || "Sin nombre"}</td>
                      <td className="p-3">{contact.phone}</td>
+                     <td className="p-3">
+                       {(() => {
+                         const cl = getClasificacionStyle(contact.clasificacion)
+                         return (
+                           <Badge variant="outline" className={`text-[9px] font-bold px-1.5 py-0 whitespace-nowrap ${cl.className}`}>
+                             {cl.label}
+                           </Badge>
+                         )
+                       })()}
+                     </td>
                      {templates.map(tmpl => {
                        const campaignData = contact.campaign_statuses?.[tmpl.template_name]
                        
@@ -386,6 +468,18 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
                      })}
                      <td className="p-3 text-right text-muted-foreground text-xs">
                        {mounted && contact.last_campaign_sent_at ? new Date(contact.last_campaign_sent_at).toLocaleDateString() : '-'}
+                     </td>
+                     <td className="p-3 text-right">
+                       <Button
+                         variant="ghost"
+                         size="icon"
+                         className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                         disabled={deletingContactId === contact.id}
+                         onClick={() => handleDeleteContact(contact)}
+                         title="Eliminar contacto de la agenda"
+                       >
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
                      </td>
                   </tr>
                 ))}

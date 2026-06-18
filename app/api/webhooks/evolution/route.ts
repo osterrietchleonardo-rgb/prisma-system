@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { CLASIFICACION_CONSULTA } from '@/lib/whatsapp/clasificacion'
 
 /**
  * POST /api/webhooks/evolution
@@ -101,6 +102,7 @@ export async function POST(req: Request) {
           score: 0,
           unread_count: 1,
           etiquetas: [],
+          clasificacion: CLASIFICACION_CONSULTA,
           last_message_at: new Date().toISOString(),
           last_inbound_at: new Date().toISOString(),
           next_follow_up_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
@@ -210,6 +212,7 @@ export async function POST(req: Request) {
             name: contactName,
             metadata: {},
             tags: [],
+            clasificacion: CLASIFICACION_CONSULTA,
           })
         } else if (contactName && contactName !== contactPhone && (!existingContact.name || existingContact.name === contactPhone)) {
           await supabase.from('wa_contacts').update({ name: contactName })

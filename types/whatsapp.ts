@@ -55,6 +55,7 @@ export interface WAConversation {
   score: number
   unread_count: number
   etiquetas: string[]
+  clasificacion: string | null  // Origen del lead: Whatsapp-Consulta / Whatsapp-Manual / personalizada
   pipeline_stage: string  // NOW a native column in wa_conversations
   
   // Motor Inactividad
@@ -114,6 +115,7 @@ export interface WAContact {
   name: string | null
   metadata: Record<string, unknown>
   tags: string[]
+  clasificacion: string | null  // Origen del lead: Whatsapp-Consulta / Whatsapp-Manual / personalizada
   last_campaign_status: string | null
   last_campaign_template: string | null
   last_campaign_sent_at: string | null

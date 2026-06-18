@@ -7,17 +7,38 @@ import { WAConversation } from "@/types/whatsapp"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
-import { Bot, User, AlertTriangle, Eye, Search, MessageCircle, Phone } from "lucide-react"
+import { Bot, User, AlertTriangle, Eye, Search, MessageCircle, Phone, Pencil, Trash2, X, Plus } from "lucide-react"
 import { toast } from "sonner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { KANBAN_STAGES } from "@/components/kanban/types"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { updateWaConversationStage } from "@/lib/queries/director"
+import { updateConversationDetails, deleteConversation } from "@/app/actions/whatsapp"
+import { getClasificacionStyle, CLASIFICACION_CONSULTA, CLASIFICACION_MANUAL } from "@/lib/whatsapp/clasificacion"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+
+const SUGGESTED_TAGS = [
+  "caliente",
+  "tibio",
+  "frío",
+  "visitó",
+  "con presupuesto",
+  "sin presupuesto",
+  "no responde",
+]
 
 function formatPhone(phone: string | null | undefined): string {
   if (!phone) return "Sin teléfono";
@@ -40,16 +61,45 @@ export default function LeadsWhatsappClient({
   const router = useRouter()
   const [conversations, setConversations] = useState(initialConversations)
   const [searchTerm, setSearchTerm] = useState("")
+  const [filterClasif, setFilterClasif] = useState("all")
+
+  // Edición de lead (modal)
+  const [editConv, setEditConv] = useState<WAConversation | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editPhone, setEditPhone] = useState("")
+  const [editTags, setEditTags] = useState<string[]>([])
+  const [editClasif, setEditClasif] = useState("")
+  const [newTag, setNewTag] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  // Eliminación
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const clasifOptions = useMemo(() => {
+    const set = new Set<string>()
+    conversations.forEach(c => { if (c.clasificacion) set.add(c.clasificacion) })
+    return Array.from(set).sort()
+  }, [conversations]);
 
   const filteredConversations = useMemo(() => {
-    if (!searchTerm) return conversations;
     const q = searchTerm.toLowerCase();
-    return conversations.filter(conv => 
-      conv.contact_name?.toLowerCase().includes(q) || 
-      conv.contact_phone?.includes(q) ||
-      conv.etiquetas?.some(tag => tag.toLowerCase().includes(q))
-    );
-  }, [conversations, searchTerm]);
+    return conversations.filter(conv => {
+      if (filterClasif !== "all") {
+        if (filterClasif === "__none__") {
+          if (conv.clasificacion) return false;
+        } else if (conv.clasificacion !== filterClasif) {
+          return false;
+        }
+      }
+      if (!q) return true;
+      return (
+        conv.contact_name?.toLowerCase().includes(q) ||
+        conv.contact_phone?.includes(q) ||
+        conv.etiquetas?.some(tag => tag.toLowerCase().includes(q)) ||
+        conv.clasificacion?.toLowerCase().includes(q)
+      );
+    });
+  }, [conversations, searchTerm, filterClasif]);
 
   const handleStageChange = async (convId: string, newStage: string) => {
     try {
@@ -70,6 +120,78 @@ export default function LeadsWhatsappClient({
     }
   }
 
+  const openEdit = (conv: WAConversation) => {
+    setEditConv(conv)
+    setEditName(conv.contact_name || "")
+    setEditPhone(conv.contact_phone || "")
+    setEditTags(conv.etiquetas || [])
+    setEditClasif(conv.clasificacion || "")
+    setNewTag("")
+  }
+
+  const handleAddTag = (tag: string) => {
+    const clean = tag.trim()
+    if (!clean) return
+    if (editTags.some(t => t.toLowerCase() === clean.toLowerCase())) return
+    setEditTags(prev => [...prev, clean])
+    setNewTag("")
+  }
+
+  const handleRemoveTag = (tag: string) => {
+    setEditTags(prev => prev.filter(t => t !== tag))
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editConv) return
+    const cleanPhone = editPhone.replace(/\D/g, "")
+    if (!cleanPhone) {
+      toast.error("El teléfono no puede quedar vacío")
+      return
+    }
+
+    setSaving(true)
+    const cleanClasif = editClasif.trim()
+    const res = await updateConversationDetails(editConv.id, {
+      contact_name: editName,
+      contact_phone: cleanPhone,
+      etiquetas: editTags,
+      clasificacion: cleanClasif === "" ? null : cleanClasif,
+    })
+    setSaving(false)
+
+    if (res.success) {
+      const finalName = editName.trim() === "" ? null : editName.trim()
+      setConversations(prev => prev.map(c =>
+        c.id === editConv.id
+          ? { ...c, contact_name: finalName, contact_phone: cleanPhone, etiquetas: editTags, clasificacion: cleanClasif === "" ? null : cleanClasif }
+          : c
+      ))
+      toast.success("Lead actualizado")
+      setEditConv(null)
+      router.refresh()
+    } else {
+      toast.error(res.error || "Error al actualizar el lead")
+    }
+  }
+
+  const handleDelete = async (conv: WAConversation) => {
+    const label = conv.contact_name || conv.contact_phone || "este lead"
+    if (!window.confirm(`¿Seguro que querés eliminar "${label}"?\n\nSe borrarán la conversación, sus mensajes y la memoria del bot. Esta acción no se puede deshacer.`)) {
+      return
+    }
+    setDeletingId(conv.id)
+    const res = await deleteConversation(conv.id)
+    setDeletingId(null)
+
+    if (res.success) {
+      setConversations(prev => prev.filter(c => c.id !== conv.id))
+      toast.success("Lead eliminado")
+      router.refresh()
+    } else {
+      toast.error(res.error || "Error al eliminar el lead")
+    }
+  }
+
   return (
     <div className="flex flex-col space-y-4">
       {/* Search and Filters */}
@@ -83,6 +205,19 @@ export default function LeadsWhatsappClient({
                onChange={(e) => setSearchTerm(e.target.value)}
             />
          </div>
+
+         <Select value={filterClasif} onValueChange={setFilterClasif}>
+            <SelectTrigger className="w-full md:w-[220px] bg-background/50 border-none focus:ring-accent/30">
+               <SelectValue placeholder="Filtrar por clasificación" />
+            </SelectTrigger>
+            <SelectContent>
+               <SelectItem value="all">Todas las clasificaciones</SelectItem>
+               <SelectItem value="__none__">Sin clasificar</SelectItem>
+               {clasifOptions.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+               ))}
+            </SelectContent>
+         </Select>
       </div>
 
       <div className="rounded-2xl border border-accent/10 bg-card/30 backdrop-blur-sm overflow-x-auto w-full">
@@ -92,6 +227,7 @@ export default function LeadsWhatsappClient({
               <TableHead className="py-4 px-4 font-bold text-[10px] uppercase">Contacto</TableHead>
               <TableHead className="hidden md:table-cell font-bold text-[10px] uppercase">Teléfono</TableHead>
               <TableHead className="hidden lg:table-cell font-bold text-[10px] uppercase">Etiquetas</TableHead>
+              <TableHead className="font-bold text-[10px] uppercase">Clasificación</TableHead>
               <TableHead className="font-bold text-[10px] uppercase">Estado Chat</TableHead>
               <TableHead className="font-bold text-[10px] uppercase">Etapa Pipeline</TableHead>
               <TableHead className="hidden md:table-cell font-bold text-[10px] uppercase">Agente</TableHead>
@@ -102,7 +238,7 @@ export default function LeadsWhatsappClient({
           <TableBody>
             {filteredConversations.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-48 text-center text-muted-foreground">
                   {searchTerm ? "No hay resultados para esta búsqueda." : "No hay leads de WhatsApp activos."}
                 </TableCell>
               </TableRow>
@@ -186,7 +322,18 @@ export default function LeadsWhatsappClient({
                         <span className="text-[10px] text-muted-foreground">—</span>
                       )}
                     </TableCell>
-    
+
+                    <TableCell>
+                      {(() => {
+                        const cl = getClasificacionStyle(conv.clasificacion)
+                        return (
+                          <Badge variant="outline" className={cn("text-[9px] font-bold px-1.5 py-0 whitespace-nowrap", cl.className)}>
+                            {cl.label}
+                          </Badge>
+                        )
+                      })()}
+                    </TableCell>
+
                     <TableCell>
                       <Badge className={cn(
                         "text-[10px] font-bold px-2 py-0 border-none shadow-none",
@@ -287,6 +434,37 @@ export default function LeadsWhatsappClient({
                             </Tooltip>
                           </TooltipProvider>
                         )}
+
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); openEdit(conv); }}
+                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring hover:bg-accent/10 hover:text-accent h-8 w-8 text-muted-foreground"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Editar Lead</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                disabled={deletingId === conv.id}
+                                onClick={(e) => { e.stopPropagation(); handleDelete(conv); }}
+                                className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring hover:bg-destructive/10 hover:text-destructive h-8 w-8 text-muted-foreground disabled:opacity-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>Eliminar Lead</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
                     </TableCell>
     
@@ -308,6 +486,120 @@ export default function LeadsWhatsappClient({
           </span>
         </div>
       )}
+
+      {/* Modal: Editar Lead */}
+      <Dialog open={!!editConv} onOpenChange={(open) => { if (!open) setEditConv(null) }}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Editar lead</DialogTitle>
+            <DialogDescription className="text-xs">
+              Los cambios impactan también en la bandeja del Asesor IA WhatsApp.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase text-muted-foreground">Nombre</label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Nombre del contacto"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase text-muted-foreground">Teléfono</label>
+              <Input
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+                placeholder="Ej: 5491155551234"
+                inputMode="tel"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Cambiar el teléfono cambia a qué número se le envía WhatsApp.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase text-muted-foreground">Clasificación</label>
+              <Input
+                value={editClasif}
+                onChange={(e) => setEditClasif(e.target.value)}
+                placeholder="Ej: Whatsapp-Consulta, Base Expo 2026..."
+                list="clasif-suggestions"
+              />
+              <datalist id="clasif-suggestions">
+                <option value={CLASIFICACION_CONSULTA} />
+                <option value={CLASIFICACION_MANUAL} />
+                {clasifOptions.filter(c => c !== CLASIFICACION_CONSULTA && c !== CLASIFICACION_MANUAL).map(c => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold uppercase text-muted-foreground">Etiquetas</label>
+              {editTags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {editTags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-[10px] gap-1 pr-1">
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="rounded-full hover:bg-destructive/20 p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") { e.preventDefault(); handleAddTag(newTag); }
+                  }}
+                  placeholder="Agregar etiqueta..."
+                  className="h-8 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={() => handleAddTag(newTag)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1 pt-1">
+                {SUGGESTED_TAGS.filter(t => !editTags.some(et => et.toLowerCase() === t.toLowerCase())).map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => handleAddTag(tag)}
+                    className="text-[10px] px-2 py-0.5 rounded-full border border-accent/20 bg-accent/5 text-accent/80 hover:bg-accent/10 transition-colors"
+                  >
+                    + {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditConv(null)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={saving}>
+              {saving ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

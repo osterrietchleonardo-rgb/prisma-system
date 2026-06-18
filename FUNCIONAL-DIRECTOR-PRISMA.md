@@ -197,9 +197,9 @@ El resultado de estos objetivos se ve en el **Dashboard**, en la sección "Objet
 Vas a ver un **asistente de configuración (Setup Wizard)** que te guía para conectar la instancia. Seguilo paso a paso.
 
 ### Una vez conectado, tenés 5 pestañas:
-- **💬 Chat:** la bandeja de conversaciones en vivo.
+- **💬 Chat:** la bandeja de conversaciones en vivo. Podés **filtrar los chats por clasificación** (origen del lead) además de por asesor; cada chat muestra su **badge de clasificación** de color.
 - **📋 Plantillas:** es un **gestor completo de plantillas de WhatsApp**. Además de las **8 plantillas de seguimiento** que PRISMA prepara (recordatorios de visita, reactivaciones, follow-ups) y de ver su **estado de aprobación**, podés **crear tus propias plantillas** (categoría, idioma, encabezado/cuerpo/pie, botones y variables `{{1}}`), **editarlas, eliminarlas** y **sincronizarlas desde Meta**.
-- **👥 Contactos:** la lista de contactos de WhatsApp, con búsqueda, selección múltiple (para campañas) e **importación de contactos desde CSV/Excel**.
+- **👥 Contactos:** la lista de contactos de WhatsApp (la "agenda" para campañas), con búsqueda, **filtro por clasificación**, selección múltiple (para campañas) e **importación desde CSV/Excel**. Cada contacto tiene una **columna de Clasificación** (badge de color) y un botón para **eliminarlo** de la agenda. Al **importar** podés escribir una **clasificación para todo el lote** (ej. "Base Expo 2026"); el sistema **descarta automáticamente los repetidos** (por teléfono, dentro del archivo y contra los que ya tenés) y te avisa cuántos entraron y cuántos se omitieron.
 - **📣 Campañas:** envíos masivos. Podés cargar los destinatarios de **dos formas**: seleccionándolos desde la pestaña **Contactos**, o **importando un CSV/Excel**. Después elegís una plantilla, **mapeás las columnas** (teléfono, nombre y las variables de la plantilla) y enviás. Vas viendo el **estado por contacto** (pendiente / enviado / error / salteado).
 - **⚙️ Configuración IA:** definís el comportamiento del bot (cómo responde, conocimiento, etc.).
 
@@ -215,6 +215,13 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 **Qué es:** los leads capturados por WhatsApp (de toda la agencia).
 
 **Cómo usarlo:** abrí un lead para ver su detalle y el **chat en vivo**. Útil para supervisar conversaciones y reasignar si hace falta.
+
+**Acciones por fila:**
+- **✏️ Editar:** cambiá nombre, teléfono, etiquetas y **clasificación** del lead. Los cambios se reflejan también en la bandeja del chat y en la agenda de Contactos.
+- **🗑️ Eliminar:** borra el lead, su conversación, sus mensajes y la memoria del bot (y lo quita de Contactos si no tiene otro chat con ese número). Pide confirmación.
+- **Clasificación:** columna con badge de color y **filtro por clasificación** para encontrar rápido (ej. todos los "Whatsapp-Consulta").
+
+> 💡 **Clasificación del lead:** identifica de dónde vino cada contacto — `Whatsapp-Consulta` (te escribió), `Whatsapp-Manual` (lo cargaste a mano desde Tracking o Calendario) o una **personalizada** (la que pusiste al importar). Sirve para elegir en bloque a quién mandarle cada campaña. Los contactos importados **recién aparecen como chat** en la bandeja/Leads cuando les enviás la campaña o cuando la persona responde (y el chat hereda la clasificación del contacto).
 
 ---
 

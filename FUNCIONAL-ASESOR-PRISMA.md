@@ -165,6 +165,7 @@
 **Cómo usarlo:**
 - A la izquierda, la **lista de conversaciones**; al centro, el **chat en vivo**.
 - Escribís y respondés directamente desde acá (mensajería en tiempo real).
+- Podés **filtrar los chats por clasificación** (origen del lead); cada chat muestra su **badge de clasificación** de color.
 - Si tu director todavía no configuró WhatsApp, vas a ver un cartel de **"WhatsApp no configurado"** (esa configuración la hace el director, no vos).
 
 > 💡 **Tip:** cuando un cliente escribe, el bot de IA puede responder solo. Si tomás el control manual, el bot se pausa para esa conversación y no pisa tus respuestas.
@@ -179,6 +180,8 @@
 **Cómo usarlo:**
 - Hacé clic en un lead para ver su detalle y el **chat en vivo** asociado.
 - Trabajalos igual que los de Tokko: respondé, calificá y agendá visitas.
+- **✏️ Editar** un lead (nombre, teléfono, etiquetas y **clasificación**) o **🗑️ eliminarlo** desde su fila. Los cambios se reflejan también en tu bandeja de chats.
+- Usá la **columna y el filtro de Clasificación** (badge de color) para separar, por ejemplo, los que te escribieron (`Whatsapp-Consulta`) de los que cargaste a mano (`Whatsapp-Manual`).
 
 ---
 

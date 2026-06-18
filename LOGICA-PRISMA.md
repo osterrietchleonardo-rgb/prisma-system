@@ -320,10 +320,13 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 
 #### WhatsApp
 - **`whatsapp_instances`** — Instancias de WhatsApp (id, agency_id, token, phone_number_id, business_id, evo_instance_name, integration_type, templates_status, flows_active)
-- **`wa_conversations`** — Conversaciones (id, agency_id, instance_id, contact_phone, contact_name, status, bot_active, unread_count, last_message_at, last_inbound_at, etiquetas[], score, pipeline_stage, funnel_status, visit_status, follow_ups_sent, follow_ups_history, requires_follow_up, recovery_stage, next_follow_up_at, opt_out, metricas jsonb)
+- **`wa_conversations`** — Conversaciones/chats (id, agency_id, instance_id, contact_phone, contact_name, status, bot_active, unread_count, last_message_at, last_inbound_at, etiquetas[], **clasificacion** (origen del lead), score, pipeline_stage, funnel_status, visit_status, follow_ups_sent, follow_ups_history, requires_follow_up, recovery_stage, next_follow_up_at, opt_out, metricas jsonb)
+- **`wa_contacts`** — Agenda de contactos para campañas (id, agency_id, phone, name, tags[], **clasificacion**, metadata, campaign_statuses, last_campaign_*). Tabla **separada** de `wa_conversations`: la solapa "Contactos" lee de acá; se sincroniza por teléfono con las conversaciones. `UNIQUE (agency_id, phone)`
 - **`wa_messages`** — Mensajes individuales (id, conversation_id, agency_id, content, role, message_type, wamid, metadata)
 - **`wa_templates`** — Templates de WhatsApp (id, agency_id, template_name, status, components, rejection_reason, meta_template_id)
 - **`n8n_chat_histories`** — Historial de chat para n8n (session_id = conversation_id, message jsonb)
+
+> **Clasificación del lead (`clasificacion`):** identifica el origen y se muestra como badge de color (con filtro) en Leads WhatsApp, Contactos y la bandeja. Valores: `Whatsapp-Consulta` (entró por consulta de WhatsApp), `Whatsapp-Manual` (alta manual desde Tracking o Calendario), o **personalizada** (definida por el usuario al importar en Contactos; "Importado" por defecto). Registros previos quedan en "Sin clasificar". Se mantiene sincronizada por teléfono entre `wa_conversations` y `wa_contacts`.
 
 #### IA y Documentos
 - **`consultor_chat_sessions`** — Sesiones del Consultor IA
@@ -1696,6 +1699,10 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
   - Integra el **Análisis de Chat de PRISMA IA** (si existe), mostrando la actitud del lead, intención de búsqueda y recomendación del próximo paso.
   - Muestra el historial cronológico de actividades (`getLeadActivities`).
 - **Lógica Interna `leads-whatsapp/[id]`:** Renderiza la interfaz de chat en vivo `ActiveChat` utilizando WebSockets para mensajería bidireccional.
+- **Acciones por fila en "Leads WhatsApp"** (`LeadsWhatsappClient`, compartido director/asesor):
+  - **Editar** (modal): nombre, teléfono, etiquetas y **clasificación**. Guarda en `wa_conversations` y replica al contacto de la agenda por teléfono (`updateConversationDetails`).
+  - **Eliminar**: borra la conversación + sus mensajes (CASCADE) + la memoria del bot (`n8n_chat_histories`) y, si ningún otro chat usa ese teléfono, también el contacto en `wa_contacts` (`deleteConversation`). Pide confirmación.
+  - **Columna y filtro por Clasificación** (badge de color). Estas acciones impactan directamente en la bandeja del "Asesor IA WhatsApp" (misma tabla `wa_conversations`).
 
 #### 5. Configuración y Asesores (`/director/configuracion`, `/director/asesores`)
 - **Objetivo:** Setup inicial y gestión del equipo.

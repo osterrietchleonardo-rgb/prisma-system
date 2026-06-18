@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { CLASIFICACION_MANUAL } from "@/lib/whatsapp/clasificacion";
 
 interface ManualContactInput {
   name: string;
@@ -63,6 +64,7 @@ export async function createManualContact(input: ManualContactInput) {
           phone: input.phone,
           name: input.name,
           tags: tagsArray,
+          clasificacion: CLASIFICACION_MANUAL,
         })
         .select()
         .single();
@@ -103,6 +105,7 @@ export async function createManualContact(input: ManualContactInput) {
           score: 0,
           unread_count: 0,
           etiquetas: tagsArray,
+          clasificacion: CLASIFICACION_MANUAL,
           last_message_at: new Date().toISOString(),
           last_inbound_at: new Date().toISOString(),
           next_follow_up_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
