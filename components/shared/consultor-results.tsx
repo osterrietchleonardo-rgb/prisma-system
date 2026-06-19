@@ -125,13 +125,13 @@ export function UnifiedPropertyCard({ property }: { property: UnifiedProperty })
             <>
               <button
                 onClick={(e) => { e.stopPropagation(); setImgIdx((imgIdx - 1 + images.length) % images.length) }}
-                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/50 z-10"
+                className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-black/50 z-10"
               >
                 ‹
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); setImgIdx((imgIdx + 1) % images.length) }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/50 z-10"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 backdrop-blur-md flex items-center justify-center text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-black/50 z-10"
               >
                 ›
               </button>
@@ -313,7 +313,7 @@ export function UnifiedPropertyDetail({
           )}
 
           {/* Acciones Footer */}
-          <div className="pt-4 border-t flex items-center justify-between gap-4">
+          <div className="pt-4 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             {property.source === 'roomix' && property.roomix_agency_source_url ? (
               <>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">

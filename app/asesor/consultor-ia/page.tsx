@@ -66,7 +66,7 @@ export default function AdvisorConsultorIAPage() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renamingTitle, setRenamingTitle] = useState("")
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [agencyId, setAgencyId] = useState<string>("")
   const [userEmail, setUserEmail] = useState<string>("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -118,8 +118,23 @@ export default function AdvisorConsultorIAPage() {
     }
   }, [messages, isLoading])
 
+  // En escritorio el historial arranca abierto; en celular queda como cajón superpuesto cerrado.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      setIsSidebarOpen(true)
+    }
+  }, [])
+
+  // En celular, cerrar el cajón al elegir/crear una búsqueda para que se vea el chat.
+  const closeSidebarOnMobile = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setIsSidebarOpen(false)
+    }
+  }
+
   const loadSession = async (id: string) => {
     if (renamingId) return
+    closeSidebarOnMobile()
     setIsLoading(true)
     setCurrentSessionId(id)
     try {
@@ -140,6 +155,7 @@ export default function AdvisorConsultorIAPage() {
   }
 
   const startNewChat = () => {
+    closeSidebarOnMobile()
     setCurrentSessionId(null)
     setMessages([{
       role: "assistant",
@@ -237,10 +253,22 @@ export default function AdvisorConsultorIAPage() {
 
   return (
     <div className="flex h-full overflow-hidden bg-background">
-      {/* Sidebar de Historial */}
+      {/* Fondo oscuro (solo celular) para cerrar el cajón del historial */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in"
+        />
+      )}
+
+      {/* Sidebar de Historial — cajón superpuesto en celular, columna fija en escritorio */}
       <aside className={cn(
-        "bg-muted/50 border-r transition-all duration-300 flex flex-col overflow-hidden",
-        isSidebarOpen ? "w-80" : "w-0"
+        "bg-muted/50 border-r flex flex-col overflow-hidden transition-all duration-300",
+        // Celular: cajón fijo que se desliza desde la izquierda
+        "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[85vw] max-md:max-w-xs max-md:shadow-2xl",
+        isSidebarOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
+        // Escritorio: empuja el contenido, se colapsa por ancho
+        isSidebarOpen ? "md:w-80" : "md:w-0"
       )}>
         <div className="p-4 border-b flex items-center justify-between">
           <div className="flex items-center gap-2 font-bold text-accent">
@@ -352,20 +380,20 @@ export default function AdvisorConsultorIAPage() {
       )}
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
-        <header className="p-4 md:p-6 border-b bg-card/30 backdrop-blur-sm flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="p-2.5 bg-accent/20 rounded-2xl shadow-inner cursor-pointer" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
+        <header className="p-4 md:p-6 border-b bg-card/30 backdrop-blur-sm flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 md:gap-4 min-w-0">
+            <div className="p-2.5 bg-accent/20 rounded-2xl shadow-inner cursor-pointer shrink-0" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
               <Bot className="w-6 h-6 text-accent" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight">Buscador IA</h1>
+            <div className="min-w-0">
+              <h1 className="text-lg md:text-xl font-bold tracking-tight truncate">Buscador IA</h1>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Buscador Inteligente de Propiedades</span>
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse shrink-0" />
+                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest truncate">Buscador Inteligente de Propiedades</span>
               </div>
             </div>
           </div>
-          <AiCreditBadge className="w-fit" />
+          <AiCreditBadge className="w-fit shrink-0" />
         </header>
 
         <ScrollArea className="flex-1 p-4 md:p-8" ref={scrollRef}>
