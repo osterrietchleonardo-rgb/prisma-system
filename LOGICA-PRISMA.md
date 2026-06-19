@@ -746,6 +746,16 @@ El Buscador IA se nutre de la tabla `roomix_properties`, la cual es alimentada d
 - **Almacenamiento:** columna `agencies.buscador_ia_config = { notes }` (jsonb, texto libre). La configura solo el director y **aplica a él y a todos sus asesores** (se lee en cada búsqueda).
 - **Comportamiento:** el modelo interpreta el texto libre. Si una propiedad recomendada —o su inmobiliaria— coincide con un comentario/directiva de las notas, lo comunica al asesor/director como una **consideración/nota** (ej: avisar que conviene evitar cierta inmobiliaria, o que una propiedad acepta permuta). No se expone el origen "Roomix" ni se usa una lista negra estructurada: todo es texto libre interpretado.
 
+### 10.6 Responsividad móvil del Buscador IA (actualización Junio 2026)
+
+Se corrigió la vista de celular del Buscador IA (afecta asesor `app/asesor/consultor-ia/page.tsx` y director `app/director/consultor/page.tsx` por compartir layout, más el componente común `components/shared/consultor-results.tsx`), solo con clases Tailwind responsivas, **sin cambios de lógica**:
+
+- **Historial de búsquedas → cajón superpuesto en celular.** Antes el `<aside>` era una columna fija de `w-80` que arrancaba abierta y aplastaba el chat (en un teléfono de ~360px dejaba el chat en una franja inservible). Ahora en `<md` es un cajón fijo (`max-md:fixed inset-y-0 left-0 z-50 w-[85vw] max-w-xs`) que se desliza con `translate-x` y arranca **cerrado**; en `md+` se mantiene el comportamiento previo (`md:w-80` ↔ `md:w-0`, empuja el contenido).
+- **Estado inicial dependiente del ancho:** `isSidebarOpen` arranca `false` y un `useEffect` lo abre solo si `window.innerWidth >= 768` (evita el "flash" del cajón sobre el contenido en celular).
+- **Fondo oscuro (backdrop) solo en celular** (`md:hidden`) para cerrar el cajón tocando afuera; además se cierra solo al elegir/crear una búsqueda (`closeSidebarOnMobile()` en `loadSession` y `startNewChat`).
+- **Encabezado:** deja de desbordar con `min-w-0` + `truncate` en título/subtítulo y `shrink-0` en el ícono y el badge de créditos.
+- **Tarjetas de propiedades (`consultor-results.tsx`):** las flechas del carrusel pasan de solo-hover a visibles siempre en celular (`opacity-100 md:opacity-0 md:group-hover:opacity-100`), porque en touch no hay hover. El footer del modal de detalle apila en pantallas angostas (`flex-col sm:flex-row`).
+
 ---
 
 ## 11. Módulo de IA — Tutor

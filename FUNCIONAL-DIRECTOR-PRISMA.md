@@ -374,6 +374,7 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 
 > 💡 **Tip:** las notas son ideales para bajar criterios comerciales a todo el equipo sin tener que avisarles uno por uno.
 > ⚠️ El asesor **no ve** la solapa de Notas; solo recibe las consideraciones en sus búsquedas.
+> 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
 > 💰 1 crédito por búsqueda.
 
 ---

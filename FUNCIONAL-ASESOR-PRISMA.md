@@ -279,6 +279,7 @@
 
 > 💡 **Tip:** cada chat tiene **memoria**. Empezá una conversación nueva para cada cliente y refiná de a poco.
 > 💡 Si una propiedad o inmobiliaria tiene una **nota/consideración** cargada por el director, el Buscador te la avisa.
+> 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
 > 💰 Cada búsqueda consume 1 crédito.
 
 ---

@@ -358,6 +358,8 @@ Asistente de búsqueda con **memoria por chat**. Flujo vigente (rediseño jun-20
 
 > Las columnas `embedding` existen pero **no** se usan en este endpoint (el flujo no es vectorial).
 
+**Frontend / responsive (jun-2026):** `app/{asesor/consultor-ia,director/consultor}/page.tsx` comparten layout. El historial (`<aside>`) es **columna fija que empuja** en `md+` (`md:w-80`↔`md:w-0`) y **cajón superpuesto** en `<md` (`max-md:fixed inset-y-0 left-0 z-50 w-[85vw] max-w-xs` + `translate-x`), con backdrop `md:hidden` para cerrar. `isSidebarOpen` arranca `false` y un `useEffect` lo abre solo si `innerWidth>=768`; `closeSidebarOnMobile()` lo cierra al abrir/crear sesión en móvil. Tarjetas (`consultor-results.tsx`): flechas del carrusel visibles en touch (`opacity-100 md:opacity-0 md:group-hover:opacity-100`).
+
 ### 10.2 Tutor IA (`/api/ai/tutor`, GPT-4.1-mini)
 Mentor con **RAG** sobre `agency_documents`. Intent RETRIEVAL/GENERAL; si RETRIEVAL → `generateEmbedding()` + `match_agency_documents(threshold 0.15, count 5, p_user_role)`. Resume el tópico de la sesión cada 4 mensajes.
 
