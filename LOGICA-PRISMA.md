@@ -325,6 +325,7 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 - **`wa_messages`** — Mensajes individuales (id, conversation_id, agency_id, content, role, message_type, wamid, metadata)
 - **`wa_templates`** — Templates de WhatsApp (id, agency_id, template_name, status, components, rejection_reason, meta_template_id)
 - **`n8n_chat_histories`** — Historial de chat para n8n (session_id = conversation_id, message jsonb)
+- **`wa_campaigns`** / **`wa_campaign_recipients`** — Campañas masivas por **goteo diario**: la campaña apunta a una clasificación (segmento) + una plantilla; cada destinatario tiene su estado (pending/sent/error). Un cron envía cada día hasta el **límite real de Meta**, marca enviados y **no repite** (idempotente, aunque se pause/reanude).
 
 > **Clasificación del lead (`clasificacion`):** identifica el origen y se muestra como badge de color (con filtro) en Leads WhatsApp, Contactos y la bandeja. Valores: `Whatsapp-Consulta` (entró por consulta de WhatsApp), `Whatsapp-Manual` (alta manual desde Tracking o Calendario), o **personalizada** (definida por el usuario al importar en Contactos; "Importado" por defecto). Registros previos quedan en "Sin clasificar". Se mantiene sincronizada por teléfono entre `wa_conversations` y `wa_contacts`.
 
@@ -668,6 +669,14 @@ Almacena el historial de conversación en el formato que n8n (LangChain) espera:
     "invalid_tool_calls": []
   }
   ```
+
+### 9.4 Campañas masivas por goteo diario (drip)
+Para bases grandes (ej. 15.000 leads) respetando el límite de Meta:
+1. **Audiencia por segmento:** se elige una **clasificación** (ej. `reclutamiento`) + una **plantilla**. Al crear la campaña se inscribe **todo el segmento** en `wa_campaign_recipients` (estado `pending`) y se marca **EN COLA** en la solapa Contactos.
+2. **Envío automático:** un cron (`/api/cron/campaigns`, disparado por GitHub Action cada hora) envía cada día **hasta el límite real de Meta** (leído de la WABA: `whatsapp_business_manager_messaging_limit`), marca cada lead como **enviado/error** (idempotente: nunca reenvía, ni al día siguiente ni si se pausó/reanudó), y crea el chat en la bandeja. Cuando se agota el segmento → **finalizada**.
+3. **Control y trazabilidad:** pausar/reanudar/eliminar; la tarjeta muestra progreso (enviados/total, en cola, errores, últimas 24h). El estado por-lead se ve en Contactos (EN COLA → ENVIADO/ERROR + fecha, por plantilla).
+4. **Límite:** lo verifica el sistema contra Meta (no lo carga el cliente). Techo del goteo serverless ~9.600/día.
+5. **Importación:** acepta cualquier formato de teléfono argentino (normaliza con `libphonenumber-js`), columnas flexibles (incluye `csTelefono1/2`), nombre opcional, dedupe por teléfono.
 
 ---
 

@@ -199,8 +199,11 @@ Vas a ver un **asistente de configuración (Setup Wizard)** que te guía para co
 ### Una vez conectado, tenés 5 pestañas:
 - **💬 Chat:** la bandeja de conversaciones en vivo. Podés **filtrar los chats por clasificación** (origen del lead) además de por asesor; cada chat muestra su **badge de clasificación** de color.
 - **📋 Plantillas:** es un **gestor completo de plantillas de WhatsApp**. Además de las **8 plantillas de seguimiento** que PRISMA prepara (recordatorios de visita, reactivaciones, follow-ups) y de ver su **estado de aprobación**, podés **crear tus propias plantillas** (categoría, idioma, encabezado/cuerpo/pie, botones y variables `{{1}}`), **editarlas, eliminarlas** y **sincronizarlas desde Meta**.
-- **👥 Contactos:** la lista de contactos de WhatsApp (la "agenda" para campañas), con búsqueda, **filtro por clasificación**, selección múltiple (para campañas) e **importación desde CSV/Excel**. Cada contacto tiene una **columna de Clasificación** (badge de color) y un botón para **eliminarlo** de la agenda. Al **importar** podés escribir una **clasificación para todo el lote** (ej. "Base Expo 2026"); el sistema **descarta automáticamente los repetidos** (por teléfono, dentro del archivo y contra los que ya tenés) y te avisa cuántos entraron y cuántos se omitieron.
-- **📣 Campañas:** envíos masivos. Podés cargar los destinatarios de **dos formas**: seleccionándolos desde la pestaña **Contactos**, o **importando un CSV/Excel**. Después elegís una plantilla, **mapeás las columnas** (teléfono, nombre y las variables de la plantilla) y enviás. Vas viendo el **estado por contacto** (pendiente / enviado / error / salteado).
+- **👥 Contactos:** la lista de contactos de WhatsApp (la "agenda" para campañas), con búsqueda, **filtro por clasificación**, **paginación de 100 por página** (soporta miles), selección múltiple e **importación desde CSV/Excel**. Cada contacto tiene **Clasificación** (badge) y botón para **eliminarlo**. Al **importar**: escribís una **clasificación para todo el lote**, el sistema **descarta repetidos** (por teléfono) y te avisa cuántos entraron/omitieron.
+  - **Excel/CSV — columnas:** solo necesita una de **teléfono** (`celular`, `telefono`, `phone`, `csTelefono1/2`, etc.) — el **nombre es opcional**. Los teléfonos pueden venir en **cualquier formato argentino** (con/sin +, con 0, con 15, áreas 11/221/2227…): el sistema los **convierte solo** al formato de WhatsApp. La clasificación NO va en el Excel (se pone al importar).
+- **📣 Campañas:** dos modos:
+  - **Campaña automática por segmento (recomendada para masivo):** elegís una **clasificación** (ej. `reclutamiento`) + una **plantilla**, y el sistema envía **solo, en goteo diario, hasta tu límite real de Meta**, marca enviados y **no repite**, hasta terminar todo el segmento (aunque cierres el navegador). Podés **pausar/reanudar/eliminar** y ver el **progreso** (enviados/total, en cola, errores). El estado de cada lead se ve en **Contactos** (EN COLA → ENVIADO/ERROR + fecha).
+  - **Envío manual puntual:** solo para **grupos chicos o individuales** (corre en el navegador, hay que dejar la pestaña abierta).
 - **⚙️ Configuración IA:** definís el comportamiento del bot (cómo responde, conocimiento, etc.).
 
 Arriba a la derecha, un **indicador de conexión** te muestra si la instancia está conectada.
@@ -393,6 +396,7 @@ La pantalla se titula "Ajustes Generales". Tiene 5 pestañas:
 
 **4. Costos Meta**
 - El **panel de costos de WhatsApp** (gastos de la mensajería de Meta).
+- **Token de Meta:** muestra si tu token está **válido o vencido**, tu **límite diario real** (leído de Meta) y un campo para **pegar el token permanente** (System User) sin reconectar. Si "Costos" o "Sincronizar plantillas" fallan, casi siempre es el token vencido: lo actualizás acá.
 
 **5. Acceso & Seguridad**
 - **Restablecer contraseña** (te llega un link).

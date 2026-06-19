@@ -664,19 +664,20 @@ export async function syncTemplatesFromMeta(): Promise<WhatsAppActionResult & { 
       return { success: false, error: result.error?.message || 'Error al sincronizar templates' }
     }
 
-    // Intentar también obtener el límite de mensajes si hay un phone_number_id
+    // Límite real de Meta: campo whatsapp_business_manager_messaging_limit en la WABA
+    // (Business Account). Meta ya NO lo expone en el número de teléfono.
     let limitTier = null;
-    if (instance.phone_number_id) {
+    if (instance.business_id) {
       try {
-        const limitRes = await fetch(`https://graph.facebook.com/v19.0/${instance.phone_number_id}?fields=messaging_limit_tier`, {
+        const limitRes = await fetch(`https://graph.facebook.com/v19.0/${instance.business_id}?fields=whatsapp_business_manager_messaging_limit`, {
           headers: {
             'Authorization': `Bearer ${instance.token}`,
           },
         })
         if (limitRes.ok) {
           const limitData = await limitRes.json()
-          if (limitData.messaging_limit_tier) {
-            limitTier = limitData.messaging_limit_tier
+          if (limitData.whatsapp_business_manager_messaging_limit) {
+            limitTier = limitData.whatsapp_business_manager_messaging_limit
             // Guardar el límite en la instancia
             await supabase
               .from('whatsapp_instances')
@@ -1622,6 +1623,149 @@ export async function getWhatsAppCosts(
     }
 
     return { success: true, data: result.data }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
+
+// =============================================
+// Action 19: Validar el token de Meta guardado
+// Llama a Meta con el token actual y reporta si es válido o venció.
+// Si es válido, refresca el messaging_limit_tier de la instancia.
+// =============================================
+
+export interface MetaTokenStatus {
+  valid: boolean
+  message: string
+  phone_display?: string | null
+  messaging_limit_tier?: string | null
+}
+
+async function checkTokenAgainstMeta(
+  token: string,
+  phone_number_id: string,
+  business_id?: string | null
+): Promise<MetaTokenStatus> {
+  if (!token || !phone_number_id) {
+    return { valid: false, message: 'Falta el token o el Phone Number ID de Meta.' }
+  }
+
+  // 1. Validez del token: llamada mínima (basta permiso de mensajería).
+  const res = await fetch(
+    `https://graph.facebook.com/v20.0/${phone_number_id}?fields=display_phone_number,verified_name`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  )
+  const data = await res.json().catch(() => ({}))
+
+  if (!res.ok) {
+    const metaMsg = (data as { error?: { message?: string } })?.error?.message || `Error ${res.status}`
+    return { valid: false, message: metaMsg }
+  }
+
+  // 2. Límite real de Meta: campo `whatsapp_business_manager_messaging_limit` en la WABA
+  //    (Business Account). Devuelve el tier (ej. TIER_2K = 2000). Best-effort.
+  let tier: string | null = null
+  if (business_id) {
+    try {
+      const tierRes = await fetch(
+        `https://graph.facebook.com/v20.0/${business_id}?fields=whatsapp_business_manager_messaging_limit`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      if (tierRes.ok) {
+        const tierData = await tierRes.json().catch(() => ({}))
+        tier = (tierData as { whatsapp_business_manager_messaging_limit?: string }).whatsapp_business_manager_messaging_limit ?? null
+      }
+    } catch {
+      /* ignorar: el tier es opcional */
+    }
+  }
+
+  return {
+    valid: true,
+    message: 'Token válido y activo.',
+    phone_display: (data as { display_phone_number?: string }).display_phone_number ?? null,
+    messaging_limit_tier: tier,
+  }
+}
+
+export async function validateMetaToken(): Promise<WhatsAppActionResult & { data?: MetaTokenStatus }> {
+  try {
+    const { agency_id } = await getDirectorProfile()
+    const supabase = createClient()
+
+    const { data: instance, error } = await supabase
+      .from('whatsapp_instances')
+      .select('id, token, phone_number_id, business_id')
+      .eq('agency_id', agency_id)
+      .limit(1)
+      .single()
+
+    if (error || !instance) {
+      return { success: false, error: 'No hay una instancia de WhatsApp configurada.' }
+    }
+
+    const status = await checkTokenAgainstMeta(instance.token, instance.phone_number_id, instance.business_id)
+
+    if (status.valid && status.messaging_limit_tier) {
+      await supabase
+        .from('whatsapp_instances')
+        .update({ messaging_limit_tier: status.messaging_limit_tier })
+        .eq('id', instance.id)
+    }
+
+    return { success: true, data: status }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
+
+// =============================================
+// Action 20: Actualizar el token de Meta (sin rehacer la conexión)
+// Pegás el token permanente (System User) y se guarda + valida.
+// =============================================
+
+export async function updateMetaToken(
+  newToken: string
+): Promise<WhatsAppActionResult & { data?: MetaTokenStatus }> {
+  try {
+    const { agency_id } = await getDirectorProfile()
+    const supabase = createClient()
+
+    const token = (newToken ?? '').trim()
+    if (!token) return { success: false, error: 'El token no puede estar vacío.' }
+
+    const { data: instance, error } = await supabase
+      .from('whatsapp_instances')
+      .select('id, phone_number_id, business_id')
+      .eq('agency_id', agency_id)
+      .limit(1)
+      .single()
+
+    if (error || !instance) {
+      return { success: false, error: 'No hay una instancia de WhatsApp configurada.' }
+    }
+
+    // Validar ANTES de guardar, para no pisar un token bueno con uno inválido.
+    const status = await checkTokenAgainstMeta(token, instance.phone_number_id, instance.business_id)
+    if (!status.valid) {
+      return { success: false, error: `El token no es válido: ${status.message}` }
+    }
+
+    const updatePayload: Record<string, unknown> = { token, status: 'connected' }
+    if (status.messaging_limit_tier) updatePayload.messaging_limit_tier = status.messaging_limit_tier
+
+    const { error: updateError } = await supabase
+      .from('whatsapp_instances')
+      .update(updatePayload)
+      .eq('id', instance.id)
+
+    if (updateError) {
+      return { success: false, error: `Error al guardar el token: ${updateError.message}` }
+    }
+
+    return { success: true, data: status }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido'
     return { success: false, error: message }

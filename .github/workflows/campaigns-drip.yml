@@ -1,0 +1,20 @@
+name: PRISMA Campaigns Drip
+
+on:
+  schedule:
+    # Cada hora (UTC). Varias corridas por día sin pagar Vercel Pro.
+    # El conteo rolling de 24h en el endpoint garantiza no exceder el límite real de Meta.
+    # Techo aproximado: MAX_PER_RUN (400) x 24 = ~9.600 envíos/día.
+    # Para tiers muy altos (10k–100k/día) hace falta un worker dedicado (ver nota).
+    - cron: '0 * * * *'
+  workflow_dispatch:
+    # Permite dispararlo manualmente desde la pestaña Actions de GitHub.
+
+jobs:
+  drip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger campaigns drip endpoint
+        run: |
+          curl -sS -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/campaigns" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils"
 import { syncTemplatesFromMeta, sendCampaignMessage, updateContactCampaignStatus } from "@/app/actions/whatsapp"
 import type { WATemplate, WAContact } from "@/types/whatsapp"
 import { CampaignState } from "./CampaignState"
+import { ScheduledCampaignManager } from "./ScheduledCampaignManager"
 import Papa from "papaparse"
 import * as XLSX from "xlsx"
 
@@ -301,7 +302,6 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
          })
 
          if (res.success) {
-           // @ts-ignore
            if (res.warning === 'skipped_duplicate') {
              skipCount++;
              setContactStatuses(prev => ({...prev, [i]: "salteado"}))
@@ -368,6 +368,22 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
              Sube tus contactos y envía un mensaje a múltiples destinatarios de una vez. Ideal para Base de Datos Inmobiliaria.
            </p>
          </div>
+      </div>
+
+      {/* Campañas automáticas por segmento (goteo diario respetando el límite de Meta) */}
+      <ScheduledCampaignManager instance={instance} />
+
+      <div className="flex items-center gap-3 pt-2">
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold">o envío manual puntual</span>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-[12px] text-amber-700 dark:text-amber-400 flex items-start gap-2">
+        <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+        <span>
+          <b>Solo para grupos chicos o envíos individuales puntuales</b> (se procesa desde el navegador: tenés que dejar la pestaña abierta).
+          Para envíos masivos (cientos o miles), usá la <b>campaña automática por segmento</b> de arriba.
+        </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start pb-20">

@@ -42,6 +42,7 @@ import { createAgencyAction, updateAgencyAction } from "@/app/actions/agency"
 import { useSearchParams } from "next/navigation"
 import { AiCreditsDashboard } from "@/components/ai-credits-dashboard"
 import { WhatsAppCostsDashboard } from "@/components/whatsapp-costs-dashboard"
+import { MetaTokenManager } from "@/components/whatsapp/MetaTokenManager"
 
 export default function DirectorConfiguracionPage() {
   const searchParams = useSearchParams()
@@ -516,7 +517,8 @@ export default function DirectorConfiguracionPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="costos" className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+        <TabsContent value="costos" className="space-y-6 animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+          <MetaTokenManager />
           <WhatsAppCostsDashboard />
         </TabsContent>
 

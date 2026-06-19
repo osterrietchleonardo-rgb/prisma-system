@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { importContacts, sendCampaignMessage, updateContactCampaignStatus, deleteContact } from "@/app/actions/whatsapp"
 import { getClasificacionStyle } from "@/lib/whatsapp/clasificacion"
+import { normalizeArgPhone } from "@/lib/whatsapp/phone-ar"
 import type { WATemplate, WAContact } from "@/types/whatsapp"
 import { CampaignState } from "./CampaignState"
 import { 
@@ -56,6 +57,8 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
   const [isImporting, setIsImporting] = useState(false)
   const [importClasif, setImportClasif] = useState("")
   const [deletingContactId, setDeletingContactId] = useState<string | null>(null)
+  const [page, setPage] = useState(0)
+  const PAGE_SIZE = 100
   
   // Campaign Redirect State
   const [isRedirecting, setIsRedirecting] = useState(false)
@@ -83,22 +86,30 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
   const fetchData = async () => {
     setLoading(true)
     try {
-      const [{ data: contactsData, error: contactsError }, { data: templatesData, error: templatesError }] = await Promise.all([
-        supabase
+      // Traer TODOS los contactos paginando de a 1000 (PostgREST limita a 1000 por defecto).
+      // Soporta bases grandes (15k+) sin perder filas.
+      const PAGE = 1000
+      const allContacts: WAContact[] = []
+      for (let from = 0; ; from += PAGE) {
+        const { data, error } = await supabase
           .from('wa_contacts')
           .select('*')
           .eq('agency_id', instance.agency_id)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('wa_templates')
-          .select('*')
-          .eq('agency_id', instance.agency_id)
-      ])
-      
-      if (contactsError) throw contactsError
+          .order('created_at', { ascending: false })
+          .range(from, from + PAGE - 1)
+        if (error) throw error
+        if (!data || data.length === 0) break
+        allContacts.push(...(data as WAContact[]))
+        if (data.length < PAGE) break
+      }
+
+      const { data: templatesData, error: templatesError } = await supabase
+        .from('wa_templates')
+        .select('*')
+        .eq('agency_id', instance.agency_id)
       if (templatesError) throw templatesError
-      
-      if (contactsData) setContacts(contactsData as WAContact[])
+
+      setContacts(allContacts)
       if (templatesData) setTemplates(templatesData as WATemplate[])
     } catch (err) {
       console.error(err)
@@ -164,49 +175,69 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
   const processAndImportData = async (data: any[]) => {
     const cols = Object.keys(data[0] as object)
     const lowerCols = cols.map(c => c.toLowerCase().trim())
-    
-    let pCol = ""
-    if (lowerCols.includes('celular')) pCol = cols[lowerCols.indexOf('celular')]
-    else if (lowerCols.includes('telefono')) pCol = cols[lowerCols.indexOf('telefono')]
-    else if (lowerCols.includes('teléfono')) pCol = cols[lowerCols.indexOf('teléfono')]
-    else if (lowerCols.includes('phone')) pCol = cols[lowerCols.indexOf('phone')]
 
-    if (!pCol) {
-       toast.error("❌ Archivo Inválido: Debe contener una columna 'celular' o 'telefono'.")
+    // 1. Columnas de teléfono: por nombre (acepta cualquier encabezado que contenga
+    //    tel/cel/phone/whats/movil/numero, incluido csTelefono1, csTelefono2, etc.)
+    const phoneRegex = /(tel|cel|phone|whats|movil|móvil|numero|número|contacto)/
+    let phoneCols = cols.filter((_, i) => phoneRegex.test(lowerCols[i]))
+
+    // 2. Si no se reconoció por nombre, detectar por VALOR: columnas cuyos valores
+    //    parecen teléfonos (útil para encabezados raros o sin nombre claro).
+    if (phoneCols.length === 0) {
+      const sample = data.slice(0, 30)
+      phoneCols = cols.filter(c => {
+        let ok = 0, tot = 0
+        for (const row of sample) {
+          const v = row[c]
+          if (v === undefined || v === null || String(v).trim() === '') continue
+          tot++
+          if (normalizeArgPhone(String(v))) ok++
+        }
+        return tot > 0 && ok / tot >= 0.6
+      })
+    }
+
+    if (phoneCols.length === 0) {
+       toast.error("❌ Archivo inválido: no encontré ninguna columna de teléfono/celular.")
        setIsImporting(false)
        return
     }
 
+    // 3. Columna de nombre: OPCIONAL.
     let nCol = ""
     if (lowerCols.includes('nombre')) nCol = cols[lowerCols.indexOf('nombre')]
     else if (lowerCols.includes('name')) nCol = cols[lowerCols.indexOf('name')]
-
-    if (!nCol) {
-       toast.error("❌ Archivo Inválido: Debe contener una columna 'nombre'.")
-       setIsImporting(false)
-       return
-    }
+    else { const idx = lowerCols.findIndex(c => c.includes('nombre') || c.includes('apellido')); if (idx >= 0) nCol = cols[idx] }
 
     const newContacts = []
-    
+    let descartados = 0
+
     for (let i = 0; i < data.length; i++) {
         const row = data[i]
-        const phoneRaw = row[pCol] ? String(row[pCol]) : ""
-        const phone = phoneRaw.replace(/\D/g, '')
-        const name = row[nCol] ? String(row[nCol]) : ""
-        
-        if (phone && phone.length >= 8 && name.trim()) {
-           // Rest of properties into metadata
+
+        // Tomar el PRIMER teléfono válido entre las columnas de teléfono detectadas.
+        let phone: string | null = null
+        for (const pc of phoneCols) {
+          const cand = normalizeArgPhone(row[pc])
+          if (cand) { phone = cand; break }
+        }
+
+        const name = nCol && row[nCol] ? String(row[nCol]).trim() : ""
+
+        if (phone) {
+           // El resto de columnas (sacando las de teléfono y nombre) van a metadata.
            const metadata = { ...row }
-           delete metadata[pCol]
-           delete metadata[nCol]
-           
+           phoneCols.forEach(pc => delete metadata[pc])
+           if (nCol) delete metadata[nCol]
+
            newContacts.push({
              phone,
              name,
              metadata,
              tags: []
            })
+        } else {
+           descartados++
         }
     }
 
@@ -223,7 +254,7 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
       const inserted = res.data?.inserted ?? newContacts.length
       const skipped = res.data?.skipped ?? 0
       toast.success(
-        `${inserted} contacto(s) nuevo(s) importado(s)${skipped ? ` · ${skipped} omitido(s) por estar repetido(s)` : ''}.`,
+        `${inserted} contacto(s) nuevo(s) importado(s)${skipped ? ` · ${skipped} repetido(s) omitido(s)` : ''}${descartados ? ` · ${descartados} con teléfono inválido` : ''}.`,
         { id: "import-toast" }
       )
       setImportClasif("")
@@ -307,6 +338,14 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
       (c.clasificacion?.toLowerCase().includes(q) ?? false)
     )
   })
+
+  // Paginación (para no renderizar miles de filas de una sola vez)
+  const pageCount = Math.max(1, Math.ceil(filteredContacts.length / PAGE_SIZE))
+  const currentPage = Math.min(page, pageCount - 1)
+  const pagedContacts = filteredContacts.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE)
+
+  // Reset de página al cambiar búsqueda/filtro
+  useEffect(() => { setPage(0) }, [searchTerm, filterClasif])
 
   if (loading) {
     return <div className="h-full flex items-center justify-center"><RefreshCw className="w-8 h-8 animate-spin text-muted-foreground" /></div>
@@ -413,7 +452,7 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
                 </tr>
               </thead>
               <tbody>
-                {filteredContacts.map((contact) => (
+                {pagedContacts.map((contact) => (
                   <tr key={contact.id} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
                      <td className="p-3">
                         <Checkbox 
@@ -444,15 +483,19 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
                          <td key={tmpl.id} className="p-3 text-center">
                            {status ? (
                              <div className="flex flex-col items-center gap-1">
-                               <Badge 
+                               <Badge
                                  variant={
                                     status === "enviado" ? "default" :
                                     status === "salteado" ? "secondary" :
-                                    status === "error" ? "destructive" : "outline"
+                                    status === "error" ? "destructive" :
+                                    status === "en_cola" ? "outline" : "outline"
                                  }
-                                 className={status === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" : ""}
+                                 className={
+                                    status === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" :
+                                    status === "en_cola" ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" : ""
+                                 }
                                >
-                                 {status.toUpperCase()}
+                                 {status === "en_cola" ? "EN COLA" : status.toUpperCase()}
                                </Badge>
                                {sentAt && (
                                  <span className="text-[10px] text-muted-foreground">
@@ -487,6 +530,23 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
             </table>
           )}
         </div>
+
+        {filteredContacts.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between gap-2 p-3 border-t bg-muted/10 text-sm">
+            <span className="text-xs text-muted-foreground">
+              Mostrando {currentPage * PAGE_SIZE + 1}–{Math.min((currentPage + 1) * PAGE_SIZE, filteredContacts.length)} de {filteredContacts.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={currentPage === 0} onClick={() => setPage(p => Math.max(0, p - 1))}>
+                Anterior
+              </Button>
+              <span className="text-xs text-muted-foreground">Página {currentPage + 1} / {pageCount}</span>
+              <Button variant="outline" size="sm" disabled={currentPage >= pageCount - 1} onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))}>
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   )

@@ -146,6 +146,8 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 - `wa_messages` — conversation_id, agency_id, content, role (`lead`/`bot`/`agent`), message_type, wamid, metadata.
 - `wa_templates` — agency_id, template_name, status, components, rejection_reason, meta_template_id.
 - `n8n_chat_histories` — session_id (= conversation_id), message (jsonb formato LangChain).
+- `wa_campaigns` — campaña masiva por goteo (agency_id, name, template_name, template_language, variable_map jsonb, audience_clasificacion, daily_limit, status `active`/`paused`/`completed`, created_by). Migración `20260618130000_create_wa_campaigns.sql`.
+- `wa_campaign_recipients` — un registro por destinatario (campaign_id, agency_id, contact_id, phone, name, status `pending`/`sent`/`error`/`skipped`, sent_at, error_message). `UNIQUE (campaign_id, phone)` → idempotencia. Funciones SQL: `enroll_campaign_recipients(p_campaign_id)` (inscribe el segmento + marca `en_cola` en wa_contacts).
 - **Clasificación del lead** (`clasificacion`, migración `20260618120000_add_clasificacion_leads.sql`): columna nullable en `wa_conversations` y `wa_contacts`, con índice `(agency_id, clasificacion)`. Valores: `Whatsapp-Consulta` (entrante por webhook), `Whatsapp-Manual` (alta manual en tracking/calendario vía `createManualContact`), o personalizada en la importación. NULL = "Sin clasificar" (registros previos, sin backfill). Helper único de etiquetas/colores: `lib/whatsapp/clasificacion.ts`.
 
 **IA y documentos**
@@ -323,6 +325,21 @@ Formato LangChain: `session_id` = conversation_id; `message` = `{ type:'human'|'
 - **Agenda de Contactos:** `importContacts(contacts, clasificacion?)` deduplica por teléfono dentro del archivo y descarta los que ya existen en la agencia (insert, no upsert) → devuelve `{inserted, skipped}`. `deleteContact(id)` borra solo de `wa_contacts` (no toca chats).
 - **Clasificación automática:** webhooks Evolution/Meta marcan `Whatsapp-Consulta` al crear conversación y contacto; `createManualContact` marca `Whatsapp-Manual`; el import aplica la clasificación del lote (o "Importado"). `sendCampaignMessage`, al crear la conversación de un contacto, hereda su `clasificacion`.
 - **UI:** badge de color (helper `getClasificacionStyle`) con filtro por clasificación en "Leads WhatsApp", "Contactos" y la bandeja (`ConversationsList`).
+
+### 9.7 Campañas masivas por goteo diario (drip)
+- **Modelo:** `wa_campaigns` (definición) + `wa_campaign_recipients` (cola por destinatario). Al crear (`createSegmentCampaign` en `app/actions/whatsapp-campaigns.ts`) se inscribe todo el segmento de la clasificación vía la función SQL `enroll_campaign_recipients` (INSERT...SELECT eficiente para 15k+) y se marca `en_cola` en `wa_contacts.campaign_statuses[plantilla]`.
+- **Motor (cron):** `GET /api/cron/campaigns` (auth `CRON_SECRET`, `maxDuration=300`). Por cada campaña `active`: valida token, lee el **límite real de Meta** (ver abajo), calcula cupo = `límite − enviados_últimas_24h`, toma hasta `min(cupo, MAX_PER_RUN=400)` pendientes, envía por Meta Cloud API, marca `sent`/`error` (e idempotente: no reenvía), crea la conversación (heredando clasificación) y refleja el estado en `wa_contacts.campaign_statuses`. Al agotar pendientes → `completed`. Token vencido → saltea sin quemar la cola.
+- **Programación:** GitHub Action `.github/workflows/campaigns-drip.yml` (cada hora, gratis; el conteo rolling de 24h respeta el límite). Techo práctico ~9.600/día (400×24); tiers más altos requieren worker dedicado.
+- **Acciones:** `getCampaignsWithStats`, `setCampaignStatus` (pausar/reanudar), `deleteCampaign`. UI: `ScheduledCampaignManager` dentro de `CampaignsTab`.
+
+### 9.8 Límite de Meta y token permanente
+- **Límite real:** Meta ya **no** expone `messaging_limit_tier` en el número; está en la **WABA**: `GET /{business_id}?fields=whatsapp_business_manager_messaging_limit` → tier (ej. `TIER_2K`=2000). Se lee y persiste en `whatsapp_instances.messaging_limit_tier` (parser robusto `TIER_2K/10K/100K/UNLIMITED`). Lo usan el cron y la UI.
+- **Token:** `validateMetaToken` / `updateMetaToken` (`app/actions/whatsapp.ts`) + UI `MetaTokenManager` (Configuración → Costos Meta): valida contra Meta y permite pegar el token permanente (System User) sin reconectar.
+
+### 9.9 Importación de contactos (bases grandes + teléfonos AR)
+- `ContactsTab`: carga **paginada** (de a 1000) para soportar 15k+, tabla con **paginación de 100/página**. Importación con **dedupe por teléfono** (intra-archivo y contra la base; `importContacts` hace `insert`, no upsert) + clasificación de lote.
+- **Detección de columnas flexible:** teléfono por nombre (regex `tel|cel|phone|whats|movil|numero|contacto`, incluye `csTelefono1/2`) o por heurística de valor; **nombre opcional**. Soporta varias columnas de teléfono (toma el primer válido por fila).
+- **Normalización AR:** `lib/whatsapp/phone-ar.ts` (`normalizeArgPhone`, usa `libphonenumber-js`) convierte cualquier formato (con/sin +, 0 de trunk, 15 de móvil, áreas 11/221/2227…) al formato WhatsApp (`549…`).
 
 ---
 
