@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarClock, Play, Pause, Trash2, Loader2, Rocket } from "lucide-react"
+import { CalendarClock, Pause, Trash2, Loader2, Rocket } from "lucide-react"
 import { toast } from "sonner"
 
 interface Props {
@@ -76,6 +76,7 @@ export function ScheduledCampaignManager({ instance }: Props) {
   const [headerMap, setHeaderMap] = useState<Record<string, VarEntry>>({})
   const [bodyMap, setBodyMap] = useState<Record<string, VarEntry>>({})
   const [creating, setCreating] = useState(false)
+  const [launchingId, setLaunchingId] = useState<string | null>(null)
 
   // Límite real leído en vivo desde Meta
   const SYSTEM_CEILING = 9600 // techo del goteo serverless (400/corrida x 24)
@@ -151,7 +152,7 @@ export function ScheduledCampaignManager({ instance }: Props) {
     setCreating(false)
 
     if (res.success) {
-      toast.success(`Campaña creada. ${res.enrolled ?? 0} contactos en cola.`)
+      toast.success(`Campaña creada con ${res.enrolled ?? 0} contactos en cola. Tocá "Lanzar ahora" para empezar a enviar.`)
       setName(""); setTemplateId(""); setAudience("__all__"); setHeaderMap({}); setBodyMap({})
       await refreshCampaigns()
     } else {
@@ -163,6 +164,32 @@ export function ScheduledCampaignManager({ instance }: Props) {
     const res = await setCampaignStatus(id, status)
     if (res.success) { toast.success(status === "active" ? "Campaña reanudada" : "Campaña pausada"); refreshCampaigns() }
     else toast.error(res.error || "Error")
+  }
+
+  const handleLaunch = async (c: CampaignWithStats) => {
+    const pend = c.pending
+    if (!window.confirm(`¿Lanzar la campaña "${c.name}" ahora?\n\nVa a empezar a enviar de inmediato a los ${pend.toLocaleString("es-AR")} contactos en cola, y seguir solo en lotes diarios (hasta tu límite de Meta) hasta terminar.`)) return
+    setLaunchingId(c.id)
+    try {
+      const res = await fetch("/api/campaigns/launch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaign_id: c.id }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        const r = data.result
+        const enviados = r && typeof r === "object" ? (r.sent ?? 0) : 0
+        toast.success(`🚀 Campaña lanzada. ${enviados} enviados ahora; el resto sigue solo en lotes diarios.`)
+      } else {
+        toast.error(data.error || "No se pudo lanzar la campaña")
+      }
+    } catch {
+      toast.error("Error de red al lanzar la campaña")
+    } finally {
+      setLaunchingId(null)
+      refreshCampaigns()
+    }
   }
 
   const handleDelete = async (c: CampaignWithStats) => {
@@ -278,8 +305,8 @@ export function ScheduledCampaignManager({ instance }: Props) {
           )}
 
           <Button onClick={handleCreate} disabled={creating} className="w-full bg-accent hover:bg-accent/90">
-            {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Rocket className="h-4 w-4 mr-2" />}
-            Crear y programar campaña
+            {creating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CalendarClock className="h-4 w-4 mr-2" />}
+            Crear campaña (queda lista para lanzar)
           </Button>
         </CardContent>
       </Card>
@@ -288,7 +315,7 @@ export function ScheduledCampaignManager({ instance }: Props) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Campañas programadas</CardTitle>
-          <CardDescription>Progreso del goteo diario. Se envían solas; podés pausarlas o reanudarlas.</CardDescription>
+          <CardDescription>Creás la campaña y la iniciás con <b>Lanzar ahora</b>. Después se envía sola en lotes diarios; podés pausarla o eliminarla.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {loading ? (
@@ -314,11 +341,20 @@ export function ScheduledCampaignManager({ instance }: Props) {
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
+                      {c.status !== "completed" && (
+                        <Button
+                          size="sm"
+                          className="h-8 bg-accent hover:bg-accent/90 gap-1"
+                          disabled={launchingId === c.id || c.pending === 0}
+                          title={c.pending === 0 ? "No hay contactos en cola" : "Lanzar/enviar ahora"}
+                          onClick={() => handleLaunch(c)}
+                        >
+                          {launchingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Rocket className="h-3.5 w-3.5" />}
+                          {c.status === "paused" ? "Lanzar ahora" : "Enviar ahora"}
+                        </Button>
+                      )}
                       {c.status === "active" && (
                         <Button variant="ghost" size="icon" className="h-8 w-8" title="Pausar" onClick={() => handleStatus(c.id, "paused")}><Pause className="h-4 w-4" /></Button>
-                      )}
-                      {c.status === "paused" && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Reanudar" onClick={() => handleStatus(c.id, "active")}><Play className="h-4 w-4" /></Button>
                       )}
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Eliminar" onClick={() => handleDelete(c)}><Trash2 className="h-4 w-4" /></Button>
                     </div>

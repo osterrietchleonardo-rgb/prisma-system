@@ -672,11 +672,12 @@ Almacena el historial de conversación en el formato que n8n (LangChain) espera:
 
 ### 9.4 Campañas masivas por goteo diario (drip)
 Para bases grandes (ej. 15.000 leads) respetando el límite de Meta:
-1. **Audiencia por segmento:** se elige una **clasificación** (ej. `reclutamiento`) + una **plantilla**. Al crear la campaña se inscribe **todo el segmento** en `wa_campaign_recipients` (estado `pending`) y se marca **EN COLA** en la solapa Contactos.
-2. **Envío automático:** un cron (`/api/cron/campaigns`, disparado por GitHub Action cada hora) envía cada día **hasta el límite real de Meta** (leído de la WABA: `whatsapp_business_manager_messaging_limit`), marca cada lead como **enviado/error** (idempotente: nunca reenvía, ni al día siguiente ni si se pausó/reanudó), y crea el chat en la bandeja. Cuando se agota el segmento → **finalizada**.
-3. **Control y trazabilidad:** pausar/reanudar/eliminar; la tarjeta muestra progreso (enviados/total, en cola, errores, últimas 24h). El estado por-lead se ve en Contactos (EN COLA → ENVIADO/ERROR + fecha, por plantilla).
-4. **Límite:** lo verifica el sistema contra Meta (no lo carga el cliente). Techo del goteo serverless ~9.600/día.
-5. **Importación:** acepta cualquier formato de teléfono argentino (normaliza con `libphonenumber-js`), columnas flexibles (incluye `csTelefono1/2`), nombre opcional, dedupe por teléfono.
+1. **Audiencia por segmento:** se elige una **clasificación** (ej. `reclutamiento`) + una **plantilla**. Al crear, la campaña queda **pausada** (no envía todavía): se inscribe **todo el segmento** en `wa_campaign_recipients` (estado `pending`) y se marca **EN COLA** en la solapa Contactos.
+2. **Lanzar ahora:** el director confirma con el botón **"Lanzar ahora"** (`/api/campaigns/launch`), que activa la campaña y manda un **primer lote en el acto**. De ahí en más se envía sola. **No requiere entrar a GitHub.**
+3. **Envío automático (goteo):** un cron (`/api/cron/campaigns`, disparado por GitHub Action cada hora) envía cada día **hasta el límite real de Meta** (leído de la WABA: `whatsapp_business_manager_messaging_limit`), marca cada lead como **enviado/error** (idempotente: nunca reenvía, ni al día siguiente ni si se pausó/reanudó), y crea el chat en la bandeja. Cuando se agota el segmento → **finalizada**.
+4. **Control y trazabilidad:** lanzar/pausar/eliminar; la tarjeta muestra progreso (enviados/total, en cola, errores, últimas 24h). El estado por-lead se ve en Contactos (EN COLA → ENVIADO/ERROR + fecha, por plantilla).
+5. **Límite:** lo verifica el sistema contra Meta (no lo carga el cliente). Techo del goteo serverless ~9.600/día.
+6. **Importación:** acepta cualquier formato de teléfono argentino (normaliza con `libphonenumber-js`), columnas flexibles (incluye `csTelefono1/2`), nombre opcional, dedupe por teléfono.
 
 ---
 

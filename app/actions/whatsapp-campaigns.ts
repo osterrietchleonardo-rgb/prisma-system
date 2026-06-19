@@ -56,7 +56,7 @@ export async function createSegmentCampaign(
         variable_map: input.variable_map || {},
         audience_clasificacion: input.audience_clasificacion,
         daily_limit: input.daily_limit,
-        status: 'active',
+        status: 'paused', // se crea pausada: el director la inicia con "Lanzar ahora"
         created_by: user_id,
       })
       .select('id')
