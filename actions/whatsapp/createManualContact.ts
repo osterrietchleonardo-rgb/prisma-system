@@ -6,6 +6,7 @@ import { CLASIFICACION_MANUAL } from "@/lib/whatsapp/clasificacion";
 interface ManualContactInput {
   name: string;
   phone: string; // Already verified client side to be numbers
+  email?: string;
   tags?: string;
   agent_id?: string; // Only provided if director assigns it explicitly
 }
@@ -45,6 +46,7 @@ export async function createManualContact(input: ManualContactInput) {
 
     // 1. Insert or update wa_contacts
     const tagsArray = input.tags ? input.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
+    const email = input.email?.trim() || null;
     
     // Check if contact already exists
     const { data: existingContact } = await supabase
@@ -64,22 +66,25 @@ export async function createManualContact(input: ManualContactInput) {
           phone: input.phone,
           name: input.name,
           tags: tagsArray,
+          metadata: email ? { email } : {},
           clasificacion: CLASIFICACION_MANUAL,
         })
         .select()
         .single();
-        
+
       if (contactError) throw contactError;
       wa_contact_id = newContact.id;
     } else {
       wa_contact_id = existingContact.id;
-      // Update name and tags if it exists
+      // Update name, tags and email if it exists
+      const updatePayload: Record<string, any> = {
+        name: input.name,
+        tags: tagsArray,
+      };
+      if (email) updatePayload.metadata = { email };
       await supabase
         .from("wa_contacts")
-        .update({ 
-          name: input.name,
-          tags: tagsArray 
-        })
+        .update(updatePayload)
         .eq('id', wa_contact_id);
     }
 

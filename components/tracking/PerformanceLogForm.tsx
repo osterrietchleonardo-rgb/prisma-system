@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Loader2, Briefcase, TrendingUp, Sparkles, MapPin, DollarSign, Percent, User } from "lucide-react";
 
 import { createManualContact } from "@/actions/whatsapp/createManualContact";
+import { ManualContactFields, ManualContactData } from "@/components/shared/ManualContactFields";
 
 interface Props {
   onSuccess: () => void;
@@ -60,10 +61,14 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
 
   const [clientType, setClientType] = useState<"ninguno" | "tokko" | "whatsapp" | "manual">("ninguno");
 
-  // Manual contact form state
-  const [manualName, setManualName] = useState("");
-  const [manualPhone, setManualPhone] = useState("");
-  const [manualTags, setManualTags] = useState("");
+  // Manual contact form state (con doble verificación + certificación)
+  const [manualContact, setManualContact] = useState<ManualContactData>({
+    name: "",
+    phone: "",
+    email: "",
+    tags: "",
+    isValid: false,
+  });
   const [manualAgentId, setManualAgentId] = useState("");
 
   useEffect(() => {
@@ -96,23 +101,17 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
 
       // Si seleccionó nuevo contacto manual, lo creamos primero
       if (clientType === "manual") {
-        if (!manualName.trim() || !manualPhone.trim()) {
-          toast.error("Debes ingresar nombre y celular para el nuevo contacto.");
-          setIsSubmitting(false);
-          return;
-        }
-
-        // Validación básica formato internacional
-        if (!/^\d+$/.test(manualPhone)) {
-          toast.error("El número de celular debe contener solo números.");
+        if (!manualContact.isValid) {
+          toast.error("Completá y verificá los datos del contacto (nombre, celular y email deben coincidir) y certificá que son veraces.");
           setIsSubmitting(false);
           return;
         }
 
         const result = await createManualContact({
-          name: manualName.trim(),
-          phone: manualPhone.trim(),
-          tags: manualTags.trim(),
+          name: manualContact.name,
+          phone: manualContact.phone,
+          email: manualContact.email,
+          tags: manualContact.tags,
           agent_id: isDirector && manualAgentId ? manualAgentId : undefined
         });
 
@@ -537,42 +536,7 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
 
             {clientType === "manual" && (
               <div className="animate-in fade-in slide-in-from-top-2 space-y-4 pt-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="manual_name">Nombre Completo *</Label>
-                    <Input 
-                      id="manual_name" 
-                      placeholder="Ej: Juan Pérez" 
-                      value={manualName}
-                      onChange={(e) => setManualName(e.target.value)}
-                      required={clientType === "manual"}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="manual_phone">Celular (Formato Internacional) *</Label>
-                    <Input 
-                      id="manual_phone" 
-                      placeholder="Ej: 5491143435555" 
-                      value={manualPhone}
-                      onChange={(e) => setManualPhone(e.target.value)}
-                      required={clientType === "manual"}
-                      pattern="^\d+$"
-                      title="Ingresá solo números, con código de país y área (ej: 549...)"
-                    />
-                    <p className="text-[10px] text-muted-foreground leading-tight">Sin el signo + ni espacios. Ej: 5492213089334.</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="manual_tags">Etiquetas (Opcional)</Label>
-                  <Input 
-                    id="manual_tags" 
-                    placeholder="Ej: Inversor, Referido Carlos" 
-                    value={manualTags}
-                    onChange={(e) => setManualTags(e.target.value)}
-                  />
-                  <p className="text-[10px] text-muted-foreground">Separadas por comas.</p>
-                </div>
+                <ManualContactFields onChange={setManualContact} />
 
                 {isDirector && (
                   <div className="space-y-2">
