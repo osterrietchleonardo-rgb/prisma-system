@@ -160,7 +160,7 @@ Tenés **3 solapas**:
 2. **Objetivos:** dónde fijás las metas mensuales por asesor (ver detalle abajo).
 3. **Configuración IA:** ajustás las escalas (qué puntaje da cada acción: llamada, captación, prelisting, etc.). Esto define cómo se calculan los KPIs.
 
-**Formulario de registro (igual que el asesor):** zona/barrio, propiedad de Tokko o de colaboración, vincular cliente (Tokko o WhatsApp), registro manual de lead nuevo (nombre + celular internacional), y origen de consulta. Como director, al cargar podés **elegir a qué asesor** corresponde.
+**Formulario de registro (igual que el asesor):** zona/barrio, propiedad de Tokko o de colaboración, vincular cliente (Tokko o WhatsApp), registro manual de lead nuevo y origen de consulta. El registro manual pide **nombre completo, celular, email y etiqueta**. El celular se carga eligiendo el **país** (lista con bandera) y escribiendo el número natural; el sistema lo normaliza al formato de WhatsApp (para AR agrega el "9" móvil aunque no se ponga el 15) y muestra el preview. Lleva **doble verificación** de nombre/celular/email (se reescriben sin copiar/pegar, con aviso ✅/❌) y una **casilla de certificación** obligatoria de que los datos son veraces. Como director, al cargar podés **elegir a qué asesor** corresponde.
 
 ### Solapa "Objetivos" (fijar metas mensuales)
 
@@ -337,7 +337,7 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 **Qué es:** la agenda de visitas de la agencia. Como director **ves las visitas de todos** y podés **filtrar por asesor**.
 
 **Cómo agendar una visita (botón "Agendar Visita"):**
-1. **Información del lead** — 3 formas: desde **Tokko**, desde **WhatsApp**, o **carga manual** (nombre, teléfono internacional, email opcional).
+1. **Información del lead** — 3 formas: desde **Tokko**, desde **WhatsApp**, o **carga manual** (nombre completo, celular, email y etiqueta). El celular se carga con **selector de país** + número natural (normalizado al formato WhatsApp con preview). La carga manual exige **doble verificación** de nombre/celular/email (reescribir sin copiar/pegar, con aviso ✅/❌) y tildar la **casilla de certificación** de que los datos son veraces antes de agendar.
 2. **Detalle de la cita:** fecha, hora.
    - **Propiedad (Tokko):** si elegís un asesor, la lista se filtra automáticamente a **sus** propiedades.
    - **Propiedad (Colaboración):** texto libre para una propiedad externa.

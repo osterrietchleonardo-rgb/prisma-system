@@ -138,7 +138,7 @@
    - **Propiedad (Tokko):** desplegable con tus propiedades de la cartera.
    - **Propiedad (Colaboración):** texto libre para propiedades de **otra inmobiliaria** (colaboración).
    - **Vincular Cliente:** buscá entre tus leads de Tokko y tus contactos de WhatsApp.
-   - **Registro Manual de Lead:** si el contacto es nuevo (un amigo, vecino, referido) y no está en el sistema, cargalo a mano. Pedís **nombre** y **celular** en formato internacional (ej.: `5492213089334`) y etiquetas opcionales. Se crea solo, asignado a tu cuenta.
+   - **Registro Manual de Lead:** si el contacto es nuevo (un amigo, vecino, referido) y no está en el sistema, cargalo a mano. Pide **nombre completo**, **celular**, **email** y **etiqueta** (opcional). Para el celular elegís el **país** de una lista (con bandera) y escribís el número **como lo marcás normalmente** (ej.: `221 15 308 9334`); el sistema lo convierte solo al formato que pide WhatsApp y te muestra abajo cómo va a quedar (ej.: *"Se guardará como +54 9 221 308 9334"*). Para Argentina agrega solo el "9" de celular aunque no pongas el 15. **Doble verificación:** nombre, celular y email se cargan dos veces y el sistema avisa en el momento si coinciden (✅) o no (❌); en el campo de verificación **no se puede copiar/pegar**, hay que reescribirlo. Antes de crear el contacto tenés que tildar la **casilla de certificación** declarando que los datos son reales, veraces y obtenidos legítimamente. Se crea solo, asignado a tu cuenta.
 2. **Origen de Consulta:** elegí el canal de la lista (Instagram, WhatsApp orgánico, Referido cliente, Portal propio, Cartel, etc.).
 
 > 💡 **Tip:** cargá tu actividad **todos los días**. Es la diferencia entre un dashboard que refleja tu esfuerzo real y uno que te subvalora.
@@ -240,7 +240,7 @@
 1. **Información del lead** — 3 formas:
    - **Desde Tokko:** desplegable con tus leads de Tokko.
    - **Desde WhatsApp:** desplegable con tus contactos de WhatsApp.
-   - **Carga Manual:** nombre, teléfono (formato internacional) y email opcional. Se crea solo para mantener el seguimiento.
+   - **Carga Manual:** **nombre completo**, **celular**, **email** y **etiqueta** (opcional). Igual que en Tracking: el celular se carga eligiendo el **país** y escribiendo el número natural (el sistema lo normaliza al formato de WhatsApp y muestra el preview), y los tres datos clave llevan **doble verificación** (se reescriben, sin copiar/pegar, con aviso ✅/❌) más la **casilla de certificación** obligatoria antes de agendar. El contacto se crea solo para mantener el seguimiento.
 2. **Detalle de la cita:** fecha y hora.
    - **Propiedad (Tokko):** desplegable con **tus** propiedades.
    - **Propiedad (Colaboración):** texto libre para una propiedad de otra inmobiliaria.

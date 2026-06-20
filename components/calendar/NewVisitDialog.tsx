@@ -22,16 +22,13 @@ import {
 import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { 
-  CalendarIcon, 
-  Clock, 
-  User, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Tag, 
+  CalendarIcon,
+  Clock,
+  User,
+  MapPin,
+  Tag,
   Briefcase,
-  Search,
-  Check
+  Search
 } from "lucide-react"
 import { 
   Popover,
@@ -42,6 +39,7 @@ import { cn } from "@/lib/utils"
 import { SearchableSelect } from "@/components/ui/searchable-select"
 import { getTrackingOptions } from "@/actions/tracking/getTrackingOptions"
 import { createManualContact } from "@/actions/whatsapp/createManualContact"
+import { ManualContactFields, ManualContactData } from "@/components/shared/ManualContactFields"
 
 interface NewVisitDialogProps {
   open: boolean
@@ -94,6 +92,14 @@ export function NewVisitDialog({
   }>({ leads: [], waContacts: [] });
   const [clientType, setClientType] = useState<"manual" | "tokko" | "whatsapp">("manual");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  // Contacto manual con doble verificación + certificación
+  const [manualContact, setManualContact] = useState<ManualContactData>({
+    name: "",
+    phone: "",
+    email: "",
+    tags: "",
+    isValid: false,
+  });
 
   const supabase = createClient()
 
@@ -173,12 +179,18 @@ export function NewVisitDialog({
 
     let finalPhone = formData.telefono;
     let finalName = formData.nombre_completo;
+    let finalEmail = formData.email;
 
-    if (clientType === "tokko" && selectedLeadId) {
+    if (clientType === "manual") {
+      finalName = manualContact.name;
+      finalPhone = manualContact.phone;
+      finalEmail = manualContact.email;
+    } else if (clientType === "tokko" && selectedLeadId) {
       const lead = trackingOptions.leads.find(l => l.id === selectedLeadId);
       if (lead) {
         finalPhone = lead.phone || lead.cellphone || "";
         finalName = lead.full_name || lead.name || "";
+        finalEmail = lead.email || "";
       }
     } else if (clientType === "whatsapp" && selectedLeadId) {
       const waContact = trackingOptions.waContacts.find(c => c.id === selectedLeadId);
@@ -190,6 +202,11 @@ export function NewVisitDialog({
 
     if (!formData.fecha_visita || !formData.hora_visita || !finalName || !finalPhone) {
       toast.error("Por favor completa los campos obligatorios de fecha, hora y cliente (nombre y teléfono)")
+      return
+    }
+
+    if (clientType === "manual" && !manualContact.isValid) {
+      toast.error("Completá y verificá los datos del cliente (nombre, celular y email deben coincidir) y certificá que son veraces.")
       return
     }
 
@@ -214,6 +231,8 @@ export function NewVisitDialog({
         const result = await createManualContact({
           name: finalName,
           phone: finalPhone,
+          email: finalEmail,
+          tags: manualContact.tags,
           agent_id: finalAgentId
         });
         
@@ -228,6 +247,7 @@ export function NewVisitDialog({
         ...formData,
         nombre_completo: finalName,
         telefono: finalPhone,
+        email: finalEmail,
         lead_id: finalPhone, // Usar celular como ID de lead según requerimiento
         agency_id: agencyId,
         agent_id: finalAgentId, // Override for cases where formData.agent_id is empty
@@ -319,49 +339,11 @@ export function NewVisitDialog({
             </div>
 
             {clientType === "manual" && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2">
-                <div className="space-y-2">
-                  <Label htmlFor="nombre_completo">Nombre Completo *</Label>
-                  <Input 
-                    id="nombre_completo" 
-                    value={formData.nombre_completo}
-                    onChange={(e) => setFormData({...formData, nombre_completo: e.target.value})}
-                    placeholder="Ej: Juan Pérez"
-                    className="bg-accent/5 border-accent/10"
-                    required={clientType === "manual"}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="telefono">Teléfono *</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      id="telefono" 
-                      value={formData.telefono}
-                      onChange={(e) => setFormData({...formData, telefono: e.target.value})}
-                      placeholder="Ej: 5491143435555"
-                      className="pl-10 bg-accent/5 border-accent/10"
-                      required={clientType === "manual"}
-                      pattern="^\d+$"
-                      title="Ingresá solo números, con código de país y área (ej: 549...)"
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground leading-tight">Formato internacional completo, sin espacios ni +.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email (Opcional)</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input 
-                      id="email" 
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({...formData, email: e.target.value})}
-                      placeholder="juan@ejemplo.com"
-                      className="pl-10 bg-accent/5 border-accent/10"
-                    />
-                  </div>
-                </div>
+              <div className="animate-in fade-in slide-in-from-top-2">
+                <ManualContactFields
+                  onChange={setManualContact}
+                  inputClassName="bg-accent/5 border-accent/10"
+                />
               </div>
             )}
 
