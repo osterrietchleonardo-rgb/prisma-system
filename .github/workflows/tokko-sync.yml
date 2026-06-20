@@ -1,0 +1,20 @@
+name: PRISMA Tokko Sync
+
+on:
+  schedule:
+    # GitHub usa UTC; Argentina es UTC-3 (sin horario de verano).
+    # 10:00 UTC = 07:00 AM Argentina
+    - cron: '0 10 * * *'
+    # 21:00 UTC = 18:00 (6 PM) Argentina
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+    # Permite dispararlo manualmente desde la pestaña Actions de GitHub.
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Tokko sync endpoint (propiedades + leads, todas las agencias)
+        run: |
+          curl -sS --max-time 290 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/tokko-sync" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

@@ -1,4 +1,5 @@
 import { differenceInDays, differenceInYears } from "date-fns";
+import { deriveLeadOrigin } from "@/lib/tokko-shared";
 
 export interface TokkoTag {
   id: number;
@@ -122,10 +123,9 @@ export const normalizeLead = (lead: TokkoLead): NormalizedLead => {
 
   const safeTags = Array.isArray(lead.tags) ? lead.tags : [];
 
-  const origen = 
-    safeTags.find((t) => t && t.group_name === "Origen de contacto")?.name ??
-    safeTags.find((t) => t && t.group_name === null && ["ICasas", "Clienapp"].includes(t.name))?.name ??
-    "Sin etiqueta";
+  // Origen flexible: sirve para cualquier configuración de agencia
+  // (grupo "Origen de contacto", "Pedidos"/"Web", canales conocidos, etc.)
+  const origen = deriveLeadOrigin(safeTags) ?? "Sin etiqueta";
 
   const tipo_cliente = safeTags.find((t) => t && t.group_name === "Tipo de cliente")?.name ?? null;
   const tipo_propiedad = safeTags.filter((t) => t && t.group_name === "Tipo de propiedad").map((t) => t.name) ?? [];

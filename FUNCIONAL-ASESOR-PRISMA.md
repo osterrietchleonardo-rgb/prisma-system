@@ -121,10 +121,10 @@
 **Qué muestra:** grilla o lista de propiedades, con filtros por texto y tipo (Casa, Departamento, etc.).
 
 **Cómo usarlo:**
-- Hacé clic en una propiedad para ver su **ficha completa**: carrusel de fotos, ficha técnica (ambientes, m²), descripción, precio y datos comerciales.
+- Hacé clic en una propiedad para ver su **ficha completa**: carrusel de fotos, ficha técnica (ambientes, baños, superficie **total** y **cubierta**), descripción, precio y datos comerciales.
 - Botones de acción rápida: **"Recomendar a Lead"** o compartir la ficha.
 
-> 💡 **Tip:** las propiedades llegan automáticamente desde Tokko. Si falta una, avisale a tu director para que revise la sincronización.
+> 💡 **Tip:** las propiedades y los leads se actualizan desde Tokko **automáticamente dos veces por día (7:00 AM y 6:00 PM)**. Si falta algo puntual, avisale a tu director para que sincronice al instante.
 
 ---
 
@@ -148,11 +148,13 @@
 
 ## 8. Leads Tokko
 
-**Qué es:** los leads/contactos que llegan desde el CRM Tokko y están **asignados a vos**.
+**Qué es:** los leads/contactos que llegan desde el CRM Tokko y están **asignados a vos**. Un lead te queda asignado automáticamente cuando el agente que tiene en Tokko coincide (por email) con tu cuenta de PRISMA.
 
 **Cómo usarlo:**
-- Hacé clic en un lead para abrir su **ficha 360**: datos de contacto, propiedad consultada, etiquetas de Tokko y su ID de contacto.
+- Hacé clic en un lead para abrir su **ficha 360**: datos de contacto, **origen** real (Web/Zonaprop/Mercadolibre…), etiquetas de Tokko, ID de contacto y **última actualización**.
 - Más abajo, el **historial cronológico** de actividades del lead.
+
+> ℹ️ Tokko no informa por API la propiedad consultada, así que "Inmueble consultado" puede figurar vacío. El origen e intereses salen de las **etiquetas**.
 
 > 💡 **Tip:** antes de llamar, leé el historial. Llegás a la conversación sabiendo qué busca y por dónde va.
 
@@ -378,8 +380,8 @@ Probablemente la agencia se quedó sin créditos. Avisale a tu director para que
 **¿La firma de contratos es digital?**
 No. Es **presencial (en papel)**. PRISMA te genera el PDF listo para imprimir y firmar.
 
-**No me llega ninguna propiedad a "Mis Propiedades".**
-Las propiedades vienen de Tokko y las asigna el director. Si falta algo, avisale para revisar la sincronización.
+**No me llega ninguna propiedad (o ningún lead) a mi cuenta.**
+Las propiedades y los leads se te asignan automáticamente cuando tu **email en PRISMA coincide con tu email de agente en Tokko**. Si te registraste con un email distinto al que usás en Tokko, no se te asigna nada. Avisale al director para alinear el email o asignártelos a mano.
 
 **Cambié mi nombre pero mi email sigue igual.**
 El email no se puede cambiar desde acá (es tu acceso). El nombre sí.

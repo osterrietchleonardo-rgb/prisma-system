@@ -38,3 +38,7 @@ next-env.d.ts
 
 # Documentación Interna
 LOGICA-PRISMA.md
+
+# Scratch / secretos locales (contienen API keys de Tokko)
+_tokko_explore/
+.mcp.json

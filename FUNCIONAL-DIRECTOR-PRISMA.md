@@ -139,7 +139,12 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 **Qué es:** el catálogo completo de la cartera de la agencia (sincronizado desde Tokko).
 
-**Qué muestra:** grilla o lista con filtros por texto y tipo. Cada propiedad tiene una **ficha detallada**: carrusel de fotos, ficha técnica (ambientes, m²), descripción, responsable interno asignado, creador original en Tokko, comentarios internos y precios.
+**Qué muestra:** grilla o lista con filtros por texto y tipo. Cada propiedad tiene una **ficha detallada**: carrusel de fotos, ficha técnica (ambientes, baños, superficie **total** y **cubierta**), descripción, responsable interno asignado, creador original en Tokko y precios.
+
+> 📐 **Superficies:** "Total" es la superficie total/lote y "Cubiertos" es la superficie techada real. (Antes la cubierta a veces mostraba el lote por error; ya está corregido.)
+> 🔒 Los datos del **propietario** (nombre, teléfono, comisión) **no se muestran** en PRISMA por privacidad, aunque Tokko los exponga.
+
+> 🔄 **Sincronización automática:** PRISMA sincroniza propiedades y leads con Tokko **solo, dos veces por día (7:00 AM y 6:00 PM)**. No hace falta que sincronices a mano para que tus asesores vean los cambios; el botón manual queda para cuando necesitás algo al instante.
 
 > 💡 **Tip:** dentro de la ficha hay un botón para ver el **JSON crudo de Tokko**, útil para diagnosticar si un dato no se ve bien.
 > 💡 Si faltan propiedades, revisá la API Key de Tokko en Configuración y volvé a guardar para forzar la sincronización.
@@ -181,10 +186,11 @@ El resultado de estos objetivos se ve en el **Dashboard**, en la sección "Objet
 
 ## 9. Leads Tokko
 
-**Qué es:** todos los leads/contactos importados de Tokko (de toda la agencia).
+**Qué es:** todos los leads/contactos importados de Tokko (de toda la agencia). Al sincronizar se traen los **más recientes primero** (hasta 1000 por vez) y cada lead queda **asignado automáticamente** al asesor cuyo email coincida con el agente de Tokko.
 
-**Cómo usarlo:** abrí un lead para ver su **ficha 360** (contacto, propiedad consultada, etiquetas Tokko, ID de contacto) y el **historial** de actividades.
+**Cómo usarlo:** abrí un lead para ver su **ficha 360** (contacto, **origen** real —Web/Zonaprop/Mercadolibre—, etiquetas Tokko, agente, ID de contacto y **última actualización**) y el **historial** de actividades.
 
+> ℹ️ Tokko **no informa por API** la propiedad consultada ni el mensaje del lead, por eso "Inmueble consultado" puede figurar como "No hay propiedad vinculada". El origen y los intereses se deducen de las **etiquetas**.
 > 💡 **Tip:** usalo para auditar la calidad de atención y detectar leads "calientes" que nadie está trabajando.
 
 ---
