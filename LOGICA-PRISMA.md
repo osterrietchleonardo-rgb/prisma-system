@@ -401,6 +401,8 @@ Las tablas de webhook (`wa_messages`, `wa_conversations`) usan `service_role_key
 5. Paginación automática hasta agotar resultados
 6. Para cada propiedad de Tokko:
    - Mapea campos: `publication_title → title`, `operations[0].prices[0] → price/currency`, etc.
+   - **Superficies:** `cubierta` = `roofed_surface` (la techada real; NO `surface`, que suele ser el lote); `total` = `total_surface` con respaldo a `surface`/`roofed_surface`. Evita el bug de mostrar el lote como superficie cubierta.
+   - **Sanitización:** se elimina `internal_data` (datos del propietario, comisión, ubicación de llaves) antes de guardar `tokko_data`, para no filtrarlo al navegador.
    - Extrae imágenes: `photos[].image`
    - Mapea agente: busca `agent_id` del agente Tokko en `profiles.tokko_agent_id`
    - Genera embedding del título+descripción+dirección via `generateEmbedding()`
@@ -418,18 +420,28 @@ GET https://tokkobroker.com/api/v1/property/?key={KEY}&format=json&limit=100&off
 
 **Flujo:**
 1. Autenticación + Rate limit
-2. Fetch paginado a Tokko API con delay de 350ms entre requests (respeta rate limits de Tokko)
+2. Fetch paginado (`limit=50`, `order_by=-created_at` → más nuevos primero, tope 1000) con delay de 350ms entre requests
 3. Para cada contacto/lead:
-   - Mapea datos del contacto
-   - Asocia `assigned_agent_id` si tiene agente asignado
+   - Mapea datos del contacto (el endpoint `/contact/` trae **solo 20 campos**)
+   - **Origen** (y operación/tipo): se extraen de `tags` (`{name, group_name}`), de forma flexible por agencia — el origen real (Zonaprop/Web/Mercadolibre…) no viene como campo suelto
+   - **Asignación automática:** `assigned_agent_id` = asesor de PRISMA cuyo email coincida con `agent.email` de Tokko
 4. Upsert en `leads` con `adminClient`
+
+> **Ojo:** `deleted_at` del contacto **no es borrado** — es la fecha de **última actualización** (viene en el 100% de los contactos). No se filtra por él.
 
 **API Tokko usada:**
 ```
-GET https://tokkobroker.com/api/v1/contact/?key={KEY}&format=json&limit=20&offset={n}
+GET https://tokkobroker.com/api/v1/contact/?key={KEY}&format=json&limit=50&offset={n}&order_by=-created_at
 ```
 
-### 7.3 Proxy Tokko
+### 7.3 Sincronización Automática (cron 2×/día)
+
+**Endpoint:** `GET /api/cron/tokko-sync` (protegido por `CRON_SECRET`)
+**Workflow:** `.github/workflows/tokko-sync.yml`
+
+Un GitHub Action lo dispara **dos veces por día** — **7:00 AM** y **6:00 PM** de Argentina (`10:00` y `21:00` UTC). El endpoint recorre **todas las agencias** con `tokko_api_key` y corre el sync de **propiedades + leads** de cada una, así los asesores ven los cambios sin que el director sincronice manualmente. La lógica vive en `lib/tokko-sync.ts` (`runPropertiesSync` / `runLeadsSync`), la misma que usan los botones manuales.
+
+### 7.4 Proxy Tokko
 
 **Endpoint:** `GET /api/tokko-proxy/[...path]`  
 **Archivo:** `app/api/tokko-proxy/[...path]/route.ts`

@@ -3,135 +3,12 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export const dynamic = "force-dynamic";
-import { fetchTokko } from "@/lib/tokko"
-
-const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
-
-// ─────────────────────────────────────────────────────────────
-// Fetch ALL contacts from Tokko with pagination + rate-limit respect
-// ─────────────────────────────────────────────────────────────
-async function fetchAllTokkoContacts(apiKey: string) {
-  const MAX_CONTACTS = 1000
-  const LIMIT        = 50
-  const DELAY_MS     = 350
-
-  let all: any[]         = []
-  let offset             = 0
-  let totalCount: number | null = null
-
-  do {
-    const data = await fetchTokko(
-      `/contact/?limit=${LIMIT}&offset=${offset}`,
-      apiKey
-    )
-
-    if (data.objects && Array.isArray(data.objects)) {
-      all = [...all, ...data.objects]
-    }
-
-    if (totalCount === null) {
-      totalCount = data.meta?.total_count ?? all.length
-    }
-
-    if (all.length >= Math.min(totalCount ?? MAX_CONTACTS, MAX_CONTACTS)) break
-
-    offset += LIMIT
-    await sleep(DELAY_MS)
-  } while (offset < Math.min(totalCount ?? MAX_CONTACTS, MAX_CONTACTS))
-
-  return { contacts: all, total: totalCount ?? all.length }
-}
-
-// ─────────────────────────────────────────────────────────────
-// Map a Tokko contact object → leads row (all available fields)
-// ─────────────────────────────────────────────────────────────
-function mapTokkoContact(c: any, agencyId: string) {
-  const firstName = c.first_name || ""
-  const lastName  = c.last_name  || ""
-  const fullName  = [firstName, lastName].filter(Boolean).join(" ").trim()
-                  || c.name || "Sin nombre"
-
-  // Tags: Tokko returns them as an array of objects or strings
-  const tags: string[] = (c.tags || []).map((t: any) =>
-    typeof t === "string" ? t : t.name || t.label || String(t)
-  ).filter(Boolean)
-
-  // Property info (nested object)
-  const prop = c.property || c.properties?.[0] || null
-
-  // Build a comprehensive notes string
-  const noteParts: string[] = []
-  if (c.message)      noteParts.push(`Mensaje: ${c.message}`)
-  if (c.search_data || c.search_text)
-    noteParts.push(`Búsqueda: ${c.search_data || c.search_text}`)
-  if (prop?.publication_title || prop?.address)
-    noteParts.push(`Propiedad: ${prop?.publication_title || prop?.address}`)
-  if (prop?.price)    noteParts.push(`Precio: ${prop?.currency || ""} ${prop?.price}`)
-  if (tags.length)    noteParts.push(`Etiquetas: ${tags.join(", ")}`)
-  if (c.origin || c.source_name)
-    noteParts.push(`Origen: ${c.origin || c.source_name}`)
-
-  // Attempt to parse tokko_created_date
-  let createdDate: string | null = null
-  const rawDate = c.created_date || c.date || c.created_at
-  if (rawDate) {
-    try { createdDate = new Date(rawDate).toISOString() }
-    catch { createdDate = null }
-  }
-
-  // Find location and operation from nested objects (based on typical Tokko response)
-  const location = c.location?.name || prop?.location?.name || null
-  const operation = c.operation?.name || (tags.find(t => t === "Alquiler") ? "Alquiler" : (tags.find(t => t === "Venta") ? "Venta" : null))
-
-  // Mapping Tokko Lead Status to PRISMA Pipeline Stage
-  let pipelineStage = "nuevo";
-  const tokkoStatus = c.lead_status?.toLowerCase();
-  
-  if (tokkoStatus) {
-    if (tokkoStatus.includes("nuevo")) pipelineStage = "nuevo";
-    else if (tokkoStatus.includes("contacto") || tokkoStatus.includes("respondido")) pipelineStage = "contacto";
-    else if (tokkoStatus.includes("visita")) pipelineStage = "visita_realizada";
-    else if (tokkoStatus.includes("propuesta") || tokkoStatus.includes("reserva")) pipelineStage = "propuesta";
-    else if (tokkoStatus.includes("negociación")) pipelineStage = "negociacion";
-    else if (tokkoStatus.includes("cerrado") || tokkoStatus.includes("vendido") || tokkoStatus.includes("alquilado")) pipelineStage = "cerrado";
-    else if (tokkoStatus.includes("perdido") || tokkoStatus.includes("descartado")) pipelineStage = "perdido";
-  }
-
-  return {
-    agency_id:              agencyId,
-    full_name:              fullName,
-    email:                  c.email          || null,
-    phone:                  c.phone || c.cellphone || c.mobile || null,
-    source:                 c.source_name || c.origin || "Tokko Broker",
-    pipeline_stage:         pipelineStage,
-    status:                 c.is_active === false ? "inactive" : "active",
-    notes:                  noteParts.join("\n\n") || null,
-
-    // Tokko-specific columns
-    tokko_contact_id:       String(c.id),
-    tokko_property_id:      prop?.id   ? String(prop.id) : null,
-    tokko_property_title:   prop?.publication_title || prop?.title || null,
-    tokko_property_address: prop?.address || null,
-    tokko_property_type:    prop?.type?.name || null,
-    tokko_property_price:   prop?.price
-                               ? `${prop?.currency || ""} ${prop.price}`.trim()
-                               : null,
-    tokko_tags:             tags.length ? tags : null,
-    tokko_search_data:      c.search_data || c.search_text || c.message || null,
-    tokko_origin:           c.origin || c.source_name || null,
-    tokko_created_date:     createdDate,
-    tokko_agent_name:       c.agent?.name || null,
-    tokko_agent_email:      c.agent?.email || null,
-    tokko_agent_phone:      c.agent?.cellphone || c.agent?.phone || null,
-    tokko_agent_picture:    c.agent?.picture || null,
-    tokko_lead_status:      c.lead_status || null,
-    tokko_property_operation: operation,
-    tokko_property_location:  location,
-
-    // Full raw object for future reference
-    tokko_raw: c,
-  }
-}
+import {
+  fetchAllTokkoContacts,
+  mapTokkoContact,
+  buildAgentEmailMap,
+  runLeadsSync,
+} from "@/lib/tokko-sync"
 
 // ─────────────────────────────────────────────────────────────
 // GET — Preview contacts from Tokko (with already_imported flag)
@@ -179,11 +56,7 @@ export async function GET(_req: NextRequest) {
     )
 
     const mapped = contacts.map((c: any) => {
-      const firstName = c.first_name || ""
-      const lastName  = c.last_name  || ""
-      const fullName  = [firstName, lastName].filter(Boolean).join(" ").trim()
-                      || c.name || "Sin nombre"
-      const prop      = c.property || c.properties?.[0] || null
+      const fullName = (c.name && String(c.name).trim()) || "Sin nombre"
       const tags: string[] = (c.tags || []).map((t: any) =>
         typeof t === "string" ? t : t.name || t.label || String(t)
       ).filter(Boolean)
@@ -192,14 +65,8 @@ export async function GET(_req: NextRequest) {
         tokko_id:         String(c.id),
         full_name:        fullName,
         email:            c.email || null,
-        phone:            c.phone || c.cellphone || c.mobile || null,
-        message:          c.message || c.search_data || null,
-        property_title:   prop?.publication_title || prop?.address || null,
-        property_address: prop?.address || null,
-        property_type:    prop?.type?.name || null,
-        property_price:   prop?.price ? `${prop?.currency || ""} ${prop.price}`.trim() : null,
-        contact_date:     c.created_date || c.date || null,
-        source:           c.source_name || c.origin || "Tokko Broker",
+        phone:            c.phone || c.cellphone || null,
+        contact_date:     c.created_at || null,
         tags,
         already_imported: alreadyImported.has(String(c.id)),
       }
@@ -245,9 +112,7 @@ export async function POST(req: NextRequest) {
 
     const { mode = "all", leads: selectedLeads, assigned_agent_id } = body
 
-    let contactsToImport: any[] = []
-    let totalTokko = 0;
-
+    // ─── Modo "all": sincroniza desde Tokko (lógica compartida con el cron) ───
     if (mode === "all") {
       const { data: agency } = await supabase
         .from("agencies")
@@ -259,60 +124,61 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "API Key de Tokko no configurada." }, { status: 400 })
       }
 
-      const { contacts, total } = await fetchAllTokkoContacts(agency.tokko_api_key)
-      contactsToImport = contacts
-      totalTokko = total
-    } else {
-      contactsToImport = selectedLeads || []
+      const res = await runLeadsSync(adminClient, profile.agency_id, agency.tokko_api_key)
+      return NextResponse.json({
+        success: true,
+        imported: res.imported,
+        nuevos: res.nuevos,
+        procesados: res.procesados,
+        tokko_total: res.total,
+        errors: res.errors,
+      })
     }
 
+    // ─── Modo "selected": importa los contactos elegidos en la UI ───
+    const contactsToImport: any[] = selectedLeads || []
     if (contactsToImport.length === 0) {
       return NextResponse.json({ error: "No hay contactos para importar" }, { status: 400 })
     }
 
+    const agentEmailMap = await buildAgentEmailMap(adminClient, profile.agency_id!)
+
+    const { count: beforeTotal } = await adminClient
+      .from("leads")
+      .select("*", { count: "exact", head: true })
+      .eq("agency_id", profile.agency_id)
+
     const rows = contactsToImport.map((c: any) => ({
-      ...mapTokkoContact(c, profile.agency_id!),
+      ...mapTokkoContact(c, profile.agency_id!, agentEmailMap),
+      // Si el director eligió un asesor manual, ese gana sobre el matcheo automático
       ...(assigned_agent_id ? { assigned_agent_id } : {}),
     }))
 
     const BATCH = 100
-    let totalUpserted = 0
     let errors: any[] = []
-
     for (let i = 0; i < rows.length; i += BATCH) {
       const batch = rows.slice(i, i + BATCH)
-      const { data, error } = await adminClient
+      const { error } = await adminClient
         .from("leads")
-        .upsert(batch, {
-          onConflict: "tokko_contact_id",
-          ignoreDuplicates: false
-        })
-        .select("id")
-
-      if (error) {
-        errors.push(error);
-        console.error(`Batch ${i / BATCH + 1} error:`, error)
-      } else {
-        totalUpserted += data?.length || batch.length
-      }
+        .upsert(batch, { onConflict: "tokko_contact_id", ignoreDuplicates: false })
+      if (error) errors.push(error)
     }
 
-    if (totalUpserted === 0 && errors.length > 0) {
-      throw new Error(`Error en base de datos: ${errors[0].message}`);
-    }
-
-    // Fetch NEW total count after sync to return to UI
     const { count: finalTotal } = await adminClient
       .from("leads")
       .select("*", { count: "exact", head: true })
       .eq("agency_id", profile.agency_id)
 
-    return NextResponse.json({ 
-      success: true, 
-      imported: finalTotal || totalUpserted, // Return the actual total in DB
-      tokko_total: totalTokko,
-      added: totalUpserted,
-      errors: errors.length > 0 ? errors : undefined 
+    if ((finalTotal || 0) === (beforeTotal || 0) && errors.length > 0) {
+      throw new Error(`Error en base de datos: ${errors[0].message}`)
+    }
+
+    return NextResponse.json({
+      success: true,
+      imported: finalTotal || 0,
+      nuevos: Math.max(0, (finalTotal || 0) - (beforeTotal || 0)),
+      procesados: rows.length,
+      errors: errors.length > 0 ? errors : undefined,
     })
   } catch (error: any) {
     console.error("Tokko import error details:", error)

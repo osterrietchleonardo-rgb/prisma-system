@@ -42,11 +42,15 @@ function CRMLeadsPageContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error de sincronización");
       
-      const updatedLeads = await refetch();
-      if (data.tokko_total && data.tokko_total > 1000) {
-        toast.success(`✅ Total de ${updatedLeads?.length || 0} leads en CRM. Se importaron los 1000 más recientes de un total de ${data.tokko_total} existentes en Tokko.`, { id: toastId, duration: 8000 });
+      await refetch();
+      const nuevos = data.nuevos ?? 0;
+      const tokkoTotal = data.tokko_total ?? 0;
+      const procesados = data.procesados ?? 0;
+      const nuevosMsg = nuevos > 0 ? `Se agregaron ${nuevos} leads nuevos` : `Sin leads nuevos`;
+      if (tokkoTotal > procesados) {
+        toast.success(`✅ ${nuevosMsg}. Se sincronizan los ${procesados} más recientes (en Tokko tenés ${tokkoTotal} en total).`, { id: toastId, duration: 8000 });
       } else {
-        toast.success(`✅ Total de ${updatedLeads?.length || 0} leads sincronizados en CRM`, { id: toastId });
+        toast.success(`✅ ${nuevosMsg}. Sincronizado el total de ${tokkoTotal} contactos de Tokko.`, { id: toastId });
       }
     } catch (err: any) {
       toast.error(err.message || "Error al sincronizar leads", { id: toastId })

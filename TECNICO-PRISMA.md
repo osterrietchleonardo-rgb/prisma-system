@@ -277,9 +277,17 @@ Patrón estándar de un endpoint protegido:
 
 ### 8.1 Tokko Broker (CRM)
 - **Sync propiedades** (`/api/tokko/sync`): paginado `GET tokkobroker.com/api/v1/property/?key=...&limit=100&offset=n`; mapeo de campos + imágenes + agente (`profiles.tokko_agent_id`); genera embedding; upsert masivo con adminClient (`onConflict: tokko_id,agency_id`). Rate limit 1 req/5 min por agencia.
-- **Sync leads** (`/api/tokko/sync-leads`): `GET .../contact/?...&limit=20`, delay 350 ms entre páginas; upsert en `leads`.
+  - **Superficies** (`lib/tokko-shared.ts` → `pickSurfaces`): `covered_area` = `roofed_surface` (la techada real; NO usar `surface`, que suele ser el lote); `total_area` = `total_surface` → `surface` → `roofed_surface` (primer valor > 0). Los campos de superficie de Tokko vienen inconsistentes según quién cargó la propiedad.
+  - **Sanitización** (`stripTokkoSensitive`): se elimina `internal_data` (datos del propietario, comisiones, ubicación de llaves) del `tokko_data` antes de guardarlo, porque el detalle de propiedad sirve `tokko_data` completo al navegador.
+- **Sync leads** (`/api/tokko/sync-leads`): `GET .../contact/?...&limit=50&order_by=-created_at` (más nuevos primero), delay 350 ms entre páginas, tope 1000; upsert en `leads`.
+  - El endpoint `/contact/` devuelve **solo 20 campos** (no trae propiedad consultada ni origen como campos sueltos). El **origen** real, la operación y el tipo viven en `tags` (`{name, group_name}`); se extraen con `deriveLeadOrigin`/`findTagByGroup` de forma flexible por agencia (grupo `~origen`, o nombre de canal conocido como "Web"/"Zonaprop").
+  - **Asignación automática**: el lead se asigna al asesor de PRISMA cuyo email coincida con `agent.email` de Tokko (`buildAgentEmailMap`). Si el director elige un asesor manual, ese gana.
+  - `deleted_at` en `/contact/` **NO es borrado**: es la fecha de **última actualización** (viene en el 100% de los contactos). NO filtrar por él. Se muestra como "Última Actualización" en el detalle del lead.
 - **Proxy** (`/api/tokko-proxy/[...path]`): inyecta el `tokko_api_key` de la agencia y reenvía a Tokko.
+- **Sync automático** (cron): `GET /api/cron/tokko-sync` (protegido por `CRON_SECRET`) recorre **todas** las agencias con `tokko_api_key` y corre propiedades + leads. Lo dispara `.github/workflows/tokko-sync.yml` **2×/día** (`10:00` y `21:00` UTC = 7am y 6pm Argentina). Así los asesores ven los cambios sin que el director sincronice a mano.
+- Toda la lógica de mapeo/upsert vive en **`lib/tokko-sync.ts`** (`runPropertiesSync` / `runLeadsSync`), compartida entre los endpoints manuales y el cron — una sola fuente de verdad.
 - La API key es **por agencia** (columna `agencies.tokko_api_key`); `TOKKO_API_KEY` global es solo fallback.
+- **Configuraciones distintas por agencia**: algunas inmobiliarias toman a cada asesor como una *sucursal* (`branch.name` = `producer.name` = asesor). La asignación de propiedades sigue siendo por email del `producer`; la de leads por email del `agent`. Si el asesor no está registrado en PRISMA con su email real de Tokko, su propiedad/lead queda sin asignar (esperado).
 
 ### 8.2 Pulso de Mercado (datos reales)
 `app/api/mercado/sync/route.ts`, sync **por fuente** (`?source=`) para mantener cada request < 10 s (límite Vercel Hobby):

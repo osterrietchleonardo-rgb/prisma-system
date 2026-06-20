@@ -316,8 +316,8 @@ export default function AsesorLeadDetailPage() {
                     <p className="text-xs">{lead.tokko_created_date ? format(new Date(lead.tokko_created_date), "dd/MM/yyyy HH:mm") : "—"}</p>
                   </div>
                   <div>
-                    <p className="text-[9px] text-muted-foreground uppercase font-bold">Último Contacto</p>
-                    <p className="text-xs">{lead.tokko_raw?.last_contact_date ? format(new Date(lead.tokko_raw.last_contact_date), "dd/MM/yyyy") : "—"}</p>
+                    <p className="text-[9px] text-muted-foreground uppercase font-bold">Última Actualización</p>
+                    <p className="text-xs">{lead.tokko_raw?.deleted_at ? format(new Date(lead.tokko_raw.deleted_at), "dd/MM/yyyy HH:mm") : "—"}</p>
                   </div>
                   <div>
                     <p className="text-[9px] text-muted-foreground uppercase font-bold">ID Agente Tokko</p>
