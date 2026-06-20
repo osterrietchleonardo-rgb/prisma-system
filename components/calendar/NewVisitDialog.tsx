@@ -90,7 +90,7 @@ export function NewVisitDialog({
     leads: any[];
     waContacts: any[];
   }>({ leads: [], waContacts: [] });
-  const [clientType, setClientType] = useState<"manual" | "tokko" | "whatsapp">("manual");
+  const [clientType, setClientType] = useState<"ninguno" | "manual" | "tokko" | "whatsapp">("ninguno");
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   // Contacto manual con doble verificación + certificación
   const [manualContact, setManualContact] = useState<ManualContactData>({
@@ -294,7 +294,7 @@ export function NewVisitDialog({
         resumen_conversacion: "",
         agent_id: isAdmin ? "" : userId
       })
-      setClientType("manual");
+      setClientType("ninguno");
       setSelectedLeadId(null);
     } catch (error: any) {
       console.error(error)
@@ -322,7 +322,7 @@ export function NewVisitDialog({
             </h3>
             
             <div className="mb-4">
-              <Label>Tipo de Cliente</Label>
+              <Label>Vincular Cliente</Label>
               <Select value={clientType} onValueChange={(v: any) => {
                 setClientType(v);
                 setSelectedLeadId(null);
@@ -331,9 +331,10 @@ export function NewVisitDialog({
                   <SelectValue placeholder="Tipo de cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="manual">Nuevo Contacto (Manual)</SelectItem>
+                  <SelectItem value="ninguno">Ninguno</SelectItem>
                   <SelectItem value="tokko">Lead (Tokko / Web)</SelectItem>
                   <SelectItem value="whatsapp">Contacto WhatsApp</SelectItem>
+                  <SelectItem value="manual">Nuevo Contacto (Manual)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
