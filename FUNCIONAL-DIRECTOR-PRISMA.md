@@ -35,6 +35,7 @@
 23. [Créditos IA: cómo administrarlos](#23-créditos-ia-cómo-administrarlos)
 24. [Checklist de puesta en marcha](#24-checklist-de-puesta-en-marcha)
 25. [Preguntas frecuentes](#25-preguntas-frecuentes)
+26. [Personalizaciones de tu agencia](#26-personalizaciones-de-tu-agencia)
 
 ---
 
@@ -499,6 +500,19 @@ La recarga la administra el equipo de PRISMA (Vakdor). Usá **Sugerencias** o el
 
 **¿Cuál es la diferencia entre "Leads Tokko" y "Leads WhatsApp"?**
 Los primeros vienen del CRM Tokko; los segundos se capturaron por WhatsApp. El **Pipeline** los une a ambos en un solo tablero.
+
+---
+
+## 26. Personalizaciones de tu agencia
+
+PRISMA es modular: cada agencia puede tener funciones **habilitadas o deshabilitadas** según su plan o sus necesidades. Esta sección deja registrado qué ajustes específicos tiene cada cliente, para mantener la trazabilidad de qué funciona en cada caso.
+
+> 📎 **Si te pasan o pasás esta guía a una agencia puntual:** dejá únicamente el bloque que le corresponde a esa agencia y borrá los demás.
+
+### Inmobiliaria de Kevin Arlandi
+
+- **Contratos IA — deshabilitado.** El módulo "Contratos IA" no está disponible para esta agencia. En el menú lateral aparece **atenuado (en gris) con la etiqueta «Deshabilitada»** y no se puede abrir; si se intenta entrar por el enlace directo, el sistema redirige automáticamente al Dashboard. Aplica al **director y a todos los asesores** de la agencia.
+- _Vigente desde: 22/06/2026._
 
 ---
 

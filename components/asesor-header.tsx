@@ -21,11 +21,12 @@ interface AsesorHeaderProps {
   userName?: string
   userEmail?: string
   agencyName?: string
+  agencyId?: string
   userRole?: string
   aiCredits?: { allocated: number; consumed: number } | null
 }
 
-export function AsesorHeader({ userName, userEmail, agencyName, userRole }: AsesorHeaderProps) {
+export function AsesorHeader({ userName, userEmail, agencyName, agencyId, userRole }: AsesorHeaderProps) {
   const pathname = usePathname()
   const [customTitle, setCustomTitle] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -75,6 +76,7 @@ export function AsesorHeader({ userName, userEmail, agencyName, userRole }: Ases
               <AsesorSidebar
                 className="border-none"
                 agencyName={agencyName}
+                agencyId={agencyId}
                 userName={userName}
                 userRole={userRole}
                 onSelect={() => setOpen(false)}

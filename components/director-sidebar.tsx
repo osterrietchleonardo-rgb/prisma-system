@@ -23,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { logout } from "@/lib/actions/auth"
+import { contratosIaDeshabilitado } from "@/lib/access/contratos-ia"
 import BrandLogo from "./brand-logo"
 
 const navItems = [
@@ -49,12 +50,13 @@ const navItems = [
 interface DirectorSidebarProps {
   className?: string
   agencyName?: string
+  agencyId?: string
   userName?: string
   userRole?: string
   onSelect?: () => void
 }
 
-export function DirectorSidebar({ className, agencyName, userName, userRole, onSelect }: DirectorSidebarProps) {
+export function DirectorSidebar({ className, agencyName, agencyId, userName, userRole, onSelect }: DirectorSidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -84,6 +86,28 @@ export function DirectorSidebar({ className, agencyName, userName, userRole, onS
         <nav className="space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+
+            // "Contratos IA" deshabilitada solo para la agencia indicada
+            const isDisabled =
+              item.href.endsWith("/contratos-ia") && contratosIaDeshabilitado(agencyId)
+
+            if (isDisabled) {
+              return (
+                <div
+                  key={item.href}
+                  aria-disabled="true"
+                  title="Función no disponible en tu plan"
+                  className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-muted-foreground/40 cursor-not-allowed select-none"
+                >
+                  <item.icon className="w-4 h-4" />
+                  {item.name}
+                  <span className="ml-auto text-[9px] font-bold uppercase tracking-wide bg-muted text-muted-foreground/60 px-1.5 py-0.5 rounded">
+                    Deshabilitada
+                  </span>
+                </div>
+              )
+            }
+
             return (
               <Link
                 key={item.href}
@@ -91,8 +115,8 @@ export function DirectorSidebar({ className, agencyName, userName, userRole, onS
                 onClick={onSelect}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all",
-                  isActive 
-                    ? "bg-accent text-accent-foreground shadow-sm" 
+                  isActive
+                    ? "bg-accent text-accent-foreground shadow-sm"
                     : "text-muted-foreground hover:bg-accent/10 hover:text-foreground"
                 )}
               >
