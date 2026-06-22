@@ -19,6 +19,7 @@ import { getTrackingOptions } from "@/actions/tracking/getTrackingOptions"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Search, MapPin } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { triggerCalendarSync } from "@/lib/google-calendar/triggerSync"
 
 interface EditVisitDialogProps {
   visit: any | null
@@ -112,6 +113,9 @@ export function EditVisitDialog({ visit, open, onOpenChange, onSuccess, agencyId
         .eq("id", visit.id)
 
       if (error) throw error
+
+      // Actualizar el evento espejo en Google Calendar (best-effort, no bloquea).
+      triggerCalendarSync(visit.id)
 
       toast.success("Visita reprogramada exitosamente")
       onSuccess()

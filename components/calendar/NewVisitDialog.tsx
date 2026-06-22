@@ -40,6 +40,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { getTrackingOptions } from "@/actions/tracking/getTrackingOptions"
 import { createManualContact } from "@/actions/whatsapp/createManualContact"
 import { ManualContactFields, ManualContactData } from "@/components/shared/ManualContactFields"
+import { triggerCalendarSync } from "@/lib/google-calendar/triggerSync"
 
 interface NewVisitDialogProps {
   open: boolean
@@ -264,11 +265,16 @@ export function NewVisitDialog({
       // Eliminar el campo que no existe en la base de datos
       delete insertData.propiedad_colaboracion;
 
-      const { error } = await supabase
+      const { data: inserted, error } = await supabase
         .from("scheduled_visits")
         .insert(insertData)
+        .select("id")
+        .single()
 
       if (error) throw error
+
+      // Espejo en Google Calendar del asesor (best-effort, no bloquea).
+      triggerCalendarSync(inserted?.id)
 
       toast.success("Visita agendada correctamente")
       onSuccess()

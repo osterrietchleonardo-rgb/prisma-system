@@ -527,6 +527,23 @@ Los primeros vienen del CRM Tokko; los segundos se capturaron por WhatsApp. El *
 
 ---
 
+## 25-bis. Sincronización de visitas con Google Calendar
+
+Tanto vos (director) como cada asesor pueden **vincular su propia cuenta de Google** para que sus visitas aparezcan en su calendario personal. Es **opcional y personal**: cada uno conecta la suya desde **Configuración → pestaña «Integraciones» → Conectar Google Calendar**.
+
+**La regla de oro:** cada visita se sincroniza al Google de **una sola persona: el "asesor responsable" de esa visita**. No importa quién la creó, sino a quién está asignada.
+
+**Qué significa para vos como director:**
+- **Vos también podés conectar tu Google** y agendarte **visitas propias**. Para eso, en **Calendario → Nueva Visita**, elegite **a vos mismo** en el campo «Asesor Responsable». Esa visita irá **solo a tu** Google.
+- Las visitas de tus asesores tienen como responsable al asesor → van **al Google de cada asesor**, **nunca al tuyo**. Tu calendario de Google no se llena con las visitas del equipo.
+- Si creás una visita y se la asignás a un asesor, el evento aparece en **el Google de ese asesor** (si lo conectó), no en el tuyo.
+- El **calendario de PRISMA** del director sigue mostrando **todas** las visitas de la agencia como siempre. Lo que cambia es solo qué se espeja en cada Google personal.
+- La sincronización es **de PRISMA hacia Google**, una sola dirección: si alguien borra el evento en su Google, la visita **sigue intacta en PRISMA**. Si Google falla, la visita **igual se guarda** (nunca bloquea el agendado).
+
+> Nota de puesta en marcha: requiere que el administrador (Vakdor) tenga configuradas las credenciales de Google en el servidor. Si en la pestaña Integraciones aparece "la integración no está habilitada", avisá a soporte.
+
+---
+
 ## 26. Personalizaciones de tu agencia
 
 PRISMA es modular: cada agencia puede tener funciones **habilitadas o deshabilitadas** según su plan o sus necesidades. Esta sección deja registrado qué ajustes específicos tiene cada cliente, para mantener la trazabilidad de qué funciona en cada caso.

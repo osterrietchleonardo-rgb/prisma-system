@@ -1919,6 +1919,11 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 | `/api/messages/bot-reply` | POST | BOT_REPLY_SECRET | Bot reply legacy |
 | `/api/n8n/reply` | POST | N8N_REPLY_SECRET | Reply desde n8n |
 | `/api/push/subscribe` | POST, DELETE | Sesión | Push notifications |
+| `/api/google-calendar/connect` | GET | Sesión | Inicia OAuth Google Calendar |
+| `/api/google-calendar/callback` | GET | Sesión | Guarda refresh token encriptado |
+| `/api/google-calendar/status` | GET | Sesión | Estado de conexión del asesor |
+| `/api/google-calendar/disconnect` | POST | Sesión | Revoca y borra la llave |
+| `/api/google-calendar/sync` | POST | Sesión | Reconcilia visita ↔ evento (best-effort) |
 | `/api/tokko/sync` | POST | Tenant + Rate limit | Sync propiedades |
 | `/api/tokko/sync-leads` | POST | Tenant + Rate limit | Sync leads |
 | `/api/tokko-proxy/[...path]` | GET | Sesión | Proxy Tokko API |

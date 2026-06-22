@@ -411,6 +411,29 @@ El email no se puede cambiar desde acá (es tu acceso). El nombre sí.
 
 ---
 
+## 21-bis. Conectar tu Google Calendar (opcional)
+
+Podés vincular tu cuenta de Google para que **tus visitas aparezcan automáticamente en tu calendario personal**.
+
+**Cómo se conecta:**
+1. Andá a **Configuración → pestaña «Integraciones»**.
+2. Tocá **«Conectar Google Calendar»**.
+3. Elegí tu cuenta de Google y aceptá los permisos. Listo: vas a ver el cartel verde **«Conectado»** con tu email.
+
+**Qué hace una vez conectado:**
+- 📅 Cuando **agendás** una visita en PRISMA, se crea sola en tu Google Calendar.
+- ✏️ Cuando **reprogramás** (cambiás fecha/hora), el evento se **actualiza** solo.
+- 🗑️ Cuando **cancelás**, el evento se **borra** de tu calendario.
+
+**Cosas importantes:**
+- Es **opcional**. Si no lo conectás, PRISMA funciona igual; solo que tus visitas no van a tu Google.
+- La sincronización va **de PRISMA hacia Google**, no al revés. Si borrás el evento en Google, la visita **sigue intacta** en PRISMA.
+- Si alguna vez Google está caído o falla, la visita **igual se guarda** en PRISMA (nunca se pierde).
+- Para desconectar: mismo lugar, botón **«Desconectar»**.
+- Si te aparece una pantalla de Google diciendo *"app no verificada"*, es normal mientras se completa la verificación: tocá **«Continuar»** y seguí.
+
+---
+
 ## 22. Personalizaciones de tu agencia
 
 PRISMA es modular: tu agencia puede tener funciones **habilitadas o deshabilitadas** según su plan. Esta sección deja registrado qué ajustes específicos tiene cada cliente.
