@@ -125,6 +125,17 @@
 - Hacé clic en una propiedad para ver su **ficha completa**: carrusel de fotos, ficha técnica (ambientes, baños, superficie **total** y **cubierta**), descripción, precio y datos comerciales.
 - Botones de acción rápida: **"Recomendar a Lead"** o compartir la ficha.
 
+### 6.1 Descripción mejorada con IA
+
+Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), tenés el bloque **"Descripción mejorada con IA"**. Sirve para generar una descripción profesional, con storytelling y optimizada para buscadores (SEO/GEO), a partir de **todos los datos** de la propiedad.
+
+**Cómo funciona:**
+- **Generar descripción con IA:** crea la **Versión 1**. La IA toma tipo, ubicación, ambientes, superficies, precio, servicios/etiquetas, etc., y arma un texto humanizado, emocional (apunta a los deseos del comprador ideal **sin inventar** datos), sin emojis, profesional y con viñetas sutiles. Incluye un bloque de **Preguntas Frecuentes (FAQ)** pensado para posicionar en Google y en buscadores de IA (ChatGPT, Gemini, Perplexity).
+- **Generar Versión 2:** una vez que existe la V1, podés escribir una **sugerencia** (ej.: *"resaltá la luz natural y la cercanía al subte"*) y la IA reescribe la descripción aplicándola, basándose en la V1.
+- **Copiar:** cada versión tiene su botón **Copiar** para que la pegues en Tokko si querés publicarla. La descripción original de Tokko **nunca se modifica**; lo que generás queda **guardado** y disponible siempre que abras la ficha.
+
+> ⚠️ Cada generación **consume 1 crédito de IA**. El tope es **2 versiones por propiedad** (V1 y V2); no se puede volver a generar.
+
 > 💡 **Tip:** las propiedades y los leads se actualizan desde Tokko **automáticamente dos veces por día (7:00 AM y 6:00 PM)**. Si falta algo puntual, avisale a tu director para que sincronice al instante.
 
 ---

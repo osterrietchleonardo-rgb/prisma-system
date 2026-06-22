@@ -29,6 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { createClient } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { AiDescription } from "@/components/propiedades/AiDescription"
 
 export default function PropertyDetailPage() {
   const { id } = useParams()
@@ -280,6 +281,7 @@ export default function PropertyDetailPage() {
               <p className="text-muted-foreground leading-relaxed whitespace-pre-line text-lg">
                 {property.description}
               </p>
+              <AiDescription propertyId={property.id} initial={property.ai_description} />
             </Card>
 
             {/* Tokko Extras (Tags) */}

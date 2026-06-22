@@ -129,7 +129,7 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 - `agency_invites` — agency_id, code, is_used, used_at, used_by.
 
 **Propiedades y leads**
-- `properties` — tokko_id, agency_id, assigned_agent_id, título, precio, moneda, tipo, estado, ubicación, ambientes/baños, superficies, images[], `tokko_data` (jsonb), `embedding vector(768)`.
+- `properties` — tokko_id, agency_id, assigned_agent_id, título, precio, moneda, tipo, estado, ubicación, ambientes/baños, superficies, images[], `tokko_data` (jsonb), `embedding vector(768)`, `ai_description` (jsonb: `{v1, v2, suggestion, model, v1_at, v2_at}` — descripción mejorada con IA; aislada del sync de Tokko, ver §Propiedades en la capa de API).
 - `leads` — agency_id, assigned_agent_id, datos de contacto, source, status, pipeline_stage, tokko_contact_id, first_response_time, `chat_analysis` (jsonb).
 - `lead_activities` — historial de actividades.
 - `scheduled_visits` — agendamiento de visitas (lead, propiedad/zona, fecha/hora, calificación, score_bant, intereses, objeciones, decisores, resumen, origen, `estado_visita`: agendada/cancelada/completada, motivo_cambio).
@@ -246,6 +246,9 @@ Patrón estándar de un endpoint protegido:
 - `POST /api/marketing-ia/generate-batch`, `/generate-image` (flujo vigente). `POST /api/marketing-ia/generate-copy` existe pero está **sin uso en la UI** (legacy, ver §20).
 - `GET/POST /api/marketing-ia/settings` (POST solo director), `POST /api/marketing-ia/settings/upload-logo`.
 - `GET /api/marketing-ia/tokko-search`.
+
+**Propiedades**
+- `POST /api/propiedades/[id]/ai-description` — genera la **descripción mejorada con IA** de una propiedad. Body `{ version: 1|2, suggestion?: string }`. Valida agencia (`requireTenant` + chequeo `property.agency_id`), consume 1 crédito (`consumeAiCredits("propiedades_descripcion")`), llama a `prismaIA` (`gemini-3.5-flash`), registra costo real por tokens (`updateAiTransactionCost`) y guarda en `properties.ai_description` (jsonb) con `createAdminClient()` (el asesor no tiene UPDATE por RLS). **Tope estricto:** rechaza (409) si la versión pedida ya existe o si se pide V2 sin V1. La V2 reescribe la V1 aplicando `suggestion`. No toca `properties.description` (la de Tokko). Componente UI: `components/propiedades/AiDescription.tsx`, embebido en las fichas de asesor y director.
 
 **Tokko**
 - `POST /api/tokko/sync` (propiedades), `POST /api/tokko/sync-leads`, `GET /api/tokko-proxy/[...path]`.

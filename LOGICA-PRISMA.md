@@ -416,6 +416,25 @@ Las tablas de webhook (`wa_messages`, `wa_conversations`) usan `service_role_key
 GET https://tokkobroker.com/api/v1/property/?key={KEY}&format=json&limit=100&offset={n}
 ```
 
+### 7.1.bis Descripción mejorada con IA (por propiedad)
+
+**Endpoint:** `POST /api/propiedades/[id]/ai-description`
+**Archivo:** `app/api/propiedades/[id]/ai-description/route.ts`
+**UI:** `components/propiedades/AiDescription.tsx` (embebido en la ficha de asesor y de director, debajo de la descripción de Tokko).
+
+**Objetivo:** generar una descripción de venta/alquiler profesional a partir de **todos** los datos de la propiedad, sin pisar la descripción original de Tokko. El prompt (`ESTILO` en el route) pide: storytelling con capa **emocional** (deseos/anhelos del comprador ideal inferidos de tipo+zona+atributos reales, **sin inventar**), optimización **SEO + GEO** (frases clave orgánicas + afirmaciones autocontenidas y entidades concretas que los motores de IA citan mejor), un bloque de **Preguntas Frecuentes (FAQ)** con respuestas basadas solo en datos provistos, tono humano (voseo) sin emojis y viñetas sutiles.
+
+**Flujo:**
+1. `requireTenant()` + chequeo explícito `property.agency_id === agencyId` (aislamiento).
+2. **Tope estricto** (control de gasto): solo existen **V1** y **V2** por propiedad. Si la versión pedida ya existe, o se pide V2 sin V1, responde `409` y **no consume crédito**.
+3. `consumeAiCredits("propiedades_descripcion", 1)` → reserva 1 crédito y devuelve `txId`.
+4. Construye el prompt con el contexto completo (tipo, operación, precio/expensas, ubicación, ambientes, baños, superficies, antigüedad, orientación, disposición, tags y la descripción de Tokko como referencia de datos). Para **V2** suma la **V1** + la **sugerencia** del usuario y pide reescribirla.
+5. `prismaIA.generateContent()` (`gemini-3.5-flash`, modelo económico).
+6. `updateAiTransactionCost(txId, ...)` con tokens reales (`usageMetadata`) → costo USD real en el panel de IA.
+7. Guarda en `properties.ai_description` (jsonb) con `createAdminClient()` (el asesor no tiene UPDATE por RLS; ya se validó la agencia). El sync de Tokko **nunca** toca esta columna.
+
+**Por qué columna nueva y no `description`:** la descripción de Tokko se pisa en cada sincronización; guardar la versión IA en `ai_description` evita perderla y permite copiarla/verla siempre y pegarla manualmente en Tokko si se quiere publicar.
+
 ### 7.2 Sincronización de Leads
 
 **Endpoint:** `POST /api/tokko/sync-leads`  
