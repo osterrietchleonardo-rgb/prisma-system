@@ -150,6 +150,16 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 > 💡 **Tip:** dentro de la ficha hay un botón para ver el **JSON crudo de Tokko**, útil para diagnosticar si un dato no se ve bien.
 > 💡 Si faltan propiedades, revisá la API Key de Tokko en Configuración y volvé a guardar para forzar la sincronización.
 
+### 7.1 Descripción mejorada con IA
+
+En la ficha de cada propiedad, debajo de la descripción de Tokko, está el bloque **"Descripción mejorada con IA"**. Genera una descripción profesional con storytelling emocional (apunta a los deseos del comprador ideal **sin inventar**), un bloque de **Preguntas Frecuentes (FAQ)** y optimización **SEO + GEO** (Google y buscadores de IA), usando **todos los datos** de la propiedad. Lo pueden usar tanto **vos como tus asesores**.
+
+- **Versión 1:** se genera a partir de los datos de la propiedad.
+- **Versión 2:** se genera sobre la V1 aplicando una **sugerencia** escrita por quien la usa.
+- Cada versión queda **guardada** (no se pierde al recargar) y se puede **copiar** para pegarla en Tokko. La descripción original de Tokko **no se toca** y se sigue pisando en cada sincronización.
+
+> ⚠️ **Costo:** cada generación **consume 1 crédito de IA** (modelo `gemini-3.5-flash`, económico). El tope es **estricto: 2 versiones por propiedad** (V1 + V2), para mantener el gasto bajo control. El costo real por tokens queda registrado en el panel de consumo de IA.
+
 ---
 
 ## 8. Tracking Performance
