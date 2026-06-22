@@ -335,6 +335,9 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 - **`tutor_chat_sessions`** — Sesiones del Tutor IA
 - **`tutor_chat_messages`** — Mensajes del Tutor IA
 - **`agency_documents`** — Documentos subidos (con embedding para RAG)
+- **`document_folders`** — Carpetas de la Biblioteca de Conocimiento (IA)
+- **`official_documents`** — Documentos Oficiales descargables (NO consultados por IA)
+- **`official_document_folders`** — Carpetas de los Documentos Oficiales
 - **`ipc_profiles`** — Perfiles de IPC para Marketing IA (Ideal Prospect Client)
 - **`generated_images`** — Imágenes generadas por Marketing IA
 - **`valuations`** — Tasaciones generadas
@@ -1248,6 +1251,17 @@ Extrae texto de un documento ya subido (sin generar embedding).
 
 - `'director'` — Solo directores
 - `'asesor'` — Todos los miembros de la agencia
+
+### 18.4 Documentos Oficiales descargables (sección aparte, NO consultada por IA)
+
+Solapa independiente dentro de `/director/documentos` y `/asesor/documentos` para alojar **documentación oficial de la agencia** (contratos, reglamentos, etc.) pensada para **descarga**, sin ningún procesamiento de IA.
+
+- **Aislamiento total de la IA:** vive en tablas propias (`official_documents` y `official_document_folders`) que la IA **no conoce**. El RAG (`match_agency_documents`) solo lee `agency_documents`, por lo que es imposible que el Tutor IA consulte estos archivos.
+- **Sin embeddings ni extracción de texto:** la subida va directo del navegador a Supabase Storage (bucket `documents`, prefijo `official/{agencyId}/`) + insert en `official_documents`. No consume créditos IA.
+- **Director:** crea carpetas con nombre personalizado, sube archivos (sin límite de tamaño), reemplaza por una versión nueva (borra la anterior del storage y sube `version`), mueve entre carpetas, elimina y descarga.
+- **Asesor:** acceso **solo lectura** — navega carpetas y descarga; no ve botones de gestión (`readOnly` en el componente compartido).
+- **Componente compartido:** `components/documentos/OfficialDocsSection.tsx` (prop `readOnly` distingue asesor de director).
+- **Permisos (RLS):** ver = cualquier miembro de la agencia; gestionar = solo `director`.
 
 ---
 
