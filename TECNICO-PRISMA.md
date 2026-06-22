@@ -514,6 +514,22 @@ Login (`POST /api/admin-vakdor/login`): rate limit 5/10min; hash SHA-256 con sal
 | Admin Vakdor | `ADMIN_VAKDOR_JWT_SECRET` |
 | Secrets | `BOT_REPLY_SECRET`, `DISPATCH_SECRET`, `CRON_SECRET` |
 | Push | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (+ clave privada VAPID server-side) |
+| Google Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENCRYPTION_KEY` (32 bytes), opcional `GOOGLE_OAUTH_REDIRECT_URI` |
+
+---
+
+## 19.1 Integración Google Calendar (sync una dirección PRISMA → Google)
+
+Sincroniza las visitas (`scheduled_visits`) hacia el Google Calendar personal de cada asesor que conecta su cuenta. **Una sola dirección**: PRISMA es la fuente de verdad; lo que pase en Google no altera PRISMA.
+
+- **Scope OAuth:** `https://www.googleapis.com/auth/calendar.events` (mínimo, sensible). `access_type=offline` + `prompt=consent` para obtener `refresh_token`.
+- **Almacenamiento:** tabla `google_calendar_tokens` (`user_id` PK → `profiles`, `refresh_token_enc`, `google_email`, `scope`). El refresh token se guarda **encriptado AES-256-GCM** (`lib/google-calendar/crypto.ts`). RLS activa; el backend accede con `service_role`. Nunca se expone el token al cliente.
+- **Columna espejo:** `scheduled_visits.google_event_id` guarda el id del evento de Google para poder editarlo/borrarlo.
+- **Librería** (`lib/google-calendar/`): `config.ts` (env/redirect/scope), `client.ts` (fetch directo a OAuth + Calendar API v3, sin dependencia `googleapis`), `sync.ts` → `reconcileVisit(visitId)` idempotente (crea/actualiza/borra según `estado_visita` y `google_event_id`; nunca lanza), `triggerSync.ts` (helper cliente fire-and-forget).
+- **Disparo:** tras `insert`/`update`/`cancel` en cliente, se llama `triggerCalendarSync(visitId)` → `POST /api/google-calendar/sync` (best-effort, no bloquea ni rompe el guardado). Puntos cableados: `NewVisitDialog`, `EditVisitDialog`, cancelación en `app/asesor/calendario`.
+- **Rutas:** `connect` (inicia OAuth), `callback` (guarda token), `status` (estado conexión), `disconnect` (revoca + borra), `sync` (reconcilia). Todas `runtime = "nodejs"`.
+- **UI:** pestaña *Integraciones* en `app/asesor/configuracion`.
+- **Requisito Google Cloud:** registrar redirect URI `<APP_URL>/api/google-calendar/callback` (y `http://localhost:3000/...` para dev). El scope de calendario es sensible → requiere verificación de la app (en producción funciona con pantalla de advertencia hasta verificar).
 
 ---
 

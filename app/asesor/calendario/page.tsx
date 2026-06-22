@@ -55,6 +55,7 @@ import { es } from "date-fns/locale"
 import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { triggerCalendarSync } from "@/lib/google-calendar/triggerSync"
 
 export default function AsesorCalendarioPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -97,6 +98,9 @@ export default function AsesorCalendarioPage() {
         .eq("id", cancelingVisit.id)
 
       if (error) throw error
+
+      // Borrar el evento espejo en Google Calendar (best-effort, no bloquea).
+      triggerCalendarSync(cancelingVisit.id)
 
       toast.success("Visita cancelada")
       setCancelingVisit(null)

@@ -13,7 +13,12 @@ import {
   Copy,
   Plus,
   Sparkles,
-  BarChart3
+  BarChart3,
+  CalendarCheck,
+  Link2,
+  Unlink,
+  Loader2,
+  CheckCircle2
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -69,7 +74,63 @@ export default function DirectorConfiguracionPage() {
   // Real Invite codes
   const [inviteCodes, setInviteCodes] = useState<any[]>([])
 
+  // Google Calendar
+  const [gcal, setGcal] = useState<{ configured: boolean; connected: boolean; email: string | null }>(
+    { configured: true, connected: false, email: null }
+  )
+  const [gcalLoading, setGcalLoading] = useState(true)
+  const [gcalActionLoading, setGcalActionLoading] = useState(false)
+
   const supabase = createClient()
+
+  const fetchGcalStatus = async () => {
+    try {
+      const res = await fetch("/api/google-calendar/status")
+      if (res.ok) {
+        const d = await res.json()
+        setGcal({ configured: d.configured, connected: d.connected, email: d.email })
+      }
+    } catch {
+      /* noop */
+    } finally {
+      setGcalLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchGcalStatus()
+  }, [])
+
+  // Mensajes de retorno del flujo OAuth (?google=...)
+  useEffect(() => {
+    const g = searchParams.get("google")
+    if (!g) return
+    if (g === "conectado") toast.success("¡Google Calendar conectado! Las visitas que te asignes se sincronizarán.")
+    else if (g === "cancelado") toast.info("Conexión con Google cancelada.")
+    else if (g === "sin_refresh") toast.error("No se pudo obtener el permiso. Probá conectar de nuevo y aceptá todos los permisos.")
+    else if (g === "no_config") toast.error("La integración con Google aún no está configurada. Avisá a soporte.")
+    else if (g === "error") toast.error("Hubo un problema al conectar con Google. Intentá de nuevo.")
+    window.history.replaceState(null, "", "/director/configuracion?tab=integraciones")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleConnectGoogle = () => {
+    window.location.href = "/api/google-calendar/connect"
+  }
+
+  const handleDisconnectGoogle = async () => {
+    try {
+      setGcalActionLoading(true)
+      const res = await fetch("/api/google-calendar/disconnect", { method: "POST" })
+      if (!res.ok) throw new Error()
+      setGcal((g) => ({ ...g, connected: false, email: null }))
+      toast.success("Google Calendar desconectado.")
+    } catch {
+      toast.error("No se pudo desconectar. Intentá de nuevo.")
+    } finally {
+      setGcalActionLoading(false)
+    }
+  }
 
   useEffect(() => {
     async function fetchData() {
@@ -301,6 +362,9 @@ export default function DirectorConfiguracionPage() {
           </TabsTrigger>
           <TabsTrigger value="seguridad" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
             <Lock className="h-4 w-4" /> Accesso & Seguridad
+          </TabsTrigger>
+          <TabsTrigger value="integraciones" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+            <CalendarCheck className="h-4 w-4" /> Integraciones
           </TabsTrigger>
         </TabsList>
 
@@ -548,6 +612,83 @@ export default function DirectorConfiguracionPage() {
                   <Switch defaultChecked />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── INTEGRACIONES ── */}
+        <TabsContent value="integraciones" className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300">
+          <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarCheck className="h-5 w-5 text-accent" />
+                Google Calendar
+              </CardTitle>
+              <CardDescription>
+                Conectá tu cuenta de Google para que las visitas que <strong>te asignás a vos mismo</strong> aparezcan en tu calendario personal.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {gcalLoading ? (
+                <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Verificando conexión...
+                </div>
+              ) : !gcal.configured ? (
+                <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-500">
+                  La integración con Google todavía no está habilitada en el servidor. Contactá a soporte.
+                </div>
+              ) : gcal.connected ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-emerald-500/10">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Conectado</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {gcal.email ? `Cuenta: ${gcal.email}` : "Tu Google Calendar está vinculado"}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleDisconnectGoogle}
+                      disabled={gcalActionLoading}
+                      className="gap-2"
+                    >
+                      {gcalActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unlink className="h-4 w-4" />}
+                      Desconectar
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-1 border border-accent/10 rounded-lg p-4 bg-background/40">
+                    <p>📌 Solo se sincronizan a tu Google las visitas en las que <strong>vos</strong> figurás como asesor responsable.</p>
+                    <p>Las visitas de tus asesores van al Google de cada uno (no al tuyo).</p>
+                    <p className="pt-1 italic">La sincronización es de PRISMA hacia Google. Borrar el evento en Google no afecta la visita en PRISMA.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-accent/20 bg-accent/5">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-accent/10">
+                        <CalendarCheck className="h-5 w-5 text-accent" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-sm">Sin conectar</h4>
+                        <p className="text-xs text-muted-foreground">Conectá tu Google para sincronizar tus visitas propias.</p>
+                      </div>
+                    </div>
+                    <Button onClick={handleConnectGoogle} className="bg-accent hover:bg-accent/90 gap-2">
+                      <Link2 className="h-4 w-4" /> Conectar Google Calendar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground border border-dashed border-border rounded-lg p-3">
+                    💡 Es opcional. Para agendarte una visita propia: en <strong>Calendario → Nueva Visita</strong>, elegite a vos mismo en «Asesor Responsable».
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
