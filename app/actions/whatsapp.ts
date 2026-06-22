@@ -1138,6 +1138,7 @@ export interface SendCampaignMessageInput {
   body_variables: string[];
   header_variables?: string[];
   template_full_text: string; // El texto armado "Hola Juan..." para guardar en el historial
+  bot_active?: boolean; // si los chats NUEVOS de esta campaña nacen con el bot IA prendido (default true)
 }
 
 export async function sendCampaignMessage(
@@ -1275,11 +1276,8 @@ export async function sendCampaignMessage(
 
     if (convData) {
       conversation_id = convData.id;
-      // Activar bot para que la IA responda cuando el lead conteste
-      await supabase
-        .from('wa_conversations')
-        .update({ bot_active: true })
-        .eq('id', conversation_id)
+      // El chat ya existe: NO tocamos su bot_active para no pisar la configuración
+      // que el asesor/director haya puesto a mano en esa conversación.
     } else {
       // Heredar la clasificación del contacto en la agenda (si existe), para que el
       // chat creado por la campaña aparezca ya clasificado en bandeja y Leads WhatsApp.
@@ -1296,7 +1294,7 @@ export async function sendCampaignMessage(
           agency_id,
           contact_phone: cleanPhone,
           contact_name: input.name,
-          bot_active: true,
+          bot_active: input.bot_active ?? true,
           unread_count: 0,
           clasificacion: contactClasif?.clasificacion ?? null
         })

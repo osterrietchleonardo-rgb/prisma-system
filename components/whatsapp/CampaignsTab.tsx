@@ -14,7 +14,9 @@ import {
   Info,
   Eye,
   Loader2,
-  Send
+  Send,
+  Bot,
+  BotOff
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,12 +24,13 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
+import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { EmptyState } from "./EmptyState"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
-import { syncTemplatesFromMeta, sendCampaignMessage, updateContactCampaignStatus } from "@/app/actions/whatsapp"
+import { syncTemplatesFromMeta, sendCampaignMessage, updateContactCampaignStatus, validateMetaToken } from "@/app/actions/whatsapp"
 import type { WATemplate, WAContact } from "@/types/whatsapp"
 import { CampaignState } from "./CampaignState"
 import { ScheduledCampaignManager } from "./ScheduledCampaignManager"
@@ -56,25 +59,26 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
   const [variableMode, setVariableMode] = useState<Record<string, "column" | "manual">>({})
   const [preflightStats, setPreflightStats] = useState({ total: 0, toSend: 0, toSkip: 0 })
   const [isSending, setIsSending] = useState(false)
+  const [botActiveOnReply, setBotActiveOnReply] = useState(true)
+  const [liveTier, setLiveTier] = useState<string | null>(instance?.messaging_limit_tier ?? null)
   const [progress, setProgress] = useState(0)
   const [results, setResults] = useState<{success: number, error: number, skipped: number, total: number}>({ success: 0, error: 0, skipped: 0, total: 0 })
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // ─── Helpers (must be defined BEFORE any useEffect that uses them) ───
+  // Parser robusto: soporta cualquier tier (TIER_2K, TIER_5K, etc.), no solo los fijos.
   const getMessagingLimitNumber = (tier: string | null | undefined): number => {
     if (!tier) return 250
-    switch (tier) {
-      case 'TIER_50': return 50
-      case 'TIER_250': return 250
-      case 'TIER_1K': return 1000
-      case 'TIER_10K': return 10000
-      case 'TIER_100K': return 100000
-      case 'TIER_UNLIMITED': return Infinity
-      default: return 250
-    }
+    const t = String(tier).toUpperCase()
+    if (t.includes('UNLIMITED')) return Infinity
+    const k = t.match(/(\d+)\s*K/)
+    if (k) return parseInt(k[1], 10) * 1000
+    const n = t.match(/(\d+)/)
+    if (n) return parseInt(n[1], 10)
+    return 250
   }
 
-  const limitNumber = getMessagingLimitNumber(instance?.messaging_limit_tier)
+  const limitNumber = getMessagingLimitNumber(liveTier ?? instance?.messaging_limit_tier)
 
   const isRowSkipped = (row: any, templateName: string | undefined): boolean => {
     if (!row || !templateName || !row.campaign_statuses) return false
@@ -124,6 +128,11 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
   // ─── Effects ───
   useEffect(() => {
     loadApprovedTemplates()
+    // Leer el límite real de Meta en vivo (igual que la campaña por goteo),
+    // para no mostrar el default de 250 cuando el tier guardado está desactualizado.
+    validateMetaToken().then(tk => {
+      if (tk.success && tk.data?.messaging_limit_tier) setLiveTier(tk.data.messaging_limit_tier)
+    }).catch(() => {})
     const sync = (c: WAContact[]) => {
       setSelectedContactsList(c)
       if (c.length === 0) {
@@ -298,7 +307,8 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
            template_language: selectedTemplate.language || "es_AR",
            header_variables: headerParams.length > 0 ? headerParams : undefined,
            body_variables: bodyParams,
-           template_full_text: fullText.trim() || `[Plantilla enviada: ${selectedTemplate.template_name}]`
+           template_full_text: fullText.trim() || `[Plantilla enviada: ${selectedTemplate.template_name}]`,
+           bot_active: botActiveOnReply
          })
 
          if (res.success) {
@@ -573,8 +583,27 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                       </div>
                     </div>
                   )}
-                  <Button 
-                    className="w-full h-12 text-lg font-bold shadow-lg shadow-primary/20" 
+                  {/* Bot IA en las respuestas: decide si los chats NUEVOS de esta campaña
+                      nacen con la IA prendida (clientes) o apagada (reclutamiento, etc). */}
+                  <div className="flex items-start justify-between gap-4 rounded-lg border p-3 bg-muted/20 mb-4">
+                    <div className="flex items-start gap-3">
+                      {botActiveOnReply
+                        ? <Bot className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                        : <BotOff className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />}
+                      <div>
+                        <Label className="text-sm font-medium">Bot IA en las respuestas de esta campaña</Label>
+                        <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
+                          {botActiveOnReply
+                            ? "Cuando un contacto responda, la IA le contesta automáticamente. Ideal para captación de clientes."
+                            : "La IA NO responde: los chats nacen en modo manual. Usalo para reclutamiento u otros envíos que no son clientes."}
+                          {" "}Solo afecta a chats nuevos; los chats ya existentes no se tocan.
+                        </p>
+                      </div>
+                    </div>
+                    <Switch checked={botActiveOnReply} onCheckedChange={setBotActiveOnReply} disabled={isSending} className="mt-0.5" />
+                  </div>
+                  <Button
+                    className="w-full h-12 text-lg font-bold shadow-lg shadow-primary/20"
                     size="lg"
                     onClick={startCampaign}
                     disabled={isSending || parsedData.length === 0 || !selectedTemplate}

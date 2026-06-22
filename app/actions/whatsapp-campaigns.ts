@@ -34,6 +34,7 @@ export interface CreateSegmentCampaignInput {
   variable_map: Record<string, unknown>
   audience_clasificacion: string | null
   daily_limit: number | null
+  bot_active_on_reply: boolean
 }
 
 export async function createSegmentCampaign(
@@ -56,6 +57,7 @@ export async function createSegmentCampaign(
         variable_map: input.variable_map || {},
         audience_clasificacion: input.audience_clasificacion,
         daily_limit: input.daily_limit,
+        bot_active_on_reply: input.bot_active_on_reply,
         status: 'paused', // se crea pausada: el director la inicia con "Lanzar ahora"
         created_by: user_id,
       })
@@ -90,6 +92,7 @@ export interface CampaignWithStats {
   template_name: string
   audience_clasificacion: string | null
   daily_limit: number | null
+  bot_active_on_reply: boolean
   status: string
   created_at: string
   total: number
@@ -106,7 +109,7 @@ export async function getCampaignsWithStats(): Promise<{ success: boolean; data?
 
     const { data: campaigns, error } = await supabase
       .from('wa_campaigns')
-      .select('id, name, template_name, audience_clasificacion, daily_limit, status, created_at')
+      .select('id, name, template_name, audience_clasificacion, daily_limit, bot_active_on_reply, status, created_at')
       .eq('agency_id', agency_id)
       .order('created_at', { ascending: false })
 
