@@ -205,7 +205,9 @@ export async function processCampaign(
             agency_id: campaign.agency_id,
             contact_phone: cleanPhone,
             contact_name: r.name,
-            bot_active: true,
+            // El director decide al crear la campaña si los chats nuevos nacen con
+            // el bot IA prendido o apagado (ej: reclutamiento → apagado). Default true.
+            bot_active: campaign.bot_active_on_reply ?? true,
             unread_count: 0,
             clasificacion: contactClasif?.clasificacion ?? campaign.audience_clasificacion ?? null,
           })

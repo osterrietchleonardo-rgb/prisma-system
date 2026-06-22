@@ -18,7 +18,8 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarClock, Pause, Trash2, Loader2, Rocket } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { CalendarClock, Pause, Trash2, Loader2, Rocket, Bot, BotOff } from "lucide-react"
 import { toast } from "sonner"
 
 interface Props {
@@ -73,6 +74,7 @@ export function ScheduledCampaignManager({ instance }: Props) {
   const [name, setName] = useState("")
   const [templateId, setTemplateId] = useState("")
   const [audience, setAudience] = useState("__all__")
+  const [botActiveOnReply, setBotActiveOnReply] = useState(true)
   const [headerMap, setHeaderMap] = useState<Record<string, VarEntry>>({})
   const [bodyMap, setBodyMap] = useState<Record<string, VarEntry>>({})
   const [creating, setCreating] = useState(false)
@@ -148,12 +150,13 @@ export function ScheduledCampaignManager({ instance }: Props) {
       variable_map,
       audience_clasificacion: audience === "__all__" ? null : audience,
       daily_limit: null, // el límite lo verifica el sistema contra Meta automáticamente
+      bot_active_on_reply: botActiveOnReply,
     })
     setCreating(false)
 
     if (res.success) {
       toast.success(`Campaña creada con ${res.enrolled ?? 0} contactos en cola. Tocá "Lanzar ahora" para empezar a enviar.`)
-      setName(""); setTemplateId(""); setAudience("__all__"); setHeaderMap({}); setBodyMap({})
+      setName(""); setTemplateId(""); setAudience("__all__"); setBotActiveOnReply(true); setHeaderMap({}); setBodyMap({})
       await refreshCampaigns()
     } else {
       toast.error(res.error || "Error al crear la campaña")
@@ -276,6 +279,26 @@ export function ScheduledCampaignManager({ instance }: Props) {
             </div>
           </div>
 
+          {/* Bot IA en las respuestas: el director decide si los chats que cree esta
+              campaña nacen con la IA prendida (clientes) o apagada (reclutamiento, etc). */}
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-3 bg-muted/20">
+            <div className="flex items-start gap-3">
+              {botActiveOnReply
+                ? <Bot className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
+                : <BotOff className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />}
+              <div>
+                <Label className="text-sm font-medium">Bot IA en las respuestas de esta campaña</Label>
+                <p className="text-[12px] text-muted-foreground mt-0.5 leading-relaxed">
+                  {botActiveOnReply
+                    ? "Cuando un lead responda, la IA le contesta automáticamente. Ideal para captación de clientes."
+                    : "La IA NO responde: los chats nacen en modo manual. Usalo para reclutamiento u otros envíos que no son clientes."}
+                  {" "}Solo afecta a chats nuevos; los chats ya existentes no se tocan.
+                </p>
+              </div>
+            </div>
+            <Switch checked={botActiveOnReply} onCheckedChange={setBotActiveOnReply} className="mt-0.5" />
+          </div>
+
           {/* Aviso dinámico según el límite real de Meta */}
           <div className="-mt-2 text-[12px] rounded-lg border bg-accent/5 border-accent/15 p-3 leading-relaxed">
             {tokenOk === false ? (
@@ -334,6 +357,12 @@ export function ScheduledCampaignManager({ instance }: Props) {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm">{c.name}</span>
                         <Badge variant="outline" className={STATUS_STYLE[c.status]}>{STATUS_LABEL[c.status] || c.status}</Badge>
+                        <Badge variant="outline" className={c.bot_active_on_reply
+                          ? "bg-accent/10 text-accent border-accent/20 gap-1"
+                          : "bg-muted text-muted-foreground border-border gap-1"}>
+                          {c.bot_active_on_reply ? <Bot className="h-3 w-3" /> : <BotOff className="h-3 w-3" />}
+                          {c.bot_active_on_reply ? "Bot IA" : "Sin bot"}
+                        </Badge>
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
                         Plantilla: {c.template_name} · Segmento: {c.audience_clasificacion || "Todos"}
