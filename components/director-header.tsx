@@ -31,11 +31,12 @@ interface DirectorHeaderProps {
   userName?: string
   userEmail?: string
   agencyName?: string
+  agencyId?: string
   userRole?: string
   aiCredits?: { allocated: number; consumed: number } | null
 }
 
-export function DirectorHeader({ userName, userEmail, agencyName, userRole, aiCredits }: DirectorHeaderProps) {
+export function DirectorHeader({ userName, userEmail, agencyName, agencyId, userRole, aiCredits }: DirectorHeaderProps) {
   const pathname = usePathname()
   const [customTitle, setCustomTitle] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
@@ -84,11 +85,12 @@ export function DirectorHeader({ userName, userEmail, agencyName, userRole, aiCr
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-72">
-              <DirectorSidebar 
-                className="border-none" 
-                agencyName={agencyName} 
-                userName={userName} 
-                userRole={userRole} 
+              <DirectorSidebar
+                className="border-none"
+                agencyName={agencyName}
+                agencyId={agencyId}
+                userName={userName}
+                userRole={userRole}
                 onSelect={() => setOpen(false)}
               />
             </SheetContent>

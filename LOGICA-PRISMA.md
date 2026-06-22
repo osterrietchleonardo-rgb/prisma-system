@@ -927,6 +927,8 @@ Busca propiedades en la cartera Tokko de la agencia para vincular a un IPC de ti
 > original y del PDF generado en Storage, y una vista diferenciada por rol (director ve todo
 > el equipo; asesor solo lo suyo). Migración: `supabase/migrations/20260612120000_contratos_ia_gestion.sql`.
 
+> **Personalización por agencia (jun-2026).** El módulo es **deshabilitable por cliente** vía `lib/access/contratos-ia.ts` (`CONTRATOS_IA_AGENCIA_DESHABILITADA` + `contratosIaDeshabilitado(agencyId)`). Para esas agencias: (1) en los sidebars el ítem "Contratos IA" se muestra atenuado con badge "Deshabilitada" y no es navegable; (2) las páginas `app/{director,asesor}/contratos-ia/page.tsx` redirigen al dashboard del rol si `profiles.agency_id` coincide. Cliente actual: **Kevin Arlandi** (`4962bf85-a92c-4c33-ba07-380686bbab76`). Es el patrón base para futuras customizaciones de accesos por cliente.
+
 ### 14.0 Cambios de esquema (migración `20260612120000_contratos_ia_gestion`)
 
 **`contract_templates`** — nuevas columnas:

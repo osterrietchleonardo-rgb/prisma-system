@@ -108,6 +108,7 @@ export default async function DirectorLayout({
       <aside className="hidden md:flex md:w-72 md:flex-col md:flex-shrink-0 z-50">
         <DirectorSidebar
           agencyName={agencyName}
+          agencyId={profile?.agency_id}
           userName={profile?.full_name || "Usuario"}
           userRole="Director"
         />
@@ -119,6 +120,7 @@ export default async function DirectorLayout({
           userName={profile?.full_name || "Usuario"}
           userEmail={profile?.email || ""}
           agencyName={agencyName}
+          agencyId={profile?.agency_id}
           userRole="Director"
           aiCredits={aiCredits ? { allocated: aiCredits.credits_total, consumed: aiCredits.credits_used } : null}
         />

@@ -31,6 +31,7 @@
 19. [Sugerencias](#19-sugerencias)
 20. [Créditos IA: cómo funcionan para vos](#20-créditos-ia-cómo-funcionan-para-vos)
 21. [Preguntas frecuentes](#21-preguntas-frecuentes)
+22. [Personalizaciones de tu agencia](#22-personalizaciones-de-tu-agencia)
 
 ---
 
@@ -385,6 +386,19 @@ Las propiedades y los leads se te asignan automáticamente cuando tu **email en 
 
 **Cambié mi nombre pero mi email sigue igual.**
 El email no se puede cambiar desde acá (es tu acceso). El nombre sí.
+
+---
+
+## 22. Personalizaciones de tu agencia
+
+PRISMA es modular: tu agencia puede tener funciones **habilitadas o deshabilitadas** según su plan. Esta sección deja registrado qué ajustes específicos tiene cada cliente.
+
+> 📎 **Si te pasan o pasás esta guía a una agencia puntual:** dejá únicamente el bloque que le corresponde a esa agencia y borrá los demás.
+
+### Inmobiliaria de Kevin Arlandi
+
+- **Contratos IA — deshabilitado.** El módulo "Contratos IA" no está disponible para esta agencia. En el menú aparece **atenuado (en gris) con la etiqueta «Deshabilitada»** y no se puede abrir; si se intenta entrar por el enlace directo, el sistema redirige automáticamente al Dashboard. Aplica a **todos los asesores y al director** de la agencia.
+- _Vigente desde: 22/06/2026._
 
 ---
 
