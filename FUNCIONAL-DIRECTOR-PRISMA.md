@@ -317,6 +317,20 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 
 > 💡 **Tip:** subí guiones de venta, manejo de objeciones y procedimientos. El Tutor IA los usará para capacitar a tu equipo automáticamente.
 
+### Solapa "Documentos Oficiales" (descargables, sin IA)
+
+Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** (lo de arriba) y **"Documentos Oficiales"**.
+
+**Qué es:** una sección **aparte** para la **documentación oficial de la agencia** (contratos, reglamentos, formularios). A diferencia de la Biblioteca, **la IA NO consulta estos archivos**: es solo para que tu equipo los **descargue**.
+
+**Cómo usarla:**
+1. **Creá carpetas** con el nombre que quieras (ej. "Reglamentos", "Modelos de contrato").
+2. **Subí archivos** (cualquier formato, sin límite de tamaño — se alojan en la nube).
+3. **Reemplazá por una versión nueva** (botón ↻): se sube la nueva y se borra la anterior; el documento muestra "v2", "v3", etc.
+4. **Mové** archivos entre carpetas, **eliminá** y **descargá** cuando quieras.
+
+> 🔒 Tus **asesores** ven esta solapa en **solo lectura**: solo navegan carpetas y descargan, no pueden subir ni modificar nada.
+
 ---
 
 ## 16. Tasaciones

@@ -156,6 +156,7 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 - `consultor_chat_sessions` / `consultor_chat_messages` — Buscador IA (memoria por sesión).
 - `tutor_chat_sessions` / `tutor_chat_messages` — Tutor IA.
 - `agency_documents` — base de conocimiento con embedding para RAG (title, type, file_url/video_url, content_text, embedding, visibility, ai_enabled, folder_id).
+- `official_documents` / `official_document_folders` — Documentos Oficiales descargables (sin embedding, **NO consultados por IA**; file_url en bucket `documents` prefijo `official/`, version, file_size).
 - `ipc_profiles` — perfiles IPC de Marketing IA.
 - `generated_images` — imágenes generadas.
 - `roomix_properties` — cartera global pre-sincronizada por el crawler (operation, ubicación, precio, `roomix_agency_name`, canonical_url, imágenes CDN).
@@ -398,6 +399,8 @@ Analytics **sin IA** (agregación pura), solo director. Lee `wa_conversations.me
 
 ### 10.8 Documentos / base de conocimiento
 `/api/documents/process`: extracción por tipo → `generateEmbedding(texto[:5000])` → `agency_documents` (con `visibility` director/asesor). El backend soporta PDF/imagen (Gemini), DOCX (mammoth), CSV (papaparse) y YouTube (transcript), pero el **uploader de la UI solo acepta `.pdf/.doc/.docx/.csv` + YouTube** (no permite seleccionar imágenes). Para docs `director` (privados) hay un flag `ai_enabled` que habilita su consulta por Tutor IA sin exponer el archivo. Subida directa a Storage `documents` (evita el límite de 4.5 MB de Vercel).
+
+**Documentos Oficiales descargables** (solapa aparte, **NO consultada por IA**): tablas propias `official_documents` + `official_document_folders`, aisladas del RAG (`match_agency_documents` solo lee `agency_documents`). Sin embeddings ni extracción: el cliente sube directo a Storage (bucket `documents`, prefijo `official/{agencyId}/`) e inserta la fila — no consume créditos IA. Componente compartido `components/documentos/OfficialDocsSection.tsx` (prop `readOnly`): director gestiona (crear/subir/reemplazar versión/mover/eliminar/descargar), asesor solo lee y descarga. RLS: ver = miembro de la agencia, gestionar = solo `director`. Reemplazo de versión = sube archivo nuevo, `version+1`, borra el anterior del storage.
 
 ---
 

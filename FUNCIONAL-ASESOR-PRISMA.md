@@ -313,6 +313,17 @@
 
 > 💡 **Tip:** si te falta material (un guion, un instructivo), pedíselo al director para que lo suba.
 
+### Solapa "Documentos Oficiales" (solo descarga)
+
+Arriba de la pantalla tenés dos solapas: **"Biblioteca Digital"** (lo de arriba) y **"Documentos Oficiales"**.
+
+**Qué es:** la **documentación oficial de la agencia** (contratos, reglamentos, formularios) que el director subió para que la tengas a mano.
+
+**Cómo usarla:**
+- Navegá las **carpetas** y **descargá** los archivos que necesites.
+- Es **solo lectura**: no podés subir ni modificar (eso lo gestiona el director).
+- Esta sección **no se consulta con la IA**: es solo para descargar el archivo oficial.
+
 ---
 
 ## 18. Configuración

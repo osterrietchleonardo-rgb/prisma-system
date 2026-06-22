@@ -58,8 +58,11 @@ import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import OfficialDocsSection from "@/components/documentos/OfficialDocsSection"
 
 export default function DocumentosPage() {
+  // Solapa de nivel superior: biblioteca IA vs documentos oficiales descargables
+  const [section, setSection] = useState<"biblioteca" | "oficiales">("biblioteca")
   const [documents, setDocuments] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
@@ -378,7 +381,18 @@ export default function DocumentosPage() {
   });
 
   return (
-    <div className="flex flex-col h-full space-y-4 p-4 md:p-8 pt-6 overflow-hidden">
+    <div className="flex flex-col h-full p-4 md:p-8 pt-6 overflow-hidden">
+      <Tabs value={section} onValueChange={(v) => setSection(v as "biblioteca" | "oficiales")} className="flex flex-col h-full">
+        <TabsList className="bg-muted/50 p-1 rounded-xl border border-accent/10 self-start mb-4">
+          <TabsTrigger value="biblioteca" className="rounded-lg px-4 h-9 text-sm data-[state=active]:bg-card data-[state=active]:text-accent gap-2">
+            <Sparkles className="h-4 w-4" /> Biblioteca de Conocimiento (IA)
+          </TabsTrigger>
+          <TabsTrigger value="oficiales" className="rounded-lg px-4 h-9 text-sm data-[state=active]:bg-card data-[state=active]:text-accent gap-2">
+            <FileBadge className="h-4 w-4" /> Documentos Oficiales
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="biblioteca" className="flex-1 flex flex-col space-y-4 overflow-hidden mt-0 data-[state=inactive]:hidden">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
@@ -389,7 +403,7 @@ export default function DocumentosPage() {
             Gestión inteligente de archivos, manuales y capacitaciones para tu agencia.
           </p>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <Dialog open={isFolderModalOpen} onOpenChange={setIsFolderModalOpen}>
             <DialogTrigger asChild>
@@ -870,6 +884,12 @@ export default function DocumentosPage() {
           </div>
         )}
       </main>
+        </TabsContent>
+
+        <TabsContent value="oficiales" className="flex-1 overflow-hidden mt-0 data-[state=inactive]:hidden">
+          <OfficialDocsSection />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
