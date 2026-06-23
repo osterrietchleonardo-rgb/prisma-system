@@ -7,6 +7,7 @@
 import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js"
 import { fetchTokko, syncPropertiesFromTokko, syncAgentsFromTokko } from "./tokko"
 import { pickSurfaces, stripTokkoSensitive, deriveLeadOrigin, findTagByGroup } from "./tokko-shared"
+import { generateEmbedding } from "./gemini"
 
 export function getAdminClient(): SupabaseClient {
   return createAdminClient(
@@ -74,6 +75,73 @@ function mapTokkoProperty(p: any, agencyId: string, agencyProfiles: any[] | null
   }
 }
 
+// Texto canonico que se vectoriza por propiedad (mismo formato que el backfill).
+function buildPropertyEmbedText(p: {
+  title?: string | null
+  property_type?: string | null
+  address?: string | null
+  city?: string | null
+  description?: string | null
+}) {
+  return [p.title, p.property_type, p.address, p.city, p.description]
+    .map((v) => (v ?? "").toString().trim())
+    .filter(Boolean)
+    .join(" ")
+}
+
+/**
+ * Genera embeddings (Gemini) para propiedades NUEVAS o cuyo texto cambio.
+ * - Best-effort: si Gemini falla en una, no corta el sync; la retoma el proximo sync.
+ * - Tope por corrida (MAX_PER_RUN) para no agotar timeouts/limites; el resto se completa
+ *   en corridas siguientes porque quedan con embedding NULL.
+ */
+async function syncPropertyEmbeddings(
+  admin: SupabaseClient,
+  agencyId: string,
+  mapped: { tokko_id: string; title: any; description: any; address: any; city: any; property_type: any }[],
+  prevTextByTokkoId: Map<string, string>,
+) {
+  const MAX_PER_RUN = 100
+  const tokkoIds = mapped.map((p) => p.tokko_id)
+
+  // tokko_ids sin embedding (recien insertados o pendientes de corridas anteriores)
+  const missing = new Set<string>()
+  const CH = 300
+  for (let i = 0; i < tokkoIds.length; i += CH) {
+    const chunk = tokkoIds.slice(i, i + CH)
+    const { data } = await admin
+      .from("properties")
+      .select("tokko_id")
+      .eq("agency_id", agencyId)
+      .in("tokko_id", chunk)
+      .is("embedding", null)
+    for (const r of data || []) missing.add(r.tokko_id)
+  }
+
+  // (Re)embeddear: sin embedding, o con texto (titulo/desc/direccion/ciudad/tipo) modificado.
+  const toEmbed = mapped.filter((p) => {
+    const newText = buildPropertyEmbedText(p)
+    if (!newText) return false
+    if (missing.has(p.tokko_id)) return true
+    const prev = prevTextByTokkoId.get(p.tokko_id)
+    return prev !== undefined && prev !== newText
+  })
+
+  let embedded = 0
+  for (const p of toEmbed.slice(0, MAX_PER_RUN)) {
+    try {
+      const embedding = await generateEmbedding(buildPropertyEmbedText(p))
+      await admin.from("properties").update({ embedding }).eq("agency_id", agencyId).eq("tokko_id", p.tokko_id)
+      embedded++
+      await sleep(300)
+    } catch (e: any) {
+      console.error(`Embedding propiedad ${p.tokko_id} fallo (no corta sync):`, e?.message || e)
+    }
+  }
+
+  return { embedded, pendientes: Math.max(0, toEmbed.length - embedded) }
+}
+
 /** Sincroniza TODAS las propiedades de una agencia. Devuelve la cantidad procesada. */
 export async function runPropertiesSync(admin: SupabaseClient, agencyId: string, apiKey: string) {
   const [tokkoProperties, tokkoAgents] = await Promise.all([
@@ -88,9 +156,28 @@ export async function runPropertiesSync(admin: SupabaseClient, agencyId: string,
 
   const propertiesToUpsert = tokkoProperties.map((p: any) => mapTokkoProperty(p, agencyId, agencyProfiles))
 
+  // Texto previo (ANTES del upsert) para detectar modificaciones que requieren re-embedding.
+  const prevTextByTokkoId = new Map<string, string>()
+  {
+    const ids = propertiesToUpsert.map((p) => p.tokko_id)
+    const CH = 300
+    for (let i = 0; i < ids.length; i += CH) {
+      const chunk = ids.slice(i, i + CH)
+      const { data } = await admin
+        .from("properties")
+        .select("tokko_id, title, description, address, city, property_type")
+        .eq("agency_id", agencyId)
+        .in("tokko_id", chunk)
+      for (const row of data || []) prevTextByTokkoId.set(row.tokko_id, buildPropertyEmbedText(row))
+    }
+  }
+
   if (propertiesToUpsert.length > 0) {
     const { error } = await admin.from("properties").upsert(propertiesToUpsert, { onConflict: "tokko_id" })
     if (error) throw error
+
+    // Embeddings automaticos para propiedades nuevas/modificadas (best-effort, no corta el sync).
+    await syncPropertyEmbeddings(admin, agencyId, propertiesToUpsert as any, prevTextByTokkoId)
   }
 
   // Desactivar propiedades que ya no están en Tokko
