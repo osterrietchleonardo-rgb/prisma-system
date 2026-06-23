@@ -59,7 +59,10 @@ const PROPERTY_LIMIT = process.env.PROPERTY_LIMIT !== undefined ? parseInt(proce
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const SITEMAP_URLS = Array.from({ length: 6 }, (_, i) =>
+// Roomix expone sitemaps de propiedades numerados 0..N. Antes leíamos 0..5 y
+// nos salteábamos el 6 (≈30k URLs). Configurable por si crece el catálogo.
+const SITEMAP_COUNT = process.env.SITEMAP_COUNT !== undefined ? parseInt(process.env.SITEMAP_COUNT) : 7;
+const SITEMAP_URLS = Array.from({ length: SITEMAP_COUNT }, (_, i) =>
   `https://roomix.ai/properties/sitemap/${i}`
 );
 
@@ -70,6 +73,61 @@ const SITEMAP_TIMEOUT = 90_000; // Los sitemaps son XML pesados, necesitan más 
 const SITEMAP_RETRIES = 3;
 const CHECKPOINT_FILE = resolve(__dirname, 'checkpoint.json');
 const xmlParser = new XMLParser({ ignoreAttributes: false });
+
+// ─── Prioridad: Ventas + AMBA primero ─────────────────────────────────────────
+// Roomix tiene páginas de listado ya filtradas por operación+zona en /buscar/comprar/<seed>.
+// Las usamos como fuente prioritaria de propiedades EN VENTA (paginadas con ?page=N).
+// Grupos de listados de venta en orden de prioridad (tier). El tier de una propiedad
+// = el del PRIMER grupo donde aparece (por eso AMBA captura primero, luego provincia, luego país).
+//   tier 0 = Venta AMBA (CABA + conurbano norte/sur/oeste)
+//   tier 1 = Venta resto provincia de Buenos Aires
+//   tier 2 = Venta resto de Argentina
+const VENTA_SEED_GROUPS = [
+  { tier: 0, label: 'AMBA', seeds: ['en-capital-federal', 'en-zona-norte', 'en-zona-sur', 'en-zona-oeste'] },
+  { tier: 1, label: 'Prov. BsAs', seeds: ['en-buenos-aires'] },
+  { tier: 2, label: 'Argentina', seeds: ['en-argentina'] },
+];
+// Tope de páginas por seed (0 = sin tope, recorre todo). Para pruebas: VENTA_MAX_PAGES=2
+const VENTA_MAX_PAGES = process.env.VENTA_MAX_PAGES !== undefined ? parseInt(process.env.VENTA_MAX_PAGES) : 0;
+
+// Barrios de CABA + partidos del conurbano (AMBA), en forma "slug" (sin acentos, con guiones).
+// Se usa solo para ORDENAR la cola (best-effort): si no matchea, no afecta la corrección de datos.
+const AMBA_TOKENS = new Set([
+  // CABA
+  'palermo','recoleta','belgrano','caballito','almagro','flores','floresta','balvanera','barracas',
+  'saavedra','nunez','colegiales','chacarita','boedo','san-telmo','monserrat','retiro','constitucion',
+  'puerto-madero','parque-patricios','paternal','agronomia','coghlan','liniers','mataderos',
+  'parque-chacabuco','parque-chas','velez-sarsfield','versalles','villa-crespo','villa-urquiza',
+  'villa-lugano','villa-devoto','villa-del-parque','villa-general-mitre','villa-ortuzar',
+  'villa-pueyrredon','villa-real','villa-riachuelo','villa-santa-rita','villa-soldati','monte-castro',
+  'nueva-pompeya','pompeya','once','barrio-norte','microcentro','centro','distrito-centro','congreso',
+  'abasto','las-canitas','las-caitas','caitas','san-cristobal','san-nicolas',
+  // GBA / conurbano (AMBA)
+  'vicente-lopez','san-isidro','tigre','san-fernando','pilar','escobar','malvinas-argentinas',
+  'jose-c-paz','san-miguel','moreno','merlo','moron','ituzaingo','hurlingham','tres-de-febrero',
+  'san-martin','general-san-martin','la-matanza','ramos-mejia','lomas-de-zamora','lanus','avellaneda',
+  'quilmes','berazategui','florencio-varela','almirante-brown','esteban-echeverria','ezeiza',
+  'presidente-peron','san-vicente','adrogue','banfield','temperley','bernal','wilde','sarandi',
+  'olivos','martinez','beccar','boulogne','victoria','munro','florida','villa-ballester','caseros',
+  'ciudadela','castelar','haedo','palomar','el-palomar','don-torcuato','benavidez','nordelta','garin',
+  'del-viso','villa-rosa'
+]);
+
+function isAmba(slug) {
+  if (!slug) return false;
+  const s = `-${slug}-`;
+  for (const t of AMBA_TOKENS) if (s.includes(`-${t}-`)) return true;
+  return false;
+}
+
+// Prioridad (menor = se procesa antes):
+//   0 = Venta AMBA | 1 = Venta resto prov. BsAs | 2 = Venta resto Argentina
+//   3 = Alquiler AMBA | 4 = Alquiler resto
+// Todas las VENTAS bajan antes que cualquier ALQUILER.
+function priorityRank(entry) {
+  if (entry._venta) return entry._vtier ?? 2;
+  return isAmba(entry.slug) ? 3 : 4;
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -99,6 +157,15 @@ function saveCheckpoint(processedIds) {
     last_run: new Date().toISOString(),
     count: processedIds.size
   }, null, 2), 'utf-8');
+}
+
+// El checkpoint sirve para REANUDAR una corrida que se cortó a la mitad. Si la corrida
+// terminó bien, lo vaciamos: así la próxima vez NO bloquea las propiedades que cambiaron
+// (el diff por lastmod las vuelve a bajar y actualizar).
+function clearCheckpoint() {
+  try {
+    writeFileSync(CHECKPOINT_FILE, JSON.stringify({ processed_ids: [], last_run: new Date().toISOString(), count: 0 }, null, 2), 'utf-8');
+  } catch (e) { log('⚠️', 'No se pudo limpiar checkpoint:', e.message); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -132,6 +199,79 @@ async function initBrowser() {
   return { browser, context };
 }
 
+// fetch DENTRO del browser (mantiene el fingerprint TLS de Chromium y el clearance de CF)
+async function browserFetch(page, url) {
+  return page.evaluate(async (u) => {
+    try {
+      const res = await fetch(u, { credentials: 'include' });
+      if (!res.ok) return { error: `HTTP ${res.status}`, status: res.status };
+      return { text: await res.text(), status: res.status };
+    } catch (e) {
+      return { error: e.message, status: 0 };
+    }
+  }, url);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STEP 1.5: VENTAS (fuente prioritaria desde /buscar/comprar/<seed>?page=N)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+async function fetchVentaSeeds(context) {
+  log('🏷️', 'Recolectando propiedades EN VENTA (prioridad por zona)...');
+  const byId = new Map();
+  const page = await context.newPage();
+  try {
+    await page.goto('https://roomix.ai/', { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
+    await sleep(1500);
+
+    for (const group of VENTA_SEED_GROUPS) {
+      const before = byId.size;
+      for (const seed of group.seeds) {
+        let pageNum = 1, emptyStreak = 0;
+        while (true) {
+          if (VENTA_MAX_PAGES > 0 && pageNum > VENTA_MAX_PAGES) break;
+          const url = `https://roomix.ai/buscar/comprar/${seed}?page=${pageNum}`;
+
+          let res = await browserFetch(page, url);
+          if (res.error) {
+            if (res.status === 403 || res.status >= 500) {
+              await sleep(8000);
+              res = await browserFetch(page, url); // un reintento
+            }
+            if (res.error) { log('⚠️', `venta/${seed} p${pageNum} → ${res.error}, corto seed`); break; }
+          }
+
+          // Los slugs de propiedad terminan en "-<8 hex>"; ese sufijo es el id.
+          const found = new Set();
+          const re = /\\?"slug\\?":\\?"([a-z0-9-]+-[0-9a-f]{8})(?=\\?")/gi;
+          let m;
+          while ((m = re.exec(res.text))) found.add(m[1]);
+
+          let added = 0;
+          for (const slug of found) {
+            const id = slug.slice(slug.lastIndexOf('-') + 1);
+            if (byId.has(id)) continue; // ya visto en un grupo de mayor prioridad → conserva su tier
+            byId.set(id, { loc: `https://roomix.ai/propiedad/${slug}`, slug, id, lastmod: null, _venta: true, _vtier: group.tier });
+            added++;
+          }
+          log('🏷️', `venta[${group.label}]/${seed} p${pageNum}: +${added} nuevas (acum ${byId.size})`);
+
+          if (added === 0) { if (++emptyStreak >= 2) break; } else emptyStreak = 0;
+          pageNum++;
+          await sleep(1200);
+        }
+      }
+      log('🏷️', `Grupo ${group.label} (tier ${group.tier}): +${byId.size - before} ventas`);
+    }
+  } catch (e) {
+    log('⚠️', `fetchVentaSeeds falló (sigo con sitemaps): ${e.message}`);
+  } finally {
+    await page.close();
+  }
+  log('🏷️', `Total propiedades en venta recolectadas: ${byId.size}`);
+  return [...byId.values()];
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // STEP 2: SITEMAPS (Via fetch DENTRO del browser para mantener fingerprint CF)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -139,6 +279,7 @@ async function initBrowser() {
 async function fetchSitemaps(context) {
   log('📡', `Descargando ${SITEMAP_URLS.length} sitemaps via browser fetch...`);
   const allEntries = [];
+  let allOk = true; // si algún sitemap falla, NO habilitamos el borrado (catálogo incompleto)
   const page = await context.newPage();
   
   // Navegar a roomix.ai para tener el origin correcto (evita CORS/Failed to fetch)
@@ -213,12 +354,13 @@ async function fetchSitemaps(context) {
       }
     }
 
+    if (!success) allOk = false;
     if (success) await sleep(2000);
   }
 
   await page.close();
-  log('📊', `Total entradas: ${allEntries.length}`);
-  return allEntries;
+  log('📊', `Total entradas: ${allEntries.length} (sitemaps completos: ${allOk ? 'sí' : 'NO'})`);
+  return { entries: allEntries, ok: allOk };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -248,8 +390,42 @@ async function diffWithSupabase(sitemapEntries) {
   const modE = sitemapEntries.filter(e => e.lastmod && exMap.get(e.id) && new Date(e.lastmod) > new Date(exMap.get(e.id)));
   const delIds = [...exMap.keys()].filter(id => !sMap.has(id));
 
-  log('📊', `Nuevas: ${newE.length} | Mod.: ${modE.length} | Elim.: ${delIds.length}`);
+  log('📊', `Nuevas: ${newE.length} | Mod.: ${modE.length} | Elim. (potencial): ${delIds.length}`);
   return { toExtract: [...newE, ...modE], toDelete: delIds };
+}
+
+// Borra de la BD las propiedades que ya no están en Roomix (salieron del catálogo).
+// Frenos de seguridad: solo si los sitemaps cargaron completos, y aborta si borraría >40% de la BD.
+async function deleteMissing(entries) {
+  const liveIds = new Set(entries.map(e => e.id));
+
+  let dbIds = [], from = 0;
+  const step = 1000;
+  while (true) {
+    const { data, error } = await supabase.from('roomix_properties').select('id').range(from, from + step - 1);
+    if (error) { log('❌', 'Error leyendo IDs para borrar:', error.message); return; }
+    dbIds = dbIds.concat((data || []).map(r => r.id));
+    if (!data || data.length < step) break;
+    from += step;
+  }
+
+  const toDelete = dbIds.filter(id => !liveIds.has(id));
+  if (toDelete.length === 0) { log('🗑️', 'Nada para eliminar'); return; }
+
+  if (toDelete.length > dbIds.length * 0.4) {
+    log('⚠️', `Eliminaría ${toDelete.length}/${dbIds.length} (>40%) → ABORTADO por seguridad (posible catálogo incompleto)`);
+    return;
+  }
+
+  log('🗑️', `Eliminando ${toDelete.length} propiedades que ya no están en Roomix...`);
+  let deleted = 0;
+  for (let i = 0; i < toDelete.length; i += 500) {
+    const chunk = toDelete.slice(i, i + 500);
+    const { error } = await supabase.from('roomix_properties').delete().in('id', chunk);
+    if (error) { log('❌', `Error borrando lote: ${error.message}`); continue; }
+    deleted += chunk.length;
+  }
+  log('🗑️', `Eliminadas ${deleted}`);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -280,10 +456,25 @@ function parseAgent(html) {
   return null;
 }
 
-function mapToRow(jsonLd, agent, entry) {
+// Operación REAL de Roomix. Ojo: el JSON-LD `businessFunction` NO sirve —
+// las VENTAS no lo traen y los ALQUILERES siempre dicen "LeaseOut", así que todo
+// terminaba como 'rent' o null. El dato fiable es `operation_type` (venta/alquiler/temporal)
+// del payload de Next.js; como respaldo, el título arranca con "VENTA"/"ALQUILER".
+function parseOperationType(html, title) {
+  const m = html.match(/operation_type["\\]*\s*:\s*["\\]*(venta|alquiler|temporal)\b/i);
+  if (m) return m[1].toLowerCase() === 'venta' ? 'sale' : 'rent';
+  const t = (title || '').trim().toUpperCase();
+  if (t.startsWith('VENTA')) return 'sale';
+  if (t.startsWith('ALQUILER')) return 'rent';
+  return null;
+}
+
+function mapToRow(jsonLd, agent, entry, operationType) {
   const off = jsonLd.offers || {}, me = jsonLd.mainEntity || {}, add = me.address || {};
   const geo = jsonLd.geo || me.geo || {}, fs = me.floorSize || jsonLd.floorSize || {};
-  const bf = off.businessFunction || '', op = bf.includes('Lease') ? 'rent' : bf.includes('Sell') ? 'sale' : bf || null;
+  // Fallback heredado (businessFunction) solo si operationType no se pudo determinar.
+  const bf = off.businessFunction || '', bfOp = bf.includes('Lease') ? 'rent' : bf.includes('Sell') ? 'sale' : null;
+  const op = operationType || bfOp;
 
   return {
     id: entry.id, slug: entry.slug, canonical_url: entry.loc,
@@ -333,7 +524,8 @@ async function extractProperty(page, entry, retries = 0) {
     const jsonLd = parseJsonLd(html);
     if (!jsonLd) { log('⚠️', `Sin JSON-LD: ${entry.id}`); return null; }
 
-    const row = mapToRow(jsonLd, parseAgent(html), entry);
+    const operationType = parseOperationType(html, jsonLd.name);
+    const row = mapToRow(jsonLd, parseAgent(html), entry, operationType);
     const txt = [row.title, row.description, row.neighborhood, (row.amenities || []).join(', ')].filter(Boolean).join(' ').trim();
     if (txt) row.embedding = await generateEmbedding(txt);
 
@@ -387,8 +579,33 @@ async function main() {
   const { browser, context } = await initBrowser();
 
   try {
-    const entries = await fetchSitemaps(context);
-    if (entries.length === 0) { log('❌', 'Sin sitemaps'); process.exit(1); }
+    // 1) Ventas (fuente prioritaria, por zona) + 2) Sitemaps (todo el catálogo)
+    const ventaEntries = await fetchVentaSeeds(context);
+    const { entries: sitemapEntries, ok: sitemapsOk } = await fetchSitemaps(context);
+    if (sitemapEntries.length === 0 && ventaEntries.length === 0) { log('❌', 'Sin entradas'); process.exit(1); }
+
+    // Merge: base = sitemap (tiene lastmod, clave para detectar modificaciones).
+    // Las de venta enriquecen con su flag/tier sin pisar el lastmod del sitemap.
+    const byId = new Map();
+    for (const e of sitemapEntries) byId.set(e.id, e);
+    for (const e of ventaEntries) {
+      const ex = byId.get(e.id);
+      if (ex) { ex._venta = true; ex._vtier = e._vtier; }   // ya estaba en sitemap → conserva lastmod
+      else byId.set(e.id, e);                                 // venta que no está en sitemap → la agrego
+    }
+    let entries = [...byId.values()];
+
+    // Orden: Venta AMBA > Venta prov. BsAs > Venta Argentina > Alquiler AMBA > Alquiler resto
+    entries.sort((a, b) => priorityRank(a) - priorityRank(b));
+    log('🎯', `Cola priorizada → en venta: ${ventaEntries.length} | total únicas: ${entries.length}`);
+
+    // Borrado de propiedades que salieron de Roomix (solo en corrida completa y con sitemaps OK).
+    if (PROPERTY_LIMIT === 0) {
+      if (sitemapsOk) await deleteMissing(entries);
+      else log('⚠️', 'Algún sitemap falló → NO se eliminan propiedades (freno de seguridad)');
+    } else {
+      log('ℹ️', 'Corrida con --limit → se omite el borrado');
+    }
 
     const work = PROPERTY_LIMIT > 0 ? entries.slice(0, PROPERTY_LIMIT) : entries;
     const { toExtract } = await diffWithSupabase(work);
@@ -401,6 +618,9 @@ async function main() {
     } else {
       log('✅', 'Nada para extraer');
     }
+
+    // Corrida terminada OK → vaciar checkpoint para no bloquear futuras modificaciones.
+    clearCheckpoint();
   } finally {
     await browser.close();
   }
