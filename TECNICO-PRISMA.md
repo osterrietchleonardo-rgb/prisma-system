@@ -61,7 +61,7 @@ El producto integra: CRM (Tokko Broker), WhatsApp bidireccional (Evolution API +
 |---|---|---|---|
 | OpenAI | `gpt-4.1-mini` | `lib/openai.ts` → `openaiIA` | Buscador IA, Tutor IA (intent + respuesta) |
 | Google Gemini | `gemini-2.0-flash` / `gemini-3.5-flash` | `lib/gemini.ts` → `prismaIA` | Marketing copy, Análisis de chat, Conversión de plantillas, Tasador legacy |
-| Google Gemini | `gemini-embedding-001` | `lib/gemini.ts` → `generateEmbedding()` | Embeddings (768 dims, taskType `RETRIEVAL_DOCUMENT`) para RAG de documentos y semántica de propiedades |
+| Google Gemini | `gemini-embedding-001` | `lib/gemini.ts` → `generateEmbedding(text, taskType)` | Embeddings (768 dims). `RETRIEVAL_DOCUMENT` al indexar (RAG docs + propiedades); `RETRIEVAL_QUERY` para la consulta del Buscador IA (`match_properties_ia`/`match_roomix_ia`) |
 | Google Gemini | Imagen / Nano Banana Pro | `lib/gemini.ts` → `generateImage()` | Generación de imágenes de marketing |
 
 ### Librerías clave
@@ -366,12 +366,12 @@ Asistente de búsqueda con **memoria por chat**. Flujo vigente (rediseño jun-20
 1. `requireTenant()` + `consumeAiCredits('consultor_ia', 1)`.
 2. Lee `agencies.buscador_ia_config` (notas/directivas del director) + nombre de agencia.
 3. Sesión `consultor_chat_sessions/_messages`; últimos 12 turnos alimentan intención y respuesta.
-4. **Intent con memoria** → criterios acumulados (operation, type, location, amenities, agency, price_max/min, currency, bedrooms, bathrooms).
-5. Búsqueda en 2 etapas: **filtro duro SQL** (operación + tipo, traducción ES→EN para Roomix; hasta 400 candidatos/tabla) → **interpretación en memoria** (zona estricta, presupuesto con moneda, ambientes tolerante, amenities puntúa, inmobiliaria fuzzy). Sin deduplicación destructiva.
-6. Combina cartera interna (Tokko) + red de colaboración (`roomix_properties`). Render en `consultor-results.tsx` (3 secciones). Enlaces: internas → `tokko_data.public_url`; Roomix → `canonical_url`.
-7. `updateAiTransactionCost()`.
+4. **Intent con memoria** → criterios acumulados (operation, type, location, amenities/servicios, agency, price_max/min, currency, **rooms = ambientes**, **bedrooms = dormitorios**, bathrooms). Distingue "2 ambientes"→`rooms` de "2 dormitorios"→`bedrooms` (la columna `bedrooms` = `suite_amount` = dormitorios). Red de seguridad: si el mensaje dice "ambientes" pero el modelo lo metió en `bedrooms`, se corrige a `rooms`.
+5. Búsqueda con **estrategia "Cartera_Propiedades" (paridad con el agente n8n)**: 2 funciones SQL — `match_properties_ia` (cartera propia/agencia; 2 llamadas, include/exclude agente) y `match_roomix_ia` (red de colaboración, sobre las ~54k **sin** el viejo límite de 400). Cada una hace, dentro de SQL: **filtro duro** (operación, tipo, **ambientes ±1**, presupuesto ×1.20 con moneda, zona) + **ranking vectorial** (embedding Gemini `RETRIEVAL_QUERY`; patrón *vector-search-then-rerank* con índices **HNSW** `idx_properties_embedding_hnsw` / `idx_roomix_embedding_hnsw`, `hnsw.iterative_scan=relaxed_order`) y devuelve `match_pct`.
+6. **% de coincidencia (`match_pct`):** se calcula con criterios concretos = ambientes 35 (exacto=full, ±1=mitad) + amenities 35 (cobertura). El **precio NO entra al puntaje** (lo decide el cliente). La **semántica solo ordena** dentro de cada escalón (incluirla en el % lo saturaba a ~100 porque las propiedades parecidas tienen similitud altísima). Si no se pide ningún criterio concreto → `match_pct` null y se ordena puro por embedding.
+7. Re-trae filas completas por id (preserva join de perfil) y combina cartera interna (Tokko) + red de colaboración (`roomix_properties`). Render en `consultor-results.tsx` (3 secciones + **badge de % por tarjeta**). Enlaces: internas → `tokko_data.public_url`; Roomix → `canonical_url`. `updateAiTransactionCost()`.
 
-> Las columnas `embedding` existen pero **no** se usan en este endpoint (el flujo no es vectorial).
+> **Ambas tablas usan embeddings** (`embedding vector(768)`: 580/580 en properties y 54.566/54.566 en roomix) vía las funciones SQL `match_properties_ia` / `match_roomix_ia` (rama `fix/buscador-ia-logica-n8n`, jun-2026). Sustituyó al viejo flujo de filtro-en-memoria sobre 400 filas, que confundía ambientes con dormitorios y no filtraba amenities (causaba "pedí 2 amb + terraza, devolvía 3 amb + balcón").
 
 **Frontend / responsive (jun-2026):** `app/{asesor/consultor-ia,director/consultor}/page.tsx` comparten layout. El historial (`<aside>`) es **columna fija que empuja** en `md+` (`md:w-80`↔`md:w-0`) y **cajón superpuesto** en `<md` (`max-md:fixed inset-y-0 left-0 z-50 w-[85vw] max-w-xs` + `translate-x`), con backdrop `md:hidden` para cerrar. `isSidebarOpen` arranca `false` y un `useEffect` lo abre solo si `innerWidth>=768`; `closeSidebarOnMobile()` lo cierra al abrir/crear sesión en móvil. Tarjetas (`consultor-results.tsx`): flechas del carrusel visibles en touch (`opacity-100 md:opacity-0 md:group-hover:opacity-100`).
 
@@ -537,7 +537,7 @@ Sincroniza las visitas (`scheduled_visits`) hacia el Google Calendar personal de
 
 - **Tasaciones legacy:** `/api/valuation/generate` + tabla `valuations` (Gemini) sin uso confirmado en frontend; `getAsesorKPIs` (`lib/queries/asesor.ts`) y `useAsesorDashboard` consumían solo esta rama. **No eliminado** por precaución.
 - **`contract_signatures`:** conservada del diseño de firma digital; el flujo vigente es firma presencial (no se alimenta).
-- **Columna `embedding`** en `properties`: la usa el agente n8n `Cartera_Propiedades` (recomendador, ranking semántico Gemini); el Buscador IA **web** sigue sin usarla (búsqueda no vectorial). `roomix_properties.embedding`: sin uso confirmado.
+- **Columna `embedding`** (`properties` y `roomix_properties`): la usan tanto el agente n8n `Cartera_Propiedades` como **el Buscador IA web** (desde jun-2026, rama `fix/buscador-ia-logica-n8n`), vía las funciones SQL `match_properties_ia` / `match_roomix_ia` + índices HNSW. Ya **no** es "sin uso": es el corazón del ranking semántico del buscador.
 - **`/api/messages/bot-reply`:** endpoint legacy de respuesta (solo Evolution, `BOT_REPLY_SECRET`); el flujo vigente es `/api/n8n/reply`.
 - **`/api/marketing-ia/generate-copy`:** genera 1 copy individual, pero **ningún componente lo llama**; el flujo vigente de "Crear Anuncio" usa `generate-batch` + `generate-image`. **No eliminado** (sirve de base para un futuro modo "copy simple").
 - **Marketing IA — vincular propiedad al IPC "vender":** el `PropertySelector` y el fetch de `propiedad_tokko_id` desde Tokko existen, pero el copy **no usa** los datos concretos de la propiedad (regla anti-invención). Función reservada para un modo futuro.

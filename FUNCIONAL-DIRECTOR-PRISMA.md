@@ -396,9 +396,10 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 **Cómo usarlo:**
 1. Escribí lo que busca el cliente: *"3 ambientes en zona norte por menos de 250k con cochera"*.
-2. Entiende operación, zona, tipo, presupuesto (USD o pesos), ambientes y amenities.
-3. Devuelve tarjetas en 3 grupos: **propias**, de la **agencia** y de la **red de colaboración**.
-4. Podés **refinar** sin repetir todo; el chat **recuerda** la conversación.
+2. Entiende operación, zona, tipo, presupuesto (USD o pesos), **ambientes** (no los confunde con dormitorios) y **todos los servicios/amenities** (cochera, pileta, parrilla, SUM, seguridad, balcón, terraza, gimnasio, baulera, apto profesional…).
+3. Devuelve tarjetas en 3 grupos (**propias**, **agencia**, **red de colaboración**), ordenadas por un **% de coincidencia** visible en cada tarjeta (verde = justo lo pedido, ámbar = comparable, gris = más lejano). Busca sobre **toda** la red de colaboración, no una muestra.
+4. **No pierde ventas:** muestra las exactas **y** los comparables cercanos (con menor %), pero descarta lo que no corresponde (un "2 ambientes" nunca trae un "4 ambientes").
+5. Podés **refinar** sin repetir todo; el chat **recuerda** la conversación.
 
 **Notas / directivas del director (exclusivo tuyo):**
 - Dentro del Buscador tenés una solapa de **Notas** donde escribís indicaciones en **texto libre** (ej.: "evitar colaborar con tal inmobiliaria", "tal propiedad acepta permuta").

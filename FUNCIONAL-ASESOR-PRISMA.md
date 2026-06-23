@@ -287,11 +287,13 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 
 **Cómo usarlo:**
 1. Escribí lo que busca tu cliente, por ejemplo: *"Busco un 3 ambientes en La Plata por menos de 120 mil dólares con cochera"*.
-2. El Buscador entiende operación, zona, tipo, presupuesto (en USD o pesos), ambientes y amenities.
-3. Te devuelve **tarjetas** organizadas en 3 grupos: propiedades **propias**, de la **agencia** y de la **red de colaboración**.
-4. Podés **refinar** sin repetir todo: *"solo las de La Plata"* o *"que acepten permuta"*. **Recuerda el hilo** de la conversación.
+2. El Buscador entiende operación, zona, tipo, presupuesto (en USD o pesos), **ambientes** (diferencia bien "ambientes" de "dormitorios"), y **todos los servicios/amenities** (cochera, pileta, parrilla, SUM, seguridad, balcón, terraza, gimnasio, baulera, apto profesional, etc.).
+3. Te devuelve **tarjetas** organizadas en 3 grupos (**propias**, **agencia**, **red de colaboración**), ordenadas por un **% de coincidencia** que ves en cada tarjeta: **verde = es justo lo pedido**, **ámbar = comparable cercano**, gris = más lejano.
+4. **No te pierde ventas:** además de las exactas, te muestra los **comparables** (ej. si pedís 2 ambientes, también ves 1 y 3, marcados con menor %). Lo que no entra, no aparece (un 2 ambientes nunca te trae un 4).
+5. Podés **refinar** sin repetir todo: *"solo las de La Plata"* o *"que acepten permuta"*. **Recuerda el hilo** de la conversación.
 
 > 💡 **Tip:** cada chat tiene **memoria**. Empezá una conversación nueva para cada cliente y refiná de a poco.
+> 💡 **El %:** mide qué tanto coincide con lo concreto que pediste (ambientes + servicios). Una de "94%" tiene casi todo; una de "60%" es una alternativa válida que le falta algo (mirá la tarjeta).
 > 💡 Si una propiedad o inmobiliaria tiene una **nota/consideración** cargada por el director, el Buscador te la avisa.
 > 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
 > 💰 Cada búsqueda consume 1 crédito.

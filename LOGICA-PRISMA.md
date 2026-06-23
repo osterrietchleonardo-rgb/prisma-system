@@ -103,7 +103,7 @@ PRISMA es un SaaS **multi-tenant** para inmobiliarias argentinas. Cada inmobilia
 | Proveedor | Modelo | Archivo | Uso |
 |---|---|---|---|
 | Google Gemini | `gemini-2.0-flash` | `lib/gemini.ts` → `prismaIA` | Marketing copy, Tasaciones, Analyze Chat, Embeddings |
-| Google Gemini | `gemini-2.0-flash` | `lib/gemini.ts` → `generateEmbedding()` | Embeddings vectoriales (text-embedding-004) |
+| Google Gemini | `gemini-embedding-001` | `lib/gemini.ts` → `generateEmbedding(text, taskType)` | Embeddings vectoriales 768 dims (`RETRIEVAL_DOCUMENT` al indexar / `RETRIEVAL_QUERY` en la consulta del Buscador IA) |
 | Google Gemini | `imagen-3.0-generate-002` | `lib/gemini.ts` → `generateImage()` | Generación de imágenes para marketing |
 | OpenAI (via Google) | `gpt-4.1-mini` | `lib/openai.ts` → `openaiIA` | Consultor IA, Tutor IA (intent + response) |
 
@@ -369,7 +369,8 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 
 | Función | Uso |
 |---|---|
-| `match_properties(query_embedding, match_threshold, match_count, p_agency_id)` | Búsqueda vectorial de propiedades (cosine similarity) |
+| `match_properties_ia(p_agency_id, p_query_embedding, p_operation, p_type_patterns, p_rooms, p_bedrooms, p_bathrooms, p_price_max/min, p_currency, p_loc_patterns, p_amenity_patterns, p_include/exclude_agent, p_limit)` | **Buscador IA — cartera propia/agencia**: filtro duro (ambientes ±1, presupuesto, zona, tipo) + ranking vectorial HNSW + `match_pct`. Devuelve `id, match_pct, semantic_sim, assigned_agent_id`. |
+| `match_roomix_ia(p_query_embedding, p_operation, p_type_patterns, p_rooms, p_bedrooms, p_bathrooms, p_price_max/min, p_currency, p_loc_patterns, p_amenity_patterns, p_agency_name_patterns, p_limit)` | **Buscador IA — red de colaboración** (54k filas, sin límite de 400). Mismo esquema. Devuelve `id, match_pct, semantic_sim`. |
 | `match_agency_documents(query_embedding, match_threshold, match_count, p_agency_id, p_user_role)` | Búsqueda vectorial de documentos (RAG) |
 | `consume_ai_credits(p_agency_id, p_user_id, p_feature, p_amount, p_summary)` | Consume créditos IA y retorna txId |
 | `update_ai_transaction_cost(p_transaction_id, p_input_tokens, p_output_tokens, p_usd_cost)` | Actualiza costo real post-generación |
@@ -742,30 +743,29 @@ El Buscador IA se nutre de la tabla `roomix_properties`, la cual es alimentada d
 1. **Auth + Créditos:** `requireTenant()` + `consumeAiCredits("consultor_ia", 1)`
 2. **Config de la agencia:** lee `agencies.buscador_ia_config` (notas/directivas del director, ver 10.5) y el nombre de la agencia.
 3. **Gestión de Sesión + Memoria por chat:** Crea/recupera `consultor_chat_sessions` y carga **todo** el historial de la sesión (`consultor_chat_messages`). Los últimos 12 turnos previos (`priorTurns`) alimentan tanto la extracción de intención como la respuesta final → cada chat tiene memoria real y sigue el hilo.
-4. **Análisis de Intent con IA (con memoria):** Sobre el último mensaje + la conversación previa, devuelve los criterios **ACUMULADOS y vigentes** (mantiene los filtros anteriores salvo que el usuario los cambie). Extrae: `operation`, `type_keywords`, `location_keywords`, `amenity_keywords`, `agency_keywords` (inmobiliaria), `price_max/min`, `price_currency` (USD/ARS), `bedrooms`, `bathrooms`.
-5. **Si intent === RETRIEVAL — búsqueda en 2 etapas:**
+4. **Análisis de Intent con IA (con memoria):** Sobre el último mensaje + la conversación previa, devuelve los criterios **ACUMULADOS y vigentes** (mantiene los filtros anteriores salvo que el usuario los cambie). Extrae: `operation`, `type_keywords`, `location_keywords`, `amenity_keywords` (servicios/amenities/espacios comunes concretos; los adjetivos subjetivos como "luminoso" NO van acá → los captura el embedding), `agency_keywords` (inmobiliaria), `price_max/min`, `price_currency` (USD/ARS), **`rooms` (ambientes)**, **`bedrooms` (dormitorios)**, `bathrooms`.
+   - **Ambientes vs dormitorios (¡bug histórico!):** "2 ambientes"→`rooms:2`; "2 dormitorios/cuartos/habitaciones"→`bedrooms:2`. La columna `bedrooms` de la base es `suite_amount` = **dormitorios**, no ambientes. Red de seguridad por código: si el texto dice "ambiente/amb" pero el modelo lo puso en `bedrooms`, se mueve a `rooms`.
 
-   a. **Filtro duro (SQL) — solo los grandes reductores:** **operación** (`properties.status`: Venta / Alquiler+Temporary rent; `roomix_properties.operation`: sale/rent) y **tipo de propiedad** (con traducción ES→EN para Roomix: Departamento→Apartment/Accommodation, Casa→House, etc.). Se traen hasta 400 candidatos por tabla, ordenados por recencia.
+5. **Si intent === RETRIEVAL — estrategia "Cartera_Propiedades" (paridad con el agente n8n), 2 capas en SQL:**
 
-   b. **Interpretación en memoria** sobre el conjunto de columnas (precisión sin perder coincidencias):
-      - **Zona/barrio (prioridad, estricto):** si se pidió zona, la propiedad debe contenerla en sus campos de ubicación (`city`/`neighborhood`/`address`/`title`/ubicación Tokko). Evita el "leak" de otra ciudad (ej: Córdoba cuando se pide La Plata).
-      - **Presupuesto (con moneda):** filtra por `price_max/min` respetando la moneda pedida (`price_currency`); si la moneda del inmueble difiere, no excluye (lo aclara el modelo). No mezcla USD con ARS.
-      - **Ambientes/baños:** tolerante (ambientes ≈ dormitorios + 1; sin dato no excluye).
-      - **Amenities/servicios:** puntúa y ordena (no excluye).
-      - **Inmobiliaria:** si se pide una puntual, filtra la red de colaboración por `roomix_agency_name` (fuzzy, ignorando puntuación/espacios → "remax" matchea "RE/MAX"). Si la inmobiliaria pedida es externa, no muestra cartera interna.
+   Se llaman 2 funciones SQL (Supabase): **`match_properties_ia`** (cartera propia + agencia; 2 llamadas, `p_include_agent`=propias / `p_exclude_agent`=agencia) y **`match_roomix_ia`** (red de colaboración, sobre las ~54.566 filas **SIN** el viejo límite de 400). Cada una, dentro de la base:
 
-   c. **Sin deduplicación destructiva:** la búsqueda re-muestra coincidencias en cada turno para que el refinamiento ("solo de La Plata") funcione. La continuidad la da la memoria del modelo, no un filtro de "ya vistas" (se eliminó el uso de `metadata.seen_property_ids`).
+   a. **Capa 1 — Filtro duro (excluye lo no comparable):** operación, tipo (traducción ES→EN para Roomix), **ambientes ±1** (un "2 ambientes" trae 1/2/3, nunca 4+; ambientes = `room_amount`, o `dormitorios+1` si falta), **presupuesto** (`≤ price_max ×1.20`, con conciencia de moneda; no mezcla USD/ARS), **zona** (`city`/`neighborhood`/`address`/`title`) e **inmobiliaria** puntual (Roomix por `roomix_agency_name`).
+
+   b. **Capa 2 — Ranking por embeddings (Gemini):** se genera el embedding de la consulta (`generateEmbedding(message, "RETRIEVAL_QUERY")`) y se rankea por similitud coseno con índices **HNSW** (`vector_cosine_ops`, `hnsw.iterative_scan=relaxed_order`), patrón *vector-search-then-rerank*. Devuelve **`match_pct`**.
+
+   c. **% de coincidencia (`match_pct`):** = ambientes 35 (exacto=full, ±1=mitad) + amenities 35 (cobertura de los servicios pedidos). **El precio NO entra al puntaje** (lo decide el cliente). La **semántica solo ordena** dentro de cada escalón (incluirla en el % lo saturaba a ~100%). Si no se pidió ningún criterio concreto → `match_pct` null y ordena puro por embedding. Filosofía: **mostrar las justas + comparables con su %, sin perder ventas** (no excluye por amenity faltante; baja el %).
 
    d. **Imágenes y CDN:** las propiedades de Roomix consumen imágenes vía `next.config.mjs` (`cdn.roomix.ai`).
 
 6. **Generación de Respuesta y Renderizado Frontend:**
-   El contexto (resumen de resultados + notas del director + lista de recomendadas para cruzar) + los turnos previos van a `openaiIA` con el prompt rioplatense de "Buscador IA". La IA responde breve; las tarjetas se renderizan en `consultor-results.tsx` (3 secciones: propias, agencia, red de colaboración).
+   Se re-traen las filas completas por id (preserva el JOIN con `profiles`). El contexto (resumen + notas del director + lista de recomendadas) + los turnos previos van a `openaiIA` con el prompt rioplatense de "Buscador IA". La IA responde breve; las tarjetas se renderizan en `consultor-results.tsx` (3 secciones: propias, agencia, red de colaboración) **con un badge de % de coincidencia por tarjeta** (verde ≥85, ámbar ≥60, gris).
    - **Mapeo de Agentes:** JOIN con `profiles` (`agent_profile`); fallback al JSONB `assigned_agent` de Tokko.
    - **Enlaces:** propiedades internas → `tokko_data.public_url`; red de colaboración → `canonical_url`.
 
 7. **Tracking de costos:** `updateAiTransactionCost()` con tokens reales, precio desde la tabla central (`utils/aiCostCalculator`).
 
-> **Nota:** la versión anterior describía una búsqueda híbrida vectorial (`match_properties`/`match_roomix_properties` por embeddings). El flujo real ahora es filtro duro SQL + interpretación en memoria; las columnas `embedding` existen pero no se usan en este endpoint.
+> **Nota (jun-2026, rama `fix/buscador-ia-logica-n8n`):** el flujo pasó de "filtro duro + interpretación en memoria sobre 400 filas" a **paridad total con el agente n8n: filtro duro + embeddings en SQL** sobre AMBAS tablas (`match_properties_ia` / `match_roomix_ia` + índices HNSW). Esto resolvió el bug reportado por cliente ("pedí 2 amb + terraza, devolvía 3 amb + balcón": confundía ambientes con dormitorios y no filtraba amenities) y eliminó el límite de 400 (Roomix ahora se busca completo).
 
 ### 10.4 Endpoints Adicionales
 
