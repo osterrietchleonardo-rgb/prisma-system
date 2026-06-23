@@ -12,11 +12,16 @@ export const prismaIA = genAI.getGenerativeModel({
   },
 });
 
-export const generateEmbedding = async (text: string) => {
+// taskType: "RETRIEVAL_DOCUMENT" para indexar propiedades; "RETRIEVAL_QUERY" para la búsqueda
+// del usuario (emparejamiento asimétrico correcto). Default DOCUMENT para no afectar a los llamadores previos.
+export const generateEmbedding = async (
+  text: string,
+  taskType: "RETRIEVAL_DOCUMENT" | "RETRIEVAL_QUERY" = "RETRIEVAL_DOCUMENT"
+) => {
   const apiKey = process.env.GEMINI_API_KEY;
   // Switching back to v1beta as embeddings are only available there for this key
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`;
-  
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -26,7 +31,7 @@ export const generateEmbedding = async (text: string) => {
       content: {
         parts: [{ text: text.substring(0, 10000) }]
       },
-      taskType: "RETRIEVAL_DOCUMENT",
+      taskType,
       outputDimensionality: 768
     })
   });

@@ -79,44 +79,48 @@ export async function POST(req: Request) {
       cochera:      ["cochera", "garage"],
     };
 
-    // Amenity synonyms for fuzzy matching against Tokko tags + description
+    // Sinónimos de amenities/servicios para matchear contra tags Tokko + descripción + título.
+    // Cada clave es lo que extrae la IA; el array son las grafías/sinónimos que se buscan en el texto.
+    // Términos concretos (NO subjetivos como "luminoso/moderno": eso lo captura el embedding).
     const AMENITY_SYNONYMS: Record<string, string[]> = {
-      pileta:      ["pileta", "pool", "piscina", "nataci"],
+      // Exteriores / verde
+      pileta:      ["pileta", "pool", "piscina", "nataci", "climatizada"],
       parrilla:    ["parrilla", "asador", "bbq"],
       quincho:     ["quincho", "parrilla", "asador"],
       "balcon":    ["balc"],
       "balcón":    ["balc"],
-      terraza:     ["terraza", "solarium"],
-      cochera:     ["cochera", "garage", "garaje"],
-      sum:         ["sum ", "salon de usos", "salón usos", "salon usos"],
-      gimnasio:    ["gimnasio", "gym"],
-      vigilancia:  ["vigilancia", "seguridad", "portero"],
-      laundry:     ["laundry", "lavanderia", "lavandería"],
-      sauna:       ["sauna"],
+      terraza:     ["terraza", "azotea", "rooftop"],
+      solarium:    ["solarium", "solárium", "solar"],
       jardin:      ["jardin", "jardín"],
       "jardín":    ["jardin", "jardín"],
+      patio:       ["patio"],
+      // Cochera / guardado
+      cochera:     ["cochera", "garage", "garaje", "estacionamiento", "auto"],
+      baulera:     ["baulera", "bauleras", "guardado"],
+      // Espacios comunes / amenities
+      sum:         ["sum ", "s.u.m", "salon de usos", "salón usos", "salon usos", "salon de fiestas"],
+      amenities:   ["amenities", "amenidades", "espacios comunes", "espacio comun", "areas comunes", "áreas comunes", "espacios verdes"],
+      gimnasio:    ["gimnasio", "gym", "fitness"],
+      coworking:   ["coworking", "cowork", "business center", "sala de reunion", "sala de reuniones", "espacio de trabajo"],
+      microcine:   ["microcine", "micro cine", "cine", "sala de cine"],
+      spa:         ["spa", "wellness"],
+      sauna:       ["sauna", "finlandes"],
+      hidromasaje: ["hidromasaje", "jacuzzi", "yacuzzi"],
+      laundry:     ["laundry", "lavanderia", "lavandería", "lavadero"],
+      // Servicios del edificio
+      vigilancia:  ["vigilancia", "seguridad", "portero", "porteria", "portería", "vigilador", "24 hs", "24hs", "24 horas"],
+      ascensor:    ["ascensor"],
+      // Confort interior (concretos)
+      "aire acondicionado": ["aire acondicionado", "split", "climatizacion", "climatización", "aire frio calor"],
+      calefaccion: ["calefaccion", "calefacción", "losa radiante", "radiadores"],
+      dependencia: ["dependencia", "cuarto de servicio", "dormitorio de servicio", "toilette de servicio"],
+      vestidor:    ["vestidor", "walking closet", "walk in closet"],
+      // Uso
+      "apto profesional": ["apto profesional", "uso profesional", "apto comercial", "apto oficina"],
+      "apto mascota":     ["pet friendly", "pet-friendly", "apto mascota", "apto mascotas", "acepta mascotas"],
+      amoblado:    ["amoblado", "amueblado", "equipado"],
     };
 
-    // Helper: match amenities against a property's Tokko tags + description + title
-    const matchAmenities = (property: any, requested: string[]): { matched: string[], missing: string[] } => {
-      if (requested.length === 0) return { matched: [], missing: [] };
-      const tags: string[] = (property.tokko_data?.tags || []).map((t: any) => (t.name || '').toLowerCase());
-      const searchable = [
-        ...tags,
-        (property.description || '').toLowerCase(),
-        (property.title || '').toLowerCase(),
-      ].join(' ');
-      const matched: string[] = [];
-      const missing: string[] = [];
-      for (const amenity of requested) {
-        const a = amenity.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const terms = AMENITY_SYNONYMS[amenity.toLowerCase()] || AMENITY_SYNONYMS[a] || [a];
-        const found = terms.some(term => searchable.includes(term));
-        if (found) matched.push(amenity);
-        else missing.push(amenity);
-      }
-      return { matched, missing };
-    };
 
     const convoContext = priorTurns.length > 0
       ? `\n\nCONVERSACIÓN PREVIA (mantené el hilo: arrastrá los filtros ya mencionados salvo que el usuario los cambie):\n${priorTurns.map((m: any) => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content}`).join('\n')}\n`
@@ -133,24 +137,27 @@ export async function POST(req: Request) {
           "operation": "venta" | "alquiler" | "ambas",
           "location_keywords": ["barrio/ciudad/zona si se menciona, si no: []"],
           "type_keywords": ["tipo de propiedad si se menciona, si no: []"],
-          "amenity_keywords": ["amenidades/servicios: parrilla, pileta, balcón, terraza, quincho, cochera, sum, gimnasio, jardín, seguridad, etc. Si no hay: []"],
+          "amenity_keywords": ["TODOS los servicios/amenities/espacios comunes CONCRETOS que pida: cochera, baulera, pileta, parrilla, quincho, balcón, terraza, solarium, jardín, patio, sum, amenities, gimnasio, coworking, microcine, spa, sauna, hidromasaje, laundry, seguridad/vigilancia, ascensor, aire acondicionado, calefacción, dependencia, vestidor, apto profesional, apto mascota, amoblado, etc. Si no hay: []"],
           "agency_keywords": ["nombre de inmobiliaria/agencia puntual si la mencionan, si no: []"],
           "price_max": número o null,
           "price_min": número o null,
           "price_currency": "USD" | "ARS" | null,
+          "rooms": número o null,
           "bedrooms": número o null,
           "bathrooms": número o null
         }
 
         REGLAS CRÍTICAS:
-        - MANTENÉ EL CONTEXTO: si antes pidió "3 ambientes en La Plata" y ahora dice "que tengan pileta", el resultado debe incluir location La Plata, bedrooms 3 y amenity pileta.
+        - MANTENÉ EL CONTEXTO: si antes pidió "3 ambientes en La Plata" y ahora dice "que tengan pileta", el resultado debe incluir location La Plata, rooms 3 y amenity pileta.
         - "operation": "en alquiler"/"alquilar" → "alquiler"; "comprar"/"en venta" → "venta"; si no especifica → "ambas".
         - "piso" en Argentina = departamento de planta completa → type_keywords: ["piso"].
-        - "depto"/"departamento" → ["departamento"]; "3 ambientes" → bedrooms: 3 (incluye el living).
+        - "depto"/"departamento" → ["departamento"].
+        - AMBIENTES vs DORMITORIOS (¡NO los mezcles, es el error más caro!): "2 ambientes"/"2 amb"/"2 amb." → rooms: 2 (un ambiente = living/cocina + cada dormitorio). "2 dormitorios"/"2 cuartos"/"2 habitaciones"/"2 hab" → bedrooms: 2. Si solo dice "ambientes", llená rooms y dejá bedrooms en null (y viceversa).
         - "menos de 100 mil"/"hasta 100.000" → price_max: 100000.
         - price_currency: inferí la moneda. Venta suele ser USD; alquiler suele ser ARS. "dólares"/"USD" → "USD"; "pesos"/"$" → "ARS"; sin precio → null.
         - agency_keywords: SOLO si menciona una inmobiliaria/agencia puntual (ej: "propiedades de Cocucci", "las de RE/MAX"). Si no → [].
         - location_keywords SOLO si menciona zona/barrio/ciudad. Si no → [].
+        - amenity_keywords: SOLO cosas concretas/verificables (cochera, pileta, sum, seguridad, balcón...). Adjetivos subjetivos ("luminoso", "moderno", "a estrenar", "amplio") NO van acá (esos se buscan por significado, no como filtro).
         - Mensaje general ("qué tenés?", "mostrá propiedades") → intent: RETRIEVAL con todo []/null/ambas.
         - Saludo/charla → intent: GENERAL.
         ${convoContext}
@@ -168,6 +175,7 @@ export async function POST(req: Request) {
     let priceMax: number | null = null;
     let priceMin: number | null = null;
     let priceCurrency: string | null = null;
+    let roomsFilter: number | null = null;
     let bedroomsFilter: number | null = null;
     let bathroomsFilter: number | null = null;
 
@@ -186,13 +194,22 @@ export async function POST(req: Request) {
       priceMax = parsed.price_max || null;
       priceMin = parsed.price_min || null;
       priceCurrency = parsed.price_currency || null;
+      roomsFilter = parsed.rooms || null;
       bedroomsFilter = parsed.bedrooms || null;
       bathroomsFilter = parsed.bathrooms || null;
     } catch(e) {
       isRetrieval = intentResText.toUpperCase().includes("RETRIEVAL");
     }
 
-    console.log("Search params:", { isRetrieval, operation, locationKeywords, typeKeywords, amenityKeywords, agencyKeywords, priceMax, priceMin, priceCurrency, bedroomsFilter, bathroomsFilter });
+    // Red de seguridad: si el usuario habló de "ambientes" pero el modelo lo metió en dormitorios,
+    // lo corregimos por código (no dependemos solo del LLM para no volver a confundir las unidades).
+    const mentionsAmbientes = /\bambient|\bamb\.?\b/i.test(message || "");
+    if (mentionsAmbientes && !roomsFilter && bedroomsFilter) {
+      roomsFilter = bedroomsFilter;
+      bedroomsFilter = null;
+    }
+
+    console.log("Search params:", { isRetrieval, operation, locationKeywords, typeKeywords, amenityKeywords, agencyKeywords, priceMax, priceMin, priceCurrency, roomsFilter, bedroomsFilter, bathroomsFilter });
     let newMatchedProperties: any[] = [];
     let propertyContext = "";
     let pisoFallback = false; 
@@ -200,9 +217,10 @@ export async function POST(req: Request) {
     if (isRetrieval) {
       const FULL_SELECT = 'id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, description, tokko_data, assigned_agent_id, assigned_agent, agent_profile:profiles(full_name, email)';
 
-      // ─── FILTRO DURO (SQL): SOLO operación + tipo de propiedad (los grandes reductores) ───
-      // El resto (zona, presupuesto, ambientes, amenities, inmobiliaria) se interpreta en memoria
-      // sobre el conjunto de columnas, para máxima precisión sin perder coincidencias válidas.
+      // ─── ESTRATEGIA "Cartera_Propiedades" (paridad con n8n): filtros duros + embeddings + % match, todo en SQL ───
+      // Funciones SQL: match_properties_ia (cartera propia/agencia) y match_roomix_ia (red de colaboración).
+      // Hacen el filtro duro (operación, tipo, ambientes ±1, presupuesto ×1.20, zona) sobre TODAS las filas
+      // (sin el viejo límite de 400), rankean por embedding (Gemini) y devuelven el % de coincidencia.
       const isPisoSearch = typeKeywords.includes('piso');
 
       // Tipos en español (properties) → Schema.org en inglés (roomix)
@@ -220,127 +238,130 @@ export async function POST(req: Request) {
         galpon: ['Warehouse', 'Industrial'],
       };
 
-      // 1) PROPERTIES (propias + agencia) — filtro duro: operación + tipo
-      let genQuery = supabase.from('properties').select(FULL_SELECT).eq('agency_id', agencyId);
-      if (operation === 'venta') genQuery = genQuery.eq('status', 'Venta');
-      else if (operation === 'alquiler') genQuery = genQuery.in('status', ['Alquiler', 'Temporary rent']);
+      // ── Patrones ILIKE para las funciones SQL ──
+      const ilike = (arr: string[]) => arr.map((t) => `%${t}%`);
+      let propTypePatterns: string[] = [];
+      let rmxTypePatterns: string[] = [];
       if (typeKeywords.length > 0) {
         if (isPisoSearch) {
-          genQuery = genQuery.or('title.ilike.%piso%,description.ilike.%piso%,property_type.ilike.%departamento%');
+          propTypePatterns = ['%piso%', '%departamento%'];
+          rmxTypePatterns = ['%piso%', '%apartment%', '%accommodation%'];
         } else {
-          const cond = typeKeywords.flatMap((t: string) => [`property_type.ilike.%${t}%`, `title.ilike.%${t}%`]).join(',');
-          genQuery = genQuery.or(cond);
-        }
-      }
-      const { data: dbPropsData } = await genQuery.order('updated_at', { ascending: false }).limit(400);
-
-      // 2) ROOMIX — filtro duro: operación + tipo (traducido a inglés)
-      let rmQuery = supabase.from('roomix_properties').select('*');
-      if (operation === 'venta') rmQuery = rmQuery.eq('operation', 'sale');
-      else if (operation === 'alquiler') rmQuery = rmQuery.eq('operation', 'rent');
-      if (typeKeywords.length > 0) {
-        if (isPisoSearch) {
-          rmQuery = rmQuery.or('title.ilike.%piso%,property_type.ilike.%apartment%,property_type.ilike.%accommodation%');
-        } else {
+          propTypePatterns = ilike(typeKeywords);
           const allTypes = [...typeKeywords];
           typeKeywords.forEach((t: string) => { const m = roomixTypeMap[t.toLowerCase()]; if (m) allTypes.push(...m); });
-          const cond = Array.from(new Set(allTypes)).flatMap((t: string) => [`property_type.ilike.%${t}%`, `title.ilike.%${t}%`]).join(',');
-          rmQuery = rmQuery.or(cond);
+          rmxTypePatterns = ilike(Array.from(new Set(allTypes)));
         }
       }
-      const { data: rmPropsData, error: rmError } = await rmQuery.order('lastmod', { ascending: false }).limit(400);
-      if (rmError) console.error('Roomix Query Error:', rmError);
-      console.log('Roomix hard-filter count:', rmPropsData?.length, '| Properties hard-filter count:', dbPropsData?.length);
+      const locPatterns = ilike(locationKeywords);
 
-      // ─── INTERPRETACIÓN EN MEMORIA sobre el conjunto de columnas ───
-      // Prioridad: tipo + operación (SQL duro) → zona/barrio (estricto) → presupuesto/ambientes/amenities/inmobiliaria.
-      const norm = (s: any) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-
-      // Zona/barrio: filtro fuerte por prioridad. Si pidió zona, debe aparecer en sus campos de ubicación (no se escapa otra ciudad).
-      const locOk = (locText: string) =>
-        locationKeywords.length === 0 || locationKeywords.some((k: string) => locText.includes(norm(k)));
-
-      // Presupuesto con conciencia de moneda. Si la moneda no coincide con la pedida, no excluimos (lo aclara el modelo).
-      const budgetOk = (price: number, cur: string) => {
-        if (!price || price <= 0) return true;
-        if (priceCurrency && cur && norm(cur) !== norm(priceCurrency)) return true;
-        if (priceMax && price > priceMax * 1.05) return false;
-        if (priceMin && price < priceMin * 0.95) return false;
-        return true;
-      };
-
-      // Ambientes/baños: tolerante (ambientes ≈ dormitorios + 1). Sin dato, no excluye.
-      const roomsOk = (beds: number | null | undefined) => {
-        if (!bedroomsFilter) return true;
-        if (beds && beds > 0) return beds >= bedroomsFilter - 1;
-        return true;
-      };
-      const bathOk = (baths: number | null | undefined) => {
-        if (!bathroomsFilter) return true;
-        if (baths && baths > 0) return baths >= bathroomsFilter;
-        return true;
-      };
-
-      // Inmobiliaria: si piden una puntual, filtramos colaboración por nombre (fuzzy, ignorando puntuación/espacios).
-      const alnum = (s: any) => norm(s).replace(/[^a-z0-9]/g, '');
-      const agencyMatch = (name: any) => {
-        if (agencyKeywords.length === 0) return true;
-        const a = alnum(name);
-        return !!a && agencyKeywords.some((k: string) => {
-          const kk = alnum(k);
-          return kk.length > 1 && (a.includes(kk) || kk.includes(a));
-        });
-      };
-      // Si la inmobiliaria pedida NO es la propia agencia, es externa → solo mostramos colaboración.
-      const askingExternalAgency = agencyKeywords.length > 0 && !agencyMatch(ownAgencyName);
-
-      // PROPERTIES (propias + agencia): interpretación sobre columnas + scoring de amenities
-      const propLocText = (p: any) => norm([p.city, p.address, p.title, p?.tokko_data?.location?.name].join(' '));
-      let propsFiltered: any[] = (dbPropsData || [])
-        .filter((p: any) => locOk(propLocText(p)))
-        .filter((p: any) => budgetOk(Number(p.price) || 0, p.currency))
-        .filter((p: any) => roomsOk(p.bedrooms))
-        .filter((p: any) => bathOk(p.bathrooms));
-      if (askingExternalAgency) propsFiltered = []; // pidió una inmobiliaria externa específica
-      propsFiltered = propsFiltered.map((p: any) => {
-        const { matched, missing } = matchAmenities(p, amenityKeywords);
-        const score = amenityKeywords.length > 0 ? matched.length / amenityKeywords.length : 1;
-        return { ...p, amenity_matches: { matched, missing }, amenity_score: score };
+      // Amenities → patrón regex (alternancia de sinónimos) por cada amenity pedida (lo evalúa SQL con ~*)
+      const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const amenityPatterns = amenityKeywords.map((a: string) => {
+        const aN = a.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        const terms = AMENITY_SYNONYMS[a.toLowerCase()] || AMENITY_SYNONYMS[aN] || [aN];
+        return terms.map(escapeRe).join('|');
       });
-      propsFiltered.sort((a: any, b: any) => (b.amenity_score || 0) - (a.amenity_score || 0));
 
-      // ─── Nivel 1 y 2: Propias y Agencia ───
-      const propias = propsFiltered
-        .filter((p: any) => p.assigned_agent_id === userId)
-        .slice(0, 10)
-        .map((p: any) => ({
+      // Inmobiliaria externa puntual → solo red de colaboración filtrada por nombre
+      const norm = (s: any) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+      const alnum = (s: any) => norm(s).replace(/[^a-z0-9]/g, '');
+      const ownAlnum = alnum(ownAgencyName);
+      const askingExternalAgency = agencyKeywords.length > 0 && !agencyKeywords.some((k: string) => {
+        const kk = alnum(k);
+        return kk.length > 1 && (ownAlnum.includes(kk) || kk.includes(ownAlnum));
+      });
+      const agencyNamePatterns = askingExternalAgency ? ilike(agencyKeywords) : [];
+
+      // ── Embedding de la consulta (RETRIEVAL_QUERY). Si falla, las funciones caen a ranking estructural. ──
+      let queryEmbeddingStr: string | null = null;
+      try {
+        const emb = await generateEmbedding(message, 'RETRIEVAL_QUERY');
+        if (Array.isArray(emb) && emb.length > 0) queryEmbeddingStr = `[${emb.join(',')}]`;
+      } catch (embErr) {
+        console.error('Query embedding fallo (se usa ranking estructural):', embErr);
+      }
+
+      // ── 1+2) PROPERTIES: dos llamadas (propias / agencia) ──
+      const propArgs = {
+        p_query_embedding: queryEmbeddingStr,
+        p_operation: operation,
+        p_type_patterns: propTypePatterns,
+        p_rooms: roomsFilter,
+        p_bedrooms: bedroomsFilter,
+        p_bathrooms: bathroomsFilter,
+        p_price_max: priceMax,
+        p_price_min: priceMin,
+        p_currency: priceCurrency,
+        p_loc_patterns: locPatterns,
+        p_amenity_patterns: amenityPatterns,
+      };
+      let propiasRanked: any[] = [];
+      let agenciaRanked: any[] = [];
+      if (!askingExternalAgency) {
+        const [ownRes, agRes] = await Promise.all([
+          supabase.rpc('match_properties_ia', { ...propArgs, p_agency_id: agencyId, p_include_agent: userId, p_limit: 10 }),
+          supabase.rpc('match_properties_ia', { ...propArgs, p_agency_id: agencyId, p_exclude_agent: userId, p_limit: 10 }),
+        ]);
+        if (ownRes.error) console.error('match_properties_ia (propias) error:', ownRes.error);
+        if (agRes.error) console.error('match_properties_ia (agencia) error:', agRes.error);
+        propiasRanked = ownRes.data || [];
+        agenciaRanked = agRes.data || [];
+      }
+
+      // ── 3) ROOMIX: una llamada (sobre las 54k, sin límite de 400) ──
+      const { data: rmxRanked, error: rmxErr } = await supabase.rpc('match_roomix_ia', {
+        p_query_embedding: queryEmbeddingStr,
+        p_operation: operation,
+        p_type_patterns: rmxTypePatterns,
+        p_rooms: roomsFilter,
+        p_bedrooms: bedroomsFilter,
+        p_bathrooms: bathroomsFilter,
+        p_price_max: priceMax,
+        p_price_min: priceMin,
+        p_currency: priceCurrency,
+        p_loc_patterns: locPatterns,
+        p_amenity_patterns: amenityPatterns,
+        p_agency_name_patterns: agencyNamePatterns,
+        p_limit: 10,
+      });
+      if (rmxErr) console.error('match_roomix_ia error:', rmxErr);
+      console.log('RPC counts → propias:', propiasRanked.length, 'agencia:', agenciaRanked.length, 'roomix:', (rmxRanked || []).length);
+
+      // ── Re-traer filas completas de properties por id (preserva join de perfil) y adjuntar match_pct ──
+      const propIds = [...propiasRanked, ...agenciaRanked].map((r: any) => r.id);
+      const propRowsById: Record<string, any> = {};
+      if (propIds.length > 0) {
+        const { data: fullRows } = await supabase.from('properties').select(FULL_SELECT).in('id', propIds);
+        for (const row of (fullRows || [])) propRowsById[(row as any).id] = row;
+      }
+      const mapProp = (r: any, source: 'own' | 'agency') => {
+        const p = propRowsById[r.id];
+        if (!p) return null;
+        return {
           ...p,
-          source: 'own',
+          source,
+          match_pct: r.match_pct ?? null,
+          similarity: r.match_pct ?? 0,
           agent_name: p.agent_profile?.full_name || p.assigned_agent?.name || 'Sin asignar',
           agent_email: p.agent_profile?.email || p.assigned_agent?.email || '',
-          public_url: p.tokko_data?.public_url || null
-        }));
+          public_url: p.tokko_data?.public_url || null,
+        };
+      };
+      const propias = propiasRanked.map((r: any) => mapProp(r, 'own')).filter(Boolean);
+      const agencia = agenciaRanked.map((r: any) => mapProp(r, 'agency')).filter(Boolean);
 
-      const agencia = propsFiltered
-        .filter((p: any) => p.assigned_agent_id !== userId)
-        .slice(0, 10)
-        .map((p: any) => ({
-          ...p,
-          source: 'agency',
-          agent_name: p.agent_profile?.full_name || p.assigned_agent?.name || 'Sin asignar',
-          agent_email: p.agent_profile?.email || p.assigned_agent?.email || '',
-          public_url: p.tokko_data?.public_url || null
-        }));
-
-      // ─── Nivel 3: Red de Colaboración (Roomix): interpretación sobre columnas ───
-      const rmxLocText = (rp: any) => norm([rp.neighborhood, rp.address, rp.title].join(' '));
-      let roomix: any[] = (rmPropsData || [])
-        .filter((rp: any) => locOk(rmxLocText(rp)))
-        .filter((rp: any) => budgetOk(Number(rp.price) || 0, rp.currency))
-        .filter((rp: any) => roomsOk(rp.bedrooms ?? rp.rooms))
-        .filter((rp: any) => bathOk(rp.bathrooms))
-        .filter((rp: any) => agencyMatch(rp.roomix_agency_name))
-        .map((rp: any) => ({
+      // ── Re-traer filas completas de roomix por id y mapear a la forma unificada (orden = ranking SQL) ──
+      const rmxIds = (rmxRanked || []).map((r: any) => r.id);
+      const rmxRowsById: Record<string, any> = {};
+      if (rmxIds.length > 0) {
+        const { data: fullRmx } = await supabase.from('roomix_properties').select('*').in('id', rmxIds);
+        for (const row of (fullRmx || [])) rmxRowsById[(row as any).id] = row;
+      }
+      const roomix = (rmxRanked || []).map((r: any) => {
+        const rp = rmxRowsById[r.id];
+        if (!rp) return null;
+        return {
           id: `roomix_${rp.slug}`,
           title: rp.title,
           address: rp.address || rp.neighborhood || '',
@@ -356,36 +377,16 @@ export async function POST(req: Request) {
           description: rp.description || '',
           amenities: rp.amenities || [],
           source: 'roomix',
+          match_pct: r.match_pct ?? null,
+          similarity: r.match_pct ?? 0,
           roomix_agency_name: rp.roomix_agency_name || 'Inmobiliaria colaboradora',
           roomix_agency_logo: rp.roomix_agency_logo,
           roomix_agency_source_url: rp.roomix_agency_source_url,
           canonical_url: rp.canonical_url,
           agent_name: rp.roomix_agency_name || 'Inmobiliaria colaboradora',
           agent_email: '',
-        }));
-
-      roomix = roomix.map((p: any) => {
-        const pSearchable = (p.amenities.join(' ') + ' ' + p.description).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const matched: string[] = [];
-        const missing: string[] = [];
-        if (amenityKeywords.length > 0) {
-          for (const amenity of amenityKeywords) {
-            const a = amenity.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-            const terms = AMENITY_SYNONYMS[amenity.toLowerCase()] || AMENITY_SYNONYMS[a] || [a];
-            if (terms.some((term: string) => pSearchable.includes(term))) matched.push(amenity);
-            else missing.push(amenity);
-          }
-        }
-        const score = amenityKeywords.length > 0 ? matched.length / amenityKeywords.length : 1;
-        return { ...p, amenity_matches: { matched, missing }, amenity_score: score };
-      });
-
-      roomix.sort((a: any, b: any) => {
-        if ((b.amenity_score || 0) !== (a.amenity_score || 0)) return (b.amenity_score || 0) - (a.amenity_score || 0);
-        return 0; // Maintain SQL recency ordering
-      });
-
-      roomix = roomix.slice(0, 10);
+        };
+      }).filter(Boolean);
 
       newMatchedProperties = { propias, agencia, roomix } as any;
       const allNewProps = [...propias, ...agencia, ...roomix];

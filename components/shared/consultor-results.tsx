@@ -19,6 +19,7 @@ export interface UnifiedProperty {
   city?: string | null
   images: string[]
   similarity: number
+  match_pct?: number   // % de coincidencia con lo pedido (ambientes + amenities + zona)
 
   // Source discrimination
   source: PropertySource
@@ -105,6 +106,19 @@ export function UnifiedPropertyCard({ property }: { property: UnifiedProperty })
             alt={property.title || 'Propiedad'}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
           />
+
+          {/* Badge de % de coincidencia (verde = exacto, ámbar = comparable, gris = lejano) */}
+          {typeof property.match_pct === 'number' && (
+            <div className="absolute top-2 left-2 z-10">
+              <span className={`text-white text-[9px] font-bold uppercase tracking-tight px-2 py-0.5 rounded-full backdrop-blur-sm shadow-md ${
+                property.match_pct >= 85 ? 'bg-emerald-600/90' :
+                property.match_pct >= 60 ? 'bg-amber-600/90' :
+                'bg-zinc-700/90'
+              }`}>
+                {property.match_pct}% coincidencia
+              </span>
+            </div>
+          )}
 
           <div className="absolute top-2 right-2 flex gap-1 z-10">
             <span className="bg-black/60 text-white text-[8px] uppercase px-2 py-0.5 rounded-full font-semibold backdrop-blur-sm">
