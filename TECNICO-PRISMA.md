@@ -61,7 +61,7 @@ El producto integra: CRM (Tokko Broker), WhatsApp bidireccional (Evolution API +
 |---|---|---|---|
 | OpenAI | `gpt-4.1-mini` | `lib/openai.ts` → `openaiIA` | Buscador IA, Tutor IA (intent + respuesta) |
 | Google Gemini | `gemini-2.0-flash` / `gemini-3.5-flash` | `lib/gemini.ts` → `prismaIA` | Marketing copy, Análisis de chat, Conversión de plantillas, Tasador legacy |
-| Google Gemini | `text-embedding-004` | `lib/gemini.ts` → `generateEmbedding()` | Embeddings (768 dims) para RAG de documentos |
+| Google Gemini | `gemini-embedding-001` | `lib/gemini.ts` → `generateEmbedding()` | Embeddings (768 dims, taskType `RETRIEVAL_DOCUMENT`) para RAG de documentos y semántica de propiedades |
 | Google Gemini | Imagen / Nano Banana Pro | `lib/gemini.ts` → `generateImage()` | Generación de imágenes de marketing |
 
 ### Librerías clave
@@ -282,7 +282,7 @@ Patrón estándar de un endpoint protegido:
 ## 8. Integraciones Externas
 
 ### 8.1 Tokko Broker (CRM)
-- **Sync propiedades** (`/api/tokko/sync`): paginado `GET tokkobroker.com/api/v1/property/?key=...&limit=100&offset=n`; mapeo de campos + imágenes + agente (`profiles.tokko_agent_id`); genera embedding; upsert masivo con adminClient (`onConflict: tokko_id,agency_id`). Rate limit 1 req/5 min por agencia.
+- **Sync propiedades** (`/api/tokko/sync`): paginado `GET tokkobroker.com/api/v1/property/?key=...&limit=100&offset=n`; mapeo de campos + imágenes + agente (`profiles.tokko_agent_id`); upsert masivo con adminClient (`onConflict: tokko_id,agency_id`); luego genera/actualiza embeddings (`lib/tokko-sync.ts` → `syncPropertyEmbeddings`) solo de propiedades **nuevas o modificadas** (Gemini `gemini-embedding-001`, best-effort, no corta el sync, tope 100/corrida). Rate limit 1 req/5 min por agencia.
   - **Superficies** (`lib/tokko-shared.ts` → `pickSurfaces`): `covered_area` = `roofed_surface` (la techada real; NO usar `surface`, que suele ser el lote); `total_area` = `total_surface` → `surface` → `roofed_surface` (primer valor > 0). Los campos de superficie de Tokko vienen inconsistentes según quién cargó la propiedad.
   - **Sanitización** (`stripTokkoSensitive`): se elimina `internal_data` (datos del propietario, comisiones, ubicación de llaves) del `tokko_data` antes de guardarlo, porque el detalle de propiedad sirve `tokko_data` completo al navegador.
 - **Sync leads** (`/api/tokko/sync-leads`): `GET .../contact/?...&limit=50&order_by=-created_at` (más nuevos primero), delay 350 ms entre páginas, tope 1000; upsert en `leads`.
@@ -537,7 +537,7 @@ Sincroniza las visitas (`scheduled_visits`) hacia el Google Calendar personal de
 
 - **Tasaciones legacy:** `/api/valuation/generate` + tabla `valuations` (Gemini) sin uso confirmado en frontend; `getAsesorKPIs` (`lib/queries/asesor.ts`) y `useAsesorDashboard` consumían solo esta rama. **No eliminado** por precaución.
 - **`contract_signatures`:** conservada del diseño de firma digital; el flujo vigente es firma presencial (no se alimenta).
-- **Columnas `embedding`** en `properties`/`roomix_properties`: presentes pero el Buscador IA actual no las usa (búsqueda no vectorial).
+- **Columna `embedding`** en `properties`: la usa el agente n8n `Cartera_Propiedades` (recomendador, ranking semántico Gemini); el Buscador IA **web** sigue sin usarla (búsqueda no vectorial). `roomix_properties.embedding`: sin uso confirmado.
 - **`/api/messages/bot-reply`:** endpoint legacy de respuesta (solo Evolution, `BOT_REPLY_SECRET`); el flujo vigente es `/api/n8n/reply`.
 - **`/api/marketing-ia/generate-copy`:** genera 1 copy individual, pero **ningún componente lo llama**; el flujo vigente de "Crear Anuncio" usa `generate-batch` + `generate-image`. **No eliminado** (sirve de base para un futuro modo "copy simple").
 - **Marketing IA — vincular propiedad al IPC "vender":** el `PropertySelector` y el fetch de `propiedad_tokko_id` desde Tokko existen, pero el copy **no usa** los datos concretos de la propiedad (regla anti-invención). Función reservada para un modo futuro.
