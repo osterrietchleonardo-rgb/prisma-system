@@ -296,6 +296,7 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 > 💡 **El %:** mide qué tanto coincide con lo concreto que pediste (ambientes + servicios). Una de "94%" tiene casi todo; una de "60%" es una alternativa válida que le falta algo (mirá la tarjeta).
 > 💡 Si una propiedad o inmobiliaria tiene una **nota/consideración** cargada por el director, el Buscador te la avisa.
 > 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
+> 🆕 **Junio 2026:** la red de colaboración ahora incluye bien las propiedades **en venta** (antes aparecían casi todas como alquiler por un error de origen, ya corregido), con prioridad en **Buenos Aires / AMBA**. Si buscás ventas, ahora vas a ver muchas más opciones.
 > 💰 Cada búsqueda consume 1 crédito.
 
 ---

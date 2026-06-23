@@ -414,10 +414,20 @@ Carpeta `roomix-sync/`. Alimenta diariamente `roomix_properties` (red de colabor
 - **Producción:** contenedor Docker en **Easypanel**; `node-cron` dispara a las **03:00 AM**; `child_process.spawn` aísla el proceso para evitar fugas de memoria de Chromium.
 - **Health check:** mini servidor HTTP nativo en puerto 80 (`cron.js`, `CMD ["node","cron.js"]`) para satisfacer Easypanel y evitar SIGTERM.
 - **Control de Concurrencia:** El schedule de `cron.js` cuenta con un sistema de lock (`isRunning`) para evitar la ejecución de instancias paralelas si el procesamiento se extiende al día siguiente.
-- **Descarga de Sitemaps:** Evita bloqueos por challenges de Cloudflare ejecutando un `fetch` nativo *dentro* de la instancia del navegador (`page.evaluate`), heredando el fingerprint TLS y las cookies de sesión (`cf_clearance`). Incluye reintentos exponenciales y timeout de 90s.
+- **Descarga de Sitemaps:** Evita bloqueos por challenges de Cloudflare ejecutando un `fetch` nativo *dentro* de la instancia del navegador (`page.evaluate`), heredando el fingerprint TLS y las cookies de sesión (`cf_clearance`). Incluye reintentos exponenciales y timeout de 90s. Lee `/properties/sitemap/0..6` (7 sitemaps, `SITEMAP_COUNT`; antes solo 0..5).
 - **Sincronización Diferencial:** Consulta a Supabase (`roomix_properties`) mediante paginación explícita (`.range()`) para bypassear el límite estándar de 1.000 filas de PostgREST, garantizando que el *diff* reconozca todo el inventario ya sincronizado.
 - **Imagen:** `mcr.microsoft.com/playwright:v1.60.0-jammy`.
 - **Imágenes/CDN:** consumidas vía `cdn.roomix.ai` (whitelisted en `next.config.mjs`).
+
+### 11.1 Cambios Junio 2026 (`crawler.mjs` v4.1)
+
+- **Operación correcta (`operation_type`):** `operation` se deriva de `operation_type` (`venta`/`alquiler`) del payload Next.js + fallback al prefijo del título (`parseOperationType`). **Reemplaza** la lógica vieja basada en `businessFunction` del JSON-LD, que era inservible (las ventas no lo traen; los alquileres siempre dicen `LeaseOut`) → producía 0 ventas y 962 `null`. `businessFunction` queda solo como último fallback.
+- **Cola priorizada (`priorityRank`):** Venta AMBA (0) → Venta resto prov. BsAs (1) → Venta resto Argentina (2) → Alquiler AMBA (3) → Alquiler resto (4). **Toda venta antes que cualquier alquiler.**
+- **Recolección de ventas (`fetchVentaSeeds`):** Fuente prioritaria desde listados `/buscar/comprar/<seed>?page=N` (paginados), agrupados por tier de zona (`VENTA_SEED_GROUPS`). El sitemap barre el resto. Tope de prueba: `VENTA_MAX_PAGES`.
+- **Borrado seguro (`deleteMissing`):** Borra las que salieron de Roomix; solo en corrida completa (sin `--limit`), solo si **todos los sitemaps cargaron OK**, y aborta si borraría **>40%** de la base.
+- **Updates desbloqueados (`clearCheckpoint`):** El `checkpoint.json` es solo para reanudar corridas cortadas; se **vacía al terminar bien** para que el *diff* por `lastmod` detecte y re-baje las modificadas en la próxima corrida (antes quedaban bloqueadas).
+- **Backfill puntual (`backfill-operation.mjs`):** Script idempotente de una vez; re-etiquetó las 962 filas con `operation = null` (UPDATE solo de `operation`). Resultado: 961 `rent` + 1 `sale`.
+- **Env de producción:** `VENTA_MAX_PAGES`, `SITEMAP_COUNT`, `PROPERTY_LIMIT` sin definir (defaults completos).
 
 ---
 

@@ -734,9 +734,26 @@ El Buscador IA se nutre de la tabla `roomix_properties`, la cual es alimentada d
 - **Worker de Producción:** Se ejecuta como un contenedor Docker en Easypanel, utilizando `node-cron` (disparándose a las 03:00 AM) y `child_process.spawn` para aislar el proceso y evitar fugas de memoria del Chromium.
 - **Despliegue & Health Check:** El Worker levanta un mini servidor HTTP nativo en el puerto 80 (`cron.js`) y ejecuta Node directamente (`CMD ["node", "cron.js"]` en `Dockerfile`) para cumplir con los requerimientos de Health Check de Easypanel, evitando errores de tipo SIGTERM y garantizando que el proceso se mantenga vivo.
 - **Concurrencia Segura (Cron):** Implementa un "semáforo" (lock) en el cron de Node para prevenir la ejecución paralela múltiple en extracciones que duren más de 24 horas, evitando baneos por exceso de requests concurrentes.
-- **Extracción de Sitemaps:** En lugar de navegación directa (que sufre bloqueos de Cloudflare), extrae los sitemaps utilizando `page.evaluate(fetch)` *dentro* del contexto de Chromium, preservando el fingerprint TLS y las cookies `cf_clearance`, con reintentos exponenciales.
+- **Extracción de Sitemaps:** En lugar de navegación directa (que sufre bloqueos de Cloudflare), extrae los sitemaps utilizando `page.evaluate(fetch)` *dentro* del contexto de Chromium, preservando el fingerprint TLS y las cookies `cf_clearance`, con reintentos exponenciales. Lee los **7 sitemaps** (`/properties/sitemap/0..6`, configurable con `SITEMAP_COUNT`; antes leía solo 0..5 y se salteaba ~30k URLs del sitemap 6).
 - **Diff con Supabase:** La consulta de comparación contra la base de datos (`diffWithSupabase`) implementa paginación explícita (`.range()`) para evitar el límite por defecto de 1.000 filas de PostgREST, garantizando la correcta deduplicación frente a bases de datos grandes.
 - **Imagen Docker:** `mcr.microsoft.com/playwright:v1.60.0-jammy`
+
+#### Mejoras Junio 2026 (`crawler.mjs` v4.1 — prioridad ventas + datos fieles)
+
+- **Detección de operación CORRECTA (`operation_type`):** El campo se determina por `operation_type` (`venta`/`alquiler`) del payload Next.js de cada ficha, con respaldo en el prefijo del título (`"VENTA…"`/`"ALQUILER…"`). **Antes** se usaba el `businessFunction` del JSON-LD, que es **inservible**: las ventas no lo traen y los alquileres siempre dicen `LeaseOut` → todo terminaba como `rent` o `null` (la columna `operation` tenía **0 ventas**). El `businessFunction` queda solo como último fallback.
+- **Prioridad de extracción (ventas + AMBA primero):** El worker arma una cola priorizada antes de procesar (`priorityRank`):
+  1. **Venta AMBA** (CABA + conurbano norte/sur/oeste) — tier 0
+  2. **Venta resto provincia de Buenos Aires** — tier 1
+  3. **Venta resto de Argentina** — tier 2
+  4. **Alquiler AMBA** — tier 3
+  5. **Alquiler resto del país** — tier 4
+  
+  Las ventas se recolectan como **fuente prioritaria** desde los listados propios de Roomix `/buscar/comprar/<seed>?page=N` (seeds por zona, paginados), que ya vienen filtrados por operación y zona. El resto del catálogo se barre por sitemaps. **Toda venta se procesa antes que cualquier alquiler.**
+- **Borrado automático con freno de seguridad (`deleteMissing`):** Elimina de la base las propiedades que ya no están en Roomix (salieron del catálogo). Solo se ejecuta en corrida completa (sin `--limit`), **únicamente si todos los sitemaps cargaron OK**, y **aborta si fuese a borrar >40%** de la base (protección ante catálogo incompleto por error de red).
+- **Actualizaciones desbloqueadas (checkpoint):** El `checkpoint.json` sirve para **reanudar** una corrida cortada a la mitad. Al terminar bien, se **vacía** (`clearCheckpoint`) → así las propiedades que Roomix marque como modificadas (por `lastmod`) vuelven a bajarse y se actualizan en la próxima corrida. Antes el checkpoint las bloqueaba para siempre.
+- **Embedding:** cada ficha nueva/modificada genera su embedding Gemini (`gemini-embedding-001`, 768 dims, `RETRIEVAL_DOCUMENT`) antes del upsert.
+- **Variables de entorno (producción):** dejar `VENTA_MAX_PAGES` y `SITEMAP_COUNT` **sin definir** (defaults: todas las ventas y los 7 sitemaps). `VENTA_MAX_PAGES=N` y `PROPERTY_LIMIT=N` sirven para pruebas acotadas.
+- **Backfill puntual (`backfill-operation.mjs`):** Script de una sola vez que re-etiquetó las **962 propiedades históricas que estaban en `operation = null`** (re-visita cada ficha y actualiza **solo** la columna `operation`). Resultado: 961 `rent` + 1 `sale`, 0 errores, 0 sin determinar. Es idempotente (toma solo las que sigan en `null`).
 
 ### 10.3 Flujo Completo de Búsqueda (rediseño Junio 2026)
 
