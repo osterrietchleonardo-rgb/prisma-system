@@ -1297,7 +1297,8 @@ Solapa independiente dentro de `/director/documentos` y `/asesor/documentos` par
 
 - **Aislamiento total de la IA:** vive en tablas propias (`official_documents` y `official_document_folders`) que la IA **no conoce**. El RAG (`match_agency_documents`) solo lee `agency_documents`, por lo que es imposible que el Tutor IA consulte estos archivos.
 - **Sin embeddings ni extracción de texto:** la subida va directo del navegador a Supabase Storage (bucket `documents`, prefijo `official/{agencyId}/`) + insert en `official_documents`. No consume créditos IA.
-- **Director:** crea carpetas con nombre personalizado, sube archivos (sin límite de tamaño), reemplaza por una versión nueva (borra la anterior del storage y sube `version`), mueve entre carpetas, elimina y descarga.
+- **Subida múltiple:** el botón "Subir Documentos" acepta **varios archivos a la vez** (input `multiple`). El `title` de cada documento se deriva del **nombre del archivo sin extensión**; todos se guardan en la **carpeta elegida** (selector único). Se suben en serie con barra de progreso (`done/total`) y manejo tolerante a fallos (si uno falla, los demás se insertan y se reporta cuál no entró).
+- **Director:** crea carpetas con nombre personalizado, sube archivos (sin límite de tamaño, uno o varios a la vez), reemplaza por una versión nueva (borra la anterior del storage y sube `version`), mueve entre carpetas, elimina y descarga.
 - **Asesor:** acceso **solo lectura** — navega carpetas y descarga; no ve botones de gestión (`readOnly` en el componente compartido).
 - **Componente compartido:** `components/documentos/OfficialDocsSection.tsx` (prop `readOnly` distingue asesor de director).
 - **Permisos (RLS):** ver = cualquier miembro de la agencia; gestionar = solo `director`.
