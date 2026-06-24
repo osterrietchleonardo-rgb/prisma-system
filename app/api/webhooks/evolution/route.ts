@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { CLASIFICACION_CONSULTA } from '@/lib/whatsapp/clasificacion'
+import { triggerN8nWithSafetyNet } from '@/lib/whatsapp/n8nTrigger'
+
+// El disparo a n8n hace hasta 3 intentos (timeout 15s c/u). Subimos el límite de
+// la función para que Vercel no la mate antes de terminar los reintentos.
+export const maxDuration = 60
 
 /**
  * POST /api/webhooks/evolution
  *
  * Recibe eventos de Evolution API y los procesa:
  * 1. Guarda el mensaje en Supabase
- * 2. Si bot_active=true, dispara n8n con payload enriquecido
+ * 2. Si bot_active=true, dispara n8n con payload enriquecido (reintentos + dead-letter)
  */
 export async function POST(req: Request) {
   try {
@@ -37,6 +42,20 @@ export async function POST(req: Request) {
     // Ignorar mensajes propios o sin número
     if (!contactPhone || data.key?.fromMe) {
       return NextResponse.json({ success: true, message: 'Ignored: outbound or missing remoteJid' })
+    }
+
+    // Dedup por wamid: Evolution puede reemitir messages.upsert para el mismo
+    // mensaje. Si ya lo tenemos, salimos para no duplicar ni re-disparar n8n.
+    if (wamid) {
+      const { data: dupMsg } = await supabase
+        .from('wa_messages')
+        .select('id')
+        .eq('wamid', wamid)
+        .maybeSingle()
+      if (dupMsg) {
+        console.log(`[Evolution Webhook] Mensaje duplicado (wamid ya procesado), se ignora: ${wamid}`)
+        return NextResponse.json({ success: true, message: 'Duplicate wamid ignored' })
+      }
     }
 
     // Extraer contenido según tipo de mensaje
@@ -283,13 +302,13 @@ export async function POST(req: Request) {
     }
 
     // 4. Disparar n8n con payload enriquecido (bot activo)
-    if (process.env.N8N_WEBHOOK_URL) {
-      console.log(`[Evolution Webhook] Intentando disparar n8n para conv: ${conversation_id} en URL: ${process.env.N8N_WEBHOOK_URL}`)
-
+    //    Disparo robusto: reintentos + red de contención (dead-letter). Si falla
+    //    tras los intentos, el mensaje NO se pierde: queda pendiente de reproceso.
+    {
       const enrichedPayload = {
         debug_v: '5.1_final_manual_mode', // Versión de debug
         message_id: insertedMsg?.id || null, // ID raíz garantizado
-        webhook_event_id: crypto.randomUUID(), 
+        webhook_event_id: crypto.randomUUID(),
         // IDs para que n8n pueda responder de vuelta
         agency_id: instance.agency_id,
         conversation_id,
@@ -331,29 +350,20 @@ export async function POST(req: Request) {
         reply_url: `${process.env.APP_URL}/api/n8n/reply`,
       }
 
-      // IMPORTANTE: Awaited fetch para evitar que Vercel mate el proceso antes de enviar
-      try {
-        const n8nRes = await fetch(process.env.N8N_WEBHOOK_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(enrichedPayload),
-          signal: AbortSignal.timeout(25000), // 25s max
-        })
+      const result = await triggerN8nWithSafetyNet(supabase, enrichedPayload, {
+        conversation_id,
+        agency_id: instance.agency_id,
+        message_id: insertedMsg?.id || null,
+        contact_phone: contactPhone,
+        source: 'evolution',
+      })
 
-        if (!n8nRes.ok) {
-          const errBody = await n8nRes.text().catch(() => '')
-          console.error(`[Evolution Webhook] n8n respondió ${n8nRes.status}: ${errBody}`)
-        } else {
-          console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
-        }
-      } catch (n8nErr: any) {
-        if (n8nErr.name === 'AbortError' || n8nErr.name === 'TimeoutError') {
-          console.error(`[Evolution Webhook] n8n timeout (>25s) — conv: ${conversation_id}`)
-        } else {
-          console.error('[Evolution Webhook] Error llamando a n8n:', n8nErr)
-        }
+      if (result.ok) {
+        console.log(`[Evolution Webhook] n8n triggered OK — conversation: ${conversation_id}`)
+      } else {
+        console.error(`[Evolution Webhook] n8n falló tras ${result.attempts} intentos — dead-letter guardado para conv: ${conversation_id}`)
       }
-    } // end if n8n configured
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {

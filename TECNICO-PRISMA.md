@@ -313,13 +313,23 @@ PRISMA soporta **dos integraciones simultáneas**: Evolution API (preferida) y M
 ### 9.1 Flujo entrante
 ```
 Lead → Evolution/Meta → webhook PRISMA → identifica instancia (agency_id)
+   → dedup por wamid (si ya existe el mensaje, se ignora)
    → crea/actualiza wa_conversations → guarda wa_messages (role:'lead')
    → si bot_active: arma enrichedPayload (últimos 10 msgs + etiquetas + score)
-        → POST N8N_WEBHOOK_URL (timeout 25s)
+        → triggerN8nWithSafetyNet → POST N8N_WEBHOOK_URL (3 intentos, timeout 15s c/u)
+             → si fallan todos: guarda en wa_n8n_dead_letter (NO se pierde el lead)
    → si bot OFF: guarda en n8n_chat_histories (contexto para reactivación)
 ```
 - `POST /api/webhooks/evolution` — identifica por `evo_instance_name`.
 - `GET/POST /api/webhooks/meta` — verificación GET por `WHATSAPP_WEBHOOK_VERIFY_TOKEN`; POST maneja `message_template_status_update` y `messages` (text/image/interactive), identifica por `phone_number_id`.
+- Ambos webhooks: `export const maxDuration = 60` (para que Vercel no mate la función antes de terminar los reintentos a n8n).
+- **Dedup por `wamid`:** antes de procesar, se consulta `wa_messages` por `wamid`; si existe, se ignora (Meta/Evolution pueden reentregar el mismo mensaje sin duplicar ni re-disparar n8n).
+
+### 9.1.1 Disparo robusto a n8n + red de contención (anti "lead perdido")
+- **Helper `lib/whatsapp/n8nTrigger.ts`:** reemplaza el viejo `fetch(...).catch(()=>log)` que tragaba los fallos. `callN8n(payload)` reintenta hasta **3 veces** (backoff 500/1000 ms, timeout 15 s por intento) y devuelve `{ok, attempts, error}`. `triggerN8nWithSafetyNet(supabase, payload, ctx)` envuelve a `callN8n` y, si agota los intentos, **persiste el disparo en `wa_n8n_dead_letter`** (`status='pending'`) para reproceso. n8n responde el webhook al instante (ACK) y devuelve la respuesta de la IA async vía `/api/n8n/reply`, por lo que un timeout = "no llegó", no "está procesando" → reintentar es seguro.
+- **Tabla `wa_n8n_dead_letter`** (migración `20260624120000_wa_n8n_dead_letter.sql`): `conversation_id, agency_id, message_id, contact_phone, source('meta'|'evolution'|'manual'), payload(jsonb), attempts, last_error, status('pending'|'reprocessed'|'failed'), timestamps`. RLS ON sin policies (solo `service_role`). Índice parcial sobre `(status, created_at) WHERE status='pending'`.
+- **Reproceso `POST /api/n8n/retry-pending`** (auth `N8N_REPLY_SECRET` por header `x-retry-secret` o `?secret=`; `?limit=1..100`, default 25): drena la cola, re-dispara con `callN8n`; éxito → `status='reprocessed'`; sigue fallando → suma `attempts` y guarda `last_error`. Pensado para correr manual o por cron (GitHub Action).
+- **Origen:** caso real Ivana Marti (23/06/2026): el disparo único falló transitoriamente, el `.catch` lo tragó y el lead quedó sin respuesta y sin rastro en n8n. Esta arquitectura lo vuelve recuperable.
 
 ### 9.2 Flujo de respuesta (`POST /api/n8n/reply`)
 Auth por `N8N_REPLY_SECRET`. Verifica anti-cruce de instancias; si el bot fue pausado, descarta. Normaliza `media_type`; calcula delay de tipeo (~40 ms/char, 800–4000 ms); envía vía Evolution (`sendText`/`sendMedia`) o Meta (`graph.facebook.com/v20.0/{phone_number_id}/messages`); persiste `wa_messages` (role `bot`); actualiza conversación; **broadcast Realtime** al canal `agency-{id}` (evento `refresh-whatsapp`).

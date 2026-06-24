@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { CLASIFICACION_CONSULTA } from '@/lib/whatsapp/clasificacion'
+import { triggerN8nWithSafetyNet } from '@/lib/whatsapp/n8nTrigger'
+
+// El disparo a n8n hace hasta 3 intentos (timeout 15s c/u). Subimos el límite de
+// la función para que Vercel no la mate antes de terminar los reintentos.
+export const maxDuration = 60
 
 // Para poder verificar el webhook desde la interfaz de Meta, primero hacemos el GET
 export async function GET(req: Request) {
@@ -82,6 +87,18 @@ export async function POST(req: Request) {
                 else if (message.type === 'interactive') {
                     content = message.interactive.button_reply?.title || message.interactive.list_reply?.title || 'Respuesta interactiva'
                 } else continue // Ignorar otros tipos por ahora
+
+                // Dedup por wamid: Meta puede reentregar el mismo mensaje. Si ya lo
+                // tenemos, saltamos para no duplicar ni re-disparar n8n.
+                const { data: dupMsg } = await supabase
+                    .from('wa_messages')
+                    .select('id')
+                    .eq('wamid', wamid)
+                    .maybeSingle()
+                if (dupMsg) {
+                    console.log(`[Meta Webhook] Mensaje duplicado (wamid ya procesado), se ignora: ${wamid}`)
+                    continue
+                }
 
                 // Buscar o crear la conversacion
                 let conversation_id: string
@@ -178,7 +195,7 @@ export async function POST(req: Request) {
                     .single()
 
                 // Gatillar n8n si el bot esta activo
-                if (botIsActive && process.env.N8N_WEBHOOK_URL) {
+                if (botIsActive) {
                     // Obtener los ultimos 10 mensajes para dar contexto de historial
                     const { data: recentMessages } = await supabase
                         .from('wa_messages')
@@ -229,17 +246,16 @@ export async function POST(req: Request) {
                         reply_url: `${process.env.APP_URL}/api/n8n/reply`,
                     }
 
-                    // No await aquí mismo, sino coleccionar para Promise.all
+                    // Disparo robusto: reintentos + red de contención (dead-letter).
+                    // No await aquí mismo, se colecciona para Promise.all.
                     n8nTriggers.push(
-                        fetch(process.env.N8N_WEBHOOK_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(enrichedPayload),
-                            signal: AbortSignal.timeout(25000)
-                        }).then(r => {
-                            if (!r.ok) console.error(`[Meta Webhook] n8n error: ${r.status}`)
-                            else console.log(`[Meta Webhook] n8n triggered OK for conv: ${conversation_id}`)
-                        }).catch(e => console.error('Error triggering n8n from meta webhook:', e))
+                        triggerN8nWithSafetyNet(supabase, enrichedPayload, {
+                            conversation_id,
+                            agency_id: instance.agency_id,
+                            message_id: insertedMsg?.id || null,
+                            contact_phone: contactPhone,
+                            source: 'meta',
+                        }).then(() => undefined)
                     )
                 } else if (!botIsActive) {
                     // Bot apagado (modo manual): guardar mensaje del lead en n8n_chat_histories
