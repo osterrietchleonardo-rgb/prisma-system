@@ -492,6 +492,7 @@ Evolution API actúa como intermediario entre PRISMA y WhatsApp Business.
 
 1. **Recepción:** Evolution API envía webhook con el mensaje
 2. **Identificación:** Busca `whatsapp_instances` por `evo_instance_name` → obtiene `agency_id`
+   - **Dedup por `wamid`:** si ya existe un `wa_messages` con ese `wamid`, se ignora (Evolution/Meta pueden reentregar el mismo mensaje).
 3. **Conversación:**
    - Busca conversación existente por `instance_id + contact_phone`
    - Si no existe → crea nueva con `bot_active: true`, `status: 'active'`
@@ -502,7 +503,8 @@ Evolution API actúa como intermediario entre PRISMA y WhatsApp Business.
    - Obtiene últimos 10 mensajes de la conversación para contexto
    - Obtiene etiquetas y score actuales
    - Construye `enrichedPayload` con toda la información
-   - Dispara POST a `N8N_WEBHOOK_URL` con timeout de 25s
+   - Dispara POST a `N8N_WEBHOOK_URL` vía `triggerN8nWithSafetyNet` (**3 intentos**, timeout 15s c/u, backoff 500/1000ms)
+   - **Red de contención (anti "lead perdido"):** si los 3 intentos fallan, el disparo se guarda en `wa_n8n_dead_letter` (`status='pending'`) en vez de perderse. Se reprocesa con `POST /api/n8n/retry-pending` (manual o cron). Ambos webhooks usan `maxDuration=60` para no ser cortados por Vercel a mitad de los reintentos.
    - El payload incluye:
      ```json
      {
