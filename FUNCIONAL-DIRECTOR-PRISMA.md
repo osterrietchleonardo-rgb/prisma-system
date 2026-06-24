@@ -407,7 +407,7 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 > 💡 **Tip:** las notas son ideales para bajar criterios comerciales a todo el equipo sin tener que avisarles uno por uno.
 
-> 🆕 **Junio 2026 — más propiedades en venta:** la red de colaboración ahora trae correctamente las propiedades **en venta** (antes casi todo el catálogo externo aparecía como alquiler por un error de origen, ya corregido). La sincronización **prioriza las ventas y el AMBA** (CABA + conurbano), y suma el resto del país. El catálogo se mantiene al día solo: agrega las nuevas, actualiza las que cambian de precio/estado y da de baja las que salieron de venta.
+> 🆕 **Junio 2026 — más propiedades en venta:** la red de colaboración ahora trae las propiedades **en venta**, **priorizando las ventas y el AMBA** (CABA + conurbano) y sumando el resto del país. Hasta hace poco casi no aparecían: el proceso que las trae quedaba **trabado** y nunca llegaba a guardarlas (por eso se veían muy pocas ventas). Ya está **arreglado** y las ventas se van **incorporando solas, día a día** (al principio sobre todo de CABA y conurbano, que son la prioridad). El catálogo se mantiene al día solo: agrega las nuevas, actualiza las que cambian de precio/estado y da de baja las que salieron.
 > ⚠️ El asesor **no ve** la solapa de Notas; solo recibe las consideraciones en sus búsquedas.
 > 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
 > 💰 1 crédito por búsqueda.
