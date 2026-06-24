@@ -61,7 +61,13 @@ const PROPERTY_LIMIT = process.env.PROPERTY_LIMIT !== undefined ? parseInt(proce
 
 // Roomix expone sitemaps de propiedades numerados 0..N. Antes leíamos 0..5 y
 // nos salteábamos el 6 (≈30k URLs). Configurable por si crece el catálogo.
-const SITEMAP_COUNT = process.env.SITEMAP_COUNT !== undefined ? parseInt(process.env.SITEMAP_COUNT) : 7;
+// OJO: blindado. Si la variable SITEMAP_COUNT está VACÍA, negativa o con basura →
+// caemos al default de 7. Una vez la dejaron vacía en EasyPanel y el crawler leyó
+// 0 sitemaps (catálogo completo apagado) sin avisar. Nunca más. El 0 EXPLÍCITO sí
+// se respeta (útil para pruebas: desactiva sitemaps a propósito); el accidente real
+// era la cadena vacía ('' → parseInt = NaN → Array.from({length:NaN}) = []).
+const _sitemapCountRaw = parseInt(process.env.SITEMAP_COUNT ?? '', 10);
+const SITEMAP_COUNT = Number.isFinite(_sitemapCountRaw) && _sitemapCountRaw >= 0 ? _sitemapCountRaw : 7;
 const SITEMAP_URLS = Array.from({ length: SITEMAP_COUNT }, (_, i) =>
   `https://roomix.ai/properties/sitemap/${i}`
 );
@@ -80,10 +86,31 @@ const xmlParser = new XMLParser({ ignoreAttributes: false });
 // Roomix tiene páginas de listado ya filtradas por operación+zona en /buscar/comprar/<seed>.
 // Las usamos como fuente prioritaria de propiedades EN VENTA (paginadas con ?page=N).
 // Grupos de listados de venta en orden de prioridad (tier). El tier de una propiedad
-// = el del PRIMER grupo donde aparece (por eso AMBA captura primero, luego provincia, luego país).
-//   tier 0 = Venta AMBA (CABA + conurbano norte/sur/oeste)
-//   tier 1 = Venta resto provincia de Buenos Aires
+// = el del PRIMER grupo donde aparece (por eso AMBA captura primero, luego país).
+//   tier 0 = Venta AMBA (CABA + los 29 partidos del conurbano)
 //   tier 2 = Venta resto de Argentina
+//
+// IMPORTANTE — seeds verificados contra Roomix real (Junio 24). Los slugs viejos eran
+// engañosos: `en-buenos-aires` devolvía el listado GENÉRICO idéntico a `en-capital-federal`
+// (99/99 props repetidas → +0 siempre); `en-zona-norte`/`en-zona-sur` filtraban por la
+// COSTA atlántica (Villa Gesell), NO por el conurbano AMBA. Por eso en producción esos
+// grupos daban +0. La forma correcta y comprobada de cubrir AMBA es CABA + cada partido
+// del conurbano por su slug propio (`en-<partido>`): los 29 filtran bien (overlap ~0 con
+// capital, ~50 props/página). El resto del país lo barre `en-argentina` (tier 2).
+const CONURBANO_SEEDS = [
+  // Norte
+  'en-vicente-lopez', 'en-san-isidro', 'en-san-fernando', 'en-tigre', 'en-escobar',
+  'en-pilar', 'en-malvinas-argentinas', 'en-jose-c-paz', 'en-san-miguel',
+  'en-general-san-martin', 'en-san-martin',
+  // Oeste
+  'en-tres-de-febrero', 'en-hurlingham', 'en-ituzaingo', 'en-moron', 'en-merlo',
+  'en-moreno', 'en-la-matanza',
+  // Sur
+  'en-avellaneda', 'en-lanus', 'en-lomas-de-zamora', 'en-almirante-brown', 'en-quilmes',
+  'en-berazategui', 'en-florencio-varela', 'en-esteban-echeverria', 'en-ezeiza',
+  'en-presidente-peron', 'en-san-vicente',
+];
+
 // Tope de páginas para `en-argentina` (tier 2). Es el listado "todo el país": tiene
 // CIENTOS de páginas y casi siempre trae +1 nueva, así que el corte por "2 páginas
 // vacías" no se gatilla nunca → la recolección se colgaba ahí durante horas y la tubería
@@ -92,8 +119,7 @@ const VENTA_AR_MAX_PAGES = process.env.VENTA_AR_MAX_PAGES !== undefined ? parseI
 
 const VENTA_SEED_GROUPS = [
   // maxPages 0 = sin tope: estos listados se autocortan solos (2 páginas seguidas sin nuevas).
-  { tier: 0, label: 'AMBA', maxPages: 0, seeds: ['en-capital-federal', 'en-zona-norte', 'en-zona-sur', 'en-zona-oeste'] },
-  { tier: 1, label: 'Prov. BsAs', maxPages: 0, seeds: ['en-buenos-aires'] },
+  { tier: 0, label: 'AMBA', maxPages: 0, seeds: ['en-capital-federal', ...CONURBANO_SEEDS] },
   { tier: 2, label: 'Argentina', maxPages: VENTA_AR_MAX_PAGES, seeds: ['en-argentina'] },
 ];
 // Override global para pruebas (aplica a TODOS los grupos): VENTA_MAX_PAGES=2
@@ -388,7 +414,11 @@ async function diffWithSupabase(sitemapEntries) {
   let from = 0;
   const step = 1000;
   while (true) {
-    const { data, error } = await supabase.from('roomix_properties').select('id, lastmod').range(from, from + step - 1);
+    // .order('id') OBLIGATORIO: sin orden explícito, Postgres no garantiza el mismo
+    // orden entre páginas de .range() → filas repetidas y otras salteadas, y los
+    // conteos de nuevas/eliminar salen mal (en una corrida: 32976 vs 54581 sobre la
+    // MISMA tabla con segundos de diferencia).
+    const { data, error } = await supabase.from('roomix_properties').select('id, lastmod').order('id', { ascending: true }).range(from, from + step - 1);
     if (error) { log('❌', 'Error DB:', error.message); return { toExtract: sitemapEntries, toDelete: [] }; }
     existing = existing.concat(data || []);
     if (!data || data.length < step) break;
@@ -416,7 +446,9 @@ async function deleteMissing(entries) {
   let dbIds = [], from = 0;
   const step = 1000;
   while (true) {
-    const { data, error } = await supabase.from('roomix_properties').select('id').range(from, from + step - 1);
+    // .order('id') OBLIGATORIO (mismo motivo que en diffWithSupabase): sin orden,
+    // .range() pagina inconsistente y el cálculo de qué borrar queda mal.
+    const { data, error } = await supabase.from('roomix_properties').select('id').order('id', { ascending: true }).range(from, from + step - 1);
     if (error) { log('❌', 'Error leyendo IDs para borrar:', error.message); return; }
     dbIds = dbIds.concat((data || []).map(r => r.id));
     if (!data || data.length < step) break;
