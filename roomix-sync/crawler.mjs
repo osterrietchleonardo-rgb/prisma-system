@@ -66,7 +66,9 @@ const SITEMAP_URLS = Array.from({ length: SITEMAP_COUNT }, (_, i) =>
   `https://roomix.ai/properties/sitemap/${i}`
 );
 
-const CONCURRENCY = 2; // Menos concurrencia para evitar flags
+// Concurrencia de extracción de fichas. 4 = buen balance velocidad/riesgo de Cloudflare.
+// Configurable por env: si en los logs aparecen muchos ⏳ (403/429), bajarla.
+const CONCURRENCY = process.env.CRAWLER_CONCURRENCY !== undefined ? parseInt(process.env.CRAWLER_CONCURRENCY) : 4;
 const BATCH_DELAY_MS = 1500;
 const PAGE_TIMEOUT = 45_000;
 const SITEMAP_TIMEOUT = 90_000; // Los sitemaps son XML pesados, necesitan más tiempo
@@ -82,12 +84,19 @@ const xmlParser = new XMLParser({ ignoreAttributes: false });
 //   tier 0 = Venta AMBA (CABA + conurbano norte/sur/oeste)
 //   tier 1 = Venta resto provincia de Buenos Aires
 //   tier 2 = Venta resto de Argentina
+// Tope de páginas para `en-argentina` (tier 2). Es el listado "todo el país": tiene
+// CIENTOS de páginas y casi siempre trae +1 nueva, así que el corte por "2 páginas
+// vacías" no se gatilla nunca → la recolección se colgaba ahí durante horas y la tubería
+// NUNCA llegaba a guardar. AMBA (la prioridad) se recolecta completo igual. Configurable.
+const VENTA_AR_MAX_PAGES = process.env.VENTA_AR_MAX_PAGES !== undefined ? parseInt(process.env.VENTA_AR_MAX_PAGES) : 60;
+
 const VENTA_SEED_GROUPS = [
-  { tier: 0, label: 'AMBA', seeds: ['en-capital-federal', 'en-zona-norte', 'en-zona-sur', 'en-zona-oeste'] },
-  { tier: 1, label: 'Prov. BsAs', seeds: ['en-buenos-aires'] },
-  { tier: 2, label: 'Argentina', seeds: ['en-argentina'] },
+  // maxPages 0 = sin tope: estos listados se autocortan solos (2 páginas seguidas sin nuevas).
+  { tier: 0, label: 'AMBA', maxPages: 0, seeds: ['en-capital-federal', 'en-zona-norte', 'en-zona-sur', 'en-zona-oeste'] },
+  { tier: 1, label: 'Prov. BsAs', maxPages: 0, seeds: ['en-buenos-aires'] },
+  { tier: 2, label: 'Argentina', maxPages: VENTA_AR_MAX_PAGES, seeds: ['en-argentina'] },
 ];
-// Tope de páginas por seed (0 = sin tope, recorre todo). Para pruebas: VENTA_MAX_PAGES=2
+// Override global para pruebas (aplica a TODOS los grupos): VENTA_MAX_PAGES=2
 const VENTA_MAX_PAGES = process.env.VENTA_MAX_PAGES !== undefined ? parseInt(process.env.VENTA_MAX_PAGES) : 0;
 
 // Barrios de CABA + partidos del conurbano (AMBA), en forma "slug" (sin acentos, con guiones).
@@ -226,10 +235,15 @@ async function fetchVentaSeeds(context) {
 
     for (const group of VENTA_SEED_GROUPS) {
       const before = byId.size;
+      // Tope efectivo: el override global de pruebas gana; si no, el del grupo (0 = sin tope).
+      const pageCap = VENTA_MAX_PAGES > 0 ? VENTA_MAX_PAGES : (group.maxPages || 0);
       for (const seed of group.seeds) {
         let pageNum = 1, emptyStreak = 0;
         while (true) {
-          if (VENTA_MAX_PAGES > 0 && pageNum > VENTA_MAX_PAGES) break;
+          if (pageCap > 0 && pageNum > pageCap) {
+            log('🏁', `venta[${group.label}]/${seed} alcanzó el tope de ${pageCap} páginas, corto seed`);
+            break;
+          }
           const url = `https://roomix.ai/buscar/comprar/${seed}?page=${pageNum}`;
 
           let res = await browserFetch(page, url);

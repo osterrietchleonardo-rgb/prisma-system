@@ -423,11 +423,14 @@ Carpeta `roomix-sync/`. Alimenta diariamente `roomix_properties` (red de colabor
 
 - **Operación correcta (`operation_type`):** `operation` se deriva de `operation_type` (`venta`/`alquiler`) del payload Next.js + fallback al prefijo del título (`parseOperationType`). **Reemplaza** la lógica vieja basada en `businessFunction` del JSON-LD, que era inservible (las ventas no lo traen; los alquileres siempre dicen `LeaseOut`) → producía 0 ventas y 962 `null`. `businessFunction` queda solo como último fallback.
 - **Cola priorizada (`priorityRank`):** Venta AMBA (0) → Venta resto prov. BsAs (1) → Venta resto Argentina (2) → Alquiler AMBA (3) → Alquiler resto (4). **Toda venta antes que cualquier alquiler.**
-- **Recolección de ventas (`fetchVentaSeeds`):** Fuente prioritaria desde listados `/buscar/comprar/<seed>?page=N` (paginados), agrupados por tier de zona (`VENTA_SEED_GROUPS`). El sitemap barre el resto. Tope de prueba: `VENTA_MAX_PAGES`.
+- **Recolección de ventas (`fetchVentaSeeds`):** Fuente prioritaria desde listados `/buscar/comprar/<seed>?page=N` (paginados), agrupados por tier de zona (`VENTA_SEED_GROUPS`). El sitemap barre el resto. Tope de prueba global: `VENTA_MAX_PAGES`.
+  - **Fix Junio 24 — tope por grupo (`maxPages`):** `en-argentina` (tier 2) tiene cientos de páginas y casi siempre trae +1 nueva, así que el corte por `emptyStreak>=2` no se gatillaba → `fetchVentaSeeds` se colgaba horas (+ throttling CF) y la tubería **nunca llegaba a `processQueue`** (síntoma: ~10 ventas con catálogo de miles). Ahora cada grupo lleva `maxPages`: AMBA/Prov.BsAs `0` (sin tope, se autocortan), `en-argentina` = `VENTA_AR_MAX_PAGES` (default **60**). Tope efectivo = `VENTA_MAX_PAGES` (override global de pruebas) > `group.maxPages`. Verificado en local: ventas 10 → 70+.
 - **Borrado seguro (`deleteMissing`):** Borra las que salieron de Roomix; solo en corrida completa (sin `--limit`), solo si **todos los sitemaps cargaron OK**, y aborta si borraría **>40%** de la base.
 - **Updates desbloqueados (`clearCheckpoint`):** El `checkpoint.json` es solo para reanudar corridas cortadas; se **vacía al terminar bien** para que el *diff* por `lastmod` detecte y re-baje las modificadas en la próxima corrida (antes quedaban bloqueadas).
 - **Backfill puntual (`backfill-operation.mjs`):** Script idempotente de una vez; re-etiquetó las 962 filas con `operation = null` (UPDATE solo de `operation`). Resultado: 961 `rent` + 1 `sale`.
-- **Env de producción:** `VENTA_MAX_PAGES`, `SITEMAP_COUNT`, `PROPERTY_LIMIT` sin definir (defaults completos).
+- **Concurrencia configurable (`CONCURRENCY`):** default **4** (antes 2 fijo), vía env `CRAWLER_CONCURRENCY`. Balance velocidad/CF; `extractProperty` ya reintenta 403/429/5xx (×2, backoff). Muchos `⏳` en logs → bajarla.
+- **Catálogo vs base (medido Junio 24):** sitemaps ≈ **181.971** propiedades; `roomix_properties` ≈ **54.600** (~30%). Ponerse al día con todo es throughput (≈1 día/corrida a conc. 4); `checkpoint.json` reanuda entre corridas. Ventas no se ven afectadas (van primeras en la cola).
+- **Env de producción:** `VENTA_MAX_PAGES`, `VENTA_AR_MAX_PAGES`, `SITEMAP_COUNT`, `CRAWLER_CONCURRENCY`, `PROPERTY_LIMIT` sin definir (defaults: ventas AMBA completas, `en-argentina`=60 pág, 7 sitemaps, conc. 4).
 
 ---
 
