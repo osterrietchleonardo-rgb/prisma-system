@@ -61,7 +61,11 @@ const PROPERTY_LIMIT = process.env.PROPERTY_LIMIT !== undefined ? parseInt(proce
 
 // Roomix expone sitemaps de propiedades numerados 0..N. Antes leíamos 0..5 y
 // nos salteábamos el 6 (≈30k URLs). Configurable por si crece el catálogo.
-const SITEMAP_COUNT = process.env.SITEMAP_COUNT !== undefined ? parseInt(process.env.SITEMAP_COUNT) : 7;
+// OJO: blindado. Si la variable SITEMAP_COUNT está vacía, en 0, negativa o con
+// basura → caemos al default de 7. Una vez la dejaron VACÍA en EasyPanel y el
+// crawler leyó 0 sitemaps (catálogo completo apagado) sin avisar. Nunca más.
+const _sitemapCountRaw = parseInt(process.env.SITEMAP_COUNT ?? '', 10);
+const SITEMAP_COUNT = Number.isFinite(_sitemapCountRaw) && _sitemapCountRaw > 0 ? _sitemapCountRaw : 7;
 const SITEMAP_URLS = Array.from({ length: SITEMAP_COUNT }, (_, i) =>
   `https://roomix.ai/properties/sitemap/${i}`
 );
@@ -388,7 +392,11 @@ async function diffWithSupabase(sitemapEntries) {
   let from = 0;
   const step = 1000;
   while (true) {
-    const { data, error } = await supabase.from('roomix_properties').select('id, lastmod').range(from, from + step - 1);
+    // .order('id') OBLIGATORIO: sin orden explícito, Postgres no garantiza el mismo
+    // orden entre páginas de .range() → filas repetidas y otras salteadas, y los
+    // conteos de nuevas/eliminar salen mal (en una corrida: 32976 vs 54581 sobre la
+    // MISMA tabla con segundos de diferencia).
+    const { data, error } = await supabase.from('roomix_properties').select('id, lastmod').order('id', { ascending: true }).range(from, from + step - 1);
     if (error) { log('❌', 'Error DB:', error.message); return { toExtract: sitemapEntries, toDelete: [] }; }
     existing = existing.concat(data || []);
     if (!data || data.length < step) break;
@@ -416,7 +424,9 @@ async function deleteMissing(entries) {
   let dbIds = [], from = 0;
   const step = 1000;
   while (true) {
-    const { data, error } = await supabase.from('roomix_properties').select('id').range(from, from + step - 1);
+    // .order('id') OBLIGATORIO (mismo motivo que en diffWithSupabase): sin orden,
+    // .range() pagina inconsistente y el cálculo de qué borrar queda mal.
+    const { data, error } = await supabase.from('roomix_properties').select('id').order('id', { ascending: true }).range(from, from + step - 1);
     if (error) { log('❌', 'Error leyendo IDs para borrar:', error.message); return; }
     dbIds = dbIds.concat((data || []).map(r => r.id));
     if (!data || data.length < step) break;
