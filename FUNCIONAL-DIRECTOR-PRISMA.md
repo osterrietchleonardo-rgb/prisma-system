@@ -335,7 +335,7 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 **Cómo usarla:**
 1. **Creá carpetas** con el nombre que quieras (ej. "Reglamentos", "Modelos de contrato").
-2. **Subí archivos** (cualquier formato, sin límite de tamaño — se alojan en la nube).
+2. **Subí archivos** con el botón **"Subir Documentos"** (cualquier formato, sin límite de tamaño — se alojan en la nube). Podés **seleccionar varios archivos a la vez**: el **nombre de cada documento se toma del archivo** (no hace falta escribir el título), y elegís **una sola carpeta** donde se guardan todos. Antes de confirmar ves la **lista de archivos elegidos** (con su tamaño y un botón para sacar alguno), y mientras suben ves el **progreso** ("Subiendo 3/8…"); si alguno falla, los demás igual se suben y te avisa cuál no entró.
 3. **Reemplazá por una versión nueva** (botón ↻): se sube la nueva y se borra la anterior; el documento muestra "v2", "v3", etc.
 4. **Mové** archivos entre carpetas, **eliminá** y **descargá** cuando quieras.
 

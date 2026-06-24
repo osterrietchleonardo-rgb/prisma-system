@@ -84,8 +84,9 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
 
   // Upload modal
   const [isUploadOpen, setIsUploadOpen] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null)
 
   // Move modal
   const [movingDoc, setMovingDoc] = useState<Record<string, any> | null>(null)
@@ -198,50 +199,79 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
     }
   }
 
-  // ── Upload ───────────────────────────────────────────────
+  // ── Upload (uno o varios archivos a la vez) ──────────────
+  // El título de cada documento toma el nombre de su archivo (sin la extensión).
+  const titleFromFileName = (fileName: string) =>
+    fileName.replace(/\.[^/.]+$/, "").trim() || fileName
+
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!agencyId) return
-    if (!selectedFile) {
-      toast.error("Seleccioná un archivo primero")
+    if (selectedFiles.length === 0) {
+      toast.error("Seleccioná al menos un archivo")
       return
     }
     const formData = new FormData(e.currentTarget)
-    const title = (formData.get("title") as string) || selectedFile.name
     const folderId = formData.get("folderId") as string
+    const targetFolderId = folderId && folderId !== "none" ? folderId : null
 
     try {
       setUploading(true)
-      const storagePath = `official/${agencyId}/${Date.now()}-${selectedFile.name}`
-      const { error: storageError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(storagePath, selectedFile, { upsert: false })
-      if (storageError) throw storageError
-
+      setUploadProgress({ done: 0, total: selectedFiles.length })
       const { data: { user } } = await supabase.auth.getUser()
-      const { error: dbError } = await supabase.from("official_documents").insert({
-        agency_id: agencyId,
-        folder_id: folderId && folderId !== "none" ? folderId : null,
-        title,
-        file_url: storagePath,
-        file_type: selectedFile.type,
-        file_size: selectedFile.size,
-        uploaded_by: user?.id,
-      })
-      if (dbError) {
-        // rollback del archivo si falla el insert
-        await supabase.storage.from(STORAGE_BUCKET).remove([storagePath])
-        throw dbError
+
+      let okCount = 0
+      const failed: string[] = []
+
+      for (const file of selectedFiles) {
+        const storagePath = `official/${agencyId}/${Date.now()}-${file.name}`
+        try {
+          const { error: storageError } = await supabase.storage
+            .from(STORAGE_BUCKET)
+            .upload(storagePath, file, { upsert: false })
+          if (storageError) throw storageError
+
+          const { error: dbError } = await supabase.from("official_documents").insert({
+            agency_id: agencyId,
+            folder_id: targetFolderId,
+            title: titleFromFileName(file.name),
+            file_url: storagePath,
+            file_type: file.type,
+            file_size: file.size,
+            uploaded_by: user?.id,
+          })
+          if (dbError) {
+            // rollback del archivo si falla el insert
+            await supabase.storage.from(STORAGE_BUCKET).remove([storagePath])
+            throw dbError
+          }
+          okCount++
+        } catch (_err) {
+          failed.push(file.name)
+        } finally {
+          setUploadProgress((p) => (p ? { ...p, done: p.done + 1 } : p))
+        }
       }
 
-      toast.success("Documento subido correctamente")
-      setIsUploadOpen(false)
-      setSelectedFile(null)
+      if (okCount > 0) {
+        toast.success(
+          okCount === 1 ? "Documento subido correctamente" : `${okCount} documentos subidos correctamente`
+        )
+      }
+      if (failed.length > 0) {
+        toast.error(`No se pudieron subir ${failed.length}: ${failed.join(", ")}`)
+      }
+
+      if (failed.length === 0) {
+        setIsUploadOpen(false)
+        setSelectedFiles([])
+      }
       fetchDocs(agencyId)
     } catch (error: any) {
       toast.error("Error al subir: " + error.message)
     } finally {
       setUploading(false)
+      setUploadProgress(null)
     }
   }
 
@@ -400,30 +430,26 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
               </DialogContent>
             </Dialog>
 
-            <Dialog open={isUploadOpen} onOpenChange={(o) => { setIsUploadOpen(o); if (!o) setSelectedFile(null) }}>
+            <Dialog open={isUploadOpen} onOpenChange={(o) => { if (uploading) return; setIsUploadOpen(o); if (!o) setSelectedFiles([]) }}>
               <DialogTrigger asChild>
                 <Button className="bg-accent hover:bg-accent/90 gap-2 h-11 px-6 shadow-lg shadow-accent/20">
                   <Plus className="h-5 w-5" />
-                  Subir Documento
+                  Subir Documentos
                 </Button>
               </DialogTrigger>
               <DialogContent className="bg-card border-accent/20 sm:max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                     <FileText className="text-accent" />
-                    Subir Documento Oficial
+                    Subir Documentos Oficiales
                   </DialogTitle>
                   <DialogDescription>
-                    El archivo quedará disponible para que los asesores lo descarguen. No se procesa con IA.
+                    Podés subir uno o varios archivos a la vez. El nombre de cada documento se toma del archivo. Quedan disponibles para que los asesores los descarguen. No se procesan con IA.
                   </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleUpload} className="space-y-5 py-4">
+                <form onSubmit={handleUpload} className="space-y-5 py-4 min-w-0">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold">Título del Documento</label>
-                    <Input name="title" placeholder="Ej: Reglamento de Comisiones 2026" required />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold">Carpeta</label>
+                    <label className="text-sm font-semibold">Carpeta donde guardar</label>
                     <Select name="folderId" defaultValue={selectedFolderId === "all" ? "none" : selectedFolderId}>
                       <SelectTrigger className="bg-muted/30">
                         <SelectValue placeholder="Sin carpeta" />
@@ -440,45 +466,79 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">Todos los archivos seleccionados se guardan en esta carpeta.</p>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold">Archivo</label>
+                    <label className="text-sm font-semibold">Archivos</label>
                     <div className={cn(
-                      "flex items-center justify-center border-2 border-dashed rounded-2xl p-10 hover:bg-accent/5 transition-all cursor-pointer relative group",
-                      selectedFile ? "border-accent/40 bg-accent/5" : "border-accent/20"
+                      "flex items-center justify-center border-2 border-dashed rounded-2xl p-8 hover:bg-accent/5 transition-all cursor-pointer relative group",
+                      selectedFiles.length > 0 ? "border-accent/40 bg-accent/5" : "border-accent/20"
                     )}>
                       <input
                         type="file"
+                        multiple
                         className="absolute inset-0 opacity-0 cursor-pointer"
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
                       />
                       <div className="flex flex-col items-center">
                         <div className={cn(
                           "w-12 h-12 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform",
-                          selectedFile ? "bg-accent/20 scale-110" : "bg-accent/10"
+                          selectedFiles.length > 0 ? "bg-accent/20 scale-110" : "bg-accent/10"
                         )}>
-                          {selectedFile ? <FileCheck className="h-6 w-6 text-accent" /> : <Upload className="h-6 w-6 text-accent" />}
+                          {selectedFiles.length > 0 ? <FileCheck className="h-6 w-6 text-accent" /> : <Upload className="h-6 w-6 text-accent" />}
                         </div>
-                        {selectedFile ? (
+                        {selectedFiles.length > 0 ? (
                           <>
-                            <p className="text-sm font-semibold text-accent">{selectedFile.name}</p>
-                            <p className="text-xs text-muted-foreground mt-1">{formatBytes(selectedFile.size)} - Listo para subir</p>
+                            <p className="text-sm font-semibold text-accent">
+                              {selectedFiles.length === 1 ? "1 archivo seleccionado" : `${selectedFiles.length} archivos seleccionados`}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">Click o arrastrá para cambiar la selección</p>
                           </>
                         ) : (
                           <>
                             <p className="text-sm font-medium">Click o arrastrá para subir</p>
-                            <p className="text-xs text-muted-foreground mt-1">Cualquier formato — sin límite de tamaño</p>
+                            <p className="text-xs text-muted-foreground mt-1">Uno o varios archivos — cualquier formato, sin límite de tamaño</p>
                           </>
                         )}
                       </div>
                     </div>
+
+                    {/* Lista de archivos seleccionados */}
+                    {selectedFiles.length > 0 && (
+                      <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1.5 rounded-xl border border-accent/10 bg-muted/20 p-2">
+                        {selectedFiles.map((file, i) => (
+                          <div key={`${file.name}-${i}`} className="flex w-full items-center gap-2 rounded-lg bg-card/60 px-3 py-2">
+                            <FileText className="h-4 w-4 text-accent/70 shrink-0" />
+                            <span className="text-xs font-medium truncate min-w-0 flex-1" title={file.name}>{titleFromFileName(file.name)}</span>
+                            {formatBytes(file.size) && (
+                              <span className="text-[10px] text-muted-foreground shrink-0">{formatBytes(file.size)}</span>
+                            )}
+                            {!uploading && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => setSelectedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <DialogFooter className="pt-2">
-                    <Button variant="ghost" type="button" onClick={() => { setIsUploadOpen(false); setSelectedFile(null) }}>
+                    <Button variant="ghost" type="button" disabled={uploading} onClick={() => { setIsUploadOpen(false); setSelectedFiles([]) }}>
                       Cancelar
                     </Button>
-                    <Button type="submit" className="bg-accent px-8" disabled={uploading}>
-                      {uploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Subiendo...</> : "Subir Documento"}
+                    <Button type="submit" className="bg-accent px-8" disabled={uploading || selectedFiles.length === 0}>
+                      {uploading ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Subiendo {uploadProgress ? `${uploadProgress.done}/${uploadProgress.total}` : ""}...</>
+                      ) : (
+                        selectedFiles.length > 1 ? `Subir ${selectedFiles.length} Documentos` : "Subir Documento"
+                      )}
                     </Button>
                   </DialogFooter>
                 </form>

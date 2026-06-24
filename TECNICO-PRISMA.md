@@ -156,7 +156,7 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 - `consultor_chat_sessions` / `consultor_chat_messages` — Buscador IA (memoria por sesión).
 - `tutor_chat_sessions` / `tutor_chat_messages` — Tutor IA.
 - `agency_documents` — base de conocimiento con embedding para RAG (title, type, file_url/video_url, content_text, embedding, visibility, ai_enabled, folder_id).
-- `official_documents` / `official_document_folders` — Documentos Oficiales descargables (sin embedding, **NO consultados por IA**; file_url en bucket `documents` prefijo `official/`, version, file_size).
+- `official_documents` / `official_document_folders` — Documentos Oficiales descargables (sin embedding, **NO consultados por IA**; file_url en bucket `documents` prefijo `official/`, version, file_size). La subida del director acepta **múltiples archivos a la vez** (`OfficialDocsSection.tsx`, input `multiple`): cada `title` se deriva del nombre del archivo sin extensión, todos van a la carpeta elegida, suben en serie con progreso y tolerancia a fallos.
 - `ipc_profiles` — perfiles IPC de Marketing IA.
 - `generated_images` — imágenes generadas.
 - `roomix_properties` — cartera global pre-sincronizada por el crawler (operation, ubicación, precio, `roomix_agency_name`, canonical_url, imágenes CDN).
