@@ -25,7 +25,7 @@ chromium.use(stealthPlugin());
 const PORT = parseInt(process.env.PORT || '80', 10);
 const SECRET = process.env.EXTRACTOR_SECRET || '';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 const CONCURRENCY = parseInt(process.env.EXTRACTOR_CONCURRENCY || '2', 10);
 const PAGE_TIMEOUT = 45_000;
 
