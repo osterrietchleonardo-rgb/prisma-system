@@ -26,6 +26,13 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      // Tasaciones pasó a llamarse ACM (Análisis Comparativo de Mercado).
+      { source: '/director/tasaciones', destination: '/director/acm', permanent: true },
+      { source: '/asesor/tasaciones', destination: '/asesor/acm', permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

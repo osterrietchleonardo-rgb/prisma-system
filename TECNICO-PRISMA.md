@@ -406,8 +406,14 @@ Rate limit 30 req/h por usuario; validación Zod (10–50000 chars); `parseWhats
 - **CRUD** con visibilidad por rol (director ve todo el equipo incl. eliminados; asesor solo lo suyo, sin eliminados). Soft-delete (`estado_gestion='eliminado'` + motivo). `codigo_unico` compartido plantilla↔contrato.
 - **PDF** en cliente (jsPDF, `lib/contratos/`), subido a Storage (`{agency}/generados/{id}.pdf`, path estable + cache-busting). **Firma presencial** (papel); `contract_signatures` conservada pero no alimentada.
 
-### 10.6 Tasaciones IA
-**Vivo:** Wizard MCM **client-side** (4 pasos, `lib/tasacion/calculos.ts`), persiste en `tasaciones`. **Legacy:** `/api/valuation/generate` + tabla `valuations` (Gemini) — sin uso confirmado en frontend (ver §20).
+### 10.6 ACM — Análisis Comparativo de Mercado (ex Tasaciones)
+**Vivo (jun-2026):** la página pasó a **ACM** en `/asesor/acm` y `/director/acm` (las viejas `/…/tasaciones` redirigen 308). Flujo: se elige propiedad sujeto (manual / link de portal / desplegable de cartera) y el backend busca **comparables reales** en `properties` + `roomix_properties` con **filtros duros + embedding** → `match_pct` + checklist (precio fuera del %).
+- **SQL:** `acm_match_properties`, `acm_match_roomix` (migración `20260625130000_acm_match_functions.sql`).
+- **API:** `app/api/acm/{comparables,extract,cartera}/route.ts`. **Libs:** `lib/acm/{extract,subject,checklist,tokko}.ts`.
+- **Extracción por link:** Tier 1 server-side (JSON-LD/OG/IA) + Tier 2 servicio navegador stealth (`roomix-sync/extractor-server.mjs`, `Dockerfile.extractor`, env `ACM_EXTRACTOR_URL`/`ACM_EXTRACTOR_SECRET`; guía `roomix-sync/ACM-EXTRACTOR-EASYPANEL.md`).
+- **Reservado:** la grilla MCM (`lib/tasacion/calculos.ts`, `step3/step4`) se conserva sin renderizar (informe con marca a futuro).
+
+**Legacy:** `/api/valuation/generate` + tabla `valuations` (Gemini) — sin uso confirmado en frontend (ver §20).
 
 ### 10.7 Conversational Insights (`/api/conversational-insights/analyze`)
 Analytics **sin IA** (agregación pura), solo director. Lee `wa_conversations.metricas` + `wa_messages`; cache en `dashboard_conversational_insights` (refresh > 6 h). Bloques: KPIs, funnel, perfil del lead, demanda, comportamiento temporal, calidad de atención.

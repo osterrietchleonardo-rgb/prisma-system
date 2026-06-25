@@ -56,6 +56,68 @@ export interface Comparable extends Omit<Sujeto, 'ocupacion'> {
   peso: number; // 1 a 5, por defecto 3, si es cerrado tokko 5
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ACM — Análisis Comparativo de Mercado
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type Operacion = 'venta' | 'alquiler';
+export type AcmSource = 'cartera' | 'roomix';
+
+// Cada renglón del checklist de comparabilidad (qué coincide y qué no).
+export interface ChecklistItem {
+  dimension: 'tipo' | 'operacion' | 'zona' | 'superficie' | 'ambientes' | 'banos' | 'amenities' | 'semantica';
+  label: string;
+  sujeto_val: string;
+  comp_val: string;
+  estado: 'match' | 'parcial' | 'distinto' | 'na';
+  peso: number;     // peso base de la dimensión (0..25)
+  score: number | null; // 0..100 o null si no aplica (sin dato)
+}
+
+// Un comparable encontrado por el ACM (propiedad real de la cartera o de la red).
+export interface AcmComparable {
+  id: string;
+  source: AcmSource;
+  match_pct: number;
+  checklist: ChecklistItem[];
+
+  titulo: string;
+  direccion: string;
+  zona: string;
+  tipo: string;
+  m2: number | null;
+  ambientes: number | null;
+  dormitorios: number | null;
+  banos: number | null;
+
+  // Precio: dato aparte, NO entra en el %.
+  precio: number | null;
+  moneda: string;
+  precio_m2: number | null;
+
+  imagen: string | null;
+  url: string | null;
+
+  // Responsable de la publicación + fecha (para la red de colaboración / portales).
+  responsable: string;
+  fecha_publicacion: string | null; // ISO o null
+}
+
+// Lo que devuelve la extracción por URL (modo "Analizar").
+export interface ExtractResult {
+  ok: boolean;
+  sujeto: Partial<Sujeto>;
+  precio: number | null;
+  moneda: Moneda;
+  operacion: Operacion;
+  responsable: string | null;
+  fecha_publicacion: string | null;
+  fuente_portal: string | null;
+  metodo: 'json-ld' | 'next-data' | 'opengraph' | 'ia' | 'extractor-service';
+  requiere_completar_manual: boolean;
+  aviso?: string;
+}
+
 export interface FactorAjusteValor {
   superficie: number;
   antiguedad_estado: number;

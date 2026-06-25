@@ -25,7 +25,7 @@
 13. [Mi Calendario (visitas)](#13-mi-calendario-visitas)
 14. [Tutor IA](#14-tutor-ia)
 15. [Buscador IA](#15-buscador-ia)
-16. [Tasaciones](#16-tasaciones)
+16. [ACM — Análisis Comparativo de Mercado](#16-acm--análisis-comparativo-de-mercado)
 17. [Biblioteca (documentos)](#17-biblioteca-documentos)
 18. [Configuración](#18-configuración)
 19. [Sugerencias](#19-sugerencias)
@@ -301,19 +301,22 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 
 ---
 
-## 16. Tasaciones
+## 16. ACM — Análisis Comparativo de Mercado
 
-**Qué es:** una herramienta para tasar una propiedad con el **Método Comparativo de Mercado**, en un asistente de **4 pasos**.
+**Qué es:** una herramienta para **encontrar propiedades comparables** a una que elijas, con un **% de comparabilidad** y un **checklist** de qué coincide y qué no. (Antes se llamaba "Tasaciones".)
 
 **Cómo usarlo paso a paso:**
-1. **Paso 1 — El inmueble:** cargás los datos de la propiedad a tasar (identificación, superficies, características, amenities, situación).
-2. **Paso 2 — Comparables:** agregás al menos **3** propiedades comparables, a mano o importándolas desde Tokko ("Buscar en Tokko").
-3. **Paso 3 — Grilla:** ajustás la matriz de homogeneización (factores, podés excluir outliers).
-4. **Paso 4 — Resultado:** ves el informe final con rango mínimo / sugerido / máximo, gráfico y tabla de testigos. Podés **imprimir o exportar PDF**.
+1. **Elegí la propiedad a analizar** de una de estas 3 formas:
+   - **Cargar a mano:** completás el formulario (tipo, zona, m², ambientes, baños, amenities…).
+   - **Desde la cartera:** elegís una propiedad de tu agencia del desplegable y se completa sola.
+   - **Desde un link:** pegás el link de un aviso (MercadoLibre, ZonaProp, Argenprop…) y apretás **Analizar**: trae los datos automáticamente. Si el portal bloquea la lectura, te avisa y completás a mano.
+2. Elegí la **operación** (Venta / Alquiler) y apretá **Buscar comparables**.
+3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (zona, superficie, ambientes, baños, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
 
-> 💡 **Tip:** el cálculo se actualiza **solo** a medida que editás. El trabajo se autoguarda entre pasos y queda en tu historial (últimas 10 tasaciones).
-> 💡 Funciona bien desde el celular (la grilla del Paso 3 se desplaza horizontalmente).
-> 💰 La tasación **no consume créditos**: es un cálculo matemático, no usa IA generativa.
+> 💡 El **tipo de propiedad** y la **operación** son filtros estrictos: solo trae comparables del mismo tipo y la misma operación. La **zona** es lo que más pesa del puntaje.
+> 💡 Para **venta** los comparables salen casi todo de tu cartera (en la red de colaboración hay muchos más avisos de alquiler que de venta).
+> 💰 No consume créditos por buscar comparables (el embedding es interno).
+> 🔜 La valuación con precio sugerido e informe con marca llegan en una etapa siguiente.
 
 ---
 
@@ -375,7 +378,7 @@ Tiene 4 pestañas:
 
 ## 20. Créditos IA: cómo funcionan para vos
 
-- Las herramientas de IA (Buscador, Tutor, Marketing, Contratos) consumen **créditos**. **Tasaciones no** (es un cálculo matemático, sin IA).
+- Las herramientas de IA (Buscador, Tutor, Marketing, Contratos) consumen **créditos**. **ACM no** (la búsqueda de comparables usa embeddings internos, sin costo por uso).
 - Tenés una **cuota mensual personal**. Se calcula como el **pool de créditos de la agencia dividido entre los asesores activos**, y se **renueva el 1° de cada mes**.
 - En **Configuración → Créditos IA** ves: tu **límite mensual**, lo **consumido** (con %) y lo **disponible**, una barra de progreso y el **detalle por módulo**.
 - Cuando llegás al **80%**, aparece un aviso para que los uses con cuidado.
@@ -387,7 +390,7 @@ Tiene 4 pestañas:
 | Buscador IA | 1 crédito |
 | Tutor IA | 1 crédito |
 | Marketing IA — "Generar 3 Variantes" | ~7 créditos (3 textos + 3 imágenes) |
-| Tasaciones | **0 — no usa IA** |
+| ACM (comparables) | **0 — sin costo por uso** |
 | Contratos (finalizar) | 5 créditos |
 
 ---

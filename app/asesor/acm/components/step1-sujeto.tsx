@@ -10,10 +10,11 @@ import { Label } from "@/components/ui/label";
 interface Step1SujetoProps {
   sujeto: Sujeto;
   onChange: (sujeto: Sujeto) => void;
-  onNext: () => void;
+  onNext?: () => void;
+  hideNextButton?: boolean;
 }
 
-export function Step1Sujeto({ sujeto, onChange, onNext }: Step1SujetoProps) {
+export function Step1Sujeto({ sujeto, onChange, onNext, hideNextButton }: Step1SujetoProps) {
   
   const handleAmenidadToggle = (key: keyof Amenidades) => {
     onChange({
@@ -272,11 +273,13 @@ export function Step1Sujeto({ sujeto, onChange, onNext }: Step1SujetoProps) {
         </div>
       </div>
 
-      <div className="pt-4 flex justify-end">
-        <Button className="h-12 w-full md:w-auto px-8 bg-accent hover:bg-accent/90" size="lg" disabled={!isValido()} onClick={onNext}>
-          Continuar a Comparables
-        </Button>
-      </div>
+      {!hideNextButton && (
+        <div className="pt-4 flex justify-end">
+          <Button className="h-12 w-full md:w-auto px-8 bg-accent hover:bg-accent/90" size="lg" disabled={!isValido()} onClick={onNext}>
+            Continuar a Comparables
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

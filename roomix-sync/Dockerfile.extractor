@@ -1,0 +1,16 @@
+# ACM · Servicio extractor on-demand (Tier 2). Misma imagen Playwright que el crawler.
+# Se despliega como un servicio SIEMPRE PRENDIDO en EasyPanel (no es cron).
+FROM mcr.microsoft.com/playwright:v1.60.0-jammy
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+
+# Puerto HTTP del servicio (la app PRISMA le pega acá).
+EXPOSE 80
+
+# Arranca el servidor extractor (no el cron del crawler).
+CMD ["node", "extractor-server.mjs"]

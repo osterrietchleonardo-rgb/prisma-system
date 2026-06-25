@@ -25,7 +25,7 @@
 13. [Contratos IA](#13-contratos-ia)
 14. [Asesores (gestión del equipo)](#14-asesores-gestión-del-equipo)
 15. [Documentos (base de conocimiento)](#15-documentos-base-de-conocimiento)
-16. [Tasaciones](#16-tasaciones)
+16. [ACM — Análisis Comparativo de Mercado](#16-acm--análisis-comparativo-de-mercado)
 17. [Calendario (visitas)](#17-calendario-visitas)
 18. [Tutor IA](#18-tutor-ia)
 19. [Buscador IA (+ notas del director)](#19-buscador-ia--notas-del-director)
@@ -349,18 +349,18 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 ---
 
-## 16. Tasaciones
+## 16. ACM — Análisis Comparativo de Mercado
 
-**Qué es:** el tasador con **Método Comparativo de Mercado** (pantalla "Módulo de Tasaciones"), en 4 pasos (idéntico al del asesor).
+**Qué es:** herramienta para **encontrar comparables** de una propiedad, con **% de comparabilidad** y **checklist** (ex "Tasaciones"). Idéntica para director y asesor.
 
 **Cómo usarlo:**
-1. **Paso 1:** datos del inmueble a tasar.
-2. **Paso 2:** al menos 3 comparables (manuales o importados desde Tokko).
-3. **Paso 3:** grilla de homogeneización (ajustás factores, excluís outliers).
-4. **Paso 4:** informe final con rango mínimo/sugerido/máximo, gráfico y testigos. Imprimir o PDF.
+1. **Elegí la propiedad a analizar:** a mano, desde la **cartera** (desplegable) o pegando un **link** de portal (botón **Analizar**, extrae los datos solos).
+2. Elegí **operación** (Venta/Alquiler) y **Buscar comparables**.
+3. Resultados en dos bloques (**Cartera de tu agencia** y **Red de colaboración**), cada comparable con su **%** y el **checklist** (zona, superficie, ambientes, baños, amenities, tipo, operación). El **precio** va al costado, **fuera del %**.
 
-> 💡 **Tip:** el cálculo es automático y reactivo; se autoguarda entre pasos. Quedan tus últimas 10 tasaciones en el historial.
-> 💰 La tasación **no consume créditos**: el cálculo es matemático (no usa IA generativa).
+> 💡 Tipo y operación son filtros estrictos; la zona es lo que más pesa del puntaje. El comparable se busca por **filtros duros + embedding** en `properties` (cartera) y `roomix_properties` (red).
+> 💰 No consume créditos por buscar comparables.
+> 🔜 Valuación con precio sugerido e informe con marca: etapa siguiente. La grilla de cálculo anterior se conserva para ese informe.
 
 ---
 
@@ -486,7 +486,7 @@ La pantalla se titula "Ajustes Generales". Tiene 5 pestañas:
 | Buscador IA | 1 crédito |
 | Tutor IA | 1 crédito |
 | Marketing IA — "Generar 3 Variantes" | ~7 créditos (3 textos + 3 imágenes) |
-| Tasaciones | **0 — no usa IA** |
+| ACM (comparables) | **0 — sin costo por uso** |
 | Convertir documento a plantilla | 1 crédito |
 | Contratos (finalizar) | 5 créditos |
 
