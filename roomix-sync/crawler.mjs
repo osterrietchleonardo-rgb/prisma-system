@@ -114,12 +114,22 @@ const CONURBANO_SEEDS = [
 // Tope de páginas para `en-argentina` (tier 2). Es el listado "todo el país": tiene
 // CIENTOS de páginas y casi siempre trae +1 nueva, así que el corte por "2 páginas
 // vacías" no se gatilla nunca → la recolección se colgaba ahí durante horas y la tubería
-// NUNCA llegaba a guardar. AMBA (la prioridad) se recolecta completo igual. Configurable.
+// NUNCA llegaba a guardar. Configurable.
 const VENTA_AR_MAX_PAGES = process.env.VENTA_AR_MAX_PAGES !== undefined ? parseInt(process.env.VENTA_AR_MAX_PAGES) : 60;
 
+// Tope de páginas por seed de AMBA (CABA + cada partido del conurbano). CLAVE:
+// medido en producción (Junio 25), Roomix permite pedir hasta ~100 páginas por
+// búsqueda y SOLO devuelve vacío en la p101 — de la p1 a la p100 siempre trae
+// propiedades (de la zona, ~50/página). O sea el autocorte por "2 páginas vacías"
+// recién salta a las 100 páginas EN CADA seed: con 30 seeds AMBA = ~3 horas solo
+// recolectando, sin llegar nunca a guardar (mismo cuelgue que tenía en-argentina).
+// Por eso cada seed AMBA lleva su tope. Default 25 (~1.000-1.200 ventas/zona,
+// recolección ~35 min). Subirlo junta más ventas pero alarga la corrida; bajarlo,
+// al revés. Lo que no entre por el seed igual lo levanta el sitemap.
+const VENTA_AMBA_MAX_PAGES = process.env.VENTA_AMBA_MAX_PAGES !== undefined ? parseInt(process.env.VENTA_AMBA_MAX_PAGES) : 25;
+
 const VENTA_SEED_GROUPS = [
-  // maxPages 0 = sin tope: estos listados se autocortan solos (2 páginas seguidas sin nuevas).
-  { tier: 0, label: 'AMBA', maxPages: 0, seeds: ['en-capital-federal', ...CONURBANO_SEEDS] },
+  { tier: 0, label: 'AMBA', maxPages: VENTA_AMBA_MAX_PAGES, seeds: ['en-capital-federal', ...CONURBANO_SEEDS] },
   { tier: 2, label: 'Argentina', maxPages: VENTA_AR_MAX_PAGES, seeds: ['en-argentina'] },
 ];
 // Override global para pruebas (aplica a TODOS los grupos): VENTA_MAX_PAGES=2
