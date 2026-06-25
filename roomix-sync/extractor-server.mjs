@@ -31,6 +31,17 @@ const PAGE_TIMEOUT = 45_000;
 const limit = pLimit(CONCURRENCY);
 let browser = null;
 
+// Proxy residencial (opcional). La clave para que portales como ZonaProp/ML/Argenprop
+// dejen pasar: salir con un IP "de casa" en vez del IP de datacenter de EasyPanel.
+// Se contrata aparte y se setean estas envs; el código no cambia.
+const PROXY = process.env.EXTRACTOR_PROXY_SERVER
+  ? {
+      server: process.env.EXTRACTOR_PROXY_SERVER, // ej: http://gw.proveedor.com:7000
+      username: process.env.EXTRACTOR_PROXY_USERNAME || undefined,
+      password: process.env.EXTRACTOR_PROXY_PASSWORD || undefined,
+    }
+  : undefined;
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
@@ -165,17 +176,56 @@ TEXTO:"""${text.slice(0, 12000)}"""`;
   }
 }
 
+// Fallback: leer lo que se pueda del propio link (tipo, operación, ambientes) cuando
+// el portal bloquea la página. No inventa: usa solo lo que está escrito en la URL.
+function fromUrlSlug(url) {
+  let path = '';
+  try { path = decodeURIComponent(new URL(url).pathname).toLowerCase().replace(/[-_/]+/g, ' '); } catch { return null; }
+  const s = { sujeto: {}, metodo: 'url-slug' };
+  if (/\b(casa|chalet|quinta)\b/.test(path)) s.sujeto.tipo_propiedad = 'casa';
+  else if (/\bph\b/.test(path)) s.sujeto.tipo_propiedad = 'ph';
+  else if (/\b(oficina|office)\b/.test(path)) s.sujeto.tipo_propiedad = 'oficina';
+  else if (/\b(local|fondo de comercio)\b/.test(path)) s.sujeto.tipo_propiedad = 'local';
+  else if (/\b(terreno|lote)\b/.test(path)) s.sujeto.tipo_propiedad = 'terreno';
+  else if (/\b(departamento|depto|monoambiente|ph|duplex)\b/.test(path)) s.sujeto.tipo_propiedad = 'departamento';
+  if (/\b(alquiler|alquilar)\b/.test(path)) s.operacion = 'alquiler';
+  else if (/\b(venta|comprar)\b/.test(path)) s.operacion = 'venta';
+  const amb = path.match(/(\d+)\s*ambient/);
+  if (amb) s.sujeto.dormitorios = Math.max(0, parseInt(amb[1], 10) - 1);
+  const m2 = path.match(/(\d+)\s*m2\b/);
+  if (m2) s.sujeto.m2_cubiertos = parseInt(m2[1], 10);
+  return s;
+}
+
 async function extract(url) {
   const b = await getBrowser();
   const context = await b.newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     viewport: { width: 1366, height: 768 },
     locale: 'es-AR',
+    ...(PROXY ? { proxy: PROXY } : {}),
+  });
+  // Ahorro de datos (clave si se usa proxy pago por tráfico): no bajamos imágenes,
+  // video ni fuentes — solo necesitamos el HTML/JSON-LD. Reduce muchísimo los MB por análisis.
+  await context.route('**/*', (route) => {
+    const t = route.request().resourceType();
+    if (t === 'image' || t === 'media' || t === 'font') return route.abort();
+    return route.continue();
   });
   const page = await context.newPage();
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
-    await sleep(2500); // dejar render/JS
+    // Esperar a que pase el desafío de Cloudflare ("Un momento…"/"Just a moment…") y
+    // aparezca el contenido real (JSON-LD). Reintenta hasta ~20s.
+    for (let i = 0; i < 8; i++) {
+      const title = await page.title().catch(() => '');
+      const challenged = /just a moment|un momento|attention required|verifying you are human/i.test(title);
+      const hasLd = await page.$('script[type="application/ld+json"]').then(Boolean).catch(() => false);
+      if (hasLd || !challenged) break;
+      await sleep(2500);
+    }
+    await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
+    await sleep(1500);
     const html = await page.content();
     const text = await page.evaluate(() => document.body?.innerText || '').catch(() => '');
 
@@ -197,7 +247,10 @@ async function extract(url) {
     const thin = !(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0);
     if (thin) apply(await fromIA(text || html.replace(/<[^>]+>/g, ' ')));
 
-    const ok = Boolean(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0 || merged.precio);
+    // Último recurso: lo que diga el propio link (no pisa lo ya extraído).
+    apply(fromUrlSlug(url));
+
+    const ok = Boolean(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0 || merged.precio || merged.sujeto.tipo_propiedad);
     return { ok, requiere_completar_manual: !ok, ...merged };
   } finally {
     await page.close().catch(() => {});

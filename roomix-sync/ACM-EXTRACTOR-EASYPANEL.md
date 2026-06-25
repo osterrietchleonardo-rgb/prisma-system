@@ -73,6 +73,22 @@ el botón **Analizar** caerá automáticamente a este servicio.
 2. En PRISMA → ACM → modo **Desde un link** → pegá un aviso de MercadoLibre o ZonaProp →
    **Analizar** → ahora debería traer los datos reales (tipo, m², ambientes, precio, responsable, fecha).
 
+## Proxy residencial (para portales que bloquean el IP del servidor)
+
+ZonaProp, MercadoLibre y Argenprop bloquean los IP de datacenter (como el de EasyPanel),
+aunque uses navegador stealth. La solución es salir por un **proxy residencial** (un IP
+que parece de una casa). Se contrata aparte y se setean estas variables en el servicio
+`acm-extractor` (NO hace falta tocar código):
+
+```
+EXTRACTOR_PROXY_SERVER=http://host-del-proxy:puerto
+EXTRACTOR_PROXY_USERNAME=usuario
+EXTRACTOR_PROXY_PASSWORD=clave
+```
+
+Como NO es uso masivo (1 request por click en "Analizar"), el consumo de datos es bajo.
+Después de setearlas, **Redeploy** del servicio.
+
 ## Notas
 
 - Si querés probar el servicio a mano (con la clave):
