@@ -37,10 +37,10 @@
 
 ## 1. Primeros pasos: cómo entrar
 
-1. Tu **director** te invita con un **código de invitación** (6 caracteres).
-2. Entrá a la página de registro de PRISMA y elegí "Soy asesor".
+1. Tu **director** te invita con un **código de invitación**.
+2. Entrá a la página de registro de PRISMA y elegí **"Unirme a una inmobiliaria"**.
 3. Completá tu **nombre, email y contraseña**, y pegá el **código de invitación**.
-4. Confirmá tu email (te llega un link). Al confirmar, quedás vinculado a la inmobiliaria.
+4. Confirmá tu email (te llega un link). Al confirmar, quedás vinculado a la inmobiliaria con el rol que el código define (en tu caso, asesor).
 5. Listo: ya podés iniciar sesión con tu email y contraseña.
 
 > 💡 **Tip:** también podés registrarte/ingresar con tu cuenta de Google.

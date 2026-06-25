@@ -63,17 +63,19 @@ export async function GET(request: Request) {
               is_used: false
             })
           }
-        } else if (role === 'asesor' && inviteCode) {
+        } else if (inviteCode) {
+           // Unirse a una inmobiliaria existente: el rol lo define el código.
            const { data: invite } = await adminClient
             .from('agency_invites')
-            .select('agency_id, is_used')
+            .select('agency_id, is_used, role')
             .eq('code', inviteCode)
             .single()
 
            if (invite && !invite.is_used) {
+             const joinRole = invite.role === 'director' ? 'director' : 'asesor'
              await adminClient
               .from('profiles')
-              .update({ agency_id: invite.agency_id })
+              .update({ agency_id: invite.agency_id, role: joinRole })
               .eq('id', user.id)
 
              await adminClient

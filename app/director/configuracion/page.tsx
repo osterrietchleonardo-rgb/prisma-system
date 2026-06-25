@@ -71,8 +71,10 @@ export default function DirectorConfiguracionPage() {
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
 
-  // Real Invite codes
+  // Real Invite codes (lista compartida por todos los directores de la agencia)
   const [inviteCodes, setInviteCodes] = useState<any[]>([])
+  // Nombre del invitado al generar (uno por cada tipo de código)
+  const [inviteeName, setInviteeName] = useState<{ asesor: string; director: string }>({ asesor: "", director: "" })
 
   // Google Calendar
   const [gcal, setGcal] = useState<{ configured: boolean; connected: boolean; email: string | null }>(
@@ -315,15 +317,21 @@ export default function DirectorConfiguracionPage() {
     }
   }
 
-  const generateCode = async () => {
+  const generateCode = async (role: "asesor" | "director") => {
     if (!profile.agency_id) return
+    const name = inviteeName[role].trim()
+    if (!name) {
+      toast.error("Escribí el nombre de la persona que vas a invitar")
+      return
+    }
     try {
       setLoading(true)
-      const newInvite = await generateAgencyInvite(profile.agency_id)
-      // Recargar invitaciones
+      await generateAgencyInvite(profile.agency_id, role, name)
+      // Recargar invitaciones (lista compartida por todos los directores)
       const codes = await getAgencyInvites(profile.agency_id)
       setInviteCodes(codes)
-      toast.success("Nuevo código de invitación generado")
+      setInviteeName((prev) => ({ ...prev, [role]: "" }))
+      toast.success(`Código de ${role === "director" ? "director" : "asesor"} generado para ${name}`)
     } catch (_error) {
       toast.error("Error al generar código")
     } finally {
@@ -334,6 +342,60 @@ export default function DirectorConfiguracionPage() {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     toast.success("Código copiado al portapapeles")
+  }
+
+  // Dibuja la sección de invitaciones de un tipo (asesor o director).
+  // La lista es compartida: todos los directores de la agencia ven los mismos códigos.
+  const renderInviteSection = (role: "asesor" | "director", descripcion: string) => {
+    const list = inviteCodes.filter((inv) => (inv.role || "asesor") === role)
+    return (
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">{descripcion}</p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input
+            value={inviteeName[role]}
+            onChange={(e) => setInviteeName((prev) => ({ ...prev, [role]: e.target.value }))}
+            placeholder="Nombre de la persona a invitar"
+            className="bg-background/50 border-accent/20 focus-visible:ring-accent"
+          />
+          <Button onClick={() => generateCode(role)} disabled={loading} variant="outline" className="gap-2 border-accent/20 text-accent hover:bg-accent/10 shrink-0">
+            <Plus className="h-4 w-4" /> Generar Código
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {list.length > 0 ? (
+            list.map((invite, i) => (
+              <div key={invite.id || i} className="flex items-center justify-between p-3 rounded-xl bg-background/50 border border-accent/10">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="font-mono font-bold text-accent px-3 py-1 bg-accent/10 rounded-md shrink-0">
+                    {invite.code}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {invite.invitee_name || invite.used_by_profile?.full_name || "Sin nombre"}
+                    </p>
+                    {!invite.is_used ? (
+                      <Badge variant="outline" className="mt-1 border-green-500/30 text-green-500 bg-green-500/10">Activo</Badge>
+                    ) : (
+                      <Badge variant="outline" className="mt-1 border-muted text-muted-foreground">Usado</Badge>
+                    )}
+                  </div>
+                </div>
+                {!invite.is_used && (
+                  <Button variant="ghost" size="icon" onClick={() => copyToClipboard(invite.code)} className="shrink-0">
+                    <Copy className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-6 text-muted-foreground border-2 border-dashed border-accent/10 rounded-xl">
+              No hay códigos de {role === "director" ? "director" : "asesor"} todavía. Escribí un nombre y generá uno.
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
 
@@ -522,50 +584,30 @@ export default function DirectorConfiguracionPage() {
           </Card>
 
           <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-accent" /> Invitación de Asesores</CardTitle>
-                <CardDescription>Genera códigos únicos para que nuevos asesores se unan a tu agencia.</CardDescription>
-              </div>
-              <Button onClick={generateCode} disabled={loading} variant="outline" className="gap-2 border-accent/20 text-accent hover:bg-accent/10">
-                <Plus className="h-4 w-4" /> Generar Código
-              </Button>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-accent" /> Invitaciones</CardTitle>
+              <CardDescription>
+                Generá códigos para sumar gente a tu inmobiliaria. Cada código lleva el nombre del invitado y
+                todos los directores ven la misma lista, así no se invita dos veces a la misma persona.
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {inviteCodes.length > 0 ? (
-                  inviteCodes.map((invite, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-background/50 border border-accent/10">
-                      <div className="flex items-center gap-4">
-                        <div className="font-mono font-bold text-accent px-3 py-1 bg-accent/10 rounded-md">
-                          {invite.code}
-                        </div>
-                        {!invite.is_used ? (
-                          <Badge variant="outline" className="border-green-500/30 text-green-500 bg-green-500/10">Activo</Badge>
-                        ) : (
-                          <Badge variant="outline" className="border-muted text-muted-foreground">Usado</Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {invite.used_by_profile && (
-                          <span className="text-sm text-muted-foreground mr-4">
-                            por {invite.used_by_profile.full_name}
-                          </span>
-                        )}
-                        {!invite.is_used && (
-                          <Button variant="ghost" size="icon" onClick={() => copyToClipboard(invite.code)}>
-                            <Copy className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-6 text-muted-foreground border-2 border-dashed border-accent/10 rounded-xl">
-                    No hay códigos generados. Haz clic en &quot;Generar Código&quot; para invitar asesores.
-                  </div>
-                )}
-              </div>
+              <Tabs defaultValue="asesores" className="space-y-4">
+                <TabsList className="bg-background/50 border border-accent/10">
+                  <TabsTrigger value="asesores" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+                    <Users className="h-4 w-4" /> Invitación de Asesores
+                  </TabsTrigger>
+                  <TabsTrigger value="directores" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+                    <Building2 className="h-4 w-4" /> Invitación de Directores
+                  </TabsTrigger>
+                </TabsList>
+                <TabsContent value="asesores">
+                  {renderInviteSection("asesor", "El asesor entra con acceso de asesor a tu inmobiliaria.")}
+                </TabsContent>
+                <TabsContent value="directores">
+                  {renderInviteSection("director", "El director entra con el mismo acceso que vos. No hay jerarquía entre directores: todos pueden invitar.")}
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
 

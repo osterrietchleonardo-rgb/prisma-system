@@ -41,13 +41,14 @@
 
 ## 1. Primeros pasos: crear tu agencia
 
-1. Entrá a la página de registro y elegí "Soy director".
-2. Completá tu **nombre, email, contraseña** y el **nombre de tu agencia**.
+1. Entrá a la página de registro y elegí **"Crear inmobiliaria nueva"**.
+2. Completá tu **nombre, email, contraseña**, el **nombre de tu agencia** y el **código de autorización** que te da el equipo de PRISMA (Vakdor). Ese código solo sirve para crear inmobiliarias nuevas.
 3. Confirmá tu email (te llega un link).
-4. Al confirmar, PRISMA crea automáticamente tu **agencia** y un **código de invitación** para sumar asesores.
-5. Entrás directo a tu **Dashboard**.
+4. Al confirmar, PRISMA crea automáticamente tu **agencia**. Entrás directo a tu **Dashboard**.
 
 > 💡 **Tip:** también podés registrarte/ingresar con Google.
+
+> 👥 **Varios directores, sin jerarquía:** una inmobiliaria puede tener **varios directores, todos con el mismo poder**. El primero se crea con el código de Vakdor; a los demás los invita cualquier director desde **Configuración → Inmobiliaria → Invitación de Directores** (ver sección 14). Todos los directores ven y gestionan lo mismo.
 
 ---
 
@@ -60,7 +61,7 @@ Antes de operar, dejá lista la base. Andá a **Configuración** (último ítem 
 3. **Conectá WhatsApp** (sección *Asesor IA en WhatsApp*): seguí el asistente de configuración (ver sección 10).
 4. **Cargá tu directiva de marketing y aviso legal** (Marketing IA → ajustes): así todos los contenidos salen con tu estilo y tu legal.
 5. **Subí documentos a la Biblioteca:** manuales y guiones para que el Tutor IA capacite a tu equipo.
-6. **Invitá a tus asesores** (Configuración → Inmobiliaria → "Generar Código", o desde Asesores).
+6. **Invitá a tu equipo** (Configuración → Inmobiliaria): dos cajitas, **Invitación de Asesores** e **Invitación de Directores**. Escribí el nombre de la persona y generá su código.
 
 > 💡 **Tip:** completar estos 6 pasos hace que PRISMA funcione "lleno" desde el día uno.
 
@@ -308,7 +309,12 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 - **Ver el rendimiento real de cada asesor:** cada tarjeta muestra datos reales tomados de la actividad cargada (Captaciones, Cierres, Cartera activa y % de Rotación), más una etiqueta de estado (Activo / Pausado / Desvinculado). Al hacer clic se abre un panel con su embudo de conversión.
 - **Desvincular un asesor:** lo quita del equipo y **le bloquea el acceso al sistema con ese email** (no podrá volver a ingresar). Es la única acción de gestión disponible desde esta pantalla y pide confirmación.
 
-> 💡 **Tip:** también podés generar códigos desde **Configuración → Inmobiliaria**. Cada código sirve una vez; vas a ver cuáles están "Activos" y cuáles "Usados" (y por quién).
+**Invitaciones (Configuración → Inmobiliaria):** hay dos cajitas, **Invitación de Asesores** e **Invitación de Directores**.
+- En cualquiera: escribí el **nombre de la persona** a invitar y apretá **Generar Código**. El nombre queda pegado al código (lo ves aunque todavía no se haya registrado).
+- El **código define el rol**: un código de la cajita "Directores" hace entrar a la persona **como director** (mismo poder que vos, sin jerarquía); uno de "Asesores", como asesor. La persona entra directo, sin que tengas que aprobar nada más.
+- **Lista compartida:** si la inmobiliaria tiene varios directores, **todos ven la misma lista** de códigos (Activos y Usados, con el nombre de cada invitado). Así nadie invita dos veces a la misma persona.
+
+> 💡 **Tip:** cada código sirve una vez. El código de invitación **no** funciona para "Crear inmobiliaria nueva" (eso necesita el código de Vakdor); si alguien lo intenta, le aparece "Código incorrecto".
 > ⚠️ "Desvincular" es irreversible desde el panel del director: el email queda bloqueado. Si necesitás reactivarlo, contactá al equipo de PRISMA (Vakdor).
 
 ---

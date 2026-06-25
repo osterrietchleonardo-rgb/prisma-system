@@ -11,7 +11,9 @@ const registerSchema = z.object({
   fullName: z.string().min(3, "Mínimo 3 caracteres"),
   email: z.string().email("Email inválido"),
   password: z.string().min(6, "Mínimo 6 caracteres"),
-  role: z.enum(["director", "asesor"]),
+  // "crear" = funda una inmobiliaria nueva (requiere código de Vakdor/admin).
+  // "unirme" = entra a una inmobiliaria existente; el rol lo define el código.
+  mode: z.enum(["crear", "unirme"]),
   agencyName: z.string().optional(),
   inviteCode: z.string().optional(),
 })
@@ -37,12 +39,17 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
     const data = registerSchema.parse(rawData)
     const supabase = createClient()
     const adminClient = createAdminClient()
-    // 0. Validar códigos de invitación ANTES de crear el usuario para evitar enviar emails prematuros
-    let validAdminInvite = null;
-    let validAgencyInvite = null;
+    // 0. Validar el código ANTES de crear el usuario (evita emails prematuros).
+    //    - "crear": SOLO vale un código de admin (tabla director_invites).
+    //    - "unirme": SOLO vale un código de agencia (tabla agency_invites); el rol sale de ahí.
+    //    Cruzar códigos (uno de agencia en "crear", o uno de admin en "unirme") cae en
+    //    "Código incorrecto" porque cada uno vive en su propia tabla.
+    let validAdminInvite: { id: string } | null = null
+    let validAgencyInvite: { agency_id: string; role: 'director' | 'asesor' } | null = null
+    let finalRole: 'director' | 'asesor' = 'director'
 
-    if (data.role === 'director') {
-      if (!data.inviteCode) return { error: "Código de autorización obligatorio para directores" }
+    if (data.mode === 'crear') {
+      if (!data.inviteCode) return { error: "Código de autorización obligatorio" }
 
       const { data: invite, error: findAdminError } = await adminClient
         .from('director_invites')
@@ -50,21 +57,26 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
         .eq('code', data.inviteCode)
         .single()
 
-      if (findAdminError || !invite) return { error: "Código de autorización inexistente" }
+      if (findAdminError || !invite) return { error: "Código incorrecto" }
       if (invite.is_used) return { error: "Este código ya fue utilizado" }
-      validAdminInvite = invite;
+      validAdminInvite = invite
+      finalRole = 'director'
     } else {
       if (!data.inviteCode) return { error: "Código de invitación obligatorio" }
 
       const { data: invite, error: findError } = await adminClient
         .from('agency_invites')
-        .select('agency_id, is_used')
+        .select('agency_id, is_used, role')
         .eq('code', data.inviteCode)
         .single()
 
-      if (findError || !invite) return { error: "Código de invitación inexistente" }
+      if (findError || !invite) return { error: "Código incorrecto" }
       if (invite.is_used) return { error: "Este código ya fue utilizado" }
-      validAgencyInvite = invite;
+      validAgencyInvite = {
+        agency_id: invite.agency_id,
+        role: invite.role === 'director' ? 'director' : 'asesor',
+      }
+      finalRole = validAgencyInvite.role
     }
 
     // 1. Crear usuario con signUp para que Supabase maneje el envío del email de confirmación
@@ -74,7 +86,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
       options: {
         data: {
           full_name: data.fullName,
-          role: data.role,
+          role: finalRole,
           invite_code: data.inviteCode,
         },
         emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
@@ -92,7 +104,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
       .upsert({
         id: userId,
         email: data.email,
-        role: data.role,
+        role: finalRole,
         full_name: data.fullName,
       }, { onConflict: 'id' })
 
@@ -103,12 +115,12 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
           .upsert({
             id: userId,
             email: data.email,
-            role: data.role,
+            role: finalRole,
             full_name: data.fullName,
           }, { onConflict: 'id' })
     }
 
-    if (data.role === 'director' && validAdminInvite) {
+    if (data.mode === 'crear' && validAdminInvite) {
       const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase()
       
       const { data: agency, error: agencyError } = await adminClient
@@ -146,13 +158,13 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
         })
         .eq('id', validAdminInvite.id)
 
-    } else if (data.role === 'asesor' && validAgencyInvite) {
+    } else if (data.mode === 'unirme' && validAgencyInvite) {
       const { error: asesorLinkError } = await adminClient
         .from('profiles')
-        .update({ agency_id: validAgencyInvite.agency_id, role: 'asesor', full_name: data.fullName })
+        .update({ agency_id: validAgencyInvite.agency_id, role: finalRole, full_name: data.fullName })
         .eq('id', userId)
-      
-      if (asesorLinkError) return { error: "Error al vincular asesor." }
+
+      if (asesorLinkError) return { error: "Error al vincular el usuario a la inmobiliaria." }
 
       await adminClient
         .from('agency_invites')
@@ -165,8 +177,8 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
     }
 
     await adminClient.auth.admin.updateUserById(userId, {
-      user_metadata: { 
-          role: data.role,
+      user_metadata: {
+          role: finalRole,
           full_name: data.fullName,
       }
     })

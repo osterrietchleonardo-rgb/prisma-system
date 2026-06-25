@@ -185,36 +185,34 @@ La función `requireTenant()` se ejecuta en CADA endpoint protegido:
 
 ## 4. Sistema de Autenticación y Creación de Cuentas
 
-### 4.1 Flujo de Registro — Director
+### 4.1 Registro — dos modos ("Crear" vs "Unirme")
 
 **Archivo:** `lib/actions/auth.ts` → `register()`  
-**Callback:** `app/auth/callback/route.ts`
+**Callback:** `app/auth/callback/route.ts`  
+**Form:** `components/auth-register-form.tsx`
 
-1. El usuario ingresa: nombre, email, contraseña, nombre de agencia
-2. `supabase.auth.signUp()` con metadata: `{ role: 'director', agency_name, full_name }`
-3. Supabase envía email de confirmación
-4. El usuario confirma → redirige a `/auth/callback?code=...`
-5. El callback:
-   a. Intercambia el code por sesión (`exchangeCodeForSession`)
-   b. Crea el perfil en `profiles` (usando adminClient para bypass RLS)
-   c. Crea la agencia en `agencies` con un `invite_code` aleatorio (6 chars)
-   d. Asocia `profiles.agency_id` con la nueva agencia
-   e. Crea entrada en `agency_invites` con el código
-   f. Sincroniza metadata en Auth (`updateUserById`)
-   g. Redirige a `/director/dashboard`
+La pantalla de registro tiene dos pestañas según la **intención** (`mode`), no según el rol:
 
-### 4.2 Flujo de Registro — Asesor
+- **"Crear inmobiliaria nueva"** (`mode: 'crear'`): funda una agencia. Requiere un código de **admin/Vakdor** (tabla `director_invites`). El rol resultante es siempre `director`.
+- **"Unirme a una inmobiliaria"** (`mode: 'unirme'`): entra a una agencia existente con un código de invitación (tabla `agency_invites`). **El rol lo define el código** (`agency_invites.role`): puede ser `director` o `asesor`. La persona NO elige su rol.
 
-1. El asesor recibe un código de invitación del director
-2. Ingresa: nombre, email, contraseña, código de invitación
-3. `supabase.auth.signUp()` con metadata: `{ role: 'asesor', invite_code }`
-4. En el callback:
-   a. Busca `agency_invites` por código → obtiene `agency_id`
-   b. Si el código es válido y no usado → asocia asesor a la agencia
-   c. Marca el invite como `is_used: true`
-   d. Redirige a `/asesor/dashboard`
+**Regla de aislamiento:** cada tipo de código vive en su propia tabla, así que **no se cruzan**: un código de `agency_invites` usado en "Crear" no se encuentra en `director_invites` → devuelve **"Código incorrecto"**, y viceversa.
 
-### 4.3 Flujo de Login
+**Flujo "crear":**
+1. El usuario ingresa nombre, email, contraseña, nombre de agencia + código de Vakdor.
+2. Se valida el código en `director_invites` (existe y no usado).
+3. `signUp()` → email de confirmación; se crea `profiles` (rol `director`), se crea la `agencies` con `invite_code`, se asocia `profiles.agency_id`, se marca el `director_invite` como usado.
+
+**Flujo "unirme":**
+1. La persona recibe un código de un director (puede ser de asesor o de director).
+2. Ingresa nombre, email, contraseña + código.
+3. Se valida el código en `agency_invites` (existe y no usado) y se lee su `role`.
+4. `signUp()` → `profiles` con ese rol y `agency_id` del invite; se marca el invite como `is_used: true` (con `used_by`).
+5. El callback (`exchangeCodeForSession`) redirige a `/director/dashboard` o `/asesor/dashboard` según el rol real del perfil.
+
+> **Múltiples directores por agencia:** no hay límite ni jerarquía. Todo se rige por `profiles.role='director' + agency_id` en las políticas RLS, así que cualquier director ve y gestiona todo lo de su agencia. El primer director de cada agencia se crea con código de Vakdor ("crear"); los demás directores los invita cualquier director existente desde Configuración (código de `agency_invites` con `role='director'`).
+
+### 4.2 Flujo de Login
 
 **Archivo:** `lib/actions/auth.ts` → `login()`
 
@@ -308,7 +306,7 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 #### Autenticación y Perfiles
 - **`profiles`** — Perfil de usuario (id, email, full_name, role, agency_id, phone, avatar_url, status, created_at)
 - **`agencies`** — Agencias inmobiliarias (id, name, logo_url, tokko_api_key, address, phone, email, invite_code, owner_id, performance_config, marketing_ai_config, buscador_ia_config, created_at)
-- **`agency_invites`** — Códigos de invitación (agency_id, code, is_used, used_at, used_by)
+- **`agency_invites`** — Códigos de invitación (agency_id, code, **role** [`director`/`asesor`], **invitee_name**, is_used, used_at, used_by). El `role` define qué será la persona al registrarse; `invitee_name` es el nombre del invitado (visible antes de usarse). RLS: cualquier **director** de la agencia ve y crea códigos (lista compartida); validación pública por código sin usar.
 
 #### Propiedades y Leads
 - **`properties`** — Propiedades sincronizadas (id, tokko_id, agency_id, assigned_agent_id, title, description, price, currency, property_type, status, address, city, bedrooms, bathrooms, total_area, covered_area, images[], tokko_data, embedding vector(768))

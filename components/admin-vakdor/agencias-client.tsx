@@ -7,6 +7,7 @@ interface Agency {
   name: string
   estado: string
   email: string
+  invite_code: string | null
   directores: Array<{ full_name: string; estado: string }>
   asesores: Array<{ full_name: string; estado: string }>
   creditos: { total: number; usado: number; disponible: number } | null
@@ -120,6 +121,11 @@ export default function AgenciasClient() {
                 <td style={{ padding: "12px 16px" }}>
                   <div style={{ color: "#fff", fontSize: 13, fontWeight: 500 }}>{a.name}</div>
                   <div style={{ color: "rgba(255,255,255,0.35)", fontSize: 11 }}>{a.email}</div>
+                  {a.invite_code && (
+                    <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, fontFamily: "monospace", marginTop: 2 }}>
+                      Código: {a.invite_code}
+                    </div>
+                  )}
                 </td>
                 <td style={{ padding: "12px 16px" }}>{estadoBadge(a.estado)}</td>
                 <td style={{ padding: "12px 16px" }}>

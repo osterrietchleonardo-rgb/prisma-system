@@ -126,7 +126,7 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 **Autenticación y perfiles**
 - `profiles` — id, email, full_name, role (`director`/`asesor`), agency_id, phone, avatar_url, `estado` (`activo`/`pausado`/`eliminado`), `tokens_invalidos_desde`, `deleted_at`/`deleted_by`, notification_prefs (jsonb), tokko_agent_id. (El bloqueo de acceso se evalúa por `estado` + `tokens_invalidos_desde` en los guards de layout.)
 - `agencies` — id, name, logo_url, tokko_api_key, invite_code, owner_id, `performance_config`, `marketing_ai_config`, `buscador_ia_config` (todas jsonb).
-- `agency_invites` — agency_id, code, is_used, used_at, used_by.
+- `agency_invites` — agency_id, code, `role` (`director`/`asesor`, default `asesor`), `invitee_name`, is_used, used_at, used_by. RLS: SELECT/INSERT para cualquier `profiles.role='director'` con el mismo `agency_id` (lista compartida entre directores) + política pública de validación por código sin usar. (Migración `20260625120000_agency_invites_roles.sql`.)
 
 **Propiedades y leads**
 - `properties` — tokko_id, agency_id, assigned_agent_id, título, precio, moneda, tipo, estado, ubicación, ambientes/baños, superficies, images[], `tokko_data` (jsonb), `embedding vector(768)`, `ai_description` (jsonb: `{v1, v2, suggestion, model, v1_at, v2_at}` — descripción mejorada con IA; aislada del sync de Tokko, ver §Propiedades en la capa de API).
@@ -216,8 +216,10 @@ El cliente Admin se usa solo en operaciones privilegiadas controladas: insercion
 
 **Archivos:** `lib/actions/auth.ts`, `app/auth/callback/route.ts`.
 
-- **Registro Director:** `signUp` con metadata `{ role:'director', agency_name, full_name }` → email de confirmación → callback `exchangeCodeForSession` → crea `profiles` + `agencies` (con `invite_code` de 6 chars, usando adminClient) + `agency_invites` → redirige a `/director/dashboard`.
-- **Registro Asesor:** `signUp` con `{ role:'asesor', invite_code }` → callback busca `agency_invites` por código, asocia a la agencia, marca invite usado → `/asesor/dashboard`.
+- **Registro por modo (`mode`):** el form (`auth-register-form.tsx`) ya no elige rol, elige intención.
+  - **`mode:'crear'`** (Crear inmobiliaria nueva): valida código de admin en `director_invites` → crea `profiles` (rol `director`) + `agencies` (con `invite_code`, adminClient) + `agency_invites` → `/director/dashboard`. Un código que no esté en `director_invites` devuelve **"Código incorrecto"**.
+  - **`mode:'unirme'`** (Unirme a una inmobiliaria): valida código en `agency_invites`, lee `agency_invites.role` y **ese** es el rol asignado (director o asesor); asocia `agency_id`, marca invite usado → dashboard según rol. Códigos cruzados (de admin) no existen en `agency_invites` → **"Código incorrecto"**.
+  - El rol final (`finalRole`) se calcula server-side; el usuario nunca lo declara. Mismo criterio replicado en el callback OAuth.
 - **Login:** rate limit → `signInWithPassword` → redirige según rol. El bloqueo por cuenta (`estado` `pausado`/`eliminado`) lo aplican los **guards de layout** (`app/(director|asesor)/layout.tsx`), que fuerzan logout; un asesor desvinculado por el director (server action `desvincularAsesor`) queda con `estado='eliminado'` + `tokens_invalidos_desde` + email en `emails_bloqueados`.
 - **Google OAuth:** `signInWithOAuth` con state (`role`, `inviteCode`, `agencyName`) → mismo callback.
 - **Guards de layout:** los layouts `(director)`/`(asesor)` revalidan sesión, estado de cuenta/agencia y coincidencia rol↔ruta. Endpoint de apoyo: `GET /api/auth/check-status`.

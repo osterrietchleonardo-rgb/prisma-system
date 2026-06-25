@@ -18,8 +18,9 @@ export default function RegisterForm() {
   const searchParams = useSearchParams()
   const router = useRouter()
   
-  const initialRole = (searchParams.get("role") as "director" | "asesor") || "director"
-  const [role, setRole] = useState<"director" | "asesor">(initialRole)
+  // El parámetro viejo ?role=asesor mapea al modo "unirme"; por defecto "crear".
+  const initialMode = searchParams.get("role") === "asesor" ? "unirme" : "crear"
+  const [mode, setMode] = useState<"crear" | "unirme">(initialMode)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -38,11 +39,11 @@ export default function RegisterForm() {
         fullName,
         email,
         password,
-        role,
-        agencyName: role === 'director' ? agencyName : undefined,
-        inviteCode: role === 'asesor' ? inviteCode : undefined,
+        mode,
+        agencyName: mode === 'crear' ? agencyName : undefined,
+        inviteCode,
       })
-      
+
       if (result.error) {
         setError(result.error)
         setLoading(false)
@@ -53,8 +54,8 @@ export default function RegisterForm() {
         setSuccess(true)
         return
       }
-      
-      router.push(role === 'director' ? '/director/dashboard' : '/asesor/dashboard')
+
+      router.push(mode === 'crear' ? '/director/dashboard' : '/auth/login')
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear cuenta")
@@ -99,10 +100,10 @@ export default function RegisterForm() {
         <CardDescription>Elegí tu rol y completá tus datos</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <Tabs value={role} onValueChange={(v) => setRole(v as "director" | "asesor")} className="w-full">
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "crear" | "unirme")} className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-background/50 border border-border/50">
-            <TabsTrigger value="director" className="data-[state=active]:bg-accent data-[state=active]:text-white">Director</TabsTrigger>
-            <TabsTrigger value="asesor" className="data-[state=active]:bg-accent data-[state=active]:text-white">Asesor</TabsTrigger>
+            <TabsTrigger value="crear" className="data-[state=active]:bg-accent data-[state=active]:text-white">Crear inmobiliaria nueva</TabsTrigger>
+            <TabsTrigger value="unirme" className="data-[state=active]:bg-accent data-[state=active]:text-white">Unirme a una inmobiliaria</TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -122,7 +123,7 @@ export default function RegisterForm() {
             <Input id="password" name="password" type="password" required disabled={loading} className="bg-background/50" />
           </div>
 
-          {role === 'director' ? (
+          {mode === 'crear' ? (
             <>
               <div className="grid gap-2">
                 <Label htmlFor="agencyName">Nombre de la Inmobiliaria</Label>
@@ -138,10 +139,10 @@ export default function RegisterForm() {
             </>
           ) : (
             <div className="grid gap-2">
-              <Label htmlFor="inviteCode">Código de Inmobiliaria</Label>
+              <Label htmlFor="inviteCode">Código de invitación</Label>
               <Input id="inviteCode" name="inviteCode" placeholder="ABC123" required disabled={loading} className="bg-background/50" />
               <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Info className="w-3 h-3" /> Solicitalo al Director de tu agencia.
+                <Info className="w-3 h-3" /> Te lo da un director de tu inmobiliaria. El código define si entrás como director o asesor.
               </p>
             </div>
           )}
@@ -150,7 +151,7 @@ export default function RegisterForm() {
           
           <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {role === 'director' ? 'Crear Agencia' : 'Unirse a Agencia'}
+            {mode === 'crear' ? 'Crear Agencia' : 'Unirme a la Agencia'}
           </Button>
         </form>
       </CardContent>

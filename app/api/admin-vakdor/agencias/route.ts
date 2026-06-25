@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   let query = db
     .from("agencies")
     .select(`
-      id, name, estado, logo_url, email, phone, address, created_at, deleted_at,
+      id, name, estado, logo_url, email, phone, address, invite_code, created_at, deleted_at,
       profiles!profiles_agency_id_fkey(id, role, estado, full_name, email),
       agency_ai_credits(credits_total, credits_used)
     `, { count: "exact" })
@@ -77,6 +77,7 @@ export async function GET(request: NextRequest) {
       estado: agency.estado || "activo",
       logo_url: agency.logo_url,
       email: agency.email,
+      invite_code: agency.invite_code,
       directores: profiles.filter((p) => p.role === "director"),
       asesores: profiles.filter((p) => p.role === "asesor"),
       creditos: credits ? { total: credits.credits_total, usado: credits.credits_used, disponible: credits.credits_total - credits.credits_used } : null,

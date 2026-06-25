@@ -269,12 +269,14 @@ export async function updateAgencySettings(agencyId: string, settings: any) {
 
 export async function getAgencyInvites(agencyId: string) {
   const supabase = createClient()
-  
+
   const { data, error } = await supabase
     .from("agency_invites")
     .select(`
       id,
       code,
+      role,
+      invitee_name,
       is_used,
       used_at,
       used_by_profile:profiles(full_name)
@@ -286,26 +288,36 @@ export async function getAgencyInvites(agencyId: string) {
   return data
 }
 
-export async function generateAgencyInvite(agencyId: string) {
+export async function generateAgencyInvite(
+  agencyId: string,
+  role: "director" | "asesor" = "asesor",
+  inviteeName?: string
+) {
   const supabase = createClient()
-  
+
+  // El rol del código define qué será la persona al registrarse.
+  const safeRole = role === "director" ? "director" : "asesor"
+
   // Get agency name prefix for the code
   const { data: agency } = await supabase
     .from("agencies")
     .select("name")
     .eq("id", agencyId)
     .single()
-    
+
   const prefix = (agency?.name?.substring(0, 6).toUpperCase() || "PRISMA").replace(/\s/g, "")
   const random = Math.random().toString(36).substring(2, 5).toUpperCase()
   const year = new Date().getFullYear()
-  const code = `${prefix}-${year}-${random}`
+  const roleTag = safeRole === "director" ? "DIR" : "ASE"
+  const code = `${prefix}-${roleTag}-${year}-${random}`
 
   const { data, error } = await supabase
     .from("agency_invites")
     .insert({
       agency_id: agencyId,
-      code
+      code,
+      role: safeRole,
+      invitee_name: inviteeName?.trim() || null,
     })
     .select()
 
