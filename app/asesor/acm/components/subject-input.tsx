@@ -132,7 +132,8 @@ export function SubjectInput({
       onChange({
         ...sujeto,
         ...data.sujeto,
-        amenidades: sujeto.amenidades, // las amenities del link no son confiables: se cargan a mano
+        // Mergeamos las amenities detectadas (solo vienen las true) sobre las 9 por defecto.
+        amenidades: { ...sujeto.amenidades, ...((data.sujeto?.amenidades as Partial<Amenidades>) || {}) },
         moneda: data.moneda || sujeto.moneda,
       });
       onExcludeIdChange(null);

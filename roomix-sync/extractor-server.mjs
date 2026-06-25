@@ -75,6 +75,35 @@ function mapTipo(raw) {
   if (/(apart|depart|condo|flat|accommod|monoambiente|studio|loft)/.test(t)) return 'departamento';
   return 'departamento';
 }
+
+// Amenities (ES+EN) desde texto/lista → las 9 banderas del Sujeto. Solo devuelve las true.
+const AMEN_RE = {
+  cochera_cubierta: /cocher|garage|garaje|estacionamiento|parking/i,
+  cochera_descubierta: /cochera descub|uncovered parking/i,
+  baulera: /bauler|storage room|\battic\b/i,
+  pileta: /\bpileta\b|piscina|\bpool\b|swimming/i,
+  gimnasio: /gimnas|\bgym\b|fitness/i,
+  sum: /\bs\.?u\.?m\.?\b|salon de usos|salón de usos|clubhouse/i,
+  seguridad_24hs: /seguridad 24|vigilanc|24 ?hs|24 hour|porter[ií]a|portero/i,
+  jardin_privado: /jard[ií]n|\bgarden\b|backyard|fondo verde/i,
+  terraza_privada: /terraza|\bterrace\b|solarium|sol[áa]rium/i,
+};
+function mapAmenidades(text) {
+  const out = {};
+  const hay = (text || '').toString();
+  for (const [k, re] of Object.entries(AMEN_RE)) if (re.test(hay)) out[k] = true;
+  return out;
+}
+
+// Limpia la dirección: saca el sufijo del portal y el prefijo comercial "Venta/Alquiler …".
+function cleanDireccion(d) {
+  if (!d) return d;
+  return d
+    .replace(/\s*[-|]\s*(zonaprop|argenprop|mercado\s?libre|properati|inmuebles24).*$/i, '')
+    .replace(/\s*\|\s*capital federal.*$/i, '')
+    .replace(/^\s*(venta|alquiler|venta de|alquiler de)\s+/i, '')
+    .trim();
+}
 function parseJsonLdNodes(html) {
   const out = [];
   const re = /<script[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -141,9 +170,9 @@ function fromOpenGraph(html) {
 
 async function fromIA(text) {
   if (!GEMINI_API_KEY || text.length < 80) return null;
-  const prompt = `Sos un extractor de datos inmobiliarios de Argentina. Del texto de un aviso, devolvé SOLO JSON válido:
-{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"","barrio":"","m2_cubiertos":0,"dormitorios":0,"banos":0,"precio":0,"moneda":"USD|ARS","operacion":"venta|alquiler","responsable":null,"fecha_publicacion":null}
-Si un dato no está usá null/0. "ambientes" no es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1.
+  const prompt = `Sos un extractor de datos inmobiliarios de Argentina. Del texto de un aviso, devolvé SOLO JSON válido (sin texto extra), MUY meticuloso:
+{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_descubiertos":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"precio":0,"moneda":"USD|ARS","operacion":"venta|alquiler","responsable":"inmobiliaria o agente que publica, o null","fecha_publicacion":null,"amenities":["TODOS los servicios/amenities concretos que SÍ tenga: cochera, baulera, pileta, gimnasio, sum, seguridad, jardin, terraza, balcon, parrilla, etc."]}
+Reglas: si un dato no está usá null/0/[]. "ambientes" NO es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1. En amenities NO incluyas cosas que el aviso diga que NO tiene. m2_cubiertos = superficie cubierta; si solo dan superficie total, poné ese número en m2_cubiertos.
 TEXTO:"""${text.slice(0, 12000)}"""`;
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
@@ -162,6 +191,8 @@ TEXTO:"""${text.slice(0, 12000)}"""`;
         direccion: j.direccion || '',
         barrio: j.barrio || '',
         m2_cubiertos: toNum(j.m2_cubiertos) ?? 0,
+        m2_descubiertos: toNum(j.m2_descubiertos) ?? 0,
+        antiguedad_anios: toNum(j.antiguedad_anios) ?? 0,
         dormitorios: toNum(j.dormitorios) ?? 0,
         banos: toNum(j.banos) ?? 0,
       },
@@ -171,6 +202,7 @@ TEXTO:"""${text.slice(0, 12000)}"""`;
       responsable: j.responsable || null,
       fecha_publicacion: j.fecha_publicacion || null,
       metodo: 'ia',
+      _amen: Array.isArray(j.amenities) ? j.amenities.join(' ') : '',
     };
   } catch {
     return null;
@@ -276,14 +308,23 @@ async function extract(url, maxAttempts = 3) {
   apply(fromJsonLd(html));
   apply(fromOpenGraph(html));
 
+  let iaRes = null;
   const thin = !(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0);
-  if (thin) apply(await fromIA(text || html.replace(/<[^>]+>/g, ' ')));
+  if (thin) { iaRes = await fromIA(text || html.replace(/<[^>]+>/g, ' ')); apply(iaRes); }
 
   // Último recurso: lo que diga el propio link (no pisa lo ya extraído).
   apply(fromUrlSlug(url));
 
-  // No ensuciar la dirección con un título de error si todas las IPs vinieron mal.
+  // Amenities: usamos la lista curada de la IA si la hay (precisa); si no, el texto del aviso.
+  const amenSource = iaRes && iaRes._amen && iaRes._amen.length > 3 ? iaRes._amen : text;
+  const amen = mapAmenidades(amenSource);
+  if (Object.keys(amen).length) merged.sujeto.amenidades = amen;
+
+  // Limpiar la dirección (sacar título/portal/error).
+  merged.sujeto.direccion = cleanDireccion(merged.sujeto.direccion);
   if (/error 404|404|just a moment|un momento|access denied|forbidden/i.test(merged.sujeto.direccion || '')) merged.sujeto.direccion = '';
+  // Si quedó sin dirección, al menos dejamos el barrio como referencia.
+  if (!merged.sujeto.direccion && merged.sujeto.barrio) merged.sujeto.direccion = merged.sujeto.barrio;
 
   const ok = Boolean(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0 || merged.precio);
   return { ok, requiere_completar_manual: !ok, ...merged };
