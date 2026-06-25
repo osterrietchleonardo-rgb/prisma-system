@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node cron.js",
-    "start:full": "node crawler.mjs --limit 0"
+    "start:full": "node crawler.mjs --limit 0",
+    "start:extractor": "node extractor-server.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",

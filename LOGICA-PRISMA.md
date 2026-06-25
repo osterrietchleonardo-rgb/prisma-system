@@ -266,7 +266,7 @@ Endpoint que los layouts consultan para verificar si la cuenta sigue activa. Ret
 | Contratos IA | `/director/contratos-ia` | Generador de contratos |
 | Asesores | `/director/asesores` | Gestión de equipo |
 | Documentos | `/director/documentos` | Base de conocimiento |
-| Tasaciones | `/director/tasaciones` | Tasador IA |
+| ACM | `/director/acm` | Análisis Comparativo de Mercado (ex Tasaciones) |
 | Calendario | `/director/calendario` | Agenda de visitas |
 | Tutor IA | `/director/tutor` | Chat formativo IA |
 | Consultor IA | `/director/consultor` | Buscador de propiedades IA |
@@ -290,7 +290,7 @@ Endpoint que los layouts consultan para verificar si la cuenta sigue activa. Ret
 | Mi Calendario | `/asesor/calendario` | Agenda personal |
 | Tutor IA | `/asesor/tutor-ia` | Aprendizaje IA |
 | Buscador IA | `/asesor/consultor-ia` | Búsqueda de propiedades |
-| Tasaciones | `/asesor/tasaciones` | Tasador |
+| ACM | `/asesor/acm` | Análisis Comparativo de Mercado (ex Tasaciones) |
 | Biblioteca | `/asesor/documentos` | Documentos de la agencia |
 | Configuración | `/asesor/configuracion` | Config personal |
 | Sugerencias | `/asesor/feedback` | Feedback |
@@ -1061,7 +1061,15 @@ Columnas: (Asesor — solo director), Contrato, **Código** (badge mono), Client
 
 ---
 
-## 15. Módulo de Tasaciones IA
+## 15. Módulo ACM — Análisis Comparativo de Mercado (ex Tasaciones)
+
+> **Actualización (jun-2026): la página "Tasaciones" pasó a ser "ACM (Análisis Comparativo de Mercado)".**
+> - Rutas nuevas: `/asesor/acm` y `/director/acm` (las viejas `/…/tasaciones` redirigen 308 a las nuevas, ver `next.config.mjs`).
+> - **Nueva lógica:** se elige UNA propiedad sujeto por **(a) formulario manual**, **(b) link de cualquier portal** (botón "Analizar", extracción server-side) o **(c) desplegable de la cartera** de la agencia. El backend busca **comparables reales** en `properties` (cartera) + `roomix_properties` (red de colaboración) con **filtros duros + embedding (Gemini 768d)**, devolviendo cada comparable con **% de comparabilidad** y un **checklist** (qué coincide y qué no). El **precio queda FUERA del %**.
+> - **Funciones SQL nuevas:** `acm_match_properties` y `acm_match_roomix` (migración `20260625130000_acm_match_functions.sql`). Filtros duros: misma operación + mismo tipo + m² ±40% + ambientes ±1. % ponderado: Zona 25 · Superficie 25 · Ambientes 20 · Baños 10 · Amenities 10 (Jaccard ES+EN) · Semántica 10; los pesos se redistribuyen si falta dato. Tipo y operación son **gates** (peso máximo, siempre coinciden).
+> - **Endpoints nuevos:** `app/api/acm/comparables`, `app/api/acm/extract`, `app/api/acm/cartera`. Librerías en `lib/acm/` (`extract.ts`, `subject.ts`, `checklist.ts`, `tokko.ts`).
+> - **Extracción por link en cascada:** Tier 1 (server-side: JSON-LD → OpenGraph → IA). Tier 2 (servicio con navegador stealth `roomix-sync/extractor-server.mjs`, env `ACM_EXTRACTOR_URL`) para portales que bloquean (ML/ZonaProp/Argenprop). Ver `roomix-sync/ACM-EXTRACTOR-EASYPANEL.md`.
+> - **Reservado a futuro:** la grilla MCM de valuación (`lib/tasacion/calculos.ts`, `step3-grilla.tsx`, `step4-resultado.tsx`) **se conserva en el repo pero NO se renderiza**; se reusará para el informe con marca. Lo descrito en 15.1/15.2 queda como referencia histórica.
 
 > **Nota (revisión jun-2026):** existen **dos implementaciones** de tasaciones y conviene no confundirlas:
 > - **La que está viva y se usa hoy** es el **Wizard MCM client-side** (ver 15.2) que corre en `/asesor/tasaciones` y `/director/tasaciones`, calcula con `lib/tasacion/calculos.ts` y persiste en la tabla `tasaciones`.
