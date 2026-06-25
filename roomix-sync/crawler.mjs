@@ -121,12 +121,13 @@ const VENTA_AR_MAX_PAGES = process.env.VENTA_AR_MAX_PAGES !== undefined ? parseI
 // medido en producción (Junio 25), Roomix permite pedir hasta ~100 páginas por
 // búsqueda y SOLO devuelve vacío en la p101 — de la p1 a la p100 siempre trae
 // propiedades (de la zona, ~50/página). O sea el autocorte por "2 páginas vacías"
-// recién salta a las 100 páginas EN CADA seed: con 30 seeds AMBA = ~3 horas solo
-// recolectando, sin llegar nunca a guardar (mismo cuelgue que tenía en-argentina).
-// Por eso cada seed AMBA lleva su tope. Default 25 (~1.000-1.200 ventas/zona,
-// recolección ~35 min). Subirlo junta más ventas pero alarga la corrida; bajarlo,
-// al revés. Lo que no entre por el seed igual lo levanta el sitemap.
-const VENTA_AMBA_MAX_PAGES = process.env.VENTA_AMBA_MAX_PAGES !== undefined ? parseInt(process.env.VENTA_AMBA_MAX_PAGES) : 25;
+// recién salta a las 100 páginas EN CADA seed.
+// Default 15. OJO: desde la IP del servidor (Easypanel) Cloudflare frena fuerte
+// después de ~150-200 páginas seguidas (se midió: 5 min POR página). Por eso el
+// flujo nuevo (a) guarda zona por zona —si Cloudflare corta, lo ya hecho queda— y
+// (b) refresca la sesión de CF antes de cada zona. Subir este número junta más por
+// zona pero acelera el throttling; bajarlo, al revés.
+const VENTA_AMBA_MAX_PAGES = process.env.VENTA_AMBA_MAX_PAGES !== undefined ? parseInt(process.env.VENTA_AMBA_MAX_PAGES) : 15;
 
 const VENTA_SEED_GROUPS = [
   { tier: 0, label: 'AMBA', maxPages: VENTA_AMBA_MAX_PAGES, seeds: ['en-capital-federal', ...CONURBANO_SEEDS] },
@@ -135,44 +136,8 @@ const VENTA_SEED_GROUPS = [
 // Override global para pruebas (aplica a TODOS los grupos): VENTA_MAX_PAGES=2
 const VENTA_MAX_PAGES = process.env.VENTA_MAX_PAGES !== undefined ? parseInt(process.env.VENTA_MAX_PAGES) : 0;
 
-// Barrios de CABA + partidos del conurbano (AMBA), en forma "slug" (sin acentos, con guiones).
-// Se usa solo para ORDENAR la cola (best-effort): si no matchea, no afecta la corrección de datos.
-const AMBA_TOKENS = new Set([
-  // CABA
-  'palermo','recoleta','belgrano','caballito','almagro','flores','floresta','balvanera','barracas',
-  'saavedra','nunez','colegiales','chacarita','boedo','san-telmo','monserrat','retiro','constitucion',
-  'puerto-madero','parque-patricios','paternal','agronomia','coghlan','liniers','mataderos',
-  'parque-chacabuco','parque-chas','velez-sarsfield','versalles','villa-crespo','villa-urquiza',
-  'villa-lugano','villa-devoto','villa-del-parque','villa-general-mitre','villa-ortuzar',
-  'villa-pueyrredon','villa-real','villa-riachuelo','villa-santa-rita','villa-soldati','monte-castro',
-  'nueva-pompeya','pompeya','once','barrio-norte','microcentro','centro','distrito-centro','congreso',
-  'abasto','las-canitas','las-caitas','caitas','san-cristobal','san-nicolas',
-  // GBA / conurbano (AMBA)
-  'vicente-lopez','san-isidro','tigre','san-fernando','pilar','escobar','malvinas-argentinas',
-  'jose-c-paz','san-miguel','moreno','merlo','moron','ituzaingo','hurlingham','tres-de-febrero',
-  'san-martin','general-san-martin','la-matanza','ramos-mejia','lomas-de-zamora','lanus','avellaneda',
-  'quilmes','berazategui','florencio-varela','almirante-brown','esteban-echeverria','ezeiza',
-  'presidente-peron','san-vicente','adrogue','banfield','temperley','bernal','wilde','sarandi',
-  'olivos','martinez','beccar','boulogne','victoria','munro','florida','villa-ballester','caseros',
-  'ciudadela','castelar','haedo','palomar','el-palomar','don-torcuato','benavidez','nordelta','garin',
-  'del-viso','villa-rosa'
-]);
-
-function isAmba(slug) {
-  if (!slug) return false;
-  const s = `-${slug}-`;
-  for (const t of AMBA_TOKENS) if (s.includes(`-${t}-`)) return true;
-  return false;
-}
-
-// Prioridad (menor = se procesa antes):
-//   0 = Venta AMBA | 1 = Venta resto prov. BsAs | 2 = Venta resto Argentina
-//   3 = Alquiler AMBA | 4 = Alquiler resto
-// Todas las VENTAS bajan antes que cualquier ALQUILER.
-function priorityRank(entry) {
-  if (entry._venta) return entry._vtier ?? 2;
-  return isAmba(entry.slug) ? 3 : 4;
-}
+// Nota: la prioridad de AMBA ya no se calcula por barrio. El flujo procesa las zonas
+// de venta en orden (AMBA primero, por VENTA_SEED_GROUPS) y guarda cada una al toque.
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -261,65 +226,45 @@ async function browserFetch(page, url) {
 // STEP 1.5: VENTAS (fuente prioritaria desde /buscar/comprar/<seed>?page=N)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function fetchVentaSeeds(context) {
-  log('🏷️', 'Recolectando propiedades EN VENTA (prioridad por zona)...');
-  const byId = new Map();
-  const page = await context.newPage();
-  try {
-    await page.goto('https://roomix.ai/', { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
-    await sleep(1500);
-
-    for (const group of VENTA_SEED_GROUPS) {
-      const before = byId.size;
-      // Tope efectivo: el override global de pruebas gana; si no, el del grupo (0 = sin tope).
-      const pageCap = VENTA_MAX_PAGES > 0 ? VENTA_MAX_PAGES : (group.maxPages || 0);
-      for (const seed of group.seeds) {
-        let pageNum = 1, emptyStreak = 0;
-        while (true) {
-          if (pageCap > 0 && pageNum > pageCap) {
-            log('🏁', `venta[${group.label}]/${seed} alcanzó el tope de ${pageCap} páginas, corto seed`);
-            break;
-          }
-          const url = `https://roomix.ai/buscar/comprar/${seed}?page=${pageNum}`;
-
-          let res = await browserFetch(page, url);
-          if (res.error) {
-            if (res.status === 403 || res.status >= 500) {
-              await sleep(8000);
-              res = await browserFetch(page, url); // un reintento
-            }
-            if (res.error) { log('⚠️', `venta/${seed} p${pageNum} → ${res.error}, corto seed`); break; }
-          }
-
-          // Los slugs de propiedad terminan en "-<8 hex>"; ese sufijo es el id.
-          const found = new Set();
-          const re = /\\?"slug\\?":\\?"([a-z0-9-]+-[0-9a-f]{8})(?=\\?")/gi;
-          let m;
-          while ((m = re.exec(res.text))) found.add(m[1]);
-
-          let added = 0;
-          for (const slug of found) {
-            const id = slug.slice(slug.lastIndexOf('-') + 1);
-            if (byId.has(id)) continue; // ya visto en un grupo de mayor prioridad → conserva su tier
-            byId.set(id, { loc: `https://roomix.ai/propiedad/${slug}`, slug, id, lastmod: null, _venta: true, _vtier: group.tier });
-            added++;
-          }
-          log('🏷️', `venta[${group.label}]/${seed} p${pageNum}: +${added} nuevas (acum ${byId.size})`);
-
-          if (added === 0) { if (++emptyStreak >= 2) break; } else emptyStreak = 0;
-          pageNum++;
-          await sleep(1200);
-        }
-      }
-      log('🏷️', `Grupo ${group.label} (tier ${group.tier}): +${byId.size - before} ventas`);
+// Recolecta los links de UNA zona (seed). Devuelve sus entries de venta (solo links,
+// no baja fichas). Corta por tope de páginas o por autocorte (2 páginas sin nuevas).
+// El guardado en Supabase lo hace main(), zona por zona, para no perder lo recolectado
+// si Cloudflare frena a mitad de camino.
+async function collectSeed(page, label, tier, seed, pageCap) {
+  const out = new Map();
+  let pageNum = 1, emptyStreak = 0;
+  while (true) {
+    if (pageCap > 0 && pageNum > pageCap) {
+      log('🏁', `venta[${label}]/${seed} alcanzó el tope de ${pageCap} páginas`);
+      break;
     }
-  } catch (e) {
-    log('⚠️', `fetchVentaSeeds falló (sigo con sitemaps): ${e.message}`);
-  } finally {
-    await page.close();
+    const url = `https://roomix.ai/buscar/comprar/${seed}?page=${pageNum}`;
+    let res = await browserFetch(page, url);
+    if (res.error) {
+      if (res.status === 403 || res.status >= 500) { await sleep(8000); res = await browserFetch(page, url); }
+      if (res.error) { log('⚠️', `venta/${seed} p${pageNum} → ${res.error}, corto seed`); break; }
+    }
+
+    // Los slugs de propiedad terminan en "-<8 hex>"; ese sufijo es el id.
+    const found = new Set();
+    const re = /\\?"slug\\?":\\?"([a-z0-9-]+-[0-9a-f]{8})(?=\\?")/gi;
+    let m;
+    while ((m = re.exec(res.text))) found.add(m[1]);
+
+    let added = 0;
+    for (const slug of found) {
+      const id = slug.slice(slug.lastIndexOf('-') + 1);
+      if (out.has(id)) continue;
+      out.set(id, { loc: `https://roomix.ai/propiedad/${slug}`, slug, id, lastmod: null, _venta: true, _vtier: tier });
+      added++;
+    }
+    log('🏷️', `venta[${label}]/${seed} p${pageNum}: +${added} (acum zona ${out.size})`);
+
+    if (added === 0) { if (++emptyStreak >= 2) break; } else emptyStreak = 0;
+    pageNum++;
+    await sleep(1200);
   }
-  log('🏷️', `Total propiedades en venta recolectadas: ${byId.size}`);
-  return [...byId.values()];
+  return [...out.values()];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -417,35 +362,19 @@ async function fetchSitemaps(context) {
 // STEP 3: INCREMENTAL DIFF
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function diffWithSupabase(sitemapEntries) {
-  log('🔍', 'Comparando con Supabase...');
-  
-  let existing = [];
-  let from = 0;
-  const step = 1000;
+// Lee id+lastmod de TODA la BD una sola vez (Map id→lastmod). Sirve para el diff
+// EN MEMORIA zona por zona, sin re-leer las 54k filas en cada zona.
+async function loadExistingMap() {
+  const map = new Map();
+  let from = 0; const step = 1000;
   while (true) {
-    // .order('id') OBLIGATORIO: sin orden explícito, Postgres no garantiza el mismo
-    // orden entre páginas de .range() → filas repetidas y otras salteadas, y los
-    // conteos de nuevas/eliminar salen mal (en una corrida: 32976 vs 54581 sobre la
-    // MISMA tabla con segundos de diferencia).
     const { data, error } = await supabase.from('roomix_properties').select('id, lastmod').order('id', { ascending: true }).range(from, from + step - 1);
-    if (error) { log('❌', 'Error DB:', error.message); return { toExtract: sitemapEntries, toDelete: [] }; }
-    existing = existing.concat(data || []);
+    if (error) { log('❌', 'Error leyendo catálogo:', error.message); break; }
+    for (const r of (data || [])) map.set(r.id, r.lastmod);
     if (!data || data.length < step) break;
     from += step;
   }
-  
-  log('📦', `Propiedades en BD: ${existing.length}`);
-
-  const exMap = new Map((existing || []).map(r => [r.id, r.lastmod]));
-  const sMap = new Set(sitemapEntries.map(e => e.id));
-
-  const newE = sitemapEntries.filter(e => !exMap.has(e.id));
-  const modE = sitemapEntries.filter(e => e.lastmod && exMap.get(e.id) && new Date(e.lastmod) > new Date(exMap.get(e.id)));
-  const delIds = [...exMap.keys()].filter(id => !sMap.has(id));
-
-  log('📊', `Nuevas: ${newE.length} | Mod.: ${modE.length} | Elim. (potencial): ${delIds.length}`);
-  return { toExtract: [...newE, ...modE], toDelete: delIds };
+  return map;
 }
 
 // Borra de la BD las propiedades que ya no están en Roomix (salieron del catálogo).
@@ -456,8 +385,8 @@ async function deleteMissing(entries) {
   let dbIds = [], from = 0;
   const step = 1000;
   while (true) {
-    // .order('id') OBLIGATORIO (mismo motivo que en diffWithSupabase): sin orden,
-    // .range() pagina inconsistente y el cálculo de qué borrar queda mal.
+    // .order('id') OBLIGATORIO: sin orden, .range() pagina inconsistente (filas
+    // repetidas/salteadas entre páginas) y el cálculo de qué borrar queda mal.
     const { data, error } = await supabase.from('roomix_properties').select('id').order('id', { ascending: true }).range(from, from + step - 1);
     if (error) { log('❌', 'Error leyendo IDs para borrar:', error.message); return; }
     dbIds = dbIds.concat((data || []).map(r => r.id));
@@ -593,11 +522,12 @@ async function extractProperty(page, entry, retries = 0) {
   }
 }
 
-async function processQueue(queue, checkpoint, context) {
+// Baja y guarda una tanda de propiedades, de a CONCURRENCY a la vez, reusando las
+// páginas ya abiertas. El guardado (upsert) es inmediato por propiedad. Va anotando
+// el checkpoint para poder reanudar si la corrida se corta.
+async function processBatch(queue, checkpoint, pages) {
   const limit = pLimit(CONCURRENCY);
   let processed = 0, errors = 0;
-  const pages = await Promise.all(Array.from({ length: CONCURRENCY }, () => context.newPage()));
-
   for (let i = 0; i < queue.length; i += CONCURRENCY) {
     const batch = queue.slice(i, i + CONCURRENCY);
     await Promise.all(batch.map((entry, idx) => limit(async () => {
@@ -605,18 +535,14 @@ async function processQueue(queue, checkpoint, context) {
       const page = pages[idx % pages.length];
       const row = await extractProperty(page, entry);
       if (!row) { errors++; return; }
-
       const { error } = await supabase.from('roomix_properties').upsert(row, { onConflict: 'id' });
       if (error) { log('❌', `DB Error ${entry.id}: ${error.message}`); errors++; return; }
-
       checkpoint.processedIds.add(entry.id);
       processed++;
     })));
     saveCheckpoint(checkpoint.processedIds);
     if (i + CONCURRENCY < queue.length) await sleep(BATCH_DELAY_MS);
   }
-
-  await Promise.all(pages.map(p => p.close()));
   return { processed, errors };
 }
 
@@ -635,45 +561,86 @@ async function main() {
   const { browser, context } = await initBrowser();
 
   try {
-    // 1) Ventas (fuente prioritaria, por zona) + 2) Sitemaps (todo el catálogo)
-    const ventaEntries = await fetchVentaSeeds(context);
-    const { entries: sitemapEntries, ok: sitemapsOk } = await fetchSitemaps(context);
-    if (sitemapEntries.length === 0 && ventaEntries.length === 0) { log('❌', 'Sin entradas'); process.exit(1); }
+    // Leemos el catálogo actual UNA vez (id→lastmod) para el diff en memoria por zona.
+    log('🔍', 'Leyendo catálogo actual de Supabase...');
+    const existing = await loadExistingMap();
+    log('📦', `Propiedades en BD: ${existing.size}`);
 
-    // Merge: base = sitemap (tiene lastmod, clave para detectar modificaciones).
-    // Las de venta enriquecen con su flag/tier sin pisar el lastmod del sitemap.
-    const byId = new Map();
-    for (const e of sitemapEntries) byId.set(e.id, e);
-    for (const e of ventaEntries) {
-      const ex = byId.get(e.id);
-      if (ex) { ex._venta = true; ex._vtier = e._vtier; }   // ya estaba en sitemap → conserva lastmod
-      else byId.set(e.id, e);                                 // venta que no está en sitemap → la agrego
+    // Páginas reusables: 1 para recolectar listados, CONCURRENCY para bajar fichas.
+    const collector = await context.newPage();
+    const workers = await Promise.all(Array.from({ length: CONCURRENCY }, () => context.newPage()));
+
+    // Acumulador de TODOS los ids vivos vistos (ventas + sitemap) para el borrado final.
+    const liveIds = new Set();
+    let totNew = 0, totErr = 0, totSeen = 0;
+
+    // ── VENTAS: zona por zona, GUARDANDO al terminar cada una ──────────────────────
+    // Si Cloudflare frena/EasyPanel se traba a mitad, lo de las zonas anteriores YA
+    // quedó en Supabase. Antes se juntaba TODO primero → un corte = 0 guardado.
+    for (const group of VENTA_SEED_GROUPS) {
+      const pageCap = VENTA_MAX_PAGES > 0 ? VENTA_MAX_PAGES : (group.maxPages || 0);
+      for (const seed of group.seeds) {
+        // Refrescar la sesión de Cloudflare antes de cada zona (mitiga el throttling
+        // acumulado: re-resuelve el challenge y renueva la cookie cf_clearance).
+        try { await collector.goto('https://roomix.ai/', { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT }); await sleep(1500); } catch {}
+
+        const zona = await collectSeed(collector, group.label, group.tier, seed, pageCap);
+        for (const e of zona) liveIds.add(e.id);
+        totSeen += zona.length;
+
+        // Diff EN MEMORIA: nuevas (no están en la BD) y no procesadas ya en esta corrida.
+        // Las de venta vienen con lastmod null, así que el "modificada" lo resuelven los sitemaps.
+        let pending = zona.filter(e => !checkpoint.processedIds.has(e.id) && !existing.has(e.id));
+        if (PROPERTY_LIMIT > 0) pending = pending.slice(0, Math.max(0, PROPERTY_LIMIT - totNew));
+        if (pending.length === 0) { log('✅', `${seed}: 0 nuevas para guardar (acum corrida ${totNew})`); continue; }
+
+        log('🚀', `${seed}: guardando ${pending.length} nuevas...`);
+        const { processed, errors } = await processBatch(pending, checkpoint, workers);
+        for (const e of pending) existing.set(e.id, e.lastmod); // ya están en BD → no re-procesar en otra zona
+        totNew += processed; totErr += errors;
+        log('💾', `${seed}: +${processed} guardadas (${errors} err) | total ventas corrida: ${totNew}`);
+
+        if (PROPERTY_LIMIT > 0 && totNew >= PROPERTY_LIMIT) { log('ℹ️', `Alcanzado --limit ${PROPERTY_LIMIT}`); break; }
+      }
+      if (PROPERTY_LIMIT > 0 && totNew >= PROPERTY_LIMIT) break;
     }
-    let entries = [...byId.values()];
+    log('🏁', `VENTAS: ${totNew} guardadas de ${totSeen} vistas (${totErr} errores)`);
 
-    // Orden: Venta AMBA > Venta prov. BsAs > Venta Argentina > Alquiler AMBA > Alquiler resto
-    entries.sort((a, b) => priorityRank(a) - priorityRank(b));
-    log('🎯', `Cola priorizada → en venta: ${ventaEntries.length} | total únicas: ${entries.length}`);
+    // ── SITEMAPS: catálogo completo (mayormente alquileres), al final ──────────────
+    // Las ventas (prioridad) ya están guardadas; si esto se corta, no se pierde lo de arriba.
+    let sitemapsOk = false;
+    if (PROPERTY_LIMIT === 0 && SITEMAP_COUNT > 0) {
+      const { entries: sitemapEntries, ok } = await fetchSitemaps(context);
+      sitemapsOk = ok;
+      for (const e of sitemapEntries) liveIds.add(e.id);
 
-    // Borrado de propiedades que salieron de Roomix (solo en corrida completa y con sitemaps OK).
-    if (PROPERTY_LIMIT === 0) {
-      if (sitemapsOk) await deleteMissing(entries);
-      else log('⚠️', 'Algún sitemap falló → NO se eliminan propiedades (freno de seguridad)');
-    } else {
-      log('ℹ️', 'Corrida con --limit → se omite el borrado');
+      const pend = sitemapEntries.filter(e => {
+        if (checkpoint.processedIds.has(e.id)) return false;
+        if (!existing.has(e.id)) return true;                                  // nueva
+        const old = existing.get(e.id);
+        return e.lastmod && old && new Date(e.lastmod) > new Date(old);        // modificada
+      });
+      if (pend.length > 0) {
+        log('🚀', `Sitemaps: ${pend.length} nuevas/modificadas...`);
+        const { processed, errors } = await processBatch(pend, checkpoint, workers);
+        log('💾', `Sitemaps: +${processed} guardadas (${errors} err)`);
+      } else {
+        log('✅', 'Sitemaps: nada nuevo para guardar');
+      }
+    } else if (SITEMAP_COUNT === 0) {
+      log('ℹ️', 'SITEMAP_COUNT=0 → se omiten sitemaps');
     }
 
-    const work = PROPERTY_LIMIT > 0 ? entries.slice(0, PROPERTY_LIMIT) : entries;
-    const { toExtract } = await diffWithSupabase(work);
-    const pending = toExtract.filter(e => !checkpoint.processedIds.has(e.id));
-
-    if (pending.length > 0) {
-      log('🚀', `Procesando ${pending.length} propiedades...`);
-      const { processed, errors } = await processQueue(pending, checkpoint, context);
-      log('✅', `Final: ${processed} OK, ${errors} Errores`);
-    } else {
-      log('✅', 'Nada para extraer');
+    // ── BORRADO: las que salieron de Roomix. Solo corrida completa + sitemaps OK ────
+    // (deleteMissing tiene su propio freno: aborta si borraría >40% de la base).
+    if (PROPERTY_LIMIT === 0 && sitemapsOk) {
+      await deleteMissing([...liveIds].map(id => ({ id })));
+    } else if (PROPERTY_LIMIT === 0) {
+      log('⚠️', 'Sitemaps incompletos/omitidos → NO se eliminan propiedades (freno de seguridad)');
     }
+
+    await Promise.all([collector, ...workers].map(p => p.close().catch(() => {})));
+    log('✅', `Final: ${totNew} ventas nuevas, ${totErr} errores`);
 
     // Corrida terminada OK → vaciar checkpoint para no bloquear futuras modificaciones.
     clearCheckpoint();
