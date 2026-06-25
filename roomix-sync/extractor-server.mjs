@@ -198,16 +198,24 @@ function fromUrlSlug(url) {
   return s;
 }
 
-async function extract(url) {
-  const b = await getBrowser();
-  const context = await b.newContext({
+// ¿La página es un error/bloqueo? (algunas IPs del proxy rotativo vienen "quemadas"
+// y el portal devuelve 404 / "Un momento…" / acceso denegado). Si es así, reintentamos
+// con OTRA IP (cada newContext sale por una IP distinta del proxy).
+function looksBadPage(title, html) {
+  const t = (title || '').toLowerCase();
+  if (/error 404|404 not found|p[aá]gina no encontrada|just a moment|un momento|attention required|verifying you are human|access denied|forbidden|robot/i.test(t)) return true;
+  if (!html || html.length < 1500) return true;
+  return false;
+}
+
+async function fetchOnce(url) {
+  const context = await (await getBrowser()).newContext({
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     viewport: { width: 1366, height: 768 },
     locale: 'es-AR',
     ...(PROXY ? { proxy: PROXY } : {}),
   });
-  // Ahorro de datos (clave si se usa proxy pago por tráfico): no bajamos imágenes,
-  // video ni fuentes — solo necesitamos el HTML/JSON-LD. Reduce muchísimo los MB por análisis.
+  // Ahorro de datos (clave con proxy por tráfico): no bajamos imágenes, video ni fuentes.
   await context.route('**/*', (route) => {
     const t = route.request().resourceType();
     if (t === 'image' || t === 'media' || t === 'font') return route.abort();
@@ -216,47 +224,69 @@ async function extract(url) {
   const page = await context.newPage();
   try {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
-    // Esperar a que pase el desafío de Cloudflare ("Un momento…"/"Just a moment…") y
-    // aparezca el contenido real (JSON-LD). Reintenta hasta ~20s.
+    // Esperar a que pase el desafío de Cloudflare y aparezca el contenido real.
     for (let i = 0; i < 8; i++) {
-      const title = await page.title().catch(() => '');
-      const challenged = /just a moment|un momento|attention required|verifying you are human/i.test(title);
+      const ttl = await page.title().catch(() => '');
+      const challenged = /just a moment|un momento|attention required|verifying you are human/i.test(ttl);
       const hasLd = await page.$('script[type="application/ld+json"]').then(Boolean).catch(() => false);
       if (hasLd || !challenged) break;
       await sleep(2500);
     }
     await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
-    await sleep(1500);
+    await sleep(1200);
     const html = await page.content();
     const text = await page.evaluate(() => document.body?.innerText || '').catch(() => '');
-
-    const merged = { sujeto: {}, precio: null, moneda: 'USD', operacion: 'venta', responsable: null, fecha_publicacion: null, metodo: 'json-ld' };
-    const apply = (p) => {
-      if (!p) return;
-      for (const [k, v] of Object.entries(p.sujeto || {})) {
-        const empty = merged.sujeto[k] === undefined || merged.sujeto[k] === '' || merged.sujeto[k] === 0;
-        if (empty && v !== undefined && v !== '' && v !== 0 && v !== null) merged.sujeto[k] = v;
-      }
-      for (const k of ['precio', 'moneda', 'operacion', 'responsable', 'fecha_publicacion', 'metodo']) {
-        const empty = merged[k] === null || merged[k] === undefined;
-        if (empty && p[k] !== undefined && p[k] !== null) merged[k] = p[k];
-      }
-    };
-    apply(fromJsonLd(html));
-    apply(fromOpenGraph(html));
-
-    const thin = !(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0);
-    if (thin) apply(await fromIA(text || html.replace(/<[^>]+>/g, ' ')));
-
-    // Último recurso: lo que diga el propio link (no pisa lo ya extraído).
-    apply(fromUrlSlug(url));
-
-    const ok = Boolean(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0 || merged.precio || merged.sujeto.tipo_propiedad);
-    return { ok, requiere_completar_manual: !ok, ...merged };
+    const title = await page.title().catch(() => '');
+    return { html, text, title };
   } finally {
     await page.close().catch(() => {});
     await context.close().catch(() => {});
   }
+}
+
+async function extract(url, maxAttempts = 3) {
+  let best = { html: '', text: '', title: '' };
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let r;
+    try {
+      r = await fetchOnce(url);
+    } catch (e) {
+      log('⚠️ intento', attempt, 'falló:', e.message);
+      r = { html: '', text: '', title: '' };
+    }
+    best = r;
+    if (!looksBadPage(r.title, r.html)) break; // página buena → salimos
+    log('↻ IP mala (', (r.title || '').slice(0, 40), ') reintento', attempt, '/', maxAttempts);
+    await sleep(700);
+  }
+
+  const { html, text } = best;
+  const merged = { sujeto: {}, precio: null, moneda: 'USD', operacion: 'venta', responsable: null, fecha_publicacion: null, metodo: 'json-ld' };
+  const apply = (p) => {
+    if (!p) return;
+    for (const [k, v] of Object.entries(p.sujeto || {})) {
+      const empty = merged.sujeto[k] === undefined || merged.sujeto[k] === '' || merged.sujeto[k] === 0;
+      if (empty && v !== undefined && v !== '' && v !== 0 && v !== null) merged.sujeto[k] = v;
+    }
+    for (const k of ['precio', 'moneda', 'operacion', 'responsable', 'fecha_publicacion', 'metodo']) {
+      const empty = merged[k] === null || merged[k] === undefined;
+      if (empty && p[k] !== undefined && p[k] !== null) merged[k] = p[k];
+    }
+  };
+  apply(fromJsonLd(html));
+  apply(fromOpenGraph(html));
+
+  const thin = !(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0);
+  if (thin) apply(await fromIA(text || html.replace(/<[^>]+>/g, ' ')));
+
+  // Último recurso: lo que diga el propio link (no pisa lo ya extraído).
+  apply(fromUrlSlug(url));
+
+  // No ensuciar la dirección con un título de error si todas las IPs vinieron mal.
+  if (/error 404|404|just a moment|un momento|access denied|forbidden/i.test(merged.sujeto.direccion || '')) merged.sujeto.direccion = '';
+
+  const ok = Boolean(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0 || merged.precio);
+  return { ok, requiere_completar_manual: !ok, ...merged };
 }
 
 // ─── HTTP server ───
