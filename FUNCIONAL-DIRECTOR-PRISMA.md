@@ -31,7 +31,7 @@
 19. [Buscador IA (+ notas del director)](#19-buscador-ia--notas-del-director)
 20. [Configuración (perfil, agencia, créditos, costos, seguridad)](#20-configuración-perfil-agencia-créditos-costos-seguridad)
 21. [Sugerencias](#21-sugerencias)
-22. [Analytics conversacional (Conversational Insights)](#22-analytics-conversacional-conversational-insights)
+22. [Análisis de conversaciones (Inteligencia Conversacional)](#22-análisis-de-conversaciones-inteligencia-conversacional)
 23. [Créditos IA: cómo administrarlos](#23-créditos-ia-cómo-administrarlos)
 24. [Checklist de puesta en marcha](#24-checklist-de-puesta-en-marcha)
 25. [Preguntas frecuentes](#25-preguntas-frecuentes)
@@ -87,7 +87,7 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 - **Gráficos:** evolución temporal (barras) y distribución por canal de origen (dona).
 - **Objetivos vs Alcanzado:** la sección de metas mensuales (ver detalle abajo), justo antes del ranking.
 - **Ranking de asesores:** quién rinde más en tu equipo.
-- **Inteligencia Conversacional:** el analytics profundo de WhatsApp (ver sección 22; vive acá adentro, no en el menú).
+- **Inteligencia Conversacional:** el análisis profundo de WhatsApp (ver sección 22; vive acá adentro, no en el menú).
 - **Embudo (Pipeline):** resumen de leads por etapa.
 - **Leads y Propiedades:** secciones con el detalle de leads recientes y de la cartera.
 - **Actividad en tiempo real:** feed de últimos eventos (nuevo lead, propiedad sincronizada, etc.).
@@ -125,7 +125,7 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 ## 6. Pipeline (CRM)
 
-**Qué es:** tablero Kanban con **todos** los leads y oportunidades de la agencia (la pantalla se titula "Pipeline Global" y está marcada como **Beta**).
+**Qué es:** tablero de columnas con **todos** los leads y oportunidades de la agencia (la pantalla se titula "Pipeline Global" y está marcada como **Beta**).
 
 **Qué muestra:** une **leads de Tokko** y **conversaciones de WhatsApp** en 9 columnas: **Nuevo contacto, Primer contacto, Calificado, Visita agendada, Visita realizada, Propuesta enviada, Negociación, Cerrado, Perdido**.
 
@@ -148,18 +148,18 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 > 🔄 **Sincronización automática:** PRISMA sincroniza propiedades y leads con Tokko **solo, dos veces por día (7:00 AM y 6:00 PM)**. No hace falta que sincronices a mano para que tus asesores vean los cambios; el botón manual queda para cuando necesitás algo al instante.
 
-> 💡 **Tip:** dentro de la ficha hay un botón para ver el **JSON crudo de Tokko**, útil para diagnosticar si un dato no se ve bien.
+> 💡 **Tip:** si un dato de la propiedad no se ve bien, dentro de la ficha hay un botón para ver la **información tal como llega de Tokko** y entender de dónde viene el error.
 > 💡 Si faltan propiedades, revisá la API Key de Tokko en Configuración y volvé a guardar para forzar la sincronización.
 
 ### 7.1 Descripción mejorada con IA
 
-En la ficha de cada propiedad, debajo de la descripción de Tokko, está el bloque **"Descripción mejorada con IA"**. Genera una descripción profesional con storytelling emocional (apunta a los deseos del comprador ideal **sin inventar**), un bloque de **Preguntas Frecuentes (FAQ)** y optimización **SEO + GEO** (Google y buscadores de IA), usando **todos los datos** de la propiedad. Lo pueden usar tanto **vos como tus asesores**.
+En la ficha de cada propiedad, debajo de la descripción de Tokko, está el bloque **"Descripción mejorada con IA"**. Genera una descripción profesional con un relato emocional (apunta a los deseos del comprador ideal **sin inventar**), un bloque de **Preguntas Frecuentes** y la deja preparada para aparecer en **Google y en los buscadores con IA**, usando **todos los datos** de la propiedad. Lo pueden usar tanto **vos como tus asesores**.
 
 - **Versión 1:** se genera a partir de los datos de la propiedad.
 - **Versión 2:** se genera sobre la V1 aplicando una **sugerencia** escrita por quien la usa.
 - Cada versión queda **guardada** (no se pierde al recargar) y se puede **copiar** para pegarla en Tokko. La descripción original de Tokko **no se toca** y se sigue pisando en cada sincronización.
 
-> ⚠️ **Costo:** cada generación **consume 1 crédito de IA** (modelo `gemini-3.5-flash`, económico). El tope es **estricto: 2 versiones por propiedad** (V1 + V2), para mantener el gasto bajo control. El costo real por tokens queda registrado en el panel de consumo de IA.
+> ⚠️ **Costo:** cada generación **consume 1 crédito de IA**. El tope es **estricto: 2 versiones por propiedad** (V1 + V2), para mantener el gasto bajo control. El consumo queda registrado en el panel de Créditos IA.
 
 ---
 
@@ -202,7 +202,7 @@ El resultado de estos objetivos se ve en el **Dashboard**, en la sección "Objet
 
 **Cómo usarlo:** abrí un lead para ver su **ficha 360** (contacto, **origen** real —Web/Zonaprop/Mercadolibre—, etiquetas Tokko, agente, ID de contacto y **última actualización**) y el **historial** de actividades.
 
-> ℹ️ Tokko **no informa por API** la propiedad consultada ni el mensaje del lead, por eso "Inmueble consultado" puede figurar como "No hay propiedad vinculada". El origen y los intereses se deducen de las **etiquetas**.
+> ℹ️ Tokko **no siempre nos pasa** la propiedad consultada ni el mensaje del lead, por eso "Inmueble consultado" puede figurar como "No hay propiedad vinculada". El origen y los intereses se deducen de las **etiquetas**.
 > 💡 **Tip:** usalo para auditar la calidad de atención y detectar leads "calientes" que nadie está trabajando.
 
 ---
@@ -212,13 +212,13 @@ El resultado de estos objetivos se ve en el **Dashboard**, en la sección "Objet
 **Qué es:** acá conectás el WhatsApp de la agencia y configurás el **bot de IA** que atiende a los clientes automáticamente.
 
 ### Si todavía no conectaste WhatsApp
-Vas a ver un **asistente de configuración (Setup Wizard)** que te guía para conectar la instancia. Seguilo paso a paso.
+Vas a ver un **asistente de configuración** que te guía paso a paso para conectar tu WhatsApp. Seguilo y listo.
 
 ### Una vez conectado, tenés 5 pestañas:
-- **💬 Chat:** la bandeja de conversaciones en vivo. Podés **filtrar los chats por clasificación** (origen del lead) además de por asesor; cada chat muestra su **badge de clasificación** de color.
+- **💬 Chat:** la bandeja de conversaciones en vivo. Podés **filtrar los chats por clasificación** (origen del lead) además de por asesor; cada chat muestra su **etiqueta de clasificación** con un color.
 - **📋 Plantillas:** es un **gestor completo de plantillas de WhatsApp**. Además de las **8 plantillas de seguimiento** que PRISMA prepara (recordatorios de visita, reactivaciones, follow-ups) y de ver su **estado de aprobación**, podés **crear tus propias plantillas** (categoría, idioma, encabezado/cuerpo/pie, botones y variables `{{1}}`), **editarlas, eliminarlas** y **sincronizarlas desde Meta**.
-- **👥 Contactos:** la lista de contactos de WhatsApp (la "agenda" para campañas), con búsqueda, **filtro por clasificación**, **paginación de 100 por página** (soporta miles), selección múltiple e **importación desde CSV/Excel**. Cada contacto tiene **Clasificación** (badge) y botón para **eliminarlo**. Al **importar**: escribís una **clasificación para todo el lote**, el sistema **descarta repetidos** (por teléfono) y te avisa cuántos entraron/omitieron.
-  - **Excel/CSV — columnas:** solo necesita una de **teléfono** (`celular`, `telefono`, `phone`, `csTelefono1/2`, etc.) — el **nombre es opcional**. Los teléfonos pueden venir en **cualquier formato argentino** (con/sin +, con 0, con 15, áreas 11/221/2227…): el sistema los **convierte solo** al formato de WhatsApp. La clasificación NO va en el Excel (se pone al importar).
+- **👥 Contactos:** la lista de contactos de WhatsApp (la "agenda" para campañas), con búsqueda, **filtro por clasificación**, **paginación de 100 por página** (soporta miles), selección múltiple e **importación desde CSV/Excel**. Cada contacto tiene **Clasificación** (etiqueta de color) y botón para **eliminarlo**. Al **importar**: escribís una **clasificación para todo el lote**, el sistema **descarta repetidos** (por teléfono) y te avisa cuántos entraron/omitieron.
+  - **Excel/CSV — columnas:** solo necesita una columna de **teléfono** (puede llamarse `celular`, `telefono`, `phone`, etc.) — el **nombre del contacto es opcional**. Los teléfonos pueden venir en **cualquier formato argentino** (con/sin +, con 0, con 15, áreas 11/221/2227…): el sistema los **convierte solo** al formato de WhatsApp. La clasificación NO va en el Excel (se pone al importar).
 - **📣 Campañas:** dos modos:
   - **Campaña automática por segmento (recomendada para masivo):** elegís una **clasificación** (ej. `reclutamiento`) + una **plantilla** y tocás **"Crear campaña"** (queda lista, en cola, sin enviar). Después confirmás con **"🚀 Lanzar ahora"**: empieza a enviar **en el acto** y sigue **solo, en goteo diario, hasta tu límite real de Meta**, marca enviados y **no repite**, hasta terminar todo el segmento (aunque cierres el navegador). **No tenés que entrar a GitHub ni a ningún lado.** Podés **pausar/eliminar** y ver el **progreso** (enviados/total, en cola, errores). El estado de cada lead se ve en **Contactos** (EN COLA → ENVIADO/ERROR + fecha).
   - **Envío manual puntual:** solo para **grupos chicos o individuales** (corre en el navegador, hay que dejar la pestaña abierta).
@@ -241,7 +241,7 @@ Arriba a la derecha, un **indicador de conexión** te muestra si la instancia es
 **Acciones por fila:**
 - **✏️ Editar:** cambiá nombre, teléfono, etiquetas y **clasificación** del lead. Los cambios se reflejan también en la bandeja del chat y en la agenda de Contactos.
 - **🗑️ Eliminar:** borra el lead, su conversación, sus mensajes y la memoria del bot (y lo quita de Contactos si no tiene otro chat con ese número). Pide confirmación.
-- **Clasificación:** columna con badge de color y **filtro por clasificación** para encontrar rápido (ej. todos los "Whatsapp-Consulta").
+- **Clasificación:** columna con etiqueta de color y **filtro por clasificación** para encontrar rápido (ej. todos los "Whatsapp-Consulta").
 
 > 💡 **Clasificación del lead:** identifica de dónde vino cada contacto — `Whatsapp-Consulta` (te escribió), `Whatsapp-Manual` (lo cargaste a mano desde Tracking o Calendario) o una **personalizada** (la que pusiste al importar). Sirve para elegir en bloque a quién mandarle cada campaña. Los contactos importados **recién aparecen como chat** en la bandeja/Leads cuando les enviás la campaña o cuando la persona responde (y el chat hereda la clasificación del contacto).
 
@@ -354,11 +354,13 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 **Qué es:** herramienta para **encontrar comparables** de una propiedad, con **% de comparabilidad** y **checklist** (ex "Tasaciones"). Idéntica para director y asesor.
 
 **Cómo usarlo:**
-1. **Elegí la propiedad a analizar:** a mano, desde la **cartera** (desplegable) o pegando un **link** de portal (botón **Analizar**, extrae los datos solos).
+1. **Elegí la propiedad a analizar:** a mano, desde la **cartera** (con **buscador**: escribís parte del título, dirección o zona y filtra al toque, ideal cuando tenés muchas propiedades) o pegando un **link** de portal (botón **Analizar**, extrae los datos solos).
 2. Elegí **operación** (Venta/Alquiler) y **Buscar comparables**.
 3. Resultados en dos bloques (**Cartera de tu agencia** y **Red de colaboración**), cada comparable con su **%** y el **checklist** (zona, superficie, ambientes, baños, amenities, tipo, operación). El **precio** va al costado, **fuera del %**.
 
-> 💡 Tipo y operación son filtros estrictos; la zona es lo que más pesa del puntaje. El comparable se busca por **filtros duros + embedding** en `properties` (cartera) y `roomix_properties` (red).
+> ℹ️ Si cambiás de modo (a mano / cartera / link), el formulario **se limpia** para no mezclar datos de una carga con otra.
+
+> 💡 Tipo y operación son filtros estrictos; la zona es lo que más pesa del puntaje. Los comparables salen de **tu cartera** y de la **red de colaboración**.
 > 💰 No consume créditos por buscar comparables.
 > 🔜 Valuación con precio sugerido e informe con marca: etapa siguiente. La grilla de cálculo anterior se conserva para ese informe.
 
@@ -376,10 +378,11 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 3. **Calificación y perfil:** operación, presupuesto, calificación (HOT/WARM/COLD), intereses, objeciones, decisores.
 4. **Gestión y asignación:** elegís el **asesor responsable** y el **origen de consulta**.
 
-**Acciones sobre visitas futuras:**
+**Acciones sobre visitas futuras (solo las tuyas):**
+- Igual que el asesor, podés **Reprogramar / Editar** y **Cancelar**, pero **solo en las visitas que tenés asignadas a vos** (las que agendaste para vos mismo). En las visitas de tus asesores ves el **detalle completo** pero **sin** botones de acción (esas las maneja el asesor responsable).
 - **Reprogramar / Editar:** con **motivo obligatorio** (la visita queda marcada como "Modificada").
 - **Cancelar:** confirma con pop-up y **motivo obligatorio** (se muestra el motivo en rojo).
-- Visitas pasadas: no se pueden modificar.
+- Solo aplica a **visitas futuras** y **agendadas**: las pasadas o ya canceladas no se pueden modificar.
 
 > 💡 **Tip:** asigná siempre un responsable claro. El detalle de cada visita muestra intereses, objeciones, decisores y resumen, útil para el seguimiento.
 
@@ -387,7 +390,7 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 ## 18. Tutor IA
 
-**Qué es:** mentor con IA que responde usando los **documentos de la Biblioteca** de tu agencia (RAG).
+**Qué es:** mentor con IA que responde usando los **documentos de la Biblioteca** de tu agencia.
 
 **Cómo usarlo:** preguntale lo que quieras sobre tus manuales y procedimientos. Te responde y te muestra las **fuentes** que usó.
 
@@ -456,7 +459,7 @@ La pantalla se titula "Ajustes Generales". Tiene 5 pestañas:
 
 ---
 
-## 22. Analytics conversacional (Conversational Insights)
+## 22. Análisis de conversaciones (Inteligencia Conversacional)
 
 **Qué es:** un análisis profundo de **todas las conversaciones de WhatsApp** de tu agencia. **Es exclusivo del director.** No es una sección aparte del menú: aparece **embebido dentro del Dashboard** (sección "Inteligencia Conversacional").
 
@@ -499,7 +502,7 @@ La pantalla se titula "Ajustes Generales". Tiene 5 pestañas:
 - [ ] Crear la agencia (registro como director).
 - [ ] Cargar **Tokko API Key** → se sincronizan propiedades y leads.
 - [ ] Subir **logo** y datos de la agencia.
-- [ ] Conectar **WhatsApp** (Setup Wizard en "Asesor IA en WhatsApp").
+- [ ] Conectar **WhatsApp** (asistente de configuración en "Asesor IA en WhatsApp").
 - [ ] Verificar que las **8 plantillas** de seguimiento queden aprobadas.
 - [ ] Configurar **directiva creativa** y **aviso legal** en Marketing IA.
 - [ ] Definir **escalas de puntaje** en Tracking Performance.
@@ -507,7 +510,7 @@ La pantalla se titula "Ajustes Generales". Tiene 5 pestañas:
 - [ ] Subir **documentos** a la Biblioteca (para el Tutor IA).
 - [ ] Cargar **notas/directivas** en el Buscador IA si tenés criterios comerciales.
 - [ ] **Invitar a los asesores** con su código.
-- [ ] Revisar el **Dashboard** y **Analytics conversacional** una vez con actividad.
+- [ ] Revisar el **Dashboard** y el **Análisis de conversaciones** una vez con actividad.
 
 ---
 

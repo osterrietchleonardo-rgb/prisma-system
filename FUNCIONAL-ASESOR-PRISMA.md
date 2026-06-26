@@ -101,7 +101,7 @@
 
 ## 5. Mi Pipeline (tablero de leads)
 
-**Qué es:** un tablero visual tipo Kanban con tus oportunidades, organizado en columnas (Nuevo, Contactado, Visita, Negociación, Reserva, etc.).
+**Qué es:** un tablero visual con tus oportunidades, organizado en columnas que representan cada etapa (Nuevo, Contactado, Visita, Negociación, Reserva, etc.).
 
 **Qué muestra:** une en un solo lugar tus **leads de Tokko** y tus **conversaciones de WhatsApp**.
 
@@ -127,10 +127,10 @@
 
 ### 6.1 Descripción mejorada con IA
 
-Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), tenés el bloque **"Descripción mejorada con IA"**. Sirve para generar una descripción profesional, con storytelling y optimizada para buscadores (SEO/GEO), a partir de **todos los datos** de la propiedad.
+Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), tenés el bloque **"Descripción mejorada con IA"**. Sirve para generar una descripción profesional, con un relato atractivo y pensada para que la propiedad aparezca mejor en Google y en los buscadores con IA, a partir de **todos los datos** de la propiedad.
 
 **Cómo funciona:**
-- **Generar descripción con IA:** crea la **Versión 1**. La IA toma tipo, ubicación, ambientes, superficies, precio, servicios/etiquetas, etc., y arma un texto humanizado, emocional (apunta a los deseos del comprador ideal **sin inventar** datos), sin emojis, profesional y con viñetas sutiles. Incluye un bloque de **Preguntas Frecuentes (FAQ)** pensado para posicionar en Google y en buscadores de IA (ChatGPT, Gemini, Perplexity).
+- **Generar descripción con IA:** crea la **Versión 1**. La IA toma tipo, ubicación, ambientes, superficies, precio, servicios, etc., y arma un texto cercano y emocional (apunta a los deseos del comprador ideal **sin inventar** datos), sin emojis, profesional y con viñetas sutiles. Incluye un bloque de **Preguntas Frecuentes** pensado para que la propiedad aparezca en Google y en los buscadores con IA (ChatGPT, Gemini, Perplexity).
 - **Generar Versión 2:** una vez que existe la V1, podés escribir una **sugerencia** (ej.: *"resaltá la luz natural y la cercanía al subte"*) y la IA reescribe la descripción aplicándola, basándose en la V1.
 - **Copiar:** cada versión tiene su botón **Copiar** para que la pegues en Tokko si querés publicarla. La descripción original de Tokko **nunca se modifica**; lo que generás queda **guardado** y disponible siempre que abras la ficha.
 
@@ -144,7 +144,7 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 
 **Qué es:** donde registrás tu actividad comercial del día (llamadas, captaciones, prelistings, etc.). Es lo que **alimenta tu Dashboard**.
 
-**Cómo cargar una actividad (formulario "PerformanceLogForm"):**
+**Cómo cargar una actividad:**
 1. **Activos vinculados:**
    - **Zona/Barrio:** texto libre con la zona de la actividad.
    - **Propiedad (Tokko):** desplegable con tus propiedades de la cartera.
@@ -166,7 +166,7 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 - Hacé clic en un lead para abrir su **ficha 360**: datos de contacto, **origen** real (Web/Zonaprop/Mercadolibre…), etiquetas de Tokko, ID de contacto y **última actualización**.
 - Más abajo, el **historial cronológico** de actividades del lead.
 
-> ℹ️ Tokko no informa por API la propiedad consultada, así que "Inmueble consultado" puede figurar vacío. El origen e intereses salen de las **etiquetas**.
+> ℹ️ A veces "Inmueble consultado" aparece vacío: Tokko no siempre nos pasa qué propiedad miró el lead. El origen y los intereses los tomamos de las **etiquetas** del contacto.
 
 > 💡 **Tip:** antes de llamar, leé el historial. Llegás a la conversación sabiendo qué busca y por dónde va.
 
@@ -179,7 +179,7 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 **Cómo usarlo:**
 - A la izquierda, la **lista de conversaciones**; al centro, el **chat en vivo**.
 - Escribís y respondés directamente desde acá (mensajería en tiempo real).
-- Podés **filtrar los chats por clasificación** (origen del lead); cada chat muestra su **badge de clasificación** de color.
+- Podés **filtrar los chats por clasificación** (origen del lead); cada chat muestra su **etiqueta de clasificación** con un color.
 - Si tu director todavía no configuró WhatsApp, vas a ver un cartel de **"WhatsApp no configurado"** (esa configuración la hace el director, no vos).
 
 > 💡 **Tip:** cuando un cliente escribe, el bot de IA puede responder solo. Si tomás el control manual, el bot se pausa para esa conversación y no pisa tus respuestas.
@@ -195,7 +195,7 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 - Hacé clic en un lead para ver su detalle y el **chat en vivo** asociado.
 - Trabajalos igual que los de Tokko: respondé, calificá y agendá visitas.
 - **✏️ Editar** un lead (nombre, teléfono, etiquetas y **clasificación**) o **🗑️ eliminarlo** desde su fila. Los cambios se reflejan también en tu bandeja de chats.
-- Usá la **columna y el filtro de Clasificación** (badge de color) para separar, por ejemplo, los que te escribieron (`Whatsapp-Consulta`) de los que cargaste a mano (`Whatsapp-Manual`).
+- Usá la **columna y el filtro de Clasificación** (la etiqueta de color) para separar, por ejemplo, los que te escribieron (`Whatsapp-Consulta`) de los que cargaste a mano (`Whatsapp-Manual`).
 
 ---
 
@@ -227,7 +227,7 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 **Qué es:** donde generás contratos a partir de plantillas.
 
 **Pestañas que ves como asesor:**
-- **Nuevo Contrato:** elegís el tipo y completás el asistente (wizard).
+- **Nuevo Contrato:** elegís el tipo y completás el asistente paso a paso.
 - **Mis Contratos:** la tabla con los contratos que **vos** generaste.
 
 > ⚠️ Las **plantillas** las sube y gestiona el director. Vos solo las **usás** para generar contratos.
@@ -308,14 +308,16 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 **Cómo usarlo paso a paso:**
 1. **Elegí la propiedad a analizar** de una de estas 3 formas:
    - **Cargar a mano:** completás el formulario (tipo, zona, m², ambientes, baños, amenities…).
-   - **Desde la cartera:** elegís una propiedad de tu agencia del desplegable y se completa sola.
-   - **Desde un link:** pegás el link de un aviso (MercadoLibre, ZonaProp, Argenprop…) y apretás **Analizar**: trae los datos automáticamente. Si el portal bloquea la lectura, te avisa y completás a mano.
+   - **Desde la cartera:** abrís el selector y **escribís para buscar** (por título, dirección o zona) entre las propiedades de tu agencia; elegís una y se completa sola. Tener buscador ayuda cuando son muchas propiedades.
+   - **Desde un link:** pegás el link de un aviso (MercadoLibre, ZonaProp, Argenprop…) y apretás **Analizar**: trae los datos automáticamente. Si el portal bloquea la lectura o tarda demasiado, te avisa con un mensaje claro y completás a mano.
+
+> ℹ️ Si cambiás de forma de carga (a mano / cartera / link), el formulario **se limpia** para no mezclar datos de una con otra.
 2. Elegí la **operación** (Venta / Alquiler) y apretá **Buscar comparables**.
 3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (zona, superficie, ambientes, baños, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
 
 > 💡 El **tipo de propiedad** y la **operación** son filtros estrictos: solo trae comparables del mismo tipo y la misma operación. La **zona** es lo que más pesa del puntaje.
 > 💡 Para **venta** los comparables salen casi todo de tu cartera (en la red de colaboración hay muchos más avisos de alquiler que de venta).
-> 💰 No consume créditos por buscar comparables (el embedding es interno).
+> 💰 Buscar comparables **no consume créditos**.
 > 🔜 La valuación con precio sugerido e informe con marca llegan en una etapa siguiente.
 
 ---
@@ -378,7 +380,7 @@ Tiene 4 pestañas:
 
 ## 20. Créditos IA: cómo funcionan para vos
 
-- Las herramientas de IA (Buscador, Tutor, Marketing, Contratos) consumen **créditos**. **ACM no** (la búsqueda de comparables usa embeddings internos, sin costo por uso).
+- Las herramientas de IA (Buscador, Tutor, Marketing, Contratos) consumen **créditos**. **ACM no** (buscar comparables es gratis, no descuenta créditos).
 - Tenés una **cuota mensual personal**. Se calcula como el **pool de créditos de la agencia dividido entre los asesores activos**, y se **renueva el 1° de cada mes**.
 - En **Configuración → Créditos IA** ves: tu **límite mensual**, lo **consumido** (con %) y lo **disponible**, una barra de progreso y el **detalle por módulo**.
 - Cuando llegás al **80%**, aparece un aviso para que los uses con cuidado.

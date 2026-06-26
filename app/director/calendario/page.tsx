@@ -27,11 +27,14 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog"
-import { 
-  Popover, 
-  PopoverContent, 
-  PopoverTrigger 
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
 } from "@/components/ui/popover"
+import { EditVisitDialog } from "@/components/calendar/EditVisitDialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
 import { DateRange } from "react-day-picker"
 import { 
@@ -60,6 +63,7 @@ import { es } from "date-fns/locale"
 import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
+import { triggerCalendarSync } from "@/lib/google-calendar/triggerSync"
 
 export default function CalendarioPage() {
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -73,6 +77,52 @@ export default function CalendarioPage() {
   const [agencyId, setAgencyId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [isNewVisitOpen, setIsNewVisitOpen] = useState(false)
+
+  const [editingVisit, setEditingVisit] = useState<any>(null)
+  const [cancelingVisit, setCancelingVisit] = useState<any>(null)
+  const [cancelReason, setCancelReason] = useState("")
+  const [isCanceling, setIsCanceling] = useState(false)
+
+  const isFutureVisit = (dateStr: string, timeStr: string) => {
+    try {
+      const visitDate = parseISO(`${dateStr}T${timeStr || '00:00'}`)
+      return visitDate > new Date()
+    } catch {
+      return false
+    }
+  }
+
+  const handleCancelSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!cancelReason.trim()) {
+      toast.error("Debes ingresar un motivo de cancelación")
+      return
+    }
+    try {
+      setIsCanceling(true)
+      const { error } = await supabase
+        .from("scheduled_visits")
+        .update({
+          estado_visita: 'cancelada',
+          motivo_cambio: cancelReason
+        })
+        .eq("id", cancelingVisit.id)
+
+      if (error) throw error
+
+      // Borrar el evento espejo en Google Calendar (best-effort, no bloquea).
+      triggerCalendarSync(cancelingVisit.id)
+
+      toast.success("Visita cancelada")
+      setCancelingVisit(null)
+      setCancelReason("")
+      fetchData()
+    } catch (error: any) {
+      toast.error("Error al cancelar: " + error.message)
+    } finally {
+      setIsCanceling(false)
+    }
+  }
 
   useEffect(() => {
     async function getAgency() {
@@ -203,6 +253,45 @@ export default function CalendarioPage() {
         isAdmin={true}
         agents={agents}
       />
+
+      <EditVisitDialog
+        visit={editingVisit}
+        open={!!editingVisit}
+        onOpenChange={(open) => !open && setEditingVisit(null)}
+        onSuccess={fetchData}
+        agencyId={agencyId || ""}
+      />
+
+      <Dialog open={!!cancelingVisit} onOpenChange={(open) => !open && setCancelingVisit(null)}>
+        <DialogContent className="bg-card border-red-500/20 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-500 font-bold text-xl">Confirmar Cancelación</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              ¿Estás seguro de que deseas cancelar la visita de <span className="font-bold">{cancelingVisit?.nombre_completo}</span>?
+            </p>
+            <div className="space-y-2">
+              <Label className="text-red-400">Motivo de la cancelación *</Label>
+              <Textarea
+                placeholder="Por favor, indica por qué se cancela la visita..."
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="bg-accent/5 border-red-500/30"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="ghost" onClick={() => {
+                setCancelingVisit(null)
+                setCancelReason("")
+              }}>Atrás</Button>
+              <Button variant="destructive" disabled={isCanceling} onClick={handleCancelSubmit}>
+                {isCanceling ? "Cancelando..." : "Confirmar Cancelación"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Card className="border-accent/10 bg-card/30 backdrop-blur-md shadow-2xl overflow-hidden">
         {/* Calendar Header */}
@@ -457,6 +546,26 @@ export default function CalendarioPage() {
                                 </div>
                               )}
                            </div>
+
+                           {/* Acciones: solo sobre las visitas propias del director (asignadas a él) y futuras */}
+                           {visit.agent_id === userId && visit.estado_visita === 'agendada' && isFutureVisit(visit.fecha_visita, visit.hora_visita) && (
+                              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-accent/10">
+                                <Button
+                                  variant="destructive"
+                                  className="w-full sm:w-auto"
+                                  onClick={() => setCancelingVisit(visit)}
+                                >
+                                  Cancelar Visita
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  className="w-full sm:w-auto border-accent/20 hover:bg-accent/10"
+                                  onClick={() => setEditingVisit(visit)}
+                                >
+                                  Reprogramar / Editar
+                                </Button>
+                              </div>
+                           )}
                         </div>
                       </DialogContent>
                     </Dialog>
