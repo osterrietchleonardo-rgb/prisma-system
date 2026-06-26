@@ -119,7 +119,8 @@ const CONURBANO_SEEDS = [
 // barre barrio por barrio en profundidad. Los alias/sub-zonas (once, congreso, microcentro…)
 // solapan con barrios oficiales pero el diff en memoria los deduplica (no hay doble descarga).
 const CABA_SEEDS = [
-  'en-palermo', 'en-belgrano', 'en-recoleta', 'en-caballito', 'en-villa-crespo', 'en-almagro',
+  'en-belgrano',  // ← arranca por Belgrano (pedido de Leonardo)
+  'en-palermo', 'en-recoleta', 'en-caballito', 'en-villa-crespo', 'en-almagro',
   'en-nunez', 'en-colegiales', 'en-villa-urquiza', 'en-devoto', 'en-flores', 'en-floresta',
   'en-balvanera', 'en-san-telmo', 'en-la-boca', 'en-barracas', 'en-boedo', 'en-parque-patricios',
   'en-mataderos', 'en-liniers', 'en-paternal', 'en-villa-del-parque', 'en-villa-luro',
