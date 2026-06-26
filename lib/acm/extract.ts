@@ -234,8 +234,9 @@ async function tryExtractorService(url: string): Promise<ExtractResult | null> {
       method: "POST",
       headers,
       body: JSON.stringify({ url }),
-      // el servicio puede tardar (resuelve Cloudflare); damos margen
-      signal: AbortSignal.timeout(45000),
+      // el servicio puede tardar (resuelve Cloudflare); damos margen, pero acotado
+      // para que la suma de tiempos no supere el maxDuration de la función (60s).
+      signal: AbortSignal.timeout(38000),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Partial<ExtractResult>;
@@ -265,7 +266,7 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
         "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
       },
       redirect: "follow",
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(12000),
     });
     status = res.status;
     html = await res.text();
@@ -275,8 +276,15 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
 
   const blocked = looksBlocked(status, html);
 
+  // El servicio con navegador (Tier 2) se intenta UNA sola vez como mucho:
+  // es lento (resuelve Cloudflare) y, si se llamara dos veces, la suma de tiempos
+  // puede superar el límite de la función serverless y devolver un error en texto
+  // plano (no-JSON) que rompía el front. Marcamos si ya lo probamos.
+  let serviceTried = false;
+
   // Si parece bloqueado, intentamos primero el servicio con navegador (si existe).
   if (blocked) {
+    serviceTried = true;
     const viaSvc = await tryExtractorService(url);
     if (viaSvc) return { ...viaSvc, fuente_portal };
   }
@@ -304,8 +312,11 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
   // renderizada como un usuario real: resuelve ML/ZonaProp/Argenprop). Recién si no
   // hay servicio configurado, caemos a la IA sobre el HTML que tengamos.
   if (!tieneDatosMinimos) {
-    const viaSvc = await tryExtractorService(url);
-    if (viaSvc) return { ...viaSvc, fuente_portal };
+    if (!serviceTried) {
+      serviceTried = true;
+      const viaSvc = await tryExtractorService(url);
+      if (viaSvc) return { ...viaSvc, fuente_portal };
+    }
 
     if (html && !blocked) {
       const ia = await fromIA(html);

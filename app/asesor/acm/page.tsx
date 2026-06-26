@@ -49,6 +49,14 @@ export function AcmModule() {
   const [view, setView] = useState<"input" | "results">("input");
   const [results, setResults] = useState<{ cartera: AcmComparable[]; roomix: AcmComparable[]; conSemantica: boolean } | null>(null);
 
+  // Reset del formulario al cambiar de solapa (manual / cartera / link),
+  // para que no queden datos escritos de un modo al pasar a otro.
+  const handleReset = () => {
+    setSujeto(SUJETO_INICIAL);
+    setOperacion("venta");
+    setExcludeId(null);
+  };
+
   const handleBuscar = async () => {
     setLoading(true);
     try {
@@ -103,6 +111,7 @@ export function AcmModule() {
               loading={loading}
               excludeId={excludeId}
               onExcludeIdChange={setExcludeId}
+              onReset={handleReset}
             />
           ) : (
             results && (

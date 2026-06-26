@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Pencil, Building2, Link2, Search, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type Modo = "manual" | "cartera" | "link";
 
@@ -39,6 +41,7 @@ interface SubjectInputProps {
   loading: boolean;
   excludeId: string | null;
   onExcludeIdChange: (id: string | null) => void;
+  onReset: () => void;
 }
 
 // Mapea una fila de la cartera (properties) → Sujeto del ACM.
@@ -80,12 +83,16 @@ export function SubjectInput({
   loading,
   excludeId,
   onExcludeIdChange,
+  onReset,
 }: SubjectInputProps) {
   const [modo, setModo] = useState<Modo>("manual");
 
   // ── Cartera ──
   const [cartera, setCartera] = useState<CarteraItem[]>([]);
   const [carteraLoading, setCarteraLoading] = useState(false);
+  const [carteraSearch, setCarteraSearch] = useState("");
+  const [carteraSel, setCarteraSel] = useState<CarteraItem | null>(null);
+  const [carteraOpen, setCarteraOpen] = useState(false);
 
   // ── Link ──
   const [url, setUrl] = useState("");
@@ -106,11 +113,39 @@ export function SubjectInput({
   const handleCarteraSelect = (id: string) => {
     const p = cartera.find((c) => c.id === id);
     if (!p) return;
+    setCarteraSel(p);
+    setCarteraOpen(false);
     onChange(carteraToSujeto(p, sujeto));
     onExcludeIdChange(id);
     if (p.status === "Alquiler" || p.status === "Temporary rent") onOperacionChange("alquiler");
     else onOperacionChange("venta");
     toast.success("Propiedad cargada desde la cartera. Revisá los datos abajo.");
+  };
+
+  // Filtrado por texto (título / dirección / ciudad), para no depender solo del desplegable
+  // cuando la cartera tiene muchas propiedades.
+  const carteraFiltrada = cartera.filter((c) => {
+    const q = carteraSearch.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (c.title || "").toLowerCase().includes(q) ||
+      (c.address || "").toLowerCase().includes(q) ||
+      (c.city || "").toLowerCase().includes(q)
+    );
+  });
+
+  // Cambiar de solapa (manual / cartera / link) limpia lo escrito en el form,
+  // así no se mezclan datos de un modo con otro.
+  const cambiarModo = (value: Modo) => {
+    if (value === modo) return;
+    setModo(value);
+    onReset();
+    setUrl("");
+    setExtractMeta(null);
+    onExcludeIdChange(null);
+    setCarteraSel(null);
+    setCarteraSearch("");
+    setCarteraOpen(false);
   };
 
   const handleAnalizar = async () => {
@@ -126,8 +161,22 @@ export function SubjectInput({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
+
+      // La respuesta puede NO ser JSON (timeout de la función, error de la plataforma,
+      // página de error en texto/HTML). Leemos como texto y parseamos con cuidado,
+      // para no romper con "Unexpected token ... is not valid JSON".
+      const rawText = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        throw new Error(
+          res.status === 504 || res.status === 408 || res.status === 524
+            ? "El análisis tardó demasiado (el portal es lento o bloquea la lectura). Probá de nuevo o cargá los datos a mano."
+            : "No se pudo leer este link automáticamente. Cargá los datos a mano."
+        );
+      }
+      if (!res.ok || data.error) throw new Error(data.error || `No se pudo analizar el link (error ${res.status}).`);
 
       onChange({
         ...sujeto,
@@ -153,7 +202,7 @@ export function SubjectInput({
 
   const ModoBtn = ({ value, icon: Icon, label }: { value: Modo; icon: any; label: string }) => (
     <button
-      onClick={() => setModo(value)}
+      onClick={() => cambiarModo(value)}
       className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all ${
         modo === value ? "border-accent bg-accent/10 text-accent" : "border-accent/10 bg-card/30 text-muted-foreground hover:border-accent/30"
       }`}
@@ -188,18 +237,59 @@ export function SubjectInput({
       {modo === "cartera" && (
         <div className="space-y-2 p-4 rounded-2xl border border-accent/10 bg-card/20">
           <Label className="text-sm font-bold">Elegí una propiedad de tu agencia</Label>
-          <Select onValueChange={handleCarteraSelect}>
-            <SelectTrigger className="bg-card/50 border-accent/10">
-              <SelectValue placeholder={carteraLoading ? "Cargando cartera..." : "Buscar propiedad..."} />
-            </SelectTrigger>
-            <SelectContent className="max-h-80">
-              {cartera.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.title} {c.m2 ? `· ${c.m2}m²` : ""} {c.city ? `· ${c.city}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Popover open={carteraOpen} onOpenChange={setCarteraOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full justify-start text-left bg-card/50 border-accent/10 h-auto p-3 font-normal">
+                {carteraSel ? (
+                  <div className="flex flex-col">
+                    <span className="font-bold line-clamp-1">{carteraSel.title}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {[carteraSel.m2 ? `${carteraSel.m2}m²` : null, carteraSel.city].filter(Boolean).join(" · ")}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">{carteraLoading ? "Cargando cartera..." : "Buscar o elegir propiedad..."}</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+              <div className="p-2 border-b">
+                <div className="relative">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Escribí para buscar (título, dirección o zona)..."
+                    className="pl-8 bg-transparent border-none focus-visible:ring-0 shadow-none"
+                    value={carteraSearch}
+                    onChange={(e) => setCarteraSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="max-h-[300px] overflow-y-auto p-2 flex flex-col gap-1">
+                {carteraLoading ? (
+                  <p className="p-4 text-sm text-center text-muted-foreground">Cargando cartera...</p>
+                ) : carteraFiltrada.length === 0 ? (
+                  <p className="p-4 text-sm text-center text-muted-foreground">No se encontraron propiedades.</p>
+                ) : (
+                  carteraFiltrada.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={cn(
+                        "w-full text-left p-2 rounded-sm text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5",
+                        carteraSel?.id === c.id && "bg-accent/10"
+                      )}
+                      onClick={() => handleCarteraSelect(c.id)}
+                    >
+                      <span className="font-semibold line-clamp-1">{c.title}</span>
+                      <span className="text-xs text-muted-foreground line-clamp-1">
+                        {[c.m2 ? `${c.m2}m²` : null, c.address || c.city].filter(Boolean).join(" · ") || "Sin datos de ubicación"}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
           {excludeId && <p className="text-xs text-accent">Se excluirá esta propiedad de los comparables (no se compara consigo misma).</p>}
         </div>
       )}
