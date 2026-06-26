@@ -111,6 +111,27 @@ const CONURBANO_SEEDS = [
   'en-presidente-peron', 'en-san-vicente',
 ];
 
+// Barrios de CABA por su slug propio (`en-<barrio>`). Extraídos del `sitemap-barrios.xml`
+// de Roomix (loc `/barrios/<slug>-caba`) y VERIFICADOS contra `/buscar/comprar/en-<barrio>`
+// (Junio 26): cada uno devuelve ~48-50 props/página, overlap ~0 entre barrios (filtran bien)
+// y tienen profundidad real (Palermo trae props hasta la p90). Antes la fase de ventas usaba
+// un solo seed `en-capital-federal` (combinado) a 15 págs → muestreaba el ~15% de CABA. Ahora
+// barre barrio por barrio en profundidad. Los alias/sub-zonas (once, congreso, microcentro…)
+// solapan con barrios oficiales pero el diff en memoria los deduplica (no hay doble descarga).
+const CABA_SEEDS = [
+  'en-palermo', 'en-belgrano', 'en-recoleta', 'en-caballito', 'en-villa-crespo', 'en-almagro',
+  'en-nunez', 'en-colegiales', 'en-villa-urquiza', 'en-devoto', 'en-flores', 'en-floresta',
+  'en-balvanera', 'en-san-telmo', 'en-la-boca', 'en-barracas', 'en-boedo', 'en-parque-patricios',
+  'en-mataderos', 'en-liniers', 'en-paternal', 'en-villa-del-parque', 'en-villa-luro',
+  'en-monte-castro', 'en-versalles', 'en-villa-real', 'en-velez-sarsfield', 'en-villa-lugano',
+  'en-villa-soldati', 'en-villa-riachuelo', 'en-parque-avellaneda', 'en-parque-chacabuco',
+  'en-nueva-pompeya', 'en-san-cristobal', 'en-monserrat', 'en-san-nicolas', 'en-puerto-madero',
+  'en-retiro', 'en-constitucion', 'en-chacarita', 'en-villa-ortuzar', 'en-agronomia',
+  'en-villa-pueyrredon', 'en-saavedra', 'en-coghlan', 'en-villa-santa-rita', 'en-abasto',
+  'en-barrio-norte', 'en-catalinas', 'en-centro-microcentro', 'en-congreso', 'en-once',
+  'en-parque-centenario', 'en-pompeya', 'en-tribunales', 'en-villa-general-mitre',
+];
+
 // Tope de páginas para `en-argentina` (tier 2). Es el listado "todo el país": tiene
 // CIENTOS de páginas y casi siempre trae +1 nueva, así que el corte por "2 páginas
 // vacías" no se gatilla nunca → la recolección se colgaba ahí durante horas y la tubería
@@ -122,15 +143,22 @@ const VENTA_AR_MAX_PAGES = process.env.VENTA_AR_MAX_PAGES !== undefined ? parseI
 // búsqueda y SOLO devuelve vacío en la p101 — de la p1 a la p100 siempre trae
 // propiedades (de la zona, ~50/página). O sea el autocorte por "2 páginas vacías"
 // recién salta a las 100 páginas EN CADA seed.
-// Default 15. OJO: desde la IP del servidor (Easypanel) Cloudflare frena fuerte
-// después de ~150-200 páginas seguidas (se midió: 5 min POR página). Por eso el
-// flujo nuevo (a) guarda zona por zona —si Cloudflare corta, lo ya hecho queda— y
-// (b) refresca la sesión de CF antes de cada zona. Subir este número junta más por
-// zona pero acelera el throttling; bajarlo, al revés.
-const VENTA_AMBA_MAX_PAGES = process.env.VENTA_AMBA_MAX_PAGES !== undefined ? parseInt(process.env.VENTA_AMBA_MAX_PAGES) : 15;
+// Default **90** (desde Junio 26): se barre cada barrio/partido EN PROFUNDIDAD (Palermo solo
+// tiene props hasta la p90). OJO: desde la IP del servidor (Easypanel) Cloudflare frena fuerte
+// tras ~150-200 páginas seguidas (medido: 5 min POR página). Mitigaciones: (a) guardado zona por
+// zona —si CF corta, lo hecho queda—; (b) refresco de sesión CF **antes de cada zona** y, dentro
+// de una zona larga, **cada `VENTA_CHUNK_PAGES` páginas** (re-navega a la home → renueva
+// `cf_clearance`). Subir el tope junta más por zona pero acelera el throttling; bajarlo, al revés.
+const VENTA_AMBA_MAX_PAGES = process.env.VENTA_AMBA_MAX_PAGES !== undefined ? parseInt(process.env.VENTA_AMBA_MAX_PAGES) : 90;
+// Cada cuántas páginas, dentro de una misma zona, refrescar la cookie de Cloudflare (volver a
+// la home). Pedido de Leonardo: 15 págs → refresco → 15 más → … hasta el tope de la zona.
+const VENTA_CHUNK_PAGES = process.env.VENTA_CHUNK_PAGES !== undefined ? parseInt(process.env.VENTA_CHUNK_PAGES) : 15;
 
 const VENTA_SEED_GROUPS = [
-  { tier: 0, label: 'AMBA', maxPages: VENTA_AMBA_MAX_PAGES, seeds: ['en-capital-federal', ...CONURBANO_SEEDS] },
+  // AMBA = barrios de CABA + partidos del conurbano, cada uno en profundidad (hasta 90 págs).
+  // Se quitó el seed combinado `en-capital-federal`: los barrios cubren CABA y las contadas
+  // propiedades sin barrio asignado las recoge igual la fase de sitemaps (backstop de completitud).
+  { tier: 0, label: 'AMBA', maxPages: VENTA_AMBA_MAX_PAGES, seeds: [...CABA_SEEDS, ...CONURBANO_SEEDS] },
   { tier: 2, label: 'Argentina', maxPages: VENTA_AR_MAX_PAGES, seeds: ['en-argentina'] },
 ];
 // Override global para pruebas (aplica a TODOS los grupos): VENTA_MAX_PAGES=2
@@ -237,6 +265,15 @@ async function collectSeed(page, label, tier, seed, pageCap) {
     if (pageCap > 0 && pageNum > pageCap) {
       log('🏁', `venta[${label}]/${seed} alcanzó el tope de ${pageCap} páginas`);
       break;
+    }
+    // Refresco de cookie CF cada VENTA_CHUNK_PAGES páginas DENTRO de la zona (antes de p16, p31, …):
+    // re-navega a la home → re-resuelve el challenge y renueva `cf_clearance`, que usa browserFetch.
+    if (VENTA_CHUNK_PAGES > 0 && pageNum > 1 && (pageNum - 1) % VENTA_CHUNK_PAGES === 0) {
+      try {
+        await page.goto('https://roomix.ai/', { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
+        await sleep(1500);
+        log('🔄', `venta[${label}]/${seed}: refresco cookie CF (antes de p${pageNum})`);
+      } catch (e) { log('⚠️', `venta/${seed} no pudo refrescar CF: ${e.message}`); }
     }
     const url = `https://roomix.ai/buscar/comprar/${seed}?page=${pageNum}`;
     let res = await browserFetch(page, url);
@@ -785,4 +822,4 @@ if (isMain) {
   main().catch(err => { console.error('💥 Fatal:', err); process.exit(1); });
 }
 
-export { parseInternal, parseJsonLd, parseAgent, mapToRow, resolveOperation, deriveCountry, buildRscBlob };
+export { parseInternal, parseJsonLd, parseAgent, mapToRow, resolveOperation, deriveCountry, buildRscBlob, collectSeed, initBrowser };
