@@ -78,7 +78,7 @@ const CONCURRENCY = process.env.CRAWLER_CONCURRENCY !== undefined ? parseInt(pro
 const BATCH_DELAY_MS = 1500;
 const PAGE_TIMEOUT = 45_000;
 const SITEMAP_TIMEOUT = 90_000; // Los sitemaps son XML pesados, necesitan más tiempo
-const SITEMAP_RETRIES = 3;
+const SITEMAP_RETRIES = 4;
 const CHECKPOINT_FILE = resolve(__dirname, 'checkpoint.json');
 const xmlParser = new XMLParser({ ignoreAttributes: false });
 
@@ -378,8 +378,20 @@ async function loadExistingMap() {
 }
 
 // Borra de la BD las propiedades que ya no están en Roomix (salieron del catálogo).
-// Frenos de seguridad: solo si los sitemaps cargaron completos, y aborta si borraría >40% de la BD.
-async function deleteMissing(entries) {
+// La SEÑAL fiable de baja es la AUSENCIA del id en los sitemaps vivos (la página de detalle
+// de una propiedad dada de baja sigue respondiendo 200, así que el 404 NO sirve).
+//
+// Antes el borrado solo corría si los 7 sitemaps cargaban PERFECTOS (sitemapsOk). Con 6
+// archivos de ~10MB sobre Cloudflare casi siempre fallaba uno → el borrado NUNCA corría y se
+// acumulaban fantasmas. Ahora el gate es MEDIDO en vez de todo-o-nada:
+//   1) Solo borra si el catálogo vivo cargó bien: liveIds ≥ 90% de la BD (el sitemap de
+//      Roomix es mucho más grande que la BD, así que si cargó OK esto sobra; si la mayoría
+//      de sitemaps falló, liveIds queda chico y NO se borra).
+//   2) Tope de seguridad ajustado: aborta si borraría más de max(1500, 5% de la BD). Las
+//      bajas reales por corrida son chicas (decenas/cientos); un número grande = carga
+//      parcial → se aborta. (Una baja errónea no es catastrófica: la propiedad sigue viva en
+//      Roomix y la próxima corrida la vuelve a bajar e insertar.)
+async function deleteMissing(entries, dbCountHint = 0) {
   const liveIds = new Set(entries.map(e => e.id));
 
   let dbIds = [], from = 0;
@@ -394,11 +406,19 @@ async function deleteMissing(entries) {
     from += step;
   }
 
+  // GATE 1 — ¿cargamos suficiente catálogo vivo para confiar en el diff?
+  if (liveIds.size < dbIds.length * 0.9) {
+    log('⚠️', `Catálogo vivo (${liveIds.size}) < 90% de la BD (${dbIds.length}) → NO se borra (carga incompleta)`);
+    return;
+  }
+
   const toDelete = dbIds.filter(id => !liveIds.has(id));
   if (toDelete.length === 0) { log('🗑️', 'Nada para eliminar'); return; }
 
-  if (toDelete.length > dbIds.length * 0.4) {
-    log('⚠️', `Eliminaría ${toDelete.length}/${dbIds.length} (>40%) → ABORTADO por seguridad (posible catálogo incompleto)`);
+  // GATE 2 — tope medido. Bajas reales por corrida = chicas. Un número grande huele a carga parcial.
+  const cap = Math.max(1500, Math.floor(dbIds.length * 0.05));
+  if (toDelete.length > cap) {
+    log('⚠️', `Eliminaría ${toDelete.length} (> tope ${cap}) → ABORTADO por seguridad (posible carga incompleta)`);
     return;
   }
 
@@ -441,42 +461,150 @@ function parseAgent(html) {
   return null;
 }
 
-// Operación REAL de Roomix. Ojo: el JSON-LD `businessFunction` NO sirve —
-// las VENTAS no lo traen y los ALQUILERES siempre dicen "LeaseOut", así que todo
-// terminaba como 'rent' o null. El dato fiable es `operation_type` (venta/alquiler/temporal)
-// del payload de Next.js; como respaldo, el título arranca con "VENTA"/"ALQUILER".
-function parseOperationType(html, title) {
-  const m = html.match(/operation_type["\\]*\s*:\s*["\\]*(venta|alquiler|temporal)\b/i);
-  if (m) return m[1].toLowerCase() === 'venta' ? 'sale' : 'rent';
-  const t = (title || '').trim().toUpperCase();
-  if (t.startsWith('VENTA')) return 'sale';
-  if (t.startsWith('ALQUILER')) return 'rent';
-  return null;
+// ─── Objeto interno de Roomix (payload Next.js / RSC) ──────────────────────────
+// Cada ficha /propiedad/ trae, además del JSON-LD, un objeto MUCHO más rico embebido
+// en los <script>self.__next_f.push([1,"..."])</script>. Ese objeto tiene barrio/ciudad/
+// región estructurados, antigüedad, expensas, m² total y cubierto, piso, fecha de
+// publicación, teléfono, índices geo H3, el LINK ORIGINAL del portal (ZonaProp/ML), etc.
+// El JSON-LD se queda como respaldo. Anclamos la extracción al slug de la propiedad para
+// no confundirnos con objetos de "propiedades similares" que la página también embebe.
+function buildRscBlob(html) {
+  const pushes = [...html.matchAll(/self\.__next_f\.push\(\[1,"((?:[^"\\]|\\.)*)"\]\)/g)].map(m => m[1]);
+  return pushes.join('')
+    .replace(/\\"/g, '"').replace(/\\n/g, '\n').replace(/\\\\/g, '\\')
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 }
 
-function mapToRow(jsonLd, agent, entry, operationType) {
+function parseInternal(html, slug) {
+  try {
+    const blob = buildRscBlob(html);
+    // Ventana del objeto principal: anclada al slug (id único de la ficha). operation_type
+    // viene ~1500 chars antes del slug; phone/h3 vienen después. Tomamos un margen amplio.
+    let win = blob;
+    const slugIdx = slug ? blob.indexOf(`"slug":"${slug}"`) : -1;
+    if (slugIdx !== -1) {
+      win = blob.slice(Math.max(0, slugIdx - 2200), slugIdx + 900);
+    } else {
+      const opIdx = blob.indexOf('"operation_type"');
+      if (opIdx === -1) return null;
+      win = blob.slice(Math.max(0, opIdx - 400), opIdx + 2000);
+    }
+    const str = (re) => { const m = win.match(re); return m && m[1] != null ? m[1] : null; };
+    const num = (re) => { const m = win.match(re); return m && m[1] != null ? parseFloat(m[1]) : null; };
+    const int = (re) => { const m = win.match(re); return m && m[1] != null ? parseInt(m[1], 10) : null; };
+    return {
+      operation_type: str(/"operation_type":"(venta|alquiler|temporal)"/),
+      property_type_es: str(/"property_type":"([^"]*)"/),
+      expenses: num(/"expenses":(\d+(?:\.\d+)?)/),
+      expenses_currency: str(/"expenses_currency":"([^"]*)"/),
+      total_usd: num(/"total_usd":(\d+(?:\.\d+)?)/),
+      location_address: str(/"location_address":"([^"]*)"/),
+      region: str(/"location_region":"([^"]*)"/),
+      city: str(/"location_city":"([^"]*)"/),
+      neighborhood: str(/"location_neighborhood":"([^"]*)"/),
+      total_area_m2: num(/"total_area_m2":(\d+(?:\.\d+)?)/),
+      covered_area_m2: num(/"covered_area_m2":(\d+(?:\.\d+)?)/),
+      property_age_years: int(/"property_age_years":(\d+)/),
+      floor: int(/"floor":(\d+)/),
+      publication_date: str(/"publication_date":"([^"]*)"/),
+      status: /"status":true/.test(win) ? true : (/"status":false/.test(win) ? false : null),
+      phone: str(/"phone":"(\+?[0-9]+)"/),
+      whatsapp: str(/"whatsapp":"(\+?[0-9]+)"/),
+      h3_res6: str(/"h3_res6":"([^"]*)"/),
+      h3_res8: str(/"h3_res8":"([^"]*)"/),
+      // El primer "url" no-roomix dentro de la ventana = ficha original del portal.
+      source_listing_url: str(/"url":"(https?:\/\/(?!roomix\.ai)[^"]+)"/),
+    };
+  } catch { return null; }
+}
+
+// País: Roomix pone addressCountry "AR" hasta para Uruguay (no sirve). Lo derivamos del
+// prefijo telefónico (fiable), de palabras clave de la región/dirección y, en última
+// instancia, de coordenadas. Default 'AR' (el catálogo es casi todo argentino).
+function deriveCountry(internal, lat, lng) {
+  const ph = internal?.phone || '';
+  if (ph.startsWith('+598')) return 'UY';
+  if (ph.startsWith('+595')) return 'PY';
+  if (ph.startsWith('+56')) return 'CL';
+  if (ph.startsWith('+54')) return 'AR';
+  const txt = `${internal?.region || ''} ${internal?.location_address || ''}`.toLowerCase();
+  if (/\b(maldonado|punta del este|montevideo|canelones|colonia|rocha|piri[aá]polis|jos[eé] ignacio|la barra|uruguay)\b/.test(txt)) return 'UY';
+  // Uruguay está al este del Río de la Plata: a latitud rioplatense, lng > -57.6 ya es UY.
+  if (lat != null && lng != null && lat < -30 && lat > -35.2 && lng > -57.6 && lng < -53) return 'UY';
+  return 'AR';
+}
+
+// Operación final. REGLA pedida por Leonardo: si el TÍTULO dice VENTA/ALQUILER explícito,
+// MANDA EL TÍTULO por encima de operation_type (Roomix a veces clasifica mal: vimos una
+// "Oportunidad en VENTA U$S 269.000" marcada como alquiler en el payload). Si el título no
+// es explícito, usamos operation_type del payload y, como último respaldo, businessFunction.
+function resolveOperation(internal, jsonLd, title) {
+  const t = (title || '').toUpperCase();
+  let titleOp = null;
+  if (t.startsWith('VENTA') || /(^|\s|")VENTA(\s|:|")/.test(t) || /EN VENTA/.test(t)) titleOp = 'sale';
+  else if (t.startsWith('ALQUILER') || /(^|\s|")ALQUILER(\s|:|")/.test(t) || /EN ALQUILER/.test(t)) titleOp = 'rent';
+
+  const ot = internal?.operation_type;
+  const internalOp = ot === 'venta' ? 'sale' : (ot === 'alquiler' || ot === 'temporal') ? 'rent' : null;
+
+  const bf = (jsonLd?.offers?.businessFunction) || '';
+  const bfOp = bf.includes('Lease') ? 'rent' : bf.includes('Sell') ? 'sale' : null;
+
+  return titleOp || internalOp || bfOp;
+}
+
+function mapToRow(jsonLd, agent, entry, internal) {
   const off = jsonLd.offers || {}, me = jsonLd.mainEntity || {}, add = me.address || {};
   const geo = jsonLd.geo || me.geo || {}, fs = me.floorSize || jsonLd.floorSize || {};
-  // Fallback heredado (businessFunction) solo si operationType no se pudo determinar.
-  const bf = off.businessFunction || '', bfOp = bf.includes('Lease') ? 'rent' : bf.includes('Sell') ? 'sale' : null;
-  const op = operationType || bfOp;
+
+  const lat = geo.latitude ? parseFloat(geo.latitude) : null;
+  const lng = geo.longitude ? parseFloat(geo.longitude) : null;
+  // Barrio: el interno (location_neighborhood) es más fiable que el JSON-LD addressLocality
+  // (que muchas veces viene null). Caemos al JSON-LD solo si el interno no lo trae.
+  const neighborhood = internal?.neighborhood || add.addressLocality || null;
+  // m²: priorizamos total_area_m2 del interno; respaldo floorSize del JSON-LD.
+  const areaM2 = internal?.total_area_m2 ?? (fs.value ? parseFloat(fs.value) : null);
 
   return {
     id: entry.id, slug: entry.slug, canonical_url: entry.loc,
-    title: jsonLd.name || null, description: jsonLd.description || null, operation: op,
+    title: jsonLd.name || null, description: jsonLd.description || null,
+    operation: resolveOperation(internal, jsonLd, jsonLd.name),
     price: off.price ? parseFloat(off.price) : null, currency: off.priceCurrency || null,
-    property_type: me['@type'] || null,
+    property_type: me['@type'] || null,                 // se mantiene el valor JSON-LD (no romper ACM)
+    category: internal?.property_type_es || null,       // tipo en español (Departamento/Casa/PH/Local…)
     rooms: (jsonLd.numberOfRooms || me.numberOfRooms) ? parseInt(jsonLd.numberOfRooms || me.numberOfRooms) : null,
     bedrooms: (jsonLd.numberOfBedrooms || me.numberOfBedrooms) ? parseInt(jsonLd.numberOfBedrooms || me.numberOfBedrooms) : null,
     bathrooms: (jsonLd.numberOfBathroomsTotal || me.numberOfBathroomsTotal) ? parseInt(jsonLd.numberOfBathroomsTotal || me.numberOfBathroomsTotal) : null,
-    area_m2: fs.value ? parseFloat(fs.value) : null,
-    address: add.streetAddress || null, neighborhood: add.addressLocality || null,
-    lat: geo.latitude ? parseFloat(geo.latitude) : null, lng: geo.longitude ? parseFloat(geo.longitude) : null,
+    area_m2: areaM2,
+    covered_area_m2: internal?.covered_area_m2 ?? null,
+    address: internal?.location_address || add.streetAddress || null,
+    neighborhood, region: internal?.region || null, city: internal?.city || null,
+    country: deriveCountry(internal, lat, lng),
+    lat, lng,
+    property_age_years: internal?.property_age_years ?? null,
+    floor: internal?.floor ?? null,
+    expenses: internal?.expenses ?? null, expenses_currency: internal?.expenses_currency || null,
+    total_usd: internal?.total_usd ?? null,
+    date_posted: internal?.publication_date ? new Date(internal.publication_date).toISOString() : null,
+    availability: off.availability ? String(off.availability).split('/').pop() : null,  // InStock / SoldOut…
+    business_function: bf_short(off.businessFunction),
+    is_active: internal?.status ?? null,
+    phone: internal?.phone || null, whatsapp: internal?.whatsapp || null,
+    h3_res6: internal?.h3_res6 || null, h3_res8: internal?.h3_res8 || null,
     amenities: (Array.isArray(me.amenityFeature || jsonLd.amenityFeature) ? (me.amenityFeature || jsonLd.amenityFeature) : []).map(a => typeof a === 'string' ? a : a.name || '').filter(Boolean),
     images: (Array.isArray(jsonLd.image) ? jsonLd.image : [jsonLd.image]).filter(Boolean),
-    roomix_agency_name: agent?.name || null, roomix_agency_logo: agent?.image || null, roomix_agency_source_url: agent?.seller_url || null,
+    roomix_agency_name: agent?.name || null, roomix_agency_logo: agent?.image || null,
+    roomix_agency_source_url: agent?.seller_url || null,
+    source_listing_url: internal?.source_listing_url || null,   // ficha ORIGINAL del portal (ZonaProp/ML/Argenprop)
     lastmod: entry.lastmod, updated_at: new Date().toISOString()
   };
+}
+
+function bf_short(bf) {
+  if (!bf) return null;
+  if (String(bf).includes('Lease')) return 'rent';
+  if (String(bf).includes('Sell')) return 'sale';
+  return null;
 }
 
 async function generateEmbedding(text) {
@@ -509,8 +637,8 @@ async function extractProperty(page, entry, retries = 0) {
     const jsonLd = parseJsonLd(html);
     if (!jsonLd) { log('⚠️', `Sin JSON-LD: ${entry.id}`); return null; }
 
-    const operationType = parseOperationType(html, jsonLd.name);
-    const row = mapToRow(jsonLd, parseAgent(html), entry, operationType);
+    const internal = parseInternal(html, entry.slug);
+    const row = mapToRow(jsonLd, parseAgent(html), entry, internal);
     const txt = [row.title, row.description, row.neighborhood, (row.amenities || []).join(', ')].filter(Boolean).join(' ').trim();
     if (txt) row.embedding = await generateEmbedding(txt);
 
@@ -631,12 +759,13 @@ async function main() {
       log('ℹ️', 'SITEMAP_COUNT=0 → se omiten sitemaps');
     }
 
-    // ── BORRADO: las que salieron de Roomix. Solo corrida completa + sitemaps OK ────
-    // (deleteMissing tiene su propio freno: aborta si borraría >40% de la base).
-    if (PROPERTY_LIMIT === 0 && sitemapsOk) {
-      await deleteMissing([...liveIds].map(id => ({ id })));
-    } else if (PROPERTY_LIMIT === 0) {
-      log('⚠️', 'Sitemaps incompletos/omitidos → NO se eliminan propiedades (freno de seguridad)');
+    // ── BORRADO: las que salieron de Roomix (ausentes del sitemap vivo) ─────────────
+    // Ya NO exige sitemaps perfectos (eso bloqueaba el borrado siempre). deleteMissing
+    // tiene gate medido: solo borra si el catálogo vivo cargó ≥90% de la BD, y aborta si
+    // el número a borrar supera el tope de seguridad.
+    if (PROPERTY_LIMIT === 0 && SITEMAP_COUNT > 0) {
+      if (!sitemapsOk) log('⚠️', 'Aviso: algún sitemap no cargó perfecto; deleteMissing decidirá por volumen de catálogo vivo.');
+      await deleteMissing([...liveIds].map(id => ({ id })), existing.size);
     }
 
     await Promise.all([collector, ...workers].map(p => p.close().catch(() => {})));
@@ -649,4 +778,11 @@ async function main() {
   }
 }
 
-main().catch(err => { console.error('💥 Fatal:', err); process.exit(1); });
+// Solo corre el crawler cuando se ejecuta directo (node crawler.mjs / spawn del cron).
+// Si se importa el módulo (p.ej. en un test), NO dispara la corrida — solo expone funciones.
+const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  main().catch(err => { console.error('💥 Fatal:', err); process.exit(1); });
+}
+
+export { parseInternal, parseJsonLd, parseAgent, mapToRow, resolveOperation, deriveCountry, buildRscBlob };
