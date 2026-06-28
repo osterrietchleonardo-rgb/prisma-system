@@ -1,0 +1,21 @@
+{
+  "operation": "En Venta",
+  "title": "Departamento 3 ambientes",
+  "location": "Belgrano, CABA",
+  "price": "USD 185.000",
+  "specs": [
+    { "label": "Ambientes", "value": "3" },
+    { "label": "Superficie", "value": "78 m²" },
+    { "label": "Baños", "value": "2" },
+    { "label": "Cochera", "value": "Sí" }
+  ],
+  "photos": [
+    "fotos/1.jpg",
+    "fotos/2.jpg",
+    "fotos/3.jpg",
+    "fotos/4.jpg"
+  ],
+  "cta": "Coordiná tu visita hoy",
+  "contact": "@vakdor · WhatsApp",
+  "secondsPerPhoto": 2.5
+}

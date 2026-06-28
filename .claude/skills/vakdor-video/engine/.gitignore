@@ -1,0 +1,6 @@
+node_modules/
+out/
+test-output/
+public/current/
+.props.resolved.json
+.props.test.json

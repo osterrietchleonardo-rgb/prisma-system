@@ -1,0 +1,22 @@
+{
+  "name": "vakdor-video-engine",
+  "version": "1.0.0",
+  "description": "Motor Remotion para reels de propiedades con marca Vakdor/PRISMA. Se despliega a 'Prisma - MK/_motor-video' y rinde mp4 a la carpeta del activo.",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render PropertyReel",
+    "preview": "remotion studio"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.290",
+    "@remotion/google-fonts": "4.0.290",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.290"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "typescript": "5.4.5"
+  }
+}
