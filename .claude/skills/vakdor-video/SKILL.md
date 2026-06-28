@@ -1,13 +1,18 @@
 ---
 name: vakdor-video
-description: Experto en crear VIDEOS/reels con la identidad visual de Vakdor usando Remotion (video por código con React). Usar SIEMPRE que el usuario pida un reel, video de propiedad, video para redes (IG/TikTok), ficha en video, o cualquier pieza audiovisual de marca. Triggerea con "reel", "video", "video de la propiedad", "para Instagram/TikTok", "ficha en video". Es la hermana en video de vakdor-carousel: misma marca (brand.json), mismo destino (Prisma - MK), copy delegado a vakdor-copywriter.
+description: Experto en crear y EDITAR VIDEOS/reels con la identidad visual de Vakdor usando Remotion (video por código con React). Usar SIEMPRE que el usuario pida un reel, video de propiedad, video para redes (IG/TikTok), ficha en video, EDITAR un video crudo (sacar silencios, subtítulos, marca, recortes, transiciones) o cualquier pieza audiovisual de marca. Triggerea con "reel", "video", "editá este video", "sacá los silencios", "ponele subtítulos", "video de la propiedad", "para Instagram/TikTok". Es la hermana en video de vakdor-carousel: misma marca (brand.json), mismo destino (Prisma - MK), copy delegado a vakdor-copywriter.
 ---
 
-# Vakdor Video — Skill de Reels de Propiedades (Remotion)
+# Vakdor Video — Skill de Video con Remotion
 
-Esta skill genera **videos verticales (1080x1920) listos para Instagram/TikTok** a partir de
-las fotos y datos de una propiedad, con la marca Vakdor/PRISMA. El motor es **Remotion**
-(video programático con React). La skill arma los datos y la marca; el render lo hace el motor.
+Esta skill tiene **dos modos**, ambos exportan video vertical 1080x1920 con la marca Vakdor/PRISMA.
+El motor es **Remotion** (video por código con React) + **ffmpeg** (análisis de audio).
+
+- **Modo A — Reel de Propiedad** (`PropertyReel`): arma un reel desde **fotos + datos** de una propiedad.
+- **Modo B — Editor de Video** (`EditedReel`): toma un **video CRUDO** del usuario y lo edita pro:
+  saca silencios (jump cuts), pone subtítulos automáticos, marca de agua e intro/outro de marca.
+
+La skill arma los datos y la marca; el render lo hace el motor.
 
 > 📜 **Licencia Remotion:** gratis para uso comercial con equipos de **hasta 3 personas** (caso de Leonardo, 1 persona). Si el equipo crece a 4+, hay que pagar licencia (ver `https://www.remotion.dev/docs/license`).
 
@@ -51,7 +56,9 @@ colores/el logo", editar `assets\brand.json` (y recopiar al motor) — NO re-esc
 
 ---
 
-## Paso 2 — Definir el contenido (mínimo de preguntas)
+## MODO A — Reel de Propiedad (`PropertyReel`)
+
+### Paso 2 — Definir el contenido (mínimo de preguntas)
 
 El video por defecto es un **Reel de Propiedad** (`PropertyReel`). Necesitás estos datos:
 
@@ -119,18 +126,68 @@ La **duración se calcula sola**: 2s intro + (Nº fotos × `secondsPerPhoto`) + 
 
 ---
 
+## MODO B — Editor de video crudo (`EditedReel`)
+
+Cuando el usuario te pasa un **video grabado por él** (ej. una recorrida de propiedad, un
+testimonio, un pitch a cámara) y quiere que lo dejes profesional. La skill:
+
+1. **Detecta los silencios** con ffmpeg (`silencedetect`) y arma los **jump cuts** (corta los
+   "ehhh", pausas y muletillas largas, pega los tramos buenos).
+2. **Subtítulos automáticos** (opcional): transcribe el audio con **Whisper local** (gratis,
+   offline, anda en español) y los pone estilo TikTok (palabra por palabra, la activa en cobre).
+   Alternativa sin Whisper: pasarle un `.srt` ya hecho con `--captions`.
+3. **Marca de agua** (logos Vakdor/PRISMA) + **intro y outro** de marca.
+
+### Qué hace Remotion y qué no (honesto)
+- ✅ Recorte/trim, pegar tramos, velocidad, volumen, subtítulos, marca, transiciones, render final.
+- ⚠️ La **detección de silencios** la hace **ffmpeg**, no Remotion (Remotion arma y renderiza).
+- ⚠️ No es un editor de timeline a mano (Descript/Premiere): es **automático y por parámetros**.
+  La calidad del corte depende de afinar el umbral (`--silence-db`, `--min-silence`).
+
+### Uso
+
+Parado en `Prisma - MK\_motor-video`:
+
+```
+node edit.mjs --video="C:\ruta\al\crudo.mp4" --out="<carpeta del activo>\final.mp4" --subtitles
+```
+
+**Opciones** (ver cabecera de `edit.mjs` para la lista completa):
+- `--subtitles` → subtítulos con Whisper (la 1ª vez baja/compila Whisper; modelo con `--model=base|small|medium`).
+- `--captions="x.srt"` → subtítulos desde un SRT (sin Whisper).
+- `--silence-db=-30` `--min-silence=0.6` `--pad=0.06` → afinan el corte de silencios.
+- `--no-intro` `--no-outro` `--no-watermark` `--no-subtitles` → apagan partes.
+- `--title="..."` `--contact="..."` → textos de intro/outro.
+- `--lang=es` → idioma de la transcripción.
+
+> Importante: el video crudo y la salida viven en `Prisma - MK` (regla de oro). `edit.mjs` copia
+> el crudo a `public\current\` para que Remotion lo lea, y limpia al terminar.
+
+### Límite de aspecto
+`EditedReel` exporta vertical 1080x1920 (reel). Si el crudo es horizontal, se recorta a vertical
+(`objectFit: cover`). Para mantener el formato original (16:9) hay que registrar una variante
+horizontal en `Root.tsx` — pedir si se necesita.
+
+---
+
 ## Composiciones disponibles
 
-- **`PropertyReel`** — reel vertical de una propiedad (intro de marca → fotos con Ken Burns y
-  specs → outro con CTA y precio). Es la base; se puede extender con más plantillas
-  (ej. "carrusel de mercado en video", "testimonios") agregando componentes en `engine\src\`
-  y registrándolos en `engine\src\Root.tsx`.
+- **`PropertyReel`** — reel vertical desde fotos de una propiedad (intro de marca → fotos con
+  Ken Burns y specs → outro con CTA y precio).
+- **`EditedReel`** — edición de un video crudo (intro → tramos sin silencio con marca de agua y
+  subtítulos → outro). 
+- Se puede extender con más plantillas (ej. "mercado en video", "testimonios") agregando
+  componentes en `engine\src\` y registrándolos en `engine\src\Root.tsx`.
 
 ## Detalle técnico del motor (`engine\`)
 
-- `src\PropertyReel.tsx` — la composición (animaciones, Ken Burns, lower-thirds, logos).
-- `src\brand.ts` + `brand.json` — colores de marca que consume la composición.
+- `src\PropertyReel.tsx` — composición del reel de propiedad (Ken Burns, lower-thirds, logos).
+- `src\EditedReel.tsx` — composición del editor (OffthreadVideo con trimBefore/trimAfter por tramo,
+  subtítulos con `@remotion/captions`, marca de agua, intro/outro).
+- `src\brand.ts` + `brand.json` — colores de marca que consumen las composiciones.
 - `src\Root.tsx` / `src\index.ts` — registro de composiciones Remotion.
-- `render.mjs` — wrapper que resuelve fotos y dispara el render (llama al CLI de Remotion por su
-  JS directo con `node`, para no romper con los espacios de "Prisma - MK").
+- `render.mjs` — wrapper del Modo A (resuelve fotos y dispara el render).
+- `edit.mjs` — orquestador del Modo B: ffmpeg silencedetect → tramos → (Whisper/SRT → subtítulos
+  re-mapeados a la línea editada) → render de `EditedReel`. Llama al CLI de Remotion por su JS
+  directo con `node` (para no romper con los espacios de "Prisma - MK").
 - `remotion.config.ts` — calidad de salida (H.264, CRF 18).
