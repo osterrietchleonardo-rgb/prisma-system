@@ -1,0 +1,17 @@
+{
+  "_comment": "Fuente unica de identidad visual de Vakdor/PRISMA para piezas de VIDEO (reels, fichas en video). Mismos colores que vakdor-carousel. Si cambia la marca, editar aca y la skill lo toma.",
+  "colors": {
+    "background": "#0A0F1A",
+    "title": "#FFFFFF",
+    "text": "#B4BAC5",
+    "accent": "#C07C41"
+  },
+  "typography": {
+    "heading": "Inter",
+    "body": "Inter"
+  },
+  "logos": {
+    "vakdor": "logo-vakdor.png",
+    "prisma": "logo-icon.png"
+  }
+}

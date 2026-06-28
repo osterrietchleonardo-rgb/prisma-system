@@ -1,0 +1,8 @@
+node_modules/
+out/
+test-output/
+public/current/
+whisper.cpp/
+.props.resolved.json
+.props.test.json
+.edit.props.json
