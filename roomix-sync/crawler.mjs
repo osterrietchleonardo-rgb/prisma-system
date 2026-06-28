@@ -154,6 +154,15 @@ const VENTA_AMBA_MAX_PAGES = process.env.VENTA_AMBA_MAX_PAGES !== undefined ? pa
 // Cada cuántas páginas, dentro de una misma zona, refrescar la cookie de Cloudflare (volver a
 // la home). Pedido de Leonardo: 15 págs → refresco → 15 más → … hasta el tope de la zona.
 const VENTA_CHUNK_PAGES = process.env.VENTA_CHUNK_PAGES !== undefined ? parseInt(process.env.VENTA_CHUNK_PAGES) : 15;
+// Cada cuántas FICHAS bajadas refrescar la cookie de Cloudflare en la FASE DE BAJADA (processBatch).
+// CLAVE (medido en producción Jun 28): collectSeed —juntar links de las páginas de listado— sí
+// refrescaba cada VENTA_CHUNK_PAGES, pero la bajada ficha-por-ficha (page.goto a /propiedad/…) NO
+// refrescaba NUNCA. Tras unos cientos de navegaciones seguidas Cloudflare frena la IP de EasyPanel
+// y TODO empieza a dar `Timeout 45000ms` (death spiral: el log se llena de errores y deja de guardar).
+// Aplicamos la misma lógica que en la recolección: cada EXTRACT_CHUNK fichas, re-navegar al home →
+// renovar cf_clearance → seguir. OJO: el throttle de CF es en parte por IP (no solo cookie), así que
+// esto MITIGA pero conviene combinarlo con CRAWLER_CONCURRENCY más baja si sigue frenando.
+const EXTRACT_CHUNK = process.env.EXTRACT_CHUNK !== undefined ? parseInt(process.env.EXTRACT_CHUNK) : 40;
 
 const VENTA_SEED_GROUPS = [
   // AMBA = barrios de CABA + partidos del conurbano, cada uno en profundidad (hasta 90 págs).
@@ -683,6 +692,15 @@ async function extractProperty(page, entry, retries = 0) {
     log('✅', `${entry.id} → ${(row.title || '').substring(0, 40)}...`);
     return row;
   } catch (err) {
+    // Timeout de navegación = Cloudflare frenando. Reintentamos UNA vez tras una pausa: el refresco
+    // periódico de cookie en processBatch mantiene cf_clearance fresca, así que el reintento tiene
+    // chance real. A propósito NO navegamos al home acá adentro: con CONCURRENCY workers en paralelo
+    // sería una estampida de gotos al home (otros 45s cada uno). El refresco lo coordina processBatch.
+    if (/Timeout .* exceeded/i.test(err.message) && retries < 1) {
+      log('⏳', `Timeout en ${entry.id}, reintento (${retries+1}/1)...`);
+      await sleep(3000);
+      return extractProperty(page, entry, retries + 1);
+    }
     log('❌', `Error ${entry.id}: ${err.message.substring(0,60)}`);
     return null;
   }
@@ -693,7 +711,7 @@ async function extractProperty(page, entry, retries = 0) {
 // el checkpoint para poder reanudar si la corrida se corta.
 async function processBatch(queue, checkpoint, pages) {
   const limit = pLimit(CONCURRENCY);
-  let processed = 0, errors = 0;
+  let processed = 0, errors = 0, sinceRefresh = 0;
   for (let i = 0; i < queue.length; i += CONCURRENCY) {
     const batch = queue.slice(i, i + CONCURRENCY);
     await Promise.all(batch.map((entry, idx) => limit(async () => {
@@ -707,7 +725,22 @@ async function processBatch(queue, checkpoint, pages) {
       processed++;
     })));
     saveCheckpoint(checkpoint.processedIds);
-    if (i + CONCURRENCY < queue.length) await sleep(BATCH_DELAY_MS);
+
+    // Refresco de cookie CF cada EXTRACT_CHUNK fichas (la misma lógica que collectSeed, pero para la
+    // bajada). cf_clearance vive en el context y la comparten las páginas worker → con re-navegar UNA
+    // al home alcanza para renovarla en todas. Solo si quedan fichas por bajar (no al final del lote).
+    sinceRefresh += batch.length;
+    const hayMas = i + CONCURRENCY < queue.length;
+    if (EXTRACT_CHUNK > 0 && hayMas && sinceRefresh >= EXTRACT_CHUNK) {
+      try {
+        await pages[0].goto('https://roomix.ai/', { waitUntil: 'domcontentloaded', timeout: PAGE_TIMEOUT });
+        await sleep(1500);
+        log('🔄', `bajada: refresco cookie CF (tras ${sinceRefresh} fichas)`);
+      } catch (e) { log('⚠️', `bajada: no pudo refrescar CF: ${e.message}`); }
+      sinceRefresh = 0;
+    }
+
+    if (hayMas) await sleep(BATCH_DELAY_MS);
   }
   return { processed, errors };
 }
@@ -823,4 +856,4 @@ if (isMain) {
   main().catch(err => { console.error('💥 Fatal:', err); process.exit(1); });
 }
 
-export { parseInternal, parseJsonLd, parseAgent, mapToRow, resolveOperation, deriveCountry, buildRscBlob, collectSeed, initBrowser };
+export { parseInternal, parseJsonLd, parseAgent, mapToRow, resolveOperation, deriveCountry, buildRscBlob, collectSeed, initBrowser, extractProperty, processBatch };
