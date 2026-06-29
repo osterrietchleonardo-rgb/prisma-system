@@ -228,7 +228,8 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 **Guía Mágica:** una guía de lectura (5 fases) con buenas prácticas para hacer campañas de captación en Meta Ads (Facebook/Instagram). No genera nada, es material para aprender.
 
 > 💡 **Tip:** el copy y las imágenes respetan la **directiva creativa** y el **aviso legal** que cargó tu director. No hace falta que los pongas vos.
-> ⚠️ Por política, el generador **no inventa** direcciones, metros, ambientes ni precios concretos. Habla del perfil de cliente, no de una propiedad puntual.
+> 🏠 **IPC "Vender" con propiedad asociada:** cuando creás un IPC de tipo **Vender**, podés **buscar y asociar una propiedad de tu cartera** (el buscador te muestra **toda tu cartera**, no solo unas pocas). Si lo hacés, los anuncios **usan los datos reales** de esa propiedad (ubicación, ambientes, superficie, lo más atractivo) integrados con criterio en el mensaje persuasivo —ni ficha técnica fría, ni texto genérico— y **nunca inventan** datos.
+> ⚠️ Si **no** asociás ninguna propiedad, el generador **no inventa** direcciones, metros, ambientes ni precios: habla del perfil de cliente, en términos generales.
 > 💰 **Costo:** cada "Generar 3 Variantes" consume **~7 créditos** (1 por los 3 textos + 2 por cada una de las 3 imágenes). El cartel de "1 crédito" en pantalla es solo por los textos, no el total.
 
 ---

@@ -1,91 +1,98 @@
+// Marketing IA · Buscador de propiedades para asociar a un IPC.
+// Lee la CARTERA COMPLETA de la agencia desde la tabla local `properties`
+// (la misma fuente sincronizada de Tokko que usa el ACM), en vez de pegarle a
+// la API de Tokko en vivo con un tope de 10. Así el director (y el asesor)
+// tienen acceso total a su cartera. La RLS "Properties: agency visibility"
+// (agency_id = get_my_agency_id()) garantiza que solo se vea la propia agencia.
+//
+// Importante: devolvemos `id` = ID numérico de Tokko (columna tokko_id), porque
+// el resto del flujo (guardar el IPC y generar copy/imagen) usa ese ID para
+// re-consultar la propiedad en Tokko.
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { requireTenant } from "@/lib/auth/tenant-validation";
 
 export const dynamic = "force-dynamic";
+
+// status interno (Tokko viene en inglés/español) → operación legible.
+function statusToOperation(status: string | null): string {
+  return status === "Alquiler" || status === "Temporary rent" ? "Alquiler" : "Venta";
+}
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const query = searchParams.get('query') || "";
-    const property_type = searchParams.get('property_type');
-    const operation_type = searchParams.get('operation_type') || "1"; // Default to Venta if matches Tokko IDs
-    const zone = searchParams.get('zone');
+    const query = (searchParams.get("query") || "").trim();
+    const propertyType = searchParams.get("property_type"); // "0" todos, "1" depto, "2" casa, "3" ph
+    const operationType = searchParams.get("operation_type") || "1"; // "1" venta, "2" alquiler
 
+    const { agencyId } = await requireTenant();
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("agency_id")
-      .eq("id", user.id)
-      .single();
+    let q = supabase
+      .from("properties")
+      .select(
+        "tokko_id, title, address, city, property_type, status, price, currency, bedrooms, bathrooms, total_area, covered_area, images, tokko_data, description"
+      )
+      .eq("agency_id", agencyId)
+      .eq("is_active", true)
+      .not("tokko_id", "is", null);
 
-    if (!profile?.agency_id) {
-      return NextResponse.json({ error: "Agencia no encontrada" }, { status: 404 });
+    // Operación
+    if (operationType === "2") q = q.in("status", ["Alquiler", "Temporary rent"]);
+    else if (operationType === "1") q = q.eq("status", "Venta");
+
+    // Tipo (los valores reales vienen de Tokko: "Departamento", "Casa", "PH", etc.)
+    if (propertyType === "1") q = q.ilike("property_type", "%departamento%");
+    else if (propertyType === "2") q = q.ilike("property_type", "%casa%");
+    else if (propertyType === "3") q = q.ilike("property_type", "%ph%");
+
+    // Texto libre: título, dirección, ciudad o descripción.
+    if (query) {
+      const safe = query.replace(/[%,()]/g, " ").trim();
+      if (safe) {
+        q = q.or(
+          `title.ilike.%${safe}%,address.ilike.%${safe}%,city.ilike.%${safe}%,description.ilike.%${safe}%`
+        );
+      }
     }
 
-    const { data: agency } = await supabase
-      .from("agencies")
-      .select("tokko_api_key")
-      .eq("id", profile.agency_id)
-      .single();
+    const { data, error } = await q.order("updated_at", { ascending: false }).limit(500);
+    if (error) throw error;
 
-    const TOKKO_API_KEY = agency?.tokko_api_key || process.env.TOKKO_API_KEY;
-    if (!TOKKO_API_KEY) {
-      return NextResponse.json({ error: "Tokko API Key not configured" }, { status: 500 });
-    }
+    const properties = (data || []).map((p: any) => {
+      const td = p.tokko_data || {};
+      const tags: string[] = Array.isArray(td.tags)
+        ? td.tags.map((t: any) => String(t?.name || "")).filter(Boolean)
+        : [];
+      const imgs: string[] = Array.isArray(p.images)
+        ? p.images.map((im: any) => (typeof im === "string" ? im : im?.url)).filter(Boolean)
+        : [];
 
-    // Build Tokko API URL
-    // Tokko uses: 
-    // operation_types: 1=Venta, 2=Alquiler
-    // property_types: 1=Departamento, 2=Casa, 3=PH, etc.
-    // However, for simplicity and robustness, we'll try to use a flexible search if possible
-    // or map the types if we have the list.
-    
-    let url = `https://tokkobroker.com/api/v1/property/?key=${TOKKO_API_KEY}&format=json&limit=10`;
-    
-    if (query) url += `&search_by_address_or_description=${encodeURIComponent(query)}`;
-    if (operation_type) url += `&operation_types=${operation_type}`;
-    if (property_type && property_type !== '0') url += `&property_types=${property_type}`;
-    // Zone filtering in Tokko usually requires ID, but let's see if we can use the search query for it.
-
-    const response = await fetch(url);
-    if (!response.ok) {
-      const err = await response.text();
-      console.error("Tokko API Error:", err);
-      return NextResponse.json({ error: "Failed to fetch from Tokko" }, { status: response.status });
-    }
-
-    const data = await response.json();
-    
-    // Transform Tokko response to our TokkoProperty interface
-    const properties = data.objects.map((p: any) => ({
-      id: p.id,
-      reference_code: p.reference_code,
-      title: p.publication_title || p.address,
-      address: p.address,
-      zone: p.location?.name || "",
-      property_type: p.type?.name || "",
-      operation_type: p.operations?.[0]?.operation_type || "",
-      price: p.operations?.[0]?.prices?.[0]?.price || 0,
-      currency: p.operations?.[0]?.prices?.[0]?.currency || "USD",
-      surface_total: p.surface || 0,
-      surface_covered: p.roofed_surface || 0,
-      rooms: p.room_amount || 0,
-      bathrooms: p.bathroom_amount || 0,
-      description: p.description,
-      photos: (p.photos || []).slice(0, 5).map((f: any) => ({
-        thumb: f.thumb,
-        image: f.image
-      })),
-      tags: (p.tags || []).map((t: any) => t.name)
-    }));
+      return {
+        id: Number(p.tokko_id), // ID de Tokko (lo consume el resto del flujo)
+        reference_code: td.reference_code || "",
+        title: p.title || p.address || "Propiedad",
+        address: p.address || "",
+        zone: p.city || td.location?.name || "",
+        property_type: p.property_type || "",
+        operation_type: statusToOperation(p.status),
+        price: p.price ? Number(p.price) : 0,
+        currency: p.currency || "USD",
+        surface_total: p.total_area ? Number(p.total_area) : p.covered_area ? Number(p.covered_area) : 0,
+        surface_covered: p.covered_area ? Number(p.covered_area) : 0,
+        rooms: td.room_amount ?? p.bedrooms ?? 0,
+        bathrooms: p.bathrooms ?? 0,
+        description: (p.description || "").slice(0, 600),
+        photos: imgs.slice(0, 1).map((u) => ({ thumb: u, image: u })),
+        tags,
+      };
+    });
 
     return NextResponse.json(properties);
-
   } catch (error: any) {
-    console.error("Tokko Search Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Marketing cartera search error:", error);
+    const status = error.message === "Unauthorized" ? 401 : 500;
+    return NextResponse.json({ error: error.message }, { status });
   }
 }

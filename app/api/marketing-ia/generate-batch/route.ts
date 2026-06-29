@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
 import { calculateCost } from "@/utils/aiCostCalculator";
 import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
+import { buildPropertyDirective } from "@/lib/marketing-ia/property-context";
 
 export const dynamic = "force-dynamic";
 
@@ -80,8 +81,7 @@ REGLA DE ORO / INSTRUCCIÓN CRÍTICA 1:
 ¡Las 3 variantes DEBEN seguir estrictamente las definiciones del IPC! Respetar el ángulo de marketing/copy recomendado, el tono sugerido, la promesa central, las objeciones y el dolor principal definidos en el perfil. Las variantes son solo diferentes formas de presentar este mismo mensaje sin alterar la identidad y el tono elegido.
 TONO: Lenguaje 100% rioplatense (voseo), auténtico, empático y profesional. Nada de "un hogar para vos", hablá de "tu próxima casa", adaptándose a lo que dice el perfil de IPC.
 
-REGLA OBLIGATORIA (NO INVENTAR PROPIEDADES):
-Todavía NO estás trabajando sobre una propiedad puntual. En NINGUNA de las 3 variantes menciones ni inventes direcciones, calles, barrios o ubicaciones exactas, metros cuadrados, cantidad de ambientes o baños, precios, ni datos técnicos concretos de un inmueble específico. Escribí en términos generales, enfocado en el perfil de cliente (IPC) y su deseo/problema, sin datos inventados.
+${buildPropertyDirective(property, { variants: true })}
 
 INSTRUCCIÓN CRÍTICA 2:
 Debes generar exactamente 3 variaciones estructurando la narrativa sobre los siguientes 3 esquemas, SIEMPRE aplicando las definiciones del IPC arriba:
@@ -181,7 +181,8 @@ export async function POST(req: Request) {
                 surface_covered: p.roofed_surface || 0,
                 rooms: p.room_amount || 0,
                 bathrooms: p.bathroom_amount || 0,
-                description: p.description
+                description: p.description,
+                tags: (p.tags || []).map((t: any) => t.name)
               } as TokkoProperty;
             }
           }

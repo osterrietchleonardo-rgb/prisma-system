@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
 import { calculateCost } from "@/utils/aiCostCalculator";
 import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
+import { buildPropertyDirective } from "@/lib/marketing-ia/property-context";
 
 export const dynamic = "force-dynamic";
 
@@ -96,8 +97,7 @@ ${directive?.trim() ? `- DIRECTIVA CREATIVA DE LA AGENCIA (OBLIGATORIO RESPETAR)
 
 TONO: Usá un lenguaje 100% rioplatense (voseo), auténtico, empático y profesional. Nada de "un hogar para vos", hablá de "tu próxima casa" o "la venta de tu depto".
 
-REGLA OBLIGATORIA (NO INVENTAR PROPIEDADES):
-Todavía NO estás trabajando sobre una propiedad puntual. NO menciones ni inventes direcciones, calles, barrios o ubicaciones exactas, metros cuadrados, cantidad de ambientes o baños, precios, ni ningún dato técnico concreto de un inmueble específico. Escribí el copy en términos generales, enfocado en el perfil de cliente (IPC) y su deseo/problema, sin datos inventados.
+${buildPropertyDirective(property)}
 
 Respondé ÚNICAMENTE en JSON válido.`;
 

@@ -286,7 +286,8 @@ Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **
 - **Aviso legal:** texto legal (hasta 300 caracteres) que se inserta en la franja inferior de las imágenes.
 
 > 💡 **Tip:** configurá la directiva creativa y el aviso legal una sola vez; aplican a toda la agencia.
-> ⚠️ El generador **no inventa** datos concretos de propiedades (direcciones, m², precios): los copies hablan del perfil de cliente, no de una propiedad puntual.
+> 🏠 **IPC "Vender" con propiedad asociada:** al crear un IPC de tipo **Vender** podés **asociar una propiedad de tu cartera**. El buscador muestra **toda tu cartera completa** (no un tope de pocas). Si asociás una propiedad, los anuncios **toman sus datos reales** (ubicación, ambientes, superficie, lo más atractivo) integrados con criterio en el copy persuasivo —ni ficha técnica, ni texto genérico— y **sin inventar** nada.
+> ⚠️ Si **no** se asocia ninguna propiedad, el generador **no inventa** datos concretos (direcciones, m², precios): los copies hablan del perfil de cliente, en términos generales.
 > 💰 **Costo real:** cada "Generar 3 Variantes" consume **~7 créditos** (1 por los 3 textos + 2 por cada una de las 3 imágenes). Nota: el cartelito de la pantalla que dice "1 crédito" se refiere solo a la generación de textos, no al total.
 
 ---
