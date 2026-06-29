@@ -59,7 +59,7 @@ El producto integra: CRM (Tokko Broker), WhatsApp bidireccional (Evolution API +
 ### IA / LLM
 | Proveedor | Modelo | Wrapper | Uso |
 |---|---|---|---|
-| OpenAI | `gpt-4.1-mini` | `lib/openai.ts` → `openaiIA` | Buscador IA, Tutor IA (intent + respuesta) |
+| OpenAI | `gpt-5.4-mini` | `lib/openai.ts` → `openaiIA` | Buscador IA, Tutor IA (intent + respuesta). Familia GPT-5 → `max_completion_tokens` |
 | Google Gemini | `gemini-2.0-flash` / `gemini-3.5-flash` | `lib/gemini.ts` → `prismaIA` | Marketing copy, Análisis de chat, Conversión de plantillas, Tasador legacy |
 | Google Gemini | `gemini-embedding-001` | `lib/gemini.ts` → `generateEmbedding(text, taskType)` | Embeddings (768 dims). `RETRIEVAL_DOCUMENT` al indexar (RAG docs + propiedades); `RETRIEVAL_QUERY` para la consulta del Buscador IA (`match_properties_ia`/`match_roomix_ia`) |
 | Google Gemini | Imagen / Nano Banana Pro | `lib/gemini.ts` → `generateImage()` | Generación de imágenes de marketing |
@@ -154,6 +154,7 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 
 **IA y documentos**
 - `consultor_chat_sessions` / `consultor_chat_messages` — Buscador IA (memoria por sesión).
+- `shared_properties` — Fichas públicas compartibles (token + snapshot jsonb; RLS sin políticas, solo service-role).
 - `tutor_chat_sessions` / `tutor_chat_messages` — Tutor IA.
 - `agency_documents` — base de conocimiento con embedding para RAG (title, type, file_url/video_url, content_text, embedding, visibility, ai_enabled, folder_id).
 - `official_documents` / `official_document_folders` — Documentos Oficiales descargables (sin embedding, **NO consultados por IA**; file_url en bucket `documents` prefijo `official/`, version, file_size). La subida del director acepta **múltiples archivos a la vez** (`OfficialDocsSection.tsx`, input `multiple`): cada `title` se deriva del nombre del archivo sin extensión, todos van a la carpeta elegida, suben en serie con progreso y tolerancia a fallos.
@@ -240,6 +241,7 @@ Patrón estándar de un endpoint protegido:
 
 **IA**
 - `POST/GET/PATCH/DELETE /api/ai/consultor` — Buscador IA + gestión de sesiones.
+- `POST /api/ficha/share` (Tenant) — genera ficha compartible; `/ficha/[token]` (público) — ficha de lujo.
 - `GET/POST /api/ai/consultor/settings` — notas/directivas del director (POST solo director).
 - `POST/GET/PATCH/DELETE /api/ai/tutor` — Tutor IA (RAG).
 - `POST /api/ai/analyze-chat` — análisis de chat pegado.
@@ -373,7 +375,7 @@ Formato LangChain: `session_id` = conversation_id; `message` = `{ type:'human'|'
 
 ## 10. Subsistema de IA
 
-### 10.1 Buscador IA (`/api/ai/consultor`, GPT-4.1-mini)
+### 10.1 Buscador IA (`/api/ai/consultor`, GPT-5.4-mini)
 Asistente de búsqueda con **memoria por chat**. Flujo vigente (rediseño jun-2026):
 1. `requireTenant()` + `consumeAiCredits('consultor_ia', 1)`.
 2. Lee `agencies.buscador_ia_config` (notas/directivas del director) + nombre de agencia.
@@ -387,7 +389,19 @@ Asistente de búsqueda con **memoria por chat**. Flujo vigente (rediseño jun-20
 
 **Frontend / responsive (jun-2026):** `app/{asesor/consultor-ia,director/consultor}/page.tsx` comparten layout. El historial (`<aside>`) es **columna fija que empuja** en `md+` (`md:w-80`↔`md:w-0`) y **cajón superpuesto** en `<md` (`max-md:fixed inset-y-0 left-0 z-50 w-[85vw] max-w-xs` + `translate-x`), con backdrop `md:hidden` para cerrar. `isSidebarOpen` arranca `false` y un `useEffect` lo abre solo si `innerWidth>=768`; `closeSidebarOnMobile()` lo cierra al abrir/crear sesión en móvil. Tarjetas (`consultor-results.tsx`): flechas del carrusel visibles en touch (`opacity-100 md:opacity-0 md:group-hover:opacity-100`).
 
-### 10.2 Tutor IA (`/api/ai/tutor`, GPT-4.1-mini)
+**Mejoras jun-29 (rama `feat/buscador-ia-venta-piso-conversacional`):**
+- **Modelo → GPT-5.4-mini** en `openaiIA` (Buscador + Tutor). GPT-5 usa `max_completion_tokens` (no `max_tokens`). Costos actualizados a `gpt-5.4-mini`.
+- **Red de seguridad de operación:** si el mensaje dice "venta/comprar" (sin "alquiler") se fuerza `operation="venta"` por código (cubre fallos de JSON que dejaban `"ambas"` y mezclaban).
+- **Piso/nivel (filtro suave):** `floor_preference` alto (6+) / bajo·medio (0–5). Distingue "un piso" (tipo) de "piso alto/bajo" (nivel). Va a SQL como `p_floor_min/p_floor_max`. No descarta fichas sin piso cargado (properties ~32%, roomix ~7%): solo excluye las que contradicen y prioriza las confirmadas.
+- **Free-text:** `free_text_keywords` (lo que no es filtro duro ni amenity: "frente", "a estrenar", "apto crédito"…) → `p_free_text_patterns`, búsqueda `~*` sobre toda la ficha en ambas tablas; suave (peso 30 al ranking, no descarta).
+- **Compuerta de datos mínimos:** si falta operación/tipo/zona/ambientes/presupuesto, NO busca ni muestra: el asistente pide lo que falta (acumula entre turnos). Escape por regex ("mostrame igual"). Tono conversacional reforzado en el system prompt.
+- **Funciones SQL** `match_properties_ia`/`match_roomix_ia` recreadas con `p_floor_min, p_floor_max, p_free_text_patterns` (migración `20260629120000_buscador_ia_piso_freetext.sql`).
+- **Fix hidratación:** `Message` lleva `created_at`; timestamp con `toLocaleTimeString('es-AR',{hour12:false})` + `suppressHydrationWarning`.
+
+### 10.1.b Ficha compartible (`/api/ficha/share`, `/ficha/[token]`)
+Genera un link público de lujo de una propiedad con la tarjeta del asesor logueado + marca de la agencia. `POST /api/ficha/share` (`requireTenant`) snapshotea perfil (`profiles`), marca (`agencies.marketing_ai_config`) y propiedad (Roomix por slug / `properties` por id validando `agency_id`), guarda en `shared_properties` (token base62, RLS sin políticas → solo service-role). Página `/ficha/[token]` = **server component público** (fuera de `/asesor`·`/director`) que lee el snapshot con admin client, suma vista (`increment_shared_view`) y renderiza ficha premium (colores de marca o default navy+dorado+Playfair; `generateMetadata` para preview WhatsApp). No expone "Ver publicación original" (solo asesores). Migración `20260629140000_shared_properties.sql`.
+
+### 10.2 Tutor IA (`/api/ai/tutor`, GPT-5.4-mini)
 Mentor con **RAG** sobre `agency_documents`. Intent RETRIEVAL/GENERAL; si RETRIEVAL → `generateEmbedding()` + `match_agency_documents(threshold 0.15, count 5, p_user_role)`. Resume el tópico de la sesión cada 4 mensajes.
 
 ### 10.3 Análisis de chat (`/api/ai/analyze-chat`, Gemini 2.0 Flash)

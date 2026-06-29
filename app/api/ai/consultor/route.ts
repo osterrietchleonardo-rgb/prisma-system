@@ -144,13 +144,19 @@ export async function POST(req: Request) {
           "price_currency": "USD" | "ARS" | null,
           "rooms": número o null,
           "bedrooms": número o null,
-          "bathrooms": número o null
+          "bathrooms": número o null,
+          "floor_preference": "alto" | "bajo" | "medio" | null,
+          "free_text_keywords": ["características concretas que NO entran en los filtros de arriba: ej 'frente', 'contrafrente', 'a estrenar', 'apto crédito', 'pozo/en construcción', 'reciclado', 'luminoso', 'al río', 'esquina', nombre de barrio cerrado/edificio, etc. Si no hay: []"]
         }
 
         REGLAS CRÍTICAS:
         - MANTENÉ EL CONTEXTO: si antes pidió "3 ambientes en La Plata" y ahora dice "que tengan pileta", el resultado debe incluir location La Plata, rooms 3 y amenity pileta.
         - "operation": "en alquiler"/"alquilar" → "alquiler"; "comprar"/"en venta" → "venta"; si no especifica → "ambas".
-        - "piso" en Argentina = departamento de planta completa → type_keywords: ["piso"].
+        - "piso" tiene DOS sentidos, NO los confundas:
+            a) TIPO de propiedad (departamento de planta completa) → SOLO cuando dicen "un piso", "busco piso/pisos", "tipo piso" sin más → type_keywords: ["piso"].
+            b) NIVEL del departamento en el edificio → cuando dicen "piso alto/bajo", "planta alta/baja", "un 7° piso", "piso 8", "que esté arriba/abajo" → floor_preference (NO lo metas en type_keywords).
+        - "floor_preference": ALTO = del 6° piso para arriba (después del 5°). BAJO/MEDIO = de planta baja (0) hasta el 5° piso. "piso alto"/"bien arriba"/"última planta" → "alto". "piso bajo"/"planta baja"/"primeros pisos" → "bajo". "piso intermedio"/"ni muy alto ni muy bajo" → "medio". Si no hablan del nivel → null.
+        - "free_text_keywords": cualquier característica puntual que NO sea operación, tipo, zona, ambientes, baños, precio, ni un amenity del listado. Va literal y en minúsculas (ej: "frente", "apto crédito", "a estrenar", "pozo"). Estas se buscan como texto en TODA la ficha (título, descripción, dirección, etc.), no descartan resultados: solo ayudan a priorizar.
         - "depto"/"departamento" → ["departamento"].
         - AMBIENTES vs DORMITORIOS (¡NO los mezcles, es el error más caro!): "2 ambientes"/"2 amb"/"2 amb." → rooms: 2 (un ambiente = living/cocina + cada dormitorio). "2 dormitorios"/"2 cuartos"/"2 habitaciones"/"2 hab" → bedrooms: 2. Si solo dice "ambientes", llená rooms y dejá bedrooms en null (y viceversa).
         - "menos de 100 mil"/"hasta 100.000" → price_max: 100000.
@@ -178,6 +184,8 @@ export async function POST(req: Request) {
     let roomsFilter: number | null = null;
     let bedroomsFilter: number | null = null;
     let bathroomsFilter: number | null = null;
+    let floorPreference: string | null = null;
+    let freeTextKeywords: string[] = [];
 
     try {
       const parsed = JSON.parse(intentResText);
@@ -197,6 +205,11 @@ export async function POST(req: Request) {
       roomsFilter = parsed.rooms || null;
       bedroomsFilter = parsed.bedrooms || null;
       bathroomsFilter = parsed.bathrooms || null;
+      const fp = (parsed.floor_preference || "").toString().toLowerCase().trim();
+      floorPreference = ["alto", "bajo", "medio"].includes(fp) ? fp : null;
+      freeTextKeywords = (parsed.free_text_keywords || [])
+        .filter((k: string) => typeof k === "string" && k.trim().length > 1)
+        .map((k: string) => k.toLowerCase().trim());
     } catch(e) {
       isRetrieval = intentResText.toUpperCase().includes("RETRIEVAL");
     }
@@ -209,12 +222,50 @@ export async function POST(req: Request) {
       bedroomsFilter = null;
     }
 
-    console.log("Search params:", { isRetrieval, operation, locationKeywords, typeKeywords, amenityKeywords, agencyKeywords, priceMax, priceMin, priceCurrency, roomsFilter, bedroomsFilter, bathroomsFilter });
+    // Red de seguridad de OPERACIÓN: si el usuario dijo claramente "venta/comprar" o "alquiler/alquilar"
+    // en ESTE mensaje, lo respetamos por código aunque el modelo lo haya devuelto distinto o haya fallado
+    // el JSON (en ese caso 'operation' quedaba en "ambas" y se mezclaban venta y alquiler).
+    const msgLower = (message || "").toLowerCase();
+    const saysVenta = /\b(venta|en venta|comprar|compra|comprando|adquirir)\b/.test(msgLower);
+    const saysAlquiler = /\b(alquiler|alquilar|alquilando|renta|rentar|locaci[oó]n|locar)\b/.test(msgLower);
+    if (saysVenta && !saysAlquiler) operation = "venta";
+    else if (saysAlquiler && !saysVenta) operation = "alquiler";
+
+    // Red de seguridad de PISO/NIVEL: si nombran nivel del depto en este mensaje, fijamos la preferencia
+    // por código (sin pisar el tipo "piso planta completa"). Solo aplica si el modelo no la detectó.
+    if (!floorPreference) {
+      if (/\bpiso\s*alto|planta\s*alta|bien\s*arriba|[úu]ltim[oa]\s*piso|pisos?\s*altos\b/.test(msgLower)) floorPreference = "alto";
+      else if (/\bpiso\s*bajo|planta\s*baja|primeros?\s*pisos|pisos?\s*bajos\b/.test(msgLower)) floorPreference = "bajo";
+      else if (/\bpiso\s*(intermedio|medio)|nivel\s*medio\b/.test(msgLower)) floorPreference = "medio";
+    }
+
+    // Traducción de la preferencia de piso a una banda numérica (alto = 6+, bajo/medio = 0..5).
+    let floorMin: number | null = null;
+    let floorMax: number | null = null;
+    if (floorPreference === "alto") { floorMin = 6; floorMax = null; }
+    else if (floorPreference === "bajo" || floorPreference === "medio") { floorMin = 0; floorMax = 5; }
+
+    console.log("Search params:", { isRetrieval, operation, locationKeywords, typeKeywords, amenityKeywords, agencyKeywords, priceMax, priceMin, priceCurrency, roomsFilter, bedroomsFilter, bathroomsFilter, floorPreference, freeTextKeywords });
+
+    // ─── COMPUERTA DE DATOS MÍNIMOS ───────────────────────────────────────────
+    // Antes de buscar/mostrar, exigimos los datos clave para que la consulta a la herramienta
+    // salga con la mayor cantidad de info posible: operación, tipo, zona, ambientes y presupuesto.
+    // Si falta alguno, NO se busca: el asistente pregunta primero (acumula el contexto entre turnos).
+    const missingRequired: string[] = [];
+    if (operation === "ambas") missingRequired.push("la operación (compra o alquiler)");
+    if (typeKeywords.length === 0) missingRequired.push("el tipo de propiedad (depto, casa, PH, etc.)");
+    if (locationKeywords.length === 0) missingRequired.push("la zona o barrio");
+    if (!roomsFilter && !bedroomsFilter) missingRequired.push("la cantidad de ambientes o dormitorios");
+    if (!priceMax && !priceMin) missingRequired.push("el presupuesto y la moneda (USD o ARS)");
+    // Salida de escape: si el usuario pide ver igual, no lo bloqueamos.
+    const wantsAnyway = /\b(mostr[aá](me)?\s+igual|lo que tengas|sin importar|de una|busc[aá] igual|igual mostr|ver(las)?\s+igual|d[ae]le igual)\b/.test(msgLower);
+    const needsMoreInfo = isRetrieval && missingRequired.length > 0 && !wantsAnyway;
+
     let newMatchedProperties: any[] = [];
     let propertyContext = "";
-    let pisoFallback = false; 
+    let pisoFallback = false;
 
-    if (isRetrieval) {
+    if (isRetrieval && !needsMoreInfo) {
       const FULL_SELECT = 'id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, description, tokko_data, assigned_agent_id, assigned_agent, agent_profile:profiles(full_name, email)';
 
       // ─── ESTRATEGIA "Cartera_Propiedades" (paridad con n8n): filtros duros + embeddings + % match, todo en SQL ───
@@ -263,6 +314,11 @@ export async function POST(req: Request) {
         return terms.map(escapeRe).join('|');
       });
 
+      // Free-text → patrón regex literal por cada característica suelta (la SQL la busca con ~* en TODA la ficha,
+      // sin descartar filas: solo prioriza las que la contienen). Acentos normalizados para matchear con/sin tilde.
+      const freeTextPatterns = freeTextKeywords.map((t: string) =>
+        escapeRe(t.normalize('NFD').replace(/[̀-ͯ]/g, '')));
+
       // Inmobiliaria externa puntual → solo red de colaboración filtrada por nombre
       const norm = (s: any) => (s ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
       const alnum = (s: any) => norm(s).replace(/[^a-z0-9]/g, '');
@@ -295,6 +351,9 @@ export async function POST(req: Request) {
         p_currency: priceCurrency,
         p_loc_patterns: locPatterns,
         p_amenity_patterns: amenityPatterns,
+        p_floor_min: floorMin,
+        p_floor_max: floorMax,
+        p_free_text_patterns: freeTextPatterns,
       };
       let propiasRanked: any[] = [];
       let agenciaRanked: any[] = [];
@@ -323,6 +382,9 @@ export async function POST(req: Request) {
         p_loc_patterns: locPatterns,
         p_amenity_patterns: amenityPatterns,
         p_agency_name_patterns: agencyNamePatterns,
+        p_floor_min: floorMin,
+        p_floor_max: floorMax,
+        p_free_text_patterns: freeTextPatterns,
         p_limit: 10,
       });
       if (rmxErr) console.error('match_roomix_ia error:', rmxErr);
@@ -415,6 +477,22 @@ ${pisoFallback ? `AVISO IMPORTANTE: El usuario buscó un "piso" (depto planta co
 Respondé con un resumen MUY BREVE (2-4 oraciones): cuántas encontraste y ofrecé refinar la búsqueda.`
         : `No se encontraron propiedades con esos criterios.${pisoFallback ? ' Tampoco se encontraron departamentos.' : ''} Explicá cordialmente y sugerí alternativas concretas (ampliar zona, cambiar precio, quitar algún filtro).`;
 
+      // ─── Aviso sobre el piso/nivel: el dato está poco cargado, así que es un filtro SUAVE (no descarta) ───
+      if (floorPreference) {
+        const banda = floorPreference === "alto" ? "piso alto (6° o más)" : floorPreference === "bajo" ? "piso bajo (planta baja al 5°)" : "piso intermedio";
+        propertyContext += `\nNOTA SOBRE EL PISO: El usuario pidió ${banda}. Prioricé las que tienen ese nivel confirmado, pero MUCHAS fichas no especifican el piso, así que también pueden aparecer sin dato (no las descarté). Aclarale brevemente que conviene confirmar el piso de las que no lo informan.`;
+      }
+
+      // ─── Conversacional: detectar qué datos clave faltan para sugerir 1-2 preguntas naturales ───
+      const faltantes: string[] = [];
+      if (operation === "ambas") faltantes.push("si es para venta o alquiler");
+      if (locationKeywords.length === 0) faltantes.push("la zona/barrio");
+      if (!priceMax && !priceMin) faltantes.push("el presupuesto y la moneda (USD/ARS)");
+      if (!roomsFilter && !bedroomsFilter) faltantes.push("cuántos ambientes o dormitorios necesita");
+      if (faltantes.length > 0) {
+        propertyContext += `\nPARA AFINAR (importante, hacelo sonar natural y humano): Todavía no sabés ${faltantes.join(", ")}. Cerrá tu respuesta preguntando 1 o 2 de estas cosas (NO todas de golpe), de forma cálida y profesional, para acotar mejor la próxima búsqueda. Si hay un cliente detrás, preguntá pensando en él.`;
+      }
+
       // Conocimiento extra del director (notas) + lista de recomendadas para cruzar
       if (buscadorNotes && totalResults > 0) {
         propertyContext += `
@@ -440,8 +518,11 @@ INSTRUCCIÓN SOBRE NOTAS: Interpretá las notas y directivas de arriba. Si algun
     - Si no hay resultados: explicá por qué y sugerí 2-3 alternativas concretas.
     - Si el usuario pide más detalle de una propiedad específica, ahí sí describí sus características.
 
-    PERSONALIDAD:
-    - Profesional y cálido. Voseo formal ("tenés", "podés", "encontré", "mirá").
+    PERSONALIDAD Y ESTILO CONVERSACIONAL:
+    - Profesional y cálido, 100% humano. Voseo formal ("tenés", "podés", "encontré", "mirá"). Nada robótico ni acartonado.
+    - Sos un asesor experto que ASESORA, no un buscador que tira resultados. Mostrá criterio inmobiliario.
+    - INDAGÁ para afinar: si faltan datos clave (operación, zona, presupuesto, ambientes), preguntá de forma natural 1 o 2 cosas por vez (nunca un interrogatorio). Si el contexto dice "PARA AFINAR", seguilo.
+    - Cuando tenga sentido, preguntá pensando en el cliente final del asesor ("¿el cliente prioriza estar en piso alto o le importa más la zona?").
     - Siempre ofrecé refinar la búsqueda al final de tu respuesta.
 
     MEMORIA DE LA CONVERSACIÓN:
@@ -449,7 +530,12 @@ INSTRUCCIÓN SOBRE NOTAS: Interpretá las notas y directivas de arriba. Si algun
     - Si el usuario refina ("y con pileta", "más barato", "en otra zona"), entendelo como ajuste sobre la búsqueda previa, no como una búsqueda nueva desde cero.
 
     CONTEXTO DE BÚSQUEDA ACTUAL:
-    ${isRetrieval ? propertyContext : 'El usuario no está buscando propiedades. Respondé normalmente y, si corresponde, retomá lo conversado.'}
+    ${needsMoreInfo
+      ? `TODAVÍA NO BUSQUÉS NI MUESTRES PROPIEDADES. El usuario quiere buscar pero faltan datos clave para traerle lo mejor. Faltan: ${missingRequired.join("; ")}.
+Tu tarea AHORA: pedile esos datos de forma natural, cálida y profesional (como un asesor experto que quiere entender bien la necesidad antes de mostrar). Reconocé lo que YA te dijo para no repreguntarlo. Podés agrupar 2-3 preguntas en una sola intervención fluida (no como formulario). Explicale en una frase por qué te sirve (para acotar y no hacerle perder tiempo). NO inventes ni menciones propiedades: todavía no hay resultados.`
+      : isRetrieval
+        ? propertyContext
+        : 'El usuario no está buscando propiedades. Respondé normalmente y, si corresponde, retomá lo conversado.'}
 
     Respondé SIEMPRE en español de Argentina.`;
 
@@ -468,12 +554,12 @@ INSTRUCCIÓN SOBRE NOTAS: Interpretá las notas y directivas de arriba. Si algun
     const assistantContent = chatResult.response.text();
 
     // ─── Record real token usage (input + output) ─────────────────────────
-    // openaiIA usa GPT-4.1-mini. Precio desde la tabla central (utils/aiCostCalculator).
+    // openaiIA usa GPT-5.4-mini. Precio desde la tabla central (utils/aiCostCalculator).
     const consultor_usage = chatResult.response.usageMetadata;
     if (consultor_usage) {
       const inputTk = consultor_usage.promptTokenCount ?? 0;
       const outputTk = consultor_usage.candidatesTokenCount ?? 0;
-      const { totalCostUSD } = calculateCost({ model: "gpt-4.1-mini", inputTokens: inputTk, outputTokens: outputTk });
+      const { totalCostUSD } = calculateCost({ model: "gpt-5.4-mini", inputTokens: inputTk, outputTokens: outputTk });
       updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
     }
 

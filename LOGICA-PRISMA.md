@@ -105,7 +105,7 @@ PRISMA es un SaaS **multi-tenant** para inmobiliarias argentinas. Cada inmobilia
 | Google Gemini | `gemini-2.0-flash` | `lib/gemini.ts` → `prismaIA` | Marketing copy, Tasaciones, Analyze Chat, Embeddings |
 | Google Gemini | `gemini-embedding-001` | `lib/gemini.ts` → `generateEmbedding(text, taskType)` | Embeddings vectoriales 768 dims (`RETRIEVAL_DOCUMENT` al indexar / `RETRIEVAL_QUERY` en la consulta del Buscador IA) |
 | Google Gemini | `imagen-3.0-generate-002` | `lib/gemini.ts` → `generateImage()` | Generación de imágenes para marketing |
-| OpenAI (via Google) | `gpt-4.1-mini` | `lib/openai.ts` → `openaiIA` | Consultor IA, Tutor IA (intent + response) |
+| OpenAI | `gpt-5.4-mini` | `lib/openai.ts` → `openaiIA` | Consultor/Buscador IA, Tutor IA (intent + response). Usa `max_completion_tokens` (familia GPT-5) |
 
 ### Integraciones Externas
 | Servicio | Protocolo | Uso |
@@ -330,6 +330,7 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 #### IA y Documentos
 - **`consultor_chat_sessions`** — Sesiones del Consultor IA
 - **`consultor_chat_messages`** — Mensajes del Consultor IA
+- **`shared_properties`** — Fichas compartibles del Buscador IA (token + snapshot; RLS sin políticas, solo service-role)
 - **`tutor_chat_sessions`** — Sesiones del Tutor IA
 - **`tutor_chat_messages`** — Mensajes del Tutor IA
 - **`agency_documents`** — Documentos subidos (con embedding para RAG)
@@ -367,8 +368,9 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 
 | Función | Uso |
 |---|---|
-| `match_properties_ia(p_agency_id, p_query_embedding, p_operation, p_type_patterns, p_rooms, p_bedrooms, p_bathrooms, p_price_max/min, p_currency, p_loc_patterns, p_amenity_patterns, p_include/exclude_agent, p_limit)` | **Buscador IA — cartera propia/agencia**: filtro duro (ambientes ±1, presupuesto, zona, tipo) + ranking vectorial HNSW + `match_pct`. Devuelve `id, match_pct, semantic_sim, assigned_agent_id`. |
-| `match_roomix_ia(p_query_embedding, p_operation, p_type_patterns, p_rooms, p_bedrooms, p_bathrooms, p_price_max/min, p_currency, p_loc_patterns, p_amenity_patterns, p_agency_name_patterns, p_limit)` | **Buscador IA — red de colaboración** (54k filas, sin límite de 400). Mismo esquema. Devuelve `id, match_pct, semantic_sim`. |
+| `match_properties_ia(p_agency_id, p_query_embedding, p_operation, p_type_patterns, p_rooms, p_bedrooms, p_bathrooms, p_price_max/min, p_currency, p_loc_patterns, p_amenity_patterns, p_floor_min, p_floor_max, p_free_text_patterns, p_include/exclude_agent, p_limit)` | **Buscador IA — cartera propia/agencia**: filtro duro (ambientes ±1, presupuesto, zona, tipo) + **banda de piso suave** + **free-text** + ranking vectorial HNSW + `match_pct`. Devuelve `id, match_pct, semantic_sim, assigned_agent_id`. |
+| `match_roomix_ia(p_query_embedding, p_operation, p_type_patterns, p_rooms, p_bedrooms, p_bathrooms, p_price_max/min, p_currency, p_loc_patterns, p_amenity_patterns, p_agency_name_patterns, p_floor_min, p_floor_max, p_free_text_patterns, p_limit)` | **Buscador IA — red de colaboración** (54k filas, sin límite de 400). Mismo esquema (+ piso suave + free-text). Devuelve `id, match_pct, semantic_sim`. |
+| `increment_shared_view(p_token)` | Suma 1 al `view_count` de una ficha compartida (`shared_properties`). SECURITY DEFINER. |
 | `match_agency_documents(query_embedding, match_threshold, match_count, p_agency_id, p_user_role)` | Búsqueda vectorial de documentos (RAG) |
 | `consume_ai_credits(p_agency_id, p_user_id, p_feature, p_amount, p_summary)` | Consume créditos IA y retorna txId |
 | `update_ai_transaction_cost(p_transaction_id, p_input_tokens, p_output_tokens, p_usd_cost)` | Actualiza costo real post-generación |
@@ -721,7 +723,7 @@ Para bases grandes (ej. 15.000 leads) respetando el límite de Meta:
 
 **Endpoint:** `POST /api/ai/consultor`  
 **Archivo:** `app/api/ai/consultor/route.ts`  
-**Modelo:** OpenAI GPT-4.1-mini (via `openaiIA`)
+**Modelo:** OpenAI GPT-5.4-mini (via `openaiIA`; usa `max_completion_tokens`)
 
 ### 10.1 Propósito
 
@@ -811,13 +813,35 @@ Se corrigió la vista de celular del Buscador IA (afecta asesor `app/asesor/cons
 - **Encabezado:** deja de desbordar con `min-w-0` + `truncate` en título/subtítulo y `shrink-0` en el ícono y el badge de créditos.
 - **Tarjetas de propiedades (`consultor-results.tsx`):** las flechas del carrusel pasan de solo-hover a visibles siempre en celular (`opacity-100 md:opacity-0 md:group-hover:opacity-100`), porque en touch no hay hover. El footer del modal de detalle apila en pantallas angostas (`flex-col sm:flex-row`).
 
+### 10.7 Mejoras Junio 29 (modelo, piso, free-text, compuerta de datos, ficha compartible)
+
+Rama `feat/buscador-ia-venta-piso-conversacional`. Cambios solo aditivos, sin romper el flujo previo.
+
+- **Modelo → GPT-5.4-mini.** `lib/openai.ts` (`openaiIA`) pasó de `gpt-4.1-mini` a `gpt-5.4-mini` (afecta Buscador IA **y** Tutor IA). La familia GPT-5 no acepta `max_tokens`: se usa **`max_completion_tokens`**. El tracking de costos (`utils/aiCostCalculator`) ya tenía `gpt-5.4-mini` (input 0.75 / output 3.00); se actualizó el modelo hardcodeado en `consultor/route.ts` y `tutor/route.ts`.
+- **Red de seguridad de operación ("venta trae solo venta"):** el filtro SQL ya filtraba bien (`properties.status='Venta'` / `roomix.operation='sale'`); el hueco era que si el JSON del modelo fallaba, `operation` quedaba en `"ambas"` y mezclaba. Ahora por código: si el mensaje dice "venta/comprar" (y no "alquiler") se fuerza `operation="venta"` (y viceversa) — mismo patrón que la red de ambientes.
+- **Piso/nivel del departamento (filtro SUAVE):** nuevo `floor_preference` (`alto`/`bajo`/`medio`). **ALTO = piso 6+** (después del 5°); **BAJO/MEDIO = planta baja (0) al 5°**. Se distingue del tipo "piso" (planta completa): "un piso" = tipo; "piso alto/bajo", "planta alta", "7° piso" = nivel (con red de seguridad por regex). Como el dato de piso está **poco cargado** (`properties.tokko_data->>'floor'` ~32%, `roomix.floor` ~7%), el filtro **no descarta** las fichas sin dato: solo excluye las que tienen piso cargado y contradicen la banda, y prioriza (ORDER BY) las de nivel confirmado. Se traduce a `floorMin/floorMax` y va a las funciones SQL.
+- **Búsqueda flexible de características (free-text):** nuevo `free_text_keywords` para lo que NO entra en los filtros duros ni en el diccionario de amenities (ej: "frente", "contrafrente", "a estrenar", "apto crédito", "pozo", "al río"). Se buscan con `~*` sobre **todo el texto de la ficha** (título, descripción, dirección, ciudad/barrio, tipo, tags/amenities) en ambas tablas. Es **suave**: suma como dimensión de ranking (peso 30, como amenities), no descarta. Con array vacío el comportamiento es idéntico al previo.
+- **Compuerta de datos mínimos (pregunta antes de buscar):** si la intención es RETRIEVAL pero faltan datos clave —**operación, tipo, zona, ambientes, presupuesto**— el Buscador **NO** llama a la herramienta ni muestra propiedades: el asistente pide lo que falta de forma natural (acumula entre turnos). Cuando ya tiene los 5, busca. Salida de escape por regex ("mostrame igual", "lo que tengas", "sin importar"). Más conversacional: el system prompt instruye a indagar como un asesor experto pensando en el cliente final.
+- **Funciones SQL actualizadas** (`match_properties_ia` / `match_roomix_ia`): suman `p_floor_min`, `p_floor_max`, `p_free_text_patterns`. Se aplicaron con `DROP + CREATE` (la firma cambió). Migración versionada: `supabase/migrations/20260629120000_buscador_ia_piso_freetext.sql`.
+- **Fix de hidratación + hora real del mensaje:** el timestamp de los mensajes (asesor/director) era un `new Date()` mockeado con locale por defecto (server "10:45 a. m." vs cliente "10:45" → error de hidratación). Ahora `Message` lleva `created_at` (de la base al cargar; `new Date().toISOString()` al enviar/recibir) y se renderiza con `toLocaleTimeString('es-AR', { hour12:false })` + `suppressHydrationWarning`. El saludo inicial no lleva hora (elimina la causa raíz).
+
+### 10.8 Ficha compartible (página pública de lujo)
+
+Permite al asesor/director generar un **link público** de una propiedad (de cualquier sección del Buscador) con su tarjeta de contacto y la marca de su agencia, para mandarle al cliente.
+
+- **Botón "Compartir ficha"** en el modal de detalle (`components/shared/consultor-results.tsx`): hace `POST /api/ficha/share`, abre la ficha en pestaña nueva y copia el link al portapapeles.
+- **Endpoint `POST /api/ficha/share`** (`app/api/ficha/share/route.ts`, `requireTenant`): saca el perfil del usuario logueado (`profiles`: nombre, email, tel, avatar, rol), la agencia + marca (`agencies.marketing_ai_config`) y la propiedad (Roomix por slug; `properties` por id **validando `agency_id`**). Arma un **snapshot** y lo guarda con un token base62 (~12 chars).
+- **Tabla `shared_properties`** (token PK, `property_source`, `property_id`, `snapshot` jsonb, `created_by`, `agency_id`, `view_count`, `created_at`). **RLS activado sin políticas**: solo el server (service-role) la lee/escribe; ni anon ni authenticated acceden directo. Función `increment_shared_view(p_token)` (SECURITY DEFINER) para el contador. Migración: `supabase/migrations/20260629140000_shared_properties.sql`.
+- **Página pública `/ficha/[token]`** (`app/ficha/[token]/page.tsx`, **server component**, fuera de `(public)` y de `/asesor`·`/director` → pública por middleware): lee el snapshot con el admin client, suma vista, y renderiza una ficha premium (galería, precio, specs, descripción, amenities, tarjeta del asesor con WhatsApp/Email). Usa los **colores de marca** de la agencia (o un **default de autoridad/lujo** navy+dorado+Playfair si no configuró). `generateMetadata` arma el preview para WhatsApp.
+- **Seguridad:** la página es de solo-lectura del snapshot, no crea sesión ni cookies, no toca otras tablas; el `SUPABASE_SERVICE_ROLE_KEY` no es `NEXT_PUBLIC` y solo se usa server-side; los tokens son aleatorios (~71 bits). El link **no** muestra "Ver publicación original" (eso es solo para asesores/directores dentro del Buscador). No es una vía de acceso al sistema.
+
 ---
 
 ## 11. Módulo de IA — Tutor
 
 **Endpoint:** `POST /api/ai/tutor`  
 **Archivo:** `app/api/ai/tutor/route.ts`  
-**Modelo:** OpenAI GPT-4.1-mini (via `openaiIA`)
+**Modelo:** OpenAI GPT-5.4-mini (via `openaiIA`; usa `max_completion_tokens`)
 
 ### 11.1 Propósito
 
@@ -1898,6 +1922,8 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 
 | Ruta | Método(s) | Auth | Descripción |
 |---|---|---|---|
+| `/api/ficha/share` | POST | Tenant | Genera ficha pública compartible (snapshot + token) |
+| `/ficha/[token]` | GET (page) | Público | Ficha de propiedad de lujo (solo-lectura del snapshot) |
 | `/api/admin-vakdor/login` | POST | Público (rate limited) | Login admin |
 | `/api/admin-vakdor/logout` | POST | Admin JWT | Logout admin |
 | `/api/admin-vakdor/agencias` | GET | Admin JWT | Lista agencias |

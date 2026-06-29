@@ -407,8 +407,11 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 1. Escribí lo que busca el cliente: *"3 ambientes en zona norte por menos de 250k con cochera"*.
 2. Entiende operación, zona, tipo, presupuesto (USD o pesos), **ambientes** (no los confunde con dormitorios) y **todos los servicios/amenities** (cochera, pileta, parrilla, SUM, seguridad, balcón, terraza, gimnasio, baulera, apto profesional…).
 3. Devuelve tarjetas en 3 grupos (**propias**, **agencia**, **red de colaboración**), ordenadas por un **% de coincidencia** visible en cada tarjeta (verde = justo lo pedido, ámbar = comparable, gris = más lejano). Busca sobre **toda** la red de colaboración, no una muestra.
-4. **No pierde ventas:** muestra las exactas **y** los comparables cercanos (con menor %), pero descarta lo que no corresponde (un "2 ambientes" nunca trae un "4 ambientes").
-5. Podés **refinar** sin repetir todo; el chat **recuerda** la conversación.
+4. **Primero pregunta, después busca:** para una búsqueda óptima pide 5 datos —**operación, tipo, zona, ambientes y presupuesto**—. Si falta alguno, **no muestra nada todavía**: repregunta de forma natural y recién busca cuando los tiene. (Si querés ver igual: *"mostrame igual"*.)
+5. **No pierde ventas:** muestra las exactas **y** los comparables cercanos (con menor %), pero descarta lo que no corresponde (un "2 ambientes" nunca trae un "4 ambientes").
+6. Podés **refinar** sin repetir todo; el chat **recuerda** la conversación.
+
+**Entiende mejor:** **"en venta"** trae solo venta (no mezcla con alquiler); **"piso alto/bajo"** = piso del depto en el edificio (**alto = 6° o más**, bajo/medio = PB al 5°; las que no informan el piso aparecen igual y conviene confirmarlas); y **características sueltas** como *"al frente"*, *"a estrenar"* o *"apto crédito"* las busca en toda la ficha para priorizarlas.
 
 **Notas / directivas del director (exclusivo tuyo):**
 - Dentro del Buscador tenés una solapa de **Notas** donde escribís indicaciones en **texto libre** (ej.: "evitar colaborar con tal inmobiliaria", "tal propiedad acepta permuta").
@@ -420,6 +423,13 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 > ⚠️ El asesor **no ve** la solapa de Notas; solo recibe las consideraciones en sus búsquedas.
 > 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
 > 💰 1 crédito por búsqueda.
+
+### Compartir ficha con el cliente
+
+En el detalle de cada propiedad, vos y tus asesores tienen el botón **"Compartir ficha"**: genera una **página de presentación profesional y de lujo** (con un link que se copia solo) para mandarle al cliente por WhatsApp. Muestra fotos, precio, datos, y la **tarjeta de contacto del asesor que la generó** (su WhatsApp y email), pintada con los **colores y el logo de tu inmobiliaria**.
+
+> 🎨 **Importante para vos:** esos colores, la tipografía y el logo salen de **Marketing IA → Configuración IA**. Si los configurás bien, **todas las fichas que compartan tus asesores salen con tu identidad de marca**. Si no, usan un diseño elegante por defecto.
+> 🔒 El cliente externo **no** ve de qué portal salió la propiedad (es info interna), ni puede acceder al sistema desde el link: es solo una vitrina de presentación de solo lectura.
 
 ---
 
