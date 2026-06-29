@@ -336,7 +336,7 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 - **`agency_documents`** — Documentos subidos (con embedding para RAG)
 - **`document_folders`** — Carpetas de la Biblioteca de Conocimiento (IA)
 - **`official_documents`** — Documentos Oficiales descargables (NO consultados por IA)
-- **`official_document_folders`** — Carpetas de los Documentos Oficiales
+- **`official_document_folders`** — Carpetas de los Documentos Oficiales (jerárquicas vía `parent_id`: admiten subcarpetas)
 - **`ipc_profiles`** — Perfiles de IPC para Marketing IA (Ideal Prospect Client)
 - **`generated_images`** — Imágenes generadas por Marketing IA
 - **`valuations`** — Tasaciones generadas
@@ -829,7 +829,8 @@ Rama `feat/buscador-ia-venta-piso-conversacional`. Cambios solo aditivos, sin ro
 
 Permite al asesor/director generar un **link público** de una propiedad (de cualquier sección del Buscador) con su tarjeta de contacto y la marca de su agencia, para mandarle al cliente.
 
-- **Botón "Compartir ficha"** en el modal de detalle (`components/shared/consultor-results.tsx`): hace `POST /api/ficha/share`, abre la ficha en pestaña nueva y copia el link al portapapeles.
+- **Botón "Compartir ficha"** en el modal de detalle (`components/shared/consultor-results.tsx`): hace `POST /api/ficha/share`, abre la ficha en pestaña nueva y copia el link al portapapeles. **Este es el único punto de entrada a la ficha de lujo.**
+- **Nota — detalle de Propiedades:** las páginas de detalle de la cartera (`app/asesor/propiedades/[id]` y `app/director/propiedades/[id]`) **no** generan la ficha de lujo. Tenían un botón decorativo "Compartir Ficha" **sin handler** que se **eliminó** por redundante; queda solo **"Ver Ficha Pública"**, que abre el aviso público del portal (`tokko.public_url`) — algo distinto de la ficha compartible de PRISMA.
 - **Endpoint `POST /api/ficha/share`** (`app/api/ficha/share/route.ts`, `requireTenant`): saca el perfil del usuario logueado (`profiles`: nombre, email, tel, avatar, rol), la agencia + marca (`agencies.marketing_ai_config`) y la propiedad (Roomix por slug; `properties` por id **validando `agency_id`**). Arma un **snapshot** y lo guarda con un token base62 (~12 chars).
 - **Tabla `shared_properties`** (token PK, `property_source`, `property_id`, `snapshot` jsonb, `created_by`, `agency_id`, `view_count`, `created_at`). **RLS activado sin políticas**: solo el server (service-role) la lee/escribe; ni anon ni authenticated acceden directo. Función `increment_shared_view(p_token)` (SECURITY DEFINER) para el contador. Migración: `supabase/migrations/20260629140000_shared_properties.sql`.
 - **Página pública `/ficha/[token]`** (`app/ficha/[token]/page.tsx`, **server component**, fuera de `(public)` y de `/asesor`·`/director` → pública por middleware): lee el snapshot con el admin client, suma vista, y renderiza una ficha premium (galería, precio, specs, descripción, amenities, tarjeta del asesor con WhatsApp/Email). Usa los **colores de marca** de la agencia (o un **default de autoridad/lujo** navy+dorado+Playfair si no configuró). `generateMetadata` arma el preview para WhatsApp.
@@ -1330,9 +1331,10 @@ Solapa independiente dentro de `/director/documentos` y `/asesor/documentos` par
 
 - **Aislamiento total de la IA:** vive en tablas propias (`official_documents` y `official_document_folders`) que la IA **no conoce**. El RAG (`match_agency_documents`) solo lee `agency_documents`, por lo que es imposible que el Tutor IA consulte estos archivos.
 - **Sin embeddings ni extracción de texto:** la subida va directo del navegador a Supabase Storage (bucket `documents`, prefijo `official/{agencyId}/`) + insert en `official_documents`. No consume créditos IA.
-- **Subida múltiple:** el botón "Subir Documentos" acepta **varios archivos a la vez** (input `multiple`). El `title` de cada documento se deriva del **nombre del archivo sin extensión**; todos se guardan en la **carpeta elegida** (selector único). Se suben en serie con barra de progreso (`done/total`) y manejo tolerante a fallos (si uno falla, los demás se insertan y se reporta cuál no entró).
-- **Director:** crea carpetas con nombre personalizado, sube archivos (sin límite de tamaño, uno o varios a la vez), reemplaza por una versión nueva (borra la anterior del storage y sube `version`), mueve entre carpetas, elimina y descarga.
-- **Asesor:** acceso **solo lectura** — navega carpetas y descarga; no ve botones de gestión (`readOnly` en el componente compartido).
+- **Subida múltiple:** el botón "Subir Documentos" acepta **varios archivos a la vez** (input `multiple`). El `title` de cada documento se deriva del **nombre del archivo sin extensión**; todos se guardan en la **carpeta elegida** (selector único, que lista las carpetas con su ruta completa "Carpeta / Subcarpeta"). Se suben en serie con barra de progreso (`done/total`) y manejo tolerante a fallos (si uno falla, los demás se insertan y se reporta cuál no entró).
+- **Carpetas y subcarpetas (jerarquía):** `official_document_folders` tiene `parent_id` (autorreferencia, `ON DELETE CASCADE`); `parent_id NULL` = carpeta de raíz. Se navega con un **breadcrumb** (Inicio › Carpeta › Subcarpeta): "entrar" a una carpeta muestra sus subcarpetas (tarjetas clickeables) y los documentos sueltos de ese nivel. "Nueva Carpeta" crea en la raíz; estando dentro de una carpeta, el mismo botón pasa a **"Nueva Subcarpeta"** y crea con `parent_id` = carpeta actual. Borrar una carpeta **borra también sus subcarpetas** (cascade) y deja los documentos de todo ese subárbol **sin carpeta** (`folder_id` queda `NULL` por el `ON DELETE SET NULL` de `official_documents`). El buscador, cuando hay texto, busca en **todas** las carpetas (ignora el nivel actual).
+- **Director:** crea carpetas y subcarpetas con nombre personalizado, sube archivos (sin límite de tamaño, uno o varios a la vez), reemplaza por una versión nueva (borra la anterior del storage y sube `version`), mueve entre carpetas, renombra/elimina y descarga.
+- **Asesor:** acceso **solo lectura** — navega carpetas/subcarpetas y descarga; no ve botones de gestión (`readOnly` en el componente compartido).
 - **Componente compartido:** `components/documentos/OfficialDocsSection.tsx` (prop `readOnly` distingue asesor de director).
 - **Permisos (RLS):** ver = cualquier miembro de la agencia; gestionar = solo `director`.
 

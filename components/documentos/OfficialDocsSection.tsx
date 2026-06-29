@@ -18,6 +18,8 @@ import {
   RefreshCw,
   ShieldCheck,
   Lock,
+  ChevronRight,
+  Home,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -74,7 +76,8 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
 
   const [folders, setFolders] = useState<Record<string, any>[]>([])
   const [documents, setDocuments] = useState<Record<string, any>[]>([])
-  const [selectedFolderId, setSelectedFolderId] = useState<string | "all">("all")
+  // null = raíz (Inicio). El id de una carpeta = estamos "dentro" de esa carpeta.
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null)
 
   // Folder modal
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false)
@@ -166,9 +169,9 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
         const { data: { user } } = await supabase.auth.getUser()
         const { error } = await supabase
           .from("official_document_folders")
-          .insert({ name, description, agency_id: agencyId, created_by: user?.id })
+          .insert({ name, description, agency_id: agencyId, created_by: user?.id, parent_id: currentFolderId })
         if (error) throw error
-        toast.success("Carpeta creada")
+        toast.success(currentFolderId ? "Subcarpeta creada" : "Carpeta creada")
       }
       setIsFolderModalOpen(false)
       setFolderToEdit(null)
@@ -180,16 +183,50 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
     }
   }
 
+  // Cadena de carpetas desde la raíz hasta la carpeta indicada (para breadcrumb y rutas).
+  const getFolderPath = (id: string | null): Record<string, any>[] => {
+    const path: Record<string, any>[] = []
+    let current = id ? folders.find((f) => f.id === id) : null
+    const guard = new Set<string>()
+    while (current && !guard.has(current.id)) {
+      guard.add(current.id)
+      path.unshift(current)
+      current = current.parent_id ? folders.find((f) => f.id === current!.parent_id) : null
+    }
+    return path
+  }
+
+  // Etiqueta tipo "Carpeta A / Subcarpeta B" para selects.
+  const folderLabel = (id: string) => getFolderPath(id).map((f) => f.name).join(" / ")
+
+  // Devuelve el id de la carpeta y de todas sus subcarpetas (en cualquier nivel).
+  const collectSubtreeIds = (id: string, list = folders): string[] => {
+    const ids = [id]
+    for (const f of list) {
+      if (f.parent_id === id) ids.push(...collectSubtreeIds(f.id, list))
+    }
+    return ids
+  }
+
   const handleDeleteFolder = async (id: string) => {
     if (!agencyId) return
-    if (!confirm("¿Eliminar esta carpeta? Los archivos no se borran, quedan sin carpeta.")) return
+    const hasChildren = folders.some((f) => f.parent_id === id)
+    const msg = hasChildren
+      ? "¿Eliminar esta carpeta y sus subcarpetas? Los archivos no se borran, quedan sin carpeta."
+      : "¿Eliminar esta carpeta? Los archivos no se borran, quedan sin carpeta."
+    if (!confirm(msg)) return
     try {
       setDeletingFolder(id)
-      await supabase.from("official_documents").update({ folder_id: null }).eq("folder_id", id)
+      // Las subcarpetas se borran solas (cascade); los documentos quedan sin carpeta (folder_id = null).
       const { error } = await supabase.from("official_document_folders").delete().eq("id", id)
       if (error) throw error
       toast.success("Carpeta eliminada")
-      if (selectedFolderId === id) setSelectedFolderId("all")
+      // Si estábamos parados dentro de la carpeta borrada (o de una subcarpeta suya), volvemos al padre.
+      const deletedSubtree = collectSubtreeIds(id)
+      if (currentFolderId && deletedSubtree.includes(currentFolderId)) {
+        const parentOfDeleted = folders.find((f) => f.id === id)?.parent_id ?? null
+        setCurrentFolderId(parentOfDeleted)
+      }
       fetchFolders(agencyId)
       fetchDocs(agencyId)
     } catch (error: any) {
@@ -366,11 +403,19 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
     window.open(data.publicUrl, "_blank")
   }
 
+  const isSearching = search.trim().length > 0
+
+  // Mientras se busca, se mira en TODAS las carpetas. Si no, solo la carpeta actual.
   const filteredDocs = documents.filter((d) => {
-    const matchesSearch = d.title?.toLowerCase().includes(search.toLowerCase())
-    const matchesFolder = selectedFolderId === "all" || d.folder_id === selectedFolderId
-    return matchesSearch && matchesFolder
+    if (isSearching) return d.title?.toLowerCase().includes(search.toLowerCase())
+    return (d.folder_id ?? null) === currentFolderId
   })
+
+  // Subcarpetas del nivel actual (no se muestran mientras se busca).
+  const currentSubfolders = folders.filter((f) => (f.parent_id ?? null) === currentFolderId)
+  const breadcrumb = getFolderPath(currentFolderId)
+  const docsInFolder = (id: string) => documents.filter((d) => d.folder_id === id).length
+  const childFoldersCount = (id: string) => folders.filter((f) => f.parent_id === id).length
 
   return (
     <div className="flex flex-col h-full space-y-4">
@@ -395,17 +440,21 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
               <DialogTrigger asChild>
                 <Button variant="outline" className="border-accent/20 hover:bg-accent/5 gap-2 h-11 px-6">
                   <FolderPlus className="h-5 w-5 text-accent" />
-                  Nueva Carpeta
+                  {currentFolderId ? "Nueva Subcarpeta" : "Nueva Carpeta"}
                 </Button>
               </DialogTrigger>
               <DialogContent className="bg-card border-accent/20 sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                     {folderToEdit ? <Folder className="text-accent" /> : <FolderPlus className="text-accent" />}
-                    {folderToEdit ? "Editar Carpeta" : "Crear Nueva Carpeta"}
+                    {folderToEdit
+                      ? "Editar Carpeta"
+                      : currentFolderId ? "Crear Subcarpeta" : "Crear Nueva Carpeta"}
                   </DialogTitle>
                   <DialogDescription>
-                    Organizá los documentos oficiales en carpetas personalizadas.
+                    {!folderToEdit && currentFolderId
+                      ? `Se creará dentro de: ${folderLabel(currentFolderId)}`
+                      : "Organizá los documentos oficiales en carpetas y subcarpetas personalizadas."}
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSaveFolder} className="space-y-4 py-4">
@@ -450,7 +499,7 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
                 <form onSubmit={handleUpload} className="space-y-5 py-4 min-w-0">
                   <div className="space-y-2">
                     <label className="text-sm font-semibold">Carpeta donde guardar</label>
-                    <Select name="folderId" defaultValue={selectedFolderId === "all" ? "none" : selectedFolderId}>
+                    <Select name="folderId" defaultValue={currentFolderId ?? "none"}>
                       <SelectTrigger className="bg-muted/30">
                         <SelectValue placeholder="Sin carpeta" />
                       </SelectTrigger>
@@ -460,7 +509,7 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
                           <SelectItem key={f.id} value={f.id}>
                             <div className="flex items-center gap-2">
                               <Folder className="h-4 w-4 text-accent/60" />
-                              <span>{f.name}</span>
+                              <span>{folderLabel(f.id)}</span>
                             </div>
                           </SelectItem>
                         ))}
@@ -585,7 +634,8 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
                     onClick={() => handleMoveToFolder(folder.id)}
                     disabled={isUpdatingFolder}
                   >
-                    <FolderOpen className="h-4 w-4 text-accent" /> {folder.name}
+                    <FolderOpen className="h-4 w-4 text-accent shrink-0" />
+                    <span className="truncate text-left">{folderLabel(folder.id)}</span>
                   </Button>
                 ))}
               </div>
@@ -610,47 +660,82 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
         </div>
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar no-scrollbar">
+      {/* Breadcrumb (navegación entre carpetas y subcarpetas) */}
+      <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar no-scrollbar text-sm">
         <Button
-          variant={selectedFolderId === "all" ? "secondary" : "ghost"}
+          variant="ghost"
           size="sm"
-          className={cn("rounded-xl h-10 px-4 whitespace-nowrap gap-2",
-            selectedFolderId === "all" ? "bg-accent/10 text-accent hover:bg-accent/20" : "text-muted-foreground")}
-          onClick={() => setSelectedFolderId("all")}
+          className={cn("rounded-xl h-9 px-3 whitespace-nowrap gap-1.5",
+            currentFolderId === null ? "bg-accent/10 text-accent hover:bg-accent/20" : "text-muted-foreground hover:bg-accent/5")}
+          onClick={() => setCurrentFolderId(null)}
         >
-          {selectedFolderId === "all" ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
-          Todos
+          <Home className="h-4 w-4" />
+          Inicio
         </Button>
-        {folders.map((folder) => (
-          <div key={folder.id} className="flex items-center gap-1 group">
-            <Button
-              variant={selectedFolderId === folder.id ? "secondary" : "ghost"}
-              size="sm"
-              className={cn("rounded-xl h-10 px-4 whitespace-nowrap gap-2",
-                selectedFolderId === folder.id ? "bg-accent/10 text-accent hover:bg-accent/20" : "text-muted-foreground hover:bg-accent/5")}
-              onClick={() => setSelectedFolderId(folder.id)}
-            >
-              {selectedFolderId === folder.id ? <FolderOpen className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
-              {folder.name}
-              <Badge variant="outline" className="ml-1 px-1.5 h-5 bg-background/50 border-none text-[10px]">
-                {documents.filter((d) => d.folder_id === folder.id).length}
-              </Badge>
-            </Button>
-            {!readOnly && selectedFolderId === folder.id && (
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-accent"
-                  onClick={() => { setFolderToEdit(folder); setIsFolderModalOpen(true) }}>
-                  <Pencil className="h-3 w-3" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  onClick={() => handleDeleteFolder(folder.id)} disabled={deletingFolder === folder.id}>
-                  {deletingFolder === folder.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
-                </Button>
-              </div>
-            )}
-          </div>
-        ))}
+        {breadcrumb.map((folder, i) => {
+          const isLast = i === breadcrumb.length - 1
+          return (
+            <div key={folder.id} className="flex items-center gap-1 shrink-0">
+              <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn("rounded-xl h-9 px-3 whitespace-nowrap gap-1.5 max-w-[200px]",
+                  isLast ? "bg-accent/10 text-accent hover:bg-accent/20 font-semibold" : "text-muted-foreground hover:bg-accent/5")}
+                onClick={() => setCurrentFolderId(folder.id)}
+              >
+                {isLast ? <FolderOpen className="h-4 w-4 shrink-0" /> : <Folder className="h-4 w-4 shrink-0" />}
+                <span className="truncate">{folder.name}</span>
+              </Button>
+              {isLast && !readOnly && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-accent"
+                    title="Renombrar carpeta"
+                    onClick={() => { setFolderToEdit(folder); setIsFolderModalOpen(true) }}>
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    title="Eliminar carpeta"
+                    onClick={() => handleDeleteFolder(folder.id)} disabled={deletingFolder === folder.id}>
+                    {deletingFolder === folder.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
+
+      {/* Subcarpetas del nivel actual (no se muestran mientras se busca) */}
+      {!isSearching && currentSubfolders.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {currentSubfolders.map((folder) => (
+            <button
+              key={folder.id}
+              type="button"
+              onClick={() => setCurrentFolderId(folder.id)}
+              className="group flex items-center gap-2.5 rounded-2xl border border-accent/15 bg-card/60 hover:bg-accent/5 hover:border-accent/30 transition-all px-4 py-2.5 text-left"
+            >
+              <div className="p-2 rounded-xl bg-accent/10 text-accent group-hover:scale-105 transition-transform">
+                <Folder className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold truncate max-w-[180px]">{folder.name}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {docsInFolder(folder.id)} {docsInFolder(folder.id) === 1 ? "archivo" : "archivos"}
+                  {childFoldersCount(folder.id) > 0 && ` · ${childFoldersCount(folder.id)} subcarpeta${childFoldersCount(folder.id) === 1 ? "" : "s"}`}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isSearching && (
+        <p className="text-xs text-muted-foreground -mt-1">
+          Mostrando coincidencias en todas las carpetas.
+        </p>
+      )}
 
       {/* Grid */}
       <main className="flex-1 overflow-y-auto pr-2 custom-scrollbar pb-8">
@@ -658,18 +743,27 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-44 rounded-3xl bg-muted/50" />)}
           </div>
+        ) : filteredDocs.length === 0 && !isSearching && currentSubfolders.length > 0 ? (
+          // La carpeta tiene subcarpetas pero ningún archivo suelto: no mostramos el cartel grande.
+          <p className="text-sm text-muted-foreground py-4">
+            Esta carpeta no tiene archivos sueltos. Entrá a una subcarpeta{!readOnly && " o subí documentos acá"}.
+          </p>
         ) : filteredDocs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[400px] text-center bg-muted/20 rounded-3xl border-2 border-dashed border-accent/10">
             <div className="w-20 h-20 bg-accent/5 rounded-full flex items-center justify-center mb-4">
               <ShieldCheck className="h-10 w-10 text-accent/40" />
             </div>
-            <h3 className="text-xl font-semibold text-foreground">No hay documentos oficiales</h3>
+            <h3 className="text-xl font-semibold text-foreground">
+              {isSearching ? "Sin resultados" : "No hay documentos oficiales"}
+            </h3>
             <p className="text-muted-foreground mt-2 max-w-sm">
-              {readOnly
+              {isSearching
+                ? "No encontramos documentos que coincidan con tu búsqueda."
+                : readOnly
                 ? "La dirección todavía no subió documentación oficial."
                 : "Subí los primeros documentos oficiales de tu agencia para que los asesores puedan descargarlos."}
             </p>
-            {!readOnly && (
+            {!readOnly && !isSearching && (
               <Button variant="outline" className="mt-6 border-accent/20" onClick={() => setIsUploadOpen(true)}>
                 Subir ahora
               </Button>
@@ -704,8 +798,8 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
                   <div className="flex flex-wrap gap-2 mb-4">
                     {doc.folder_id && (
                       <Badge variant="secondary" className="bg-accent/5 text-accent border-accent/10 flex items-center gap-1.5 py-1 px-3 rounded-xl text-[10px]">
-                        <Folder className="h-3 w-3" />
-                        {folders.find((f) => f.id === doc.folder_id)?.name || "Carpeta"}
+                        <Folder className="h-3 w-3 shrink-0" />
+                        {folderLabel(doc.folder_id) || "Carpeta"}
                       </Badge>
                     )}
                   </div>

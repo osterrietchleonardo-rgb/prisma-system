@@ -1,7 +1,7 @@
 "use client";
 
 // El ACM del director usa el mismo módulo que el asesor (misma lógica de comparables).
-import { AcmModule } from "@/app/asesor/acm/page";
+import { AcmModule } from "@/app/asesor/acm/components/acm-module";
 
 export default function ACMDirectorPage() {
   return <AcmModule />;

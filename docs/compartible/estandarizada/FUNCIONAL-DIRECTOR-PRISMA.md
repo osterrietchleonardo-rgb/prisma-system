@@ -144,6 +144,7 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 > 📐 **Superficies:** "Total" es la superficie total/lote y "Cubiertos" es la superficie techada real. (Antes la cubierta a veces mostraba el lote por error; ya está corregido.)
 > 🔒 Los datos del **propietario** (nombre, teléfono, comisión) **no se muestran** en PRISMA por privacidad, aunque Tokko los exponga.
+> 🔗 En el detalle de cada propiedad tenés el botón **"Ver Ficha Pública"**, que abre el **aviso público** de esa propiedad en el portal. Para mandarle a un cliente una **ficha de presentación de lujo** con la marca de tu inmobiliaria, usá el botón **"Compartir ficha"** del **Buscador IA** (ver más abajo).
 
 > 🔄 **Sincronización automática:** PRISMA sincroniza propiedades y leads con Tokko **solo, dos veces por día (7:00 AM y 6:00 PM)**. No hace falta que sincronices a mano para que tus asesores vean los cambios; el botón manual queda para cuando necesitás algo al instante.
 
@@ -353,12 +354,12 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 **Qué es:** una sección **aparte** para la **documentación oficial de la agencia** (contratos, reglamentos, formularios). A diferencia de la Biblioteca, **la IA NO consulta estos archivos**: es solo para que tu equipo los **descargue**.
 
 **Cómo usarla:**
-1. **Creá carpetas** con el nombre que quieras (ej. "Reglamentos", "Modelos de contrato").
-2. **Subí archivos** con el botón **"Subir Documentos"** (cualquier formato, sin límite de tamaño — se alojan en la nube). Podés **seleccionar varios archivos a la vez**: el **nombre de cada documento se toma del archivo** (no hace falta escribir el título), y elegís **una sola carpeta** donde se guardan todos. Antes de confirmar ves la **lista de archivos elegidos** (con su tamaño y un botón para sacar alguno), y mientras suben ves el **progreso** ("Subiendo 3/8…"); si alguno falla, los demás igual se suben y te avisa cuál no entró.
+1. **Creá carpetas** con el nombre que quieras (ej. "Reglamentos", "Modelos de contrato"). Podés armar **subcarpetas dentro de una carpeta**: entrá a la carpeta (tocándola) y el botón pasa a llamarse **"Nueva Subcarpeta"**. Arriba ves el camino donde estás parado (**Inicio › Carpeta › Subcarpeta**); tocá cualquier parte para volver. Así podés ordenar tipo "Contratos › Alquiler", "Contratos › Venta".
+2. **Subí archivos** con el botón **"Subir Documentos"** (cualquier formato, sin límite de tamaño — se alojan en la nube). Podés **seleccionar varios archivos a la vez**: el **nombre de cada documento se toma del archivo** (no hace falta escribir el título), y elegís **una sola carpeta** (o subcarpeta) donde se guardan todos. Antes de confirmar ves la **lista de archivos elegidos** (con su tamaño y un botón para sacar alguno), y mientras suben ves el **progreso** ("Subiendo 3/8…"); si alguno falla, los demás igual se suben y te avisa cuál no entró.
 3. **Reemplazá por una versión nueva** (botón ↻): se sube la nueva y se borra la anterior; el documento muestra "v2", "v3", etc.
-4. **Mové** archivos entre carpetas, **eliminá** y **descargá** cuando quieras.
+4. **Mové** archivos entre carpetas, **renombrá/eliminá** carpetas y **descargá** cuando quieras. Si borrás una carpeta que tiene subcarpetas, **se borran también las subcarpetas**; los **archivos no se borran**, quedan "sin carpeta".
 
-> 🔒 Tus **asesores** ven esta solapa en **solo lectura**: solo navegan carpetas y descargan, no pueden subir ni modificar nada.
+> 🔒 Tus **asesores** ven esta solapa en **solo lectura**: solo navegan carpetas y subcarpetas y descargan, no pueden subir ni modificar nada.
 
 ---
 
@@ -438,7 +439,7 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 ### Compartir ficha con el cliente
 
-En el detalle de cada propiedad, vos y tus asesores tienen el botón **"Compartir ficha"**: genera una **página de presentación profesional y de lujo** (con un link que se copia solo) para mandarle al cliente por WhatsApp. Muestra fotos, precio, datos, y la **tarjeta de contacto del asesor que la generó** (su WhatsApp y email), pintada con los **colores y el logo de tu inmobiliaria**.
+Cuando vos o tus asesores hacen una búsqueda en el **Buscador IA** y abren el detalle de una propiedad (en los resultados), tienen el botón **"Compartir ficha"**: genera una **página de presentación profesional y de lujo** (con un link que se copia solo) para mandarle al cliente por WhatsApp. Muestra fotos, precio, datos, y la **tarjeta de contacto del asesor que la generó** (su WhatsApp y email), pintada con los **colores y el logo de tu inmobiliaria**.
 
 > 🎨 **Importante para vos:** esos colores, la tipografía y el logo salen de **Marketing IA → Configuración IA**. Si los configurás bien, **todas las fichas que compartan tus asesores salen con tu identidad de marca**. Si no, usan un diseño elegante por defecto.
 > 🔒 El cliente externo **no** ve de qué portal salió la propiedad (es info interna), ni puede acceder al sistema desde el link: es solo una vitrina de presentación de solo lectura.

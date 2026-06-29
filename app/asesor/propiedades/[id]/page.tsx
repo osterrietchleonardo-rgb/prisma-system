@@ -342,11 +342,6 @@ export default function AsesorPropertyDetailPage() {
                   Sincronizado el {new Date(property.updated_at).toLocaleDateString()}
                   </p>
                 </div>
-                
-                <Button className="w-full h-14 text-lg font-bold gap-3 bg-accent hover:bg-accent/90 shadow-lg shadow-accent/20">
-                  <Share2 className="h-5 w-5" />
-                  Compartir Ficha
-                </Button>
               </div>
             </CardContent>
           </Card>

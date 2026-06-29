@@ -122,7 +122,9 @@
 
 **Cómo usarlo:**
 - Hacé clic en una propiedad para ver su **ficha completa**: carrusel de fotos, ficha técnica (ambientes, baños, superficie **total** y **cubierta**), descripción, precio y datos comerciales.
-- Botones de acción rápida: **"Recomendar a Lead"** o compartir la ficha.
+- Arriba tenés el botón **"Ver Ficha Pública"**, que abre la **publicación de la propiedad en el portal** (la versión pública del aviso).
+
+> 💡 Para mandarle a un cliente una **ficha de presentación de lujo** con tu tarjeta de contacto y la marca de la inmobiliaria, usá el botón **"Compartir ficha"** del **Buscador IA** (ver más abajo).
 
 ### 6.1 Descripción mejorada con IA
 
@@ -316,7 +318,7 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 ### Compartir ficha con tu cliente
 
-Cuando abrís el detalle de una propiedad, tenés el botón **"Compartir ficha"**. Al tocarlo se genera una **página web de presentación, elegante y profesional**, y el link se **copia solo** para que se lo mandes al cliente por WhatsApp.
+Cuando hacés una búsqueda en el **Buscador IA** y abrís el detalle de una propiedad (en los resultados), tenés el botón **"Compartir ficha"**. Al tocarlo se genera una **página web de presentación, elegante y profesional**, y el link se **copia solo** para que se lo mandes al cliente por WhatsApp.
 
 Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tarjeta de contacto** (tu nombre, tu WhatsApp y tu email) con los **colores y el logo de tu inmobiliaria**. El cliente la abre sin tener que registrarse en nada.
 
@@ -363,7 +365,8 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca Digital"** (lo de arriba
 **Qué es:** la **documentación oficial de la agencia** (contratos, reglamentos, formularios) que el director subió para que la tengas a mano.
 
 **Cómo usarla:**
-- Navegá las **carpetas** y **descargá** los archivos que necesites.
+- Navegá las **carpetas** (y las **subcarpetas dentro de ellas**) y **descargá** los archivos que necesites. Arriba te aparece el camino donde estás parado (**Inicio › Carpeta › Subcarpeta**); tocá cualquier parte para volver.
+- El **buscador** mira en **todas** las carpetas a la vez, así que no hace falta entrar a cada una.
 - Es **solo lectura**: no podés subir ni modificar (eso lo gestiona el director).
 - Esta sección **no se consulta con la IA**: es solo para descargar el archivo oficial.
 
