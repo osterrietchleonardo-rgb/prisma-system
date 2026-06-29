@@ -117,7 +117,7 @@ export function PropertySelector({ onSelect, onContinue }: PropertySelectorProps
             <div className="flex gap-3">
               <div className="w-20 h-20 rounded-md bg-muted overflow-hidden flex-shrink-0">
                 {p.photos?.[0]?.thumb ? (
-                  <img src={p.photos[0].thumb} className="w-full h-full object-cover" alt={p.title} />
+                  <img src={p.photos[0].thumb} loading="lazy" className="w-full h-full object-cover" alt={p.title} />
                 ) : (
                   <Building className="w-full h-full p-4 text-muted-foreground" />
                 )}

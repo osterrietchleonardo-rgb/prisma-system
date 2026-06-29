@@ -932,7 +932,7 @@ Los IPC son perfiles estratégicos de marketing que definen:
 1. Obtiene IPC del usuario y la `creative_directive` de la agencia (ver 13.5)
 2. Mapea ángulo de marketing: PAS, autoridad, transformación, social_proof, curiosidad, urgencia, aspiracional, datos
 3. Mapea nivel de consciencia: 0 (inconsciente) → 4 (muy consciente)
-4. Genera prompt con la estrategia del IPC + la **directiva creativa** del director. **No referencia ninguna propiedad puntual**: regla explícita que prohíbe inventar/mencionar direcciones, m², ambientes o precios concretos.
+4. Genera prompt con la estrategia del IPC + la **directiva creativa** del director + (si el IPC tiene `propiedad_tokko_id`) los **datos reales de la propiedad asociada** vía `buildPropertyDirective()`. Con propiedad: el copy se apoya en 2-4 atributos persuasivos reales (sin ficha técnica, sin inventar, respetando `no_mostrar`). Sin propiedad: regla explícita que prohíbe inventar/mencionar direcciones, m², ambientes o precios concretos.
 5. **Output:**
    - Copy tipo `post/historia`: `{ hook, desarrollo, cta }`
    - Copy tipo `video`: `{ hook, problema, agitacion, solucion, cta }`
@@ -943,7 +943,7 @@ Los IPC son perfiles estratégicos de marketing que definen:
 **Componente:** `components/marketing-ia/copy-generator-flow.tsx`
 
 Es un **multi-generador todo-en-uno**. El usuario elige IPC + tipo de copy (`video` | `post`) + formato de imagen (`reels`/`post`/`historia`) + estilo, y un único botón **"Generar 3 Variantes Automáticamente"** orquesta desde el cliente:
-1. `generate-batch` → **3 variaciones** simultáneas (ángulos PAS, Transformación y Autoridad/Datos) en una llamada a Gemini 3.5 Flash. Respeta la **directiva creativa** del director y la regla de no inventar propiedades. Output: array de 3 objetos.
+1. `generate-batch` → **3 variaciones** simultáneas (ángulos PAS, Transformación y Autoridad/Datos) en una llamada a Gemini 3.5 Flash. Respeta la **directiva creativa** del director. Si el IPC "vender" tiene propiedad asociada, **inyecta sus datos reales** (tipo, ubicación, m², ambientes, baños, precio, amenities, descripción) en las 3 variantes con criterio psicológico (`buildPropertyDirective`); si no, mantiene la regla de no inventar propiedades. Output: array de 3 objetos.
 2. Inserta los 3 `copy_drafts` y llama `generate-image` **una vez por draft** (3 imágenes).
 
 > 💰 **Costo real:** `generate-batch` = 1 crédito + `generate-image` = 2 créditos × 3 = **~7 créditos por tanda**. El cartel "1 crédito" del componente solo refleja el batch de textos (discrepancia de UI a corregir).
@@ -983,7 +983,7 @@ Gestiona la configuración de branding de la agencia (`marketing_ai_config`):
 
 **Endpoint:** `GET /api/marketing-ia/tokko-search`
 
-Busca propiedades en la cartera Tokko de la agencia para vincular a un IPC de tipo "vender".
+Busca propiedades para vincular a un IPC de tipo "vender". Lee la **cartera completa de la agencia** desde la tabla local `properties` (la misma fuente sincronizada que usa el ACM), no la API de Tokko en vivo. Por eso el **director (y el asesor) ven toda su cartera** —no un tope de 10—: filtra por `agency_id` + `is_active` (RLS por agencia), operación y tipo, con buscador de texto libre (título/dirección/zona/descripción). Devuelve el `id` de Tokko de cada propiedad para que, al asociarla y generar el anuncio, se traiga su ficha real desde Tokko.
 
 ---
 
