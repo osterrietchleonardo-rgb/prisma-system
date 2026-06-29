@@ -138,7 +138,7 @@ Conseguí (o confirmá con el usuario) los parámetros de la pieza: **objetivo, 
 Usá la matriz de matching (sección 6) según el ángulo de la pieza. Ante la duda, M1 (Scorecard). Definí: arquetipo, promesa específica, calificador, y el CTA (diagnóstico/aplicación, nunca ruego).
 
 **PASO 2 — Escribir el contenido (Markdown), con la voz de Vakdor.**
-Apoyate en **`vakdor-copywriter`** para la voz, el ICP y las reglas (es la skill base de contenido). Aplicá su **Regla de Fuente**: si el magnet menciona funciones concretas de PRISMA, leé primero `C:\Users\LENOVO\Desktop\CODE\Antigravity - Apps\PRISMA-SYSTEM\FUNCIONAL-DIRECTOR-PRISMA.md` y hablá con información real (no inventar features). Redactá el `.md` siguiendo la **anatomía fija** (sección 5) y armado como **herramienta** (tablas para completar, casillas `[ ]`, campos en blanco), no como artículo. Guardalo en la carpeta del activo en `Prisma - MK`.
+Apoyate en **`vakdor-copywriter`** para la voz, el ICP y las reglas (es la skill base de contenido). Aplicá su **Regla de Fuente**: si el magnet menciona funciones concretas de PRISMA, leé primero `C:\Users\LENOVO\Desktop\CODE\Antigravity - Apps\PRISMA-SYSTEM\docs\compartible\estandarizada\FUNCIONAL-DIRECTOR-PRISMA.md` y hablá con información real (no inventar features). Redactá el `.md` siguiendo la **anatomía fija** (sección 5) y armado como **herramienta** (tablas para completar, casillas `[ ]`, campos en blanco), no como artículo. Guardalo en la carpeta del activo en `Prisma - MK`.
 
 **PASO 3 — Generar el PDF con Vakdor-PDF (delegación obligatoria).**
 NO renderices el PDF por tu cuenta: escribí un config y llamá a `Vakdor-PDF`. Usá el branding de marketing de Vakdor (cobre `#C07C41` + logo Vakdor), no el branding doc por defecto.

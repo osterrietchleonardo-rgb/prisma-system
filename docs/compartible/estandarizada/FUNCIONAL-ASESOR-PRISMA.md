@@ -2,7 +2,6 @@
 
 > **Para quién es esta guía:** asesores inmobiliarios que usan PRISMA en el día a día.
 > **Qué vas a encontrar:** qué hace cada pantalla, cómo usarla paso a paso, consejos y tips.
-> **Fecha:** Junio 2026.
 >
 > 💡 No necesitás saber nada técnico. Esta guía está escrita en lenguaje simple y sigue el orden del menú lateral de tu cuenta.
 
@@ -185,6 +184,16 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 > 💡 **Tip:** cuando un cliente escribe, el bot de IA puede responder solo. Si tomás el control manual, el bot se pausa para esa conversación y no pisa tus respuestas.
 > 💡 Activá las **notificaciones push** en Configuración para enterarte al instante de mensajes nuevos.
 
+### Avisos por email cuando un cliente avanza
+
+Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y además **te pasa esa conversación a tu bandeja** de WhatsApp para que tomes el control. Esto ocurre en 3 momentos:
+
+- **Consulta sobre una propiedad de tu cartera:** un cliente está preguntando por una propiedad que tenés asignada.
+- **Pedido de hablar con una persona:** el cliente pide ser atendido por un asesor humano.
+- **Visita agendada:** el cliente coordinó una visita y queda derivado a vos para el seguimiento.
+
+> 💡 **Tip:** mantené tu **bandeja de entrada de email a mano**: estos avisos llegan al instante y te permiten entrar al chat cuando el lead está caliente. La conversación ya te queda asignada en WhatsApp Bandeja.
+
 ---
 
 ## 10. Leads WhatsApp
@@ -302,7 +311,7 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 > 💡 **El %:** mide qué tanto coincide con lo concreto que pediste (ambientes + servicios). Una de "94%" tiene casi todo; una de "60%" es una alternativa válida que le falta algo (mirá la tarjeta).
 > 💡 Si una propiedad o inmobiliaria tiene una **nota/consideración** cargada por el director, el Buscador te la avisa.
 > 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
-> 🆕 **Junio 2026:** la red de colaboración ahora incluye las propiedades **en venta**, con prioridad en **Buenos Aires / AMBA**. Antes casi no aparecían (el sistema que las trae quedaba trabado y no llegaba a cargarlas); ya está **arreglado** y las ventas se van **sumando solas día a día**. Si buscás ventas, vas a ver cada vez más opciones (al principio sobre todo de CABA y conurbano).
+> 🔎 La red de colaboración incluye propiedades **en venta y en alquiler**, con prioridad en **Buenos Aires / AMBA** (CABA + conurbano) y el resto del país. El catálogo se mantiene actualizado solo: suma las nuevas, actualiza precios/estado y da de baja las que salieron.
 > 💰 Cada búsqueda consume 1 crédito.
 
 ### Compartir ficha con tu cliente
@@ -460,14 +469,11 @@ Podés vincular tu cuenta de Google para que **tus visitas aparezcan automática
 
 ## 22. Personalizaciones de tu agencia
 
-PRISMA es modular: tu agencia puede tener funciones **habilitadas o deshabilitadas** según su plan. Esta sección deja registrado qué ajustes específicos tiene cada cliente.
+PRISMA es **modular**: tu agencia puede tener algunos módulos **habilitados o deshabilitados** según su plan o sus necesidades. No todas las agencias usan todo.
 
-> 📎 **Si te pasan o pasás esta guía a una agencia puntual:** dejá únicamente el bloque que le corresponde a esa agencia y borrá los demás.
+**Cómo se ve un módulo deshabilitado:** aparece en el menú lateral **atenuado (en gris) con la etiqueta «Deshabilitada»** y no se puede abrir; si intentás entrar por el enlace directo, el sistema te redirige al Dashboard. Aplica por igual al director y a los asesores.
 
-### Inmobiliaria de Kevin Arlandi
-
-- **Contratos IA — deshabilitado.** El módulo "Contratos IA" no está disponible para esta agencia. En el menú aparece **atenuado (en gris) con la etiqueta «Deshabilitada»** y no se puede abrir; si se intenta entrar por el enlace directo, el sistema redirige automáticamente al Dashboard. Aplica a **todos los asesores y al director** de la agencia.
-- _Vigente desde: 22/06/2026._
+> 💡 Si ves un módulo en gris, **no es un error**: es una configuración de tu agencia. Si lo necesitás, pedíselo a tu director.
 
 ---
 

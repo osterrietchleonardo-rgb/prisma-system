@@ -113,7 +113,7 @@ Antes de escribir, clasificá la pieza en uno de dos tipos y elegí la fuente de
 
 **1. Contenido de VENTA / técnico sobre un tema específico**
 (cuando se da a conocer PRISMA como la solución, o se mencionan features, módulos, integraciones, flujos o capacidades concretas del producto)
-• **OBLIGATORIO:** leer primero `C:\Users\LENOVO\Desktop\CODE\Antigravity - Apps\PRISMA-SYSTEM\FUNCIONAL-DIRECTOR-PRISMA.md` y hablar con información REAL del producto (qué hace de verdad, cómo funciona, qué resuelve).
+• **OBLIGATORIO:** leer primero `C:\Users\LENOVO\Desktop\CODE\Antigravity - Apps\PRISMA-SYSTEM\docs\compartible\estandarizada\FUNCIONAL-DIRECTOR-PRISMA.md` y hablar con información REAL del producto (qué hace de verdad, cómo funciona, qué resuelve).
 • NUNCA inventar funcionalidades ni prometer cosas que el documento no respalde.
 • Combinar esa información real con toda la persuasión y los frameworks de esta skill.
 
@@ -443,7 +443,7 @@ Validá la combinación contra las **Reglas de Compatibilidad** antes de escribi
 Antes de proponer cualquier copy, consultá obligatoriamente el archivo `C:\Users\LENOVO\Desktop\CODE\Antigravity - Apps\Prisma - MK\memoria.md` para analizar qué temas, ganchos, formatos y estructuras se utilizaron en activos previos. Tu nueva propuesta debe ser diferente en ángulo, gancho o desarrollo para evitar duplicidades.
 
 **PASO 0.2 — Clasificar Fuente (Venta vs. Autoridad)**
-Aplicá la "Regla de Fuente de Información (Venta vs. Autoridad)". Si la pieza es de VENTA / técnica sobre features concretas, leé `C:\Users\LENOVO\Desktop\CODE\Antigravity - Apps\PRISMA-SYSTEM\FUNCIONAL-DIRECTOR-PRISMA.md` ANTES de redactar. Si es de autoridad/educación, trabajá conceptual con los frameworks de esta skill.
+Aplicá la "Regla de Fuente de Información (Venta vs. Autoridad)". Si la pieza es de VENTA / técnica sobre features concretas, leé `C:\Users\LENOVO\Desktop\CODE\Antigravity - Apps\PRISMA-SYSTEM\docs\compartible\estandarizada\FUNCIONAL-DIRECTOR-PRISMA.md` ANTES de redactar. Si es de autoridad/educación, trabajá conceptual con los frameworks de esta skill.
 
 **PASO 1 — Estructura y Ángulo**
 Consultá `references/platform_structures.md` para el formato exacto. Usá el "Elevator Pitch" mental: El verdadero problema no es retener talento, sino la Dependencia Operativa. PRISMA es el Sistema Operativo centralizado con IA que conecta Tokko Broker y WhatsApp para estandarizar procesos, controlar la performance de los asesores y darle trazabilidad matemática al dueño. PRISMA rompe el techo de cristal.

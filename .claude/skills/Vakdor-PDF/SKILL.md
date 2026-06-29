@@ -64,7 +64,7 @@ y se usa por defecto; cualquier campo de marca puede sobrescribirse en el config
   },
   "docs": [
     {
-      "file": "C:/Users/.../FUNCIONAL-DIRECTOR-PRISMA.md",
+      "file": "C:/Users/.../docs/compartible/estandarizada/FUNCIONAL-DIRECTOR-PRISMA.md",
       "out": "PRISMA - Guia del Director.pdf",
       "kicker": "Guía de Usuario",
       "title": "Guía del Director",

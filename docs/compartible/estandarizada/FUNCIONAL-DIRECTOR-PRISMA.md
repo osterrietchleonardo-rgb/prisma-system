@@ -2,7 +2,6 @@
 
 > **Para quién es esta guía:** directores/dueños de inmobiliaria que administran su agencia en PRISMA.
 > **Qué vas a encontrar:** qué hace cada pantalla, cómo configurarla y usarla paso a paso, consejos y tips.
-> **Fecha:** Junio 2026.
 >
 > 💡 Como director tenés **acceso total** a tu agencia: configuración, integraciones, equipo, estadísticas globales y todas las herramientas de IA.
 
@@ -227,6 +226,20 @@ Vas a ver un **asistente de configuración** que te guía paso a paso para conec
 
 Arriba a la derecha, un **indicador de conexión** te muestra si la instancia está conectada.
 
+### Avisos automáticos por email al asesor
+
+Cuando el bot detecta que un cliente avanza, **le manda un email al asesor asignado** (remitente "PRISMA IA") y **le deriva esa conversación a su bandeja** de WhatsApp para que tome el control. Pasa en 3 casos:
+
+- **Consulta por una propiedad de su cartera:** un cliente está preguntando por una propiedad asignada a ese asesor.
+- **Pedido de hablar con un humano:** el cliente solicita ser atendido por una persona.
+- **Visita agendada:** el cliente coordinó una visita y se deriva al asesor para el seguimiento.
+
+Así el equipo no pierde oportunidades: el asesor se entera por email aunque no tenga PRISMA abierto.
+
+### Seguimientos automáticos
+
+Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **seguimientos solos** a los leads por WhatsApp (recordatorios de visita, reactivación de contactos fríos y follow-ups según el momento del lead), sin que el asesor tenga que acordarse. Es lo que mantiene vivas las conversaciones y suma a las métricas de "seguimientos enviados".
+
 > 💡 **Tip:** las plantillas de seguimiento deben estar **aprobadas por Meta** para que los flujos automáticos funcionen. PRISMA revisa el estado todos los días; cuando las 8 están aprobadas, se activan los flujos automáticos.
 > 💡 El bot responde solo cuando está activo; si un asesor toma el control manual de un chat, el bot se pausa para esa conversación.
 
@@ -419,7 +432,7 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 > 💡 **Tip:** las notas son ideales para bajar criterios comerciales a todo el equipo sin tener que avisarles uno por uno.
 
-> 🆕 **Junio 2026 — más propiedades en venta:** la red de colaboración ahora trae las propiedades **en venta**, **priorizando las ventas y el AMBA** (CABA + conurbano) y sumando el resto del país. Hasta hace poco casi no aparecían: el proceso que las trae quedaba **trabado** y nunca llegaba a guardarlas (por eso se veían muy pocas ventas). Ya está **arreglado** y las ventas se van **incorporando solas, día a día** (al principio sobre todo de CABA y conurbano, que son la prioridad). El catálogo se mantiene al día solo: agrega las nuevas, actualiza las que cambian de precio/estado y da de baja las que salieron.
+> 🔎 **Propiedades en venta y alquiler:** la red de colaboración prioriza **ventas y AMBA** (CABA + conurbano) y suma el resto del país. El catálogo se mantiene al día solo: agrega las nuevas, actualiza las que cambian de precio/estado y da de baja las que salieron.
 > ⚠️ El asesor **no ve** la solapa de Notas; solo recibe las consideraciones en sus búsquedas.
 > 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
 > 💰 1 crédito por búsqueda.
@@ -568,14 +581,11 @@ Tanto vos (director) como cada asesor pueden **vincular su propia cuenta de Goog
 
 ## 26. Personalizaciones de tu agencia
 
-PRISMA es modular: cada agencia puede tener funciones **habilitadas o deshabilitadas** según su plan o sus necesidades. Esta sección deja registrado qué ajustes específicos tiene cada cliente, para mantener la trazabilidad de qué funciona en cada caso.
+PRISMA es **modular**: tu agencia puede tener módulos **habilitados o deshabilitados** según tu plan o tus necesidades. No todas las agencias usan todas las herramientas.
 
-> 📎 **Si te pasan o pasás esta guía a una agencia puntual:** dejá únicamente el bloque que le corresponde a esa agencia y borrá los demás.
+**Cómo se ve un módulo deshabilitado:** aparece en el menú lateral **atenuado (en gris) con la etiqueta «Deshabilitada»**, no se puede abrir y, si se entra por el enlace directo, el sistema redirige al Dashboard. Aplica al director y a todos los asesores de la agencia.
 
-### Inmobiliaria de Kevin Arlandi
-
-- **Contratos IA — deshabilitado.** El módulo "Contratos IA" no está disponible para esta agencia. En el menú lateral aparece **atenuado (en gris) con la etiqueta «Deshabilitada»** y no se puede abrir; si se intenta entrar por el enlace directo, el sistema redirige automáticamente al Dashboard. Aplica al **director y a todos los asesores** de la agencia.
-- _Vigente desde: 22/06/2026._
+> 💡 Para **habilitar o deshabilitar** un módulo de tu agencia, coordinalo con el equipo de PRISMA (Vakdor).
 
 ---
 
