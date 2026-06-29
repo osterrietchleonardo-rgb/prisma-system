@@ -285,7 +285,7 @@ Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **
 - **Aviso legal:** texto legal (hasta 300 caracteres) que se inserta en la franja inferior de las imágenes.
 
 > 💡 **Tip:** configurá la directiva creativa y el aviso legal una sola vez; aplican a toda la agencia.
-> ⚠️ El generador **no inventa** datos concretos de propiedades (direcciones, m², precios). Es una decisión de diseño: los copies hablan del perfil de cliente, no de una propiedad puntual. (En el IPC "Vender" podés vincular una propiedad de Tokko, pero esa función está **reservada para más adelante**: hoy el copy no usa sus datos concretos.)
+> ⚠️ El generador **no inventa** datos concretos de propiedades (direcciones, m², precios): los copies hablan del perfil de cliente, no de una propiedad puntual.
 > 💰 **Costo real:** cada "Generar 3 Variantes" consume **~7 créditos** (1 por los 3 textos + 2 por cada una de las 3 imágenes). Nota: el cartelito de la pantalla que dice "1 crédito" se refiere solo a la generación de textos, no al total.
 
 ---
@@ -375,7 +375,6 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 > 💡 Tipo y operación son filtros estrictos; la zona es lo que más pesa del puntaje. Los comparables salen de **tu cartera** y de la **red de colaboración**.
 > 💰 No consume créditos por buscar comparables.
-> 🔜 Valuación con precio sugerido e informe con marca: etapa siguiente. La grilla de cálculo anterior se conserva para ese informe.
 
 ---
 
@@ -432,7 +431,7 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 > 💡 **Tip:** las notas son ideales para bajar criterios comerciales a todo el equipo sin tener que avisarles uno por uno.
 
-> 🔎 **Propiedades en venta y alquiler:** la red de colaboración prioriza **ventas y AMBA** (CABA + conurbano) y suma el resto del país. El catálogo se mantiene al día solo: agrega las nuevas, actualiza las que cambian de precio/estado y da de baja las que salieron.
+> 🔎 La **red de colaboración** son propiedades de **otras inmobiliarias** (en venta y alquiler) que amplían la oferta de tu equipo más allá de la cartera propia.
 > ⚠️ El asesor **no ve** la solapa de Notas; solo recibe las consideraciones en sus búsquedas.
 > 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
 > 💰 1 crédito por búsqueda.

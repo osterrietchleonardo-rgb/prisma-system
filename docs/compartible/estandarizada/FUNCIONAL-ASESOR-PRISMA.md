@@ -311,7 +311,7 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 > 💡 **El %:** mide qué tanto coincide con lo concreto que pediste (ambientes + servicios). Una de "94%" tiene casi todo; una de "60%" es una alternativa válida que le falta algo (mirá la tarjeta).
 > 💡 Si una propiedad o inmobiliaria tiene una **nota/consideración** cargada por el director, el Buscador te la avisa.
 > 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
-> 🔎 La red de colaboración incluye propiedades **en venta y en alquiler**, con prioridad en **Buenos Aires / AMBA** (CABA + conurbano) y el resto del país. El catálogo se mantiene actualizado solo: suma las nuevas, actualiza precios/estado y da de baja las que salieron.
+> 🔎 La **red de colaboración** son propiedades de **otras inmobiliarias** (en venta y alquiler), para que tengas más opciones para ofrecerle a tu cliente además de tu propia cartera.
 > 💰 Cada búsqueda consume 1 crédito.
 
 ### Compartir ficha con tu cliente
@@ -341,9 +341,8 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (zona, superficie, ambientes, baños, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
 
 > 💡 El **tipo de propiedad** y la **operación** son filtros estrictos: solo trae comparables del mismo tipo y la misma operación. La **zona** es lo que más pesa del puntaje.
-> 💡 Para **venta** los comparables salen casi todo de tu cartera (en la red de colaboración hay muchos más avisos de alquiler que de venta).
+> 💡 Para **venta**, la mayoría de los comparables salen de tu propia cartera.
 > 💰 Buscar comparables **no consume créditos**.
-> 🔜 La valuación con precio sugerido e informe con marca llegan en una etapa siguiente.
 
 ---
 
