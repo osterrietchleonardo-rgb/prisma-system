@@ -44,6 +44,7 @@ interface Message {
   role: "user" | "assistant"
   content: string
   matchedProperties?: MatchedPropertiesResponse | UnifiedProperty[]
+  created_at?: string
 }
 
 interface Session {
@@ -144,7 +145,8 @@ export default function AdvisorConsultorIAPage() {
         setMessages(data.map((m: any) => ({
           role: m.role,
           content: m.content,
-          matchedProperties: m.metadata?.matchedProperties
+          matchedProperties: m.metadata?.matchedProperties,
+          created_at: m.created_at
         })))
       }
     } catch (e) {
@@ -207,7 +209,7 @@ export default function AdvisorConsultorIAPage() {
 
     const userMessage = input.trim()
     setInput("")
-    setMessages(prev => [...prev, { role: "user", content: userMessage }])
+    setMessages(prev => [...prev, { role: "user", content: userMessage, created_at: new Date().toISOString() }])
     setIsLoading(true)
 
     try {
@@ -230,10 +232,11 @@ export default function AdvisorConsultorIAPage() {
         setCurrentSessionId(data.sessionId)
       }
 
-      setMessages(prev => [...prev, { 
-        role: "assistant", 
+      setMessages(prev => [...prev, {
+        role: "assistant",
         content: data.content,
-        matchedProperties: data.matchedProperties
+        matchedProperties: data.matchedProperties,
+        created_at: new Date().toISOString()
       }])
 
       // Auto-refresh credit badge after consumption
@@ -242,9 +245,10 @@ export default function AdvisorConsultorIAPage() {
     } catch (error) {
       console.error("Error:", error)
       toast.error("Error al consultar propiedades.")
-      setMessages(prev => [...prev, { 
-        role: "assistant", 
-        content: "Lo siento, hubo un error al consultar las propiedades. Por favor, intenta de nuevo." 
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: "Lo siento, hubo un error al consultar las propiedades. Por favor, intenta de nuevo.",
+        created_at: new Date().toISOString()
       }])
     } finally {
       setIsLoading(false)
@@ -445,12 +449,14 @@ export default function AdvisorConsultorIAPage() {
                              )} />
                           )}
 
-                          <div className={cn(
+                          {message.created_at && (
+                          <div suppressHydrationWarning className={cn(
                              "text-[10px] mt-1 text-right opacity-40",
                              message.role === "user" ? "text-accent" : "text-muted-foreground"
                           )}>
-                             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                             {new Date(message.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
                           </div>
+                          )}
                         </div>
                       );
                     })}

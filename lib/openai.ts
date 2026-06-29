@@ -19,10 +19,11 @@ export const openaiIA = {
       }
 
       const response = await openai.chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-5.4-mini",
         messages: messages,
         temperature: 0.5,
-        max_tokens: 2048,
+        // La familia GPT-5 usa max_completion_tokens (max_tokens quedó deprecado y da 400 en estos modelos).
+        max_completion_tokens: 2048,
       });
 
       const textOutput = response.choices[0].message.content || "";

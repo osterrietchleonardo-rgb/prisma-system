@@ -289,8 +289,14 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 1. Escribí lo que busca tu cliente, por ejemplo: *"Busco un 3 ambientes en La Plata por menos de 120 mil dólares con cochera"*.
 2. El Buscador entiende operación, zona, tipo, presupuesto (en USD o pesos), **ambientes** (diferencia bien "ambientes" de "dormitorios"), y **todos los servicios/amenities** (cochera, pileta, parrilla, SUM, seguridad, balcón, terraza, gimnasio, baulera, apto profesional, etc.).
 3. Te devuelve **tarjetas** organizadas en 3 grupos (**propias**, **agencia**, **red de colaboración**), ordenadas por un **% de coincidencia** que ves en cada tarjeta: **verde = es justo lo pedido**, **ámbar = comparable cercano**, gris = más lejano.
-4. **No te pierde ventas:** además de las exactas, te muestra los **comparables** (ej. si pedís 2 ambientes, también ves 1 y 3, marcados con menor %). Lo que no entra, no aparece (un 2 ambientes nunca te trae un 4).
-5. Podés **refinar** sin repetir todo: *"solo las de La Plata"* o *"que acepten permuta"*. **Recuerda el hilo** de la conversación.
+4. **Primero te pregunta, después busca:** para traerte lo mejor, el Buscador necesita 5 datos: **operación** (venta o alquiler), **tipo**, **zona**, **ambientes** y **presupuesto**. Si te falta alguno, **no muestra nada todavía**: te pregunta lo que falta de forma natural (como lo haría un buen asesor). Cuando ya los tiene, recién ahí te trae las propiedades. Si querés ver igual sin dar todo, decile *"mostrame igual"*.
+5. **No te pierde ventas:** además de las exactas, te muestra los **comparables** (ej. si pedís 2 ambientes, también ves 1 y 3, marcados con menor %). Lo que no entra, no aparece (un 2 ambientes nunca te trae un 4).
+6. Podés **refinar** sin repetir todo: *"solo las de La Plata"* o *"que acepten permuta"*. **Recuerda el hilo** de la conversación.
+
+**Pedidos que ahora entiende mejor:**
+- **"En venta" trae solo venta** (y "alquiler" solo alquiler), sin mezclar.
+- **"Piso alto / piso bajo":** se refiere al **piso del departamento en el edificio**. Para el sistema, **alto = del 6° para arriba**; **bajo/medio = de planta baja al 5°**. Ojo: muchas publicaciones **no dicen en qué piso están**; esas no se descartan (aparecen igual) y conviene confirmarlas — el Buscador te lo avisa.
+- **Características sueltas:** podés pedir cosas puntuales como *"al frente"*, *"a estrenar"*, *"apto crédito"*, *"al río"* y las busca en toda la ficha para priorizar las que las tienen.
 
 > 💡 **Tip:** cada chat tiene **memoria**. Empezá una conversación nueva para cada cliente y refiná de a poco.
 > 💡 **El %:** mide qué tanto coincide con lo concreto que pediste (ambientes + servicios). Una de "94%" tiene casi todo; una de "60%" es una alternativa válida que le falta algo (mirá la tarjeta).
@@ -298,6 +304,16 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 > 📱 **Desde el celular:** el chat se ve a pantalla completa. El **historial de búsquedas** queda escondido y se abre tocando el ícono del robot (arriba a la izquierda) o la pestaña de la izquierda; se cierra solo al elegir una búsqueda o tocando fuera.
 > 🆕 **Junio 2026:** la red de colaboración ahora incluye las propiedades **en venta**, con prioridad en **Buenos Aires / AMBA**. Antes casi no aparecían (el sistema que las trae quedaba trabado y no llegaba a cargarlas); ya está **arreglado** y las ventas se van **sumando solas día a día**. Si buscás ventas, vas a ver cada vez más opciones (al principio sobre todo de CABA y conurbano).
 > 💰 Cada búsqueda consume 1 crédito.
+
+### Compartir ficha con tu cliente
+
+Cuando abrís el detalle de una propiedad, tenés el botón **"Compartir ficha"**. Al tocarlo se genera una **página web de presentación, elegante y profesional**, y el link se **copia solo** para que se lo mandes al cliente por WhatsApp.
+
+Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tarjeta de contacto** (tu nombre, tu WhatsApp y tu email) con los **colores y el logo de tu inmobiliaria**. El cliente la abre sin tener que registrarse en nada.
+
+> 💡 **Tip:** es ideal para mandar por WhatsApp — al pegar el link aparece una vista previa con la foto y el título.
+> 🔒 El cliente **no** ve de qué portal salió la propiedad (eso es info interna tuya). Tampoco puede entrar al sistema desde ahí: es solo una vitrina de presentación.
+> 🎨 Los colores y el logo salen de lo que el director cargó en **Marketing IA → Configuración IA**. Si todavía no lo configuró, la ficha usa un diseño elegante por defecto.
 
 ---
 

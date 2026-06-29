@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { toast } from 'sonner'
 
 export type PropertySource = 'own' | 'agency' | 'roomix'
 
@@ -220,9 +221,33 @@ export function UnifiedPropertyDetail({
   onClose: () => void
 }) {
   const [selectedImg, setSelectedImg] = useState(0)
+  const [sharing, setSharing] = useState(false)
   const images = property.images && property.images.length > 0 ? property.images : []
   const badge = BADGE_CONFIG[property.source]
   const headerGradient = DETAIL_HEADER_COLORS[property.source]
+
+  // Genera una ficha pública de lujo (con la marca de la agencia + datos del asesor logueado) y la abre.
+  const handleShare = async () => {
+    if (sharing) return
+    setSharing(true)
+    try {
+      const res = await fetch('/api/ficha/share', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: property.source, id: property.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'No se pudo generar la ficha')
+      const url = `${window.location.origin}${data.path}`
+      try { await navigator.clipboard.writeText(url) } catch { /* sin clipboard */ }
+      window.open(data.path, '_blank', 'noopener')
+      toast.success('Ficha lista y link copiado al portapapeles')
+    } catch (e: any) {
+      toast.error(e.message || 'Error al generar la ficha')
+    } finally {
+      setSharing(false)
+    }
+  }
 
   const agentInfo = property.source === 'roomix'
     ? property.roomix_agency_name || 'Inmobiliaria colaboradora'
@@ -325,6 +350,20 @@ export function UnifiedPropertyDetail({
               </div>
             </div>
           )}
+
+          {/* Botón Compartir ficha (página pública de lujo con la marca + datos del asesor) */}
+          <div className="pt-4 border-t flex justify-end">
+            <button
+              onClick={handleShare}
+              disabled={sharing}
+              className="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors border border-accent/30 text-accent hover:bg-accent/10 disabled:opacity-60"
+            >
+              {sharing ? 'Generando ficha…' : 'Compartir ficha'}
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+            </button>
+          </div>
 
           {/* Acciones Footer */}
           <div className="pt-4 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3">

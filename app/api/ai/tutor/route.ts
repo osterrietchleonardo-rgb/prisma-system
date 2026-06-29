@@ -117,12 +117,12 @@ export async function POST(req: NextRequest) {
     const responseText = result.response.text()
 
     // ─── Record real token usage (input + output) ──────────────────────────
-    // openaiIA usa GPT-4.1-mini. Precio desde la tabla central (utils/aiCostCalculator).
+    // openaiIA usa GPT-5.4-mini. Precio desde la tabla central (utils/aiCostCalculator).
     const tutor_usage = result.response.usageMetadata;
     if (tutor_usage) {
       const inputTk = tutor_usage.promptTokenCount ?? 0;
       const outputTk = tutor_usage.candidatesTokenCount ?? 0;
-      const { totalCostUSD } = calculateCost({ model: "gpt-4.1-mini", inputTokens: inputTk, outputTokens: outputTk });
+      const { totalCostUSD } = calculateCost({ model: "gpt-5.4-mini", inputTokens: inputTk, outputTokens: outputTk });
       updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
     }
 
