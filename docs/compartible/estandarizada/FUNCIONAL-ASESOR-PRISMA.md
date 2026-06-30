@@ -301,12 +301,15 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 1. Escribí lo que busca tu cliente, por ejemplo: *"Busco un 3 ambientes en La Plata por menos de 120 mil dólares con cochera"*.
 2. El Buscador entiende operación, zona, tipo, presupuesto (en USD o pesos), **ambientes** (diferencia bien "ambientes" de "dormitorios"), y **todos los servicios/amenities** (cochera, pileta, parrilla, SUM, seguridad, balcón, terraza, gimnasio, baulera, apto profesional, etc.).
 3. Te devuelve **tarjetas** organizadas en 3 grupos (**propias**, **agencia**, **red de colaboración**), ordenadas por un **% de coincidencia** que ves en cada tarjeta: **verde = es justo lo pedido**, **ámbar = comparable cercano**, gris = más lejano.
-4. **Primero te pregunta, después busca:** para traerte lo mejor, el Buscador necesita 5 datos: **operación** (venta o alquiler), **tipo**, **zona**, **ambientes** y **presupuesto**. Si te falta alguno, **no muestra nada todavía**: te pregunta lo que falta de forma natural (como lo haría un buen asesor). Cuando ya los tiene, recién ahí te trae las propiedades. Si querés ver igual sin dar todo, decile *"mostrame igual"*.
+4. **Primero te pregunta, después busca:** para traerte lo mejor, el Buscador necesita 5 datos: **operación** (venta o alquiler), **tipo**, **zona**, **ambientes** y **presupuesto**. Si te falta alguno, **no muestra nada todavía**: te pregunta lo que falta de forma natural (como lo haría un buen asesor). Cuando ya los tiene, recién ahí te trae las propiedades. **Y si no tenés más datos, decíselo como quieras** —*"mostrame igual"*, *"dale, lo que tengas"*, *"no tengo más"*, *"avanzá"*— y busca al toque con lo que haya (no hace falta una frase exacta: lo entiende).
 5. **No te pierde ventas:** además de las exactas, te muestra los **comparables** (ej. si pedís 2 ambientes, también ves 1 y 3, marcados con menor %). Lo que no entra, no aparece (un 2 ambientes nunca te trae un 4).
 6. Podés **refinar** sin repetir todo: *"solo las de La Plata"* o *"que acepten permuta"*. **Recuerda el hilo** de la conversación.
 
 **Pedidos que ahora entiende mejor:**
 - **"En venta" trae solo venta** (y "alquiler" solo alquiler), sin mezclar.
+- **Entiende la jerga del rubro:** *"espacio aéreo"*, *"con patio o balcón"*, *"aire libre"* o *"expansión"* los toma como **espacio exterior** (te trae las que tengan balcón **o** terraza **o** patio **o** jardín, sin descartar por tener solo uno). También entiende *"a estrenar"*, *"en pozo"*, *"apto crédito"*, *"semipiso"*, *"categoría/premium"*, etc.
+- **"Depto y PH" te trae los dos** tipos juntos (aunque el PH esté cargado con otro nombre en el sistema, lo reconoce).
+- **"Monoambiente":** lo entiende como **1 ambiente** y te lo trae aunque la publicación no use esa palabra exacta.
 - **"Piso alto / piso bajo":** se refiere al **piso del departamento en el edificio**. Para el sistema, **alto = del 6° para arriba**; **bajo/medio = de planta baja al 5°**. Ojo: muchas publicaciones **no dicen en qué piso están**; esas no se descartan (aparecen igual) y conviene confirmarlas — el Buscador te lo avisa.
 - **Características sueltas:** podés pedir cosas puntuales como *"al frente"*, *"a estrenar"*, *"apto crédito"*, *"al río"* y las busca en toda la ficha para priorizar las que las tienen.
 

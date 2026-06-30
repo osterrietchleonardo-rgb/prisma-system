@@ -67,7 +67,9 @@ export async function POST(req: Request) {
       depto:        ["departamento"],
       departamento: ["departamento"],
       duplex:       ["duplex"],
-      ph:           ["ph"],
+      // Tokko guarda los PH como tipo "Condo" en la cartera propia → incluimos ambos para no perderlos
+      // (además del título, que suele decir "PH"). En roomix el patrón %condo% también matchea su tipo Condo.
+      ph:           ["ph", "condo"],
       monoambiente: ["monoambiente"],
       local:        ["local comercial", "local"],
       galpon:       ["galpón", "galpon"],
@@ -94,6 +96,10 @@ export async function POST(req: Request) {
       jardin:      ["jardin", "jardín"],
       "jardín":    ["jardin", "jardín"],
       patio:       ["patio"],
+      // Jerga: "espacio aéreo" / "expansión" / "aire libre" = CUALQUIER espacio exterior (balcón, terraza, patio, jardín, azotea).
+      // Se matchea si está presente cualquiera → ideal para pedidos tipo "patio o balcón" sin penalizar por tener solo uno.
+      "espacio aereo": ["balc", "terraza", "azotea", "patio", "jardin", "jardín", "expansion", "expansión", "aire libre", "solarium", "rooftop"],
+      expansion:       ["balc", "terraza", "azotea", "patio", "jardin", "jardín", "expansion", "expansión", "aire libre", "solarium", "rooftop"],
       // Cochera / guardado
       cochera:     ["cochera", "garage", "garaje", "estacionamiento", "auto"],
       baulera:     ["baulera", "bauleras", "guardado"],
@@ -146,7 +152,9 @@ export async function POST(req: Request) {
           "bedrooms": número o null,
           "bathrooms": número o null,
           "floor_preference": "alto" | "bajo" | "medio" | null,
-          "free_text_keywords": ["características concretas que NO entran en los filtros de arriba: ej 'frente', 'contrafrente', 'a estrenar', 'apto crédito', 'pozo/en construcción', 'reciclado', 'luminoso', 'al río', 'esquina', nombre de barrio cerrado/edificio, etc. Si no hay: []"]
+          "free_text_keywords": ["características concretas que NO entran en los filtros de arriba: ej 'frente', 'contrafrente', 'a estrenar', 'apto crédito', 'pozo/en construcción', 'reciclado', 'luminoso', 'al río', 'esquina', nombre de barrio cerrado/edificio, etc. Si no hay: []"],
+          "search_summary": "frase corta en lenguaje natural que describe la búsqueda ACUMULADA del usuario (tipo, zona, ambientes, operación, presupuesto y matices subjetivos como 'luminoso', 'para una familia', 'a estrenar'). Ej: 'departamento 2 ambientes luminoso a estrenar en venta en Almagro hasta 120000 usd'. Si todavía no hay criterios concretos: ''",
+          "force_search": false
         }
 
         REGLAS CRÍTICAS:
@@ -155,7 +163,7 @@ export async function POST(req: Request) {
         - "piso" tiene DOS sentidos, NO los confundas:
             a) TIPO de propiedad (departamento de planta completa) → SOLO cuando dicen "un piso", "busco piso/pisos", "tipo piso" sin más → type_keywords: ["piso"].
             b) NIVEL del departamento en el edificio → cuando dicen "piso alto/bajo", "planta alta/baja", "un 7° piso", "piso 8", "que esté arriba/abajo" → floor_preference (NO lo metas en type_keywords).
-        - "floor_preference": ALTO = del 6° piso para arriba (después del 5°). BAJO/MEDIO = de planta baja (0) hasta el 5° piso. "piso alto"/"bien arriba"/"última planta" → "alto". "piso bajo"/"planta baja"/"primeros pisos" → "bajo". "piso intermedio"/"ni muy alto ni muy bajo" → "medio". Si no hablan del nivel → null.
+        - "floor_preference": SOLO acepta "alto" | "bajo" | "medio" | null (nivel del depto). ALTO = del 6° piso para arriba (después del 5°). BAJO/MEDIO = de planta baja (0) hasta el 5° piso. "piso alto"/"bien arriba"/"última planta" → "alto". "piso bajo"/"planta baja"/"primeros pisos" → "bajo". "piso intermedio"/"ni muy alto ni muy bajo" → "medio". Si no hablan del nivel → null. OJO: "frente"/"al frente"/"contrafrente"/"lateral" NO son niveles (son orientación) → van a free_text_keywords, NUNCA a floor_preference.
         - "free_text_keywords": cualquier característica puntual que NO sea operación, tipo, zona, ambientes, baños, precio, ni un amenity del listado. Va literal y en minúsculas (ej: "frente", "apto crédito", "a estrenar", "pozo"). Estas se buscan como texto en TODA la ficha (título, descripción, dirección, etc.), no descartan resultados: solo ayudan a priorizar.
         - "depto"/"departamento" → ["departamento"].
         - AMBIENTES vs DORMITORIOS (¡NO los mezcles, es el error más caro!): "2 ambientes"/"2 amb"/"2 amb." → rooms: 2 (un ambiente = living/cocina + cada dormitorio). "2 dormitorios"/"2 cuartos"/"2 habitaciones"/"2 hab" → bedrooms: 2. Si solo dice "ambientes", llená rooms y dejá bedrooms en null (y viceversa).
@@ -164,6 +172,10 @@ export async function POST(req: Request) {
         - agency_keywords: SOLO si menciona una inmobiliaria/agencia puntual (ej: "propiedades de Cocucci", "las de RE/MAX"). Si no → [].
         - location_keywords SOLO si menciona zona/barrio/ciudad. Si no → [].
         - amenity_keywords: SOLO cosas concretas/verificables (cochera, pileta, sum, seguridad, balcón...). Adjetivos subjetivos ("luminoso", "moderno", "a estrenar", "amplio") NO van acá (esos se buscan por significado, no como filtro).
+        - ESPACIO EXTERIOR (importante): si piden espacio al aire libre de forma genérica o con "o" (ej "patio o balcón", "balcón o terraza", "espacio aéreo", "aire libre", "con expansión", "algo afuera/al exterior", "espacio verde propio") → poné UN SOLO amenity: "espacio aereo" (NO listes patio y balcón por separado: así matchea si tiene CUALQUIERA y no se penaliza por tener solo uno). Listá el específico (ej solo "balcón", solo "patio") únicamente cuando pidan ESE puntual y excluyente.
+        - JERGA INMOBILIARIA AR (traducí a los campos): "espacio aéreo/expansión/aire libre" → amenity "espacio aereo". "a estrenar/sin estrenar/nuevo/recién terminado" → free_text "a estrenar". "pozo/en pozo/del pozo/en construcción/preventa/desde pozo" → free_text "pozo". "apto crédito/apto banco/apto hipotecario" → free_text "apto credito". "apto profesional/uso profesional/apto oficina" → amenity "apto profesional". "semipiso" → type "departamento" + free_text "semipiso". "monoambiente/mono" → type "monoambiente". "dúplex/tríplex" → type "duplex". "PH" → type "ph". "frente/contrafrente/lateral" → free_text con ese término. "reciclado/a reciclar/a refaccionar/a remodelar" → free_text con ese término. "categoría/premium/de lujo/alta gama/super luxe" → free_text "categoria". "fondo/parque/jardín propio" → amenity "jardin". "cochera fija/cubierta/descubierta" → amenity "cochera". Términos subjetivos puros ("luminoso", "amplio", "moderno", "para la familia") NO van a filtros: van SOLO en search_summary (los captura el significado).
+        - search_summary: SIEMPRE redactalo acumulando todo lo dicho (incluí los matices subjetivos). Es la base de la búsqueda por significado; nunca lo dejes vacío si ya hay aunque sea un criterio.
+        - "force_search": tu JUICIO sobre si el usuario quiere ver resultados YA con lo que haya, AUNQUE falten datos. Poné true si de CUALQUIER forma (no hay frase fija) da a entender que no tiene/no quiere dar más datos o que avancés: "mostrame igual", "dale mostrame", "quiero ver lo que hay", "no tengo más", "no importa", "lo que sea", "buscá ya", "avanzá", "así está bien", "no me preguntes más", "ya está", etc. Poné false si todavía está respondiendo/dando datos o pregunta otra cosa. Interpretá la intención humana, no busques palabras exactas.
         - Mensaje general ("qué tenés?", "mostrá propiedades") → intent: RETRIEVAL con todo []/null/ambas.
         - Saludo/charla → intent: GENERAL.
         ${convoContext}
@@ -186,6 +198,8 @@ export async function POST(req: Request) {
     let bathroomsFilter: number | null = null;
     let floorPreference: string | null = null;
     let freeTextKeywords: string[] = [];
+    let searchSummary = "";
+    let forceSearch = false;
 
     try {
       const parsed = JSON.parse(intentResText);
@@ -210,6 +224,8 @@ export async function POST(req: Request) {
       freeTextKeywords = (parsed.free_text_keywords || [])
         .filter((k: string) => typeof k === "string" && k.trim().length > 1)
         .map((k: string) => k.toLowerCase().trim());
+      searchSummary = typeof parsed.search_summary === "string" ? parsed.search_summary.trim() : "";
+      forceSearch = parsed.force_search === true || parsed.force_search === "true";
     } catch(e) {
       isRetrieval = intentResText.toUpperCase().includes("RETRIEVAL");
     }
@@ -245,20 +261,34 @@ export async function POST(req: Request) {
     if (floorPreference === "alto") { floorMin = 6; floorMax = null; }
     else if (floorPreference === "bajo" || floorPreference === "medio") { floorMin = 0; floorMax = 5; }
 
+    // Blindaje MONOAMBIENTE: en Tokko/roomix se guardan como Departamento/Apartment con 1 ambiente
+    // (room_amount=1, sin dormitorio) y NO siempre lo dicen en el título. Si pidió SOLO monoambiente y no
+    // dio cantidad, fijamos 1 ambiente: así se suman los que no escriben "monoambiente" (además del match
+    // por título/descripción) y de paso ya no preguntamos "cuántos ambientes".
+    const onlyMonoambiente = typeKeywords.length > 0 && typeKeywords.every((t: string) => t === "monoambiente");
+    if (onlyMonoambiente && !roomsFilter && !bedroomsFilter) roomsFilter = 1;
+
     console.log("Search params:", { isRetrieval, operation, locationKeywords, typeKeywords, amenityKeywords, agencyKeywords, priceMax, priceMin, priceCurrency, roomsFilter, bedroomsFilter, bathroomsFilter, floorPreference, freeTextKeywords });
 
     // ─── COMPUERTA DE DATOS MÍNIMOS ───────────────────────────────────────────
-    // Antes de buscar/mostrar, exigimos los datos clave para que la consulta a la herramienta
-    // salga con la mayor cantidad de info posible: operación, tipo, zona, ambientes y presupuesto.
-    // Si falta alguno, NO se busca: el asistente pregunta primero (acumula el contexto entre turnos).
+    // Pedimos los 5 datos clave (operación, tipo, zona, ambientes, presupuesto) para que la búsqueda
+    // salga con la mayor info posible. Mientras falte alguno, NO se busca: el asistente pregunta
+    // (acumulando el contexto entre turnos). EXCEPCIÓN: si el usuario dice "no tengo más datos" /
+    // "buscá con eso" → buscamos YA con lo que haya. No se busca al tener solo el primer dato.
     const missingRequired: string[] = [];
     if (operation === "ambas") missingRequired.push("la operación (compra o alquiler)");
     if (typeKeywords.length === 0) missingRequired.push("el tipo de propiedad (depto, casa, PH, etc.)");
     if (locationKeywords.length === 0) missingRequired.push("la zona o barrio");
     if (!roomsFilter && !bedroomsFilter) missingRequired.push("la cantidad de ambientes o dormitorios");
     if (!priceMax && !priceMin) missingRequired.push("el presupuesto y la moneda (USD o ARS)");
-    // Salida de escape: si el usuario pide ver igual, no lo bloqueamos.
-    const wantsAnyway = /\b(mostr[aá](me)?\s+igual|lo que tengas|sin importar|de una|busc[aá] igual|igual mostr|ver(las)?\s+igual|d[ae]le igual)\b/.test(msgLower);
+
+    // Señal principal: el MODELO interpreta (force_search) si el usuario quiere ver YA con lo que haya,
+    // dicho de cualquier forma (no hay frase detonadora fija). El regex queda SOLO de respaldo por si el
+    // JSON del extractor falla (en ese caso forceSearch quedó en false y al menos cubrimos lo más común).
+    const wantsAnywayRegex = /\b(mostr[aá]|busc[aá]|dame|d[ae]le|quiero ver|a ver|ver opcione|opcione|resultado)\b|\b(lo que (tengas|haya|hay|sea)|sin (m[aá]s|importar)|no tengo (m[aá]s|nada)|es lo que hay|con eso|igual mostr|mostr[aá]\s+igual|d[ae]le igual)\b/.test(msgLower);
+    const wantsAnyway = forceSearch || wantsAnywayRegex;
+
+    // Mientras falte algún dato clave y el usuario NO haya pedido ver igual → preguntamos sin buscar.
     const needsMoreInfo = isRetrieval && missingRequired.length > 0 && !wantsAnyway;
 
     let newMatchedProperties: any[] = [];
@@ -302,6 +332,12 @@ export async function POST(req: Request) {
           const allTypes = [...typeKeywords];
           typeKeywords.forEach((t: string) => { const m = roomixTypeMap[t.toLowerCase()]; if (m) allTypes.push(...m); });
           rmxTypePatterns = ilike(Array.from(new Set(allTypes)));
+          // Monoambiente: ampliamos el tipo a Departamento/Apartment para agarrar también los que NO escriben
+          // "monoambiente" en el título (ya quedan acotados a 1 ambiente por el filtro de ambientes de arriba).
+          if (onlyMonoambiente) {
+            propTypePatterns = Array.from(new Set([...propTypePatterns, '%departamento%']));
+            rmxTypePatterns = Array.from(new Set([...rmxTypePatterns, '%apartment%', '%accommodation%', '%studio%']));
+          }
         }
       }
       const locPatterns = ilike(locationKeywords);
@@ -330,9 +366,30 @@ export async function POST(req: Request) {
       const agencyNamePatterns = askingExternalAgency ? ilike(agencyKeywords) : [];
 
       // ── Embedding de la consulta (RETRIEVAL_QUERY). Si falla, las funciones caen a ranking estructural. ──
+      // CLAVE: NO embebemos el último mensaje suelto (en turnos de refinamiento puede ser "Comprar", "sí",
+      // "dale" → vector sin sentido que hace colapsar el escaneo vectorial sobre las 69k filas de roomix).
+      // Embebemos una consulta ACUMULADA: criterios estructurados + el resumen en lenguaje natural (que
+      // captura también los matices subjetivos tipo "luminoso"). Fallback al mensaje crudo solo si no hay nada.
+      const canonicalQuery = [
+        operation !== "ambas" ? (operation === "venta" ? "en venta" : "en alquiler") : "",
+        typeKeywords.length ? typeKeywords.join(" o ") : "",
+        roomsFilter ? `${roomsFilter} ambientes` : "",
+        bedroomsFilter ? `${bedroomsFilter} dormitorios` : "",
+        locationKeywords.length ? `en ${locationKeywords.join(", ")}` : "",
+        amenityKeywords.length ? `con ${amenityKeywords.join(", ")}` : "",
+        freeTextKeywords.length ? freeTextKeywords.join(", ") : "",
+        priceMax ? `hasta ${priceMax} ${priceCurrency || ""}`.trim() : "",
+      ].filter(Boolean).join(" ");
+      const embeddingText = [canonicalQuery, searchSummary]
+        .map((s) => (s || "").trim())
+        .filter((s) => s.length > 0)
+        .join(". ")
+        .trim() || message;
+      console.log("Embedding query text:", embeddingText);
+
       let queryEmbeddingStr: string | null = null;
       try {
-        const emb = await generateEmbedding(message, 'RETRIEVAL_QUERY');
+        const emb = await generateEmbedding(embeddingText, 'RETRIEVAL_QUERY');
         if (Array.isArray(emb) && emb.length > 0) queryEmbeddingStr = `[${emb.join(',')}]`;
       } catch (embErr) {
         console.error('Query embedding fallo (se usa ranking estructural):', embErr);
@@ -517,6 +574,7 @@ INSTRUCCIÓN SOBRE NOTAS: Interpretá las notas y directivas de arriba. Si algun
     - Si hay amenities parciales: mencionalo ("Encontré 5 propiedades, algunas con parrilla pero sin pileta — podés verlo en las tarjetas").
     - Si no hay resultados: explicá por qué y sugerí 2-3 alternativas concretas.
     - Si el usuario pide más detalle de una propiedad específica, ahí sí describí sus características.
+    - REGLA ANTI-ERROR (no negociable): NUNCA digas "mirá las tarjetas de abajo", "te muestro las opciones" ni des a entender que hay propiedades en pantalla si NO se encontró ninguna o si todavía no buscaste. Solo mencionás tarjetas/resultados cuando el contexto confirma que SÍ hay propiedades.
 
     PERSONALIDAD Y ESTILO CONVERSACIONAL:
     - Profesional y cálido, 100% humano. Voseo formal ("tenés", "podés", "encontré", "mirá"). Nada robótico ni acartonado.
@@ -532,7 +590,7 @@ INSTRUCCIÓN SOBRE NOTAS: Interpretá las notas y directivas de arriba. Si algun
     CONTEXTO DE BÚSQUEDA ACTUAL:
     ${needsMoreInfo
       ? `TODAVÍA NO BUSQUÉS NI MUESTRES PROPIEDADES. El usuario quiere buscar pero faltan datos clave para traerle lo mejor. Faltan: ${missingRequired.join("; ")}.
-Tu tarea AHORA: pedile esos datos de forma natural, cálida y profesional (como un asesor experto que quiere entender bien la necesidad antes de mostrar). Reconocé lo que YA te dijo para no repreguntarlo. Podés agrupar 2-3 preguntas en una sola intervención fluida (no como formulario). Explicale en una frase por qué te sirve (para acotar y no hacerle perder tiempo). NO inventes ni menciones propiedades: todavía no hay resultados.`
+Tu tarea AHORA: pedile esos datos de forma natural, cálida y profesional (como un asesor experto que quiere entender bien la necesidad antes de mostrar). Reconocé lo que YA te dijo para no repreguntarlo. Podés agrupar 2-3 preguntas en una sola intervención fluida (no como formulario). Explicale en una frase por qué te sirve (para acotar y no hacerle perder tiempo). NO inventes ni menciones propiedades, y NO digas "mirá las tarjetas", "te muestro las opciones" ni nada que sugiera que hay resultados en pantalla: TODAVÍA NO HAY.`
       : isRetrieval
         ? propertyContext
         : 'El usuario no está buscando propiedades. Respondé normalmente y, si corresponde, retomá lo conversado.'}
