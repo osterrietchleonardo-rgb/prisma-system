@@ -109,9 +109,35 @@ export default function BandejaDetalleClient({ conversationId }: { conversationI
     setLoading(false)
   }, [conversationId])
 
+  // Refresco automático silencioso: trae solo los mensajes nuevos (sin parpadeo ni
+  // perder el scroll). No toca el estado de carga ni borra lo ya mostrado.
+  const silentRefresh = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/admin-vakdor/bandejas/${conversationId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.conversation) setConv(data.conversation)
+      if (Array.isArray(data.messages)) {
+        setMessages((prev) => {
+          const existing = new Set(prev.map((m) => m.id))
+          const nuevos = (data.messages as Message[]).filter((m) => !existing.has(m.id))
+          return nuevos.length ? [...prev, ...nuevos] : prev
+        })
+      }
+    } catch {
+      /* error transitorio de red: lo ignoramos y reintentamos en el próximo ciclo */
+    }
+  }, [conversationId])
+
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  // Polling cada 5 s mientras la conversación está abierta
+  useEffect(() => {
+    const id = setInterval(silentRefresh, 5000)
+    return () => clearInterval(id)
+  }, [silentRefresh])
 
   if (loading) {
     return <div style={{ padding: 40, color: "rgba(255,255,255,0.4)", fontSize: 14 }}>Cargando conversación...</div>

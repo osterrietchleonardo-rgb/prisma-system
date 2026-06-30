@@ -78,6 +78,28 @@ export default function BandejasClient() {
     fetchConversations()
   }, [fetchConversations])
 
+  // Refresco automático silencioso de la lista (sin parpadeo ni reset de filtros/página)
+  const silentRefresh = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({ page: String(page), perPage: String(PER_PAGE) })
+      if (q) params.set("q", q)
+      if (agencyId) params.set("agency_id", agencyId)
+      if (estado) params.set("estado", estado)
+      const res = await fetch(`/api/admin-vakdor/bandejas?${params}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setConversations(data.data || [])
+      setTotal(data.total || 0)
+    } catch {
+      /* error transitorio: reintentamos en el próximo ciclo */
+    }
+  }, [q, agencyId, estado, page])
+
+  useEffect(() => {
+    const id = setInterval(silentRefresh, 10000)
+    return () => clearInterval(id)
+  }, [silentRefresh])
+
   function estadoBadge(e: string) {
     const s = ESTADO_BADGE[e] || ESTADO_BADGE.pending
     return (
