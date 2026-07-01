@@ -168,6 +168,52 @@ function fromOpenGraph(html) {
   };
 }
 
+// ─── Datos "a la vista" del texto renderizado (precio/ambientes/dormitorios/baños/m²) ──
+// Mismo espíritu que `parseInternal` del crawler (leer MÁS que el JSON-LD) pero PORTAL-AGNÓSTICO:
+// no depende de selectores CSS que cada portal cambia, sino de lo que el aviso MUESTRA en texto.
+// ML mete el precio/ambientes en el DOM (no en su JSON-LD), así que esto los rescata. Es
+// DETERMINISTA (sin IA, sin costo) y en `extract()` corre de forma ADITIVA: `apply()` solo
+// completa los campos que quedaron vacíos → nunca pisa lo que JSON-LD/OpenGraph ya trajeron.
+function fromVisibleText(text) {
+  if (!text || text.length < 40) return null;
+  const t = text.replace(/\s+/g, ' ');
+  const sujeto = {};
+
+  // Ambientes/dormitorios: si el aviso no da dormitorios explícitos, dormitorios = ambientes - 1
+  // (regla del proyecto: "monoambiente"/"1 ambiente" = 0 dormitorios).
+  const dorm = t.match(/(\d{1,2})\s*(?:dormitorio|habitaci[oó]n|cuarto)/i);
+  const amb = t.match(/(\d{1,2})\s*ambiente/i);
+  if (dorm) sujeto.dormitorios = parseInt(dorm[1], 10);
+  else if (/monoambiente/i.test(t)) sujeto.dormitorios = 0;
+  else if (amb) sujeto.dormitorios = Math.max(0, parseInt(amb[1], 10) - 1);
+
+  const ban = t.match(/(\d{1,2})\s*ba[ñn]o/i);
+  if (ban) sujeto.banos = parseInt(ban[1], 10);
+
+  const m2 = t.match(/(\d{2,4})\s*m(?:²|2\b|ts?2?\b)/i);
+  if (m2) sujeto.m2_cubiertos = parseInt(m2[1], 10);
+
+  // Precio: primer monto con símbolo de moneda que NO sea de expensas y sea >= 1000
+  // (evita agarrar "expensas $50.000", teléfonos o números sueltos). Formato AR con puntos
+  // de miles lo normaliza `toNum`. En venta AR el precio suele venir en USD ("US$"/"U$S").
+  let precio = null, moneda = 'USD';
+  const priceRe = /(u\$s|us\$|usd|d[óo]lares?|ar\$|\$|pesos)\s*([0-9][0-9.\, ]{3,})/ig;
+  let pm;
+  while ((pm = priceRe.exec(t))) {
+    const ctx = t.slice(Math.max(0, pm.index - 25), pm.index).toLowerCase();
+    if (/expensa/.test(ctx)) continue;
+    const val = toNum(pm[2]);
+    if (val && val >= 1000) {
+      precio = val;
+      moneda = /u\$s|us\$|usd|d[óo]lar/i.test(pm[1]) ? 'USD' : 'ARS';
+      break;
+    }
+  }
+
+  if (!Object.keys(sujeto).length && precio == null) return null;
+  return { sujeto, precio, moneda, metodo: 'texto-visible' };
+}
+
 async function fromIA(text) {
   if (!GEMINI_API_KEY || text.length < 80) return null;
   const prompt = `Sos un extractor de datos inmobiliarios de Argentina. Del texto de un aviso, devolvé SOLO JSON válido (sin texto extra), MUY meticuloso:
@@ -307,6 +353,10 @@ async function extract(url, maxAttempts = 3) {
   };
   apply(fromJsonLd(html));
   apply(fromOpenGraph(html));
+  // Rescate determinista de lo que el aviso MUESTRA (precio/ambientes/m²), típico de ML que
+  // no lo pone en el JSON-LD. Aditivo. Corre ANTES del gate `thin`: si ya completó m²/dormitorios,
+  // ni siquiera hace falta gastar la IA abajo.
+  apply(fromVisibleText(text));
 
   let iaRes = null;
   const thin = !(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0);
