@@ -1,4 +1,4 @@
-import { Shield, Lock, Eye, FileText, Globe, UserCheck, MessageSquare } from "lucide-react";
+import { Shield, Lock, Eye, FileText, Globe, UserCheck, MessageSquare, CalendarDays } from "lucide-react";
 
 export default function PrivacyPage() {
   return (
@@ -10,7 +10,7 @@ export default function PrivacyPage() {
             <Shield className="w-8 h-8" />
           </div>
           <h1 className="text-4xl md:text-6xl font-black tracking-tighter mt-4">Política de <br /><span className="text-accent italic">Privacidad</span></h1>
-          <p className="text-xl text-muted-foreground">Última actualización: 6 de mayo de 2026</p>
+          <p className="text-xl text-muted-foreground">Última actualización: 1 de julio de 2026</p>
         </div>
 
         {/* Content Sections */}
@@ -89,6 +89,53 @@ export default function PrivacyPage() {
               <p>
                 Implementamos medidas de seguridad de nivel bancario, incluyendo cifrado SSL/TLS para todos los datos en tránsito y cifrado AES-256 para datos en reposo. PRISMA-SYSTEM utiliza infraestructuras seguras (Supabase/AWS) con redundancia y monitoreo 24/7.
               </p>
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-6 p-8 rounded-3xl bg-white/[0.02] border border-white/10 backdrop-blur-sm">
+            <div className="flex items-center gap-3 text-accent">
+              <CalendarDays className="w-6 h-6" />
+              <h2 className="text-2xl font-black uppercase tracking-widest">5. Servicios de API de Google</h2>
+            </div>
+            <div className="prose prose-invert max-w-none text-muted-foreground leading-relaxed space-y-4">
+              <p>
+                PRISMA-SYSTEM ofrece una integración opcional con Google Calendar. Al conectar tu cuenta de Google, accedemos únicamente a la información necesaria para sincronizar visitas y eventos de tu agenda inmobiliaria.
+              </p>
+              <h3 className="text-white font-bold text-lg">Datos que accedemos de Google Calendar</h3>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>Lectura y escritura de eventos en tu calendario seleccionado.</li>
+                <li>Información básica del perfil de Google (nombre y email) para identificar la cuenta conectada.</li>
+              </ul>
+              <h3 className="text-white font-bold text-lg">Cómo usamos estos datos</h3>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>Crear, actualizar y eliminar eventos de visitas programadas desde PRISMA.</li>
+                <li>Sincronizar tu agenda para evitar conflictos de horarios.</li>
+                <li>Mostrar disponibilidad en la plataforma.</li>
+              </ul>
+              <h3 className="text-white font-bold text-lg">Lo que NO hacemos</h3>
+              <ul className="list-disc pl-5 space-y-2">
+                <li>No almacenamos el contenido completo de tu calendario de Google.</li>
+                <li>No compartimos tus datos de Google con terceros.</li>
+                <li>No utilizamos tus datos de Google para publicidad ni entrenamiento de modelos de IA.</li>
+                <li>No accedemos a tu calendario sin tu autorización explícita.</li>
+              </ul>
+              <p>
+                Podés desconectar tu cuenta de Google en cualquier momento desde la sección de Configuración de PRISMA, lo cual revocará el acceso de la plataforma a tu calendario.
+              </p>
+              <div className="p-4 rounded-xl bg-accent/5 border border-accent/10 mt-4">
+                <p className="text-sm text-white/90">
+                  <strong>Divulgación de Uso Limitado:</strong> El uso y la transferencia de la información recibida de las API de Google a cualquier otra aplicación por parte de PRISMA-SYSTEM cumplirán con la{" "}
+                  <a
+                    href="https://developers.google.com/terms/api-services-user-data-policy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent underline hover:text-accent/80 transition-colors"
+                  >
+                    Política de Datos del Usuario de los Servicios de las API de Google
+                  </a>
+                  , incluidos los requisitos de Uso Limitado.
+                </p>
+              </div>
             </div>
           </section>
 
