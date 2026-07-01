@@ -222,21 +222,20 @@ function fromVisibleText(text) {
 function fromLocationText(text) {
   if (!text) return null;
   const t = text.replace(/\s+/g, ' ');
-  const re = /([A-Za-zÁÉÍÓÚÑáéíóúñ0-9.º°'\- ]{4,45}?),\s*([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ .'\-]{2,35}?),\s*(capital federal|ciudad de buenos aires|c\.?a\.?b\.?a|buenos aires|gran buenos aires)\b/i;
-  const m = t.match(re);
-  if (!m) return null;
-  let dir = m[1].trim().replace(/^(ubicaci[oó]n|ver en el mapa|mapa|direcci[oó]n)\s*/i, '').trim();
-  const barrio = m[2].trim();
-  const out = { barrio };
-  // La dirección SOLO si quedó una calle+altura LIMPIA ("Montevideo al 200"): sin palabras de
-  // ficha (superficie/m2/ambientes/etc), sin "!", y con forma calle + número al final. Si no,
-  // no se toca (queda lo que había = no empeora ACM).
-  if (dir.length <= 45 && !/[!¡]/.test(dir)
-      && !/superficie|caracter|m2|m²|ubicaci|precio|ambiente|dormitor|ba[ñn]o|expensa|piso/i.test(dir)
-      && /^[A-Za-zÁÉÍÓÚÑáéíóúñ][A-Za-zÁÉÍÓÚÑáéíóúñ.'\- ]*\s+(?:al\s+)?\d{1,5}$/.test(dir)) {
-    out.direccion = dir;
+  const out = {};
+  // Barrio: "..., <Barrio>, Capital Federal" o "barrio de <Barrio>". No debe ser "Capital Federal" ni traer números.
+  const bm = t.match(/,\s*([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ .'\-]{2,30}?),\s*(?:capital federal|ciudad de buenos aires|c\.?a\.?b\.?a)\b/i)
+          || t.match(/barrio de ([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ .'\-]{2,30}?)[.,!]/i);
+  if (bm) { const b = bm[1].trim(); if (!/capital federal|buenos aires|\d/i.test(b)) out.barrio = b; }
+  // Dirección: "<Calle> [al] <altura>" con la calle en palabras CAPITALIZADAS (así corta la frase en
+  // minúscula previa, ej "...de la zona Montevideo al 200" → "Montevideo al 200"). Validada: rechaza
+  // palabras de ficha. Si no sale limpia, no se toca (queda lo que había = no empeora ACM).
+  const sm = t.match(/\b((?:[A-ZÁÉÍÓÚÑ][a-záéíóúñ.]+\s+){0,3}[A-ZÁÉÍÓÚÑ][a-záéíóúñ.]+\s+(?:al\s+)?\d{1,5})\s*,\s*(?:[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ .'\-]{2,30}?,\s*)?(?:capital federal|ciudad de buenos aires|c\.?a\.?b\.?a|buenos aires)\b/i);
+  if (sm) {
+    const dir = sm[1].trim();
+    if (dir.length <= 45 && !/superficie|caracter|m2|m²|precio|ambiente|dormitor|ba[ñn]o|expensa|piso|informaci|zona/i.test(dir)) out.direccion = dir;
   }
-  return { sujeto: out, metodo: 'ubicacion-texto' };
+  return Object.keys(out).length ? { sujeto: out, metodo: 'ubicacion-texto' } : null;
 }
 
 async function fromIA(text) {
