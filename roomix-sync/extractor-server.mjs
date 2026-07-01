@@ -67,7 +67,7 @@ function mapMoneda(c) {
 }
 function mapTipo(raw) {
   const t = (raw || '').toLowerCase();
-  if (/\bph\b/.test(t)) return 'ph';
+  if (/\bph\b|\bp\.h\.?|propiedad horizontal/.test(t)) return 'ph';
   if (/(office|oficina)/.test(t)) return 'oficina';
   if (/(local|store|commercial|premises|comercial)/.test(t)) return 'local';
   if (/(land|lote|terreno)/.test(t)) return 'terreno';
@@ -214,6 +214,31 @@ function fromVisibleText(text) {
   return { sujeto, precio, moneda, metodo: 'texto-visible' };
 }
 
+// ─── Direccion + barrio desde el bloque de ubicacion del aviso ───
+// Formato tipico en el texto: "Calle Numero, Barrio, Ciudad, Provincia" (ej "Montevideo al 200,
+// Monserrat, Capital Federal"). ML NO pone streetAddress en el JSON-LD (deja el titulo del aviso),
+// asi que de aca sacamos la CALLE real y el BARRIO. Determinista, aditivo y VALIDADO: solo devuelve
+// lo que parezca una direccion/barrio de verdad (no rompe ACM: si no matchea, no completa nada).
+function fromLocationText(text) {
+  if (!text) return null;
+  const t = text.replace(/\s+/g, ' ');
+  const re = /([A-Za-zÁÉÍÓÚÑáéíóúñ0-9.º°'\- ]{4,45}?),\s*([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ .'\-]{2,35}?),\s*(capital federal|ciudad de buenos aires|c\.?a\.?b\.?a|buenos aires|gran buenos aires)\b/i;
+  const m = t.match(re);
+  if (!m) return null;
+  let dir = m[1].trim().replace(/^(ubicaci[oó]n|ver en el mapa|mapa|direcci[oó]n)\s*/i, '').trim();
+  const barrio = m[2].trim();
+  const out = { barrio };
+  // La dirección SOLO si quedó una calle+altura LIMPIA ("Montevideo al 200"): sin palabras de
+  // ficha (superficie/m2/ambientes/etc), sin "!", y con forma calle + número al final. Si no,
+  // no se toca (queda lo que había = no empeora ACM).
+  if (dir.length <= 45 && !/[!¡]/.test(dir)
+      && !/superficie|caracter|m2|m²|ubicaci|precio|ambiente|dormitor|ba[ñn]o|expensa|piso/i.test(dir)
+      && /^[A-Za-zÁÉÍÓÚÑáéíóúñ][A-Za-zÁÉÍÓÚÑáéíóúñ.'\- ]*\s+(?:al\s+)?\d{1,5}$/.test(dir)) {
+    out.direccion = dir;
+  }
+  return { sujeto: out, metodo: 'ubicacion-texto' };
+}
+
 async function fromIA(text) {
   if (!GEMINI_API_KEY || text.length < 80) return null;
   const prompt = `Sos un extractor de datos inmobiliarios de Argentina. Del texto de un aviso, devolvé SOLO JSON válido (sin texto extra), MUY meticuloso:
@@ -322,7 +347,7 @@ async function fetchOnce(url) {
   }
 }
 
-async function extract(url, maxAttempts = 3) {
+async function extract(url, maxAttempts = 3, debug = false) {
   let best = { html: '', text: '', title: '' };
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let r;
@@ -365,6 +390,16 @@ async function extract(url, maxAttempts = 3) {
   // Último recurso: lo que diga el propio link (no pisa lo ya extraído).
   apply(fromUrlSlug(url));
 
+  // Dirección/barrio reales del bloque de ubicación (ML deja el TÍTULO en dirección).
+  const loc = fromLocationText(text);
+  if (loc && loc.sujeto) {
+    if (!merged.sujeto.barrio && loc.sujeto.barrio) merged.sujeto.barrio = loc.sujeto.barrio;
+    // Si la dirección actual parece un título (larga o con "!") y hay una calle real, la reemplazamos.
+    const cur = merged.sujeto.direccion || '';
+    const curEsTitulo = !cur || cur.length > 45 || /[!¡]/.test(cur);
+    if (loc.sujeto.direccion && curEsTitulo) merged.sujeto.direccion = loc.sujeto.direccion;
+  }
+
   // Amenities: usamos la lista curada de la IA si la hay (precisa); si no, el texto del aviso.
   const amenSource = iaRes && iaRes._amen && iaRes._amen.length > 3 ? iaRes._amen : text;
   const amen = mapAmenidades(amenSource);
@@ -377,7 +412,14 @@ async function extract(url, maxAttempts = 3) {
   if (!merged.sujeto.direccion && merged.sujeto.barrio) merged.sujeto.direccion = merged.sujeto.barrio;
 
   const ok = Boolean(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0 || merged.precio);
-  return { ok, requiere_completar_manual: !ok, ...merged };
+  const result = { ok, requiere_completar_manual: !ok, ...merged };
+  // Modo debug (temporal): devuelve un pedazo del texto renderizado y los @type del JSON-LD,
+  // para verificar/afinar los parsers contra la página real sin adivinar. NO afecta la salida normal.
+  if (debug) {
+    result._text = (text || '').slice(0, 3500);
+    result._jsonld = parseJsonLdNodes(html).slice(0, 4).map((n) => ({ '@type': n['@type'], name: n.name, address: n.address }));
+  }
+  return result;
 }
 
 // ─── HTTP server ───
@@ -397,11 +439,11 @@ const server = http.createServer((req, res) => {
       if (body.length > 1e6) req.destroy();
     });
     req.on('end', () => {
-      let url;
-      try { url = JSON.parse(body).url; } catch { return send(400, { error: 'bad json' }); }
+      let url, debug = false;
+      try { const b = JSON.parse(body); url = b.url; debug = !!b.debug; } catch { return send(400, { error: 'bad json' }); }
       if (!url || !/^https?:\/\//i.test(url)) return send(400, { error: 'invalid url' });
       log('▶️  extract', url);
-      limit(() => extract(url))
+      limit(() => extract(url, 3, debug))
         .then((r) => { log('✅', url, r.ok ? 'ok' : 'thin'); send(200, r); })
         .catch((e) => { log('❌', url, e.message); send(500, { error: e.message, ok: false, requiere_completar_manual: true, sujeto: {} }); });
     });
