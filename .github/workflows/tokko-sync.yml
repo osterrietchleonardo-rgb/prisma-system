@@ -18,3 +18,12 @@ jobs:
         run: |
           curl -sS --max-time 290 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/tokko-sync" \
                -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      # Colgado del mismo cron (2×/día): sincroniza costos de IA (OpenAI + Anthropic + Gemini)
+      # hacia finanzas. Independiente del paso anterior (if: always) y no rompe el workflow si falla.
+      - name: Trigger Finance costs sync (OpenAI + Anthropic + Gemini)
+        if: always()
+        continue-on-error: true
+        run: |
+          curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/finance-sync?days=7" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

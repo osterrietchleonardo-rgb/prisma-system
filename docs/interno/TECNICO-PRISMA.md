@@ -555,6 +555,21 @@ Login (`POST /api/admin-vakdor/login`): rate limit 5/10min; hash SHA-256 con sal
 
 **Endpoints:** agencias (lista/detalle/créditos/estado/pagos/sugerencias/tokko-stats), asesores/directores (estado), bloqueados, dashboard/metricas, invitaciones, pagos, sugerencias (+ métricas/estado), usuarios desbloquear, logout, y **bandejas** (`GET /api/admin-vakdor/bandejas` y `/[id]`) — **monitoreo cross-tenant** de conversaciones WhatsApp de todas las agencias vía `service_role`, con filtros por agencia/estado/texto. Páginas en `app/admin-vakdor/*`.
 
+### 16.1 Módulo Finanzas (`/admin-vakdor/finanzas`)
+
+Panel económico/contable (solo dueño): P&L, márgenes, **apalancamiento operativo = MC/EBIT**, USD + ARS con tipo de cambio, gráficos y tabla. Conector en `lib/admin-vakdor/finance/{providers,sync,google-auth}.ts`.
+
+- **Costos reales de IA** (cost APIs oficiales, upsert diario idempotente):
+  - OpenAI `GET /v1/organization/costs` (admin key `OPENAI_ADMIN_API_KEY`) → `amount.value` en **USD**. group_by project_id+line_item; `quantity`=tokens. (El viejo `/v1/usage` está deprecado.)
+  - Anthropic `GET /v1/organizations/cost_report` (admin key `ANTHROPIC_ADMIN_API_KEY`, **requiere cuenta Organización**) → `amount` en **centavos** ⇒ /100. group_by workspace_id+description.
+  - Gemini vía **BigQuery FOCUS export** (auth service-account JWT RS256 → OAuth; `PROJECT_ID`/`CLIENT_EMAIL`/`PRIVATE_KEY`/`TOKEN_URI`). `ServiceName='Gemini API'`, `BilledCost` en USD, `DATE(ChargePeriodStart)`. Tiene lag ~1-2 días.
+- **Tablas** (migración `20260701120000_create_finance_tables`): `finance_api_costs` (costos diarios USD; UNIQUE `fecha,proveedor,proyecto,modelo,fuente`), `finance_expenses` (gastos fijos/variables, CRUD manual), `finance_fx` (USD→ARS por mes). **Ingresos = reuso de `pagos_agencia`**. Las 3 con **RLS on + sin policies** (solo `service_role`).
+- **Endpoints:** `GET finance/metricas` (P&L agregado por mes + evolución 12m + breakdowns), `finance/expenses` (GET/POST/PATCH/DELETE), `finance/fx` (GET/POST upsert), `POST finance/sync` (manual, botón "Sincronizar", cookie admin). **Cron** `GET /api/cron/finance-sync?days=7` (auth `CRON_SECRET`) **colgado del workflow `tokko-sync.yml`** (2×/día), no crea infra nueva.
+- **Gotcha:** las lecturas usan un cliente `service_role` con `cache:"no-store"` + `export const fetchCache="force-no-store"` porque Next 14 cachea los `fetch` internos de supabase-js y congelaba lecturas vacías (gastos recién agregados no aparecían).
+- **UI:** `components/admin-vakdor/finanzas-client.tsx` + `finance-evolution-chart.tsx` (SVG propios, sin librería), reusa `DonutChart`; iconos SVG inline; estética dark/cobre.
+
+**Seguridad (misma tanda):** migración `20260701123000_secure_admin_tables_rls` prende RLS (solo `service_role`) en las 5 tablas admin que estaban expuestas: `admin_vakdor_users`, `admin_vakdor_activity_log`, `log_creditos_admin`, `pagos_agencia`, `emails_bloqueados`.
+
 ---
 
 ## 17. Frontend: estructura y convenciones

@@ -1513,6 +1513,25 @@ Sistema de auth **completamente separado** de Supabase Auth:
 | `/api/admin-vakdor/sugerencias/[id]/estado` | PATCH | Cambiar estado |
 | `/api/admin-vakdor/usuarios/[id]/desbloquear` | POST | Desbloquear usuario |
 | `/api/admin-vakdor/logout` | POST | Cerrar sesión admin |
+| `/api/admin-vakdor/finance/metricas` | GET | P&L del mes: ingresos, costos IA, gastos, MC, EBIT, margen, apalancamiento + evolución 12m |
+| `/api/admin-vakdor/finance/expenses` | GET/POST/PATCH/DELETE | Alta/edición/baja de gastos fijos y variables |
+| `/api/admin-vakdor/finance/fx` | GET/POST | Tipo de cambio USD→ARS por mes |
+| `/api/admin-vakdor/finance/sync` | POST | Sincronización manual de costos (botón del panel) |
+| `/api/cron/finance-sync` | GET | Sincronización automática 2×/día (colgada de `tokko-sync.yml`, auth `CRON_SECRET`) |
+
+### 23.1 Módulo Finanzas
+
+Panel económico/contable del dueño (`/admin-vakdor/finanzas`). Objetivo: trazabilidad de costos y rentabilidad para tomar decisiones informadas y mostrar el panorama a inversores.
+
+**Qué muestra:** KPIs de P&L (Ingresos, Costos de IA, Gastos fijos/variables, Margen de contribución, Utilidad EBIT, Margen neto, **Apalancamiento operativo = MC/EBIT**), evolución mensual ingresos vs costos (12 meses), tortas de costo por proveedor y gasto por categoría, estado de resultados desglosado, tabla de gastos con alta/edición/baja, y toggle **USD/ARS**.
+
+**De dónde salen los números:**
+- **Costos de IA (reales):** se traen automáticamente de las cost APIs de OpenAI (USD), Anthropic (centavos→USD, requiere cuenta Organización) y Gemini (export FOCUS de Google Cloud a BigQuery), **2×/día**, y se guardan en `finance_api_costs`. Detalle técnico en TÉCNICO §16.1.
+- **Ingresos:** se reusan de `pagos_agencia` (la facturación ya registrada).
+- **Gastos operativos:** carga manual (suscripciones, infraestructura, proxy, sueldos, etc.) en `finance_expenses`; se prorratean por mes según recurrencia (mensual/anual/único) y por tipo (fijo/variable).
+- **Tipo de cambio:** carga manual mensual en `finance_fx` para mostrar todo también en pesos.
+
+**Cálculo:** MC = Ingresos − costos variables (costos de IA + gastos variables); EBIT = MC − gastos fijos; Apalancamiento = MC / EBIT; Margen neto = EBIT / Ingresos. Todo se unifica a USD y se convierte a ARS con el tipo de cambio del mes.
 
 ---
 
