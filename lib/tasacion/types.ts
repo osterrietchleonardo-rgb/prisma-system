@@ -65,7 +65,7 @@ export type AcmSource = 'cartera' | 'roomix';
 
 // Cada renglón del checklist de comparabilidad (qué coincide y qué no).
 export interface ChecklistItem {
-  dimension: 'tipo' | 'operacion' | 'zona' | 'superficie' | 'ambientes' | 'banos' | 'amenities' | 'semantica';
+  dimension: 'tipo' | 'operacion' | 'zona' | 'superficie' | 'ambientes' | 'dormitorios' | 'banos' | 'antiguedad' | 'amenities' | 'semantica';
   label: string;
   sujeto_val: string;
   comp_val: string;

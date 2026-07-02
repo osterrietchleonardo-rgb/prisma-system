@@ -11,12 +11,16 @@ export interface SubScores {
   sc_zona: number | null;
   sc_superficie: number | null;
   sc_ambientes: number | null;
+  sc_dormitorios: number | null;
   sc_banos: number | null;
+  sc_antiguedad: number | null;
   sc_amenities: number | null;
   sc_semantica: number | null;
 }
 
-const PESOS = { zona: 25, superficie: 25, ambientes: 20, banos: 10, amenities: 10, semantica: 10 } as const;
+// Pesos base del % (deben coincidir con los de las funciones SQL acm_match_*). La ZONA ya NO
+// pesa: es un filtro duro (todos los comparables son del mismo barrio) → se muestra como "filtro".
+const PESOS = { superficie: 22, ambientes: 16, dormitorios: 14, banos: 12, antiguedad: 14, amenities: 12, semantica: 10 } as const;
 
 function estado(score: number | null): ChecklistItem["estado"] {
   if (score === null || score === undefined) return "na";
@@ -26,12 +30,14 @@ function estado(score: number | null): ChecklistItem["estado"] {
 }
 
 const fmtNum = (v: number | null | undefined, suf = "") => (v && v > 0 ? `${v}${suf}` : "—");
+// La antigüedad admite 0 ("a estrenar") como valor válido a mostrar.
+const fmtAnios = (v: number | null | undefined) => (v !== null && v !== undefined && v >= 0 ? `${v} años` : "—");
 
 export function buildChecklist(args: {
   sub: SubScores;
   operacion: string;
-  sujeto: { tipo: string; zona: string; m2: number | null; ambientes: number | null; banos: number | null; amenities: string[] };
-  comp: { tipo: string; zona: string; m2: number | null; ambientes: number | null; banos: number | null; amenities: string[] };
+  sujeto: { tipo: string; zona: string; m2: number | null; ambientes: number | null; dormitorios: number | null; banos: number | null; antiguedad: number | null; amenities: string[] };
+  comp: { tipo: string; zona: string; m2: number | null; ambientes: number | null; dormitorios: number | null; banos: number | null; antiguedad: number | null; amenities: string[] };
 }): ChecklistItem[] {
   const { sub, sujeto, comp, operacion } = args;
   const amenSujeto = sujeto.amenities.length ? sujeto.amenities.join(", ") : "—";
@@ -57,14 +63,15 @@ export function buildChecklist(args: {
       peso: 0,
       score: null,
     },
+    // Zona es filtro duro (gate): todo comparable es del mismo barrio que el sujeto → "filtro".
     {
       dimension: "zona",
-      label: "Zona / ubicación",
+      label: "Zona / barrio",
       sujeto_val: sujeto.zona || "—",
-      comp_val: comp.zona || "—",
-      estado: estado(sub.sc_zona),
-      peso: PESOS.zona,
-      score: sub.sc_zona,
+      comp_val: comp.zona || sujeto.zona || "—",
+      estado: "match",
+      peso: 0,
+      score: null,
     },
     {
       dimension: "superficie",
@@ -85,6 +92,15 @@ export function buildChecklist(args: {
       score: sub.sc_ambientes,
     },
     {
+      dimension: "dormitorios",
+      label: "Dormitorios",
+      sujeto_val: fmtNum(sujeto.dormitorios),
+      comp_val: fmtNum(comp.dormitorios),
+      estado: estado(sub.sc_dormitorios),
+      peso: PESOS.dormitorios,
+      score: sub.sc_dormitorios,
+    },
+    {
       dimension: "banos",
       label: "Baños",
       sujeto_val: fmtNum(sujeto.banos),
@@ -92,6 +108,15 @@ export function buildChecklist(args: {
       estado: estado(sub.sc_banos),
       peso: PESOS.banos,
       score: sub.sc_banos,
+    },
+    {
+      dimension: "antiguedad",
+      label: "Antigüedad",
+      sujeto_val: fmtAnios(sujeto.antiguedad),
+      comp_val: fmtAnios(comp.antiguedad),
+      estado: estado(sub.sc_antiguedad),
+      peso: PESOS.antiguedad,
+      score: sub.sc_antiguedad,
     },
     {
       dimension: "amenities",

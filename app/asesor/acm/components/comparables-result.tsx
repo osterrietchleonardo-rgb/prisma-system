@@ -95,7 +95,8 @@ function ComparableCard({ c }: { c: AcmComparable }) {
                 <span className="text-foreground">{item.comp_val}</span>
               </span>
               <span className="shrink-0 tabular-nums text-muted-foreground w-12 text-right">
-                {item.dimension === "tipo" || item.dimension === "operacion" ? "filtro" : item.score !== null ? `${item.score}%` : "n/a"}
+                {/* Las dimensiones con peso 0 son filtros duros (tipo, operación, zona/barrio). */}
+                {item.peso === 0 ? "filtro" : item.score !== null ? `${item.score}%` : "n/a"}
               </span>
             </div>
           ))}
