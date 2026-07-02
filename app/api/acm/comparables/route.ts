@@ -7,6 +7,8 @@ import { requireTenant } from "@/lib/auth/tenant-validation";
 import { generateEmbedding } from "@/lib/gemini";
 import {
   sujetoAmbientes,
+  sujetoDormitorios,
+  sujetoAntiguedad,
   sujetoM2,
   sujetoToEmbeddingText,
   propTypePatterns,
@@ -49,10 +51,14 @@ export async function POST(req: Request) {
     const sujeto = (body.sujeto || {}) as Partial<Sujeto>;
     const operacion: Operacion = body.operacion === "alquiler" ? "alquiler" : "venta";
     const excludeId: string | null = body.exclude_id || null; // si el sujeto vino de la cartera
-    const limit = Math.min(Number(body.limit) || 20, 30);
+    // Sin límites artificiales: el gate de barrio ya acota el universo; traemos todos los
+    // comparables del barrio (tope alto por performance del render, configurable por request).
+    const limit = Math.min(Number(body.limit) || 50, 100);
 
     const m2 = sujetoM2(sujeto);
     const ambientes = sujetoAmbientes(sujeto);
+    const dormitorios = sujetoDormitorios(sujeto);
+    const antiguedad = sujetoAntiguedad(sujeto);
     const banos = sujeto.banos && sujeto.banos > 0 ? sujeto.banos : null;
     const loc = locPatterns(sujeto);
     const amen = amenityTokens(sujeto.amenidades);
@@ -80,7 +86,9 @@ export async function POST(req: Request) {
         p_type_patterns: propTypePatterns(sujeto.tipo_propiedad),
         p_m2: m2,
         p_rooms: ambientes,
+        p_dormitorios: dormitorios,
         p_bathrooms: banos,
+        p_antiguedad: antiguedad,
         p_loc_patterns: loc,
         p_amenities: amen,
         p_exclude_id: excludeId,
@@ -92,7 +100,9 @@ export async function POST(req: Request) {
         p_type_patterns: roomixTypePatterns(sujeto.tipo_propiedad),
         p_m2: m2,
         p_rooms: ambientes,
+        p_dormitorios: dormitorios,
         p_bathrooms: banos,
+        p_antiguedad: antiguedad,
         p_loc_patterns: loc,
         p_amenities: amen,
         p_limit: limit,
@@ -130,7 +140,7 @@ export async function POST(req: Request) {
     ]);
 
     const tipoLabel = sujeto.tipo_propiedad || "—";
-    const sujetoForChecklist = { tipo: tipoLabel, zona: sujetoZona, m2, ambientes, banos, amenities: sujetoAmenLabels };
+    const sujetoForChecklist = { tipo: tipoLabel, zona: sujetoZona, m2, ambientes, dormitorios, banos, antiguedad, amenities: sujetoAmenLabels };
 
     const cartera: AcmComparable[] = (carteraFull.data || [])
       .map((p: any): AcmComparable | null => {
@@ -138,6 +148,8 @@ export async function POST(req: Request) {
         if (!sub) return null;
         const candM2 = sub.cand_m2 != null ? Number(sub.cand_m2) : p.total_area ? Number(p.total_area) : null;
         const candAmb = sub.cand_amb ?? null;
+        const candDorm = sub.cand_dorm ?? (p.bedrooms != null && p.bedrooms > 0 ? p.bedrooms : null);
+        const candAnt = sub.cand_ant ?? null;
         const compAmen = propAmenities(p.tokko_data);
         const subs: SubScores = sub;
         return {
@@ -148,7 +160,7 @@ export async function POST(req: Request) {
             sub: subs,
             operacion,
             sujeto: sujetoForChecklist,
-            comp: { tipo: p.property_type || "", zona: [p.city, p.address].filter(Boolean).join(" "), m2: candM2, ambientes: candAmb, banos: p.bathrooms ?? null, amenities: compAmen },
+            comp: { tipo: p.property_type || "", zona: [p.city, p.address].filter(Boolean).join(" "), m2: candM2, ambientes: candAmb, dormitorios: candDorm, banos: p.bathrooms ?? null, antiguedad: candAnt, amenities: compAmen },
           }),
           titulo: p.title || "",
           direccion: p.address || "",
@@ -156,7 +168,7 @@ export async function POST(req: Request) {
           tipo: p.property_type || "",
           m2: candM2,
           ambientes: candAmb,
-          dormitorios: p.bedrooms ?? null,
+          dormitorios: candDorm,
           banos: p.bathrooms ?? null,
           precio: p.price ? Number(p.price) : null,
           moneda: p.currency || "USD",
@@ -176,6 +188,8 @@ export async function POST(req: Request) {
         if (!sub) return null;
         const candM2 = sub.cand_m2 != null ? Number(sub.cand_m2) : r.area_m2 ? Number(r.area_m2) : null;
         const candAmb = sub.cand_amb ?? null;
+        const candDorm = sub.cand_dorm ?? (r.bedrooms != null && r.bedrooms > 0 ? r.bedrooms : null);
+        const candAnt = sub.cand_ant ?? null;
         const compAmen = Array.isArray(r.amenities) ? r.amenities.slice(0, 12) : [];
         const subs: SubScores = sub;
         return {
@@ -186,7 +200,7 @@ export async function POST(req: Request) {
             sub: subs,
             operacion,
             sujeto: sujetoForChecklist,
-            comp: { tipo: r.property_type || "", zona: [r.neighborhood, r.address].filter(Boolean).join(" "), m2: candM2, ambientes: candAmb, banos: r.bathrooms ?? null, amenities: compAmen },
+            comp: { tipo: r.property_type || "", zona: [r.neighborhood, r.address].filter(Boolean).join(" "), m2: candM2, ambientes: candAmb, dormitorios: candDorm, banos: r.bathrooms ?? null, antiguedad: candAnt, amenities: compAmen },
           }),
           titulo: r.title || "",
           direccion: r.address || r.neighborhood || "",
@@ -194,7 +208,7 @@ export async function POST(req: Request) {
           tipo: r.property_type || "",
           m2: candM2,
           ambientes: candAmb,
-          dormitorios: r.bedrooms ?? null,
+          dormitorios: candDorm,
           banos: r.bathrooms ?? null,
           precio: r.price ? Number(r.price) : null,
           moneda: r.currency || "USD",

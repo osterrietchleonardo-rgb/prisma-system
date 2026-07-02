@@ -19,6 +19,19 @@ export function sujetoM2(s: Partial<Sujeto>): number | null {
   return m2 > 0 ? m2 : null;
 }
 
+// Dormitorios reales del sujeto (dato propio, distinto de "ambientes"). 0 = sin dato → null.
+export function sujetoDormitorios(s: Partial<Sujeto>): number | null {
+  const d = s.dormitorios ?? 0;
+  return d > 0 ? d : null;
+}
+
+// Antigüedad en años. 0 se trata como "sin dato" (el form arranca en 0), NO como "a estrenar":
+// así no se puntúa antigüedad contra un default que el asesor no cargó. Solo compara si hay dato.
+export function sujetoAntiguedad(s: Partial<Sujeto>): number | null {
+  const a = s.antiguedad_anios ?? 0;
+  return a > 0 ? a : null;
+}
+
 // Texto descriptivo para el embedding (mismo estilo con el que se indexan properties/roomix).
 export function sujetoToEmbeddingText(s: Partial<Sujeto>): string {
   const amen = s.amenidades ? amenityLabels(s.amenidades) : [];
