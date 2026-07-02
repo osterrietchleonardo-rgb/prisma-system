@@ -376,8 +376,15 @@ async function fetchOnce(url) {
       if (hasLd || !challenged) break;
       await sleep(2500);
     }
-    await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
-    await sleep(1200);
+    // Si la IP trajo contenido (JSON-LD o cuerpo con texto) esperamos a que termine de pintar.
+    // Si NO hay nada (IP quemada: solo el <head>), no perdemos ~7s: devolvemos ya para reintentar
+    // con otra IP del proxy rotativo (cada newContext sale por un IP distinto).
+    const hasLd = await page.$('script[type="application/ld+json"]').then(Boolean).catch(() => false);
+    const bodyLen = await page.evaluate(() => document.body?.innerText?.length || 0).catch(() => 0);
+    if (hasLd || bodyLen > 500) {
+      await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
+      await sleep(1200);
+    }
     const html = await page.content();
     const text = await page.evaluate(() => document.body?.innerText || '').catch(() => '');
     const title = await page.title().catch(() => '');
@@ -388,8 +395,19 @@ async function fetchOnce(url) {
   }
 }
 
-async function extract(url, maxAttempts = 3, debug = false) {
+// Puntaje de contenido REAL de una página: prioriza JSON-LD y, si no, la cantidad de texto
+// renderizado. Una IP quemada devuelve el <head> (título/OpenGraph) pero 0 texto y 0 JSON-LD →
+// puntaje 0. Sirve para (a) decidir si vale la pena reintentar con otra IP y (b) quedarnos con
+// el MEJOR intento si al final ninguna IP trae la página completa.
+function pageScore(r) {
+  const ld = parseJsonLdNodes(r.html || '').length;
+  const txt = (r.text || '').length;
+  return ld * 100000 + txt;
+}
+
+async function extract(url, maxAttempts = 5, debug = false) {
   let best = { html: '', text: '', title: '' };
+  let bestScore = -1;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let r;
     try {
@@ -398,9 +416,14 @@ async function extract(url, maxAttempts = 3, debug = false) {
       log('⚠️ intento', attempt, 'falló:', e.message);
       r = { html: '', text: '', title: '' };
     }
-    best = r;
-    if (!looksBadPage(r.title, r.html)) break; // página buena → salimos
-    log('↻ IP mala (', (r.title || '').slice(0, 40), ') reintento', attempt, '/', maxAttempts);
+    const score = pageScore(r);
+    if (score > bestScore) { best = r; bestScore = score; } // nos quedamos con el más completo
+    // Página buena Y con contenido real (JSON-LD o texto sustancioso) → listo. Si NO trajo
+    // contenido (IP quemada que igual "parece" válida: título ok, algo de HTML), REINTENTAMOS
+    // con otra IP en vez de aceptar datos vagos. Este era el bug: aceptaba la página vacía.
+    const conContenido = parseJsonLdNodes(r.html || '').length > 0 || (r.text || '').length > 300;
+    if (!looksBadPage(r.title, r.html) && conContenido) break;
+    log('↻ IP sin contenido (', (r.title || '').slice(0, 40), '| score', score, ') reintento', attempt, '/', maxAttempts);
     await sleep(700);
   }
 
@@ -465,7 +488,11 @@ async function extract(url, maxAttempts = 3, debug = false) {
   // Si quedó sin dirección, al menos dejamos el barrio como referencia.
   if (!merged.sujeto.direccion && merged.sujeto.barrio) merged.sujeto.direccion = merged.sujeto.barrio;
 
-  const ok = Boolean(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0 || merged.precio);
+  // "ok" solo si trajimos datos SUSTANCIOSOS de la página (precio o m²). Los datos de slug
+  // (tipo/operación/dormitorios de la URL) NO alcanzan para darlo por bueno: si la IP quedó
+  // quemada y solo tenemos eso, marcamos requiere_completar_manual para que el asesor/agente
+  // sepa que la lectura fue parcial (en vez de mostrar datos vagos como si fueran completos).
+  const ok = Boolean(merged.precio > 0 || merged.sujeto.m2_cubiertos > 0);
   const result = { ok, requiere_completar_manual: !ok, ...merged };
   // Modo debug (temporal): devuelve un pedazo del texto renderizado y los @type del JSON-LD,
   // para verificar/afinar los parsers contra la página real sin adivinar. NO afecta la salida normal.
@@ -497,7 +524,7 @@ const server = http.createServer((req, res) => {
       try { const b = JSON.parse(body); url = b.url; debug = !!b.debug; } catch { return send(400, { error: 'bad json' }); }
       if (!url || !/^https?:\/\//i.test(url)) return send(400, { error: 'invalid url' });
       log('▶️  extract', url);
-      limit(() => extract(url, 3, debug))
+      limit(() => extract(url, 5, debug))
         .then((r) => { log('✅', url, r.ok ? 'ok' : 'thin'); send(200, r); })
         .catch((e) => { log('❌', url, e.message); send(500, { error: e.message, ok: false, requiere_completar_manual: true, sujeto: {} }); });
     });
