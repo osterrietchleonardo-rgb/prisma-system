@@ -23,8 +23,8 @@ function emptyResult(extra: Partial<ExtractResult> = {}): ExtractResult {
     ok: false,
     sujeto: {},
     precio: null,
-    moneda: "USD",
-    operacion: "venta",
+    moneda: null, // SIN default: si no se determina, queda vacío para completar a mano
+    operacion: null, // SIN default: nunca se asume "venta"
     responsable: null,
     fecha_publicacion: null,
     fuente_portal: null,
@@ -60,11 +60,11 @@ function toNum(v: any): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function mapMoneda(raw?: string | null): Moneda {
+function mapMoneda(raw?: string | null): Moneda | null {
   const c = (raw || "").toUpperCase();
-  if (c.includes("ARS") || c.includes("$") && !c.includes("US")) return "ARS";
   if (c.includes("USD") || c.includes("U$S") || c.includes("US$") || c.includes("DOLAR")) return "USD";
-  return "USD";
+  if (c.includes("ARS") || (c.includes("$") && !c.includes("US"))) return "ARS";
+  return null; // sin señal clara NO se inventa moneda
 }
 
 // ── JSON-LD (schema.org RealEstateListing). Maneja @graph y arrays. ──
@@ -112,7 +112,11 @@ function fromJsonLd(html: string): { extract: Partial<ExtractResult>; sujeto: Pa
   const seller = offers.seller || ld.provider || ld.author || me.broker || null;
   const responsable = typeof seller === "string" ? seller : seller?.name || null;
   const bf = String(offers.businessFunction || "").toLowerCase();
-  const operacion: Operacion = bf.includes("lease") || bf.includes("rent") ? "alquiler" : "venta";
+  // Solo afirmamos la operación si el portal la declara. Si no (ML no la trae), null → la decide la IA.
+  const operacion: Operacion | null =
+    bf.includes("lease") || bf.includes("rent") ? "alquiler"
+    : bf.includes("sell") || bf.includes("sale") ? "venta"
+    : null;
 
   const sujeto: Partial<Sujeto> = {
     direccion: addr.streetAddress || ld.name || "",
@@ -161,8 +165,9 @@ function fromOpenGraph(html: string): { extract: Partial<ExtractResult>; sujeto:
   };
 }
 
-// ── Fallback IA: del texto visible, Gemini devuelve JSON estructurado. ──
-async function fromIA(html: string): Promise<{ extract: Partial<ExtractResult>; sujeto: Partial<Sujeto> } | null> {
+// ── IA = cerebro: recibe TODO lo que trae la página (título, URL, descripción, JSON-LD y
+//    texto visible) e INTERPRETA las variables razonando. Nunca inventa moneda/operación. ──
+async function fromIA(html: string, url = ""): Promise<{ extract: Partial<ExtractResult>; sujeto: Partial<Sujeto> } | null> {
   const text = html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
@@ -170,25 +175,33 @@ async function fromIA(html: string): Promise<{ extract: Partial<ExtractResult>; 
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 12000);
-  if (text.length < 80) return null;
+  const meta = (prop: string) => {
+    const re = new RegExp(`<meta[^>]+(?:property|name)\\s*=\\s*["']${prop}["'][^>]*content\\s*=\\s*["']([^"']+)["']`, "i");
+    return html.match(re)?.[1]?.trim() || "";
+  };
+  const title = meta("og:title") || html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || "";
+  const metaDesc = meta("og:description") || meta("description") || "";
+  const ldNodes = parseJsonLdListings(html);
+  const jsonld = ldNodes.length ? JSON.stringify(ldNodes).slice(0, 4000) : "";
+  const contenido = [
+    title && `TÍTULO DEL AVISO: ${title}`,
+    url && `URL DE LA PUBLICACIÓN: ${url}`,
+    metaDesc && `DESCRIPCIÓN (meta): ${metaDesc}`,
+    jsonld && `DATOS ESTRUCTURADOS DEL PORTAL (JSON-LD): ${jsonld}`,
+    text && `TEXTO VISIBLE DEL AVISO: ${text}`,
+  ].filter(Boolean).join("\n\n").slice(0, 14000);
+  if (contenido.length < 60) return null;
 
-  const prompt = `Sos un extractor de datos inmobiliarios de Argentina. Del siguiente texto de un aviso de propiedad, devolvé SOLO un JSON válido (sin texto extra) con esta forma exacta:
-{
-  "tipo_propiedad": "departamento|casa|ph|local|oficina|terreno",
-  "direccion": "string",
-  "barrio": "string",
-  "m2_cubiertos": number,
-  "dormitorios": number,
-  "banos": number,
-  "precio": number,
-  "moneda": "USD|ARS",
-  "operacion": "venta|alquiler",
-  "responsable": "nombre de la inmobiliaria o publicante, o null",
-  "fecha_publicacion": "fecha o antigüedad de la publicación si aparece, o null"
-}
-Reglas: si un dato no está, usá null (o 0 en numéricos). "ambientes" NO es lo mismo que "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1.
-TEXTO:
-"""${text}"""`;
+  const prompt = `Sos un analista inmobiliario experto de Argentina. Te paso TODO el contenido de la página de un aviso. Leé y RAZONÁ sobre el conjunto (título, URL, descripción, datos del portal y texto), y devolvé SOLO un JSON válido (sin texto extra):
+{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"dormitorios":0,"banos":0,"precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","responsable":"inmobiliaria o publicante, o null","fecha_publicacion":null}
+Cómo razonar (interpretá lo que dice la página, NO adivines ni pongas valores por defecto):
+- operacion: mirá la URL, el título y el texto. "alquiler"/"alquilar"/"renta" -> alquiler. "venta"/"en venta"/"comprar" -> venta. Si de verdad no se puede determinar, null. PROHIBIDO asumir "venta" sin señal.
+- moneda: mirá cómo se muestra el precio. "US$"/"U$S"/"USD"/"dólares" -> USD. "$"/"ARS"/"pesos" sin símbolo de dólar -> ARS. Coherencia: alquiler mensual suele ser ARS, venta suele ser USD, pero mandá lo que la página indica. Si no hay señal, null.
+- precio: el valor de la propiedad, NUNCA las expensas.
+- "ambientes" NO es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1.
+- Si un dato no está: null (0 en numéricos).
+CONTENIDO:
+"""${contenido}"""`;
 
   try {
     const res = await prismaIA.generateContent(prompt);
@@ -197,8 +210,8 @@ TEXTO:
     return {
       extract: {
         precio: toNum(j.precio),
-        moneda: mapMoneda(j.moneda),
-        operacion: j.operacion === "alquiler" ? "alquiler" : "venta",
+        moneda: mapMoneda(j.moneda), // null si la IA no la determinó
+        operacion: j.operacion === "alquiler" ? "alquiler" : j.operacion === "venta" ? "venta" : null,
         responsable: j.responsable || null,
         fecha_publicacion: j.fecha_publicacion || null,
         metodo: "ia",
@@ -240,11 +253,14 @@ async function tryExtractorService(url: string): Promise<ExtractResult | null> {
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Partial<ExtractResult>;
+    // Respetamos el veredicto del servicio: si NO pudo leer la página (bloqueo/thin), devuelve
+    // ok:false y requiere_completar_manual:true. NO lo forzamos a "ok" para no dar datos inventados.
+    const ok = data.ok ?? Boolean(data.precio || (data.sujeto && (data.sujeto.m2_cubiertos || data.sujeto.dormitorios)));
     return {
       ...emptyResult(),
       ...data,
-      ok: true,
-      requiere_completar_manual: false,
+      ok,
+      requiere_completar_manual: data.requiere_completar_manual ?? !ok,
       metodo: "extractor-service",
     };
   } catch {
@@ -308,22 +324,28 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
 
   const tieneDatosMinimos = (sujeto.m2_cubiertos && sujeto.m2_cubiertos > 0) || (sujeto.dormitorios && sujeto.dormitorios > 0);
 
-  // Si lo estructurado quedó flojo, PRIMERO el servicio con navegador (lee la página
-  // renderizada como un usuario real: resuelve ML/ZonaProp/Argenprop). Recién si no
-  // hay servicio configurado, caemos a la IA sobre el HTML que tengamos.
-  if (!tieneDatosMinimos) {
-    if (!serviceTried) {
-      serviceTried = true;
-      const viaSvc = await tryExtractorService(url);
-      if (viaSvc) return { ...viaSvc, fuente_portal };
-    }
+  // Si lo estructurado quedó flojo, intentamos el servicio con navegador (lee la página
+  // renderizada como un usuario real: resuelve ML/ZonaProp/Argenprop) antes de seguir.
+  if (!tieneDatosMinimos && !serviceTried) {
+    serviceTried = true;
+    const viaSvc = await tryExtractorService(url);
+    if (viaSvc) return { ...viaSvc, fuente_portal };
+  }
 
-    if (html && !blocked) {
-      const ia = await fromIA(html);
-      if (ia) {
-        for (const [k, v] of Object.entries(ia.sujeto)) if (isEmpty((sujeto as any)[k]) && !isEmpty(v)) (sujeto as any)[k] = v;
-        for (const [k, v] of Object.entries(ia.extract)) if (isEmpty((ext as any)[k]) && !isEmpty(v)) (ext as any)[k] = v;
-      }
+  // IA = cerebro: SIEMPRE que tengamos la página (no bloqueada) razona sobre TODO el contenido
+  // y decide la interpretación (operación, moneda, tipo, responsable), además de completar los
+  // números que falten. Ya NO se limita a "cuando faltan datos".
+  if (html && !blocked) {
+    const ia = await fromIA(html, url);
+    if (ia) {
+      // Vacíos: la IA completa lo que los deterministas no trajeron.
+      for (const [k, v] of Object.entries(ia.sujeto)) if (isEmpty((sujeto as any)[k]) && !isEmpty(v)) (sujeto as any)[k] = v;
+      for (const [k, v] of Object.entries(ia.extract)) if (isEmpty((ext as any)[k]) && !isEmpty(v)) (ext as any)[k] = v;
+      // Interpretación: la IA PISA a los deterministas (razona sobre la página, no por keywords).
+      if (ia.extract.operacion) ext.operacion = ia.extract.operacion;
+      if (ia.extract.moneda) ext.moneda = ia.extract.moneda;
+      if (ia.sujeto.tipo_propiedad) sujeto.tipo_propiedad = ia.sujeto.tipo_propiedad;
+      if (ia.extract.responsable) ext.responsable = ia.extract.responsable;
     }
   }
 
@@ -333,8 +355,8 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
     ...emptyResult(),
     sujeto,
     precio: ext.precio ?? null,
-    moneda: (ext.moneda as Moneda) ?? "USD",
-    operacion: (ext.operacion as Operacion) ?? "venta",
+    moneda: (ext.moneda as Moneda) ?? null,       // SIN default: vacío si no se determinó
+    operacion: (ext.operacion as Operacion) ?? null, // SIN default: nunca "venta" por defecto
     responsable: ext.responsable ?? null,
     fecha_publicacion: ext.fecha_publicacion ?? null,
     fuente_portal,

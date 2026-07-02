@@ -108,8 +108,8 @@ export interface ExtractResult {
   ok: boolean;
   sujeto: Partial<Sujeto>;
   precio: number | null;
-  moneda: Moneda;
-  operacion: Operacion;
+  moneda: Moneda | null;      // null = no se pudo determinar (se completa a mano; NO se asume USD)
+  operacion: Operacion | null; // null = no se pudo determinar (NO se asume "venta")
   responsable: string | null;
   fecha_publicacion: string | null;
   fuente_portal: string | null;

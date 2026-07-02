@@ -63,7 +63,7 @@ function mapMoneda(c) {
   const s = (c || '').toUpperCase();
   if (s.includes('USD') || s.includes('U$S') || s.includes('US$') || s.includes('DOLAR')) return 'USD';
   if (s.includes('ARS') || s === '$') return 'ARS';
-  return 'USD';
+  return null; // sin señal clara NO se inventa moneda (mejor vacío → completar manual)
 }
 function mapTipo(raw) {
   const t = (raw || '').toLowerCase();
@@ -147,7 +147,10 @@ function fromJsonLd(html) {
     },
     precio: toNum(offers.price),
     moneda: mapMoneda(offers.priceCurrency),
-    operacion: bf.includes('lease') || bf.includes('rent') ? 'alquiler' : 'venta',
+    // Solo afirmamos la operación si el JSON-LD la declara (businessFunction). ML NO la trae:
+    // en ese caso queda null y la decide la IA / el slug de la URL. NO se asume "venta".
+    operacion: bf.includes('lease') || bf.includes('rent') ? 'alquiler'
+             : (bf.includes('sell') || bf.includes('sale') ? 'venta' : null),
     responsable,
     fecha_publicacion: ld.datePosted || ld.datePublished || offers.validFrom || null,
     metodo: 'json-ld',
@@ -196,7 +199,7 @@ function fromVisibleText(text) {
   // Precio: primer monto con símbolo de moneda que NO sea de expensas y sea >= 1000
   // (evita agarrar "expensas $50.000", teléfonos o números sueltos). Formato AR con puntos
   // de miles lo normaliza `toNum`. En venta AR el precio suele venir en USD ("US$"/"U$S").
-  let precio = null, moneda = 'USD';
+  let precio = null, moneda = null;
   const priceRe = /(u\$s|us\$|usd|d[óo]lares?|ar\$|\$|pesos)\s*([0-9][0-9.\, ]{3,})/ig;
   let pm;
   while ((pm = priceRe.exec(t))) {
@@ -238,15 +241,35 @@ function fromLocationText(text) {
   return Object.keys(out).length ? { sujeto: out, metodo: 'ubicacion-texto' } : null;
 }
 
-async function fromIA(text) {
-  if (!GEMINI_API_KEY || text.length < 80) return null;
-  const prompt = `Sos un extractor de datos inmobiliarios de Argentina. Del texto de un aviso, devolvé SOLO JSON válido (sin texto extra), MUY meticuloso:
-{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_descubiertos":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"precio":0,"moneda":"USD|ARS","operacion":"venta|alquiler","responsable":"inmobiliaria o agente que publica, o null","fecha_publicacion":null,"amenities":["TODOS los servicios/amenities concretos que SÍ tenga: cochera, baulera, pileta, gimnasio, sum, seguridad, jardin, terraza, balcon, parrilla, etc."]}
-Reglas: si un dato no está usá null/0/[]. "ambientes" NO es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1. En amenities NO incluyas cosas que el aviso diga que NO tiene. m2_cubiertos = superficie cubierta; si solo dan superficie total, poné ese número en m2_cubiertos.
-TEXTO:"""${text.slice(0, 12000)}"""`;
+// La IA es el CEREBRO del extractor: recibe TODO lo que trae la página (título, URL,
+// descripción, datos estructurados del portal y el texto visible) e INTERPRETA las
+// variables razonando sobre el conjunto — no por listas de palabras clave. Nunca inventa:
+// lo que no puede determinar lo devuelve null (moneda/operación incluidas).
+async function fromIA(ctx) {
+  const { text = '', title = '', url = '', jsonld = '', metaDesc = '' } = ctx || {};
+  const contenido = [
+    title && `TÍTULO DEL AVISO: ${title}`,
+    url && `URL DE LA PUBLICACIÓN: ${url}`,
+    metaDesc && `DESCRIPCIÓN (meta): ${metaDesc}`,
+    jsonld && `DATOS ESTRUCTURADOS DEL PORTAL (JSON-LD): ${jsonld}`,
+    text && `TEXTO VISIBLE DEL AVISO (lo que ve el usuario): ${text}`,
+  ].filter(Boolean).join('\n\n').slice(0, 14000);
+  if (!GEMINI_API_KEY || contenido.length < 60) return null;
+
+  const prompt = `Sos un analista inmobiliario experto de Argentina. Te paso TODO el contenido de la página de un aviso. Leé y RAZONÁ sobre el conjunto (título, URL, descripción, datos del portal y texto), y devolvé SOLO un JSON válido (sin texto extra):
+{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_descubiertos":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","responsable":"inmobiliaria o agente que publica, o null","fecha_publicacion":null,"amenities":["todos los amenities concretos que SÍ tenga: cochera, baulera, pileta, gimnasio, sum, seguridad, jardin, terraza, balcon, parrilla, etc."]}
+Cómo razonar (interpretá lo que dice la página, NO adivines ni pongas valores por defecto):
+- operacion: mirá la URL, el título y el texto. "alquiler"/"alquilar"/"renta"/"$ ... por mes" -> alquiler. "venta"/"en venta"/"comprar" -> venta. Si de verdad no se puede determinar, poné null. PROHIBIDO asumir "venta" cuando no hay señal.
+- moneda: mirá CÓMO se muestra el precio. "US$"/"U$S"/"USD"/"dólares" -> USD. "$"/"ARS"/"pesos" sin símbolo de dólar -> ARS. Usá la coherencia (un alquiler mensual suele ser en ARS; una venta suele ser en USD) para desambiguar, pero mandá lo que la página realmente indica. Si no hay ninguna señal, null.
+- precio: el valor de la propiedad, NUNCA las expensas ni un teléfono.
+- "ambientes" NO es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1 (monoambiente/1 ambiente = 0 dormitorios).
+- amenities: solo los que el aviso dice que SÍ tiene (no los que dice que NO). m2_cubiertos = superficie cubierta; si solo dan total, poné ese número ahí.
+- Si un dato no está: null (0 en numéricos, [] en amenities).
+CONTENIDO:
+"""${contenido}"""`;
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-    const res = await fetch(url, {
+    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    const res = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
@@ -255,6 +278,7 @@ TEXTO:"""${text.slice(0, 12000)}"""`;
     const data = await res.json();
     const raw = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '').replace(/```json|```/g, '').trim();
     const j = JSON.parse(raw);
+    const op = j.operacion === 'alquiler' ? 'alquiler' : (j.operacion === 'venta' ? 'venta' : null);
     return {
       sujeto: {
         tipo_propiedad: mapTipo(j.tipo_propiedad),
@@ -267,8 +291,8 @@ TEXTO:"""${text.slice(0, 12000)}"""`;
         banos: toNum(j.banos) ?? 0,
       },
       precio: toNum(j.precio),
-      moneda: mapMoneda(j.moneda),
-      operacion: j.operacion === 'alquiler' ? 'alquiler' : 'venta',
+      moneda: mapMoneda(j.moneda), // null si la IA no la determinó
+      operacion: op,               // null si la IA no la determinó
       responsable: j.responsable || null,
       fecha_publicacion: j.fecha_publicacion || null,
       metodo: 'ia',
@@ -362,8 +386,9 @@ async function extract(url, maxAttempts = 3, debug = false) {
     await sleep(700);
   }
 
-  const { html, text } = best;
-  const merged = { sujeto: {}, precio: null, moneda: 'USD', operacion: 'venta', responsable: null, fecha_publicacion: null, metodo: 'json-ld' };
+  const { html, text, title } = best;
+  // SIN valores por defecto: lo que no se determine queda null → se completa a mano.
+  const merged = { sujeto: {}, precio: null, moneda: null, operacion: null, responsable: null, fecha_publicacion: null, metodo: null };
   const apply = (p) => {
     if (!p) return;
     for (const [k, v] of Object.entries(p.sujeto || {})) {
@@ -375,18 +400,30 @@ async function extract(url, maxAttempts = 3, debug = false) {
       if (empty && p[k] !== undefined && p[k] !== null) merged[k] = p[k];
     }
   };
+
+  // 1) Deterministas: NÚMEROS duros y datos estructurados exactos del portal (precio, m², ambientes).
+  //    No inventan moneda/operación: solo las ponen si el portal las declara explícitamente.
   apply(fromJsonLd(html));
   apply(fromOpenGraph(html));
-  // Rescate determinista de lo que el aviso MUESTRA (precio/ambientes/m²), típico de ML que
-  // no lo pone en el JSON-LD. Aditivo. Corre ANTES del gate `thin`: si ya completó m²/dormitorios,
-  // ni siquiera hace falta gastar la IA abajo.
   apply(fromVisibleText(text));
 
-  let iaRes = null;
-  const thin = !(merged.sujeto.m2_cubiertos > 0 || merged.sujeto.dormitorios > 0);
-  if (thin) { iaRes = await fromIA(text || html.replace(/<[^>]+>/g, ' ')); apply(iaRes); }
+  // 2) IA = CEREBRO. Recibe TODO el contenido de la página (título, URL, descripción, JSON-LD y
+  //    texto) y razona. Tiene PRIORIDAD en la interpretación (operación, moneda, tipo, responsable),
+  //    y completa cualquier número que faltara. Corre SIEMPRE (no solo cuando faltan datos).
+  const metaDesc = metaOf(html, 'og:description') || metaOf(html, 'description') || '';
+  const ldNodes = parseJsonLdNodes(html);
+  const jsonldStr = ldNodes.length ? JSON.stringify(ldNodes).slice(0, 4000) : '';
+  const iaRes = await fromIA({ text, title, url, jsonld: jsonldStr, metaDesc });
+  if (iaRes) {
+    apply(iaRes); // completa lo que falte (números, dirección/barrio si vinieron vacíos)
+    // La interpretación de la IA pisa a los deterministas: razona sobre toda la página, no por keywords.
+    if (iaRes.operacion) merged.operacion = iaRes.operacion;
+    if (iaRes.moneda) merged.moneda = iaRes.moneda;
+    if (iaRes.sujeto && iaRes.sujeto.tipo_propiedad) merged.sujeto.tipo_propiedad = iaRes.sujeto.tipo_propiedad;
+    if (iaRes.responsable) merged.responsable = iaRes.responsable;
+  }
 
-  // Último recurso: lo que diga el propio link (no pisa lo ya extraído).
+  // 3) Último recurso para la operación: lo que diga el propio link (solo si sigue sin definirse).
   apply(fromUrlSlug(url));
 
   // Dirección/barrio reales del bloque de ubicación (ML deja el TÍTULO en dirección).
