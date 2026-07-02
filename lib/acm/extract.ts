@@ -25,6 +25,7 @@ function emptyResult(extra: Partial<ExtractResult> = {}): ExtractResult {
     precio: null,
     moneda: null, // SIN default: si no se determina, queda vacío para completar a mano
     operacion: null, // SIN default: nunca se asume "venta"
+    expensas: null,
     responsable: null,
     fecha_publicacion: null,
     fuente_portal: null,
@@ -66,6 +67,27 @@ function mapMoneda(raw?: string | null): Moneda | null {
   if (c.includes("ARS") || (c.includes("$") && !c.includes("US"))) return "ARS";
   return null; // sin señal clara NO se inventa moneda
 }
+
+// Amenities (ES+EN) desde una lista/texto → las 9 banderas de Amenidades (solo las true).
+const AMEN_RE: Record<string, RegExp> = {
+  cochera_cubierta: /cocher|garage|garaje|estacionamiento|parking/i,
+  cochera_descubierta: /cochera descub|uncovered parking/i,
+  baulera: /bauler|storage room|\battic\b/i,
+  pileta: /\bpileta\b|piscina|\bpool\b|swimming/i,
+  gimnasio: /gimnas|\bgym\b|fitness/i,
+  sum: /\bs\.?u\.?m\.?\b|salon de usos|salón de usos|clubhouse/i,
+  seguridad_24hs: /seguridad 24|vigilanc|24 ?hs|24 hour|porter[ií]a|portero/i,
+  jardin_privado: /jard[ií]n|\bgarden\b|backyard|fondo verde/i,
+  terraza_privada: /terraza|\bterrace\b|solarium|sol[áa]rium/i,
+};
+function mapAmenidades(text?: string | null): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  const hay = (text || "").toString();
+  for (const [k, re] of Object.entries(AMEN_RE)) if (re.test(hay)) out[k] = true;
+  return out;
+}
+
+const ORIENT_OK = new Set(["norte", "sur", "este", "oeste", "ne", "no", "se", "so"]);
 
 // ── JSON-LD (schema.org RealEstateListing). Maneja @graph y arrays. ──
 function parseJsonLdListings(html: string): any[] {
@@ -193,13 +215,15 @@ async function fromIA(html: string, url = ""): Promise<{ extract: Partial<Extrac
   if (contenido.length < 60) return null;
 
   const prompt = `Sos un analista inmobiliario experto de Argentina. Te paso TODO el contenido de la página de un aviso. Leé y RAZONÁ sobre el conjunto (título, URL, descripción, datos del portal y texto), y devolvé SOLO un JSON válido (sin texto extra):
-{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"dormitorios":0,"banos":0,"precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","responsable":"inmobiliaria o publicante, o null","fecha_publicacion":null}
-Cómo razonar (interpretá lo que dice la página, NO adivines ni pongas valores por defecto):
+{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_semicubiertos":0,"m2_descubiertos":0,"m2_terreno":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"piso":null,"orientacion":"norte|sur|este|oeste|ne|no|se|so|null","precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","expensas":0,"responsable":"inmobiliaria o publicante, o null","fecha_publicacion":null,"amenities":["todos los amenities concretos que SÍ tenga: cochera, baulera, pileta, gimnasio, sum, seguridad, jardin, terraza, parrilla, etc."]}
+Traé el MÁXIMO de variables que ENCUENTRES en el aviso (no dejes vacío lo que sí está escrito). Cómo razonar (interpretá lo que dice la página, NO adivines ni pongas valores por defecto):
 - operacion: mirá la URL, el título y el texto. "alquiler"/"alquilar"/"renta" -> alquiler. "venta"/"en venta"/"comprar" -> venta. Si de verdad no se puede determinar, null. PROHIBIDO asumir "venta" sin señal.
 - moneda: mirá cómo se muestra el precio. "US$"/"U$S"/"USD"/"dólares" -> USD. "$"/"ARS"/"pesos" sin símbolo de dólar -> ARS. Coherencia: alquiler mensual suele ser ARS, venta suele ser USD, pero mandá lo que la página indica. Si no hay señal, null.
-- precio: el valor de la propiedad, NUNCA las expensas.
+- precio: el valor de la propiedad, NUNCA las expensas. expensas: monto MENSUAL de expensas si aparece (número en ARS), si no 0.
+- superficies: m2_cubiertos = cubierta; m2_semicubiertos = balcón/semicubierto; m2_descubiertos = patio/descubierto; m2_terreno = lote. Si solo dan total, ponela en m2_cubiertos.
+- piso: número de piso si aplica (PB = 0), si no null. orientacion: solo si el aviso la indica, si no null. antiguedad_anios: años; "a estrenar"/"nuevo" = 0.
 - "ambientes" NO es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1.
-- Si un dato no está: null (0 en numéricos).
+- amenities: solo los que el aviso dice que SÍ tiene. Si un dato no está: null (0 en numéricos, [] en amenities).
 CONTENIDO:
 """${contenido}"""`;
 
@@ -207,23 +231,36 @@ CONTENIDO:
     const res = await prismaIA.generateContent(prompt);
     const raw = res.response.text().replace(/```json|```/g, "").trim();
     const j = JSON.parse(raw);
+    const orient = ORIENT_OK.has(String(j.orientacion || "").toLowerCase()) ? (String(j.orientacion).toLowerCase() as Sujeto["orientacion"]) : undefined;
+    const piso = toNum(j.piso);
+    const sujeto: Partial<Sujeto> = {
+      tipo_propiedad: mapTipo(j.tipo_propiedad),
+      direccion: j.direccion || "",
+      barrio: j.barrio || "",
+      m2_cubiertos: toNum(j.m2_cubiertos) ?? 0,
+      m2_semicubiertos: toNum(j.m2_semicubiertos) ?? 0,
+      m2_descubiertos: toNum(j.m2_descubiertos) ?? 0,
+      m2_terreno: toNum(j.m2_terreno) ?? 0,
+      antiguedad_anios: toNum(j.antiguedad_anios) ?? 0,
+      dormitorios: toNum(j.dormitorios) ?? 0,
+      banos: toNum(j.banos) ?? 0,
+    };
+    if (piso !== null) sujeto.piso = piso;
+    if (orient) sujeto.orientacion = orient;
+    const amen = mapAmenidades(Array.isArray(j.amenities) ? j.amenities.join(" ") : "");
+    // amen trae solo las banderas true; el form las mergea sobre las 9 por defecto (parcial OK en runtime).
+    if (Object.keys(amen).length) sujeto.amenidades = amen as unknown as Sujeto["amenidades"];
     return {
       extract: {
         precio: toNum(j.precio),
         moneda: mapMoneda(j.moneda), // null si la IA no la determinó
         operacion: j.operacion === "alquiler" ? "alquiler" : j.operacion === "venta" ? "venta" : null,
+        expensas: toNum(j.expensas),
         responsable: j.responsable || null,
         fecha_publicacion: j.fecha_publicacion || null,
         metodo: "ia",
       },
-      sujeto: {
-        tipo_propiedad: mapTipo(j.tipo_propiedad),
-        direccion: j.direccion || "",
-        barrio: j.barrio || "",
-        m2_cubiertos: toNum(j.m2_cubiertos) ?? 0,
-        dormitorios: toNum(j.dormitorios) ?? 0,
-        banos: toNum(j.banos) ?? 0,
-      },
+      sujeto,
     };
   } catch {
     return null;
@@ -357,6 +394,7 @@ export async function extractFromUrl(url: string): Promise<ExtractResult> {
     precio: ext.precio ?? null,
     moneda: (ext.moneda as Moneda) ?? null,       // SIN default: vacío si no se determinó
     operacion: (ext.operacion as Operacion) ?? null, // SIN default: nunca "venta" por defecto
+    expensas: ext.expensas ?? null,
     responsable: ext.responsable ?? null,
     fecha_publicacion: ext.fecha_publicacion ?? null,
     fuente_portal,

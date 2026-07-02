@@ -110,6 +110,7 @@ export interface ExtractResult {
   precio: number | null;
   moneda: Moneda | null;      // null = no se pudo determinar (se completa a mano; NO se asume USD)
   operacion: Operacion | null; // null = no se pudo determinar (NO se asume "venta")
+  expensas: number | null;     // expensas mensuales si el aviso las muestra (parte del costo)
   responsable: string | null;
   fecha_publicacion: string | null;
   fuente_portal: string | null;

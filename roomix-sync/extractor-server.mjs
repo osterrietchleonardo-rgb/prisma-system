@@ -213,8 +213,13 @@ function fromVisibleText(text) {
     }
   }
 
-  if (!Object.keys(sujeto).length && precio == null) return null;
-  return { sujeto, precio, moneda, metodo: 'texto-visible' };
+  // Expensas: monto que aparece etiquetado como "expensas" (parte del costo mensual).
+  let expensas = null;
+  const em = t.match(/expensas?\s*[:\-]?\s*(?:\$|ar\$|pesos)?\s*([0-9][0-9.\, ]{3,})/i);
+  if (em) { const v = toNum(em[1]); if (v && v >= 1000) expensas = v; }
+
+  if (!Object.keys(sujeto).length && precio == null && expensas == null) return null;
+  return { sujeto, precio, moneda, expensas, metodo: 'texto-visible' };
 }
 
 // ─── Direccion + barrio desde el bloque de ubicacion del aviso ───
@@ -257,13 +262,17 @@ async function fromIA(ctx) {
   if (!GEMINI_API_KEY || contenido.length < 60) return null;
 
   const prompt = `Sos un analista inmobiliario experto de Argentina. Te paso TODO el contenido de la página de un aviso. Leé y RAZONÁ sobre el conjunto (título, URL, descripción, datos del portal y texto), y devolvé SOLO un JSON válido (sin texto extra):
-{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_descubiertos":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","responsable":"inmobiliaria o agente que publica, o null","fecha_publicacion":null,"amenities":["todos los amenities concretos que SÍ tenga: cochera, baulera, pileta, gimnasio, sum, seguridad, jardin, terraza, balcon, parrilla, etc."]}
-Cómo razonar (interpretá lo que dice la página, NO adivines ni pongas valores por defecto):
+{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_semicubiertos":0,"m2_descubiertos":0,"m2_terreno":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"piso":null,"orientacion":"norte|sur|este|oeste|ne|no|se|so|null","precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","expensas":0,"responsable":"inmobiliaria o agente que publica, o null","fecha_publicacion":null,"amenities":["todos los amenities concretos que SÍ tenga: cochera, baulera, pileta, gimnasio, sum, seguridad, jardin, terraza, balcon, parrilla, etc."]}
+Traé el MÁXIMO de variables que ENCUENTRES en el aviso (no dejes vacío lo que sí está escrito). Cómo razonar (interpretá lo que dice la página, NO adivines ni pongas valores por defecto):
 - operacion: mirá la URL, el título y el texto. "alquiler"/"alquilar"/"renta"/"$ ... por mes" -> alquiler. "venta"/"en venta"/"comprar" -> venta. Si de verdad no se puede determinar, poné null. PROHIBIDO asumir "venta" cuando no hay señal.
 - moneda: mirá CÓMO se muestra el precio. "US$"/"U$S"/"USD"/"dólares" -> USD. "$"/"ARS"/"pesos" sin símbolo de dólar -> ARS. Usá la coherencia (un alquiler mensual suele ser en ARS; una venta suele ser en USD) para desambiguar, pero mandá lo que la página realmente indica. Si no hay ninguna señal, null.
 - precio: el valor de la propiedad, NUNCA las expensas ni un teléfono.
+- expensas: el monto MENSUAL de expensas si el aviso lo muestra (número), en ARS. Si no aparece, 0.
+- superficies: m2_cubiertos = cubierta; m2_semicubiertos = balcón/terraza semicubierta; m2_descubiertos = patio/jardín descubierto; m2_terreno = lote (casas/PH/terreno). Si solo dan superficie total, ponela en m2_cubiertos.
+- piso: número de piso si aplica (PB = 0); si no corresponde/no está, null. orientacion: solo si el aviso la indica; si no, null.
+- antiguedad_anios: años de antigüedad; "a estrenar"/"nuevo" = 0.
 - "ambientes" NO es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1 (monoambiente/1 ambiente = 0 dormitorios).
-- amenities: solo los que el aviso dice que SÍ tiene (no los que dice que NO). m2_cubiertos = superficie cubierta; si solo dan total, poné ese número ahí.
+- amenities: solo los que el aviso dice que SÍ tiene (no los que dice que NO).
 - Si un dato no está: null (0 en numéricos, [] en amenities).
 CONTENIDO:
 """${contenido}"""`;
@@ -279,20 +288,29 @@ CONTENIDO:
     const raw = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '').replace(/```json|```/g, '').trim();
     const j = JSON.parse(raw);
     const op = j.operacion === 'alquiler' ? 'alquiler' : (j.operacion === 'venta' ? 'venta' : null);
+    const ORIENT = ['norte', 'sur', 'este', 'oeste', 'ne', 'no', 'se', 'so'];
+    const orient = ORIENT.includes(String(j.orientacion || '').toLowerCase()) ? String(j.orientacion).toLowerCase() : undefined;
+    const piso = toNum(j.piso);
+    const sujeto = {
+      tipo_propiedad: mapTipo(j.tipo_propiedad),
+      direccion: j.direccion || '',
+      barrio: j.barrio || '',
+      m2_cubiertos: toNum(j.m2_cubiertos) ?? 0,
+      m2_semicubiertos: toNum(j.m2_semicubiertos) ?? 0,
+      m2_descubiertos: toNum(j.m2_descubiertos) ?? 0,
+      m2_terreno: toNum(j.m2_terreno) ?? 0,
+      antiguedad_anios: toNum(j.antiguedad_anios) ?? 0,
+      dormitorios: toNum(j.dormitorios) ?? 0,
+      banos: toNum(j.banos) ?? 0,
+    };
+    if (piso !== null) sujeto.piso = piso;
+    if (orient) sujeto.orientacion = orient;
     return {
-      sujeto: {
-        tipo_propiedad: mapTipo(j.tipo_propiedad),
-        direccion: j.direccion || '',
-        barrio: j.barrio || '',
-        m2_cubiertos: toNum(j.m2_cubiertos) ?? 0,
-        m2_descubiertos: toNum(j.m2_descubiertos) ?? 0,
-        antiguedad_anios: toNum(j.antiguedad_anios) ?? 0,
-        dormitorios: toNum(j.dormitorios) ?? 0,
-        banos: toNum(j.banos) ?? 0,
-      },
+      sujeto,
       precio: toNum(j.precio),
       moneda: mapMoneda(j.moneda), // null si la IA no la determinó
       operacion: op,               // null si la IA no la determinó
+      expensas: toNum(j.expensas),
       responsable: j.responsable || null,
       fecha_publicacion: j.fecha_publicacion || null,
       metodo: 'ia',
@@ -388,14 +406,14 @@ async function extract(url, maxAttempts = 3, debug = false) {
 
   const { html, text, title } = best;
   // SIN valores por defecto: lo que no se determine queda null → se completa a mano.
-  const merged = { sujeto: {}, precio: null, moneda: null, operacion: null, responsable: null, fecha_publicacion: null, metodo: null };
+  const merged = { sujeto: {}, precio: null, moneda: null, operacion: null, expensas: null, responsable: null, fecha_publicacion: null, metodo: null };
   const apply = (p) => {
     if (!p) return;
     for (const [k, v] of Object.entries(p.sujeto || {})) {
       const empty = merged.sujeto[k] === undefined || merged.sujeto[k] === '' || merged.sujeto[k] === 0;
       if (empty && v !== undefined && v !== '' && v !== 0 && v !== null) merged.sujeto[k] = v;
     }
-    for (const k of ['precio', 'moneda', 'operacion', 'responsable', 'fecha_publicacion', 'metodo']) {
+    for (const k of ['precio', 'moneda', 'operacion', 'expensas', 'responsable', 'fecha_publicacion', 'metodo']) {
       const empty = merged[k] === null || merged[k] === undefined;
       if (empty && p[k] !== undefined && p[k] !== null) merged[k] = p[k];
     }

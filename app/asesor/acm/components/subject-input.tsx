@@ -97,7 +97,7 @@ export function SubjectInput({
   // ── Link ──
   const [url, setUrl] = useState("");
   const [analizando, setAnalizando] = useState(false);
-  const [extractMeta, setExtractMeta] = useState<{ responsable: string | null; fecha: string | null; portal: string | null; aviso?: string } | null>(null);
+  const [extractMeta, setExtractMeta] = useState<{ responsable: string | null; fecha: string | null; portal: string | null; expensas?: number | null; aviso?: string } | null>(null);
 
   useEffect(() => {
     if (modo === "cartera" && cartera.length === 0 && !carteraLoading) {
@@ -187,7 +187,7 @@ export function SubjectInput({
       });
       onExcludeIdChange(null);
       onOperacionChange(data.operacion === "alquiler" ? "alquiler" : "venta");
-      setExtractMeta({ responsable: data.responsable, fecha: data.fecha_publicacion, portal: data.fuente_portal, aviso: data.aviso });
+      setExtractMeta({ responsable: data.responsable, fecha: data.fecha_publicacion, portal: data.fuente_portal, expensas: data.expensas, aviso: data.aviso });
 
       if (data.requiere_completar_manual) toast.warning(data.aviso || "Completá los datos faltantes a mano.");
       else toast.success("Datos extraídos. Revisá y completá si falta algo.");
@@ -310,6 +310,7 @@ export function SubjectInput({
               {extractMeta.portal && <p className="text-muted-foreground">Fuente: <span className="text-foreground">{extractMeta.portal}</span></p>}
               {extractMeta.responsable && <p className="text-muted-foreground">Publica: <span className="text-foreground">{extractMeta.responsable}</span></p>}
               {extractMeta.fecha && <p className="text-muted-foreground">Publicado: <span className="text-foreground">{extractMeta.fecha}</span></p>}
+              {extractMeta.expensas ? <p className="text-muted-foreground">Expensas: <span className="text-foreground">$ {extractMeta.expensas.toLocaleString("es-AR")}</span></p> : null}
               {extractMeta.aviso && (
                 <p className="flex items-center gap-1 text-amber-500"><AlertTriangle className="w-3 h-3" /> {extractMeta.aviso}</p>
               )}
