@@ -376,15 +376,11 @@ async function fetchOnce(url) {
       if (hasLd || !challenged) break;
       await sleep(2500);
     }
-    // Si la IP trajo contenido (JSON-LD o cuerpo con texto) esperamos a que termine de pintar.
-    // Si NO hay nada (IP quemada: solo el <head>), no perdemos ~7s: devolvemos ya para reintentar
-    // con otra IP del proxy rotativo (cada newContext sale por un IP distinto).
-    const hasLd = await page.$('script[type="application/ld+json"]').then(Boolean).catch(() => false);
-    const bodyLen = await page.evaluate(() => document.body?.innerText?.length || 0).catch(() => 0);
-    if (hasLd || bodyLen > 500) {
-      await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
-      await sleep(1200);
-    }
+    // IMPRESCINDIBLE: ML/ZonaProp/etc. renderizan el contenido y el JSON-LD por JavaScript DESPUÉS
+    // del domcontentloaded (son SPAs). Hay que esperar a que la página se "pinte" antes de leerla;
+    // si no, aun con IP buena volvería vacía (solo el <head>). NO optimizar salteando esta espera.
+    await page.waitForLoadState('networkidle', { timeout: 6000 }).catch(() => {});
+    await sleep(1200);
     const html = await page.content();
     const text = await page.evaluate(() => document.body?.innerText || '').catch(() => '');
     const title = await page.title().catch(() => '');
