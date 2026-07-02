@@ -262,7 +262,7 @@ async function fromIA(ctx) {
   if (!GEMINI_API_KEY || contenido.length < 60) return null;
 
   const prompt = `Sos un analista inmobiliario experto de Argentina. Te paso TODO el contenido de la página de un aviso. Leé y RAZONÁ sobre el conjunto (título, URL, descripción, datos del portal y texto), y devolvé SOLO un JSON válido (sin texto extra):
-{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_semicubiertos":0,"m2_descubiertos":0,"m2_terreno":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"piso":null,"orientacion":"norte|sur|este|oeste|ne|no|se|so|null","precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","expensas":0,"responsable":"inmobiliaria o agente que publica, o null","fecha_publicacion":null,"amenities":["todos los amenities concretos que SÍ tenga: cochera, baulera, pileta, gimnasio, sum, seguridad, jardin, terraza, balcon, parrilla, etc."]}
+{"tipo_propiedad":"departamento|casa|ph|local|oficina|terreno","direccion":"calle y altura si aparece; si no, la zona/barrio. NUNCA el título del aviso","barrio":"","m2_cubiertos":0,"m2_semicubiertos":0,"m2_descubiertos":0,"m2_terreno":0,"antiguedad_anios":0,"dormitorios":0,"banos":0,"piso":null,"orientacion":"norte|sur|este|oeste|ne|no|se|so|null","precio":0,"moneda":"USD|ARS|null","operacion":"venta|alquiler|null","expensas":0,"responsable":"inmobiliaria o agente que publica, o null","fecha_publicacion":null,"amenidades":{"cochera_cubierta":false,"cochera_descubierta":false,"baulera":false,"pileta":false,"gimnasio":false,"sum":false,"seguridad_24hs":false,"jardin_privado":false,"terraza_privada":false}}
 Traé el MÁXIMO de variables que ENCUENTRES en el aviso (no dejes vacío lo que sí está escrito). Cómo razonar (interpretá lo que dice la página, NO adivines ni pongas valores por defecto):
 - operacion: mirá la URL, el título y el texto. "alquiler"/"alquilar"/"renta"/"$ ... por mes" -> alquiler. "venta"/"en venta"/"comprar" -> venta. Si de verdad no se puede determinar, poné null. PROHIBIDO asumir "venta" cuando no hay señal.
 - moneda: mirá CÓMO se muestra el precio. "US$"/"U$S"/"USD"/"dólares" -> USD. "$"/"ARS"/"pesos" sin símbolo de dólar -> ARS. Usá la coherencia (un alquiler mensual suele ser en ARS; una venta suele ser en USD) para desambiguar, pero mandá lo que la página realmente indica. Si no hay ninguna señal, null.
@@ -272,8 +272,8 @@ Traé el MÁXIMO de variables que ENCUENTRES en el aviso (no dejes vacío lo que
 - piso: número de piso si aplica (PB = 0); si no corresponde/no está, null. orientacion: solo si el aviso la indica; si no, null.
 - antiguedad_anios: años de antigüedad; "a estrenar"/"nuevo" = 0.
 - "ambientes" NO es "dormitorios": si solo hay ambientes, dormitorios = ambientes - 1 (monoambiente/1 ambiente = 0 dormitorios).
-- amenities: solo los que el aviso dice que SÍ tiene (no los que dice que NO).
-- Si un dato no está: null (0 en numéricos, [] en amenities).
+- amenidades: RAZONÁ cada una y poné true SOLO la que el aviso confirme que SÍ tiene (si dice "No" o no la menciona, false). Guía de interpretación: "cochera/garage cubierta" -> cochera_cubierta; "cochera descubierta" -> cochera_descubierta; "baulera" -> baulera; "pileta/piscina" -> pileta; "gimnasio/gym" -> gimnasio; "SUM/salón de usos múltiples" -> sum; cualquier vigilancia/portería/seguridad (incluso "Seguridad: Sí") -> seguridad_24hs; "jardín" propio -> jardin_privado; "terraza/balcón aterrazado/solárium" -> terraza_privada. NO uses coincidencia literal de palabras: interpretá el sentido.
+- Si un dato no está: null (0 en numéricos, amenidades en false).
 CONTENIDO:
 """${contenido}"""`;
   try {
@@ -305,6 +305,11 @@ CONTENIDO:
     };
     if (piso !== null) sujeto.piso = piso;
     if (orient) sujeto.orientacion = orient;
+    // Amenidades: las RAZONA la IA (objeto de 9 banderas). Nos quedamos solo con las true.
+    const AMEN_KEYS = ['cochera_cubierta', 'cochera_descubierta', 'baulera', 'pileta', 'gimnasio', 'sum', 'seguridad_24hs', 'jardin_privado', 'terraza_privada'];
+    const amen = {};
+    if (j.amenidades && typeof j.amenidades === 'object') for (const k of AMEN_KEYS) if (j.amenidades[k] === true) amen[k] = true;
+    if (Object.keys(amen).length) sujeto.amenidades = amen;
     return {
       sujeto,
       precio: toNum(j.precio),
@@ -314,7 +319,6 @@ CONTENIDO:
       responsable: j.responsable || null,
       fecha_publicacion: j.fecha_publicacion || null,
       metodo: 'ia',
-      _amen: Array.isArray(j.amenities) ? j.amenities.join(' ') : '',
     };
   } catch {
     return null;
@@ -453,11 +457,20 @@ async function extract(url, maxAttempts = 5, debug = false) {
   const iaRes = await fromIA({ text, title, url, jsonld: jsonldStr, metaDesc });
   if (iaRes) {
     apply(iaRes); // completa lo que falte (números, dirección/barrio si vinieron vacíos)
-    // La interpretación de la IA pisa a los deterministas: razona sobre toda la página, no por keywords.
+    // La IA razonó sobre TODA la página → PISA a los deterministas en interpretación y en los
+    // campos que el dato estructurado del portal suele errar: ML cuenta los AMBIENTES como
+    // "dormitorios" y pone la superficie TOTAL como "cubierta". La IA aplica ambientes-1 y separa
+    // cubierta/semicubierta. Las amenidades las razona la IA (no hay mapeo por palabras clave).
+    const S = iaRes.sujeto || {};
     if (iaRes.operacion) merged.operacion = iaRes.operacion;
     if (iaRes.moneda) merged.moneda = iaRes.moneda;
-    if (iaRes.sujeto && iaRes.sujeto.tipo_propiedad) merged.sujeto.tipo_propiedad = iaRes.sujeto.tipo_propiedad;
     if (iaRes.responsable) merged.responsable = iaRes.responsable;
+    if (S.tipo_propiedad) merged.sujeto.tipo_propiedad = S.tipo_propiedad;
+    if (Number.isFinite(S.dormitorios)) merged.sujeto.dormitorios = S.dormitorios; // ambientes-1
+    if (S.m2_cubiertos > 0) merged.sujeto.m2_cubiertos = S.m2_cubiertos;
+    if (S.m2_semicubiertos > 0) merged.sujeto.m2_semicubiertos = S.m2_semicubiertos;
+    if (S.banos > 0) merged.sujeto.banos = S.banos;
+    if (S.amenidades && Object.keys(S.amenidades).length) merged.sujeto.amenidades = S.amenidades;
   }
 
   // 3) Último recurso para la operación: lo que diga el propio link (solo si sigue sin definirse).
@@ -473,10 +486,8 @@ async function extract(url, maxAttempts = 5, debug = false) {
     if (loc.sujeto.direccion && curEsTitulo) merged.sujeto.direccion = loc.sujeto.direccion;
   }
 
-  // Amenities: usamos la lista curada de la IA si la hay (precisa); si no, el texto del aviso.
-  const amenSource = iaRes && iaRes._amen && iaRes._amen.length > 3 ? iaRes._amen : text;
-  const amen = mapAmenidades(amenSource);
-  if (Object.keys(amen).length) merged.sujeto.amenidades = amen;
+  // Amenidades: las razona la IA (objeto de 9 banderas), ya quedaron en merged.sujeto.amenidades
+  // vía el override de arriba. Sin mapeo por palabras clave.
 
   // Limpiar la dirección (sacar título/portal/error).
   merged.sujeto.direccion = cleanDireccion(merged.sujeto.direccion);
