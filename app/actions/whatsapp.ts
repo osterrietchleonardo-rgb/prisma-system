@@ -1651,6 +1651,11 @@ export async function importContacts(
     const { agency_id } = await getAgencyProfile()
     const supabase = createClient()
 
+    // Dueño de los contactos importados = quien los sube (queda visible solo
+    // para él; el director ve todos igual por RLS).
+    const { data: { user } } = await supabase.auth.getUser()
+    const owner_id = user?.id ?? null
+
     // Clasificación del lote: lo que escribió el usuario, o "Importado" por defecto.
     const clasifValue = (clasificacion ?? '').trim() || 'Importado'
 
@@ -1688,6 +1693,7 @@ export async function importContacts(
 
     const formattedContacts = toInsert.map((c) => ({
       agency_id,
+      agent_id: owner_id,
       phone: c.phone,
       name: c.name,
       metadata: c.metadata,

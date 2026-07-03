@@ -111,6 +111,7 @@ export interface WATemplate {
 export interface WAContact {
   id: string
   agency_id: string
+  agent_id: string | null  // Dueño del contacto: el asesor lo ve solo si es suyo; el director ve todos
   phone: string
   name: string | null
   metadata: Record<string, unknown>
