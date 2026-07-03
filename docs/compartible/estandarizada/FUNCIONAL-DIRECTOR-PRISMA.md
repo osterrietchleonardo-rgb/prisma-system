@@ -379,6 +379,24 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 > 💡 Tipo, operación **y barrio** son filtros estrictos: **todos los comparables son del mismo barrio** que la propiedad analizada (reconoce sub-barrios como Belgrano R/C y no le afectan los acentos). El **checklist compara todo lo que tiene dato real** (suma **dormitorios** y **antigüedad**; si falta un dato, dice "sin dato" y no baja el puntaje). Trae **hasta 50 por bloque**, ordenados por comparabilidad, de **tu cartera** y de la **red de colaboración**.
 > 💰 No consume créditos por buscar comparables.
 
+### Crear una ficha para el cliente
+
+Con los comparables a la vista, vos o tus asesores pueden armar una **ficha profesional** para pasarle al cliente (link para compartir **+ PDF**), con la marca de la agencia.
+
+1. Tocá **"Crear ficha"** (arriba a la derecha de los resultados).
+2. **Marcá** los comparables a incluir (se pueden mezclar los de la **cartera** y los de la **red de colaboración**). Cada uno ocupa **una hoja** con **todas sus fotos** y características.
+3. Tocá **"Crear ficha"** en la barra de abajo: se abre un **link público** listo para compartir.
+4. En esa página están **"Descargar PDF"** (para enviar por mail/WhatsApp) y **"Compartir"** (copia el link).
+
+**Qué trae la ficha:**
+- **Portada** con la propiedad de referencia, los datos de quien la crea y la fecha.
+- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes) y todas las fotos + características.
+- **Hoja final** con la **comparación de valores por m²** (promedio y desvío de cada comparable respecto del cierre de **su propia zona**) y los **datos de contacto** de quien la generó.
+- El **logo** y el **aviso legal** en el pie de cada hoja (si están cargados).
+
+> 💡 **Tip:** la ficha toma los **colores, el logo y el aviso legal** que definís en **Marketing IA → Identidad Visual**. Si el logo o el aviso legal no están cargados, simplemente no aparecen (y si no hay colores, usa un diseño elegante por defecto). Configurarlos una vez mejora todas las fichas que creen tus asesores.
+> 💰 Crear la ficha **no consume créditos**.
+
 ---
 
 ## 17. Calendario (visitas)

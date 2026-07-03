@@ -352,6 +352,24 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 > 💡 Trae **hasta 50 comparables por bloque** (cartera y red), ordenados por comparabilidad (los mejores arriba). Para **venta**, la mayoría suele salir de tu propia cartera.
 > 💰 Buscar comparables **no consume créditos**.
 
+### Crear una ficha para tu cliente
+
+Con los comparables a la vista podés armar una **ficha profesional** para pasarle a tu cliente (link para compartir **+ PDF**), con la marca de tu agencia.
+
+1. Tocá **"Crear ficha"** (arriba a la derecha de los resultados).
+2. **Marcá** los comparables que quieras incluir (podés mezclar los de **tu cartera** y los de la **red de colaboración**). Cada uno ocupará **una hoja** con **todas sus fotos** y características.
+3. Tocá **"Crear ficha"** en la barra de abajo: se abre un **link público** listo para compartir.
+4. En esa página tenés **"Descargar PDF"** (para mandar por mail o WhatsApp) y **"Compartir"** (copia el link).
+
+**Qué trae la ficha:**
+- Una **portada** con la propiedad de referencia, tus datos y la fecha.
+- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes) y todas las fotos + características.
+- Una **hoja final** con la **comparación de valores por m²** (el promedio y cuánto se desvía cada comparable respecto del cierre de **su propia zona**) y tus **datos de contacto** para que el cliente te escriba (WhatsApp / email).
+- Tu **logo** y el **aviso legal** en el pie de cada hoja (si el director los cargó en la configuración de marca).
+
+> 💡 **Tip:** la ficha usa los **colores y el logo** de tu agencia (los configura el director en **Marketing IA → Identidad Visual**). Si todavía no están cargados, sale con un diseño elegante por defecto.
+> 💰 Crear la ficha **no consume créditos**.
+
 ---
 
 ## 17. Biblioteca (documentos)

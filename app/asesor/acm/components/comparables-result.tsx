@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { AcmComparable, ChecklistItem, Sujeto, Operacion } from "@/lib/tasacion/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Minus, ChevronDown, ExternalLink, Building2, Network, ArrowLeft, MapPin, Ruler, DoorOpen } from "lucide-react";
+import { toast } from "sonner";
+import {
+  Check, X, Minus, ChevronDown, ExternalLink, Building2, Network, ArrowLeft, MapPin, Ruler, DoorOpen,
+  FileText, Loader2, CheckSquare, Square,
+} from "lucide-react";
 
 interface Props {
   sujeto: Sujeto;
@@ -28,11 +33,28 @@ const pctColor = (p: number) =>
 const fmtPrecio = (c: AcmComparable) =>
   c.precio ? `${c.moneda === "ARS" ? "$" : "US$"} ${c.precio.toLocaleString("es-AR")}` : "Consultar";
 
-function ComparableCard({ c }: { c: AcmComparable }) {
+function ComparableCard({
+  c, selectable, selected, onToggle,
+}: {
+  c: AcmComparable; selectable?: boolean; selected?: boolean; onToggle?: (id: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-2xl border border-accent/10 bg-card/40 overflow-hidden">
+    <div
+      className={`rounded-2xl border overflow-hidden transition-colors ${
+        selectable && selected ? "border-accent bg-accent/5 ring-1 ring-accent/40" : "border-accent/10 bg-card/40"
+      }`}
+    >
       <div className="flex gap-4 p-4">
+        {selectable && (
+          <button
+            onClick={() => onToggle?.(c.id)}
+            className="shrink-0 self-start pt-1 text-accent"
+            aria-label={selected ? "Quitar de la ficha" : "Agregar a la ficha"}
+          >
+            {selected ? <CheckSquare className="w-6 h-6" /> : <Square className="w-6 h-6 text-muted-foreground/50" />}
+          </button>
+        )}
         {c.imagen ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={c.imagen} alt={c.titulo} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-muted" />
@@ -111,7 +133,12 @@ function ComparableCard({ c }: { c: AcmComparable }) {
   );
 }
 
-function Section({ title, icon: Icon, items, empty }: { title: string; icon: any; items: AcmComparable[]; empty: string }) {
+function Section({
+  title, icon: Icon, items, empty, selectable, selected, onToggle,
+}: {
+  title: string; icon: any; items: AcmComparable[]; empty: string;
+  selectable?: boolean; selected?: Set<string>; onToggle?: (id: string) => void;
+}) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -122,15 +149,78 @@ function Section({ title, icon: Icon, items, empty }: { title: string; icon: any
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground p-4 rounded-xl bg-card/20 border border-accent/5">{empty}</p>
       ) : (
-        <div className="space-y-3">{items.map((c) => <ComparableCard key={c.id} c={c} />)}</div>
+        <div className="space-y-3">
+          {items.map((c) => (
+            <ComparableCard key={c.id} c={c} selectable={selectable} selected={selected?.has(c.id)} onToggle={onToggle} />
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
+const MAX_FICHA = 12;
+
 export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSemantica, onVolver }: Props) {
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [creating, setCreating] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const byId = useMemo(() => {
+    const m = new Map<string, AcmComparable>();
+    for (const c of [...cartera, ...roomix]) m.set(c.id, c);
+    return m;
+  }, [cartera, roomix]);
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else {
+        if (next.size >= MAX_FICHA) {
+          toast.error(`Podés incluir hasta ${MAX_FICHA} comparables por ficha.`);
+          return prev;
+        }
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const cancelar = () => {
+    setSelecting(false);
+    setSelected(new Set());
+  };
+
+  const crearFicha = async () => {
+    const comparables = [...selected].map((id) => byId.get(id)).filter(Boolean) as AcmComparable[];
+    if (comparables.length === 0) {
+      toast.error("Seleccioná al menos un comparable.");
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await fetch("/api/acm/ficha", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operacion, sujeto, comparables }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "No se pudo crear la ficha.");
+      toast.success("Ficha creada. Abriendo…");
+      window.open(data.path, "_blank");
+      cancelar();
+    } catch (e: any) {
+      toast.error("Error creando la ficha: " + e.message);
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in">
+    <div className="space-y-6 animate-in fade-in pb-24">
       {/* Sujeto */}
       <div className="flex items-start justify-between gap-4 p-4 rounded-2xl border border-accent/20 bg-accent/5">
         <div>
@@ -141,23 +231,72 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
           </p>
           {!conSemantica && <p className="text-[11px] text-amber-500 mt-1">Ranking estructural (sin similitud semántica esta vez).</p>}
         </div>
-        <Button variant="outline" size="sm" className="border-accent/20 shrink-0" onClick={onVolver}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Editar
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {!selecting ? (
+            <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" onClick={() => setSelecting(true)}>
+              <FileText className="w-4 h-4 mr-1" /> Crear ficha
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="border-accent/20" onClick={cancelar}>
+              Cancelar
+            </Button>
+          )}
+          <Button variant="outline" size="sm" className="border-accent/20" onClick={onVolver}>
+            <ArrowLeft className="w-4 h-4 mr-1" /> Editar
+          </Button>
+        </div>
       </div>
+
+      {selecting && (
+        <div className="text-sm text-muted-foreground p-3 rounded-xl bg-card/30 border border-accent/10">
+          Marcá los comparables que querés incluir en la ficha para tu cliente. Cada uno ocupará una hoja con todas sus fotos y
+          características.
+        </div>
+      )}
 
       <Section
         title="Cartera de tu agencia"
         icon={Building2}
         items={cartera}
         empty="No se encontraron comparables en tu cartera con estos criterios."
+        selectable={selecting}
+        selected={selected}
+        onToggle={toggle}
       />
       <Section
         title="Red de colaboración"
         icon={Network}
         items={roomix}
         empty="No se encontraron comparables en la red de colaboración. (Para venta hay pocos avisos en la red; el grueso está en alquiler.)"
+        selectable={selecting}
+        selected={selected}
+        onToggle={toggle}
       />
+
+      {/* Barra de acción flotante al seleccionar — via portal a <body> para escapar el
+          contenedor de posicionamiento que crea el backdrop-blur de la Card del ACM
+          (si no, "fixed" queda anclado a la Card y hay que scrollear hasta el final para verla). */}
+      {selecting && mounted &&
+        createPortal(
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-5 py-3 rounded-2xl bg-card border border-accent/30 shadow-2xl shadow-black/30">
+            <span className="text-sm font-semibold whitespace-nowrap">
+              {selected.size} {selected.size === 1 ? "comparable" : "comparables"} seleccionado{selected.size === 1 ? "" : "s"}
+            </span>
+            <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={cancelar}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+              disabled={creating || selected.size === 0}
+              onClick={crearFicha}
+            >
+              {creating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileText className="w-4 h-4 mr-1" />}
+              {creating ? "Creando…" : "Crear ficha"}
+            </Button>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
