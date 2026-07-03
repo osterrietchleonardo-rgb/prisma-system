@@ -1504,7 +1504,7 @@ Sistema de auth **completamente separado** de Supabase Auth:
 | `/api/admin-vakdor/asesores/[id]/estado` | PATCH | Pausar/activar asesor |
 | `/api/admin-vakdor/directores/[id]/estado` | PATCH | Pausar/activar director |
 | `/api/admin-vakdor/bloqueados` | GET | Usuarios bloqueados |
-| `/api/admin-vakdor/bandejas` | GET | Monitoreo cross-tenant de conversaciones WhatsApp de todas las agencias (lista paginada con filtros por agencia/estado/texto) |
+| `/api/admin-vakdor/bandejas` | GET | Monitoreo cross-tenant de conversaciones WhatsApp de todas las agencias (lista paginada, orden por `last_message_at` desc, filtros por agencia/estado/texto). Responde con `Cache-Control: no-store` para evitar listas viejas cacheadas por el navegador |
 | `/api/admin-vakdor/bandejas/[id]` | GET | Detalle de una conversación (mensajes) de cualquier agencia |
 | `/api/admin-vakdor/dashboard/metricas` | GET | Métricas globales del SaaS |
 | `/api/admin-vakdor/invitaciones` | GET | Códigos de invitación |

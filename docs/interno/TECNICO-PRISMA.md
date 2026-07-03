@@ -558,7 +558,9 @@ Diario a medianoche → verifica aprobación de templates de WhatsApp (§9.4). E
 
 Login (`POST /api/admin-vakdor/login`): rate limit 5/10min; hash SHA-256 con salt `email + ADMIN_VAKDOR_JWT_SECRET`; busca `admin_vakdor_users`.
 
-**Endpoints:** agencias (lista/detalle/créditos/estado/pagos/sugerencias/tokko-stats), asesores/directores (estado), bloqueados, dashboard/metricas, invitaciones, pagos, sugerencias (+ métricas/estado), usuarios desbloquear, logout, y **bandejas** (`GET /api/admin-vakdor/bandejas` y `/[id]`) — **monitoreo cross-tenant** de conversaciones WhatsApp de todas las agencias vía `service_role`, con filtros por agencia/estado/texto. Páginas en `app/admin-vakdor/*`.
+**Endpoints:** agencias (lista/detalle/créditos/estado/pagos/sugerencias/tokko-stats), asesores/directores (estado), bloqueados, dashboard/metricas, invitaciones, pagos, sugerencias (+ métricas/estado), usuarios desbloquear, logout, y **bandejas** (`GET /api/admin-vakdor/bandejas` y `/[id]`) — **monitoreo cross-tenant** de conversaciones WhatsApp de todas las agencias vía `service_role`, con filtros por agencia/estado/texto y orden por `last_message_at` desc. Páginas en `app/admin-vakdor/*`.
+
+> **Anti-caché de la lista de bandejas:** el endpoint responde con `Cache-Control: no-store, max-age=0` y el cliente hace `fetch(..., { cache: "no-store" })` tanto en la carga inicial como en el auto-refresco (10 s) y en el botón **"Actualizar"** (`bandejas-client.tsx`). Sin esto, el navegador servía una respuesta cacheada (misma URL) y la lista aparecía incompleta o desordenada al sacar el filtro de agencia, aunque la BD estuviera correcta.
 
 ### 16.1 Módulo Finanzas (`/admin-vakdor/finanzas`)
 
