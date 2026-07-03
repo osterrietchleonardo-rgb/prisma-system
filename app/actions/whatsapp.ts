@@ -47,6 +47,98 @@ async function getAgencyProfile(): Promise<{ agency_id: string; role: string }> 
   return { agency_id: profile.agency_id, role: profile.role }
 }
 
+// =============================================
+// Helper: detectar error real en la respuesta de Evolution
+// Evolution puede responder HTTP 2xx pero con un error de Meta en el body
+// (ej: token vencido → {message:"Authentication Error", code:190}). En ese
+// caso el mensaje NO se entrega aunque response.ok sea true.
+// Devuelve un string de error si el envío falló, o null si fue exitoso.
+// =============================================
+
+function evolutionSendError(res: Response, data: any): string | null {
+  if (!res.ok) {
+    const m = data?.message || data?.error?.message || `HTTP ${res.status}`
+    return typeof m === 'string' ? m : JSON.stringify(m)
+  }
+  // Sin body legible: algunos setups responden vacío en éxito → asumimos OK
+  if (!data) return null
+  // Error explícito estilo Graph: { error: { message } }
+  if (data.error) {
+    return data.error?.message || JSON.stringify(data.error)
+  }
+  // Error de Meta proxeado: { message, code, type:"OAuthException" } sin key de mensaje
+  if (typeof data.code === 'number' && data.message && !data.key) {
+    return `${data.message} (código ${data.code})`
+  }
+  return null
+}
+
+// Extrae el wamid de una respuesta de Evolution exitosa
+function evolutionWamid(data: any): string | null {
+  return data?.key?.id || data?.messageId || null
+}
+
+// =============================================
+// Helper: crear/recrear la instancia en Evolution (modo WHATSAPP-BUSINESS)
+// Evolution guarda su PROPIA copia del token de Meta al crearse. Si el token
+// se renueva en PRISMA hay que empujarlo también acá, si no queda desfasado
+// y los envíos fallan con OAuthException (code 190) aunque el token de la BD
+// sea válido. Borra la instancia previa (best-effort) y la vuelve a crear.
+// Lanza error si la creación falla.
+// =============================================
+
+async function recreateEvolutionInstance(params: {
+  instanceName: string
+  token: string
+  phoneNumberId: string
+  existingEvoName?: string | null
+}): Promise<{ evoInstanceName: string; evoInstanceId: string | null }> {
+  const evolutionUrl = process.env.EVOLUTION_API_URL
+  const evolutionKey = process.env.EVOLUTION_API_KEY
+  const appUrl = process.env.APP_URL
+
+  if (!evolutionUrl || !evolutionKey || !appUrl) {
+    throw new Error('Faltan EVOLUTION_API_URL / EVOLUTION_API_KEY / APP_URL en el servidor')
+  }
+
+  // Borrar instancia anterior en Evolution (best-effort, esperamos a que termine
+  // para evitar el error "instance already exists" al recrear)
+  const evoNameToDelete = params.existingEvoName || params.instanceName
+  await fetch(`${evolutionUrl}/instance/delete/${evoNameToDelete}`, {
+    method: 'DELETE',
+    headers: { apikey: evolutionKey },
+  }).catch(() => null)
+
+  const evoRes = await fetch(`${evolutionUrl}/instance/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: evolutionKey },
+    body: JSON.stringify({
+      instanceName: params.instanceName,
+      integration: 'WHATSAPP-BUSINESS',
+      token: params.token,
+      number: params.phoneNumberId,
+      qrcode: false,
+      webhook: {
+        url: `${appUrl}/api/webhooks/evolution`,
+        byEvents: true,
+        base64: false,
+        events: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'CONNECTION_UPDATE', 'SEND_MESSAGE'],
+      },
+    }),
+  })
+
+  if (!evoRes.ok) {
+    const evoErr = await evoRes.text()
+    throw new Error(`Error al crear instancia en Evolution (${evoRes.status}): ${evoErr}`)
+  }
+
+  const evoData = await evoRes.json()
+  return {
+    evoInstanceName: evoData?.instance?.instanceName || params.instanceName,
+    evoInstanceId: evoData?.instance?.instanceId || null,
+  }
+}
+
 // Backward-compatible director-only guard (used by connectWhatsApp + createTemplate + sync)
 async function getDirectorProfile(): Promise<{ agency_id: string }> {
   const result = await getAgencyProfile()
@@ -88,45 +180,24 @@ export async function connectWhatsApp(
         .eq('agency_id', agency_id)
         .maybeSingle()
 
-      if (existing?.evo_instance_name) {
-        // Eliminar instancia anterior en Evolution (best-effort)
-        fetch(`${evolutionUrl}/instance/delete/${existing.evo_instance_name}`, {
-          method: 'DELETE',
-          headers: { apikey: evolutionKey },
-        }).catch(() => null)
-      }
-
-      // Crear instancia: integration WHATSAPP-BUSINESS = Meta Cloud API oficial
-      const evoRes = await fetch(`${evolutionUrl}/instance/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: evolutionKey },
-        body: JSON.stringify({
+      // Crear/recrear instancia en Evolution (integration WHATSAPP-BUSINESS = Meta Cloud API)
+      let evoInstanceName: string
+      let evoInstanceId: string | null
+      try {
+        const created = await recreateEvolutionInstance({
           instanceName: instance_name,
-          integration: 'WHATSAPP-BUSINESS', // Meta Cloud API
-          token: input.token,              // Meta Access Token permanente
-          number: input.phone_number_id,   // Phone Number ID de Meta
-          qrcode: false,
-          webhook: {
-            url: `${appUrl}/api/webhooks/evolution`,
-            byEvents: true,
-            base64: false,
-            events: ['MESSAGES_UPSERT', 'MESSAGES_UPDATE', 'CONNECTION_UPDATE', 'SEND_MESSAGE'],
-          },
-        }),
-      })
-
-      if (!evoRes.ok) {
-        const evoErr = await evoRes.text()
+          token: input.token,
+          phoneNumberId: input.phone_number_id,
+          existingEvoName: existing?.evo_instance_name,
+        })
+        evoInstanceName = created.evoInstanceName
+        evoInstanceId = created.evoInstanceId
+      } catch (e) {
         return {
           success: false,
-          error: `Error al crear instancia en Evolution API (${evoRes.status}): ${evoErr}`,
+          error: e instanceof Error ? e.message : 'Error al crear instancia en Evolution API',
         }
       }
-
-      const evoData = await evoRes.json()
-      // Evolution devuelve: { instance: { instanceName, instanceId }, hash: { apikey } }
-      const evoInstanceName: string = evoData?.instance?.instanceName || instance_name
-      const evoInstanceId: string | null = evoData?.instance?.instanceId || null
 
       // Guardar en Supabase
       const { data: existing2 } = existing
@@ -399,10 +470,12 @@ export async function sendDirectMessage(
       }
     )
 
-    if (!response.ok) {
+    const evoData = await response.json().catch(() => null)
+    const sendError = evolutionSendError(response, evoData)
+    if (sendError) {
       return {
         success: false,
-        error: `Error al enviar mensaje via Evolution: ${response.status}`,
+        error: `No se pudo enviar el mensaje: ${sendError}`,
       }
     }
 
@@ -415,6 +488,7 @@ export async function sendDirectMessage(
         content,
         role: 'human',
         message_type: 'text',
+        wamid: evolutionWamid(evoData),
       })
       .select()
       .single()
@@ -458,6 +532,215 @@ export async function sendDirectMessage(
           },
           invalid_tool_calls: []
         }
+      })
+
+    return { success: true, data: insertedMsg }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Error desconocido'
+    return { success: false, error: message }
+  }
+}
+
+// =============================================
+// Action 4b: Enviar archivo adjunto (media) manual al lead
+// Modo handoff/control manual. Espeja sendDirectMessage pero usa
+// el endpoint sendMedia de Evolution (mismo patrón que /api/n8n/reply).
+// =============================================
+
+const VALID_MEDIA_TYPES = ['image', 'video', 'audio', 'document'] as const
+type MediaType = (typeof VALID_MEDIA_TYPES)[number]
+
+export async function sendDirectMedia(
+  conversation_id: string,
+  media_url: string,
+  media_type: MediaType,
+  file_name: string,
+  mimetype?: string,
+  caption?: string
+): Promise<WhatsAppActionResult> {
+  try {
+    const { agency_id } = await getAgencyProfile()
+    const supabase = createClient()
+
+    if (!media_url) {
+      return { success: false, error: 'Falta la URL del archivo.' }
+    }
+
+    const safeMediaType: MediaType = VALID_MEDIA_TYPES.includes(media_type)
+      ? media_type
+      : 'document'
+
+    const evolutionUrl = process.env.EVOLUTION_API_URL
+    const evolutionKey = process.env.EVOLUTION_API_KEY
+
+    if (!evolutionUrl || !evolutionKey) {
+      return {
+        success: false,
+        error: 'Configuración de Evolution API incompleta.',
+      }
+    }
+
+    // Obtener instance_name de la agencia
+    const { data: instance, error: instanceError } = await supabase
+      .from('whatsapp_instances')
+      .select('instance_name, evo_instance_name, integration_type')
+      .eq('agency_id', agency_id)
+      .limit(1)
+      .single()
+
+    if (instanceError || !instance) {
+      return {
+        success: false,
+        error: 'No se encontró una instancia de WhatsApp configurada.',
+      }
+    }
+
+    // Obtener contact_phone y last_inbound_at de la conversación
+    const { data: conversation, error: convError } = await supabase
+      .from('wa_conversations')
+      .select('contact_phone, last_inbound_at')
+      .eq('id', conversation_id)
+      .single()
+
+    if (convError || !conversation) {
+      return { success: false, error: 'Conversación no encontrada.' }
+    }
+
+    // Validación de ventana de 24 horas (Reglas de Meta) — aplica también a media
+    if (conversation.last_inbound_at) {
+      const inboundTime = new Date(conversation.last_inbound_at).getTime()
+      const now = new Date().getTime()
+      const diffInHours = (now - inboundTime) / (1000 * 60 * 60)
+      if (diffInHours > 24) {
+        return {
+          success: false,
+          error: 'No se puede enviar el archivo: pasaron más de 24hs desde el último mensaje del cliente.',
+        }
+      }
+    } else {
+      return {
+        success: false,
+        error: 'No se puede enviar el archivo: el cliente aún no ha respondido.',
+      }
+    }
+
+    // Resolver mimetype si no vino del navegador (fallback por extensión / tipo)
+    const urlPath = media_url.split('?')[0]
+    const urlExt = urlPath.split('.').pop()?.toLowerCase() || ''
+    const mimeMap: Record<string, string> = {
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+      gif: 'image/gif', webp: 'image/webp', mp4: 'video/mp4',
+      mp3: 'audio/mpeg', ogg: 'audio/ogg', pdf: 'application/pdf',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      xls: 'application/vnd.ms-excel',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    }
+    const typeDefaultMime: Record<MediaType, string> = {
+      image: 'image/jpeg', video: 'video/mp4',
+      audio: 'audio/mpeg', document: 'application/pdf',
+    }
+    const resolvedMime = mimetype || mimeMap[urlExt] || typeDefaultMime[safeMediaType]
+    const cleanCaption = caption?.trim() || ''
+
+    // Enviar via Evolution API — endpoint sendMedia
+    const cleanPhone = conversation.contact_phone.replace(/\D/g, '')
+    const evoName = instance.evo_instance_name || instance.instance_name
+
+    const evoPayload: Record<string, unknown> = {
+      number: cleanPhone,
+      mediatype: safeMediaType,
+      mimetype: resolvedMime,
+      media: media_url,
+      fileName: file_name || urlPath.split('/').pop() || `archivo.${urlExt || 'bin'}`,
+    }
+    if (cleanCaption) evoPayload.caption = cleanCaption
+
+    const response = await fetch(
+      `${evolutionUrl}/message/sendMedia/${evoName}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: evolutionKey,
+        },
+        body: JSON.stringify(evoPayload),
+      }
+    )
+
+    const evoData = await response.json().catch(() => null)
+    const sendError = evolutionSendError(response, evoData)
+    if (sendError) {
+      return {
+        success: false,
+        error: `No se pudo enviar el archivo: ${sendError}`,
+      }
+    }
+
+    const wamid: string | null = evolutionWamid(evoData)
+
+    // Guardar mensaje en Supabase (role human, tipo = media)
+    const { data: insertedMsg, error: insertError } = await supabase
+      .from('wa_messages')
+      .insert({
+        conversation_id,
+        agency_id,
+        content: cleanCaption || media_url,
+        role: 'human',
+        message_type: safeMediaType,
+        wamid,
+        metadata: {
+          media_url,
+          file_name,
+          source: 'system_manual_chat',
+          agent_role: 'human_intervention',
+        },
+      })
+      .select()
+      .single()
+
+    if (insertError) {
+      return {
+        success: false,
+        error: `Archivo enviado pero error al guardar: ${insertError.message}`,
+      }
+    }
+
+    // Sincronizar con la memoria de n8n para que el agente sepa qué se envió
+    const fecha = new Date().toLocaleString('es-AR', {
+      timeZone: 'America/Argentina/Buenos_Aires',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).replace(',', '')
+
+    const memoriaMensaje = cleanCaption
+      ? `[Archivo adjunto enviado: ${file_name}] ${cleanCaption}`
+      : `[Archivo adjunto enviado: ${file_name}]`
+
+    await supabase
+      .from('n8n_chat_histories')
+      .insert({
+        session_id: conversation_id,
+        message: {
+          type: 'ai',
+          content: JSON.stringify({
+            output: {
+              Mensaje: memoriaMensaje,
+              Fecha: fecha,
+            },
+          }),
+          tool_calls: [],
+          additional_kwargs: {},
+          response_metadata: {
+            source: 'system_manual_chat',
+            agent_role: 'human_intervention',
+          },
+          invalid_tool_calls: [],
+        },
       })
 
     return { success: true, data: insertedMsg }
@@ -1736,7 +2019,7 @@ export async function updateMetaToken(
 
     const { data: instance, error } = await supabase
       .from('whatsapp_instances')
-      .select('id, phone_number_id, business_id')
+      .select('id, phone_number_id, business_id, integration_type, evo_instance_name, instance_name')
       .eq('agency_id', agency_id)
       .limit(1)
       .single()
@@ -1753,6 +2036,27 @@ export async function updateMetaToken(
 
     const updatePayload: Record<string, unknown> = { token, status: 'connected' }
     if (status.messaging_limit_tier) updatePayload.messaging_limit_tier = status.messaging_limit_tier
+
+    // Si la instancia usa Evolution, empujar el token nuevo también a Evolution.
+    // Evolution guarda su propia copia; sin esto queda desfasada y los envíos
+    // fallan con OAuthException aunque el token de la BD sea válido.
+    if (instance.integration_type === 'evolution' && instance.phone_number_id) {
+      try {
+        const created = await recreateEvolutionInstance({
+          instanceName: instance.instance_name || `prisma-${agency_id}`,
+          token,
+          phoneNumberId: instance.phone_number_id,
+          existingEvoName: instance.evo_instance_name,
+        })
+        updatePayload.evo_instance_name = created.evoInstanceName
+        updatePayload.evo_instance_id = created.evoInstanceId
+      } catch (e) {
+        return {
+          success: false,
+          error: `El token es válido pero no se pudo re-sincronizar con Evolution: ${e instanceof Error ? e.message : 'error desconocido'}`,
+        }
+      }
+    }
 
     const { error: updateError } = await supabase
       .from('whatsapp_instances')
