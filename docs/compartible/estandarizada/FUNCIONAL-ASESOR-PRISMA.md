@@ -184,6 +184,7 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 - Si tu director todavía no configuró WhatsApp, vas a ver un cartel de **"WhatsApp no configurado"** (esa configuración la hace el director, no vos).
 
 > 💡 **Tip:** cuando un cliente escribe, el bot de IA puede responder solo. Si tomás el control manual, el bot se pausa para esa conversación y no pisa tus respuestas.
+> 📎 **Enviar archivos:** con el chat en **control manual** (bot pausado), al lado de la caja de mensaje tenés un **clip 📎** para adjuntar una foto, un PDF, un audio o un video. El archivo queda **en espera** con una vista previa (podés **Cambiar** el archivo o **Quitarlo** con la ✕ si te equivocaste) y se manda recién cuando tocás **Enviar** — así podés escribir un texto para que vaya **junto al archivo**. Solo funciona dentro de las 24 hs desde el último mensaje del cliente (regla de WhatsApp).
 > 💡 Activá las **notificaciones push** en Configuración para enterarte al instante de mensajes nuevos.
 
 ### Avisos por email cuando un cliente avanza

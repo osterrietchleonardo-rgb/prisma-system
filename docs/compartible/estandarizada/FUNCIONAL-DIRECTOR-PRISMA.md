@@ -243,6 +243,7 @@ Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **
 
 > 💡 **Tip:** las plantillas de seguimiento deben estar **aprobadas por Meta** para que los flujos automáticos funcionen. PRISMA revisa el estado todos los días; cuando las 8 están aprobadas, se activan los flujos automáticos.
 > 💡 El bot responde solo cuando está activo; si un asesor toma el control manual de un chat, el bot se pausa para esa conversación.
+> 📎 **Enviar archivos en un chat:** con el chat en **control manual** (bot pausado), al lado de la caja de mensaje aparece un **clip 📎** para adjuntar foto, PDF, audio o video. El archivo queda **en espera** con vista previa (podés **Cambiarlo** o **Quitarlo** con la ✕) y se manda al tocar **Enviar**, pudiendo acompañarlo con un texto. Aplica tanto al director como a los asesores, y solo dentro de las 24 hs desde el último mensaje del cliente.
 
 ---
 
@@ -465,7 +466,7 @@ La pantalla se titula "Ajustes Generales". Tiene 5 pestañas:
 
 **4. Costos Meta**
 - El **panel de costos de WhatsApp** (gastos de la mensajería de Meta).
-- **Token de Meta:** muestra si tu token está **válido o vencido**, tu **límite diario real** (leído de Meta) y un campo para **pegar el token permanente** (System User) sin reconectar. Si "Costos" o "Sincronizar plantillas" fallan, casi siempre es el token vencido: lo actualizás acá.
+- **Token de Meta:** muestra si tu token está **válido o vencido**, tu **límite diario real** (leído de Meta) y un campo para **pegar el token permanente** (System User) sin reconectar. Si "Costos", "Sincronizar plantillas" **o el envío de mensajes** fallan, casi siempre es el token vencido: lo actualizás acá. Al **"Guardar y validar"**, PRISMA además **reconecta WhatsApp con el token nuevo automáticamente** (se corta la conexión unos segundos y vuelve; **no se pierde ningún chat ni lead**), así los mensajes vuelven a salir enseguida.
 
 **5. Acceso & Seguridad**
 - **Restablecer contraseña** (te llega un link).

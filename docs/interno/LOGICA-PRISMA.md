@@ -560,6 +560,17 @@ Evolution API actúa como intermediario entre PRISMA y WhatsApp Business.
    })
    ```
 
+#### 8.1.2.b Envío manual en handoff (control humano)
+
+Cuando el asesor/director pausa el bot y responde a mano desde la bandeja (`ActiveChat.tsx`, compartida por ambos roles), no pasa por n8n: son server actions directas en `app/actions/whatsapp.ts`.
+
+- **Texto:** `sendDirectMessage(conv_id, texto)` → Evolution `sendText`.
+- **Archivos adjuntos:** `sendDirectMedia(conv_id, media_url, media_type, file_name, mimetype?, caption?)` → Evolution `sendMedia`. La bandeja sube el archivo a Storage (`documents`, prefijo `wa-outbound/…`), obtiene la URL pública y lo manda; el adjunto queda **en espera con vista previa** y se envía al tocar Enviar, con el texto como pie de foto.
+- Ambas validan la **ventana de 24 h** de Meta y espejan la respuesta en `n8n_chat_histories` (para que el bot sepa qué se dijo al reactivarse).
+- **Silent-fail resuelto:** Evolution puede responder `HTTP 201` con un **error de Meta en el body** (token vencido → `code:190`); el helper `evolutionSendError` detecta ese caso y ya **no** se da por enviado un mensaje que no llegó.
+
+> ⚠️ **Token propio de Evolution:** en modo `WHATSAPP-BUSINESS`, Evolution guarda su **propia copia** del token de Meta. Renovar el token con `updateMetaToken` **debe** re-empujarlo a Evolution (helper `recreateEvolutionInstance`), si no queda desfasado y todos los envíos fallan con `code:190` aunque el token de la BD sea válido.
+
 #### 8.1.3 Envío de Templates
 
 **Endpoint:** `POST /api/whatsapp/dispatch`  

@@ -7,6 +7,7 @@ import type { WAConversation, WAMessage, WhatsAppInstance } from "@/types/whatsa
 import {
   toggleBotActive,
   sendDirectMessage,
+  sendDirectMedia,
   addInternalNote,
   updateEtiquetas,
 } from "@/app/actions/whatsapp"
@@ -22,6 +23,7 @@ import {
   User,
   Info,
   RefreshCw,
+  Paperclip,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -93,6 +95,13 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   const [sending, setSending] = useState(false)
   const [sendingNote, setSendingNote] = useState(false)
   const [switchingBot, setSwitchingBot] = useState(false)
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [pendingFile, setPendingFile] = useState<{
+    file: File
+    previewUrl: string
+    mediaType: 'image' | 'video' | 'audio' | 'document'
+  } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Tag popover
   const [tagOpen, setTagOpen] = useState(false)
@@ -108,6 +117,14 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   useEffect(() => {
     setConv(initialConv)
   }, [initialConv])
+
+  // Al cambiar de conversación, descartar cualquier archivo en espera
+  useEffect(() => {
+    setPendingFile((prev) => {
+      if (prev) URL.revokeObjectURL(prev.previewUrl)
+      return null
+    })
+  }, [conv.id])
 
   // Load messages
   useEffect(() => {
@@ -356,6 +373,132 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
       setMessages(prev => prev.map(m => m.id === tempId ? (result.data as WAMessage) : m))
     }
     setSending(false)
+  }
+
+  const detectMediaType = (mime: string): 'image' | 'video' | 'audio' | 'document' => {
+    if (mime.startsWith('image/')) return 'image'
+    if (mime.startsWith('video/')) return 'video'
+    if (mime.startsWith('audio/')) return 'audio'
+    return 'document'
+  }
+
+  const handlePickFile = () => {
+    if (uploadingFile || sending) return
+    fileInputRef.current?.click()
+  }
+
+  // Selección de archivo: solo lo deja EN ESPERA (no lo envía todavía)
+  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    // Reset para poder volver a elegir/cambiar el mismo archivo luego
+    if (e.target) e.target.value = ""
+    if (!file || uploadingFile) return
+
+    const mediaType = detectMediaType(file.type || "")
+
+    // Límites de WhatsApp por tipo (bytes)
+    const sizeLimits: Record<string, number> = {
+      image: 5 * 1024 * 1024,
+      video: 16 * 1024 * 1024,
+      audio: 16 * 1024 * 1024,
+      document: 100 * 1024 * 1024,
+    }
+    if (file.size > sizeLimits[mediaType]) {
+      const mb = Math.round(sizeLimits[mediaType] / (1024 * 1024))
+      toast.error(`El archivo supera el límite de ${mb}MB para ${mediaType}.`)
+      return
+    }
+
+    // Reemplaza cualquier archivo en espera (revoca el preview anterior)
+    setPendingFile((prev) => {
+      if (prev) URL.revokeObjectURL(prev.previewUrl)
+      return { file, previewUrl: URL.createObjectURL(file), mediaType }
+    })
+  }
+
+  const handleRemovePendingFile = () => {
+    setPendingFile((prev) => {
+      if (prev) URL.revokeObjectURL(prev.previewUrl)
+      return null
+    })
+  }
+
+  // Envía el archivo en espera con el texto actual como caption
+  const handleSendPendingFile = async () => {
+    if (!pendingFile || uploadingFile) return
+    const { file, mediaType } = pendingFile
+    const caption = msgText.trim()
+    setUploadingFile(true)
+
+    // Optimistic insert
+    const tempId = crypto.randomUUID()
+    const localUrl = URL.createObjectURL(file)
+    const optimisticMsg: WAMessage = {
+      id: tempId,
+      conversation_id: conv.id,
+      agency_id: instance.agency_id,
+      content: caption || localUrl,
+      role: 'human',
+      message_type: mediaType,
+      wamid: null,
+      created_at: new Date().toISOString(),
+      metadata: { optimistic: true, media_url: localUrl, file_name: file.name },
+    }
+    setMessages(prev => [...prev, optimisticMsg])
+    setMsgText("")
+    handleRemovePendingFile()
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50)
+
+    let storagePath = ""
+    try {
+      const supabase = createClient()
+      const safeName = file.name.replace(/[^\w.\-]+/g, "_")
+      storagePath = `wa-outbound/${instance.agency_id}/${conv.id}/${Date.now()}-${safeName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(storagePath, file, { upsert: false, contentType: file.type || undefined })
+
+      if (uploadError) throw new Error(uploadError.message)
+
+      const { data: pub } = supabase.storage.from("documents").getPublicUrl(storagePath)
+
+      const result = await sendDirectMedia(
+        conv.id,
+        pub.publicUrl,
+        mediaType,
+        file.name,
+        file.type || undefined,
+        caption || undefined
+      )
+
+      if (!result.success) {
+        // Rollback: borra el archivo subido y el optimista, y restaura el caption
+        await supabase.storage.from("documents").remove([storagePath]).catch(() => {})
+        setMessages(prev => prev.filter(m => m.id !== tempId))
+        if (caption) setMsgText(caption)
+        toast.error(result.error || "Error al enviar el archivo")
+      } else if (result.data) {
+        setMessages(prev => prev.map(m => m.id === tempId ? (result.data as WAMessage) : m))
+      }
+    } catch (err) {
+      setMessages(prev => prev.filter(m => m.id !== tempId))
+      if (caption) setMsgText(caption)
+      toast.error(err instanceof Error ? err.message : "Error al subir el archivo")
+    } finally {
+      URL.revokeObjectURL(localUrl)
+      setUploadingFile(false)
+    }
+  }
+
+  // Acción unificada del botón Enviar / Enter: si hay archivo en espera lo manda,
+  // si no, envía el texto.
+  const handleSend = () => {
+    if (pendingFile) {
+      handleSendPendingFile()
+    } else {
+      handleSendMessage()
+    }
   }
 
   const handleAddNote = async () => {
@@ -728,28 +871,96 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                   : false;
 
                 return is24hWindowOpen ? (
-                  <div className="flex gap-2">
-                    <Textarea
-                      value={msgText}
-                      aria-label="Mensaje al lead"
-                      onChange={(e) => setMsgText(e.target.value)}
-                      placeholder="Escribe un mensaje al lead..."
-                      rows={2}
-                      className="resize-none text-sm flex-1"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault()
-                          handleSendMessage()
-                        }
-                      }}
+                  <div className="flex flex-col gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={handleFileSelected}
+                      accept="image/*,video/*,audio/*,application/pdf,.doc,.docx,.xls,.xlsx"
                     />
-                    <Button
-                      onClick={handleSendMessage}
-                      disabled={!msgText.trim() || sending}
-                      className="bg-accent hover:bg-accent/90 text-white self-end h-10 w-10 p-0"
-                    >
-                      <Send className="w-4 h-4" />
-                    </Button>
+
+                    {/* Archivo en espera (se envía al tocar Enviar) */}
+                    {pendingFile && (
+                      <div className="flex items-center gap-3 rounded-lg border border-accent/30 bg-accent/5 p-2">
+                        {pendingFile.mediaType === 'image' ? (
+                          <img
+                            src={pendingFile.previewUrl}
+                            alt="Vista previa"
+                            className="w-12 h-12 rounded-md object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-md bg-accent/10 flex items-center justify-center flex-shrink-0">
+                            <Paperclip className="w-5 h-5 text-accent" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{pendingFile.file.name}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {(pendingFile.file.size / 1024).toFixed(0)} KB · listo para enviar
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handlePickFile}
+                          disabled={uploadingFile}
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-accent"
+                          title="Cambiar archivo"
+                        >
+                          Cambiar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleRemovePendingFile}
+                          disabled={uploadingFile}
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          title="Quitar archivo"
+                          aria-label="Quitar archivo"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={handlePickFile}
+                        disabled={uploadingFile || sending}
+                        className="self-end h-10 w-10 p-0 text-muted-foreground hover:text-accent"
+                        title="Adjuntar archivo"
+                        aria-label="Adjuntar archivo"
+                      >
+                        <Paperclip className="w-4 h-4" />
+                      </Button>
+                      <Textarea
+                        value={msgText}
+                        aria-label="Mensaje al lead"
+                        onChange={(e) => setMsgText(e.target.value)}
+                        placeholder={pendingFile ? "Agrega un mensaje al archivo (opcional)..." : "Escribe un mensaje o adjunta un archivo..."}
+                        rows={2}
+                        className="resize-none text-sm flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault()
+                            handleSend()
+                          }
+                        }}
+                      />
+                      <Button
+                        onClick={handleSend}
+                        disabled={(!msgText.trim() && !pendingFile) || sending || uploadingFile}
+                        className="bg-accent hover:bg-accent/90 text-white self-end h-10 w-10 p-0"
+                      >
+                        {uploadingFile ? (
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-md text-xs text-center border border-red-100 dark:border-red-900/50">
@@ -910,10 +1121,17 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
         <div className="max-w-[70%]">
           <div className="flex items-center gap-1.5 mb-1">
             <User className="w-3 h-3 text-primary" />
-            <span className="text-xs font-semibold text-primary">Director</span>
+            <span className="text-xs font-semibold text-primary">Equipo</span>
           </div>
-          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl rounded-bl-sm px-4 py-2.5">
-            <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+          <div className="bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-2xl rounded-bl-sm overflow-hidden">
+            {isMedia && <div className="p-1"><MediaContent msg={msg} /></div>}
+            {msg.content && msg.content !== (msg.metadata as any)?.media_url && (
+              <p className={`text-sm whitespace-pre-wrap break-words ${isMedia ? 'px-4 pb-2.5 pt-1' : 'px-4 py-2.5'
+                }`}>{msg.content}</p>
+            )}
+            {!isMedia && !msg.content && (
+              <p className="text-sm px-4 py-2.5 text-muted-foreground italic">Mensaje multimedia</p>
+            )}
           </div>
           <p className="text-[10px] text-muted-foreground mt-1">{time}</p>
         </div>
