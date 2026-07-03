@@ -66,7 +66,8 @@ export default function BandejasClient() {
     if (q) params.set("q", q)
     if (agencyId) params.set("agency_id", agencyId)
     if (estado) params.set("estado", estado)
-    const res = await fetch(`/api/admin-vakdor/bandejas?${params}`)
+    // cache: no-store → siempre pega a la base, nunca a una respuesta vieja del navegador
+    const res = await fetch(`/api/admin-vakdor/bandejas?${params}`, { cache: "no-store" })
     const data = await res.json()
     setConversations(data.data || [])
     setTotal(data.total || 0)
@@ -85,7 +86,7 @@ export default function BandejasClient() {
       if (q) params.set("q", q)
       if (agencyId) params.set("agency_id", agencyId)
       if (estado) params.set("estado", estado)
-      const res = await fetch(`/api/admin-vakdor/bandejas?${params}`)
+      const res = await fetch(`/api/admin-vakdor/bandejas?${params}`, { cache: "no-store" })
       if (!res.ok) return
       const data = await res.json()
       setConversations(data.data || [])
@@ -156,7 +157,29 @@ export default function BandejasClient() {
           <option value="pending">Pendientes</option>
           <option value="closed">Cerrados</option>
         </select>
+        <button
+          onClick={fetchConversations}
+          disabled={loading}
+          title="Consultar la base y traer los chats al instante"
+          style={{
+            ...inputStyle,
+            display: "flex",
+            alignItems: "center",
+            gap: 7,
+            background: "rgba(99,102,241,0.15)",
+            border: "1px solid rgba(99,102,241,0.3)",
+            color: "#a5b4fc",
+            fontWeight: 600,
+            cursor: loading ? "not-allowed" : "pointer",
+            opacity: loading ? 0.6 : 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          <span style={{ display: "inline-block", animation: loading ? "spin 0.8s linear infinite" : "none" }}>↻</span>
+          {loading ? "Actualizando..." : "Actualizar"}
+        </button>
       </div>
+      <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
 
       {/* Table */}
       <div style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden" }}>

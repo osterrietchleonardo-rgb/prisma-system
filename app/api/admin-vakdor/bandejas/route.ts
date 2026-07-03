@@ -76,11 +76,14 @@ export async function GET(request: NextRequest) {
     }
   })
 
-  return NextResponse.json({
-    data,
-    total: count || 0,
-    page,
-    perPage,
-    agencies: agencies || [],
-  })
+  return NextResponse.json(
+    {
+      data,
+      total: count || 0,
+      page,
+      perPage,
+      agencies: agencies || [],
+    },
+    { headers: { "Cache-Control": "no-store, max-age=0" } }
+  )
 }
