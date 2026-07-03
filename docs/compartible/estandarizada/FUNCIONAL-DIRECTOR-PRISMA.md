@@ -371,11 +371,11 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 **Cómo usarlo:**
 1. **Elegí la propiedad a analizar:** a mano, desde la **cartera** (con **buscador**: escribís parte del título, dirección o zona y filtra al toque, ideal cuando tenés muchas propiedades) o pegando un **link** de portal (botón **Analizar**, extrae los datos solos).
 2. Elegí **operación** (Venta/Alquiler) y **Buscar comparables**.
-3. Resultados en dos bloques (**Cartera de tu agencia** y **Red de colaboración**), cada comparable con su **%** y el **checklist** (zona, superficie, ambientes, baños, amenities, tipo, operación). El **precio** va al costado, **fuera del %**.
+3. Resultados en dos bloques (**Cartera de tu agencia** y **Red de colaboración**), cada comparable con su **%** y el **checklist** (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo, operación). El **precio** va al costado, **fuera del %**.
 
 > ℹ️ Si cambiás de modo (a mano / cartera / link), el formulario **se limpia** para no mezclar datos de una carga con otra.
 
-> 💡 Tipo y operación son filtros estrictos; la zona es lo que más pesa del puntaje. Los comparables salen de **tu cartera** y de la **red de colaboración**.
+> 💡 Tipo, operación **y barrio** son filtros estrictos: **todos los comparables son del mismo barrio** que la propiedad analizada (reconoce sub-barrios como Belgrano R/C y no le afectan los acentos). El **checklist compara todo lo que tiene dato real** (suma **dormitorios** y **antigüedad**; si falta un dato, dice "sin dato" y no baja el puntaje). Trae **hasta 50 por bloque**, ordenados por comparabilidad, de **tu cartera** y de la **red de colaboración**.
 > 💰 No consume créditos por buscar comparables.
 
 ---

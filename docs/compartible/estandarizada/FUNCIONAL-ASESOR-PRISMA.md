@@ -344,10 +344,11 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 > ℹ️ Si cambiás de forma de carga (a mano / cartera / link), el formulario **se limpia** para no mezclar datos de una con otra.
 2. Elegí la **operación** (Venta / Alquiler) y apretá **Buscar comparables**.
-3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (zona, superficie, ambientes, baños, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
+3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
 
-> 💡 El **tipo de propiedad** y la **operación** son filtros estrictos: solo trae comparables del mismo tipo y la misma operación. La **zona** es lo que más pesa del puntaje.
-> 💡 Para **venta**, la mayoría de los comparables salen de tu propia cartera.
+> 💡 El **tipo**, la **operación** y ahora también el **barrio** son filtros estrictos: **todos los comparables son del mismo barrio** que la propiedad que analizás (si es de Belgrano, todos de Belgrano). Reconoce los sub-barrios (Belgrano R/C cuentan como Belgrano) y no le molestan los acentos (Nuñez = Núñez).
+> 💡 El **checklist compara todo lo que tiene dato real**: además de zona/superficie/ambientes/baños/amenities, ahora suma **dormitorios** y **antigüedad**. Si de un comparable falta un dato, ese renglón dice "sin dato" y no baja el puntaje.
+> 💡 Trae **hasta 50 comparables por bloque** (cartera y red), ordenados por comparabilidad (los mejores arriba). Para **venta**, la mayoría suele salir de tu propia cartera.
 > 💰 Buscar comparables **no consume créditos**.
 
 ---
