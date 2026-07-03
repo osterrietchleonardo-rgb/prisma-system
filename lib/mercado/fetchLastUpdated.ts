@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 export async function fetchLastUpdated(): Promise<string | null> {
   try {
     const supabase = createClient()
-    const tablas = ['mercado_icc', 'mercado_zonas', 'mercado_barrios'] as const
+    const tablas = ['mercado_icc', 'mercado_zonas', 'mercado_barrios', 'mercado_cierre_mensual', 'mercado_escrituras'] as const
 
     const results = await Promise.all(
       tablas.map((t) =>

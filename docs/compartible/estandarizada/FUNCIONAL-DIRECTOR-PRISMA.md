@@ -112,13 +112,14 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 **Qué es:** tablero de comando con datos reales del mercado argentino.
 
-**Qué muestra:** dólar (tiempo real), ICC, precios Zonaprop por zona, precio m² por barrio (Mudafy) y escrituras CABA (Colegio de Escribanos). Cada dato con su **fecha real de actualización**.
+**Qué muestra:** dólar (tiempo real), **precio de cierre real** en CABA por ambientes (operaciones concretadas, estudio REMAX + Universidad del CEMA) con la brecha vs. lo publicado, gráfico de evolución **publicado vs. cierre real**, precios Zonaprop por zona, precio m² por barrio (lista Mudafy + cierre estimado con la brecha real del mes), ICC y escrituras CABA (Colegio de Escribanos). Cada dato con su **fecha real de actualización**.
 
 **Cómo usarlo:**
-- Botón **"Actualizar"** para refrescar las fuentes (se sincronizan una por una).
+- Botón **"Actualizar"** para refrescar todas las fuentes (se sincronizan en paralelo).
 - Si una fuente dice "Sin datos", es porque no publicó el dato. PRISMA **no inventa** cifras.
+- El **cierre real** y su brecha son el mejor respaldo para revisar tasaciones del equipo y alinear expectativas de propietarios.
 
-> 💡 **Tip:** úsalo en reuniones y capacitaciones para fundamentar precios con datos oficiales.
+> 💡 **Tip:** úsalo en reuniones y capacitaciones para fundamentar precios con datos oficiales — y la brecha publicado/cierre para explicar por qué sobretasar atrasa la venta.
 
 ---
 

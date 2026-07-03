@@ -3,6 +3,7 @@ export const maxDuration = 60
 
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { syncUcema } from '@/lib/mercado/ucemaSync'
 import * as XLSX from 'xlsx'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse-fork')
@@ -171,17 +172,22 @@ async function parsearZonaPDF(buffer: Buffer): Promise<ZonaParsed | null> {
   const { text } = await pdfParse(buffer)
   if (!text) return null
 
-  // Precio m² — ancla fuerte: "USD 2.460 por m2"
-  const precioMatch = text.match(/USD\s*([\d.,]+)\s*por\s*m2/i)
+  // Precio m² — ancla fuerte. Algunos PDFs usan "m²" (superíndice) en vez de
+  // "m2". Preferir la oración del precio medio de departamentos: el match
+  // genérico puede caer en el heat map ("máximo en Puerto Madero con USD 6.152").
+  const precioMatch =
+    text.match(/precio\s+medio\s+de\s+los\s+departamentos[\s\S]{0,80}?USD\s*([\d.,]+)\s*por\s*m[2²]/i) ??
+    text.match(/USD\s*([\d.,]+)\s*por\s*m[2²]/i)
   const precio = parseEntero(precioMatch?.[1])
   if (precio === null) return null // sin precio confiable, no vale la pena grabar
 
-  // Variación interanual — anclada a "últimos 12/doce meses", con detección de signo.
+  // Variación interanual — anclada a "últimos 12/doce meses", con detección de
+  // signo. Se descartan los "incrementos nominales" (van en pesos, no USD).
   let varAnual: number | null = null
   const anualMatch = text.match(
     /[úu]ltimos\s+(?:12|doce)\s+meses[^%]{0,40}?\b(sube|aumenta|registra|crece|cae|baja|disminuye|ca[íi]da)\b[^%\d+-]*([+-]?[\d.,]+)\s*%/i
   )
-  if (anualMatch) {
+  if (anualMatch && !/nominal/i.test(anualMatch[0])) {
     const base = parsePct(anualMatch[2])
     if (base !== null) {
       const negativo = /cae|baja|disminuye|ca[íi]da/i.test(anualMatch[1])
@@ -193,8 +199,13 @@ async function parsearZonaPDF(buffer: Buffer): Promise<ZonaParsed | null> {
   let varMensual: number | null = null
   if (precioMatch) {
     const idx = text.indexOf(precioMatch[0])
-    const seg = text.slice(idx, idx + 200)
-    if (/estable/i.test(seg)) {
+    const seg = text.slice(idx, idx + 250)
+    // redacción nueva: "con una suba/baja mensual de 0.2%"
+    const mensualDe = seg.match(/\b(suba|baja|ca[íi]da)\s+mensual\s+de\s+([+-]?[\d.,]+)\s*%/i)
+    if (mensualDe) {
+      const base = parsePct(mensualDe[2])
+      if (base !== null) varMensual = /baja|ca[íi]da/i.test(mensualDe[1]) ? -Math.abs(base) : base
+    } else if (/estable/i.test(seg)) {
       varMensual = 0
     } else {
       const mm = seg.match(/\b(sube|aumenta|cae|baja|disminuye)\b[^%\d+-]*([+-]?[\d.,]+)\s*%\s+en\s+(?:el\s+mes|[a-zé]+)/i)
@@ -514,6 +525,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ timestamp, results: { mudafy: await syncMudafy(supabase) } })
     case 'escrituras':
       return NextResponse.json({ timestamp, results: { escrituras: await syncEscrituras(supabase) } })
+    case 'ucema':
+      return NextResponse.json({ timestamp, results: { ucema: await syncUcema(supabase) } })
     case 'zonaprop': {
       const zona = searchParams.get('zona') ?? 'CABA'
       const periodo = searchParams.get('periodo')
@@ -522,13 +535,14 @@ export async function GET(req: Request) {
     }
     default: {
       // Modo "todo" (cron). Lento; no usado por el botón en Hobby.
-      const [icc, zonaprop, mudafy, escrituras] = await Promise.all([
+      const [icc, zonaprop, mudafy, escrituras, ucema] = await Promise.all([
         syncICC(supabase),
         syncZonaprop(supabase),
         syncMudafy(supabase),
         syncEscrituras(supabase),
+        syncUcema(supabase),
       ])
-      return NextResponse.json({ timestamp, results: { icc, zonaprop, mudafy, escrituras } })
+      return NextResponse.json({ timestamp, results: { icc, zonaprop, mudafy, escrituras, ucema } })
     }
   }
 }

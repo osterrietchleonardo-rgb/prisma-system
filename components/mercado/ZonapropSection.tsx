@@ -119,44 +119,6 @@ function ZonaCard({ zona }: { zona: ZonaResult }) {
             </div>
           )}
 
-          {/* Barrios sub-table */}
-          {zona.barrios.length > 0 && (
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
-                Barrios destacados
-              </p>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left pb-1 text-muted-foreground font-medium">Barrio</th>
-                    <th className="text-right pb-1 text-muted-foreground font-medium">USD/m²</th>
-                    <th className="text-right pb-1 text-muted-foreground font-medium">Var.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {zona.barrios.slice(0, 8).map((b) => (
-                    <tr key={b.nombre} className="border-b border-border/30">
-                      <td className="py-1">{b.nombre}</td>
-                      <td className="py-1 text-right font-semibold text-violet-400 tabular-nums">
-                        {b.precio_m2_usd.toLocaleString("es-AR")}
-                      </td>
-                      <td className="py-1 text-right">
-                        {b.variacion_pct !== null ? (
-                          <span className={b.variacion_pct >= 0 ? "text-emerald-400" : "text-red-400"}>
-                            {b.variacion_pct >= 0 ? "+" : ""}
-                            {b.variacion_pct}%
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
           {/* PDF link */}
           {zona.url_pdf && (
             <a

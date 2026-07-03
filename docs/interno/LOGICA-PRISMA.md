@@ -255,7 +255,7 @@ Endpoint que los layouts consultan para verificar si la cuenta sigue activa. Ret
 | Sección | Ruta | Descripción |
 |---|---|---|
 | Dashboard | `/director/dashboard` | KPIs, métricas, resumen |
-| Pulso de Mercado | `/director/mercado` | Dólar, ICC, Zonaprop, barrios, escrituras |
+| Pulso de Mercado | `/director/mercado` | Dólar, cierre real (REMAX+UCEMA), ICC, Zonaprop, barrios, escrituras |
 | Pipeline | `/director/pipeline` | Tablero Kanban de leads |
 | Propiedades | `/director/propiedades` | Cartera de propiedades (Tokko) |
 | Tracking Performance | `/director/tracking-performance` | Rendimiento de asesores |
@@ -1202,6 +1202,7 @@ Se corrigieron problemas de la vista de celular del wizard (afecta asesor y dire
 | `zonaprop&zona=GBA_SUR&periodo=YYYY-MM` | GBA Sur (barre día del mes dado) |
 | `mudafy` | Precios de oferta por barrio |
 | `escrituras` | Escrituras CABA |
+| `ucema` | Cierre real CABA general + 1/2/3 amb (Índice Real m2 by REMAX y UCEMA) |
 | _(sin `source`)_ | Modo "todo" (cron); lento, no usado por el botón en Hobby |
 
 En producción requiere `?secret=CRON_SECRET` solo cuando se pasa secret (cron).
@@ -1224,14 +1225,25 @@ carpeta del mes **N+1**: `.../{N+1 año}/{N+1 mes}/{slug}_{N año}-{N mes}.pdf`.
   confirmado por las estándar).
 - Parser conservador (`pdf-parse-fork`): precio USD/m², variación interanual con
   signo, alquileres 2/3 amb. Lo no inequívoco → `null`.
+- **Blindajes del parser (jul-2026, verificados contra PDFs reales):** (a) acepta
+  "m²" superíndice además de "m2" y ancla primero en la oración del *precio medio
+  de los departamentos* — sin esto el PDF de feb-2026 devolvía el máximo del heat
+  map (Puerto Madero USD 6.152) como precio de CABA; (b) descarta variaciones
+  "nominales" (van en pesos, no USD — el PDF de mar-2026 decía "incremento nominal
+  de 34.7%"); (c) reconoce la redacción nueva "con una suba/baja mensual de X%".
 - **Histórico:** upsert por `(zona, mes_reporte)` → una fila por mes (constraint
   `mercado_zonas_zona_mes_unique`). Los consumidores leen el último mes por zona.
+  El histórico 2026 de CABA (ene–jun) fue **backfilleado desde los PDFs reales**;
+  se eliminaron 3 filas legacy sembradas a mano con valores falsos (CABA ene-2026
+  decía 2.309; el PDF real dice 2.450).
 
 ### 16.3 Mudafy (precios de oferta por barrio) → `mercado_barrios`
 
 **Fuente:** tabla HTML estática de `mudafy.com.ar` (Barrio · Comuna · Valor m² USD).
-`UPDATE` por barrio de `precio_m2_usd` (45 barrios). No toca `precio_cierre_m2_usd`
-(precios de cierre, dato real cargado aparte).
+`UPDATE` por barrio de `precio_m2_usd` (45 barrios). La columna `precio_cierre_m2_usd`
+quedó **discontinuada en NULL** (eran 8 valores redondos cargados a mano, sin fuente
+verificable): el cierre por barrio que muestra la UI es **estimado** = lista × la
+brecha real publicado/cierre del mes (REMAX+UCEMA), rotulado como estimación.
 
 ### 16.4 Escrituras CABA → `mercado_escrituras`
 
@@ -1240,15 +1252,46 @@ carpeta del mes **N+1**: `.../{N+1 año}/{N+1 mes}/{slug}_{N año}-{N mes}.pdf`.
 actos, monto, variación mensual/interanual y upsert por `periodo`. El acumulado
 anual (YTD) se calcula en query, no se almacena.
 
-### 16.5 Lectura / consumo
+### 16.5 Cierre real REMAX+UCEMA → `mercado_cierre_mensual` + `mercado_stats`
+
+**Fuente:** "Índice Real m2 by REMAX y UCEMA" (respaldo de Reporte Inmobiliario) —
+PDF mensual en `ucema.edu.ar` con **precios efectivos de operaciones concretadas**
+en CABA: general + 1/2/3 ambientes + brecha % publicado/cierre, serie desde 2020.
+Es el mismo estudio que Remax publica como "índice Remax". Código: `lib/mercado/ucemaSync.ts`.
+
+- **URL:** `/sites/default/files/{YYYY-MM pub}/Informe_M2_Real_{Mes}_{YYYY}.pdf`;
+  dato del mes M se publica en carpeta M+1 (a veces M+2; hay meses salteados, ej.
+  abr-2026). Cada informe trae la serie completa → basta encontrar el más reciente.
+- **Parser GEOMÉTRICO** (coordenadas de pdf.js vía `pagerender` de `pdf-parse-fork`):
+  el texto plano sale en orden de dibujo arbitrario y las etiquetas de año tienen
+  capas superpuestas (un "2025" debajo de un "2026") → no son confiables. En cambio:
+  cada tabla ancla en su item "Mes" (meses/valores/% comparten fila `y`); en páginas
+  de a pares la tabla **izquierda es el año más nuevo**; la tabla parcial (<12 meses)
+  es el año del informe y debe tener exactamente tantos meses como el mes del
+  informe. Validado **30/30** contra las ediciones de Mayo y Febrero 2026; el `N/A`
+  de abr-2020 (pandemia) se respeta como null.
+- **Escribe:** serie completa → `mercado_cierre_mensual` (periodo PK, migración
+  `20260703150000`); último mes por segmento → `mercado_stats`
+  (`promedio_caba_cierre` / `monoambiente_cierre` / `dos_ambientes_cierre` /
+  `tres_ambientes_cierre`, con variaciones mensual/interanual **calculadas de la
+  serie**). Esto también alimenta la **ficha pública del ACM** (banner de pulso),
+  que antes usaba valores manuales de mar-2026.
+
+### 16.6 Lectura / consumo
 
 - `GET /api/mercado/zonaprop` y los pages → último `mes_reporte` por zona.
-- `lib/mercado/fetchBarrios.ts` → barrios + **serie histórica del gráfico** (precio
-  m² CABA por mes desde `mercado_zonas`, crece con cada sync).
+- `lib/mercado/fetchBarrios.ts` → barrios lista (fuente+fecha reales de la DB) +
+  **serie histórica lista** (precio m² CABA por mes desde `mercado_zonas`).
+- `lib/mercado/fetchCierre.ts` → serie de cierre + último mes por segmento con
+  variaciones calculadas; alimenta el KPI "Cierre real", la sección por ambientes,
+  la línea verde del gráfico (lista vs cierre) y la **brecha** con la que la tabla
+  de barrios estima el cierre por barrio.
 - `lib/mercado/fetchEscrituras.ts` → último mes + acumulado YTD.
-- `lib/mercado/fetchLastUpdated.ts` → `max(fecha_actualizacion)` real (no la hora de
-  render) para "Datos de mercado actualizados".
+- `lib/mercado/fetchLastUpdated.ts` → `max(fecha_actualizacion)` real entre las 5
+  tablas de mercado (no la hora de render) para "Datos de mercado actualizados".
 - `GET /api/mercado/refresh` → revalida la caché (`revalidateTag('mercado')`).
+- **UI sin textos de fecha/fuente hardcodeados:** tooltips, footers y períodos salen
+  de la DB (antes decían "Mudafy Enero 2026", "Q1 2026", "Marzo 2026" fijos).
 
 ---
 

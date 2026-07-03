@@ -10,11 +10,17 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts"
-import { HistoricalMonthData } from "@/lib/mercado/fetchBarrios"
 import { AlertTriangle } from "lucide-react"
 
+export interface EvolutionPoint {
+  label: string          // 'Ene 26'
+  periodo: string        // '2026-01'
+  lista: number | null   // USD/m² publicado (Zonaprop Index CABA)
+  cierre: number | null  // USD/m² cierre real (REMAX + UCEMA)
+}
+
 interface EvolutionChartProps {
-  historical: HistoricalMonthData[]
+  data: EvolutionPoint[]
 }
 
 const CustomTooltip = ({
@@ -43,23 +49,23 @@ const CustomTooltip = ({
   )
 }
 
-export function EvolutionChart({ historical }: EvolutionChartProps) {
-  const hasData = historical.length >= 2
+export function EvolutionChart({ data }: EvolutionChartProps) {
+  const hasData = data.length >= 2
 
   return (
     <div className="rounded-2xl border bg-card/50 backdrop-blur p-6">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
-            Evolución Precio m² CABA
+            Evolución Precio m² CABA — Lista vs. Cierre real
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Precio m² venta (USD) · CABA · Zonaprop Index
+            Lista: Zonaprop Index · Cierre real: REMAX + UCEMA (operaciones concretadas)
           </p>
         </div>
         {hasData && (
           <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full shrink-0">
-            {historical.length} meses
+            {data.length} meses
           </span>
         )}
       </div>
@@ -72,50 +78,55 @@ export function EvolutionChart({ historical }: EvolutionChartProps) {
       ) : (
         <ResponsiveContainer width="100%" height={280}>
           <LineChart
-            data={historical}
+            data={data}
             margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+              tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)" }}
+              axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
               tickLine={false}
-              axisLine={false}
-              interval={historical.length > 12 ? 1 : 0}
             />
             <YAxis
-              tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+              domain={["dataMin - 60", "dataMax + 60"]}
+              tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)" }}
+              axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
               tickLine={false}
-              axisLine={false}
-              tickFormatter={(v) => `$${(v / 1000).toFixed(1)}k`}
-              width={48}
-              domain={["auto", "auto"]}
+              tickFormatter={(v: number) => `${v.toLocaleString("es-AR")}`}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend
-              wrapperStyle={{ fontSize: "11px", paddingTop: "12px" }}
-              formatter={(value) => (
-                <span style={{ color: "hsl(var(--muted-foreground))" }}>{value}</span>
+              wrapperStyle={{ fontSize: 11 }}
+              formatter={(value: string) => (
+                <span style={{ color: "rgba(255,255,255,0.7)" }}>{value}</span>
               )}
             />
             <Line
               type="monotone"
-              dataKey="promedio_caba_usd"
-              name="CABA Promedio"
-              stroke="#a78bfa"
-              strokeWidth={2.5}
-              dot={historical.length <= 24 ? { r: 3, fill: "#a78bfa", strokeWidth: 0 } : false}
-              activeDot={{ r: 5, strokeWidth: 0 }}
+              dataKey="lista"
+              name="Lista (Zonaprop)"
+              stroke="#8b5cf6"
+              strokeWidth={2}
+              dot={{ r: 3, fill: "#8b5cf6" }}
+              connectNulls
+            />
+            <Line
+              type="monotone"
+              dataKey="cierre"
+              name="Cierre real (REMAX+UCEMA)"
+              stroke="#34d399"
+              strokeWidth={2}
+              dot={{ r: 3, fill: "#34d399" }}
+              connectNulls
             />
           </LineChart>
         </ResponsiveContainer>
       )}
 
-      {hasData && (
-        <p className="text-[10px] text-muted-foreground/50 mt-2 text-right">
-          Serie histórica acumulada por sincronización
-        </p>
-      )}
+      <p className="text-[10px] text-muted-foreground/50 mt-3">
+        La distancia entre las dos líneas es la brecha real de negociación del mercado.
+      </p>
     </div>
   )
 }

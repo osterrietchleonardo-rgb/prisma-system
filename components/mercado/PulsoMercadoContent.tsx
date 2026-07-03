@@ -2,14 +2,18 @@ import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
 import { DolaresResult } from "@/lib/mercado/fetchDolares"
 import { BarriosResult } from "@/lib/mercado/fetchBarrios"
+import { CierreResult } from "@/lib/mercado/fetchCierre"
 import { ICCResult } from "@/lib/mercado/fetchICC"
+import { EscriturasResult } from "@/lib/mercado/fetchEscrituras"
 import { ZonaResult } from "@/app/api/mercado/zonaprop/route"
 import { DolarBar } from "./DolarBar"
 import { KpiCards } from "./KpiCards"
+import { CierreSection } from "./CierreSection"
 import { BarriosTable } from "./BarriosTable"
 import { ICCCard } from "./ICCCard"
 import { ZonapropSection } from "./ZonapropSection"
 import { RefreshButton } from "./RefreshButton"
+import type { EvolutionPoint } from "./EvolutionChart"
 
 // Dynamic import — client-only Recharts component
 const EvolutionChart = dynamic(
@@ -23,7 +27,9 @@ const EvolutionChart = dynamic(
 interface PulsoMercadoContentProps {
   dolares: DolaresResult
   barrios: BarriosResult
+  cierre: CierreResult
   icc: ICCResult
+  escrituras: EscriturasResult
   zonas: ZonaResult[]
   lastUpdated: string | null
   zonapropError: boolean
@@ -42,14 +48,43 @@ function formatDateTime(iso: string | null): string {
   }
 }
 
+const MESES_ABREV = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+function labelMes(periodo: string): string {
+  const m = periodo.match(/(\d{4})-(\d{2})/)
+  if (!m) return periodo
+  return `${MESES_ABREV[Number(m[2]) - 1] ?? m[2]} ${m[1].slice(2)}`
+}
+
+/** Une lista (Zonaprop) y cierre real (REMAX+UCEMA) por mes. Últimos 18 meses. */
+function buildEvolution(barrios: BarriosResult, cierre: CierreResult): EvolutionPoint[] {
+  const puntos = new Map<string, EvolutionPoint>()
+  for (const h of barrios.historical ?? []) {
+    puntos.set(h.periodo, { periodo: h.periodo, label: h.label, lista: h.promedio_caba_usd, cierre: null })
+  }
+  for (const c of cierre.serie) {
+    if (c.cierre_general_usd == null) continue
+    const prev = puntos.get(c.periodo)
+    if (prev) prev.cierre = c.cierre_general_usd
+    else puntos.set(c.periodo, { periodo: c.periodo, label: labelMes(c.periodo), lista: null, cierre: c.cierre_general_usd })
+  }
+  return Array.from(puntos.values())
+    .sort((a, b) => a.periodo.localeCompare(b.periodo))
+    .slice(-18)
+}
+
 export function PulsoMercadoContent({
   dolares,
   barrios,
+  cierre,
   icc,
+  escrituras,
   zonas,
   lastUpdated,
   zonapropError,
 }: PulsoMercadoContentProps) {
+  const evolution = buildEvolution(barrios, cierre)
+
   return (
     <div className="flex flex-col min-h-full">
       {/* Sticky Dolar Bar */}
@@ -71,15 +106,21 @@ export function PulsoMercadoContent({
         </div>
 
         {/* ── KPI Cards ── */}
-        <KpiCards dolares={dolares} barrios={barrios} icc={icc} />
+        <KpiCards dolares={dolares} cierre={cierre} icc={icc} escrituras={escrituras} />
 
-        {/* ── Evolution Chart — datos reales del CSV histórico ── */}
-        <EvolutionChart historical={barrios.historical ?? []} />
+        {/* ── Evolution Chart — lista (Zonaprop) vs cierre real (REMAX+UCEMA) ── */}
+        <EvolutionChart data={evolution} />
+
+        {/* ── Cierre real por ambientes ── */}
+        <CierreSection cierre={cierre} />
 
         {/* ── Barrios Table ── */}
         <BarriosTable
           barrios={barrios.barrios}
-          period={barrios.period}
+          fuente={barrios.fuente}
+          fechaActualizacion={barrios.fecha_actualizacion}
+          brechaPct={cierre.general?.brecha_pct ?? null}
+          brechaLabel={cierre.periodoLabel}
           hasError={!!barrios.error || barrios.barrios.length === 0}
         />
 

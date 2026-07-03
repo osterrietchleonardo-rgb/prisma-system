@@ -14,11 +14,14 @@ import {
 
 interface BarriosTableProps {
   barrios: BarrioData[]
-  period: string | null
+  fuente: string | null              // ej. 'Mudafy'
+  fechaActualizacion: string | null  // ISO real de la DB
+  brechaPct: number | null           // brecha real cierre vs publicado (REMAX+UCEMA)
+  brechaLabel: string | null         // ej. 'Mayo 2026'
   hasError: boolean
 }
 
-type SortKey = "barrio" | "precio_m2_usd" | "precio_cierre_m2_usd"
+type SortKey = "barrio" | "precio_m2_usd" | "cierre_estimado"
 type SortDir = "asc" | "desc"
 
 const PAGE_SIZE = 15
@@ -28,31 +31,58 @@ function fmt(val: number | undefined | null): string {
   return `USD ${val.toLocaleString("es-AR")}`
 }
 
+function fmtFecha(iso: string | null): string | null {
+  if (!iso) return null
+  try {
+    return new Intl.DateTimeFormat("es-AR", {
+      month: "long",
+      year: "numeric",
+      timeZone: "America/Argentina/Buenos_Aires",
+    }).format(new Date(iso))
+  } catch {
+    return null
+  }
+}
+
 function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
   if (!active) return <ChevronsUpDown className="w-3 h-3 opacity-40" />
   if (dir === "asc") return <ChevronUp className="w-3 h-3 text-accent" />
   return <ChevronDown className="w-3 h-3 text-accent" />
 }
 
-export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
+export function BarriosTable({ barrios, fuente, fechaActualizacion, brechaPct, brechaLabel, hasError }: BarriosTableProps) {
   const [filter, setFilter] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("barrio")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [page, setPage] = useState(0)
 
+  const fechaLabel = fmtFecha(fechaActualizacion)
+
+  // Cierre estimado por barrio: precio de lista ajustado por la brecha REAL
+  // entre publicado y cierre que mide REMAX+UCEMA a nivel CABA. Es una
+  // estimación (no hay cierre medido por barrio en ninguna fuente pública).
+  const rows = useMemo(
+    () =>
+      barrios.map((b) => ({
+        ...b,
+        cierre_estimado: brechaPct != null ? Math.round(b.precio_m2_usd * (1 + brechaPct / 100)) : null,
+      })),
+    [barrios, brechaPct]
+  )
+
   const filtered = useMemo(() => {
     const q = filter.toLowerCase()
-    return barrios.filter((b) => b.barrio.toLowerCase().includes(q))
-  }, [barrios, filter])
+    return rows.filter((b) => b.barrio.toLowerCase().includes(q))
+  }, [rows, filter])
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       const av = a[sortKey]
       const bv = b[sortKey]
-      
+
       if (av === undefined || av === null) return 1
       if (bv === undefined || bv === null) return -1
-      
+
       if (typeof av === "string" && typeof bv === "string") {
         return sortDir === "asc" ? av.localeCompare(bv) : bv.localeCompare(av)
       }
@@ -75,15 +105,18 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
 
   const cols: { key: SortKey; label: string; tooltip?: string }[] = [
     { key: "barrio", label: "Barrio" },
-    { 
-      key: "precio_m2_usd", 
-      label: "USD/m² Lista", 
-      tooltip: "Precio promedio de publicación (Asking Price) según Mudafy Enero 2026." 
+    {
+      key: "precio_m2_usd",
+      label: "USD/m² Lista",
+      tooltip: `Precio promedio de publicación (asking price)${fuente ? ` según ${fuente}` : ""}${fechaLabel ? ` · ${fechaLabel}` : ""}.`,
     },
-    { 
-      key: "precio_cierre_m2_usd", 
-      label: "USD/m² Cierre", 
-      tooltip: "Precio real de cierre (Transacción) según Reporte Inmobiliario / RE/MAX Marzo 2026." 
+    {
+      key: "cierre_estimado",
+      label: "USD/m² Cierre estimado",
+      tooltip:
+        brechaPct != null
+          ? `Estimación: precio de lista ajustado por la brecha real entre publicado y cierre (${brechaPct}%) medida por REMAX + UCEMA${brechaLabel ? ` en ${brechaLabel}` : ""}. No existe cierre medido por barrio.`
+          : "Sin brecha de cierre disponible para estimar.",
     },
   ]
 
@@ -93,13 +126,10 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
       <div className="p-5 border-b bg-gradient-to-r from-violet-950/20 to-transparent flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
-            Precios por Barrio · CABA 2026
-            <span className="bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/20">
-              Datos Reales
-            </span>
+            Precios por Barrio · CABA
           </h3>
           <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-            {period ? `Actualizado: ${period}` : "Período: Q1 2026"} · Comparativa Lista vs. Cierre
+            {fechaLabel ? `Actualizado: ${fechaLabel}` : "Sin fecha de actualización"} · Lista real vs. cierre estimado
             {hasError && (
               <span className="ml-2 inline-flex items-center gap-1 text-amber-400">
                 <AlertTriangle className="w-3 h-3" />
@@ -138,7 +168,7 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
                           <TooltipTrigger asChild>
                             <Info className="w-3 h-3 opacity-0 group-hover:opacity-50 transition-opacity" />
                           </TooltipTrigger>
-                          <TooltipContent className="max-w-[200px] text-[10px]">
+                          <TooltipContent className="max-w-[220px] text-[10px]">
                             {col.tooltip}
                           </TooltipContent>
                         </Tooltip>
@@ -162,7 +192,7 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
                 </td>
               </tr>
             ) : (
-              pageItems.map((b, i) => (
+              pageItems.map((b) => (
                 <tr
                   key={b.barrio}
                   className={`transition-colors hover:bg-white/[0.03] group`}
@@ -173,8 +203,8 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
                   <td className="px-4 py-3.5 text-sm tabular-nums text-muted-foreground">
                     {fmt(b.precio_m2_usd)}
                   </td>
-                  <td className={`px-4 py-3.5 text-sm tabular-nums font-bold ${b.precio_cierre_m2_usd ? "text-emerald-400" : "text-muted-foreground/30"}`}>
-                    {fmt(b.precio_cierre_m2_usd)}
+                  <td className={`px-4 py-3.5 text-sm tabular-nums font-bold ${b.cierre_estimado ? "text-emerald-400" : "text-muted-foreground/30"}`}>
+                    {fmt(b.cierre_estimado)}
                   </td>
                 </tr>
               ))
@@ -213,12 +243,12 @@ export function BarriosTable({ barrios, period, hasError }: BarriosTableProps) {
       )}
 
       {/* Footer Attribution */}
-      <div className="px-5 py-3 border-t bg-muted/5 flex items-center justify-between">
+      <div className="px-5 py-3 border-t bg-muted/5 flex flex-col sm:flex-row sm:items-center gap-1 justify-between">
         <p className="text-[10px] text-muted-foreground/40 italic">
-          Fuentes: Mudafy (Lista) · Reporte Inmobiliario (Cierre) · IDECBA · La Nación
+          Fuentes: {fuente ?? "—"} (lista) · REMAX + UCEMA (brecha de cierre{brechaLabel ? ` ${brechaLabel}` : ""})
         </p>
         <p className="text-[10px] text-violet-400/60 font-medium">
-          Actualización automática · Marzo 2026
+          {fechaLabel ? `Actualización automática · ${fechaLabel}` : "Actualización automática"}
         </p>
       </div>
     </div>
