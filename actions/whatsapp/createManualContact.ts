@@ -63,6 +63,7 @@ export async function createManualContact(input: ManualContactInput) {
         .from("wa_contacts")
         .insert({
           agency_id,
+          agent_id: assigned_agent_id,
           phone: input.phone,
           name: input.name,
           tags: tagsArray,

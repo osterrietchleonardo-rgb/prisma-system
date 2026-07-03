@@ -181,6 +181,8 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 - A la izquierda, la **lista de conversaciones**; al centro, el **chat en vivo**.
 - Escribís y respondés directamente desde acá (mensajería en tiempo real).
 - Podés **filtrar los chats por clasificación** (origen del lead); cada chat muestra su **etiqueta de clasificación** con un color.
+- Arriba tenés dos solapas: **💬 Bandeja** (los chats) y **👥 Contactos** (tu agenda para importar leads y campañas).
+- **En Contactos ves solo TUS contactos:** los que vos importaste/cargaste y los de los leads que tenés asignados. **No ves los contactos de los otros asesores** (ni ellos los tuyos). Tu director sí ve los de todos.
 - Si tu director todavía no configuró WhatsApp, vas a ver un cartel de **"WhatsApp no configurado"** (esa configuración la hace el director, no vos).
 
 > 💡 **Tip:** cuando un cliente escribe, el bot de IA puede responder solo. Si tomás el control manual, el bot se pausa para esa conversación y no pisa tus respuestas.
