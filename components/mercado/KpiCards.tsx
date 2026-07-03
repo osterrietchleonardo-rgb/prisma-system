@@ -1,16 +1,18 @@
 import { DolaresResult } from "@/lib/mercado/fetchDolares"
-import { BarriosResult } from "@/lib/mercado/fetchBarrios"
+import { CierreResult } from "@/lib/mercado/fetchCierre"
 import { ICCResult } from "@/lib/mercado/fetchICC"
+import { EscriturasResult } from "@/lib/mercado/fetchEscrituras"
 import { Building2, DollarSign, HardHat, FileText, AlertTriangle } from "lucide-react"
 
 interface KpiCardsProps {
   dolares: DolaresResult
-  barrios: BarriosResult
+  cierre: CierreResult
   icc: ICCResult
+  escrituras: EscriturasResult
 }
 
-function fmt(val: number | null, prefix = "", suffix = ""): string {
-  if (val === null) return "—"
+function fmt(val: number | null | undefined, prefix = "", suffix = ""): string {
+  if (val === null || val === undefined) return "—"
   return `${prefix}${val.toLocaleString("es-AR")}${suffix}`
 }
 
@@ -27,17 +29,23 @@ interface KpiCardDef {
   errorSource: string
 }
 
-export function KpiCards({ dolares, barrios, icc }: KpiCardsProps) {
+export function KpiCards({ dolares, cierre, icc, escrituras }: KpiCardsProps) {
   const cards: KpiCardDef[] = [
     {
-      title: "m² Promedio CABA",
-      value: fmt(barrios.promedio_caba_usd, "USD "),
-      sub: barrios.period ? `Período: ${barrios.period}` : "Último mes disponible",
+      title: "m² CABA · Cierre real",
+      value: fmt(cierre.general?.valor ?? null, "USD "),
+      sub: cierre.periodoLabel
+        ? `Operaciones reales · ${cierre.periodoLabel} · REMAX + UCEMA`
+        : "Precio efectivo de operaciones concretadas",
+      badge: cierre.general?.brecha_pct != null
+        ? `${cierre.general.brecha_pct}% vs publicado`
+        : null,
+      badgeColor: "text-violet-300/90",
       icon: <Building2 className="w-5 h-5" />,
       accent: "text-violet-400",
       bg: "from-violet-500/10 to-violet-500/5 border-violet-500/20",
-      hasError: !!barrios.error || barrios.promedio_caba_usd === null,
-      errorSource: "data.buenosaires.gob.ar",
+      hasError: !!cierre.error || cierre.general?.valor == null,
+      errorSource: "ucema.edu.ar",
     },
     {
       title: "Dólar MEP",
@@ -65,18 +73,18 @@ export function KpiCards({ dolares, barrios, icc }: KpiCardsProps) {
     },
     {
       title: "Escrituras CABA",
-      value: barrios.escrituras_count ? `${barrios.escrituras_count.toLocaleString("es-AR")}` : "—",
-      sub: barrios.escrituras_count
-        ? `Actos compraventa · ${barrios.escrituras_year ?? ""}${barrios.escrituras_ytd ? ` · Acum. año: ${barrios.escrituras_ytd.toLocaleString("es-AR")}` : ""}`
+      value: escrituras.cantidad_mensual ? `${escrituras.cantidad_mensual.toLocaleString("es-AR")}` : "—",
+      sub: escrituras.cantidad_mensual
+        ? `Actos compraventa · ${escrituras.label ?? ""}${escrituras.ytd_count ? ` · Acum. año: ${escrituras.ytd_count.toLocaleString("es-AR")}` : ""}`
         : "Sin datos disponibles",
-      badge: barrios.escrituras_var != null
-        ? `${barrios.escrituras_var >= 0 ? "+" : ""}${barrios.escrituras_var}% i.a.`
+      badge: escrituras.var_anual_pct != null
+        ? `${escrituras.var_anual_pct >= 0 ? "+" : ""}${escrituras.var_anual_pct}% i.a.`
         : null,
-      badgeColor: (barrios.escrituras_var ?? 0) >= 0 ? "text-emerald-400" : "text-red-400",
+      badgeColor: (escrituras.var_anual_pct ?? 0) >= 0 ? "text-emerald-400" : "text-red-400",
       icon: <FileText className="w-5 h-5" />,
       accent: "text-emerald-400",
       bg: "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20",
-      hasError: barrios.escrituras_count === null,
+      hasError: escrituras.cantidad_mensual === null,
       errorSource: "colegio-escribanos.org.ar",
     },
   ]

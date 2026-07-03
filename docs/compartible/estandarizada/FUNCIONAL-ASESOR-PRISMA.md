@@ -85,16 +85,19 @@
 
 **Qué muestra:**
 - **Dólar** en tiempo real.
+- **Precio de cierre real** en CABA (promedio y por 1, 2 y 3 ambientes): lo que **efectivamente se pagó** en operaciones concretadas, según el estudio de REMAX y la Universidad del CEMA. Incluye cuánto más barato se cierra respecto de lo publicado (la "brecha", hoy alrededor del -5%).
+- **Gráfico de evolución** con dos líneas: precio publicado vs. precio de cierre real, mes a mes. La distancia entre ambas es el margen de negociación real del mercado.
+- **Precios Zonaprop** por zona (CABA, GBA Norte, Oeste, Sur), con alquileres de 2 y 3 ambientes.
+- **Precio del m² por barrio**: el de lista (Mudafy) y un **cierre estimado** (el de lista ajustado por la brecha real del mes — está marcado como estimación porque ninguna fuente pública mide el cierre barrio por barrio).
 - **ICC** (Índice de Costo de Construcción).
-- **Precios Zonaprop** por zona (CABA, GBA Norte, Oeste, Sur).
-- **Precio del m²** por barrio (datos de Mudafy).
 - **Escrituras CABA** (Colegio de Escribanos).
 
 **Cómo usarlo:**
 - Usalo como **argumento de venta**: mostrale al cliente datos oficiales y actualizados.
+- El dato de **cierre real** es oro para tasaciones y contraofertas: no es una opinión, son operaciones que ya se firmaron.
 - Cada dato muestra su **fecha real de actualización**. Si dice "Sin datos disponibles", es porque la fuente no publicó el dato (PRISMA **nunca inventa** números).
 
-> 💡 **Tip:** es ideal para responder objeciones de precio con información de mercado, no con opiniones.
+> 💡 **Tip:** cuando el propietario pide un precio alto, mostrale la brecha entre publicado y cierre: publicar caro no cambia lo que el mercado realmente paga.
 
 ---
 

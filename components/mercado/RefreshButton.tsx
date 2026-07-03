@@ -19,6 +19,7 @@ interface AggregatedResults {
   zonaprop: Record<string, SourceStatus>
   mudafy?: SourceStatus
   escrituras?: SourceStatus
+  ucema?: SourceStatus
 }
 
 interface RefreshButtonProps {
@@ -61,13 +62,15 @@ function summarize(r: AggregatedResults): { text: string; allOk: boolean } {
     r.mudafy?.status === "ok" ? `${r.mudafy.barrios_actualizados ?? ""} barrios`.trim() : `barrios: ${r.mudafy?.status ?? "—"}`
   )
   parts.push(`Escrituras ${r.escrituras?.status === "ok" ? r.escrituras.periodo ?? "✓" : r.escrituras?.status ?? "—"}`)
+  parts.push(`Cierre ${r.ucema?.status === "ok" ? r.ucema.periodo ?? "✓" : r.ucema?.status ?? "—"}`)
 
   const allOk =
     r.icc?.status === "ok" &&
     zonas.length > 0 &&
     zonasOk === zonas.length &&
     r.mudafy?.status === "ok" &&
-    r.escrituras?.status === "ok"
+    r.escrituras?.status === "ok" &&
+    r.ucema?.status === "ok"
   return { text: parts.join(" · "), allOk }
 }
 
@@ -90,10 +93,11 @@ export function RefreshButton({ lastUpdated }: RefreshButtonProps) {
 
     try {
       // Cada fuente en paralelo → cada request del servidor queda < 10s (Hobby).
-      const [icc, mudafy, escrituras, caba, norte, oeste] = await Promise.all([
+      const [icc, mudafy, escrituras, ucema, caba, norte, oeste] = await Promise.all([
         syncSource("source=icc"),
         syncSource("source=mudafy"),
         syncSource("source=escrituras"),
+        syncSource("source=ucema"),
         syncSource("source=zonaprop&zona=CABA"),
         syncSource("source=zonaprop&zona=GBA_NORTE"),
         syncSource("source=zonaprop&zona=GBA_OESTE"),
@@ -105,7 +109,7 @@ export function RefreshButton({ lastUpdated }: RefreshButtonProps) {
       const sur = await syncSource(`source=zonaprop&zona=GBA_SUR${periodo ? `&periodo=${encodeURIComponent(periodo)}` : ""}`)
 
       // Si TODAS las fuentes fallaron a nivel red → error duro.
-      if (![icc, mudafy, escrituras, caba, norte, oeste, sur].some(Boolean)) {
+      if (![icc, mudafy, escrituras, ucema, caba, norte, oeste, sur].some(Boolean)) {
         throw new Error("sin respuesta del servidor")
       }
 
@@ -120,6 +124,7 @@ export function RefreshButton({ lastUpdated }: RefreshButtonProps) {
         zonaprop,
         mudafy: mudafy?.mudafy as SourceStatus | undefined,
         escrituras: escrituras?.escrituras as SourceStatus | undefined,
+        ucema: ucema?.ucema as SourceStatus | undefined,
       }
 
       await fetch("/api/mercado/refresh", { method: "POST" }).catch(() => {})

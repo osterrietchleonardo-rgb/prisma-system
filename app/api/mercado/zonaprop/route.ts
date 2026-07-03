@@ -12,7 +12,6 @@ export interface ZonaResult {
   variacion_anual_pct: number | null
   precio_alquiler_2amb_ars: number | null
   precio_alquiler_3amb_ars: number | null
-  barrios: { nombre: string; precio_m2_usd: number; variacion_pct: number | null }[]
   fuente: 'zonaprop'
   parseado_ok: boolean
   error?: string
@@ -41,11 +40,10 @@ export async function GET() {
       mes_reporte: z.mes_reporte,
       url_pdf: z.url_pdf,
       precio_m2_venta_usd: z.precio_m2_venta_usd ? Number(z.precio_m2_venta_usd) : null,
-      variacion_mensual_pct: z.variacion_mensual_pct ? Number(z.variacion_mensual_pct) : null,
-      variacion_anual_pct: z.variacion_anual_pct ? Number(z.variacion_anual_pct) : null,
+      variacion_mensual_pct: z.variacion_mensual_pct != null ? Number(z.variacion_mensual_pct) : null,
+      variacion_anual_pct: z.variacion_anual_pct != null ? Number(z.variacion_anual_pct) : null,
       precio_alquiler_2amb_ars: z.precio_alquiler_2amb_ars ? Number(z.precio_alquiler_2amb_ars) : null,
       precio_alquiler_3amb_ars: z.precio_alquiler_3amb_ars ? Number(z.precio_alquiler_3amb_ars) : null,
-      barrios: [], // Detailed neighborhood data is now in the main BarriosTable
       fuente: 'zonaprop' as const,
       parseado_ok: true
     }))
