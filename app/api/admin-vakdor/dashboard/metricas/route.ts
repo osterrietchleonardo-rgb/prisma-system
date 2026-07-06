@@ -22,12 +22,11 @@ export async function GET(request: NextRequest) {
     pagosRes,
     feedbackRes,
     creditTransRes,
-    actividadRes,
   ] = await Promise.all([
-    // Agencias por estado
-    db.from("agencies").select("id, estado, created_at"),
-    // Profiles por rol y estado
-    db.from("profiles").select("id, role, estado, created_at, agency_id"),
+    // Agencias por estado (incluyendo nombre para mapear actividad)
+    db.from("agencies").select("id, name, estado, created_at"),
+    // Profiles por rol y estado (incluyendo nombre y email para mapear actividad)
+    db.from("profiles").select("id, full_name, email, role, estado, created_at, agency_id"),
     // Créditos disponibles por agencia
     db.from("agency_ai_credits").select("agency_id, credits_total, credits_used"),
     // Propiedades totales
@@ -38,11 +37,6 @@ export async function GET(request: NextRequest) {
     db.from("system_feedback").select("id, estado, created_at, type"),
     // Transacciones de créditos (consumo)
     db.from("ai_credit_transactions").select("id, agency_id, credits_consumed, created_at"),
-    // Actividad reciente (últimos 50)
-    db.from("admin_vakdor_activity_log")
-      .select("*")
-      .order("timestamp", { ascending: false })
-      .limit(50),
   ])
 
   const agencias = agenciasRes.data || []
@@ -135,6 +129,6 @@ export async function GET(request: NextRequest) {
       propsPorAgencia,
       evolucionFacturacion,
     },
-    actividadReciente: actividadRes.data || [],
+    agenciasList: agencias.map(a => ({ id: a.id, name: a.name || "Sin nombre" })),
   })
 }
