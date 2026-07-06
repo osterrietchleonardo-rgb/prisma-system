@@ -281,7 +281,10 @@ CONTENIDO:
     const res = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      // thinkingBudget:0 -> una extracción a JSON NO necesita "razonar". Sin esto, gemini-3.5-flash
+      // quema ~8x tokens de thinking que se facturan como OUTPUT ($9/1M) y no aportan nada.
+      // Verificado 2026-07-06: 992 tokens -> 255 con budget 0 (output -88%).
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { thinkingConfig: { thinkingBudget: 0 } } }),
     });
     if (!res.ok) return null;
     const data = await res.json();

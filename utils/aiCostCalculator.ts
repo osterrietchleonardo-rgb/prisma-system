@@ -25,7 +25,7 @@ export const AI_PRICING: Record<string, { input: number; output: number; label: 
   "gemini-3-pro":          { input: 4.00, output: 16.00, label: "Gemini 3 Pro" },
   "gemini-3.1-flash":      { input: 0.15, output: 0.60,  label: "Gemini 3.1 Flash" },
   "gemini-3.1-flash-lite": { input: 0.25, output: 1.50,  label: "Gemini 3.1 Flash-Lite" },
-  "gemini-3.5-flash":      { input: 0.75, output: 4.50,  label: "Gemini 3.5 Flash" },
+  "gemini-3.5-flash":      { input: 1.50, output: 9.00,  label: "Gemini 3.5 Flash" },
   "gemini-3.1-pro":        { input: 2.00, output: 12.00, label: "Gemini 3.1 Pro (contexto ≤ 200k)" },
   "gemini-3.1-pro-long":   { input: 4.00, output: 18.00, label: "Gemini 3.1 Pro (contexto > 200k)" },
 
