@@ -7,7 +7,7 @@ import {
   requireTenant,
   updateAiTransactionCost,
 } from "@/lib/auth/tenant-validation";
-import { calculateCost } from "@/utils/aiCostCalculator";
+import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
 
 export const dynamic = "force-dynamic";
 
@@ -163,8 +163,7 @@ export async function POST(
     // ── Registrar costo real (tokens) ──
     const usage = result.response.usageMetadata;
     if (usage) {
-      const inputTk = usage.promptTokenCount ?? 0;
-      const outputTk = usage.candidatesTokenCount ?? 0;
+      const { inputTokens: inputTk, outputTokens: outputTk } = tokensFromUsage(usage);
       const { totalCostUSD } = calculateCost({
         model: AI_MODEL,
         inputTokens: inputTk,

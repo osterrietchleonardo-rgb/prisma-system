@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prismaIA } from "@/lib/gemini";
 import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
-import { calculateCost } from "@/utils/aiCostCalculator";
+import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
 import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
 import { buildPropertyDirective } from "@/lib/marketing-ia/property-context";
 
@@ -203,8 +203,7 @@ export async function POST(req: Request) {
     // Precio tomado de la tabla central (utils/aiCostCalculator) según el modelo real.
     const usage = result.response.usageMetadata;
     if (usage) {
-      const inputTk = usage.promptTokenCount ?? 0;
-      const outputTk = usage.candidatesTokenCount ?? 0;
+      const { inputTokens: inputTk, outputTokens: outputTk } = tokensFromUsage(usage);
       const { totalCostUSD } = calculateCost({ model: "gemini-3.5-flash", inputTokens: inputTk, outputTokens: outputTk });
       updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
     }

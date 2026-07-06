@@ -3,7 +3,7 @@ import { prismaIA } from "@/lib/gemini"
 import { parseWhatsAppChat } from "@/lib/whatsapp-parser"
 import { createClient } from "@/lib/supabase/server"
 import { consumeAiCredits, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
-import { calculateCost } from "@/utils/aiCostCalculator"
+import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator"
 import { rateLimit, LIMITS } from "@/lib/rate-limiter"
 import { z } from "zod"
 
@@ -77,8 +77,7 @@ export async function POST(req: NextRequest) {
     // ─── Record real token usage (modelo gemini-3.5-flash, precio desde la tabla central) ───
     const chat_usage = aiResult.response.usageMetadata;
     if (chat_usage) {
-      const inputTk = chat_usage.promptTokenCount ?? 0;
-      const outputTk = chat_usage.candidatesTokenCount ?? 0;
+      const { inputTokens: inputTk, outputTokens: outputTk } = tokensFromUsage(chat_usage);
       const { totalCostUSD } = calculateCost({ model: "gemini-3.5-flash", inputTokens: inputTk, outputTokens: outputTk });
       updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
     }

@@ -4,7 +4,7 @@ import { generateEmbedding } from "@/lib/gemini";
 import { openaiIA } from "@/lib/openai";
 import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
-import { calculateCost } from "@/utils/aiCostCalculator";
+import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
 
 export const dynamic = "force-dynamic";
 
@@ -615,8 +615,7 @@ Tu tarea AHORA: pedile esos datos de forma natural, cálida y profesional (como 
     // openaiIA usa GPT-5.4-mini. Precio desde la tabla central (utils/aiCostCalculator).
     const consultor_usage = chatResult.response.usageMetadata;
     if (consultor_usage) {
-      const inputTk = consultor_usage.promptTokenCount ?? 0;
-      const outputTk = consultor_usage.candidatesTokenCount ?? 0;
+      const { inputTokens: inputTk, outputTokens: outputTk } = tokensFromUsage(consultor_usage);
       const { totalCostUSD } = calculateCost({ model: "gpt-5.4-mini", inputTokens: inputTk, outputTokens: outputTk });
       updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
     }

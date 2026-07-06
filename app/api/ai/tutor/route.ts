@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
-import { calculateCost } from "@/utils/aiCostCalculator"
+import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator"
 import { generateEmbedding } from "@/lib/gemini"
 import { openaiIA } from "@/lib/openai"
 
@@ -120,8 +120,7 @@ export async function POST(req: NextRequest) {
     // openaiIA usa GPT-5.4-mini. Precio desde la tabla central (utils/aiCostCalculator).
     const tutor_usage = result.response.usageMetadata;
     if (tutor_usage) {
-      const inputTk = tutor_usage.promptTokenCount ?? 0;
-      const outputTk = tutor_usage.candidatesTokenCount ?? 0;
+      const { inputTokens: inputTk, outputTokens: outputTk } = tokensFromUsage(tutor_usage);
       const { totalCostUSD } = calculateCost({ model: "gpt-5.4-mini", inputTokens: inputTk, outputTokens: outputTk });
       updateAiTransactionCost(txId, inputTk, outputTk, totalCostUSD);
     }

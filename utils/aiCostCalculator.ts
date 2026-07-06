@@ -110,3 +110,36 @@ export function calculateImageCost(usage: ImageUsage) {
     totalCostUSD: (costPerImage * usage.imageCount),
   };
 }
+
+// usageMetadata que devuelven los modelos (Gemini nativo o el mapeo de OpenAI en lib/openai.ts).
+export interface ModelUsageMetadata {
+  promptTokenCount?: number;
+  candidatesTokenCount?: number;
+  thoughtsTokenCount?: number; // tokens de "thinking" de Gemini → Google los factura como OUTPUT
+  totalTokenCount?: number;
+}
+
+/**
+ * Deriva input/output tokens desde el usageMetadata de forma que el OUTPUT incluya
+ * los tokens de "thinking". Gemini los devuelve en `thoughtsTokenCount` y los factura
+ * como salida ($9/1M en 3.5-flash), pero `candidatesTokenCount` (lo visible) NO los
+ * incluye → si contáramos solo eso, subestimaríamos el costo real (~9x en llamadas
+ * con mucho razonamiento). Verificado 2026-07-06.
+ *
+ * Robusto ante cómo venga el metadata:
+ *  - Gemini con thinking:  candidates + thoughts.
+ *  - Si el SDK no expone `thoughts` pero sí `total`: total - input (incluye el thinking).
+ *  - OpenAI (lib/openai.ts): sin thoughts ni total → candidates (que ya incluye su razonamiento).
+ * Nunca devuelve menos que `candidatesTokenCount`.
+ */
+export function tokensFromUsage(usage: ModelUsageMetadata | null | undefined): {
+  inputTokens: number;
+  outputTokens: number;
+} {
+  const inputTokens = usage?.promptTokenCount ?? 0;
+  const candidates = usage?.candidatesTokenCount ?? 0;
+  const thoughts = usage?.thoughtsTokenCount ?? 0;
+  const byTotal = (usage?.totalTokenCount ?? 0) - inputTokens; // incluye thinking si total viene lleno
+  const outputTokens = Math.max(candidates + thoughts, byTotal, candidates);
+  return { inputTokens, outputTokens };
+}
