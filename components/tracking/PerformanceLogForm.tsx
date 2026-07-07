@@ -15,7 +15,8 @@ import { savePerformanceLog } from "@/actions/tracking/savePerformanceLog";
 import { updatePerformanceLog } from "@/actions/tracking/updatePerformanceLog";
 import { getTrackingOptions } from "@/actions/tracking/getTrackingOptions";
 import { toast } from "sonner";
-import { Loader2, Briefcase, TrendingUp, Sparkles, MapPin, DollarSign, Percent, User } from "lucide-react";
+import { Loader2, Briefcase, TrendingUp, Sparkles, MapPin, DollarSign, Percent, User, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { createManualContact } from "@/actions/whatsapp/createManualContact";
 import { ManualContactFields, ManualContactData } from "@/components/shared/ManualContactFields";
@@ -242,6 +243,8 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
                 <SelectContent>
                   <SelectItem value="Vendedor">Vendedor</SelectItem>
                   <SelectItem value="Comprador">Comprador</SelectItem>
+                  <SelectItem value="Locador">Locador</SelectItem>
+                  <SelectItem value="Locatario">Locatario</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -398,7 +401,25 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
               </div>
             </div>
             <div className="space-y-2 col-span-1 md:col-span-2">
-              <Label>Participación</Label>
+              <div className="flex items-center gap-1.5">
+                <Label>Participación</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="text-muted-foreground hover:text-accent transition-colors">
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[300px]">
+                      <p className="text-xs leading-relaxed space-y-1">
+                        <span className="block"><strong>Ambas puntas:</strong> representaste a las dos partes del negocio (dueño y comprador/inquilino) → cuenta como 1 negocio completo.</span>
+                        <span className="block"><strong>Solo Vendedor / Solo Locador / Solo Comprador / Solo Locatario:</strong> trabajaste una sola punta → cuenta como medio negocio (0.5) en las métricas de cierres.</span>
+                        <span className="block opacity-80">No afecta el monto ni la comisión que cargaste, solo cómo se cuenta el negocio en la tasa de cierre, rotación y conversión del dashboard.</span>
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <Select onValueChange={(v) => handleMetadataChange("participacion", v)} value={watch("metadata")?.participacion || ""}>
                 <SelectTrigger className="h-11">
                   <SelectValue placeholder="Seleccionar participación..." />
@@ -407,6 +428,8 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
                   <SelectItem value="Ambas puntas">Ambas puntas</SelectItem>
                   <SelectItem value="Solo Comprador">Solo Comprador</SelectItem>
                   <SelectItem value="Solo Vendedor">Solo Vendedor</SelectItem>
+                  <SelectItem value="Solo Locador">Solo Locador</SelectItem>
+                  <SelectItem value="Solo Locatario">Solo Locatario</SelectItem>
                 </SelectContent>
               </Select>
             </div>

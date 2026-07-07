@@ -92,7 +92,7 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
       transacciones: perfLogs?.filter(l => l.type === 'cierre').reduce((acc, l) => {
         const part = l.metadata?.participacion;
         if (part === 'Ambas puntas') return acc + 1;
-        if (part === 'Solo Comprador' || part === 'Solo Vendedor') return acc + 0.5;
+        if (part === 'Solo Comprador' || part === 'Solo Vendedor' || part === 'Solo Locador' || part === 'Solo Locatario') return acc + 0.5;
         return acc + 1; // Default
       }, 0) || 0,
       volumenVentas: perfLogs?.filter(l => l.type === 'cierre').reduce((acc, l) => acc + (Number(l.monto_operacion) || 0), 0) || 0,
