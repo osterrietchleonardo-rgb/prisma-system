@@ -32,8 +32,7 @@ async function metricasWhatsapp(agencyId: string | null): Promise<MetricasWa> {
   // desde el server helper). Offset AR fijo -3h (sin horario de verano).
   const ahora = new Date()
   const ar = new Date(ahora.toLocaleString("en-US", { timeZone: TZ }))
-  const inicioAr = new Date(ar.getFullYear(), ar.getMonth(), ar.getDate())
-  const inicioUtc = new Date(inicioAr.getTime() + 3 * 3600 * 1000).toISOString()
+  const inicioUtc = new Date(Date.UTC(ar.getFullYear(), ar.getMonth(), ar.getDate()) + 3 * 3600 * 1000).toISOString()
   const hace6h = new Date(Date.now() - 6 * 3600 * 1000).toISOString()
   const hace7d = new Date(Date.now() - 7 * 86400 * 1000).toISOString()
 
@@ -50,7 +49,7 @@ async function metricasWhatsapp(agencyId: string | null): Promise<MetricasWa> {
 
   const [
     leads_nuevos, conversaciones_activas, msgs_entrantes, msgs_salientes, contactos_nuevos,
-    agente_ciego, calificados, visitas_agendadas, handoffs, reactivaciones, enfriados,
+    agente_ciego, calificados, visitas_agendadas, handoffs, enfriados,
   ] = await Promise.all([
     cnt((q) => q.gte("created_at", inicioUtc), "wa_conversations"),
     cnt((q) => q.eq("status", "active"), "wa_conversations"),
@@ -61,20 +60,22 @@ async function metricasWhatsapp(agencyId: string | null): Promise<MetricasWa> {
     cnt((q) => q.in("metricas->>etapa", ["calificacion", "recomendacion", "visita"]), "wa_conversations"),
     cnt((q) => q.eq("metricas->>visita_agendada", "true"), "wa_conversations"),
     cnt((q) => q.eq("metricas->>fue_derivado_a_humano", "true"), "wa_conversations"),
-    cnt((q) => q.not("recovery_stage", "is", null), "wa_conversations"),
     cnt((q) => q.or(`funnel_status.eq.closed_lost,last_message_at.lt.${hace7d}`), "wa_conversations"),
   ])
 
   // sin_responder: NO se puede comparar dos columnas con .filter(col, op, "otraCol")
   // en supabase-js — el 3er argumento es un literal, no el nombre de otra columna.
   // El dataset es chico (~28 filas), así que se trae y se calcula en JS.
-  let srQ = db.from("wa_conversations").select("id, last_inbound_at, last_message_at")
+  // reactivaciones aprovecha la misma pasada: recovery_stage="follow_up" + misma
+  // regla de "último mensaje fue del lead" que sin_responder.
+  let srQ = db.from("wa_conversations").select("id, last_inbound_at, last_message_at, recovery_stage")
   srQ = withAg(srQ)
   const { data: srRows, error: srErr } = await srQ
   if (srErr) throw new Error(`sin_responder: ${srErr.message}`)
   const hace6hMs = Date.now() - 6 * 3600 * 1000
   let sin_responder_total = 0
   let sin_responder_6h = 0
+  let reactivaciones = 0
   for (const r of srRows ?? []) {
     const inbound = r.last_inbound_at as string | null
     if (!inbound) continue
@@ -83,6 +84,7 @@ async function metricasWhatsapp(agencyId: string | null): Promise<MetricasWa> {
     if (lastMsgMs <= inboundMs) {
       sin_responder_total++
       if (inboundMs < hace6hMs) sin_responder_6h++
+      if (r.recovery_stage === "follow_up") reactivaciones++
     }
   }
 
