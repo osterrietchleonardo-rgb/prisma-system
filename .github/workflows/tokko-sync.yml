@@ -27,3 +27,11 @@ jobs:
         run: |
           curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/finance-sync?days=7" \
                -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      # Colgado del mismo cron (2×/día): Experto 1 (WhatsApp) del módulo de Métricas.
+      - name: Trigger Audit WhatsApp (Experto 1)
+        if: always()
+        continue-on-error: true
+        run: |
+          curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/audit-whatsapp" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
