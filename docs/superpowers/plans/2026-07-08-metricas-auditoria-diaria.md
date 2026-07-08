@@ -594,7 +594,7 @@ git commit -m "feat(metricas): endpoint cron Experto 1 + enganche a tokko-sync"
 - Create: `app/api/cron/audit-notify/route.ts`
 - Modify: `.github/workflows/tokko-sync.yml`
 
-**Env nuevas (agregar en `.env` local + Vercel):** `RESEND_API_KEY`, `AUDIT_MAIL_TO` (destino, ej. `osterrietchleonardo@vakdor.com`), `AUDIT_MAIL_FROM` (ej. `PRISMA <no-reply@vakbot.vakdor.com>` — dominio verificado en Resend).
+**Env:** `RESEND_API_KEY` y `RESEND_FROM` **ya existen** en `.env` (verificado). Reusarlas. El destino sale de `AUDIT_MAIL_TO` con fallback a `ADMIN_VAKDOR_EMAIL` (ya existente). Sólo agregar `AUDIT_MAIL_TO` si se quiere un destino distinto al admin. Recordar sumar las que falten en Vercel.
 
 **Interfaces:**
 - Consumes: `getAdminDb`.
@@ -630,9 +630,9 @@ const NOMBRE: Record<string, string> = { whatsapp: "WhatsApp", sistema: "Salud d
 
 export async function enviarMailMetricas(): Promise<{ enviado: boolean; motivo?: string }> {
   const apiKey = process.env.RESEND_API_KEY
-  const to = process.env.AUDIT_MAIL_TO
-  const from = process.env.AUDIT_MAIL_FROM ?? "PRISMA <no-reply@vakbot.vakdor.com>"
-  if (!apiKey || !to) return { enviado: false, motivo: "falta RESEND_API_KEY o AUDIT_MAIL_TO" }
+  const to = process.env.AUDIT_MAIL_TO ?? process.env.ADMIN_VAKDOR_EMAIL
+  const from = process.env.RESEND_FROM ?? "PRISMA <no-reply@vakbot.vakdor.com>"
+  if (!apiKey || !to) return { enviado: false, motivo: "falta RESEND_API_KEY o destino (AUDIT_MAIL_TO/ADMIN_VAKDOR_EMAIL)" }
 
   const items = await ultimosGlobales()
   // Ordenar: rojo primero, luego amarillo, luego verde.
