@@ -14,10 +14,13 @@ import {
   QrCode,
   RefreshCcw,
   Zap,
-  Briefcase
+  Briefcase,
+  PauseCircle,
+  PlayCircle,
+  AlertTriangle
 } from "lucide-react"
 import { getAgentPerformanceAction, getAgencyAdvisorsPerformanceAction } from "@/app/actions/performance"
-import { desvincularAsesor } from "@/app/actions/asesores"
+import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa } from "@/app/actions/asesores"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -51,6 +54,7 @@ import {
   SheetTitle, 
   SheetDescription 
 } from "@/components/ui/sheet"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
 import { QRCodeSVG } from "qrcode.react"
@@ -68,7 +72,17 @@ export default function AsesoresPage() {
   const [loadingKpis, setLoadingKpis] = useState(false)
   const [perfMap, setPerfMap] = useState<Record<string, any>>({})
   const [desvinculando, setDesvinculando] = useState<string | null>(null)
-  
+  // Diálogo de pausa: asesor elegido + motivo
+  const [agentToPause, setAgentToPause] = useState<Record<string, any> | null>(null)
+  const [pauseReason, setPauseReason] = useState("")
+  const [pausing, setPausing] = useState(false)
+  const [reanudando, setReanudando] = useState<string | null>(null)
+  // Diálogo de desvinculación: asesor elegido + motivo
+  const [agentToUnlink, setAgentToUnlink] = useState<Record<string, any> | null>(null)
+  const [unlinkReason, setUnlinkReason] = useState("")
+  // Info de la pausa vigente del asesor abierto en el panel (motivo/fecha/quién)
+  const [pauseInfo, setPauseInfo] = useState<{ motivo: string | null; created_at: string; ejecutado_por_nombre: string | null } | null>(null)
+
   const supabase = createClient()
   const [agencyId, setAgencyId] = useState<string | null>(null)
 
@@ -136,12 +150,19 @@ export default function AsesoresPage() {
     }
   }, [supabase, agencyId])
 
-  const handleDesvincular = async (agent: Record<string, any>) => {
-    if (!confirm(`¿Desvincular a ${agent.full_name}? No podrá volver a ingresar al sistema con su email (${agent.email}).`)) return
+  // Confirmada la desvinculación desde el diálogo (con motivo obligatorio).
+  const handleConfirmDesvincular = async () => {
+    if (!agentToUnlink) return
+    if (!unlinkReason.trim()) {
+      toast.error("Escribí el motivo de la desvinculación")
+      return
+    }
     try {
-      setDesvinculando(agent.id)
-      await desvincularAsesor(agent.id)
+      setDesvinculando(agentToUnlink.id)
+      await desvincularAsesor(agentToUnlink.id, unlinkReason)
       toast.success("Asesor desvinculado. Ya no puede acceder al sistema.")
+      setAgentToUnlink(null)
+      setUnlinkReason("")
       setSelectedAgent(null)
       fetchAgents()
     } catch (e: any) {
@@ -151,9 +172,62 @@ export default function AsesoresPage() {
     }
   }
 
+  // Confirmada la pausa desde el diálogo (con motivo obligatorio).
+  const handleConfirmPausar = async () => {
+    if (!agentToPause) return
+    if (!pauseReason.trim()) {
+      toast.error("Escribí el motivo de la pausa")
+      return
+    }
+    try {
+      setPausing(true)
+      await pausarAsesor(agentToPause.id, pauseReason)
+      toast.success("Asesor pausado. No podrá acceder hasta que lo reactives.")
+      setAgentToPause(null)
+      setPauseReason("")
+      setSelectedAgent(null)
+      fetchAgents()
+    } catch (e: any) {
+      toast.error(e.message || "Error al pausar asesor")
+    } finally {
+      setPausing(false)
+    }
+  }
+
+  const handleReanudar = async (agent: Record<string, any>) => {
+    try {
+      setReanudando(agent.id)
+      await reanudarAsesor(agent.id)
+      toast.success("Asesor reactivado. Ya puede volver a ingresar.")
+      setSelectedAgent(null)
+      fetchAgents()
+    } catch (e: any) {
+      toast.error(e.message || "Error al reactivar asesor")
+    } finally {
+      setReanudando(null)
+    }
+  }
+
   useEffect(() => {
     fetchAgents()
   }, [fetchAgents])
+
+  useEffect(() => {
+    // Si el asesor abierto está pausado, traemos el motivo/fecha/quién de la pausa.
+    const fetchPauseInfo = async () => {
+      if (!selectedAgent || selectedAgent.estado !== "pausado") {
+        setPauseInfo(null)
+        return
+      }
+      try {
+        const info = await getUltimaAccionPausa(selectedAgent.id)
+        setPauseInfo(info)
+      } catch {
+        setPauseInfo(null)
+      }
+    }
+    fetchPauseInfo()
+  }, [selectedAgent])
 
   useEffect(() => {
     const fetchAgentPerformance = async () => {
@@ -317,12 +391,28 @@ export default function AsesoresPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-card border-accent/20">
+                      {agent.estado === "pausado" ? (
+                        <DropdownMenuItem
+                          className="text-green-600 cursor-pointer"
+                          disabled={reanudando === agent.id}
+                          onClick={(e) => { e.stopPropagation(); handleReanudar(agent); }}
+                        >
+                          <PlayCircle className="h-4 w-4 mr-2" /> Reactivar asesor
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem
+                          className="text-amber-600 cursor-pointer"
+                          onClick={(e) => { e.stopPropagation(); setAgentToPause(agent); setPauseReason(""); }}
+                        >
+                          <PauseCircle className="h-4 w-4 mr-2" /> Pausar asesor
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem
                         className="text-destructive cursor-pointer"
                         disabled={desvinculando === agent.id}
-                        onClick={(e) => { e.stopPropagation(); handleDesvincular(agent); }}
+                        onClick={(e) => { e.stopPropagation(); setAgentToUnlink(agent); setUnlinkReason(""); }}
                       >
-                        Desvincular asesor
+                        <XCircle className="h-4 w-4 mr-2" /> Desvincular asesor
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -388,17 +478,53 @@ export default function AsesoresPage() {
                 <SheetTitle className="text-2xl font-bold">{selectedAgent?.full_name}</SheetTitle>
                 <SheetDescription>{selectedAgent?.email}</SheetDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap justify-center gap-2">
+                {selectedAgent?.estado === "pausado" ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-green-600 border-green-500/20 hover:bg-green-500/10"
+                    disabled={reanudando === selectedAgent?.id}
+                    onClick={() => selectedAgent && handleReanudar(selectedAgent)}
+                  >
+                    <PlayCircle className="h-3 w-3" /> Reactivar asesor
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-amber-600 border-amber-500/20 hover:bg-amber-500/10"
+                    onClick={() => { if (selectedAgent) { setAgentToPause(selectedAgent); setPauseReason("") } }}
+                  >
+                    <PauseCircle className="h-3 w-3" /> Pausar asesor
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
                   className="gap-2 text-destructive border-destructive/20 hover:bg-destructive/10"
                   disabled={desvinculando === selectedAgent?.id}
-                  onClick={() => selectedAgent && handleDesvincular(selectedAgent)}
+                  onClick={() => { if (selectedAgent) { setAgentToUnlink(selectedAgent); setUnlinkReason("") } }}
                 >
                   <XCircle className="h-3 w-3" /> Desvincular asesor
                 </Button>
               </div>
+
+              {/* Aviso de pausa vigente con su trazabilidad */}
+              {selectedAgent?.estado === "pausado" && (
+                <div className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left text-xs text-amber-700 space-y-1">
+                  <p className="font-bold flex items-center gap-1">
+                    <PauseCircle className="h-3.5 w-3.5" /> Asesor pausado
+                  </p>
+                  {pauseInfo?.motivo && <p><span className="font-semibold">Motivo:</span> {pauseInfo.motivo}</p>}
+                  {pauseInfo && (
+                    <p className="text-amber-600/80">
+                      {pauseInfo.ejecutado_por_nombre ? `Por ${pauseInfo.ejecutado_por_nombre} · ` : ""}
+                      {new Date(pauseInfo.created_at).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </SheetHeader>
           
@@ -517,6 +643,88 @@ export default function AsesoresPage() {
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Diálogo de PAUSA con motivo obligatorio */}
+      <Dialog open={!!agentToPause} onOpenChange={(open) => { if (!open) { setAgentToPause(null); setPauseReason("") } }}>
+        <DialogContent className="bg-card border-amber-500/20">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <PauseCircle className="h-5 w-5" /> Pausar asesor
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-1 pt-2">
+                <p>
+                  <strong>{agentToPause?.full_name}</strong> no podrá acceder al sistema mientras esté pausado.
+                  Podés reactivarlo cuando quieras (no se bloquea su email).
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-sm font-medium">Motivo de la pausa</label>
+            <Textarea
+              value={pauseReason}
+              onChange={(e) => setPauseReason(e.target.value)}
+              placeholder="Ej: licencia, motivos internos, etc."
+              className="min-h-[80px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAgentToPause(null); setPauseReason("") }} disabled={pausing}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-amber-500 hover:bg-amber-500/90 text-white gap-2"
+              onClick={handleConfirmPausar}
+              disabled={pausing || !pauseReason.trim()}
+            >
+              <PauseCircle className="h-4 w-4" /> Pausar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de DESVINCULACIÓN con motivo obligatorio */}
+      <Dialog open={!!agentToUnlink} onOpenChange={(open) => { if (!open) { setAgentToUnlink(null); setUnlinkReason("") } }}>
+        <DialogContent className="bg-card border-destructive/20">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Desvincular asesor
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2 pt-2">
+                <p>
+                  <strong>{agentToUnlink?.full_name}</strong> no podrá volver a ingresar al sistema con su email
+                  {agentToUnlink?.email ? <> (<span className="font-mono">{agentToUnlink.email}</span>)</> : null}.
+                  Esta acción es más fuerte que una pausa.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <label className="text-sm font-medium">Motivo de la desvinculación</label>
+            <Textarea
+              value={unlinkReason}
+              onChange={(e) => setUnlinkReason(e.target.value)}
+              placeholder="Ej: dejó la inmobiliaria, etc."
+              className="min-h-[80px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAgentToUnlink(null); setUnlinkReason("") }} disabled={desvinculando === agentToUnlink?.id}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              className="gap-2"
+              onClick={handleConfirmDesvincular}
+              disabled={desvinculando === agentToUnlink?.id || !unlinkReason.trim()}
+            >
+              <XCircle className="h-4 w-4" /> Desvincular
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

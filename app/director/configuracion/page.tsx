@@ -18,7 +18,9 @@ import {
   Link2,
   Unlink,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  Trash2,
+  AlertTriangle
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -33,16 +35,25 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
 import { Badge } from "@/components/ui/badge"
 
-import { 
-  getAgencySettings, 
-  getAgencyInvites, 
-  generateAgencyInvite 
+import {
+  getAgencySettings,
+  getAgencyInvites,
+  generateAgencyInvite
 } from "@/lib/queries/director"
 import { createAgencyAction, updateAgencyAction } from "@/app/actions/agency"
+import { eliminarCodigoInvitacion } from "@/app/actions/invites"
 
 import { useSearchParams } from "next/navigation"
 import { AiCreditsDashboard } from "@/components/ai-credits-dashboard"
@@ -75,6 +86,9 @@ export default function DirectorConfiguracionPage() {
   const [inviteCodes, setInviteCodes] = useState<any[]>([])
   // Nombre del invitado al generar (uno por cada tipo de código)
   const [inviteeName, setInviteeName] = useState<{ asesor: string; director: string }>({ asesor: "", director: "" })
+  // Código que el director quiere borrar (abre el popup de confirmación)
+  const [codeToDelete, setCodeToDelete] = useState<any | null>(null)
+  const [deletingCode, setDeletingCode] = useState(false)
 
   // Google Calendar
   const [gcal, setGcal] = useState<{ configured: boolean; connected: boolean; email: string | null }>(
@@ -344,6 +358,24 @@ export default function DirectorConfiguracionPage() {
     toast.success("Código copiado al portapapeles")
   }
 
+  const handleDeleteCode = async () => {
+    if (!codeToDelete?.id) return
+    try {
+      setDeletingCode(true)
+      await eliminarCodigoInvitacion(codeToDelete.id)
+      if (profile.agency_id) {
+        const codes = await getAgencyInvites(profile.agency_id)
+        setInviteCodes(codes)
+      }
+      toast.success("Código eliminado de la lista")
+      setCodeToDelete(null)
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo eliminar el código")
+    } finally {
+      setDeletingCode(false)
+    }
+  }
+
   // Dibuja la sección de invitaciones de un tipo (asesor o director).
   // La lista es compartida: todos los directores de la agencia ven los mismos códigos.
   const renderInviteSection = (role: "asesor" | "director", descripcion: string) => {
@@ -381,11 +413,22 @@ export default function DirectorConfiguracionPage() {
                     )}
                   </div>
                 </div>
-                {!invite.is_used && (
-                  <Button variant="ghost" size="icon" onClick={() => copyToClipboard(invite.code)} className="shrink-0">
-                    <Copy className="h-4 w-4 text-muted-foreground" />
+                <div className="flex items-center gap-1 shrink-0">
+                  {!invite.is_used && (
+                    <Button variant="ghost" size="icon" onClick={() => copyToClipboard(invite.code)}>
+                      <Copy className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setCodeToDelete(invite)}
+                    className="text-muted-foreground hover:text-destructive"
+                    title="Eliminar código"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
-                )}
+                </div>
               </div>
             ))
           ) : (
@@ -735,6 +778,42 @@ export default function DirectorConfiguracionPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Popup de advertencia + confirmación para borrar un código */}
+      <Dialog open={!!codeToDelete} onOpenChange={(open) => !open && setCodeToDelete(null)}>
+        <DialogContent className="bg-card border-destructive/20">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Eliminar código
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 pt-2">
+                <p>
+                  Vas a eliminar el código{" "}
+                  <span className="font-mono font-bold text-foreground">{codeToDelete?.code}</span>
+                  {codeToDelete?.invitee_name ? <> de <strong>{codeToDelete.invitee_name}</strong></> : null}.
+                  Esta acción no se puede deshacer.
+                </p>
+                {codeToDelete?.is_used && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-600">
+                    ⚠️ Este código <strong>ya fue usado</strong>. Borrarlo <strong>NO desvincula a la persona</strong> del
+                    sistema (para eso usá «Desvincular asesor» en la sección Asesores). Solo saca la fila de esta lista.
+                  </div>
+                )}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCodeToDelete(null)} disabled={deletingCode}>
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteCode} disabled={deletingCode} className="gap-2">
+              {deletingCode ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+              Eliminar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
