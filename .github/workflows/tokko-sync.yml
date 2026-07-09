@@ -35,3 +35,11 @@ jobs:
         run: |
           curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/audit-whatsapp" \
                -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      # Mail resumen de Métricas. El endpoint decide (guard interno) mandar sólo en la corrida de las 10 UTC.
+      - name: Trigger Audit Notify (mail resumen)
+        if: always()
+        continue-on-error: true
+        run: |
+          curl -sS --max-time 60 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/audit-notify" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
