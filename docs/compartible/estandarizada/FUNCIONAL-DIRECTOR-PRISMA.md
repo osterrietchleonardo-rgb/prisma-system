@@ -325,15 +325,18 @@ Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **
 **Qué podés hacer:**
 - **Invitar asesores:** generá un **código de invitación**. El asesor se registra con ese código y queda vinculado a tu agencia.
 - **Ver el rendimiento real de cada asesor:** cada tarjeta muestra datos reales tomados de la actividad cargada (Captaciones, Cierres, Cartera activa y % de Rotación), más una etiqueta de estado (Activo / Pausado / Desvinculado). Al hacer clic se abre un panel con su embudo de conversión.
-- **Desvincular un asesor:** lo quita del equipo y **le bloquea el acceso al sistema con ese email** (no podrá volver a ingresar). Es la única acción de gestión disponible desde esta pantalla y pide confirmación.
+- **Pausar un asesor (temporal):** para cuando necesitás dejarlo fuera un tiempo (licencia, motivos internos) sin darlo de baja. Al pausar te pide un **motivo obligatorio**. El asesor pausado **queda deslogueado y no puede volver a entrar** hasta que lo reactivés; si intenta ingresar ve "Tu cuenta ha sido suspendida" (nunca ve el motivo). El mismo botón cambia a **Reactivar** para devolverle el acceso al instante. Su **email no se bloquea**, así que reactivarlo es inmediato.
+- **Desvincular un asesor:** lo quita del equipo y **le bloquea el acceso al sistema con ese email** (no podrá volver a ingresar). Al desvincular también te pide un **motivo**. Es una acción más fuerte que la pausa y pide confirmación.
+- **Trazabilidad:** cada pausa, reactivación y desvinculación queda registrada con **motivo, fecha y qué director la hizo**. Mientras un asesor está pausado, en su ficha (panel lateral) ves el **motivo, la fecha y quién lo pausó** (esto lo ves solo vos como director; el asesor no).
 
 **Invitaciones (Configuración → Inmobiliaria):** hay dos cajitas, **Invitación de Asesores** e **Invitación de Directores**.
 - En cualquiera: escribí el **nombre de la persona** a invitar y apretá **Generar Código**. El nombre queda pegado al código (lo ves aunque todavía no se haya registrado).
 - El **código define el rol**: un código de la cajita "Directores" hace entrar a la persona **como director** (mismo poder que vos, sin jerarquía); uno de "Asesores", como asesor. La persona entra directo, sin que tengas que aprobar nada más.
 - **Lista compartida:** si la inmobiliaria tiene varios directores, **todos ven la misma lista** de códigos (Activos y Usados, con el nombre de cada invitado). Así nadie invita dos veces a la misma persona.
+- **Borrar un código:** cada código de la lista tiene un botón de **papelera 🗑️** para limpiarla (por ejemplo cuando generaste dos códigos para la misma persona, o uno sin querer). Al tocarlo aparece un **cartel de advertencia y confirmación**. Si el código **ya fue usado**, el cartel aclara fuerte que borrarlo **NO desvincula a la persona** (para eso está "Desvincular asesor"): solo saca la fila de la lista.
 
 > 💡 **Tip:** cada código sirve una vez. El código de invitación **no** funciona para "Crear inmobiliaria nueva" (eso necesita el código de Vakdor); si alguien lo intenta, le aparece "Código incorrecto".
-> ⚠️ "Desvincular" es irreversible desde el panel del director: el email queda bloqueado. Si necesitás reactivarlo, contactá al equipo de PRISMA (Vakdor).
+> ⚠️ **Pausar vs. Desvincular:** la **pausa** es temporal y la revertís vos con "Reactivar". La **desvinculación** bloquea el email y es más definitiva; si después necesitás reactivar a esa persona, contactá al equipo de PRISMA (Vakdor).
 
 ---
 
