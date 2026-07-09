@@ -41,20 +41,29 @@ function GruposDeDatos({ grupos }: { grupos?: Record<string, Record<string, any>
   )
 }
 
-/** Desglose de n8n por workflow: estado · errores · causa · corrección. */
-function N8nWorkflows({ data }: { data?: Record<string, { estado: string; errores: string; causa: string; correccion: string }> }) {
+/** Desglose de n8n por workflow: estado · errores · fecha · causa · corrección. */
+function N8nWorkflows({ data, nota }: {
+  data?: Record<string, { estado: string; errores: string; ultimo_error?: string; causa: string; correccion: string }>
+  nota?: string
+}) {
   const entries = Object.entries(data ?? {})
   if (!entries.length) return null
   return (
     <div style={{ marginTop: 14 }}>
       <GrupoTitulo>n8n · desglose por workflow</GrupoTitulo>
+      {nota && (
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontStyle: "italic", marginBottom: 8 }}>{nota}</div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {entries.map(([nombre, w]) => (
           <div key={nombre} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "10px 12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <Semaforo estado={w.estado} />
               <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{nombre}</span>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginLeft: "auto" }}>{w.errores}</span>
+              {w.ultimo_error && (
+                <span style={{ fontSize: 11, color: "rgba(184,115,51,0.85)", width: "100%", textAlign: "right" }}>último: {w.ultimo_error}</span>
+              )}
             </div>
             {w.causa && w.causa !== "—" && (
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.5, marginTop: 6 }}>
@@ -145,7 +154,7 @@ export default function AuditSection({
         {/* PANEL 2 — SALUD (agrupado por app/sistema) */}
         <PanelExperto titulo="2 · Salud del sistema" semaforo={sistema?.semaforo ?? "gris"} resumen={sistema?.resumen}>
           <GruposDeDatos grupos={sistema?.metricas?.grupos} />
-          <N8nWorkflows data={sistema?.metricas?.n8n_workflows} />
+          <N8nWorkflows data={sistema?.metricas?.n8n_workflows} nota={sistema?.metricas?.n8n_nota} />
         </PanelExperto>
 
         {/* PANEL 3 — REDES (agrupado por fuente) */}
