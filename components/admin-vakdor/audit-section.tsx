@@ -82,10 +82,67 @@ function N8nWorkflows({ data, nota }: {
   )
 }
 
+/** Análisis del agente IA principal: muestra, fortalezas, desvíos vs prompt y mejoras. */
+function AnalisisAgente({ data, resumen }: { data?: any; resumen?: string }) {
+  if (!data) return null
+  const sevColor: Record<string, string> = { alto: "#dc2626", medio: "#d97706", bajo: "#6b7280" }
+  return (
+    <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+        <span style={{ width: 4, height: 16, background: "#B87333", borderRadius: 2, display: "inline-block" }} />
+        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#fff", margin: 0 }}>Análisis del agente IA</h4>
+        <span style={{ marginLeft: "auto", fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{data.muestra}</span>
+      </div>
+      {data.prompt_ref && (
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 8 }}>Comparado contra: {data.prompt_ref}</div>
+      )}
+      {resumen && <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, margin: "0 0 12px", fontStyle: "italic" }}>{resumen}</p>}
+
+      {Array.isArray(data.fortalezas) && data.fortalezas.length > 0 && (
+        <>
+          <GrupoTitulo>Fortalezas</GrupoTitulo>
+          <ul style={{ margin: "0 0 12px", paddingLeft: 18, color: "rgba(255,255,255,0.62)", fontSize: 12.5, lineHeight: 1.6 }}>
+            {data.fortalezas.map((f: string, i: number) => <li key={i}>{f}</li>)}
+          </ul>
+        </>
+      )}
+
+      {Array.isArray(data.desvios) && data.desvios.length > 0 && (
+        <>
+          <GrupoTitulo>Desvíos vs. el prompt</GrupoTitulo>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+            {data.desvios.map((d: any, i: number) => (
+              <div key={i} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, padding: "10px 12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ width: 9, height: 9, borderRadius: "50%", background: sevColor[d.severidad] ?? "#6b7280", display: "inline-block" }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{d.titulo}</span>
+                  <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: sevColor[d.severidad] ?? "#6b7280", marginLeft: "auto" }}>{d.severidad}</span>
+                </div>
+                {d.detalle && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.5, marginTop: 6 }}>{d.detalle}</div>}
+                {d.ejemplo && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.5, marginTop: 3 }}><span style={{ color: "#e29e6d", fontWeight: 600 }}>Ejemplo:</span> {d.ejemplo}</div>}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {Array.isArray(data.mejoras) && data.mejoras.length > 0 && (
+        <>
+          <GrupoTitulo>Corrección / mejora óptima</GrupoTitulo>
+          <ol style={{ margin: 0, paddingLeft: 18, color: "rgba(255,255,255,0.62)", fontSize: 12.5, lineHeight: 1.6 }}>
+            {data.mejoras.map((mj: string, i: number) => <li key={i} style={{ marginBottom: 4 }}>{mj}</li>)}
+          </ol>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function AuditSection({
   whatsapp, sistema, redes,
 }: { whatsapp: SnapRow[]; sistema: SnapRow | null; redes: SnapRow | null }) {
   const global = whatsapp.find((w) => w.scope === "global")
+  const analisis = whatsapp.find((w) => w.scope === "agente")
   const [scope, setScope] = useState<string>("global")
   const waActual = whatsapp.find((w) => w.scope === scope) ?? global
   const m = waActual?.metricas ?? {}
@@ -119,7 +176,7 @@ export default function AuditSection({
                 style={{ background: "#131A2D", color: "#fff", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 10px", fontSize: 12 }}
               >
                 <option value="global">Global</option>
-                {whatsapp.filter((w) => w.scope !== "global").map((w) => (
+                {whatsapp.filter((w) => w.scope !== "global" && w.scope !== "agente").map((w) => (
                   <option key={w.scope} value={w.scope}>{w.metricas?.agencia ?? w.scope}</option>
                 ))}
               </select>
@@ -148,6 +205,7 @@ export default function AuditSection({
               <Kpi label="Reactivaciones" value={m.reactivaciones ?? 0} />
               <Kpi label="Enfriados" value={m.enfriados ?? 0} />
             </Grupo>
+            <AnalisisAgente data={analisis?.metricas} resumen={analisis?.resumen} />
           </PanelExperto>
         )}
 
