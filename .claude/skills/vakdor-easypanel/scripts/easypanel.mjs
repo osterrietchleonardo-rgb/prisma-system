@@ -32,9 +32,12 @@ if (!token) {
 const BASE = process.env.EASYPANEL_URL || 'https://panel.vakdor.com'
 
 async function trpc(proc, input) {
-  const qs = input ? `?input=${encodeURIComponent(JSON.stringify({ json: input }))}` : ''
-  const res = await fetch(`${BASE}/api/trpc/${proc}${qs}`, {
-    headers: { Authorization: `Bearer ${token}` },
+  // EasyPanel (>= v2.3x) expone los procedimientos vía POST con body {json: input}.
+  // (Antes eran GET con ?input=...; ahora GET devuelve 405 METHOD_NOT_SUPPORTED.)
+  const res = await fetch(`${BASE}/api/trpc/${proc}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ json: input ?? null }),
   })
   const text = await res.text()
   if (!res.ok) throw new Error(`${proc} -> ${res.status}: ${text}`)

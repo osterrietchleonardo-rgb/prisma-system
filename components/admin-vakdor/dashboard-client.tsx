@@ -4,6 +4,8 @@ import LineChartSVG from "@/components/admin-vakdor/line-chart-svg"
 import BarChartDivs from "@/components/admin-vakdor/bar-chart-divs"
 import DonutChart from "@/components/admin-vakdor/donut-chart"
 import CreditAnalyticsSection from "@/components/admin-vakdor/credit-analytics-section"
+import AuditSection from "@/components/admin-vakdor/audit-section"
+import type { SnapRow } from "@/lib/admin-vakdor/audit/read"
 
 interface Metricas {
   resumen: {
@@ -22,7 +24,7 @@ interface Metricas {
   agenciasList: Array<{ id: string; name: string }>
 }
 
-const COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe"]
+const COLORS = ["#B87333", "#c2783c", "#d99a6c", "#e29e6d", "#8a5a2b"]
 
 function MetricCard({ label, value, sub, color = "#6366f1", icon }: {
   label: string; value: string | number; sub?: string; color?: string; icon?: string
@@ -45,7 +47,9 @@ function MetricCard({ label, value, sub, color = "#6366f1", icon }: {
   )
 }
 
-export default function DashboardClient() {
+export default function DashboardClient({ audit }: {
+  audit: { whatsapp: SnapRow[]; sistema: SnapRow | null; redes: SnapRow | null }
+}) {
   const [data, setData] = useState<Metricas | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
@@ -109,9 +113,9 @@ export default function DashboardClient() {
   ].filter(d => d.value > 0)
 
   const usuariosData = [
-    { label: "Dir. Activos",  value: resumen.directores.activos,  color: "#6366f1" },
+    { label: "Dir. Activos",  value: resumen.directores.activos,  color: "#B87333" },
     { label: "Dir. Pausados", value: resumen.directores.pausados, color: "#4b5563" },
-    { label: "As. Activos",   value: resumen.asesores.activos,    color: "#8b5cf6" },
+    { label: "As. Activos",   value: resumen.asesores.activos,    color: "#c2783c" },
     { label: "As. Pausados",  value: resumen.asesores.pausados,   color: "#374151" },
   ]
 
@@ -134,18 +138,21 @@ export default function DashboardClient() {
         </p>
       </div>
 
+      {/* Auditoría diaria — los 3 expertos (WhatsApp, Salud, Redes) en posición estratégica */}
+      <AuditSection whatsapp={audit.whatsapp} sistema={audit.sistema} redes={audit.redes} />
+
       {/* Metrics Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
-        <MetricCard icon="🏢" label="Agencias activas" value={resumen.agencias.activas} sub={`${resumen.agencias.total} en total`} color="#6366f1" />
-        <MetricCard icon="👤" label="Directores" value={resumen.directores.activos} sub={`${resumen.directores.pausados} pausados`} color="#8b5cf6" />
-        <MetricCard icon="🧑‍💼" label="Asesores" value={resumen.asesores.activos} sub={`${resumen.asesores.pausados} pausados`} color="#a78bfa" />
-        <MetricCard icon="🏠" label="Propiedades sync" value={resumen.propiedades.toLocaleString()} color="#7c3aed" />
+        <MetricCard icon="🏢" label="Agencias activas" value={resumen.agencias.activas} sub={`${resumen.agencias.total} en total`} color="#B87333" />
+        <MetricCard icon="👤" label="Directores" value={resumen.directores.activos} sub={`${resumen.directores.pausados} pausados`} color="#c2783c" />
+        <MetricCard icon="🧑‍💼" label="Asesores" value={resumen.asesores.activos} sub={`${resumen.asesores.pausados} pausados`} color="#d99a6c" />
+        <MetricCard icon="🏠" label="Propiedades sync" value={resumen.propiedades.toLocaleString()} color="#e29e6d" />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 28 }}>
-        <MetricCard icon="⚡" label="Créditos disponibles" value={resumen.creditos.disponibles.toLocaleString()} sub={`${resumen.creditos.consumidosHoy} hoy`} color="#10b981" />
-        <MetricCard icon="📊" label="Consumo este mes" value={resumen.creditos.consumidosMes.toLocaleString()} sub="créditos" color="#059669" />
-        <MetricCard icon="💰" label="Facturado este mes" value={`$${resumen.facturacion.mes.toLocaleString()}`} sub={`${resumen.facturacion.agenciasSinPagoMes} sin pago`} color="#f59e0b" />
-        <MetricCard icon="💬" label="Sugerencias pendientes" value={resumen.sugerencias.pendientes} sub={`${resumen.sugerencias.esteMes} este mes`} color="#ef4444" />
+        <MetricCard icon="⚡" label="Créditos disponibles" value={resumen.creditos.disponibles.toLocaleString()} sub={`${resumen.creditos.consumidosHoy} hoy`} color="#B87333" />
+        <MetricCard icon="📊" label="Consumo este mes" value={resumen.creditos.consumidosMes.toLocaleString()} sub="créditos" color="#c2783c" />
+        <MetricCard icon="💰" label="Facturado este mes" value={`$${resumen.facturacion.mes.toLocaleString()}`} sub={`${resumen.facturacion.agenciasSinPagoMes} sin pago`} color="#d99a6c" />
+        <MetricCard icon="💬" label="Sugerencias pendientes" value={resumen.sugerencias.pendientes} sub={`${resumen.sugerencias.esteMes} este mes`} color="#e29e6d" />
       </div>
 
       {/* Charts Row */}
@@ -223,13 +230,13 @@ export default function DashboardClient() {
                     width: 7,
                     height: 7,
                     borderRadius: "50%",
-                    background: log.feature === "marketing_ia" ? "#8b5cf6" : log.feature === "tutor_ia" ? "#f59e0b" : log.feature === "propiedades_descripcion" ? "#3b82f6" : "#10b981",
+                    background: log.feature === "marketing_ia" ? "#c2783c" : log.feature === "tutor_ia" ? "#d99a6c" : log.feature === "propiedades_descripcion" ? "#e29e6d" : "#B87333",
                     flexShrink: 0,
                   }} />
                   <div style={{ flex: 1, fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
                     <strong style={{ color: "#fff" }}>{log.userName}</strong>{" "}
                     <span style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>({log.userRole})</span> de{" "}
-                    <span style={{ color: "#a78bfa" }}>{log.agencyName}</span> usó{" "}
+                    <span style={{ color: "#d99a6c" }}>{log.agencyName}</span> usó{" "}
                     <strong style={{ color: "#f3f4f6" }}>{FEATURE_LABELS[log.feature] || log.feature}</strong>{" "}
                     <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 12 }}>({log.creditsConsumed} {log.creditsConsumed === 1 ? "crédito" : "créditos"})</span>
                   </div>

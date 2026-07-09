@@ -1,3 +1,4 @@
+import { leerSnapshots } from "@/lib/admin-vakdor/audit/read"
 import DashboardClient from "@/components/admin-vakdor/dashboard-client"
 
 export const metadata = {
@@ -5,6 +6,9 @@ export const metadata = {
   robots: { index: false, follow: false },
 }
 
-export default function AdminDashboardPage() {
-  return <DashboardClient />
+export const dynamic = "force-dynamic"
+
+export default async function AdminDashboardPage() {
+  const audit = await leerSnapshots()
+  return <DashboardClient audit={audit} />
 }
