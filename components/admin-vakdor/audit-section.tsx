@@ -96,6 +96,9 @@ function AnalisisAgente({ data, resumen }: { data?: any; resumen?: string }) {
       {data.prompt_ref && (
         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginBottom: 8 }}>Comparado contra: {data.prompt_ref}</div>
       )}
+      {data.nota && (
+        <div style={{ fontSize: 12, color: "#e29e6d", background: "rgba(184,115,51,0.08)", border: "1px solid rgba(184,115,51,0.2)", borderRadius: 8, padding: "8px 10px", marginBottom: 12, lineHeight: 1.5 }}>{data.nota}</div>
+      )}
       {resumen && <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.6, margin: "0 0 12px", fontStyle: "italic" }}>{resumen}</p>}
 
       {Array.isArray(data.fortalezas) && data.fortalezas.length > 0 && (
@@ -116,7 +119,10 @@ function AnalisisAgente({ data, resumen }: { data?: any; resumen?: string }) {
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: sevColor[d.severidad] ?? "#6b7280", display: "inline-block" }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{d.titulo}</span>
-                  <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: sevColor[d.severidad] ?? "#6b7280", marginLeft: "auto" }}>{d.severidad}</span>
+                  {d.estado && (
+                    <span style={{ marginLeft: "auto", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, color: d.estado === "corregido hoy" ? "#16a34a" : "#d97706" }}>{d.estado}</span>
+                  )}
+                  <span style={{ marginLeft: d.estado ? 8 : "auto", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: sevColor[d.severidad] ?? "#6b7280" }}>{d.severidad}</span>
                 </div>
                 {d.detalle && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", lineHeight: 1.5, marginTop: 6 }}>{d.detalle}</div>}
                 {d.ejemplo && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", lineHeight: 1.5, marginTop: 3 }}><span style={{ color: "#e29e6d", fontWeight: 600 }}>Ejemplo:</span> {d.ejemplo}</div>}
