@@ -36,6 +36,22 @@ jobs:
           curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/audit-whatsapp" \
                -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
+      # Colgado del mismo cron (2×/día): Experto 2 (Salud del sistema) server-side.
+      - name: Trigger Audit Sistema (Experto 2)
+        if: always()
+        continue-on-error: true
+        run: |
+          curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/audit-sistema" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+      # Colgado del mismo cron (2×/día): Experto 3 (Redes / SEO) server-side.
+      - name: Trigger Audit Redes (Experto 3)
+        if: always()
+        continue-on-error: true
+        run: |
+          curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/audit-redes" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
       # Mail resumen de Métricas. El endpoint decide (guard interno) mandar sólo en la corrida de las 10 UTC.
       - name: Trigger Audit Notify (mail resumen)
         if: always()
