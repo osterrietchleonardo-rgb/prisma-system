@@ -33,6 +33,7 @@ import {
   PopoverTrigger
 } from "@/components/ui/popover"
 import { EditVisitDialog } from "@/components/calendar/EditVisitDialog"
+import { VisitStatusActions } from "@/components/calendar/VisitStatusActions"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Calendar } from "@/components/ui/calendar"
@@ -547,23 +548,30 @@ export default function CalendarioPage() {
                               )}
                            </div>
 
-                           {/* Acciones: solo sobre las visitas propias del director (asignadas a él) y futuras */}
-                           {visit.agent_id === userId && visit.estado_visita === 'agendada' && isFutureVisit(visit.fecha_visita, visit.hora_visita) && (
-                              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-accent/10">
-                                <Button
-                                  variant="destructive"
-                                  className="w-full sm:w-auto"
-                                  onClick={() => setCancelingVisit(visit)}
-                                >
-                                  Cancelar Visita
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  className="w-full sm:w-auto border-accent/20 hover:bg-accent/10"
-                                  onClick={() => setEditingVisit(visit)}
-                                >
-                                  Reprogramar / Editar
-                                </Button>
+                           {/* Acciones: solo sobre las visitas propias del director (asignadas a él) */}
+                           {visit.agent_id === userId && (
+                              <div className="flex flex-col gap-3 pt-4 border-t border-accent/10">
+                                {/* Ciclo de vida: confirmar / realizada / no asistió */}
+                                <VisitStatusActions visit={visit} onSuccess={fetchData} />
+                                {/* Cancelar / reprogramar: solo visitas activas y futuras */}
+                                {['agendada', 'reprogramada', 'confirmada'].includes(visit.estado_visita) && isFutureVisit(visit.fecha_visita, visit.hora_visita) && (
+                                  <div className="flex flex-col sm:flex-row gap-3">
+                                    <Button
+                                      variant="destructive"
+                                      className="w-full sm:w-auto"
+                                      onClick={() => setCancelingVisit(visit)}
+                                    >
+                                      Cancelar Visita
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      className="w-full sm:w-auto border-accent/20 hover:bg-accent/10"
+                                      onClick={() => setEditingVisit(visit)}
+                                    >
+                                      Reprogramar / Editar
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
                            )}
                         </div>
