@@ -103,9 +103,7 @@ Notas: idempotente; si no hay conversación para ese teléfono no toca nada; si 
 Las plantillas de recordatorio aprobadas en Meta **NO tienen botones**: el cliente responde con **texto natural libre** ("sí, confirmo", "ahí estoy", "dale", "no voy a poder", "cancelá", etc.). Por lo tanto no hay match exacto contra un botón; hay que **interpretar intención**. Dos caminos según el estado del bot:
 
 - **Bot activo:** el agente principal ya interpreta la respuesta. La confirmación fluye por el agente (que puede setear el estado vía una acción). Detalle de wiring en el plan de la Fase 2.
-- **Bot apagado (asesor atendiendo):** el webhook de entrada (`/api/webhooks/evolution` y `/api/webhooks/meta`, que corren siempre) detecta que existe una visita `agendada`/`confirmada` reciente para ese teléfono+agencia y, solo entonces, clasifica el texto entrante como confirmación / cancelación / ninguna. La clasificación se hace con un **clasificador liviano** (heurística de palabras clave en español rioplatense + fallback a un LLM barato ante ambigüedad — se define en el plan). Ante confirmación → `estado_visita='confirmada'`; ante cancelación → `cancelada`; ante duda → no hace nada (no arriesga). El trigger propaga a `wa_conversations`.
-
-Este clasificador solo se activa cuando hay una visita abierta esperando confirmación, para acotar el alcance y el costo (no analiza todos los mensajes entrantes).
+- **Bot apagado (asesor atendiendo) — DECISIÓN (2026-07-10): NO se automatiza.** Cuando un humano tomó la conversación, actualizar el estado de la visita en el calendario es **responsabilidad del asesor/director** (con los botones de la UI, ver Fase 3). No se implementa el clasificador en el webhook: es cosa del equipo humano mantener su calendario al día. Se descartó deliberadamente para no agregar costo/complejidad por un caso que el asesor ya cubre a mano.
 
 **Acciones del asesor (UI calendario):** botones para `confirmada`, `realizada` y `no_asistio` (además del cancelar/reprogramar ya existentes). `realizada`/`no_asistio` solo se ofrecen cuando la visita está `confirmada`.
 
