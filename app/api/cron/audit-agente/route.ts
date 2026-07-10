@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { assertCron } from "@/lib/admin-vakdor/cron-auth"
 import { auditarAgente } from "@/lib/admin-vakdor/audit/agente"
 import { guardarSnapshot } from "@/lib/admin-vakdor/audit/store"
 
@@ -6,10 +7,8 @@ export const dynamic = "force-dynamic"
 export const maxDuration = 120
 
 export async function GET(req: Request) {
-  const authHeader = req.headers.get("authorization")
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const denied = assertCron(req)
+  if (denied) return denied
   try {
     const snap = await auditarAgente()
     await guardarSnapshot(snap)

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { assertCron } from '@/lib/admin-vakdor/cron-auth'
 import { createClient } from '@supabase/supabase-js'
 import { processCampaign } from '@/lib/whatsapp/campaign-sender'
 
@@ -10,10 +11,8 @@ export const maxDuration = 300
 const MAX_PER_RUN = 400
 
 export async function GET(req: Request) {
-  const authHeader = req.headers.get('authorization')
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const denied = assertCron(req)
+  if (denied) return denied
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

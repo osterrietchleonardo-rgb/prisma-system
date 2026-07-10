@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { assertCron } from "@/lib/admin-vakdor/cron-auth"
 import { syncApiCosts } from "@/lib/admin-vakdor/finance/sync"
 
 export const dynamic = "force-dynamic"
@@ -12,10 +13,8 @@ export const maxDuration = 60
  * lag del export de Google y la finalización de costos de los proveedores (upsert idempotente).
  */
 export async function GET(req: Request) {
-  const authHeader = req.headers.get("authorization")
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const denied = assertCron(req)
+  if (denied) return denied
 
   const { searchParams } = new URL(req.url)
   const days = Math.min(Math.max(Number(searchParams.get("days") ?? 7) || 7, 1), 400)

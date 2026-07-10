@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { assertCron } from "@/lib/admin-vakdor/cron-auth"
 import { getAdminClient, runPropertiesSync, runLeadsSync } from "@/lib/tokko-sync"
 
 export const dynamic = "force-dynamic"
@@ -11,10 +12,8 @@ export const maxDuration = 300
 // usando la misma lógica que los botones manuales (lib/tokko-sync).
 // ─────────────────────────────────────────────────────────────
 export async function GET(req: Request) {
-  const authHeader = req.headers.get("authorization")
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const denied = assertCron(req)
+  if (denied) return denied
 
   const admin = getAdminClient()
 

@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server"
+import { assertCron } from "@/lib/admin-vakdor/cron-auth"
 import { enviarMailMetricas } from "@/lib/admin-vakdor/audit/notify"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
 
 export async function GET(req: Request) {
-  const authHeader = req.headers.get("authorization")
-  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const denied = assertCron(req)
+  if (denied) return denied
   // Guard: sólo manda mail en la corrida de las 10 UTC (07:00 AR). ?force=1 para probar.
   const { searchParams } = new URL(req.url)
   const force = searchParams.get("force") === "1"
