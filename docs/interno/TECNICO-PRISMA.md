@@ -593,6 +593,21 @@ Panel económico/contable (solo dueño): P&L, márgenes, **apalancamiento operat
 
 **Seguridad (misma tanda):** migración `20260701123000_secure_admin_tables_rls` prende RLS (solo `service_role`) en las 5 tablas admin que estaban expuestas: `admin_vakdor_users`, `admin_vakdor_activity_log`, `log_creditos_admin`, `pagos_agencia`, `emails_bloqueados`.
 
+### 16.2 Módulo Auditoría diaria (`/admin-vakdor/dashboard` → "Auditoría diaria del sistema")
+
+3 "expertos" automáticos + análisis del agente IA que corren **2×/día** (colgados de `tokko-sync.yml`) y dejan un snapshot en Supabase; el Dashboard los muestra. **Regla de oro:** el semáforo (`verde/amarillo/rojo/gris`) lo calcula una regla fija por código; la IA (Gemini `gemini-3.5-flash`) **sólo redacta** el resumen.
+
+- **Tabla** `audit_snapshots` (migración `audit_snapshots`): `experto` (`whatsapp|sistema|redes`), `scope` (`global` | `<agency_id>` | `agente`), `semaforo`, `resumen`, `metricas` (jsonb), `run_at`. Índice `(experto,scope,run_at desc)`. **RLS on sin policies** (solo `service_role`). Se guarda historial (una fila por corrida); la UI lee la última por experto+scope.
+- **Núcleo** `lib/admin-vakdor/audit/`: `types.ts` (`Semaforo`, `peorSemaforo` = el peor sub-semáforo manda), `store.ts` (`guardarSnapshot`), `narrate.ts` (`redactarResumen` con Gemini; falla soft si no hay key).
+- **Experto 1 — WhatsApp** (`whatsapp.ts`, 100% server-side, datos de Supabase): global + una fila por agencia activa. Bloques Actividad/SLA/Embudo/Origen. Gotchas: "hoy AR" con `Date.UTC(...)+3h` (no el constructor local, que dobla el offset); `sin_responder`/`propiedades_mostradas`/`reactivaciones` se computan en JS (supabase-js `.filter` no compara dos columnas); `reactivaciones` = `recovery_stage='follow_up'` + último mensaje entrante.
+- **Experto 2 — Salud** (`sistema.ts` + `sources/*`): EasyPanel (POST tRPC, 5 core: n8n/evolution/worker/extractor/redis), n8n (REST `X-N8N-API-KEY`: salud + errores de 6 workflows + **causa/corrección** vía `n8n-diagnose.ts` que trae el detalle del error `/executions/{id}?includeData=true` y Gemini redacta), GitHub Actions (`GH_TOKEN`), Vercel (`VERCEL_API_KEY`), Cloudflare (`CLOUDFLARE_API_KEY`, zona+DNS), Supabase advisors (`SUPABASE_API_KEY_MANAGEMENT` sbp_, `/v1/projects/{ref}/advisors/{security,performance}`), dead-letters (Supabase).
+- **Experto 3 — Redes** (`redes.ts` + `sources/*`): Buffer (`POST api.buffer.com/graphql` `aggregatedPostMetrics`, LinkedIn personal = motor), Clarity (`scripts/clarity.mjs` port, límite 10 req/día), Google Analytics + Search Console (reusa `finance/google-auth.ts` `getGoogleAccessToken(scope)` con `analytics.readonly`/`webmasters.readonly`), Meta Ads (`META_TOKEN_PERMANENTE`, descubre cuentas vía `me/adaccounts`).
+- **Agente IA** (`agente.ts`, endpoint `audit-agente`, scope `agente`): trae el **prompt vigente** del agente PRISMA desde n8n (`/workflows/{id}` nodo "Agente IA CEO", solo lectura) + muestra de conversaciones de Supabase → Gemini evalúa fortalezas/desvíos (marca `corregido|abierto` según el prompt) /mejoras.
+- **Endpoints cron** (auth `assertCron`, ver abajo): `audit-whatsapp`, `audit-sistema`, `audit-redes`, `audit-agente`, `audit-notify` (mail Resend, guard de hora: sólo la corrida 10 UTC = 07:00 AR). Todos colgados de `tokko-sync.yml` (`if: always()` + `continue-on-error`).
+- **UI:** `components/admin-vakdor/audit-section.tsx` (embebido en `dashboard-client.tsx`) + `metricas-primitivos.tsx` (Semaforo/Kpi/Grid/PanelExperto). Estética dark/cobre, `motion`, sin emojis, agrupado por app/sistema.
+
+**Hardening de crons (`lib/admin-vakdor/cron-auth.ts`):** helper `assertCron(req)` que **falla cerrado** — 401 si `CRON_SECRET` no está configurado O el header no coincide. Reemplazó el patrón fail-open `if (CRON_SECRET && ...)` en los 9 endpoints cron. `CRON_SECRET` está en Vercel (preview+production).
+
 ---
 
 ## 17. Frontend: estructura y convenciones
@@ -627,8 +642,9 @@ Panel económico/contable (solo dueño): P&L, márgenes, **apalancamiento operat
 | WhatsApp/Evolution | `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` |
 | n8n | `N8N_WEBHOOK_URL`, `N8N_REPLY_SECRET`, `APP_URL` |
 | Rate limit | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` |
-| Admin Vakdor | `ADMIN_VAKDOR_JWT_SECRET` |
+| Admin Vakdor | `ADMIN_VAKDOR_JWT_SECRET`, `ADMIN_VAKDOR_EMAIL` |
 | Secrets | `BOT_REPLY_SECRET`, `DISPATCH_SECRET`, `CRON_SECRET` |
+| Auditoría (Exp.2/3) | `EASYPANEL_API_KEY`, `N8N_API_KEY`, `GH_TOKEN`, `VERCEL_API_KEY`, `CLOUDFLARE_API_KEY`, `SUPABASE_API_KEY_MANAGEMENT` (sbp_), `BUFFER_API_KEY`, `CLARITY_API_KEY`, `META_TOKEN_PERMANENTE`, `RESEND_API_KEY`, `RESEND_FROM` |
 | Push | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (+ clave privada VAPID server-side) |
 | Google Calendar | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENCRYPTION_KEY` (32 bytes), opcional `GOOGLE_OAUTH_REDIRECT_URI` |
 

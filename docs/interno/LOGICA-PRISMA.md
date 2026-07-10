@@ -1591,6 +1591,19 @@ Panel económico/contable del dueño (`/admin-vakdor/finanzas`). Objetivo: traza
 
 **Cálculo:** MC = Ingresos − costos variables (costos de IA + gastos variables); EBIT = MC − gastos fijos; Apalancamiento = MC / EBIT; Margen neto = EBIT / Ingresos. Todo se unifica a USD y se convierte a ARS con el tipo de cambio del mes.
 
+### 23.3 Auditoría diaria del sistema
+
+Sección dentro del Dashboard del dueño (`/admin-vakdor/dashboard`). Objetivo: que cada mañana Leonardo vea de un vistazo cómo está todo, sin tener que revisar 8 herramientas distintas. Corre **automático 2×/día** (07:00 y 18:00 AR) y manda un **mail resumen** a la mañana.
+
+**Cómo funciona (en criollo):** tres "expertos" y un análisis del agente miran cada uno lo suyo, le ponen una **luz de semáforo** (verde/amarillo/rojo) a cada cosa, y una IA escribe un resumen corto de qué pasó y qué conviene hacer. La luz la decide una regla fija (no la IA), así siempre es confiable.
+
+- **Experto WhatsApp** — leads nuevos, sin responder, agente ciego (mensajes caídos), tiempo de 1ª respuesta, calificados, visitas, handoffs, reactivaciones, enfriados. Se puede ver **global o por agencia**.
+- **Experto Salud** — que estén levantados los servicios (n8n, evolution, worker, extractor, redis), los deploys de Vercel, los Actions de GitHub, el DNS de Cloudflare y la seguridad de Supabase. Para n8n **desglosa los 6 flujos** con su estado, errores, **causa y corrección posible** (la IA lee el error real y explica qué pasó y cómo arreglarlo).
+- **Experto Redes** — cómo vienen los posts orgánicos (LinkedIn/Instagram vía Buffer), la publicidad (Meta Ads), el tráfico web (Google Analytics), el SEO (Search Console) y el comportamiento en la web (Clarity).
+- **Análisis del agente IA** — toma una muestra de las conversaciones reales más recientes, las compara contra el **prompt vigente del agente** (solo lectura) y marca fortalezas, desvíos (distinguiendo lo ya corregido de lo que sigue abierto) y mejoras óptimas.
+
+**Nota:** las fuentes que fallan no rompen la corrida (se muestran "no disponible" y el resto sigue). Detalle técnico (tablas, endpoints, tokens) en TÉCNICO §16.2.
+
 ---
 
 ## 24. Configuración de Despliegue (Vercel)
