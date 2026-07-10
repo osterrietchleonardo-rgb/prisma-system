@@ -1901,6 +1901,12 @@ Consecuencias de diseño:
 - La **dirección** del recordatorio sale de `wa_conversations.visit_address` (sincronizada del calendario); si viniera vacía, el nodo `Edit Fields` cae al extractor por LLM (`Mensaje V`) como fallback.
 - La rama V del motor ya no filtra por `bot_active` (un recordatorio de visita agendada debe salir aunque un humano atienda).
 
+**Ciclo de vida de la visita — objetivo: que el cliente CONFIRME.** Los recordatorios V persiguen la confirmación. Cómo cambia de estado (siempre sobre `scheduled_visits`, propaga el trigger):
+- **agendada/reprogramada → confirmada:** el asesor coordina día/hora → queda `scheduled` y los recordatorios continúan; cuando el cliente **confirma explícitamente por chat**, el nodo `Confirmar_Visita_Calendario` (lo detecta `Analizar_Conversacion2` leyendo la conversación) marca `confirmada`, y el asesor lo ve en su calendario. Con el bot apagado, lo confirma el asesor con el botón de la UI.
+- **confirmada → realizada:** automático cuando pasó la fecha/hora (nodo `Auto_Realizada` del workflow `Seguimiento`), o a mano por el asesor.
+- **→ no_asistio:** el asesor lo marca (pisa el `realizada` automático si el cliente confirmó pero no fue); reactiva los seguimientos por inactividad.
+- **UI:** componente compartido `VisitStatusActions` en los calendarios de director y asesor (Confirmar / Realizada / No asistió).
+
 ---
 
 ## 27. Arquitectura del Frontend y Lógica de Interfaz de Usuario (UI/UX)
