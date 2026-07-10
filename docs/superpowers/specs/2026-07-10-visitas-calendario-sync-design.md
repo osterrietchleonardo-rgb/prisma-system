@@ -123,6 +123,8 @@ Este clasificador solo se activa cuando hay una visita abierta esperando confirm
 - **Fase 2 — Confirmación por el cliente (WhatsApp).** Interpretación del texto natural de respuesta al recordatorio (las plantillas no tienen botones): vía el agente cuando el bot está activo, y vía clasificador liviano en el webhook de entrada cuando el bot está apagado → `confirmada`/`cancelada`.
 - **Fase 3 — UI del calendario + `realizada` automática + no-show.** Botones del asesor (`confirmada`/`realizada`/`no_asistio`), job automático de `realizada`, precedencia del asesor, e integración de la rama NS.
 
+- **Fase 4 — Detección de colega/inmobiliaria externa (no-lead).** Ver §13.b. Independiente de las anteriores; solo edita prompts de n8n.
+
 Cada fase es entregable y testeable por separado; el plan de implementación detalla la Fase 1 primero.
 
 ## 11. Match y edge cases
@@ -147,6 +149,24 @@ En rama de Supabase (o transacción con rollback):
 ## 13. Docs a actualizar al cerrar
 
 - `docs/interno/LOGICA-PRISMA.md`, `docs/interno/TECNICO-PRISMA.md`. FUNCIONAL-ASESOR/DIRECTOR solo si cambia el uso (los botones del calendario en Fase 3 sí lo tocarían).
+
+## 13.b Fase 4 — Detección de colega/inmobiliaria externa (no-lead)
+
+**Problema:** cuando quien escribe (típicamente tras compartir un link o consultar por una propiedad puntual) se identifica como **asesor / inmobiliaria / corredor externo** que busca **colaborar** o pide **% de comisión**, NO es un cliente. Hoy el agente no lo detecta de forma confiable y —salvo que dispare handoff por otro motivo— el motor le sigue mandando seguimientos de inactividad ("¿por qué no contestaste?"), lo cual es incorrecto.
+
+**Verificado (estado actual):**
+- El prompt del `Agente IA CEO` no tiene regla para este escenario (sí tiene link→`Aviso_Asesor`, visita, y handoff por enojo/negociación/legal). El campo `acompanado_asesor` es otra cosa (el *cliente* viene acompañado, no el interlocutor *es* un asesor).
+- `Analizar_Conversacion2` solo pone `requires_follow_up=false` ante visita `scheduled/confirmed` o handoff explícito. Un colega sin handoff sigue con follow-up activo.
+
+**Solución (dos ediciones de prompt en n8n, requieren OK):**
+
+1. **`Agente IA CEO` (workflow `PRISMA`) — detección + derivación + no-lead.** Regla nueva: si el interlocutor se identifica como asesor/inmobiliaria/corredor/martillero externo que pide colaboración, permuta entre colegas, o comisión sobre una propiedad → **derivar al asesor a cargo de esa propiedad** (`Aviso_Asesor` si hay `email_asesor` de la propiedad; si no, `Gestion_Handoff`) y **avisarle cortito y cordial** ("te derivo con el asesor a cargo de esa propiedad, se contacta con vos"). No calificarlo como lead (no pedir presupuesto/datos de cliente).
+
+2. **`Analizar_Conversacion2` (workflow `PRISMA`) — corte de seguimiento.** Regla nueva: si en la conversación el interlocutor se identifica como colega/inmobiliaria externa (colaboración/comisión) → `requires_follow_up=false` y `dropoff_reason='colega_externo'` (trazabilidad).
+
+**Comportamiento definido:** derivar y avisar cortito (no seguir el flujo de calificación de cliente).
+
+**Fuera de alcance de esta fase:** distinguir sub-tipos de colega, ni automatizar la respuesta de colaboración; solo derivar y no hacer seguimiento.
 
 ## 14. Fuera de alcance
 
