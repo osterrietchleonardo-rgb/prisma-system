@@ -158,15 +158,15 @@ En rama de Supabase (o transacción con rollback):
 - El prompt del `Agente IA CEO` no tiene regla para este escenario (sí tiene link→`Aviso_Asesor`, visita, y handoff por enojo/negociación/legal). El campo `acompanado_asesor` es otra cosa (el *cliente* viene acompañado, no el interlocutor *es* un asesor).
 - `Analizar_Conversacion2` solo pone `requires_follow_up=false` ante visita `scheduled/confirmed` o handoff explícito. Un colega sin handoff sigue con follow-up activo.
 
-**Solución (dos ediciones de prompt en n8n, requieren OK):**
+**Solución IMPLEMENTADA (2026-07-10) — una sola edición de prompt:**
 
-1. **`Agente IA CEO` (workflow `PRISMA`) — detección + derivación + no-lead.** Regla nueva: si el interlocutor se identifica como asesor/inmobiliaria/corredor/martillero externo que pide colaboración, permuta entre colegas, o comisión sobre una propiedad → **derivar al asesor a cargo de esa propiedad** (`Aviso_Asesor` si hay `email_asesor` de la propiedad; si no, `Gestion_Handoff`) y **avisarle cortito y cordial** ("te derivo con el asesor a cargo de esa propiedad, se contacta con vos"). No calificarlo como lead (no pedir presupuesto/datos de cliente).
+Análisis de tools: `Avisar_Asesor` NO sirve (su `DERIVAR_CONVERSACION` deja `bot_active=true`, o sea no hace handoff real; su email es "nuevo interesado" sin motivo). `Gestion_Handoff` SÍ: su `DERIVAR_CONVERSACION` pone `bot_active=false` (handoff real) + asigna `agent_id`, y su email ya incluye **Propiedad consultada (dirección)** + fila **Motivo**. Por eso se usa **solo `Gestion_Handoff`**.
 
-2. **`Analizar_Conversacion2` (workflow `PRISMA`) — corte de seguimiento.** Regla nueva: si en la conversación el interlocutor se identifica como colega/inmobiliaria externa (colaboración/comisión) → `requires_follow_up=false` y `dropoff_reason='colega_externo'` (trazabilidad).
+1. **`Agente IA CEO` (workflow `PRISMA`) — sección nueva "COLEGA O INMOBILIARIA EXTERNA (no es un cliente)"** (antes de HANDOFF A HUMANO). Si el interlocutor se identifica como asesor/inmobiliaria/corredor/martillero externo que pide colaboración/permuta/comisión sobre una propiedad → NO lo trata como lead (no califica), responde cortito y cordial ("te derivo con el asesor a cargo de esa propiedad, se contacta con vos"), y ejecuta **`Gestion_Handoff`** con motivo="es un asesor o inmobiliaria externa que consulta por colaboracion o comision sobre esta propiedad", la dirección de la propiedad y el `email_asesor` de ESA propiedad (ruteo al asesor correcto). Si no hay propiedad identificada, pide link/dirección una vez.
 
-**Comportamiento definido:** derivar y avisar cortito (no seguir el flujo de calificación de cliente).
+2. **Corte de seguimiento:** ya cubierto por la regla de handoff en `Analizar_Conversacion2` (handoff explícito → `requires_follow_up=false`). No requiere cambio adicional.
 
-**Fuera de alcance de esta fase:** distinguir sub-tipos de colega, ni automatizar la respuesta de colaboración; solo derivar y no hacer seguimiento.
+**Fuera de alcance:** distinguir sub-tipos de colega; automatizar la respuesta de colaboración. Solo derivar (con handoff + email de motivo) y no hacer seguimiento.
 
 ## 14. Fuera de alcance
 
