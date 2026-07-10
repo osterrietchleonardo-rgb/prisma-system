@@ -313,13 +313,13 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 - **`properties`** — Propiedades sincronizadas (id, tokko_id, agency_id, assigned_agent_id, title, description, price, currency, property_type, status, address, city, bedrooms, bathrooms, total_area, covered_area, images[], tokko_data, embedding vector(768))
 - **`leads`** — Leads del CRM (id, agency_id, assigned_agent_id, full_name, email, phone, source, status, pipeline_stage, notes, tokko_contact_id, first_response_time, chat_analysis)
 - **`lead_activities`** — Historial de actividades de leads
-- **`scheduled_visits`** — Visitas agendadas (id, agency_id, agent_id, lead_id, nombre_completo, telefono, email, propiedad_titulo, zona_propiedad, fecha_visita, hora_visita, tipo_operacion, presupuesto, calificacion_lead, score_bant, intereses_clave, objeciones_detectadas, decisores, resumen_conversacion, origen_consulta, estado_visita [agendada|cancelada|completada], motivo_cambio, created_at)
+- **`scheduled_visits`** — Visitas agendadas (id, agency_id, agent_id, lead_id, nombre_completo, telefono, email, propiedad_titulo, zona_propiedad, fecha_visita, hora_visita, tipo_operacion, presupuesto, calificacion_lead, score_bant, intereses_clave, objeciones_detectadas, decisores, resumen_conversacion, origen_consulta, estado_visita [agendada|reprogramada|confirmada|realizada|no_asistio|cancelada], google_event_id, motivo_cambio, created_at). Un trigger sincroniza `estado_visita` → `wa_conversations.visit_status` (ver §26.5).
 - **`visits`** — Visitas (legacy)
 - **`closings`** — Cierres de operaciones
 
 #### WhatsApp
 - **`whatsapp_instances`** — Instancias de WhatsApp (id, agency_id, token, phone_number_id, business_id, evo_instance_name, integration_type, templates_status, flows_active)
-- **`wa_conversations`** — Conversaciones/chats (id, agency_id, instance_id, contact_phone, contact_name, status, bot_active, unread_count, last_message_at, last_inbound_at, etiquetas[], **clasificacion** (origen del lead), score, pipeline_stage, funnel_status, visit_status, follow_ups_sent, follow_ups_history, requires_follow_up, recovery_stage, next_follow_up_at, opt_out, metricas jsonb)
+- **`wa_conversations`** — Conversaciones/chats (id, agency_id, instance_id, contact_phone, contact_name, status, bot_active, unread_count, last_message_at, last_inbound_at, etiquetas[], **clasificacion** (origen del lead), score, pipeline_stage, funnel_status, visit_status [none|scheduled|confirmed|completed|no_show|cancelled], visit_scheduled_at, visit_address, follow_ups_sent, follow_ups_history, requires_follow_up, recovery_stage, next_follow_up_at, opt_out, metricas jsonb). `visit_status`/`visit_scheduled_at`/`visit_address` los gobierna el calendario vía trigger (ver §26.5), no el bot.
 - **`wa_contacts`** — Agenda de contactos para campañas (id, agency_id, **agent_id** (dueño), phone, name, tags[], **clasificacion**, metadata, campaign_statuses, last_campaign_*). Tabla **separada** de `wa_conversations`: la solapa "Contactos" lee de acá; se sincroniza por teléfono con las conversaciones. `UNIQUE (agency_id, phone)`. **Visibilidad por asesor:** cada asesor ve **solo sus contactos** (los que cargó/importó, o los del lead que tiene asignado); el **director ve todos** los de la agencia. Lo garantiza la RLS (no un filtro de la pantalla).
 - **`wa_messages`** — Mensajes individuales (id, conversation_id, agency_id, content, role, message_type, wamid, metadata)
 - **`wa_templates`** — Templates de WhatsApp (id, agency_id, template_name, status, components, rejection_reason, meta_template_id)
@@ -1881,6 +1881,25 @@ n8n determina que un lead necesita seguimiento
 │ 8. Broadcast Realtime              │
 └────────────────────────────────────┘
 ```
+
+### 26.5 Visitas regidas por el calendario (sync `scheduled_visits` → `wa_conversations`)
+
+El **calendario (`scheduled_visits`) es la única fuente de verdad** de las visitas. Un trigger de base (`trg_sync_visit_to_conversation`, función `sync_visit_to_conversation()`) propaga automáticamente el estado de la visita a la(s) conversación(es) de WhatsApp que matchean por `agency_id` + teléfono normalizado (`regexp_replace(...,'\D','','g')`), aún con el bot apagado.
+
+Mapeo `estado_visita` → `wa_conversations.visit_status`:
+
+| `estado_visita` | `visit_status` | Efecto en el motor |
+|---|---|---|
+| `agendada` / `reprogramada` | `scheduled` | Recordatorios V (24/3/1h) persiguen la confirmación; `requires_follow_up=false`; flags de recordatorio reseteados |
+| `confirmada` | `confirmed` | El cliente confirmó → dejan de perseguirse recordatorios |
+| `realizada` | `completed` | Visita hecha; sin seguimientos |
+| `no_asistio` | `no_show` | Reactiva seguimientos por inactividad (`requires_follow_up=true`, temporizador reseteado) |
+| `cancelada` (o DELETE) | `cancelled` | Limpia fecha/dirección y reactiva seguimientos |
+
+Consecuencias de diseño:
+- El **bot ya NO escribe** `visit_status`/`visit_scheduled_at` (se quitaron del nodo `Actualizar_Metricas2` de n8n) para no pisar al calendario. Sigue escribiendo `opt_out` y `requires_follow_up`.
+- La **dirección** del recordatorio sale de `wa_conversations.visit_address` (sincronizada del calendario); si viniera vacía, el nodo `Edit Fields` cae al extractor por LLM (`Mensaje V`) como fallback.
+- La rama V del motor ya no filtra por `bot_active` (un recordatorio de visita agendada debe salir aunque un humano atienda).
 
 ---
 
