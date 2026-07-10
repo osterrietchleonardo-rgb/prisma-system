@@ -52,6 +52,14 @@ jobs:
           curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/audit-redes" \
                -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
+      # Colgado del mismo cron (2×/día): análisis del agente IA principal (prompt vs conversaciones).
+      - name: Trigger Audit Agente (análisis del agente IA)
+        if: always()
+        continue-on-error: true
+        run: |
+          curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/audit-agente" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
       # Mail resumen de Métricas. El endpoint decide (guard interno) mandar sólo en la corrida de las 10 UTC.
       - name: Trigger Audit Notify (mail resumen)
         if: always()

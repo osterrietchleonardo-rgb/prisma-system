@@ -5,20 +5,20 @@ import { peorSemaforo, type AuditSnapshot, type Semaforo } from "./types"
 import { getBufferMetrics } from "./sources/buffer"
 import { getClarityInsights } from "./sources/clarity"
 import { getGoogleTraffic } from "./sources/google"
-
-const NO_CONSULTADO = { Estado: "no consultado (Fase 2)" }
+import { getMetaAds } from "./sources/meta"
 
 /** Snapshot global de redes/SEO (scope "global"). */
 export async function auditarRedes(): Promise<AuditSnapshot> {
-  const [buffer, clarity, google] = await Promise.all([
+  const [buffer, clarity, google, meta] = await Promise.all([
     getBufferMetrics(),
     getClarityInsights(),
     getGoogleTraffic(),
+    getMetaAds(),
   ])
 
   const grupos: Record<string, Record<string, string>> = {
     ...buffer.grupos,
-    "Meta Ads": { ...NO_CONSULTADO },
+    "Meta Ads": meta.kvs,
     "Google Analytics (7d)": google.ga,
     "Search Console (7d)": google.gsc,
     "Clarity (3d)": clarity.kvs,
@@ -29,6 +29,7 @@ export async function auditarRedes(): Promise<AuditSnapshot> {
     clarity: clarity.sub,
     google_analytics: google.subGa,
     search_console: google.subGsc,
+    meta: meta.sub,
   }
 
   const semaforo = peorSemaforo(Object.values(sub_semaforos))

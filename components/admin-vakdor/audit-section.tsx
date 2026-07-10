@@ -120,7 +120,7 @@ function AnalisisAgente({ data, resumen }: { data?: any; resumen?: string }) {
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: sevColor[d.severidad] ?? "#6b7280", display: "inline-block" }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{d.titulo}</span>
                   {d.estado && (
-                    <span style={{ marginLeft: "auto", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, color: d.estado === "corregido hoy" ? "#16a34a" : "#d97706" }}>{d.estado}</span>
+                    <span style={{ marginLeft: "auto", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 700, color: /correg/i.test(d.estado) ? "#16a34a" : "#d97706" }}>{d.estado}</span>
                   )}
                   <span style={{ marginLeft: d.estado ? 8 : "auto", fontSize: 10, textTransform: "uppercase", letterSpacing: "0.05em", color: sevColor[d.severidad] ?? "#6b7280" }}>{d.severidad}</span>
                 </div>

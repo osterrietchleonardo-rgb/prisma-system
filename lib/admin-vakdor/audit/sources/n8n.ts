@@ -1,10 +1,19 @@
 // Fuente: n8n (vn8nv.vakdor.com) — salud + errores de los 6 workflows core.
-// Este chequeo server-side solo cuenta y fecha los errores (causa/corrección quedan
-// vacías a propósito: requieren inspección manual del payload/execution, no disponible
-// en un cron sin sesión).
+// Cuenta/fecha los errores y captura el ID del último error por workflow, para que
+// el paso de diagnóstico (n8n-diagnose) traiga el detalle y redacte causa/corrección.
 import { type Semaforo } from "@/lib/admin-vakdor/audit/types"
 
-const BASE = "https://vn8nv.vakdor.com/api/v1"
+export const N8N_BASE = "https://vn8nv.vakdor.com/api/v1"
+const BASE = N8N_BASE
+
+/** Fetch autenticado contra la REST de n8n (exportado para el diagnóstico). */
+export async function n8nGetAuth(path: string): Promise<any> {
+  const key = process.env.N8N_API_KEY
+  if (!key) throw new Error("Falta N8N_API_KEY")
+  const res = await fetch(`${BASE}${path}`, { headers: { "X-N8N-API-KEY": key }, cache: "no-store" })
+  if (!res.ok) throw new Error(`n8n ${path} -> ${res.status}`)
+  return res.json()
+}
 
 /** Los 6 workflows core del sistema (nombre exacto en n8n). */
 const WORKFLOW_NAMES = [
@@ -37,16 +46,7 @@ export interface N8nWorkflowStatus {
   correccion: string
 }
 
-async function n8nGet(path: string): Promise<any> {
-  const key = process.env.N8N_API_KEY
-  if (!key) throw new Error("Falta N8N_API_KEY")
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { "X-N8N-API-KEY": key },
-    cache: "no-store",
-  })
-  if (!res.ok) throw new Error(`n8n ${path} -> ${res.status}`)
-  return res.json()
-}
+const n8nGet = n8nGetAuth
 
 /** "DD-MM (hace N días)" a partir de la fecha de fin (o inicio) de la ejecución. */
 function formatUltimoError(fechaStr: string): string {
@@ -70,6 +70,7 @@ export async function getN8nHealth(): Promise<{
   vivo: boolean
   errores24h: number
   workflows: Record<string, N8nWorkflowStatus>
+  ultimoErrorId: Record<string, string | null> // workflow -> exec id del último error (para diagnóstico)
   nota: string
   sub: Semaforo
 }> {
@@ -86,11 +87,13 @@ export async function getN8nHealth(): Promise<{
     let errores24h = 0
     let hayHistoricos = false
     const workflows: Record<string, N8nWorkflowStatus> = {}
+    const ultimoErrorId: Record<string, string | null> = {}
 
     for (const nombre of WORKFLOW_NAMES) {
       const wf = wfList.find((w) => w.name === nombre)
       if (!wf) {
         workflows[nombre] = { ...SIN_DATOS, errores: "workflow no encontrado" }
+        ultimoErrorId[nombre] = null
         continue
       }
       const erroresWf = exList
@@ -108,6 +111,7 @@ export async function getN8nHealth(): Promise<{
       } else estado = "verde"
 
       const ultimo = erroresWf[0]
+      ultimoErrorId[nombre] = ultimo?.id ?? null
       workflows[nombre] = {
         estado,
         errores: `${erroresWf.length} errores`,
@@ -123,16 +127,22 @@ export async function getN8nHealth(): Promise<{
       vivo,
       errores24h,
       workflows,
+      ultimoErrorId,
       nota: `Errores históricos (${errores24h} en 24h). Si son viejos pueden estar ya corregidos; el chequeo diario lo revalida.`,
       sub,
     }
   } catch {
     const workflows: Record<string, N8nWorkflowStatus> = {}
-    for (const nombre of WORKFLOW_NAMES) workflows[nombre] = SIN_DATOS
+    const ultimoErrorId: Record<string, string | null> = {}
+    for (const nombre of WORKFLOW_NAMES) {
+      workflows[nombre] = SIN_DATOS
+      ultimoErrorId[nombre] = null
+    }
     return {
       vivo: false,
       errores24h: 0,
       workflows,
+      ultimoErrorId,
       nota: "no disponible",
       sub: "gris",
     }
