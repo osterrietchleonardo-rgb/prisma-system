@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@supabase/supabase-js"
 import { requireAdminVakdor, isNextResponse } from "@/lib/admin-vakdor/guard"
+import {
+  loadFinanceData,
+  kpisDeMes,
+  estadoResultadoDeMes,
+  nAgenciasPagando,
+  gastoDelMes,
+} from "@/lib/admin-vakdor/finance/metrics"
 
 export const dynamic = "force-dynamic"
 export const fetchCache = "force-no-store"
@@ -21,34 +28,6 @@ function getFreshAdminDb() {
 // 'YYYY-MM' de una fecha
 const mesKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
 
-interface Expense {
-  id: string
-  concepto: string
-  categoria: string
-  tipo: "fijo" | "variable"
-  monto: number
-  moneda: "USD" | "ARS"
-  recurrencia: "mensual" | "anual" | "unico"
-  fecha_inicio: string
-  fecha_fin: string | null
-  proveedor: string | null
-  notas: string | null
-  activo: boolean
-}
-
-/** Cuánto pesa un gasto en un mes dado (en su propia moneda). 0 si no aplica. */
-function gastoDelMes(e: Expense, mes: string): number {
-  if (!e.activo) return 0
-  const inicio = e.fecha_inicio.slice(0, 7)
-  const fin = e.fecha_fin ? e.fecha_fin.slice(0, 7) : null
-  if (mes < inicio) return 0
-  if (fin && mes > fin) return 0
-  if (e.recurrencia === "mensual") return Number(e.monto)
-  if (e.recurrencia === "anual") return Number(e.monto) / 12
-  if (e.recurrencia === "unico") return inicio === mes ? Number(e.monto) : 0
-  return 0
-}
-
 export async function GET(request: NextRequest) {
   const auth = await requireAdminVakdor(request)
   if (isNextResponse(auth)) return auth
@@ -58,64 +37,13 @@ export async function GET(request: NextRequest) {
   const mesSel = searchParams.get("mes") || mesKey(now)
 
   const db = getFreshAdminDb()
-  const [costsRes, pagosRes, expensesRes, fxRes] = await Promise.all([
-    db.from("finance_api_costs").select("fecha, proveedor, costo_usd"),
-    db.from("pagos_agencia").select("monto, moneda, periodo_mes"),
-    db.from("finance_expenses").select("*").order("fecha_inicio", { ascending: false }),
-    db.from("finance_fx").select("periodo_mes, usd_ars"),
-  ])
+  const data = await loadFinanceData(db)
+  const { costs, expenses, pagos, fxDe, fxSorted } = data
 
-  const costs = costsRes.data || []
-  const pagos = pagosRes.data || []
-  const expenses = (expensesRes.data || []) as Expense[]
-  const fxRows = fxRes.data || []
+  // Último análisis IA guardado del mes (para mostrarlo sin re-llamar a la IA).
+  const analisisRes = await db.from("finance_ai_analysis").select("*").eq("mes", mesSel).maybeSingle()
 
-  // Mapa de tipo de cambio + fallback al más reciente
-  const fxMap = new Map<string, number>()
-  fxRows.forEach((f) => fxMap.set(f.periodo_mes, Number(f.usd_ars)))
-  const fxSorted = [...fxRows].sort((a, b) => a.periodo_mes.localeCompare(b.periodo_mes))
-  const fxLatest = fxSorted.length ? Number(fxSorted[fxSorted.length - 1].usd_ars) : null
-  const fxDe = (mes: string): number | null => fxMap.get(mes) ?? fxLatest
-
-  // ---- Cálculo de un mes → todo en USD ----
-  function kpisDeMes(mes: string) {
-    const fx = fxDe(mes)
-
-    // Ingresos (pagos_agencia) en USD
-    let ingresos = 0
-    for (const p of pagos) {
-      if (p.periodo_mes !== mes) continue
-      const monto = Number(p.monto)
-      ingresos += p.moneda === "ARS" ? (fx ? monto / fx : 0) : monto
-    }
-
-    // Costos de IA (ya en USD)
-    const costosIa = costs
-      .filter((c) => (c.fecha || "").slice(0, 7) === mes)
-      .reduce((s, c) => s + Number(c.costo_usd), 0)
-
-    // Gastos operativos → USD, separados fijo/variable
-    let gastosFijos = 0
-    let gastosVariables = 0
-    for (const e of expenses) {
-      const monto = gastoDelMes(e, mes)
-      if (!monto) continue
-      const usd = e.moneda === "ARS" ? (fx ? monto / fx : 0) : monto
-      if (e.tipo === "fijo") gastosFijos += usd
-      else gastosVariables += usd
-    }
-
-    const costosVariables = costosIa + gastosVariables // COGS variable (escala con el uso)
-    const mc = ingresos - costosVariables // margen de contribución
-    const ebit = mc - gastosFijos // utilidad operativa (antes de impuestos/intereses)
-    const costosTotal = costosIa + gastosVariables + gastosFijos
-    const dol = ebit !== 0 ? mc / ebit : null // apalancamiento operativo
-    const margenPct = ingresos > 0 ? (ebit / ingresos) * 100 : null
-
-    return { fx, ingresos, costosIa, gastosFijos, gastosVariables, costosVariables, costosTotal, mc, ebit, dol, margenPct }
-  }
-
-  const kpis = kpisDeMes(mesSel)
+  const kpis = kpisDeMes(mesSel, data)
 
   // Breakdown de costos IA por proveedor (mes seleccionado)
   const provMap = new Map<string, number>()
@@ -139,7 +67,7 @@ export async function GET(request: NextRequest) {
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const mes = mesKey(d)
-    const k = kpisDeMes(mes)
+    const k = kpisDeMes(mes, data)
     evolucion.push({
       mes,
       ingresos_usd: k.ingresos,
@@ -148,6 +76,8 @@ export async function GET(request: NextRequest) {
       fx: k.fx,
     })
   }
+
+  const estadoResultado = estadoResultadoDeMes(mesSel, data)
 
   return NextResponse.json({
     mesSel,
@@ -164,10 +94,15 @@ export async function GET(request: NextRequest) {
       dol: kpis.dol,
       margenPct: kpis.margenPct,
     },
+    estadoResultado,
+    nAgenciasPagando: nAgenciasPagando(mesSel, pagos),
     providerBreakdown,
     categoriaBreakdown,
     evolucion,
     expenses,
     fxList: fxSorted,
+    ultimoAnalisis: analisisRes.data
+      ? { contenido: analisisRes.data.contenido, generated_at: analisisRes.data.generated_at, modelo: analisisRes.data.modelo }
+      : null,
   })
 }

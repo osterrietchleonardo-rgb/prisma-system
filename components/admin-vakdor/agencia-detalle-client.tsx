@@ -36,7 +36,7 @@ export default function AgenciaDetalleClient() {
   const [pagoModal, setPagoModal] = useState(false)
   const [creditForm, setCreditForm] = useState({ credits_total: 0, credits_director: 0, credits_asesores: 0, motivo: "" })
   const [creditInfo, setCreditInfo] = useState<{ numAsesores: number; creditsPorAsesor: number } | null>(null)
-  const [pagoForm, setPagoForm] = useState({ monto: "", moneda: "ARS", periodo_mes: "", notas: "" })
+  const [pagoForm, setPagoForm] = useState({ id: "", monto: "", moneda: "ARS", periodo_mes: "", notas: "" })
   const [msg, setMsg] = useState("")
 
   const fetchData = useCallback(async () => {
@@ -105,11 +105,49 @@ export default function AgenciaDetalleClient() {
     setActionLoading(false)
   }
 
-  async function registrarPago() {
+  function abrirNuevoPago() {
+    setPagoForm({ id: "", monto: "", moneda: "ARS", periodo_mes: "", notas: "" })
+    setPagoModal(true)
+  }
+
+  function editarPago(p: any) {
+    setPagoForm({
+      id: p.id,
+      monto: String(p.monto),
+      moneda: p.moneda,
+      periodo_mes: p.periodo_mes,
+      notas: p.notas ?? "",
+    })
+    setPagoModal(true)
+  }
+
+  async function guardarPago() {
     setActionLoading(true)
+    const payload = {
+      monto: parseFloat(pagoForm.monto),
+      moneda: pagoForm.moneda,
+      periodo_mes: pagoForm.periodo_mes,
+      notas: pagoForm.notas,
+    }
+
+    // Editar un pago existente (PATCH).
+    if (pagoForm.id) {
+      const res = await fetch(`/api/admin-vakdor/pagos/${pagoForm.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const d = await res.json()
+      if (res.ok) { fetchData(); setPagoModal(false); setMsg("Pago actualizado") }
+      else if (d.error === "PERIODO_OCUPADO") { setMsg(d.mensaje || "Ya hay un pago para ese mes en esta agencia.") }
+      else { setMsg(d.error || "Error al editar el pago") }
+      setActionLoading(false)
+      return
+    }
+
+    // Registrar un pago nuevo (POST).
     const res = await fetch(`/api/admin-vakdor/agencias/${id}/pagos`, {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...pagoForm, monto: parseFloat(pagoForm.monto) }),
+      body: JSON.stringify(payload),
     })
     const d = await res.json()
     if (res.ok) { fetchData(); setPagoModal(false); setMsg("Pago registrado") }
@@ -117,11 +155,20 @@ export default function AgenciaDetalleClient() {
       if (confirm("Ya existe un pago para este período. ¿Reemplazar?")) {
         const res2 = await fetch(`/api/admin-vakdor/agencias/${id}/pagos`, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...pagoForm, monto: parseFloat(pagoForm.monto), forzar: true }),
+          body: JSON.stringify({ ...payload, forzar: true }),
         })
         if (res2.ok) { fetchData(); setPagoModal(false); setMsg("Pago actualizado") }
       }
     } else { setMsg(d.error) }
+    setActionLoading(false)
+  }
+
+  async function borrarPago(p: any) {
+    if (!confirm(`¿Borrar el pago de ${p.periodo_mes} ($${Number(p.monto).toLocaleString()} ${p.moneda})? No se puede deshacer.`)) return
+    setActionLoading(true)
+    const res = await fetch(`/api/admin-vakdor/pagos/${p.id}`, { method: "DELETE" })
+    if (res.ok) { fetchData(); setMsg("Pago eliminado") }
+    else { const d = await res.json().catch(() => ({})); setMsg(d.error || "Error al eliminar el pago") }
     setActionLoading(false)
   }
 
@@ -258,13 +305,19 @@ export default function AgenciaDetalleClient() {
                 : <span style={{ color: "#f87171", fontSize: 12 }}>✗ Sin pago {pagos.mesActual}</span>
               }
             </div>
-            <button onClick={() => setPagoModal(true)} style={btnStyle("primary")}>+ Registrar pago</button>
+            <button onClick={abrirNuevoPago} style={btnStyle("primary")}>+ Registrar pago</button>
           </div>
           <div style={{ maxHeight: 160, overflowY: "auto" }}>
             {pagos.historial.slice(0, 8).map((p: any) => (
-              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: 12 }}>
+              <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: "1px solid rgba(255,255,255,0.04)", fontSize: 12 }}>
                 <span style={{ color: "rgba(255,255,255,0.6)" }}>{p.periodo_mes}</span>
-                <span style={{ color: "#34d399", fontWeight: 600 }}>${Number(p.monto).toLocaleString()} {p.moneda}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ color: "#34d399", fontWeight: 600 }}>${Number(p.monto).toLocaleString()} {p.moneda}</span>
+                  <button onClick={() => editarPago(p)} disabled={actionLoading} title="Editar pago"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", fontSize: 13, lineHeight: 1, padding: 0 }}>✏️</button>
+                  <button onClick={() => borrarPago(p)} disabled={actionLoading} title="Borrar pago"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "rgba(239,68,68,0.75)", fontSize: 13, lineHeight: 1, padding: 0 }}>🗑️</button>
+                </div>
               </div>
             ))}
           </div>
@@ -450,7 +503,7 @@ export default function AgenciaDetalleClient() {
       {pagoModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
           <div style={{ background: "#0d1117", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 14, padding: 28, width: 380 }}>
-            <h3 style={{ color: "#fff", margin: "0 0 18px" }}>Registrar Pago</h3>
+            <h3 style={{ color: "#fff", margin: "0 0 18px" }}>{pagoForm.id ? "Editar Pago" : "Registrar Pago"}</h3>
             <input type="month" value={pagoForm.periodo_mes}
               onChange={e => setPagoForm(f => ({ ...f, periodo_mes: e.target.value }))} style={{ ...inputStyle, marginBottom: 10 }} />
             <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -463,8 +516,8 @@ export default function AgenciaDetalleClient() {
             <input placeholder="Notas (opcional)" value={pagoForm.notas}
               onChange={e => setPagoForm(f => ({ ...f, notas: e.target.value }))} style={{ ...inputStyle, marginBottom: 16 }} />
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={registrarPago} disabled={!pagoForm.monto || !pagoForm.periodo_mes || actionLoading} style={{ ...btnStyle("primary"), flex: 1 }}>
-                {actionLoading ? "Guardando..." : "Registrar"}
+              <button onClick={guardarPago} disabled={!pagoForm.monto || !pagoForm.periodo_mes || actionLoading} style={{ ...btnStyle("primary"), flex: 1 }}>
+                {actionLoading ? "Guardando..." : pagoForm.id ? "Guardar cambios" : "Registrar"}
               </button>
               <button onClick={() => setPagoModal(false)} style={{ ...btnStyle("ghost"), flex: 1 }}>Cancelar</button>
             </div>

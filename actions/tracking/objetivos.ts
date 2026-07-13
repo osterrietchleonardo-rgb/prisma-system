@@ -132,3 +132,89 @@ export async function saveObjectives(input: SaveObjectivesInput) {
 
   return { success: true, saved: rows.length };
 }
+
+// ── Pesos mensuales (%) para repartir el total anual ─────────────────────────
+
+export interface ObjectiveWeightRow {
+  metric: ObjectiveMetric;
+  month: number; // 1-12
+  weight_pct: number;
+}
+
+/** Lee los % mensuales guardados de la agencia para un año (todas las métricas). */
+export async function getObjectiveWeights(year: number): Promise<ObjectiveWeightRow[]> {
+  const { agencyId } = await getDirectorContext();
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("performance_objective_weights")
+    .select("metric, month, weight_pct")
+    .eq("agency_id", agencyId)
+    .eq("year", year);
+
+  if (error) {
+    console.error("Error fetching objective weights", error);
+    return [];
+  }
+  return (data || []).map((r: any) => ({
+    metric: r.metric as ObjectiveMetric,
+    month: Number(r.month),
+    weight_pct: Number(r.weight_pct) || 0,
+  }));
+}
+
+/**
+ * Guarda (upsert) los 12 % de UNA métrica para un año.
+ * Valida: rol director, métrica válida, meses 1-12, y que los 12 sumen 100 (±0.01).
+ * Escribe siempre las 12 filas (los meses no provistos quedan en 0).
+ */
+export async function saveObjectiveWeights(input: {
+  year: number;
+  metric: ObjectiveMetric;
+  weights: { month: number; weight_pct: number }[];
+}) {
+  const { userId, agencyId } = await getDirectorContext();
+
+  const validMetrics: ObjectiveMetric[] = ["facturacion", "captacion"];
+  if (!validMetrics.includes(input.metric)) {
+    throw new Error("Métrica inválida");
+  }
+
+  const byMonth = new Map<number, number>();
+  for (const w of input.weights) {
+    if (w.month >= 1 && w.month <= 12) {
+      const v = Number(w.weight_pct);
+      byMonth.set(w.month, Number.isFinite(v) ? Math.max(0, v) : 0);
+    }
+  }
+
+  const suma = [...byMonth.values()].reduce((s, v) => s + v, 0);
+  if (Math.abs(suma - 100) > 0.01) {
+    throw new Error("Los porcentajes deben sumar 100%");
+  }
+
+  const rows = [];
+  for (let m = 1; m <= 12; m++) {
+    rows.push({
+      agency_id: agencyId,
+      year: input.year,
+      metric: input.metric,
+      month: m,
+      weight_pct: byMonth.get(m) ?? 0,
+      created_by: userId,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  const supabaseAdmin = createAdminClient();
+  const { error } = await supabaseAdmin
+    .from("performance_objective_weights")
+    .upsert(rows, { onConflict: "agency_id,year,metric,month" });
+
+  if (error) {
+    console.error("Error saving objective weights", error);
+    throw new Error(error.message);
+  }
+
+  revalidatePath("/director/tracking-performance");
+  return { success: true };
+}
