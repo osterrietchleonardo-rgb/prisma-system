@@ -1564,7 +1564,7 @@ Sistema de auth **completamente separado** de Supabase Auth:
 | `/api/admin-vakdor/bandejas/[id]` | GET | Detalle de una conversación (mensajes) de cualquier agencia |
 | `/api/admin-vakdor/dashboard/metricas` | GET | Métricas globales del SaaS |
 | `/api/admin-vakdor/invitaciones` | GET | Códigos de invitación |
-| `/api/admin-vakdor/pagos/[pago_id]` | PATCH | Gestionar pago |
+| `/api/admin-vakdor/pagos/[pago_id]` | PATCH/DELETE | Editar (monto/moneda/notas + mes, con chequeo de duplicado) o **borrar** un pago |
 | `/api/admin-vakdor/sugerencias` | GET | Todas las sugerencias |
 | `/api/admin-vakdor/sugerencias/metricas` | GET | Métricas de sugerencias |
 | `/api/admin-vakdor/sugerencias/[id]` | GET | Detalle de sugerencia |
@@ -1581,7 +1581,7 @@ Sistema de auth **completamente separado** de Supabase Auth:
 
 Panel económico/contable del dueño (`/admin-vakdor/finanzas`). Objetivo: trazabilidad de costos y rentabilidad para tomar decisiones informadas y mostrar el panorama a inversores.
 
-**Qué muestra:** KPIs de P&L (Ingresos, Costos de IA, Gastos fijos/variables, Margen de contribución, Utilidad EBIT, Margen neto, **Apalancamiento operativo = MC/EBIT**), evolución mensual ingresos vs costos (12 meses), tortas de costo por proveedor y gasto por categoría, estado de resultados desglosado, tabla de gastos con alta/edición/baja, y toggle **USD/ARS**.
+**Qué muestra:** KPIs de P&L (Ingresos, Costos de IA, Gastos fijos/variables, Margen de contribución, Utilidad EBIT, Margen neto, **Apalancamiento operativo = MC/EBIT**), evolución mensual ingresos vs costos (12 meses), tortas de costo por proveedor y gasto por categoría, **Estado de Resultado contable clásico** (ventas → costo de ventas → utilidad bruta → gastos operativos → utilidad operativa → gastos financieros → utilidad antes de impuestos → impuestos → utilidad neta, con sub-renglones desglosados y % sobre ventas), **Punto de equilibrio** (en cantidad de agencias, prellenado con datos reales y editable para simular), **Análisis del experto IA** (Gemini), tabla de gastos con alta/edición/baja, y toggle **USD/ARS**.
 
 **De dónde salen los números:**
 - **Costos de IA (reales):** se traen automáticamente de las cost APIs de OpenAI (USD), Anthropic (centavos→USD, requiere cuenta Organización) y Gemini (export FOCUS de Google Cloud a BigQuery), **2×/día**, y se guardan en `finance_api_costs`. Detalle técnico en TÉCNICO §16.1.
@@ -1590,6 +1590,12 @@ Panel económico/contable del dueño (`/admin-vakdor/finanzas`). Objetivo: traza
 - **Tipo de cambio:** carga manual mensual en `finance_fx` para mostrar todo también en pesos.
 
 **Cálculo:** MC = Ingresos − costos variables (costos de IA + gastos variables); EBIT = MC − gastos fijos; Apalancamiento = MC / EBIT; Margen neto = EBIT / Ingresos. Todo se unifica a USD y se convierte a ARS con el tipo de cambio del mes.
+
+**Estado de Resultado (mapeo por categoría):** ventas = ingresos; costo de ventas = costos de IA + gastos de categoría {infraestructura, proxy}; gastos operativos = {sueldos, marketing, suscripción, otro}; gastos financieros = categoría **{financiero}** (nueva); impuestos = {impuestos}. Los renglones compuestos se muestran **desglosados por sub-ítem** y las utilidades traen su **% sobre ventas**.
+
+**Punto de equilibrio:** una unidad = una agencia que paga. Prellena precio = ingresos/#agencias, costo variable unitario = (costos IA + gastos variables)/#agencias y gastos fijos del mes; calcula el margen de contribución unitario y el **nº de agencias necesarias para cubrir los fijos**. Todo editable para simular escenarios ("¿y si subo el precio?").
+
+**Experto IA (Gemini 3.5 Flash):** el botón **"Actualizar"** (antes "Sincronizar costos") trae los costos, recalcula y corre el análisis, que devuelve diagnóstico + mejoras + optimización de costos + próximos pasos + riesgos. Se guarda el último análisis por mes (`finance_ai_analysis`) y se muestra al entrar sin volver a gastar IA. Detalle técnico en TÉCNICO §16.1.
 
 ### 23.3 Auditoría diaria del sistema
 
@@ -1971,8 +1977,8 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 - **Tab "Objetivos" (solo director, `PerformanceObjectivesEditor`):**
   - Matriz asesores × 12 meses para cargar la meta mensual de **Facturación** (USD) y **Captación** (cantidad). Toggle de métrica + filtro de año.
   - **Edición temporal:** solo el mes en curso y los futuros son editables (`isMonthLocked`); meses cerrados se bloquean y los años anteriores quedan en solo lectura (historial de planificaciones).
-  - **"Aplicar a todos":** copia un valor a todos los meses editables de un asesor.
-  - **Server Actions** (`actions/tracking/objetivos.ts`): `getAgencyAdvisors`, `getObjectivesForEditor(year)` y `saveObjectives({year, cells})`. `saveObjectives` valida `role='director'`, descarta meses cerrados, fuerza el `agency_id` desde el perfil y hace `upsert` con `createAdminClient()` sobre `performance_objectives` (`onConflict: agent_id,year,month,metric`). Revalida los paths del tracking y los dashboards.
+  - **% mensuales y "Total del año":** una fila superior define, por año y **por métrica**, el **peso en % de cada mes** (común a toda la agencia); deben **sumar 100** (contador en vivo, verde/rojo). La columna derecha pasa a ser **"Total del año"**: al Aplicar reparte ese total por mes (`objetivo_mes = total × %`), salteando meses cerrados. Los % se guardan en `performance_objective_weights` (un juego por métrica).
+  - **Server Actions** (`actions/tracking/objetivos.ts`): `getAgencyAdvisors`, `getObjectivesForEditor(year)` y `saveObjectives({year, cells})`. `saveObjectives` valida `role='director'`, descarta meses cerrados, fuerza el `agency_id` desde el perfil y hace `upsert` con `createAdminClient()` sobre `performance_objectives` (`onConflict: agent_id,year,month,metric`). Revalida los paths del tracking y los dashboards. Para los %: `getObjectiveWeights(year)` / `saveObjectiveWeights({year, metric, weights})` (valida rol director + que los 12 % sumen 100) sobre `performance_objective_weights` (`onConflict: agency_id,year,metric,month`).
   - **Alcanzado (derivado, no se guarda):** `lib/tracking/objetivos.ts` → `getAchievedByAgentMonth` agrupa `performance_logs` por asesor×mes con la misma fórmula del Dashboard (facturación = Σ monto·comisión/100 sobre cierres; captación = nº de captaciones).
 - **Formulario de Registro (PerformanceLogForm):**
   - **Activos Vinculados:**
@@ -2066,7 +2072,7 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 | `/api/admin-vakdor/dashboard/metricas` | GET | Admin JWT | Métricas globales |
 | `/api/admin-vakdor/directores/[id]/estado` | PATCH | Admin JWT | Estado director |
 | `/api/admin-vakdor/invitaciones` | GET | Admin JWT | Invitaciones |
-| `/api/admin-vakdor/pagos/[pago_id]` | PATCH | Admin JWT | Gestionar pago |
+| `/api/admin-vakdor/pagos/[pago_id]` | PATCH/DELETE | Admin JWT | Editar/borrar pago |
 | `/api/admin-vakdor/sugerencias` | GET | Admin JWT | Sugerencias |
 | `/api/admin-vakdor/sugerencias/metricas` | GET | Admin JWT | Métricas sug. |
 | `/api/admin-vakdor/sugerencias/[id]` | GET | Admin JWT | Detalle sug. |

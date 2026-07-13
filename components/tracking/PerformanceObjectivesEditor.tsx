@@ -16,6 +16,8 @@ import {
   getAgencyAdvisors,
   getObjectivesForEditor,
   saveObjectives,
+  getObjectiveWeights,
+  saveObjectiveWeights,
 } from "@/actions/tracking/objetivos";
 import {
   MONTH_NAMES,
@@ -35,6 +37,9 @@ type ValuesMap = Record<string, string>;
 const cellKey = (agentId: string, metric: ObjectiveMetric, month: number) =>
   `${agentId}|${metric}|${month}`;
 
+// key: `${metric}|${month}` -> string (raw input) para los % mensuales
+const weightKey = (metric: ObjectiveMetric, month: number) => `${metric}|${month}`;
+
 export function PerformanceObjectivesEditor() {
   const now = useMemo(() => new Date(), []);
   const currentYear = now.getFullYear();
@@ -43,9 +48,11 @@ export function PerformanceObjectivesEditor() {
   const [metric, setMetric] = useState<ObjectiveMetric>("facturacion");
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [values, setValues] = useState<ValuesMap>({});
-  const [bulk, setBulk] = useState<Record<string, string>>({}); // agentId -> bulk value
+  const [weights, setWeights] = useState<Record<string, string>>({}); // `${metric}|${month}` -> raw %
+  const [bulk, setBulk] = useState<Record<string, string>>({}); // agentId -> total del año
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingWeights, setIsSavingWeights] = useState(false);
   const [dirty, setDirty] = useState(false);
 
   const yearOptions = useMemo(() => {
@@ -57,12 +64,24 @@ export function PerformanceObjectivesEditor() {
   const metricMeta = OBJECTIVE_METRICS.find((m) => m.key === metric)!;
   const isYearReadOnly = year < currentYear;
 
+  // Suma de los % de la métrica activa (para el contador y para habilitar el reparto).
+  const sumaPesos = useMemo(() => {
+    let s = 0;
+    for (let m = 1; m <= 12; m++) {
+      const v = Number(weights[weightKey(metric, m)]);
+      if (Number.isFinite(v)) s += v;
+    }
+    return s;
+  }, [weights, metric]);
+  const pesos100 = Math.abs(sumaPesos - 100) < 0.01;
+
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [adv, objs] = await Promise.all([
+      const [adv, objs, wts] = await Promise.all([
         getAgencyAdvisors(),
         getObjectivesForEditor(year),
+        getObjectiveWeights(year),
       ]);
       setAdvisors(adv);
       const next: ValuesMap = {};
@@ -70,6 +89,11 @@ export function PerformanceObjectivesEditor() {
         next[cellKey(o.agent_id, o.metric, o.month)] = String(Number(o.target_value) || 0);
       }
       setValues(next);
+      const nextW: Record<string, string> = {};
+      for (const w of wts) {
+        nextW[weightKey(w.metric, w.month)] = String(Number(w.weight_pct) || 0);
+      }
+      setWeights(nextW);
       setBulk({});
       setDirty(false);
     } catch (e: any) {
@@ -89,23 +113,58 @@ export function PerformanceObjectivesEditor() {
     setDirty(true);
   };
 
+  const setWeightCell = (month: number, raw: string) => {
+    setWeights((prev) => ({ ...prev, [weightKey(metric, month)]: raw }));
+  };
+
+  const saveWeights = async () => {
+    if (!pesos100) {
+      toast.error("Los porcentajes deben sumar 100%");
+      return;
+    }
+    setIsSavingWeights(true);
+    try {
+      const ws = [];
+      for (let m = 1; m <= 12; m++) {
+        ws.push({ month: m, weight_pct: Number(weights[weightKey(metric, m)]) || 0 });
+      }
+      await saveObjectiveWeights({ year, metric, weights: ws });
+      toast.success(`Porcentajes de ${metricMeta.label} guardados`);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e?.message || "No se pudieron guardar los porcentajes");
+    } finally {
+      setIsSavingWeights(false);
+    }
+  };
+
+  // "Aplicar a todos" ahora reparte el TOTAL DEL AÑO según los % de cada mes.
   const applyToAll = (agentId: string) => {
     const raw = bulk[agentId];
     if (raw === undefined || raw === "") {
-      toast.error("Escribe un valor para aplicar a todos los meses");
+      toast.error("Escribí el total del año para repartir");
+      return;
+    }
+    if (!pesos100) {
+      toast.error("Cargá los % del año — deben sumar 100%");
+      return;
+    }
+    const total = Number(raw);
+    if (!Number.isFinite(total)) {
+      toast.error("El total del año no es un número válido");
       return;
     }
     setValues((prev) => {
       const next = { ...prev };
       for (let m = 1; m <= 12; m++) {
-        if (!isMonthLocked(year, m, now)) {
-          next[cellKey(agentId, metric, m)] = raw;
-        }
+        if (isMonthLocked(year, m, now)) continue;
+        const w = Number(weights[weightKey(metric, m)]) || 0;
+        next[cellKey(agentId, metric, m)] = String(Math.round((total * w) / 100));
       }
       return next;
     });
     setDirty(true);
-    toast.success("Valor aplicado a los meses editables");
+    toast.success("Total repartido por mes según los %");
   };
 
   const handleSave = async () => {
@@ -233,11 +292,65 @@ export function PerformanceObjectivesEditor() {
                     );
                   })}
                   <th className="px-3 py-3 font-bold text-center min-w-[200px] border-l border-accent/10">
-                    Aplicar a todos
+                    Total del año
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-accent/5">
+                {/* Fila de % por mes (común a la agencia, por año y métrica) */}
+                <tr className="bg-accent/[0.07] border-b border-accent/15">
+                  <td className="px-5 py-3 sticky left-0 bg-card/95 backdrop-blur-md z-10 border-r border-accent/10">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-[11px] font-bold text-accent">% del mes</span>
+                      <span
+                        className={`text-[10px] font-semibold ${
+                          pesos100 ? "text-emerald-400" : "text-red-400"
+                        }`}
+                      >
+                        Suma: {Number.isInteger(sumaPesos) ? sumaPesos : sumaPesos.toFixed(1)}%{" "}
+                        {pesos100 ? "✓" : "✗"}
+                      </span>
+                    </div>
+                  </td>
+                  {MONTH_NAMES.map((mn, i) => {
+                    const month = i + 1;
+                    const w = weights[weightKey(metric, month)] ?? "";
+                    return (
+                      <td key={mn} className="px-1.5 py-2 text-center">
+                        <Input
+                          type="number"
+                          min={0}
+                          max={100}
+                          inputMode="decimal"
+                          value={w}
+                          disabled={isYearReadOnly}
+                          onChange={(e) => setWeightCell(month, e.target.value)}
+                          placeholder="0"
+                          className={`h-8 w-[72px] text-center text-xs px-1 rounded-lg bg-background/40 border-accent/20 ${
+                            isYearReadOnly ? "opacity-40 cursor-not-allowed" : "focus:border-accent/50"
+                          }`}
+                        />
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-2 border-l border-accent/10 text-center">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={isYearReadOnly || !pesos100 || isSavingWeights}
+                      onClick={saveWeights}
+                      className="h-8 px-2 gap-1 text-[11px] rounded-lg border-accent/30"
+                    >
+                      {isSavingWeights ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Save className="w-3 h-3" />
+                      )}
+                      Guardar %
+                    </Button>
+                  </td>
+                </tr>
                 {advisors.map((adv) => (
                   <tr key={adv.id} className="hover:bg-accent/5 transition-colors">
                     <td className="px-5 py-3 sticky left-0 bg-card/95 backdrop-blur-md z-10 border-r border-accent/10 font-semibold text-foreground/90 truncate max-w-[180px]">
@@ -272,8 +385,8 @@ export function PerformanceObjectivesEditor() {
                           value={bulk[adv.id] ?? ""}
                           disabled={isYearReadOnly}
                           onChange={(e) => setBulk((p) => ({ ...p, [adv.id]: e.target.value }))}
-                          placeholder="valor"
-                          className="h-8 w-[90px] text-center text-xs rounded-lg bg-background/40 border-white/5"
+                          placeholder="Total año"
+                          className="h-8 w-[100px] text-center text-xs rounded-lg bg-background/40 border-white/5"
                         />
                         <Button
                           type="button"
@@ -293,8 +406,9 @@ export function PerformanceObjectivesEditor() {
             </table>
           </div>
           <p className="px-5 py-3 text-[11px] text-muted-foreground border-t border-accent/5">
-            Los meses ya cerrados aparecen bloqueados. Solo se pueden editar el mes en curso y los
-            futuros. "Aplicar a todos" copia el valor a los meses editables de ese asesor.
+            Definí el % de cada mes (deben sumar 100%) y guardalos. Después, por asesor, escribí el
+            total del año y apretá "Aplicar": cada mes se completa con total × % del mes. Los meses ya
+            cerrados aparecen bloqueados y no se tocan.
           </p>
         </div>
       )}

@@ -9,6 +9,20 @@ interface Expense {
   monto: number; moneda: "USD" | "ARS"; recurrencia: "mensual" | "anual" | "unico"
   fecha_inicio: string; fecha_fin: string | null; proveedor: string | null; notas: string | null; activo: boolean
 }
+interface EstadoResultado {
+  ventas: number; costoVentas: number; utilidadBruta: number; gastosOperativos: number
+  utilidadOperativa: number; gastosFinancieros: number; utilidadAntesImpuestos: number
+  impuestos: number; utilidadNeta: number
+  detalle: {
+    costoVentas: { label: string; monto: number }[]
+    gastosOperativos: { label: string; monto: number }[]
+  }
+}
+interface AnalisisIA {
+  diagnostico: string; mejoras: string[]; optimizacion_costos: string[]
+  proximos_pasos: string[]; riesgos: string[]
+}
+interface AnalisisGuardado { contenido: AnalisisIA; generated_at: string; modelo: string }
 interface Metricas {
   mesSel: string
   fxPeriodo: number | null
@@ -17,17 +31,20 @@ interface Metricas {
     ingresos: number; costosIa: number; gastosFijos: number; gastosVariables: number
     costosTotal: number; mc: number; ebit: number; dol: number | null; margenPct: number | null
   }
+  estadoResultado: EstadoResultado
+  nAgenciasPagando: number
   providerBreakdown: { proveedor: string; costo_usd: number }[]
   categoriaBreakdown: { categoria: string; monto_usd: number }[]
   evolucion: { mes: string; ingresos_usd: number; costos_usd: number; ebit_usd: number; fx: number | null }[]
   expenses: Expense[]
   fxList: { periodo_mes: string; usd_ars: number }[]
+  ultimoAnalisis: AnalisisGuardado | null
 }
 
 // ---------------- helpers ----------------
 const PROV_LABEL: Record<string, string> = { openai: "OpenAI", anthropic: "Anthropic", google: "Gemini" }
 const PROV_COLOR: Record<string, string> = { openai: "#10b981", anthropic: "#B87333", google: "#6366f1" }
-const CAT_LABEL: Record<string, string> = { suscripcion: "Suscripción", infraestructura: "Infraestructura", proxy: "Proxy", marketing: "Marketing", sueldos: "Sueldos", impuestos: "Impuestos", otro: "Otro" }
+const CAT_LABEL: Record<string, string> = { suscripcion: "Suscripción", infraestructura: "Infraestructura", proxy: "Proxy", marketing: "Marketing", sueldos: "Sueldos", impuestos: "Impuestos", financiero: "Financiero", otro: "Otro" }
 const CAT_COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#B87333", "#e29e6d", "#10b981", "#64748b"]
 
 function mesLabel(mes: string) {
@@ -92,6 +109,10 @@ export default function FinanzasClient() {
   const [moneda, setMoneda] = useState<"USD" | "ARS">("USD")
   const [syncing, setSyncing] = useState(false)
   const [syncMsg, setSyncMsg] = useState("")
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analisis, setAnalisis] = useState<AnalisisGuardado | null>(null)
+  // Simulador de punto de equilibrio: null = usar datos reales; objeto = valores editados.
+  const [beOverride, setBeOverride] = useState<{ precio: string; costo: string; fijos: string } | null>(null)
 
   // form gasto
   const [showForm, setShowForm] = useState(false)
@@ -108,6 +129,8 @@ export default function FinanzasClient() {
       const d = await r.json()
       if (!r.ok) throw new Error(d.error || "Error")
       setData(d); setError("")
+      setAnalisis(d.ultimoAnalisis || null)
+      setBeOverride(null)
     } catch (e) { setError(e instanceof Error ? e.message : "Error cargando finanzas") }
     setLoading(false)
   }
@@ -137,16 +160,36 @@ export default function FinanzasClient() {
   const provDonut = (data?.providerBreakdown || []).map((p) => ({ label: PROV_LABEL[p.proveedor] || p.proveedor, value: Math.round(p.costo_usd * 10000) / 10000, color: PROV_COLOR[p.proveedor] || "#64748b" })).filter((d) => d.value > 0)
   const catDonut = (data?.categoriaBreakdown || []).map((c, i) => ({ label: CAT_LABEL[c.categoria] || c.categoria, value: Math.round(c.monto_usd * 100) / 100, color: CAT_COLORS[i % CAT_COLORS.length] })).filter((d) => d.value > 0)
 
-  async function sync() {
+  // Botón "Actualizar": 1) trae costos de IA, 2) recarga métricas, 3) corre el
+  // análisis del experto IA (Gemini). Los tres pasos, en un solo botón.
+  async function actualizar() {
     setSyncing(true); setSyncMsg("")
     try {
+      // 1) Costos de IA
       const r = await fetch(`/api/admin-vakdor/finance/sync?days=3`, { method: "POST" })
       const d = await r.json()
       if (!r.ok) throw new Error(d.error || "Error")
       const tot = (d.results || []).map((x: { proveedor: string; ok: boolean }) => `${x.proveedor}${x.ok ? "✓" : "✗"}`).join(" ")
-      setSyncMsg(`Sincronizado: ${tot}`)
+      setSyncMsg(`Costos: ${tot} · analizando con IA…`)
+
+      // 2) Recargar métricas / estado de resultado / punto de equilibrio
       await load(mesSel)
+
+      // 3) Análisis del experto IA
+      setAnalyzing(true)
+      const ra = await fetch(`/api/admin-vakdor/finance/analisis`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mes: mesSel }),
+      })
+      if (ra.ok) {
+        const da = await ra.json()
+        setAnalisis({ contenido: da.contenido, generated_at: da.generated_at, modelo: da.modelo })
+        setSyncMsg(`Actualizado · análisis IA listo`)
+      } else {
+        setSyncMsg(`Actualizado · el análisis IA no se pudo generar (los números están al día)`)
+      }
     } catch (e) { setSyncMsg(e instanceof Error ? e.message : "Error") }
+    setAnalyzing(false)
     setSyncing(false)
   }
 
@@ -187,6 +230,28 @@ export default function FinanzasClient() {
   const positivo = k.ebit >= 0
   const meses = ultimosMeses(18)
 
+  const er = data.estadoResultado
+  const pctV = (v: number) => (er.ventas > 0 ? (v / er.ventas) * 100 : null)
+
+  // ── Punto de equilibrio (en la moneda elegida) ──
+  const cv = (usd: number) => { const v = conv(usd); return Number.isFinite(v) ? v : 0 }
+  const nAg = data.nAgenciasPagando
+  const bePrecioReal = nAg > 0 ? cv(k.ingresos) / nAg : 0
+  const beCostoReal = nAg > 0 ? cv(k.costosIa + k.gastosVariables) / nAg : 0
+  const beFijosReal = cv(k.gastosFijos)
+  const beRound = (v: number) => Math.round(v).toString()
+  const bePrecio = beOverride ? Number(beOverride.precio) || 0 : bePrecioReal
+  const beCosto = beOverride ? Number(beOverride.costo) || 0 : beCostoReal
+  const beFijos = beOverride ? Number(beOverride.fijos) || 0 : beFijosReal
+  const beMcUnit = bePrecio - beCosto
+  const bePuntoEq = beMcUnit > 0 ? Math.ceil(beFijos / beMcUnit) : null
+  const setBe = (field: "precio" | "costo" | "fijos", val: string) => {
+    setBeOverride((prev) => {
+      const base = prev ?? { precio: beRound(bePrecioReal), costo: beRound(beCostoReal), fijos: beRound(beFijosReal) }
+      return { ...base, [field]: val }
+    })
+  }
+
   return (
     <div style={{ padding: "28px 32px", minHeight: "100%" }}>
       {/* Header */}
@@ -207,12 +272,12 @@ export default function FinanzasClient() {
               }}>{mo}</button>
             ))}
           </div>
-          <button onClick={sync} disabled={syncing} style={{
+          <button onClick={actualizar} disabled={syncing} title="Trae costos de IA, recalcula y corre el análisis del experto IA" style={{
             display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", borderRadius: 8, cursor: syncing ? "wait" : "pointer",
             background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", color: "#a5b4fc", fontSize: 12, fontWeight: 600, transition: "all 0.15s",
           }}>
             <span style={{ display: "flex", animation: syncing ? "spin 1s linear infinite" : "none" }}><Icon d={ICONS.sync} color="#a5b4fc" size={14} /></span>
-            {syncing ? "Sincronizando…" : "Sincronizar costos"}
+            {syncing ? (analyzing ? "Analizando…" : "Actualizando…") : "Actualizar"}
           </button>
         </div>
       </div>
@@ -258,18 +323,99 @@ export default function FinanzasClient() {
       {/* P&L breakdown + categorías */}
       <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, marginBottom: 26 }}>
         <div style={{ ...card, padding: 22 }}>
-          <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Estado de Resultados · {mesLabel(mesSel)}</h3>
-          <PnLRow label="Ingresos" value={money(k.ingresos)} bold />
-          <PnLRow label="− Costos de IA" value={money(k.costosIa)} neg />
-          <PnLRow label="− Gastos variables" value={money(k.gastosVariables)} neg />
-          <PnLRow label="= Margen de contribución" value={money(k.mc)} sep bold color="#10b981" />
-          <PnLRow label="− Gastos fijos" value={money(k.gastosFijos)} neg />
-          <PnLRow label="= Utilidad operativa (EBIT)" value={money(k.ebit)} sep bold color={positivo ? "#10b981" : "#ef4444"} />
+          <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Estado de Resultado · {mesLabel(mesSel)}</h3>
+          <PnLRow label="Ventas" value={money(er.ventas)} bold />
+          <PnLRow label="− Costo de ventas" value={money(er.costoVentas)} neg />
+          {er.detalle.costoVentas.map((d) => (
+            <PnLSub key={`cv-${d.label}`} label={d.label} value={money(d.monto)} />
+          ))}
+          <PnLRow label="= Utilidad bruta" value={money(er.utilidadBruta)} sep bold pct={pctV(er.utilidadBruta)} color={er.utilidadBruta >= 0 ? "#10b981" : "#ef4444"} />
+          <PnLRow label="− Gastos operativos" value={money(er.gastosOperativos)} neg />
+          {er.detalle.gastosOperativos.map((d) => (
+            <PnLSub key={`go-${d.label}`} label={d.label} value={money(d.monto)} />
+          ))}
+          <PnLRow label="= Utilidad operativa" value={money(er.utilidadOperativa)} sep bold pct={pctV(er.utilidadOperativa)} color={er.utilidadOperativa >= 0 ? "#10b981" : "#ef4444"} />
+          <PnLRow label="− Gastos financieros" value={money(er.gastosFinancieros)} neg />
+          <PnLRow label="= Utilidad antes de impuestos" value={money(er.utilidadAntesImpuestos)} sep bold pct={pctV(er.utilidadAntesImpuestos)} color={er.utilidadAntesImpuestos >= 0 ? "#10b981" : "#ef4444"} />
+          <PnLRow label="− Impuestos" value={money(er.impuestos)} neg />
+          <PnLRow label="= Utilidad neta" value={money(er.utilidadNeta)} sep bold pct={pctV(er.utilidadNeta)} color={er.utilidadNeta >= 0 ? "#10b981" : "#ef4444"} />
         </div>
         <div style={{ ...card, padding: 20 }}>
           <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Gastos por categoría</h3>
           {catDonut.length ? <DonutChart data={catDonut} size={170} /> : <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", paddingTop: 40, fontSize: 13 }}>Sin gastos cargados</div>}
         </div>
+      </div>
+
+      {/* Punto de equilibrio */}
+      <div style={{ ...card, padding: 22, marginBottom: 26 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, flexWrap: "wrap", gap: 8 }}>
+          <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon d={ICONS.palanca} color="#B87333" size={16} /> Punto de equilibrio
+          </h3>
+          {beOverride && (
+            <button onClick={() => setBeOverride(null)} style={{ background: "none", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 7, color: "rgba(255,255,255,0.6)", fontSize: 11, padding: "5px 10px", cursor: "pointer" }}>
+              Restablecer con datos reales
+            </button>
+          )}
+        </div>
+        <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, margin: "0 0 16px" }}>
+          Una unidad = una agencia que paga. Prellenado con datos reales de {mesLabel(mesSel)} · editá para simular. {nAg > 0 ? `${nAg} agencia${nAg !== 1 ? "s" : ""} con pago este mes` : "sin agencias con pago este mes"}
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14 }}>
+          <div>
+            <label style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, display: "block", marginBottom: 5 }}>Precio / agencia ({moneda})</label>
+            <input type="number" min={0} value={beOverride ? beOverride.precio : beRound(bePrecioReal)} onChange={(e) => setBe("precio", e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, display: "block", marginBottom: 5 }}>Costo variable / agencia ({moneda})</label>
+            <input type="number" min={0} value={beOverride ? beOverride.costo : beRound(beCostoReal)} onChange={(e) => setBe("costo", e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, display: "block", marginBottom: 5 }}>Gastos fijos ({moneda})</label>
+            <input type="number" min={0} value={beOverride ? beOverride.fijos : beRound(beFijosReal)} onChange={(e) => setBe("fijos", e.target.value)} style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, display: "block", marginBottom: 5 }}>Margen contribución / agencia</label>
+            <div style={{ color: beMcUnit > 0 ? "#10b981" : "#ef4444", fontSize: 20, fontWeight: 700 }}>{simbolo}{beMcUnit.toLocaleString("es-AR", { maximumFractionDigits: 0 })}</div>
+          </div>
+          <div>
+            <label style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, display: "block", marginBottom: 5 }}>Punto de equilibrio</label>
+            <div style={{ color: "#B87333", fontSize: 20, fontWeight: 700 }}>{bePuntoEq != null ? `${bePuntoEq} agencia${bePuntoEq !== 1 ? "s" : ""}` : "—"}</div>
+          </div>
+        </div>
+        {beMcUnit <= 0 && (
+          <div style={{ marginTop: 14, color: "#fbbf24", fontSize: 12 }}>⚠ Con estos números no hay punto de equilibrio: el precio no cubre el costo variable por agencia.</div>
+        )}
+      </div>
+
+      {/* Análisis del experto (IA) */}
+      <div style={{ ...card, padding: 22, marginBottom: 26 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, flexWrap: "wrap", gap: 8 }}>
+          <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+            <Icon d={ICONS.ia} color="#8b5cf6" size={16} /> Análisis del experto (IA)
+          </h3>
+          {analisis && (
+            <span style={{ color: "rgba(255,255,255,0.35)", fontSize: 11 }}>
+              {analisis.modelo} · {new Date(analisis.generated_at).toLocaleString("es-AR")}
+            </span>
+          )}
+        </div>
+        {analyzing ? (
+          <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, padding: "16px 0" }}>Analizando con IA…</div>
+        ) : !analisis ? (
+          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, padding: "16px 0" }}>
+            Apretá <b style={{ color: "rgba(255,255,255,0.7)" }}>Actualizar</b> para generar el análisis del experto sobre este mes.
+          </div>
+        ) : (
+          <div style={{ display: "grid", gap: 14, marginTop: 10 }}>
+            <div style={{ color: "rgba(255,255,255,0.78)", fontSize: 13, lineHeight: 1.55 }}>{analisis.contenido.diagnostico}</div>
+            <AnalisisLista titulo="Mejoras" items={analisis.contenido.mejoras} color="#10b981" />
+            <AnalisisLista titulo="Optimización de costos" items={analisis.contenido.optimizacion_costos} color="#B87333" />
+            <AnalisisLista titulo="Próximos pasos" items={analisis.contenido.proximos_pasos} color="#6366f1" />
+            <AnalisisLista titulo="Riesgos" items={analisis.contenido.riesgos} color="#ef4444" />
+            <div style={{ color: "rgba(255,255,255,0.3)", fontSize: 10.5, marginTop: 2 }}>Generado por IA — revisá antes de decidir.</div>
+          </div>
+        )}
       </div>
 
       {/* Tabla de gastos */}
@@ -343,11 +489,37 @@ export default function FinanzasClient() {
   )
 }
 
-function PnLRow({ label, value, neg, bold, sep, color }: { label: string; value: string; neg?: boolean; bold?: boolean; sep?: boolean; color?: string }) {
+function PnLRow({ label, value, neg, bold, sep, color, pct }: { label: string; value: string; neg?: boolean; bold?: boolean; sep?: boolean; color?: string; pct?: number | null }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderTop: sep ? "1px solid rgba(255,255,255,0.1)" : "none", marginTop: sep ? 4 : 0 }}>
       <span style={{ fontSize: 13, color: bold ? "#fff" : "rgba(255,255,255,0.55)", fontWeight: bold ? 600 : 400 }}>{label}</span>
-      <span style={{ fontSize: bold ? 15 : 13, fontWeight: bold ? 700 : 500, color: color || (neg ? "rgba(255,255,255,0.7)" : "#fff") }}>{neg ? "" : ""}{value}</span>
+      <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        {pct != null && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontWeight: 500 }}>{pct.toFixed(0)}% s/ventas</span>}
+        <span style={{ fontSize: bold ? 15 : 13, fontWeight: bold ? 700 : 500, color: color || (neg ? "rgba(255,255,255,0.7)" : "#fff") }}>{value}</span>
+      </span>
+    </div>
+  )
+}
+
+function PnLSub({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0 3px 16px" }}>
+      <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)" }}>· {label}</span>
+      <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)" }}>{value}</span>
+    </div>
+  )
+}
+
+function AnalisisLista({ titulo, items, color }: { titulo: string; items?: string[]; color: string }) {
+  if (!items || items.length === 0) return null
+  return (
+    <div>
+      <div style={{ color, fontSize: 12, fontWeight: 700, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.04em" }}>{titulo}</div>
+      <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 5 }}>
+        {items.map((it, i) => (
+          <li key={i} style={{ color: "rgba(255,255,255,0.7)", fontSize: 12.5, lineHeight: 1.5 }}>{it}</li>
+        ))}
+      </ul>
     </div>
   )
 }
