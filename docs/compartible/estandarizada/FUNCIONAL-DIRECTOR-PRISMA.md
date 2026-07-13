@@ -181,8 +181,10 @@ Tenés **3 solapas**:
 
 **Cómo se usa:**
 - Arriba elegís la **métrica** (Facturación o Captación) y el **año**.
-- Ves una tabla con tus asesores en las filas y los 12 meses en las columnas. Escribís el objetivo en cada celda.
-- **"Aplicar a todos":** escribís un valor una vez y con un botón se copia a todos los meses editables de ese asesor (después podés ajustar mes a mes).
+- **Fila de "% del mes" (arriba de todo):** definís qué **porcentaje del año** cae en cada mes (por ejemplo, si facturás más a fin de año, ponés más % en noviembre y diciembre). Los 12 meses **tienen que sumar 100%** — al lado te muestra la suma con un ✓ verde cuando llegás. Cada métrica tiene su propio reparto. Apretás **"Guardar %"**.
+- **Cargás la meta de cada asesor** de una de estas dos formas:
+  - escribiendo el objetivo mes a mes en cada celda, o
+  - escribiendo el **"Total del año"** del asesor (columna de la derecha) y apretando **"Aplicar"**: el sistema reparte ese total por mes según los % que definiste arriba (cada mes = total × % del mes).
 - Apretás **"Guardar objetivos"**.
 
 **Reglas importantes:**
@@ -193,7 +195,7 @@ Tenés **3 solapas**:
 El resultado de estos objetivos se ve en el **Dashboard**, en la sección "Objetivos vs Alcanzado" (ver sección 4).
 
 > 💡 **Tip:** definí bien las escalas de puntaje al principio; son la base de un ranking justo.
-> 💡 **Tip:** cargá los objetivos del año a principio de ejercicio con "Aplicar a todos" y después ajustá los meses que cambien. Solo podrás corregir de acá en adelante, no el pasado.
+> 💡 **Tip:** cargá primero los **% de cada mes** (que sumen 100) una sola vez, y después, por asesor, poné el **total del año** y apretá "Aplicar": se reparte solo respetando la estacionalidad. Solo podrás corregir de acá en adelante, no el pasado.
 
 ---
 
