@@ -13,6 +13,10 @@ interface EstadoResultado {
   ventas: number; costoVentas: number; utilidadBruta: number; gastosOperativos: number
   utilidadOperativa: number; gastosFinancieros: number; utilidadAntesImpuestos: number
   impuestos: number; utilidadNeta: number
+  detalle: {
+    costoVentas: { label: string; monto: number }[]
+    gastosOperativos: { label: string; monto: number }[]
+  }
 }
 interface AnalisisIA {
   diagnostico: string; mejoras: string[]; optimizacion_costos: string[]
@@ -227,6 +231,7 @@ export default function FinanzasClient() {
   const meses = ultimosMeses(18)
 
   const er = data.estadoResultado
+  const pctV = (v: number) => (er.ventas > 0 ? (v / er.ventas) * 100 : null)
 
   // ── Punto de equilibrio (en la moneda elegida) ──
   const cv = (usd: number) => { const v = conv(usd); return Number.isFinite(v) ? v : 0 }
@@ -321,13 +326,19 @@ export default function FinanzasClient() {
           <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Estado de Resultado · {mesLabel(mesSel)}</h3>
           <PnLRow label="Ventas" value={money(er.ventas)} bold />
           <PnLRow label="− Costo de ventas" value={money(er.costoVentas)} neg />
-          <PnLRow label="= Utilidad bruta" value={money(er.utilidadBruta)} sep bold color={er.utilidadBruta >= 0 ? "#10b981" : "#ef4444"} />
+          {er.detalle.costoVentas.map((d) => (
+            <PnLSub key={`cv-${d.label}`} label={d.label} value={money(d.monto)} />
+          ))}
+          <PnLRow label="= Utilidad bruta" value={money(er.utilidadBruta)} sep bold pct={pctV(er.utilidadBruta)} color={er.utilidadBruta >= 0 ? "#10b981" : "#ef4444"} />
           <PnLRow label="− Gastos operativos" value={money(er.gastosOperativos)} neg />
-          <PnLRow label="= Utilidad operativa" value={money(er.utilidadOperativa)} sep bold color={er.utilidadOperativa >= 0 ? "#10b981" : "#ef4444"} />
+          {er.detalle.gastosOperativos.map((d) => (
+            <PnLSub key={`go-${d.label}`} label={d.label} value={money(d.monto)} />
+          ))}
+          <PnLRow label="= Utilidad operativa" value={money(er.utilidadOperativa)} sep bold pct={pctV(er.utilidadOperativa)} color={er.utilidadOperativa >= 0 ? "#10b981" : "#ef4444"} />
           <PnLRow label="− Gastos financieros" value={money(er.gastosFinancieros)} neg />
-          <PnLRow label="= Utilidad antes de impuestos" value={money(er.utilidadAntesImpuestos)} sep bold color={er.utilidadAntesImpuestos >= 0 ? "#10b981" : "#ef4444"} />
+          <PnLRow label="= Utilidad antes de impuestos" value={money(er.utilidadAntesImpuestos)} sep bold pct={pctV(er.utilidadAntesImpuestos)} color={er.utilidadAntesImpuestos >= 0 ? "#10b981" : "#ef4444"} />
           <PnLRow label="− Impuestos" value={money(er.impuestos)} neg />
-          <PnLRow label="= Utilidad neta" value={money(er.utilidadNeta)} sep bold color={er.utilidadNeta >= 0 ? "#10b981" : "#ef4444"} />
+          <PnLRow label="= Utilidad neta" value={money(er.utilidadNeta)} sep bold pct={pctV(er.utilidadNeta)} color={er.utilidadNeta >= 0 ? "#10b981" : "#ef4444"} />
         </div>
         <div style={{ ...card, padding: 20 }}>
           <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Gastos por categoría</h3>
@@ -478,11 +489,23 @@ export default function FinanzasClient() {
   )
 }
 
-function PnLRow({ label, value, neg, bold, sep, color }: { label: string; value: string; neg?: boolean; bold?: boolean; sep?: boolean; color?: string }) {
+function PnLRow({ label, value, neg, bold, sep, color, pct }: { label: string; value: string; neg?: boolean; bold?: boolean; sep?: boolean; color?: string; pct?: number | null }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderTop: sep ? "1px solid rgba(255,255,255,0.1)" : "none", marginTop: sep ? 4 : 0 }}>
       <span style={{ fontSize: 13, color: bold ? "#fff" : "rgba(255,255,255,0.55)", fontWeight: bold ? 600 : 400 }}>{label}</span>
-      <span style={{ fontSize: bold ? 15 : 13, fontWeight: bold ? 700 : 500, color: color || (neg ? "rgba(255,255,255,0.7)" : "#fff") }}>{neg ? "" : ""}{value}</span>
+      <span style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        {pct != null && <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontWeight: 500 }}>{pct.toFixed(0)}% s/ventas</span>}
+        <span style={{ fontSize: bold ? 15 : 13, fontWeight: bold ? 700 : 500, color: color || (neg ? "rgba(255,255,255,0.7)" : "#fff") }}>{value}</span>
+      </span>
+    </div>
+  )
+}
+
+function PnLSub({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "3px 0 3px 16px" }}>
+      <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)" }}>· {label}</span>
+      <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.5)" }}>{value}</span>
     </div>
   )
 }

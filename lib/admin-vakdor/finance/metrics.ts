@@ -61,6 +61,19 @@ function gastosUsdPorCategorias(expenses: FinanceExpense[], mes: string, cats: s
   return total
 }
 
+const CAT_LABELS: Record<string, string> = {
+  infraestructura: "Infraestructura", proxy: "Proxy",
+  sueldos: "Sueldos", marketing: "Marketing", suscripcion: "Suscripción", otro: "Otro",
+  financiero: "Financiero", impuestos: "Impuestos",
+}
+
+/** Desglose (label + monto USD) por categoría, solo las que suman > 0. */
+function detalleCategorias(expenses: FinanceExpense[], mes: string, cats: string[], fx: number | null): EstadoResultadoLinea[] {
+  return cats
+    .map((c) => ({ label: CAT_LABELS[c] || c, monto: gastosUsdPorCategorias(expenses, mes, [c], fx) }))
+    .filter((x) => x.monto > 0)
+}
+
 /** KPIs del mes → todo en USD (idéntico al cálculo histórico de la ruta). */
 export function kpisDeMes(mes: string, { costs, pagos, expenses, fxDe }: FinanceData) {
   const fx = fxDe(mes)
@@ -96,6 +109,8 @@ export function kpisDeMes(mes: string, { costs, pagos, expenses, fxDe }: Finance
   return { fx, ingresos, costosIa, gastosFijos, gastosVariables, costosVariables, costosTotal, mc, ebit, dol, margenPct }
 }
 
+export interface EstadoResultadoLinea { label: string; monto: number }
+
 export interface EstadoResultado {
   ventas: number
   costoVentas: number
@@ -106,6 +121,11 @@ export interface EstadoResultado {
   utilidadAntesImpuestos: number
   impuestos: number
   utilidadNeta: number
+  // Desglose de los renglones compuestos (para mostrarlos abiertos en la UI).
+  detalle: {
+    costoVentas: EstadoResultadoLinea[]
+    gastosOperativos: EstadoResultadoLinea[]
+  }
 }
 
 /** Estado de Resultado clásico del mes (todo en USD). */
@@ -133,9 +153,18 @@ export function estadoResultadoDeMes(mes: string, data: FinanceData): EstadoResu
   const impuestos = gastosUsdPorCategorias(expenses, mes, TAX_CATS, fx)
   const utilidadNeta = utilidadAntesImpuestos - impuestos
 
+  const detalle = {
+    costoVentas: [
+      ...(costosIa > 0 ? [{ label: "Costos de IA", monto: costosIa }] : []),
+      ...detalleCategorias(expenses, mes, COGS_CATS, fx),
+    ],
+    gastosOperativos: detalleCategorias(expenses, mes, OPEX_CATS, fx),
+  }
+
   return {
     ventas, costoVentas, utilidadBruta, gastosOperativos, utilidadOperativa,
     gastosFinancieros, utilidadAntesImpuestos, impuestos, utilidadNeta,
+    detalle,
   }
 }
 
