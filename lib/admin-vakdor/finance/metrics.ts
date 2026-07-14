@@ -21,11 +21,13 @@ export interface FinanceExpense {
 
 export interface CostRow { fecha: string; proveedor: string; costo_usd: number }
 export interface PagoRow { monto: number; moneda: string; periodo_mes: string; agencia_id?: string }
+export interface WcRow { periodo_mes: string; tipo: string; monto: number; moneda: string }
 
 export interface FinanceData {
   costs: CostRow[]
   pagos: PagoRow[]
   expenses: FinanceExpense[]
+  workingCapital: WcRow[]
   fxDe: (mes: string) => number | null
 }
 
@@ -41,6 +43,29 @@ const DA_CATS = ["depreciacion"]
 // CAPEX = inversión, NO gasto del Estado de Resultado. Se excluye del EBIT y de las
 // tortas; solo impacta el Flujo de Caja Libre.
 export const CAPEX_CATS = ["capex"]
+
+// Signo del capital de trabajo (WC = activos operativos − pasivos operativos).
+// + inmoviliza caja (si sube, resta al FCL) · − libera caja (si sube, suma al FCL).
+const WC_SIGN: Record<string, number> = { por_cobrar: 1, prepago: 1, por_pagar: -1, anticipo_cliente: -1 }
+
+/** Mes anterior en formato 'YYYY-MM'. */
+function prevMes(mes: string): string {
+  const [y, m] = mes.split("-").map(Number)
+  const d = new Date(y, m - 2, 1) // m-1 = mes actual (0-index); −1 más = mes anterior
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+}
+
+/** Saldo de capital de trabajo del mes, en USD (con signo por partida). */
+function wcTotalUsd(mes: string, wc: WcRow[], fxDe: (m: string) => number | null): number {
+  const fx = fxDe(mes)
+  let total = 0
+  for (const r of wc) {
+    if (r.periodo_mes !== mes) continue
+    const usd = r.moneda === "ARS" ? (fx ? Number(r.monto) / fx : 0) : Number(r.monto)
+    total += (WC_SIGN[r.tipo] ?? 0) * usd
+  }
+  return total
+}
 
 /** Cuánto pesa un gasto en un mes dado (en su propia moneda). 0 si no aplica. */
 export function gastoDelMes(e: FinanceExpense, mes: string): number {
@@ -182,19 +207,31 @@ export interface EbitdaFcl {
   ebitda: number
   impuestos: number
   capex: number
-  // FCL sin el Δ capital de trabajo (= EBITDA − impuestos − CAPEX). El cliente le
-  // resta el Δ capital de trabajo (campo manual) para el FCL final.
-  fclSinWC: number
+  // Δ capital de trabajo del mes = saldo(mes) − saldo(mes anterior), calculado desde
+  // finance_working_capital. Con su signo, un Δ positivo RESTA caja al FCL.
+  deltaCapitalTrabajo: number
+  // FCL final = EBITDA − impuestos − CAPEX − Δ capital de trabajo.
+  fcl: number
+  // ¿Hay saldos cargados en el mes anterior? (si no, el Δ arranca desde 0 vs vacío).
+  wcTieneMesPrevio: boolean
 }
 
-/** EBITDA y base del Flujo de Caja Libre del mes (todo en USD). */
+/** EBITDA y Flujo de Caja Libre del mes (todo en USD). */
 export function ebitdaFclDeMes(mes: string, data: FinanceData): EbitdaFcl {
   const er = estadoResultadoDeMes(mes, data)
   const fx = data.fxDe(mes)
   const depreciacionAmortizacion = gastosUsdPorCategorias(data.expenses, mes, DA_CATS, fx)
   const capex = gastosUsdPorCategorias(data.expenses, mes, CAPEX_CATS, fx)
   const ebitda = er.utilidadOperativa + depreciacionAmortizacion
-  const fclSinWC = ebitda - er.impuestos - capex
+
+  // Δ capital de trabajo: saldo del mes menos el del mes anterior.
+  const prev = prevMes(mes)
+  const wcAhora = wcTotalUsd(mes, data.workingCapital, data.fxDe)
+  const wcAntes = wcTotalUsd(prev, data.workingCapital, data.fxDe)
+  const deltaCapitalTrabajo = wcAhora - wcAntes
+  const wcTieneMesPrevio = data.workingCapital.some((r) => r.periodo_mes === prev)
+
+  const fcl = ebitda - er.impuestos - capex - deltaCapitalTrabajo
   return {
     ventas: er.ventas,
     utilidadOperativa: er.utilidadOperativa,
@@ -202,7 +239,9 @@ export function ebitdaFclDeMes(mes: string, data: FinanceData): EbitdaFcl {
     ebitda,
     impuestos: er.impuestos,
     capex,
-    fclSinWC,
+    deltaCapitalTrabajo,
+    fcl,
+    wcTieneMesPrevio,
   }
 }
 
@@ -217,16 +256,18 @@ export function nAgenciasPagando(mes: string, pagos: PagoRow[]): number {
 
 /** Lee las 4 tablas de finanzas y arma FinanceData + fxSorted (para fxList). */
 export async function loadFinanceData(db: any): Promise<FinanceData & { fxSorted: { periodo_mes: string; usd_ars: number }[] }> {
-  const [costsRes, pagosRes, expensesRes, fxRes] = await Promise.all([
+  const [costsRes, pagosRes, expensesRes, fxRes, wcRes] = await Promise.all([
     db.from("finance_api_costs").select("fecha, proveedor, costo_usd"),
     db.from("pagos_agencia").select("monto, moneda, periodo_mes, agencia_id"),
     db.from("finance_expenses").select("*").order("fecha_inicio", { ascending: false }),
     db.from("finance_fx").select("periodo_mes, usd_ars"),
+    db.from("finance_working_capital").select("periodo_mes, tipo, monto, moneda"),
   ])
 
   const costs = (costsRes.data || []) as CostRow[]
   const pagos = (pagosRes.data || []) as PagoRow[]
   const expenses = (expensesRes.data || []) as FinanceExpense[]
+  const workingCapital = (wcRes.data || []) as WcRow[]
   const fxRows = (fxRes.data || []) as { periodo_mes: string; usd_ars: number }[]
 
   const fxMap = new Map<string, number>()
@@ -235,5 +276,5 @@ export async function loadFinanceData(db: any): Promise<FinanceData & { fxSorted
   const fxLatest = fxSorted.length ? Number(fxSorted[fxSorted.length - 1].usd_ars) : null
   const fxDe = (mes: string): number | null => fxMap.get(mes) ?? fxLatest
 
-  return { costs, pagos, expenses, fxDe, fxSorted }
+  return { costs, pagos, expenses, workingCapital, fxDe, fxSorted }
 }

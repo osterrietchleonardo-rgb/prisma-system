@@ -203,9 +203,9 @@ export default function GuiaFinancieraModal({ onClose }: { onClose: () => void }
             <Term name="CAPEX" tag="Inversiones" essence="Plata en cosas que duran (equipos, desarrollo grande, licencia importante). No es gasto del mes: es inversión, por eso no aparece en el Estado de Resultado, pero sí te saca caja."
               paraQue="En software suele ser bajo. El sistema lo excluye del EBIT y de las tortas, y lo resta solo en el FCL."
               analizar={["Un mes con CAPEX alto baja el FCL sin que el negocio esté peor: es inversión puntual."]} />
-            <Term name="Capital de trabajo" tag="Δ manual" essence="La plata atada en el día a día: lo que te deben menos lo que debés. Su variación te suma o resta caja."
+            <Term name="Capital de trabajo" tag="Δ calculado" essence="La plata atada en el día a día: lo que te deben menos lo que debés (más anticipos y prepagos). Su variación mes a mes te suma o resta caja."
               paraQue="Si las inmobiliarias te pagan por adelantado, juega a tu favor (cobrás antes de gastar). Si les das crédito, te ata caja."
-              analizar={["Se carga a mano en la tarjeta de FCL. Cobrar más rápido = más caja libre sin vender un peso más."]} />
+              analizar={[<>Cargás los <b>saldos</b> de cada partida con “Cargar saldos de capital de trabajo”; el sistema calcula la variación contra el mes anterior. Cobrar más rápido = más caja libre sin vender un peso más.</>]} />
           </div>
 
           {/* 06 - Rutina */}

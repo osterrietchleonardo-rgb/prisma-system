@@ -34,7 +34,6 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({} as any))
   const now = new Date()
   const mes = (body?.mes as string) || mesKey(now)
-  const deltaWC = Number(body?.deltaCapitalTrabajo) || 0 // Δ capital de trabajo (manual)
 
   const db = getFreshAdminDb()
   const data = await loadFinanceData(db)
@@ -50,9 +49,9 @@ export async function POST(request: NextRequest) {
   const mcUnit = precio - costoVarUnit
   const puntoEquilibrio = mcUnit > 0 ? Math.ceil(kpis.gastosFijos / mcUnit) : null
 
-  // EBITDA y Flujo de Caja Libre
+  // EBITDA y Flujo de Caja Libre (Δ capital de trabajo calculado desde los saldos)
   const ef = ebitdaFclDeMes(mes, data)
-  const fcl = ef.fclSinWC - deltaWC
+  const fcl = ef.fcl
 
   // Evolución últimos 12 meses (resumen compacto)
   const evolucion = []
@@ -97,7 +96,7 @@ export async function POST(request: NextRequest) {
       margen_ebitda_pct: ef.ventas > 0 ? r2((ef.ebitda / ef.ventas) * 100) : null,
       impuestos: r2(ef.impuestos),
       capex: r2(ef.capex),
-      delta_capital_trabajo: r2(deltaWC),
+      delta_capital_trabajo: r2(ef.deltaCapitalTrabajo),
       flujo_caja_libre: r2(fcl),
       margen_fcl_pct: ef.ventas > 0 ? r2((fcl / ef.ventas) * 100) : null,
     },
