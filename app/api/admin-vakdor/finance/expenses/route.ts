@@ -4,7 +4,7 @@ import { getAdminDb, logAdminActivity, getClientIp } from "@/lib/admin-vakdor/lo
 
 export const dynamic = "force-dynamic"
 
-const CATEGORIAS = ["suscripcion", "infraestructura", "proxy", "marketing", "sueldos", "impuestos", "financiero", "otro"]
+const CATEGORIAS = ["suscripcion", "infraestructura", "proxy", "marketing", "sueldos", "impuestos", "financiero", "depreciacion", "capex", "otro"]
 const TIPOS = ["fijo", "variable"]
 const RECURRENCIAS = ["mensual", "anual", "unico"]
 const MONEDAS = ["USD", "ARS"]

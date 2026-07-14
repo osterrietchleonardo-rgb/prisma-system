@@ -32,9 +32,15 @@ export interface FinanceData {
 // Mapa fijo categoría → renglón del Estado de Resultado clásico.
 // Los costos de IA (finance_api_costs) SIEMPRE van a Costo de ventas.
 const COGS_CATS = ["infraestructura", "proxy"]
-const OPEX_CATS = ["sueldos", "marketing", "suscripcion", "otro"]
+// La Depreciación/Amortización es gasto operativo (baja el EBIT); EBITDA la re-suma.
+const OPEX_CATS = ["sueldos", "marketing", "suscripcion", "otro", "depreciacion"]
 const FIN_CATS = ["financiero"]
 const TAX_CATS = ["impuestos"]
+// Depreciación/Amortización (para volver a sumarla en EBITDA).
+const DA_CATS = ["depreciacion"]
+// CAPEX = inversión, NO gasto del Estado de Resultado. Se excluye del EBIT y de las
+// tortas; solo impacta el Flujo de Caja Libre.
+export const CAPEX_CATS = ["capex"]
 
 /** Cuánto pesa un gasto en un mes dado (en su propia moneda). 0 si no aplica. */
 export function gastoDelMes(e: FinanceExpense, mes: string): number {
@@ -92,6 +98,7 @@ export function kpisDeMes(mes: string, { costs, pagos, expenses, fxDe }: Finance
   let gastosFijos = 0
   let gastosVariables = 0
   for (const e of expenses) {
+    if (CAPEX_CATS.includes(e.categoria)) continue // CAPEX no es gasto operativo
     const monto = gastoDelMes(e, mes)
     if (!monto) continue
     const usd = e.moneda === "ARS" ? (fx ? monto / fx : 0) : monto
@@ -165,6 +172,37 @@ export function estadoResultadoDeMes(mes: string, data: FinanceData): EstadoResu
     ventas, costoVentas, utilidadBruta, gastosOperativos, utilidadOperativa,
     gastosFinancieros, utilidadAntesImpuestos, impuestos, utilidadNeta,
     detalle,
+  }
+}
+
+export interface EbitdaFcl {
+  ventas: number
+  utilidadOperativa: number
+  depreciacionAmortizacion: number
+  ebitda: number
+  impuestos: number
+  capex: number
+  // FCL sin el Δ capital de trabajo (= EBITDA − impuestos − CAPEX). El cliente le
+  // resta el Δ capital de trabajo (campo manual) para el FCL final.
+  fclSinWC: number
+}
+
+/** EBITDA y base del Flujo de Caja Libre del mes (todo en USD). */
+export function ebitdaFclDeMes(mes: string, data: FinanceData): EbitdaFcl {
+  const er = estadoResultadoDeMes(mes, data)
+  const fx = data.fxDe(mes)
+  const depreciacionAmortizacion = gastosUsdPorCategorias(data.expenses, mes, DA_CATS, fx)
+  const capex = gastosUsdPorCategorias(data.expenses, mes, CAPEX_CATS, fx)
+  const ebitda = er.utilidadOperativa + depreciacionAmortizacion
+  const fclSinWC = ebitda - er.impuestos - capex
+  return {
+    ventas: er.ventas,
+    utilidadOperativa: er.utilidadOperativa,
+    depreciacionAmortizacion,
+    ebitda,
+    impuestos: er.impuestos,
+    capex,
+    fclSinWC,
   }
 }
 
