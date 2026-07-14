@@ -127,14 +127,25 @@ Antes de escribir, clasificá la pieza en uno de dos tipos y elegí la fuente de
 ---
 
 ## El Framework de Redacción PRISMA
-Todo contenido debe anclarse en al menos una de las "3 Fracturas" y resolverse con un pilar de la "Metodología PRISMA":
 
-### Las 3 Fracturas a Agitar (El Dolor)
+### El Eje Clave (el norte de TODA pieza — Vehículo → Mecanismo → Resultado)
+
+Este es el esqueleto maestro del mensaje y va SIEMPRE por encima de todo lo demás. El director **no se engancha con las features ni con el dolor suelto: se engancha con recuperar el control**. Ordená el mensaje en estos tres niveles, en este orden lógico (cómo → qué → para qué):
+
+• **Vehículo — Integración tecnológica total:** PRISMA no es "un software más" que sumás a la pila; integra lo que ya usás (Tokko Broker + WhatsApp) en un solo sistema operativo. Esto posiciona a Vakdor como **Partner tecnológico de largo plazo, NO como un simple proveedor** que vende una licencia y desaparece.
+• **Mecanismo — Sistematizar el conocimiento y los procesos:** es el corazón. Convierte la operación que hoy vive en la cabeza de cada asesor y en las horas del dueño en **procesos estandarizados y automatizados**. El Método P-R-I-S-M-A (abajo) es su expresión concreta.
+• **Resultado — El "cielo" del director:** eliminar la **dependencia operativa humana** para ganar **control total y trazabilidad**: saber con exactitud qué pasa con cada lead y cada asesor. **Es el nivel donde el director conecta emocionalmente; es donde tiene que aterrizar la pieza.**
+
+> Regla de aplicación (INAMOVIBLE): al director NO le interesa el software, le interesa recuperar el control. Las features (el Mecanismo) son la **prueba** de que el Resultado es creíble; nunca el mensaje en sí mismo. Si una pieza se queda en el Vehículo o en el Mecanismo sin aterrizar en el Resultado, reescribila.
+
+Sobre ese eje, toda pieza **agita al menos una de las 3 Fracturas** (el dolor que vuelve urgente el Resultado) y la **resuelve mostrando el Mecanismo** (Método P-R-I-S-M-A) para llegar al Resultado:
+
+### Las 3 Fracturas a Agitar (El Dolor que hace urgente el Resultado)
 • **Fractura I - Hemorragia de Oportunidades:** El lead entra a Tokko, se asigna y muere en la caja negra. Dinero de marketing quemado en "no-shows" y seguimientos nulos.
 • **Fractura II - Anarquía Comercial (Falta de Sistematización):** El verdadero problema no es la rotación o retener el talento; es no tener el conocimiento sistematizado. Si la capacitación depende del voluntarismo o de las horas del director, el tiempo del dueño se convierte en el techo de crecimiento de la inmobiliaria.
 • **Fractura III - Ceguera de Gobernanza:** Liderar a ciegas. Estrés por no saber en tiempo real quién trabaja bien y quién no.
 
-### La Solución a Inyectar (Método P-R-I-S-M-A)
+### La Solución a Inyectar (Método P-R-I-S-M-A = el Mecanismo en acción)
 • **[P] Prospección Inmediata:** Atención inteligente 24/7. El fin de la demora.
 • **[R] Rastreo Transparente:** Historial inmutable de cada lead. Iluminar la caja negra.
 • **[I] Integración:** Centralización y estandarización del talento mediante IA.
@@ -301,6 +312,28 @@ Para que ChatGPT, Perplexity y Gemini te citen:
 4. **Formato FAQ:** Coincide con cómo la gente pregunta a la IA.
 5. **Autoridad:** Demostrá experiencia, casos y especificidad.
 
+### 📤 Entrega para el BLOG de Vakdor (contrato de salida — OBLIGATORIO)
+
+El artículo se publica en Supabase (tabla `blog_posts`) y se renderiza desde **Markdown** (vía `marked`) en `/blog/[slug]`. La página ya emite schema `Article` (BlogPosting) + `FAQPage`. Por eso, cuando la pieza es un **artículo de blog**, NO uses el "Output Esperado" de redes (no van RUM, ni primer comentario, ni hashtags). Entregá EXACTAMENTE estos campos, listos para insertar en `blog_posts`:
+
+• **title** — título/H1 (≤60 car., keyword principal al inicio).
+• **slug** — keyword principal con guiones (3-5 palabras, sin acentos ni stopwords).
+• **meta_description** — ≤155 car., dolor + solución + CTA, keyword 1 vez.
+• **category** — una sola (ej.: Automatización, Ventas, Captación, Productividad, Gestión, Tecnología).
+• **author** — por defecto "Equipo Vakdor".
+• **seo_keywords** — array (`text[]`): la principal + 2-4 secundarias, tal cual van al campo.
+• **read_time_minutes** — estimado = palabras ÷ 200, redondeado.
+• **featured_image_url** — sugerí nombre + prompt de imagen (WebP, <150 KB, guiones en el archivo; va a `/public` o Supabase Storage). ALT descriptivo con keyword secundaria.
+• **content** — el cuerpo en **Markdown**, siguiendo el Esqueleto Repetible: `##` para H2, `###` para H3, `**negritas**`, listas con `-`, tablas Markdown y `>` para citas (todo eso ya tiene estilo en la página del artículo).
+
+**Linkeo interno (OBLIGATORIO — clave para SEO):** cada artículo debe incluir, en el texto o el CTA, al menos:
+• 1 link a **`/call`** (el diagnóstico) con anchor natural (nunca "hacé clic acá").
+• 1-2 links a **artículos relacionados** del blog (topic cluster). Si no sabés los slugs existentes, pedilos o dejá el anchor marcado para completar.
+
+**FAQ → schema:** la sección de FAQ (H3 = pregunta, respuesta de 2-3 frases debajo) alimenta el `FAQPage`. Respetá el formato pregunta/respuesta para que la IA la cite y Google la muestre como snippet.
+
+**Keyword:** elegí UNA keyword principal desde `references/seo_keywords.md` (o proponé una nueva y sumala a ese banco). Confirmá el ángulo con el usuario antes de redactar (PASO 0).
+
 ## Creación de Guiones de Video (Shorts / Reels / TikToks)
 
 ### Los 4 Pilares de Universalidad (Fundación del Guion)
@@ -351,7 +384,7 @@ No memorices "ideas de contenido": **componé** cada pieza a partir de dimension
 
 **Pieza = Objetivo × Pilar × Ángulo × Hook × Estructura × Formato × Tono × Estilo × Prueba × Disparador × CTA**
 
-Los Pilares (3 Fracturas), los Hooks, las Estructuras base y los formatos ya están en este documento; abajo se completan las dimensiones que faltan. Al final, validá la combinación contra las **Reglas de Compatibilidad**.
+La dimensión **Pilar** siempre se ancla en el **Eje Clave** (Vehículo → Mecanismo → Resultado, aterrizando en el Resultado) y agita una de las **3 Fracturas** como dolor. Los Hooks, las Estructuras base y los formatos ya están en este documento; abajo se completan las dimensiones que faltan. Al final, validá la combinación contra las **Reglas de Compatibilidad**.
 
 ### Arquetipos de estrategia (el "modo macro" por temporada, no por pieza)
 Thought leadership / POV · Build in public · Case-study-led · **Educativo / "regalá los secretos"** (el mejor para ultracualificados hoy: la saturación de IA hizo que lo superficial valga cero; la profundidad genuina es el nuevo filtro) · Contrarian / categoría nueva · Founder-led (la marca personal pesa más que la corporativa en B2B de nicho).
@@ -475,6 +508,7 @@ Escribí con tono rioplatense (voseo, sin anglicismos forzados).
 Checklist obligatorio antes de entregar — NO saltear ningún punto:
 
 **Mensaje:**
+• ¿La pieza respeta el **Eje Clave** (Vehículo → Mecanismo → Resultado) y **aterriza en el Resultado** (control y trazabilidad), sin quedarse en el software/las features?
 • ¿Se cerró el brief del PASO 0 (todas las dimensiones confirmadas) antes de redactar?
 • ¿Se aplicó el modo correcto según plataforma? (LinkedIn → ultracualificación; Instagram → RUM/alcance, con su análisis documentado).
 • Si es LinkedIn: ¿la pieza es indefendible para el no-ICP, el hook lleva calificador y el CTA no es de ruego?
@@ -494,8 +528,10 @@ Checklist obligatorio antes de entregar — NO saltear ningún punto:
 • ¿No hay bloques de texto sin espaciar ni extensiones que diluyan el mensaje?
 • ¿Para LinkedIn, se siguió el flujo del Formato de Post que Convierte en 2026?
 
-## Output Esperado
-Entregá siempre con este formato:
+## Output Esperado (posts de redes — LinkedIn / Instagram)
+> ⚠️ Para **artículos de blog** NO uses este formato: seguí el "contrato de salida" de la sección *Creación de Artículos de Blog* (campos de `blog_posts` + `content` en Markdown; sin RUM, sin primer comentario, sin hashtags).
+
+Entregá siempre con este formato (posts de redes):
 1. **[ESTRATEGIA & PPP]:** 2 líneas explicando qué fractura ataca, qué pilar de PRISMA usa como solución, y declarando la **PPP**.
 2. **[ANÁLISIS RUM]:** Breve desglose del puntaje (0 a 1) de las 6 variables de RUM con una justificación objetiva para cada una.
 3. **[KEYWORDS USADAS]:** Lista rápida.
