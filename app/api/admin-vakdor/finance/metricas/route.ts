@@ -5,8 +5,10 @@ import {
   loadFinanceData,
   kpisDeMes,
   estadoResultadoDeMes,
+  ebitdaFclDeMes,
   nAgenciasPagando,
   gastoDelMes,
+  CAPEX_CATS,
 } from "@/lib/admin-vakdor/finance/metrics"
 
 export const dynamic = "force-dynamic"
@@ -55,6 +57,7 @@ export async function GET(request: NextRequest) {
   // Breakdown de gastos por categoría (mes seleccionado, en USD)
   const catMap = new Map<string, number>()
   for (const e of expenses) {
+    if (CAPEX_CATS.includes(e.categoria)) continue // CAPEX no es gasto operativo
     const monto = gastoDelMes(e, mesSel)
     if (!monto) continue
     const usd = e.moneda === "ARS" ? (kpis.fx ? monto / kpis.fx : 0) : monto
@@ -78,6 +81,7 @@ export async function GET(request: NextRequest) {
   }
 
   const estadoResultado = estadoResultadoDeMes(mesSel, data)
+  const ebitdaFcl = ebitdaFclDeMes(mesSel, data)
 
   return NextResponse.json({
     mesSel,
@@ -95,6 +99,7 @@ export async function GET(request: NextRequest) {
       margenPct: kpis.margenPct,
     },
     estadoResultado,
+    ebitdaFcl,
     nAgenciasPagando: nAgenciasPagando(mesSel, pagos),
     providerBreakdown,
     categoriaBreakdown,

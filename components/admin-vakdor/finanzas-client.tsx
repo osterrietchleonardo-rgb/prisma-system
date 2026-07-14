@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from "react"
 import DonutChart from "@/components/admin-vakdor/donut-chart"
 import FinanceEvolutionChart from "@/components/admin-vakdor/finance-evolution-chart"
+import GuiaFinancieraModal from "@/components/admin-vakdor/guia-financiera-modal"
+import WorkingCapitalModal from "@/components/admin-vakdor/working-capital-modal"
 
 // ---------------- tipos ----------------
 interface Expense {
@@ -18,6 +20,10 @@ interface EstadoResultado {
     gastosOperativos: { label: string; monto: number }[]
   }
 }
+interface EbitdaFcl {
+  ventas: number; utilidadOperativa: number; depreciacionAmortizacion: number; ebitda: number
+  impuestos: number; capex: number; deltaCapitalTrabajo: number; fcl: number; wcTieneMesPrevio: boolean
+}
 interface AnalisisIA {
   diagnostico: string; mejoras: string[]; optimizacion_costos: string[]
   proximos_pasos: string[]; riesgos: string[]
@@ -32,6 +38,7 @@ interface Metricas {
     costosTotal: number; mc: number; ebit: number; dol: number | null; margenPct: number | null
   }
   estadoResultado: EstadoResultado
+  ebitdaFcl: EbitdaFcl
   nAgenciasPagando: number
   providerBreakdown: { proveedor: string; costo_usd: number }[]
   categoriaBreakdown: { categoria: string; monto_usd: number }[]
@@ -44,7 +51,7 @@ interface Metricas {
 // ---------------- helpers ----------------
 const PROV_LABEL: Record<string, string> = { openai: "OpenAI", anthropic: "Anthropic", google: "Gemini" }
 const PROV_COLOR: Record<string, string> = { openai: "#10b981", anthropic: "#B87333", google: "#6366f1" }
-const CAT_LABEL: Record<string, string> = { suscripcion: "Suscripción", infraestructura: "Infraestructura", proxy: "Proxy", marketing: "Marketing", sueldos: "Sueldos", impuestos: "Impuestos", financiero: "Financiero", otro: "Otro" }
+const CAT_LABEL: Record<string, string> = { suscripcion: "Suscripción", infraestructura: "Infraestructura", proxy: "Proxy", marketing: "Marketing", sueldos: "Sueldos", impuestos: "Impuestos", financiero: "Financiero", depreciacion: "Depreciación/Amort.", capex: "Inversiones/CAPEX", otro: "Otro" }
 const CAT_COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#B87333", "#e29e6d", "#10b981", "#64748b"]
 
 function mesLabel(mes: string) {
@@ -113,6 +120,8 @@ export default function FinanzasClient() {
   const [analisis, setAnalisis] = useState<AnalisisGuardado | null>(null)
   // Simulador de punto de equilibrio: null = usar datos reales; objeto = valores editados.
   const [beOverride, setBeOverride] = useState<{ precio: string; costo: string; fijos: string } | null>(null)
+  const [showGuia, setShowGuia] = useState(false)
+  const [showWC, setShowWC] = useState(false) // modal ABM de saldos de capital de trabajo
 
   // form gasto
   const [showForm, setShowForm] = useState(false)
@@ -175,7 +184,7 @@ export default function FinanzasClient() {
       // 2) Recargar métricas / estado de resultado / punto de equilibrio
       await load(mesSel)
 
-      // 3) Análisis del experto IA
+      // 3) Análisis del experto IA (el Δ capital de trabajo se calcula server-side)
       setAnalyzing(true)
       const ra = await fetch(`/api/admin-vakdor/finance/analisis`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -233,6 +242,10 @@ export default function FinanzasClient() {
   const er = data.estadoResultado
   const pctV = (v: number) => (er.ventas > 0 ? (v / er.ventas) * 100 : null)
 
+  // ── EBITDA y Flujo de Caja Libre (Δ capital de trabajo calculado desde los saldos cargados) ──
+  const ef = data.ebitdaFcl
+  const fclUsd = ef.fcl
+
   // ── Punto de equilibrio (en la moneda elegida) ──
   const cv = (usd: number) => { const v = conv(usd); return Number.isFinite(v) ? v : 0 }
   const nAg = data.nAgenciasPagando
@@ -257,7 +270,21 @@ export default function FinanzasClient() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>Finanzas</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>Finanzas</h1>
+            <button
+              onClick={() => setShowGuia(true)}
+              title="Cómo leer tus números"
+              aria-label="Abrir guía financiera"
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: "rgba(184,115,51,0.12)", border: "1px solid rgba(184,115,51,0.4)", cursor: "pointer", padding: 0 }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#B87333" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9.5" />
+                <path d="M12 11v5" />
+                <path d="M12 7.6h.01" />
+              </svg>
+            </button>
+          </div>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, margin: "4px 0 0" }}>Costos reales de IA · gastos · márgenes · rentabilidad</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -344,6 +371,34 @@ export default function FinanzasClient() {
           <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: "0 0 16px" }}>Gastos por categoría</h3>
           {catDonut.length ? <DonutChart data={catDonut} size={170} /> : <div style={{ textAlign: "center", color: "rgba(255,255,255,0.3)", paddingTop: 40, fontSize: 13 }}>Sin gastos cargados</div>}
         </div>
+      </div>
+
+      {/* EBITDA y Flujo de Caja Libre */}
+      <div style={{ ...card, padding: 22, marginBottom: 26 }}>
+        <h3 style={{ color: "#fff", fontSize: 14, fontWeight: 600, margin: "0 0 6px" }}>EBITDA y Flujo de Caja Libre · {mesLabel(mesSel)}</h3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
+          <p style={{ color: "rgba(255,255,255,0.35)", fontSize: 11, margin: 0, maxWidth: 560 }}>
+            EBITDA = utilidad operativa + depreciación/amortización (no es salida de caja). FCL = EBITDA − impuestos − CAPEX − variación de capital de trabajo. Cargá D&A y CAPEX como gastos con su categoría; el capital de trabajo se carga aparte (botón) y su variación se calcula sola.
+          </p>
+          <button onClick={() => setShowWC(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 7, cursor: "pointer", background: "rgba(184,115,51,0.12)", border: "1px solid rgba(184,115,51,0.4)", color: "#e29e6d", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
+            Cargar saldos de capital de trabajo
+          </button>
+        </div>
+        <PnLRow label="Utilidad operativa" value={money(ef.utilidadOperativa)} />
+        <PnLRow label="+ Depreciación y Amortización" value={money(ef.depreciacionAmortizacion)} />
+        <PnLRow label="= EBITDA" value={money(ef.ebitda)} sep bold pct={pctV(ef.ebitda)} color={ef.ebitda >= 0 ? "#10b981" : "#ef4444"} />
+        <PnLRow label="− Impuestos" value={money(ef.impuestos)} neg />
+        <PnLRow label="− CAPEX (inversiones)" value={money(ef.capex)} neg />
+        <PnLRow label="− Δ Capital de trabajo" value={money(ef.deltaCapitalTrabajo)} neg />
+        <PnLRow label="= Flujo de Caja Libre" value={money(fclUsd)} sep bold pct={pctV(fclUsd)} color={fclUsd >= 0 ? "#10b981" : "#ef4444"} />
+        {!ef.wcTieneMesPrevio && (
+          <div style={{ marginTop: 10, color: "rgba(255,255,255,0.4)", fontSize: 11 }}>
+            La variación se calcula contra los saldos del mes anterior. Como no hay saldos cargados en el mes previo, se compara contra cero.
+          </div>
+        )}
+        {ef.ebitda !== 0 && fclUsd < 0 && (
+          <div style={{ marginTop: 12, color: "#fbbf24", fontSize: 12 }}>⚠ El flujo de caja libre es negativo: el negocio consume más caja de la que genera este mes (mirá impuestos, CAPEX y capital de trabajo).</div>
+        )}
       </div>
 
       {/* Punto de equilibrio */}
@@ -483,6 +538,9 @@ export default function FinanzasClient() {
           </div>
         )}
       </div>
+
+      {showGuia && <GuiaFinancieraModal onClose={() => setShowGuia(false)} />}
+      {showWC && <WorkingCapitalModal mes={mesSel} onClose={(changed) => { setShowWC(false); if (changed) load(mesSel) }} />}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>

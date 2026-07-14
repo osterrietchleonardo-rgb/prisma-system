@@ -6,6 +6,7 @@ import {
   loadFinanceData,
   kpisDeMes,
   estadoResultadoDeMes,
+  ebitdaFclDeMes,
   nAgenciasPagando,
 } from "@/lib/admin-vakdor/finance/metrics"
 
@@ -48,6 +49,10 @@ export async function POST(request: NextRequest) {
   const mcUnit = precio - costoVarUnit
   const puntoEquilibrio = mcUnit > 0 ? Math.ceil(kpis.gastosFijos / mcUnit) : null
 
+  // EBITDA y Flujo de Caja Libre (Δ capital de trabajo calculado desde los saldos)
+  const ef = ebitdaFclDeMes(mes, data)
+  const fcl = ef.fcl
+
   // Evolución últimos 12 meses (resumen compacto)
   const evolucion = []
   for (let i = 11; i >= 0; i--) {
@@ -84,10 +89,21 @@ export async function POST(request: NextRequest) {
       gastos_fijos: r2(kpis.gastosFijos),
       agencias_para_equilibrio: puntoEquilibrio,
     },
+    ebitda_y_fcl: {
+      utilidad_operativa: r2(ef.utilidadOperativa),
+      depreciacion_amortizacion: r2(ef.depreciacionAmortizacion),
+      ebitda: r2(ef.ebitda),
+      margen_ebitda_pct: ef.ventas > 0 ? r2((ef.ebitda / ef.ventas) * 100) : null,
+      impuestos: r2(ef.impuestos),
+      capex: r2(ef.capex),
+      delta_capital_trabajo: r2(ef.deltaCapitalTrabajo),
+      flujo_caja_libre: r2(fcl),
+      margen_fcl_pct: ef.ventas > 0 ? r2((fcl / ef.ventas) * 100) : null,
+    },
     evolucion_12_meses: evolucion,
   }
 
-  const prompt = `Sos un CFO / experto en finanzas de una empresa SaaS argentina llamada Vakdor, que le cobra una suscripción mensual a inmobiliarias (cada "unidad" es una agencia que paga). Analizá estos números (todo en USD) y devolvé recomendaciones accionables y concretas, con cifras, sin relleno ni obviedades.
+  const prompt = `Sos un CFO / experto en finanzas de una empresa SaaS argentina llamada Vakdor, que le cobra una suscripción mensual a inmobiliarias (cada "unidad" es una agencia que paga). Analizá estos números (todo en USD) y devolvé recomendaciones accionables y concretas, con cifras, sin relleno ni obviedades. Prestá especial atención al **EBITDA** (rentabilidad operativa de caja y su margen) y al **Flujo de Caja Libre** (la caja real que queda tras impuestos, CAPEX y capital de trabajo): si el FCL es negativo o mucho menor al EBITDA, explicá por qué y qué hacer.
 
 DATOS DEL MES Y EVOLUCIÓN:
 ${JSON.stringify(resumen, null, 2)}
