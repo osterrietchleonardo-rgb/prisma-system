@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react"
 import DonutChart from "@/components/admin-vakdor/donut-chart"
 import FinanceEvolutionChart from "@/components/admin-vakdor/finance-evolution-chart"
+import GuiaFinancieraModal from "@/components/admin-vakdor/guia-financiera-modal"
 
 // ---------------- tipos ----------------
 interface Expense {
@@ -120,6 +121,7 @@ export default function FinanzasClient() {
   const [beOverride, setBeOverride] = useState<{ precio: string; costo: string; fijos: string } | null>(null)
   // Δ capital de trabajo (manual, en la moneda elegida) para el Flujo de Caja Libre.
   const [deltaWC, setDeltaWC] = useState("")
+  const [showGuia, setShowGuia] = useState(false)
 
   // form gasto
   const [showForm, setShowForm] = useState(false)
@@ -273,7 +275,21 @@ export default function FinanzasClient() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16, marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>Finanzas</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+            <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: "-0.02em" }}>Finanzas</h1>
+            <button
+              onClick={() => setShowGuia(true)}
+              title="Cómo leer tus números"
+              aria-label="Abrir guía financiera"
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: "rgba(184,115,51,0.12)", border: "1px solid rgba(184,115,51,0.4)", cursor: "pointer", padding: 0 }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#B87333" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9.5" />
+                <path d="M12 11v5" />
+                <path d="M12 7.6h.01" />
+              </svg>
+            </button>
+          </div>
           <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 13, margin: "4px 0 0" }}>Costos reales de IA · gastos · márgenes · rentabilidad</p>
         </div>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -520,6 +536,8 @@ export default function FinanzasClient() {
           </div>
         )}
       </div>
+
+      {showGuia && <GuiaFinancieraModal onClose={() => setShowGuia(false)} />}
 
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>
