@@ -5,6 +5,12 @@ import { ESTADOS, type MarketingIdea, type EstadoIdea } from "@/lib/admin-vakdor
 
 const ACCENT = "#c2783c"
 
+const inputStyle: React.CSSProperties = {
+  padding: "9px 12px", background: "rgba(255,255,255,0.04)",
+  border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
+  color: "#fff", fontSize: 13, outline: "none",
+}
+
 function Chip({ children }: { children: React.ReactNode }) {
   return (
     <span style={{
@@ -56,6 +62,7 @@ function Card({ idea, onMover }: { idea: MarketingIdea; onMover: (id: string, e:
 export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const router = useRouter()
   const [items, setItems] = useState<MarketingIdea[]>(ideas)
+  const [nueva, setNueva] = useState(false)
 
   const porEstado = (e: EstadoIdea) => items.filter((i) => i.estado === e)
 
@@ -89,6 +96,10 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
             Pipeline de contenido del Agente IA de Marketing
           </p>
         </div>
+        <button onClick={() => setNueva(true)}
+          style={{ padding: "9px 16px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+          + Nueva idea
+        </button>
       </div>
 
       <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 12, alignItems: "flex-start" }}>
@@ -124,6 +135,50 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
           )
         })}
       </div>
+
+      {nueva ? (
+        <div onClick={() => setNueva(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
+          <form onClick={(e) => e.stopPropagation()}
+            onSubmit={async (e) => {
+              e.preventDefault()
+              const fd = new FormData(e.currentTarget as HTMLFormElement)
+              const res = await fetch("/api/admin-vakdor/marketing", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  titulo: fd.get("titulo"), fuente: fd.get("fuente"),
+                  formato: fd.get("formato"), angulo: fd.get("angulo"), motivo: fd.get("motivo"),
+                }),
+              })
+              if (res.ok) { const { idea } = await res.json(); setItems((p) => [idea, ...p]); setNueva(false) }
+            }}
+            style={{ background: "#0d1424", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 24, width: 420, display: "flex", flexDirection: "column", gap: 12 }}>
+            <h2 style={{ fontSize: 16, color: "#fff", margin: 0 }}>Nueva idea</h2>
+            <input name="titulo" required placeholder="Título de la idea" style={inputStyle} />
+            <select name="fuente" defaultValue="linkedin" style={inputStyle}>
+              <option value="linkedin">LinkedIn</option>
+              <option value="instagram">Instagram</option>
+              <option value="blog">Blog</option>
+            </select>
+            <select name="formato" defaultValue="post_texto" style={inputStyle}>
+              <option value="post_texto">Post de texto</option>
+              <option value="carrusel">Carrusel</option>
+              <option value="imagen">Imagen</option>
+              <option value="encuesta">Encuesta</option>
+              <option value="articulo_linkedin">Artículo LinkedIn</option>
+              <option value="reel">Reel</option>
+              <option value="lead_magnet">Lead magnet</option>
+              <option value="articulo_blog">Artículo blog</option>
+            </select>
+            <input name="angulo" placeholder="Ángulo (opcional)" style={inputStyle} />
+            <input name="motivo" placeholder="Motivo / por qué (opcional)" style={inputStyle} />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" onClick={() => setNueva(false)} style={{ padding: "8px 14px", background: "transparent", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, color: "rgba(255,255,255,0.6)", cursor: "pointer" }}>Cancelar</button>
+              <button type="submit" style={{ padding: "8px 14px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontWeight: 600, cursor: "pointer" }}>Crear</button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   )
 }
