@@ -56,18 +56,28 @@ function Card({ idea, onMover }: { idea: MarketingIdea; onMover: (id: string, e:
 export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const router = useRouter()
   const [items, setItems] = useState<MarketingIdea[]>(ideas)
-  const [dragId, setDragId] = useState<string | null>(null)
 
   const porEstado = (e: EstadoIdea) => items.filter((i) => i.estado === e)
 
   async function mover(id: string, estado: EstadoIdea) {
+    const previo = items.find((i) => i.id === id)?.estado
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, estado } : i)))
-    const res = await fetch(`/api/admin-vakdor/marketing/${id}/estado`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estado }),
-    })
-    if (!res.ok) { router.refresh() } // revertir con la verdad del server si falló
+    try {
+      const res = await fetch(`/api/admin-vakdor/marketing/${id}/estado`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado }),
+      })
+      if (!res.ok) {
+        if (previo) setItems((prev) => prev.map((i) => (i.id === id ? { ...i, estado: previo! } : i)))
+        router.refresh() // resincronizar con la verdad del server
+        alert("No se pudo mover la idea; volvió a su estado anterior.")
+      }
+    } catch {
+      if (previo) setItems((prev) => prev.map((i) => (i.id === id ? { ...i, estado: previo! } : i)))
+      router.refresh()
+      alert("No se pudo mover la idea; volvió a su estado anterior.")
+    }
   }
 
   return (
