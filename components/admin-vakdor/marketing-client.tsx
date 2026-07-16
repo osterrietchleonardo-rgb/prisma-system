@@ -139,10 +139,20 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
             Pipeline de contenido del Agente IA de Marketing
           </p>
         </div>
-        <button onClick={() => setNueva(true)}
-          style={{ padding: "9px 16px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-          + Nueva idea
-        </button>
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={() => setNueva(true)}
+            style={{ padding: "9px 16px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            + Nueva idea
+          </button>
+          <button onClick={async () => {
+              const res = await fetch("/api/admin-vakdor/marketing/generar", { method: "POST" })
+              if (res.ok) router.refresh()
+              else alert("No se pudieron generar ideas ahora")
+            }}
+            style={{ padding: "9px 16px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, color: "#a5b4fc", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+            ✦ Generar ideas ahora
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 12, alignItems: "flex-start" }}>
