@@ -49,12 +49,44 @@ function Card({ idea, onMover }: { idea: MarketingIdea; onMover: (id: string, e:
           {idea.motivo}
         </div>
       ) : null}
+      {idea.estado === "en_revision" ? <Reformular idea={idea} /> : null}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <button disabled={!prev} onClick={() => prev && onMover(idea.id, prev)}
           style={{ fontSize: 14, background: "none", border: "none", color: prev ? "#a5b4fc" : "rgba(255,255,255,0.15)", cursor: prev ? "pointer" : "default" }}>◀</button>
         <button disabled={!next} onClick={() => next && onMover(idea.id, next)}
           style={{ fontSize: 14, background: "none", border: "none", color: next ? "#a5b4fc" : "rgba(255,255,255,0.15)", cursor: next ? "pointer" : "default" }}>▶</button>
       </div>
+    </div>
+  )
+}
+
+function Reformular({ idea }: { idea: MarketingIdea }) {
+  const [comentario, setComentario] = useState("")
+  const [contenido, setContenido] = useState(idea.contenido ?? "")
+  const [cargando, setCargando] = useState(false)
+  return (
+    <div style={{ marginBottom: 8 }}>
+      {contenido ? (
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)", whiteSpace: "pre-wrap", maxHeight: 120, overflowY: "auto", marginBottom: 6, padding: 8, background: "rgba(0,0,0,0.2)", borderRadius: 6 }}>
+          {contenido}
+        </div>
+      ) : null}
+      <textarea value={comentario} onChange={(e) => setComentario(e.target.value)}
+        placeholder="Comentario para reformular…" rows={2}
+        style={{ width: "100%", fontSize: 11, padding: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", resize: "vertical" }} />
+      <button disabled={cargando || !comentario.trim()}
+        onClick={async () => {
+          setCargando(true)
+          const res = await fetch(`/api/admin-vakdor/marketing/${idea.id}/reformular`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ comentario }),
+          })
+          if (res.ok) { const d = await res.json(); setContenido(d.contenido); setComentario("") }
+          setCargando(false)
+        }}
+        style={{ marginTop: 6, width: "100%", padding: "6px 0", fontSize: 11, fontWeight: 600, background: cargando ? "rgba(194,120,60,0.4)" : ACCENT, border: "none", borderRadius: 6, color: "#fff", cursor: cargando ? "default" : "pointer" }}>
+        {cargando ? "Reformulando…" : "Reformular"}
+      </button>
     </div>
   )
 }
