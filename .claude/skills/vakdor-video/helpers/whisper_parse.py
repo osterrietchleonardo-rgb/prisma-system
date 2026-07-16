@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 import unicodedata
 
-_SPECIAL = re.compile(r"^\[_.*_\]$")
+# Tokens especiales de whisper: [_BEG_], [_EOT_], y marcas de tiempo [_TT_1234].
+# (Terminan en '_]' o en dígito+']' — por eso el patrón NO exige '_' antes del ']'.)
+_SPECIAL = re.compile(r"^\[_.*\]$")
 
 # Puntuación que abre y se adhiere a la palabra SIGUIENTE.
 _OPEN = set("¿¡(«\"'“‘[")

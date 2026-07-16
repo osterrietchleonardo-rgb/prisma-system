@@ -10,6 +10,7 @@ def test_parse_tokens_reconstructs_words():
         {"text": "[_BEG_]", "offsets": {"from": 0, "to": 0}},
         {"text": " Vak", "offsets": {"from": 280, "to": 300}},
         {"text": "dor", "offsets": {"from": 300, "to": 560}},
+        {"text": "[_TT_1004]", "offsets": {"from": 560, "to": 560}},  # token de tiempo: se salta
         {"text": " es", "offsets": {"from": 560, "to": 700}},
         {"text": " tu", "offsets": {"from": 700, "to": 820}},
     ]}]}

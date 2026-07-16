@@ -7,7 +7,7 @@ from whisper_parse import parse_whisper_tokens, merge_punctuation, group_into_ph
 from silences import detect_silences
 
 DEFAULT_WHISPER = r"C:\whisper-cpp"
-PARSER_VERSION = 4  # subir cuando cambie el parseo -> invalida caches viejos
+PARSER_VERSION = 5  # subir cuando cambie el parseo -> invalida caches viejos
 
 
 def _cache_valid(cache_path: str, video: str) -> bool:
