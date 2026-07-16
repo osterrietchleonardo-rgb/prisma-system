@@ -16,7 +16,7 @@ function Chip({ children }: { children: React.ReactNode }) {
     <span style={{
       fontSize: 10, padding: "2px 8px", borderRadius: 999,
       background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)",
-      whiteSpace: "nowrap",
+      maxWidth: "100%", whiteSpace: "normal", wordBreak: "break-word", lineHeight: 1.25,
     }}>{children}</span>
   )
 }
