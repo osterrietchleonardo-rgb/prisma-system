@@ -1,6 +1,21 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "helpers"))
-from whisper_parse import parse_whisper_json, group_into_phrases
+from whisper_parse import (parse_whisper_json, parse_whisper_tokens,
+                           merge_punctuation, group_into_phrases)
+
+
+def test_parse_tokens_reconstructs_words():
+    # -ojf: tokens; espacio inicial abre palabra, el resto se pega. [_BEG_] se salta.
+    data = {"transcription": [{"tokens": [
+        {"text": "[_BEG_]", "offsets": {"from": 0, "to": 0}},
+        {"text": " Vak", "offsets": {"from": 280, "to": 300}},
+        {"text": "dor", "offsets": {"from": 300, "to": 560}},
+        {"text": " es", "offsets": {"from": 560, "to": 700}},
+        {"text": " tu", "offsets": {"from": 700, "to": 820}},
+    ]}]}
+    words = parse_whisper_tokens(data)
+    assert [w["word"] for w in words] == ["Vakdor", "es", "tu"]
+    assert words[0]["start"] == 0.28 and words[0]["end"] == 0.56
 
 WHISPER_SAMPLE = {
     "transcription": [
@@ -19,6 +34,22 @@ def test_parse_words_seconds_and_strip():
         {"word": "mundo", "start": 0.42, "end": 0.9},
         {"word": "nuevo.", "start": 2.0, "end": 2.5},
     ]
+
+
+def test_merge_punctuation_open_and_close():
+    raw = parse_whisper_json({"transcription": [
+        {"offsets": {"from": 0, "to": 100}, "text": " ¿"},
+        {"offsets": {"from": 100, "to": 400}, "text": " Cómo"},
+        {"offsets": {"from": 400, "to": 700}, "text": " estás"},
+        {"offsets": {"from": 700, "to": 750}, "text": " ?"},
+        {"offsets": {"from": 750, "to": 760}, "text": " ,"},  # cierre sin cambio de palabra
+    ]})
+    merged = merge_punctuation(raw)
+    assert [w["word"] for w in merged] == ["¿Cómo", "estás?,"]
+    # el signo de apertura no inventa tiempo: arranca con la palabra real
+    assert merged[0]["start"] == 0.1 and merged[0]["end"] == 0.4
+    # el cierre extiende el end de la palabra anterior
+    assert merged[1]["end"] == 0.76
 
 
 def test_group_phrases_breaks_on_gap():
