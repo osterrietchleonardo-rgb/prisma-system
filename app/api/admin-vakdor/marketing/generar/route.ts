@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
 
   const ideas: NuevaIdeaInput[] = []
   for (const it of parsed as Record<string, unknown>[]) {
+    if (!it || typeof it !== "object") continue
     const titulo = typeof it.titulo === "string" ? it.titulo.trim() : ""
     const fuente = it.fuente as FuenteIdea
     const formato = it.formato as FormatoIdea

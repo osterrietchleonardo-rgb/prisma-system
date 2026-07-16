@@ -106,6 +106,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const router = useRouter()
   const [items, setItems] = useState<MarketingIdea[]>(ideas)
   const [nueva, setNueva] = useState(false)
+  const [generando, setGenerando] = useState(false)
 
   const porEstado = (e: EstadoIdea) => items.filter((i) => i.estado === e)
 
@@ -144,13 +145,24 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
             style={{ padding: "9px 16px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             + Nueva idea
           </button>
-          <button onClick={async () => {
-              const res = await fetch("/api/admin-vakdor/marketing/generar", { method: "POST" })
-              if (res.ok) router.refresh()
-              else alert("No se pudieron generar ideas ahora")
+          <button disabled={generando}
+            onClick={async () => {
+              setGenerando(true)
+              try {
+                const res = await fetch("/api/admin-vakdor/marketing/generar", { method: "POST" })
+                if (res.ok) {
+                  router.refresh()
+                } else {
+                  alert("No se pudieron generar ideas ahora")
+                }
+              } catch {
+                alert("No se pudieron generar ideas ahora")
+              } finally {
+                setGenerando(false)
+              }
             }}
             style={{ padding: "9px 16px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, color: "#a5b4fc", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            ✦ Generar ideas ahora
+            {generando ? "Generando…" : "✦ Generar ideas ahora"}
           </button>
         </div>
       </div>
