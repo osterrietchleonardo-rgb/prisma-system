@@ -17,6 +17,7 @@ import {
   type Caption,
 } from "@remotion/captions";
 import { BRAND } from "./brand";
+import { FORMATS, unit, resolveFormat, VideoFormat } from "./format";
 
 const { fontFamily } = loadFont();
 
@@ -36,6 +37,7 @@ export type EditedReelProps = {
   brandOutro: boolean;
   title: string; // para intro/outro
   contact: string; // para outro (CTA)
+  format: VideoFormat; // vertical | horizontal | cuadrado
 };
 
 export const editedReelDefaults: EditedReelProps = {
@@ -48,6 +50,7 @@ export const editedReelDefaults: EditedReelProps = {
   brandOutro: true,
   title: "Vakdor · PRISMA",
   contact: "@vakdor · WhatsApp",
+  format: "vertical",
 };
 
 const secToFrames = (s: number) => Math.round(s * EDIT_FPS);
@@ -63,9 +66,12 @@ export const calcEditedMetadata: CalculateMetadataFunction<
     : secToFrames(60); // fallback si no hay segmentos (se ajusta con duracion real al renderizar)
   const intro = props.brandIntro ? INTRO : 0;
   const outro = props.brandOutro ? OUTRO : 0;
+  const { width, height } = FORMATS[resolveFormat(props.format)];
   return {
     durationInFrames: intro + segFrames + outro,
     fps: EDIT_FPS,
+    width,
+    height,
   };
 };
 
@@ -73,39 +79,44 @@ const resolveSrc = (p: string) =>
   /^https?:\/\//.test(p) || p.startsWith("data:") ? p : staticFile(p);
 
 // ---------- Marca de agua (logos discretos) ----------
-const Watermark: React.FC = () => (
-  <>
-    <Img
-      src={staticFile("logo-vakdor.png")}
-      style={{
-        position: "absolute",
-        top: 60,
-        left: 50,
-        width: 72,
-        height: 72,
-        objectFit: "contain",
-        opacity: 0.92,
-      }}
-    />
-    <Img
-      src={staticFile("logo-icon.png")}
-      style={{
-        position: "absolute",
-        top: 60,
-        right: 50,
-        width: 72,
-        height: 72,
-        objectFit: "contain",
-        opacity: 0.92,
-      }}
-    />
-  </>
-);
+const Watermark: React.FC = () => {
+  const { width, height } = useVideoConfig();
+  const u = unit(width, height);
+  return (
+    <>
+      <Img
+        src={staticFile("logo-vakdor.png")}
+        style={{
+          position: "absolute",
+          top: 60 * u,
+          left: 50 * u,
+          width: 72 * u,
+          height: 72 * u,
+          objectFit: "contain",
+          opacity: 0.92,
+        }}
+      />
+      <Img
+        src={staticFile("logo-icon.png")}
+        style={{
+          position: "absolute",
+          top: 60 * u,
+          right: 50 * u,
+          width: 72 * u,
+          height: 72 * u,
+          objectFit: "contain",
+          opacity: 0.92,
+        }}
+      />
+    </>
+  );
+};
 
 // ---------- Subtitulos estilo TikTok ----------
 const Subtitles: React.FC<{ captions: Caption[] }> = ({ captions }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
+  const u = unit(width, height);
   const nowMs = (frame / fps) * 1000;
 
   const { pages } = createTikTokStyleCaptions({
@@ -122,12 +133,12 @@ const Subtitles: React.FC<{ captions: Caption[] }> = ({ captions }) => {
     <div
       style={{
         position: "absolute",
-        bottom: 360,
-        left: 60,
-        right: 60,
+        bottom: height * 0.1875, // relativo al alto: ~bottom 360 en vertical, ~202 en horizontal
+        left: 60 * u,
+        right: 60 * u,
         textAlign: "center",
         fontFamily,
-        fontSize: 70,
+        fontSize: 70 * u,
         fontWeight: 800,
         lineHeight: 1.2,
         textShadow: "0 4px 24px rgba(0,0,0,0.85)",
@@ -140,7 +151,7 @@ const Subtitles: React.FC<{ captions: Caption[] }> = ({ captions }) => {
             key={i}
             style={{
               color: active ? BRAND.accent : BRAND.title,
-              marginRight: 14,
+              marginRight: 14 * u,
               display: "inline-block",
             }}
           >
@@ -159,7 +170,8 @@ const BrandCard: React.FC<{ line1: string; line2?: string; pill?: string }> = ({
   pill,
 }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
+  const u = unit(width, height);
   const appear = spring({ frame, fps, config: { damping: 200 } });
   const rise = interpolate(appear, [0, 1], [40, 0]);
   return (
@@ -169,27 +181,27 @@ const BrandCard: React.FC<{ line1: string; line2?: string; pill?: string }> = ({
         justifyContent: "center",
         alignItems: "center",
         textAlign: "center",
-        padding: 90,
+        padding: 90 * u,
         fontFamily,
       }}
     >
       <Img
         src={staticFile("logo-vakdor.png")}
-        style={{ width: 150, height: 150, objectFit: "contain", opacity: appear }}
+        style={{ width: 150 * u, height: 150 * u, objectFit: "contain", opacity: appear }}
       />
       <div
         style={{
-          width: interpolate(appear, [0, 1], [0, 200]),
-          height: 7,
+          width: interpolate(appear, [0, 1], [0, 200 * u]),
+          height: 7 * u,
           backgroundColor: BRAND.accent,
           borderRadius: 4,
-          margin: "40px 0",
+          margin: `${40 * u}px 0`,
         }}
       />
       <div
         style={{
           color: BRAND.title,
-          fontSize: 72,
+          fontSize: 72 * u,
           fontWeight: 800,
           lineHeight: 1.1,
           transform: `translateY(${rise}px)`,
@@ -200,7 +212,7 @@ const BrandCard: React.FC<{ line1: string; line2?: string; pill?: string }> = ({
       </div>
       {line2 ? (
         <div
-          style={{ color: BRAND.text, fontSize: 44, fontWeight: 600, marginTop: 20, opacity: appear }}
+          style={{ color: BRAND.text, fontSize: 44 * u, fontWeight: 600, marginTop: 20 * u, opacity: appear }}
         >
           {line2}
         </div>
@@ -208,12 +220,12 @@ const BrandCard: React.FC<{ line1: string; line2?: string; pill?: string }> = ({
       {pill ? (
         <div
           style={{
-            marginTop: 48,
+            marginTop: 48 * u,
             backgroundColor: BRAND.accent,
             color: BRAND.title,
-            fontSize: 40,
+            fontSize: 40 * u,
             fontWeight: 700,
-            padding: "26px 56px",
+            padding: `${26 * u}px ${56 * u}px`,
             borderRadius: 999,
             opacity: appear,
           }}

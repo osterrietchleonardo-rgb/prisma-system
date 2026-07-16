@@ -15,6 +15,7 @@
 //   --min-keep=0.25        Descarta tramos buenos mas cortos que esto (seg).
 //   --no-intro --no-outro --no-watermark --no-subtitles
 //   --title="..."  --contact="..."
+//   --format=vertical|horizontal|cuadrado   (default vertical; horizontal=1920x1080 LinkedIn/YT)
 //
 // Regla de oro: la salida SIEMPRE va a "Prisma - MK". Nunca escribe en PRISMA-SYSTEM.
 
@@ -55,6 +56,7 @@ const opt = {
   subtitles: Boolean(args.subtitles || args.captions) && !args["no-subtitles"],
   title: args.title ?? "Vakdor · PRISMA",
   contact: args.contact ?? "@vakdor · WhatsApp",
+  format: args.format ?? "vertical",
 };
 
 const ff = (a) => spawnSync("ffmpeg", a, { encoding: "utf8" });
@@ -219,6 +221,7 @@ async function main() {
     brandOutro: opt.brandOutro,
     title: opt.title,
     contact: opt.contact,
+    format: opt.format,
   };
   const resolvedPath = path.join(__dirname, ".edit.props.json");
   fs.writeFileSync(resolvedPath, JSON.stringify(props, null, 2));
