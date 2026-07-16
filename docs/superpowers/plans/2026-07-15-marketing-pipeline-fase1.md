@@ -14,7 +14,7 @@
 - **Auth admin:** toda ruta bajo `app/api/admin-vakdor/**` usa `requireAdminVakdor(request)` + `isNextResponse(auth)` de `@/lib/admin-vakdor/guard`. Nunca dejar una ruta admin sin ese guard.
 - **DB:** acceso solo vía `getAdminDb()` (`@/lib/admin-vakdor/logger`, service role). La tabla tiene RLS activado SIN políticas públicas.
 - **Estilo UI:** inline styles, tema oscuro (fondo `#070B14`, tarjetas `rgba(255,255,255,0.025)`, acento índigo `#6366f1` y cobre `#c2783c`), consistente con `components/admin-vakdor/sidebar.tsx` y `finanzas-client.tsx`.
-- **Modelo Claude:** confirmar id exacto y uso del SDK invocando la skill `claude-api` (paso explícito en Task 6). Default previsto: `claude-sonnet-5` para reformular/generar.
+- **Modelo Claude (confirmado con la skill `claude-api`):** `claude-opus-4-8` (es el default obligatorio del SDK salvo que el usuario pida otro; Leo no pidió otro). SDK `@anthropic-ai/sdk` (ya instalado): `client.messages.create({ model, max_tokens, system, messages })`; `response.content` es unión discriminada → filtrar `type === "text"` antes de leer `.text`. En Opus 4.8 NO se pasa `temperature`/`top_p`/`top_k` (devuelven 400). Sin streaming alcanza con `max_tokens ≤ 16000`.
 - **Regla de trabajo (memoria del proyecto):** todo se prueba en local; merge a `main` SOLO con OK explícito de Leo; commitear solo lo propio (nunca `git add -A`).
 - **Nombres de estado (verbatim):** `idea` · `en_proceso` · `en_revision` · `aprobada` · `publicada` · `rechazada`.
 - **Nombres de fuente (verbatim):** `linkedin` · `instagram` · `blog`.
@@ -784,9 +784,9 @@ git commit -m "feat(marketing): alta manual de idea (modal + endpoint)"
   - `BRAND_SYSTEM: string` (paquete de marca destilado).
   - `generarTexto(system: string, user: string): Promise<string>` — una llamada simple a Claude que devuelve texto.
 
-- [ ] **Step 1: Confirmar modelo/SDK con la skill claude-api**
+- [ ] **Step 1: Modelo/SDK ya confirmados por el controlador (skill claude-api)**
 
-Invocar la skill `claude-api` (Skill tool) para confirmar: id de modelo vigente (default previsto `claude-sonnet-5`), forma de `client.messages.create`, y manejo de la key. Ajustar el código del Step 3 a lo que indique la skill si difiere.
+El controlador ya consultó la skill `claude-api`. Usá exactamente: modelo `claude-opus-4-8`; SDK `@anthropic-ai/sdk` con `client.messages.create({ model, max_tokens, system, messages })`; `response.content` es unión discriminada → filtrá los bloques `type === "text"` y concatená su `.text`. NO pases `temperature`/`top_p`/`top_k` (Opus 4.8 los rechaza con 400). Sin streaming (max_tokens ≤ 16000). No hace falta que invoques la skill de nuevo.
 
 - [ ] **Step 2: Paquete de marca destilado**
 
@@ -830,15 +830,16 @@ Create `lib/admin-vakdor/marketing/claude.ts`:
 ```typescript
 import Anthropic from "@anthropic-ai/sdk"
 
-const MODEL = "claude-sonnet-5" // confirmar con la skill claude-api
+const MODEL = "claude-opus-4-8" // default del SDK (confirmado con la skill claude-api)
 
-export async function generarTexto(system: string, user: string): Promise<string> {
+export async function generarTexto(system: string, user: string, maxTokens = 4000): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error("Falta ANTHROPIC_API_KEY")
   const client = new Anthropic({ apiKey })
+  // Sin temperature/top_p/top_k: Opus 4.8 los rechaza con 400. Sin streaming: max_tokens <= 16000.
   const res = await client.messages.create({
     model: MODEL,
-    max_tokens: 2000,
+    max_tokens: maxTokens,
     system,
     messages: [{ role: "user", content: user }],
   })
