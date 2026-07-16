@@ -12,6 +12,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const path = new URL(request.url).searchParams.get("path")
   if (!path) return NextResponse.json({ error: "falta path" }, { status: 400 })
 
+  // Rechazar segmentos de traversal ("." / "..") antes de cualquier otra validación.
+  if (path.split("/").some((s) => s === "." || s === "..")) {
+    return NextResponse.json({ error: "path inválido" }, { status: 400 })
+  }
   // Verificar que el asset pertenece a esta idea (el path arranca con ideas/<id>/).
   if (!path.startsWith(`ideas/${params.id}/`)) {
     return NextResponse.json({ error: "path no pertenece a la idea" }, { status: 403 })

@@ -49,8 +49,21 @@ function Card({ idea, onMover }: { idea: MarketingIdea; onMover: (id: string, e:
           {idea.assets.map((a, idx) => (
             <button key={idx}
               onClick={async () => {
-                const res = await fetch(`/api/admin-vakdor/marketing/${idea.id}/asset?path=${encodeURIComponent(a.path)}`)
-                if (res.ok) { const { url } = await res.json(); window.open(url, "_blank") }
+                const win = window.open("", "_blank") // abrir sincrónico para conservar el gesto
+                try {
+                  const res = await fetch(`/api/admin-vakdor/marketing/${idea.id}/asset?path=${encodeURIComponent(a.path)}`)
+                  if (res.ok) {
+                    const { url } = await res.json()
+                    if (win) win.location.href = url
+                    else window.open(url, "_blank")
+                  } else {
+                    if (win) win.close()
+                    alert("No se pudo abrir el archivo.")
+                  }
+                } catch {
+                  if (win) win.close()
+                  alert("No se pudo abrir el archivo.")
+                }
               }}
               style={{ fontSize: 10, padding: "3px 8px", borderRadius: 6, background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", color: "#a5b4fc", cursor: "pointer" }}>
               ⬇ {a.tipo.toUpperCase()}{idea.assets.length > 1 ? ` ${idx + 1}` : ""}
