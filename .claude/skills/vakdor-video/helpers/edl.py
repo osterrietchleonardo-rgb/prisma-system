@@ -47,11 +47,20 @@ def master_srt_offsets(edl: dict, transcripts: dict) -> list[dict]:
     for r, off in zip(edl.get("ranges", []), offs):
         words = (transcripts.get(r["source"], {}) or {}).get("words", [])
         for w in words:
-            if w["start"] >= r["start"] and w["end"] <= r["end"]:
-                subs.append({
-                    "start": round(w["start"] - r["start"] + off, 3),
-                    "end": round(w["end"] - r["start"] + off, 3),
-                    "text": w["word"],
-                })
+            # incluir toda palabra que SOLAPE el tramo (no solo las 100% contenidas):
+            # así no se pierden palabras cuyo borde cae en un corte (whisper pega el
+            # silencio al final de la palabra). Se recorta su tiempo al tramo.
+            ov_start = max(w["start"], r["start"])
+            ov_end = min(w["end"], r["end"])
+            if ov_end <= ov_start:
+                continue
+            # exigir un solapamiento mínimo para no duplicar una palabra partida en dos tramos
+            if (ov_end - ov_start) < 0.4 * (w["end"] - w["start"]) and (w["end"] - w["start"]) > 0:
+                continue
+            subs.append({
+                "start": round(ov_start - r["start"] + off, 3),
+                "end": round(ov_end - r["start"] + off, 3),
+                "text": w["word"],
+            })
     subs.sort(key=lambda s: s["start"])
     return subs
