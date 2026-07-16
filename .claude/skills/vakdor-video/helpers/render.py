@@ -24,6 +24,34 @@ def build_srt(subs: list[dict]) -> str:
     return "\n".join(out)
 
 
+def group_word_subs(subs: list[dict], max_words: int = 4, max_dur: float = 2.6,
+                    max_gap: float = 0.7) -> list[dict]:
+    """Agrupa subtítulos word-level en cues de frase corta (más premium que palabra-por-palabra).
+    Corta el cue al llegar a max_words, si el hueco al siguiente supera max_gap, o si la duración
+    del cue superaría max_dur."""
+    cues: list[dict] = []
+    cur: list[dict] = []
+    for w in subs:
+        if cur:
+            gap = w["start"] - cur[-1]["end"]
+            dur = w["end"] - cur[0]["start"]
+            if len(cur) >= max_words or gap > max_gap or dur > max_dur:
+                cues.append(_flush_cue(cur))
+                cur = []
+        cur.append(w)
+    if cur:
+        cues.append(_flush_cue(cur))
+    return cues
+
+
+def _flush_cue(words: list[dict]) -> dict:
+    return {
+        "start": words[0]["start"],
+        "end": words[-1]["end"],
+        "text": " ".join(w["text"] for w in words),
+    }
+
+
 def _probe_duration(path: str) -> float:
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
                         "-of", "default=nw=1:nk=1", path], capture_output=True, text=True, check=True)
@@ -45,7 +73,8 @@ def _extract_segment(src, start, end, grade, out, preview):
     subprocess.run(cmd, check=True, capture_output=True)
 
 
-def render(edl_path: str, out: str, preview=False, build_subtitles=False, edit_dir=None):
+def render(edl_path: str, out: str, preview=False, build_subtitles=False, edit_dir=None,
+           sub_chunk=0):
     edl = load_edl(edl_path)
     errs = validate_edl(edl)
     if errs:
@@ -99,9 +128,11 @@ def render(edl_path: str, out: str, preview=False, build_subtitles=False, edit_d
                 if os.path.exists(p):
                     transcripts[src] = json.load(open(p, encoding="utf-8"))
             subs = master_srt_offsets(edl, transcripts)
+            if sub_chunk and sub_chunk > 1:
+                subs = group_word_subs(subs, max_words=sub_chunk)
             srt_path = os.path.join(edit_dir, "master.srt")
             open(srt_path, "w", encoding="utf-8").write(build_srt(subs))
-            print(f"[subs] master.srt: {len(subs)} líneas")
+            print(f"[subs] master.srt: {len(subs)} líneas (chunk={sub_chunk or 'palabra'})")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
         if srt_path and os.path.exists(srt_path):
             style = ("FontName=Inter,FontSize=16,Bold=1,PrimaryColour=&H00FFFFFF,"
@@ -131,8 +162,10 @@ def main():
     ap.add_argument("--preview", action="store_true")
     ap.add_argument("--build-subtitles", action="store_true")
     ap.add_argument("--edit-dir")
+    ap.add_argument("--sub-chunk", type=int, default=0,
+                    help="palabras por cue de subtítulo (0=palabra-por-palabra; 3-4=frase corta)")
     a = ap.parse_args()
-    render(a.edl, a.out, a.preview, a.build_subtitles, a.edit_dir)
+    render(a.edl, a.out, a.preview, a.build_subtitles, a.edit_dir, a.sub_chunk)
 
 
 if __name__ == "__main__":
