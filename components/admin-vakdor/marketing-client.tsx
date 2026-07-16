@@ -77,12 +77,23 @@ function Reformular({ idea }: { idea: MarketingIdea }) {
       <button disabled={cargando || !comentario.trim()}
         onClick={async () => {
           setCargando(true)
-          const res = await fetch(`/api/admin-vakdor/marketing/${idea.id}/reformular`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ comentario }),
-          })
-          if (res.ok) { const d = await res.json(); setContenido(d.contenido); setComentario("") }
-          setCargando(false)
+          try {
+            const res = await fetch(`/api/admin-vakdor/marketing/${idea.id}/reformular`, {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ comentario: comentario.trim() }),
+            })
+            if (res.ok) {
+              const d = await res.json()
+              setContenido(d.contenido)
+              setComentario("")
+            } else {
+              alert("No se pudo reformular. Probá de nuevo.")
+            }
+          } catch {
+            alert("No se pudo reformular. Probá de nuevo.")
+          } finally {
+            setCargando(false)
+          }
         }}
         style={{ marginTop: 6, width: "100%", padding: "6px 0", fontSize: 11, fontWeight: 600, background: cargando ? "rgba(194,120,60,0.4)" : ACCENT, border: "none", borderRadius: 6, color: "#fff", cursor: cargando ? "default" : "pointer" }}>
         {cargando ? "Reformulando…" : "Reformular"}
