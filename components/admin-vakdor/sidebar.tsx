@@ -5,6 +5,7 @@ import { useState } from "react"
 const NAV = [
   { href: "/admin-vakdor/dashboard", icon: "⊞", label: "Dashboard" },
   { href: "/admin-vakdor/finanzas", icon: "💰", label: "Finanzas" },
+  { href: "/admin-vakdor/marketing", icon: "📣", label: "Marketing" },
   { href: "/admin-vakdor/agencias", icon: "🏢", label: "Agencias" },
   { href: "/admin-vakdor/bandejas", icon: "📥", label: "Bandejas de entrada" },
   { href: "/admin-vakdor/invitaciones", icon: "🔑", label: "Invitaciones" },
