@@ -10,7 +10,7 @@ DEFAULT_WHISPER = r"C:\whisper-cpp"
 PARSER_VERSION = 5  # subir cuando cambie el parseo -> invalida caches viejos
 
 
-def _cache_valid(cache_path: str, video: str) -> bool:
+def _cache_valid(cache_path: str, video: str, model: str) -> bool:
     if not os.path.exists(cache_path):
         return False
     try:
@@ -19,6 +19,7 @@ def _cache_valid(cache_path: str, video: str) -> bool:
         return False
     st = os.stat(video)
     return (meta.get("parser_version") == PARSER_VERSION
+            and meta.get("model") == model
             and meta.get("source_mtime") == int(st.st_mtime)
             and meta.get("source_size") == st.st_size)
 
@@ -29,7 +30,7 @@ def transcribe_file(video: str, edit_dir: str, lang: str = "es",
     tdir = os.path.join(edit_dir, "transcripts")
     os.makedirs(tdir, exist_ok=True)
     cache_path = os.path.join(tdir, f"{stem}.json")
-    if _cache_valid(cache_path, video):
+    if _cache_valid(cache_path, video, model):
         print(f"[whisper] cache HIT: {cache_path}")
         return cache_path
 
@@ -56,7 +57,7 @@ def transcribe_file(video: str, edit_dir: str, lang: str = "es",
     st = os.stat(video)
     payload = {
         "source": stem, "source_path": os.path.abspath(video),
-        "language": lang, "parser_version": PARSER_VERSION,
+        "language": lang, "model": model, "parser_version": PARSER_VERSION,
         "source_mtime": int(st.st_mtime), "source_size": st.st_size,
         "words": words, "phrases": phrases, "silences": silences,
     }
