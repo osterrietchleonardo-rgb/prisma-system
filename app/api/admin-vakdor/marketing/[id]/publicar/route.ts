@@ -3,6 +3,8 @@ import { requireAdminVakdor, isNextResponse } from "@/lib/admin-vakdor/guard"
 import { getAdminDb } from "@/lib/admin-vakdor/logger"
 import { marcarPublicada } from "@/lib/admin-vakdor/marketing/store"
 import { publicarBlog, type PublicarBlogInput } from "@/lib/admin-vakdor/marketing/blog-client"
+import { publicarLinkedIn } from "@/lib/admin-vakdor/marketing/buffer-client"
+import type { AssetRef } from "@/lib/admin-vakdor/marketing/types"
 
 export const dynamic = "force-dynamic"
 
@@ -13,13 +15,50 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const db = getAdminDb()
   const { data: idea, error } = await db
     .from("marketing_ideas")
-    .select("fuente, estado, titulo, contenido, blog")
+    .select("fuente, estado, titulo, contenido, blog, hashtags, assets, primer_comentario")
     .eq("id", params.id).single()
   if (error || !idea) return NextResponse.json({ error: "idea no encontrada" }, { status: 404 })
 
+  if (idea.fuente === "linkedin") {
+    const contenido = typeof idea.contenido === "string" ? idea.contenido : ""
+    if (!contenido) {
+      return NextResponse.json(
+        { error: "Primero desarrollá el contenido del post." },
+        { status: 400 },
+      )
+    }
+
+    const blog = (idea.blog ?? {}) as Record<string, unknown>
+    const assets = (idea.assets ?? []) as Array<AssetRef & { url?: string }>
+    let imageUrl: string | null = null
+    if (typeof blog.featured_image_url === "string" && /^https?:\/\//.test(blog.featured_image_url)) {
+      imageUrl = blog.featured_image_url
+    } else {
+      const conUrl = assets.find((a) => typeof a.url === "string" && a.url.startsWith("http"))
+      if (conUrl?.url) imageUrl = conUrl.url
+    }
+
+    const hashtags = Array.isArray(idea.hashtags) ? (idea.hashtags as string[]) : []
+    const hashtagsLine = hashtags.join(" ")
+    const text = hashtags.length > 0 && !contenido.includes(hashtagsLine)
+      ? `${contenido}\n\n${hashtagsLine}`
+      : contenido
+
+    try {
+      const result = await publicarLinkedIn({ text, imageUrl })
+      await marcarPublicada(params.id, {
+        canal: "linkedin", ref_id: result.id, url: "https://www.linkedin.com/feed/",
+        fecha: new Date().toISOString(), status: result.status,
+      })
+      return NextResponse.json({ ok: true, status: result.status, primer_comentario: idea.primer_comentario ?? null })
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 500 })
+    }
+  }
+
   if (idea.fuente !== "blog") {
     return NextResponse.json(
-      { error: "Publicación de LinkedIn en construcción; por ahora solo blog." },
+      { error: "Publicación no soportada para esta fuente." },
       { status: 501 },
     )
   }

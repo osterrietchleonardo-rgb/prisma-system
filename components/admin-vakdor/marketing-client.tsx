@@ -129,13 +129,14 @@ function Card({ idea, onMover, desarrollando, onVer, onProgramar, onPublicar, pu
         </button>
       ) : null}
       {idea.estado === "aprobada" && idea.fuente === "linkedin" ? (
-        <div style={{
-          width: "100%", marginBottom: 8, padding: "6px 0", fontSize: 11, fontWeight: 600, textAlign: "center",
-          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6,
-          color: "rgba(255,255,255,0.35)",
-        }}>
-          Publicar LinkedIn (próximamente)
-        </div>
+        <button disabled={publicando} onClick={() => onPublicar(idea.id)}
+          style={{
+            width: "100%", marginBottom: 8, padding: "6px 0", fontSize: 11, fontWeight: 600,
+            background: publicando ? "rgba(99,102,241,0.3)" : "rgba(99,102,241,0.85)", border: "none", borderRadius: 6,
+            color: "#fff", cursor: publicando ? "default" : "pointer",
+          }}>
+          {publicando ? "Publicando…" : "Publicar en LinkedIn"}
+        </button>
       ) : null}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <button disabled={!prev} onClick={() => prev && onMover(idea.id, prev)}
@@ -315,6 +316,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const [desarrollandoId, setDesarrollandoId] = useState<string | null>(null)
   const [publicandoId, setPublicandoId] = useState<string | null>(null)
   const [verIdea, setVerIdea] = useState<MarketingIdea | null>(null)
+  const [comentarioModal, setComentarioModal] = useState<string | null>(null)
   const [vista, setVista] = useState<"tablero" | "calendario">("tablero")
 
   const porEstado = (e: EstadoIdea) => items.filter((i) => i.estado === e)
@@ -364,14 +366,27 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
 
   async function publicar(id: string) {
     if (publicandoId) return
-    if (!window.confirm("¿Publicar este artículo en el blog de Vakdor (queda público)?")) return
+    const item = items.find((i) => i.id === id)
+    const esLinkedIn = item?.fuente === "linkedin"
+    const confirmMsg = esLinkedIn
+      ? "¿Publicar este post en tu LinkedIn AHORA? (sale a tu cuenta real)"
+      : "¿Publicar este artículo en el blog de Vakdor (queda público)?"
+    if (!window.confirm(confirmMsg)) return
     setPublicandoId(id)
     try {
       const res = await fetch(`/api/admin-vakdor/marketing/${id}/publicar`, { method: "POST" })
       const d = await res.json().catch(() => ({}))
       if (res.ok) {
         setItems((prev) => prev.map((i) => (i.id === id ? { ...i, estado: "publicada" } : i)))
-        alert("Publicado ✓\n" + (d.url ?? ""))
+        if (esLinkedIn) {
+          if (d.primer_comentario) {
+            setComentarioModal(d.primer_comentario)
+          } else {
+            alert("Publicado en LinkedIn ✓")
+          }
+        } else {
+          alert("Publicado ✓\n" + (d.url ?? ""))
+        }
       } else {
         alert("No se pudo publicar: " + (d.error ?? ""))
       }
@@ -582,6 +597,33 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
                 {verIdea.hashtags.map((h, idx) => <Chip key={idx}>{h}</Chip>)}
               </div>
             ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {comentarioModal ? (
+        <div onClick={() => setComentarioModal(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: "#0d1424", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 24, width: 480, maxWidth: "90vw", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+              <h2 style={{ fontSize: 16, color: "#fff", margin: 0 }}>Publicado ✓ — pegá el primer comentario</h2>
+              <button onClick={() => setComentarioModal(null)}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>×</button>
+            </div>
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", margin: 0 }}>
+              Pegalo como primer comentario en tu post de LinkedIn.
+            </p>
+            <textarea readOnly value={comentarioModal} rows={6}
+              style={{ width: "100%", fontSize: 13, padding: 10, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "rgba(255,255,255,0.85)", resize: "vertical" }} />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(comentarioModal)
+                alert("Comentario copiado ✓")
+              }}
+              style={{ alignSelf: "flex-start", padding: "6px 12px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              Copiar
+            </button>
           </div>
         </div>
       ) : null}
