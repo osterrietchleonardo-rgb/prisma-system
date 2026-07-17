@@ -571,6 +571,32 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
               <button onClick={() => setVerIdea(null)}
                 style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>×</button>
             </div>
+            {(() => {
+              const blogImg = (verIdea.blog as Record<string, unknown>)?.featured_image_url
+              const assetImg = (verIdea.assets ?? []).map((a) => (a as { url?: string }).url).find((u) => typeof u === "string" && u.startsWith("http"))
+              const img = typeof blogImg === "string" && blogImg.startsWith("http") ? blogImg : (assetImg as string | undefined)
+              const pdfs = (verIdea.assets ?? []).filter((a) => a.tipo === "pdf") as Array<{ url?: string; path: string }>
+              return (
+                <>
+                  {img ? (
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>Imagen de marca</div>
+                      <img src={img} alt="portada" style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)" }} />
+                    </div>
+                  ) : null}
+                  {pdfs.length > 0 ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {pdfs.map((a, idx) => (a.url ? (
+                        <a key={idx} href={a.url} target="_blank" rel="noreferrer"
+                          style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, background: "rgba(194,120,60,0.15)", border: "1px solid rgba(194,120,60,0.3)", color: "#e29e6d", textDecoration: "none" }}>
+                          Ver PDF{pdfs.length > 1 ? ` ${idx + 1}` : ""}
+                        </a>
+                      ) : null))}
+                    </div>
+                  ) : null}
+                </>
+              )
+            })()}
             <button
               onClick={() => {
                 navigator.clipboard.writeText(verIdea.contenido ?? "")
