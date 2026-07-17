@@ -437,20 +437,22 @@ export function NewVisitDialog({
                   className="bg-accent/5 border-accent/10"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <Label htmlFor="propiedad_titulo">Seleccionar Propiedad (Tokko)</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
-                      className="w-full justify-between bg-accent/5 border-accent/10 h-10 font-normal"
+                      className="w-full justify-between bg-accent/5 border-accent/10 h-10 font-normal min-w-0 overflow-hidden"
                     >
-                      {formData.propiedad_titulo || "Seleccionar propiedad..."}
+                      <span className="truncate text-left flex-1">
+                        {formData.propiedad_titulo || "Seleccionar propiedad..."}
+                      </span>
                       <Briefcase className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0 bg-card border-accent/20 shadow-2xl" align="start">
+                  <PopoverContent className="w-[400px] max-w-[90vw] p-0 bg-card border-accent/20 shadow-2xl" align="start">
                     <div className="p-2 border-b border-accent/10">
                       <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -473,19 +475,40 @@ export function NewVisitDialog({
                             key={prop.id}
                             type="button"
                             className={cn(
-                              "w-full text-left p-2 rounded-sm text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5",
+                              "w-full text-left p-2 rounded-sm text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5 min-w-0 overflow-hidden",
                               formData.propiedad_titulo === prop.title && "bg-accent/10"
                             )}
                             onClick={() => handlePropertyChange(prop.id)}
                           >
-                            <span className="font-semibold">{prop.title}</span>
-                            <span className="text-xs text-muted-foreground line-clamp-1">{prop.address}</span>
+                            <span className="font-semibold line-clamp-1 text-xs">{prop.title}</span>
+                            <span className="text-[11px] text-muted-foreground line-clamp-1">{prop.address}</span>
                           </button>
                         ))
                       )}
                     </div>
                   </PopoverContent>
                 </Popover>
+
+                {formData.propiedad_titulo && (() => {
+                  const selectedProp = properties.find(p => p.title === formData.propiedad_titulo);
+                  return (
+                    <div className="p-2.5 rounded-lg border border-accent/20 bg-accent/5 space-y-1 text-xs mt-2 min-w-0 overflow-hidden">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <span className="font-semibold text-xs text-accent line-clamp-1 flex-1">{formData.propiedad_titulo}</span>
+                        {selectedProp?.city && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-medium shrink-0">
+                            {selectedProp.city}
+                          </span>
+                        )}
+                      </div>
+                      {selectedProp?.address && (
+                        <p className="text-[11px] text-muted-foreground line-clamp-1 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 shrink-0 opacity-70" /> {selectedProp.address}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="propiedad_colaboracion">Propiedad (Colaboración)</Label>
