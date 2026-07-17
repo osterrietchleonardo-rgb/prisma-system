@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { 
   TrendingUp, 
   Plus, 
@@ -9,13 +9,21 @@ import {
   LayoutDashboard,
   Filter,
   Trash2,
-  Edit2
+  Edit2,
+  Users
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { PerformanceScaleEditor } from "@/components/tracking/PerformanceScaleEditor";
 import { PerformanceObjectivesEditor } from "@/components/tracking/PerformanceObjectivesEditor";
@@ -56,6 +64,7 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
   const [filter, setFilter] = useState<"todos" | "prospeccion" | "prelisting" | "prebuying" | "captacion" | "reserva" | "cierre">("todos");
   const [statusFilter, setStatusFilter] = useState<"todos" | "original" | "modificada" | "eliminada">("todos");
   const [search, setSearch] = useState("");
+  const [advisorFilter, setAdvisorFilter] = useState<string>("all");
 
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
@@ -121,9 +130,24 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
     window.dispatchEvent(new CustomEvent('prisma-header-title', { detail: "Tracking Performance" }));
   }, [fetchLogs, fetchAgencyConfig]);
 
+  // Derive unique advisors from logs for the director filter dropdown
+  const advisorOptions = useMemo(() => {
+    if (!isDirector) return [];
+    const map = new Map<string, string>();
+    for (const log of logs) {
+      if (log.agent_id && log.profiles?.full_name && !map.has(log.agent_id)) {
+        map.set(log.agent_id, log.profiles.full_name);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [logs, isDirector]);
+
   const filteredLogs = logs.filter(log => {
     const matchesFilter = filter === "todos" || log.type === filter;
     const matchesStatus = statusFilter === "todos" || log.status === statusFilter || (statusFilter === "original" && !log.status);
+    const matchesAdvisor = advisorFilter === "all" || log.agent_id === advisorFilter;
     
     const matchesSearch = 
       !search || 
@@ -132,7 +156,7 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
         val?.toString().toLowerCase().includes(search.toLowerCase())
       );
 
-    return matchesFilter && matchesSearch && matchesStatus;
+    return matchesFilter && matchesSearch && matchesStatus && matchesAdvisor;
   });
 
   return (
@@ -233,14 +257,34 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                 )}
               </div>
 
-              <div className="relative w-full md:w-[320px]">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground/50" />
-                <Input 
-                  placeholder="Buscar por cliente o propiedad..." 
-                  className="pl-10 bg-background/30 border-white/5 focus:border-accent/50 transition-all rounded-xl h-10"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                {isDirector && advisorOptions.length > 0 && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <Select value={advisorFilter} onValueChange={setAdvisorFilter}>
+                      <SelectTrigger className="w-full sm:w-[220px] h-10 text-xs bg-background/30 backdrop-blur-sm border-white/5 focus:border-accent/50 rounded-xl">
+                        <SelectValue placeholder="Todos los asesores" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los asesores</SelectItem>
+                        {advisorOptions.map((advisor) => (
+                          <SelectItem key={advisor.id} value={advisor.id}>
+                            {advisor.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="relative w-full md:w-[320px]">
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground/50" />
+                  <Input 
+                    placeholder="Buscar por cliente o propiedad..." 
+                    className="pl-10 bg-background/30 border-white/5 focus:border-accent/50 transition-all rounded-xl h-10"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           </Card>
