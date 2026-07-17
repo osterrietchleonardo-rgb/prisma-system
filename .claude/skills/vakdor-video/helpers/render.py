@@ -83,7 +83,7 @@ def _extract_segment(src, start, end, grade, out, preview):
 
 
 def render(edl_path: str, out: str, preview=False, build_subtitles=False, edit_dir=None,
-           sub_chunk=0, emphasis=False, corrections=None):
+           sub_chunk=0, emphasis=False, corrections=None, sub_size=40):
     edl = load_edl(edl_path)
     errs = validate_edl(edl)
     if errs:
@@ -150,7 +150,8 @@ def render(edl_path: str, out: str, preview=False, build_subtitles=False, edit_d
                 mv = int(h * 0.195)  # margen inferior relativo al alto (queda sobre el video)
                 ass_path = os.path.join(edit_dir, "master.ass")
                 open(ass_path, "w", encoding="utf-8").write(
-                    build_ass(subs, width=w, height=h, margin_v=mv, corrections=corr))
+                    build_ass(subs, width=w, height=h, fontsize=sub_size, margin_v=mv,
+                              corrections=corr))
                 print(f"[subs] master.ass: {len(subs)} cues (cobre+correcciones)")
             else:
                 srt_path = os.path.join(edit_dir, "master.srt")
@@ -196,9 +197,10 @@ def main():
     ap.add_argument("--emphasis", action="store_true",
                     help="subtítulos .ass con palabras clave en cobre + correcciones de jerga")
     ap.add_argument("--corrections", help="json {mal: bien} extra para corregir términos")
+    ap.add_argument("--sub-size", type=int, default=40, help="tamaño de fuente del subtítulo (.ass)")
     a = ap.parse_args()
     render(a.edl, a.out, a.preview, a.build_subtitles, a.edit_dir, a.sub_chunk,
-           a.emphasis, a.corrections)
+           a.emphasis, a.corrections, a.sub_size)
 
 
 if __name__ == "__main__":
