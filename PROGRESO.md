@@ -1,4 +1,4 @@
-# 📋 PROGRESO — PRISMA IA (v1.0.4)
+# 📋 PROGRESO — PRISMA IA (v1.0.7)
 > Estado: Producción activa. Primer cliente real onboardeado (MaxRE Inmobiliaria). Bugs corregidos.
 > Actualizar al finalizar cada tarea, prompt o sesión de trabajo.
 
@@ -9,8 +9,8 @@
 - Stack: Next.js 14 · Supabase · Gemini API · Tokko API · TypeScript · Tailwind · shadcn/ui
 - Repo GitHub: [URL del repo]
 - Supabase Project: `vutopjvdrwmvrkgnrfno` (prisma) — región `sa-east-1`
-- Versión actual: v1.0.4
-- Último deploy: 2026-05-28
+- Versión actual: v1.0.7
+- Último deploy: 2026-07-17
 
 ---
 
@@ -100,6 +100,7 @@
 | v1.0.4 | 2026-05-28 | Primer cliente real (MaxRE). Bug `last_sync_at` corregido. Logo upload implementado. |
 | v1.0.5 | 2026-05-29 | Documentación completa del módulo Marketing IA. Skill `vakdor-video` creado. |
 | v1.0.6 | 2026-06-01 | Reescritura Landing Page (Framework Vakdor) con foco High-Ticket y Multi-Audiencia. Análisis exhaustivo de 36 herramientas. |
+| v1.0.7 | 2026-07-17 | Fix Marketing IA: Superposición determinista de logo con Sharp en imágenes publicitarías (100% completo, 1 vez, posición/tamaño exactos sin alucinaciones de IA). |
 
 ---
 

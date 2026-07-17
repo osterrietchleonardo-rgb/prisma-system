@@ -975,20 +975,16 @@ Es un **multi-generador todo-en-uno**. El usuario elige IPC + tipo de copy (`vid
 
 **Endpoint:** `POST /api/marketing-ia/generate-image`  
 **Archivo:** `app/api/marketing-ia/generate-image/route.ts`  
-**Modelo:** Gemini 3 Pro Image (Nano Banana Pro)
+**Modelo:** Gemini 3 Pro Image (Nano Banana Pro) + Superposición Sharp
 
 **Flujo:**
-1. Obtiene branding de la agencia (`marketing_ai_config`): colores, logo, tipografía, **directiva creativa** y **aviso legal**
-2. Si hay logo → lo descarga y envía como imagen de referencia al modelo
-3. Construye prompt con:
-   - Formato: reels (1080x1920), post (1080x1080), historia (1080x1920)
-   - Estilo: moderno, lujoso, cálido, corporativo, vibrante
-   - Hook del copy a incluir en la imagen
-   - **Directiva creativa** del director (obligatoria)
-   - **Aviso legal** (si está cargado): texto legal en letra pequeña y legible en la franja inferior, sin tapar otros elementos
-4. Genera imagen via `generateImage(prompt, 'pro', imageParts)`
-5. Sube a Supabase Storage (`marketing-images`) y guarda en `generated_images`
-6. Costo desde la tabla central: ~$0.134/imagen (Nano Banana Pro, 1K/2K) · $0.24 (4K)
+1. Obtiene la configuración de branding de la agencia desde Configuración IA (`marketing_ai_config`): colores, logo (`logo_url`), tipografía, posición/tamaño del logo, **directiva creativa** y **aviso legal** (con fallback a `agencies.logo_url`).
+2. Construye el prompt a Gemini solicitando generar la imagen publicitaria con la propiedad, el hook y el **aviso legal** en la franja inferior, ordenándole expresamente abarcar todo el lienzo de forma fotorrealista continua sin dibujar recuadros blancos ni cajas vacías artificiales.
+3. Genera la imagen base via `generateImage(prompt, 'pro', [])` sin enviar el logo como entrada de imagen multimodal (evitando alucinaciones, deformaciones o duplicados del logo por parte de la IA).
+4. **Superposición determinista de logo (Sharp)**: Si hay un logo configurado (`logo_url`), rescata el archivo PNG (mediante HTTP fetch con fallback a descarga directa desde Supabase Storage `marketing-images`), lee la resolución nativa exacta devuelta por Gemini (`baseMeta.width` y `baseMeta.height`), lo redimensiona conservando transparencia y aspecto según el tamaño elegido (`small`: 12%, `medium`: 16%, `large`: 22% del ancho de imagen), calcula la esquina configurada (`top-left`, `top-right`, `bottom-left`, `bottom-right`) suspendiendo el logo de forma segura por encima de la franja del aviso legal (~11% de offset vertical), y superpone digitalmente el logo nítido sobre la imagen final **1 sola vez**.
+5. **Previsualización UI (`object-contain`)**: En la galería e inspección de anuncios (`marketing-history.tsx` e `image-generator-form.tsx`), las imágenes se sirven con `object-contain` para garantizar que la pantalla muestre la pieza publicitaria completa sin recortes en bordes superior/inferior.
+6. Sube la imagen a Supabase Storage (`marketing-images`) y guarda en `generated_images`.
+7. Costo desde la tabla central: ~$0.134/imagen (Nano Banana Pro, 1K/2K) · $0.24 (4K).
 
 ### 13.5 Settings de Marketing
 

@@ -304,7 +304,7 @@ export function MarketingHistory() {
                     {group.variants.map((v, i) => (
                       <div key={v.id} className="min-w-full h-full snap-start relative">
                         {v.public_url ? (
-                          <img src={v.public_url} alt={renderText(v.angle)} className="w-full h-full object-cover transition-transform group-hover:scale-105" />
+                          <img src={v.public_url} alt={renderText(v.angle)} className="w-full h-full object-contain transition-transform group-hover:scale-105" />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground">
                             <ImageIcon className="w-8 h-8 opacity-20 mb-2" />
@@ -403,7 +403,7 @@ export function MarketingHistory() {
                       {selectedGroup.variants[activeVariantIndex].public_url ? (
                         <img 
                           src={selectedGroup.variants[activeVariantIndex].public_url} 
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-contain"
                           alt="Art"
                         />
                       ) : (
