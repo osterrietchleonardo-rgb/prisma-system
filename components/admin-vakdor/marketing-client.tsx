@@ -30,10 +30,12 @@ function Chip({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Card({ idea, onMover, desarrollando, onVer, onProgramar }: {
+function Card({ idea, onMover, desarrollando, onVer, onProgramar, onPublicar, publicando }: {
   idea: MarketingIdea; onMover: (id: string, e: EstadoIdea) => void
   desarrollando: boolean; onVer: (idea: MarketingIdea) => void
   onProgramar: (id: string, fechaISO: string | null) => void
+  onPublicar: (id: string) => void
+  publicando: boolean
 }) {
   const orden = ESTADOS.map((e) => e.key)
   const i = orden.indexOf(idea.estado)
@@ -114,6 +116,25 @@ function Card({ idea, onMover, desarrollando, onVer, onProgramar }: {
               onProgramar(idea.id, v ? new Date(v).toISOString() : null)
             }}
             style={{ width: "100%", fontSize: 11, padding: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", colorScheme: "dark" }} />
+        </div>
+      ) : null}
+      {idea.estado === "aprobada" && idea.fuente === "blog" ? (
+        <button disabled={publicando} onClick={() => onPublicar(idea.id)}
+          style={{
+            width: "100%", marginBottom: 8, padding: "6px 0", fontSize: 11, fontWeight: 600,
+            background: publicando ? "rgba(194,120,60,0.4)" : ACCENT, border: "none", borderRadius: 6,
+            color: "#fff", cursor: publicando ? "default" : "pointer",
+          }}>
+          {publicando ? "Publicando…" : "Publicar en blog"}
+        </button>
+      ) : null}
+      {idea.estado === "aprobada" && idea.fuente === "linkedin" ? (
+        <div style={{
+          width: "100%", marginBottom: 8, padding: "6px 0", fontSize: 11, fontWeight: 600, textAlign: "center",
+          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6,
+          color: "rgba(255,255,255,0.35)",
+        }}>
+          Publicar LinkedIn (próximamente)
         </div>
       ) : null}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -292,6 +313,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const [nueva, setNueva] = useState(false)
   const [generando, setGenerando] = useState(false)
   const [desarrollandoId, setDesarrollandoId] = useState<string | null>(null)
+  const [publicandoId, setPublicandoId] = useState<string | null>(null)
   const [verIdea, setVerIdea] = useState<MarketingIdea | null>(null)
   const [vista, setVista] = useState<"tablero" | "calendario">("tablero")
 
@@ -337,6 +359,26 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
       alert("No se pudo desarrollar el contenido.")
     } finally {
       setDesarrollandoId(null)
+    }
+  }
+
+  async function publicar(id: string) {
+    if (publicandoId) return
+    if (!window.confirm("¿Publicar este artículo en el blog de Vakdor (queda público)?")) return
+    setPublicandoId(id)
+    try {
+      const res = await fetch(`/api/admin-vakdor/marketing/${id}/publicar`, { method: "POST" })
+      const d = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, estado: "publicada" } : i)))
+        alert("Publicado ✓\n" + (d.url ?? ""))
+      } else {
+        alert("No se pudo publicar: " + (d.error ?? ""))
+      }
+    } catch {
+      alert("No se pudo publicar: " + "error de red")
+    } finally {
+      setPublicandoId(null)
     }
   }
 
@@ -446,7 +488,8 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
                 </div>
                 {cards.map((idea) => (
                   <Card key={idea.id} idea={idea} onMover={mover}
-                    desarrollando={desarrollandoId === idea.id} onVer={setVerIdea} onProgramar={programar} />
+                    desarrollando={desarrollandoId === idea.id} onVer={setVerIdea} onProgramar={programar}
+                    onPublicar={publicar} publicando={publicandoId === idea.id} />
                 ))}
                 {cards.length === 0 ? (
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px 0" }}>—</div>

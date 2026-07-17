@@ -152,6 +152,22 @@ export async function programarIdea(id: string, fechaISO: string | null): Promis
   if (error) throw new Error(`programarIdea: ${error.message}`)
 }
 
+/** Marca la idea como publicada (blog o LinkedIn) y guarda el detalle de dónde quedó publicada. */
+export async function marcarPublicada(id: string, publicado_en: Record<string, unknown>): Promise<void> {
+  const db = getAdminDb()
+  const { data, error: e1 } = await db.from("marketing_ideas").select("historial").eq("id", id).single()
+  if (e1) throw new Error(`marcarPublicada(leer): ${e1.message}`)
+  const historial = (data as { historial: HistorialEvento[] }).historial ?? []
+  const evento: HistorialEvento = {
+    fecha: new Date().toISOString(), tipo: "publicada", detalle: String(publicado_en.canal ?? ""),
+  }
+  const { error } = await db
+    .from("marketing_ideas")
+    .update({ estado: "publicada", publicado_en, historial: [...historial, evento] })
+    .eq("id", id)
+  if (error) throw new Error(`marcarPublicada: ${error.message}`)
+}
+
 /** URL firmada temporal para ver/descargar un asset del bucket privado. */
 export async function firmarAsset(path: string): Promise<string | null> {
   const db = getAdminDb()
