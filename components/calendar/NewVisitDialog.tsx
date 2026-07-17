@@ -355,18 +355,42 @@ export function NewVisitDialog({
             )}
 
             {clientType === "tokko" && (
-               <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+               <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                   <Label>Buscar Lead de Tokko</Label>
                   <SearchableSelect 
                     options={trackingOptions.leads.map(l => ({
-                      label: l.full_name || 'Sin nombre',
-                      value: l.id
+                      label: `${l.full_name || 'Sin nombre'}${l.phone ? ` (${l.phone})` : ''}`,
+                      value: l.id,
+                      description: l.email || undefined
                     }))}
                     value={selectedLeadId || undefined}
                     onChange={(val) => setSelectedLeadId(val)}
                     placeholder="Buscar Lead de Tokko..."
                     emptyMessage="No se encontraron leads."
                   />
+                  {selectedLeadId && (() => {
+                    const selectedLead = trackingOptions.leads.find(l => l.id === selectedLeadId);
+                    if (!selectedLead) return null;
+                    const phone = selectedLead.phone || selectedLead.cellphone;
+                    const email = selectedLead.email;
+                    return (
+                      <div className="p-3 rounded-lg border border-accent/20 bg-accent/5 space-y-1 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm">{selectedLead.full_name || selectedLead.name || 'Sin nombre'}</span>
+                          {phone ? (
+                            <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-bold">
+                              📞 {phone}
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-medium">
+                              ⚠️ Sin teléfono registrado
+                            </span>
+                          )}
+                        </div>
+                        {email && <p className="text-muted-foreground">✉️ {email}</p>}
+                      </div>
+                    );
+                  })()}
                </div>
             )}
 

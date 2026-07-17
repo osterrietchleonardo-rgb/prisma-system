@@ -268,7 +268,7 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 **Cómo agendar una visita (botón "Agendar Visita"):**
 1. **Información del lead** — 3 formas:
-   - **Desde Tokko:** desplegable con tus leads de Tokko.
+   - **Desde Tokko:** desplegable con tus leads de Tokko (recopila nombre, teléfono y email, con tarjeta de vista previa).
    - **Desde WhatsApp:** desplegable con tus contactos de WhatsApp.
    - **Carga Manual:** **nombre completo**, **celular**, **email** y **etiqueta** (opcional). Igual que en Tracking: el celular se carga eligiendo el **país** y escribiendo el número natural (el sistema lo normaliza al formato de WhatsApp y muestra el preview), y los tres datos clave llevan **doble verificación** (se reescriben, sin copiar/pegar, con aviso ✅/❌) más la **casilla de certificación** obligatoria antes de agendar. El contacto se crea solo para mantener el seguimiento.
 2. **Detalle de la cita:** fecha y hora.

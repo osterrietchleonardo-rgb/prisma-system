@@ -411,7 +411,7 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 **Qué es:** la agenda de visitas de la agencia. Como director **ves las visitas de todos** y podés **filtrar por asesor**.
 
 **Cómo agendar una visita (botón "Agendar Visita"):**
-1. **Información del lead** — 3 formas: desde **Tokko**, desde **WhatsApp**, o **carga manual** (nombre completo, celular, email y etiqueta). El celular se carga con **selector de país** + número natural (normalizado al formato WhatsApp con preview). La carga manual exige **doble verificación** de nombre/celular/email (reescribir sin copiar/pegar, con aviso ✅/❌) y tildar la **casilla de certificación** de que los datos son veraces antes de agendar.
+1. **Información del lead** — 3 formas: desde **Tokko** (desplegable con los leads de la agencia que recopila nombre, teléfono y email con tarjeta de vista previa), desde **WhatsApp**, o **carga manual** (nombre completo, celular, email y etiqueta). El celular se carga con **selector de país** + número natural (normalizado al formato WhatsApp con preview). La carga manual exige **doble verificación** de nombre/celular/email (reescribir sin copiar/pegar, con aviso ✅/❌) y tildar la **casilla de certificación** de que los datos son veraces antes de agendar.
 2. **Detalle de la cita:** fecha, hora.
    - **Propiedad (Tokko):** si elegís un asesor, la lista se filtra automáticamente a **sus** propiedades.
    - **Propiedad (Colaboración):** texto libre para una propiedad externa.

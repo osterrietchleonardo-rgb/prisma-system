@@ -30,7 +30,7 @@ export async function getTrackingOptions() {
   // Fetch leads
   let leadsQuery = supabase
     .from("leads")
-    .select("id, full_name")
+    .select("id, full_name, phone, email")
     .eq("agency_id", profile.agency_id);
 
   if (profile.role !== "director") {

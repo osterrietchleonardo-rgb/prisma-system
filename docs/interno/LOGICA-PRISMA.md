@@ -2004,7 +2004,7 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 
   **Formulario "Agendar Visita" (`NewVisitDialog.tsx`):**
   - **Información del Lead — 3 alternativas:**
-    1. **Buscar desde Tokko:** Desplegable con leads de Tokko asignados al asesor (o todos si es director).
+    1. **Buscar desde Tokko:** Desplegable con leads de Tokko asignados al asesor (o todos si es director). `getTrackingOptions` consulta `id, full_name, phone, email`. El buscador muestra el teléfono y email en la lista, y al seleccionar un lead despliega una tarjeta de vista previa con sus datos completos (Nombre, Teléfono con badge de presencia/alerta y Email) para recopilar correctamente la información previa al envío.
     2. **Buscar desde WhatsApp:** Desplegable con contactos de `wa_conversations` de la agencia.
     3. **Carga Manual (componente compartido `ManualContactFields`):** Nombre completo, celular (formato internacional obligatorio), email y etiqueta (opcional). Igual que en Tracking, nombre/celular/email llevan **doble verificación** (reescritura sin copiar/pegar + validación de coincidencia y formato en tiempo real) y una **casilla de certificación** obligatoria. Crea automáticamente el contacto en `wa_contacts`/`wa_conversations` vía `createManualContact.ts` y guarda el email también en `scheduled_visits`.
   - **Detalle de la Cita:**
