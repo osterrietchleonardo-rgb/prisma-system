@@ -5,6 +5,7 @@ import argparse, json, os, subprocess, sys, tempfile
 sys.path.insert(0, os.path.dirname(__file__))
 from edl import load_edl, validate_edl, total_duration, master_srt_offsets
 from grade import grade_filter
+from subtitles import build_ass, DEFAULT_CORRECTIONS
 
 FADE = 0.03  # 30 ms (Regla Dura 3)
 
@@ -58,6 +59,14 @@ def _probe_duration(path: str) -> float:
     return float(r.stdout.strip())
 
 
+def _probe_wh(path: str) -> tuple[int, int]:
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+                        "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", path],
+                       capture_output=True, text=True, check=True)
+    w, h = r.stdout.strip().split("x")
+    return int(w), int(h)
+
+
 def _extract_segment(src, start, end, grade, out, preview):
     dur = end - start
     fade = f"afade=t=in:st=0:d={FADE},afade=t=out:st={max(dur - FADE, 0):.3f}:d={FADE}"
@@ -74,7 +83,7 @@ def _extract_segment(src, start, end, grade, out, preview):
 
 
 def render(edl_path: str, out: str, preview=False, build_subtitles=False, edit_dir=None,
-           sub_chunk=0):
+           sub_chunk=0, emphasis=False, corrections=None):
     edl = load_edl(edl_path)
     errs = validate_edl(edl)
     if errs:
@@ -120,6 +129,7 @@ def render(edl_path: str, out: str, preview=False, build_subtitles=False, edit_d
 
         # 4) subtítulos AL FINAL (Regla Dura 1)
         srt_path = edl.get("subtitles")
+        ass_path = None
         if build_subtitles and not srt_path:
             transcripts = {}
             tdir = os.path.join(edit_dir, "transcripts")
@@ -130,11 +140,30 @@ def render(edl_path: str, out: str, preview=False, build_subtitles=False, edit_d
             subs = master_srt_offsets(edl, transcripts)
             if sub_chunk and sub_chunk > 1:
                 subs = group_word_subs(subs, max_words=sub_chunk)
-            srt_path = os.path.join(edit_dir, "master.srt")
-            open(srt_path, "w", encoding="utf-8").write(build_srt(subs))
-            print(f"[subs] master.srt: {len(subs)} líneas (chunk={sub_chunk or 'palabra'})")
+            if emphasis:
+                # Vía ASS: color cobre en palabras clave + correcciones de jerga.
+                corr = DEFAULT_CORRECTIONS.copy()
+                if corrections and os.path.exists(corrections):
+                    corr.update({k.lower(): v for k, v in
+                                 json.load(open(corrections, encoding="utf-8")).items()})
+                w, h = _probe_wh(current)
+                mv = int(h * 0.195)  # margen inferior relativo al alto (queda sobre el video)
+                ass_path = os.path.join(edit_dir, "master.ass")
+                open(ass_path, "w", encoding="utf-8").write(
+                    build_ass(subs, width=w, height=h, margin_v=mv, corrections=corr))
+                print(f"[subs] master.ass: {len(subs)} cues (cobre+correcciones)")
+            else:
+                srt_path = os.path.join(edit_dir, "master.srt")
+                open(srt_path, "w", encoding="utf-8").write(build_srt(subs))
+                print(f"[subs] master.srt: {len(subs)} líneas (chunk={sub_chunk or 'palabra'})")
         os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-        if srt_path and os.path.exists(srt_path):
+        if ass_path and os.path.exists(ass_path):
+            ass_ff = ass_path.replace("\\", "/").replace(":", "\\:")
+            subprocess.run(["ffmpeg", "-i", current, "-vf", f"ass='{ass_ff}'",
+                            "-c:v", "libx264", "-crf", "23" if preview else "18",
+                            "-pix_fmt", "yuv420p", "-c:a", "copy", "-y", out],
+                           check=True, capture_output=True)
+        elif srt_path and os.path.exists(srt_path):
             style = ("FontName=Inter,FontSize=16,Bold=1,PrimaryColour=&H00FFFFFF,"
                      "OutlineColour=&H00000000,BorderStyle=1,Outline=2,Shadow=0,"
                      "Alignment=2,MarginV=48")
@@ -164,8 +193,12 @@ def main():
     ap.add_argument("--edit-dir")
     ap.add_argument("--sub-chunk", type=int, default=0,
                     help="palabras por cue de subtítulo (0=palabra-por-palabra; 3-4=frase corta)")
+    ap.add_argument("--emphasis", action="store_true",
+                    help="subtítulos .ass con palabras clave en cobre + correcciones de jerga")
+    ap.add_argument("--corrections", help="json {mal: bien} extra para corregir términos")
     a = ap.parse_args()
-    render(a.edl, a.out, a.preview, a.build_subtitles, a.edit_dir, a.sub_chunk)
+    render(a.edl, a.out, a.preview, a.build_subtitles, a.edit_dir, a.sub_chunk,
+           a.emphasis, a.corrections)
 
 
 if __name__ == "__main__":

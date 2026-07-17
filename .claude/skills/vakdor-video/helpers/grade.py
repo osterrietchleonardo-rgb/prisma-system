@@ -10,6 +10,9 @@ GRADE_PRESETS: dict[str, str] = {
     "warm_cinematic": "curves=all='0/0.02 0.5/0.5 1/0.98',eq=saturation=0.92:contrast=1.06:gamma_r=1.03:gamma_b=0.98",
     # Look premium/lujo: contraste elevado, sombras profundas frías, altas cálidas, nítido.
     "luxury": "curves=r='0/0.01 0.5/0.52 1/1':b='0/0.03 0.5/0.48 1/0.97',eq=contrast=1.12:saturation=0.96:gamma=0.98,unsharp=5:5:0.5",
+    # Luxury reforzado: más contraste y split teal/orange marcado, viñeta sutil, más nitidez.
+    "luxury_strong": ("curves=r='0/0.00 0.25/0.24 0.5/0.55 1/1':b='0/0.05 0.5/0.45 1/0.94':g='0/0.01 0.5/0.5 1/0.99',"
+                      "eq=contrast=1.22:saturation=0.9:gamma=0.95,unsharp=5:5:0.9,vignette=PI/5"),
 }
 
 
