@@ -21,7 +21,10 @@ function Chip({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Card({ idea, onMover }: { idea: MarketingIdea; onMover: (id: string, e: EstadoIdea) => void }) {
+function Card({ idea, onMover, desarrollando, onVer }: {
+  idea: MarketingIdea; onMover: (id: string, e: EstadoIdea) => void
+  desarrollando: boolean; onVer: (idea: MarketingIdea) => void
+}) {
   const orden = ESTADOS.map((e) => e.key)
   const i = orden.indexOf(idea.estado)
   const prev = i > 0 ? orden[i - 1] : null
@@ -75,6 +78,19 @@ function Card({ idea, onMover }: { idea: MarketingIdea; onMover: (id: string, e:
         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontStyle: "italic", marginBottom: 8 }}>
           {idea.motivo}
         </div>
+      ) : null}
+      {desarrollando ? (
+        <div style={{ fontSize: 11, color: ACCENT, marginBottom: 8 }}>Desarrollando…</div>
+      ) : null}
+      {idea.contenido ? (
+        <button onClick={() => onVer(idea)}
+          style={{
+            fontSize: 11, padding: "4px 8px", borderRadius: 6, width: "100%", marginBottom: 8,
+            background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+            color: "rgba(255,255,255,0.75)", cursor: "pointer",
+          }}>
+          📄 Ver contenido
+        </button>
       ) : null}
       {idea.estado === "en_revision" ? <Reformular idea={idea} /> : null}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -134,11 +150,38 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const [items, setItems] = useState<MarketingIdea[]>(ideas)
   const [nueva, setNueva] = useState(false)
   const [generando, setGenerando] = useState(false)
+  const [desarrollandoId, setDesarrollandoId] = useState<string | null>(null)
+  const [verIdea, setVerIdea] = useState<MarketingIdea | null>(null)
 
   const porEstado = (e: EstadoIdea) => items.filter((i) => i.estado === e)
 
+  async function desarrollar(id: string) {
+    setDesarrollandoId(id)
+    try {
+      const res = await fetch(`/api/admin-vakdor/marketing/${id}/desarrollar`, { method: "POST" })
+      if (res.ok) {
+        const d = await res.json()
+        setItems((prev) => prev.map((i) => (i.id === id ? {
+          ...i,
+          contenido: d.contenido ?? i.contenido,
+          primer_comentario: d.primer_comentario ?? i.primer_comentario,
+          hashtags: d.hashtags ?? i.hashtags,
+          blog: d.blog ?? i.blog,
+        } : i)))
+        alert("Contenido desarrollado ✓")
+      } else {
+        alert("No se pudo desarrollar el contenido.")
+      }
+    } catch {
+      alert("No se pudo desarrollar el contenido.")
+    } finally {
+      setDesarrollandoId(null)
+    }
+  }
+
   async function mover(id: string, estado: EstadoIdea) {
-    const previo = items.find((i) => i.id === id)?.estado
+    const item = items.find((i) => i.id === id)
+    const previo = item?.estado
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, estado } : i)))
     try {
       const res = await fetch(`/api/admin-vakdor/marketing/${id}/estado`, {
@@ -150,6 +193,12 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
         if (previo) setItems((prev) => prev.map((i) => (i.id === id ? { ...i, estado: previo! } : i)))
         router.refresh() // resincronizar con la verdad del server
         alert("No se pudo mover la idea; volvió a su estado anterior.")
+        return
+      }
+      if (estado === "en_proceso" && item && !item.contenido) {
+        if (window.confirm("¿Desarrollar el contenido completo con IA ahora?")) {
+          await desarrollar(id)
+        }
       }
     } catch {
       if (previo) setItems((prev) => prev.map((i) => (i.id === id ? { ...i, estado: previo! } : i)))
@@ -219,7 +268,10 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
                 </span>
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{cards.length}</span>
               </div>
-              {cards.map((idea) => <Card key={idea.id} idea={idea} onMover={mover} />)}
+              {cards.map((idea) => (
+                <Card key={idea.id} idea={idea} onMover={mover}
+                  desarrollando={desarrollandoId === idea.id} onVer={setVerIdea} />
+              ))}
               {cards.length === 0 ? (
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px 0" }}>—</div>
               ) : null}
@@ -269,6 +321,46 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
               <button type="submit" style={{ padding: "8px 14px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontWeight: 600, cursor: "pointer" }}>Crear</button>
             </div>
           </form>
+        </div>
+      ) : null}
+
+      {verIdea ? (
+        <div onClick={() => setVerIdea(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ background: "#0d1424", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 24, width: 560, maxWidth: "90vw", maxHeight: "80vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+              <h2 style={{ fontSize: 16, color: "#fff", margin: 0 }}>{verIdea.titulo}</h2>
+              <button onClick={() => setVerIdea(null)}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>×</button>
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(verIdea.contenido ?? "")
+                alert("Contenido copiado ✓")
+              }}
+              style={{ alignSelf: "flex-start", padding: "6px 12px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              Copiar contenido
+            </button>
+            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap", maxHeight: 360, overflowY: "auto", padding: 12, background: "rgba(0,0,0,0.2)", borderRadius: 8 }}>
+              {verIdea.contenido}
+            </div>
+            {verIdea.primer_comentario ? (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Primer comentario
+                </div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", whiteSpace: "pre-wrap", padding: 8, background: "rgba(0,0,0,0.15)", borderRadius: 6 }}>
+                  {verIdea.primer_comentario}
+                </div>
+              </div>
+            ) : null}
+            {verIdea.hashtags && verIdea.hashtags.length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {verIdea.hashtags.map((h, idx) => <Chip key={idx}>{h}</Chip>)}
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </div>

@@ -108,6 +108,26 @@ export async function actualizarContenido(
   if (error) throw new Error(`actualizarContenido: ${error.message}`)
 }
 
+/** Guarda el desarrollo completo de la pieza (contenido final generado por IA al pasar a "En proceso"). */
+export async function guardarDesarrollo(
+  id: string,
+  patch: { contenido?: string; primer_comentario?: string; hashtags?: string[]; blog?: Record<string, unknown>; evento: HistorialEvento },
+): Promise<void> {
+  const db = getAdminDb()
+  const actual = await (async () => {
+    const { data, error } = await db.from("marketing_ideas").select("historial, blog").eq("id", id).single()
+    if (error) throw new Error(`guardarDesarrollo(leer): ${error.message}`)
+    return data as { historial: HistorialEvento[]; blog: Record<string, unknown> }
+  })()
+  const update: Record<string, unknown> = { historial: [...(actual.historial ?? []), patch.evento] }
+  if (patch.contenido !== undefined) update.contenido = patch.contenido
+  if (patch.primer_comentario !== undefined) update.primer_comentario = patch.primer_comentario
+  if (patch.hashtags !== undefined) update.hashtags = patch.hashtags
+  if (patch.blog !== undefined) update.blog = { ...(actual.blog ?? {}), ...patch.blog }
+  const { error } = await db.from("marketing_ideas").update(update).eq("id", id)
+  if (error) throw new Error(`guardarDesarrollo: ${error.message}`)
+}
+
 /** Títulos + ángulos recientes, para que el motor NO repita (memoria anti-repetición). */
 export async function resumenParaMemoria(): Promise<{ titulo: string; angulo: string | null }[]> {
   const db = getAdminDb()
