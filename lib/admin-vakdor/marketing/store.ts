@@ -168,6 +168,21 @@ export async function marcarPublicada(id: string, publicado_en: Record<string, u
   if (error) throw new Error(`marcarPublicada: ${error.message}`)
 }
 
+/** Ideas aprobadas cuya fecha de programación ya venció (listas para el cron de auto-publicación). */
+export async function listarProgramadasVencidas(): Promise<MarketingIdea[]> {
+  const db = getAdminDb()
+  const { data, error } = await db
+    .from("marketing_ideas")
+    .select(COLS)
+    .eq("estado", "aprobada")
+    .not("programada_para", "is", null)
+    .lte("programada_para", new Date().toISOString())
+    .order("programada_para", { ascending: true })
+    .limit(50)
+  if (error) throw new Error(`listarProgramadasVencidas: ${error.message}`)
+  return (data ?? []) as unknown as MarketingIdea[]
+}
+
 /** URL firmada temporal para ver/descargar un asset del bucket privado. */
 export async function firmarAsset(path: string): Promise<string | null> {
   const db = getAdminDb()
