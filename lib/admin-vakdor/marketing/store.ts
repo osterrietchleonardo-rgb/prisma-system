@@ -140,6 +140,18 @@ export async function resumenParaMemoria(): Promise<{ titulo: string; angulo: st
   return (data ?? []) as { titulo: string; angulo: string | null }[]
 }
 
+/** Programa (o desprograma, con fechaISO=null) la fecha de publicación de una idea. */
+export async function programarIdea(id: string, fechaISO: string | null): Promise<void> {
+  const db = getAdminDb()
+  const { data: actual, error: e1 } = await db.from("marketing_ideas").select("historial").eq("id", id).single()
+  if (e1) throw new Error(`programarIdea(leer): ${e1.message}`)
+  const evento = { fecha: new Date().toISOString(), tipo: "programada", detalle: fechaISO ?? "sin fecha" }
+  const { error } = await db.from("marketing_ideas")
+    .update({ programada_para: fechaISO, historial: [...(((actual as {historial: HistorialEvento[]}).historial) ?? []), evento] })
+    .eq("id", id)
+  if (error) throw new Error(`programarIdea: ${error.message}`)
+}
+
 /** URL firmada temporal para ver/descargar un asset del bucket privado. */
 export async function firmarAsset(path: string): Promise<string | null> {
   const db = getAdminDb()

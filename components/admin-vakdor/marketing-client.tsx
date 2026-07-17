@@ -11,6 +11,15 @@ const inputStyle: React.CSSProperties = {
   color: "#fff", fontSize: 13, outline: "none",
 }
 
+/** ISO → valor de <input type="datetime-local"> en hora local ("YYYY-MM-DDTHH:mm"). */
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ""
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
 function Chip({ children }: { children: React.ReactNode }) {
   return (
     <span style={{
@@ -21,9 +30,10 @@ function Chip({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Card({ idea, onMover, desarrollando, onVer }: {
+function Card({ idea, onMover, desarrollando, onVer, onProgramar }: {
   idea: MarketingIdea; onMover: (id: string, e: EstadoIdea) => void
   desarrollando: boolean; onVer: (idea: MarketingIdea) => void
+  onProgramar: (id: string, fechaISO: string | null) => void
 }) {
   const orden = ESTADOS.map((e) => e.key)
   const i = orden.indexOf(idea.estado)
@@ -93,6 +103,19 @@ function Card({ idea, onMover, desarrollando, onVer }: {
         </button>
       ) : null}
       {idea.estado === "en_revision" ? <Reformular idea={idea} /> : null}
+      {idea.estado === "aprobada" || idea.programada_para ? (
+        <div key={`prog-${idea.id}-${idea.programada_para ?? ""}`} style={{ marginBottom: 8 }}>
+          <label style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", display: "block", marginBottom: 4 }}>
+            📅 Programar
+          </label>
+          <input type="datetime-local" defaultValue={isoToLocalInput(idea.programada_para)}
+            onChange={(e) => {
+              const v = e.target.value
+              onProgramar(idea.id, v ? new Date(v).toISOString() : null)
+            }}
+            style={{ width: "100%", fontSize: 11, padding: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", colorScheme: "dark" }} />
+        </div>
+      ) : null}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <button disabled={!prev} onClick={() => prev && onMover(idea.id, prev)}
           style={{ fontSize: 14, background: "none", border: "none", color: prev ? "#a5b4fc" : "rgba(255,255,255,0.15)", cursor: prev ? "pointer" : "default" }}>◀</button>
@@ -145,6 +168,124 @@ function Reformular({ idea }: { idea: MarketingIdea }) {
   )
 }
 
+const FUENTES_FILTRO = [
+  { key: "", label: "Todas" },
+  { key: "linkedin", label: "LinkedIn" },
+  { key: "instagram", label: "Instagram" },
+  { key: "blog", label: "Blog" },
+] as const
+
+const FORMATOS_FILTRO = [
+  { key: "", label: "Todos" },
+  { key: "post_texto", label: "Post de texto" },
+  { key: "carrusel", label: "Carrusel" },
+  { key: "imagen", label: "Imagen" },
+  { key: "encuesta", label: "Encuesta" },
+  { key: "articulo_linkedin", label: "Artículo LinkedIn" },
+  { key: "reel", label: "Reel" },
+  { key: "lead_magnet", label: "Lead magnet" },
+  { key: "articulo_blog", label: "Artículo blog" },
+] as const
+
+const FUENTE_COLOR: Record<string, { bg: string; text: string }> = {
+  linkedin: { bg: "rgba(99,102,241,0.25)", text: "#a5b4fc" },
+  blog: { bg: "rgba(194,120,60,0.25)", text: "#e29e6d" },
+  instagram: { bg: "rgba(236,72,153,0.25)", text: "#f9a8d4" },
+}
+
+const DIAS_SEMANA = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+
+function Calendario({ items, onVer }: { items: MarketingIdea[]; onVer: (i: MarketingIdea) => void }) {
+  const [mes, setMes] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() } })
+  const [fFuente, setFFuente] = useState("")
+  const [fFormato, setFFormato] = useState("")
+  const [fAngulo, setFAngulo] = useState("")
+
+  const filtradas = items.filter((i) => {
+    if (fFuente && i.fuente !== fFuente) return false
+    if (fFormato && i.formato !== fFormato) return false
+    if (fAngulo && !(i.angulo ?? "").toLowerCase().includes(fAngulo.toLowerCase())) return false
+    return true
+  })
+
+  const primerDia = new Date(mes.y, mes.m, 1)
+  const diasEnMes = new Date(mes.y, mes.m + 1, 0).getDate()
+  // getDay(): 0=domingo..6=sábado. La semana arranca en lunes.
+  const offset = (primerDia.getDay() + 6) % 7
+  const celdas: (number | null)[] = [...Array(offset).fill(null), ...Array.from({ length: diasEnMes }, (_, i) => i + 1)]
+  while (celdas.length % 7 !== 0) celdas.push(null)
+
+  const hoy = new Date()
+  const nombreMes = primerDia.toLocaleDateString("es-AR", { month: "long", year: "numeric" })
+
+  const ideasDelDia = (dia: number) => filtradas.filter((i) => {
+    if (!i.programada_para) return false
+    const d = new Date(i.programada_para)
+    return d.getFullYear() === mes.y && d.getMonth() === mes.m && d.getDate() === dia
+  })
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
+        <select value={fFuente} onChange={(e) => setFFuente(e.target.value)} style={inputStyle}>
+          {FUENTES_FILTRO.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+        </select>
+        <select value={fFormato} onChange={(e) => setFFormato(e.target.value)} style={inputStyle}>
+          {FORMATOS_FILTRO.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+        </select>
+        <input value={fAngulo} onChange={(e) => setFAngulo(e.target.value)} placeholder="Ángulo contiene…" style={inputStyle} />
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 14 }}>
+        <button onClick={() => setMes((m) => { const d = new Date(m.y, m.m - 1, 1); return { y: d.getFullYear(), m: d.getMonth() } })}
+          style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", fontSize: 18, cursor: "pointer" }}>‹</button>
+        <span style={{ fontSize: 15, fontWeight: 700, color: "#fff", textTransform: "capitalize", minWidth: 160, textAlign: "center" }}>
+          {nombreMes}
+        </span>
+        <button onClick={() => setMes((m) => { const d = new Date(m.y, m.m + 1, 1); return { y: d.getFullYear(), m: d.getMonth() } })}
+          style={{ background: "none", border: "none", color: "rgba(255,255,255,0.6)", fontSize: 18, cursor: "pointer" }}>›</button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 }}>
+        {DIAS_SEMANA.map((d) => (
+          <div key={d} style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.4)", textAlign: "center", padding: "4px 0" }}>{d}</div>
+        ))}
+        {celdas.map((dia, idx) => {
+          const esHoy = dia !== null && mes.y === hoy.getFullYear() && mes.m === hoy.getMonth() && dia === hoy.getDate()
+          return (
+            <div key={idx} style={{
+              minHeight: 90, borderRadius: 8, padding: 6,
+              background: "rgba(255,255,255,0.02)",
+              border: esHoy ? `1px solid ${ACCENT}` : "1px solid rgba(255,255,255,0.06)",
+            }}>
+              {dia !== null ? (
+                <>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 4, textAlign: "right" }}>{dia}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    {ideasDelDia(dia).map((idea) => {
+                      const color = FUENTE_COLOR[idea.fuente] ?? { bg: "rgba(255,255,255,0.08)", text: "rgba(255,255,255,0.7)" }
+                      const titulo = idea.titulo.length > 18 ? `${idea.titulo.slice(0, 18)}…` : idea.titulo
+                      return (
+                        <button key={idea.id} onClick={() => onVer(idea)}
+                          style={{
+                            fontSize: 10, textAlign: "left", padding: "2px 6px", borderRadius: 5,
+                            background: color.bg, color: color.text, border: "none", cursor: "pointer",
+                          }}>
+                          {titulo}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const router = useRouter()
   const [items, setItems] = useState<MarketingIdea[]>(ideas)
@@ -152,8 +293,28 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const [generando, setGenerando] = useState(false)
   const [desarrollandoId, setDesarrollandoId] = useState<string | null>(null)
   const [verIdea, setVerIdea] = useState<MarketingIdea | null>(null)
+  const [vista, setVista] = useState<"tablero" | "calendario">("tablero")
 
   const porEstado = (e: EstadoIdea) => items.filter((i) => i.estado === e)
+
+  async function programar(id: string, fechaISO: string | null) {
+    const anterior = items.find((i) => i.id === id)?.programada_para ?? null
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, programada_para: fechaISO } : i)))
+    try {
+      const res = await fetch(`/api/admin-vakdor/marketing/${id}/programar`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fecha: fechaISO }),
+      })
+      if (!res.ok) {
+        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, programada_para: anterior } : i)))
+        alert("No se pudo programar.")
+      }
+    } catch {
+      setItems((prev) => prev.map((i) => (i.id === id ? { ...i, programada_para: anterior } : i)))
+      alert("No se pudo programar.")
+    }
+  }
 
   async function desarrollar(id: string) {
     setDesarrollandoId(id)
@@ -216,7 +377,20 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
             Pipeline de contenido del Agente IA de Marketing
           </p>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: 3 }}>
+            {(["tablero", "calendario"] as const).map((v) => (
+              <button key={v} onClick={() => setVista(v)}
+                style={{
+                  padding: "6px 12px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  background: vista === v ? ACCENT : "transparent",
+                  color: vista === v ? "#fff" : "rgba(255,255,255,0.5)",
+                }}>
+                {v === "tablero" ? "Tablero" : "Calendario"}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
           <button onClick={() => setNueva(true)}
             style={{ padding: "9px 16px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             + Nueva idea
@@ -240,45 +414,50 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
             style={{ padding: "9px 16px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, color: "#a5b4fc", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
             {generando ? "Generando…" : "✦ Generar ideas ahora"}
           </button>
+          </div>
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 12, alignItems: "flex-start" }}>
-        {ESTADOS.map((col) => {
-          const cards = porEstado(col.key)
-          const esRechazada = col.key === "rechazada"
-          return (
-            <div key={col.key}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault()
-                const id = e.dataTransfer.getData("text/plain")
-                if (id) mover(id, col.key)
-              }}
-              style={{
-              minWidth: 260, width: 260, flexShrink: 0,
-              background: esRechazada ? "rgba(239,68,68,0.04)" : "rgba(255,255,255,0.015)",
-              border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 12,
-            }}>
-              <div style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12,
+      {vista === "tablero" ? (
+        <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 12, alignItems: "flex-start" }}>
+          {ESTADOS.map((col) => {
+            const cards = porEstado(col.key)
+            const esRechazada = col.key === "rechazada"
+            return (
+              <div key={col.key}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const id = e.dataTransfer.getData("text/plain")
+                  if (id) mover(id, col.key)
+                }}
+                style={{
+                minWidth: 260, width: 260, flexShrink: 0,
+                background: esRechazada ? "rgba(239,68,68,0.04)" : "rgba(255,255,255,0.015)",
+                border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 12,
               }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: esRechazada ? "#fca5a5" : ACCENT, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  {col.label}
-                </span>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{cards.length}</span>
+                <div style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12,
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: esRechazada ? "#fca5a5" : ACCENT, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    {col.label}
+                  </span>
+                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{cards.length}</span>
+                </div>
+                {cards.map((idea) => (
+                  <Card key={idea.id} idea={idea} onMover={mover}
+                    desarrollando={desarrollandoId === idea.id} onVer={setVerIdea} onProgramar={programar} />
+                ))}
+                {cards.length === 0 ? (
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px 0" }}>—</div>
+                ) : null}
               </div>
-              {cards.map((idea) => (
-                <Card key={idea.id} idea={idea} onMover={mover}
-                  desarrollando={desarrollandoId === idea.id} onVer={setVerIdea} />
-              ))}
-              {cards.length === 0 ? (
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px 0" }}>—</div>
-              ) : null}
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      ) : (
+        <Calendario items={items} onVer={setVerIdea} />
+      )}
 
       {nueva ? (
         <div onClick={() => setNueva(false)}
