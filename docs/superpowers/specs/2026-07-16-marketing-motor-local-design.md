@@ -35,16 +35,21 @@ El spec de Fase 1 asumía que el motor diario sería un **GitHub Action (nube) c
 │      (LinkedIn: copy + primer comentario + hashtags; blog: title/    │
 │      slug/meta/keywords/content markdown)                            │
 │    • vakdor-carousel / Vakdor-LeadMagnet: assets (Playwright → PDF/PNG)│
+│      IMÁGENES DE MARCA (siempre vakdor-carousel):                     │
+│        - blog  → portada Open Graph 1200×630 → featured_image_url     │
+│        - LinkedIn artículo/carrusel → slides/imagen de marca          │
+│        - lead magnet → PDF (Vakdor-LeadMagnet)                        │
 │    → actualiza contenido en Supabase + sube assets a Storage         │
-│      + pasa la idea a 'en_revision'                                   │
+│      + (blog) setea blog.featured_image_url + pasa a 'en_revision'    │
 └──────────────────────────────┬───────────────────────────────────────┘
                                ▼
         App (tablero) — Leo revisa / reformula / aprueba / PROGRAMA
                                ▼
 ┌─ NUBE — automático (cron Vercel) ────────────────────────────────────┐
 │  toma lo APROBADO + con `programada_para` <= ahora y PUBLICA:        │
-│   • LinkedIn: Buffer (post + primer comentario)                      │
-│   • Blog: fila en la base "vakdor app" (blog_posts, is_published)    │
+│   • LinkedIn: Buffer (post + primer comentario + imagen/carrusel)   │
+│   • Blog: fila en "vakdor app" (blog_posts, is_published,           │
+│           featured_image_url = portada de vakdor-carousel)          │
 │  → marca la idea 'publicada' + guarda `publicado_en`                 │
 └──────────────────────────────────────────────────────────────────────┘
 ```
