@@ -35,6 +35,12 @@
 - **Reformular con visuales:** check "También regenerar imágenes/PDF" (carrusel/lead_magnet). Marcado → `regenerarVisuales(id, comentario)` limpia contenido+assets, → `en_proceso`, y el worker rehace **descripción + slides/PDF** alineados al comentario (`ajusteIdea`). Sin marcar → solo texto (para estas piezas, el texto es la descripción del posteo).
 - **Verificado (18-jul) en dev real** (login admin + Playwright): galería carrusel navegable (slide 3/8), lead_magnet PDF embebido, checkbox visible; flujo reformular+regenerar end-to-end (carrusel real → en_proceso → worker rehace descripción limpia + 8 slides + pdf → en_revision).
 
+## ✅ Artículo de blog → CROSS-POST web + LinkedIn (rama `feat/blog-crosspost-linkedin`)
+- Publicar un `articulo_blog` (`fuente=blog`) ahora hace **las dos**: web (`blog_posts` + portada) **y** LinkedIn (post teaser standalone + misma portada, **sin links** ni mención del artículo — el link vive en el perfil). Helper `publicarArticuloBlog` en `publisher.ts`, usado por el botón y el cron.
+- El **worker** genera la versión LinkedIn del artículo (`blog.linkedin_post` / `linkedin_primer_comentario` / `linkedin_hashtags`); el visor la muestra ("Versión LinkedIn") para revisarla.
+- **Fix de 2 bugs** del botón manual de blog: no mandaba la portada (web salía sin imagen) y exigía `category` que el worker no setea (daba 400). Ahora pasa portada + defaultea category.
+- **Verificado (18-jul):** worker desarrolla artículo + portada + versión LinkedIn (sin links, confirmado por query); crosspost a LinkedIn = post con la portada como imagen (Buffer draft OK). Web = vía ya probada por el cron.
+
 ## ⏭️ QUÉ FALTA (próximos pasos)
 1. **Deploy del worker a EasyPanel** (always-on, sin depender de la PC de Leo) — **igual que el acm-extractor**: Dockerfile con base `mcr.microsoft.com/playwright`, instalar las deps (playwright/@anthropic-ai/sdk/@supabase/supabase-js/pdfkit/marked), env vars como secrets, `CMD ["node","watch.mjs"]`. El worker ya es host-agnóstico (logos data-URI, sin rutas absolutas en el render).
 2. **Primer comentario LinkedIn automático:** requiere plan pago de Buffer. Decisión de Leo (por ahora se pega a mano).

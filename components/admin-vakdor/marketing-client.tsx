@@ -129,7 +129,7 @@ function Card({ idea, onMover, desarrollando, onVer, onProgramar, onPublicar, pu
             background: publicando ? "rgba(194,120,60,0.4)" : ACCENT, border: "none", borderRadius: 6,
             color: "#fff", cursor: publicando ? "default" : "pointer",
           }}>
-          {publicando ? "Publicando…" : "Publicar en blog"}
+          {publicando ? "Publicando…" : "Publicar (web + LinkedIn)"}
         </button>
       ) : null}
       {idea.estado === "aprobada" && idea.fuente === "linkedin" ? (
@@ -467,7 +467,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
     const esLinkedIn = item?.fuente === "linkedin"
     const confirmMsg = esLinkedIn
       ? "¿Publicar este post en tu LinkedIn AHORA? (sale a tu cuenta real)"
-      : "¿Publicar este artículo en el blog de Vakdor (queda público)?"
+      : "¿Publicar este artículo AHORA en la web de Vakdor Y en tu LinkedIn?"
     if (!window.confirm(confirmMsg)) return
     setPublicandoId(id)
     try {
@@ -482,7 +482,14 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
             alert("Publicado en LinkedIn ✓")
           }
         } else {
-          alert("Publicado ✓\n" + (d.url ?? ""))
+          // Blog: web + LinkedIn (teaser). Si LinkedIn salió y hay primer comentario, mostralo para pegar.
+          const ln = d.linkedin ? "y en LinkedIn ✓" : (d.linkedin_omitido ? `(LinkedIn omitido: ${d.linkedin_omitido})` : "")
+          if (d.linkedin && d.primer_comentario) {
+            alert(`Publicado en la web ${ln}\n${d.url ?? ""}`)
+            setComentarioModal(d.primer_comentario)
+          } else {
+            alert(`Publicado en la web ${ln}\n${d.url ?? ""}`)
+          }
         }
       } else {
         alert("No se pudo publicar: " + (d.error ?? ""))
@@ -683,6 +690,24 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap", maxHeight: 360, overflowY: "auto", padding: 12, background: "rgba(0,0,0,0.2)", borderRadius: 8 }}>
               {verIdea.contenido}
             </div>
+            {(() => {
+              const b = (verIdea.blog ?? {}) as Record<string, unknown>
+              const lnPost = typeof b.linkedin_post === "string" ? b.linkedin_post : ""
+              const lnCom = typeof b.linkedin_primer_comentario === "string" ? b.linkedin_primer_comentario : ""
+              if (verIdea.fuente !== "blog" || !lnPost) return null
+              return (
+                <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: "0.04em" }}>Versión LinkedIn (post + portada)</div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap", maxHeight: 260, overflowY: "auto", padding: 12, background: "rgba(99,102,241,0.06)", borderRadius: 8 }}>{lnPost}</div>
+                  {lnCom ? (
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: 4, textTransform: "uppercase" }}>Primer comentario (engagement)</div>
+                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", whiteSpace: "pre-wrap", padding: 8, background: "rgba(0,0,0,0.15)", borderRadius: 6 }}>{lnCom}</div>
+                    </div>
+                  ) : null}
+                </div>
+              )
+            })()}
             {verIdea.primer_comentario ? (
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>

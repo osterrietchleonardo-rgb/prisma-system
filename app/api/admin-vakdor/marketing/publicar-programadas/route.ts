@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { assertCron } from "@/lib/admin-vakdor/cron-auth"
 import { listarProgramadasVencidas, marcarPublicada } from "@/lib/admin-vakdor/marketing/store"
-import { publicarBlog, type PublicarBlogInput } from "@/lib/admin-vakdor/marketing/blog-client"
+import { publicarArticuloBlog } from "@/lib/admin-vakdor/marketing/publisher"
 import { publicarLinkedIn, resolverImagenLinkedIn, resolverDocumentoLinkedIn } from "@/lib/admin-vakdor/marketing/buffer-client"
 
 export const dynamic = "force-dynamic"
@@ -21,31 +21,13 @@ export async function POST(request: Request) {
   for (const idea of ideas) {
     try {
       if (idea.fuente === "blog") {
-        const blog = idea.blog ?? {}
-        const title = typeof blog.title === "string" ? blog.title : ""
-        const slug = typeof blog.slug === "string" ? blog.slug : ""
-        const category = typeof blog.category === "string" ? blog.category : ""
-        const contenido = idea.contenido ?? ""
-
-        if (!contenido || !title || !slug) {
-          errores.push({ id: idea.id, titulo: idea.titulo, error: "Falta contenido o datos de blog (title/slug)." })
-          continue
-        }
-
-        const input: PublicarBlogInput = {
-          title,
-          slug,
-          category: category || "General",
-          content: contenido,
-          meta_description: typeof blog.meta_description === "string" ? blog.meta_description : undefined,
-          seo_keywords: Array.isArray(blog.seo_keywords) ? (blog.seo_keywords as string[]) : undefined,
-          read_time_minutes: typeof blog.read_time_minutes === "number" ? blog.read_time_minutes : undefined,
-          featured_image_url: typeof blog.featured_image_url === "string" ? blog.featured_image_url : undefined,
-        }
-
-        const r = await publicarBlog(input)
+        // Web (artículo + portada) + LinkedIn (teaser + portada), mismo helper que el botón.
+        const r = await publicarArticuloBlog({ titulo: idea.titulo, contenido: idea.contenido ?? null, blog: idea.blog ?? {} })
         await marcarPublicada(idea.id, {
-          canal: "blog", ref_id: r.id, url: r.url, fecha: new Date().toISOString(),
+          canal: r.linkedin ? "blog+linkedin" : "blog",
+          blog: { ref_id: r.blogId, url: r.blogUrl },
+          linkedin: r.linkedin,
+          fecha: new Date().toISOString(),
         })
         publicadas += 1
         continue

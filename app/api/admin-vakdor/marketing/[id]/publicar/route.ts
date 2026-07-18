@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { requireAdminVakdor, isNextResponse } from "@/lib/admin-vakdor/guard"
 import { getAdminDb } from "@/lib/admin-vakdor/logger"
 import { marcarPublicada } from "@/lib/admin-vakdor/marketing/store"
-import { publicarBlog, type PublicarBlogInput } from "@/lib/admin-vakdor/marketing/blog-client"
+import { publicarArticuloBlog } from "@/lib/admin-vakdor/marketing/publisher"
 import { publicarLinkedIn, resolverImagenLinkedIn, resolverDocumentoLinkedIn } from "@/lib/admin-vakdor/marketing/buffer-client"
 import type { AssetRef } from "@/lib/admin-vakdor/marketing/types"
 
@@ -59,35 +59,24 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     )
   }
 
-  const blog = (idea.blog ?? {}) as Record<string, unknown>
-  const contenido = typeof idea.contenido === "string" ? idea.contenido : ""
-  const title = typeof blog.title === "string" ? blog.title : ""
-  const slug = typeof blog.slug === "string" ? blog.slug : ""
-  const category = typeof blog.category === "string" ? blog.category : ""
-
-  if (!contenido || !title || !slug || !category) {
-    return NextResponse.json(
-      { error: "Primero desarrollá el contenido del artículo (falta contenido o datos de blog)." },
-      { status: 400 },
-    )
-  }
-
-  const input: PublicarBlogInput = {
-    title,
-    slug,
-    category: category || "General",
-    content: contenido,
-    meta_description: typeof blog.meta_description === "string" ? blog.meta_description : undefined,
-    seo_keywords: Array.isArray(blog.seo_keywords) ? (blog.seo_keywords as string[]) : undefined,
-    read_time_minutes: typeof blog.read_time_minutes === "number" ? blog.read_time_minutes : undefined,
-  }
-
+  // Artículo de blog → publica en la WEB (artículo + portada) y en LinkedIn (teaser + portada).
   try {
-    const result = await publicarBlog(input)
-    await marcarPublicada(params.id, {
-      canal: "blog", ref_id: result.id, url: result.url, fecha: new Date().toISOString(),
+    const r = await publicarArticuloBlog({
+      titulo: idea.titulo,
+      contenido: typeof idea.contenido === "string" ? idea.contenido : null,
+      blog: (idea.blog ?? {}) as Record<string, unknown>,
     })
-    return NextResponse.json({ ok: true, url: result.url })
+    await marcarPublicada(params.id, {
+      canal: r.linkedin ? "blog+linkedin" : "blog",
+      blog: { ref_id: r.blogId, url: r.blogUrl },
+      linkedin: r.linkedin,
+      fecha: new Date().toISOString(),
+    })
+    return NextResponse.json({
+      ok: true, url: r.blogUrl,
+      linkedin: !!r.linkedin, linkedin_omitido: r.linkedinSkipped,
+      primer_comentario: r.primer_comentario,
+    })
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 })
   }
