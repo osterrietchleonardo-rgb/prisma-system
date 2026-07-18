@@ -128,6 +128,25 @@ export async function guardarDesarrollo(
   if (error) throw new Error(`guardarDesarrollo: ${error.message}`)
 }
 
+/**
+ * Marca una idea (carrusel/lead_magnet) para que el worker REGENERE la pieza completa:
+ * limpia `contenido` + `assets`, guarda el `comentario` de reformular y la manda a `en_proceso`.
+ * El worker rehace la descripción del posteo Y los visuales (slides/PDF) alineados al comentario,
+ * y la devuelve a `en_revision`.
+ */
+export async function regenerarVisuales(id: string, comentario: string): Promise<void> {
+  const db = getAdminDb()
+  const { data, error: e1 } = await db.from("marketing_ideas").select("historial").eq("id", id).single()
+  if (e1) throw new Error(`regenerarVisuales(leer): ${e1.message}`)
+  const historial = (data as { historial: HistorialEvento[] }).historial ?? []
+  const evento: HistorialEvento = { fecha: new Date().toISOString(), tipo: "regenerar_visuales", detalle: comentario.slice(0, 120) }
+  const { error } = await db
+    .from("marketing_ideas")
+    .update({ contenido: null, assets: [], comentario, estado: "en_proceso", historial: [...historial, evento] })
+    .eq("id", id)
+  if (error) throw new Error(`regenerarVisuales: ${error.message}`)
+}
+
 /** Títulos + ángulos recientes, para que el motor NO repita (memoria anti-repetición). */
 export async function resumenParaMemoria(): Promise<{ titulo: string; angulo: string | null }[]> {
   const db = getAdminDb()

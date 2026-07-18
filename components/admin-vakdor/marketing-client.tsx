@@ -30,12 +30,13 @@ function Chip({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Card({ idea, onMover, desarrollando, onVer, onProgramar, onPublicar, publicando }: {
+function Card({ idea, onMover, desarrollando, onVer, onProgramar, onPublicar, publicando, onReformulada }: {
   idea: MarketingIdea; onMover: (id: string, e: EstadoIdea) => void
   desarrollando: boolean; onVer: (idea: MarketingIdea) => void
   onProgramar: (id: string, fechaISO: string | null) => void
   onPublicar: (id: string) => void
   publicando: boolean
+  onReformulada: (id: string, patch: Partial<MarketingIdea>) => void
 }) {
   const orden = ESTADOS.map((e) => e.key)
   const i = orden.indexOf(idea.estado)
@@ -107,7 +108,7 @@ function Card({ idea, onMover, desarrollando, onVer, onProgramar, onPublicar, pu
           📄 Ver contenido
         </button>
       ) : null}
-      {idea.estado === "en_revision" ? <Reformular idea={idea} /> : null}
+      {idea.estado === "en_revision" ? <Reformular idea={idea} onResult={(patch) => onReformulada(idea.id, patch)} /> : null}
       {idea.estado === "aprobada" || idea.programada_para ? (
         <div key={`prog-${idea.id}-${idea.programada_para ?? ""}`} style={{ marginBottom: 8 }}>
           <label style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", display: "block", marginBottom: 4 }}>
@@ -151,10 +152,12 @@ function Card({ idea, onMover, desarrollando, onVer, onProgramar, onPublicar, pu
   )
 }
 
-function Reformular({ idea }: { idea: MarketingIdea }) {
+function Reformular({ idea, onResult }: { idea: MarketingIdea; onResult: (patch: Partial<MarketingIdea>) => void }) {
   const [comentario, setComentario] = useState("")
   const [contenido, setContenido] = useState(idea.contenido ?? "")
   const [cargando, setCargando] = useState(false)
+  const [regenerar, setRegenerar] = useState(false)
+  const puedeRegenerar = idea.formato === "carrusel" || idea.formato === "lead_magnet"
   return (
     <div style={{ marginBottom: 8 }}>
       {contenido ? (
@@ -165,18 +168,30 @@ function Reformular({ idea }: { idea: MarketingIdea }) {
       <textarea value={comentario} onChange={(e) => setComentario(e.target.value)}
         placeholder="Comentario para reformular…" rows={2}
         style={{ width: "100%", fontSize: 11, padding: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", resize: "vertical" }} />
+      {puedeRegenerar ? (
+        <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 10, color: "rgba(255,255,255,0.6)", cursor: "pointer" }}>
+          <input type="checkbox" checked={regenerar} onChange={(e) => setRegenerar(e.target.checked)} style={{ accentColor: ACCENT }} />
+          También regenerar imágenes/PDF (rehace la pieza con el worker)
+        </label>
+      ) : null}
       <button disabled={cargando || !comentario.trim()}
         onClick={async () => {
           setCargando(true)
           try {
             const res = await fetch(`/api/admin-vakdor/marketing/${idea.id}/reformular`, {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ comentario: comentario.trim() }),
+              body: JSON.stringify({ comentario: comentario.trim(), regenerar_visuales: puedeRegenerar && regenerar }),
             })
             if (res.ok) {
               const d = await res.json()
-              setContenido(d.contenido)
               setComentario("")
+              if (d.regenerando) {
+                onResult({ contenido: null, estado: "en_proceso", assets: [] })
+                alert("Reformulado ✓ — la tarjeta volvió a “En proceso”; el worker rehace la descripción + las imágenes/PDF y la devuelve a “En revisión”.")
+              } else {
+                setContenido(d.contenido)
+                onResult({ contenido: d.contenido })
+              }
             } else {
               alert("No se pudo reformular. Probá de nuevo.")
             }
@@ -187,10 +202,84 @@ function Reformular({ idea }: { idea: MarketingIdea }) {
           }
         }}
         style={{ marginTop: 6, width: "100%", padding: "6px 0", fontSize: 11, fontWeight: 600, background: cargando ? "rgba(194,120,60,0.4)" : ACCENT, border: "none", borderRadius: 6, color: "#fff", cursor: cargando ? "default" : "pointer" }}>
-        {cargando ? "Reformulando…" : "Reformular"}
+        {cargando ? (regenerar && puedeRegenerar ? "Reformulando + regenerando…" : "Reformulando…") : "Reformular"}
       </button>
     </div>
   )
+}
+
+/** Fuerza descarga desde Supabase Storage (query `?download=<nombre>` → Content-Disposition attachment). */
+function urlDescarga(url: string, nombre: string) {
+  return url + (url.includes("?") ? "&" : "?") + "download=" + encodeURIComponent(nombre)
+}
+
+const btnDescarga: React.CSSProperties = {
+  alignSelf: "flex-start", fontSize: 12, padding: "5px 12px", borderRadius: 6, marginTop: 6,
+  background: "rgba(194,120,60,0.15)", border: "1px solid rgba(194,120,60,0.35)", color: "#e29e6d",
+  textDecoration: "none", fontWeight: 600, cursor: "pointer",
+}
+const previewLabel: React.CSSProperties = {
+  fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em",
+}
+
+/** Preview real de la pieza en el visor: carrusel = galería slide por slide; lead_magnet = PDF embebido; resto = imagen. */
+function PreviewPieza({ idea }: { idea: MarketingIdea }) {
+  const [i, setI] = useState(0)
+  const assets = (idea.assets ?? []) as Array<{ tipo?: string; url?: string; orden?: number }>
+  const slides = assets
+    .filter((a) => a.tipo === "png" && typeof a.url === "string" && a.url.startsWith("http"))
+    .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+  const pdf = assets.find((a) => a.tipo === "pdf" && typeof a.url === "string" && a.url.startsWith("http"))
+  const blogImg = (idea.blog as Record<string, unknown>)?.featured_image_url
+
+  if (idea.formato === "carrusel" && slides.length > 0) {
+    const idx = Math.min(i, slides.length - 1)
+    return (
+      <div>
+        <div style={previewLabel}>Carrusel — slide {idx + 1}/{slides.length}</div>
+        <div style={{ position: "relative" }}>
+          <img src={slides[idx].url} alt={`slide ${idx + 1}`}
+            style={{ width: "100%", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", display: "block" }} />
+          {slides.length > 1 ? (
+            <>
+              <button onClick={() => setI((idx - 1 + slides.length) % slides.length)}
+                style={{ position: "absolute", top: "50%", left: 8, transform: "translateY(-50%)", background: "rgba(0,0,0,0.55)", border: "none", color: "#fff", width: 34, height: 34, borderRadius: "50%", cursor: "pointer", fontSize: 16, zIndex: 2 }}>◀</button>
+              <button onClick={() => setI((idx + 1) % slides.length)}
+                style={{ position: "absolute", top: "50%", right: 8, transform: "translateY(-50%)", background: "rgba(0,0,0,0.55)", border: "none", color: "#fff", width: 34, height: 34, borderRadius: "50%", cursor: "pointer", fontSize: 16, zIndex: 2 }}>▶</button>
+            </>
+          ) : null}
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", gap: 5, marginTop: 8, flexWrap: "wrap" }}>
+          {slides.map((_, k) => (
+            <span key={k} onClick={() => setI(k)}
+              style={{ width: 7, height: 7, borderRadius: "50%", cursor: "pointer", background: k === idx ? ACCENT : "rgba(255,255,255,0.25)" }} />
+          ))}
+        </div>
+        {pdf?.url ? (
+          <a href={urlDescarga(pdf.url, `carrusel-${idea.id}.pdf`)} download style={btnDescarga}>⬇ Descargar PDF</a>
+        ) : null}
+      </div>
+    )
+  }
+
+  if (idea.formato === "lead_magnet" && pdf?.url) {
+    return (
+      <div>
+        <div style={previewLabel}>Lead magnet (PDF)</div>
+        <iframe src={pdf.url} title="lead magnet"
+          style={{ width: "100%", height: 460, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, background: "#fff" }} />
+        <a href={urlDescarga(pdf.url, `lead-magnet-${idea.id}.pdf`)} download style={btnDescarga}>⬇ Descargar PDF</a>
+      </div>
+    )
+  }
+
+  const img = typeof blogImg === "string" && blogImg.startsWith("http") ? blogImg : slides[0]?.url
+  return img ? (
+    <div>
+      <div style={previewLabel}>Imagen de marca</div>
+      <img src={img} alt="portada" style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)" }} />
+    </div>
+  ) : null
 }
 
 const FUENTES_FILTRO = [
@@ -323,6 +412,11 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const [vista, setVista] = useState<"tablero" | "calendario">("tablero")
 
   const porEstado = (e: EstadoIdea) => items.filter((i) => i.estado === e)
+
+  function onReformulada(id: string, patch: Partial<MarketingIdea>) {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
+    setVerIdea((v) => (v && v.id === id ? { ...v, ...patch } : v))
+  }
 
   async function programar(id: string, fechaISO: string | null) {
     const anterior = items.find((i) => i.id === id)?.programada_para ?? null
@@ -507,7 +601,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
                 {cards.map((idea) => (
                   <Card key={idea.id} idea={idea} onMover={mover}
                     desarrollando={desarrollandoId === idea.id} onVer={setVerIdea} onProgramar={programar}
-                    onPublicar={publicar} publicando={publicandoId === idea.id} />
+                    onPublicar={publicar} publicando={publicandoId === idea.id} onReformulada={onReformulada} />
                 ))}
                 {cards.length === 0 ? (
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px 0" }}>—</div>
@@ -574,40 +668,18 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
               <button onClick={() => setVerIdea(null)}
                 style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>×</button>
             </div>
-            {(() => {
-              const blogImg = (verIdea.blog as Record<string, unknown>)?.featured_image_url
-              const assetImg = (verIdea.assets ?? []).map((a) => (a as { url?: string }).url).find((u) => typeof u === "string" && u.startsWith("http"))
-              const img = typeof blogImg === "string" && blogImg.startsWith("http") ? blogImg : (assetImg as string | undefined)
-              const pdfs = (verIdea.assets ?? []).filter((a) => a.tipo === "pdf") as Array<{ url?: string; path: string }>
-              return (
-                <>
-                  {img ? (
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>Imagen de marca</div>
-                      <img src={img} alt="portada" style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)" }} />
-                    </div>
-                  ) : null}
-                  {pdfs.length > 0 ? (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {pdfs.map((a, idx) => (a.url ? (
-                        <a key={idx} href={a.url} target="_blank" rel="noreferrer"
-                          style={{ fontSize: 12, padding: "4px 10px", borderRadius: 6, background: "rgba(194,120,60,0.15)", border: "1px solid rgba(194,120,60,0.3)", color: "#e29e6d", textDecoration: "none" }}>
-                          Ver PDF{pdfs.length > 1 ? ` ${idx + 1}` : ""}
-                        </a>
-                      ) : null))}
-                    </div>
-                  ) : null}
-                </>
-              )
-            })()}
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(verIdea.contenido ?? "")
-                alert("Contenido copiado ✓")
-              }}
-              style={{ alignSelf: "flex-start", padding: "6px 12px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-              Copiar contenido
-            </button>
+            <PreviewPieza idea={verIdea} />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.04em" }}>Descripción del posteo</div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(verIdea.contenido ?? "")
+                  alert("Descripción copiada ✓")
+                }}
+                style={{ padding: "5px 12px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                Copiar
+              </button>
+            </div>
             <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap", maxHeight: 360, overflowY: "auto", padding: 12, background: "rgba(0,0,0,0.2)", borderRadius: 8 }}>
               {verIdea.contenido}
             </div>
