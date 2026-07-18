@@ -1572,6 +1572,15 @@ Sistema de auth **completamente separado** de Supabase Auth:
 | `/api/admin-vakdor/finance/fx` | GET/POST | Tipo de cambio USD→ARS por mes |
 | `/api/admin-vakdor/finance/sync` | POST | Sincronización manual de costos (botón del panel) |
 | `/api/cron/finance-sync` | GET | Sincronización automática 2×/día (colgada de `tokko-sync.yml`, auth `CRON_SECRET`) |
+| `/api/admin-vakdor/marketing` | GET/POST | Lista ideas / alta manual (tablero) |
+| `/api/admin-vakdor/marketing/[id]/estado` | POST | Mover idea de columna |
+| `/api/admin-vakdor/marketing/[id]/desarrollar` | POST | Generar contenido rápido in-app (Claude) |
+| `/api/admin-vakdor/marketing/[id]/reformular` | POST | Reescribir contenido (Claude) |
+| `/api/admin-vakdor/marketing/[id]/programar` | POST | Fijar fecha de publicación |
+| `/api/admin-vakdor/marketing/[id]/asset` | GET | URL firmada de un asset del bucket privado |
+| `/api/admin-vakdor/marketing/[id]/publicar` | POST | Publicar ya (blog o LinkedIn) |
+| `/api/admin-vakdor/marketing/generar` | POST | Motor de ideas (funda ideas con GA/Search/copywriter) |
+| `/api/admin-vakdor/marketing/publicar-programadas` | POST | Cron: publica aprobadas con fecha vencida (auth `assertCron`, workflow `marketing-publish.yml` cada 30 min) |
 
 ### 23.1 Módulo Finanzas
 
@@ -1607,6 +1616,19 @@ Sección dentro del Dashboard del dueño (`/admin-vakdor/dashboard`). Objetivo: 
 - **Análisis del agente IA** — toma una muestra de las conversaciones reales más recientes, las compara contra el **prompt vigente del agente** (solo lectura) y marca fortalezas, desvíos (distinguiendo lo ya corregido de lo que sigue abierto) y mejoras óptimas.
 
 **Nota:** las fuentes que fallan no rompen la corrida (se muestran "no disponible" y el resto sigue). Detalle técnico (tablas, endpoints, tokens) en TÉCNICO §16.2.
+
+### 23.4 Marketing — "Agente IA de Marketing" (`/admin-vakdor/marketing`)
+
+Sala de control del contenido orgánico de Vakdor (LinkedIn, Instagram y blog). Objetivo: llevar una idea de contenido desde que se piensa hasta que se publica, sin salir de un solo lugar.
+
+**Cómo funciona (en criollo):** es un **tablero tipo Trello** con columnas *Idea → En proceso → En revisión → Aprobada → Publicada* (más *Rechazada* al costado). Cada tarjeta es una pieza de contenido. Leonardo (o el "motor de ideas") llena la columna Idea; al mover una tarjeta a **"En proceso"**, un **robot que corre en la compu de Vakdor (el worker)** la agarra y le hace el trabajo pesado: escribe el contenido con la voz de Vakdor y le arma las **imágenes de marca**. Cuando termina, la deja en **"En revisión"** para que Leonardo la mire. Si la aprueba y le pone fecha, se **publica sola** a la hora programada.
+
+- **Qué imágenes arma según el tipo de pieza:** un **carrusel** → varias placas 1080×1080 (portada + desarrollo + placa final con el CTA) y un PDF con todas juntas; un **lead magnet** (imán de leads) → un **PDF tipo scorecard/checklist** con la marca, para descargar; cualquier otra → una **portada única** (blog 1200×630 / redes 1080×1080). Todo con el logo de Vakdor y el color cobre.
+- **Publicar:** el **blog** se escribe directo en la web de Vakdor (vakdor-app). **LinkedIn** se postea a través de Buffer (texto + imagen). El **primer comentario** de LinkedIn (donde va el link) hoy se pega a mano porque la API gratis de Buffer no lo permite. Un **cron cada 30 min** revisa si hay piezas aprobadas con fecha vencida y las publica solas.
+- **Ojo:** los **carruseles no se publican solos** (Buffer solo deja subir 1 imagen por post, no documentos; Instagram todavía no tiene publicación automática) → quedan listos para descargar y subir a mano.
+- **Reformular / desarrollar rápido:** desde el tablero, botones que usan Claude en la app para reescribir o generar un borrador de texto al toque (sin esperar al worker).
+
+**Regla de fondo:** todo lo que necesita las herramientas de diseño reales (imágenes de marca, PDFs) corre en la máquina de Vakdor, no en el servidor de la app. La app se encarga del tablero, publicar y programar. Detalle técnico (tablas, endpoints, worker, formatos) en TÉCNICO §16.3; estado y pendientes en `docs/interno/marketing-handoff.md`.
 
 ---
 
