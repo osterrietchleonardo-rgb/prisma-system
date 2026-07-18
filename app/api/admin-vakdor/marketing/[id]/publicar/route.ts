@@ -3,7 +3,7 @@ import { requireAdminVakdor, isNextResponse } from "@/lib/admin-vakdor/guard"
 import { getAdminDb } from "@/lib/admin-vakdor/logger"
 import { marcarPublicada } from "@/lib/admin-vakdor/marketing/store"
 import { publicarBlog, type PublicarBlogInput } from "@/lib/admin-vakdor/marketing/blog-client"
-import { publicarLinkedIn, resolverImagenLinkedIn } from "@/lib/admin-vakdor/marketing/buffer-client"
+import { publicarLinkedIn, resolverImagenLinkedIn, resolverDocumentoLinkedIn } from "@/lib/admin-vakdor/marketing/buffer-client"
 import type { AssetRef } from "@/lib/admin-vakdor/marketing/types"
 
 export const dynamic = "force-dynamic"
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const db = getAdminDb()
   const { data: idea, error } = await db
     .from("marketing_ideas")
-    .select("fuente, estado, titulo, contenido, blog, hashtags, assets, primer_comentario")
+    .select("fuente, formato, estado, titulo, contenido, blog, hashtags, assets, primer_comentario")
     .eq("id", params.id).single()
   if (error || !idea) return NextResponse.json({ error: "idea no encontrada" }, { status: 404 })
 
@@ -30,7 +30,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const blog = (idea.blog ?? {}) as Record<string, unknown>
     const assets = (idea.assets ?? []) as AssetRef[]
-    const imageUrl = resolverImagenLinkedIn(blog, assets)
+    // Carrusel → document post (PDF deslizable). Resto → imagen.
+    const documento = idea.formato === "carrusel" ? resolverDocumentoLinkedIn(idea.titulo, assets) : null
+    const imageUrl = documento ? null : resolverImagenLinkedIn(blog, assets)
 
     const hashtags = Array.isArray(idea.hashtags) ? (idea.hashtags as string[]) : []
     const hashtagsLine = hashtags.join(" ")
@@ -39,7 +41,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       : contenido
 
     try {
-      const result = await publicarLinkedIn({ text, imageUrl })
+      const result = await publicarLinkedIn({ text, imageUrl, document: documento })
       await marcarPublicada(params.id, {
         canal: "linkedin", ref_id: result.id, url: "https://www.linkedin.com/feed/",
         fecha: new Date().toISOString(), status: result.status,

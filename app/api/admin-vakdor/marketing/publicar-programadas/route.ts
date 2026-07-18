@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { assertCron } from "@/lib/admin-vakdor/cron-auth"
 import { listarProgramadasVencidas, marcarPublicada } from "@/lib/admin-vakdor/marketing/store"
 import { publicarBlog, type PublicarBlogInput } from "@/lib/admin-vakdor/marketing/blog-client"
-import { publicarLinkedIn, resolverImagenLinkedIn } from "@/lib/admin-vakdor/marketing/buffer-client"
+import { publicarLinkedIn, resolverImagenLinkedIn, resolverDocumentoLinkedIn } from "@/lib/admin-vakdor/marketing/buffer-client"
 
 export const dynamic = "force-dynamic"
 
@@ -59,9 +59,11 @@ export async function POST(request: Request) {
         }
 
         const text = contenido + (idea.hashtags?.length ? `\n\n${idea.hashtags.join(" ")}` : "")
-        const imageUrl = resolverImagenLinkedIn(idea.blog, idea.assets)
+        // Carrusel → document post (PDF deslizable). Resto → imagen.
+        const documento = idea.formato === "carrusel" ? resolverDocumentoLinkedIn(idea.titulo, idea.assets) : null
+        const imageUrl = documento ? null : resolverImagenLinkedIn(idea.blog, idea.assets)
 
-        const r = await publicarLinkedIn({ text, imageUrl })
+        const r = await publicarLinkedIn({ text, imageUrl, document: documento })
         await marcarPublicada(idea.id, {
           canal: "linkedin", ref_id: r.id, url: "https://www.linkedin.com/feed/",
           fecha: new Date().toISOString(), status: r.status,
