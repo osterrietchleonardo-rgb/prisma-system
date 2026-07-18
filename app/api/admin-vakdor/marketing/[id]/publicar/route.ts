@@ -3,7 +3,7 @@ import { requireAdminVakdor, isNextResponse } from "@/lib/admin-vakdor/guard"
 import { getAdminDb } from "@/lib/admin-vakdor/logger"
 import { marcarPublicada } from "@/lib/admin-vakdor/marketing/store"
 import { publicarBlog, type PublicarBlogInput } from "@/lib/admin-vakdor/marketing/blog-client"
-import { publicarLinkedIn } from "@/lib/admin-vakdor/marketing/buffer-client"
+import { publicarLinkedIn, resolverImagenLinkedIn } from "@/lib/admin-vakdor/marketing/buffer-client"
 import type { AssetRef } from "@/lib/admin-vakdor/marketing/types"
 
 export const dynamic = "force-dynamic"
@@ -29,14 +29,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
 
     const blog = (idea.blog ?? {}) as Record<string, unknown>
-    const assets = (idea.assets ?? []) as Array<AssetRef & { url?: string }>
-    let imageUrl: string | null = null
-    if (typeof blog.featured_image_url === "string" && /^https?:\/\//.test(blog.featured_image_url)) {
-      imageUrl = blog.featured_image_url
-    } else {
-      const conUrl = assets.find((a) => typeof a.url === "string" && a.url.startsWith("http"))
-      if (conUrl?.url) imageUrl = conUrl.url
-    }
+    const assets = (idea.assets ?? []) as AssetRef[]
+    const imageUrl = resolverImagenLinkedIn(blog, assets)
 
     const hashtags = Array.isArray(idea.hashtags) ? (idea.hashtags as string[]) : []
     const hashtagsLine = hashtags.join(" ")

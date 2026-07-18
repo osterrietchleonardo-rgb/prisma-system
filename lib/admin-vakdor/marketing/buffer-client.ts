@@ -1,4 +1,20 @@
 const LINKEDIN_PERSONAL_CHANNEL = "6a4aca1140483446287320b8"
+
+/**
+ * Resuelve la imagen pública para un post de LinkedIn.
+ * Prioriza `blog.featured_image_url`; si no hay, cae al primer `assets[].url` público
+ * (el worker de marketing genera la imagen 1080×1080 y la sube a un bucket público).
+ * Buffer exige una URL http(s) accesible, no una firmada temporal de bucket privado.
+ */
+export function resolverImagenLinkedIn(
+  blog: Record<string, unknown> | null | undefined,
+  assets: Array<{ url?: string }> | null | undefined,
+): string | null {
+  const featured = blog?.featured_image_url
+  if (typeof featured === "string" && /^https?:\/\//.test(featured)) return featured
+  const conUrl = (assets ?? []).find((a) => typeof a.url === "string" && a.url.startsWith("http"))
+  return conUrl?.url ?? null
+}
 const CREATE_POST = `mutation($input: CreatePostInput!){ createPost(input:$input){ __typename ... on PostActionSuccess { post { id status } } ... on RestProxyError { message code } ... on InvalidInputError { message } ... on UnauthorizedError { message } ... on LimitReachedError { message } ... on NotFoundError { message } ... on UnexpectedError { message } } }`
 
 export interface PublicarLinkedInInput {

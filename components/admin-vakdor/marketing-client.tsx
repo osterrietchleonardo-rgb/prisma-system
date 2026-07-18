@@ -64,6 +64,9 @@ function Card({ idea, onMover, desarrollando, onVer, onProgramar, onPublicar, pu
           {idea.assets.map((a, idx) => (
             <button key={idx}
               onClick={async () => {
+                // Assets del worker viven en bucket público → abrir la url directa.
+                // Los del bucket privado (sin url) se firman por el endpoint.
+                if (a.url && /^https?:\/\//.test(a.url)) { window.open(a.url, "_blank"); return }
                 const win = window.open("", "_blank") // abrir sincrónico para conservar el gesto
                 try {
                   const res = await fetch(`/api/admin-vakdor/marketing/${idea.id}/asset?path=${encodeURIComponent(a.path)}`)

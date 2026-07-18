@@ -26,6 +26,8 @@ export interface HistorialEvento {
 export interface AssetRef {
   tipo: "pdf" | "png"
   path: string
+  /** URL pública (la setea el worker al subir a un bucket público); usada p.ej. como imagen de LinkedIn. */
+  url?: string
   orden?: number
 }
 
