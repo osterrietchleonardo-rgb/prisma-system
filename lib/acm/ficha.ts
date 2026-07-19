@@ -10,17 +10,20 @@ export interface AmbienteStats {
   dos_ambientes_cierre: number | null;
   tres_ambientes_cierre: number | null;
   promedio_caba_cierre: number | null;
+  brecha_general_pct?: number | null;
 }
 
 // ── Pulso de mercado para una zona + segmento de ambientes (banner superior de cada hoja) ──
 export interface FichaPulso {
-  barrio: string;             // barrio matcheado (o la zona del comparable si no hubo match)
-  ambiente_label: string;     // "Monoambiente" | "2 ambientes" | "3 ambientes" | "4+ ambientes" | "Promedio"
-  barrio_m2: number | null;   // $/m² del barrio: cierre si existe, si no oferta
+  barrio: string;                  // barrio matcheado (o la zona del comparable si no hubo match)
+  ambiente_label: string;          // "Monoambiente" | "2 ambientes" | "3 ambientes" | "4+ ambientes" | "Promedio"
+  barrio_m2: number | null;        // $/m² de oferta/lista del barrio
+  barrio_cierre_est_m2: number | null; // $/m² estimado de cierre del barrio (lista * (1 + brecha/100))
   barrio_m2_tipo: "cierre" | "oferta" | null;
-  caba_amb_m2: number | null; // cierre CABA del segmento de ambientes (real, mercado_stats)
-  fuente: string;             // fuente del dato de barrio
-  matched: boolean;           // true si matcheó un barrio real de mercado_barrios
+  caba_amb_m2: number | null;      // cierre CABA del segmento de ambientes (real, mercado_stats)
+  brecha_pct: number | null;       // brecha % real CABA utilizada para estimar el cierre del barrio
+  fuente: string;                  // fuente del dato de barrio
+  matched: boolean;                // true si matcheó un barrio real de mercado_barrios
 }
 
 // ── Un comparable dentro de la ficha (comparable del ACM + fotos/amenities/desc) ──
@@ -57,7 +60,7 @@ export interface FichaComparisonRow {
   moneda: string;
   precio_m2: number | null;
   ref_m2: number | null;    // cierre de referencia de la zona del comparable
-  ref_label: string;        // "Recoleta (cierre)" | "Caballito (oferta)" | "CABA 2 amb (cierre)"
+  ref_label: string;        // "Recoleta (cierre est.)" | "Caballito (oferta)" | "CABA 2 amb (cierre)"
   desvio_pct: number | null; // $/m² del comparable vs ref_m2
   calificacion: string;
 }
@@ -156,14 +159,20 @@ export function matchBarrioPulso(
   }
 
   let barrio_m2: number | null = null;
+  let barrio_cierre_est_m2: number | null = null;
   let barrio_m2_tipo: "cierre" | "oferta" | null = null;
+
   if (hit) {
     if (hit.precio_cierre_m2_usd != null) {
       barrio_m2 = hit.precio_cierre_m2_usd;
+      barrio_cierre_est_m2 = hit.precio_cierre_m2_usd;
       barrio_m2_tipo = "cierre";
     } else if (hit.precio_m2_usd != null) {
       barrio_m2 = hit.precio_m2_usd;
       barrio_m2_tipo = "oferta";
+      if (stats.brecha_general_pct != null) {
+        barrio_cierre_est_m2 = Math.round(hit.precio_m2_usd * (1 + stats.brecha_general_pct / 100));
+      }
     }
   }
 
@@ -171,8 +180,10 @@ export function matchBarrioPulso(
     barrio: hit?.barrio || zona || "CABA",
     ambiente_label: ambienteLabel(ambientes),
     barrio_m2,
+    barrio_cierre_est_m2,
     barrio_m2_tipo,
     caba_amb_m2: cabaAmbCierre(ambientes, stats),
+    brecha_pct: stats.brecha_general_pct ?? null,
     fuente: hit?.fuente || "Reporte inmobiliario",
     matched: !!hit,
   };
@@ -189,10 +200,13 @@ function calificar(desvio: number | null): string {
   return "Premium / por encima del mercado";
 }
 
-// Cierre de referencia de la zona de UN comparable (para su desvío): cierre del barrio → oferta del
+// Cierre de referencia de la zona de UN comparable (para su desvío): cierre est. del barrio → oferta del
 // barrio → cierre CABA por ambientes. Devuelve el valor y una etiqueta que dice de dónde salió.
 function refZona(c: FichaComparable): { m2: number | null; label: string } {
   const p = c.pulso;
+  if (p.barrio_cierre_est_m2 != null) {
+    return { m2: p.barrio_cierre_est_m2, label: `${p.barrio} (cierre est.)` };
+  }
   if (p.barrio_m2 != null) {
     return { m2: p.barrio_m2, label: `${p.barrio} (${p.barrio_m2_tipo === "cierre" ? "cierre" : "oferta"})` };
   }

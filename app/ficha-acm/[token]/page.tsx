@@ -262,20 +262,29 @@ function ComparableSheet({
     { label: "Baños", value: c.banos ?? "—" },
     { label: "Valor / m²", value: fmtM2(c.precio_m2, c.moneda) },
   ];
-  const barrioTipoLabel = c.pulso.barrio_m2_tipo === "cierre" ? "cierre" : "oferta";
 
   return (
     <section className="sheet">
       <div className="pulso" style={{ backgroundColor: primary, color: onPrimary }}>
-        <div>
-          <span className="pulso-eyebrow" style={{ color: accent }}>PULSO DE MERCADO · {c.pulso.barrio}</span>
-          <div className="pulso-barrio">{c.pulso.ambiente_label}</div>
-          {c.pulso.barrio_m2 != null && <span className="pulso-note">{c.pulso.barrio}: {fmtM2(c.pulso.barrio_m2)} ({barrioTipoLabel})</span>}
+        <div className="pulso-left">
+          <span className="pulso-eyebrow" style={{ color: accent }}>REFERENCIA BARRIO · {c.pulso.barrio}</span>
+          <div className="pulso-barrio-vals">
+            {c.pulso.barrio_m2 != null && (
+              <span className="pulso-val-item">
+                <span className="pulso-val-lbl">Lista:</span> {fmtM2(c.pulso.barrio_m2)}
+              </span>
+            )}
+            {c.pulso.barrio_cierre_est_m2 != null && (
+              <span className="pulso-val-item highlight">
+                <span className="pulso-val-lbl">Cierre est.:</span> {fmtM2(c.pulso.barrio_cierre_est_m2)}
+              </span>
+            )}
+          </div>
         </div>
         <div className="pulso-right">
-          <span className="pulso-label">Cierre CABA · {c.pulso.ambiente_label}</span>
+          <span className="pulso-label" style={{ color: accent }}>CIERRE REAL CABA · {c.pulso.ambiente_label}</span>
           <strong style={{ color: accent }}>{fmtM2(c.pulso.caba_amb_m2)}</strong>
-          <span className="pulso-sub">Reporte inmobiliario</span>
+          <span className="pulso-sub">Índice REMAX + UCEMA</span>
         </div>
       </div>
 
@@ -370,13 +379,16 @@ const CSS = `
 
 /* Banner de pulso / consolidado (informativo, no llamativo) */
 .pulso { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 10px var(--pad); gap: 16px; }
-.pulso-eyebrow { font-size: 9.5px; font-weight: 800; letter-spacing: .16em; }
-.pulso-barrio { font-size: 13px; font-weight: 600; margin-top: 2px; }
-.pulso-note { display: block; font-size: 10px; opacity: .82; margin-top: 3px; }
+.pulso-left { display: flex; flex-direction: column; }
+.pulso-eyebrow { font-size: 9.5px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+.pulso-barrio-vals { display: flex; align-items: center; gap: 10px; margin-top: 3px; font-size: 11.5px; }
+.pulso-val-item { opacity: .9; }
+.pulso-val-item.highlight { font-weight: 700; opacity: 1; }
+.pulso-val-lbl { opacity: .7; font-weight: 400; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
 .pulso-right { text-align: right; display: flex; flex-direction: column; }
-.pulso-right strong { font-size: 16px; line-height: 1.15; }
-.pulso-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: .12em; opacity: .82; }
-.pulso-sub { font-size: 9.5px; opacity: .72; margin-top: 2px; }
+.pulso-right strong { font-size: 15px; line-height: 1.15; }
+.pulso-label { font-size: 9.5px; text-transform: uppercase; letter-spacing: .12em; font-weight: 700; }
+.pulso-sub { font-size: 9px; opacity: .72; margin-top: 2px; }
 
 /* Encabezado del comparable */
 .comp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
