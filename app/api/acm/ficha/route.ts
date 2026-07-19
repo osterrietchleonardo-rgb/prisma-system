@@ -72,7 +72,7 @@ export async function POST(req: Request) {
       .map((c) => c.id.replace(/^roomix_/, ""));
 
     // ── Enriquecer con fotos/amenities/descripción + marca + contacto + pulso, en paralelo ──
-    const [carteraFullRes, roomixFullRes, profileRes, agencyRes, barriosRes, cabaStatRes] = await Promise.all([
+    const [carteraFullRes, roomixFullRes, profileRes, agencyRes, barriosRes, cabaStatRes, cierreRes] = await Promise.all([
       carteraIds.length
         ? supabase
             .from("properties")
@@ -90,6 +90,12 @@ export async function POST(req: Request) {
         .from("mercado_stats")
         .select("id, valor")
         .in("id", ["monoambiente_cierre", "dos_ambientes_cierre", "tres_ambientes_cierre", "promedio_caba_cierre"]),
+      supabase
+        .from("mercado_cierre_mensual")
+        .select("brecha_general_pct")
+        .order("periodo", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     const carteraById: Record<string, any> = {};
@@ -107,11 +113,14 @@ export async function POST(req: Request) {
       const row = (cabaStatRes.data || []).find((s: any) => s.id === id);
       return row?.valor != null ? Number(row.valor) : null;
     };
+    const brechaGeneral = cierreRes?.data?.brecha_general_pct != null ? Number(cierreRes.data.brecha_general_pct) : null;
+
     const ambStats: AmbienteStats = {
       monoambiente_cierre: statById("monoambiente_cierre"),
       dos_ambientes_cierre: statById("dos_ambientes_cierre"),
       tres_ambientes_cierre: statById("tres_ambientes_cierre"),
       promedio_caba_cierre: statById("promedio_caba_cierre"),
+      brecha_general_pct: brechaGeneral,
     };
 
     // ── Armar los comparables de la ficha (respetando el orden de selección) ──
