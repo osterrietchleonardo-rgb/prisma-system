@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdminVakdor, isNextResponse } from "@/lib/admin-vakdor/guard"
+import { getAdminDb } from "@/lib/admin-vakdor/logger"
 import { resumenParaMemoria, insertarIdeasMotor } from "@/lib/admin-vakdor/marketing/store"
 import { generarTexto } from "@/lib/admin-vakdor/marketing/claude"
 import { BRAND_SYSTEM } from "@/lib/admin-vakdor/marketing/brand-prompt"
@@ -18,8 +19,17 @@ export async function POST(request: NextRequest) {
   const previas = await resumenParaMemoria()
   const evitar = previas.map((p) => `- ${p.titulo}${p.angulo ? ` (${p.angulo})` : ""}`).join("\n") || "(ninguna todavía)"
 
+  // Insights reales de Buffer (los cachea el worker 1x/día). Fundamentan las ideas con datos.
+  let insights = ""
+  try {
+    const { data } = await getAdminDb()
+      .from("marketing_insights").select("resumen").order("fecha", { ascending: false }).limit(1).maybeSingle()
+    insights = typeof data?.resumen === "string" ? data.resumen : ""
+  } catch { /* falla suave */ }
+
   const user = [
     `Generá 5 ideas de contenido para Vakdor (mezcla LinkedIn y blog).`,
+    insights ? `DATOS REALES DE RENDIMIENTO (Buffer) — priorizá ángulos/temas parecidos a los que MÁS rinden y evitá el patrón de los que menos; no inventes:\n${insights}` : "",
     `Balanceá el EMBUDO: asigná a cada idea una etapa "funnel": "tofu" (descubrimiento, dolor amplio, sin vender), "mofu" (nutrición, el mecanismo/método PRISMA), "bofu" (empujón a la reunión, prueba + CTA a agendar). Mezclá las 3 etapas.`,
     `NO repitas estos ángulos/títulos ya usados:\n${evitar}`,
     `Devolvé SOLO un array JSON válido, sin texto extra, con objetos:`,
