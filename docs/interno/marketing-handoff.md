@@ -41,7 +41,16 @@
 - **Fix de 2 bugs** del botón manual de blog: no mandaba la portada (web salía sin imagen) y exigía `category` que el worker no setea (daba 400). Ahora pasa portada + defaultea category.
 - **Verificado (18-jul):** worker desarrolla artículo + portada + versión LinkedIn (sin links, confirmado por query); crosspost a LinkedIn = post con la portada como imagen (Buffer draft OK). Web = vía ya probada por el cron.
 
-## ⏭️ QUÉ FALTA (próximos pasos)
+## ✅ Embudo TOFU/MOFU/BOFU + estructura copywriter + desarrollo solo-worker (main)
+- **Desarrollo solo por el worker:** mover a "En proceso" ya NO dispara el desarrollo in-app (texto sin imágenes, que volcaba las slides como texto y no generaba imagen en blog). Desarrolla el worker (estructura + imágenes de marca). Se quitó ese botón.
+- **Estructura vakdor-copywriter:** las descripciones de LinkedIn (post, carrusel, versión LinkedIn del blog) siguen la estructura de `platform_structures.md` (hook→fricción→quiebre→solución→prueba→CTA, 1500-2500 car).
+- **Embudo:** columna `funnel` (`tofu|mofu|bofu`) + badge de color en la tarjeta/visor + selector en Nueva idea + filtro en calendario + el motor balancea las 3 etapas. El worker adapta el contenido a la etapa (`funnelInstruccion`): TOFU no vende, MOFU muestra el mecanismo, BOFU empuja a la reunión. Verificado (TOFU vs BOFU dan tono/CTA distintos).
+
+## ⏭️ Próximos sub-proyectos pedidos (18-jul, definidos con Leo)
+- **Skills reales en el worker (camino elegido: leer los .md):** que el worker cargue el contenido real de vakdor-copywriter/carousel/leadmagnet (sus `.md`) y los siga por pieza, en vez de replicar la lógica inline. Sigue SDK/headless (deployable a EasyPanel).
+- **Análisis diario Buffer + vakdor-metricas:** leer 1×/día el rendimiento real de los posts (Buffer: qué contenido rinde más en engagement) + vakdor-metricas, y que las ideas y el contenido del día tomen decisiones con ese fundamento (nada inventado). Los datos existen (Buffer CLI andando).
+
+## ⏭️ QUÉ FALTA (infra)
 1. **Deploy del worker a EasyPanel** (always-on, sin depender de la PC de Leo) — **igual que el acm-extractor**: Dockerfile con base `mcr.microsoft.com/playwright`, instalar las deps (playwright/@anthropic-ai/sdk/@supabase/supabase-js/pdfkit/marked), env vars como secrets, `CMD ["node","watch.mjs"]`. El worker ya es host-agnóstico (logos data-URI, sin rutas absolutas en el render).
 2. **Primer comentario LinkedIn automático:** requiere plan pago de Buffer. Decisión de Leo (por ahora se pega a mano).
 3. **(Opcional) lead-magnet como document post** de LinkedIn: hoy va como texto+imagen (portada); se podría publicar el `magnet.pdf` como documento igual que el carrusel si conviene.

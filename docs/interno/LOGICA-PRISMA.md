@@ -1621,6 +1621,8 @@ Sección dentro del Dashboard del dueño (`/admin-vakdor/dashboard`). Objetivo: 
 
 Sala de control del contenido orgánico de Vakdor (LinkedIn, Instagram y blog). Objetivo: llevar una idea de contenido desde que se piensa hasta que se publica, sin salir de un solo lugar.
 
+**Embudo (TOFU/MOFU/BOFU):** cada idea lleva una **etapa del embudo** (etiqueta de color en la tarjeta): **TOFU** = descubrimiento (dolor amplio, sin vender), **MOFU** = nutrición (el mecanismo/método PRISMA), **BOFU** = empujón a la reunión (prueba + CTA a agendar). El contenido se **adapta a la etapa** (un TOFU no vende, un BOFU cierra). Se elige al crear la idea y el motor de ideas balancea las tres. Hay filtro por etapa en el calendario.
+
 **Cómo funciona (en criollo):** es un **tablero tipo Trello** con columnas *Idea → En proceso → En revisión → Aprobada → Publicada* (más *Rechazada* al costado). Cada tarjeta es una pieza de contenido. Leonardo (o el "motor de ideas") llena la columna Idea; al mover una tarjeta a **"En proceso"**, un **robot que corre en la compu de Vakdor (el worker)** la agarra y le hace el trabajo pesado: escribe el contenido con la voz de Vakdor y le arma las **imágenes de marca**. Cuando termina, la deja en **"En revisión"** para que Leonardo la mire. Si la aprueba y le pone fecha, se **publica sola** a la hora programada.
 
 - **Qué imágenes arma según el tipo de pieza:** un **carrusel** → varias placas 1080×1080 (portada + desarrollo + placa final con el CTA) y un PDF con todas juntas; un **lead magnet** (imán de leads) → un **PDF tipo scorecard/checklist** con la marca, para descargar; cualquier otra → una **portada única** (blog 1200×630 / redes 1080×1080). Todo con el logo de Vakdor y el color cobre.

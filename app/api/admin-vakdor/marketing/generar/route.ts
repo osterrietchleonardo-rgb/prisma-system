@@ -3,12 +3,13 @@ import { requireAdminVakdor, isNextResponse } from "@/lib/admin-vakdor/guard"
 import { resumenParaMemoria, insertarIdeasMotor } from "@/lib/admin-vakdor/marketing/store"
 import { generarTexto } from "@/lib/admin-vakdor/marketing/claude"
 import { BRAND_SYSTEM } from "@/lib/admin-vakdor/marketing/brand-prompt"
-import type { NuevaIdeaInput, FuenteIdea, FormatoIdea } from "@/lib/admin-vakdor/marketing/types"
+import type { NuevaIdeaInput, FuenteIdea, FormatoIdea, FunnelStage } from "@/lib/admin-vakdor/marketing/types"
 
 export const dynamic = "force-dynamic"
 
 const FUENTES: FuenteIdea[] = ["linkedin", "instagram", "blog"]
 const FORMATOS: FormatoIdea[] = ["post_texto","carrusel","imagen","encuesta","articulo_linkedin","reel","lead_magnet","articulo_blog"]
+const FUNNELS: FunnelStage[] = ["tofu", "mofu", "bofu"]
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdminVakdor(request)
@@ -19,9 +20,10 @@ export async function POST(request: NextRequest) {
 
   const user = [
     `Generá 5 ideas de contenido para Vakdor (mezcla LinkedIn y blog).`,
+    `Balanceá el EMBUDO: asigná a cada idea una etapa "funnel": "tofu" (descubrimiento, dolor amplio, sin vender), "mofu" (nutrición, el mecanismo/método PRISMA), "bofu" (empujón a la reunión, prueba + CTA a agendar). Mezclá las 3 etapas.`,
     `NO repitas estos ángulos/títulos ya usados:\n${evitar}`,
     `Devolvé SOLO un array JSON válido, sin texto extra, con objetos:`,
-    `{"titulo": string, "fuente": "linkedin"|"blog", "formato": "post_texto"|"carrusel"|"articulo_blog", "angulo": string, "gancho": string, "motivo": string}`,
+    `{"titulo": string, "fuente": "linkedin"|"blog", "formato": "post_texto"|"carrusel"|"articulo_blog", "funnel": "tofu"|"mofu"|"bofu", "angulo": string, "gancho": string, "motivo": string}`,
   ].join("\n\n")
 
   let raw: string
@@ -45,8 +47,10 @@ export async function POST(request: NextRequest) {
     const fuente = it.fuente as FuenteIdea
     const formato = it.formato as FormatoIdea
     if (!titulo || !FUENTES.includes(fuente) || !FORMATOS.includes(formato)) continue
+    const funnel = it.funnel as FunnelStage
     ideas.push({
       titulo, fuente, formato,
+      funnel: FUNNELS.includes(funnel) ? funnel : null,
       angulo: typeof it.angulo === "string" ? it.angulo : null,
       gancho: typeof it.gancho === "string" ? it.gancho : null,
       motivo: typeof it.motivo === "string" ? it.motivo : null,

@@ -4,7 +4,7 @@ import type {
 } from "./types"
 
 const COLS =
-  "id, estado, fuente, formato, titulo, angulo, estructura, gancho, contenido, " +
+  "id, estado, fuente, formato, funnel, titulo, angulo, estructura, gancho, contenido, " +
   "primer_comentario, hashtags, motivo, comentario, brief, blog, assets, " +
   "programada_para, publicado_en, origen, historial, created_at, updated_at"
 
@@ -27,6 +27,7 @@ export async function crearIdeaManual(input: NuevaIdeaInput): Promise<MarketingI
       titulo: input.titulo,
       fuente: input.fuente,
       formato: input.formato,
+      funnel: input.funnel ?? null,
       angulo: input.angulo ?? null,
       estructura: input.estructura ?? null,
       gancho: input.gancho ?? null,
@@ -52,6 +53,7 @@ export async function insertarIdeasMotor(ideas: NuevaIdeaInput[]): Promise<numbe
     titulo: i.titulo,
     fuente: i.fuente,
     formato: i.formato,
+    funnel: i.funnel ?? null,
     angulo: i.angulo ?? null,
     estructura: i.estructura ?? null,
     gancho: i.gancho ?? null,

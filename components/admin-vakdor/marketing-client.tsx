@@ -1,9 +1,26 @@
 "use client"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ESTADOS, type MarketingIdea, type EstadoIdea } from "@/lib/admin-vakdor/marketing/types"
+import { ESTADOS, type MarketingIdea, type EstadoIdea, type FunnelStage } from "@/lib/admin-vakdor/marketing/types"
 
 const ACCENT = "#c2783c"
+
+// Colores por etapa del embudo.
+const FUNNEL_UI: Record<FunnelStage, { label: string; bg: string; border: string; color: string }> = {
+  tofu: { label: "TOFU", bg: "rgba(56,189,248,0.14)", border: "rgba(56,189,248,0.4)", color: "#7dd3fc" },
+  mofu: { label: "MOFU", bg: "rgba(167,139,250,0.14)", border: "rgba(167,139,250,0.4)", color: "#c4b5fd" },
+  bofu: { label: "BOFU", bg: "rgba(52,211,153,0.14)", border: "rgba(52,211,153,0.4)", color: "#6ee7b7" },
+}
+function FunnelBadge({ funnel }: { funnel: FunnelStage | null }) {
+  if (!funnel) return null
+  const f = FUNNEL_UI[funnel]
+  return (
+    <span title={funnel === "tofu" ? "Descubrimiento" : funnel === "mofu" ? "Nutrición" : "Empujón a la reunión"}
+      style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.06em", padding: "2px 7px", borderRadius: 5, background: f.bg, border: `1px solid ${f.border}`, color: f.color }}>
+      {f.label}
+    </span>
+  )
+}
 
 const inputStyle: React.CSSProperties = {
   padding: "9px 12px", background: "rgba(255,255,255,0.04)",
@@ -55,7 +72,8 @@ function Card({ idea, onMover, onVer, onProgramar, onPublicar, publicando, onRef
       <div style={{ fontSize: 13, fontWeight: 600, color: "#fff", marginBottom: 8, lineHeight: 1.3 }}>
         {idea.titulo}
       </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: 8 }}>
+        <FunnelBadge funnel={idea.funnel} />
         <Chip>{idea.fuente}</Chip>
         <Chip>{idea.formato}</Chip>
         {idea.angulo ? <Chip>{idea.angulo}</Chip> : null}
@@ -310,11 +328,13 @@ function Calendario({ items, onVer }: { items: MarketingIdea[]; onVer: (i: Marke
   const [mes, setMes] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() } })
   const [fFuente, setFFuente] = useState("")
   const [fFormato, setFFormato] = useState("")
+  const [fFunnel, setFFunnel] = useState("")
   const [fAngulo, setFAngulo] = useState("")
 
   const filtradas = items.filter((i) => {
     if (fFuente && i.fuente !== fFuente) return false
     if (fFormato && i.formato !== fFormato) return false
+    if (fFunnel && i.funnel !== fFunnel) return false
     if (fAngulo && !(i.angulo ?? "").toLowerCase().includes(fAngulo.toLowerCase())) return false
     return true
   })
@@ -343,6 +363,12 @@ function Calendario({ items, onVer }: { items: MarketingIdea[]; onVer: (i: Marke
         </select>
         <select value={fFormato} onChange={(e) => setFFormato(e.target.value)} style={inputStyle}>
           {FORMATOS_FILTRO.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+        </select>
+        <select value={fFunnel} onChange={(e) => setFFunnel(e.target.value)} style={inputStyle}>
+          <option value="">Todo el embudo</option>
+          <option value="tofu">TOFU · Descubrimiento</option>
+          <option value="mofu">MOFU · Nutrición</option>
+          <option value="bofu">BOFU · Reunión</option>
         </select>
         <input value={fAngulo} onChange={(e) => setFAngulo(e.target.value)} placeholder="Ángulo contiene…" style={inputStyle} />
       </div>
@@ -604,7 +630,8 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   titulo: fd.get("titulo"), fuente: fd.get("fuente"),
-                  formato: fd.get("formato"), angulo: fd.get("angulo"), motivo: fd.get("motivo"),
+                  formato: fd.get("formato"), funnel: fd.get("funnel"),
+                  angulo: fd.get("angulo"), motivo: fd.get("motivo"),
                 }),
               })
               if (res.ok) { const { idea } = await res.json(); setItems((p) => [idea, ...p]); setNueva(false) }
@@ -627,6 +654,11 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
               <option value="lead_magnet">Lead magnet</option>
               <option value="articulo_blog">Artículo blog</option>
             </select>
+            <select name="funnel" defaultValue="tofu" style={inputStyle}>
+              <option value="tofu">TOFU · Descubrimiento (dolor amplio)</option>
+              <option value="mofu">MOFU · Nutrición (mecanismo/método)</option>
+              <option value="bofu">BOFU · Empujón a la reunión</option>
+            </select>
             <input name="angulo" placeholder="Ángulo (opcional)" style={inputStyle} />
             <input name="motivo" placeholder="Motivo / por qué (opcional)" style={inputStyle} />
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -643,7 +675,10 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
           <div onClick={(e) => e.stopPropagation()}
             style={{ background: "#0d1424", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 24, width: 560, maxWidth: "90vw", maxHeight: "80vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-              <h2 style={{ fontSize: 16, color: "#fff", margin: 0 }}>{verIdea.titulo}</h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}><FunnelBadge funnel={verIdea.funnel} /></div>
+                <h2 style={{ fontSize: 16, color: "#fff", margin: 0 }}>{verIdea.titulo}</h2>
+              </div>
               <button onClick={() => setVerIdea(null)}
                 style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>×</button>
             </div>

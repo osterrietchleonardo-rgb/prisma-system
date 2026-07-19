@@ -3,6 +3,15 @@ export type EstadoIdea =
 
 export type FuenteIdea = "linkedin" | "instagram" | "blog"
 
+/** Etapa del embudo. tofu=descubrimiento (dolor amplio), mofu=nutrición (mecanismo), bofu=empujón a la reunión. */
+export type FunnelStage = "tofu" | "mofu" | "bofu"
+
+export const FUNNEL_LABELS: Record<FunnelStage, string> = {
+  tofu: "TOFU · Descubrimiento",
+  mofu: "MOFU · Nutrición",
+  bofu: "BOFU · Reunión",
+}
+
 export type FormatoIdea =
   | "post_texto" | "carrusel" | "imagen" | "encuesta"
   | "articulo_linkedin" | "reel" | "lead_magnet" | "articulo_blog"
@@ -36,6 +45,7 @@ export interface MarketingIdea {
   estado: EstadoIdea
   fuente: FuenteIdea
   formato: FormatoIdea
+  funnel: FunnelStage | null
   titulo: string
   angulo: string | null
   estructura: string | null
@@ -60,6 +70,7 @@ export interface NuevaIdeaInput {
   titulo: string
   fuente: FuenteIdea
   formato: FormatoIdea
+  funnel?: FunnelStage | null
   angulo?: string | null
   estructura?: string | null
   gancho?: string | null
