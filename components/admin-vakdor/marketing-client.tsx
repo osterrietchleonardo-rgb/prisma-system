@@ -30,9 +30,9 @@ function Chip({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Card({ idea, onMover, desarrollando, onVer, onProgramar, onPublicar, publicando, onReformulada }: {
+function Card({ idea, onMover, onVer, onProgramar, onPublicar, publicando, onReformulada }: {
   idea: MarketingIdea; onMover: (id: string, e: EstadoIdea) => void
-  desarrollando: boolean; onVer: (idea: MarketingIdea) => void
+  onVer: (idea: MarketingIdea) => void
   onProgramar: (id: string, fechaISO: string | null) => void
   onPublicar: (id: string) => void
   publicando: boolean
@@ -94,9 +94,6 @@ function Card({ idea, onMover, desarrollando, onVer, onProgramar, onPublicar, pu
         <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontStyle: "italic", marginBottom: 8 }}>
           {idea.motivo}
         </div>
-      ) : null}
-      {desarrollando ? (
-        <div style={{ fontSize: 11, color: ACCENT, marginBottom: 8 }}>Desarrollando…</div>
       ) : null}
       {idea.contenido ? (
         <button onClick={() => onVer(idea)}
@@ -405,7 +402,6 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const [items, setItems] = useState<MarketingIdea[]>(ideas)
   const [nueva, setNueva] = useState(false)
   const [generando, setGenerando] = useState(false)
-  const [desarrollandoId, setDesarrollandoId] = useState<string | null>(null)
   const [publicandoId, setPublicandoId] = useState<string | null>(null)
   const [verIdea, setVerIdea] = useState<MarketingIdea | null>(null)
   const [comentarioModal, setComentarioModal] = useState<string | null>(null)
@@ -434,30 +430,6 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
     } catch {
       setItems((prev) => prev.map((i) => (i.id === id ? { ...i, programada_para: anterior } : i)))
       alert("No se pudo programar.")
-    }
-  }
-
-  async function desarrollar(id: string) {
-    setDesarrollandoId(id)
-    try {
-      const res = await fetch(`/api/admin-vakdor/marketing/${id}/desarrollar`, { method: "POST" })
-      if (res.ok) {
-        const d = await res.json()
-        setItems((prev) => prev.map((i) => (i.id === id ? {
-          ...i,
-          contenido: d.contenido ?? i.contenido,
-          primer_comentario: d.primer_comentario ?? i.primer_comentario,
-          hashtags: d.hashtags ?? i.hashtags,
-          blog: d.blog ?? i.blog,
-        } : i)))
-        alert("Contenido desarrollado ✓")
-      } else {
-        alert("No se pudo desarrollar el contenido.")
-      }
-    } catch {
-      alert("No se pudo desarrollar el contenido.")
-    } finally {
-      setDesarrollandoId(null)
     }
   }
 
@@ -517,10 +489,10 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
         alert("No se pudo mover la idea; volvió a su estado anterior.")
         return
       }
-      if (estado === "en_proceso" && item && !item.contenido) {
-        if (window.confirm("¿Desarrollar el contenido completo con IA ahora?")) {
-          await desarrollar(id)
-        }
+      if (estado === "en_proceso" && item && (!item.contenido || !(item.assets && item.assets.length))) {
+        // El WORKER (local/EasyPanel) desarrolla la pieza: contenido con estructura copywriter
+        // + imágenes de marca (portada / slides de carrusel / PDF). Acá no se desarrolla nada.
+        alert("En proceso ✓ — el worker va a desarrollar el contenido y las imágenes de marca, y la pasará a “En revisión”. (Asegurate de que el worker esté corriendo.)")
       }
     } catch {
       if (previo) setItems((prev) => prev.map((i) => (i.id === id ? { ...i, estado: previo! } : i)))
@@ -607,7 +579,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
                 </div>
                 {cards.map((idea) => (
                   <Card key={idea.id} idea={idea} onMover={mover}
-                    desarrollando={desarrollandoId === idea.id} onVer={setVerIdea} onProgramar={programar}
+                    onVer={setVerIdea} onProgramar={programar}
                     onPublicar={publicar} publicando={publicandoId === idea.id} onReformulada={onReformulada} />
                 ))}
                 {cards.length === 0 ? (
