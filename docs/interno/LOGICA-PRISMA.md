@@ -506,6 +506,7 @@ Evolution API actúa como intermediario entre PRISMA y WhatsApp Business.
    - Construye `enrichedPayload` con toda la información
    - Dispara POST a `N8N_WEBHOOK_URL` vía `triggerN8nWithSafetyNet` (**3 intentos**, timeout 15s c/u, backoff 500/1000ms)
    - **Red de contención (anti "lead perdido"):** si los 3 intentos fallan, el disparo se guarda en `wa_n8n_dead_letter` (`status='pending'`) en vez de perderse. Se reprocesa con `POST /api/n8n/retry-pending` (manual o cron). Ambos webhooks usan `maxDuration=60` para no ser cortados por Vercel a mitad de los reintentos.
+   - **Reproceso automático:** el cron `.github/workflows/n8n-retry-pending.yml` corre cada 15 min y reinyecta a n8n lo caído en las **últimas 3 horas** (`?maxAgeHours=3`), para que un blip de red/reinicio de n8n no deje un lead sin respuesta. Lo más viejo que eso NO se reenvía solo (contestarle a alguien un mensaje de días atrás es peor que no contestar): queda `pending` para decisión manual, o se cierra marcándolo `status='discarded'`.
    - El payload incluye:
      ```json
      {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { callN8n } from '@/lib/whatsapp/n8nTrigger'
 
+export const dynamic = 'force-dynamic'
 // Puede reprocesar varios disparos (cada uno con reintentos). Damos margen.
 export const maxDuration = 60
 
@@ -12,21 +13,32 @@ export const maxDuration = 60
  * disparo original falló (red de contención anti "lead perdido"). Pensado para
  * llamarse manualmente o desde un cron (GitHub Action).
  *
- * Seguridad: si N8N_REPLY_SECRET está configurado, se exige en header
- * `x-retry-secret` o query `?secret=`.
+ * Seguridad (acepta cualquiera de las dos):
+ *   - Estándar de cron: header `Authorization: Bearer <CRON_SECRET>` (lo usa el
+ *     GitHub Action, igual que los demás crons del proyecto).
+ *   - Manual: header `x-retry-secret` o query `?secret=` con `N8N_REPLY_SECRET`.
+ *   Falla CERRADO: si no matchea ninguno, 401.
  *
- * Query opcional: ?limit=25 (1..100)
+ * Query opcional:
+ *   ?limit=25          (1..100) — cuántos drenar por corrida.
+ *   ?maxAgeHours=3     — solo reprocesar lo caído en las últimas N horas. Evita
+ *                        que el cron le conteste a un lead un mensaje viejísimo.
+ *                        Sin este parámetro, drena TODO lo pendiente (uso manual).
  */
 export async function POST(req: Request) {
   try {
     const url = new URL(req.url)
 
-    const expectedSecret = process.env.N8N_REPLY_SECRET
-    if (expectedSecret) {
-      const provided = req.headers.get('x-retry-secret') || url.searchParams.get('secret')
-      if (provided !== expectedSecret) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
+    // Auth: cron (Bearer CRON_SECRET) O manual (N8N_REPLY_SECRET). Fail-closed.
+    const cronSecret = process.env.CRON_SECRET
+    const cronOk = !!cronSecret && req.headers.get('authorization') === `Bearer ${cronSecret}`
+
+    const manualSecret = process.env.N8N_REPLY_SECRET
+    const providedManual = req.headers.get('x-retry-secret') || url.searchParams.get('secret')
+    const manualOk = !!manualSecret && providedManual === manualSecret
+
+    if (!cronOk && !manualOk) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const supabase = createClient(
@@ -36,10 +48,21 @@ export async function POST(req: Request) {
 
     const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') || '25', 10) || 25, 1), 100)
 
-    const { data: pendings, error } = await supabase
+    // Filtro de antigüedad opcional: solo caídos recientes (para el cron).
+    const maxAgeHours = parseFloat(url.searchParams.get('maxAgeHours') || '')
+    const hasAgeFilter = Number.isFinite(maxAgeHours) && maxAgeHours > 0
+
+    let query = supabase
       .from('wa_n8n_dead_letter')
       .select('id, payload, attempts, conversation_id')
       .eq('status', 'pending')
+
+    if (hasAgeFilter) {
+      const cutoff = new Date(Date.now() - maxAgeHours * 3600_000).toISOString()
+      query = query.gte('created_at', cutoff)
+    }
+
+    const { data: pendings, error } = await query
       .order('created_at', { ascending: true })
       .limit(limit)
 
