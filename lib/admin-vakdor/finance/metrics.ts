@@ -254,27 +254,27 @@ export function nAgenciasPagando(mes: string, pagos: PagoRow[]): number {
   return set.size
 }
 
-/** Lee las 4 tablas de finanzas y arma FinanceData + fxSorted (para fxList). */
-export async function loadFinanceData(db: any): Promise<FinanceData & { fxSorted: { periodo_mes: string; usd_ars: number }[] }> {
-  const [costsRes, pagosRes, expensesRes, fxRes, wcRes] = await Promise.all([
+import { fetchDolares } from "@/lib/mercado/fetchDolares"
+
+/** Lee las tablas de finanzas y arma FinanceData con la cotización en vivo de Pulso de Mercado. */
+export async function loadFinanceData(db: any): Promise<FinanceData & { fxSorted: { periodo_mes: string; usd_ars: number }[]; fxLive: number | null }> {
+  const [costsRes, pagosRes, expensesRes, wcRes, dolaresRes] = await Promise.all([
     db.from("finance_api_costs").select("fecha, proveedor, costo_usd"),
     db.from("pagos_agencia").select("monto, moneda, periodo_mes, agencia_id"),
     db.from("finance_expenses").select("*").order("fecha_inicio", { ascending: false }),
-    db.from("finance_fx").select("periodo_mes, usd_ars"),
     db.from("finance_working_capital").select("periodo_mes, tipo, monto, moneda"),
+    fetchDolares().catch(() => null),
   ])
 
   const costs = (costsRes.data || []) as CostRow[]
   const pagos = (pagosRes.data || []) as PagoRow[]
   const expenses = (expensesRes.data || []) as FinanceExpense[]
   const workingCapital = (wcRes.data || []) as WcRow[]
-  const fxRows = (fxRes.data || []) as { periodo_mes: string; usd_ars: number }[]
 
-  const fxMap = new Map<string, number>()
-  fxRows.forEach((f) => fxMap.set(f.periodo_mes, Number(f.usd_ars)))
-  const fxSorted = [...fxRows].sort((a, b) => a.periodo_mes.localeCompare(b.periodo_mes))
-  const fxLatest = fxSorted.length ? Number(fxSorted[fxSorted.length - 1].usd_ars) : null
-  const fxDe = (mes: string): number | null => fxMap.get(mes) ?? fxLatest
+  // Cotización en vivo tomada exclusivamente de Pulso de Mercado (dolarapi.com: Dólar Blue / MEP venta)
+  const fxLive = dolaresRes?.blue?.venta ?? dolaresRes?.mep?.venta ?? dolaresRes?.oficial?.venta ?? null
+  const fxDe = (_mes: string): number | null => fxLive
+  const fxSorted: { periodo_mes: string; usd_ars: number }[] = []
 
-  return { costs, pagos, expenses, workingCapital, fxDe, fxSorted }
+  return { costs, pagos, expenses, workingCapital, fxDe, fxSorted, fxLive }
 }
