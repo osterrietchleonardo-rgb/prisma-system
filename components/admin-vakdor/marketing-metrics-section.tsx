@@ -78,7 +78,7 @@ export function MarketingMetricsSection() {
             </span>
           </div>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", margin: 0 }}>
-            Rendimiento en tiempo real de vakdor.com (GA4), frases SEO de Google Search Console y publicaciones de LinkedIn
+            Rendimiento en tiempo real de vakdor.com (GA4), tráfico, retención por página, SEO de Google Search Console y Buffer
           </p>
         </div>
 
@@ -131,7 +131,7 @@ export function MarketingMetricsSection() {
               </span>
             </div>
 
-            {/* Embudo Trapezoidal Desacoplado (Sin corte de texto) */}
+            {/* Embudo Trapezoidal Desacoplado */}
             <div style={{
               width: "100%",
               maxWidth: 760,
@@ -173,7 +173,7 @@ export function MarketingMetricsSection() {
                       border: `1px solid ${borderColors[idx % borderColors.length]}`,
                       boxShadow: idx === funnel.length - 1 ? "0 4px 20px rgba(34,197,94,0.25)" : "none",
                     }}>
-                      {/* Fondo Trapezoidal Recortado (Capa Trasera) */}
+                      {/* Fondo Trapezoidal Recortado */}
                       <div style={{
                         position: "absolute",
                         inset: 0,
@@ -244,6 +244,129 @@ export function MarketingMetricsSection() {
             </div>
           </div>
 
+          {/* Grid de Métricas Avanzadas GA4: Fuentes, Dispositivos & Páginas Top */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+            {/* 1. Fuentes de Tráfico (GA4) */}
+            <div style={{
+              background: "rgba(0,0,0,0.25)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 12,
+              padding: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#38bdf8", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  🌐 GA4 · Origen del Tráfico
+                </span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Canales</span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {(data?.trafficSources ?? []).map((ts, idx) => (
+                  <div key={idx} style={{
+                    padding: "8px 10px",
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    borderRadius: 6,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center"
+                  }}>
+                    <span style={{ fontSize: 11, color: "#fff", fontWeight: 600 }}>
+                      {ts.channel}
+                    </span>
+                    <div style={{ fontSize: 11, color: "rgba(255,255,255,0.6)" }}>
+                      <b style={{ color: "#38bdf8" }}>{ts.sessions}</b> sesiones ({ts.activeUsers} usuarios)
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Dispositivos (Desktop vs Mobile GA4) */}
+            <div style={{
+              background: "rgba(0,0,0,0.25)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 12,
+              padding: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#c084fc", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  💻 GA4 · Dispositivos
+                </span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Desktop vs Mobile</span>
+              </div>
+
+              <div style={{ display: "flex", gap: 12, padding: "8px 0" }}>
+                <div style={{ flex: 1, padding: 12, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>💻 Escritorio</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#c084fc" }}>
+                    {data?.deviceBreakdown?.desktopPct ?? 0}%
+                  </div>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                    {data?.deviceBreakdown?.desktopUsers ?? 0} usuarios
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, padding: 12, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>📱 Celulares</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#38bdf8" }}>
+                    {data?.deviceBreakdown?.mobilePct ?? 0}%
+                  </div>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                    {data?.deviceBreakdown?.mobileUsers ?? 0} usuarios
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Páginas Más Visitadas & Tiempo de Permanencia (GA4) */}
+            <div style={{
+              background: "rgba(0,0,0,0.25)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 12,
+              padding: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  ⏱️ GA4 · Páginas Top & Retención
+                </span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Tiempo Promedio</span>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto" }}>
+                {(data?.topPagesPerformance ?? []).map((tp, idx) => (
+                  <div key={idx} style={{
+                    padding: "6px 10px",
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    borderRadius: 6,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    fontSize: 10
+                  }}>
+                    <span style={{ color: "#fff", fontWeight: 600 }}>
+                      {tp.path}
+                    </span>
+                    <div style={{ display: "flex", gap: 8, color: "rgba(255,255,255,0.5)" }}>
+                      <span><b>{tp.views}</b> vistas</span>
+                      <span style={{ color: "#4ade80" }}>⏱️ <b>{tp.avgTimeSeconds}s</b>/user</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Grid Secundario: Métricas Reales de Buffer LinkedIn + SEO Google Search Console */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
             {/* Métricas Orgánicas Reales de Buffer / LinkedIn */}
@@ -265,7 +388,6 @@ export function MarketingMetricsSection() {
                 </span>
               </div>
 
-              {/* Tarjetas de Totales Reales devueltas por Buffer API */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, padding: "12px 0" }}>
                 <div style={{ padding: 12, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
                   <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Impresiones Totales</div>

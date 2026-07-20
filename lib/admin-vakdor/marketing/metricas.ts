@@ -37,6 +37,27 @@ export interface ContentDistribution {
   totalIdeas: number
 }
 
+export interface TrafficSource {
+  channel: string
+  sessions: number
+  activeUsers: number
+}
+
+export interface DeviceBreakdown {
+  desktopUsers: number
+  mobileUsers: number
+  desktopPct: number
+  mobilePct: number
+}
+
+export interface TopPagePerformance {
+  path: string
+  views: number
+  users: number
+  bounceRatePct: number
+  avgTimeSeconds: number
+}
+
 export interface MarketingMetricsPayload {
   funnel: FunnelStageData[]
   periodo: "7d" | "30d" | "90d"
@@ -51,6 +72,9 @@ export interface MarketingMetricsPayload {
     publicaciones: BufferPublishedPost[]
   }
   contentDistribution: ContentDistribution
+  trafficSources: TrafficSource[]
+  deviceBreakdown: DeviceBreakdown
+  topPagesPerformance: TopPagePerformance[]
   updatedAt: string
 }
 
@@ -76,19 +100,27 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 3
 
 /**
  * Consulta en tiempo real a Google Analytics 4 (Property 526455345).
- * Extrae y mapea 100% de datos reales del embudo de 6 etapas de vakdor.com.
  */
-export async function fetchGa4Funnel(periodo: "7d" | "30d" | "90d"): Promise<FunnelStageData[]> {
+export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
+  funnel: FunnelStageData[]
+  trafficSources: TrafficSource[]
+  deviceBreakdown: DeviceBreakdown
+  topPagesPerformance: TopPagePerformance[]
+}> {
   const days = getPeriodDays(periodo)
   const startDate = `${days}daysAgo`
 
-  let rows: Array<{ dimensionValues: Array<{ value: string }>; metricValues: Array<{ value: string }> }> = []
+  let funnelRows: any[] = []
+  let trafficRows: any[] = []
+  let deviceRows: any[] = []
+  let topPageRows: any[] = []
 
   try {
     const token = await getGoogleAccessToken("https://www.googleapis.com/auth/analytics.readonly")
-    const res = await fetchWithTimeout(
-      `https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`,
-      {
+
+    // Run parallel reports for GA4
+    const [resFunnel, resTraffic, resDevices, resPages] = await Promise.all([
+      fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -98,18 +130,53 @@ export async function fetchGa4Funnel(periodo: "7d" | "30d" | "90d"): Promise<Fun
           limit: 300,
         }),
         cache: "no-store",
-      },
-      3500
-    )
+      }, 3500),
 
-    if (res.ok) {
-      const data = await res.json()
-      rows = data.rows ?? []
-    }
+      fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dateRanges: [{ startDate, endDate: "today" }],
+          dimensions: [{ name: "sessionDefaultChannelGroup" }],
+          metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+          limit: 10,
+        }),
+        cache: "no-store",
+      }, 3500),
+
+      fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dateRanges: [{ startDate, endDate: "today" }],
+          dimensions: [{ name: "deviceCategory" }],
+          metrics: [{ name: "activeUsers" }, { name: "sessions" }],
+        }),
+        cache: "no-store",
+      }, 3500),
+
+      fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dateRanges: [{ startDate, endDate: "today" }],
+          dimensions: [{ name: "pagePath" }],
+          metrics: [{ name: "screenPageViews" }, { name: "activeUsers" }, { name: "bounceRate" }, { name: "userEngagementDuration" }],
+          limit: 8,
+        }),
+        cache: "no-store",
+      }, 3500),
+    ])
+
+    if (resFunnel.ok) funnelRows = (await resFunnel.json()).rows ?? []
+    if (resTraffic.ok) trafficRows = (await resTraffic.json()).rows ?? []
+    if (resDevices.ok) deviceRows = (await resDevices.json()).rows ?? []
+    if (resPages.ok) topPageRows = (await resPages.json()).rows ?? []
   } catch (err) {
     console.error("GA4 fetch error:", err)
   }
 
+  // 1. Funnel Processing
   let homeCount = 0
   let demoCount = 0
   let video100Count = 0
@@ -117,32 +184,26 @@ export async function fetchGa4Funnel(periodo: "7d" | "30d" | "90d"): Promise<Fun
   let formCount = 0
   let meetingCount = 0
 
-  for (const r of rows) {
+  for (const r of funnelRows) {
     const eventName = r.dimensionValues?.[0]?.value ?? ""
     const pagePath = r.dimensionValues?.[1]?.value ?? ""
     const count = Number(r.metricValues?.[0]?.value ?? 0)
 
-    // 1. Home (/)
     if (pagePath === "/" || pagePath === "/home" || pagePath === "") {
       if (eventName === "page_view" || eventName === "session_start") homeCount += count
     }
-    // 2. Demo (/demostracion)
     if (pagePath.includes("/demostracion") || pagePath.includes("/demo")) {
       if (eventName === "page_view" || eventName === "session_start") demoCount += count
     }
-    // 3. Video 100% (Únicamente evento real video_complete, sin incluir scroll)
     if (eventName === "video_complete") {
       video100Count += count
     }
-    // 4. Página /call (agendar)
     if (pagePath.includes("/call") || pagePath.includes("/contact") || pagePath.includes("/agendar")) {
       if (eventName === "page_view" || eventName === "session_start") callPageCount += count
     }
-    // 5. Formulario completado
     if (eventName === "form_submit" || eventName === "clic_agendar_demo") {
       formCount += count
     }
-    // 6. Reunión solicitada (Conversion API / generate_lead / schedule_call)
     if (eventName === "schedule_call" || eventName === "generate_lead") {
       meetingCount += count
     }
@@ -158,22 +219,57 @@ export async function fetchGa4Funnel(periodo: "7d" | "30d" | "90d"): Promise<Fun
   ]
 
   const topCount = rawStages[0].count
-
-  return rawStages.map((stage, idx) => {
+  const funnel = rawStages.map((stage, idx) => {
     const prevCount = idx === 0 ? stage.count : rawStages[idx - 1].count
     const conversionFromStartPct = topCount > 0 ? Math.min(100, Math.round((stage.count / topCount) * 1000) / 10) : 0
     const dropoffPct = idx === 0 ? 0 : (prevCount > 0 ? Math.max(0, Math.round((1 - stage.count / prevCount) * 1000) / 10) : 0)
 
-    return {
-      ...stage,
-      conversionFromStartPct,
-      dropoffPct,
-    }
+    return { ...stage, conversionFromStartPct, dropoffPct }
   })
+
+  // 2. Traffic Sources
+  const trafficSources: TrafficSource[] = trafficRows.map((r: any) => ({
+    channel: r.dimensionValues?.[0]?.value ?? "Otro",
+    sessions: Number(r.metricValues?.[0]?.value ?? 0),
+    activeUsers: Number(r.metricValues?.[1]?.value ?? 0),
+  }))
+
+  // 3. Devices
+  let desktopUsers = 0
+  let mobileUsers = 0
+  for (const r of deviceRows) {
+    const cat = (r.dimensionValues?.[0]?.value ?? "").toLowerCase()
+    const users = Number(r.metricValues?.[0]?.value ?? 0)
+    if (cat === "desktop") desktopUsers += users
+    else if (cat === "mobile" || cat === "tablet") mobileUsers += users
+  }
+  const totalDevUsers = Math.max(1, desktopUsers + mobileUsers)
+  const deviceBreakdown: DeviceBreakdown = {
+    desktopUsers,
+    mobileUsers,
+    desktopPct: Math.round((desktopUsers / totalDevUsers) * 100),
+    mobilePct: Math.round((mobileUsers / totalDevUsers) * 100),
+  }
+
+  // 4. Top Pages Performance
+  const topPagesPerformance: TopPagePerformance[] = topPageRows.map((r: any) => {
+    const path = r.dimensionValues?.[0]?.value ?? "/"
+    const views = Number(r.metricValues?.[0]?.value ?? 0)
+    const users = Number(r.metricValues?.[1]?.value ?? 0)
+    const bounceRate = Number(r.metricValues?.[2]?.value ?? 0)
+    const durationSeconds = Number(r.metricValues?.[3]?.value ?? 0)
+
+    const avgTimeSeconds = users > 0 ? Math.round(durationSeconds / users) : 0
+    const bounceRatePct = Math.round(bounceRate * 100)
+
+    return { path, views, users, bounceRatePct, avgTimeSeconds }
+  })
+
+  return { funnel, trafficSources, deviceBreakdown, topPagesPerformance }
 }
 
 /**
- * Consulta a Google Search Console (Palabras clave orgánicas reales de vakdor.com).
+ * Consulta a Google Search Console.
  */
 export async function fetchGscQueries(periodo: "7d" | "30d" | "90d"): Promise<GscQuery[]> {
   try {
@@ -217,8 +313,7 @@ export async function fetchGscQueries(periodo: "7d" | "30d" | "90d"): Promise<Gs
 }
 
 /**
- * Consulta a Buffer (GraphQL API) + Supabase (marketing_ideas) para publicaciones 100% reales.
- * SIN NINGÚN CÁLCULO FABRICADO POR POST.
+ * Consulta a Buffer (GraphQL API)
  */
 export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise<{
   totalPosts: number
@@ -289,38 +384,19 @@ export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise
     console.error("Buffer fetch error:", err)
   }
 
-  // Leer únicamente las publicaciones reales guardadas en Supabase
-  const db = getAdminDb()
-  const { data: dbIdeas } = await db
-    .from("marketing_ideas")
-    .select("id, titulo, formato, angulo, publicado_en, created_at, estado")
-    .order("created_at", { ascending: false })
-    .limit(10)
-
-  const publicadas = (dbIdeas ?? []).filter((i: any) => i.estado === "publicada" || i.publicado_en)
-  const listaBase = publicadas.length > 0 ? publicadas : (dbIdeas ?? []).slice(0, 5)
-
-  const publicaciones: BufferPublishedPost[] = listaBase.map((i: any) => ({
-    id: i.id,
-    text: i.titulo,
-    createdAt: i.created_at,
-    formato: i.formato ?? "post_texto",
-    angulo: typeof i.angulo === "string" ? i.angulo : "general",
-  }))
-
   return {
-    totalPosts: postCount || publicaciones.length,
+    totalPosts: postCount,
     totalImpressions,
     reach,
     totalReactions,
     totalComments,
     avgEngagementRate,
-    publicaciones,
+    publicaciones: [],
   }
 }
 
 /**
- * Consulta real a Supabase `marketing_ideas`
+ * Consulta a Supabase `marketing_ideas`
  */
 export async function fetchMarketingContentStats(): Promise<ContentDistribution> {
   try {
@@ -360,19 +436,22 @@ export async function fetchMarketingContentStats(): Promise<ContentDistribution>
  * Orquestador de payload
  */
 export async function loadMarketingMetricsPayload(periodo: "7d" | "30d" | "90d"): Promise<MarketingMetricsPayload> {
-  const [funnel, gscQueries, bufferStats, contentDistribution] = await Promise.all([
-    fetchGa4Funnel(periodo),
+  const [ga4, gscQueries, bufferStats, contentDistribution] = await Promise.all([
+    fetchGa4Metrics(periodo),
     fetchGscQueries(periodo),
     fetchBufferRanking(periodo),
     fetchMarketingContentStats(),
   ])
 
   return {
-    funnel,
+    funnel: ga4.funnel,
     periodo,
     gscQueries,
     bufferStats,
     contentDistribution,
+    trafficSources: ga4.trafficSources,
+    deviceBreakdown: ga4.deviceBreakdown,
+    topPagesPerformance: ga4.topPagesPerformance,
     updatedAt: new Date().toISOString(),
   }
 }
