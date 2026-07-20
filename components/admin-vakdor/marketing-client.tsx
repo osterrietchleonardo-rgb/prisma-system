@@ -164,7 +164,7 @@ function SeccionProgramacion({
 
 function Card({ idea, onMover, onVer, onProgramar, onPublicar, publicando, onReformulada }: {
   idea: MarketingIdea; onMover: (id: string, e: EstadoIdea) => void
-  onVer: (idea: MarketingIdea) => void
+  onVer: (idea: MarketingIdea, tab?: any) => void
   onProgramar: (id: string, fechaISO: string | null) => void
   onPublicar: (id: string) => void
   publicando: boolean
@@ -228,16 +228,24 @@ function Card({ idea, onMover, onVer, onProgramar, onPublicar, publicando, onRef
           {idea.motivo}
         </div>
       ) : null}
-      {idea.contenido ? (
-        <button onClick={() => onVer(idea)}
+      <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+        <button onClick={() => onVer(idea, "post")}
           style={{
-            fontSize: 11, padding: "4px 8px", borderRadius: 6, width: "100%", marginBottom: 8,
+            flex: 1, fontSize: 11, padding: "5px 8px", borderRadius: 6,
             background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
             color: "rgba(255,255,255,0.75)", cursor: "pointer",
           }}>
-          📄 Ver contenido
+          👁️ Ver idea
         </button>
-      ) : null}
+        <button onClick={() => onVer(idea, "config")}
+          style={{
+            fontSize: 11, padding: "5px 8px", borderRadius: 6,
+            background: "rgba(56,189,248,0.12)", border: "1px solid rgba(56,189,248,0.3)",
+            color: "#7dd3fc", cursor: "pointer", fontWeight: 600,
+          }}>
+          ⚙️ Config
+        </button>
+      </div>
       {idea.estado === "en_revision" ? <Reformular idea={idea} onResult={(patch) => onReformulada(idea.id, patch)} /> : null}
       {idea.estado === "aprobada" || idea.programada_para ? (
         <SeccionProgramacion key={`prog-${idea.id}-${idea.programada_para ?? ""}`} idea={idea} onProgramar={onProgramar} />
@@ -540,7 +548,7 @@ function Calendario({ items, onVer }: { items: MarketingIdea[]; onVer: (i: Marke
   )
 }
 
-function ModalVisor({ idea, onClose }: { idea: MarketingIdea; onClose: () => void }) {
+function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post" }: { idea: MarketingIdea; onClose: () => void; onIdeaUpdated?: (updated: MarketingIdea) => void; initialTab?: any }) {
   const assets = idea.assets ?? []
   const tieneVisuales = assets.length > 0 || Boolean((idea.blog as Record<string, unknown>)?.featured_image_url)
   const blogObj = (idea.blog ?? {}) as Record<string, unknown>
@@ -550,7 +558,51 @@ function ModalVisor({ idea, onClose }: { idea: MarketingIdea; onClose: () => voi
   const tieneLinkedIn = idea.fuente === "blog" && Boolean(lnPost)
   const tieneComentarios = Boolean(primerComentario) || (idea.hashtags && idea.hashtags.length > 0)
 
-  const [tab, setTab] = useState<"post" | "preview" | "linkedin" | "comentario" | "todo">("post")
+  const [tab, setTab] = useState<any>(initialTab)
+
+  const [editTitulo, setEditTitulo] = useState(idea.titulo)
+  const [editFuente, setEditFuente] = useState(idea.fuente)
+  const [editFormato, setEditFormato] = useState<string>(idea.formato)
+  const [editFunnel, setEditFunnel] = useState(idea.funnel ?? "tofu")
+  const [editAngulo, setEditAngulo] = useState(idea.angulo ?? "")
+  const [guardandoConfig, setGuardandoConfig] = useState(false)
+
+  async function handleGuardarConfig(regenerar = false) {
+    setGuardandoConfig(true)
+    try {
+      const res = await fetch(`/api/admin-vakdor/marketing/${idea.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          titulo: editTitulo,
+          fuente: editFuente,
+          formato: editFormato,
+          funnel: editFunnel,
+          angulo: editAngulo,
+          regenerar,
+        }),
+      })
+
+      if (res.ok) {
+        const d = await res.json()
+        if (onIdeaUpdated && d.idea) {
+          onIdeaUpdated(d.idea)
+        }
+        alert(
+          regenerar
+            ? "Configuración guardada ✓ — La idea volvió a 'En proceso' para regenerar contenido y visuales con el nuevo formato."
+            : "Configuración actualizada con éxito ✓"
+        )
+        onClose()
+      } else {
+        alert("Error al actualizar la configuración de la idea.")
+      }
+    } catch {
+      alert("Error de conexión al actualizar la idea.")
+    } finally {
+      setGuardandoConfig(false)
+    }
+  }
 
   function copiarTexto(texto: string, msj = "Texto copiado ✓") {
     navigator.clipboard.writeText(texto)
@@ -596,8 +648,8 @@ function ModalVisor({ idea, onClose }: { idea: MarketingIdea; onClose: () => voi
             onClick={() => setTab("post")}
             style={{
               flex: 1,
-              minWidth: 100,
-              padding: "8px 16px",
+              minWidth: 90,
+              padding: "8px 14px",
               borderRadius: 8,
               border: "none",
               fontSize: 12,
@@ -617,8 +669,8 @@ function ModalVisor({ idea, onClose }: { idea: MarketingIdea; onClose: () => voi
               onClick={() => setTab("preview")}
               style={{
                 flex: 1,
-                minWidth: 100,
-                padding: "8px 16px",
+                minWidth: 90,
+                padding: "8px 14px",
                 borderRadius: 8,
                 border: "none",
                 fontSize: 12,
@@ -639,8 +691,8 @@ function ModalVisor({ idea, onClose }: { idea: MarketingIdea; onClose: () => voi
               onClick={() => setTab("linkedin")}
               style={{
                 flex: 1,
-                minWidth: 100,
-                padding: "8px 16px",
+                minWidth: 90,
+                padding: "8px 14px",
                 borderRadius: 8,
                 border: "none",
                 fontSize: 12,
@@ -661,8 +713,8 @@ function ModalVisor({ idea, onClose }: { idea: MarketingIdea; onClose: () => voi
               onClick={() => setTab("comentario")}
               style={{
                 flex: 1,
-                minWidth: 110,
-                padding: "8px 16px",
+                minWidth: 100,
+                padding: "8px 14px",
                 borderRadius: 8,
                 border: "none",
                 fontSize: 12,
@@ -679,11 +731,31 @@ function ModalVisor({ idea, onClose }: { idea: MarketingIdea; onClose: () => voi
           ) : null}
 
           <button
+            onClick={() => setTab("config")}
+            style={{
+              flex: 1,
+              minWidth: 110,
+              padding: "8px 14px",
+              borderRadius: 8,
+              border: "none",
+              fontSize: 12,
+              fontWeight: tab === "config" ? 700 : 500,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              background: tab === "config" ? "#38bdf8" : "transparent",
+              color: tab === "config" ? "#fff" : "#7dd3fc",
+              boxShadow: tab === "config" ? "0 2px 8px rgba(56,189,248,0.35)" : "none",
+            }}
+          >
+            ⚙️ Configuración
+          </button>
+
+          <button
             onClick={() => setTab("todo")}
             style={{
               flex: 1,
-              minWidth: 90,
-              padding: "8px 16px",
+              minWidth: 80,
+              padding: "8px 14px",
               borderRadius: 8,
               border: "none",
               fontSize: 12,
@@ -756,23 +828,23 @@ function ModalVisor({ idea, onClose }: { idea: MarketingIdea; onClose: () => voi
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      Primer Comentario (Engagement)
+                      Primer Comentario de LinkedIn
                     </span>
                     <button
-                      onClick={() => copiarTexto(primerComentario, "Primer comentario copiado ✓")}
-                      style={{ padding: "5px 12px", background: "rgba(194,120,60,0.2)", border: "1px solid rgba(194,120,60,0.4)", borderRadius: 6, color: "#e29e6d", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      onClick={() => copiarTexto(primerComentario, "Comentario copiado ✓")}
+                      style={{ padding: "6px 14px", background: "rgba(194,120,60,0.2)", border: "1px solid rgba(194,120,60,0.4)", borderRadius: 6, color: "#e29e6d", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
                       📋 Copiar Comentario
                     </button>
                   </div>
-                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.5, whiteSpace: "pre-wrap", padding: 12, background: "rgba(0,0,0,0.25)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", whiteSpace: "pre-wrap", padding: 14, background: "rgba(0,0,0,0.3)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)" }}>
                     {primerComentario}
                   </div>
                 </div>
               ) : null}
 
               {idea.hashtags && idea.hashtags.length > 0 ? (
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 6, textTransform: "uppercase" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase" }}>
                     Hashtags Recomendados
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -780,6 +852,79 @@ function ModalVisor({ idea, onClose }: { idea: MarketingIdea; onClose: () => voi
                   </div>
                 </div>
               ) : null}
+            </div>
+          )}
+
+          {tab === "config" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 18, background: "rgba(0,0,0,0.25)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#38bdf8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
+                  ⚙️ Editar Configuración de la Idea
+                </div>
+                <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", margin: 0 }}>
+                  Modificá el canal, formato, etapa del embudo, ángulo o título de esta propuesta generada por la IA.
+                </p>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", display: "block", marginBottom: 4, fontWeight: 600 }}>📌 Título de la idea</label>
+                  <input value={editTitulo} onChange={(e) => setEditTitulo(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", display: "block", marginBottom: 4, fontWeight: 600 }}>🌐 Canal (Fuente)</label>
+                  <select value={editFuente} onChange={(e) => setEditFuente(e.target.value as any)} style={{ ...inputStyle, width: "100%" }}>
+                    <option value="linkedin">LinkedIn</option>
+                    <option value="instagram">Instagram</option>
+                    <option value="blog">Blog</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", display: "block", marginBottom: 4, fontWeight: 600 }}>🎨 Formato de la pieza</label>
+                  <select value={editFormato} onChange={(e) => setEditFormato(e.target.value)} style={{ ...inputStyle, width: "100%" }}>
+                    <option value="post_texto">Post de texto</option>
+                    <option value="carrusel">Carrusel</option>
+                    <option value="imagen">Imagen</option>
+                    <option value="encuesta">Encuesta</option>
+                    <option value="articulo_linkedin">Artículo LinkedIn</option>
+                    <option value="reel">Reel</option>
+                    <option value="lead_magnet">Lead magnet</option>
+                    <option value="articulo_blog">Artículo blog</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", display: "block", marginBottom: 4, fontWeight: 600 }}>🎯 Etapa del Embudo</label>
+                  <select value={editFunnel} onChange={(e) => setEditFunnel(e.target.value as any)} style={{ ...inputStyle, width: "100%" }}>
+                    <option value="tofu">TOFU · Descubrimiento (dolor amplio)</option>
+                    <option value="mofu">MOFU · Nutrición (mecanismo/método)</option>
+                    <option value="bofu">BOFU · Empujón a la reunión</option>
+                  </select>
+                </div>
+
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", display: "block", marginBottom: 4, fontWeight: 600 }}>💡 Ángulo de contenido (opcional)</label>
+                  <input value={editAngulo} onChange={(e) => setEditAngulo(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8, flexWrap: "wrap" }}>
+                <button
+                  disabled={guardandoConfig}
+                  onClick={() => handleGuardarConfig(false)}
+                  style={{ padding: "8px 16px", background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  {guardandoConfig ? "Guardando…" : "💾 Guardar Solo Configuración"}
+                </button>
+
+                <button
+                  disabled={guardandoConfig}
+                  onClick={() => handleGuardarConfig(true)}
+                  style={{ padding: "8px 16px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  {guardandoConfig ? "Guardando…" : "🔄 Guardar y Regenerar con Nuevo Formato"}
+                </button>
+              </div>
             </div>
           )}
 
@@ -850,15 +995,19 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const [nueva, setNueva] = useState(false)
   const [generando, setGenerando] = useState(false)
   const [publicandoId, setPublicandoId] = useState<string | null>(null)
-  const [verIdea, setVerIdea] = useState<MarketingIdea | null>(null)
+  const [verIdea, setVerIdea] = useState<{ idea: MarketingIdea; tab?: any } | null>(null)
   const [comentarioModal, setComentarioModal] = useState<string | null>(null)
   const [vista, setVista] = useState<"tablero" | "calendario">("tablero")
 
   const porEstado = (e: EstadoIdea) => items.filter((i) => i.estado === e)
 
+  function handleVerIdea(idea: MarketingIdea, tab?: any) {
+    setVerIdea({ idea, tab })
+  }
+
   function onReformulada(id: string, patch: Partial<MarketingIdea>) {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
-    setVerIdea((v) => (v && v.id === id ? { ...v, ...patch } : v))
+    setVerIdea((v) => (v && v.idea.id === id ? { ...v, idea: { ...v.idea, ...patch } } : v))
   }
 
   async function programar(id: string, fechaISO: string | null) {
@@ -1061,7 +1210,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
                     </div>
                     {cards.map((idea) => (
                       <Card key={idea.id} idea={idea} onMover={mover}
-                        onVer={setVerIdea} onProgramar={programar}
+                        onVer={handleVerIdea} onProgramar={programar}
                         onPublicar={publicar} publicando={publicandoId === idea.id} onReformulada={onReformulada} />
                     ))}
                     {cards.length === 0 ? (
@@ -1072,7 +1221,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
               })}
             </div>
           ) : (
-            <Calendario items={items} onVer={setVerIdea} />
+            <Calendario items={items} onVer={handleVerIdea} />
           )}
         </>
       )}
@@ -1133,7 +1282,12 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
       ) : null}
 
       {verIdea ? (
-        <ModalVisor idea={verIdea} onClose={() => setVerIdea(null)} />
+        <ModalVisor
+          idea={verIdea.idea}
+          initialTab={verIdea.tab ?? "post"}
+          onClose={() => setVerIdea(null)}
+          onIdeaUpdated={(updated) => setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)))}
+        />
       ) : null}
 
       {comentarioModal ? (
