@@ -52,7 +52,7 @@ export function MarketingMetricsSection() {
     <div style={{
       marginTop: 40,
       padding: 24,
-      background: "rgba(11, 18, 32, 0.75)",
+      background: "rgba(11, 18, 32, 0.85)",
       backdropFilter: "blur(12px)",
       border: "1px solid rgba(255, 255, 255, 0.08)",
       borderRadius: 16,
@@ -113,7 +113,7 @@ export function MarketingMetricsSection() {
         </div>
       ) : (
         <>
-          {/* Gráfico de Embudo Invertido Real (Forma de Triángulo / Embudo Geométrico) */}
+          {/* Gráfico de Embudo Invertido Real (Sin recorte de texto) */}
           <div style={{
             background: "rgba(0,0,0,0.25)",
             border: "1px solid rgba(255,255,255,0.06)",
@@ -125,35 +125,34 @@ export function MarketingMetricsSection() {
           }}>
             <div style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                📐 Embudo Invertido Geométrico (6 Etapas Reales de vakdor.com)
+                📐 Embudo Invertido de Conversión (6 Etapas Reales de vakdor.com)
               </span>
               <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
                 Tasa Global de Conversión: <b style={{ color: "#4ade80" }}>{funnel.length > 0 ? funnel[funnel.length - 1].conversionFromStartPct : 0}%</b>
               </span>
             </div>
 
-            {/* Embudo Triangulado / Trapezoidal Stacked */}
+            {/* Embudo Trapezoidal con Capas Desacopladas (Garantiza NULA superposición/corte de texto) */}
             <div style={{
               width: "100%",
-              maxWidth: 720,
+              maxWidth: 760,
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 4
+              gap: 8
             }}>
               {funnel.map((stage, idx) => {
                 const totalStages = funnel.length
-                // Ancho superior e inferior para lograr el estrechamiento trapezoidal continuo en forma de embudo/triángulo
-                const topWidth = 100 - (idx * (76 / totalStages))
-                const bottomWidth = 100 - ((idx + 1) * (76 / totalStages))
+                const topWidth = 100 - (idx * (65 / totalStages))
+                const bottomWidth = 100 - ((idx + 1) * (65 / totalStages))
 
                 const colors = [
-                  "linear-gradient(180deg, rgba(56,189,248,0.22), rgba(56,189,248,0.12))",
-                  "linear-gradient(180deg, rgba(99,102,241,0.22), rgba(99,102,241,0.12))",
-                  "linear-gradient(180deg, rgba(168,85,247,0.22), rgba(168,85,247,0.12))",
-                  "linear-gradient(180deg, rgba(236,72,153,0.22), rgba(236,72,153,0.12))",
-                  "linear-gradient(180deg, rgba(245,158,11,0.22), rgba(245,158,11,0.12))",
-                  "linear-gradient(180deg, rgba(34,197,94,0.32), rgba(34,197,94,0.18))",
+                  "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(56,189,248,0.05))",
+                  "linear-gradient(135deg, rgba(99,102,241,0.2), rgba(99,102,241,0.05))",
+                  "linear-gradient(135deg, rgba(168,85,247,0.2), rgba(168,85,247,0.05))",
+                  "linear-gradient(135deg, rgba(236,72,153,0.2), rgba(236,72,153,0.05))",
+                  "linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.05))",
+                  "linear-gradient(135deg, rgba(34,197,94,0.28), rgba(34,197,94,0.12))",
                 ]
                 const borderColors = [
                   "rgba(56,189,248,0.4)",
@@ -166,64 +165,78 @@ export function MarketingMetricsSection() {
 
                 return (
                   <div key={stage.key} style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
-                    {/* Bloque Trapezoidal */}
                     <div style={{
                       width: `${topWidth}%`,
-                      clipPath: `polygon(0% 0%, 100% 0%, ${100 - ((topWidth - bottomWidth) / (2 * topWidth)) * 100}% 100%, ${((topWidth - bottomWidth) / (2 * topWidth)) * 100}% 100%)`,
-                      background: colors[idx % colors.length],
-                      borderTop: `1px solid ${borderColors[idx % borderColors.length]}`,
-                      padding: "12px 20px",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      minHeight: 46,
-                      boxShadow: idx === funnel.length - 1 ? "0 4px 20px rgba(34,197,94,0.3)" : "none",
-                      transition: "all 0.3s ease",
+                      position: "relative",
+                      minHeight: 52,
+                      borderRadius: 8,
+                      overflow: "hidden",
+                      border: `1px solid ${borderColors[idx % borderColors.length]}`,
+                      boxShadow: idx === funnel.length - 1 ? "0 4px 20px rgba(34,197,94,0.25)" : "none",
                     }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{
-                          width: 22, height: 22, borderRadius: "50%",
-                          background: "rgba(255,255,255,0.15)", color: "#fff",
-                          fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center"
-                        }}>
-                          {idx + 1}
-                        </span>
-                        <div>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1.1 }}>
-                            {stage.label}
-                          </div>
-                          <div style={{ fontSize: 9, color: "rgba(255,255,255,0.5)" }}>
-                            {stage.sublabel}
-                          </div>
-                        </div>
-                      </div>
+                      {/* Fondo Trapezoidal Recortado (Capa Trasera) */}
+                      <div style={{
+                        position: "absolute",
+                        inset: 0,
+                        clipPath: `polygon(0% 0%, 100% 0%, ${100 - ((topWidth - bottomWidth) / (2 * topWidth)) * 100}% 100%, ${((topWidth - bottomWidth) / (2 * topWidth)) * 100}% 100%)`,
+                        background: colors[idx % colors.length],
+                        zIndex: 1,
+                      }} />
 
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: "#fff" }}>
-                          {stage.count.toLocaleString()}
+                      {/* Contenido de Texto Desacoplado (Capa Frontal - Imposible que se corte) */}
+                      <div style={{
+                        position: "relative",
+                        zIndex: 2,
+                        padding: "12px 24px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        height: "100%",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          <span style={{
+                            width: 24, height: 24, borderRadius: "50%",
+                            background: "rgba(255,255,255,0.15)", color: "#fff",
+                            fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center"
+                          }}>
+                            {idx + 1}
+                          </span>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1.2 }}>
+                              {stage.label}
+                            </div>
+                            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
+                              {stage.sublabel}
+                            </div>
+                          </div>
                         </div>
-                        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.6)" }}>
-                          {stage.conversionFromStartPct}% conv.
+
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: "#fff" }}>
+                            {stage.count.toLocaleString()}
+                          </div>
+                          <div style={{ fontSize: 10, color: "rgba(255,255,255,0.65)" }}>
+                            {stage.conversionFromStartPct}% del total
+                          </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* Badge de Fuga / Abandono flotante entre escalones */}
+                    {/* Badge de Abandono entre etapas */}
                     {idx < funnel.length - 1 && (
                       <div style={{
-                        marginTop: -2,
-                        marginBottom: -2,
+                        marginTop: 2,
+                        marginBottom: 2,
                         zIndex: 10,
                         fontSize: 9,
                         color: "#fca5a5",
                         background: "rgba(239,68,68,0.2)",
-                        border: "1px solid rgba(239,68,68,0.4)",
-                        padding: "1px 8px",
+                        border: "1px solid rgba(239,68,68,0.35)",
+                        padding: "2px 10px",
                         borderRadius: 999,
                         fontWeight: 700,
-                        backdropFilter: "blur(4px)",
                       }}>
-                        ↓ Drop-off: {funnel[idx + 1].dropoffPct}%
+                        ↓ Abandono: {funnel[idx + 1].dropoffPct}%
                       </div>
                     )}
                   </div>
@@ -232,9 +245,9 @@ export function MarketingMetricsSection() {
             </div>
           </div>
 
-          {/* Grid Secundario: Ranking de Buffer + SEO Google Search Console */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
-            {/* Ranking de Buffer / LinkedIn */}
+          {/* Grid Secundario: Métricas Reales de Buffer LinkedIn + SEO Google Search Console */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
+            {/* Métricas Orgánicas Reales de Buffer / LinkedIn */}
             <div style={{
               background: "rgba(0,0,0,0.25)",
               border: "1px solid rgba(255,255,255,0.06)",
@@ -246,14 +259,41 @@ export function MarketingMetricsSection() {
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  💼 Buffer · Ranking de Posts (LinkedIn)
+                  💼 Buffer · Métricas Reales de LinkedIn
                 </span>
                 <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>
-                  Engagement promedio: <b style={{ color: "#a5b4fc" }}>{data?.bufferStats?.avgEngagementRate ?? 0}%</b>
+                  LinkedIn Personal
                 </span>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 300, overflowY: "auto" }}>
+              {/* Tarjetas de Totales Reales devueltas por Buffer API */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                <div style={{ padding: 8, background: "rgba(255,255,255,0.03)", borderRadius: 6, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Impresiones</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
+                    {(data?.bufferStats?.totalImpressions ?? 0).toLocaleString()}
+                  </div>
+                </div>
+                <div style={{ padding: 8, background: "rgba(255,255,255,0.03)", borderRadius: 6, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Engagement</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80" }}>
+                    {data?.bufferStats?.avgEngagementRate ?? 0}%
+                  </div>
+                </div>
+                <div style={{ padding: 8, background: "rgba(255,255,255,0.03)", borderRadius: 6, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Posts Totales</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#a5b4fc" }}>
+                    {data?.bufferStats?.totalPosts ?? 0}
+                  </div>
+                </div>
+              </div>
+
+              {/* Publicaciones Reales Registradas en la Base de Datos */}
+              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginTop: 4 }}>
+                Publicaciones Reales Publicadas
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto" }}>
                 {(data?.bufferStats?.ranking ?? []).length > 0 ? (
                   (data?.bufferStats?.ranking ?? []).map((post, rIdx) => (
                     <div key={post.id || rIdx} style={{
@@ -270,15 +310,12 @@ export function MarketingMetricsSection() {
                           #{rIdx + 1} {post.text}
                         </span>
                         <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: "rgba(99,102,241,0.2)", color: "#a5b4fc", fontWeight: 700 }}>
-                          {post.formato ?? "carrusel"}
+                          {post.formato ?? "post_texto"}
                         </span>
                       </div>
 
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "rgba(255,255,255,0.5)" }}>
-                        <span>👁️ {post.impressions} imp</span>
-                        <span>👍 {post.reactions} react</span>
-                        <span>💬 {post.comments} com</span>
-                        <span style={{ color: "#4ade80", fontWeight: 700 }}>⚡ {post.engagementRate}% eng</span>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontStyle: "italic" }}>
+                        Ángulo: {post.angulo}
                       </div>
                     </div>
                   ))
@@ -304,7 +341,7 @@ export function MarketingMetricsSection() {
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#7dd3fc", textTransform: "uppercase", letterSpacing: "0.04em" }}>
                   🔍 Google Search Console · Frases Clave
                 </span>
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Top búsquedas orgánicas</span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Búsquedas orgánicas reales</span>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto" }}>
