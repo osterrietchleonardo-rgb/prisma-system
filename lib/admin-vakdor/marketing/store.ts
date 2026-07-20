@@ -213,3 +213,32 @@ export async function firmarAsset(path: string): Promise<string | null> {
   if (error) return null
   return data?.signedUrl ?? null
 }
+
+/** Duplica una idea existente creando una nueva copia limpia en estado "idea". */
+export async function duplicarIdea(id: string): Promise<MarketingIdea> {
+  const db = getAdminDb()
+  const original = await leerIdea(id)
+  const { data, error } = await db
+    .from("marketing_ideas")
+    .insert({
+      titulo: original.titulo,
+      fuente: original.fuente,
+      formato: original.formato,
+      funnel: original.funnel ?? null,
+      angulo: original.angulo ?? null,
+      estructura: original.estructura ?? null,
+      gancho: original.gancho ?? null,
+      contenido: null,
+      primer_comentario: null,
+      hashtags: original.hashtags ?? [],
+      motivo: original.motivo ?? null,
+      brief: original.brief ?? {},
+      origen: original.origen ?? "manual",
+      estado: "idea",
+      historial: [{ fecha: new Date().toISOString(), tipo: "duplicada", detalle: `Duplicada desde ${original.id}` }],
+    })
+    .select(COLS)
+    .single()
+  if (error) throw new Error(`duplicarIdea: ${error.message}`)
+  return data as unknown as MarketingIdea
+}

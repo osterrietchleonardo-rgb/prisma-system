@@ -28,7 +28,27 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   const db = getAdminDb()
+
+  // Verificar que la idea esté en la etapa 'idea' para permitir cambio de configuración
+  const { data: actual, error: fetchError } = await db
+    .from("marketing_ideas")
+    .select("estado")
+    .eq("id", params.id)
+    .single()
+
+  if (fetchError || !actual) {
+    return NextResponse.json({ error: "Idea no encontrada" }, { status: 404 })
+  }
+
+  if (actual.estado !== "idea") {
+    return NextResponse.json(
+      { error: "La configuración solo se puede modificar cuando la idea está en la etapa 'Idea'." },
+      { status: 400 }
+    )
+  }
+
   const { data: idea, error } = await db
+
     .from("marketing_ideas")
     .update(updatePatch)
     .eq("id", params.id)

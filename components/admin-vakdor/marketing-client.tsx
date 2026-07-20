@@ -26,8 +26,14 @@ function FunnelBadge({ funnel }: { funnel: FunnelStage | null }) {
 const inputStyle: React.CSSProperties = {
   padding: "9px 12px", background: "rgba(255,255,255,0.04)",
   border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8,
-  color: "#fff", fontSize: 13, outline: "none",
+  color: "#fff", fontSize: 13, outline: "none", colorScheme: "dark",
 }
+
+const optionStyle: React.CSSProperties = {
+  background: "#0d1424",
+  color: "#ffffff",
+}
+
 
 /** ISO → valor de <input type="datetime-local"> en hora local ("YYYY-MM-DDTHH:mm"). */
 function isoToLocalInput(iso: string | null): string {
@@ -162,13 +168,15 @@ function SeccionProgramacion({
   )
 }
 
-function Card({ idea, onMover, onVer, onProgramar, onPublicar, publicando, onReformulada }: {
+function Card({ idea, onMover, onVer, onProgramar, onPublicar, publicando, onReformulada, onDuplicar, duplicandoId }: {
   idea: MarketingIdea; onMover: (id: string, e: EstadoIdea) => void
   onVer: (idea: MarketingIdea, tab?: any) => void
   onProgramar: (id: string, fechaISO: string | null) => void
   onPublicar: (id: string) => void
   publicando: boolean
   onReformulada: (id: string, patch: Partial<MarketingIdea>) => void
+  onDuplicar: (id: string) => void
+  duplicandoId: string | null
 }) {
   const orden = ESTADOS.map((e) => e.key)
   const i = orden.indexOf(idea.estado)
@@ -237,15 +245,32 @@ function Card({ idea, onMover, onVer, onProgramar, onPublicar, publicando, onRef
           }}>
           👁️ Ver idea
         </button>
-        <button onClick={() => onVer(idea, "config")}
-          style={{
-            fontSize: 11, padding: "5px 8px", borderRadius: 6,
-            background: "rgba(56,189,248,0.12)", border: "1px solid rgba(56,189,248,0.3)",
-            color: "#7dd3fc", cursor: "pointer", fontWeight: 600,
-          }}>
-          ⚙️ Config
-        </button>
+        {idea.estado === "idea" ? (
+          <>
+            <button onClick={() => onVer(idea, "config")}
+              style={{
+                fontSize: 11, padding: "5px 8px", borderRadius: 6,
+                background: "rgba(56,189,248,0.12)", border: "1px solid rgba(56,189,248,0.3)",
+                color: "#7dd3fc", cursor: "pointer", fontWeight: 600,
+              }}>
+              ⚙️ Config
+            </button>
+            <button
+              disabled={duplicandoId === idea.id}
+              onClick={() => onDuplicar(idea.id)}
+              title="Duplicar idea para usar en otro formato"
+              style={{
+                fontSize: 11, padding: "5px 8px", borderRadius: 6,
+                background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)",
+                color: "#c4b5fd", cursor: duplicandoId === idea.id ? "default" : "pointer", fontWeight: 600,
+              }}>
+              {duplicandoId === idea.id ? "…" : "📋 Duplicar"}
+            </button>
+          </>
+        ) : null}
       </div>
+
+
       {idea.estado === "en_revision" ? <Reformular idea={idea} onResult={(patch) => onReformulada(idea.id, patch)} /> : null}
       {idea.estado === "aprobada" || idea.programada_para ? (
         <SeccionProgramacion key={`prog-${idea.id}-${idea.programada_para ?? ""}`} idea={idea} onProgramar={onProgramar} />
@@ -484,19 +509,20 @@ function Calendario({ items, onVer }: { items: MarketingIdea[]; onVer: (i: Marke
     <div>
       <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
         <select value={fFuente} onChange={(e) => setFFuente(e.target.value)} style={inputStyle}>
-          {FUENTES_FILTRO.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+          {FUENTES_FILTRO.map((f) => <option key={f.key} value={f.key} style={optionStyle}>{f.label}</option>)}
         </select>
         <select value={fFormato} onChange={(e) => setFFormato(e.target.value)} style={inputStyle}>
-          {FORMATOS_FILTRO.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+          {FORMATOS_FILTRO.map((f) => <option key={f.key} value={f.key} style={optionStyle}>{f.label}</option>)}
         </select>
         <select value={fFunnel} onChange={(e) => setFFunnel(e.target.value)} style={inputStyle}>
-          <option value="">Todo el embudo</option>
-          <option value="tofu">TOFU · Descubrimiento</option>
-          <option value="mofu">MOFU · Nutrición</option>
-          <option value="bofu">BOFU · Reunión</option>
+          <option value="" style={optionStyle}>Todo el embudo</option>
+          <option value="tofu" style={optionStyle}>TOFU · Descubrimiento</option>
+          <option value="mofu" style={optionStyle}>MOFU · Nutrición</option>
+          <option value="bofu" style={optionStyle}>BOFU · Reunión</option>
         </select>
         <input value={fAngulo} onChange={(e) => setFAngulo(e.target.value)} placeholder="Ángulo contiene…" style={inputStyle} />
       </div>
+
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 14 }}>
         <button onClick={() => setMes((m) => { const d = new Date(m.y, m.m - 1, 1); return { y: d.getFullYear(), m: d.getMonth() } })}
@@ -548,7 +574,7 @@ function Calendario({ items, onVer }: { items: MarketingIdea[]; onVer: (i: Marke
   )
 }
 
-function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post" }: { idea: MarketingIdea; onClose: () => void; onIdeaUpdated?: (updated: MarketingIdea) => void; initialTab?: any }) {
+function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post", onDuplicar, duplicandoId }: { idea: MarketingIdea; onClose: () => void; onIdeaUpdated?: (updated: MarketingIdea) => void; initialTab?: any; onDuplicar: (id: string) => void; duplicandoId: string | null }) {
   const assets = idea.assets ?? []
   const tieneVisuales = assets.length > 0 || Boolean((idea.blog as Record<string, unknown>)?.featured_image_url)
   const blogObj = (idea.blog ?? {}) as Record<string, unknown>
@@ -558,7 +584,8 @@ function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post" }: { ide
   const tieneLinkedIn = idea.fuente === "blog" && Boolean(lnPost)
   const tieneComentarios = Boolean(primerComentario) || (idea.hashtags && idea.hashtags.length > 0)
 
-  const [tab, setTab] = useState<any>(initialTab)
+  const [tab, setTab] = useState<any>(() => (initialTab === "config" && idea.estado !== "idea" ? "post" : initialTab))
+
 
   const [editTitulo, setEditTitulo] = useState(idea.titulo)
   const [editFuente, setEditFuente] = useState(idea.fuente)
@@ -629,9 +656,25 @@ function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post" }: { ide
             </div>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.3 }}>{idea.titulo}</h2>
           </div>
-          <button onClick={onClose}
-            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)", fontSize: 18, width: 32, height: 32, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {idea.estado === "idea" ? (
+              <button
+                disabled={duplicandoId === idea.id}
+                onClick={() => onDuplicar(idea.id)}
+                style={{
+                  padding: "6px 12px", background: "rgba(167,139,250,0.15)", border: "1px solid rgba(167,139,250,0.35)",
+                  borderRadius: 8, color: "#c4b5fd", fontSize: 12, fontWeight: 600, cursor: duplicandoId === idea.id ? "default" : "pointer",
+                  display: "flex", alignItems: "center", gap: 4
+                }}>
+                {duplicandoId === idea.id ? "Duplicando…" : "📋 Duplicar Idea"}
+              </button>
+            ) : null}
+            <button onClick={onClose}
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)", fontSize: 18, width: 32, height: 32, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+          </div>
+
         </div>
+
 
         {/* Tab Navigation Bar (Segmented Control Style) */}
         <div style={{
@@ -730,25 +773,28 @@ function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post" }: { ide
             </button>
           ) : null}
 
-          <button
-            onClick={() => setTab("config")}
-            style={{
-              flex: 1,
-              minWidth: 110,
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "none",
-              fontSize: 12,
-              fontWeight: tab === "config" ? 700 : 500,
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-              background: tab === "config" ? "#38bdf8" : "transparent",
-              color: tab === "config" ? "#fff" : "#7dd3fc",
-              boxShadow: tab === "config" ? "0 2px 8px rgba(56,189,248,0.35)" : "none",
-            }}
-          >
-            ⚙️ Configuración
-          </button>
+          {idea.estado === "idea" ? (
+            <button
+              onClick={() => setTab("config")}
+              style={{
+                flex: 1,
+                minWidth: 110,
+                padding: "8px 14px",
+                borderRadius: 8,
+                border: "none",
+                fontSize: 12,
+                fontWeight: tab === "config" ? 700 : 500,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                background: tab === "config" ? "#38bdf8" : "transparent",
+                color: tab === "config" ? "#fff" : "#7dd3fc",
+                boxShadow: tab === "config" ? "0 2px 8px rgba(56,189,248,0.35)" : "none",
+              }}
+            >
+              ⚙️ Configuración
+            </button>
+          ) : null}
+
 
           <button
             onClick={() => setTab("todo")}
@@ -855,7 +901,7 @@ function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post" }: { ide
             </div>
           )}
 
-          {tab === "config" && (
+          {tab === "config" && idea.estado === "idea" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 16, padding: 18, background: "rgba(0,0,0,0.25)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: 12 }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#38bdf8", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>
@@ -875,32 +921,32 @@ function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post" }: { ide
                 <div>
                   <label style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", display: "block", marginBottom: 4, fontWeight: 600 }}>🌐 Canal (Fuente)</label>
                   <select value={editFuente} onChange={(e) => setEditFuente(e.target.value as any)} style={{ ...inputStyle, width: "100%" }}>
-                    <option value="linkedin">LinkedIn</option>
-                    <option value="instagram">Instagram</option>
-                    <option value="blog">Blog</option>
+                    <option value="linkedin" style={optionStyle}>LinkedIn</option>
+                    <option value="instagram" style={optionStyle}>Instagram</option>
+                    <option value="blog" style={optionStyle}>Blog</option>
                   </select>
                 </div>
 
                 <div>
                   <label style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", display: "block", marginBottom: 4, fontWeight: 600 }}>🎨 Formato de la pieza</label>
                   <select value={editFormato} onChange={(e) => setEditFormato(e.target.value)} style={{ ...inputStyle, width: "100%" }}>
-                    <option value="post_texto">Post de texto</option>
-                    <option value="carrusel">Carrusel</option>
-                    <option value="imagen">Imagen</option>
-                    <option value="encuesta">Encuesta</option>
-                    <option value="articulo_linkedin">Artículo LinkedIn</option>
-                    <option value="reel">Reel</option>
-                    <option value="lead_magnet">Lead magnet</option>
-                    <option value="articulo_blog">Artículo blog</option>
+                    <option value="post_texto" style={optionStyle}>Post de texto</option>
+                    <option value="carrusel" style={optionStyle}>Carrusel</option>
+                    <option value="imagen" style={optionStyle}>Imagen</option>
+                    <option value="encuesta" style={optionStyle}>Encuesta</option>
+                    <option value="articulo_linkedin" style={optionStyle}>Artículo LinkedIn</option>
+                    <option value="reel" style={optionStyle}>Reel</option>
+                    <option value="lead_magnet" style={optionStyle}>Lead magnet</option>
+                    <option value="articulo_blog" style={optionStyle}>Artículo blog</option>
                   </select>
                 </div>
 
                 <div>
                   <label style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", display: "block", marginBottom: 4, fontWeight: 600 }}>🎯 Etapa del Embudo</label>
                   <select value={editFunnel} onChange={(e) => setEditFunnel(e.target.value as any)} style={{ ...inputStyle, width: "100%" }}>
-                    <option value="tofu">TOFU · Descubrimiento (dolor amplio)</option>
-                    <option value="mofu">MOFU · Nutrición (mecanismo/método)</option>
-                    <option value="bofu">BOFU · Empujón a la reunión</option>
+                    <option value="tofu" style={optionStyle}>TOFU · Descubrimiento (dolor amplio)</option>
+                    <option value="mofu" style={optionStyle}>MOFU · Nutrición (mecanismo/método)</option>
+                    <option value="bofu" style={optionStyle}>BOFU · Empujón a la reunión</option>
                   </select>
                 </div>
 
@@ -927,6 +973,8 @@ function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post" }: { ide
               </div>
             </div>
           )}
+
+
 
           {tab === "todo" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -995,6 +1043,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const [nueva, setNueva] = useState(false)
   const [generando, setGenerando] = useState(false)
   const [publicandoId, setPublicandoId] = useState<string | null>(null)
+  const [duplicandoId, setDuplicandoId] = useState<string | null>(null)
   const [verIdea, setVerIdea] = useState<{ idea: MarketingIdea; tab?: any } | null>(null)
   const [comentarioModal, setComentarioModal] = useState<string | null>(null)
   const [vista, setVista] = useState<"tablero" | "calendario">("tablero")
@@ -1008,6 +1057,26 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   function onReformulada(id: string, patch: Partial<MarketingIdea>) {
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
     setVerIdea((v) => (v && v.idea.id === id ? { ...v, idea: { ...v.idea, ...patch } } : v))
+  }
+
+  async function handleDuplicar(id: string) {
+    if (duplicandoId) return
+    setDuplicandoId(id)
+    try {
+      const res = await fetch(`/api/admin-vakdor/marketing/${id}/duplicar`, { method: "POST" })
+      if (res.ok) {
+        const { idea: nuevaIdea } = await res.json()
+        setItems((prev) => [nuevaIdea, ...prev])
+        setVerIdea({ idea: nuevaIdea, tab: "config" })
+      } else {
+        const d = await res.json().catch(() => ({}))
+        alert("No se pudo duplicar la idea: " + (d.error ?? ""))
+      }
+    } catch {
+      alert("Error al duplicar la idea.")
+    } finally {
+      setDuplicandoId(null)
+    }
   }
 
   async function programar(id: string, fechaISO: string | null) {
@@ -1211,7 +1280,8 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
                     {cards.map((idea) => (
                       <Card key={idea.id} idea={idea} onMover={mover}
                         onVer={handleVerIdea} onProgramar={programar}
-                        onPublicar={publicar} publicando={publicandoId === idea.id} onReformulada={onReformulada} />
+                        onPublicar={publicar} publicando={publicandoId === idea.id} onReformulada={onReformulada}
+                        onDuplicar={handleDuplicar} duplicandoId={duplicandoId} />
                     ))}
                     {cards.length === 0 ? (
                       <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px 0" }}>—</div>
@@ -1252,24 +1322,24 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
             <h2 style={{ fontSize: 16, color: "#fff", margin: 0 }}>Nueva idea</h2>
             <input name="titulo" required placeholder="Título de la idea" style={inputStyle} />
             <select name="fuente" defaultValue="linkedin" style={inputStyle}>
-              <option value="linkedin">LinkedIn</option>
-              <option value="instagram">Instagram</option>
-              <option value="blog">Blog</option>
+              <option value="linkedin" style={optionStyle}>LinkedIn</option>
+              <option value="instagram" style={optionStyle}>Instagram</option>
+              <option value="blog" style={optionStyle}>Blog</option>
             </select>
             <select name="formato" defaultValue="post_texto" style={inputStyle}>
-              <option value="post_texto">Post de texto</option>
-              <option value="carrusel">Carrusel</option>
-              <option value="imagen">Imagen</option>
-              <option value="encuesta">Encuesta</option>
-              <option value="articulo_linkedin">Artículo LinkedIn</option>
-              <option value="reel">Reel</option>
-              <option value="lead_magnet">Lead magnet</option>
-              <option value="articulo_blog">Artículo blog</option>
+              <option value="post_texto" style={optionStyle}>Post de texto</option>
+              <option value="carrusel" style={optionStyle}>Carrusel</option>
+              <option value="imagen" style={optionStyle}>Imagen</option>
+              <option value="encuesta" style={optionStyle}>Encuesta</option>
+              <option value="articulo_linkedin" style={optionStyle}>Artículo LinkedIn</option>
+              <option value="reel" style={optionStyle}>Reel</option>
+              <option value="lead_magnet" style={optionStyle}>Lead magnet</option>
+              <option value="articulo_blog" style={optionStyle}>Artículo blog</option>
             </select>
             <select name="funnel" defaultValue="tofu" style={inputStyle}>
-              <option value="tofu">TOFU · Descubrimiento (dolor amplio)</option>
-              <option value="mofu">MOFU · Nutrición (mecanismo/método)</option>
-              <option value="bofu">BOFU · Empujón a la reunión</option>
+              <option value="tofu" style={optionStyle}>TOFU · Descubrimiento (dolor amplio)</option>
+              <option value="mofu" style={optionStyle}>MOFU · Nutrición (mecanismo/método)</option>
+              <option value="bofu" style={optionStyle}>BOFU · Empujón a la reunión</option>
             </select>
             <input name="angulo" placeholder="Ángulo (opcional)" style={inputStyle} />
             <input name="motivo" placeholder="Motivo / por qué (opcional)" style={inputStyle} />
@@ -1287,6 +1357,8 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
           initialTab={verIdea.tab ?? "post"}
           onClose={() => setVerIdea(null)}
           onIdeaUpdated={(updated) => setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)))}
+          onDuplicar={handleDuplicar}
+          duplicandoId={duplicandoId}
         />
       ) : null}
 
