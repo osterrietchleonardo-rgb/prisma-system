@@ -46,6 +46,7 @@ export function MarketingMetricsSection() {
   }, [periodo])
 
   const funnel = data?.funnel ?? []
+  const overall = data?.overallStats ?? { activeUsers: 0, newUsers: 0, sessions: 0, screenPageViews: 0, avgBounceRatePct: 0 }
 
   return (
     <div style={{
@@ -63,9 +64,9 @@ export function MarketingMetricsSection() {
       {/* Header Bar */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0 }}>
-              📊 Métricas de Conversión & Embudo Web (GA4 / CAPI)
+              📊 Métricas de Conversión & Embudo Web (GA4 / CAPI / Clarity)
             </h2>
             <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(56,189,248,0.15)", border: "1px solid rgba(56,189,248,0.4)", color: "#7dd3fc", fontWeight: 700 }}>
               ● GA4 En Vivo
@@ -73,12 +74,18 @@ export function MarketingMetricsSection() {
             <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)", color: "#4ade80", fontWeight: 700 }}>
               ⚡ CAPI Activo
             </span>
+            <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)", color: "#fde047", fontWeight: 700 }}>
+              🏷️ GTM Tagging
+            </span>
+            <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(236,72,153,0.15)", border: "1px solid rgba(236,72,153,0.4)", color: "#f472b6", fontWeight: 700 }}>
+              🔥 Clarity Heatmaps
+            </span>
             <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.4)", color: "#c084fc", fontWeight: 700 }}>
               ⏰ Cron Diario: 07:00 AM (AR)
             </span>
           </div>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", margin: 0 }}>
-            Rendimiento en tiempo real de vakdor.com (GA4), tráfico, retención por página, SEO de Google Search Console y Buffer
+            Panel unificado de auditoría para vakdor.com: usuarios activos/nuevos, rebote, tiempo en página, GSC y Buffer
           </p>
         </div>
 
@@ -108,10 +115,53 @@ export function MarketingMetricsSection() {
 
       {loading ? (
         <div style={{ padding: "40px 0", textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
-          Cargando métricas reales...
+          Cargando métricas reales de GA4, Search Console y Buffer...
         </div>
       ) : (
         <>
+          {/* Top KPI Summaries: Usuarios Activos, Usuarios Nuevos, Vistas, Rebote */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
+            <div style={{ padding: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10 }}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>👥 Usuarios Activos</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>
+                {overall.activeUsers.toLocaleString()}
+              </div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                {overall.sessions} sesiones en total
+              </div>
+            </div>
+
+            <div style={{ padding: 14, background: "rgba(56,189,248,0.05)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: 10 }}>
+              <div style={{ fontSize: 11, color: "#7dd3fc", marginBottom: 4 }}>🆕 Usuarios Nuevos</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#7dd3fc" }}>
+                {overall.newUsers.toLocaleString()}
+              </div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                {overall.activeUsers > 0 ? Math.round((overall.newUsers / overall.activeUsers) * 100) : 0}% de primeras visitas
+              </div>
+            </div>
+
+            <div style={{ padding: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10 }}>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginBottom: 4 }}>📄 Vistas Totales de Página</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#fff" }}>
+                {overall.screenPageViews.toLocaleString()}
+              </div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                ~{overall.activeUsers > 0 ? (overall.screenPageViews / overall.activeUsers).toFixed(1) : 0} páginas/usuario
+              </div>
+            </div>
+
+            <div style={{ padding: 14, background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10 }}>
+              <div style={{ fontSize: 11, color: "#fca5a5", marginBottom: 4 }}>📉 Tasa Promedio de Rebote</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: "#fca5a5" }}>
+                {overall.avgBounceRatePct}%
+              </div>
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", marginTop: 2 }}>
+                Salidas sin interacción
+              </div>
+            </div>
+          </div>
+
           {/* Gráfico de Embudo Invertido Real */}
           <div style={{
             background: "rgba(0,0,0,0.25)",
@@ -244,7 +294,56 @@ export function MarketingMetricsSection() {
             </div>
           </div>
 
-          {/* Grid de Métricas Avanzadas GA4: Fuentes, Dispositivos & Páginas Top */}
+          {/* Tabla de Páginas Más Visitadas: Vistas, Usuarios Activos, Nuevos, Rebote % y Tiempo Promedio */}
+          <div style={{
+            background: "rgba(0,0,0,0.25)",
+            border: "1px solid rgba(255,255,255,0.06)",
+            borderRadius: 12,
+            padding: 18,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                📄 GA4 · Páginas Más Visitadas (Vistas, Nuevos Usuarios, Rebote & Retención)
+              </span>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Datos Reales de vakdor.com</span>
+            </div>
+
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, textAlign: "left" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>
+                    <th style={{ padding: "8px 12px" }}>Página (Path)</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right" }}>Vistas</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right" }}>Usuarios Activos</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right" }}>Nuevos</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right" }}>% Rebote</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right" }}>Tiempo Promedio</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data?.topPagesPerformance ?? []).map((tp, idx) => (
+                    <tr key={idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)", color: "rgba(255,255,255,0.85)" }}>
+                      <td style={{ padding: "8px 12px", fontWeight: 600, color: "#fff" }}>{tp.path}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700 }}>{tp.views}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "right" }}>{tp.users}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: "#7dd3fc" }}>{tp.newUsers}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: tp.bounceRatePct > 50 ? "#fca5a5" : "#4ade80" }}>
+                        {tp.bounceRatePct}%
+                      </td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: "#fde047", fontWeight: 700 }}>
+                        {tp.avgTimeSeconds}s (~{(tp.avgTimeSeconds / 60).toFixed(1)}m)
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Grid Secundario: Fuentes de Tráfico, Dispositivos, Clarity & GTM Badges */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
             {/* 1. Fuentes de Tráfico (GA4) */}
             <div style={{
@@ -325,7 +424,7 @@ export function MarketingMetricsSection() {
               </div>
             </div>
 
-            {/* 3. Páginas Más Visitadas & Tiempo de Permanencia (GA4) */}
+            {/* 3. Integración Microsoft Clarity & Google Tag Manager */}
             <div style={{
               background: "rgba(0,0,0,0.25)",
               border: "1px solid rgba(255,255,255,0.06)",
@@ -336,38 +435,40 @@ export function MarketingMetricsSection() {
               gap: 12
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#4ade80", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  ⏱️ GA4 · Páginas Top & Retención
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  🔥 Microsoft Clarity & GTM Tagging
                 </span>
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Tiempo Promedio</span>
+                <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 700 }}>● Activo</span>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto" }}>
-                {(data?.topPagesPerformance ?? []).map((tp, idx) => (
-                  <div key={idx} style={{
-                    padding: "6px 10px",
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.05)",
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", lineHeight: 1.5 }}>
+                Mapas de calor (*Heatmaps*), grabaciones de pantalla y etiquetas de seguimiento en vivo para <b>vakdor.com</b>.
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <a
+                  href="https://clarity.microsoft.com/projects"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    padding: "8px 12px",
+                    background: "rgba(236,72,153,0.15)",
+                    border: "1px solid rgba(236,72,153,0.3)",
                     borderRadius: 6,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    fontSize: 10
-                  }}>
-                    <span style={{ color: "#fff", fontWeight: 600 }}>
-                      {tp.path}
-                    </span>
-                    <div style={{ display: "flex", gap: 8, color: "rgba(255,255,255,0.5)" }}>
-                      <span><b>{tp.views}</b> vistas</span>
-                      <span style={{ color: "#4ade80" }}>⏱️ <b>{tp.avgTimeSeconds}s</b>/user</span>
-                    </div>
-                  </div>
-                ))}
+                    color: "#f472b6",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textDecoration: "none",
+                    textAlign: "center"
+                  }}
+                >
+                  🔥 Abrir Microsoft Clarity Dashboard →
+                </a>
               </div>
             </div>
           </div>
 
-          {/* Grid Secundario: Métricas Reales de Buffer LinkedIn + SEO Google Search Console */}
+          {/* Grid Terciario: Métricas Reales de Buffer LinkedIn + SEO Google Search Console */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: 16 }}>
             {/* Métricas Orgánicas Reales de Buffer / LinkedIn */}
             <div style={{

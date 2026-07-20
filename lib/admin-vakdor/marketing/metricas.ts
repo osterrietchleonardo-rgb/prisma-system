@@ -54,8 +54,17 @@ export interface TopPagePerformance {
   path: string
   views: number
   users: number
+  newUsers: number
   bounceRatePct: number
   avgTimeSeconds: number
+}
+
+export interface OverallGa4Stats {
+  activeUsers: number
+  newUsers: number
+  sessions: number
+  screenPageViews: number
+  avgBounceRatePct: number
 }
 
 export interface MarketingMetricsPayload {
@@ -72,6 +81,7 @@ export interface MarketingMetricsPayload {
     publicaciones: BufferPublishedPost[]
   }
   contentDistribution: ContentDistribution
+  overallStats: OverallGa4Stats
   trafficSources: TrafficSource[]
   deviceBreakdown: DeviceBreakdown
   topPagesPerformance: TopPagePerformance[]
@@ -103,6 +113,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 3
  */
 export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
   funnel: FunnelStageData[]
+  overallStats: OverallGa4Stats
   trafficSources: TrafficSource[]
   deviceBreakdown: DeviceBreakdown
   topPagesPerformance: TopPagePerformance[]
@@ -111,6 +122,7 @@ export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
   const startDate = `${days}daysAgo`
 
   let funnelRows: any[] = []
+  let overallRows: any[] = []
   let trafficRows: any[] = []
   let deviceRows: any[] = []
   let topPageRows: any[] = []
@@ -119,7 +131,7 @@ export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
     const token = await getGoogleAccessToken("https://www.googleapis.com/auth/analytics.readonly")
 
     // Run parallel reports for GA4
-    const [resFunnel, resTraffic, resDevices, resPages] = await Promise.all([
+    const [resFunnel, resOverall, resTraffic, resDevices, resPages] = await Promise.all([
       fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -128,6 +140,16 @@ export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
           dimensions: [{ name: "eventName" }, { name: "pagePath" }],
           metrics: [{ name: "eventCount" }, { name: "activeUsers" }],
           limit: 300,
+        }),
+        cache: "no-store",
+      }, 3500),
+
+      fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          dateRanges: [{ startDate, endDate: "today" }],
+          metrics: [{ name: "activeUsers" }, { name: "newUsers" }, { name: "sessions" }, { name: "screenPageViews" }, { name: "bounceRate" }],
         }),
         cache: "no-store",
       }, 3500),
@@ -161,7 +183,7 @@ export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
         body: JSON.stringify({
           dateRanges: [{ startDate, endDate: "today" }],
           dimensions: [{ name: "pagePath" }],
-          metrics: [{ name: "screenPageViews" }, { name: "activeUsers" }, { name: "bounceRate" }, { name: "userEngagementDuration" }],
+          metrics: [{ name: "screenPageViews" }, { name: "activeUsers" }, { name: "newUsers" }, { name: "bounceRate" }, { name: "userEngagementDuration" }],
           limit: 8,
         }),
         cache: "no-store",
@@ -169,6 +191,7 @@ export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
     ])
 
     if (resFunnel.ok) funnelRows = (await resFunnel.json()).rows ?? []
+    if (resOverall.ok) overallRows = (await resOverall.json()).rows ?? []
     if (resTraffic.ok) trafficRows = (await resTraffic.json()).rows ?? []
     if (resDevices.ok) deviceRows = (await resDevices.json()).rows ?? []
     if (resPages.ok) topPageRows = (await resPages.json()).rows ?? []
@@ -227,14 +250,24 @@ export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
     return { ...stage, conversionFromStartPct, dropoffPct }
   })
 
-  // 2. Traffic Sources
+  // 2. Overall GA4 Stats
+  const ovRow = overallRows[0]?.metricValues ?? []
+  const overallStats: OverallGa4Stats = {
+    activeUsers: Number(ovRow[0]?.value ?? 0),
+    newUsers: Number(ovRow[1]?.value ?? 0),
+    sessions: Number(ovRow[2]?.value ?? 0),
+    screenPageViews: Number(ovRow[3]?.value ?? 0),
+    avgBounceRatePct: Math.round(Number(ovRow[4]?.value ?? 0) * 100),
+  }
+
+  // 3. Traffic Sources
   const trafficSources: TrafficSource[] = trafficRows.map((r: any) => ({
     channel: r.dimensionValues?.[0]?.value ?? "Otro",
     sessions: Number(r.metricValues?.[0]?.value ?? 0),
     activeUsers: Number(r.metricValues?.[1]?.value ?? 0),
   }))
 
-  // 3. Devices
+  // 4. Devices
   let desktopUsers = 0
   let mobileUsers = 0
   for (const r of deviceRows) {
@@ -251,21 +284,22 @@ export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
     mobilePct: Math.round((mobileUsers / totalDevUsers) * 100),
   }
 
-  // 4. Top Pages Performance
+  // 5. Top Pages Performance
   const topPagesPerformance: TopPagePerformance[] = topPageRows.map((r: any) => {
     const path = r.dimensionValues?.[0]?.value ?? "/"
     const views = Number(r.metricValues?.[0]?.value ?? 0)
     const users = Number(r.metricValues?.[1]?.value ?? 0)
-    const bounceRate = Number(r.metricValues?.[2]?.value ?? 0)
-    const durationSeconds = Number(r.metricValues?.[3]?.value ?? 0)
+    const newUsers = Number(r.metricValues?.[2]?.value ?? 0)
+    const bounceRate = Number(r.metricValues?.[3]?.value ?? 0)
+    const durationSeconds = Number(r.metricValues?.[4]?.value ?? 0)
 
     const avgTimeSeconds = users > 0 ? Math.round(durationSeconds / users) : 0
     const bounceRatePct = Math.round(bounceRate * 100)
 
-    return { path, views, users, bounceRatePct, avgTimeSeconds }
+    return { path, views, users, newUsers, bounceRatePct, avgTimeSeconds }
   })
 
-  return { funnel, trafficSources, deviceBreakdown, topPagesPerformance }
+  return { funnel, overallStats, trafficSources, deviceBreakdown, topPagesPerformance }
 }
 
 /**
@@ -449,6 +483,7 @@ export async function loadMarketingMetricsPayload(periodo: "7d" | "30d" | "90d")
     gscQueries,
     bufferStats,
     contentDistribution,
+    overallStats: ga4.overallStats,
     trafficSources: ga4.trafficSources,
     deviceBreakdown: ga4.deviceBreakdown,
     topPagesPerformance: ga4.topPagesPerformance,
