@@ -47,6 +47,17 @@ export function MarketingMetricsSection() {
 
   const funnel = data?.funnel ?? []
   const overall = data?.overallStats ?? { activeUsers: 0, newUsers: 0, sessions: 0, screenPageViews: 0, avgBounceRatePct: 0 }
+  const clarity = data?.clarityStats ?? {
+    rageClicksPct: 0,
+    deadClicksPct: 0,
+    quickBacksPct: 0,
+    avgScrollDepthPct: 0,
+    totalSessions: 0,
+    distinctUsers: 0,
+    pagesPerSession: 0,
+    scriptErrorsPct: 0,
+    popularPages: [],
+  }
 
   return (
     <div style={{
@@ -74,18 +85,15 @@ export function MarketingMetricsSection() {
             <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.4)", color: "#4ade80", fontWeight: 700 }}>
               ⚡ CAPI Activo
             </span>
-            <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.4)", color: "#fde047", fontWeight: 700 }}>
-              🏷️ GTM Tagging
-            </span>
             <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(236,72,153,0.15)", border: "1px solid rgba(236,72,153,0.4)", color: "#f472b6", fontWeight: 700 }}>
-              🔥 Clarity Heatmaps
+              🔥 Clarity API Conectado
             </span>
             <span style={{ fontSize: 10, padding: "2px 8px", borderRadius: 999, background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.4)", color: "#c084fc", fontWeight: 700 }}>
               ⏰ Cron Diario: 07:00 AM (AR)
             </span>
           </div>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", margin: 0 }}>
-            Panel unificado de auditoría para vakdor.com: usuarios activos/nuevos, rebote, tiempo en página, GSC y Buffer
+            Panel unificado de auditoría para vakdor.com: usuarios activos/nuevos, rebote, tiempo en página, Microsoft Clarity, GSC y Buffer
           </p>
         </div>
 
@@ -115,7 +123,7 @@ export function MarketingMetricsSection() {
 
       {loading ? (
         <div style={{ padding: "40px 0", textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
-          Cargando métricas reales de GA4, Search Console y Buffer...
+          Cargando métricas reales de GA4, Microsoft Clarity API, Search Console y Buffer...
         </div>
       ) : (
         <>
@@ -343,7 +351,7 @@ export function MarketingMetricsSection() {
             </div>
           </div>
 
-          {/* Grid Secundario: Fuentes de Tráfico, Dispositivos, Clarity & GTM Badges */}
+          {/* Grid Secundario: Fuentes de Tráfico, Dispositivos y MICROSOFT CLARITY REAL API METRICS */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
             {/* 1. Fuentes de Tráfico (GA4) */}
             <div style={{
@@ -424,7 +432,7 @@ export function MarketingMetricsSection() {
               </div>
             </div>
 
-            {/* 3. Integración Microsoft Clarity & Google Tag Manager */}
+            {/* 3. MICROSOFT CLARITY LIVE INSIGHTS API DATA */}
             <div style={{
               background: "rgba(0,0,0,0.25)",
               border: "1px solid rgba(255,255,255,0.06)",
@@ -436,34 +444,43 @@ export function MarketingMetricsSection() {
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#f472b6", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  🔥 Microsoft Clarity & GTM Tagging
+                  🔥 Microsoft Clarity · Comportamiento Real
                 </span>
-                <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 700 }}>● Activo</span>
+                <span style={{ fontSize: 10, color: "#4ade80", fontWeight: 700 }}>● API Live</span>
               </div>
 
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", lineHeight: 1.5 }}>
-                Mapas de calor (*Heatmaps*), grabaciones de pantalla y etiquetas de seguimiento en vivo para <b>vakdor.com</b>.
-              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+                <div style={{ padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>Scroll Depth Promedio</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#f472b6" }}>
+                    {clarity.avgScrollDepthPct}%
+                  </div>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>Profundidad de lectura</div>
+                </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <a
-                  href="https://clarity.microsoft.com/projects"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{
-                    padding: "8px 12px",
-                    background: "rgba(236,72,153,0.15)",
-                    border: "1px solid rgba(236,72,153,0.3)",
-                    borderRadius: 6,
-                    color: "#f472b6",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    textDecoration: "none",
-                    textAlign: "center"
-                  }}
-                >
-                  🔥 Abrir Microsoft Clarity Dashboard →
-                </a>
+                <div style={{ padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>Páginas / Sesión</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#38bdf8" }}>
+                    {clarity.pagesPerSession}
+                  </div>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>Promedio por visita</div>
+                </div>
+
+                <div style={{ padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>Rage Clicks (Frustración)</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: clarity.rageClicksPct > 0 ? "#ef4444" : "#4ade80" }}>
+                    {clarity.rageClicksPct}%
+                  </div>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>Clics repetitivos</div>
+                </div>
+
+                <div style={{ padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>Quick Backs (Retornos)</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#fde047" }}>
+                    {clarity.quickBacksPct}%
+                  </div>
+                  <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)" }}>Volvieron rápido atrás</div>
+                </div>
               </div>
             </div>
           </div>

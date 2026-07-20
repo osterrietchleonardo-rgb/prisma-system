@@ -67,6 +67,18 @@ export interface OverallGa4Stats {
   avgBounceRatePct: number
 }
 
+export interface ClarityMetricsPayload {
+  rageClicksPct: number
+  deadClicksPct: number
+  quickBacksPct: number
+  avgScrollDepthPct: number
+  totalSessions: number
+  distinctUsers: number
+  pagesPerSession: number
+  scriptErrorsPct: number
+  popularPages: Array<{ url: string; visitsCount: number }>
+}
+
 export interface MarketingMetricsPayload {
   funnel: FunnelStageData[]
   periodo: "7d" | "30d" | "90d"
@@ -85,6 +97,7 @@ export interface MarketingMetricsPayload {
   trafficSources: TrafficSource[]
   deviceBreakdown: DeviceBreakdown
   topPagesPerformance: TopPagePerformance[]
+  clarityStats: ClarityMetricsPayload
   updatedAt: string
 }
 
@@ -106,6 +119,91 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 3
     clearTimeout(id)
     throw err
   }
+}
+
+/**
+ * Consulta en tiempo real a Microsoft Clarity Live Insights API
+ */
+export async function fetchClarityMetrics(): Promise<ClarityMetricsPayload> {
+  const defaultRes: ClarityMetricsPayload = {
+    rageClicksPct: 0,
+    deadClicksPct: 0,
+    quickBacksPct: 0,
+    avgScrollDepthPct: 0,
+    totalSessions: 0,
+    distinctUsers: 0,
+    pagesPerSession: 0,
+    scriptErrorsPct: 0,
+    popularPages: [],
+  }
+
+  try {
+    const token = process.env.CLARITY_API_KEY
+    if (!token) return defaultRes
+
+    const res = await fetchWithTimeout("https://www.clarity.ms/export-data/api/v1/project-live-insights", {
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      cache: "no-store",
+    }, 3500)
+
+    if (res.ok) {
+      const data = await res.json()
+      let rageClicksPct = 0
+      let deadClicksPct = 0
+      let quickBacksPct = 0
+      let avgScrollDepthPct = 0
+      let totalSessions = 0
+      let distinctUsers = 0
+      let pagesPerSession = 0
+      let scriptErrorsPct = 0
+      let popularPages: Array<{ url: string; visitsCount: number }> = []
+
+      for (const item of data) {
+        if (item.metricName === "RageClickCount") {
+          rageClicksPct = item.information?.[0]?.sessionsWithMetricPercentage ?? 0
+        }
+        if (item.metricName === "DeadClickCount") {
+          deadClicksPct = item.information?.[0]?.sessionsWithMetricPercentage ?? 0
+        }
+        if (item.metricName === "QuickbackClick") {
+          quickBacksPct = item.information?.[0]?.sessionsWithMetricPercentage ?? 0
+        }
+        if (item.metricName === "ScriptErrorCount") {
+          scriptErrorsPct = item.information?.[0]?.sessionsWithMetricPercentage ?? 0
+        }
+        if (item.metricName === "ScrollDepth") {
+          avgScrollDepthPct = Math.round((item.information?.[0]?.averageScrollDepth ?? 0) * 10) / 10
+        }
+        if (item.metricName === "Traffic") {
+          totalSessions = Number(item.information?.[0]?.totalSessionCount ?? 0)
+          distinctUsers = Number(item.information?.[0]?.distinctUserCount ?? 0)
+          pagesPerSession = Number(item.information?.[0]?.pagesPerSessionPercentage ?? 0)
+        }
+        if (item.metricName === "PopularPages") {
+          popularPages = (item.information ?? []).map((p: any) => ({
+            url: p.url ?? "",
+            visitsCount: Number(p.visitsCount ?? 0),
+          }))
+        }
+      }
+
+      return {
+        rageClicksPct,
+        deadClicksPct,
+        quickBacksPct,
+        avgScrollDepthPct,
+        totalSessions,
+        distinctUsers,
+        pagesPerSession,
+        scriptErrorsPct,
+        popularPages,
+      }
+    }
+  } catch (err) {
+    console.error("Clarity fetch error:", err)
+  }
+
+  return defaultRes
 }
 
 /**
@@ -470,11 +568,12 @@ export async function fetchMarketingContentStats(): Promise<ContentDistribution>
  * Orquestador de payload
  */
 export async function loadMarketingMetricsPayload(periodo: "7d" | "30d" | "90d"): Promise<MarketingMetricsPayload> {
-  const [ga4, gscQueries, bufferStats, contentDistribution] = await Promise.all([
+  const [ga4, gscQueries, bufferStats, contentDistribution, clarityStats] = await Promise.all([
     fetchGa4Metrics(periodo),
     fetchGscQueries(periodo),
     fetchBufferRanking(periodo),
     fetchMarketingContentStats(),
+    fetchClarityMetrics(),
   ])
 
   return {
@@ -487,6 +586,7 @@ export async function loadMarketingMetricsPayload(periodo: "7d" | "30d" | "90d")
     trafficSources: ga4.trafficSources,
     deviceBreakdown: ga4.deviceBreakdown,
     topPagesPerformance: ga4.topPagesPerformance,
+    clarityStats,
     updatedAt: new Date().toISOString(),
   }
 }
