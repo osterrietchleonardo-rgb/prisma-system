@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { 
   UserPlus, 
   Search, 
@@ -17,12 +17,22 @@ import {
   Briefcase,
   PauseCircle,
   PlayCircle,
-  AlertTriangle
+  AlertTriangle,
+  Filter,
+  Users,
+  RotateCcw
 } from "lucide-react"
 import { getAgentPerformanceAction, getAgencyAdvisorsPerformanceAction } from "@/app/actions/performance"
 import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa } from "@/app/actions/asesores"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Card,
   CardContent,
@@ -64,6 +74,8 @@ export default function AsesoresPage() {
   const [agents, setAgents] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [selectedAdvisorFilter, setSelectedAdvisorFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
   const [copied, setCopied] = useState(false)
@@ -275,10 +287,47 @@ export default function AsesoresPage() {
     toast.success("Código copiado")
   }
 
-  const filteredAgents = agents.filter(a => 
-    a.full_name?.toLowerCase().includes(search.toLowerCase()) || 
-    a.email?.toLowerCase().includes(search.toLowerCase())
-  )
+  const sortedAdvisorOptions = useMemo(() => {
+    return [...agents].sort((a, b) => 
+      (a.full_name || "").localeCompare(b.full_name || "", "es", { sensitivity: "base" })
+    )
+  }, [agents])
+
+  const filteredAgents = useMemo(() => {
+    return agents.filter((agent) => {
+      // 1. Búsqueda por texto (nombre o email)
+      const matchesSearch =
+        !search.trim() ||
+        agent.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+        agent.email?.toLowerCase().includes(search.toLowerCase())
+
+      // 2. Filtro por Asesor específico
+      const matchesAdvisor =
+        selectedAdvisorFilter === "all" || agent.id === selectedAdvisorFilter
+
+      // 3. Filtro por Estado (activo, pausado, eliminado)
+      const matchesStatus =
+        statusFilter === "all"
+          ? true
+          : statusFilter === "activo"
+          ? agent.estado !== "pausado" && agent.estado !== "eliminado"
+          : statusFilter === "pausado"
+          ? agent.estado === "pausado"
+          : statusFilter === "eliminado"
+          ? agent.estado === "eliminado"
+          : true
+
+      return matchesSearch && matchesAdvisor && matchesStatus
+    })
+  }, [agents, search, selectedAdvisorFilter, statusFilter])
+
+  const hasActiveFilters = search.trim() !== "" || selectedAdvisorFilter !== "all" || statusFilter !== "all"
+
+  const resetFilters = () => {
+    setSearch("")
+    setSelectedAdvisorFilter("all")
+    setStatusFilter("all")
+  }
 
   return (
     <div className="flex flex-col h-full space-y-4 p-4 md:p-8 pt-6">
@@ -287,7 +336,7 @@ export default function AsesoresPage() {
           <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
             Equipo de Asesores
             <Badge variant="secondary" className="bg-accent/10 text-accent font-medium border-none">
-              {agents.length} Miembros
+              {hasActiveFilters ? `${filteredAgents.length} de ${agents.length}` : `${agents.length}`} Miembros
             </Badge>
           </h2>
           <p className="text-muted-foreground mt-1">
@@ -344,14 +393,87 @@ export default function AsesoresPage() {
         </div>
       </div>
 
-      <div className="relative w-full md:w-96 mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input 
-          placeholder="Buscar asesor por nombre..." 
-          className="pl-10 bg-card/50 border-accent/10"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Barra de Filtros (Búsqueda, Asesor ordenado alfabéticamente, Estado) */}
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 mb-4">
+        {/* Búsqueda por texto */}
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Buscar por nombre o email..." 
+            className="pl-9 bg-card/50 border-accent/10 focus-visible:ring-accent"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Filtro por Asesor (Orden Alfabético) */}
+        <div className="w-full sm:w-[220px]">
+          <Select value={selectedAdvisorFilter} onValueChange={setSelectedAdvisorFilter}>
+            <SelectTrigger className="bg-card/50 border-accent/10 focus:ring-accent">
+              <div className="flex items-center gap-2 truncate">
+                <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+                <SelectValue placeholder="Todos los asesores" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="bg-card border-accent/20 max-h-[300px]">
+              <SelectItem value="all" className="cursor-pointer font-medium">
+                Todos los asesores
+              </SelectItem>
+              {sortedAdvisorOptions.map((agent) => (
+                <SelectItem key={agent.id} value={agent.id} className="cursor-pointer">
+                  {agent.full_name || agent.email || "Sin nombre"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Filtro por Estado */}
+        <div className="w-full sm:w-[200px]">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="bg-card/50 border-accent/10 focus:ring-accent">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                <SelectValue placeholder="Todos los estados" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="bg-card border-accent/20">
+              <SelectItem value="all" className="cursor-pointer font-medium">
+                Todos los estados
+              </SelectItem>
+              <SelectItem value="activo" className="cursor-pointer">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                  Activo
+                </span>
+              </SelectItem>
+              <SelectItem value="pausado" className="cursor-pointer">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                  Pausado
+                </span>
+              </SelectItem>
+              <SelectItem value="eliminado" className="cursor-pointer">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-destructive"></span>
+                  Deshabilitado
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Botón limpiar filtros */}
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            onClick={resetFilters}
+            className="h-10 px-3 text-xs text-muted-foreground hover:text-foreground gap-1.5 self-start sm:self-auto"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -367,6 +489,19 @@ export default function AsesoresPage() {
               </CardHeader>
             </Card>
           ))}
+        </div>
+      ) : filteredAgents.length === 0 ? (
+        <div className="py-16 text-center bg-card/20 rounded-2xl border border-dashed border-accent/15 space-y-3 mt-4">
+          <Users className="h-12 w-12 text-muted-foreground/30 mx-auto" />
+          <p className="text-base font-semibold text-foreground">No se encontraron asesores</p>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            No hay ningún asesor que coincida con los filtros aplicados.
+          </p>
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" onClick={resetFilters} className="mt-2 border-accent/20">
+              Limpiar filtros
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pt-4">
