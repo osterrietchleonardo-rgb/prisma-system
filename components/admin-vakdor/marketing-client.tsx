@@ -47,6 +47,120 @@ function Chip({ children }: { children: React.ReactNode }) {
   )
 }
 
+function formatearFechaLocal(iso: string | null): string {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return ""
+  return d.toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
+function SeccionProgramacion({
+  idea,
+  onProgramar,
+}: {
+  idea: MarketingIdea
+  onProgramar: (id: string, fechaISO: string | null) => void
+}) {
+  const [fechaInput, setFechaInput] = useState(() => isoToLocalInput(idea.programada_para))
+  const [guardando, setGuardando] = useState(false)
+
+  const estaProgramada = Boolean(idea.programada_para)
+  const fechaIsoInput = fechaInput ? new Date(fechaInput).toISOString() : null
+  const hayCambioSinGuardar = Boolean(fechaInput && fechaIsoInput !== idea.programada_para)
+
+  async function handleGuardar() {
+    if (!fechaInput) return
+    setGuardando(true)
+    const iso = new Date(fechaInput).toISOString()
+    await onProgramar(idea.id, iso)
+    setGuardando(false)
+  }
+
+  async function handleQuitar() {
+    setGuardando(true)
+    setFechaInput("")
+    await onProgramar(idea.id, null)
+    setGuardando(false)
+  }
+
+  return (
+    <div style={{
+      marginBottom: 10, padding: 8, borderRadius: 8,
+      background: "rgba(0,0,0,0.25)", border: "1px solid rgba(255,255,255,0.08)"
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>
+          📅 Programación automática
+        </span>
+      </div>
+
+      <input
+        type="datetime-local"
+        value={fechaInput}
+        onChange={(e) => setFechaInput(e.target.value)}
+        style={{
+          width: "100%", fontSize: 11, padding: "5px 8px", marginBottom: 6,
+          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 6, color: "#fff", colorScheme: "dark"
+        }}
+      />
+
+      {hayCambioSinGuardar || (!estaProgramada && fechaInput) ? (
+        <button
+          disabled={guardando}
+          onClick={handleGuardar}
+          style={{
+            width: "100%", padding: "5px 0", fontSize: 11, fontWeight: 700,
+            background: ACCENT, border: "none", borderRadius: 6, color: "#fff",
+            cursor: guardando ? "default" : "pointer", marginBottom: 6
+          }}
+        >
+          {guardando ? "Guardando…" : "💾 Guardar fecha de programación"}
+        </button>
+      ) : null}
+
+      {estaProgramada ? (
+        <div style={{ marginTop: 4 }}>
+          <div style={{
+            fontSize: 10, padding: "6px 8px", borderRadius: 6,
+            background: idea.estado === "aprobada" ? "rgba(34,197,94,0.15)" : "rgba(234,179,8,0.15)",
+            border: `1px solid ${idea.estado === "aprobada" ? "rgba(34,197,94,0.4)" : "rgba(234,179,8,0.4)"}`,
+            color: idea.estado === "aprobada" ? "#4ade80" : "#fde047",
+            marginBottom: 6, lineHeight: 1.3
+          }}>
+            {idea.estado === "aprobada" ? (
+              <>✓ <b>Programada para:</b> {formatearFechaLocal(idea.programada_para)}<br/><span style={{ opacity: 0.8, fontSize: 9 }}>Se publicará automáticamente por cron en esa fecha</span></>
+            ) : (
+              <>⚠️ <b>Programada:</b> {formatearFechaLocal(idea.programada_para)}<br/><span style={{ opacity: 0.85, fontSize: 9 }}>Mové la tarjeta a "Aprobada" para activar el auto-publicado</span></>
+            )}
+          </div>
+          <button
+            disabled={guardando}
+            onClick={handleQuitar}
+            style={{
+              width: "100%", padding: "4px 0", fontSize: 10,
+              background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)",
+              borderRadius: 5, color: "#fca5a5", cursor: guardando ? "default" : "pointer"
+            }}
+          >
+            {guardando ? "Quitando…" : "❌ Cancelar / Quitar programación"}
+          </button>
+        </div>
+      ) : (
+        <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontStyle: "italic" }}>
+          Ingresá fecha/hora y presioná guardar para programar la publicación automática.
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Card({ idea, onMover, onVer, onProgramar, onPublicar, publicando, onReformulada }: {
   idea: MarketingIdea; onMover: (id: string, e: EstadoIdea) => void
   onVer: (idea: MarketingIdea) => void
@@ -125,37 +239,41 @@ function Card({ idea, onMover, onVer, onProgramar, onPublicar, publicando, onRef
       ) : null}
       {idea.estado === "en_revision" ? <Reformular idea={idea} onResult={(patch) => onReformulada(idea.id, patch)} /> : null}
       {idea.estado === "aprobada" || idea.programada_para ? (
-        <div key={`prog-${idea.id}-${idea.programada_para ?? ""}`} style={{ marginBottom: 8 }}>
-          <label style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", display: "block", marginBottom: 4 }}>
-            📅 Programar
-          </label>
-          <input type="datetime-local" defaultValue={isoToLocalInput(idea.programada_para)}
-            onChange={(e) => {
-              const v = e.target.value
-              onProgramar(idea.id, v ? new Date(v).toISOString() : null)
-            }}
-            style={{ width: "100%", fontSize: 11, padding: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", colorScheme: "dark" }} />
-        </div>
+        <SeccionProgramacion key={`prog-${idea.id}-${idea.programada_para ?? ""}`} idea={idea} onProgramar={onProgramar} />
       ) : null}
       {idea.estado === "aprobada" && idea.fuente === "blog" ? (
-        <button disabled={publicando} onClick={() => onPublicar(idea.id)}
-          style={{
-            width: "100%", marginBottom: 8, padding: "6px 0", fontSize: 11, fontWeight: 600,
-            background: publicando ? "rgba(194,120,60,0.4)" : ACCENT, border: "none", borderRadius: 6,
-            color: "#fff", cursor: publicando ? "default" : "pointer",
-          }}>
-          {publicando ? "Publicando…" : "Publicar (web + LinkedIn)"}
-        </button>
+        <div style={{ marginBottom: 8 }}>
+          <button disabled={publicando} onClick={() => onPublicar(idea.id)}
+            style={{
+              width: "100%", padding: "6px 0", fontSize: 11, fontWeight: 600,
+              background: publicando ? "rgba(194,120,60,0.4)" : ACCENT, border: "none", borderRadius: 6,
+              color: "#fff", cursor: publicando ? "default" : "pointer",
+            }}>
+            {publicando ? "Publicando…" : idea.programada_para ? "⚡ Publicar AHORA (inmediato)" : "Publicar (web + LinkedIn)"}
+          </button>
+          {idea.programada_para ? (
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", display: "block", textAlign: "center", marginTop: 2 }}>
+              Publica inmediatamente sin esperar a la fecha programada
+            </span>
+          ) : null}
+        </div>
       ) : null}
       {idea.estado === "aprobada" && idea.fuente === "linkedin" ? (
-        <button disabled={publicando} onClick={() => onPublicar(idea.id)}
-          style={{
-            width: "100%", marginBottom: 8, padding: "6px 0", fontSize: 11, fontWeight: 600,
-            background: publicando ? "rgba(99,102,241,0.3)" : "rgba(99,102,241,0.85)", border: "none", borderRadius: 6,
-            color: "#fff", cursor: publicando ? "default" : "pointer",
-          }}>
-          {publicando ? "Publicando…" : "Publicar en LinkedIn"}
-        </button>
+        <div style={{ marginBottom: 8 }}>
+          <button disabled={publicando} onClick={() => onPublicar(idea.id)}
+            style={{
+              width: "100%", padding: "6px 0", fontSize: 11, fontWeight: 600,
+              background: publicando ? "rgba(99,102,241,0.3)" : "rgba(99,102,241,0.85)", border: "none", borderRadius: 6,
+              color: "#fff", cursor: publicando ? "default" : "pointer",
+            }}>
+            {publicando ? "Publicando…" : idea.programada_para ? "⚡ Publicar AHORA (inmediato)" : "Publicar en LinkedIn"}
+          </button>
+          {idea.programada_para ? (
+            <span style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", display: "block", textAlign: "center", marginTop: 2 }}>
+              Publica inmediatamente sin esperar a la fecha programada
+            </span>
+          ) : null}
+        </div>
       ) : null}
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <button disabled={!prev} onClick={() => prev && onMover(idea.id, prev)}
@@ -423,6 +541,310 @@ function Calendario({ items, onVer }: { items: MarketingIdea[]; onVer: (i: Marke
   )
 }
 
+function ModalVisor({ idea, onClose }: { idea: MarketingIdea; onClose: () => void }) {
+  const assets = idea.assets ?? []
+  const tieneVisuales = assets.length > 0 || Boolean((idea.blog as Record<string, unknown>)?.featured_image_url)
+  const blogObj = (idea.blog ?? {}) as Record<string, unknown>
+  const lnPost = typeof blogObj.linkedin_post === "string" ? blogObj.linkedin_post : ""
+  const lnCom = typeof blogObj.linkedin_primer_comentario === "string" ? blogObj.linkedin_primer_comentario : ""
+  const primerComentario = idea.primer_comentario || lnCom
+  const tieneLinkedIn = idea.fuente === "blog" && Boolean(lnPost)
+  const tieneComentarios = Boolean(primerComentario) || (idea.hashtags && idea.hashtags.length > 0)
+
+  const [tab, setTab] = useState<"post" | "preview" | "linkedin" | "comentario" | "todo">("post")
+
+  function copiarTexto(texto: string, msj = "Texto copiado ✓") {
+    navigator.clipboard.writeText(texto)
+    alert(msj)
+  }
+
+  return (
+    <div onClick={onClose}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#0b1220", border: "1px solid rgba(255,255,255,0.12)",
+          borderRadius: 16, padding: 24, width: 780, maxWidth: "95vw", maxHeight: "88vh",
+          display: "flex", flexDirection: "column", gap: 16, boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)"
+        }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, borderBottom: "1px solid rgba(255,255,255,0.08)", paddingBottom: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <FunnelBadge funnel={idea.funnel} />
+              <Chip>{idea.fuente.toUpperCase()}</Chip>
+              <Chip>{idea.formato}</Chip>
+              {idea.angulo ? <Chip>{idea.angulo}</Chip> : null}
+            </div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.3 }}>{idea.titulo}</h2>
+          </div>
+          <button onClick={onClose}
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)", fontSize: 18, width: 32, height: 32, borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+        </div>
+
+        {/* Tab Navigation Bar (Segmented Control Style) */}
+        <div style={{
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          borderRadius: 12,
+          padding: 4,
+          display: "flex",
+          gap: 4,
+          alignItems: "center",
+          flexWrap: "wrap",
+        }}>
+          <button
+            onClick={() => setTab("post")}
+            style={{
+              flex: 1,
+              minWidth: 100,
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: "none",
+              fontSize: 12,
+              fontWeight: tab === "post" ? 700 : 500,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              background: tab === "post" ? ACCENT : "transparent",
+              color: tab === "post" ? "#fff" : "rgba(255,255,255,0.6)",
+              boxShadow: tab === "post" ? "0 2px 8px rgba(194,120,60,0.35)" : "none",
+            }}
+          >
+            📄 Posteo
+          </button>
+
+          {tieneVisuales ? (
+            <button
+              onClick={() => setTab("preview")}
+              style={{
+                flex: 1,
+                minWidth: 100,
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: "none",
+                fontSize: 12,
+                fontWeight: tab === "preview" ? 700 : 500,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                background: tab === "preview" ? ACCENT : "transparent",
+                color: tab === "preview" ? "#fff" : "rgba(255,255,255,0.6)",
+                boxShadow: tab === "preview" ? "0 2px 8px rgba(194,120,60,0.35)" : "none",
+              }}
+            >
+              🖼️ Visuales
+            </button>
+          ) : null}
+
+          {tieneLinkedIn ? (
+            <button
+              onClick={() => setTab("linkedin")}
+              style={{
+                flex: 1,
+                minWidth: 100,
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: "none",
+                fontSize: 12,
+                fontWeight: tab === "linkedin" ? 700 : 500,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                background: tab === "linkedin" ? "#6366f1" : "transparent",
+                color: tab === "linkedin" ? "#fff" : "#a5b4fc",
+                boxShadow: tab === "linkedin" ? "0 2px 8px rgba(99,102,241,0.35)" : "none",
+              }}
+            >
+              💼 LinkedIn
+            </button>
+          ) : null}
+
+          {tieneComentarios ? (
+            <button
+              onClick={() => setTab("comentario")}
+              style={{
+                flex: 1,
+                minWidth: 110,
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: "none",
+                fontSize: 12,
+                fontWeight: tab === "comentario" ? 700 : 500,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+                background: tab === "comentario" ? ACCENT : "transparent",
+                color: tab === "comentario" ? "#fff" : "rgba(255,255,255,0.6)",
+                boxShadow: tab === "comentario" ? "0 2px 8px rgba(194,120,60,0.35)" : "none",
+              }}
+            >
+              💬 Comentario
+            </button>
+          ) : null}
+
+          <button
+            onClick={() => setTab("todo")}
+            style={{
+              flex: 1,
+              minWidth: 90,
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: "none",
+              fontSize: 12,
+              fontWeight: tab === "todo" ? 700 : 500,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
+              background: tab === "todo" ? "rgba(255,255,255,0.12)" : "transparent",
+              color: tab === "todo" ? "#fff" : "rgba(255,255,255,0.5)",
+            }}
+          >
+            🔍 Ver Todo
+          </button>
+        </div>
+
+        {/* Content Area */}
+        <div style={{ flex: 1, overflowY: "auto", paddingRight: 4, display: "flex", flexDirection: "column", gap: 16 }}>
+          {tab === "post" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Contenido del Posteo
+                </span>
+                <button
+                  onClick={() => copiarTexto(idea.contenido ?? "")}
+                  style={{ padding: "6px 14px", background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.4)", borderRadius: 6, color: "#a5b4fc", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  📋 Copiar Texto Completo
+                </button>
+              </div>
+              <div style={{
+                fontSize: 14, color: "rgba(255,255,255,0.9)", lineHeight: 1.6, whiteSpace: "pre-wrap",
+                padding: 16, background: "rgba(0,0,0,0.3)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.06)",
+                minHeight: 200, flex: 1
+              }}>
+                {idea.contenido || <span style={{ color: "rgba(255,255,255,0.3)", fontStyle: "italic" }}>Sin contenido desarrollado todavía.</span>}
+              </div>
+            </div>
+          )}
+
+          {tab === "preview" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <PreviewPieza idea={idea} />
+            </div>
+          )}
+
+          {tab === "linkedin" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  Versión Adaptada para LinkedIn
+                </span>
+                <button
+                  onClick={() => copiarTexto(lnPost)}
+                  style={{ padding: "6px 14px", background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.4)", borderRadius: 6, color: "#a5b4fc", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  📋 Copiar Post LinkedIn
+                </button>
+              </div>
+              <div style={{
+                fontSize: 14, color: "rgba(255,255,255,0.9)", lineHeight: 1.6, whiteSpace: "pre-wrap",
+                padding: 16, background: "rgba(99,102,241,0.08)", borderRadius: 10, border: "1px solid rgba(99,102,241,0.2)",
+                minHeight: 200
+              }}>
+                {lnPost}
+              </div>
+            </div>
+          )}
+
+          {tab === "comentario" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {primerComentario ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      Primer Comentario (Engagement)
+                    </span>
+                    <button
+                      onClick={() => copiarTexto(primerComentario, "Primer comentario copiado ✓")}
+                      style={{ padding: "5px 12px", background: "rgba(194,120,60,0.2)", border: "1px solid rgba(194,120,60,0.4)", borderRadius: 6, color: "#e29e6d", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      📋 Copiar Comentario
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.5, whiteSpace: "pre-wrap", padding: 12, background: "rgba(0,0,0,0.25)", borderRadius: 8, border: "1px solid rgba(255,255,255,0.06)" }}>
+                    {primerComentario}
+                  </div>
+                </div>
+              ) : null}
+
+              {idea.hashtags && idea.hashtags.length > 0 ? (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginBottom: 6, textTransform: "uppercase" }}>
+                    Hashtags Recomendados
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {idea.hashtags.map((h, idx) => <Chip key={idx}>{h}</Chip>)}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {tab === "todo" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              {tieneVisuales ? (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, textTransform: "uppercase" }}>
+                    Visuales
+                  </div>
+                  <PreviewPieza idea={idea} />
+                </div>
+              ) : null}
+
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: ACCENT, textTransform: "uppercase" }}>
+                    Descripción / Contenido principal
+                  </span>
+                  <button onClick={() => copiarTexto(idea.contenido ?? "")}
+                    style={{ padding: "4px 10px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                    Copiar
+                  </button>
+                </div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.5, whiteSpace: "pre-wrap", padding: 12, background: "rgba(0,0,0,0.2)", borderRadius: 8 }}>
+                  {idea.contenido}
+                </div>
+              </div>
+
+              {tieneLinkedIn ? (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: "#a5b4fc", marginBottom: 8, textTransform: "uppercase" }}>
+                    Versión LinkedIn
+                  </div>
+                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", lineHeight: 1.5, whiteSpace: "pre-wrap", padding: 12, background: "rgba(99,102,241,0.06)", borderRadius: 8 }}>
+                    {lnPost}
+                  </div>
+                </div>
+              ) : null}
+
+              {primerComentario ? (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: ACCENT, marginBottom: 8, textTransform: "uppercase" }}>
+                    Primer Comentario
+                  </div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.5, whiteSpace: "pre-wrap", padding: 10, background: "rgba(0,0,0,0.15)", borderRadius: 6 }}>
+                    {primerComentario}
+                  </div>
+                </div>
+              ) : null}
+
+              {idea.hashtags && idea.hashtags.length > 0 ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {idea.hashtags.map((h, idx) => <Chip key={idx}>{h}</Chip>)}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const router = useRouter()
   const [items, setItems] = useState<MarketingIdea[]>(ideas)
@@ -670,68 +1092,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
       ) : null}
 
       {verIdea ? (
-        <div onClick={() => setVerIdea(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
-          <div onClick={(e) => e.stopPropagation()}
-            style={{ background: "#0d1424", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 14, padding: 24, width: 560, maxWidth: "90vw", maxHeight: "80vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}><FunnelBadge funnel={verIdea.funnel} /></div>
-                <h2 style={{ fontSize: 16, color: "#fff", margin: 0 }}>{verIdea.titulo}</h2>
-              </div>
-              <button onClick={() => setVerIdea(null)}
-                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", fontSize: 18, cursor: "pointer", lineHeight: 1 }}>×</button>
-            </div>
-            <PreviewPieza idea={verIdea} />
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, textTransform: "uppercase", letterSpacing: "0.04em" }}>Descripción del posteo</div>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(verIdea.contenido ?? "")
-                  alert("Descripción copiada ✓")
-                }}
-                style={{ padding: "5px 12px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 6, color: "#a5b4fc", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                Copiar
-              </button>
-            </div>
-            <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap", maxHeight: 360, overflowY: "auto", padding: 12, background: "rgba(0,0,0,0.2)", borderRadius: 8 }}>
-              {verIdea.contenido}
-            </div>
-            {(() => {
-              const b = (verIdea.blog ?? {}) as Record<string, unknown>
-              const lnPost = typeof b.linkedin_post === "string" ? b.linkedin_post : ""
-              const lnCom = typeof b.linkedin_primer_comentario === "string" ? b.linkedin_primer_comentario : ""
-              if (verIdea.fuente !== "blog" || !lnPost) return null
-              return (
-                <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: "0.04em" }}>Versión LinkedIn (post + portada)</div>
-                  <div style={{ fontSize: 13, color: "rgba(255,255,255,0.8)", whiteSpace: "pre-wrap", maxHeight: 260, overflowY: "auto", padding: 12, background: "rgba(99,102,241,0.06)", borderRadius: 8 }}>{lnPost}</div>
-                  {lnCom ? (
-                    <div>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.4)", marginBottom: 4, textTransform: "uppercase" }}>Primer comentario (engagement)</div>
-                      <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", whiteSpace: "pre-wrap", padding: 8, background: "rgba(0,0,0,0.15)", borderRadius: 6 }}>{lnCom}</div>
-                    </div>
-                  ) : null}
-                </div>
-              )
-            })()}
-            {verIdea.primer_comentario ? (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: ACCENT, marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  Primer comentario
-                </div>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", whiteSpace: "pre-wrap", padding: 8, background: "rgba(0,0,0,0.15)", borderRadius: 6 }}>
-                  {verIdea.primer_comentario}
-                </div>
-              </div>
-            ) : null}
-            {verIdea.hashtags && verIdea.hashtags.length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {verIdea.hashtags.map((h, idx) => <Chip key={idx}>{h}</Chip>)}
-              </div>
-            ) : null}
-          </div>
-        </div>
+        <ModalVisor idea={verIdea} onClose={() => setVerIdea(null)} />
       ) : null}
 
       {comentarioModal ? (
