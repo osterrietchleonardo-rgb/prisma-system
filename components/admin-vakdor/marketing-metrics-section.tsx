@@ -113,7 +113,7 @@ export function MarketingMetricsSection() {
         </div>
       ) : (
         <>
-          {/* Gráfico de Embudo Invertido Real (Sin recorte de texto) */}
+          {/* Gráfico de Embudo Invertido Real */}
           <div style={{
             background: "rgba(0,0,0,0.25)",
             border: "1px solid rgba(255,255,255,0.06)",
@@ -132,7 +132,7 @@ export function MarketingMetricsSection() {
               </span>
             </div>
 
-            {/* Embudo Trapezoidal con Capas Desacopladas (Garantiza NULA superposición/corte de texto) */}
+            {/* Embudo Trapezoidal Desacoplado (Sin corte de texto) */}
             <div style={{
               width: "100%",
               maxWidth: 760,
@@ -183,7 +183,7 @@ export function MarketingMetricsSection() {
                         zIndex: 1,
                       }} />
 
-                      {/* Contenido de Texto Desacoplado (Capa Frontal - Imposible que se corte) */}
+                      {/* Contenido de Texto Desacoplado */}
                       <div style={{
                         position: "relative",
                         zIndex: 2,
@@ -275,27 +275,27 @@ export function MarketingMetricsSection() {
                   </div>
                 </div>
                 <div style={{ padding: 8, background: "rgba(255,255,255,0.03)", borderRadius: 6, textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Engagement</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80" }}>
-                    {data?.bufferStats?.avgEngagementRate ?? 0}%
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Alcance (Reach)</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#7dd3fc" }}>
+                    {(data?.bufferStats?.reach ?? 0).toLocaleString()}
                   </div>
                 </div>
                 <div style={{ padding: 8, background: "rgba(255,255,255,0.03)", borderRadius: 6, textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Posts Totales</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#a5b4fc" }}>
-                    {data?.bufferStats?.totalPosts ?? 0}
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Engagement</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80" }}>
+                    {data?.bufferStats?.avgEngagementRate ?? 0}%
                   </div>
                 </div>
               </div>
 
               {/* Publicaciones Reales Registradas en la Base de Datos */}
               <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginTop: 4 }}>
-                Publicaciones Reales Publicadas
+                Publicaciones Reales Registradas
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto" }}>
-                {(data?.bufferStats?.ranking ?? []).length > 0 ? (
-                  (data?.bufferStats?.ranking ?? []).map((post, rIdx) => (
+                {(data?.bufferStats?.publicaciones ?? []).length > 0 ? (
+                  (data?.bufferStats?.publicaciones ?? []).map((post, rIdx) => (
                     <div key={post.id || rIdx} style={{
                       padding: 10,
                       background: "rgba(255,255,255,0.02)",

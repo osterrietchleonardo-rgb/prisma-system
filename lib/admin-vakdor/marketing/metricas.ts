@@ -22,14 +22,9 @@ export interface GscQuery {
   position: number
 }
 
-export interface BufferPostRanking {
+export interface BufferPublishedPost {
   id: string
   text: string
-  impressions: number
-  clicks: number
-  reactions: number
-  comments: number
-  engagementRate: number
   createdAt: string
   formato: string
   angulo: string
@@ -49,8 +44,11 @@ export interface MarketingMetricsPayload {
   bufferStats: {
     totalPosts: number
     totalImpressions: number
+    reach: number
+    totalReactions: number
+    totalComments: number
     avgEngagementRate: number
-    ranking: BufferPostRanking[]
+    publicaciones: BufferPublishedPost[]
   }
   contentDistribution: ContentDistribution
   updatedAt: string
@@ -130,22 +128,22 @@ export async function fetchGa4Funnel(periodo: "7d" | "30d" | "90d"): Promise<Fun
     }
     // 2. Demo (/demostracion)
     if (pagePath.includes("/demostracion") || pagePath.includes("/demo")) {
-      if (eventName === "page_view" || eventName === "session_start" || eventName === "first_visit") demoCount += count
+      if (eventName === "page_view" || eventName === "session_start") demoCount += count
     }
-    // 3. Video 100%
-    if (eventName === "video_complete" || eventName === "scroll_depth" || (pagePath.includes("/demostracion") && eventName === "user_engagement")) {
+    // 3. Video 100% (Únicamente evento real video_complete, sin incluir scroll)
+    if (eventName === "video_complete") {
       video100Count += count
     }
     // 4. Página /call (agendar)
     if (pagePath.includes("/call") || pagePath.includes("/contact") || pagePath.includes("/agendar")) {
-      if (eventName === "page_view" || eventName === "session_start" || eventName === "first_visit") callPageCount += count
+      if (eventName === "page_view" || eventName === "session_start") callPageCount += count
     }
     // 5. Formulario completado
-    if (eventName === "form_start" || eventName === "form_submit" || eventName === "clic_agendar_demo" || eventName === "clic_email_contacto") {
+    if (eventName === "form_submit" || eventName === "clic_agendar_demo") {
       formCount += count
     }
     // 6. Reunión solicitada (Conversion API / generate_lead / schedule_call)
-    if (eventName === "schedule_call" || eventName === "generate_lead" || eventName === "conversion") {
+    if (eventName === "schedule_call" || eventName === "generate_lead") {
       meetingCount += count
     }
   }
@@ -153,7 +151,7 @@ export async function fetchGa4Funnel(periodo: "7d" | "30d" | "90d"): Promise<Fun
   const rawStages = [
     { key: "home", label: "Home", sublabel: "vakdor.com/", count: homeCount },
     { key: "demo", label: "Demostración", sublabel: "/demostracion", count: demoCount },
-    { key: "video_100", label: "Video 100%", sublabel: "Reproducción completa", count: video100Count },
+    { key: "video_100", label: "Video 100%", sublabel: "Reproducción completa (video_complete)", count: video100Count },
     { key: "call", label: "Página /call", sublabel: "/call (Agendar)", count: callPageCount },
     { key: "form", label: "Formulario", sublabel: "Formulario completado", count: formCount },
     { key: "meeting", label: "Reunión Solicitada", sublabel: "Lead cualificado CAPI", count: meetingCount },
@@ -175,7 +173,7 @@ export async function fetchGa4Funnel(periodo: "7d" | "30d" | "90d"): Promise<Fun
 }
 
 /**
- * Consulta a Google Search Console (Palabras clave orgánicas de vakdor.com).
+ * Consulta a Google Search Console (Palabras clave orgánicas reales de vakdor.com).
  */
 export async function fetchGscQueries(periodo: "7d" | "30d" | "90d"): Promise<GscQuery[]> {
   try {
@@ -219,16 +217,23 @@ export async function fetchGscQueries(periodo: "7d" | "30d" | "90d"): Promise<Gs
 }
 
 /**
- * Consulta a Buffer (GraphQL API) + Supabase (marketing_ideas) para ranking de LinkedIn 100% real.
+ * Consulta a Buffer (GraphQL API) + Supabase (marketing_ideas) para publicaciones 100% reales.
+ * SIN NINGÚN CÁLCULO FABRICADO POR POST.
  */
 export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise<{
   totalPosts: number
   totalImpressions: number
+  reach: number
+  totalReactions: number
+  totalComments: number
   avgEngagementRate: number
-  ranking: BufferPostRanking[]
+  publicaciones: BufferPublishedPost[]
 }> {
   let postCount = 0
   let totalImpressions = 0
+  let reach = 0
+  let totalReactions = 0
+  let totalComments = 0
   let avgEngagementRate = 0
 
   try {
@@ -274,6 +279,9 @@ export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise
         const metrics = body?.data?.aggregatedPostMetrics?.metrics ?? []
         postCount = metrics.find((m: any) => m.type === "postCount")?.value ?? 0
         totalImpressions = metrics.find((m: any) => m.type === "impressions")?.value ?? 0
+        reach = metrics.find((m: any) => m.type === "reach")?.value ?? 0
+        totalReactions = metrics.find((m: any) => m.type === "reactions")?.value ?? 0
+        totalComments = metrics.find((m: any) => m.type === "comments")?.value ?? 0
         avgEngagementRate = metrics.find((m: any) => m.type === "engagementRate")?.value ?? 0
       }
     }
@@ -281,38 +289,33 @@ export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise
     console.error("Buffer fetch error:", err)
   }
 
-  // Leer las publicaciones reales guardadas en la base de datos de marketing_ideas
+  // Leer únicamente las publicaciones reales guardadas en Supabase
   const db = getAdminDb()
   const { data: dbIdeas } = await db
     .from("marketing_ideas")
     .select("id, titulo, formato, angulo, publicado_en, created_at, estado")
     .order("created_at", { ascending: false })
-    .limit(15)
+    .limit(10)
 
   const publicadas = (dbIdeas ?? []).filter((i: any) => i.estado === "publicada" || i.publicado_en)
-  const listaProcesada = publicadas.length > 0 ? publicadas : (dbIdeas ?? []).slice(0, 5)
+  const listaBase = publicadas.length > 0 ? publicadas : (dbIdeas ?? []).slice(0, 5)
 
-  const ranking: BufferPostRanking[] = listaProcesada.map((i: any, idx: number) => {
-    const baseImp = totalImpressions > 0 ? Math.round(totalImpressions / (idx + 1.5)) : 0
-    return {
-      id: i.id,
-      text: i.titulo,
-      impressions: baseImp,
-      clicks: Math.round(baseImp * 0.06),
-      reactions: Math.round(baseImp * 0.04),
-      comments: Math.round(baseImp * 0.01),
-      engagementRate: avgEngagementRate || 0,
-      createdAt: i.created_at,
-      formato: i.formato ?? "carrusel",
-      angulo: typeof i.angulo === "string" ? i.angulo : "general",
-    }
-  })
+  const publicaciones: BufferPublishedPost[] = listaBase.map((i: any) => ({
+    id: i.id,
+    text: i.titulo,
+    createdAt: i.created_at,
+    formato: i.formato ?? "post_texto",
+    angulo: typeof i.angulo === "string" ? i.angulo : "general",
+  }))
 
   return {
-    totalPosts: postCount || publicadas.length,
+    totalPosts: postCount || publicaciones.length,
     totalImpressions,
+    reach,
+    totalReactions,
+    totalComments,
     avgEngagementRate,
-    ranking,
+    publicaciones,
   }
 }
 
