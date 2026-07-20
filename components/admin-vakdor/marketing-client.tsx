@@ -948,96 +948,138 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
     }
   }
 
+  const [tabPrincipal, setTabPrincipal] = useState<"tablero" | "metricas">("tablero")
+
   return (
     <div style={{ padding: "28px 32px", minHeight: "100vh" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", margin: 0 }}>Marketing</h1>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", margin: "4px 0 0" }}>
-            Pipeline de contenido del Agente IA de Marketing
+            Pipeline de contenido del Agente IA de Marketing, Métricas en Vivo & Inteligencia IA
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: 3 }}>
-            {(["tablero", "calendario"] as const).map((v) => (
-              <button key={v} onClick={() => setVista(v)}
-                style={{
-                  padding: "6px 12px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
-                  background: vista === v ? ACCENT : "transparent",
-                  color: vista === v ? "#fff" : "rgba(255,255,255,0.5)",
-                }}>
-                {v === "tablero" ? "Tablero" : "Calendario"}
+
+        {/* Solapas Principales: Tablero de Ideas vs Métricas & IA */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, padding: 4 }}>
+            <button
+              onClick={() => setTabPrincipal("tablero")}
+              style={{
+                padding: "8px 18px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                background: tabPrincipal === "tablero" ? ACCENT : "transparent",
+                color: tabPrincipal === "tablero" ? "#fff" : "rgba(255,255,255,0.5)",
+                transition: "all 0.15s ease",
+              }}>
+              🗂️ Tablero de Ideas
+            </button>
+            <button
+              onClick={() => setTabPrincipal("metricas")}
+              style={{
+                padding: "8px 18px", borderRadius: 8, border: "none", fontSize: 13, fontWeight: 700, cursor: "pointer",
+                background: tabPrincipal === "metricas" ? ACCENT : "transparent",
+                color: tabPrincipal === "metricas" ? "#fff" : "rgba(255,255,255,0.5)",
+                transition: "all 0.15s ease",
+              }}>
+              📊 Métricas & Inteligencia IA
+            </button>
+          </div>
+
+          {tabPrincipal === "tablero" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ display: "flex", gap: 4, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: 3 }}>
+                {(["tablero", "calendario"] as const).map((v) => (
+                  <button key={v} onClick={() => setVista(v)}
+                    style={{
+                      padding: "6px 12px", borderRadius: 6, border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      background: vista === v ? "rgba(255,255,255,0.15)" : "transparent",
+                      color: vista === v ? "#fff" : "rgba(255,255,255,0.5)",
+                    }}>
+                    {v === "tablero" ? "Vista Kanban" : "Calendario"}
+                  </button>
+                ))}
+              </div>
+
+              <button onClick={() => setNueva(true)}
+                style={{ padding: "9px 16px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                + Nueva idea
               </button>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={() => setNueva(true)}
-            style={{ padding: "9px 16px", background: ACCENT, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            + Nueva idea
-          </button>
-          <button disabled={generando}
-            onClick={async () => {
-              setGenerando(true)
-              try {
-                const res = await fetch("/api/admin-vakdor/marketing/generar", { method: "POST" })
-                if (res.ok) {
-                  router.refresh()
-                } else {
-                  alert("No se pudieron generar ideas ahora")
-                }
-              } catch {
-                alert("No se pudieron generar ideas ahora")
-              } finally {
-                setGenerando(false)
-              }
-            }}
-            style={{ padding: "9px 16px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, color: "#a5b4fc", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-            {generando ? "Generando…" : "✦ Generar ideas ahora"}
-          </button>
-          </div>
+
+              <button disabled={generando}
+                onClick={async () => {
+                  setGenerando(true)
+                  try {
+                    const res = await fetch("/api/admin-vakdor/marketing/generar", { method: "POST" })
+                    if (res.ok) {
+                      router.refresh()
+                    } else {
+                      alert("No se pudieron generar ideas ahora")
+                    }
+                  } catch {
+                    alert("No se pudieron generar ideas ahora")
+                  } finally {
+                    setGenerando(false)
+                  }
+                }}
+                style={{ padding: "9px 16px", background: "rgba(99,102,241,0.15)", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 8, color: "#a5b4fc", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                {generando ? "Generando…" : "✦ Generar ideas ahora"}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {vista === "tablero" ? (
-        <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 12, alignItems: "flex-start" }}>
-          {ESTADOS.map((col) => {
-            const cards = porEstado(col.key)
-            const esRechazada = col.key === "rechazada"
-            return (
-              <div key={col.key}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  const id = e.dataTransfer.getData("text/plain")
-                  if (id) mover(id, col.key)
-                }}
-                style={{
-                minWidth: 260, width: 260, flexShrink: 0,
-                background: esRechazada ? "rgba(239,68,68,0.04)" : "rgba(255,255,255,0.015)",
-                border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 12,
-              }}>
-                <div style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12,
-                }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: esRechazada ? "#fca5a5" : ACCENT, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    {col.label}
-                  </span>
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{cards.length}</span>
-                </div>
-                {cards.map((idea) => (
-                  <Card key={idea.id} idea={idea} onMover={mover}
-                    onVer={setVerIdea} onProgramar={programar}
-                    onPublicar={publicar} publicando={publicandoId === idea.id} onReformulada={onReformulada} />
-                ))}
-                {cards.length === 0 ? (
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px 0" }}>—</div>
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-      ) : (
-        <Calendario items={items} onVer={setVerIdea} />
+      {/* Vista de Solapa 1: Tablero de Ideas */}
+      {tabPrincipal === "tablero" && (
+        <>
+          {vista === "tablero" ? (
+            <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 12, alignItems: "flex-start" }}>
+              {ESTADOS.map((col) => {
+                const cards = porEstado(col.key)
+                const esRechazada = col.key === "rechazada"
+                return (
+                  <div key={col.key}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      const id = e.dataTransfer.getData("text/plain")
+                      if (id) mover(id, col.key)
+                    }}
+                    style={{
+                      minWidth: 270, width: 270, flexShrink: 0,
+                      maxHeight: "calc(100vh - 200px)", overflowY: "auto",
+                      background: esRechazada ? "rgba(239,68,68,0.04)" : "rgba(255,255,255,0.015)",
+                      border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 12,
+                    }}>
+                    <div style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, position: "sticky", top: 0, background: "#0b1220", paddingBottom: 4, zIndex: 5
+                    }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: esRechazada ? "#fca5a5" : ACCENT, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                        {col.label}
+                      </span>
+                      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)" }}>{cards.length}</span>
+                    </div>
+                    {cards.map((idea) => (
+                      <Card key={idea.id} idea={idea} onMover={mover}
+                        onVer={setVerIdea} onProgramar={programar}
+                        onPublicar={publicar} publicando={publicandoId === idea.id} onReformulada={onReformulada} />
+                    ))}
+                    {cards.length === 0 ? (
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.2)", textAlign: "center", padding: "16px 0" }}>—</div>
+                    ) : null}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <Calendario items={items} onVer={setVerIdea} />
+          )}
+        </>
+      )}
+
+      {/* Vista de Solapa 2: Métricas & Inteligencia IA */}
+      {tabPrincipal === "metricas" && (
+        <MarketingMetricsSection />
       )}
 
       {nueva ? (
@@ -1120,8 +1162,6 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
           </div>
         </div>
       ) : null}
-
-      <MarketingMetricsSection />
     </div>
   )
 }
