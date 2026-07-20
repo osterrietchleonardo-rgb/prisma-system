@@ -2,6 +2,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { ESTADOS, type MarketingIdea, type EstadoIdea, type FunnelStage } from "@/lib/admin-vakdor/marketing/types"
+import { MarketingMetricsSection } from "@/components/admin-vakdor/marketing-metrics-section"
 
 const ACCENT = "#c2783c"
 
@@ -1121,6 +1122,8 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
           </div>
         </div>
       ) : null}
+
+      <MarketingMetricsSection />
     </div>
   )
 }

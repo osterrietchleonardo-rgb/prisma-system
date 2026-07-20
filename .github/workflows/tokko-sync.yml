@@ -60,6 +60,14 @@ jobs:
           curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/audit-agente" \
                -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
+      # Colgado del mismo cron (diario 07:00 AM Argentina): métricas de conversión GA4 + ranking Buffer + IA Gemini 3.5 Flash.
+      - name: Trigger Marketing Metrics & AI Analysis
+        if: always()
+        continue-on-error: true
+        run: |
+          curl -sS --max-time 120 -X GET "https://${{ secrets.SITE_DOMAIN }}/api/cron/marketing-metrics" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
       # Mail resumen de Métricas. El endpoint decide (guard interno) mandar sólo en la corrida de las 10 UTC.
       - name: Trigger Audit Notify (mail resumen)
         if: always()
