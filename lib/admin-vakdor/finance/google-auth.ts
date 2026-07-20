@@ -1,5 +1,5 @@
 /**
- * Auth de Google service-account para BigQuery, sin dependencias externas.
+ * Auth de Google service-account para BigQuery y Analytics, sin dependencias externas.
  * Firma un JWT RS256 y lo canjea por un access token OAuth2.
  * Lee de .env: CLIENT_EMAIL, PRIVATE_KEY (con \n escapados), TOKEN_URI.
  */
@@ -8,13 +8,14 @@ import { createSign } from "crypto"
 const b64url = (s: string | Buffer) =>
   Buffer.from(s).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "")
 
-let cached: { token: string; exp: number } | null = null
+const cachedTokens: Record<string, { token: string; exp: number }> = {}
 
 export async function getGoogleAccessToken(
   scope = "https://www.googleapis.com/auth/bigquery.readonly"
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
-  if (cached && cached.exp - 60 > now) return cached.token
+  const existing = cachedTokens[scope]
+  if (existing && existing.exp - 60 > now) return existing.token
 
   const clientEmail = process.env.CLIENT_EMAIL
   const privateKey = (process.env.PRIVATE_KEY || "").replace(/\\n/g, "\n")
@@ -37,7 +38,7 @@ export async function getGoogleAccessToken(
   const j = await res.json()
   if (!res.ok || !j.access_token) throw new Error(`Google token ${res.status}: ${JSON.stringify(j).slice(0, 200)}`)
 
-  cached = { token: j.access_token, exp: now + (j.expires_in || 3600) }
+  cachedTokens[scope] = { token: j.access_token, exp: now + (j.expires_in || 3600) }
   return j.access_token
 }
 

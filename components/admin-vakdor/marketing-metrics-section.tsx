@@ -46,7 +46,6 @@ export function MarketingMetricsSection() {
   }, [periodo])
 
   const funnel = data?.funnel ?? []
-  const maxFunnelCount = funnel.length > 0 ? Math.max(1, funnel[0].count) : 1
 
   return (
     <div style={{
@@ -267,63 +266,29 @@ export function MarketingMetricsSection() {
               </div>
 
               {/* Tarjetas de Totales Reales devueltas por Buffer API */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                <div style={{ padding: 8, background: "rgba(255,255,255,0.03)", borderRadius: 6, textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Impresiones</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, padding: "12px 0" }}>
+                <div style={{ padding: 12, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Impresiones Totales</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>
                     {(data?.bufferStats?.totalImpressions ?? 0).toLocaleString()}
                   </div>
                 </div>
-                <div style={{ padding: 8, background: "rgba(255,255,255,0.03)", borderRadius: 6, textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Alcance (Reach)</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#7dd3fc" }}>
+                <div style={{ padding: 12, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Alcance (Reach)</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#7dd3fc" }}>
                     {(data?.bufferStats?.reach ?? 0).toLocaleString()}
                   </div>
                 </div>
-                <div style={{ padding: 8, background: "rgba(255,255,255,0.03)", borderRadius: 6, textAlign: "center" }}>
-                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Engagement</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#4ade80" }}>
+                <div style={{ padding: 12, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
+                  <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 4 }}>Engagement Rate</div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: "#4ade80" }}>
                     {data?.bufferStats?.avgEngagementRate ?? 0}%
                   </div>
                 </div>
               </div>
 
-              {/* Publicaciones Reales Registradas en la Base de Datos */}
-              <div style={{ fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.6)", marginTop: 4 }}>
-                Publicaciones Reales Registradas
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 220, overflowY: "auto" }}>
-                {(data?.bufferStats?.publicaciones ?? []).length > 0 ? (
-                  (data?.bufferStats?.publicaciones ?? []).map((post, rIdx) => (
-                    <div key={post.id || rIdx} style={{
-                      padding: 10,
-                      background: "rgba(255,255,255,0.02)",
-                      border: "1px solid rgba(255,255,255,0.05)",
-                      borderRadius: 8,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 6
-                    }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>
-                          #{rIdx + 1} {post.text}
-                        </span>
-                        <span style={{ fontSize: 9, padding: "1px 6px", borderRadius: 4, background: "rgba(99,102,241,0.2)", color: "#a5b4fc", fontWeight: 700 }}>
-                          {post.formato ?? "post_texto"}
-                        </span>
-                      </div>
-
-                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", fontStyle: "italic" }}>
-                        Ángulo: {post.angulo}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textAlign: "center", padding: "16px 0" }}>
-                    Sin publicaciones registradas en el período
-                  </div>
-                )}
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", lineHeight: 1.4, background: "rgba(255,255,255,0.02)", padding: 10, borderRadius: 6 }}>
+                💡 <b>Métricas conectadas en vivo con Buffer GraphQL API</b> para el canal de LinkedIn Personal de Vakdor.
               </div>
             </div>
 
@@ -339,9 +304,9 @@ export function MarketingMetricsSection() {
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: "#7dd3fc", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  🔍 Google Search Console · Frases Clave
+                  🔍 Google Search Console · Búsquedas Reales
                 </span>
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Búsquedas orgánicas reales</span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>SEO vakdor.com</span>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto" }}>
@@ -368,7 +333,7 @@ export function MarketingMetricsSection() {
                   ))
                 ) : (
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textAlign: "center", padding: "16px 0" }}>
-                    Sin consultas de búsqueda registradas
+                    Sin consultas de búsqueda registradas en el período
                   </div>
                 )}
               </div>
@@ -416,7 +381,7 @@ export function MarketingMetricsSection() {
                   </div>
                 </div>
 
-                {/* 2. Análisis del Ranking de Posts (Buffer/LinkedIn) */}
+                {/* 2. Análisis de Estrategia LinkedIn */}
                 {aiAnalysis.ranking_analisis && (
                   <div style={{ padding: 14, background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 10 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: "#a5b4fc", textTransform: "uppercase", marginBottom: 6, letterSpacing: "0.04em" }}>
