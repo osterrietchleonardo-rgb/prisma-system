@@ -23,12 +23,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     .eq("id", params.id).single()
   if (error || !idea) return NextResponse.json({ error: "idea no encontrada" }, { status: 404 })
 
-  // Solo carrusel/lead_magnet tienen visuales que el worker puede regenerar.
-  const puedeRegenerar = idea.formato === "carrusel" || idea.formato === "lead_magnet"
+  // Permitir regeneración de visuales / portada para todos los formatos (carrusel, blog, post imagen, etc.)
+  const puedeRegenerar = true
   const haráRegenerar = regenerar && puedeRegenerar
 
-  // Regenerar TODO: no generamos texto acá (el worker rehace descripción + slides/PDF
-  // desde el comentario, con la maqueta de marca). Solo limpiamos y mandamos a "en_proceso".
+  // Regenerar TODO: limpiamos assets y borrador y mandamos la tarjeta a "en_proceso" con el comentario para el worker
   if (haráRegenerar) {
     try {
       await regenerarVisuales(params.id, comentario)
@@ -38,14 +37,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
   }
 
-  // Reformular solo el texto. Para carrusel/lead_magnet, el "texto" es la DESCRIPCIÓN del
-  // posteo (caption con hook + storytelling), NO las slides ni el PDF.
-  const esVisual = puedeRegenerar
+  // Reformular solo el texto.
   const user = [
     `Pieza: ${idea.fuente} · ${idea.formato}. Título: ${idea.titulo}.`,
-    esVisual ? `Para ${idea.formato}, el texto es la DESCRIPCIÓN del posteo que acompaña a la pieza: un post con hook + storytelling, NO las slides ni el contenido del PDF.` : "",
-    idea.contenido ? `Borrador actual:\n${idea.contenido}` : `Todavía no hay borrador; escribí uno.`,
     `Instrucción del director para reformular: ${comentario}`,
+    idea.contenido ? `Borrador actual:\n${idea.contenido}` : `Todavía no hay borrador; escribí uno.`,
     `Devolvé SOLO el nuevo texto, listo para publicar. Sin explicaciones.`,
   ].filter(Boolean).join("\n\n")
 

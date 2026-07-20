@@ -291,7 +291,7 @@ function Reformular({ idea, onResult }: { idea: MarketingIdea; onResult: (patch:
   const [contenido, setContenido] = useState(idea.contenido ?? "")
   const [cargando, setCargando] = useState(false)
   const [regenerar, setRegenerar] = useState(false)
-  const puedeRegenerar = idea.formato === "carrusel" || idea.formato === "lead_magnet"
+  const puedeRegenerar = true
   return (
     <div style={{ marginBottom: 8 }}>
       {contenido ? (
@@ -302,26 +302,24 @@ function Reformular({ idea, onResult }: { idea: MarketingIdea; onResult: (patch:
       <textarea value={comentario} onChange={(e) => setComentario(e.target.value)}
         placeholder="Comentario para reformular…" rows={2}
         style={{ width: "100%", fontSize: 11, padding: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, color: "#fff", resize: "vertical" }} />
-      {puedeRegenerar ? (
-        <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 10, color: "rgba(255,255,255,0.6)", cursor: "pointer" }}>
-          <input type="checkbox" checked={regenerar} onChange={(e) => setRegenerar(e.target.checked)} style={{ accentColor: ACCENT }} />
-          También regenerar imágenes/PDF (rehace la pieza con el worker)
-        </label>
-      ) : null}
+      <label style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6, fontSize: 10, color: "rgba(255,255,255,0.7)", cursor: "pointer" }}>
+        <input type="checkbox" checked={regenerar} onChange={(e) => setRegenerar(e.target.checked)} style={{ accentColor: ACCENT }} />
+        También regenerar imágenes / portada / PDF (rehace la pieza visual con el worker)
+      </label>
       <button disabled={cargando || !comentario.trim()}
         onClick={async () => {
           setCargando(true)
           try {
             const res = await fetch(`/api/admin-vakdor/marketing/${idea.id}/reformular`, {
               method: "POST", headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ comentario: comentario.trim(), regenerar_visuales: puedeRegenerar && regenerar }),
+              body: JSON.stringify({ comentario: comentario.trim(), regenerar_visuales: regenerar }),
             })
             if (res.ok) {
               const d = await res.json()
               setComentario("")
               if (d.regenerando) {
                 onResult({ contenido: null, estado: "en_proceso", assets: [] })
-                alert("Reformulado ✓ — la tarjeta volvió a “En proceso”; el worker rehace la descripción + las imágenes/PDF y la devuelve a “En revisión”.")
+                alert("Reformulado ✓ — la tarjeta volvió a “En proceso”; el worker rehace la descripción + la portada/imágenes/PDF y la devuelve a “En revisión”.")
               } else {
                 setContenido(d.contenido)
                 onResult({ contenido: d.contenido })
@@ -336,7 +334,7 @@ function Reformular({ idea, onResult }: { idea: MarketingIdea; onResult: (patch:
           }
         }}
         style={{ marginTop: 6, width: "100%", padding: "6px 0", fontSize: 11, fontWeight: 600, background: cargando ? "rgba(194,120,60,0.4)" : ACCENT, border: "none", borderRadius: 6, color: "#fff", cursor: cargando ? "default" : "pointer" }}>
-        {cargando ? (regenerar && puedeRegenerar ? "Reformulando + regenerando…" : "Reformulando…") : "Reformular"}
+        {cargando ? (regenerar ? "Reformulando + regenerando visuales…" : "Reformulando…") : "Reformular"}
       </button>
     </div>
   )
