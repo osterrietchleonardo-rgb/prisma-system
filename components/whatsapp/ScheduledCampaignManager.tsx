@@ -137,9 +137,23 @@ export function ScheduledCampaignManager({ instance }: Props) {
     if (!name.trim()) return toast.error("Ponele un nombre a la campaña.")
     if (!selectedTemplate) return toast.error("Elegí una plantilla.")
 
+    for (const v of headerVars) {
+      const entry = headerMap[v] || { mode: "field", value: "nombre" }
+      if (entry.mode === "manual" && !entry.value.trim()) {
+        return toast.error(`Completá el texto fijo para la variable {{${v}}} del encabezado.`)
+      }
+    }
+
+    for (const v of bodyVars) {
+      const entry = bodyMap[v] || { mode: "field", value: "nombre" }
+      if (entry.mode === "manual" && !entry.value.trim()) {
+        return toast.error(`Completá el texto fijo para la variable {{${v}}} del cuerpo.`)
+      }
+    }
+
     const variable_map = {
-      header: headerVars.map((v) => headerMap[v] || { mode: "manual", value: "" }),
-      body: bodyVars.map((v) => bodyMap[v] || { mode: "manual", value: "" }),
+      header: headerVars.map((v) => headerMap[v] || { mode: "field", value: "nombre" }),
+      body: bodyVars.map((v) => bodyMap[v] || { mode: "field", value: "nombre" }),
     }
 
     setCreating(true)
