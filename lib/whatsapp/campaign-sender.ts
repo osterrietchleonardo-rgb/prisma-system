@@ -214,6 +214,16 @@ export async function processCampaign(
           .select('id')
           .single()
         conversationId = newConv?.id
+      } else {
+        // Si la conversación ya existía de antes, actualizamos bot_active y clasificacion 
+        // para alinearlos con la configuración de la campaña actual.
+        await supabase
+          .from('wa_conversations')
+          .update({
+            bot_active: campaign.bot_active_on_reply ?? true,
+            clasificacion: campaign.audience_clasificacion ?? null
+          })
+          .eq('id', conversationId)
       }
 
       if (conversationId) {
@@ -223,6 +233,36 @@ export async function processCampaign(
           content: fullText.trim(),
           role: 'human',
           message_type: 'text',
+        })
+
+        // Guardar en n8n_chat_histories para dar contexto a la IA
+        const fecha = new Date().toLocaleString('es-AR', { 
+          timeZone: 'America/Argentina/Buenos_Aires',
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }).replace(',', '')
+
+        await supabase.from('n8n_chat_histories').insert({
+          session_id: conversationId,
+          message: {
+            type: 'ai',
+            content: JSON.stringify({
+              output: {
+                Mensaje: fullText.trim(),
+                Fecha: fecha
+              }
+            }),
+            tool_calls: [],
+            additional_kwargs: {
+              is_template: true,
+              template_name: campaign.template_name
+            },
+            response_metadata: {
+              source: 'campaign_template_mass_auto',
+              agent_role: 'system_campaign_auto'
+            },
+            invalid_tool_calls: []
+          }
         })
       }
 

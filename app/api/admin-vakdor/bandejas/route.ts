@@ -24,12 +24,14 @@ export async function GET(request: NextRequest) {
       "id, agency_id, agent_id, contact_name, contact_phone, status, bot_active, unread_count, pipeline_stage, etiquetas, last_message_at, created_at",
       { count: "exact" }
     )
-    .order("last_message_at", { ascending: false, nullsFirst: false })
-    .range(offset, offset + perPage - 1)
 
   if (agencyId) query = query.eq("agency_id", agencyId)
   if (estado && estado !== "todos") query = query.eq("status", estado)
   if (q) query = query.or(`contact_name.ilike.%${q}%,contact_phone.ilike.%${q}%`)
+
+  query = query
+    .order("last_message_at", { ascending: false, nullsFirst: false })
+    .range(offset, offset + perPage - 1)
 
   const { data: conversations, count, error } = await query
 
