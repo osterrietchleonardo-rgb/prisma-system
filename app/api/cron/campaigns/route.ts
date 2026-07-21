@@ -8,7 +8,7 @@ export const maxDuration = 300
 
 // Tope de envíos por ejecución del cron (para no exceder el timeout de la función).
 // El límite DIARIO real se respeta con el conteo de enviados en las últimas 24h.
-const MAX_PER_RUN = 400
+const MAX_PER_RUN = 200
 
 export async function GET(req: Request) {
   const denied = assertCron(req)

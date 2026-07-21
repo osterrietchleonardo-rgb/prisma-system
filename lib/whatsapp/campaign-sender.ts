@@ -226,7 +226,7 @@ export async function processCampaign(
         })
       }
 
-      await supabase.from('wa_campaign_recipients').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', r.id)
+      await supabase.from('wa_campaign_recipients').update({ status: 'sent', sent_at: new Date().toISOString(), error_message: null }).eq('id', r.id)
       await markContactStatus(r.contact_id, r.phone, 'enviado')
       sent++
     } catch (e) {
