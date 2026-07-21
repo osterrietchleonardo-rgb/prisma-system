@@ -100,7 +100,14 @@ export function FeedbackForm() {
   async function onSubmit(data: FeedbackFormValues) {
     setIsPending(true)
     try {
-      const result = await submitFeedback({ ...data, evidenceFiles })
+      const payload = new FormData()
+      payload.append("type", data.type)
+      payload.append("content", data.content)
+      for (const file of evidenceFiles) {
+        payload.append("evidenceFiles", file)
+      }
+
+      const result = await submitFeedback(payload)
       if (result.success) {
         setIsSuccess(true)
         toast.success("¡Gracias por tu feedback!", {
@@ -116,8 +123,9 @@ export function FeedbackForm() {
         })
       }
     } catch (error) {
+      console.error("Error submitting feedback:", error)
       toast.error("Error al enviar", {
-        description: "No se pudo conectar con el servidor.",
+        description: error instanceof Error ? error.message : "No se pudo conectar con el servidor.",
       })
     } finally {
       setIsPending(false)

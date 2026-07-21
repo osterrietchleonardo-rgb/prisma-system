@@ -4,11 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 
-export async function submitFeedback(formData: {
-  type: string
-  content: string
-  evidenceFiles?: File[]
-}) {
+export async function submitFeedback(formData: FormData) {
   const supabase = createClient()
   const adminClient = createAdminClient()
 
@@ -30,21 +26,32 @@ export async function submitFeedback(formData: {
     return { error: "Perfil no encontrado" }
   }
 
+  const type = formData.get("type") as string
+  const content = formData.get("content") as string
+  const evidenceFiles = formData.getAll("evidenceFiles") as File[]
+
+  if (!type || !content) {
+    return { error: "Tipo y contenido son requeridos" }
+  }
+
   // Upload evidence images to Storage
   const evidenceUrls: string[] = []
-  if (formData.evidenceFiles && formData.evidenceFiles.length > 0) {
-    for (const file of formData.evidenceFiles.slice(0, 2)) {
-      const ext = file.name.split(".").pop() || "jpg"
+  if (evidenceFiles && evidenceFiles.length > 0) {
+    for (const file of evidenceFiles.slice(0, 2)) {
+      if (!file || typeof file === "string" || file.size === 0) continue
+      const ext = file.name ? file.name.split(".").pop() || "jpg" : "jpg"
       const path = `${session.user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
       const buffer = Buffer.from(await file.arrayBuffer())
       const { error: uploadError } = await adminClient.storage
         .from("feedback-evidence")
-        .upload(path, buffer, { contentType: file.type, upsert: false })
+        .upload(path, buffer, { contentType: file.type || "image/jpeg", upsert: false })
       if (!uploadError) {
         const { data: urlData } = adminClient.storage
           .from("feedback-evidence")
           .getPublicUrl(path)
         evidenceUrls.push(urlData.publicUrl)
+      } else {
+        console.error("Error uploading evidence image:", uploadError)
       }
     }
   }
@@ -54,8 +61,8 @@ export async function submitFeedback(formData: {
     email: profile.email,
     role: profile.role,
     agency_id: profile.agency_id ?? null,
-    type: formData.type,
-    content: formData.content,
+    type,
+    content,
     status: "new",
     estado: "pendiente",
     evidence_urls: evidenceUrls,
