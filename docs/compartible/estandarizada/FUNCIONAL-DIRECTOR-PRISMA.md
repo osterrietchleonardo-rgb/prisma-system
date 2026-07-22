@@ -231,7 +231,8 @@ Vas a ver un **asistente de configuración** que te guía paso a paso para conec
     > 🧭 **La clasificación se acumula, no se pisa.** Un lead puede tener varias y la columna las muestra en orden: `1. Whatsapp-Consulta` `2. Oferta-Julio` `3. oferta_julio_2026`. Es el recorrido: de dónde vino, en qué listas lo importaste y qué plantillas recibió.
     > - **Filtrás por cualquiera de ellas.** Si buscás `Whatsapp-Consulta` te aparece; si buscás la plantilla `oferta_julio_2026`, ese mismo lead **también** aparece. Sirve para ver en la bandeja quiénes recibieron una plantilla puntual, sin necesidad de una columna por campaña.
     > - **Al importar no se duplica nada.** Si el teléfono ya está en la agenda, se le **suma** la clasificación de la lista nueva: mismo contacto, mismo chat, sin perder de dónde venía. Antes esos contactos se salteaban y quedaban fuera del lote.
-    > - **Las plantillas que mandás clasifican solas** con su propio nombre, no tenés que cargar nada. Los seguimientos automáticos del sistema (recordatorios de visita, reactivación) **no** clasifican, para no ensuciar la lista.
+    > - **Las plantillas que mandás clasifican solas**, no tenés que cargar nada. Si la campaña va a un segmento, manda **el nombre que le pusiste al lote** cuando importaste (ej. `Oferta-Julio`), no el nombre técnico de la plantilla: un solo badge, no dos parecidos. El nombre de la plantilla se usa solo cuando la campaña va a todos los contactos, o en el envío manual puntual.
+    > - Los seguimientos automáticos del sistema (recordatorios de visita, reactivación) **no** clasifican, para no ensuciar la lista.
 - **⚙️ Configuración IA:** definís el comportamiento del bot (cómo responde, conocimiento, etc.).
 
 Arriba a la derecha, un **indicador de conexión** te muestra si la instancia está conectada.

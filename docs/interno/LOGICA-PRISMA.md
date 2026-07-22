@@ -743,7 +743,8 @@ Un mismo lead pasa por varios lugares: **entra** por `Whatsapp-Consulta`, despu�
   |---|---|
   | Chat entrante / alta manual | Siembra la primera (`Whatsapp-Consulta` / `Whatsapp-Manual`) |
   | Importar lista | Si el teléfono ya existe: **no duplica** contacto ni chat, le **suma** la del lote conservando su origen. Si es nuevo: la del lote |
-  | Campaña por segmento | Suma el segmento **y** el nombre de la plantilla |
+  | Campaña por segmento | Suma **el segmento** — o sea el nombre que el director le puso al lote al importar. **Gana sobre el nombre de la plantilla**, para no dejar dos badges que dicen casi lo mismo (`Reclutamientormx0726` + `reclutamiento_22062026`) |
+  | Campaña sin segmento (a todos los contactos) | Como no hay lote, el respaldo es el **nombre de la plantilla** |
   | Envío manual puntual | Suma el **nombre de la plantilla** enviada (no se le pide ningún dato extra al director) |
   | Plantillas del sistema | **Nada.** Se reconocen por el prefijo `ag<6 hex>_` (`esPlantillaDelSistema`): seguimiento, recordatorios de visita, reactivación. No son campañas del cliente |
 

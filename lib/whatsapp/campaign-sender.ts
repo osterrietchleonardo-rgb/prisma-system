@@ -155,9 +155,16 @@ export async function processCampaign(
   let sinMarcar = 0         // enviados a Meta pero no se pudo marcar (quedan en 'sending')
   let cortadaPorTiempo = false
 
-  // La plantilla enviada queda como clasificación del lead (para filtrar "quiénes
-  // recibieron esta plantilla"). Las que dispara el sistema solo, no clasifican.
+  // Clasificación que deja la campaña en el lead. GANA el segmento (que es el nombre que
+  // el director le puso al lote cuando importó los contactos); el nombre de la plantilla
+  // es solo el respaldo para cuando la campaña no tiene segmento (va a todos los contactos).
+  // Así no quedan dos badges redundantes ("Reclutamientormx0726" + "reclutamiento_22062026").
+  // Las plantillas que dispara el sistema solo nunca clasifican.
   const clasifPlantilla = esPlantillaDelSistema(campaign.template_name) ? null : campaign.template_name
+  const clasifCampaign: string | null = campaign.audience_clasificacion ?? clasifPlantilla
+  const origenCampaign = campaign.audience_clasificacion
+    ? `campaña: ${campaign.name || campaign.template_name}`
+    : origenPlantilla(campaign.template_name)
 
   const markContactStatus = async (contactId: string | null, phone: string, statusLabel: 'enviado' | 'error') => {
     try {
@@ -177,14 +184,8 @@ export async function processCampaign(
       }
       // Solo se clasifica lo que efectivamente salió.
       if (statusLabel === 'enviado') {
-        for (const clasif of [campaign.audience_clasificacion, clasifPlantilla]) {
-          const hist = sumarClasificacion(
-            { clasificacion: c.clasificacion, clasificaciones_historial: update.clasificaciones_historial ?? c.clasificaciones_historial },
-            clasif,
-            clasif === clasifPlantilla ? origenPlantilla(campaign.template_name) : `campaña: ${campaign.name || campaign.template_name}`
-          )
-          if (hist) update.clasificaciones_historial = hist
-        }
+        const hist = sumarClasificacion(c, clasifCampaign, origenCampaign)
+        if (hist) update.clasificaciones_historial = hist
       }
       await supabase.from('wa_contacts').update(update).eq('id', c.id)
     } catch { /* best-effort */ }
@@ -287,7 +288,6 @@ export async function processCampaign(
         .limit(1)
         .maybeSingle()
 
-      const origenClasif = `campaña: ${campaign.name || campaign.template_name}`
 
       let conversationId: string | undefined
       if (!conv) {
@@ -295,13 +295,13 @@ export async function processCampaign(
           .from('wa_contacts').select('clasificacion').eq('agency_id', campaign.agency_id).eq('phone', cleanPhone).maybeSingle()
         // Si la campaña tiene segmento, manda el segmento. Si va a todos los contactos
         // (sin segmento), se respeta la del contacto en vez de dejar el chat sin clasificar.
-        const clasifInicial = campaign.audience_clasificacion ?? contactClasif?.clasificacion ?? null
+        // Gana el segmento de la campaña (el nombre del lote importado); si no tiene,
+        // la del contacto en la agenda; y como último respaldo el nombre de la plantilla.
+        const clasifInicial = campaign.audience_clasificacion ?? contactClasif?.clasificacion ?? clasifPlantilla
         const atNuevo = new Date().toISOString()
-        const historialNuevo: Array<{ clasificacion: string; origen: string; at: string }> = []
-        if (clasifInicial) historialNuevo.push({ clasificacion: clasifInicial, origen: origenClasif, at: atNuevo })
-        if (clasifPlantilla && clasifPlantilla !== clasifInicial) {
-          historialNuevo.push({ clasificacion: clasifPlantilla, origen: origenPlantilla(campaign.template_name), at: atNuevo })
-        }
+        const historialNuevo = clasifInicial
+          ? [{ clasificacion: clasifInicial, origen: origenCampaign, at: atNuevo }]
+          : []
         const { data: newConv } = await supabase
           .from('wa_conversations')
           .insert({
@@ -332,24 +332,16 @@ export async function processCampaign(
           instance_id: instance.id,
           bot_active: campaign.bot_active_on_reply ?? true,
         }
-        // Si el lead no tenía ninguna, el segmento de la campaña pasa a ser su origen.
-        if (!conv.clasificacion && campaign.audience_clasificacion) {
-          update.clasificacion = campaign.audience_clasificacion
+        // Si el lead no tenía ninguna, la de la campaña pasa a ser su origen.
+        if (!conv.clasificacion && clasifCampaign) {
+          update.clasificacion = clasifCampaign
         }
-        for (const [clasif, origen] of [
-          [campaign.audience_clasificacion, origenClasif],
-          [clasifPlantilla, origenPlantilla(campaign.template_name)],
-        ] as Array<[string | null, string]>) {
-          const hist = sumarClasificacion(
-            {
-              clasificacion: (update.clasificacion as string) ?? conv.clasificacion,
-              clasificaciones_historial: update.clasificaciones_historial ?? conv.clasificaciones_historial,
-            },
-            clasif,
-            origen
-          )
-          if (hist) update.clasificaciones_historial = hist
-        }
+        const hist = sumarClasificacion(
+          { clasificacion: (update.clasificacion as string) ?? conv.clasificacion, clasificaciones_historial: conv.clasificaciones_historial },
+          clasifCampaign,
+          origenCampaign
+        )
+        if (hist) update.clasificaciones_historial = hist
 
         await supabase.from('wa_conversations').update(update).eq('id', conversationId)
       }
