@@ -113,7 +113,7 @@ export default function BandejaDetalleClient({ conversationId }: { conversationI
   // perder el scroll). No toca el estado de carga ni borra lo ya mostrado.
   const silentRefresh = useCallback(async () => {
     try {
-      const res = await fetch(`/api/admin-vakdor/bandejas/${conversationId}`)
+      const res = await fetch(`/api/admin-vakdor/bandejas/${conversationId}`, { cache: "no-store" })
       if (!res.ok) return
       const data = await res.json()
       if (data.conversation) setConv(data.conversation)
