@@ -97,7 +97,7 @@ export default function BandejaDetalleClient({ conversationId }: { conversationI
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const res = await fetch(`/api/admin-vakdor/bandejas/${conversationId}`)
+    const res = await fetch(`/api/admin-vakdor/bandejas/${conversationId}`, { cache: "no-store" })
     if (res.status === 404) {
       setNotFound(true)
       setLoading(false)

@@ -51,12 +51,15 @@ export async function GET(
     .order("created_at", { ascending: true })
     .limit(1000)
 
-  return NextResponse.json({
-    conversation: {
-      ...conv,
-      agency_name: agency?.name || "—",
-      agent_name: agent?.full_name || agent?.email || null,
+  return NextResponse.json(
+    {
+      conversation: {
+        ...conv,
+        agency_name: agency?.name || "—",
+        agent_name: agent?.full_name || agent?.email || null,
+      },
+      messages: messages || [],
     },
-    messages: messages || [],
-  })
+    { headers: { "Cache-Control": "no-store, max-age=0" } }
+  )
 }
