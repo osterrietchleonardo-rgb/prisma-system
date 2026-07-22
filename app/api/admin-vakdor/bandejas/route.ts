@@ -3,6 +3,8 @@ import { requireAdminVakdor, isNextResponse } from "@/lib/admin-vakdor/guard"
 import { getAdminDb } from "@/lib/admin-vakdor/logger"
 
 export const dynamic = "force-dynamic"
+export const revalidate = 0
+export const fetchCache = "force-no-store"
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdminVakdor(request)
