@@ -4,6 +4,9 @@ import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { processCampaign } from '@/lib/whatsapp/campaign-sender'
 
 export const dynamic = 'force-dynamic'
+// Mismo motivo que en /api/cron/campaigns: las lecturas de la cola no pueden salir de caché.
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
 export const maxDuration = 120
 
 // Primer lote inmediato al "Lanzar ahora" (chico, para respuesta rápida).

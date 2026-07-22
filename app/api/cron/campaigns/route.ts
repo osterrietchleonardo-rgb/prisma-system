@@ -4,6 +4,12 @@ import { createClient } from '@supabase/supabase-js'
 import { processCampaign } from '@/lib/whatsapp/campaign-sender'
 
 export const dynamic = 'force-dynamic'
+// Sin esto, Next cachea los fetch que hace supabase-js por debajo y la corrida trabaja
+// con datos viejos: llegó a ver "no hay campañas activas" con una campaña activa, y peor,
+// puede leer una lista de pendientes ya enviados. La reserva condicional lo cubre igual
+// (un UPDATE nunca se cachea), pero la lectura tiene que ser fresca sí o sí.
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
 export const maxDuration = 300
 
 // Tope de envíos por ejecución del cron (para no exceder el timeout de la función).
