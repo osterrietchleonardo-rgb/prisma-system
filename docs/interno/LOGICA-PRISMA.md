@@ -729,9 +729,27 @@ Para bases grandes (ej. 15.000 leads) respetando el límite de Meta:
 4. **Control y trazabilidad:** lanzar/pausar/eliminar; la tarjeta muestra progreso (enviados/total, en cola, errores, últimas 24h). El estado por-lead se ve en Contactos (EN COLA → ENVIADO/ERROR + fecha, por plantilla).
 5. **Bot IA prendido/apagado por campaña:** al crear, el director elige con un interruptor si los chats que cree la campaña nacen con la IA **prendida** (clientes) o **apagada** (reclutamiento u otros no-clientes; el chat queda en modo manual y la IA no responde). Se guarda en `wa_campaigns.bot_active_on_reply` (default `true`). El webhook ya respeta `bot_active` (si está OFF, guarda el mensaje del lead pero no dispara la IA).
    - **Chats que ya existían (jul-2026):** la campaña los alinea con su configuración. `instance_id` **siempre** (es lo que ata el chat a la instancia; sin esto se creaban chats duplicados). `bot_active`: **lo decide la campaña**, a propósito pisa el interruptor manual del asesor. `clasificacion`: la campaña la asigna pero **nunca la borra** — si la campaña va a todos los contactos (sin segmento) se conserva la que tenía el lead (antes quedaba en `null`).
-   - **Trazabilidad de clasificación:** cada cambio queda registrado en `wa_conversations.clasificaciones_historial` (`[{clasificacion, origen, at}]`). Así se ve el recorrido del lead: entró como `Whatsapp-Consulta`, después recibió la campaña "Oferta" y quedó como `Oferta`. `clasificacion` sigue siendo la **vigente** (los filtros no cambian) y el historial guarda de dónde viene. Complementa a `wa_contacts.campaign_statuses`, que ya registraba el estado por plantilla del lado de la agenda.
+   - **Clasificaciones acumuladas (jul-2026):** un lead pasa por varios lugares y antes cada paso **pisaba** al anterior. Ahora se **acumulan** en `clasificaciones_historial` (`[{clasificacion, origen, at}]`), tanto en `wa_conversations` como en `wa_contacts`. La columna `clasificacion` (singular) **no se toca**: sigue siendo el **origen** del lead, así todo lo que ya la lee sigue funcionando. Ver §9.4b.
 6. **Límite:** lo verifica el sistema contra Meta (no lo carga el cliente). Techo real del goteo serverless **~2.400/día**: cada envío cuesta ~2,3s (Meta + escrituras + espera anti-flood) y la corrida corta sola a los 240s, así que salen ~90-100 por corrida × 24 corridas. Para bases muy grandes o tiers altos hace falta un worker dedicado.
 6. **Importación:** acepta cualquier formato de teléfono argentino (normaliza con `libphonenumber-js`), columnas flexibles (incluye `csTelefono1/2`), nombre opcional, dedupe por teléfono.
+
+### 9.4b Clasificaciones acumuladas (recorrido del lead)
+Un mismo lead pasa por varios lugares: **entra** por `Whatsapp-Consulta`, después lo **importás** en la lista "Oferta-Julio", después **recibe** la plantilla `oferta_julio_2026`. Antes la columna guardaba **un solo valor** y cada paso pisaba al anterior. Peor: al importar una lista, los teléfonos que **ya existían se salteaban enteros**, así que nunca quedaban registrados en ese lote y el filtro no los encontraba (el director veía 300 de 500).
+
+- **Modelo:** `clasificaciones_historial` jsonb `[{clasificacion, origen, at}]` en `wa_conversations` **y** `wa_contacts`. La columna `clasificacion` (singular) **no se toca**: es el **origen** y sigue alimentando todo lo que ya la leía. La lista es **aditiva**. Helper único: `lib/whatsapp/clasificaciones.ts` (`clasificacionesDe`, `sumarClasificacion`, `coincideClasificacion`, `esPlantillaDelSistema`).
+- **Quién suma una clasificación:**
+
+  | Origen | Qué hace |
+  |---|---|
+  | Chat entrante / alta manual | Siembra la primera (`Whatsapp-Consulta` / `Whatsapp-Manual`) |
+  | Importar lista | Si el teléfono ya existe: **no duplica** contacto ni chat, le **suma** la del lote conservando su origen. Si es nuevo: la del lote |
+  | Campaña por segmento | Suma el segmento **y** el nombre de la plantilla |
+  | Envío manual puntual | Suma el **nombre de la plantilla** enviada (no se le pide ningún dato extra al director) |
+  | Plantillas del sistema | **Nada.** Se reconocen por el prefijo `ag<6 hex>_` (`esPlantillaDelSistema`): seguimiento, recordatorios de visita, reactivación. No son campañas del cliente |
+
+- **Lectura:** los filtros de **Contactos** y **Bandeja** traen al lead si coincide **cualquiera** de sus clasificaciones (`coincideClasificacion`), y la búsqueda por texto también las mira. La UI muestra el recorrido numerado (`1. Whatsapp-Consulta` `2. Oferta-Julio`).
+- **Inscripción de campañas:** `enroll_campaign_recipients` matchea con `clasificacion = X` **OR** `clasificaciones_historial @> [{"clasificacion":"X"}]`. Es indispensable que sea igual que el filtro: si no, el director ve 500 en el filtro y la campaña le manda a 300. Índices GIN `jsonb_path_ops` en ambas tablas (verificado: usa Bitmap Index Scan, no seq scan).
+- Migraciones: `20260722160000_clasificaciones_historial.sql` (chats), `20260722180000_clasificaciones_acumuladas_contactos.sql` (agenda + índices), `20260722181000_enroll_por_cualquier_clasificacion.sql`.
 
 ---
 

@@ -1,4 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import {
+  sumarClasificacion,
+  origenPlantilla,
+  esPlantillaDelSistema,
+} from '@/lib/whatsapp/clasificaciones'
 
 // Lógica compartida de envío de una campaña por goteo.
 // La usan: el cron (/api/cron/campaigns) y el botón "Lanzar ahora" (/api/campaigns/launch).
@@ -150,19 +155,38 @@ export async function processCampaign(
   let sinMarcar = 0         // enviados a Meta pero no se pudo marcar (quedan en 'sending')
   let cortadaPorTiempo = false
 
+  // La plantilla enviada queda como clasificación del lead (para filtrar "quiénes
+  // recibieron esta plantilla"). Las que dispara el sistema solo, no clasifican.
+  const clasifPlantilla = esPlantillaDelSistema(campaign.template_name) ? null : campaign.template_name
+
   const markContactStatus = async (contactId: string | null, phone: string, statusLabel: 'enviado' | 'error') => {
     try {
-      const base = supabase.from('wa_contacts').select('id, campaign_statuses').eq('agency_id', campaign.agency_id)
+      const base = supabase
+        .from('wa_contacts')
+        .select('id, campaign_statuses, clasificacion, clasificaciones_historial')
+        .eq('agency_id', campaign.agency_id)
       const { data: c } = await (contactId ? base.eq('id', contactId) : base.eq('phone', phone.replace(/\D/g, ''))).maybeSingle()
       if (!c) return
       const current = (c.campaign_statuses || {}) as Record<string, unknown>
       const at = new Date().toISOString()
-      await supabase.from('wa_contacts').update({
+      const update: Record<string, unknown> = {
         campaign_statuses: { ...current, [campaign.template_name]: { status: statusLabel, sent_at: at } },
         last_campaign_status: statusLabel,
         last_campaign_template: campaign.template_name,
         last_campaign_sent_at: at,
-      }).eq('id', c.id)
+      }
+      // Solo se clasifica lo que efectivamente salió.
+      if (statusLabel === 'enviado') {
+        for (const clasif of [campaign.audience_clasificacion, clasifPlantilla]) {
+          const hist = sumarClasificacion(
+            { clasificacion: c.clasificacion, clasificaciones_historial: update.clasificaciones_historial ?? c.clasificaciones_historial },
+            clasif,
+            clasif === clasifPlantilla ? origenPlantilla(campaign.template_name) : `campaña: ${campaign.name || campaign.template_name}`
+          )
+          if (hist) update.clasificaciones_historial = hist
+        }
+      }
+      await supabase.from('wa_contacts').update(update).eq('id', c.id)
     } catch { /* best-effort */ }
   }
 
@@ -272,6 +296,12 @@ export async function processCampaign(
         // Si la campaña tiene segmento, manda el segmento. Si va a todos los contactos
         // (sin segmento), se respeta la del contacto en vez de dejar el chat sin clasificar.
         const clasifInicial = campaign.audience_clasificacion ?? contactClasif?.clasificacion ?? null
+        const atNuevo = new Date().toISOString()
+        const historialNuevo: Array<{ clasificacion: string; origen: string; at: string }> = []
+        if (clasifInicial) historialNuevo.push({ clasificacion: clasifInicial, origen: origenClasif, at: atNuevo })
+        if (clasifPlantilla && clasifPlantilla !== clasifInicial) {
+          historialNuevo.push({ clasificacion: clasifPlantilla, origen: origenPlantilla(campaign.template_name), at: atNuevo })
+        }
         const { data: newConv } = await supabase
           .from('wa_conversations')
           .insert({
@@ -284,9 +314,7 @@ export async function processCampaign(
             bot_active: campaign.bot_active_on_reply ?? true,
             unread_count: 0,
             clasificacion: clasifInicial,
-            clasificaciones_historial: clasifInicial
-              ? [{ clasificacion: clasifInicial, origen: origenClasif, at: new Date().toISOString() }]
-              : [],
+            clasificaciones_historial: historialNuevo,
           })
           .select('id')
           .single()
@@ -297,24 +325,30 @@ export async function processCampaign(
         //  - instance_id: SIEMPRE. Es lo que ata el chat a la instancia; sin esto se creaban
         //    chats duplicados para el mismo teléfono.
         //  - bot_active: lo decide la campaña (decisión del director, pisa el manual a propósito).
-        //  - clasificacion: la campaña la asigna, pero NUNCA la borra. Si la campaña no tiene
-        //    segmento se conserva la que ya tenía el lead (antes quedaba en null).
-        const clasifNueva = campaign.audience_clasificacion ?? conv.clasificacion ?? null
-        const cambia = clasifNueva !== conv.clasificacion
-
+        //  - clasificacion: NO se pisa. El lead conserva su origen (ej. `Whatsapp-Consulta`)
+        //    y las de la campaña se le SUMAN al recorrido. Así el filtro lo encuentra por
+        //    cualquiera de las dos y no se pierde de dónde vino.
         const update: Record<string, unknown> = {
           instance_id: instance.id,
           bot_active: campaign.bot_active_on_reply ?? true,
-          clasificacion: clasifNueva,
         }
-        // Trazabilidad: queda registrado por dónde pasó el lead (ej. entró por
-        // Whatsapp-Consulta y después recibió la campaña "Oferta").
-        if (cambia && clasifNueva) {
-          const historial = Array.isArray(conv.clasificaciones_historial) ? conv.clasificaciones_historial : []
-          update.clasificaciones_historial = [
-            ...historial,
-            { clasificacion: clasifNueva, origen: origenClasif, at: new Date().toISOString() },
-          ]
+        // Si el lead no tenía ninguna, el segmento de la campaña pasa a ser su origen.
+        if (!conv.clasificacion && campaign.audience_clasificacion) {
+          update.clasificacion = campaign.audience_clasificacion
+        }
+        for (const [clasif, origen] of [
+          [campaign.audience_clasificacion, origenClasif],
+          [clasifPlantilla, origenPlantilla(campaign.template_name)],
+        ] as Array<[string | null, string]>) {
+          const hist = sumarClasificacion(
+            {
+              clasificacion: (update.clasificacion as string) ?? conv.clasificacion,
+              clasificaciones_historial: update.clasificaciones_historial ?? conv.clasificaciones_historial,
+            },
+            clasif,
+            origen
+          )
+          if (hist) update.clasificaciones_historial = hist
         }
 
         await supabase.from('wa_conversations').update(update).eq('id', conversationId)
