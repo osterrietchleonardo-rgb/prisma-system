@@ -256,17 +256,22 @@ export async function processCampaign(
       const cleanPhone = r.phone.replace(/\D/g, '')
       const { data: conv } = await supabase
         .from('wa_conversations')
-        .select('id')
+        .select('id, clasificacion, clasificaciones_historial')
         .eq('agency_id', campaign.agency_id)
         .eq('contact_phone', cleanPhone)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
-      let conversationId = conv?.id as string | undefined
-      if (!conversationId) {
+      const origenClasif = `campaña: ${campaign.name || campaign.template_name}`
+
+      let conversationId: string | undefined
+      if (!conv) {
         const { data: contactClasif } = await supabase
           .from('wa_contacts').select('clasificacion').eq('agency_id', campaign.agency_id).eq('phone', cleanPhone).maybeSingle()
+        // Si la campaña tiene segmento, manda el segmento. Si va a todos los contactos
+        // (sin segmento), se respeta la del contacto en vez de dejar el chat sin clasificar.
+        const clasifInicial = campaign.audience_clasificacion ?? contactClasif?.clasificacion ?? null
         const { data: newConv } = await supabase
           .from('wa_conversations')
           .insert({
@@ -278,22 +283,41 @@ export async function processCampaign(
             // el bot IA prendido o apagado (ej: reclutamiento → apagado). Default true.
             bot_active: campaign.bot_active_on_reply ?? true,
             unread_count: 0,
-            clasificacion: contactClasif?.clasificacion ?? campaign.audience_clasificacion ?? null,
+            clasificacion: clasifInicial,
+            clasificaciones_historial: clasifInicial
+              ? [{ clasificacion: clasifInicial, origen: origenClasif, at: new Date().toISOString() }]
+              : [],
           })
           .select('id')
           .single()
         conversationId = newConv?.id
       } else {
-        // Si la conversación ya existía de antes, actualizamos instance_id, bot_active y clasificacion 
-        // para alinearlos con la configuración de la campaña actual.
-        await supabase
-          .from('wa_conversations')
-          .update({
-            instance_id: instance.id,
-            bot_active: campaign.bot_active_on_reply ?? true,
-            clasificacion: campaign.audience_clasificacion ?? null
-          })
-          .eq('id', conversationId)
+        conversationId = conv.id
+        // El chat ya existía: se alinea con la campaña en curso.
+        //  - instance_id: SIEMPRE. Es lo que ata el chat a la instancia; sin esto se creaban
+        //    chats duplicados para el mismo teléfono.
+        //  - bot_active: lo decide la campaña (decisión del director, pisa el manual a propósito).
+        //  - clasificacion: la campaña la asigna, pero NUNCA la borra. Si la campaña no tiene
+        //    segmento se conserva la que ya tenía el lead (antes quedaba en null).
+        const clasifNueva = campaign.audience_clasificacion ?? conv.clasificacion ?? null
+        const cambia = clasifNueva !== conv.clasificacion
+
+        const update: Record<string, unknown> = {
+          instance_id: instance.id,
+          bot_active: campaign.bot_active_on_reply ?? true,
+          clasificacion: clasifNueva,
+        }
+        // Trazabilidad: queda registrado por dónde pasó el lead (ej. entró por
+        // Whatsapp-Consulta y después recibió la campaña "Oferta").
+        if (cambia && clasifNueva) {
+          const historial = Array.isArray(conv.clasificaciones_historial) ? conv.clasificaciones_historial : []
+          update.clasificaciones_historial = [
+            ...historial,
+            { clasificacion: clasifNueva, origen: origenClasif, at: new Date().toISOString() },
+          ]
+        }
+
+        await supabase.from('wa_conversations').update(update).eq('id', conversationId)
       }
 
       if (conversationId) {
