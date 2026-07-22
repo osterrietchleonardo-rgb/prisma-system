@@ -5,6 +5,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const SEND_DELAY_MS = 350
 
+// Presupuesto de tiempo por corrida. La función se muere sola a los 300s (maxDuration) y
+// ese corte a mitad de una iteración era lo que dejaba leads "pendientes" con la plantilla
+// ya entregada. Cortamos ANTES, de forma ordenada, y el resto lo toma la corrida siguiente.
+export const RUN_BUDGET_MS = 240_000
+
 export function tierToNumber(tier: string | null | undefined): number {
   if (!tier) return 250
   const t = String(tier).toUpperCase()
@@ -30,12 +35,22 @@ function resolveVar(entry: VarEntry | undefined, recipient: { name: string | nul
  * Procesa UN lote de una campaña: lee el límite real de Meta, calcula el cupo restante
  * (límite − enviados últimas 24h), envía hasta `maxToSend` pendientes, marca enviados/errores
  * (idempotente), crea el chat y refleja el estado en wa_contacts. No supera el límite de Meta.
+ *
+ * Garantía de NO reenvío (una plantilla por lead, pase lo que pase):
+ *  1. Cada lead se RESERVA ('pending' -> 'sending') antes de mandar nada a Meta. La reserva es
+ *     condicional, así que dos corridas superpuestas nunca toman el mismo lead.
+ *  2. Apenas Meta acepta el mensaje se marca 'sent', ANTES de crear el chat y los mensajes.
+ *  3. La corrida se corta sola a los RUN_BUDGET_MS, antes de que la plataforma la mate.
+ *  4. Si algo falla después del envío, el lead queda en 'sending' y nadie lo reenvía:
+ *     preferimos no enviar antes que enviar dos veces.
  */
 export async function processCampaign(
   campaign: any,
   supabase: SupabaseClient,
   maxToSend: number
 ): Promise<Record<string, unknown> | string> {
+  const startedAt = Date.now()
+
   // 1. Instancia de la agencia.
   const { data: instance } = await supabase
     .from('whatsapp_instances')
@@ -110,7 +125,11 @@ export async function processCampaign(
     .select('id, phone, name, contact_id')
     .eq('campaign_id', campaign.id)
     .eq('status', 'pending')
+    // Desempate por id: los destinatarios se cargan de un saque y comparten el MISMO
+    // created_at, así que ordenar solo por fecha devolvía un grupo distinto en cada
+    // corrida (unos leads salían sorteados muchas veces y otros nunca).
     .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
     .limit(batchSize)
 
   if (!recipients || recipients.length === 0) {
@@ -127,6 +146,9 @@ export async function processCampaign(
 
   let sent = 0
   let errored = 0
+  let omitidos = 0          // ya reservados por otra corrida
+  let sinMarcar = 0         // enviados a Meta pero no se pudo marcar (quedan en 'sending')
+  let cortadaPorTiempo = false
 
   const markContactStatus = async (contactId: string | null, phone: string, statusLabel: 'enviado' | 'error') => {
     try {
@@ -145,6 +167,27 @@ export async function processCampaign(
   }
 
   for (const r of recipients) {
+    // Cortar de forma ordenada antes de que la plataforma mate la función a mitad de un envío.
+    if (Date.now() - startedAt > RUN_BUDGET_MS) {
+      cortadaPorTiempo = true
+      break
+    }
+
+    // RESERVA: pending -> sending, en una sola operación condicional. Si no afecta ninguna
+    // fila es porque otra corrida ya la tomó, así que no se manda. Esto es lo que impide
+    // que dos corridas superpuestas le manden la misma plantilla al mismo lead.
+    const { data: reservado, error: errReserva } = await supabase
+      .from('wa_campaign_recipients')
+      .update({ status: 'sending', claimed_at: new Date().toISOString() })
+      .eq('id', r.id)
+      .eq('status', 'pending')
+      .select('id')
+
+    if (errReserva || !reservado || reservado.length === 0) {
+      omitidos++
+      continue
+    }
+
     try {
       const headerParams = (varMap.header || []).map((e) => resolveVar(e, r))
       const bodyParams = (varMap.body || []).map((e) => resolveVar(e, r))
@@ -178,10 +221,33 @@ export async function processCampaign(
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}))
         const msg = (errBody as any)?.error?.message || `HTTP ${res.status}`
-        await supabase.from('wa_campaign_recipients').update({ status: 'error', error_message: String(msg).slice(0, 400) }).eq('id', r.id)
+        await supabase
+          .from('wa_campaign_recipients')
+          .update({ status: 'error', error_message: String(msg).slice(0, 400) })
+          .eq('id', r.id)
+          .eq('status', 'sending')
         await markContactStatus(r.contact_id, r.phone, 'error')
         errored++
         continue
+      }
+
+      // La plantilla YA salió por WhatsApp. Marcar 'sent' ACÁ, antes de crear el chat y los
+      // mensajes: si algo falla más abajo se pierde el registro visual (recuperable), pero
+      // nunca se reenvía. Antes se marcaba al final y cualquier corte en el medio provocaba
+      // que la corrida siguiente le mandara la plantilla de nuevo al mismo lead.
+      const marcarEnviado = () => supabase
+        .from('wa_campaign_recipients')
+        .update({ status: 'sent', sent_at: new Date().toISOString(), error_message: null })
+        .eq('id', r.id)
+
+      let { error: errMarca } = await marcarEnviado()
+      if (errMarca) {
+        ;({ error: errMarca } = await marcarEnviado())
+      }
+      if (errMarca) {
+        // Queda en 'sending': no se reenvía (preferimos no enviar antes que enviar dos veces).
+        console.error(`[campaigns] plantilla enviada a ${r.phone} pero no se pudo marcar: ${errMarca.message}`)
+        sinMarcar++
       }
 
       let fullText = bodyTextTemplate
@@ -270,12 +336,18 @@ export async function processCampaign(
         })
       }
 
-      await supabase.from('wa_campaign_recipients').update({ status: 'sent', sent_at: new Date().toISOString(), error_message: null }).eq('id', r.id)
       await markContactStatus(r.contact_id, r.phone, 'enviado')
       sent++
     } catch (e) {
+      // Ojo: la plantilla pudo haber salido igual. Solo volvemos a 'pending' (reintentable)
+      // si la excepción ocurrió ANTES de que Meta aceptara el mensaje; si ya se marcó
+      // 'sent' este update no la toca, porque filtra por status 'sending'.
       errored++
-      await supabase.from('wa_campaign_recipients').update({ status: 'error', error_message: (e instanceof Error ? e.message : 'error').slice(0, 400) }).eq('id', r.id)
+      await supabase
+        .from('wa_campaign_recipients')
+        .update({ status: 'error', error_message: (e instanceof Error ? e.message : 'error').slice(0, 400) })
+        .eq('id', r.id)
+        .eq('status', 'sending')
       await markContactStatus(r.contact_id, r.phone, 'error')
     }
 
@@ -288,9 +360,27 @@ export async function processCampaign(
     .eq('campaign_id', campaign.id)
     .eq('status', 'pending')
 
-  if ((remaining ?? 0) === 0) {
+  // 'sending' cuenta como pendiente de resolver: son leads que quedaron reservados por una
+  // corrida cortada. No se reenvían, pero la campaña tampoco puede darse por completada.
+  const { count: reservados } = await supabase
+    .from('wa_campaign_recipients')
+    .select('id', { count: 'exact', head: true })
+    .eq('campaign_id', campaign.id)
+    .eq('status', 'sending')
+
+  if ((remaining ?? 0) === 0 && (reservados ?? 0) === 0) {
     await supabase.from('wa_campaigns').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', campaign.id)
   }
 
-  return { sent, errored, remaining: remaining ?? 0, dailyLimit }
+  return {
+    sent,
+    errored,
+    omitidos,
+    sinMarcar,
+    reservados: reservados ?? 0,
+    remaining: remaining ?? 0,
+    dailyLimit,
+    cortadaPorTiempo,
+    duracionSeg: Math.round((Date.now() - startedAt) / 1000),
+  }
 }

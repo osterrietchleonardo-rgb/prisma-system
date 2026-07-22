@@ -98,6 +98,7 @@ export interface CampaignWithStats {
   total: number
   sent: number
   pending: number
+  sending: number
   error: number
   sent_24h: number
 }
@@ -124,10 +125,11 @@ export async function getCampaignsWithStats(): Promise<{ success: boolean; data?
           .select('id', { count: 'exact', head: true })
           .eq('campaign_id', c.id)
 
-        const [total, sent, pending, errored, sent24h] = await Promise.all([
+        const [total, sent, pending, sending, errored, sent24h] = await Promise.all([
           base,
           supabase.from('wa_campaign_recipients').select('id', { count: 'exact', head: true }).eq('campaign_id', c.id).eq('status', 'sent'),
           supabase.from('wa_campaign_recipients').select('id', { count: 'exact', head: true }).eq('campaign_id', c.id).eq('status', 'pending'),
+          supabase.from('wa_campaign_recipients').select('id', { count: 'exact', head: true }).eq('campaign_id', c.id).eq('status', 'sending'),
           supabase.from('wa_campaign_recipients').select('id', { count: 'exact', head: true }).eq('campaign_id', c.id).eq('status', 'error'),
           supabase.from('wa_campaign_recipients').select('id', { count: 'exact', head: true }).eq('campaign_id', c.id).eq('status', 'sent').gt('sent_at', since24h),
         ])
@@ -136,7 +138,10 @@ export async function getCampaignsWithStats(): Promise<{ success: boolean; data?
           ...c,
           total: total.count ?? 0,
           sent: sent.count ?? 0,
-          pending: pending.count ?? 0,
+          // Los reservados ('sending') se muestran junto a los pendientes para que los
+          // totales sigan cerrando: total = enviados + pendientes + errores.
+          pending: (pending.count ?? 0) + (sending.count ?? 0),
+          sending: sending.count ?? 0,
           error: errored.count ?? 0,
           sent_24h: sent24h.count ?? 0,
         }
