@@ -1434,7 +1434,7 @@ export async function sendCampaignMessage(
     // 1. Obtener la instancia y credenciales
     const { data: instance, error: instanceError } = await supabase
       .from('whatsapp_instances')
-      .select('token, phone_number_id, business_id')
+      .select('id, token, phone_number_id, business_id')
       .eq('agency_id', agency_id)
       .limit(1)
       .single()
@@ -1487,6 +1487,8 @@ export async function sendCampaignMessage(
       .select('id')
       .eq('agency_id', agency_id)
       .eq('contact_phone', cleanPhone)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
     if (preCheckConv) {
@@ -1555,12 +1557,17 @@ export async function sendCampaignMessage(
       .select('id')
       .eq('agency_id', agency_id)
       .eq('contact_phone', cleanPhone)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
     if (convData) {
       conversation_id = convData.id;
-      // El chat ya existe: NO tocamos su bot_active para no pisar la configuración
-      // que el asesor/director haya puesto a mano en esa conversación.
+      // Asegurar que la conversación tenga el instance_id asignado
+      await supabase
+        .from('wa_conversations')
+        .update({ instance_id: instance.id })
+        .eq('id', conversation_id)
     } else {
       // Heredar la clasificación del contacto en la agenda (si existe), para que el
       // chat creado por la campaña aparezca ya clasificado en bandeja y Leads WhatsApp.
@@ -1575,6 +1582,7 @@ export async function sendCampaignMessage(
         .from('wa_conversations')
         .insert({
           agency_id,
+          instance_id: instance.id,
           contact_phone: cleanPhone,
           contact_name: input.name,
           bot_active: input.bot_active ?? true,

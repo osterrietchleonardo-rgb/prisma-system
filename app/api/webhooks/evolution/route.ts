@@ -97,13 +97,16 @@ export async function POST(req: Request) {
 
     const { data: convs } = await supabase
       .from('wa_conversations')
-      .select('id, bot_active, etiquetas, score, status, unread_count, funnel_status, next_follow_up_at, follow_ups_sent, opt_out, follow_ups_history')
-      .eq('instance_id', instance.id)
+      .select('id, bot_active, etiquetas, score, status, unread_count, funnel_status, next_follow_up_at, follow_ups_sent, opt_out, follow_ups_history, instance_id')
+      .eq('agency_id', instance.agency_id)
       .eq('contact_phone', contactPhone)
-      .order('last_message_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(1)
 
     const conv = convs && convs.length > 0 ? convs[0] : null
+    if (conv && !conv.instance_id) {
+      await supabase.from('wa_conversations').update({ instance_id: instance.id }).eq('id', conv.id)
+    }
 
     // Declarar fuera del bloque para que sea accesible globalmente
     let newConv: typeof conv = null

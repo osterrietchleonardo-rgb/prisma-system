@@ -103,12 +103,13 @@ export async function POST(req: Request) {
                 // Buscar o crear la conversacion
                 let conversation_id: string
                 let botIsActive = true
-                
-                const { data: conv } = await supabase
+                                const { data: conv } = await supabase
                     .from('wa_conversations')
-                    .select('id, bot_active, unread_count')
-                    .eq('instance_id', instance.id)
+                    .select('id, bot_active, unread_count, instance_id')
+                    .eq('agency_id', instance.agency_id)
                     .eq('contact_phone', contactPhone)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
                     .maybeSingle()
 
                 if (!conv) {
@@ -138,6 +139,12 @@ export async function POST(req: Request) {
                 } else {
                     conversation_id = conv.id
                     botIsActive = conv.bot_active
+                    if (!conv.instance_id) {
+                        await supabase
+                            .from('wa_conversations')
+                            .update({ instance_id: instance.id })
+                            .eq('id', conv.id)
+                    }
                     await supabase
                         .from('wa_conversations')
                         .update({

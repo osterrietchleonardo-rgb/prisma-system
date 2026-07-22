@@ -39,7 +39,7 @@ export async function processCampaign(
   // 1. Instancia de la agencia.
   const { data: instance } = await supabase
     .from('whatsapp_instances')
-    .select('token, phone_number_id, business_id, messaging_limit_tier, status')
+    .select('id, token, phone_number_id, business_id, messaging_limit_tier, status')
     .eq('agency_id', campaign.agency_id)
     .limit(1)
     .maybeSingle()
@@ -193,6 +193,8 @@ export async function processCampaign(
         .select('id')
         .eq('agency_id', campaign.agency_id)
         .eq('contact_phone', cleanPhone)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
       let conversationId = conv?.id as string | undefined
@@ -203,6 +205,7 @@ export async function processCampaign(
           .from('wa_conversations')
           .insert({
             agency_id: campaign.agency_id,
+            instance_id: instance.id,
             contact_phone: cleanPhone,
             contact_name: r.name,
             // El director decide al crear la campaña si los chats nuevos nacen con
@@ -215,11 +218,12 @@ export async function processCampaign(
           .single()
         conversationId = newConv?.id
       } else {
-        // Si la conversación ya existía de antes, actualizamos bot_active y clasificacion 
+        // Si la conversación ya existía de antes, actualizamos instance_id, bot_active y clasificacion 
         // para alinearlos con la configuración de la campaña actual.
         await supabase
           .from('wa_conversations')
           .update({
+            instance_id: instance.id,
             bot_active: campaign.bot_active_on_reply ?? true,
             clasificacion: campaign.audience_clasificacion ?? null
           })
