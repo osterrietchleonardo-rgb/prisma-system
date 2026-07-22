@@ -12,6 +12,7 @@ import { EmptyState } from "./EmptyState"
 import { toast } from "sonner"
 import { markConversationRead, deleteConversation } from "@/app/actions/whatsapp"
 import { getClasificacionStyle } from "@/lib/whatsapp/clasificacion"
+import { clasificacionesDe } from "@/lib/whatsapp/clasificaciones"
 import {
   Select,
   SelectContent,
@@ -259,7 +260,9 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
 
   const clasifOptions = useMemo(() => {
     const set = new Set<string>()
-    conversations.forEach((c) => { if (c?.clasificacion) set.add(c.clasificacion) })
+    // Todas las clasificaciones del recorrido, no solo la de origen: así se puede
+    // filtrar la bandeja por una plantilla enviada ("quiénes recibieron Oferta-Julio").
+    conversations.forEach((c) => { if (c) clasificacionesDe(c).forEach((v) => set.add(v)) })
     return Array.from(set).sort()
   }, [conversations])
 
@@ -269,10 +272,12 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
       if (!c) return false;
       // Búsqueda por nombre o teléfono
       const searchTerm = search.toLowerCase()
-      const matchesSearch = 
-        (c.contact_phone || "").toLowerCase().includes(searchTerm) || 
-        (c.contact_name || "").toLowerCase().includes(searchTerm)
-      
+      const clasificaciones = clasificacionesDe(c)
+      const matchesSearch =
+        (c.contact_phone || "").toLowerCase().includes(searchTerm) ||
+        (c.contact_name || "").toLowerCase().includes(searchTerm) ||
+        clasificaciones.some((v) => v.toLowerCase().includes(searchTerm))
+
       if (!matchesSearch) return false
 
       // Filtro por tab (bot/pausado/etc)
@@ -286,11 +291,11 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
         if (email !== filterAgentEmail) return false;
       }
 
-      // Filtro por clasificación
+      // Filtro por clasificación: coincide con CUALQUIERA de las que tuvo el lead.
       if (filterClasif !== "all") {
         if (filterClasif === "__none__") {
-          if (c.clasificacion) return false;
-        } else if (c.clasificacion !== filterClasif) {
+          if (clasificaciones.length > 0) return false;
+        } else if (!clasificaciones.includes(filterClasif)) {
           return false;
         }
       }
@@ -479,18 +484,27 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
                       )}
                     </div>
 
-                    {conv.clasificacion && (
-                      <div className="flex flex-wrap gap-1">
-                        {(() => {
-                          const cl = getClasificacionStyle(conv.clasificacion)
-                          return (
-                            <span className={`text-[8px] px-1.5 rounded uppercase font-black tracking-tighter border ${cl.className}`}>
-                              {cl.label}
-                            </span>
-                          )
-                        })()}
-                      </div>
-                    )}
+                    {(() => {
+                      // Recorrido del lead: de dónde vino y qué campañas/plantillas recibió.
+                      const todas = clasificacionesDe(conv)
+                      if (todas.length === 0) return null
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          {todas.map((valor, i) => {
+                            const cl = getClasificacionStyle(valor)
+                            return (
+                              <span
+                                key={valor}
+                                title={i === 0 ? "Origen del lead" : `Clasificación ${i + 1}`}
+                                className={`text-[8px] px-1.5 rounded uppercase font-black tracking-tighter border ${cl.className}`}
+                              >
+                                {cl.label}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
 
                     {conv.etiquetas && conv.etiquetas.length > 0 && (
                       <div className="flex flex-wrap gap-1">
