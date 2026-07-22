@@ -9,6 +9,25 @@ import { FileDown, MapPin, Building, Printer, Tag } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 
+const MESES_ES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+];
+
+/**
+ * Nombre propuesto para el PDF del ACM: "ACM - Arcos 2825 - Julio 2026".
+ * El navegador usa el document.title como nombre de archivo al imprimir a PDF,
+ * por eso se calcula acá y se aplica justo antes de window.print().
+ */
+export function nombreArchivoAcm(direccion: string | undefined, fecha: Date = new Date()): string {
+  const periodo = `${MESES_ES[fecha.getMonth()]} ${fecha.getFullYear()}`;
+  const dir = (direccion ?? "")
+    .replace(/[/\\:*?"<>|]/g, " ") // caracteres que Windows no acepta en nombres de archivo
+    .replace(/\s+/g, " ")
+    .trim();
+  return dir ? `ACM - ${dir} - ${periodo}` : `ACM - ${periodo}`;
+}
+
 // Minimal Scatter Chart using pure HTML/SVG
 function SimpleScatterChart({ resultado, comparables }: { resultado: ResultadoTasacion, comparables: Comparable[] }) {
   const data = resultado.resultados_comparables.filter(rc => !rc.excluido);
@@ -74,7 +93,19 @@ export function Step4Resultado({
 }: Step4ResultadoProps) {
 
   const handlePrint = () => {
-    window.print();
+    const tituloAnterior = document.title;
+    const restaurar = () => { document.title = tituloAnterior; };
+
+    document.title = nombreArchivoAcm(sujeto.direccion);
+
+    // window.print() es bloqueante en algunos navegadores y asíncrono en otros:
+    // restauramos con afterprint y, por las dudas, con un timeout de respaldo.
+    window.addEventListener("afterprint", restaurar, { once: true });
+    try {
+      window.print();
+    } finally {
+      setTimeout(restaurar, 1000);
+    }
   };
 
   return (
