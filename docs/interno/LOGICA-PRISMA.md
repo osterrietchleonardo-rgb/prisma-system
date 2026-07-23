@@ -149,7 +149,7 @@ El middleware intercepta TODAS las requests y aplica:
 
 4. **Redirección Inteligente:**
    - Si el usuario está autenticado y va a `/auth/*` → redirige a su dashboard
-   - Si no está autenticado y va a ruta protegida → redirige a `/auth/login`
+   - Si no está autenticado y va a ruta protegida → redirige a `/auth/login?next=<ruta+query>`, **guardando el destino** para volver ahí después de loguearse (ver 4.2)
 
 ### 3.2 Headers de Seguridad (`next.config.mjs`)
 
@@ -222,7 +222,8 @@ La pantalla de registro tiene dos pestañas según la **intención** (`mode`), n
 4. Verificación de estado:
    - Si `profile.status === 'pausado'` → error "Cuenta pausada"
    - Si `profile.status === 'eliminado'` → error "Cuenta eliminada"
-5. Redirige a `/director/dashboard` o `/asesor/dashboard` según rol
+5. Redirige al **destino guardado** si el middleware pasó un `?next` válido (ej. el chat de un lead abierto desde el email de aviso); si no, a `/director/dashboard` o `/asesor/dashboard` según rol
+   - `next` se valida con `rutaInternaSegura()` (`components/auth-login-form.tsx`): solo rutas internas (empieza con `/`, no `//` ni `/\`, no `/auth`, sin caracteres de control) → evita **open redirect**
 
 ### 4.4 Login con Google (OAuth)
 
@@ -1179,6 +1180,8 @@ La pantalla de Tasaciones es un **wizard de 4 pasos** (Método Comparativo de Me
 | 2 | `step2-comparables.tsx` | Alta de comparables (mín. 3): manual o importados desde Tokko (`/api/tokko-proxy/property`) |
 | 3 | `step3-grilla.tsx` | Matriz de homogeneización editable (factores por columna, outliers, exclusiones, ponderado) |
 | 4 | `step4-resultado.tsx` | Informe final: rango min/sugerido/máx, gráfico de dispersión, tabla de testigos, imprimir/PDF |
+
+- **Nombre del PDF (jul-2026):** al imprimir/guardar el informe, el PDF se descarga como **`ACM - <Dirección> - <Mes Año>`** (ej. `ACM - Arcos 2825 - Julio 2026`) en vez de un nombre fijo que se pisaba. `handlePrint` setea el `document.title` (`nombreArchivoAcm()`) antes de `window.print()` y lo restaura; sanea caracteres inválidos de Windows; fallback `ACM - <Mes Año>` sin dirección.
 
 - El cálculo es **client-side** (`lib/tasacion/calculos.ts`, `lib/tasacion/types.ts`), reactivo vía `useMemo`.
 - Persistencia: tabla `tasaciones` en Supabase (borrador/finalizada) con autoguardado entre pasos e historial (últimas 10 por usuario).

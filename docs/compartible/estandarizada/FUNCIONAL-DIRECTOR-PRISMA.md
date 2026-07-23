@@ -247,6 +247,8 @@ Cuando el bot detecta que un cliente avanza, **le manda un email al asesor asign
 
 Así el equipo no pierde oportunidades: el asesor se entera por email aunque no tenga PRISMA abierto.
 
+> 🔐 Si al abrir un link de PRISMA (por ejemplo, el del aviso de lead) la app pide **iniciar sesión de nuevo**, después de entrar lleva **directo a donde iba** el usuario, sin dejarlo en la pantalla de inicio. Con la sesión ya abierta, entra sin que le pida nada.
+
 ### Seguimientos automáticos
 
 Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **seguimientos solos** a los leads por WhatsApp (recordatorios de visita, reactivación de contactos fríos y follow-ups según el momento del lead), sin que el asesor tenga que acordarse. Es lo que mantiene vivas las conversaciones y suma a las métricas de "seguimientos enviados".
@@ -391,6 +393,8 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 > 💡 Tipo, operación **y barrio** son filtros estrictos: **todos los comparables son del mismo barrio** que la propiedad analizada (reconoce sub-barrios como Belgrano R/C y no le afectan los acentos). El **checklist compara todo lo que tiene dato real** (suma **dormitorios** y **antigüedad**; si falta un dato, dice "sin dato" y no baja el puntaje). Trae **hasta 50 por bloque**, ordenados por comparabilidad, de **tu cartera** y de la **red de colaboración**.
 > 💰 No consume créditos por buscar comparables.
+
+> 📄 **Al imprimir o guardar el informe como PDF**, el archivo se descarga con un **nombre claro**: **`ACM - Dirección - Mes Año`** (ej. `ACM - Arcos 2825 - Julio 2026`), así cada tasación queda con su nombre y no se pisan en la carpeta de descargas (fallback `ACM - Mes Año` si falta la dirección).
 
 ### Crear una ficha para el cliente
 

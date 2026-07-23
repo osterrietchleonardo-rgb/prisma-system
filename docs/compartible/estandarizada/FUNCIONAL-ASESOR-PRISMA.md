@@ -202,6 +202,8 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 > 💡 **Tip:** mantené tu **bandeja de entrada de email a mano**: estos avisos llegan al instante y te permiten entrar al chat cuando el lead está caliente. La conversación ya te queda asignada en WhatsApp Bandeja.
 
+> 🔐 Si al abrir un link de PRISMA (por ejemplo, el del aviso de lead) la app te pide **iniciar sesión de nuevo**, después de entrar te lleva **directo a donde ibas** —no te deja tirado en el inicio—. Si ya tenés la sesión abierta, entrás sin que te pida nada.
+
 ---
 
 ## 10. Leads WhatsApp
@@ -356,6 +358,8 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 > 💡 El **checklist compara todo lo que tiene dato real**: además de zona/superficie/ambientes/baños/amenities, ahora suma **dormitorios** y **antigüedad**. Si de un comparable falta un dato, ese renglón dice "sin dato" y no baja el puntaje.
 > 💡 Trae **hasta 50 comparables por bloque** (cartera y red), ordenados por comparabilidad (los mejores arriba). Para **venta**, la mayoría suele salir de tu propia cartera.
 > 💰 Buscar comparables **no consume créditos**.
+
+> 📄 **Al imprimir o guardar el informe como PDF**, el archivo ahora se descarga con un **nombre claro**: **`ACM - Dirección - Mes Año`** (por ejemplo, `ACM - Arcos 2825 - Julio 2026`). Así cada tasación queda con su propio nombre y no se pisan entre sí en tu carpeta de descargas. Si todavía no cargaste la dirección, sale como `ACM - Mes Año`.
 
 ### Crear una ficha para tu cliente
 
