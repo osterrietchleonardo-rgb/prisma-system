@@ -67,9 +67,20 @@ exactamente las mismas filas que la anterior (37 usuarios comparados, 0 diferenc
 
 El mismo antipatrón (`EXISTS` correlacionado con `auth.uid()` sin envolver) está en **29
 políticas más**, entre ellas `wa_messages`, `wa_contacts`, `performance_logs`, `visits` y
-`lead_activities`. La de `wa_messages` es la más expuesta: `pg_stat_statements` registraba
-ejecuciones de 7.978 ms contra un `statement_timeout` de 8 s, y es la que carga los mensajes
-de cada chat.
+`lead_activities`.
+
+**La de `wa_messages` es la más urgente y sigue rota.** Es la que carga los mensajes al abrir
+un chat, y su política tiene un `EXISTS` anidado (profiles → wa_conversations), o sea el
+problema al cuadrado. Medido en producción el 23/07, después de arreglar `wa_conversations`
+y reseteando las estadísticas para tener números limpios:
+
+| Consulta | Llamadas reales | Media | Máximo |
+|---|---|---|---|
+| Bandeja (`wa_conversations`) — ya arreglada | 16 | **1,2 a 2,2 ms** | 2,3 ms |
+| Abrir un chat (`wa_messages`) — sin arreglar | 6 | **5.944 a 6.098 ms** | 6.230 ms |
+
+Seis segundos para abrir un chat, contra un `statement_timeout` de 8 s: queda a 1,8 s de
+empezar a fallar igual que fallaba la bandeja.
 
 No se tocó acá para no mezclar alcances. Conviene tratarlo como tarea propia, tabla por tabla
 y con la misma verificación de equivalencia que se usó en esta (comparar los pares
