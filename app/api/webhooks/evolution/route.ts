@@ -30,10 +30,6 @@ export async function POST(req: Request) {
     // que el chat muestre si el mensaje realmente llegó (clave con el número en calidad ROJA,
     // donde Meta acepta pero descarta en silencio).
     if (payload.event === 'messages.update') {
-      // LOG TEMPORAL: capturar el shape real del update para confirmar el parseo.
-      // TODO(entrega): quitar este console.log una vez validado en producción.
-      console.log('[Evolution Webhook] messages.update RAW:', JSON.stringify(payload.data))
-
       const upd = payload.data || {}
       const wamid: string | undefined =
         upd.key?.id || upd.keyId || upd.wamid || upd.id
