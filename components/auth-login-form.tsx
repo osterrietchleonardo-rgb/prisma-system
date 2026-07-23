@@ -11,6 +11,20 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Globe as Google, Loader2 } from "lucide-react"
 import AuthLoadingOverlay from "@/components/auth-loading-overlay"
 
+/**
+ * Solo se acepta como destino una ruta interna de la app.
+ * Sin esta validación se abre un open redirect: un mail malicioso podría
+ * mandar al asesor a un login falso después de iniciar sesión.
+ */
+export function rutaInternaSegura(valor: string | null | undefined): string | null {
+  if (!valor) return null
+  if (!valor.startsWith("/")) return null // http://…, javascript:…, rutas relativas
+  if (valor.startsWith("//") || valor.startsWith("/\\")) return null // //evil.com
+  if (/[\x00-\x1f\x7f]/.test(valor)) return null
+  if (valor.startsWith("/auth")) return null // evita volver al propio login
+  return valor
+}
+
 export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
@@ -26,6 +40,9 @@ export default function LoginForm() {
       : errorParam === "session_revoked"
       ? "Tu sesión fue revocada por el administrador. Ingresá nuevamente."
       : null
+
+  // Destino original guardado por el middleware al expulsar (?next=/asesor/…)
+  const destinoOriginal = rutaInternaSegura(searchParams.get("next"))
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -71,7 +88,9 @@ export default function LoginForm() {
       // Esperamos el mínimo de visibilidad antes de navegar
       await minDisplay
 
-      if (role === "director") {
+      if (destinoOriginal) {
+        router.push(destinoOriginal)
+      } else if (role === "director") {
         router.push("/director/dashboard")
       } else if (role === "asesor") {
         router.push("/asesor/dashboard")

@@ -112,7 +112,11 @@ export async function middleware(request: NextRequest) {
     // 2. PROTECTED ROUTES
     if (url.pathname.startsWith('/director') || url.pathname.startsWith('/asesor')) {
       if (!user) {
-        return NextResponse.redirect(new URL('/auth/login', request.url))
+        // Guardamos a dónde quería ir para volver ahí después de iniciar sesión
+        // (ej: el link del email de aviso que abre el chat de un lead).
+        const loginUrl = new URL('/auth/login', request.url)
+        loginUrl.searchParams.set('next', `${url.pathname}${url.search}`)
+        return NextResponse.redirect(loginUrl)
       }
       // Account status (pausado/eliminado) checked in layout.tsx server components
     }
