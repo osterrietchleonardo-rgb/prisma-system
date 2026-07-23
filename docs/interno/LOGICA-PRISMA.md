@@ -1183,6 +1183,8 @@ La pantalla de Tasaciones es un **wizard de 4 pasos** (Método Comparativo de Me
 
 - **Nombre del PDF (jul-2026):** al imprimir/guardar el informe, el PDF se descarga como **`ACM - <Dirección> - <Mes Año>`** (ej. `ACM - Arcos 2825 - Julio 2026`) en vez de un nombre fijo que se pisaba. `handlePrint` setea el `document.title` (`nombreArchivoAcm()`) antes de `window.print()` y lo restaura; sanea caracteres inválidos de Windows; fallback `ACM - <Mes Año>` sin dirección.
 
+- **Historial "Mis ACM" (jul-2026):** la página tiene dos solapas, **"Nuevo ACM"** y **"Mis ACM"**. Cada búsqueda que hace un asesor o el director **se guarda sola** (tabla `acm_searches`) con la propiedad analizada y **todos los comparables encontrados** (cartera + colaboración, con su % y checklist), así se puede **reabrir tal cual** aunque después cambien o se den de baja las publicaciones. Al tocar una fila del historial se abre la **misma pantalla de resultados**. Si de esa búsqueda salió una **ficha pública**, la fila muestra el link directo; si se crea una **segunda ficha** desde la misma búsqueda, se **duplica la fila** con la ficha nueva (una fila por ficha). El **asesor ve las suyas**; el **director ve las de toda la agencia** con el nombre de quién la hizo. Se pueden borrar del historial (la ficha compartida sigue viva).
+
 - El cálculo es **client-side** (`lib/tasacion/calculos.ts`, `lib/tasacion/types.ts`), reactivo vía `useMemo`.
 - Persistencia: tabla `tasaciones` en Supabase (borrador/finalizada) con autoguardado entre pasos e historial (últimas 10 por usuario).
 

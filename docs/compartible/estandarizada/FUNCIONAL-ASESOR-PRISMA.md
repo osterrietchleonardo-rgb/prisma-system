@@ -361,6 +361,19 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 > 📄 **Al imprimir o guardar el informe como PDF**, el archivo ahora se descarga con un **nombre claro**: **`ACM - Dirección - Mes Año`** (por ejemplo, `ACM - Arcos 2825 - Julio 2026`). Así cada tasación queda con su propio nombre y no se pisan entre sí en tu carpeta de descargas. Si todavía no cargaste la dirección, sale como `ACM - Mes Año`.
 
+### Mis ACM (tu historial)
+
+Arriba de todo tenés dos solapas: **Nuevo ACM** y **Mis ACM**.
+
+**Cada análisis que hacés se guarda solo.** No tenés que apretar "guardar" ni nada: en el momento en que buscás comparables, ese ACM queda en **Mis ACM** con la propiedad que analizaste y **todos los comparables** que aparecieron (los de tu cartera y los de la red de colaboración, con su % y su checklist).
+
+- **Tocá cualquier fila** y volvés a la **misma pantalla de resultados**, tal como quedó ese día.
+- Si de ese ACM armaste una **ficha para el cliente**, la fila te muestra el botón **"Ficha"** para abrir el link directo.
+- Si armás **otra ficha** desde el mismo ACM (por ejemplo con otros comparables), te queda **una fila por cada ficha**, así no perdés ninguna.
+- Podés **borrar** un ACM del historial con el tacho. Ojo: si ya compartiste la ficha con el cliente, **el link sigue funcionando**.
+
+> 💡 Es la forma de retomar una tasación que empezaste la semana pasada sin volver a cargar todo, y de tener a mano lo que ya le mostraste a cada cliente.
+
 ### Crear una ficha para tu cliente
 
 Con los comparables a la vista podés armar una **ficha profesional** para pasarle a tu cliente (link para compartir **+ PDF**), con la marca de tu agencia.

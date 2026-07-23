@@ -3,6 +3,7 @@
 // El precio se devuelve aparte (NO entra en el %).
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { generateEmbedding } from "@/lib/gemini";
 import {
@@ -44,7 +45,7 @@ function propAmenities(tokko_data: any): string[] {
 
 export async function POST(req: Request) {
   try {
-    const { agencyId } = await requireTenant();
+    const { userId, agencyId } = await requireTenant();
     const supabase = await createClient();
 
     const body = await req.json();
@@ -222,9 +223,34 @@ export async function POST(req: Request) {
       .filter((x): x is AcmComparable => x !== null)
       .sort((a, b) => b.match_pct - a.match_pct);
 
+    // Historial "Mis ACM": guardamos la búsqueda con su snapshot de comparables para poder reabrirla.
+    // Si falla, la búsqueda igual se devuelve (el historial no puede romper el ACM).
+    let searchId: string | null = null;
+    try {
+      const { data: saved, error: saveErr } = await createAdminClient()
+        .from("acm_searches")
+        .insert({
+          agency_id: agencyId,
+          user_id: userId,
+          operacion,
+          sujeto,
+          exclude_id: excludeId,
+          resultados: { cartera, roomix, con_semantica: Boolean(embStr) },
+          total_cartera: cartera.length,
+          total_roomix: roomix.length,
+        })
+        .select("id")
+        .single();
+      if (saveErr) throw saveErr;
+      searchId = saved?.id ?? null;
+    } catch (e) {
+      console.error("ACM: no se pudo guardar la búsqueda en el historial:", e);
+    }
+
     return NextResponse.json({
       cartera,
       roomix,
+      search_id: searchId,
       meta: {
         operacion,
         con_semantica: Boolean(embStr),

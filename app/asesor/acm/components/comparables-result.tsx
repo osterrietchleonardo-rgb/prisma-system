@@ -17,6 +17,10 @@ interface Props {
   cartera: AcmComparable[];
   roomix: AcmComparable[];
   conSemantica: boolean;
+  /** Fila del historial "Mis ACM" a la que pertenece esta búsqueda (para colgarle la ficha). */
+  searchId?: string | null;
+  /** Avisa qué fila del historial quedó asociada a la ficha recién creada. */
+  onFichaCreada?: (searchId: string | null) => void;
   onVolver: () => void;
 }
 
@@ -161,7 +165,7 @@ function Section({
 
 const MAX_FICHA = 12;
 
-export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSemantica, onVolver }: Props) {
+export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSemantica, searchId, onFichaCreada, onVolver }: Props) {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
@@ -205,10 +209,11 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
       const res = await fetch("/api/acm/ficha", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operacion, sujeto, comparables }),
+        body: JSON.stringify({ operacion, sujeto, comparables, search_id: searchId ?? null }),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "No se pudo crear la ficha.");
+      onFichaCreada?.(data.search_id ?? searchId ?? null);
       toast.success("Ficha creada. Abriendo…");
       window.open(data.path, "_blank");
       cancelar();

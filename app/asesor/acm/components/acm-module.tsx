@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Scale } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 import { Sujeto, Operacion, AcmComparable } from "@/lib/tasacion/types";
 import { SubjectInput } from "./subject-input";
 import { ComparablesResult } from "./comparables-result";
+import { MisAcm } from "./mis-acm";
 
 export const SUJETO_INICIAL: Sujeto = {
   direccion: "",
@@ -48,6 +50,11 @@ export function AcmModule() {
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"input" | "results">("input");
   const [results, setResults] = useState<{ cartera: AcmComparable[]; roomix: AcmComparable[]; conSemantica: boolean } | null>(null);
+  // Historial "Mis ACM": id de la búsqueda guardada (para linkearle la ficha) + solapa activa.
+  const [tab, setTab] = useState<"nuevo" | "historial">("nuevo");
+  const [searchId, setSearchId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [abriendoId, setAbriendoId] = useState<string | null>(null);
 
   // Reset del formulario al cambiar de solapa (manual / cartera / link),
   // para que no queden datos escritos de un modo al pasar a otro.
@@ -68,12 +75,35 @@ export function AcmModule() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       setResults({ cartera: data.cartera || [], roomix: data.roomix || [], conSemantica: data.meta?.con_semantica ?? false });
+      setSearchId(data.search_id ?? null);
+      setRefreshKey((k) => k + 1); // la búsqueda quedó guardada en "Mis ACM"
       setView("results");
       if ((data.meta?.total ?? 0) === 0) toast.info("No se encontraron comparables con estos criterios. Probá ampliar la zona o cambiar la operación.");
     } catch (e: any) {
       toast.error("Error buscando comparables: " + e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Abrir un ACM del historial: trae el snapshot guardado y muestra la MISMA pantalla de resultados.
+  const handleAbrirGuardado = async (id: string) => {
+    setAbriendoId(id);
+    try {
+      const res = await fetch(`/api/acm/searches/${id}`);
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "No se pudo abrir el ACM.");
+      setSujeto({ ...SUJETO_INICIAL, ...(data.sujeto || {}) });
+      setOperacion(data.operacion === "alquiler" ? "alquiler" : "venta");
+      setExcludeId(data.exclude_id ?? null);
+      setResults({ cartera: data.cartera || [], roomix: data.roomix || [], conSemantica: Boolean(data.con_semantica) });
+      setSearchId(data.id);
+      setView("results");
+      setTab("nuevo");
+    } catch (e: any) {
+      toast.error("Error abriendo el ACM: " + e.message);
+    } finally {
+      setAbriendoId(null);
     }
   };
 
@@ -91,17 +121,42 @@ export function AcmModule() {
         </div>
       </div>
 
+      {/* Solapas: análisis nuevo / historial guardado */}
+      <div className="inline-flex items-center gap-1 p-1 rounded-xl border border-accent/10 bg-card/30">
+        {([
+          ["nuevo", "Nuevo ACM"],
+          ["historial", "Mis ACM"],
+        ] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={cn(
+              "px-4 py-1.5 rounded-lg text-sm font-bold transition-colors",
+              tab === key ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <Card className="border-accent/10 bg-card/20 backdrop-blur-md shadow-xl overflow-hidden">
         <CardHeader className="border-b border-accent/5 pb-4">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold uppercase tracking-widest text-accent">
-              {view === "input" ? "1 · Elegí la propiedad a analizar" : "2 · Comparables encontrados"}
+              {tab === "historial"
+                ? "Historial · Tus análisis guardados"
+                : view === "input"
+                  ? "1 · Elegí la propiedad a analizar"
+                  : "2 · Comparables encontrados"}
             </p>
             <Badge variant="outline" className="text-[10px] border-accent/10">ACM</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-8">
-          {view === "input" ? (
+          {tab === "historial" ? (
+            <MisAcm onAbrir={handleAbrirGuardado} abriendoId={abriendoId} refreshKey={refreshKey} />
+          ) : view === "input" ? (
             <SubjectInput
               sujeto={sujeto}
               onChange={setSujeto}
@@ -121,6 +176,11 @@ export function AcmModule() {
                 cartera={results.cartera}
                 roomix={results.roomix}
                 conSemantica={results.conSemantica}
+                searchId={searchId}
+                onFichaCreada={(nuevoId) => {
+                  setSearchId(nuevoId);
+                  setRefreshKey((k) => k + 1);
+                }}
                 onVolver={() => setView("input")}
               />
             )

@@ -57,6 +57,7 @@ export async function POST(req: Request) {
     const operacion: string = body.operacion === "alquiler" ? "alquiler" : "venta";
     const sujeto = (body.sujeto || {}) as any;
     const comparablesIn = (Array.isArray(body.comparables) ? body.comparables : []) as AcmComparable[];
+    const searchId: string | null = typeof body.search_id === "string" ? body.search_id : null; // fila del historial "Mis ACM"
 
     if (comparablesIn.length === 0) {
       return NextResponse.json({ error: "Elegí al menos un comparable para armar la ficha." }, { status: 400 });
@@ -216,7 +217,35 @@ export async function POST(req: Request) {
     });
     if (insErr) throw insErr;
 
-    return NextResponse.json({ token, path: `/ficha-acm/${token}` });
+    // Historial "Mis ACM": la primera ficha se pega a la fila de la búsqueda; si esa búsqueda YA tenía
+    // ficha, duplicamos la fila (misma propiedad y mismos comparables) para que quede una por ficha.
+    let historialId: string | null = searchId;
+    if (searchId) {
+      try {
+        const { data: row } = await admin
+          .from("acm_searches")
+          .select("id, agency_id, user_id, operacion, sujeto, exclude_id, resultados, total_cartera, total_roomix, ficha_token")
+          .eq("id", searchId)
+          .eq("agency_id", agencyId)
+          .maybeSingle();
+
+        if (row && row.ficha_token) {
+          const { id: _id, ficha_token: _ft, ...copia } = row as any;
+          const { data: nueva } = await admin
+            .from("acm_searches")
+            .insert({ ...copia, user_id: userId, ficha_token: token })
+            .select("id")
+            .single();
+          historialId = nueva?.id ?? searchId;
+        } else if (row) {
+          await admin.from("acm_searches").update({ ficha_token: token }).eq("id", searchId);
+        }
+      } catch (e) {
+        console.error("ACM: no se pudo vincular la ficha al historial:", e);
+      }
+    }
+
+    return NextResponse.json({ token, path: `/ficha-acm/${token}`, search_id: historialId });
   } catch (error: any) {
     console.error("Crear ficha ACM error:", error);
     return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 500 });

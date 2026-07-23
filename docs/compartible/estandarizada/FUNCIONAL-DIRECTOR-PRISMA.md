@@ -396,6 +396,21 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 > 📄 **Al imprimir o guardar el informe como PDF**, el archivo se descarga con un **nombre claro**: **`ACM - Dirección - Mes Año`** (ej. `ACM - Arcos 2825 - Julio 2026`), así cada tasación queda con su nombre y no se pisan en la carpeta de descargas (fallback `ACM - Mes Año` si falta la dirección).
 
+### Mis ACM (historial de tu equipo)
+
+Arriba de todo tenés dos solapas: **Nuevo ACM** y **Mis ACM**.
+
+**Cada análisis se guarda solo**, sin que nadie tenga que apretar "guardar". Como director, en **Mis ACM** ves **todos los ACM de tu agencia** —los tuyos y los de cada asesor, con el nombre de quién lo hizo—; el asesor solo ve los suyos.
+
+Cada fila guarda la propiedad analizada y **todos los comparables** que aparecieron (cartera + red de colaboración, con su % y su checklist):
+
+- **Tocá una fila** y se abre la **misma pantalla de resultados**, tal como quedó ese día (aunque después esas publicaciones hayan cambiado o se hayan dado de baja).
+- Si de ese ACM salió una **ficha para el cliente**, la fila tiene el botón **"Ficha"** con el link directo.
+- Si desde el mismo ACM se arma **otra ficha**, queda **una fila por cada ficha**.
+- Se puede **borrar** del historial; si la ficha ya se compartió, **el link sigue funcionando**.
+
+> 💡 Sirve para dos cosas: que nadie repita trabajo ya hecho, y que vos veas **qué se está tasando, en qué zonas y con qué comparables** se lo está mostrando al cliente.
+
 ### Crear una ficha para el cliente
 
 Con los comparables a la vista, vos o tus asesores pueden armar una **ficha profesional** para pasarle al cliente (link para compartir **+ PDF**), con la marca de la agencia.
