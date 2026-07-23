@@ -10,18 +10,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const db = getAdminDb()
   const body = await request.json()
-  const { estado, respuesta } = body
+  const { estado, respuesta, nota_cliente } = body
 
-  const VALID_ESTADOS = ["pendiente", "en_revision", "resuelta", "descartada"]
+  const VALID_ESTADOS = ["pendiente", "en_proceso", "en_revision", "resuelta", "pospuesta"]
   if (!VALID_ESTADOS.includes(estado)) {
     return NextResponse.json({ error: "Estado inválido" }, { status: 400 })
   }
 
   const STATUS_MAP: Record<string, string> = {
     pendiente: "new",
+    en_proceso: "in_progress",
     en_revision: "reviewing",
     resuelta: "resolved",
-    descartada: "rejected",
+    pospuesta: "postponed",
   }
   const status = STATUS_MAP[estado] || "new"
 
@@ -31,6 +32,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       estado,
       status,
       respuesta: respuesta || null,
+      nota_cliente: nota_cliente || null,
       respondida_por: auth.payload.sub,
       updated_at: new Date().toISOString(),
     })

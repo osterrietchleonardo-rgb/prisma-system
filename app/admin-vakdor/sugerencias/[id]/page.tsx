@@ -2,12 +2,13 @@
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 
-const ESTADOS = ["pendiente", "en_revision", "resuelta", "descartada"]
+const ESTADOS = ["pendiente", "en_proceso", "en_revision", "resuelta", "pospuesta"]
 const ESTADO_BADGE: Record<string, { bg: string; color: string }> = {
   pendiente: { bg: "rgba(239,68,68,0.15)", color: "#f87171" },
+  en_proceso: { bg: "rgba(59,130,246,0.15)", color: "#60a5fa" },
   en_revision: { bg: "rgba(245,158,11,0.15)", color: "#fbbf24" },
   resuelta: { bg: "rgba(16,185,129,0.15)", color: "#34d399" },
-  descartada: { bg: "rgba(107,114,128,0.15)", color: "#9ca3af" },
+  pospuesta: { bg: "rgba(107,114,128,0.15)", color: "#9ca3af" },
 }
 
 export default function SugerenciaDetalleClient() {
@@ -17,6 +18,7 @@ export default function SugerenciaDetalleClient() {
   const [loading, setLoading] = useState(true)
   const [estado, setEstado] = useState("")
   const [respuesta, setRespuesta] = useState("")
+  const [notaCliente, setNotaCliente] = useState("")
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [msg, setMsg] = useState("")
@@ -28,6 +30,7 @@ export default function SugerenciaDetalleClient() {
         setData(d)
         setEstado(d.estado || "pendiente")
         setRespuesta(d.respuesta || "")
+        setNotaCliente(d.nota_cliente || "")
         setLoading(false)
       })
   }, [id])
@@ -36,7 +39,7 @@ export default function SugerenciaDetalleClient() {
     setSaving(true)
     const res = await fetch(`/api/admin-vakdor/sugerencias/${id}/estado`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estado, respuesta }),
+      body: JSON.stringify({ estado, respuesta, nota_cliente: notaCliente }),
     })
     if (res.ok) setMsg("Guardado correctamente")
     else { const d = await res.json(); setMsg(d.error || "Error") }
@@ -151,11 +154,20 @@ export default function SugerenciaDetalleClient() {
         </div>
 
         <div style={{ marginBottom: 16 }}>
+          <label style={{ display: "block", color: "rgba(255,255,255,0.45)", fontSize: 12, marginBottom: 6 }}>Nota para el cliente (opcional)</label>
+          <textarea
+            value={notaCliente}
+            onChange={e => setNotaCliente(e.target.value)}
+            rows={3}
+            placeholder="Escribí aquí lo que verá el cliente..."
+            style={{ ...inputStyle, resize: "vertical" as const, marginBottom: 16 }}
+          />
+
           <label style={{ display: "block", color: "rgba(255,255,255,0.45)", fontSize: 12, marginBottom: 6 }}>Nota interna (opcional)</label>
           <textarea
             value={respuesta}
             onChange={e => setRespuesta(e.target.value)}
-            rows={4}
+            rows={3}
             placeholder="Agregar nota o respuesta interna..."
             style={{ ...inputStyle, resize: "vertical" as const }}
           />
