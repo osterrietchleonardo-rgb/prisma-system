@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { CLASIFICACION_CONSULTA } from '@/lib/whatsapp/clasificacion'
 import { triggerN8nWithSafetyNet } from '@/lib/whatsapp/n8nTrigger'
+import { actualizarEstadoEntrega } from '@/lib/whatsapp/delivery-status'
 
 // El disparo a n8n hace hasta 3 intentos (timeout 15s c/u). Subimos el límite de
 // la función para que Vercel no la mate antes de terminar los reintentos.
@@ -23,6 +24,29 @@ export async function POST(req: Request) {
 
     const payload = await req.json()
     console.log(`[Evolution Webhook] Evento recibido: ${payload.event} para instancia: ${payload.instance}`)
+
+    // Actualización de estado de entrega de un mensaje SALIENTE (sent/delivered/read/failed).
+    // Evolution reemite los MESSAGES_UPDATE de Meta. Actualizamos wa_messages por wamid para
+    // que el chat muestre si el mensaje realmente llegó (clave con el número en calidad ROJA,
+    // donde Meta acepta pero descarta en silencio).
+    if (payload.event === 'messages.update') {
+      // LOG TEMPORAL: capturar el shape real del update para confirmar el parseo.
+      // TODO(entrega): quitar este console.log una vez validado en producción.
+      console.log('[Evolution Webhook] messages.update RAW:', JSON.stringify(payload.data))
+
+      const upd = payload.data || {}
+      const wamid: string | undefined =
+        upd.key?.id || upd.keyId || upd.wamid || upd.id
+      const rawStatus =
+        upd.status ?? upd.update?.status ?? upd.message?.status
+      const errMsg =
+        upd.error?.message || upd.errors?.[0]?.title || upd.update?.error || null
+
+      if (wamid) {
+        await actualizarEstadoEntrega(supabase, wamid, rawStatus, errMsg)
+      }
+      return NextResponse.json({ success: true, message: 'status update processed' })
+    }
 
     // Solo procesar mensajes entrantes del lead
     if (payload.event !== 'messages.upsert') {

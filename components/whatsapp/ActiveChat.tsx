@@ -1067,9 +1067,34 @@ function MediaContent({ msg }: { msg: WAMessage }) {
 // Message Bubble
 // =============================================
 
+// Indicador de entrega para mensajes salientes (bot / equipo).
+// Refleja el estado REAL que reporta Meta por webhook, no solo "guardado en Prisma".
+function DeliveryStatus({ msg }: { msg: WAMessage }) {
+  const s = msg.status
+  if (!s) return null
+  if (s === 'failed') {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 text-red-600 dark:text-red-400 font-semibold"
+        title={msg.status_error || 'Meta no entregó este mensaje (número con reputación baja o fuera de la ventana de 24 h).'}
+      >
+        ✗ No entregado
+      </span>
+    )
+  }
+  if (s === 'pending') {
+    return <span className="text-muted-foreground" title="Enviándose…">🕓</span>
+  }
+  // sent / delivered / read
+  const label = s === 'read' ? '✓✓ Leído' : s === 'delivered' ? '✓✓ Entregado' : '✓ Enviado'
+  const color = s === 'read' ? 'text-sky-500' : 'text-muted-foreground'
+  return <span className={color} title={label}>{label}</span>
+}
+
 function MessageBubble({ msg }: { msg: WAMessage }) {
   const time = formatTime(msg.created_at)
   const isMedia = ['image', 'video', 'audio', 'document'].includes(msg.message_type || '')
+  const isOutbound = msg.role === 'bot' || msg.role === 'human'
 
   if (msg.role === "lead") {
     return (
@@ -1109,7 +1134,10 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
               <p className="text-sm px-4 py-2.5 text-muted-foreground italic">Mensaje multimedia</p>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">{time}</p>
+          <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1.5">
+            <span>{time}</span>
+            <DeliveryStatus msg={msg} />
+          </p>
         </div>
       </div>
     )
@@ -1133,7 +1161,10 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
               <p className="text-sm px-4 py-2.5 text-muted-foreground italic">Mensaje multimedia</p>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">{time}</p>
+          <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1.5">
+            <span>{time}</span>
+            <DeliveryStatus msg={msg} />
+          </p>
         </div>
       </div>
     )

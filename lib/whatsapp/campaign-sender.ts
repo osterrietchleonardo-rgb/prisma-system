@@ -256,6 +256,10 @@ export async function processCampaign(
         continue
       }
 
+      // Capturar el wamid de Meta para poder rastrear la entrega real (webhook de estado).
+      const okBody = await res.json().catch(() => ({}))
+      const campWamid: string | null = (okBody as any)?.messages?.[0]?.id || null
+
       // La plantilla YA salió por WhatsApp. Marcar 'sent' ACÁ, antes de crear el chat y los
       // mensajes: si algo falla más abajo se pierde el registro visual (recuperable), pero
       // nunca se reenvía. Antes se marcaba al final y cualquier corte en el medio provocaba
@@ -353,6 +357,7 @@ export async function processCampaign(
           content: fullText.trim(),
           role: 'human',
           message_type: 'text',
+          wamid: campWamid,
         })
 
         // Guardar en n8n_chat_histories para dar contexto a la IA
