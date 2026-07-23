@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { CLASIFICACION_CONSULTA } from '@/lib/whatsapp/clasificacion'
 import { triggerN8nWithSafetyNet } from '@/lib/whatsapp/n8nTrigger'
+import { actualizarEstadoEntrega } from '@/lib/whatsapp/delivery-status'
 
 // El disparo a n8n hace hasta 3 intentos (timeout 15s c/u). Subimos el límite de
 // la función para que Vercel no la mate antes de terminar los reintentos.
@@ -60,6 +61,19 @@ export async function POST(req: Request) {
                      updated_at: new Date().toISOString()
                  })
                  .eq('meta_template_id', templateId)
+          }
+
+          // CASO 1b: Estado de entrega de mensajes SALIENTES (sent/delivered/read/failed).
+          // Meta lo manda en change.field === 'messages' con value.statuses (no value.messages).
+          // Actualizamos wa_messages por wamid para reflejar la entrega real en el chat.
+          if (change.field === 'messages' && Array.isArray(val.statuses)) {
+             for (const st of val.statuses) {
+                const wamid = st.id
+                const errMsg = st.errors?.[0]?.message || st.errors?.[0]?.title || null
+                if (wamid) {
+                   await actualizarEstadoEntrega(supabase, wamid, st.status, errMsg)
+                }
+             }
           }
 
           // CASO 2: Mensajes entrantes (Inbound Messages)

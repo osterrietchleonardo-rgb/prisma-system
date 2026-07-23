@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { dentroDeVentanaEnvio, ventanaEnvioLabel } from '@/lib/whatsapp/sending-window'
 
 export async function POST(req: Request) {
   try {
@@ -14,6 +15,19 @@ export async function POST(req: Request) {
 
     if (!agency_id || !conversation_id || !contact_phone || !template_name) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // Ventana horaria: los seguimientos proactivos solo salen entre 6am y 11pm (Argentina).
+    // Fuera de ventana NO se envía ni se guarda como enviado (así no ensucia el chat ni
+    // castiga la reputación del número). n8n recibe el skip y el seguimiento lo retoma
+    // su próxima corrida dentro del horario permitido.
+    if (!dentroDeVentanaEnvio()) {
+      return NextResponse.json({
+        success: false,
+        skipped: 'fuera_de_ventana_horaria',
+        ventana: ventanaEnvioLabel(),
+        message: `Seguimiento no enviado: fuera de la ventana horaria (${ventanaEnvioLabel()}).`,
+      })
     }
 
     const supabase = createClient(

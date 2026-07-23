@@ -96,6 +96,10 @@ export interface WAMessage {
   wamid: string | null
   metadata: Record<string, unknown>
   created_at: string
+  // Estado real de entrega (solo salientes): lo actualiza el webhook de Meta/Evolution.
+  status?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | null
+  status_error?: string | null
+  status_at?: string | null
 }
 
 export interface WATemplate {
