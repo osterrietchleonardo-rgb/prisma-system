@@ -63,24 +63,51 @@ exactamente las mismas filas que la anterior (37 usuarios comparados, 0 diferenc
 
 ---
 
-## Hallazgo lateral — reportado, NO arreglado en esta rama
+## Segunda parte — `wa_messages` (también corregida en esta rama)
 
-El mismo antipatrón (`EXISTS` correlacionado con `auth.uid()` sin envolver) está en **29
-políticas más**, entre ellas `wa_messages`, `wa_contacts`, `performance_logs`, `visits` y
-`lead_activities`.
+Migración: `supabase/migrations/20260723150000_fix_wa_messages_rls_performance.sql`.
 
-**La de `wa_messages` es la más urgente y sigue rota.** Es la que carga los mensajes al abrir
-un chat, y su política tiene un `EXISTS` anidado (profiles → wa_conversations), o sea el
-problema al cuadrado. Medido en producción el 23/07, después de arreglar `wa_conversations`
-y reseteando las estadísticas para tener números limpios:
+La política de `wa_messages` tenía el mismo antipatrón **al cuadrado**: un `EXISTS` contra
+`profiles` que a su vez contenía otro `EXISTS` contra `wa_conversations`.
 
-| Consulta | Llamadas reales | Media | Máximo |
-|---|---|---|---|
-| Bandeja (`wa_conversations`) — ya arreglada | 16 | **1,2 a 2,2 ms** | 2,3 ms |
-| Abrir un chat (`wa_messages`) — sin arreglar | 6 | **5.944 a 6.098 ms** | 6.230 ms |
+**Dónde se notaba, que no era donde parecía.** Al detectarlo se asumió que era "abrir un
+chat". No lo era: esa consulta filtra por `conversation_id` y siempre fue barata. La consulta
+de 6 segundos era la del **Dashboard** — "Response Time Analytics"
+(`lib/queries/dashboard.ts:334`), que recorre todos los mensajes de la agencia con un join
+lateral y sin filtrar por conversación. Medido para un asesor:
 
-Seis segundos para abrir un chat, contra un `statement_timeout` de 8 s: queda a 1,8 s de
-empezar a fallar igual que fallaba la bandeja.
+| Momento | Dashboard de un asesor |
+|---|---|
+| Antes de arreglar `wa_conversations` | ~6.100 ms |
+| Después de aquel fix, antes de este | 669 a 896 ms |
+| **Con este fix** | **5,3 a 5,5 ms** |
+
+Para el director pasa de 64 ms a 48 ms: nunca fue el caso malo, porque la rama `director`
+corta antes por el `OR` y no llega a evaluar el `EXISTS`.
+
+Índice agregado: `(conversation_id, created_at DESC)`. La tabla no tenía **ningún** índice por
+`conversation_id` —solo la PK por `id` y el unique por `wamid`—, y todas las lecturas de la app
+filtran por ahí. Abrir un chat pasó de 2,8 ms a 1,6 ms.
+
+Se probó además un índice `(agency_id, created_at)` para la consulta del dashboard y **se
+descartó con la medición**: empeoraba las dos consultas (abrir un chat pasaba de 1,6 ms a
+6,9 ms) porque el planner lo elegía en lugar del de conversación.
+
+Verificación de equivalencia: 19.315 pares (usuario, mensaje) con la lógica vieja y con la
+nueva, 0 diferencias. Prueba directa de aislamiento sobre un chat de 96 mensajes de Carlos:
+Carlos ve 96, el director ve 96, otra asesora ve 0.
+
+---
+
+## Hallazgo lateral — reportado, NO arreglado
+
+El mismo antipatrón sigue en **27 políticas más**, entre ellas `wa_contacts`,
+`performance_logs`, `visits`, `lead_activities` y `n8n_chat_histories`. Ninguna se midió como
+crítica hoy, pero todas van a degradarse igual a medida que crezcan las tablas.
+
+Conviene tratarlo como tarea propia, tabla por tabla, con la misma verificación de
+equivalencia que se usó acá (comparar los pares usuario/fila visibles antes y después) y
+midiendo si el índice hace falta en vez de agregarlo por las dudas.
 
 No se tocó acá para no mezclar alcances. Conviene tratarlo como tarea propia, tabla por tabla
 y con la misma verificación de equivalencia que se usó en esta (comparar los pares
