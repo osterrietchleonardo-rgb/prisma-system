@@ -12,15 +12,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const body = await request.json()
   const { estado, respuesta, nota_cliente } = body
 
-  const VALID_ESTADOS = ["pendiente", "en_proceso", "en_revision", "resuelta", "pospuesta"]
+  const VALID_ESTADOS = ["pendiente", "en_revision", "en_proceso", "resuelta", "pospuesta"]
   if (!VALID_ESTADOS.includes(estado)) {
     return NextResponse.json({ error: "Estado inválido" }, { status: 400 })
   }
 
   const STATUS_MAP: Record<string, string> = {
     pendiente: "new",
-    en_proceso: "in_progress",
     en_revision: "reviewing",
+    en_proceso: "in_progress",
     resuelta: "resolved",
     pospuesta: "postponed",
   }
