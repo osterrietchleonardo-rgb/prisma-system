@@ -2018,7 +2018,7 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 #### 5. Configuración y Asesores (`/director/configuracion`, `/director/asesores`)
 - **Objetivo:** Setup inicial y gestión del equipo.
 - **Lógica Interna:**
-  - **Asesores:** Invitar nuevos asesores mediante códigos. Cada tarjeta muestra performance real (Captaciones/Cierres/Cartera/Rotación, de `getDashboardData`) y un panel con el embudo de conversión. La única acción de gestión es **Desvincular asesor** (server action `desvincularAsesor`): pone `estado='eliminado'` + `tokens_invalidos_desde` y bloquea el email en `emails_bloqueados`, dejándolo sin acceso al sistema.
+  - **Asesores:** Invitar nuevos asesores mediante códigos. Cada tarjeta muestra performance real (Captaciones/Cierres/Cartera/Rotación, de `getDashboardData`) y un panel con el embudo de conversión. La única acción de gestión es **Desvincular asesor** (server action `desvincularAsesor`): pone `estado='eliminado'` + `tokens_invalidos_desde` y bloquea el email en `emails_bloqueados`, dejándolo sin acceso al sistema. Cada tarjeta también permite **clasificar** al asesor como *Client Director* o *Client Support* (`setClasificacionAsesor` → `profiles.clasificacion`, toggle: volver a tocar el botón activo lo deja en NULL = "Asesor"). Es una **etiqueta secundaria de organización interna: no modifica `role` ni `estado`**, así que no cambia permisos, rutas ni lo que ve el asesor.
   - **Configuración:** Token de Tokko, Instancia de WhatsApp, Branding (logo y colores para Marketing IA), y facturación.
 
 #### 6. Herramientas IA (Marketing, Contratos, Tasaciones)

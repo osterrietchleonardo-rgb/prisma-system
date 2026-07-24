@@ -182,6 +182,41 @@ export async function desvincularAsesor(agentId: string, motivo?: string) {
   return { success: true }
 }
 
+// Clasificaciones válidas que el director puede asignar a un asesor.
+// (no se exporta la constante: en un archivo "use server" solo pueden
+// exportarse funciones async; el tipo sí, porque se borra al compilar)
+const CLASIFICACIONES_ASESOR = ["client_director", "client_support"] as const
+export type ClasificacionAsesor = (typeof CLASIFICACIONES_ASESOR)[number]
+
+/**
+ * Asigna (o quita) la clasificación de un asesor: "Client Director" o
+ * "Client Support". Pasar null lo deja como "Asesor" (sin clasificación).
+ * Solo el director de SU misma agencia puede hacerlo.
+ */
+export async function setClasificacionAsesor(
+  agentId: string,
+  clasificacion: ClasificacionAsesor | null
+) {
+  if (clasificacion !== null && !CLASIFICACIONES_ASESOR.includes(clasificacion)) {
+    throw new Error("Clasificación inválida")
+  }
+
+  const { admin } = await requireDirectorSobreAsesor(agentId)
+
+  const { error } = await admin
+    .from("profiles")
+    .update({ clasificacion })
+    .eq("id", agentId)
+
+  if (error) {
+    console.error("Error clasificando asesor:", error)
+    throw new Error(error.message)
+  }
+
+  revalidatePath("/director/asesores")
+  return { success: true }
+}
+
 /**
  * Devuelve la última acción de pausa vigente de un asesor (para mostrar el motivo
  * mientras está pausado): motivo, fecha y nombre de quién lo pausó.

@@ -23,7 +23,7 @@ import {
   RotateCcw
 } from "lucide-react"
 import { getAgentPerformanceAction, getAgencyAdvisorsPerformanceAction } from "@/app/actions/performance"
-import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa } from "@/app/actions/asesores"
+import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa, setClasificacionAsesor, type ClasificacionAsesor } from "@/app/actions/asesores"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -70,6 +70,16 @@ import { createClient } from "@/lib/supabase"
 import { QRCodeSVG } from "qrcode.react"
 // import { cn } from "@/lib/utils" // Unused
 
+// Clasificaciones que el director puede asignar a cada asesor.
+// Si no elige ninguna, el asesor queda simplemente como "Asesor".
+const CLASIFICACIONES: { valor: ClasificacionAsesor; label: string }[] = [
+  { valor: "client_director", label: "Client Director" },
+  { valor: "client_support", label: "Client Support" },
+]
+
+const labelClasificacion = (valor?: string | null) =>
+  CLASIFICACIONES.find((c) => c.valor === valor)?.label ?? "Asesor"
+
 export default function AsesoresPage() {
   const [agents, setAgents] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
@@ -89,6 +99,8 @@ export default function AsesoresPage() {
   const [pauseReason, setPauseReason] = useState("")
   const [pausing, setPausing] = useState(false)
   const [reanudando, setReanudando] = useState<string | null>(null)
+  // Asesor cuya clasificación se está guardando (para deshabilitar sus botones)
+  const [clasificando, setClasificando] = useState<string | null>(null)
   // Diálogo de desvinculación: asesor elegido + motivo
   const [agentToUnlink, setAgentToUnlink] = useState<Record<string, any> | null>(null)
   const [unlinkReason, setUnlinkReason] = useState("")
@@ -217,6 +229,23 @@ export default function AsesoresPage() {
       toast.error(e.message || "Error al reactivar asesor")
     } finally {
       setReanudando(null)
+    }
+  }
+
+  // Clasifica al asesor. Si toca el botón que ya estaba activo, lo deselecciona
+  // (vuelve a quedar como "Asesor").
+  const handleClasificar = async (agent: Record<string, any>, valor: ClasificacionAsesor) => {
+    const nuevo = agent.clasificacion === valor ? null : valor
+    try {
+      setClasificando(agent.id)
+      await setClasificacionAsesor(agent.id, nuevo)
+      setAgents((prev) => prev.map((a) => (a.id === agent.id ? { ...a, clasificacion: nuevo } : a)))
+      setSelectedAgent((prev) => (prev?.id === agent.id ? { ...prev, clasificacion: nuevo } : prev))
+      toast.success(nuevo ? `Clasificado como ${labelClasificacion(nuevo)}` : "Clasificación quitada. Queda como Asesor.")
+    } catch (e: any) {
+      toast.error(e.message || "Error al clasificar al asesor")
+    } finally {
+      setClasificando(null)
     }
   }
 
@@ -558,6 +587,36 @@ export default function AsesoresPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-5 pt-4 space-y-4">
+                {/* Clasificación del asesor (se puede seleccionar y deseleccionar) */}
+                <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">
+                    Rol: <span className="text-foreground">{labelClasificacion(agent.clasificacion)}</span>
+                  </p>
+                  <div className="flex gap-1.5">
+                    {CLASIFICACIONES.map(({ valor, label }) => {
+                      const activo = agent.clasificacion === valor
+                      return (
+                        <Button
+                          key={valor}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={clasificando === agent.id}
+                          onClick={(e) => { e.stopPropagation(); handleClasificar(agent, valor) }}
+                          className={`h-7 flex-1 px-2 text-[10px] font-semibold ${
+                            activo
+                              ? "bg-accent/15 text-accent border-accent/40 hover:bg-accent/20"
+                              : "border-accent/10 text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {activo && <Check className="h-3 w-3 mr-1" />}
+                          {label}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-3 gap-2">
                   <div className="flex flex-col items-center p-2 rounded-lg bg-accent/5 border border-accent/10">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Capt.</span>
