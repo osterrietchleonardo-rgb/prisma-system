@@ -46,6 +46,7 @@ export const SUJETO_INICIAL: Sujeto = {
 export function AcmModule() {
   const [sujeto, setSujeto] = useState<Sujeto>(SUJETO_INICIAL);
   const [operacion, setOperacion] = useState<Operacion>("venta");
+  const [considerarPh, setConsiderarPh] = useState(true); // ACM: considerar PH como comparables (solo aplica a Casa)
   const [excludeId, setExcludeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"input" | "results">("input");
@@ -61,6 +62,7 @@ export function AcmModule() {
   const handleReset = () => {
     setSujeto(SUJETO_INICIAL);
     setOperacion("venta");
+    setConsiderarPh(true);
     setExcludeId(null);
   };
 
@@ -70,7 +72,7 @@ export function AcmModule() {
       const res = await fetch("/api/acm/comparables", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sujeto, operacion, exclude_id: excludeId }),
+        body: JSON.stringify({ sujeto, operacion, exclude_id: excludeId, considerar_ph: considerarPh }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -162,6 +164,8 @@ export function AcmModule() {
               onChange={setSujeto}
               operacion={operacion}
               onOperacionChange={setOperacion}
+              considerarPh={considerarPh}
+              onConsiderarPhChange={setConsiderarPh}
               onBuscar={handleBuscar}
               loading={loading}
               excludeId={excludeId}
