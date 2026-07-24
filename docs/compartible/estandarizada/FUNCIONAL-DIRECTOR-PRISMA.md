@@ -169,7 +169,7 @@ En la ficha de cada propiedad, debajo de la descripción de Tokko, está el bloq
 **Qué es:** el registro de actividad comercial del equipo, que **alimenta el Dashboard**. Como director, además podés definir cuánto puntúa cada acción y **fijar los objetivos mensuales** de cada asesor.
 
 Tenés **3 solapas**:
-1. **Actividad:** el historial de actividad del equipo (ver, filtrar, cargar nuevas). Como director ves un **filtro por asesor** (desplegable en orden alfabético) que te permite ver solo la actividad de un asesor específico o de todos.
+1. **Actividad:** el historial de actividad del equipo (ver, filtrar, cargar nuevas). Como director ves un **filtro por asesor** (desplegable en orden alfabético) que te permite ver solo la actividad de un asesor específico o de todos. También tenés un **filtro de fechas** (mismo selector que el Dashboard: presets Hoy/Mes/Trimestre/Año/Últimos 30 o rango a mano) para acotar el historial a un período; se combina con el resto de los filtros y **"Limpiar"** lo resetea.
 2. **Objetivos:** dónde fijás las metas mensuales por asesor (ver detalle abajo).
 3. **Configuración IA:** ajustás las escalas (qué puntaje da cada acción: llamada, captación, prelisting, etc.). Esto define cómo se calculan los KPIs.
 

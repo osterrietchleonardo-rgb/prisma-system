@@ -159,6 +159,8 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
    - **Registro Manual de Lead:** si el contacto es nuevo (un amigo, vecino, referido) y no está en el sistema, cargalo a mano. Pide **nombre completo**, **celular**, **email** y **etiqueta** (opcional). Para el celular elegís el **país** de una lista (con bandera) y escribís el número **como lo marcás normalmente** (ej.: `221 15 308 9334`); el sistema lo convierte solo al formato que pide WhatsApp y te muestra abajo cómo va a quedar (ej.: *"Se guardará como +54 9 221 308 9334"*). Para Argentina agrega solo el "9" de celular aunque no pongas el 15. **Doble verificación:** nombre, celular y email se cargan dos veces y el sistema avisa en el momento si coinciden (✅) o no (❌); en el campo de verificación **no se puede copiar/pegar**, hay que reescribirlo. Antes de crear el contacto tenés que tildar la **casilla de certificación** declarando que los datos son reales, veraces y obtenidos legítimamente. Se crea solo, asignado a tu cuenta.
 2. **Origen de Consulta:** elegí el canal de la lista (Instagram, WhatsApp orgánico, Referido cliente, Portal propio, Cartel, etc.).
 
+**Filtros del historial:** además de buscar por cliente/propiedad y filtrar por tipo de actividad, tenés un **filtro de fechas** (mismo selector que el Dashboard). Elegí un preset (Hoy, Este Mes, Este Trimestre, Este Año, Últimos 30 días) o un rango a mano para ver solo la actividad de ese período; con **"Limpiar"** volvés a ver todo.
+
 > 💡 **Tip:** cargá tu actividad **todos los días**. Es la diferencia entre un dashboard que refleja tu esfuerzo real y uno que te subvalora.
 > 💡 La pestaña de "Configuración IA" de las escalas de puntaje la define el director; vos solo cargás actividad.
 

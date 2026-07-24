@@ -29,6 +29,8 @@ import { PerformanceScaleEditor } from "@/components/tracking/PerformanceScaleEd
 import { PerformanceObjectivesEditor } from "@/components/tracking/PerformanceObjectivesEditor";
 import { PerformanceHistoryList } from "@/components/tracking/PerformanceHistoryList";
 import { PerformanceLogDrawer } from "@/components/tracking/PerformanceLogDrawer";
+import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getPerformanceLogs } from "@/lib/tracking/queries";
 import { AgencyPerformanceConfig, PerformanceLog } from "@/lib/tracking/types";
@@ -65,6 +67,13 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
   const [statusFilter, setStatusFilter] = useState<"todos" | "original" | "modificada" | "eliminada">("todos");
   const [search, setSearch] = useState("");
   const [advisorFilter, setAdvisorFilter] = useState<string>("all");
+
+  // Filtro de fechas (comparte el mismo DatePeriodFilter que el dashboard: from/to en la URL)
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
 
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
@@ -148,15 +157,19 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
     const matchesFilter = filter === "todos" || log.type === filter;
     const matchesStatus = statusFilter === "todos" || log.status === statusFilter || (statusFilter === "original" && !log.status);
     const matchesAdvisor = advisorFilter === "all" || log.agent_id === advisorFilter;
-    
-    const matchesSearch = 
-      !search || 
+
+    // Rango de fechas: compara el día (yyyy-MM-dd) de fecha_actividad contra from/to. Sin params → todo.
+    const logDay = log.fecha_actividad ? String(log.fecha_actividad).slice(0, 10) : "";
+    const matchesDate = (!fromParam || logDay >= fromParam) && (!toParam || logDay <= toParam);
+
+    const matchesSearch =
+      !search ||
       log.propiedad_ref?.toLowerCase().includes(search.toLowerCase()) ||
-      Object.values(log.metadata || {}).some(val => 
+      Object.values(log.metadata || {}).some(val =>
         val?.toString().toLowerCase().includes(search.toLowerCase())
       );
 
-    return matchesFilter && matchesSearch && matchesStatus && matchesAdvisor;
+    return matchesFilter && matchesSearch && matchesStatus && matchesAdvisor && matchesDate;
   });
 
   return (
@@ -280,12 +293,25 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                 )}
                 <div className="relative w-full sm:w-[320px]">
                   <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground/50" />
-                  <Input 
-                    placeholder="Buscar por cliente o propiedad..." 
+                  <Input
+                    placeholder="Buscar por cliente o propiedad..."
                     className="pl-10 bg-background/30 border-white/5 focus:border-accent/50 transition-all rounded-xl h-10"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
+                </div>
+                <div className="flex items-center gap-2 sm:ml-auto">
+                  <DatePeriodFilter />
+                  {(fromParam || toParam) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 text-xs text-accent font-semibold shrink-0"
+                      onClick={() => router.push(pathname)}
+                    >
+                      Limpiar
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
