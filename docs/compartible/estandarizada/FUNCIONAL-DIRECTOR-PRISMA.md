@@ -393,6 +393,7 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 > ℹ️ Si cambiás de modo (a mano / cartera / link), el formulario **se limpia** para no mezclar datos de una carga con otra.
 
 > 💡 Tipo, operación **y barrio** son filtros estrictos: **todos los comparables son del mismo barrio** que la propiedad analizada (reconoce sub-barrios como Belgrano R/C y no le afectan los acentos). El **checklist compara todo lo que tiene dato real** (suma **dormitorios** y **antigüedad**; si falta un dato, dice "sin dato" y no baja el puntaje). Trae **hasta 50 por bloque**, ordenados por comparabilidad, de **tu cartera** y de la **red de colaboración**.
+> 🏠 **¿Considerar PH? (solo en Casas):** al analizar una **Casa** aparece la casilla **"Considerar PH"**, tildada por defecto (no cambia nada). Como los **PH** suelen figurar como "casa" en los portales, si querés comparar **solo casas puras**, **destildala** antes de buscar. En cualquier otro tipo de propiedad la casilla no aparece.
 > 💰 No consume créditos por buscar comparables.
 
 > 📄 **Al imprimir o guardar el informe como PDF**, el archivo se descarga con un **nombre claro**: **`ACM - Dirección - Mes Año`** (ej. `ACM - Arcos 2825 - Julio 2026`), así cada tasación queda con su nombre y no se pisan en la carpeta de descargas (fallback `ACM - Mes Año` si falta la dirección).
