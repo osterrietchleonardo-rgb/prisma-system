@@ -52,6 +52,10 @@ export async function POST(req: Request) {
     const sujeto = (body.sujeto || {}) as Partial<Sujeto>;
     const operacion: Operacion = body.operacion === "alquiler" ? "alquiler" : "venta";
     const excludeId: string | null = body.exclude_id || null; // si el sujeto vino de la cartera
+    // Considerar PH: por defecto SÍ (no cambia nada). Solo se excluyen los PH cuando el
+    // sujeto es Casa Y el cliente destildó la casilla. Cualquier otro caso → false.
+    const considerarPh = body.considerar_ph !== false;
+    const excludePh = sujeto.tipo_propiedad === "casa" && considerarPh === false;
     // Sin límites artificiales: el gate de barrio ya acota el universo; traemos todos los
     // comparables del barrio (tope alto por performance del render, configurable por request).
     const limit = Math.min(Number(body.limit) || 50, 100);
@@ -93,6 +97,7 @@ export async function POST(req: Request) {
         p_loc_patterns: loc,
         p_amenities: amen,
         p_exclude_id: excludeId,
+        p_exclude_ph: excludePh,
         p_limit: limit,
       }),
       supabase.rpc("acm_match_roomix", {
@@ -106,6 +111,7 @@ export async function POST(req: Request) {
         p_antiguedad: antiguedad,
         p_loc_patterns: loc,
         p_amenities: amen,
+        p_exclude_ph: excludePh,
         p_limit: limit,
       }),
     ]);
