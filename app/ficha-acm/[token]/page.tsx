@@ -87,6 +87,12 @@ export default async function FichaAcmPage({ params }: { params: { token: string
   const agencyName = agency?.name || "Inmobiliaria";
 
   const fecha = new Intl.DateTimeFormat("es-AR", { day: "numeric", month: "long", year: "numeric" }).format(new Date(snap.created_at));
+
+  // Nombre del PDF al "Descargar PDF": "Ficha ACM - Direccion - Mes Año" (el navegador toma el document.title).
+  const periodoArchivo = new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" }).format(new Date(snap.created_at));
+  const periodoCap = periodoArchivo.charAt(0).toUpperCase() + periodoArchivo.slice(1);
+  const dirArchivo = (subject.direccion || "").replace(/[/\\:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
+  const nombreArchivo = dirArchivo ? `Ficha ACM - ${dirArchivo} - ${periodoCap}` : `Ficha ACM - ${periodoCap}`;
   const opLabel = operacion === "alquiler" ? "Alquiler" : "Venta";
   const roleLabel = agent?.role === "director" ? "Director/a" : "Asesor/a Inmobiliario/a";
   const initials = (agent?.full_name || "A").split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
@@ -98,7 +104,7 @@ export default async function FichaAcmPage({ params }: { params: { token: string
   return (
     <div className={`${playfair.variable} ${inter.variable} acm-root`}>
       <style>{CSS}</style>
-      <PrintButton accent={accent} onAccent={onAccent} />
+      <PrintButton accent={accent} onAccent={onAccent} fileName={nombreArchivo} />
 
       {/* ══════════ PORTADA ══════════ */}
       <section className="sheet">
