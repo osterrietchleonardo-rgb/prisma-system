@@ -380,13 +380,15 @@ Con los comparables a la vista podés armar una **ficha profesional** para pasar
 
 1. Tocá **"Crear ficha"** (arriba a la derecha de los resultados).
 2. **Marcá** los comparables que quieras incluir (podés mezclar los de **tu cartera** y los de la **red de colaboración**). Cada uno ocupará **una hoja** con **todas sus fotos** y características.
-3. Tocá **"Crear ficha"** en la barra de abajo: se abre un **link público** listo para compartir.
-4. En esa página tenés **"Descargar PDF"** (para mandar por mail o WhatsApp) y **"Compartir"** (copia el link).
+3. Tocá **"Continuar"** en la barra de abajo: se abre una ventana con las **conclusiones del estudio** ya calculadas. Podés **editarlas, agregar las tuyas o sacar la sección** (destildá "Incluir la sección de conclusiones") para que no aparezcan en la ficha.
+4. Tocá **"Crear ficha"**: se abre un **link público** listo para compartir.
+5. En esa página tenés **"Descargar PDF"** (para mandar por mail o WhatsApp) y **"Compartir"** (copia el link).
 
 **Qué trae la ficha:**
-- Una **portada** con la propiedad de referencia, tus datos y la fecha.
+- Una **portada** con la propiedad de referencia y la fecha.
 - **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes) y todas las fotos + características.
-- Una **hoja final** con la **comparación de valores por m²** (el promedio y cuánto se desvía cada comparable respecto del cierre de **su propia zona**) y tus **datos de contacto** para que el cliente te escriba (WhatsApp / email).
+- Una **hoja final** con la **matriz comparativa de valores por m²** (con los **promedios de superficie, precio y $/m²** de la muestra), un gráfico de **"La Pirámide del Precio"** que muestra cómo cae la demanda cuando el precio se aleja del valor de mercado, las **conclusiones** (las que revisaste) y tus **datos de contacto** para que el cliente te escriba (WhatsApp / email).
+- Sobre tu nombre, en la tarjeta de contacto, aparece **tu clasificación** (Client Director / Client Support, la que te puso tu director; si no tenés, dice "Asesor/a").
 - Tu **logo** y el **aviso legal** en el pie de cada hoja (si el director los cargó en la configuración de marca).
 
 > 💡 **Tip:** la ficha usa los **colores y el logo** de tu agencia (los configura el director en **Marketing IA → Identidad Visual**). Si todavía no están cargados, sale con un diseño elegante por defecto.

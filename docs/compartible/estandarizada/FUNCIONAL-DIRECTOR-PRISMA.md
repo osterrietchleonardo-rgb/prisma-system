@@ -418,14 +418,16 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 
 1. Tocá **"Crear ficha"** (arriba a la derecha de los resultados).
 2. **Marcá** los comparables a incluir (se pueden mezclar los de la **cartera** y los de la **red de colaboración**). Cada uno ocupa **una hoja** con **todas sus fotos** y características.
-3. Tocá **"Crear ficha"** en la barra de abajo: se abre un **link público** listo para compartir.
-4. En esa página están **"Descargar PDF"** (para enviar por mail/WhatsApp) y **"Compartir"** (copia el link).
+3. Tocá **"Continuar"** en la barra de abajo: se abre una ventana con las **conclusiones del estudio** ya calculadas, que podés **editar, ampliar o sacar** (destildá "Incluir la sección de conclusiones").
+4. Tocá **"Crear ficha"**: se abre un **link público** listo para compartir.
+5. En esa página están **"Descargar PDF"** (para enviar por mail/WhatsApp) y **"Compartir"** (copia el link).
 
 **Qué trae la ficha:**
-- **Portada** con la propiedad de referencia, los datos de quien la crea y la fecha.
+- **Portada** con la propiedad de referencia y la fecha.
 - **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes) y todas las fotos + características.
-- **Hoja final** con la **comparación de valores por m²** (promedio y desvío de cada comparable respecto del cierre de **su propia zona**) y los **datos de contacto** de quien la generó.
-- El **logo** y el **aviso legal** en el pie de cada hoja (si están cargados).
+- **Hoja final** con la **matriz comparativa de valores por m²** (con **promedios de superficie, precio y $/m²**), el gráfico **"La Pirámide del Precio"** (por qué un precio alto apaga la demanda), las **conclusiones** revisadas y los **datos de contacto** de quien la generó.
+- En la tarjeta de contacto, sobre el nombre: si la ficha la hizo el **director** dice "Director/a"; si la hizo un **asesor**, aparece **la clasificación que le pusiste** (Client Director / Client Support, o "Asesor/a" si no le asignaste ninguna, desde la pestaña **Asesores**).
+- El **logo** y el **aviso legal** en el pie de cada hoja (si están cargados). El logo se **recorta y agranda solo** para que se vea grande y nítido, cualquiera sea el archivo que subas.
 
 > 💡 **Tip:** la ficha toma los **colores, el logo y el aviso legal** que definís en **Marketing IA → Identidad Visual**. Si el logo o el aviso legal no están cargados, simplemente no aparecen (y si no hay colores, usa un diseño elegante por defecto). Configurarlos una vez mejora todas las fichas que creen tus asesores.
 > 💰 Crear la ficha **no consume créditos**.

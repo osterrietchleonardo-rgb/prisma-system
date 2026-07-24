@@ -70,6 +70,8 @@ export interface FichaComparison {
   promedio_m2: number | null;   // promedio de oferta $/m² de los elegidos (solo USD)
   min_m2: number | null;
   max_m2: number | null;
+  promedio_sup?: number | null;    // promedio de superficie (m²) de los comparables con dato
+  promedio_precio?: number | null; // promedio de precio de los comparables en USD
   desvio_prom_pct: number | null; // desvío promedio de la muestra vs. el cierre de su zona
   rows: FichaComparisonRow[];
   conclusiones: string[];
@@ -82,6 +84,8 @@ export interface FichaAgent {
   phone: string;
   avatar_url: string | null;
   role: string;
+  /** Clasificación secundaria que pone el director en "Asesores": client_director | client_support | null. */
+  clasificacion?: string | null;
 }
 export interface FichaBrand {
   colors: string[];
@@ -230,6 +234,15 @@ export function computeComparison(comparables: FichaComparable[], _stats: Ambien
   const min = valores.length ? Math.min(...valores) : null;
   const max = valores.length ? Math.max(...valores) : null;
 
+  // Promedios de las columnas "Sup." y "Precio" de la matriz.
+  // Superficie: todos los que tengan m². Precio: solo los publicados en USD (no mezcla monedas).
+  const sups = comparables.map((c) => c.m2).filter((m): m is number => m != null && m > 0);
+  const promedioSup = sups.length ? round(sups.reduce((a, b) => a + b, 0) / sups.length) : null;
+  const precios = comparables
+    .filter((c) => c.moneda === "USD" && c.precio != null && c.precio > 0)
+    .map((c) => c.precio as number);
+  const promedioPrecio = precios.length ? round(precios.reduce((a, b) => a + b, 0) / precios.length) : null;
+
   const desvios: number[] = [];
   const rows: FichaComparisonRow[] = comparables.map((c) => {
     const esUsd = c.moneda === "USD" && c.precio_m2 != null && c.precio_m2 > 0;
@@ -281,6 +294,8 @@ export function computeComparison(comparables: FichaComparable[], _stats: Ambien
     promedio_m2: promedio,
     min_m2: min,
     max_m2: max,
+    promedio_sup: promedioSup,
+    promedio_precio: promedioPrecio,
     desvio_prom_pct: desvioProm,
     rows,
     conclusiones,

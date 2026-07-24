@@ -33,6 +33,11 @@ function readableOn(hex: string): string {
 const opt = (url: string | null | undefined, w: number, q = 65): string =>
   url && /^https?:\/\//.test(url) ? `/_next/image?url=${encodeURIComponent(url)}&w=${w}&q=${q}` : url || "";
 
+// Logo de marca recortado (sin el aire transparente/blanco alrededor) para que llene su caja
+// sea cual sea la estructura del archivo que subió la agencia. Ver app/api/brand-logo/route.ts.
+const brandLogo = (url: string | null | undefined): string =>
+  url && /^https?:\/\//.test(url) ? `/api/brand-logo?url=${encodeURIComponent(url)}` : url || "";
+
 const fmtMoney = (v: number | null, currency = "USD") =>
   v != null && v > 0 ? `${currency === "ARS" ? "$" : "USD"} ${new Intl.NumberFormat("es-AR").format(Math.round(v))}` : "Consultar";
 const fmtM2 = (v: number | null, currency = "USD") =>
@@ -57,8 +62,12 @@ function SheetFooter({ brand, agencyName, primary }: { brand: FichaBrand; agency
     <footer className="sheet-footer">
       <div className="sf-left">
         {brand?.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={brand.logo_url} alt="" className="sf-logo" />
+          // Chip del MISMO color del banner superior: garantiza que el logo (venga claro u oscuro)
+          // se vea igual que en la carátula, sin desaparecer contra el fondo crema del pie.
+          <span className="sf-logo-chip" style={{ backgroundColor: primary }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={brandLogo(brand.logo_url)} alt="" className="sf-logo" />
+          </span>
         ) : (
           <strong style={{ color: primary }}>{agencyName || "PRISMA"}</strong>
         )}
@@ -94,7 +103,16 @@ export default async function FichaAcmPage({ params }: { params: { token: string
   const dirArchivo = (subject.direccion || "").replace(/[/\\:*?"<>|]/g, " ").replace(/\s+/g, " ").trim();
   const nombreArchivo = dirArchivo ? `Ficha ACM - ${dirArchivo} - ${periodoCap}` : `Ficha ACM - ${periodoCap}`;
   const opLabel = operacion === "alquiler" ? "Alquiler" : "Venta";
-  const roleLabel = agent?.role === "director" ? "Director/a" : "Asesor/a Inmobiliario/a";
+  // Bajada arriba del nombre en la tarjeta de contacto. Para asesores usa la clasificación secundaria
+  // que pone el director en "Asesores" (Client Director / Client Support); sin clasificar → "Asesor/a".
+  const roleLabel =
+    agent?.role === "director"
+      ? "Director/a"
+      : agent?.clasificacion === "client_director"
+      ? "Client Director"
+      : agent?.clasificacion === "client_support"
+      ? "Client Support"
+      : "Asesor/a";
   const initials = (agent?.full_name || "A").split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
   const phoneDigits = (agent?.phone || "").replace(/[^\d]/g, "");
   const waLink = phoneDigits
@@ -112,7 +130,7 @@ export default async function FichaAcmPage({ params }: { params: { token: string
           <div className="cover-brand">
             {brand?.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={brand.logo_url} alt={agencyName} className="cover-logo" />
+              <img src={brandLogo(brand.logo_url)} alt={agencyName} className="cover-logo" />
             ) : (
               <span style={{ fontFamily: "var(--font-display)" }}>{agencyName}</span>
             )}
@@ -133,11 +151,6 @@ export default async function FichaAcmPage({ params }: { params: { token: string
               <span className="label">Propiedad de referencia</span>
               <strong style={{ color: primary }}>{subject.direccion || "Propiedad analizada"}</strong>
               <span className="muted">{[subject.tipo, subject.barrio, subject.m2 ? `${subject.m2} m²` : null, opLabel].filter(Boolean).join(" · ")}</span>
-            </div>
-            <div className="cover-meta-block">
-              <span className="label">Preparado por</span>
-              <strong style={{ color: primary }}>{agent?.full_name || "Su asesor"}</strong>
-              <span className="muted">{roleLabel} · {agencyName}</span>
             </div>
             <div className="cover-meta-block">
               <span className="label">Fecha de análisis</span>
@@ -194,7 +207,9 @@ export default async function FichaAcmPage({ params }: { params: { token: string
                 </tr>
               ))}
               <tr className="matrix-avg">
-                <td><strong>Promedio de la muestra</strong></td><td>—</td><td>—</td>
+                <td><strong>Promedio de la muestra</strong></td>
+                <td><strong>{comparison.promedio_sup ? `${comparison.promedio_sup} m²` : "—"}</strong></td>
+                <td><strong>{comparison.promedio_precio ? fmtMoney(comparison.promedio_precio) : "—"}</strong></td>
                 <td><strong>{fmtM2(comparison.promedio_m2)}</strong></td>
                 <td className="muted-cell">cada uno vs. su zona</td>
                 <td><strong>{comparison.desvio_prom_pct != null ? `${comparison.desvio_prom_pct > 0 ? "+" : ""}${comparison.desvio_prom_pct}%` : "—"}</strong></td>
@@ -202,6 +217,8 @@ export default async function FichaAcmPage({ params }: { params: { token: string
               </tr>
             </tbody>
           </table>
+
+          <PiramidePrecios primary={primary} accent={accent} desvio={comparison.desvio_prom_pct} />
 
           {comparison.conclusiones.length > 0 && (
             <div className="conclusiones">
@@ -248,6 +265,79 @@ export default async function FichaAcmPage({ params }: { params: { token: string
 
         <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
       </section>
+    </div>
+  );
+}
+
+// ── Pirámide de Precios ──────────────────────────────────────────────────────
+// Gráfico conceptual: cuanto más se aleja el precio de publicación del valor competitivo, menos
+// respuesta genera el aviso. Los umbrales (+20 / +15 / +10 / mercado) son los del método clásico.
+// El escalón que corresponde al desvío promedio de la muestra queda resaltado.
+const PIRAMIDE_NIVELES = [
+  { color: "#e03131", umbral: 20, titulo: "Más de 20% sobre el valor competitivo", efecto: "No llama nadie." },
+  { color: "#f76707", umbral: 15, titulo: "Entre 15% y 20% sobre el valor competitivo", efecto: "Llaman, pero no visitan." },
+  { color: "#f2b705", umbral: 10, titulo: "Entre 10% y 15% sobre el valor competitivo", efecto: "Llaman y visitan, pero no hacen ofertas." },
+  { color: "#2f9e44", umbral: -Infinity, titulo: "En valor de mercado", efecto: "Se logra un acuerdo y se vende." },
+];
+
+// Trapecios de cada escalón (viewBox 0 0 100 100, preserveAspectRatio none → escala con la fila).
+const PIRAMIDE_FORMAS = [
+  "50,4 68,100 32,100",
+  "32,0 68,0 80,100 20,100",
+  "20,0 80,0 90,100 10,100",
+  "10,0 90,0 100,100 0,100",
+];
+
+function PiramidePrecios({ primary, accent, desvio }: { primary: string; accent: string; desvio: number | null }) {
+  const activo = desvio == null ? -1 : PIRAMIDE_NIVELES.findIndex((n) => desvio > n.umbral);
+
+  return (
+    <div className="piramide">
+      <div className="piramide-head">
+        <h3 style={{ fontFamily: "var(--font-display)", color: primary }}>La Pirámide del Precio</h3>
+        <p className="piramide-sub">
+          Si al mes de publicado no hay consultas, el precio es incorrecto: cada escalón por encima del valor
+          competitivo apaga una parte de la demanda.
+        </p>
+      </div>
+
+      <div className="piramide-body">
+        <div className="piramide-shape">
+          {PIRAMIDE_FORMAS.map((puntos, i) => (
+            <div key={i} className="piramide-row">
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="piramide-svg">
+                <polygon
+                  points={puntos}
+                  fill={PIRAMIDE_NIVELES[i].color}
+                  opacity={activo === -1 || activo === i ? 1 : 0.28}
+                />
+              </svg>
+            </div>
+          ))}
+        </div>
+
+        <div className="piramide-legend">
+          {PIRAMIDE_NIVELES.map((n, i) => (
+            <div key={i} className={`piramide-item${activo === i ? " is-active" : ""}`}>
+              <span className="piramide-dot" style={{ backgroundColor: n.color }} />
+              <div>
+                <div className="piramide-item-title">{n.titulo}</div>
+                <div className="piramide-item-efecto" style={{ color: n.color }}>{n.efecto}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {desvio != null && (
+        <p className="piramide-foot">
+          <span className="piramide-chip" style={{ backgroundColor: accent, color: readableOn(accent) }}>
+            {desvio > 0 ? "+" : ""}{desvio}%
+          </span>
+          Desvío promedio de la muestra respecto del precio de cierre de su zona: ahí se ubica hoy este conjunto de
+          propiedades dentro de la pirámide.
+        </p>
+      )}
     </div>
   );
 }
@@ -363,15 +453,19 @@ const CSS = `
 
 /* Pie de marca — mismo en cada hoja (in-flow, abajo de todo). */
 .sheet-footer { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 2.2fr 1fr; align-items: center; gap: 12px; padding: 8px var(--pad); border-top: 1px solid #ece8df; background: #faf9f6; }
-.sf-logo { height: 20px; width: auto; object-fit: contain; }
+.sf-logo-chip { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; }
+.sf-logo { height: 26px; max-height: 26px; max-width: 40mm; width: auto; object-fit: contain; object-position: left center; display: block; }
 .sf-left strong { font-size: 13px; }
 .sf-legal { text-align: center; font-size: 9px; color: #8a8a8a; line-height: 1.35; }
 .sf-right { text-align: right; font-size: 9px; text-transform: uppercase; letter-spacing: .1em; color: #a2a2a2; }
 
 /* Portada */
 .cover-topbar { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 16px var(--pad); }
-.cover-brand { display: flex; align-items: center; gap: 12px; font-weight: 600; letter-spacing: .02em; font-size: 17px; }
-.cover-logo { height: 40px; width: auto; object-fit: contain; }
+.cover-brand { display: flex; align-items: center; gap: 12px; font-weight: 600; letter-spacing: .02em; font-size: 17px; min-width: 0; }
+/* Caja del logo: como el logo llega recortado (/api/brand-logo saca el aire alrededor), un alto
+   generoso (72px) lo muestra grande sin importar la estructura del archivo. El tope de ancho (60mm)
+   contiene los logos apaisados; object-fit:contain conserva la proporción. */
+.cover-logo { height: 72px; max-height: 72px; max-width: 60mm; width: auto; object-fit: contain; object-position: left center; display: block; }
 .cover-topbar-tag { font-size: 10px; text-transform: uppercase; letter-spacing: .22em; opacity: .85; }
 .cover-body { padding-top: 46px; }
 .eyebrow { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .28em; }
@@ -431,6 +525,23 @@ const CSS = `
 .matrix .muted-cell { color: #7b7b7b; }
 .matrix-avg td { border-top: 2px solid #ece8df; background: #f7f4ee; }
 .ref-label { display: block; font-size: 9px; color: #9a9a9a; margin-top: 1px; }
+
+/* Pirámide del precio */
+.piramide { margin-bottom: 18px; }
+.piramide-head h3 { font-size: 14px; font-weight: 600; margin: 0 0 3px; }
+.piramide-sub { font-size: 11px; color: #7b7b7b; line-height: 1.45; margin: 0 0 10px; max-width: 92%; }
+.piramide-body { display: grid; grid-template-columns: 88mm 1fr; align-items: stretch; gap: 14px; }
+.piramide-shape { display: flex; flex-direction: column; gap: 3px; }
+.piramide-row { flex: 1 1 0; min-height: 26px; }
+.piramide-svg { width: 100%; height: 100%; display: block; }
+.piramide-legend { display: flex; flex-direction: column; gap: 3px; }
+.piramide-item { flex: 1 1 0; display: flex; align-items: center; gap: 8px; padding: 4px 8px; border-radius: 8px; }
+.piramide-item.is-active { background: #f7f4ee; box-shadow: inset 0 0 0 1px #e6e1d6; }
+.piramide-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.piramide-item-title { font-size: 10.5px; color: #3d3d3d; line-height: 1.3; }
+.piramide-item-efecto { font-size: 11.5px; font-weight: 700; line-height: 1.3; margin-top: 1px; }
+.piramide-foot { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 10.5px; color: #7b7b7b; line-height: 1.45; }
+.piramide-chip { flex-shrink: 0; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
 
 /* Conclusiones */
 .conclusiones ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }

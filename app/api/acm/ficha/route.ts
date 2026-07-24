@@ -58,6 +58,14 @@ export async function POST(req: Request) {
     const sujeto = (body.sujeto || {}) as any;
     const comparablesIn = (Array.isArray(body.comparables) ? body.comparables : []) as AcmComparable[];
     const searchId: string | null = typeof body.search_id === "string" ? body.search_id : null; // fila del historial "Mis ACM"
+    // preview=true: calcula todo y devuelve las conclusiones para que el asesor las revise ANTES de
+    // crear la ficha (no guarda nada, no consume token).
+    const preview: boolean = body.preview === true;
+    // Conclusiones ya revisadas por el asesor: si viene un array, reemplaza a las calculadas
+    // (array vacío = decidió que la sección de conclusiones NO aparezca en la ficha).
+    const conclusionesIn: string[] | null = Array.isArray(body.conclusiones)
+      ? body.conclusiones.filter((t: any) => typeof t === "string" && t.trim()).map((t: string) => t.trim())
+      : null;
 
     if (comparablesIn.length === 0) {
       return NextResponse.json({ error: "Elegí al menos un comparable para armar la ficha." }, { status: 400 });
@@ -84,7 +92,7 @@ export async function POST(req: Request) {
       roomixIds.length
         ? supabase.from("roomix_properties").select("id, description, images, amenities").in("id", roomixIds)
         : Promise.resolve({ data: [] as any[] }),
-      supabase.from("profiles").select("full_name, email, phone, avatar_url, role").eq("id", userId).single(),
+      supabase.from("profiles").select("full_name, email, phone, avatar_url, role, clasificacion").eq("id", userId).single(),
       supabase.from("agencies").select("id, name, marketing_ai_config").eq("id", agencyId).single(),
       supabase.from("mercado_barrios").select("barrio, precio_m2_usd, precio_cierre_m2_usd, fuente"),
       supabase
@@ -172,6 +180,17 @@ export async function POST(req: Request) {
     });
 
     const comparison = computeComparison(comparables, ambStats);
+    if (conclusionesIn) comparison.conclusiones = conclusionesIn;
+
+    // Modo revisión: devolvemos las conclusiones calculadas y cortamos acá (no se guarda la ficha).
+    if (preview) {
+      return NextResponse.json({
+        preview: true,
+        conclusiones: comparison.conclusiones,
+        promedio_m2: comparison.promedio_m2,
+        desvio_prom_pct: comparison.desvio_prom_pct,
+      });
+    }
 
     // ── Marca de la agencia (Marketing IA → Configuración IA), con aviso legal ──
     const mk = (agencyRes.data?.marketing_ai_config as any) || {};
@@ -201,6 +220,7 @@ export async function POST(req: Request) {
         phone: profile?.phone || "",
         avatar_url: profile?.avatar_url || null,
         role: profile?.role || "asesor",
+        clasificacion: (profile as any)?.clasificacion || null,
       },
       agency: { id: agencyRes.data?.id || agencyId, name: agencyRes.data?.name || "" },
       brand,
