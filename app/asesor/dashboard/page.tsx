@@ -9,10 +9,19 @@ import { ObjectivesDashboard } from "@/components/dashboard/ObjectivesDashboard"
 import { getObjectivesDashboard } from "@/lib/tracking/objetivos"
 import { DashboardActivity } from "@/components/dashboard-activity"
 import { DashboardHeaderActions } from "@/components/dashboard-header-actions"
+import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, Eye } from "lucide-react"
 
-export default async function AsesorDashboardPage() {
+export const revalidate = 0;
+
+export default async function AsesorDashboardPage({
+  searchParams
+}: {
+  searchParams: { from?: string; to?: string }
+}) {
+  const from = searchParams.from
+  const to = searchParams.to
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -34,8 +43,8 @@ export default async function AsesorDashboardPage() {
   // Agency-wide: all advisors for the leaderboard + recent agency activity
   const currentYear = new Date().getFullYear()
   const [myData, agencyData, objectivesData] = await Promise.all([
-    getDashboardData(profile.agency_id, user.id),
-    getDashboardData(profile.agency_id),           // no agentId → full agency
+    getDashboardData(profile.agency_id, user.id, from, to),
+    getDashboardData(profile.agency_id, undefined, from, to),  // no agentId → full agency
     getObjectivesDashboard(profile.agency_id, currentYear),
   ])
 
@@ -50,7 +59,13 @@ export default async function AsesorDashboardPage() {
             Tus métricas comerciales personales del período activo.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <DatePeriodFilter />
+          {(from || to) && (
+            <Button asChild variant="ghost" size="sm" className="h-9 text-xs text-accent font-semibold">
+              <Link href="/asesor/dashboard">Limpiar</Link>
+            </Button>
+          )}
           <DashboardHeaderActions data={myData} />
           <Button asChild variant="outline" size="sm" className="h-9 gap-2">
             <Link href="/asesor/tracking-performance">
