@@ -63,6 +63,7 @@
 **Qué es:** tu vista panorámica de rendimiento personal.
 
 **Qué muestra:**
+- **Filtro de fechas (arriba a la derecha):** elegí el **período** que querés ver. Tenés atajos rápidos (**Hoy, Este Mes, Este Trimestre, Este Año, Últimos 30 días**) o podés marcar un **rango a mano** en el calendario. Para una **fecha puntual**, tocá el mismo día dos veces. Tus tarjetas y el ranking se recalculan según lo que elijas; con **"Limpiar"** volvés a ver todo.
 - **Tarjetas (KPIs):** tus leads, captaciones, reservas y cierres, con la variación respecto al período anterior.
 - **Gráficos:** evolución en el tiempo y distribución de tus leads por canal de origen.
 - **Objetivos vs Alcanzado:** la tabla de metas mensuales del equipo (Facturación y Captación) con lo planificado, lo logrado y el % cumplido por mes, más un gráfico de evolución. Podés filtrar por año y cambiar de métrica.
@@ -70,6 +71,7 @@
 
 **Cómo usarlo:**
 - Revisalo al empezar el día para saber dónde estás parado.
+- Usá el **filtro de fechas** para comparar cómo venís: por ejemplo "Este Mes" contra "Este Año", o un día concreto de mucha actividad.
 - Si un KPI bajó respecto al período anterior, mirá qué actividad podés reforzar.
 - En "Objetivos vs Alcanzado" mirás cómo vas contra la meta del mes: lo "alcanzado" se llena solo con la actividad que cargás.
 

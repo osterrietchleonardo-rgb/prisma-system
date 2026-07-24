@@ -278,7 +278,7 @@ Endpoint que los layouts consultan para verificar si la cuenta sigue activa. Ret
 
 | Sección | Ruta | Descripción |
 |---|---|---|
-| Mi Dashboard | `/asesor/dashboard` | KPIs personales |
+| Mi Dashboard | `/asesor/dashboard` | KPIs personales (con filtro de fechas) |
 | Pulso de Mercado | `/asesor/mercado` | Datos de mercado |
 | Mi Pipeline | `/asesor/pipeline` | Leads asignados |
 | Mis Propiedades | `/asesor/propiedades` | Propiedades asignadas |
@@ -2091,6 +2091,7 @@ El módulo del asesor hereda y reutiliza gran parte de los componentes de UI del
 
 #### 1. Dashboard Asesor (`/asesor/dashboard`)
 - **Diferencia con Director:** Llama a `getDashboardData(agency_id, user.id)`. Solo muestra los KPIs y gráficos de las propiedades, leads y actividades asignadas a este asesor en particular. Sin embargo, muestra el ranking global (`PerformanceLeaderboard`) y la sección **Objetivos vs Alcanzado** (`ObjectivesDashboard`, a nivel agencia) para que el asesor conozca su posición y las metas del equipo. El asesor **no** puede editar objetivos (la carga es exclusiva del director en Tracking Performance).
+- **Filtro de fechas (`DatePeriodFilter`):** el asesor elige el **período** (presets Hoy/Mes/Trimestre/Año/Últimos 30, o rango a mano) y el dashboard **recalcula KPIs y ranking sobre ese rango**. El filtro escribe `from`/`to` en la URL; la página los pasa a `getDashboardData(agency_id, user.id, from, to)` (y también al leaderboard de agencia). Filtra por `fecha_actividad` de los logs y `created_at` de WhatsApp; los **objetivos siguen siendo por año** (no dependen del filtro). Mismo componente y comportamiento que ya tenía el director.
 
 #### 2. Pipeline Asesor (`/asesor/pipeline`)
 - Mismo Kanban visual (`PipelineClient`), pero la consulta SQL de carga inicial se restringe estrictamente a `assigned_agent_id = user.id`.
