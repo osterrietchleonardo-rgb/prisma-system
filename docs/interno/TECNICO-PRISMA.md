@@ -193,8 +193,26 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 Intercepta todas las requests:
 1. **Rate limiting global** (Upstash en prod / memoria en dev): login 10 req/15 min por IP; IA 30 req/min por IP.
 2. **Protección de rutas:** públicas excluidas (`/`, `/auth/*`, `/api/webhooks/*`, `/api/n8n/*`, `/api/cron/*`, `/api/messages/*`, `/api/whatsapp/dispatch`); el resto bajo `/director/*` y `/asesor/*` requiere sesión.
-3. **Refresh de sesión** Supabase en cada request.
+3. **Refresh de sesión** Supabase en cada request, **salvo** en dos casos que se excluyen a propósito (ver §5.1.1): los prefetch de Next.js (`next-router-prefetch: 1`) y los archivos estáticos de `/public` (excluidos ya en el `matcher`).
 4. **Redirección inteligente:** autenticado en `/auth/*` → su dashboard; no autenticado en ruta protegida → `/auth/login?next=<pathname+search>` (el middleware **guarda el destino** para volver ahí tras el login; ver §6).
+
+#### 5.1.1 Por qué el prefetch no refresca el token
+Supabase tiene la rotación de refresh token activada (`refresh_token_rotation_enabled: true`). Cuando varios requests llegan en paralelo con el token de acceso ya vencido, todos intentan refrescar con el **mismo** refresh token; los que caen fuera de la ventana de reuso reciben `refresh_token_already_used` y Supabase **revoca la familia entera** de tokens, dejando la sesión muerta (`refresh_token_not_found` en la siguiente navegación).
+
+Esto echaba a los asesores desde el celular: se medían ráfagas de hasta 13 llamadas a `/auth/v1/user` en el mismo segundo, y con la red móvil los requests se espacian lo suficiente como para salirse de la ventana.
+
+Un prefetch no es una navegación real, así que no tiene por qué rotar el token. Saltearlo **no** abre ningún hueco de seguridad: los layouts de `/asesor` y `/director` validan la sesión por su cuenta y redirigen al login (defensa en profundidad).
+
+Config de Auth que acompaña este comportamiento:
+
+| Parámetro | Valor | Motivo |
+|---|---|---|
+| `jwt_exp` | `86400` (24 h) | antes 1 h; baja los refrescos de ~24/día a 1/día |
+| `security_refresh_token_reuse_interval` | `30` s | antes 10 s; absorbe las ráfagas concurrentes |
+| `sessions_timebox` | `0` | la sesión no caduca por tiempo |
+| `sessions_inactivity_timeout` | `0` | la sesión no caduca por inactividad |
+
+> El `jwt_exp` de 24 h **no** demora la expulsión de un asesor pausado o desvinculado: los layouts consultan `profiles` contra la base en cada carga y aplican `estado` y `tokens_invalidos_desde` al instante.
 
 ### 5.2 Headers (`next.config.mjs`)
 `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` restrictiva, **CSP con whitelist explícita**. Imágenes remotas autorizadas: `static.tokkobroker.com`, `*.supabase.co`, `images.unsplash.com`, `cdn.roomix.ai`.

@@ -145,7 +145,13 @@ El middleware intercepta TODAS las requests y aplica:
    - Rutas públicas excluidas: `/`, `/auth/*`, `/api/webhooks/*`, `/api/n8n/*`, `/api/cron/*`, `/api/messages/*`, `/api/whatsapp/dispatch`
    - Rutas protegidas: Todo bajo `/(director)/*` y `/(asesor)/*` requiere sesión activa
    
-3. **Refresh de Sesión:** Refresca tokens de Supabase en cada request
+3. **Refresh de Sesión:** Refresca tokens de Supabase en cada request, con dos exclusiones deliberadas:
+   - **Prefetch de Next.js** (header `next-router-prefetch: 1`): los links que el navegador precarga no son navegaciones reales.
+   - **Archivos estáticos de `/public`** (logos, `og-image`, `sw.js`): excluidos directamente en el `matcher`.
+
+   El motivo es la rotación de refresh token de Supabase: si varios requests paralelos refrescan con el mismo token, los que llegan tarde reciben `refresh_token_already_used` y Supabase revoca la familia entera, dejando la sesión muerta. Era lo que echaba a los asesores desde el celular. La protección no se debilita: los layouts de `/asesor` y `/director` validan la sesión igual.
+
+   Config de Auth asociada: `jwt_exp` 24 h, `security_refresh_token_reuse_interval` 30 s, `sessions_timebox` y `sessions_inactivity_timeout` en 0 (la sesión no caduca). Detalle completo en TECNICO §5.1.1.
 
 4. **Redirección Inteligente:**
    - Si el usuario está autenticado y va a `/auth/*` → redirige a su dashboard

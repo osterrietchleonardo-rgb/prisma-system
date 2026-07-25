@@ -45,6 +45,11 @@
 > 💡 **Tip:** también podés registrarte/ingresar con tu cuenta de Google.
 > ⚠️ Si tu cuenta aparece como "pausada" o "eliminada", no vas a poder entrar: contactá a tu director.
 
+**Una vez que entrás, quedás adentro.** No hace falta volver a iniciar sesión cada vez que abrís la app o cambiás de pantalla, ni en la computadora ni en el celular. La sesión se mantiene hasta que vos toques **"Cerrar Sesión"**.
+
+> 💡 **Tip para el celular:** guardá PRISMA en la pantalla de inicio (en el navegador, "Agregar a pantalla de inicio"). Se abre como una app y mantiene tu sesión.
+> ⚠️ Si abrís PRISMA desde el link de un mail, algunos celulares lo abren en un navegador interno de la app de correo, que no comparte tu sesión y te va a pedir la clave de nuevo. Para evitarlo, elegí **"Abrir en el navegador"** desde el menú de esa pantalla.
+
 ---
 
 ## 2. Cómo moverte por PRISMA
