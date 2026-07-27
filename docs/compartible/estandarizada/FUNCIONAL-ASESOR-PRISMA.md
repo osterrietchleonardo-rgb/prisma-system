@@ -288,6 +288,8 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 3. **Calificación y perfil:** tipo de operación, presupuesto, calificación (HOT/WARM/COLD), intereses clave, objeciones, decisores.
 4. **Origen de consulta:** de la lista de canales.
 
+> **Si el celular ya estaba en la inmobiliaria:** puede pasar que ese número ya lo haya cargado otro asesor, o que haya entrado solo por WhatsApp. No es un error y **no te frena**: la visita se agenda igual. Si el contacto ya tenía dueño, vas a ver un aviso con el nombre del asesor (para que se pongan de acuerdo) y sus datos quedan intactos. Si el número no tenía dueño, pasa a ser tuyo y desde ese momento lo ves en tu solapa **Contactos**.
+
 **Acciones sobre una visita futura:**
 - **Reprogramar / Editar:** cambiás lo que necesites. **Te pide un motivo obligatorio.**
 - **Cancelar:** confirma con un pop-up y **te pide el motivo** de cancelación.

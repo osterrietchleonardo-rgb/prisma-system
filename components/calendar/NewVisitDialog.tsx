@@ -242,6 +242,11 @@ export function NewVisitDialog({
           setLoading(false);
           return;
         }
+
+        // El número ya era de otro asesor: se avisa, pero la visita se agenda igual.
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
       }
       
       const insertData: any = {
@@ -303,8 +308,9 @@ export function NewVisitDialog({
       setClientType("ninguno");
       setSelectedLeadId(null);
     } catch (error: any) {
+      // El detalle técnico va al log; en pantalla, algo legible.
       console.error(error)
-      toast.error("Error al agendar visita: " + error.message)
+      toast.error("No pudimos agendar la visita. Revisá los datos e intentá de nuevo; si sigue fallando, avisale al equipo de Vakdor.")
     } finally {
       setLoading(false)
     }

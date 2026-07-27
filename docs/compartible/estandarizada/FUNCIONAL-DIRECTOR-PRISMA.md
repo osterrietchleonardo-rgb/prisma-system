@@ -447,6 +447,8 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 3. **Calificación y perfil:** operación, presupuesto, calificación (HOT/WARM/COLD), intereses, objeciones, decisores.
 4. **Gestión y asignación:** elegís el **asesor responsable** y el **origen de consulta**.
 
+> **Contactos repetidos:** si el celular ya existe en la inmobiliaria, la visita se agenda igual. A vos, como director, el sistema te deja **reasignarlo** al asesor que elijas (ves toda la agenda de la agencia). A un asesor, en cambio, no le deja pisar un contacto que ya tiene otro dueño: le avisa de quién es y sigue adelante sin modificarlo. Los contactos que entran solos por WhatsApp quedan **sin dueño** (visibles solo para vos) hasta que un asesor los toma al agendar una visita o cargar una actividad.
+
 **Acciones sobre visitas futuras (solo las tuyas):**
 - Igual que el asesor, podés **Reprogramar / Editar** y **Cancelar**, pero **solo en las visitas que tenés asignadas a vos** (las que agendaste para vos mismo). En las visitas de tus asesores ves el **detalle completo** pero **sin** botones de acción (esas las maneja el asesor responsable).
 - **Reprogramar / Editar:** con **motivo obligatorio** (la visita queda marcada como "Modificada").

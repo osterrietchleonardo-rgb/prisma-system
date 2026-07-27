@@ -121,7 +121,12 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
           setIsSubmitting(false);
           return;
         }
-        
+
+        // El número ya era de otro asesor: se avisa, pero el registro se guarda igual.
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
+
         finalValues.wa_contact_id = result.wa_contact_id;
       }
 
