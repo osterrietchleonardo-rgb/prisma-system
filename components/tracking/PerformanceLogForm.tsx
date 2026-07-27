@@ -116,7 +116,7 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
           agent_id: isDirector && manualAgentId ? manualAgentId : undefined
         });
 
-        if (!result.success || !result.wa_contact_id) {
+        if (!result.success) {
           toast.error(result.error || "Error al crear el contacto manualmente.");
           setIsSubmitting(false);
           return;
@@ -127,7 +127,9 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
           toast.warning(result.warning);
         }
 
-        finalValues.wa_contact_id = result.wa_contact_id;
+        // Puede venir vacío si el lead es de otro asesor y no hay contacto que
+        // enlazar; el registro se guarda igual, solo sin el vínculo.
+        finalValues.wa_contact_id = result.wa_contact_id ?? null;
       }
 
       if (logToEdit) {

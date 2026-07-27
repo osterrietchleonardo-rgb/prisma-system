@@ -48,17 +48,19 @@ export async function createManualContact(input: ManualContactInput) {
       return { success: false, error: "La agencia no tiene WhatsApp conectado." };
     }
 
-    // 1. Insert or update wa_contacts
     const tagsArray = input.tags ? input.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
     const email = input.email?.trim() || null;
 
-    // La búsqueda del contacto va con el cliente admin a propósito.
-    // La restricción UNIQUE(agency_id, phone) es de TODA la agencia, pero la RLS
-    // solo le muestra al asesor sus propios contactos: buscando con su sesión,
-    // un teléfono ya cargado por otro asesor (o sin dueño, como los que crea el
-    // webhook) aparecía como inexistente y el INSERT moría con
-    // "wa_contacts_agency_id_phone_key", cortando el alta de la visita.
+    // 1. Buscar qué hay ya para ese teléfono, con el cliente admin a propósito.
+    // La restricción UNIQUE(agency_id, phone) de wa_contacts es de TODA la
+    // agencia, pero la RLS solo le muestra al asesor sus propios contactos:
+    // buscando con su sesión, un teléfono ya cargado por otro asesor (o sin
+    // dueño, como los que crea el webhook) aparecía como inexistente y el
+    // INSERT moría con "wa_contacts_agency_id_phone_key", cortando el alta de
+    // la visita. En wa_conversations pasa lo mismo pero peor: como no tiene
+    // índice único por teléfono, en vez de fallar duplicaba el chat.
     const admin = createAdminClient();
+
     const { data: existingContact } = await admin
       .from('wa_contacts')
       .select('id, agent_id')
@@ -66,10 +68,44 @@ export async function createManualContact(input: ManualContactInput) {
       .eq('phone', input.phone)
       .maybeSingle();
 
-    let wa_contact_id: string;
-    // Aviso no bloqueante: el contacto ya es de otro asesor y no se lo tocamos.
+    const { data: existingConv } = await admin
+      .from("wa_conversations")
+      .select("id, agent_id")
+      .eq("instance_id", instance.id)
+      .eq("contact_phone", input.phone)
+      .maybeSingle();
+
+    // De quién es el lead lo dice SIEMPRE la conversación (`wa_conversations`):
+    // es la que el agente de WhatsApp asigna cuando el cliente se interesa por
+    // una propiedad. `wa_contacts.agent_id` no sirve como dueño porque al
+    // importar queda a nombre del que subió el archivo, no del que lo trabaja.
+    const duenoAjeno =
+      existingConv?.agent_id && existingConv.agent_id !== assigned_agent_id
+        ? existingConv.agent_id
+        : null;
+    const esDeOtroAsesor = !isDirector && !!duenoAjeno;
+
+    let wa_contact_id: string | undefined;
+    // Aviso no bloqueante: el lead ya es de otro asesor y no le tocamos nada.
     let warning: string | undefined;
 
+    if (esDeOtroAsesor) {
+      // No se le roba el lead ni se le crea un chat paralelo al que lo carga:
+      // se reutiliza lo que ya existe, sin modificarlo, y se avisa.
+      wa_contact_id = existingContact?.id;
+      const { data: owner } = await admin
+        .from("profiles")
+        .select("full_name")
+        .eq("id", duenoAjeno!)
+        .maybeSingle();
+      warning = owner?.full_name
+        ? `El número ya está en la inmobiliaria a nombre de ${owner.full_name}. Se agendó igual, pero el contacto de WhatsApp quedó como estaba.`
+        : "El número ya está en la inmobiliaria a nombre de otro asesor. Se agendó igual, pero el contacto de WhatsApp quedó como estaba.";
+
+      return { success: true, wa_contact_id, warning };
+    }
+
+    // 2. wa_contacts: se crea solo si el teléfono no estaba; si ya estaba, se reutiliza.
     if (!existingContact) {
       const { data: newContact, error: contactError } = await supabase
         .from("wa_contacts")
@@ -87,48 +123,15 @@ export async function createManualContact(input: ManualContactInput) {
 
       if (contactError) throw contactError;
       wa_contact_id = newContact.id;
-    } else if (!isDirector && existingContact.agent_id && existingContact.agent_id !== assigned_agent_id) {
-      // Ya tiene dueño y es otro asesor: no se le roba el contacto ni se le pisan
-      // los datos. Se reutiliza el que existe y se avisa.
-      wa_contact_id = existingContact.id;
-      const { data: owner } = await admin
-        .from("profiles")
-        .select("full_name")
-        .eq("id", existingContact.agent_id)
-        .maybeSingle();
-      warning = owner?.full_name
-        ? `El número ya estaba cargado en la agencia a nombre de ${owner.full_name}. Se usó ese contacto sin modificarlo.`
-        : "El número ya estaba cargado en la agencia por otro asesor. Se usó ese contacto sin modificarlo.";
     } else {
+      // El teléfono ya está en la agenda: se reutiliza tal cual. NO se escribe
+      // nada sobre `wa_contacts` (ni dueño ni nombre ni etiquetas): la agenda es
+      // de la inmobiliaria y no se le pisan los datos a nadie. Consultarla es lo
+      // único necesario, justamente para no re-insertar y chocar con el UNIQUE.
       wa_contact_id = existingContact.id;
-      // Update name, tags and email if it exists
-      const updatePayload: Record<string, any> = {
-        name: input.name,
-        tags: tagsArray,
-      };
-      if (email) updatePayload.metadata = { email };
-      // Sin dueño (típico de los contactos que crea el webhook): recién ahora,
-      // que el cliente se engancha con una propiedad, queda asignado al asesor.
-      // Va por admin porque la RLS todavía no le deja ver esa fila.
-      if (!existingContact.agent_id) {
-        updatePayload.agent_id = assigned_agent_id;
-        await admin.from("wa_contacts").update(updatePayload).eq("id", wa_contact_id);
-      } else {
-        await supabase.from("wa_contacts").update(updatePayload).eq("id", wa_contact_id);
-      }
     }
 
-    // 2. Check if conversation already exists for this phone and instance
-    // También por admin: wa_conversations no tiene índice único por teléfono, así
-    // que buscar con la RLS del asesor haría que una conversación de otro asesor
-    // se vea como inexistente y termine duplicando el chat en la bandeja.
-    const { data: existingConv } = await admin
-      .from("wa_conversations")
-      .select("id, agent_id")
-      .eq("instance_id", instance.id)
-      .eq("contact_phone", input.phone)
-      .maybeSingle();
-
+    // 3. Insert or update wa_conversations (ya buscada arriba)
     if (!existingConv) {
       const { error: convError } = await supabase
         .from("wa_conversations")
@@ -156,13 +159,9 @@ export async function createManualContact(input: ManualContactInput) {
         console.error("Error creating wa_conversation:", convError);
         // We do not throw to avoid crashing if it's just a duplicate issue that we missed
       }
-    } else if (!isDirector && existingConv.agent_id && existingConv.agent_id !== assigned_agent_id) {
-      // La conversación ya es de otro asesor: se deja como está (mismo criterio
-      // que el contacto). Normalmente el aviso ya se armó arriba, salvo que la
-      // conversación y el contacto tengan dueños distintos.
-      warning ??= "Ese número ya tiene una conversación de WhatsApp a cargo de otro asesor. Se dejó como está.";
     } else if (!existingConv.agent_id) {
-      // Sin asignar: queda para este asesor. Por admin, igual que el contacto.
+      // Sin asignar: queda para este asesor. Por admin, porque la RLS todavía no
+      // le deja ver esa fila. (Si fuera de otro asesor ya salimos más arriba.)
       await admin
         .from("wa_conversations")
         .update({ agent_id: assigned_agent_id, contact_name: input.name, etiquetas: tagsArray })
