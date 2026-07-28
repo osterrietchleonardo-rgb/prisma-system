@@ -236,7 +236,6 @@ Todo el razonamiento (clave de cliente, agrupación, etapa actual) vive en un ar
 - Consumes: `PerformanceLog` y `ActivityType` de `lib/tracking/types.ts`; `normalizePhoneE164` de `lib/whatsapp/phone.ts`.
 - Produces:
   - `PIPELINE_STAGES: readonly PipelineStageDef[]` — las 6 etapas en orden lineal.
-  - `stageIndex(stage: ActivityType): number`
   - `clientKeyFromLog(log: PerformanceLog): string | null`
   - `buildPipeline(logs: PerformanceLog[], moves: PipelineMove[]): { cards: PipelineCard[]; sinCliente: number }`
   - Tipos `PipelineStageDef`, `PipelineCard`.
@@ -310,10 +309,6 @@ export const PIPELINE_STAGES: readonly PipelineStageDef[] = [
   { id: "reserva", title: "Reserva", color: "bg-orange-500", icon: FileSignature },
   { id: "cierre", title: "Cierre", color: "bg-emerald-500", icon: Trophy },
 ] as const;
-
-export function stageIndex(stage: ActivityType): number {
-  return PIPELINE_STAGES.findIndex((s) => s.id === stage);
-}
 
 export interface PipelineCard {
   /** Celular normalizado, o "lead:<id>" / "wa:<id>" como respaldo. */
@@ -718,7 +713,7 @@ Sin cliente no hay tarjeta. Este es el único cambio que altera la rutina actual
 
 - [ ] **Step 1: Validar el cliente elegido en el submit**
 
-En `components/tracking/PerformanceLogForm.tsx`, dentro de `onSubmit`, **antes** del bloque `if (clientType === "manual")` (línea 104), insertar:
+En `components/tracking/PerformanceLogForm.tsx`, dentro de `onSubmit`, insertar este bloque **inmediatamente después** de la línea `let finalValues = { ...values };` y **antes** de `// Si seleccionó nuevo contacto manual, lo creamos primero`:
 
 ```ts
       // Cliente obligatorio: sin cliente no se puede armar la tarjeta del
@@ -743,7 +738,17 @@ En `components/tracking/PerformanceLogForm.tsx`, dentro de `onSubmit`, **antes**
 
 - [ ] **Step 2: Avisar cuando el alta manual no puede vincular**
 
-El caso ya existe y **no se rompe**: `createManualContact` puede devolver `wa_contact_id` vacío si el número ya es de otro asesor, y el registro se guarda igual. Solo se agrega el aviso. Reemplazar las líneas 130-132 por:
+El caso ya existe y **no se rompe**: `createManualContact` puede devolver `wa_contact_id` vacío si el número ya es de otro asesor, y el registro se guarda igual. Solo se agrega el aviso.
+
+Buscar este bloque exacto (es la única aparición de `finalValues.wa_contact_id`):
+
+```ts
+        // Puede venir vacío si el lead es de otro asesor y no hay contacto que
+        // enlazar; el registro se guarda igual, solo sin el vínculo.
+        finalValues.wa_contact_id = result.wa_contact_id ?? null;
+```
+
+y reemplazarlo por:
 
 ```ts
         // Puede venir vacío si el lead es de otro asesor y no hay contacto que
@@ -757,13 +762,25 @@ El caso ya existe y **no se rompe**: `createManualContact` puede devolver `wa_co
 
 - [ ] **Step 3: Sacar el "(Opcional)" del bloque de cliente**
 
-El encabezado de la línea 451 dice `Activos Vinculados (Opcional)` y ahora el cliente es obligatorio. Reemplazar esa línea por:
+El encabezado dice `Activos Vinculados (Opcional)` y ahora el cliente es obligatorio. Reemplazar esta línea exacta:
+
+```tsx
+             <h3 className="text-xs uppercase tracking-wider">Activos Vinculados (Opcional)</h3>
+```
+
+por:
 
 ```tsx
              <h3 className="text-xs uppercase tracking-wider">Propiedad (opcional) y Cliente</h3>
 ```
 
-Y en la línea 517, marcar el campo como obligatorio:
+Y marcar el campo como obligatorio. Reemplazar esta línea exacta:
+
+```tsx
+              <Label className="text-sm font-medium">Vincular Cliente</Label>
+```
+
+por:
 
 ```tsx
               <Label className="text-sm font-medium">Vincular Cliente *</Label>
@@ -803,7 +820,7 @@ El popup del tablero tiene que ser **el mismo formulario**, no una copia. Se le 
 
 - [ ] **Step 1: Ampliar las props y los valores por defecto**
 
-Reemplazar la interfaz `Props` (líneas 24-28) por:
+Reemplazar el bloque `interface Props { … }` completo (el que hoy tiene solo `onSuccess`, `logToEdit` e `isDirector`) por:
 
 ```tsx
 interface Props {
@@ -823,7 +840,7 @@ interface Props {
 }
 ```
 
-Actualizar la firma (línea 30):
+Reemplazar la línea de la firma `export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }: Props) {` por:
 
 ```tsx
 export function PerformanceLogForm({
@@ -836,7 +853,7 @@ export function PerformanceLogForm({
 }: Props) {
 ```
 
-Y agregar el import de `ActivityType` en la línea 6:
+Y ampliar el import existente de `@/lib/tracking/types` para incluir `ActivityType`:
 
 ```tsx
 import { performanceLogSchema, PerformanceLogFormData, PerformanceLog, ActivityType } from "@/lib/tracking/types";
@@ -844,7 +861,7 @@ import { performanceLogSchema, PerformanceLogFormData, PerformanceLog, ActivityT
 
 - [ ] **Step 2: Aplicar los valores fijados en los defaults del formulario**
 
-En el objeto de `defaultValues` para el caso "sin `logToEdit`" (líneas 43-53), reemplazarlo por:
+En `defaultValues`, reemplazar la **rama del ternario que corre cuando NO hay `logToEdit`** (la que empieza en `} : {` y hoy fija `type: "prospeccion"`) por:
 
 ```tsx
     } : {
@@ -862,7 +879,7 @@ En el objeto de `defaultValues` para el caso "sin `logToEdit`" (líneas 43-53), 
 
 - [ ] **Step 3: Fijar el `clientType` cuando el cliente viene bloqueado**
 
-Reemplazar el `useState` de `clientType` (línea 63) por:
+Reemplazar la declaración `const [clientType, setClientType] = useState<...>("ninguno");` por:
 
 ```tsx
   const [clientType, setClientType] = useState<"ninguno" | "tokko" | "whatsapp" | "manual">(
@@ -872,7 +889,7 @@ Reemplazar el `useState` de `clientType` (línea 63) por:
 
 - [ ] **Step 4: Ocultar el selector de etapa cuando viene fijada**
 
-Reemplazar la sección 1 completa (líneas 160-189) por:
+Reemplazar la sección entera que abre con el comentario `{/* SECCIÓN 1: Actividad a registrar */}` (desde su `<section className="space-y-4">` hasta el `</section>` que la cierra) por:
 
 ```tsx
       <section className="space-y-4">
@@ -917,7 +934,7 @@ Reemplazar la sección 1 completa (líneas 160-189) por:
 
 - [ ] **Step 5: Ocultar el selector de cliente cuando viene bloqueado**
 
-Reemplazar el `Select` de tipo de cliente y sus tres bloques condicionales (líneas 520-587) envolviéndolos: si `lockedClient` está presente, se muestra el cliente fijo; si no, se muestra todo como hoy.
+Dentro del recuadro "Vincular Cliente", envolver el `<Select value={clientType} …>` **y** los tres bloques condicionales que le siguen (`{clientType === "tokko" && …}`, `{clientType === "whatsapp" && …}`, `{clientType === "manual" && …}`): si `lockedClient` está presente se muestra el cliente fijo; si no, se muestra todo como hoy.
 
 ```tsx
             {lockedClient ? (
@@ -1406,7 +1423,8 @@ Es el corazón: decide si mover pide datos o no.
 
 **Interfaces:**
 - Consumes: `buildPipeline`, `PIPELINE_STAGES` de `lib/tracking/pipeline.ts`; `movePipelineCard`; `PipelineColumnView`; `PipelineCardItem`; `PipelineStageDialog`; `PipelineClientSheet`.
-- Produces: `PipelineBoard({ logs, moves, isDirector, onRefresh, onEditLog })`.
+- Produces: `PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, onEditLog })`, donde
+  `cardFilter: (card: PipelineCard) => boolean` decide qué tarjetas se ven (nunca en qué columna caen).
 
 - [ ] **Step 1: Escribir el tablero**
 
@@ -1623,9 +1641,9 @@ import { LayoutGrid, List } from "lucide-react";
 import type { PipelineCard } from "@/lib/tracking/pipeline";
 ```
 
-(y quitar el import viejo `import { getPerformanceLogs } from "@/lib/tracking/queries";` de la línea 35, que queda reemplazado).
+(y quitar el import viejo `import { getPerformanceLogs } from "@/lib/tracking/queries";`, que queda reemplazado por el nuevo).
 
-Junto a los estados existentes (después de la línea 58) agregar:
+Junto a los estados existentes, justo después de `const [agencyConfig, setAgencyConfig] = useState<AgencyPerformanceConfig | null>(null);`, agregar:
 
 ```tsx
   const [viewMode, setViewMode] = useState<"lista" | "pipeline">("lista");
@@ -1634,7 +1652,7 @@ Junto a los estados existentes (después de la línea 58) agregar:
 
 - [ ] **Step 2: Traer los movimientos junto con los logs**
 
-Reemplazar `fetchLogs` (líneas 78-88) por:
+Reemplazar el `const fetchLogs = useCallback(...)` completo por:
 
 ```tsx
   const fetchLogs = useCallback(async () => {
@@ -1653,7 +1671,7 @@ Reemplazar `fetchLogs` (líneas 78-88) por:
 
 - [ ] **Step 3: Preparar los datos del tablero**
 
-Después de `filteredLogs` (línea 173), agregar:
+Justo después del cierre del `const filteredLogs = logs.filter(...)`, agregar:
 
 ```tsx
   // El tablero recibe los logs filtrados SOLO por asesor: la etapa de cada
@@ -1692,14 +1710,14 @@ Después de `filteredLogs` (línea 173), agregar:
 
 El filtro de tipo de actividad no puede aplicarse en el tablero (las columnas *son* los tipos: filtrar dejaría el tablero con una sola columna), y el de estado tampoco (la etapa siempre se calcula sobre las no eliminadas).
 
-Envolver la fila 1 de filtros (el `div` que abre en la línea 219 y sus dos bloques internos) en una condición. Reemplazar la apertura de la línea 219 por:
+Envolver la fila 1 de filtros en una condición. Es el `div` que sigue al comentario `{/* Row 1: Activity type tabs + Status tabs */}` y contiene los botones de tipo y el bloque `{isDirector && (...)}` de estado. Reemplazar su línea de apertura por:
 
 ```tsx
               {viewMode === "lista" && (
               <div className="flex flex-col lg:flex-row lg:items-center gap-2 overflow-x-auto">
 ```
 
-y cerrar ese `div` (línea 272) con:
+y cerrar ese mismo `div` (el que está justo antes del comentario `{/* Row 2: Advisor filter + Search */}`) con:
 
 ```tsx
               </div>
@@ -1708,7 +1726,7 @@ y cerrar ese `div` (línea 272) con:
 
 - [ ] **Step 5: Agregar el switch Lista | Pipeline**
 
-Dentro del bloque de la línea 303 (`<div className="flex items-center gap-2 sm:ml-auto">`), **antes** del `<DatePeriodFilter />`, insertar:
+Dentro del `<div className="flex items-center gap-2 sm:ml-auto">`, **antes** del `<DatePeriodFilter />`, insertar:
 
 ```tsx
                   <div className="flex bg-muted/30 p-1 rounded-xl border border-white/5 shrink-0">
@@ -1733,7 +1751,7 @@ Dentro del bloque de la línea 303 (`<div className="flex items-center gap-2 sm:
 
 - [ ] **Step 6: Renderizar el tablero o la lista**
 
-Reemplazar el bloque de render de resultados (líneas 320-339, el `isLoading ? ... : <PerformanceHistoryList ... />`) por:
+Reemplazar el bloque de render de resultados (el ternario `{isLoading ? (...) : (<PerformanceHistoryList ... />)}` que está dentro de `<TabsContent value="actividad">`, después del `</Card>`) por:
 
 ```tsx
           {isLoading ? (
@@ -1869,4 +1887,10 @@ Sin huecos.
 
 **Consistencia de nombres verificada:** `buildPipeline` devuelve `{ cards, sinCliente }` y así se consume en la Task 9. `PipelineCardItem` es el componente y `PipelineCard` el tipo (aclarado en la Task 6). `stagesConActividad` se define en la Task 2 y se usa en la Task 9. `movePipelineCard` devuelve `{ success, error }` en la Task 3 y así se lee en la Task 9. `getPipelineMoves` se define en la Task 3 y se importa en la Task 10.
 
-**Nota:** `stageIndex()` se exporta en la Task 2 pero no se consume en ninguna task. Se deja porque `PIPELINE_STAGES` ya define el orden y `stageIndex` es la forma legible de preguntarlo si más adelante se quiere distinguir avanzar de retroceder en la interfaz; si al implementar molesta al linter, borrarla.
+**Escaneo previo (2026-07-28, antes de ejecutar):** se corrigieron tres cosas en este plan.
+
+1. Se eliminó `stageIndex()`: no lo consumía ninguna task. La regla de movimiento no compara posiciones (pregunta si la etapa destino ya tiene actividad), así que el orden de `PIPELINE_STAGES` solo se usa para ordenar las columnas. Código muerto, fuera por YAGNI.
+2. El bloque *Interfaces* de la Task 9 no listaba `cardFilter`, que sí está en las props del componente. Corregido.
+3. Las Tasks 4 y 5 modifican el mismo archivo (`PerformanceLogForm.tsx`) y la 4 inserta líneas antes de los puntos que la 5 referencia: los números de línea se corrían. Se reemplazaron por anclas de texto exactas.
+
+**Sobre los tests:** este plan no agrega tests automatizados porque el repo no tiene framework (ver Global Constraints). Es una decisión explícita y consentida, no un descuido. Los revisores reciben esa restricción textual: la verificación de este plan es typecheck + lint + build + comprobación contra datos reales + prueba manual.
