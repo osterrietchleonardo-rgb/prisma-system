@@ -68,10 +68,18 @@ console.log(`Actividades vivas: ${vivos.length}`);
 console.log(`Sin cliente vinculado (no generan tarjeta): ${sinCliente}`);
 console.log(`Tarjetas que se arman: ${porCliente.size}\n`);
 
-for (const [key, items] of porCliente) {
+// Mismo orden que el tablero: de la mas actual a la mas antigua.
+const tarjetas = [...porCliente.entries()]
+  .map(([key, items]) => {
+    const ordenados = [...items].sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    return { key, items: ordenados, lastEventAt: ordenados[0].created_at };
+  })
+  .sort((a, b) => (a.lastEventAt < b.lastEventAt ? 1 : -1));
+
+for (const { key, items, lastEventAt } of tarjetas) {
   const ultima = items[0];
   const nombre = ultima.wa_name || ultima.lead_name || key;
   console.log(
-    `- ${nombre} [${key}] → etapa ${ultima.type} | ${items.length} activ. | etapas: ${[...new Set(items.map((i) => i.type))].join(", ")}`
+    `- ${nombre} [${key}] → etapa ${ultima.type} | ${items.length} activ. | ultimo evento: ${String(lastEventAt).slice(0, 16)} | etapas: ${[...new Set(items.map((i) => i.type))].join(", ")}`
   );
 }

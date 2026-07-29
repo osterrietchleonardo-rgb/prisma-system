@@ -55,6 +55,13 @@ export interface PipelineCard {
   activityCount: number;
   /** fecha_actividad de la actividad más reciente (para el filtro de fechas). */
   lastActivityDate: string | null;
+  /**
+   * Cuándo pasó lo último con este cliente: el created_at más nuevo entre sus
+   * actividades y sus movimientos manuales. Ordena las tarjetas dentro de la
+   * columna (más nueva arriba) y es el MISMO criterio con el que se decide en
+   * qué columna cae, así el orden y la etapa nunca se contradicen.
+   */
+  lastEventAt: string;
   /** Todas las fechas de actividad, para saber si cae dentro de un rango. */
   activityDates: string[];
   agentId: string;
@@ -146,8 +153,9 @@ export function buildPipeline(
     const ultima = ordenados[0];
 
     const move = ultimoMovimiento.get(clientKey);
-    const stage: ActivityType =
-      move && move.created_at > ultima.created_at ? move.to_stage : ultima.type;
+    const movioDespues = !!move && move.created_at > ultima.created_at;
+    const stage: ActivityType = movioDespues ? move!.to_stage : ultima.type;
+    const lastEventAt = movioDespues ? move!.created_at : ultima.created_at;
 
     const stagesConActividad = Array.from(new Set(ordenados.map((l) => l.type)));
 
@@ -171,12 +179,17 @@ export function buildPipeline(
       propiedadRef: ultima.propiedad_ref ?? null,
       activityCount: ordenados.length,
       lastActivityDate: ultima.fecha_actividad ?? null,
+      lastEventAt,
       activityDates: ordenados.map((l) => l.fecha_actividad).filter(Boolean),
       agentId: ultima.agent_id,
       agentName: ultima.profiles?.full_name ?? null,
       logs: ordenados,
     });
   }
+
+  // De la más actual a la más antigua: lo último que se movió queda arriba de
+  // todo en su columna, sin importar cuántas tarjetas se acumulen abajo.
+  cards.sort((a, b) => (a.lastEventAt < b.lastEventAt ? 1 : a.lastEventAt > b.lastEventAt ? -1 : 0));
 
   return { cards, sinCliente };
 }

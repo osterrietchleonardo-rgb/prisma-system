@@ -20,8 +20,9 @@ export function PipelineColumnView({ stage, cards, onOpenCard, onMoveCard, showA
   const Icon = stage.icon;
 
   return (
-    <div className="flex flex-col w-[280px] shrink-0 h-full bg-accent/5 rounded-xl border border-accent/10">
-      <div className="p-3 flex items-center justify-between">
+    <div className="flex flex-col w-[280px] shrink-0 h-full min-h-0 bg-accent/5 rounded-xl border border-accent/10">
+      {/* Encabezado fijo: queda siempre visible aunque la lista scrollee. */}
+      <div className="p-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <div className={cn("p-1.5 rounded-lg text-white", stage.color)}>
             <Icon className="h-4 w-4" />
@@ -34,7 +35,8 @@ export function PipelineColumnView({ stage, cards, onOpenCard, onMoveCard, showA
       <div
         ref={setNodeRef}
         className={cn(
-          "flex-1 p-2 space-y-2 overflow-y-auto scrollbar-hide min-h-[300px] transition-colors rounded-b-xl",
+          // min-h-0 es lo que habilita el scroll propio dentro del flex.
+          "flex-1 min-h-0 p-2 space-y-2 overflow-y-auto transition-colors rounded-b-xl",
           isOver && "bg-accent/10"
         )}
       >

@@ -121,8 +121,14 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
       >
-        <div className="overflow-x-auto pb-4">
-          <div className="inline-flex gap-3 min-h-[500px]">
+        {/*
+          Alto fijo a propósito: el tablero entero entra en pantalla y el scroll
+          pasa DENTRO de cada columna. Si el alto fuera automático, al acumularse
+          tarjetas la columna crecería hacia abajo, scrollearía la página y los
+          encabezados de las etapas se irían de la vista.
+        */}
+        <div className="overflow-x-auto pb-4 h-[calc(100vh-22rem)] min-h-[26rem]">
+          <div className="inline-flex gap-3 h-full">
             {PIPELINE_STAGES.map((stage) => (
               <PipelineColumnView
                 key={stage.id}

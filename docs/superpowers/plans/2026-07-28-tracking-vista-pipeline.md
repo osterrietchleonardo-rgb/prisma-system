@@ -1893,4 +1893,9 @@ Sin huecos.
 2. El bloque *Interfaces* de la Task 9 no listaba `cardFilter`, que sí está en las props del componente. Corregido.
 3. Las Tasks 4 y 5 modifican el mismo archivo (`PerformanceLogForm.tsx`) y la 4 inserta líneas antes de los puntos que la 5 referencia: los números de línea se corrían. Se reemplazaron por anclas de texto exactas.
 
+**Ajuste posterior a la primera prueba de Leonardo (2026-07-29):** el tablero se comportaba mal cuando se acumulan tarjetas. Dos correcciones fuera del plan original:
+
+1. **El tablero se iba de pantalla.** Las columnas tenían `overflow-y-auto` pero sin alto definido, así que crecían hacia abajo y el que scrolleaba era la página: los encabezados de las etapas desaparecían. Ahora el contenedor tiene alto fijo (`h-[calc(100vh-22rem)] min-h-[26rem]`) y el scroll pasa dentro de cada columna, con su encabezado siempre visible.
+2. **Las tarjetas no tenían orden explícito.** Se agregó `lastEventAt` a `PipelineCard` (el `created_at` más nuevo entre sus actividades y sus movimientos) y `buildPipeline` ordena por ese campo de la más actual a la más antigua. Es el mismo criterio con el que se decide la columna, así el orden y la etapa nunca se contradicen.
+
 **Sobre los tests:** este plan no agrega tests automatizados porque el repo no tiene framework (ver Global Constraints). Es una decisión explícita y consentida, no un descuido. Los revisores reciben esa restricción textual: la verificación de este plan es typecheck + lint + build + comprobación contra datos reales + prueba manual.
