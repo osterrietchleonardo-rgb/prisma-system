@@ -578,7 +578,7 @@ git commit -m "feat(tracking): logica de armado de tarjetas del pipeline por cli
   - `movePipelineCard(input: MovePipelineCardInput): Promise<{ success: boolean; error?: string }>` en `actions/tracking/movePipelineCard.ts`, con
     `MovePipelineCardInput = { clientKey: string; leadId: string | null; waContactId: string | null; fromStage: ActivityType | null; toStage: ActivityType }`
 
-- [ ] **Step 1: Ampliar el select de `leads` y agregar `getPipelineMoves`**
+- [x] **Step 1: Ampliar el select de `leads` y agregar `getPipelineMoves`**
 
 En `lib/tracking/queries.ts:17`, el select trae `leads(id, full_name)` **sin teléfono**, y sin él la agrupación por celular no funciona. Reemplazar esa línea por:
 
@@ -617,7 +617,7 @@ Y actualizar el import de la primera línea:
 import { PerformanceLog, PipelineMove } from "./types";
 ```
 
-- [ ] **Step 2: Escribir la server action**
+- [x] **Step 2: Escribir la server action**
 
 Crear `actions/tracking/movePipelineCard.ts`:
 
@@ -683,7 +683,7 @@ export async function movePipelineCard(
 }
 ```
 
-- [ ] **Step 3: Verificar que compila**
+- [x] **Step 3: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -691,7 +691,7 @@ npx tsc --noEmit
 
 Esperado: sin errores.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add lib/tracking/queries.ts actions/tracking/movePipelineCard.ts
