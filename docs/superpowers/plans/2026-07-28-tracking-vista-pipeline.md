@@ -1286,7 +1286,7 @@ git commit -m "feat(tracking): popup para cargar la etapa al mover una tarjeta"
 - Consumes: `PipelineCard`, `PIPELINE_STAGES`, `PipelineMove`.
 - Produces: `PipelineClientSheet({ open, onOpenChange, card, moves, onEditLog })` con `onEditLog: (log: PerformanceLog) => void`.
 
-- [ ] **Step 1: Escribir el panel**
+- [x] **Step 1: Escribir el panel**
 
 Crear `components/tracking/pipeline/PipelineClientSheet.tsx`:
 
@@ -1397,7 +1397,7 @@ export function PipelineClientSheet({ open, onOpenChange, card, moves, onEditLog
 }
 ```
 
-- [ ] **Step 2: Verificar que compila**
+- [x] **Step 2: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -1405,7 +1405,7 @@ npx tsc --noEmit
 
 Esperado: sin errores.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add components/tracking/pipeline/PipelineClientSheet.tsx
