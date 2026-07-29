@@ -240,7 +240,7 @@ Todo el razonamiento (clave de cliente, agrupación, etapa actual) vive en un ar
   - `buildPipeline(logs: PerformanceLog[], moves: PipelineMove[]): { cards: PipelineCard[]; sinCliente: number }`
   - Tipos `PipelineStageDef`, `PipelineCard`.
 
-- [ ] **Step 1: Agregar `phone` a `leads` y el tipo `PipelineMove` en `lib/tracking/types.ts`**
+- [x] **Step 1: Agregar `phone` a `leads` y el tipo `PipelineMove` en `lib/tracking/types.ts`**
 
 En `lib/tracking/types.ts:73-76`, reemplazar el bloque `leads`:
 
@@ -269,7 +269,7 @@ export interface PipelineMove {
 }
 ```
 
-- [ ] **Step 2: Escribir `lib/tracking/pipeline.ts`**
+- [x] **Step 2: Escribir `lib/tracking/pipeline.ts`**
 
 ```ts
 import {
@@ -456,7 +456,7 @@ export function buildPipeline(
 }
 ```
 
-- [ ] **Step 3: Verificar que compila**
+- [x] **Step 3: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -464,7 +464,7 @@ npx tsc --noEmit
 
 Esperado: sin errores. Si `lucide-react` no exporta alguno de esos íconos, cambiarlo por uno que sí exista y seguir.
 
-- [ ] **Step 4: Escribir el script de comprobación contra datos reales**
+- [x] **Step 4: Escribir el script de comprobación contra datos reales**
 
 Crear `scratch/verify-pipeline-cards.mjs`. Reproduce la lógica de agrupación contra la base real y muestra el resultado, para confirmar que agrupa como esperamos antes de tocar la interfaz:
 
@@ -548,7 +548,7 @@ for (const [key, items] of porCliente) {
 }
 ```
 
-- [ ] **Step 5: Correr la comprobación**
+- [x] **Step 5: Correr la comprobación**
 
 ```bash
 node scratch/verify-pipeline-cards.mjs
@@ -556,7 +556,7 @@ node scratch/verify-pipeline-cards.mjs
 
 Esperado, con los datos actuales: `Sin cliente vinculado` debe dar **20**, y las tarjetas deben salir de los 7 registros restantes. **Confirmar a ojo que ningún cliente aparece dos veces en la lista.** Si aparece repetido, el problema está en la normalización del teléfono y hay que resolverlo antes de seguir.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/tracking/pipeline.ts lib/tracking/types.ts scratch/verify-pipeline-cards.mjs
