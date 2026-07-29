@@ -818,7 +818,7 @@ El popup del tablero tiene que ser **el mismo formulario**, no una copia. Se le 
   `defaults?: { propertyId: string | null; propiedadRef: string | null }`.
   Sin esas props se comporta exactamente como hoy.
 
-- [ ] **Step 1: Ampliar las props y los valores por defecto**
+- [x] **Step 1: Ampliar las props y los valores por defecto**
 
 Reemplazar el bloque `interface Props { … }` completo (el que hoy tiene solo `onSuccess`, `logToEdit` e `isDirector`) por:
 
@@ -859,7 +859,7 @@ Y ampliar el import existente de `@/lib/tracking/types` para incluir `ActivityTy
 import { performanceLogSchema, PerformanceLogFormData, PerformanceLog, ActivityType } from "@/lib/tracking/types";
 ```
 
-- [ ] **Step 2: Aplicar los valores fijados en los defaults del formulario**
+- [x] **Step 2: Aplicar los valores fijados en los defaults del formulario**
 
 En `defaultValues`, reemplazar la **rama del ternario que corre cuando NO hay `logToEdit`** (la que empieza en `} : {` y hoy fija `type: "prospeccion"`) por:
 
@@ -877,7 +877,7 @@ En `defaultValues`, reemplazar la **rama del ternario que corre cuando NO hay `l
     },
 ```
 
-- [ ] **Step 3: Fijar el `clientType` cuando el cliente viene bloqueado**
+- [x] **Step 3: Fijar el `clientType` cuando el cliente viene bloqueado**
 
 Reemplazar la declaración `const [clientType, setClientType] = useState<...>("ninguno");` por:
 
@@ -887,7 +887,7 @@ Reemplazar la declaración `const [clientType, setClientType] = useState<...>("n
   );
 ```
 
-- [ ] **Step 4: Ocultar el selector de etapa cuando viene fijada**
+- [x] **Step 4: Ocultar el selector de etapa cuando viene fijada**
 
 Reemplazar la sección entera que abre con el comentario `{/* SECCIÓN 1: Actividad a registrar */}` (desde su `<section className="space-y-4">` hasta el `</section>` que la cierra) por:
 
@@ -932,7 +932,7 @@ Reemplazar la sección entera que abre con el comentario `{/* SECCIÓN 1: Activi
       </section>
 ```
 
-- [ ] **Step 5: Ocultar el selector de cliente cuando viene bloqueado**
+- [x] **Step 5: Ocultar el selector de cliente cuando viene bloqueado**
 
 Dentro del recuadro "Vincular Cliente", envolver el `<Select value={clientType} …>` **y** los tres bloques condicionales que le siguen (`{clientType === "tokko" && …}`, `{clientType === "whatsapp" && …}`, `{clientType === "manual" && …}`): si `lockedClient` está presente se muestra el cliente fijo; si no, se muestra todo como hoy.
 
@@ -953,7 +953,7 @@ Dentro del recuadro "Vincular Cliente", envolver el `<Select value={clientType} 
 
 Al implementar, mover el bloque existente tal cual dentro del `<>...</>`, sin modificarlo.
 
-- [ ] **Step 6: Verificar que compila y que la vista actual sigue igual**
+- [x] **Step 6: Verificar que compila y que la vista actual sigue igual**
 
 ```bash
 npx tsc --noEmit && npm run lint && npm run build
@@ -961,7 +961,7 @@ npx tsc --noEmit && npm run lint && npm run build
 
 Esperado: build exitoso. Como ninguna prop nueva se está pasando todavía, el formulario debe comportarse **exactamente** como antes.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add components/tracking/PerformanceLogForm.tsx

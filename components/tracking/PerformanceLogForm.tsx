@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { performanceLogSchema, PerformanceLogFormData, PerformanceLog } from "@/lib/tracking/types";
+import { performanceLogSchema, PerformanceLogFormData, PerformanceLog, ActivityType } from "@/lib/tracking/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,9 +25,26 @@ interface Props {
   onSuccess: () => void;
   logToEdit?: PerformanceLog | null;
   isDirector?: boolean;
+  /** Fija la etapa y oculta el selector. Lo usa el popup del tablero. */
+  forcedType?: ActivityType;
+  /** Fija el cliente y oculta el selector. Lo usa el popup del tablero. */
+  lockedClient?: {
+    label: string;
+    leadId: string | null;
+    waContactId: string | null;
+  };
+  /** Precarga la propiedad del último registro del cliente (editable). */
+  defaults?: { propertyId: string | null; propiedadRef: string | null };
 }
 
-export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }: Props) {
+export function PerformanceLogForm({
+  onSuccess,
+  logToEdit,
+  isDirector = false,
+  forcedType,
+  lockedClient,
+  defaults,
+}: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reason, setReason] = useState("");
 
@@ -41,11 +58,11 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
       fecha_actividad: logToEdit.fecha_actividad ? logToEdit.fecha_actividad.split("T")[0] : new Date().toISOString().split("T")[0],
       metadata: logToEdit.metadata || {},
     } : {
-      type: "prospeccion",
-      propiedad_ref: "",
-      property_id: null,
-      lead_id: null,
-      wa_contact_id: null,
+      type: forcedType ?? "prospeccion",
+      propiedad_ref: defaults?.propiedadRef ?? "",
+      property_id: defaults?.propertyId ?? null,
+      lead_id: lockedClient?.leadId ?? null,
+      wa_contact_id: lockedClient?.waContactId ?? null,
       monto_operacion: 0,
       comision_generada: 0,
       fecha_actividad: new Date().toISOString().split("T")[0],
@@ -60,7 +77,9 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
     agents?: any[];
   }>({ properties: [], leads: [], waContacts: [], agents: [] });
 
-  const [clientType, setClientType] = useState<"ninguno" | "tokko" | "whatsapp" | "manual">("ninguno");
+  const [clientType, setClientType] = useState<"ninguno" | "tokko" | "whatsapp" | "manual">(
+    lockedClient ? (lockedClient.waContactId ? "whatsapp" : "tokko") : "ninguno"
+  );
 
   // Manual contact form state (con doble verificación + certificación)
   const [manualContact, setManualContact] = useState<ManualContactData>({
@@ -189,24 +208,32 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
         <div className="grid grid-cols-1 gap-4">
           <div className="space-y-2">
             <Label htmlFor="type">Tipo de Actividad *</Label>
-            <Select onValueChange={(v) => {
-              setValue("type", v as any);
-              setValue("metadata", {}); // Reset metadata on type change
-              setValue("monto_operacion", 0);
-              setValue("comision_generada", 0);
-            }} value={watch("type")}>
-              <SelectTrigger className="h-12 text-base">
-                <SelectValue placeholder="Seleccionar actividad..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="prospeccion">Prospección</SelectItem>
-                <SelectItem value="prelisting">Prelisting</SelectItem>
-                <SelectItem value="prebuying">Prebuying</SelectItem>
-                <SelectItem value="captacion">Captación</SelectItem>
-                <SelectItem value="reserva">Reserva</SelectItem>
-                <SelectItem value="cierre">Cierre</SelectItem>
-              </SelectContent>
-            </Select>
+            {forcedType ? (
+              // Viene del tablero: la etapa la decide la columna donde soltaste
+              // la tarjeta, así que se muestra pero no se cambia acá.
+              <div className="h-12 px-3 flex items-center rounded-md border border-accent/20 bg-accent/5 text-base font-semibold capitalize">
+                {forcedType}
+              </div>
+            ) : (
+              <Select onValueChange={(v) => {
+                setValue("type", v as any);
+                setValue("metadata", {}); // Reset metadata on type change
+                setValue("monto_operacion", 0);
+                setValue("comision_generada", 0);
+              }} value={watch("type")}>
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue placeholder="Seleccionar actividad..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="prospeccion">Prospección</SelectItem>
+                  <SelectItem value="prelisting">Prelisting</SelectItem>
+                  <SelectItem value="prebuying">Prebuying</SelectItem>
+                  <SelectItem value="captacion">Captación</SelectItem>
+                  <SelectItem value="reserva">Reserva</SelectItem>
+                  <SelectItem value="cierre">Cierre</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
       </section>
@@ -540,6 +567,13 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
               <Label className="text-sm font-medium">Vincular Cliente *</Label>
             </div>
             
+            {lockedClient ? (
+              // Viene del tablero: la tarjeta ES el cliente, no se cambia acá.
+              <div className="px-3 py-2.5 rounded-md border border-accent/20 bg-accent/5 text-sm font-semibold">
+                {lockedClient.label}
+              </div>
+            ) : (
+              <>
             <Select value={clientType} onValueChange={(v: any) => {
               setClientType(v);
               if (v !== "tokko") setValue("lead_id", null);
@@ -607,6 +641,8 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
                   </div>
                 )}
               </div>
+            )}
+              </>
             )}
           </div>
 
