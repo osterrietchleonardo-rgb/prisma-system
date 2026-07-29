@@ -1629,7 +1629,7 @@ git commit -m "feat(tracking): tablero del pipeline con la regla de movimiento"
 - Consumes: `PipelineBoard`, `getPipelineMoves`.
 - Produces: la solapa *Actividad* con switch Lista | Pipeline.
 
-- [ ] **Step 1: Agregar imports y estado**
+- [x] **Step 1: Agregar imports y estado**
 
 En `components/tracking/TrackingPerformanceView.tsx`, agregar a los imports:
 
@@ -1650,7 +1650,7 @@ Junto a los estados existentes, justo después de `const [agencyConfig, setAgenc
   const [moves, setMoves] = useState<PipelineMove[]>([]);
 ```
 
-- [ ] **Step 2: Traer los movimientos junto con los logs**
+- [x] **Step 2: Traer los movimientos junto con los logs**
 
 Reemplazar el `const fetchLogs = useCallback(...)` completo por:
 
@@ -1669,7 +1669,7 @@ Reemplazar el `const fetchLogs = useCallback(...)` completo por:
   }, []);
 ```
 
-- [ ] **Step 3: Preparar los datos del tablero**
+- [x] **Step 3: Preparar los datos del tablero**
 
 Justo después del cierre del `const filteredLogs = logs.filter(...)`, agregar:
 
@@ -1706,7 +1706,7 @@ Justo después del cierre del `const filteredLogs = logs.filter(...)`, agregar:
   );
 ```
 
-- [ ] **Step 4: Ocultar en el tablero los filtros que no aplican**
+- [x] **Step 4: Ocultar en el tablero los filtros que no aplican**
 
 El filtro de tipo de actividad no puede aplicarse en el tablero (las columnas *son* los tipos: filtrar dejaría el tablero con una sola columna), y el de estado tampoco (la etapa siempre se calcula sobre las no eliminadas).
 
@@ -1724,7 +1724,7 @@ y cerrar ese mismo `div` (el que está justo antes del comentario `{/* Row 2: Ad
               )}
 ```
 
-- [ ] **Step 5: Agregar el switch Lista | Pipeline**
+- [x] **Step 5: Agregar el switch Lista | Pipeline**
 
 Dentro del `<div className="flex items-center gap-2 sm:ml-auto">`, **antes** del `<DatePeriodFilter />`, insertar:
 
@@ -1749,7 +1749,7 @@ Dentro del `<div className="flex items-center gap-2 sm:ml-auto">`, **antes** del
                   </div>
 ```
 
-- [ ] **Step 6: Renderizar el tablero o la lista**
+- [x] **Step 6: Renderizar el tablero o la lista**
 
 Reemplazar el bloque de render de resultados (el ternario `{isLoading ? (...) : (<PerformanceHistoryList ... />)}` que está dentro de `<TabsContent value="actividad">`, después del `</Card>`) por:
 
@@ -1788,7 +1788,7 @@ Reemplazar el bloque de render de resultados (el ternario `{isLoading ? (...) : 
           )}
 ```
 
-- [ ] **Step 7: Verificar que compila, lint y build**
+- [x] **Step 7: Verificar que compila, lint y build**
 
 ```bash
 npx tsc --noEmit && npm run lint && npm run build
@@ -1796,7 +1796,7 @@ npx tsc --noEmit && npm run lint && npm run build
 
 Esperado: build exitoso.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add components/tracking/TrackingPerformanceView.tsx
