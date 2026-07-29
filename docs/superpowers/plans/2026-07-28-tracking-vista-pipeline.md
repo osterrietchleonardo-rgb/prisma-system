@@ -52,7 +52,7 @@
 
 ## Preparación (una sola vez, antes de la Task 1)
 
-- [ ] **Crear la rama desde `main` actualizado**
+- [x] **Crear la rama desde `main` actualizado**
 
 ```bash
 cd "C:/Users/LENOVO/Desktop/CODE/Antigravity - Apps/PRISMA-SYSTEM"
@@ -75,7 +75,7 @@ Guarda los movimientos manuales del tablero. Es append-only: nunca se actualiza 
 - Consumes: nada (primera task).
 - Produces: tabla `public.tracking_pipeline_moves` con columnas `id uuid`, `agency_id uuid`, `agent_id uuid`, `client_key text`, `lead_id uuid null`, `wa_contact_id uuid null`, `from_stage text null`, `to_stage text`, `created_at timestamptz`.
 
-- [ ] **Step 1: Escribir la migración**
+- [x] **Step 1: Escribir la migración**
 
 Crear `supabase/migrations/20260728120000_create_tracking_pipeline_moves.sql`:
 
@@ -145,7 +145,7 @@ WITH CHECK (
 );
 ```
 
-- [ ] **Step 2: Escribir el script que aplica la migración**
+- [x] **Step 2: Escribir el script que aplica la migración**
 
 Las migraciones del repo no se aplican solas. Crear `scratch/apply-pipeline-moves-migration.mjs`:
 
@@ -180,7 +180,7 @@ console.log(res.status, JSON.stringify(out));
 if (!res.ok) process.exit(1);
 ```
 
-- [ ] **Step 3: Aplicar la migración**
+- [x] **Step 3: Aplicar la migración**
 
 ```bash
 node scratch/apply-pipeline-moves-migration.mjs
@@ -188,7 +188,7 @@ node scratch/apply-pipeline-moves-migration.mjs
 
 Esperado: `200 []`. Si devuelve error, leerlo y corregir el SQL antes de seguir.
 
-- [ ] **Step 4: Verificar que la tabla existe con las columnas correctas**
+- [x] **Step 4: Verificar que la tabla existe con las columnas correctas**
 
 ```bash
 node -e "
@@ -201,7 +201,7 @@ fetch('https://api.supabase.com/v1/projects/'+g('SUPABASE_PROJECT_REF')+'/databa
 
 Esperado: las 9 columnas `id, agency_id, agent_id, client_key, lead_id, wa_contact_id, from_stage, to_stage, created_at`.
 
-- [ ] **Step 5: Verificar que la RLS quedó activa**
+- [x] **Step 5: Verificar que la RLS quedó activa**
 
 ```bash
 node -e "
@@ -214,7 +214,7 @@ fetch('https://api.supabase.com/v1/projects/'+g('SUPABASE_PROJECT_REF')+'/databa
 
 Esperado: `[{"relrowsecurity":true}]`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add supabase/migrations/20260728120000_create_tracking_pipeline_moves.sql
