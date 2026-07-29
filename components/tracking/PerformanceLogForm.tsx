@@ -100,6 +100,25 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
     try {
       let finalValues = { ...values };
 
+      // Cliente obligatorio: sin cliente no se puede armar la tarjeta del
+      // pipeline. Se valida sobre lo que el usuario ELIGIÓ, no sobre el
+      // resultado de resolverlo (ver el caso del alta manual más abajo).
+      if (clientType === "ninguno") {
+        toast.error("Vinculá un cliente: elegí un lead de Tokko, un contacto de WhatsApp, o cargalo como contacto nuevo.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (clientType === "tokko" && !values.lead_id) {
+        toast.error("Elegí el lead de Tokko de la lista.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (clientType === "whatsapp" && !values.wa_contact_id) {
+        toast.error("Elegí el contacto de WhatsApp de la lista.");
+        setIsSubmitting(false);
+        return;
+      }
+
       // Si seleccionó nuevo contacto manual, lo creamos primero
       if (clientType === "manual") {
         if (!manualContact.isValid) {
@@ -128,8 +147,12 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
         }
 
         // Puede venir vacío si el lead es de otro asesor y no hay contacto que
-        // enlazar; el registro se guarda igual, solo sin el vínculo.
+        // enlazar; el registro se guarda igual, solo sin el vínculo. En ese
+        // caso no va a generar tarjeta en el tablero, y hay que avisarlo.
         finalValues.wa_contact_id = result.wa_contact_id ?? null;
+        if (!result.wa_contact_id) {
+          toast.warning("La actividad se guarda, pero no va a aparecer en el tablero: ese celular ya es de otro asesor.");
+        }
       }
 
       if (logToEdit) {
@@ -448,7 +471,7 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
         <div className="space-y-4">
           <header className="flex items-center gap-2 text-accent/70 font-semibold">
              <MapPin className="w-4 h-4" />
-             <h3 className="text-xs uppercase tracking-wider">Activos Vinculados (Opcional)</h3>
+             <h3 className="text-xs uppercase tracking-wider">Propiedad (opcional) y Cliente</h3>
           </header>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -514,7 +537,7 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
           <div className="space-y-4 p-4 border border-white/5 rounded-2xl bg-white/5">
             <div className="flex items-center gap-2 mb-2">
               <User className="w-4 h-4 text-accent" />
-              <Label className="text-sm font-medium">Vincular Cliente</Label>
+              <Label className="text-sm font-medium">Vincular Cliente *</Label>
             </div>
             
             <Select value={clientType} onValueChange={(v: any) => {

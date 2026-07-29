@@ -711,7 +711,7 @@ Sin cliente no hay tarjeta. Este es el único cambio que altera la rutina actual
 - Consumes: nada nuevo.
 - Produces: `PerformanceLogForm` rechaza el envío si el usuario no eligió cliente.
 
-- [ ] **Step 1: Validar el cliente elegido en el submit**
+- [x] **Step 1: Validar el cliente elegido en el submit**
 
 En `components/tracking/PerformanceLogForm.tsx`, dentro de `onSubmit`, insertar este bloque **inmediatamente después** de la línea `let finalValues = { ...values };` y **antes** de `// Si seleccionó nuevo contacto manual, lo creamos primero`:
 
@@ -736,7 +736,7 @@ En `components/tracking/PerformanceLogForm.tsx`, dentro de `onSubmit`, insertar 
       }
 ```
 
-- [ ] **Step 2: Avisar cuando el alta manual no puede vincular**
+- [x] **Step 2: Avisar cuando el alta manual no puede vincular**
 
 El caso ya existe y **no se rompe**: `createManualContact` puede devolver `wa_contact_id` vacío si el número ya es de otro asesor, y el registro se guarda igual. Solo se agrega el aviso.
 
@@ -760,7 +760,7 @@ y reemplazarlo por:
         }
 ```
 
-- [ ] **Step 3: Sacar el "(Opcional)" del bloque de cliente**
+- [x] **Step 3: Sacar el "(Opcional)" del bloque de cliente**
 
 El encabezado dice `Activos Vinculados (Opcional)` y ahora el cliente es obligatorio. Reemplazar esta línea exacta:
 
@@ -786,7 +786,7 @@ por:
               <Label className="text-sm font-medium">Vincular Cliente *</Label>
 ```
 
-- [ ] **Step 4: Verificar que compila y que el lint pasa**
+- [x] **Step 4: Verificar que compila y que el lint pasa**
 
 ```bash
 npx tsc --noEmit && npm run lint
@@ -794,7 +794,7 @@ npx tsc --noEmit && npm run lint
 
 Esperado: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add components/tracking/PerformanceLogForm.tsx
