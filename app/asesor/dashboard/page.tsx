@@ -10,6 +10,8 @@ import { getObjectivesDashboard } from "@/lib/tracking/objetivos"
 import { DashboardActivity } from "@/components/dashboard-activity"
 import { DashboardHeaderActions } from "@/components/dashboard-header-actions"
 import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter"
+import { HandoffsPanel } from "@/components/dashboard/HandoffsPanel"
+import { getHandoffsDashboardData } from "@/lib/queries/handoffs"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, Eye } from "lucide-react"
 
@@ -42,10 +44,11 @@ export default async function AsesorDashboardPage({
   // Personal KPIs + charts: filtered by this asesor's ID
   // Agency-wide: all advisors for the leaderboard + recent agency activity
   const currentYear = new Date().getFullYear()
-  const [myData, agencyData, objectivesData] = await Promise.all([
+  const [myData, agencyData, objectivesData, handoffsData] = await Promise.all([
     getDashboardData(profile.agency_id, user.id, from, to),
     getDashboardData(profile.agency_id, undefined, from, to),  // no agentId → full agency
     getObjectivesDashboard(profile.agency_id, currentYear),
+    getHandoffsDashboardData(profile.agency_id, user.id, from, to),  // solo las derivaciones propias
   ])
 
   return (
@@ -84,6 +87,9 @@ export default async function AsesorDashboardPage({
 
       {/* Personal metrics — 9 cards filtered to this asesor */}
       <PerformanceMetricsGrid kpis={myData.kpis} />
+
+      {/* Clientes que el bot le derivó y todavía no atendió */}
+      <HandoffsPanel data={handoffsData} basePath="/asesor" scope="propio" />
 
       {/* Personal evolution + channel charts */}
       <PerformanceCharts
