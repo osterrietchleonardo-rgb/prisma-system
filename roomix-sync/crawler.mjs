@@ -17,6 +17,7 @@ import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { condensarDescripcion } from './condensar-descripcion.mjs';
 
 chromium.use(stealthPlugin());
 
@@ -600,7 +601,24 @@ function resolveOperation(internal, jsonLd, title) {
   return titleOp || internalOp || bfOp;
 }
 
-function mapToRow(jsonLd, agent, entry, internal) {
+// La descripción del JSON-LD viene CORTADA por Roomix a 500 caracteres, y corta a mitad de
+// palabra ("...- 2 dormitorios - El pri"): así se veía en la ficha compartida y en el ACM.
+// El texto COMPLETO está en el cuerpo de la ficha (div.whitespace-pre-wrap), sin tags adentro.
+function parseDescripcionCompleta(html) {
+  const m = html.match(/<div class="whitespace-pre-wrap[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+  if (!m) return null;
+  const texto = m[1]
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
+    .trim();
+  return texto || null;
+}
+
+function mapToRow(jsonLd, agent, entry, internal, descripcionCompleta) {
   const off = jsonLd.offers || {}, me = jsonLd.mainEntity || {}, add = me.address || {};
   const geo = jsonLd.geo || me.geo || {}, fs = me.floorSize || jsonLd.floorSize || {};
 
@@ -614,7 +632,11 @@ function mapToRow(jsonLd, agent, entry, internal) {
 
   return {
     id: entry.id, slug: entry.slug, canonical_url: entry.loc,
-    title: jsonLd.name || null, description: jsonLd.description || null,
+    title: jsonLd.name || null,
+    // Descripción: se arma con el texto COMPLETO de la ficha y se condensa a ≤500 caracteres
+    // ordenados (Superficie · Interior · Ubicación · Edificio), sin la letra chica ni el
+    // contacto de la inmobiliaria publicante. Respaldo: el JSON-LD cortado, como antes.
+    description: condensarDescripcion(descripcionCompleta || jsonLd.description || '') || jsonLd.description || null,
     operation: resolveOperation(internal, jsonLd, jsonLd.name),
     price: off.price ? parseFloat(off.price) : null, currency: off.priceCurrency || null,
     property_type: me['@type'] || null,                 // se mantiene el valor JSON-LD (no romper ACM)
@@ -685,7 +707,7 @@ async function extractProperty(page, entry, retries = 0) {
     if (!jsonLd) { log('⚠️', `Sin JSON-LD: ${entry.id}`); return null; }
 
     const internal = parseInternal(html, entry.slug);
-    const row = mapToRow(jsonLd, parseAgent(html), entry, internal);
+    const row = mapToRow(jsonLd, parseAgent(html), entry, internal, parseDescripcionCompleta(html));
     const txt = [row.title, row.description, row.neighborhood, (row.amenities || []).join(', ')].filter(Boolean).join(' ').trim();
     if (txt) row.embedding = await generateEmbedding(txt);
 
@@ -856,4 +878,4 @@ if (isMain) {
   main().catch(err => { console.error('💥 Fatal:', err); process.exit(1); });
 }
 
-export { parseInternal, parseJsonLd, parseAgent, mapToRow, resolveOperation, deriveCountry, buildRscBlob, collectSeed, initBrowser, extractProperty, processBatch };
+export { parseInternal, parseJsonLd, parseAgent, mapToRow, parseDescripcionCompleta, resolveOperation, deriveCountry, buildRscBlob, collectSeed, initBrowser, extractProperty, processBatch };

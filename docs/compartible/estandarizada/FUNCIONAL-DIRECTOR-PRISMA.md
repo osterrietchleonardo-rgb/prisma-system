@@ -523,6 +523,8 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 
 Cuando vos o tus asesores hacen una búsqueda en el **Buscador IA** y abren el detalle de una propiedad (en los resultados), tienen el botón **"Compartir ficha"**: genera una **página de presentación profesional y de lujo** (con un link que se copia solo) para mandarle al cliente por WhatsApp. Muestra fotos, precio, datos, y la **tarjeta de contacto del asesor que la generó** (su WhatsApp y email), pintada con los **colores y el logo de tu inmobiliaria**.
 
+En las propiedades de la **red de colaboración**, la descripción se muestra **resumida y ordenada** por secciones (Superficie · Interior · Ubicación · Edificio), siempre completa y **sin la letra chica ni los datos de contacto de la inmobiliaria que publicó el aviso**: el cliente ve la propiedad, no a la competencia.
+
 > 🎨 **Importante para vos:** esos colores, la tipografía y el logo salen de **Marketing IA → Configuración IA**. Si los configurás bien, **todas las fichas que compartan tus asesores salen con tu identidad de marca**. Si no, usan un diseño elegante por defecto.
 > 🔒 El cliente externo **no** ve de qué portal salió la propiedad (es info interna), ni puede acceder al sistema desde el link: es solo una vitrina de presentación de solo lectura.
 
