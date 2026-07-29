@@ -1817,7 +1817,7 @@ git commit -m "feat(tracking): switch Lista/Pipeline en la solapa Actividad"
 - Consumes: todo lo anterior.
 - Produces: la funcionalidad verificada a mano y documentada.
 
-- [ ] **Step 1: Levantar la app**
+- [x] **Step 1: Levantar la app**
 
 ```bash
 npm run dev
@@ -1825,7 +1825,9 @@ npm run dev
 
 Pasarle a Leonardo el link `http://localhost:3000/asesor/tracking-performance` (y el de `/director/...`). **No pedirle que la levante él.**
 
-- [ ] **Step 2: Recorrer los 10 casos de prueba del spec**
+- [x] **Step 2: Recorrer los 10 casos de prueba del spec**
+
+> **Qué se probó realmente (2026-07-29):** Leonardo revisó el tablero en local y confirmó el **caso 2** (al pasar a una etapa nueva, el popup pide la información) y el aspecto general de la vista. Los otros 9 casos **no se recorrieron uno por uno**: dio el OK por confianza para mergear. Quedan como pendiente de verificación en uso real — el más importante de confirmar es el **caso 3** (mover hacia atrás y comprobar que los KPIs del Dashboard no cambian). La prueba de esa sesión sí destapó dos problemas reales, ya corregidos: el tablero se iba de pantalla al acumular tarjetas y las tarjetas no tenían orden explícito (ver "Ajuste posterior" al final).
 
 Del spec, sección 6. Marcar cada uno:
 
@@ -1842,21 +1844,21 @@ Del spec, sección 6. Marcar cada uno:
 
 Además, confirmar que **nada se rompió**: la vista Lista, sus filtros, *Nueva Actividad*, editar y eliminar con motivo, y las solapas *Objetivos* y *Configuración IA* siguen funcionando igual.
 
-- [ ] **Step 3: Actualizar los 4 documentos**
+- [x] **Step 3: Actualizar los 4 documentos**
 
 - `docs/interno/LOGICA-PRISMA.md` → en la sección de Tracking Performance (cerca de la línea 2038), agregar la vista Pipeline: la regla de movimiento, la agrupación por celular, y por qué mover hacia atrás no crea actividad.
 - `docs/interno/TECNICO-PRISMA.md` → en la lista de tablas (cerca de la línea 140), agregar `tracking_pipeline_moves` con su propósito y su RLS.
 - `docs/compartible/estandarizada/FUNCIONAL-ASESOR-PRISMA.md` → cómo usar el tablero, en lenguaje simple y sin tecnicismos: arrastrar o usar "Mover a…", cuándo pide datos y cuándo no, y por qué ahora hay que vincular siempre un cliente.
 - `docs/compartible/estandarizada/FUNCIONAL-DIRECTOR-PRISMA.md` → lo mismo, más el filtro por asesor y la lectura del tablero como foto del equipo.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/
 git commit -m "docs(tracking): documentar la vista Pipeline en los 4 documentos"
 ```
 
-- [ ] **Step 5: Merge solo con OK de Leonardo**
+- [x] **Step 5: Merge solo con OK de Leonardo**
 
 No mergear a `main` sin su OK explícito.
 
