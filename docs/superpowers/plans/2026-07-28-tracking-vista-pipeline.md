@@ -984,7 +984,7 @@ git commit -m "feat(tracking): el formulario acepta etapa y cliente fijados para
 
 > Nota de nombres: el componente se llama `PipelineCardItem` (no `PipelineCard`) para no chocar con el **tipo** `PipelineCard` de `lib/tracking/pipeline.ts`.
 
-- [ ] **Step 1: Escribir la tarjeta**
+- [x] **Step 1: Escribir la tarjeta**
 
 Crear `components/tracking/pipeline/PipelineCard.tsx`:
 
@@ -1097,7 +1097,7 @@ export function PipelineCardItem({ card, onOpen, onMoveTo, showAgent }: Props) {
 }
 ```
 
-- [ ] **Step 2: Escribir la columna**
+- [x] **Step 2: Escribir la columna**
 
 Crear `components/tracking/pipeline/PipelineColumn.tsx`:
 
@@ -1165,7 +1165,7 @@ export function PipelineColumnView({ stage, cards, onOpenCard, onMoveCard, showA
 }
 ```
 
-- [ ] **Step 3: Verificar que compila**
+- [x] **Step 3: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -1173,7 +1173,7 @@ npx tsc --noEmit
 
 Esperado: sin errores. Si `@dnd-kit/utilities` no estuviera instalado, usar `transform` a mano (`translate3d`) en vez de `CSS.Transform.toString`; **no** instalar paquetes.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add components/tracking/pipeline/PipelineCard.tsx components/tracking/pipeline/PipelineColumn.tsx
