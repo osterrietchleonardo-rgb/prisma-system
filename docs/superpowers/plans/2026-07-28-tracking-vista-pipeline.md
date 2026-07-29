@@ -1193,7 +1193,7 @@ Envuelve el `PerformanceLogForm` con la etapa destino y el cliente ya fijados.
 - Consumes: `PerformanceLogForm` con las props de la Task 5; `PIPELINE_STAGES`.
 - Produces: `PipelineStageDialog({ open, onOpenChange, card, targetStage, isDirector, onSaved })`.
 
-- [ ] **Step 1: Escribir el popup**
+- [x] **Step 1: Escribir el popup**
 
 Crear `components/tracking/pipeline/PipelineStageDialog.tsx`:
 
@@ -1260,7 +1260,7 @@ export function PipelineStageDialog({ open, onOpenChange, card, targetStage, isD
 }
 ```
 
-- [ ] **Step 2: Verificar que compila**
+- [x] **Step 2: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -1268,7 +1268,7 @@ npx tsc --noEmit
 
 Esperado: sin errores.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add components/tracking/pipeline/PipelineStageDialog.tsx
