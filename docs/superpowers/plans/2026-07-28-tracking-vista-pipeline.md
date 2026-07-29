@@ -1426,7 +1426,7 @@ Es el corazón: decide si mover pide datos o no.
 - Produces: `PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, onEditLog })`, donde
   `cardFilter: (card: PipelineCard) => boolean` decide qué tarjetas se ven (nunca en qué columna caen).
 
-- [ ] **Step 1: Escribir el tablero**
+- [x] **Step 1: Escribir el tablero**
 
 Crear `components/tracking/pipeline/PipelineBoard.tsx`:
 
@@ -1603,7 +1603,7 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
 }
 ```
 
-- [ ] **Step 2: Verificar que compila**
+- [x] **Step 2: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -1611,7 +1611,7 @@ npx tsc --noEmit
 
 Esperado: sin errores.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add components/tracking/pipeline/PipelineBoard.tsx
