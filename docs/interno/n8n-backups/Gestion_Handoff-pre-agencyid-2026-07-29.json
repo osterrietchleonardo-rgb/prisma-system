@@ -1,0 +1,1627 @@
+{
+  "updatedAt": "2026-07-29T18:29:51.563Z",
+  "createdAt": "2026-04-27T04:06:47.354Z",
+  "id": "Xy0tpQWNwj5dVXSw",
+  "name": "Gestion_Handoff",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "c055762a-8fe7-4141-a639-df2372f30060",
+      "typeVersion": 1.1,
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        96,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const v = item.json;\n  const text = v.query || \"\";\n\n  const extract = (pattern, fallback = \"\") => {\n    const match = text.match(pattern);\n    return match ? match[1].trim() : fallback;\n  };\n  // grab: valor de \"label:\" hasta ; , \". \" (punto+espacio), salto de línea o fin.\n  // (?<![\\w]) evita que \"credito\" matchee dentro de \"apto_credito\", \"nombre\" dentro de \"nombre_asesor\", etc.\n  const grab = (label) => {\n    const m = text.match(new RegExp(\"(?<![\\\\w])\" + label + \"\\\\s*:\\\\s*([^;\\\\n]*?)\\\\s*(?=;|\\\\.\\\\s|\\\\n|$)\", \"i\"));\n    return m ? m[1].trim().replace(/[.,;\\s]+$/, \"\").trim() : \"\";\n  };\n\n  // Identificadores\n  v.agency_id       = extract(/agency_id:([a-f0-9-]{36})/i, \"default_session\");\n  v.lead_id         = extract(/lead_id:(\\d+)/i);\n  v.conversation_id = extract(/conversation_id:([a-f0-9-]{36})/i);\n\n  // Propiedad y motivo (vienen como lenguaje natural, no como tag)\n  v.direccion = extract(/interesado en la propiedad\\s+(.+?)\\.\\s*El asesor/i)\n             || extract(/interesado en la propiedad\\s([^,]+?)(?:,|el asesor|$)/i);\n  v.motivo = extract(/porque\\s+(.+?)\\./i);\n\n  // Asesor (tags)\n  v.email_asesor   = grab(\"email_asesor\");\n  v.nombre_asesor  = grab(\"nombre_asesor\");\n  v.celular_asesor = grab(\"celular_asesor\");\n\n  // Lead (tags)\n  v.lead_nombre      = grab(\"nombre\");\n  v.lead_email       = grab(\"email\");\n  v.lead_tipo_op     = grab(\"tipo_operacion\");\n  v.lead_tipo_prop   = grab(\"tipo_propiedad\");\n  v.lead_zona        = grab(\"zona\");\n  v.lead_ambientes   = grab(\"ambientes_buscados\");\n  v.lead_presupuesto = grab(\"presupuesto\");\n  v.lead_criterios   = grab(\"criterios_innegociables\");\n  v.lead_etapa       = grab(\"etapa\");\n  v.lead_vender      = grab(\"necesita_vender_para_comprar\");\n  v.lead_credito     = grab(\"credito\");\n\n  // --- Filas de las tarjetas (solo aparecen si hay dato) ---\n  const row = (label, value) => value\n    ? `<tr><td style='padding:4px 0;font-size:13px;color:#888;width:40%;vertical-align:top;'>${label}</td><td style='padding:4px 0;font-size:14px;color:#131A2D;font-weight:600;'>${value}</td></tr>`\n    : \"\";\n\n  const propRows = [ row(\"Dirección\", v.direccion) ].join(\"\");\n\n  const leadRows = [\n    row(\"Motivo\", v.motivo ? v.motivo.charAt(0).toUpperCase() + v.motivo.slice(1) : \"\"),\n    row(\"Nombre\", v.lead_nombre),\n    row(\"Operación\", v.lead_tipo_op),\n    row(\"Tipo\", v.lead_tipo_prop),\n    row(\"Zona\", v.lead_zona),\n    row(\"Ambientes\", v.lead_ambientes),\n    row(\"Presupuesto\", v.lead_presupuesto),\n    row(\"Innegociable\", v.lead_criterios),\n    row(\"Necesita vender\", v.lead_vender),\n    row(\"Crédito\", v.lead_credito),\n    row(\"Etapa\", v.lead_etapa),\n    row(\"Contacto\", v.lead_id ? \"+\" + v.lead_id : \"\"),\n    row(\"Email\", v.lead_email)\n  ].join(\"\");\n\n  v.asunto = `Un cliente pide atención${v.direccion ? ' · ' + v.direccion : ''}`;\n\n  item.json.html_email = `<!DOCTYPE html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><style>body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background-color:#f4f7f9;color:#333;margin:0;padding:0;}.container{max-width:600px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);border:1px solid #e1e8ed;}.header{background-color:#131A2D;padding:28px;text-align:center;}.logo-text{color:#fff;font-size:24px;font-weight:bold;letter-spacing:2px;}.accent{color:#B57E3B;}.content{padding:36px 40px;}.badge{color:#fff;background:#C0392B;font-weight:bold;font-size:12px;text-transform:uppercase;letter-spacing:1px;display:inline-block;padding:5px 12px;border-radius:20px;margin-bottom:14px;}h1{color:#131A2D;font-size:22px;margin:0 0 18px;}p{font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;}.alert{background:#fdf3f2;border-left:4px solid #C0392B;border-radius:8px;padding:14px 18px;margin:0 0 20px;font-size:15px;color:#a93226;font-weight:600;}.card{border:1px solid #e1e8ed;border-left:4px solid #B57E3B;border-radius:10px;padding:16px 20px;margin:18px 0;background:#fafbfc;}.card-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#B57E3B;font-weight:bold;margin-bottom:8px;}table{width:100%;border-collapse:collapse;}.btn-wrap{text-align:center;margin-top:24px;}.button{display:inline-block;padding:14px 32px;background-color:#B57E3B;color:#fff !important;text-decoration:none;border-radius:8px;font-weight:bold;}.footer{padding:20px;text-align:center;font-size:12px;color:#888;background:#fafafa;}</style></head><body><div class='container'><div class='header'><div class='logo-text'>PRISMA <span class='accent'>IA</span></div></div><div class='content'><span class='badge'>Atención requerida</span><h1>Un cliente pidió hablar con una persona</h1><div class='alert'>Necesita ser atendido lo antes posible.</div><p>Hola${v.nombre_asesor ? ' ' + v.nombre_asesor : ''},</p><p>Un cliente que estaba conversando con el asistente pidió pasar a un humano. Puede que tenga una duda puntual, que el asistente no haya podido resolverla o que prefiera un trato personal. Tomá la conversación cuanto antes para no perder la oportunidad.</p><div class='card'><div class='card-title'>Propiedad consultada</div><table>${propRows}</table></div><div class='card'><div class='card-title'>Qué necesita el cliente</div><table>${leadRows}</table></div><div class='btn-wrap'><a href='https://prisma.vakdor.com' class='button'>Atender ahora</a></div></div><div class='footer'>Aviso automático de PRISMA IA · No respondas a este correo.<br>© 2026 PRISMA IA — Sistema Inteligente Real Estate.</div></div></body></html>`;\n\n  // Body completo y válido para Resend (JSON.stringify escapa todo el HTML)\n  item.json.resend_body = JSON.stringify({\n    from: \"PRISMA IA <no-reply@vakbot.vakdor.com>\",\n    to: v.email_asesor,\n    subject: v.asunto,\n    html: item.json.html_email\n  });\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        320,
+        352
+      ],
+      "id": "ad2b8e6e-1a17-4290-98ac-08214a503852",
+      "name": "extraer_info",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "profiles",
+          "mode": "list",
+          "cachedResultName": "profiles"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "email",
+              "value": "={{ $('extraer_info')?.item?.json?.email_asesor ?? null }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        512,
+        352
+      ],
+      "id": "80e7335b-c2ba-4f77-9679-849b155341dc",
+      "name": "Buscar_agent_id",
+      "executeOnce": true,
+      "retryOnFail": true,
+      "credentials": {
+        "postgres": {
+          "id": "Vje6BCZn5QY9nNWy",
+          "name": "MEMORIA_PRISMA"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3b819ea7-5dad-4d05-8f12-3ed039de0466",
+              "name": "query",
+              "value": "={{ $('extraer_info').item.json.query }}",
+              "type": "string"
+            },
+            {
+              "id": "8f8962d8-f0f1-45fa-9b2e-1ea5c5579b7f",
+              "name": "agency_id",
+              "value": "={{ $('extraer_info').item.json.agency_id }}",
+              "type": "string"
+            },
+            {
+              "id": "17f1e95d-3562-427a-92b0-903c725ba100",
+              "name": "lead_id",
+              "value": "={{ $('extraer_info').item.json.lead_id }}",
+              "type": "string"
+            },
+            {
+              "id": "79285232-53bb-434d-bf6d-54610bc46864",
+              "name": "=conversation_id",
+              "value": "={{ $('extraer_info').item.json.conversation_id }}",
+              "type": "string"
+            },
+            {
+              "id": "dbc7125f-5990-4db5-9669-387ca53f14f4",
+              "name": "=email_asesor",
+              "value": "={{ $('extraer_info')?.item?.json?.email_asesor ?? null }}",
+              "type": "string"
+            },
+            {
+              "id": "4471f12c-d21f-44b0-b8f8-91eaf8a44c30",
+              "name": "agent_id",
+              "value": "={{ $('Buscar_agent_id')?.item?.json?.id ?? null }}",
+              "type": "string"
+            },
+            {
+              "id": "1cc6e6c3-0683-4048-8923-56426c9774e3",
+              "name": "nombre_asesor",
+              "value": "={{ $('Buscar_agent_id')?.item?.json?.full_name ?? null }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        720,
+        352
+      ],
+      "id": "2f440b15-6bb4-40eb-b710-ce4e0836cc94",
+      "name": "valores",
+      "alwaysOutputData": true,
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "hay-email-asesor",
+              "leftValue": "={{ $('extraer_info').first().json.email_asesor }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        0
+      ],
+      "id": "a1f0c3d2-handoff-if-email",
+      "name": "Hay_email_asesor"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer __RESEND_API_KEY_REMOVIDA_VER_TECNICO_9.2.2__"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $('extraer_info').first().json.resend_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "id": "ac17dde9-cba1-4367-abe8-22c490fd3012",
+      "name": "Enviar_Email_Resend"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "wa_conversations",
+          "mode": "list",
+          "cachedResultName": "wa_conversations"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "bot_active": "={{ false }}",
+            "contact_phone": "={{ $('valores').item.json.lead_id }}",
+            "agent_id": "={{ $('valores')?.item?.json?.agent_id ?? null }}"
+          },
+          "matchingColumns": [
+            "contact_phone"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "agency_id",
+              "displayName": "agency_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "instance_id",
+              "displayName": "instance_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "contact_phone",
+              "displayName": "contact_phone",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_message_at",
+              "displayName": "last_message_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_inbound_at",
+              "displayName": "last_inbound_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "bot_active",
+              "displayName": "bot_active",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "etiquetas",
+              "displayName": "etiquetas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "array",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "unread_count",
+              "displayName": "unread_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "agent_id",
+              "displayName": "agent_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "pipeline_stage",
+              "displayName": "pipeline_stage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "metricas",
+              "displayName": "metricas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "funnel_status",
+              "displayName": "funnel_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "requires_follow_up",
+              "displayName": "requires_follow_up",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "next_follow_up_at",
+              "displayName": "next_follow_up_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "opt_out",
+              "displayName": "opt_out",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "follow_ups_sent",
+              "displayName": "follow_ups_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "follow_ups_history",
+              "displayName": "follow_ups_history",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "recovery_stage",
+              "displayName": "recovery_stage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "dropoff_reason",
+              "displayName": "dropoff_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "visit_status",
+              "displayName": "visit_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "visit_scheduled_at",
+              "displayName": "visit_scheduled_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "visit_reminder_24h_sent",
+              "displayName": "visit_reminder_24h_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "visit_reminder_3h_sent",
+              "displayName": "visit_reminder_3h_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "visit_reminder_1h_sent",
+              "displayName": "visit_reminder_1h_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        660,
+        0
+      ],
+      "id": "73695da3-b283-490f-aaa6-c309d24557f9",
+      "name": "DERIVAR_CONVERSACION",
+      "credentials": {
+        "postgres": {
+          "id": "Vje6BCZn5QY9nNWy",
+          "name": "MEMORIA_PRISMA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "wa_messages",
+          "mode": "list",
+          "cachedResultName": "wa_messages"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "conversation_id": "={{ $('valores').item.json.conversation_id }}",
+            "agency_id": "={{ $('valores').item.json.agency_id }}",
+            "content": "⚠️ Handoff activado: El bot se ha desactivado.",
+            "role": "internal",
+            "message_type": "text"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "conversation_id",
+              "displayName": "conversation_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "agency_id",
+              "displayName": "agency_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "content",
+              "displayName": "content",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "role",
+              "displayName": "role",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "message_type",
+              "displayName": "message_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "wamid",
+              "displayName": "wamid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "metadata",
+              "displayName": "metadata",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        0
+      ],
+      "id": "b9ed100b-031b-44f1-bc4b-cb6f0fcac76e",
+      "name": "AVISAR_MENSAJE_INTERNO",
+      "credentials": {
+        "postgres": {
+          "id": "Vje6BCZn5QY9nNWy",
+          "name": "MEMORIA_PRISMA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Respuesta determinista hacia el Agente Principal.\n// Reemplaza al AI Agent: mismo contrato ({ respuesta }) + diagnostico.\nconst v = $('extraer_info').first().json;\n\nconst corrio = (nodo) => { try { const r = $(nodo).all(); return r.length > 0; } catch (e) { return false; } };\n\nlet email_enviado = false, resultado_aviso_email = '';\nif (!v.email_asesor) {\n  resultado_aviso_email = 'sin email_asesor';\n} else {\n  try {\n    const r = $('Enviar_Email_Resend').first().json;\n    email_enviado = !!(r && r.id);\n    resultado_aviso_email = email_enviado ? 'ok' : 'Resend no devolvio id';\n  } catch (e) { resultado_aviso_email = 'no se ejecuto el envio'; }\n}\n\nlet conversacion_derivada = false;\ntry {\n  const d = $('DERIVAR_CONVERSACION').all();\n  conversacion_derivada = d.length > 0 && !!d[0].json && Object.keys(d[0].json).length > 0;\n} catch (e) { }\n\nconst aviso_interno = corrio('AVISAR_MENSAJE_INTERNO');\nconst exito_total = conversacion_derivada && aviso_interno && email_enviado;\n\n// Lo unico que el Agente Principal usa para hablarle al cliente.\nlet respuesta;\nif (conversacion_derivada) {\n  respuesta = 'Derivacion exitosa. Informar al cliente que se estaran comunicando a la brevedad.';\n} else if (!v.email_asesor) {\n  respuesta = 'No se pudo derivar: la propiedad no tiene asesor asignado. No le prometas al cliente que lo van a contactar; ofrecele seguir ayudandolo vos.';\n} else {\n  respuesta = 'No se pudo completar la derivacion. No le prometas al cliente que lo van a contactar.';\n}\n\nreturn [{ json: {\n  respuesta,\n  exito_total,\n  resultado_derivacion: conversacion_derivada ? 'ok' : 'no se derivo la conversacion',\n  resultado_aviso_interno: aviso_interno ? 'ok' : 'no se registro el mensaje interno',\n  resultado_aviso_email,\n  asesor: v.email_asesor || ''\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "b2e1d4c3-handoff-respuesta",
+      "name": "respuesta"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "extraer_info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extraer_info": {
+      "main": [
+        [
+          {
+            "node": "Buscar_agent_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar_agent_id": {
+      "main": [
+        [
+          {
+            "node": "valores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "valores": {
+      "main": [
+        [
+          {
+            "node": "Hay_email_asesor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay_email_asesor": {
+      "main": [
+        [
+          {
+            "node": "Enviar_Email_Resend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar_Email_Resend": {
+      "main": [
+        [
+          {
+            "node": "DERIVAR_CONVERSACION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DERIVAR_CONVERSACION": {
+      "main": [
+        [
+          {
+            "node": "AVISAR_MENSAJE_INTERNO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AVISAR_MENSAJE_INTERNO": {
+      "main": [
+        [
+          {
+            "node": "respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "819693a0-807e-4fd9-a9de-b6633b45a9de",
+  "activeVersionId": "819693a0-807e-4fd9-a9de-b6633b45a9de",
+  "versionCounter": 388,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-04-27T04:06:47.367Z",
+      "createdAt": "2026-04-27T04:06:47.367Z",
+      "role": "workflow:owner",
+      "workflowId": "Xy0tpQWNwj5dVXSw",
+      "projectId": "kHDUN61HinE2WNyr",
+      "project": {
+        "updatedAt": "2026-01-10T15:03:38.251Z",
+        "createdAt": "2026-01-10T15:02:52.885Z",
+        "id": "kHDUN61HinE2WNyr",
+        "name": "Leo Osterrietch <osterrietchleonardo@vakdor.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "9b194ba8-440e-4a8a-b5ba-e6a5ba26f7b6"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-07-29T18:29:51.565Z",
+    "createdAt": "2026-07-29T18:29:51.565Z",
+    "versionId": "819693a0-807e-4fd9-a9de-b6633b45a9de",
+    "workflowId": "Xy0tpQWNwj5dVXSw",
+    "nodes": [
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "id": "c055762a-8fe7-4141-a639-df2372f30060",
+        "typeVersion": 1.1,
+        "name": "When Executed by Another Workflow",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "position": [
+          96,
+          352
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "for (const item of $input.all()) {\n  const v = item.json;\n  const text = v.query || \"\";\n\n  const extract = (pattern, fallback = \"\") => {\n    const match = text.match(pattern);\n    return match ? match[1].trim() : fallback;\n  };\n  // grab: valor de \"label:\" hasta ; , \". \" (punto+espacio), salto de línea o fin.\n  // (?<![\\w]) evita que \"credito\" matchee dentro de \"apto_credito\", \"nombre\" dentro de \"nombre_asesor\", etc.\n  const grab = (label) => {\n    const m = text.match(new RegExp(\"(?<![\\\\w])\" + label + \"\\\\s*:\\\\s*([^;\\\\n]*?)\\\\s*(?=;|\\\\.\\\\s|\\\\n|$)\", \"i\"));\n    return m ? m[1].trim().replace(/[.,;\\s]+$/, \"\").trim() : \"\";\n  };\n\n  // Identificadores\n  v.agency_id       = extract(/agency_id:([a-f0-9-]{36})/i, \"default_session\");\n  v.lead_id         = extract(/lead_id:(\\d+)/i);\n  v.conversation_id = extract(/conversation_id:([a-f0-9-]{36})/i);\n\n  // Propiedad y motivo (vienen como lenguaje natural, no como tag)\n  v.direccion = extract(/interesado en la propiedad\\s+(.+?)\\.\\s*El asesor/i)\n             || extract(/interesado en la propiedad\\s([^,]+?)(?:,|el asesor|$)/i);\n  v.motivo = extract(/porque\\s+(.+?)\\./i);\n\n  // Asesor (tags)\n  v.email_asesor   = grab(\"email_asesor\");\n  v.nombre_asesor  = grab(\"nombre_asesor\");\n  v.celular_asesor = grab(\"celular_asesor\");\n\n  // Lead (tags)\n  v.lead_nombre      = grab(\"nombre\");\n  v.lead_email       = grab(\"email\");\n  v.lead_tipo_op     = grab(\"tipo_operacion\");\n  v.lead_tipo_prop   = grab(\"tipo_propiedad\");\n  v.lead_zona        = grab(\"zona\");\n  v.lead_ambientes   = grab(\"ambientes_buscados\");\n  v.lead_presupuesto = grab(\"presupuesto\");\n  v.lead_criterios   = grab(\"criterios_innegociables\");\n  v.lead_etapa       = grab(\"etapa\");\n  v.lead_vender      = grab(\"necesita_vender_para_comprar\");\n  v.lead_credito     = grab(\"credito\");\n\n  // --- Filas de las tarjetas (solo aparecen si hay dato) ---\n  const row = (label, value) => value\n    ? `<tr><td style='padding:4px 0;font-size:13px;color:#888;width:40%;vertical-align:top;'>${label}</td><td style='padding:4px 0;font-size:14px;color:#131A2D;font-weight:600;'>${value}</td></tr>`\n    : \"\";\n\n  const propRows = [ row(\"Dirección\", v.direccion) ].join(\"\");\n\n  const leadRows = [\n    row(\"Motivo\", v.motivo ? v.motivo.charAt(0).toUpperCase() + v.motivo.slice(1) : \"\"),\n    row(\"Nombre\", v.lead_nombre),\n    row(\"Operación\", v.lead_tipo_op),\n    row(\"Tipo\", v.lead_tipo_prop),\n    row(\"Zona\", v.lead_zona),\n    row(\"Ambientes\", v.lead_ambientes),\n    row(\"Presupuesto\", v.lead_presupuesto),\n    row(\"Innegociable\", v.lead_criterios),\n    row(\"Necesita vender\", v.lead_vender),\n    row(\"Crédito\", v.lead_credito),\n    row(\"Etapa\", v.lead_etapa),\n    row(\"Contacto\", v.lead_id ? \"+\" + v.lead_id : \"\"),\n    row(\"Email\", v.lead_email)\n  ].join(\"\");\n\n  v.asunto = `Un cliente pide atención${v.direccion ? ' · ' + v.direccion : ''}`;\n\n  item.json.html_email = `<!DOCTYPE html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><style>body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background-color:#f4f7f9;color:#333;margin:0;padding:0;}.container{max-width:600px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);border:1px solid #e1e8ed;}.header{background-color:#131A2D;padding:28px;text-align:center;}.logo-text{color:#fff;font-size:24px;font-weight:bold;letter-spacing:2px;}.accent{color:#B57E3B;}.content{padding:36px 40px;}.badge{color:#fff;background:#C0392B;font-weight:bold;font-size:12px;text-transform:uppercase;letter-spacing:1px;display:inline-block;padding:5px 12px;border-radius:20px;margin-bottom:14px;}h1{color:#131A2D;font-size:22px;margin:0 0 18px;}p{font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;}.alert{background:#fdf3f2;border-left:4px solid #C0392B;border-radius:8px;padding:14px 18px;margin:0 0 20px;font-size:15px;color:#a93226;font-weight:600;}.card{border:1px solid #e1e8ed;border-left:4px solid #B57E3B;border-radius:10px;padding:16px 20px;margin:18px 0;background:#fafbfc;}.card-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#B57E3B;font-weight:bold;margin-bottom:8px;}table{width:100%;border-collapse:collapse;}.btn-wrap{text-align:center;margin-top:24px;}.button{display:inline-block;padding:14px 32px;background-color:#B57E3B;color:#fff !important;text-decoration:none;border-radius:8px;font-weight:bold;}.footer{padding:20px;text-align:center;font-size:12px;color:#888;background:#fafafa;}</style></head><body><div class='container'><div class='header'><div class='logo-text'>PRISMA <span class='accent'>IA</span></div></div><div class='content'><span class='badge'>Atención requerida</span><h1>Un cliente pidió hablar con una persona</h1><div class='alert'>Necesita ser atendido lo antes posible.</div><p>Hola${v.nombre_asesor ? ' ' + v.nombre_asesor : ''},</p><p>Un cliente que estaba conversando con el asistente pidió pasar a un humano. Puede que tenga una duda puntual, que el asistente no haya podido resolverla o que prefiera un trato personal. Tomá la conversación cuanto antes para no perder la oportunidad.</p><div class='card'><div class='card-title'>Propiedad consultada</div><table>${propRows}</table></div><div class='card'><div class='card-title'>Qué necesita el cliente</div><table>${leadRows}</table></div><div class='btn-wrap'><a href='https://prisma.vakdor.com' class='button'>Atender ahora</a></div></div><div class='footer'>Aviso automático de PRISMA IA · No respondas a este correo.<br>© 2026 PRISMA IA — Sistema Inteligente Real Estate.</div></div></body></html>`;\n\n  // Body completo y válido para Resend (JSON.stringify escapa todo el HTML)\n  item.json.resend_body = JSON.stringify({\n    from: \"PRISMA IA <no-reply@vakbot.vakdor.com>\",\n    to: v.email_asesor,\n    subject: v.asunto,\n    html: item.json.html_email\n  });\n}\n\nreturn $input.all();"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          320,
+          352
+        ],
+        "id": "ad2b8e6e-1a17-4290-98ac-08214a503852",
+        "name": "extraer_info",
+        "retryOnFail": true,
+        "alwaysOutputData": true,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "operation": "select",
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": {
+            "__rl": true,
+            "value": "profiles",
+            "mode": "list",
+            "cachedResultName": "profiles"
+          },
+          "limit": 1,
+          "where": {
+            "values": [
+              {
+                "column": "email",
+                "value": "={{ $('extraer_info')?.item?.json?.email_asesor ?? null }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          512,
+          352
+        ],
+        "id": "80e7335b-c2ba-4f77-9679-849b155341dc",
+        "name": "Buscar_agent_id",
+        "executeOnce": true,
+        "retryOnFail": true,
+        "credentials": {
+          "postgres": {
+            "id": "Vje6BCZn5QY9nNWy",
+            "name": "MEMORIA_PRISMA"
+          }
+        },
+        "onError": "continueRegularOutput",
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "3b819ea7-5dad-4d05-8f12-3ed039de0466",
+                "name": "query",
+                "value": "={{ $('extraer_info').item.json.query }}",
+                "type": "string"
+              },
+              {
+                "id": "8f8962d8-f0f1-45fa-9b2e-1ea5c5579b7f",
+                "name": "agency_id",
+                "value": "={{ $('extraer_info').item.json.agency_id }}",
+                "type": "string"
+              },
+              {
+                "id": "17f1e95d-3562-427a-92b0-903c725ba100",
+                "name": "lead_id",
+                "value": "={{ $('extraer_info').item.json.lead_id }}",
+                "type": "string"
+              },
+              {
+                "id": "79285232-53bb-434d-bf6d-54610bc46864",
+                "name": "=conversation_id",
+                "value": "={{ $('extraer_info').item.json.conversation_id }}",
+                "type": "string"
+              },
+              {
+                "id": "dbc7125f-5990-4db5-9669-387ca53f14f4",
+                "name": "=email_asesor",
+                "value": "={{ $('extraer_info')?.item?.json?.email_asesor ?? null }}",
+                "type": "string"
+              },
+              {
+                "id": "4471f12c-d21f-44b0-b8f8-91eaf8a44c30",
+                "name": "agent_id",
+                "value": "={{ $('Buscar_agent_id')?.item?.json?.id ?? null }}",
+                "type": "string"
+              },
+              {
+                "id": "1cc6e6c3-0683-4048-8923-56426c9774e3",
+                "name": "nombre_asesor",
+                "value": "={{ $('Buscar_agent_id')?.item?.json?.full_name ?? null }}",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          720,
+          352
+        ],
+        "id": "2f440b15-6bb4-40eb-b710-ce4e0836cc94",
+        "name": "valores",
+        "alwaysOutputData": true,
+        "retryOnFail": true,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "hay-email-asesor",
+                "leftValue": "={{ $('extraer_info').first().json.email_asesor }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          220,
+          0
+        ],
+        "id": "a1f0c3d2-handoff-if-email",
+        "name": "Hay_email_asesor"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.resend.com/emails",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer __RESEND_API_KEY_REMOVIDA_VER_TECNICO_9.2.2__"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ $('extraer_info').first().json.resend_body }}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          440,
+          0
+        ],
+        "id": "ac17dde9-cba1-4367-abe8-22c490fd3012",
+        "name": "Enviar_Email_Resend"
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": {
+            "__rl": true,
+            "value": "wa_conversations",
+            "mode": "list",
+            "cachedResultName": "wa_conversations"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "bot_active": "={{ false }}",
+              "contact_phone": "={{ $('valores').item.json.lead_id }}",
+              "agent_id": "={{ $('valores')?.item?.json?.agent_id ?? null }}"
+            },
+            "matchingColumns": [
+              "contact_phone"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "agency_id",
+                "displayName": "agency_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "instance_id",
+                "displayName": "instance_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "contact_phone",
+                "displayName": "contact_phone",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "contact_name",
+                "displayName": "contact_name",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "last_message_at",
+                "displayName": "last_message_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "last_inbound_at",
+                "displayName": "last_inbound_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "bot_active",
+                "displayName": "bot_active",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "status",
+                "displayName": "status",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "score",
+                "displayName": "score",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "etiquetas",
+                "displayName": "etiquetas",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "array",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "created_at",
+                "displayName": "created_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "unread_count",
+                "displayName": "unread_count",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "agent_id",
+                "displayName": "agent_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "pipeline_stage",
+                "displayName": "pipeline_stage",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "metricas",
+                "displayName": "metricas",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "object",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "funnel_status",
+                "displayName": "funnel_status",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "requires_follow_up",
+                "displayName": "requires_follow_up",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "next_follow_up_at",
+                "displayName": "next_follow_up_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "opt_out",
+                "displayName": "opt_out",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "follow_ups_sent",
+                "displayName": "follow_ups_sent",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "follow_ups_history",
+                "displayName": "follow_ups_history",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "object",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "recovery_stage",
+                "displayName": "recovery_stage",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "dropoff_reason",
+                "displayName": "dropoff_reason",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "visit_status",
+                "displayName": "visit_status",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "visit_scheduled_at",
+                "displayName": "visit_scheduled_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "visit_reminder_24h_sent",
+                "displayName": "visit_reminder_24h_sent",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "visit_reminder_3h_sent",
+                "displayName": "visit_reminder_3h_sent",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "visit_reminder_1h_sent",
+                "displayName": "visit_reminder_1h_sent",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          660,
+          0
+        ],
+        "id": "73695da3-b283-490f-aaa6-c309d24557f9",
+        "name": "DERIVAR_CONVERSACION",
+        "credentials": {
+          "postgres": {
+            "id": "Vje6BCZn5QY9nNWy",
+            "name": "MEMORIA_PRISMA"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": {
+            "__rl": true,
+            "value": "wa_messages",
+            "mode": "list",
+            "cachedResultName": "wa_messages"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "conversation_id": "={{ $('valores').item.json.conversation_id }}",
+              "agency_id": "={{ $('valores').item.json.agency_id }}",
+              "content": "⚠️ Handoff activado: El bot se ha desactivado.",
+              "role": "internal",
+              "message_type": "text"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "conversation_id",
+                "displayName": "conversation_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "agency_id",
+                "displayName": "agency_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "content",
+                "displayName": "content",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "role",
+                "displayName": "role",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "message_type",
+                "displayName": "message_type",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "wamid",
+                "displayName": "wamid",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "metadata",
+                "displayName": "metadata",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "object",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "created_at",
+                "displayName": "created_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          880,
+          0
+        ],
+        "id": "b9ed100b-031b-44f1-bc4b-cb6f0fcac76e",
+        "name": "AVISAR_MENSAJE_INTERNO",
+        "credentials": {
+          "postgres": {
+            "id": "Vje6BCZn5QY9nNWy",
+            "name": "MEMORIA_PRISMA"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "// Respuesta determinista hacia el Agente Principal.\n// Reemplaza al AI Agent: mismo contrato ({ respuesta }) + diagnostico.\nconst v = $('extraer_info').first().json;\n\nconst corrio = (nodo) => { try { const r = $(nodo).all(); return r.length > 0; } catch (e) { return false; } };\n\nlet email_enviado = false, resultado_aviso_email = '';\nif (!v.email_asesor) {\n  resultado_aviso_email = 'sin email_asesor';\n} else {\n  try {\n    const r = $('Enviar_Email_Resend').first().json;\n    email_enviado = !!(r && r.id);\n    resultado_aviso_email = email_enviado ? 'ok' : 'Resend no devolvio id';\n  } catch (e) { resultado_aviso_email = 'no se ejecuto el envio'; }\n}\n\nlet conversacion_derivada = false;\ntry {\n  const d = $('DERIVAR_CONVERSACION').all();\n  conversacion_derivada = d.length > 0 && !!d[0].json && Object.keys(d[0].json).length > 0;\n} catch (e) { }\n\nconst aviso_interno = corrio('AVISAR_MENSAJE_INTERNO');\nconst exito_total = conversacion_derivada && aviso_interno && email_enviado;\n\n// Lo unico que el Agente Principal usa para hablarle al cliente.\nlet respuesta;\nif (conversacion_derivada) {\n  respuesta = 'Derivacion exitosa. Informar al cliente que se estaran comunicando a la brevedad.';\n} else if (!v.email_asesor) {\n  respuesta = 'No se pudo derivar: la propiedad no tiene asesor asignado. No le prometas al cliente que lo van a contactar; ofrecele seguir ayudandolo vos.';\n} else {\n  respuesta = 'No se pudo completar la derivacion. No le prometas al cliente que lo van a contactar.';\n}\n\nreturn [{ json: {\n  respuesta,\n  exito_total,\n  resultado_derivacion: conversacion_derivada ? 'ok' : 'no se derivo la conversacion',\n  resultado_aviso_interno: aviso_interno ? 'ok' : 'no se registro el mensaje interno',\n  resultado_aviso_email,\n  asesor: v.email_asesor || ''\n} }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1100,
+          0
+        ],
+        "id": "b2e1d4c3-handoff-respuesta",
+        "name": "respuesta"
+      }
+    ],
+    "connections": {
+      "When Executed by Another Workflow": {
+        "main": [
+          [
+            {
+              "node": "extraer_info",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "extraer_info": {
+        "main": [
+          [
+            {
+              "node": "Buscar_agent_id",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Buscar_agent_id": {
+        "main": [
+          [
+            {
+              "node": "valores",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "valores": {
+        "main": [
+          [
+            {
+              "node": "Hay_email_asesor",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Hay_email_asesor": {
+        "main": [
+          [
+            {
+              "node": "Enviar_Email_Resend",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "respuesta",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Enviar_Email_Resend": {
+        "main": [
+          [
+            {
+              "node": "DERIVAR_CONVERSACION",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "DERIVAR_CONVERSACION": {
+        "main": [
+          [
+            {
+              "node": "AVISAR_MENSAJE_INTERNO",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AVISAR_MENSAJE_INTERNO": {
+        "main": [
+          [
+            {
+              "node": "respuesta",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Leo Osterrietch",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-07-29T18:29:51.656Z",
+        "id": 503,
+        "workflowId": "Xy0tpQWNwj5dVXSw",
+        "versionId": "819693a0-807e-4fd9-a9de-b6633b45a9de",
+        "event": "activated",
+        "userId": "9b194ba8-440e-4a8a-b5ba-e6a5ba26f7b6"
+      },
+      {
+        "createdAt": "2026-07-29T18:29:51.634Z",
+        "id": 502,
+        "workflowId": "Xy0tpQWNwj5dVXSw",
+        "versionId": "819693a0-807e-4fd9-a9de-b6633b45a9de",
+        "event": "deactivated",
+        "userId": "9b194ba8-440e-4a8a-b5ba-e6a5ba26f7b6"
+      }
+    ]
+  }
+}
