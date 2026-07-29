@@ -666,6 +666,21 @@ Body: {
 
 Versión anterior del endpoint de respuesta, usa `BOT_REPLY_SECRET` para auth. Envía solo via Evolution API.
 
+### 8.4 Reglas del handoff (derivación del bot a un humano)
+
+**Cuándo deriva:** el cliente pide hablar con una persona, está molesto, es un colega/inmobiliaria externa, quiere negociar precio, o consulta/cancela una visita ya coordinada.
+
+**Reglas de negocio:**
+1. **Nunca se apaga el bot sin haber avisado al asesor.** Primero sale el email; recién si salió se apaga el bot. Un cliente sin bot y sin asesor avisado es la peor combinación posible: nadie lo atiende y no queda rastro.
+2. **Sin asesor asignado no hay derivación.** Si la propiedad no tiene asesor (o el link no matcheó ninguna propiedad de la cartera), el bot **sigue atendiendo** y recibe la instrucción explícita de *no prometerle al cliente que lo van a contactar*. Antes prometía el contacto y no avisaba a nadie.
+3. **Toda derivación deja rastro** con un mensaje interno en la conversación. Ese rastro es lo que alimenta el panel de handoffs sin atender.
+4. **La derivación asigna la conversación** al asesor de la propiedad (`agent_id`), para que aparezca en su bandeja y en su dashboard.
+5. **Una derivación no atendida es una venta que se está perdiendo.** Se considera atendida solo cuando alguien de la inmobiliaria escribe en la conversación después del handoff; que el asesor haya recibido el email no alcanza.
+
+> Contexto: la auditoría del 29/07/2026 encontró 35 de 45 derivaciones sin ninguna respuesta del asesor dentro de PRISMA, 28 de ellas con más de 24 h, y clientes reclamando por WhatsApp que nadie los había contactado. De ahí salieron el panel y estas reglas.
+
+Detalle de implementación en TECNICO-PRISMA § 9.2.2 y § 9.2.3.
+
 ---
 
 ## 9. Motor de Automatización n8n
