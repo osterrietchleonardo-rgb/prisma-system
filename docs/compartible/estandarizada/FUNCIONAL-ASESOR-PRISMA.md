@@ -166,6 +166,30 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 
 **Filtros del historial:** además de buscar por cliente/propiedad y filtrar por tipo de actividad, tenés un **filtro de fechas** (mismo selector que el Dashboard). Elegí un preset (Hoy, Este Mes, Este Trimestre, Este Año, Últimos 30 días) o un rango a mano para ver solo la actividad de ese período; con **"Limpiar"** volvés a ver todo.
 
+### Dos formas de ver lo mismo: Lista y Pipeline
+
+Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos botones: **Lista** y **Pipeline**.
+
+- **Lista** es lo de siempre: el historial de actividades, una fila por cada cosa que cargaste.
+- **Pipeline** es un **tablero**: cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy. Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
+
+**Cómo leerlo:**
+- Cada tarjeta te muestra el nombre del cliente, su celular, la propiedad y cuántas actividades le cargaste.
+- Arriba de cada columna hay un **número**: cuántos clientes tenés en esa etapa. De un vistazo ves dónde se te está juntando el trabajo.
+- Las tarjetas están ordenadas **de la más reciente a la más antigua**, así lo último que tocaste queda siempre arriba. Si tenés muchas, **scrolleás dentro de la columna** y el tablero no se te va de la pantalla.
+- Si un cliente entró por Tokko y también te escribió por WhatsApp, **es una sola tarjeta**: el sistema los une por el celular.
+
+**Cómo mover un cliente de etapa:** arrastrá la tarjeta a la columna que quieras, o tocá los **tres puntitos** de la tarjeta y elegí **"Mover a…"** (esto último es lo más cómodo desde el celular). Ahí pasa una de dos cosas:
+
+- **Si es una etapa nueva para ese cliente** → se abre el formulario pidiéndote los datos de esa etapa (por ejemplo, al pasarlo a Reserva te pide el monto). Se guarda como una actividad más, igual que si la hubieras cargado a mano.
+- **Si es una etapa por la que ya pasó** (por ejemplo, lo volvés para atrás porque se enfrió) → **no te pide nada**, la tarjeta se mueve y listo.
+
+> ⚠️ **Importante:** mover una tarjeta **para atrás no borra ni inventa nada**. Tus números del Dashboard quedan exactamente igual. El tablero es para que ordenes tu cabeza, no para inflar ni bajar tus métricas.
+
+**Ver todo lo que pasó con un cliente:** tocá la tarjeta (en el nombre) y se abre un panel lateral con **toda su historia** en orden: cada actividad que cargaste y cada vez que lo moviste de etapa, con la fecha. Desde ahí también podés editar cualquier actividad.
+
+> ⚠️ **Ahora el cliente es obligatorio.** Para guardar cualquier actividad tenés que vincular un cliente (un lead de Tokko, un contacto de WhatsApp, o cargarlo a mano). Es lo que permite armar la tarjeta. Si tenés actividades viejas sin cliente, el tablero te lo avisa con un cartel amarillo: entrá a la vista Lista, editalas y vinculales el cliente para que aparezcan.
+
 > 💡 **Tip:** cargá tu actividad **todos los días**. Es la diferencia entre un dashboard que refleja tu esfuerzo real y uno que te subvalora.
 > 💡 La pestaña de "Configuración IA" de las escalas de puntaje la define el director; vos solo cargás actividad.
 

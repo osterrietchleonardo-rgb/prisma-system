@@ -10,7 +10,9 @@ import {
   Filter,
   Trash2,
   Edit2,
-  Users
+  Users,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -32,8 +34,10 @@ import { PerformanceLogDrawer } from "@/components/tracking/PerformanceLogDrawer
 import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getPerformanceLogs } from "@/lib/tracking/queries";
-import { AgencyPerformanceConfig, PerformanceLog } from "@/lib/tracking/types";
+import { getPerformanceLogs, getPipelineMoves } from "@/lib/tracking/queries";
+import { AgencyPerformanceConfig, PerformanceLog, PipelineMove } from "@/lib/tracking/types";
+import { PipelineBoard } from "@/components/tracking/pipeline/PipelineBoard";
+import type { PipelineCard } from "@/lib/tracking/pipeline";
 import { deletePerformanceLog } from "@/actions/tracking/deletePerformanceLog";
 import { toast } from "sonner";
 import {
@@ -56,7 +60,9 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [logToEdit, setLogToEdit] = useState<PerformanceLog | null>(null);
   const [agencyConfig, setAgencyConfig] = useState<AgencyPerformanceConfig | null>(null);
-  
+  const [viewMode, setViewMode] = useState<"lista" | "pipeline">("lista");
+  const [moves, setMoves] = useState<PipelineMove[]>([]);
+
   // Deletion states
   const [logToDelete, setLogToDelete] = useState<PerformanceLog | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -78,8 +84,9 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getPerformanceLogs();
+      const [data, movesData] = await Promise.all([getPerformanceLogs(), getPipelineMoves()]);
       setLogs(data);
+      setMoves(movesData);
     } catch (error) {
       console.error("Error fetching logs:", error);
     } finally {
@@ -172,6 +179,37 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
     return matchesFilter && matchesSearch && matchesStatus && matchesAdvisor && matchesDate;
   });
 
+  // El tablero recibe los logs filtrados SOLO por asesor: la etapa de cada
+  // tarjeta se calcula siempre con todo el historial del cliente. Si el rango
+  // de fechas recortara el historial, un cliente que cerró en mayo aparecería
+  // parado en prospección al filtrar julio.
+  const pipelineLogs = useMemo(
+    () => logs.filter((log) => advisorFilter === "all" || log.agent_id === advisorFilter),
+    [logs, advisorFilter]
+  );
+
+  // El filtro decide QUÉ TARJETAS ves, nunca en qué columna caen.
+  const cardFilter = useCallback(
+    (card: PipelineCard) => {
+      const matchesDate =
+        (!fromParam && !toParam) ||
+        card.activityDates.some((d) => {
+          const day = String(d).slice(0, 10);
+          return (!fromParam || day >= fromParam) && (!toParam || day <= toParam);
+        });
+
+      const term = search.toLowerCase();
+      const matchesSearch =
+        !search ||
+        card.clientName.toLowerCase().includes(term) ||
+        (card.clientPhone ?? "").includes(term) ||
+        (card.propertyLabel ?? "").toLowerCase().includes(term);
+
+      return matchesDate && matchesSearch;
+    },
+    [fromParam, toParam, search]
+  );
+
   return (
     <div id="tracking-performance-page" className="w-full p-4 md:p-8 flex flex-col gap-6 md:gap-8 pb-32">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -216,6 +254,7 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
           <Card className="bg-card/30 border-accent/10 backdrop-blur-md p-4">
             <div className="flex flex-col gap-4">
               {/* Row 1: Activity type tabs + Status tabs */}
+              {viewMode === "lista" && (
               <div className="flex flex-col lg:flex-row lg:items-center gap-2 overflow-x-auto">
                 <div className="tracking-tabs-list flex bg-muted/30 p-1 rounded-xl border border-white/5 shrink-0">
                     <button 
@@ -270,6 +309,7 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                   </div>
                 )}
               </div>
+              )}
 
               {/* Row 2: Advisor filter + Search */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -301,6 +341,24 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                   />
                 </div>
                 <div className="flex items-center gap-2 sm:ml-auto">
+                  <div className="flex bg-muted/30 p-1 rounded-xl border border-white/5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("lista")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${viewMode === "lista" ? "bg-accent text-white shadow-lg shadow-accent/20" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <List className="w-3.5 h-3.5" />
+                      Lista
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("pipeline")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${viewMode === "pipeline" ? "bg-accent text-white shadow-lg shadow-accent/20" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      Pipeline
+                    </button>
+                  </div>
                   <DatePeriodFilter />
                   {(fromParam || toParam) && (
                     <Button
@@ -322,9 +380,21 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                <Loader2 className="w-10 h-10 animate-spin text-accent/50" />
                <p className="font-medium tracking-wide">Analizando historial de performance...</p>
             </div>
+          ) : viewMode === "pipeline" ? (
+            <PipelineBoard
+              logs={pipelineLogs}
+              moves={moves}
+              isDirector={isDirector}
+              cardFilter={cardFilter}
+              onRefresh={fetchLogs}
+              onEditLog={(log) => {
+                setLogToEdit(log);
+                setIsDrawerOpen(true);
+              }}
+            />
           ) : (
-            <PerformanceHistoryList 
-              logs={filteredLogs} 
+            <PerformanceHistoryList
+              logs={filteredLogs}
               onRefresh={fetchLogs} 
               isDirector={isDirector}
               onEdit={(log) => {

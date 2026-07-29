@@ -173,6 +173,30 @@ Tenés **3 solapas**:
 2. **Objetivos:** dónde fijás las metas mensuales por asesor (ver detalle abajo).
 3. **Configuración IA:** ajustás las escalas (qué puntaje da cada acción: llamada, captación, prelisting, etc.). Esto define cómo se calculan los KPIs.
 
+### Dos formas de ver la actividad: Lista y Pipeline
+
+Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos botones: **Lista** y **Pipeline**.
+
+- **Lista** es lo de siempre: el historial de actividades del equipo, una fila por registro.
+- **Pipeline** es un **tablero**: cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy. Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
+
+**Cómo leerlo como director — es la foto del equipo:**
+- El número arriba de cada columna te dice **cuántos clientes hay en cada etapa**. Ahí ves el embudo real: si tenés 40 en Prospección y 2 en Reserva, sabés exactamente dónde se está trabando el equipo.
+- Cada tarjeta muestra, además del cliente y la propiedad, **el nombre del asesor** que la trabaja.
+- Con el **filtro por asesor** (el desplegable de la fila de abajo) ves el tablero de una sola persona: útil para una reunión de seguimiento uno a uno.
+- Las tarjetas van **de la más reciente a la más antigua**. Las que quedan abajo de todo en una columna son, literalmente, **los clientes que nadie tocó hace más tiempo**.
+- Si un cliente entró por Tokko y también por WhatsApp, es **una sola tarjeta** (se unen por el celular): no se te duplica el embudo.
+
+**Mover un cliente de etapa:** se arrastra la tarjeta, o se usa el menú de **tres puntitos → "Mover a…"**. Si la etapa destino es nueva para ese cliente, se abre el formulario y pide los datos de esa etapa (queda registrada como una actividad normal). Si es una etapa por la que ya pasó, se mueve sin pedir nada.
+
+> ⚠️ **Mover tarjetas no toca tus números.** Volver un cliente para atrás **no borra actividades ni cambia ningún KPI** del Dashboard. Queda registrado quién lo movió y cuándo, pero las métricas y el ranking se siguen calculando solo con la actividad realmente cargada. Es una herramienta de orden, no una forma de maquillar resultados.
+
+**Trazabilidad por cliente:** al tocar una tarjeta se abre un panel con **toda la historia de ese cliente** en orden: cada actividad cargada y cada movimiento de etapa, con fecha y con acceso a editar. Es la auditoría completa del caso.
+
+> ⚠️ **Ahora el cliente es obligatorio** al cargar cualquier actividad (para el equipo y para vos). Sin cliente vinculado no se puede armar la tarjeta. Las actividades viejas sin cliente se siguen viendo en la vista Lista y el tablero avisa cuántas son con un cartel amarillo; hay que editarlas y vincularles el cliente.
+
+> 💡 **Tip de gestión:** abrí el Pipeline filtrado por un asesor antes de cada reunión. En 5 segundos ves cuántos clientes tiene en cada etapa y cuáles están frenados hace semanas — mucho más rápido que leer el historial fila por fila.
+
 **Formulario de registro (igual que el asesor):** zona/barrio, propiedad de Tokko o de colaboración, vincular cliente (Tokko o WhatsApp), registro manual de lead nuevo y origen de consulta. El registro manual pide **nombre completo, celular, email y etiqueta**. El celular se carga eligiendo el **país** (lista con bandera) y escribiendo el número natural; el sistema lo normaliza al formato de WhatsApp (para AR agrega el "9" móvil aunque no se ponga el 15) y muestra el preview. Lleva **doble verificación** de nombre/celular/email (se reescriben sin copiar/pegar, con aviso ✅/❌) y una **casilla de certificación** obligatoria de que los datos son veraces. Como director, al cargar podés **elegir a qué asesor** corresponde.
 
 ### Solapa "Objetivos" (fijar metas mensuales)

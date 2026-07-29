@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { PerformanceLog } from "./types";
+import { PerformanceLog, PipelineMove } from "./types";
 
 export async function getPerformanceLogs(): Promise<PerformanceLog[]> {
   const supabase = createClient();
@@ -14,7 +14,7 @@ export async function getPerformanceLogs(): Promise<PerformanceLog[]> {
 
   let query = supabase
     .from("performance_logs")
-    .select("*, profiles(full_name, email), properties(id, title, address, tokko_id), leads(id, full_name), wa_contacts(id, name, phone)")
+    .select("*, profiles(full_name, email), properties(id, title, address, tokko_id), leads(id, full_name, phone), wa_contacts(id, name, phone)")
     .order("fecha_actividad", { ascending: false });
 
   if (profile?.role === "director") {
@@ -30,5 +30,26 @@ export async function getPerformanceLogs(): Promise<PerformanceLog[]> {
     return [];
   }
   return data as PerformanceLog[];
+}
+
+/**
+ * Movimientos manuales del tablero. La RLS ya filtra sola: el asesor ve los
+ * suyos y el director los de toda la agencia.
+ */
+export async function getPipelineMoves(): Promise<PipelineMove[]> {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const { data, error } = await supabase
+    .from("tracking_pipeline_moves")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching pipeline moves", error);
+    return [];
+  }
+  return (data ?? []) as PipelineMove[];
 }
 

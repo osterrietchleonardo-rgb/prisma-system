@@ -52,7 +52,7 @@
 
 ## Preparación (una sola vez, antes de la Task 1)
 
-- [ ] **Crear la rama desde `main` actualizado**
+- [x] **Crear la rama desde `main` actualizado**
 
 ```bash
 cd "C:/Users/LENOVO/Desktop/CODE/Antigravity - Apps/PRISMA-SYSTEM"
@@ -75,7 +75,7 @@ Guarda los movimientos manuales del tablero. Es append-only: nunca se actualiza 
 - Consumes: nada (primera task).
 - Produces: tabla `public.tracking_pipeline_moves` con columnas `id uuid`, `agency_id uuid`, `agent_id uuid`, `client_key text`, `lead_id uuid null`, `wa_contact_id uuid null`, `from_stage text null`, `to_stage text`, `created_at timestamptz`.
 
-- [ ] **Step 1: Escribir la migración**
+- [x] **Step 1: Escribir la migración**
 
 Crear `supabase/migrations/20260728120000_create_tracking_pipeline_moves.sql`:
 
@@ -145,7 +145,7 @@ WITH CHECK (
 );
 ```
 
-- [ ] **Step 2: Escribir el script que aplica la migración**
+- [x] **Step 2: Escribir el script que aplica la migración**
 
 Las migraciones del repo no se aplican solas. Crear `scratch/apply-pipeline-moves-migration.mjs`:
 
@@ -180,7 +180,7 @@ console.log(res.status, JSON.stringify(out));
 if (!res.ok) process.exit(1);
 ```
 
-- [ ] **Step 3: Aplicar la migración**
+- [x] **Step 3: Aplicar la migración**
 
 ```bash
 node scratch/apply-pipeline-moves-migration.mjs
@@ -188,7 +188,7 @@ node scratch/apply-pipeline-moves-migration.mjs
 
 Esperado: `200 []`. Si devuelve error, leerlo y corregir el SQL antes de seguir.
 
-- [ ] **Step 4: Verificar que la tabla existe con las columnas correctas**
+- [x] **Step 4: Verificar que la tabla existe con las columnas correctas**
 
 ```bash
 node -e "
@@ -201,7 +201,7 @@ fetch('https://api.supabase.com/v1/projects/'+g('SUPABASE_PROJECT_REF')+'/databa
 
 Esperado: las 9 columnas `id, agency_id, agent_id, client_key, lead_id, wa_contact_id, from_stage, to_stage, created_at`.
 
-- [ ] **Step 5: Verificar que la RLS quedó activa**
+- [x] **Step 5: Verificar que la RLS quedó activa**
 
 ```bash
 node -e "
@@ -214,7 +214,7 @@ fetch('https://api.supabase.com/v1/projects/'+g('SUPABASE_PROJECT_REF')+'/databa
 
 Esperado: `[{"relrowsecurity":true}]`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add supabase/migrations/20260728120000_create_tracking_pipeline_moves.sql
@@ -236,12 +236,11 @@ Todo el razonamiento (clave de cliente, agrupación, etapa actual) vive en un ar
 - Consumes: `PerformanceLog` y `ActivityType` de `lib/tracking/types.ts`; `normalizePhoneE164` de `lib/whatsapp/phone.ts`.
 - Produces:
   - `PIPELINE_STAGES: readonly PipelineStageDef[]` — las 6 etapas en orden lineal.
-  - `stageIndex(stage: ActivityType): number`
   - `clientKeyFromLog(log: PerformanceLog): string | null`
   - `buildPipeline(logs: PerformanceLog[], moves: PipelineMove[]): { cards: PipelineCard[]; sinCliente: number }`
   - Tipos `PipelineStageDef`, `PipelineCard`.
 
-- [ ] **Step 1: Agregar `phone` a `leads` y el tipo `PipelineMove` en `lib/tracking/types.ts`**
+- [x] **Step 1: Agregar `phone` a `leads` y el tipo `PipelineMove` en `lib/tracking/types.ts`**
 
 En `lib/tracking/types.ts:73-76`, reemplazar el bloque `leads`:
 
@@ -270,7 +269,7 @@ export interface PipelineMove {
 }
 ```
 
-- [ ] **Step 2: Escribir `lib/tracking/pipeline.ts`**
+- [x] **Step 2: Escribir `lib/tracking/pipeline.ts`**
 
 ```ts
 import {
@@ -310,10 +309,6 @@ export const PIPELINE_STAGES: readonly PipelineStageDef[] = [
   { id: "reserva", title: "Reserva", color: "bg-orange-500", icon: FileSignature },
   { id: "cierre", title: "Cierre", color: "bg-emerald-500", icon: Trophy },
 ] as const;
-
-export function stageIndex(stage: ActivityType): number {
-  return PIPELINE_STAGES.findIndex((s) => s.id === stage);
-}
 
 export interface PipelineCard {
   /** Celular normalizado, o "lead:<id>" / "wa:<id>" como respaldo. */
@@ -461,7 +456,7 @@ export function buildPipeline(
 }
 ```
 
-- [ ] **Step 3: Verificar que compila**
+- [x] **Step 3: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -469,7 +464,7 @@ npx tsc --noEmit
 
 Esperado: sin errores. Si `lucide-react` no exporta alguno de esos íconos, cambiarlo por uno que sí exista y seguir.
 
-- [ ] **Step 4: Escribir el script de comprobación contra datos reales**
+- [x] **Step 4: Escribir el script de comprobación contra datos reales**
 
 Crear `scratch/verify-pipeline-cards.mjs`. Reproduce la lógica de agrupación contra la base real y muestra el resultado, para confirmar que agrupa como esperamos antes de tocar la interfaz:
 
@@ -553,7 +548,7 @@ for (const [key, items] of porCliente) {
 }
 ```
 
-- [ ] **Step 5: Correr la comprobación**
+- [x] **Step 5: Correr la comprobación**
 
 ```bash
 node scratch/verify-pipeline-cards.mjs
@@ -561,7 +556,7 @@ node scratch/verify-pipeline-cards.mjs
 
 Esperado, con los datos actuales: `Sin cliente vinculado` debe dar **20**, y las tarjetas deben salir de los 7 registros restantes. **Confirmar a ojo que ningún cliente aparece dos veces en la lista.** Si aparece repetido, el problema está en la normalización del teléfono y hay que resolverlo antes de seguir.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add lib/tracking/pipeline.ts lib/tracking/types.ts scratch/verify-pipeline-cards.mjs
@@ -583,7 +578,7 @@ git commit -m "feat(tracking): logica de armado de tarjetas del pipeline por cli
   - `movePipelineCard(input: MovePipelineCardInput): Promise<{ success: boolean; error?: string }>` en `actions/tracking/movePipelineCard.ts`, con
     `MovePipelineCardInput = { clientKey: string; leadId: string | null; waContactId: string | null; fromStage: ActivityType | null; toStage: ActivityType }`
 
-- [ ] **Step 1: Ampliar el select de `leads` y agregar `getPipelineMoves`**
+- [x] **Step 1: Ampliar el select de `leads` y agregar `getPipelineMoves`**
 
 En `lib/tracking/queries.ts:17`, el select trae `leads(id, full_name)` **sin teléfono**, y sin él la agrupación por celular no funciona. Reemplazar esa línea por:
 
@@ -622,7 +617,7 @@ Y actualizar el import de la primera línea:
 import { PerformanceLog, PipelineMove } from "./types";
 ```
 
-- [ ] **Step 2: Escribir la server action**
+- [x] **Step 2: Escribir la server action**
 
 Crear `actions/tracking/movePipelineCard.ts`:
 
@@ -688,7 +683,7 @@ export async function movePipelineCard(
 }
 ```
 
-- [ ] **Step 3: Verificar que compila**
+- [x] **Step 3: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -696,7 +691,7 @@ npx tsc --noEmit
 
 Esperado: sin errores.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add lib/tracking/queries.ts actions/tracking/movePipelineCard.ts
@@ -716,9 +711,9 @@ Sin cliente no hay tarjeta. Este es el único cambio que altera la rutina actual
 - Consumes: nada nuevo.
 - Produces: `PerformanceLogForm` rechaza el envío si el usuario no eligió cliente.
 
-- [ ] **Step 1: Validar el cliente elegido en el submit**
+- [x] **Step 1: Validar el cliente elegido en el submit**
 
-En `components/tracking/PerformanceLogForm.tsx`, dentro de `onSubmit`, **antes** del bloque `if (clientType === "manual")` (línea 104), insertar:
+En `components/tracking/PerformanceLogForm.tsx`, dentro de `onSubmit`, insertar este bloque **inmediatamente después** de la línea `let finalValues = { ...values };` y **antes** de `// Si seleccionó nuevo contacto manual, lo creamos primero`:
 
 ```ts
       // Cliente obligatorio: sin cliente no se puede armar la tarjeta del
@@ -741,9 +736,19 @@ En `components/tracking/PerformanceLogForm.tsx`, dentro de `onSubmit`, **antes**
       }
 ```
 
-- [ ] **Step 2: Avisar cuando el alta manual no puede vincular**
+- [x] **Step 2: Avisar cuando el alta manual no puede vincular**
 
-El caso ya existe y **no se rompe**: `createManualContact` puede devolver `wa_contact_id` vacío si el número ya es de otro asesor, y el registro se guarda igual. Solo se agrega el aviso. Reemplazar las líneas 130-132 por:
+El caso ya existe y **no se rompe**: `createManualContact` puede devolver `wa_contact_id` vacío si el número ya es de otro asesor, y el registro se guarda igual. Solo se agrega el aviso.
+
+Buscar este bloque exacto (es la única aparición de `finalValues.wa_contact_id`):
+
+```ts
+        // Puede venir vacío si el lead es de otro asesor y no hay contacto que
+        // enlazar; el registro se guarda igual, solo sin el vínculo.
+        finalValues.wa_contact_id = result.wa_contact_id ?? null;
+```
+
+y reemplazarlo por:
 
 ```ts
         // Puede venir vacío si el lead es de otro asesor y no hay contacto que
@@ -755,21 +760,33 @@ El caso ya existe y **no se rompe**: `createManualContact` puede devolver `wa_co
         }
 ```
 
-- [ ] **Step 3: Sacar el "(Opcional)" del bloque de cliente**
+- [x] **Step 3: Sacar el "(Opcional)" del bloque de cliente**
 
-El encabezado de la línea 451 dice `Activos Vinculados (Opcional)` y ahora el cliente es obligatorio. Reemplazar esa línea por:
+El encabezado dice `Activos Vinculados (Opcional)` y ahora el cliente es obligatorio. Reemplazar esta línea exacta:
+
+```tsx
+             <h3 className="text-xs uppercase tracking-wider">Activos Vinculados (Opcional)</h3>
+```
+
+por:
 
 ```tsx
              <h3 className="text-xs uppercase tracking-wider">Propiedad (opcional) y Cliente</h3>
 ```
 
-Y en la línea 517, marcar el campo como obligatorio:
+Y marcar el campo como obligatorio. Reemplazar esta línea exacta:
+
+```tsx
+              <Label className="text-sm font-medium">Vincular Cliente</Label>
+```
+
+por:
 
 ```tsx
               <Label className="text-sm font-medium">Vincular Cliente *</Label>
 ```
 
-- [ ] **Step 4: Verificar que compila y que el lint pasa**
+- [x] **Step 4: Verificar que compila y que el lint pasa**
 
 ```bash
 npx tsc --noEmit && npm run lint
@@ -777,7 +794,7 @@ npx tsc --noEmit && npm run lint
 
 Esperado: sin errores.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add components/tracking/PerformanceLogForm.tsx
@@ -801,9 +818,9 @@ El popup del tablero tiene que ser **el mismo formulario**, no una copia. Se le 
   `defaults?: { propertyId: string | null; propiedadRef: string | null }`.
   Sin esas props se comporta exactamente como hoy.
 
-- [ ] **Step 1: Ampliar las props y los valores por defecto**
+- [x] **Step 1: Ampliar las props y los valores por defecto**
 
-Reemplazar la interfaz `Props` (líneas 24-28) por:
+Reemplazar el bloque `interface Props { … }` completo (el que hoy tiene solo `onSuccess`, `logToEdit` e `isDirector`) por:
 
 ```tsx
 interface Props {
@@ -823,7 +840,7 @@ interface Props {
 }
 ```
 
-Actualizar la firma (línea 30):
+Reemplazar la línea de la firma `export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }: Props) {` por:
 
 ```tsx
 export function PerformanceLogForm({
@@ -836,15 +853,15 @@ export function PerformanceLogForm({
 }: Props) {
 ```
 
-Y agregar el import de `ActivityType` en la línea 6:
+Y ampliar el import existente de `@/lib/tracking/types` para incluir `ActivityType`:
 
 ```tsx
 import { performanceLogSchema, PerformanceLogFormData, PerformanceLog, ActivityType } from "@/lib/tracking/types";
 ```
 
-- [ ] **Step 2: Aplicar los valores fijados en los defaults del formulario**
+- [x] **Step 2: Aplicar los valores fijados en los defaults del formulario**
 
-En el objeto de `defaultValues` para el caso "sin `logToEdit`" (líneas 43-53), reemplazarlo por:
+En `defaultValues`, reemplazar la **rama del ternario que corre cuando NO hay `logToEdit`** (la que empieza en `} : {` y hoy fija `type: "prospeccion"`) por:
 
 ```tsx
     } : {
@@ -860,9 +877,9 @@ En el objeto de `defaultValues` para el caso "sin `logToEdit`" (líneas 43-53), 
     },
 ```
 
-- [ ] **Step 3: Fijar el `clientType` cuando el cliente viene bloqueado**
+- [x] **Step 3: Fijar el `clientType` cuando el cliente viene bloqueado**
 
-Reemplazar el `useState` de `clientType` (línea 63) por:
+Reemplazar la declaración `const [clientType, setClientType] = useState<...>("ninguno");` por:
 
 ```tsx
   const [clientType, setClientType] = useState<"ninguno" | "tokko" | "whatsapp" | "manual">(
@@ -870,9 +887,9 @@ Reemplazar el `useState` de `clientType` (línea 63) por:
   );
 ```
 
-- [ ] **Step 4: Ocultar el selector de etapa cuando viene fijada**
+- [x] **Step 4: Ocultar el selector de etapa cuando viene fijada**
 
-Reemplazar la sección 1 completa (líneas 160-189) por:
+Reemplazar la sección entera que abre con el comentario `{/* SECCIÓN 1: Actividad a registrar */}` (desde su `<section className="space-y-4">` hasta el `</section>` que la cierra) por:
 
 ```tsx
       <section className="space-y-4">
@@ -915,9 +932,9 @@ Reemplazar la sección 1 completa (líneas 160-189) por:
       </section>
 ```
 
-- [ ] **Step 5: Ocultar el selector de cliente cuando viene bloqueado**
+- [x] **Step 5: Ocultar el selector de cliente cuando viene bloqueado**
 
-Reemplazar el `Select` de tipo de cliente y sus tres bloques condicionales (líneas 520-587) envolviéndolos: si `lockedClient` está presente, se muestra el cliente fijo; si no, se muestra todo como hoy.
+Dentro del recuadro "Vincular Cliente", envolver el `<Select value={clientType} …>` **y** los tres bloques condicionales que le siguen (`{clientType === "tokko" && …}`, `{clientType === "whatsapp" && …}`, `{clientType === "manual" && …}`): si `lockedClient` está presente se muestra el cliente fijo; si no, se muestra todo como hoy.
 
 ```tsx
             {lockedClient ? (
@@ -936,7 +953,7 @@ Reemplazar el `Select` de tipo de cliente y sus tres bloques condicionales (lín
 
 Al implementar, mover el bloque existente tal cual dentro del `<>...</>`, sin modificarlo.
 
-- [ ] **Step 6: Verificar que compila y que la vista actual sigue igual**
+- [x] **Step 6: Verificar que compila y que la vista actual sigue igual**
 
 ```bash
 npx tsc --noEmit && npm run lint && npm run build
@@ -944,7 +961,7 @@ npx tsc --noEmit && npm run lint && npm run build
 
 Esperado: build exitoso. Como ninguna prop nueva se está pasando todavía, el formulario debe comportarse **exactamente** como antes.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add components/tracking/PerformanceLogForm.tsx
@@ -967,7 +984,7 @@ git commit -m "feat(tracking): el formulario acepta etapa y cliente fijados para
 
 > Nota de nombres: el componente se llama `PipelineCardItem` (no `PipelineCard`) para no chocar con el **tipo** `PipelineCard` de `lib/tracking/pipeline.ts`.
 
-- [ ] **Step 1: Escribir la tarjeta**
+- [x] **Step 1: Escribir la tarjeta**
 
 Crear `components/tracking/pipeline/PipelineCard.tsx`:
 
@@ -1080,7 +1097,7 @@ export function PipelineCardItem({ card, onOpen, onMoveTo, showAgent }: Props) {
 }
 ```
 
-- [ ] **Step 2: Escribir la columna**
+- [x] **Step 2: Escribir la columna**
 
 Crear `components/tracking/pipeline/PipelineColumn.tsx`:
 
@@ -1148,7 +1165,7 @@ export function PipelineColumnView({ stage, cards, onOpenCard, onMoveCard, showA
 }
 ```
 
-- [ ] **Step 3: Verificar que compila**
+- [x] **Step 3: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -1156,7 +1173,7 @@ npx tsc --noEmit
 
 Esperado: sin errores. Si `@dnd-kit/utilities` no estuviera instalado, usar `transform` a mano (`translate3d`) en vez de `CSS.Transform.toString`; **no** instalar paquetes.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add components/tracking/pipeline/PipelineCard.tsx components/tracking/pipeline/PipelineColumn.tsx
@@ -1176,7 +1193,7 @@ Envuelve el `PerformanceLogForm` con la etapa destino y el cliente ya fijados.
 - Consumes: `PerformanceLogForm` con las props de la Task 5; `PIPELINE_STAGES`.
 - Produces: `PipelineStageDialog({ open, onOpenChange, card, targetStage, isDirector, onSaved })`.
 
-- [ ] **Step 1: Escribir el popup**
+- [x] **Step 1: Escribir el popup**
 
 Crear `components/tracking/pipeline/PipelineStageDialog.tsx`:
 
@@ -1243,7 +1260,7 @@ export function PipelineStageDialog({ open, onOpenChange, card, targetStage, isD
 }
 ```
 
-- [ ] **Step 2: Verificar que compila**
+- [x] **Step 2: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -1251,7 +1268,7 @@ npx tsc --noEmit
 
 Esperado: sin errores.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add components/tracking/pipeline/PipelineStageDialog.tsx
@@ -1269,7 +1286,7 @@ git commit -m "feat(tracking): popup para cargar la etapa al mover una tarjeta"
 - Consumes: `PipelineCard`, `PIPELINE_STAGES`, `PipelineMove`.
 - Produces: `PipelineClientSheet({ open, onOpenChange, card, moves, onEditLog })` con `onEditLog: (log: PerformanceLog) => void`.
 
-- [ ] **Step 1: Escribir el panel**
+- [x] **Step 1: Escribir el panel**
 
 Crear `components/tracking/pipeline/PipelineClientSheet.tsx`:
 
@@ -1380,7 +1397,7 @@ export function PipelineClientSheet({ open, onOpenChange, card, moves, onEditLog
 }
 ```
 
-- [ ] **Step 2: Verificar que compila**
+- [x] **Step 2: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -1388,7 +1405,7 @@ npx tsc --noEmit
 
 Esperado: sin errores.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add components/tracking/pipeline/PipelineClientSheet.tsx
@@ -1406,9 +1423,10 @@ Es el corazón: decide si mover pide datos o no.
 
 **Interfaces:**
 - Consumes: `buildPipeline`, `PIPELINE_STAGES` de `lib/tracking/pipeline.ts`; `movePipelineCard`; `PipelineColumnView`; `PipelineCardItem`; `PipelineStageDialog`; `PipelineClientSheet`.
-- Produces: `PipelineBoard({ logs, moves, isDirector, onRefresh, onEditLog })`.
+- Produces: `PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, onEditLog })`, donde
+  `cardFilter: (card: PipelineCard) => boolean` decide qué tarjetas se ven (nunca en qué columna caen).
 
-- [ ] **Step 1: Escribir el tablero**
+- [x] **Step 1: Escribir el tablero**
 
 Crear `components/tracking/pipeline/PipelineBoard.tsx`:
 
@@ -1585,7 +1603,7 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
 }
 ```
 
-- [ ] **Step 2: Verificar que compila**
+- [x] **Step 2: Verificar que compila**
 
 ```bash
 npx tsc --noEmit
@@ -1593,7 +1611,7 @@ npx tsc --noEmit
 
 Esperado: sin errores.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add components/tracking/pipeline/PipelineBoard.tsx
@@ -1611,7 +1629,7 @@ git commit -m "feat(tracking): tablero del pipeline con la regla de movimiento"
 - Consumes: `PipelineBoard`, `getPipelineMoves`.
 - Produces: la solapa *Actividad* con switch Lista | Pipeline.
 
-- [ ] **Step 1: Agregar imports y estado**
+- [x] **Step 1: Agregar imports y estado**
 
 En `components/tracking/TrackingPerformanceView.tsx`, agregar a los imports:
 
@@ -1623,18 +1641,18 @@ import { LayoutGrid, List } from "lucide-react";
 import type { PipelineCard } from "@/lib/tracking/pipeline";
 ```
 
-(y quitar el import viejo `import { getPerformanceLogs } from "@/lib/tracking/queries";` de la línea 35, que queda reemplazado).
+(y quitar el import viejo `import { getPerformanceLogs } from "@/lib/tracking/queries";`, que queda reemplazado por el nuevo).
 
-Junto a los estados existentes (después de la línea 58) agregar:
+Junto a los estados existentes, justo después de `const [agencyConfig, setAgencyConfig] = useState<AgencyPerformanceConfig | null>(null);`, agregar:
 
 ```tsx
   const [viewMode, setViewMode] = useState<"lista" | "pipeline">("lista");
   const [moves, setMoves] = useState<PipelineMove[]>([]);
 ```
 
-- [ ] **Step 2: Traer los movimientos junto con los logs**
+- [x] **Step 2: Traer los movimientos junto con los logs**
 
-Reemplazar `fetchLogs` (líneas 78-88) por:
+Reemplazar el `const fetchLogs = useCallback(...)` completo por:
 
 ```tsx
   const fetchLogs = useCallback(async () => {
@@ -1651,9 +1669,9 @@ Reemplazar `fetchLogs` (líneas 78-88) por:
   }, []);
 ```
 
-- [ ] **Step 3: Preparar los datos del tablero**
+- [x] **Step 3: Preparar los datos del tablero**
 
-Después de `filteredLogs` (línea 173), agregar:
+Justo después del cierre del `const filteredLogs = logs.filter(...)`, agregar:
 
 ```tsx
   // El tablero recibe los logs filtrados SOLO por asesor: la etapa de cada
@@ -1688,27 +1706,27 @@ Después de `filteredLogs` (línea 173), agregar:
   );
 ```
 
-- [ ] **Step 4: Ocultar en el tablero los filtros que no aplican**
+- [x] **Step 4: Ocultar en el tablero los filtros que no aplican**
 
 El filtro de tipo de actividad no puede aplicarse en el tablero (las columnas *son* los tipos: filtrar dejaría el tablero con una sola columna), y el de estado tampoco (la etapa siempre se calcula sobre las no eliminadas).
 
-Envolver la fila 1 de filtros (el `div` que abre en la línea 219 y sus dos bloques internos) en una condición. Reemplazar la apertura de la línea 219 por:
+Envolver la fila 1 de filtros en una condición. Es el `div` que sigue al comentario `{/* Row 1: Activity type tabs + Status tabs */}` y contiene los botones de tipo y el bloque `{isDirector && (...)}` de estado. Reemplazar su línea de apertura por:
 
 ```tsx
               {viewMode === "lista" && (
               <div className="flex flex-col lg:flex-row lg:items-center gap-2 overflow-x-auto">
 ```
 
-y cerrar ese `div` (línea 272) con:
+y cerrar ese mismo `div` (el que está justo antes del comentario `{/* Row 2: Advisor filter + Search */}`) con:
 
 ```tsx
               </div>
               )}
 ```
 
-- [ ] **Step 5: Agregar el switch Lista | Pipeline**
+- [x] **Step 5: Agregar el switch Lista | Pipeline**
 
-Dentro del bloque de la línea 303 (`<div className="flex items-center gap-2 sm:ml-auto">`), **antes** del `<DatePeriodFilter />`, insertar:
+Dentro del `<div className="flex items-center gap-2 sm:ml-auto">`, **antes** del `<DatePeriodFilter />`, insertar:
 
 ```tsx
                   <div className="flex bg-muted/30 p-1 rounded-xl border border-white/5 shrink-0">
@@ -1731,9 +1749,9 @@ Dentro del bloque de la línea 303 (`<div className="flex items-center gap-2 sm:
                   </div>
 ```
 
-- [ ] **Step 6: Renderizar el tablero o la lista**
+- [x] **Step 6: Renderizar el tablero o la lista**
 
-Reemplazar el bloque de render de resultados (líneas 320-339, el `isLoading ? ... : <PerformanceHistoryList ... />`) por:
+Reemplazar el bloque de render de resultados (el ternario `{isLoading ? (...) : (<PerformanceHistoryList ... />)}` que está dentro de `<TabsContent value="actividad">`, después del `</Card>`) por:
 
 ```tsx
           {isLoading ? (
@@ -1770,7 +1788,7 @@ Reemplazar el bloque de render de resultados (líneas 320-339, el `isLoading ? .
           )}
 ```
 
-- [ ] **Step 7: Verificar que compila, lint y build**
+- [x] **Step 7: Verificar que compila, lint y build**
 
 ```bash
 npx tsc --noEmit && npm run lint && npm run build
@@ -1778,7 +1796,7 @@ npx tsc --noEmit && npm run lint && npm run build
 
 Esperado: build exitoso.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add components/tracking/TrackingPerformanceView.tsx
@@ -1799,7 +1817,7 @@ git commit -m "feat(tracking): switch Lista/Pipeline en la solapa Actividad"
 - Consumes: todo lo anterior.
 - Produces: la funcionalidad verificada a mano y documentada.
 
-- [ ] **Step 1: Levantar la app**
+- [x] **Step 1: Levantar la app**
 
 ```bash
 npm run dev
@@ -1807,7 +1825,9 @@ npm run dev
 
 Pasarle a Leonardo el link `http://localhost:3000/asesor/tracking-performance` (y el de `/director/...`). **No pedirle que la levante él.**
 
-- [ ] **Step 2: Recorrer los 10 casos de prueba del spec**
+- [x] **Step 2: Recorrer los 10 casos de prueba del spec**
+
+> **Qué se probó realmente (2026-07-29):** Leonardo revisó el tablero en local y confirmó el **caso 2** (al pasar a una etapa nueva, el popup pide la información) y el aspecto general de la vista. Los otros 9 casos **no se recorrieron uno por uno**: dio el OK por confianza para mergear. Quedan como pendiente de verificación en uso real — el más importante de confirmar es el **caso 3** (mover hacia atrás y comprobar que los KPIs del Dashboard no cambian). La prueba de esa sesión sí destapó dos problemas reales, ya corregidos: el tablero se iba de pantalla al acumular tarjetas y las tarjetas no tenían orden explícito (ver "Ajuste posterior" al final).
 
 Del spec, sección 6. Marcar cada uno:
 
@@ -1824,21 +1844,21 @@ Del spec, sección 6. Marcar cada uno:
 
 Además, confirmar que **nada se rompió**: la vista Lista, sus filtros, *Nueva Actividad*, editar y eliminar con motivo, y las solapas *Objetivos* y *Configuración IA* siguen funcionando igual.
 
-- [ ] **Step 3: Actualizar los 4 documentos**
+- [x] **Step 3: Actualizar los 4 documentos**
 
 - `docs/interno/LOGICA-PRISMA.md` → en la sección de Tracking Performance (cerca de la línea 2038), agregar la vista Pipeline: la regla de movimiento, la agrupación por celular, y por qué mover hacia atrás no crea actividad.
 - `docs/interno/TECNICO-PRISMA.md` → en la lista de tablas (cerca de la línea 140), agregar `tracking_pipeline_moves` con su propósito y su RLS.
 - `docs/compartible/estandarizada/FUNCIONAL-ASESOR-PRISMA.md` → cómo usar el tablero, en lenguaje simple y sin tecnicismos: arrastrar o usar "Mover a…", cuándo pide datos y cuándo no, y por qué ahora hay que vincular siempre un cliente.
 - `docs/compartible/estandarizada/FUNCIONAL-DIRECTOR-PRISMA.md` → lo mismo, más el filtro por asesor y la lectura del tablero como foto del equipo.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/
 git commit -m "docs(tracking): documentar la vista Pipeline en los 4 documentos"
 ```
 
-- [ ] **Step 5: Merge solo con OK de Leonardo**
+- [x] **Step 5: Merge solo con OK de Leonardo**
 
 No mergear a `main` sin su OK explícito.
 
@@ -1869,4 +1889,15 @@ Sin huecos.
 
 **Consistencia de nombres verificada:** `buildPipeline` devuelve `{ cards, sinCliente }` y así se consume en la Task 9. `PipelineCardItem` es el componente y `PipelineCard` el tipo (aclarado en la Task 6). `stagesConActividad` se define en la Task 2 y se usa en la Task 9. `movePipelineCard` devuelve `{ success, error }` en la Task 3 y así se lee en la Task 9. `getPipelineMoves` se define en la Task 3 y se importa en la Task 10.
 
-**Nota:** `stageIndex()` se exporta en la Task 2 pero no se consume en ninguna task. Se deja porque `PIPELINE_STAGES` ya define el orden y `stageIndex` es la forma legible de preguntarlo si más adelante se quiere distinguir avanzar de retroceder en la interfaz; si al implementar molesta al linter, borrarla.
+**Escaneo previo (2026-07-28, antes de ejecutar):** se corrigieron tres cosas en este plan.
+
+1. Se eliminó `stageIndex()`: no lo consumía ninguna task. La regla de movimiento no compara posiciones (pregunta si la etapa destino ya tiene actividad), así que el orden de `PIPELINE_STAGES` solo se usa para ordenar las columnas. Código muerto, fuera por YAGNI.
+2. El bloque *Interfaces* de la Task 9 no listaba `cardFilter`, que sí está en las props del componente. Corregido.
+3. Las Tasks 4 y 5 modifican el mismo archivo (`PerformanceLogForm.tsx`) y la 4 inserta líneas antes de los puntos que la 5 referencia: los números de línea se corrían. Se reemplazaron por anclas de texto exactas.
+
+**Ajuste posterior a la primera prueba de Leonardo (2026-07-29):** el tablero se comportaba mal cuando se acumulan tarjetas. Dos correcciones fuera del plan original:
+
+1. **El tablero se iba de pantalla.** Las columnas tenían `overflow-y-auto` pero sin alto definido, así que crecían hacia abajo y el que scrolleaba era la página: los encabezados de las etapas desaparecían. Ahora el contenedor tiene alto fijo (`h-[calc(100vh-22rem)] min-h-[26rem]`) y el scroll pasa dentro de cada columna, con su encabezado siempre visible.
+2. **Las tarjetas no tenían orden explícito.** Se agregó `lastEventAt` a `PipelineCard` (el `created_at` más nuevo entre sus actividades y sus movimientos) y `buildPipeline` ordena por ese campo de la más actual a la más antigua. Es el mismo criterio con el que se decide la columna, así el orden y la etapa nunca se contradicen.
+
+**Sobre los tests:** este plan no agrega tests automatizados porque el repo no tiene framework (ver Global Constraints). Es una decisión explícita y consentida, no un descuido. Los revisores reciben esa restricción textual: la verificación de este plan es typecheck + lint + build + comprobación contra datos reales + prueba manual.

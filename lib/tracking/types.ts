@@ -73,6 +73,7 @@ export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
   leads?: {
     id: string;
     full_name: string;
+    phone: string | null;
   } | null;
   wa_contacts?: {
     id: string;
@@ -113,5 +114,18 @@ export interface AgencyPerformanceConfig {
     rotacion: PerformanceMetric;
   };
   custom_instructions?: string;
+}
+
+/** Fila de public.tracking_pipeline_moves: un movimiento manual del tablero. */
+export interface PipelineMove {
+  id: string;
+  agency_id: string;
+  agent_id: string;
+  client_key: string;
+  lead_id: string | null;
+  wa_contact_id: string | null;
+  from_stage: ActivityType | null;
+  to_stage: ActivityType;
+  created_at: string;
 }
 
