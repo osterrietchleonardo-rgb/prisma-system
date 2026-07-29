@@ -371,6 +371,8 @@ Cuando hacés una búsqueda en el **Buscador IA** y abrís el detalle de una pro
 
 Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tarjeta de contacto** (tu nombre, tu WhatsApp y tu email) con los **colores y el logo de tu inmobiliaria**. El cliente la abre sin tener que registrarse en nada.
 
+**Sobre la descripción:** en las propiedades de la **red de colaboración** (las que no son de tu cartera), la descripción de la ficha se muestra **resumida y ordenada** por secciones (Superficie · Interior · Ubicación · Edificio), con lo importante del aviso y **sin la letra chica** (matrículas, textos legales ni los datos de contacto de la inmobiliaria que publicó). Antes se cortaba a la mitad de una frase; ahora siempre termina completa.
+
 > 💡 **Tip:** es ideal para mandar por WhatsApp — al pegar el link aparece una vista previa con la foto y el título.
 > 🔒 El cliente **no** ve de qué portal salió la propiedad (eso es info interna tuya). Tampoco puede entrar al sistema desde ahí: es solo una vitrina de presentación.
 > 🎨 Los colores y el logo salen de lo que el director cargó en **Marketing IA → Configuración IA**. Si todavía no lo configuró, la ficha usa un diseño elegante por defecto.
