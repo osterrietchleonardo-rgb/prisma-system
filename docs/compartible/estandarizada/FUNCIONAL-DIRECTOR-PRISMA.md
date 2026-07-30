@@ -470,7 +470,7 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 
 **Qué trae la ficha:**
 - **Portada** con la propiedad de referencia y la fecha.
-- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes) y todas las fotos + características.
+- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes), una **descripción breve** de la propiedad (resumida en pocas líneas, sin la letra chica ni los datos de contacto de quien publicó el aviso) y todas las fotos + características.
 - **Hoja final** con la **matriz comparativa de valores por m²** (con **promedios de superficie, precio y $/m²**), el gráfico **"La Pirámide del Precio"** (por qué un precio alto apaga la demanda), las **conclusiones** revisadas y los **datos de contacto** de quien la generó.
 - En la tarjeta de contacto, sobre el nombre: si la ficha la hizo el **director** dice "Director/a"; si la hizo un **asesor**, aparece **la clasificación que le pusiste** (Client Director / Client Support, o "Asesor/a" si no le asignaste ninguna, desde la pestaña **Asesores**).
 - El **logo** y el **aviso legal** en el pie de cada hoja (si están cargados). El logo se **recorta y agranda solo** para que se vea grande y nítido, cualquiera sea el archivo que subas.
