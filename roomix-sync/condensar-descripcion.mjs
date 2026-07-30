@@ -35,7 +35,8 @@ const RUIDO = [
   /ley\s*(n[°º]?\.?\s*)?\d|ley nacional|en cumplimiento de la ley|decreto\s*\d/i,
   /intermediaci[óo]n y la conclusi[óo]n|ser[áa]n llevadas exclusivamente|profesional responsable/i,
   /no constituye (una )?oferta|car[áa]cter informativo|sin previo aviso|sujet[oa]s? a (cambios|modificaci)/i,
-  /medidas (son )?aproximadas|fotos? (son )?ilustrativas?|im[áa]genes ilustrativas|a t[íi]tulo orientativo/i,
+  /medidas (son )?aproximadas|medidas declaradas|medidas estimativas|fotos? (son )?ilustrativas?|im[áa]genes ilustrativas|a t[íi]tulo orientativo/i,
+  /d[óo]lares billete|montos? en d[óo]lares|tipo de cambio/i,
   /no es accesible para personas con movilidad reducida/i,
   /toda la informaci[óo]n deber[áa] ser verificada|documentaci[óo]n respaldatoria|registral|surgir[áa]n de la documentaci[óo]n/i,
   /disclaimer|aviso de responsabilidad|art[íi]culo\s*\d|\bart\.\s*\d/i,
@@ -150,6 +151,11 @@ export function condensarDescripcion(raw, max = MAX_DESCRIPCION) {
     if (linea.length > 200) unidades.push(...oraciones(linea));
     else unidades.push(linea);
   }
+
+  // Si el texto de ENTRADA ya venía cortado (las fichas viejas guardaron los 500 chars mochos de
+  // Roomix), su último pedazo es un fragmento a mitad de palabra ("...UNA HABITACION CON P").
+  // Se descarta: mejor una idea menos que una frase colgada.
+  if (unidades.length > 1 && texto.length >= 495 && !/[.!?:)\]]$/.test(texto)) unidades.pop();
 
   // ── 2. Agrupar por sección, salteando ruido y secciones descartadas ──
   let titular = '';
