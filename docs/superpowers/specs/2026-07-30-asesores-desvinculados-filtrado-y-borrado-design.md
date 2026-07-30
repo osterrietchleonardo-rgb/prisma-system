@@ -98,11 +98,24 @@ Las 10 superficies del director que listan asesores sin mirar `estado`:
 | Filtro de asesor en Tracking Performance | `actions/tracking/getTrackingOptions.ts:91` | |
 | Filtro en Pipeline + asignar asesor en Leads | `lib/queries/director.ts:188` | tampoco filtra `role`: **mete directores** |
 | Filtro de asesor en Calendario | `app/director/calendario/page.tsx:159` | |
-| Asignar visita nueva | `components/calendar/NewVisitDialog.tsx:123` | |
+| Asignar visita nueva | `components/calendar/NewVisitDialog.tsx:611` | ver §3.8: se filtra el desplegable, **no** la consulta |
 | Créditos IA por miembro | `components/ai-credits-dashboard.tsx:150` | |
-| Conteo de asesores para repartir créditos | `app/api/asesor/creditos/route.ts:48` | |
 
-La única que **sí** filtra bien es `app/director/asesores/page.tsx:342`, la página de gestión, que tiene su propio selector activo/pausado/eliminado.
+Las que **sí** filtran bien y no se tocan:
+- `app/director/asesores/page.tsx:342` — la página de gestión, con su selector activo/pausado/eliminado.
+- `app/api/asesor/creditos/route.ts:52` — ya tiene `.eq("estado", "activo")`, que además de los eliminados excluye a los pausados. Correcto para repartir créditos.
+
+### 3.8 En `NewVisitDialog` la lista de perfiles sirve para tres cosas
+
+`allAgencyProfiles` (`NewVisitDialog.tsx:122`) se usa en:
+
+| Línea | Uso | ¿Filtrar? |
+|---|---|---|
+| 148 | emparejar el asesor de Tokko de una propiedad, por email | **No** |
+| 164 | resolver el perfil del asesor activo por id | **No** |
+| 611 | el desplegable "Asesor Responsable" | **Sí** |
+
+Filtrar la consulta rompería el emparejamiento: una propiedad cuyo agente de Tokko es un ex-asesor perdería el nombre y mostraría la advertencia "No se encontró un perfil en PRISMA". **Se filtra sólo en el render del desplegable.**
 
 ### 3.5 Los totales de la agencia no dependen de la lista de asesores
 
@@ -145,7 +158,9 @@ Se agrega `.neq("estado", "eliminado")` a las consultas de §3.4, con dos salved
 
 **`getAgencyAgents` además filtra por rol.** Hoy devuelve directores mezclados con asesores en un desplegable rotulado "asesor" (§3.4). Se agrega `.eq("role", "asesor")` junto con el filtro de estado.
 
-**El filtro de Tracking se cruza contra la lista vigente.** `TrackingPerformanceView` sigue derivando los asesores de los registros, pero descarta los que no estén en `agents` de `getTrackingOptions` (§3.7).
+**El filtro de Tracking se cruza contra la lista vigente.** `TrackingPerformanceView` sigue derivando los asesores de los registros (§3.7), pero descarta los que no estén vigentes. La lista vigente la trae el propio componente con el cliente de Supabase que ya usa en `fetchAgencyConfig` — no se llama a `getTrackingOptions`, que además trae propiedades, leads y contactos que acá no hacen falta.
+
+**En `NewVisitDialog` se filtra el render, no la consulta** (§3.8): la consulta sigue devolviendo todos los perfiles para los emparejamientos, y el desplegable de la línea 611 filtra por `estado !== 'eliminado'` y `role === 'asesor'`.
 
 ### 5.2 Parte B — Borrado definitivo
 
