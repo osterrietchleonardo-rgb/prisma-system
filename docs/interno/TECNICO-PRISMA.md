@@ -375,6 +375,44 @@ Cuando el asesor/director pausa el bot (`bot_active=false`), la bandeja (`compon
 - **`sendDirectMedia(conv_id, media_url, media_type, file_name, mimetype?, caption?)`** — **archivos adjuntos**. Mismo patrón (ventana 24 h + memoria n8n) pero usa Evolution `sendMedia` (mediatype/mimetype/media/fileName/caption), igual que `/api/n8n/reply`. La UI sube el archivo a Storage bucket `documents` (prefijo `wa-outbound/{agency}/{conv}/`), saca la URL pública y la manda; el archivo queda **en espera con vista previa** (Cambiar/Quitar) y se envía al tocar Enviar, con el texto como `caption`. Límites por tipo (imagen 5 MB, video/audio 16 MB, documento 100 MB). La burbuja `role:'human'` renderiza media además de texto.
 - **Fix "envío fantasma":** Evolution puede responder **HTTP 201 con un error de Meta en el body** (ej. token vencido → `{message:"Authentication Error", code:190}`). Antes `sendDirectMessage` solo miraba `response.ok` y daba el mensaje por enviado sin que llegara. Helper `evolutionSendError(res, data)` detecta ese caso (y `{error}` estilo Graph) y devuelve error real; `evolutionWamid(data)` guarda el wamid. Aplicado a ambas actions.
 
+### 9.2.2 Handoff a humano — flujo determinista (n8n `Gestion_Handoff`, id `Xy0tpQWNwj5dVXSw`)
+Cuando el bot decide derivar (cliente molesto, pide un humano, colega externo, consulta que no puede resolver), el agente principal llama a la tool `Gestion_Handoff`. **Desde el 29/07/2026 el sub-workflow es determinista**: antes las tres acciones críticas eran herramientas de un LLM interno que decidía si llamarlas.
+
+Ruta actual (nodos de flujo, sin AI Agent):
+```
+trigger → extraer_info → Buscar_agent_id → valores → Hay_email_asesor
+   ├─ hay email → Enviar_Email_Resend → DERIVAR_CONVERSACION → AVISAR_MENSAJE_INTERNO → respuesta
+   └─ sin email → respuesta   (NO apaga el bot)
+```
+- **El email va ANTES de apagar el bot.** Si Resend falla, la ejecución corta ahí y `bot_active` queda en `true`: el cliente sigue atendido en vez de quedar mudo esperando a un asesor que nunca fue avisado.
+- **`DERIVAR_CONVERSACION`** (`wa_conversations`): `bot_active=false` + `agent_id`, matcheando por **`contact_phone` + `agency_id`**. El `agency_id` se agregó al matcheo el 29/07/2026: antes matcheaba solo por teléfono y un mismo número presente en dos agencias apagaba el bot en **las dos** (verificado en vivo con el teléfono duplicado real `5492213089334`).
+- **`AVISAR_MENSAJE_INTERNO`** (`wa_messages`): inserta `role='internal'` con el texto **`⚠️ Handoff activado: El bot se ha desactivado.`**. Ese texto es el marcador que consume el panel de handoffs sin atender (§ 9.2.3) — **si se cambia, el panel deja de detectar derivaciones**.
+- **`respuesta`** (Code): devuelve `{respuesta, exito_total, resultado_derivacion, resultado_aviso_interno, resultado_aviso_email, asesor}`. `respuesta` es lo único que lee el agente principal. Sin asesor asignado devuelve *"No se pudo derivar… No le prometas al cliente que lo van a contactar"*, para que el bot no prometa un contacto que nadie va a hacer.
+- **`Buscar_agent_id` tiene `alwaysOutputData: true`.** Sin eso, un email de asesor que no existe en `profiles` devolvía 0 filas y **cortaba la ejecución en silencio** (causa real de derivaciones que nunca avisaron a nadie).
+- **`extraer_info`** parsea el texto del agente con `grab(label)`. El capturador es `([^;\n]*?)`: no puede cruzar un `;`, así que un campo vacío da `""` y no la basura `"; nombre_asesor:"` que antes hacía creer que había email.
+
+#### El parser `grab()` (mismo código en `Gestion_Handoff` y `Avisar_Asesor`)
+Los dos sub-workflows reciben del agente un texto con pares `etiqueta:valor` separados por `;` y lo parsean con la misma función:
+```js
+new RegExp("(?<![\\w])" + label + "\\s*:\\s*([^;\\n]*?)\\s*(?=;|\\.\\s|\\n|$)", "i")
+```
+El capturador **`([^;\n]*?)` no puede cruzar un `;` y puede quedar vacío**. Antes era `(.+?)`, que exigía al menos un carácter y por lo tanto se comía la etiqueta siguiente: un campo vacío devolvía `"; nombre_asesor:"` en lugar de `""`. Arreglado en los dos flujos el 29/07/2026; validado corriendo el código viejo y el nuevo sobre **60 payloads reales**: 1813 valores idénticos y 127 campos que pasaron de basura a vacío, sin ningún valor real alterado.
+
+Qué ensuciaba en los mails al asesor: `apto_credito` mostraba la URL de la ficha (24 casos), `presupuesto` mostraba los criterios innegociables (29), `zona` mostraba los ambientes (18). Ahora esas filas simplemente no aparecen, o muestran `"no registrado"`.
+
+> ⚠️ **Pendiente conocido — `Avisar_Asesor` sin asesor:** si `email_asesor` viene vacío, `Buscar_agent_id` no encuentra perfil, devuelve 0 filas y **corta la ejecución en silencio** (la tool devuelve error al agente y no se avisa a nadie). Es el comportamiento de siempre, no lo cambió el arreglo del parser. **No se le puede poner `alwaysOutputData` sin más**, como sí se hizo en `Gestion_Handoff`: acá `DERIVAR_CONVERSACION` matchea por `id` de conversación y escribe `agent_id`, así que con un item vacío **pondría `agent_id = null` y desasignaría** una conversación que ya tenía asesor. Para arreglarlo hace falta mover el `Hay_email_asesor` ANTES de `Buscar_agent_id`.
+
+> ⚠️ La API key de Resend está **hardcodeada** en el nodo HTTP de `Gestion_Handoff` y `Avisar_Asesor`, no como credencial de n8n.
+
+### 9.2.3 Panel "Handoffs sin atender" (dashboards de director y asesor)
+- **Query:** `lib/queries/handoffs.ts` → `getHandoffsDashboardData(agencyId, agentId?, from?, to?)`.
+- **Marcador:** el mensaje interno de § 9.2.2. **`bot_active=false` NO sirve** para detectar handoffs: 1335 de 1370 conversaciones con el bot apagado se apagaron a mano desde la app.
+- **"Atendido"** = existe, después del handoff, un mensaje `role='human'` o `role='internal'` que no sea la propia marca (algunos mensajes de asesor quedan como `internal`).
+- Si una conversación se derivó varias veces, vale **la marca más reciente**.
+- **Alcance:** lo resuelve RLS (`wa_conversations_access_policy`): director ve toda la agencia, asesor solo donde `agent_id = auth.uid()`. El dashboard del asesor además pasa `agentId = user.id`.
+- **Filtros:** respeta los del dashboard (`agentId` + `from`/`to` en director, `from`/`to` en asesor). `DatePeriodFilter` manda `yyyy-MM-dd`, así que `to` se extiende a `T23:59:59.999Z` para no ocultar los handoffs del día en curso.
+- **Severidad:** `reciente` <2 h · `demorado` 2–24 h · `critico` ≥24 h. Componente: `components/dashboard/HandoffsPanel.tsx`.
+
 ### 9.3 Templates de seguimiento (`POST /api/whatsapp/dispatch`)
 Auth por `DISPATCH_SECRET`. Prefijo por agencia `ag{agency_id[0:6]}_`. 8 templates: `seg_f1_seguimiento`, `seg_f2_valor`, `seg_f3_breakup`, `visita_recordatorio_24h/3h/1h`, `visita_post_noshow`, `reactivacion_snoozed`. Persiste en `wa_messages` + `n8n_chat_histories` + registra en `follow_ups_history` (con snapshot del estado). Broadcast Realtime.
 

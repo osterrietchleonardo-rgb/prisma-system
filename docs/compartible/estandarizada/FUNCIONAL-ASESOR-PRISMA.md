@@ -70,6 +70,7 @@
 **Qué muestra:**
 - **Filtro de fechas (arriba a la derecha):** elegí el **período** que querés ver. Tenés atajos rápidos (**Hoy, Este Mes, Este Trimestre, Este Año, Últimos 30 días**) o podés marcar un **rango a mano** en el calendario. Para una **fecha puntual**, tocá el mismo día dos veces. Tus tarjetas y el ranking se recalculan según lo que elijas; con **"Limpiar"** volvés a ver todo.
 - **Tarjetas (KPIs):** tus leads, captaciones, reservas y cierres, con la variación respecto al período anterior.
+- **Handoffs sin atender:** los clientes que el bot te derivó y **todavía no respondiste** (ver detalle abajo).
 - **Gráficos:** evolución en el tiempo y distribución de tus leads por canal de origen.
 - **Objetivos vs Alcanzado:** la tabla de metas mensuales del equipo (Facturación y Captación) con lo planificado, lo logrado y el % cumplido por mes, más un gráfico de evolución. Podés filtrar por año y cambiar de métrica.
 - **Ranking del equipo:** aunque solo veas tus números, el ranking te muestra **tu posición** frente al resto de la agencia.
@@ -83,6 +84,21 @@
 > 💡 Los **objetivos** los define el director (vos no los editás). Tu trabajo es cargar bien tu actividad para que el "alcanzado" refleje la realidad.
 
 > 💡 **Tip:** tus números se nutren de lo que cargás en **Tracking Performance** y de los leads/visitas que gestionás. Cuanto mejor cargues tu actividad, más fiel es tu dashboard.
+
+### Handoffs sin atender
+
+**Qué es:** cuando un cliente le pide al bot hablar con una persona, la conversación **te la pasa a vos** y te llega un mail. Acá ves cuáles de esos clientes **te siguen esperando**.
+
+**Qué muestra:** la lista de clientes que esperan tu respuesta, del que más tiempo lleva al que menos, con hace cuánto espera cada uno y un semáforo: **azul** recién derivado, **amarillo** más de 2 horas, **rojo** más de un día. La etiqueta naranja **"X sin responder"** significa que el cliente te siguió escribiendo y todavía no le contestaste.
+
+**Cómo usarlo:**
+- Es lo primero que conviene mirar cada mañana. Estos clientes **ya levantaron la mano**: pidieron hablar con una persona. Son los más fáciles de convertir.
+- Tocá cualquier fila y entrás directo a esa conversación para responder.
+- Empezá por los rojos y por los que tienen la etiqueta naranja: son los que más tiempo llevan esperando.
+
+> ⚠️ **Ojo:** para que salga de la lista tenés que **responder desde PRISMA**. Si le escribís desde tu WhatsApp personal, el sistema no lo registra y te va a seguir figurando como pendiente (y a tu director también).
+
+> 💡 Si la sección no aparece, es que no tenés ninguna derivación en el período elegido.
 
 ---
 

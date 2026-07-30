@@ -83,6 +83,7 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 **Qué muestra:** es una vista larga que reúne varias secciones, en este orden:
 - **Tarjetas (KPIs):** leads, captaciones, reservas y cierres totales, con variación porcentual.
+- **Handoffs sin atender:** los clientes que el bot le pasó a un asesor y **todavía nadie respondió** (ver detalle abajo).
 - **Gráficos:** evolución temporal (barras) y distribución por canal de origen (dona).
 - **Objetivos vs Alcanzado:** la sección de metas mensuales (ver detalle abajo), justo antes del ranking.
 - **Ranking de asesores:** quién rinde más en tu equipo.
@@ -94,6 +95,26 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 **Cómo usarlo:**
 - Es tu tablero de control diario. El ranking te ayuda a detectar quién necesita apoyo y quién está rindiendo.
 - Los KPIs se nutren de lo que el equipo carga en **Tracking Performance** y de los leads/visitas.
+
+### Handoffs sin atender
+
+**Qué es:** cuando un cliente le pide al bot hablar con una persona (o el bot se da cuenta de que no puede resolverlo), la conversación se le **pasa a un asesor** y se le manda un mail avisándole. A eso le decimos "handoff". Esta sección te muestra **cuáles de esos clientes siguen esperando** que alguien les conteste.
+
+**Qué muestra:**
+- Cuatro números arriba: **sin atender**, **críticos** (más de 24 horas esperando), **esperando respuesta** (el cliente siguió escribiendo y nadie le contestó) y **cuánto tarda tu equipo en promedio** en responder.
+- Abajo, la lista de clientes que esperan, **del que más tiempo lleva al que menos**, con el nombre del cliente, el asesor a cargo y hace cuánto espera.
+- Un semáforo: **azul** recién derivado, **amarillo** más de 2 horas, **rojo** más de un día.
+- La etiqueta naranja **"X sin responder"** es la más grave: significa que el cliente escribió mensajes después de que lo derivamos y nadie le contestó.
+
+**Cómo usarlo:**
+- Miralo todos los días, es lo primero que conviene revisar. Un cliente que pidió hablar con una persona es un cliente **caliente**: ya levantó la mano.
+- Tocá cualquier fila y vas directo a esa conversación de WhatsApp.
+- Si un mismo asesor te aparece seguido en rojo, ahí tenés una conversación pendiente con él.
+- Los filtros de arriba del dashboard (asesor y fechas) también aplican acá: podés mirar solo los handoffs de una persona o de un período.
+
+> ⚠️ **Importante:** que el asesor haya recibido el mail no cuenta como atendido. Cuenta solo cuando **escribe en la conversación desde PRISMA**. Si tu equipo responde desde su WhatsApp personal, el sistema no lo ve y te va a figurar como pendiente.
+
+> 💡 **Tip:** si la sección no aparece es porque no hubo ninguna derivación en el período elegido. Si aparece con el cartel verde, están todas atendidas.
 
 ### Objetivos vs Alcanzado
 

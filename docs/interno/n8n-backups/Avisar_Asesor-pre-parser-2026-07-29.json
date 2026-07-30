@@ -1,0 +1,1197 @@
+{
+  "updatedAt": "2026-07-23T12:36:32.727Z",
+  "createdAt": "2026-06-26T21:09:06.138Z",
+  "id": "bx5bqyUigVr3Hlvf",
+  "name": "Avisar_Asesor",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "c055762a-8fe7-4141-a639-df2372f30060",
+      "typeVersion": 1.1,
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        16,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of $input.all()) {\n  const text = item.json.query || \"\";\n\n  const grab = (label) => {\n    const m = text.match(new RegExp(\"(?<![\\\\w])\" + label + \"\\\\s*:\\\\s*(.+?)\\\\s*(?=;|\\\\.\\\\s|\\\\n|$)\", \"i\"));\n    return m ? m[1].trim().replace(/[.,;\\s]+$/, \"\").trim() : \"\";\n  };\n\n  // --- IDs (UUID) ---\n  const agencyMatch = text.match(/agency_id:\\s*([a-f0-9-]{36})/i);\n  item.json.extracted_agency_id = agencyMatch ? agencyMatch[1] : \"default_session\";\n  const conversationMatch = text.match(/conversation_id:\\s*([a-f0-9-]{36})/i);\n  item.json.extracted_conversation_id = conversationMatch ? conversationMatch[1] : \"default_conversation\";\n\n  // --- teléfono del lead ---\n  const leadMatch = text.match(/lead_id:\\s*([0-9+]{6,})/i);\n  item.json.lead_id = leadMatch ? leadMatch[1] : \"\";\n\n  // --- DATOS DEL ASESOR ---\n  item.json.email_asesor   = grab(\"email_asesor\");\n  item.json.nombre_asesor  = grab(\"nombre_asesor\");\n  item.json.celular_asesor = grab(\"celular_asesor\");\n\n  // --- PROPIEDAD CONSULTADA ---\n  item.json.prop_direccion    = grab(\"direccion\");\n  item.json.prop_precio       = grab(\"precio\");\n  item.json.prop_ambientes    = grab(\"ambientes\");\n  item.json.prop_dormitorios  = grab(\"dormitorios\");\n  item.json.prop_banos        = grab(\"baños\") || grab(\"banos\");\n  item.json.prop_apto_credito = grab(\"apto_credito\");\n\n  const urlMatch = text.match(/https?:\\/\\/[^\\s;]+/i);\n  item.json.prop_ficha = urlMatch ? urlMatch[0].replace(/[.,]+$/, \"\") : \"\";\n\n  // --- DATOS DEL LEAD ---\n  item.json.lead_nombre      = grab(\"nombre\");\n  item.json.lead_email       = grab(\"email\");\n  item.json.lead_tipo_op     = grab(\"tipo_operacion\");\n  item.json.lead_tipo_prop   = grab(\"tipo_propiedad\");\n  item.json.lead_zona        = grab(\"zona\");\n  item.json.lead_ambientes   = grab(\"ambientes_buscados\");\n  item.json.lead_presupuesto = grab(\"presupuesto\");\n  item.json.lead_criterios   = grab(\"criterios_innegociables\");\n  item.json.lead_etapa       = grab(\"etapa\");\n  item.json.lead_vender      = grab(\"necesita_vender_para_comprar\");\n  item.json.lead_credito     = grab(\"credito\");\n  item.json.lead_acompanado  = grab(\"acompanado_asesor\");\n  item.json.lead_hace_cuanto = grab(\"hace_cuanto_busca\");\n  item.json.lead_calificado  = grab(\"calificado\");\n\n  // --- Detección de escenario: quiere visitar / coordinar vs consulta por link ---\n  const esVisita = /quiere\\s+visitar|DISPONIBILIDAD\\s+DEL\\s+CLIENTE|disponibilidad\\s*:|agend[oó]\\s+una\\s+visita|VISITA\\s*:\\s*fecha|MOTIVO\\s*:\\s*(el\\s+cliente\\s+)?quiere\\s+visitar|MOTIVO\\s*:\\s*visita/i.test(text);\n  item.json.disponibilidad = esVisita ? grab(\"disponibilidad\") : \"\";\n  item.json.visita_fecha   = esVisita ? grab(\"fecha\") : \"\";\n  item.json.visita_hora    = esVisita ? grab(\"hora\")  : \"\";\n\n  // --- ASUNTO + HTML branded PRISMA (comillas simples, sin saltos) ---\n  const v = item.json;\n\n  const row = (l, val) => val\n    ? `<tr><td style='padding:6px 0;color:#888;font-size:13px;'>${l}</td><td style='padding:6px 0;color:#131A2D;font-size:14px;font-weight:600;text-align:right;'>${val}</td></tr>`\n    : '';\n\n  const FALTA = \"<span style='color:#c62828;font-weight:600;'>no registrado</span>\";\n  const isEmpty = (val) => !val || /^(no\\s*registrado|ninguno|ninguna|null|-)$/i.test(String(val).trim());\n  const rowQ = (l, val) => `<tr><td style='padding:6px 0;color:#888;font-size:13px;'>${l}</td><td style='padding:6px 0;font-size:14px;font-weight:600;text-align:right;'>${isEmpty(val) ? FALTA : \"<span style='color:#131A2D;'>\" + val + \"</span>\"}</td></tr>`;\n\n  const espacios = [\n    v.prop_ambientes   ? v.prop_ambientes + ' amb'    : '',\n    v.prop_dormitorios ? v.prop_dormitorios + ' dorm' : '',\n    v.prop_banos       ? v.prop_banos + ' baños'      : ''\n  ].filter(Boolean).join(' · ');\n\n  const propRows = row('Dirección', v.prop_direccion) + row('Precio', v.prop_precio)\n    + row('Composición', espacios) + row('Apto crédito', v.prop_apto_credito)\n    + (v.prop_ficha ? row('Ficha', `<a href='${v.prop_ficha}' style='color:#B57E3B;'>ver publicación</a>`) : '');\n\n  const leadRows = rowQ('Nombre', v.lead_nombre) + rowQ('Operación', v.lead_tipo_op)\n    + rowQ('Tipo', v.lead_tipo_prop) + rowQ('Zona', v.lead_zona) + rowQ('Ambientes', v.lead_ambientes)\n    + rowQ('Presupuesto', v.lead_presupuesto) + row('Innegociable', v.lead_criterios)\n    + row('Necesita vender', v.lead_vender) + row('Crédito', v.lead_credito)\n    + rowQ('Otro asesor', v.lead_acompanado) + rowQ('Buscando hace', v.lead_hace_cuanto)\n    + row('Etapa', v.lead_etapa) + row('Teléfono', v.lead_id) + row('Email', v.lead_email);\n\n  // --- Copy adaptativo según escenario ---\n  let badge, h1, intro, btnText, visitaCard = '';\n  if (esVisita) {\n    badge = 'Quiere visitar';\n    h1 = 'Tu cliente quiere coordinar una visita';\n    intro = 'Un cliente quiere visitar una propiedad que tenés asignada. Te dejamos su disponibilidad y su calificación para que coordines el día directamente con él. Te derivamos la conversación para el seguimiento.';\n    btnText = 'Coordinar la visita';\n    v.email_subject = 'Quiere visitar' + (v.prop_direccion ? ': ' + v.prop_direccion : '');\n    const dispo = v.disponibilidad || [v.visita_fecha, v.visita_hora ? (v.visita_hora + ' hs') : ''].filter(Boolean).join(' · ');\n    const vcRows = rowQ('Disponibilidad', dispo) + rowQ('Calificado', v.lead_calificado);\n    visitaCard = `<div class='card' style='border-left-color:#2e7d32;'><div class='card-title' style='color:#2e7d32;'>Coordinar visita</div><table>${vcRows}</table></div>`;\n  } else {\n    badge = 'Nuevo interesado';\n    h1 = 'Tenés un nuevo lead';\n    intro = 'Un potencial cliente está consultando por una propiedad que tenés asignada. Entrá al sistema para ver la conversación y darle seguimiento mientras está caliente.';\n    btnText = 'Ir al sistema';\n    v.email_subject = 'Nuevo interesado en tu propiedad: ' + (v.prop_direccion || 'consulta');\n  }\n\n  // --- Destino del botón: deep link al chat del lead (ítem 3A) ---\n  const BASE_APP = 'https://prisma.vakdor.com';\n  const destino = (v.extracted_conversation_id && v.extracted_conversation_id !== 'default_conversation')\n    ? BASE_APP + '/asesor/leads-whatsapp/' + v.extracted_conversation_id\n    : BASE_APP;\n\n  v.html_email = `<!DOCTYPE html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><style>body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background-color:#f4f7f9;color:#333;margin:0;padding:0;}.container{max-width:600px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);border:1px solid #e1e8ed;}.header{background-color:#131A2D;padding:28px;text-align:center;}.logo-text{color:#fff;font-size:24px;font-weight:bold;letter-spacing:2px;}.accent{color:#B57E3B;}.content{padding:36px 40px;}.badge{color:#B57E3B;font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:8px;}h1{color:#131A2D;font-size:22px;margin:0 0 18px;}p{font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;}.card{border:1px solid #e1e8ed;border-left:4px solid #B57E3B;border-radius:10px;padding:16px 20px;margin:18px 0;background:#fafbfc;}.card-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#B57E3B;font-weight:bold;margin-bottom:8px;}table{width:100%;border-collapse:collapse;}.btn-wrap{text-align:center;margin-top:24px;}.button{display:inline-block;padding:14px 32px;background-color:#B57E3B;color:#fff !important;text-decoration:none;border-radius:8px;font-weight:bold;}.footer{padding:20px;text-align:center;font-size:12px;color:#888;background:#fafafa;}</style></head><body><div class='container'><div class='header'><div class='logo-text'>PRISMA <span class='accent'>IA</span></div></div><div class='content'><span class='badge'>${badge}</span><h1>${h1}</h1><p>Hola${v.nombre_asesor ? ' ' + v.nombre_asesor : ''},</p><p>${intro}</p>${visitaCard}<div class='card'><div class='card-title'>Propiedad consultada</div><table>${propRows}</table></div><div class='card'><div class='card-title'>Qué busca el cliente</div><table>${leadRows}</table></div><div class='btn-wrap'><a href='${destino}' class='button'>${btnText}</a></div></div><div class='footer'>Aviso automático de PRISMA IA · No respondas a este correo.<br>© 2026 PRISMA IA — Sistema Inteligente Real Estate.</div></div></body></html>`;\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        352
+      ],
+      "id": "fb2bb174-381d-4d9b-b389-b8c32762a59d",
+      "name": "extraer_agency_id"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"from\": \"PRISMA IA <no-reply@vakbot.vakdor.com>\",\n  \"to\": [\n    \"{{ $('extraer_agency_id').first().json.email_asesor }}\"\n  ],\n  \"subject\": \"{{ $('extraer_agency_id').first().json.email_subject }}\",\n  \"html\": \"{{ $('extraer_agency_id').first().json.html_email }}\"\n}\n",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer __RESEND_API_KEY_REMOVIDA_VER_TECNICO_9.2.2__"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1136,
+        256
+      ],
+      "id": "ee63b6d1-758c-4333-80d9-8dde7466b746",
+      "name": "Enviar_Email_Resend",
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "profiles",
+          "mode": "list",
+          "cachedResultName": "profiles"
+        },
+        "limit": 1,
+        "where": {
+          "values": [
+            {
+              "column": "email",
+              "value": "={{ $('extraer_agency_id')?.item?.json?.email_asesor ?? null }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        480,
+        352
+      ],
+      "id": "39960ef6-641c-4ebe-8bb4-0772bda71f12",
+      "name": "Buscar_agent_id",
+      "executeOnce": true,
+      "retryOnFail": true,
+      "credentials": {
+        "postgres": {
+          "id": "Vje6BCZn5QY9nNWy",
+          "name": "MEMORIA_PRISMA"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "wa_conversations",
+          "mode": "list",
+          "cachedResultName": "wa_conversations"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('extraer_agency_id').first().json.extracted_conversation_id }}",
+            "bot_active": "={{ true }}",
+            "agent_id": "={{ $('Buscar_agent_id').first().json.id ?? null }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "agency_id",
+              "displayName": "agency_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "instance_id",
+              "displayName": "instance_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "contact_phone",
+              "displayName": "contact_phone",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "contact_name",
+              "displayName": "contact_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_message_at",
+              "displayName": "last_message_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "last_inbound_at",
+              "displayName": "last_inbound_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "bot_active",
+              "displayName": "bot_active",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "etiquetas",
+              "displayName": "etiquetas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "array",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "unread_count",
+              "displayName": "unread_count",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "agent_id",
+              "displayName": "agent_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "pipeline_stage",
+              "displayName": "pipeline_stage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "metricas",
+              "displayName": "metricas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "funnel_status",
+              "displayName": "funnel_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "requires_follow_up",
+              "displayName": "requires_follow_up",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "next_follow_up_at",
+              "displayName": "next_follow_up_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "opt_out",
+              "displayName": "opt_out",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "follow_ups_sent",
+              "displayName": "follow_ups_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "follow_ups_history",
+              "displayName": "follow_ups_history",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "object",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "recovery_stage",
+              "displayName": "recovery_stage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "dropoff_reason",
+              "displayName": "dropoff_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "visit_status",
+              "displayName": "visit_status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "visit_scheduled_at",
+              "displayName": "visit_scheduled_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "visit_reminder_24h_sent",
+              "displayName": "visit_reminder_24h_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "visit_reminder_3h_sent",
+              "displayName": "visit_reminder_3h_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "visit_reminder_1h_sent",
+              "displayName": "visit_reminder_1h_sent",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        704,
+        352
+      ],
+      "id": "f4aade52-07e4-409d-bbca-e92e1cdb4b39",
+      "name": "DERIVAR_CONVERSACION",
+      "credentials": {
+        "postgres": {
+          "id": "Vje6BCZn5QY9nNWy",
+          "name": "MEMORIA_PRISMA"
+        }
+      },
+      "retryOnFail": true,
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "hay-email-asesor",
+              "leftValue": "={{ $('extraer_agency_id').first().json.email_asesor }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        928,
+        352
+      ],
+      "id": "a1a1a1a1-0000-4000-8000-000000000001",
+      "name": "Hay_email_asesor"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Respuesta determinista hacia el Agente Principal (mismo contrato que antes)\nconst v = $('extraer_agency_id').first().json;\n\nlet email_enviado = false;\nlet motivo = '';\ntry {\n  const r = $('Enviar_Email_Resend').first().json;\n  email_enviado = !!(r && r.id);\n  if (!email_enviado) motivo = 'Resend no devolvio id: ' + JSON.stringify(r).slice(0, 200);\n} catch (e) {\n  motivo = v.email_asesor ? 'No se ejecuto el envio de email' : 'Sin email_asesor: no se envio mail';\n}\n\nlet conversacion_derivada = false;\ntry {\n  const d = $('DERIVAR_CONVERSACION').all();\n  conversacion_derivada = d.length > 0 && !!d[0].json && Object.keys(d[0].json).length > 0;\n} catch (e) { }\nif (!conversacion_derivada && !motivo) motivo = 'No se derivo la conversacion (conversation_id sin coincidencia)';\n\nconst out = {\n  email_enviado,\n  conversacion_derivada,\n  asesor: v.email_asesor || '',\n  asunto: v.email_subject || ''\n};\nif (motivo) out.motivo = motivo;\n\nreturn [{ json: out }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        352
+      ],
+      "id": "a1a1a1a1-0000-4000-8000-000000000002",
+      "name": "respuesta"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "extraer_agency_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "extraer_agency_id": {
+      "main": [
+        [
+          {
+            "node": "Buscar_agent_id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar_agent_id": {
+      "main": [
+        [
+          {
+            "node": "DERIVAR_CONVERSACION",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DERIVAR_CONVERSACION": {
+      "main": [
+        [
+          {
+            "node": "Hay_email_asesor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hay_email_asesor": {
+      "main": [
+        [
+          {
+            "node": "Enviar_Email_Resend",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar_Email_Resend": {
+      "main": [
+        [
+          {
+            "node": "respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "e6aa3b6f-b2f2-47b3-8d47-8681929222d0",
+  "activeVersionId": "e6aa3b6f-b2f2-47b3-8d47-8681929222d0",
+  "versionCounter": 105,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-06-26T21:09:06.149Z",
+      "createdAt": "2026-06-26T21:09:06.149Z",
+      "role": "workflow:owner",
+      "workflowId": "bx5bqyUigVr3Hlvf",
+      "projectId": "kHDUN61HinE2WNyr",
+      "project": {
+        "updatedAt": "2026-01-10T15:03:38.251Z",
+        "createdAt": "2026-01-10T15:02:52.885Z",
+        "id": "kHDUN61HinE2WNyr",
+        "name": "Leo Osterrietch <osterrietchleonardo@vakdor.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "9b194ba8-440e-4a8a-b5ba-e6a5ba26f7b6"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-07-23T12:36:32.730Z",
+    "createdAt": "2026-07-23T12:36:32.730Z",
+    "versionId": "e6aa3b6f-b2f2-47b3-8d47-8681929222d0",
+    "workflowId": "bx5bqyUigVr3Hlvf",
+    "nodes": [
+      {
+        "parameters": {
+          "inputSource": "passthrough"
+        },
+        "id": "c055762a-8fe7-4141-a639-df2372f30060",
+        "typeVersion": 1.1,
+        "name": "When Executed by Another Workflow",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "position": [
+          16,
+          352
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "for (const item of $input.all()) {\n  const text = item.json.query || \"\";\n\n  const grab = (label) => {\n    const m = text.match(new RegExp(\"(?<![\\\\w])\" + label + \"\\\\s*:\\\\s*(.+?)\\\\s*(?=;|\\\\.\\\\s|\\\\n|$)\", \"i\"));\n    return m ? m[1].trim().replace(/[.,;\\s]+$/, \"\").trim() : \"\";\n  };\n\n  // --- IDs (UUID) ---\n  const agencyMatch = text.match(/agency_id:\\s*([a-f0-9-]{36})/i);\n  item.json.extracted_agency_id = agencyMatch ? agencyMatch[1] : \"default_session\";\n  const conversationMatch = text.match(/conversation_id:\\s*([a-f0-9-]{36})/i);\n  item.json.extracted_conversation_id = conversationMatch ? conversationMatch[1] : \"default_conversation\";\n\n  // --- teléfono del lead ---\n  const leadMatch = text.match(/lead_id:\\s*([0-9+]{6,})/i);\n  item.json.lead_id = leadMatch ? leadMatch[1] : \"\";\n\n  // --- DATOS DEL ASESOR ---\n  item.json.email_asesor   = grab(\"email_asesor\");\n  item.json.nombre_asesor  = grab(\"nombre_asesor\");\n  item.json.celular_asesor = grab(\"celular_asesor\");\n\n  // --- PROPIEDAD CONSULTADA ---\n  item.json.prop_direccion    = grab(\"direccion\");\n  item.json.prop_precio       = grab(\"precio\");\n  item.json.prop_ambientes    = grab(\"ambientes\");\n  item.json.prop_dormitorios  = grab(\"dormitorios\");\n  item.json.prop_banos        = grab(\"baños\") || grab(\"banos\");\n  item.json.prop_apto_credito = grab(\"apto_credito\");\n\n  const urlMatch = text.match(/https?:\\/\\/[^\\s;]+/i);\n  item.json.prop_ficha = urlMatch ? urlMatch[0].replace(/[.,]+$/, \"\") : \"\";\n\n  // --- DATOS DEL LEAD ---\n  item.json.lead_nombre      = grab(\"nombre\");\n  item.json.lead_email       = grab(\"email\");\n  item.json.lead_tipo_op     = grab(\"tipo_operacion\");\n  item.json.lead_tipo_prop   = grab(\"tipo_propiedad\");\n  item.json.lead_zona        = grab(\"zona\");\n  item.json.lead_ambientes   = grab(\"ambientes_buscados\");\n  item.json.lead_presupuesto = grab(\"presupuesto\");\n  item.json.lead_criterios   = grab(\"criterios_innegociables\");\n  item.json.lead_etapa       = grab(\"etapa\");\n  item.json.lead_vender      = grab(\"necesita_vender_para_comprar\");\n  item.json.lead_credito     = grab(\"credito\");\n  item.json.lead_acompanado  = grab(\"acompanado_asesor\");\n  item.json.lead_hace_cuanto = grab(\"hace_cuanto_busca\");\n  item.json.lead_calificado  = grab(\"calificado\");\n\n  // --- Detección de escenario: quiere visitar / coordinar vs consulta por link ---\n  const esVisita = /quiere\\s+visitar|DISPONIBILIDAD\\s+DEL\\s+CLIENTE|disponibilidad\\s*:|agend[oó]\\s+una\\s+visita|VISITA\\s*:\\s*fecha|MOTIVO\\s*:\\s*(el\\s+cliente\\s+)?quiere\\s+visitar|MOTIVO\\s*:\\s*visita/i.test(text);\n  item.json.disponibilidad = esVisita ? grab(\"disponibilidad\") : \"\";\n  item.json.visita_fecha   = esVisita ? grab(\"fecha\") : \"\";\n  item.json.visita_hora    = esVisita ? grab(\"hora\")  : \"\";\n\n  // --- ASUNTO + HTML branded PRISMA (comillas simples, sin saltos) ---\n  const v = item.json;\n\n  const row = (l, val) => val\n    ? `<tr><td style='padding:6px 0;color:#888;font-size:13px;'>${l}</td><td style='padding:6px 0;color:#131A2D;font-size:14px;font-weight:600;text-align:right;'>${val}</td></tr>`\n    : '';\n\n  const FALTA = \"<span style='color:#c62828;font-weight:600;'>no registrado</span>\";\n  const isEmpty = (val) => !val || /^(no\\s*registrado|ninguno|ninguna|null|-)$/i.test(String(val).trim());\n  const rowQ = (l, val) => `<tr><td style='padding:6px 0;color:#888;font-size:13px;'>${l}</td><td style='padding:6px 0;font-size:14px;font-weight:600;text-align:right;'>${isEmpty(val) ? FALTA : \"<span style='color:#131A2D;'>\" + val + \"</span>\"}</td></tr>`;\n\n  const espacios = [\n    v.prop_ambientes   ? v.prop_ambientes + ' amb'    : '',\n    v.prop_dormitorios ? v.prop_dormitorios + ' dorm' : '',\n    v.prop_banos       ? v.prop_banos + ' baños'      : ''\n  ].filter(Boolean).join(' · ');\n\n  const propRows = row('Dirección', v.prop_direccion) + row('Precio', v.prop_precio)\n    + row('Composición', espacios) + row('Apto crédito', v.prop_apto_credito)\n    + (v.prop_ficha ? row('Ficha', `<a href='${v.prop_ficha}' style='color:#B57E3B;'>ver publicación</a>`) : '');\n\n  const leadRows = rowQ('Nombre', v.lead_nombre) + rowQ('Operación', v.lead_tipo_op)\n    + rowQ('Tipo', v.lead_tipo_prop) + rowQ('Zona', v.lead_zona) + rowQ('Ambientes', v.lead_ambientes)\n    + rowQ('Presupuesto', v.lead_presupuesto) + row('Innegociable', v.lead_criterios)\n    + row('Necesita vender', v.lead_vender) + row('Crédito', v.lead_credito)\n    + rowQ('Otro asesor', v.lead_acompanado) + rowQ('Buscando hace', v.lead_hace_cuanto)\n    + row('Etapa', v.lead_etapa) + row('Teléfono', v.lead_id) + row('Email', v.lead_email);\n\n  // --- Copy adaptativo según escenario ---\n  let badge, h1, intro, btnText, visitaCard = '';\n  if (esVisita) {\n    badge = 'Quiere visitar';\n    h1 = 'Tu cliente quiere coordinar una visita';\n    intro = 'Un cliente quiere visitar una propiedad que tenés asignada. Te dejamos su disponibilidad y su calificación para que coordines el día directamente con él. Te derivamos la conversación para el seguimiento.';\n    btnText = 'Coordinar la visita';\n    v.email_subject = 'Quiere visitar' + (v.prop_direccion ? ': ' + v.prop_direccion : '');\n    const dispo = v.disponibilidad || [v.visita_fecha, v.visita_hora ? (v.visita_hora + ' hs') : ''].filter(Boolean).join(' · ');\n    const vcRows = rowQ('Disponibilidad', dispo) + rowQ('Calificado', v.lead_calificado);\n    visitaCard = `<div class='card' style='border-left-color:#2e7d32;'><div class='card-title' style='color:#2e7d32;'>Coordinar visita</div><table>${vcRows}</table></div>`;\n  } else {\n    badge = 'Nuevo interesado';\n    h1 = 'Tenés un nuevo lead';\n    intro = 'Un potencial cliente está consultando por una propiedad que tenés asignada. Entrá al sistema para ver la conversación y darle seguimiento mientras está caliente.';\n    btnText = 'Ir al sistema';\n    v.email_subject = 'Nuevo interesado en tu propiedad: ' + (v.prop_direccion || 'consulta');\n  }\n\n  // --- Destino del botón: deep link al chat del lead (ítem 3A) ---\n  const BASE_APP = 'https://prisma.vakdor.com';\n  const destino = (v.extracted_conversation_id && v.extracted_conversation_id !== 'default_conversation')\n    ? BASE_APP + '/asesor/leads-whatsapp/' + v.extracted_conversation_id\n    : BASE_APP;\n\n  v.html_email = `<!DOCTYPE html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1.0'><style>body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;background-color:#f4f7f9;color:#333;margin:0;padding:0;}.container{max-width:600px;margin:40px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.08);border:1px solid #e1e8ed;}.header{background-color:#131A2D;padding:28px;text-align:center;}.logo-text{color:#fff;font-size:24px;font-weight:bold;letter-spacing:2px;}.accent{color:#B57E3B;}.content{padding:36px 40px;}.badge{color:#B57E3B;font-weight:bold;font-size:13px;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:8px;}h1{color:#131A2D;font-size:22px;margin:0 0 18px;}p{font-size:15px;line-height:1.6;color:#555;margin:0 0 14px;}.card{border:1px solid #e1e8ed;border-left:4px solid #B57E3B;border-radius:10px;padding:16px 20px;margin:18px 0;background:#fafbfc;}.card-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:#B57E3B;font-weight:bold;margin-bottom:8px;}table{width:100%;border-collapse:collapse;}.btn-wrap{text-align:center;margin-top:24px;}.button{display:inline-block;padding:14px 32px;background-color:#B57E3B;color:#fff !important;text-decoration:none;border-radius:8px;font-weight:bold;}.footer{padding:20px;text-align:center;font-size:12px;color:#888;background:#fafafa;}</style></head><body><div class='container'><div class='header'><div class='logo-text'>PRISMA <span class='accent'>IA</span></div></div><div class='content'><span class='badge'>${badge}</span><h1>${h1}</h1><p>Hola${v.nombre_asesor ? ' ' + v.nombre_asesor : ''},</p><p>${intro}</p>${visitaCard}<div class='card'><div class='card-title'>Propiedad consultada</div><table>${propRows}</table></div><div class='card'><div class='card-title'>Qué busca el cliente</div><table>${leadRows}</table></div><div class='btn-wrap'><a href='${destino}' class='button'>${btnText}</a></div></div><div class='footer'>Aviso automático de PRISMA IA · No respondas a este correo.<br>© 2026 PRISMA IA — Sistema Inteligente Real Estate.</div></div></body></html>`;\n}\n\nreturn $input.all();"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          240,
+          352
+        ],
+        "id": "fb2bb174-381d-4d9b-b389-b8c32762a59d",
+        "name": "extraer_agency_id"
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.resend.com/emails",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\n  \"from\": \"PRISMA IA <no-reply@vakbot.vakdor.com>\",\n  \"to\": [\n    \"{{ $('extraer_agency_id').first().json.email_asesor }}\"\n  ],\n  \"subject\": \"{{ $('extraer_agency_id').first().json.email_subject }}\",\n  \"html\": \"{{ $('extraer_agency_id').first().json.html_email }}\"\n}\n",
+          "options": {},
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer __RESEND_API_KEY_REMOVIDA_VER_TECNICO_9.2.2__"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          1136,
+          256
+        ],
+        "id": "ee63b6d1-758c-4333-80d9-8dde7466b746",
+        "name": "Enviar_Email_Resend",
+        "retryOnFail": true,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "operation": "select",
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": {
+            "__rl": true,
+            "value": "profiles",
+            "mode": "list",
+            "cachedResultName": "profiles"
+          },
+          "limit": 1,
+          "where": {
+            "values": [
+              {
+                "column": "email",
+                "value": "={{ $('extraer_agency_id')?.item?.json?.email_asesor ?? null }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          480,
+          352
+        ],
+        "id": "39960ef6-641c-4ebe-8bb4-0772bda71f12",
+        "name": "Buscar_agent_id",
+        "executeOnce": true,
+        "retryOnFail": true,
+        "credentials": {
+          "postgres": {
+            "id": "Vje6BCZn5QY9nNWy",
+            "name": "MEMORIA_PRISMA"
+          }
+        },
+        "onError": "continueRegularOutput"
+      },
+      {
+        "parameters": {
+          "operation": "update",
+          "schema": {
+            "__rl": true,
+            "mode": "list",
+            "value": "public"
+          },
+          "table": {
+            "__rl": true,
+            "value": "wa_conversations",
+            "mode": "list",
+            "cachedResultName": "wa_conversations"
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "id": "={{ $('extraer_agency_id').first().json.extracted_conversation_id }}",
+              "bot_active": "={{ true }}",
+              "agent_id": "={{ $('Buscar_agent_id').first().json.id ?? null }}"
+            },
+            "matchingColumns": [
+              "id"
+            ],
+            "schema": [
+              {
+                "id": "id",
+                "displayName": "id",
+                "required": false,
+                "defaultMatch": true,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "agency_id",
+                "displayName": "agency_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "instance_id",
+                "displayName": "instance_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "contact_phone",
+                "displayName": "contact_phone",
+                "required": true,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "contact_name",
+                "displayName": "contact_name",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "last_message_at",
+                "displayName": "last_message_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "last_inbound_at",
+                "displayName": "last_inbound_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "bot_active",
+                "displayName": "bot_active",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true
+              },
+              {
+                "id": "status",
+                "displayName": "status",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "score",
+                "displayName": "score",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "etiquetas",
+                "displayName": "etiquetas",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "array",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "created_at",
+                "displayName": "created_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "unread_count",
+                "displayName": "unread_count",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "agent_id",
+                "displayName": "agent_id",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": false
+              },
+              {
+                "id": "pipeline_stage",
+                "displayName": "pipeline_stage",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "metricas",
+                "displayName": "metricas",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "object",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "funnel_status",
+                "displayName": "funnel_status",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "requires_follow_up",
+                "displayName": "requires_follow_up",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "next_follow_up_at",
+                "displayName": "next_follow_up_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "opt_out",
+                "displayName": "opt_out",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "follow_ups_sent",
+                "displayName": "follow_ups_sent",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "follow_ups_history",
+                "displayName": "follow_ups_history",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "object",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "recovery_stage",
+                "displayName": "recovery_stage",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "dropoff_reason",
+                "displayName": "dropoff_reason",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "visit_status",
+                "displayName": "visit_status",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "visit_scheduled_at",
+                "displayName": "visit_scheduled_at",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "dateTime",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "visit_reminder_24h_sent",
+                "displayName": "visit_reminder_24h_sent",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "visit_reminder_3h_sent",
+                "displayName": "visit_reminder_3h_sent",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true,
+                "removed": true
+              },
+              {
+                "id": "visit_reminder_1h_sent",
+                "displayName": "visit_reminder_1h_sent",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "boolean",
+                "canBeUsedToMatch": true,
+                "removed": true
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          704,
+          352
+        ],
+        "id": "f4aade52-07e4-409d-bbca-e92e1cdb4b39",
+        "name": "DERIVAR_CONVERSACION",
+        "credentials": {
+          "postgres": {
+            "id": "Vje6BCZn5QY9nNWy",
+            "name": "MEMORIA_PRISMA"
+          }
+        },
+        "retryOnFail": true,
+        "onError": "continueRegularOutput",
+        "alwaysOutputData": true
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "hay-email-asesor",
+                "leftValue": "={{ $('extraer_agency_id').first().json.email_asesor }}",
+                "rightValue": "",
+                "operator": {
+                  "type": "string",
+                  "operation": "notEmpty",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "looseTypeValidation": true,
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          928,
+          352
+        ],
+        "id": "a1a1a1a1-0000-4000-8000-000000000001",
+        "name": "Hay_email_asesor"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Respuesta determinista hacia el Agente Principal (mismo contrato que antes)\nconst v = $('extraer_agency_id').first().json;\n\nlet email_enviado = false;\nlet motivo = '';\ntry {\n  const r = $('Enviar_Email_Resend').first().json;\n  email_enviado = !!(r && r.id);\n  if (!email_enviado) motivo = 'Resend no devolvio id: ' + JSON.stringify(r).slice(0, 200);\n} catch (e) {\n  motivo = v.email_asesor ? 'No se ejecuto el envio de email' : 'Sin email_asesor: no se envio mail';\n}\n\nlet conversacion_derivada = false;\ntry {\n  const d = $('DERIVAR_CONVERSACION').all();\n  conversacion_derivada = d.length > 0 && !!d[0].json && Object.keys(d[0].json).length > 0;\n} catch (e) { }\nif (!conversacion_derivada && !motivo) motivo = 'No se derivo la conversacion (conversation_id sin coincidencia)';\n\nconst out = {\n  email_enviado,\n  conversacion_derivada,\n  asesor: v.email_asesor || '',\n  asunto: v.email_subject || ''\n};\nif (motivo) out.motivo = motivo;\n\nreturn [{ json: out }];"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1360,
+          352
+        ],
+        "id": "a1a1a1a1-0000-4000-8000-000000000002",
+        "name": "respuesta"
+      }
+    ],
+    "connections": {
+      "When Executed by Another Workflow": {
+        "main": [
+          [
+            {
+              "node": "extraer_agency_id",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "extraer_agency_id": {
+        "main": [
+          [
+            {
+              "node": "Buscar_agent_id",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Buscar_agent_id": {
+        "main": [
+          [
+            {
+              "node": "DERIVAR_CONVERSACION",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "DERIVAR_CONVERSACION": {
+        "main": [
+          [
+            {
+              "node": "Hay_email_asesor",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Hay_email_asesor": {
+        "main": [
+          [
+            {
+              "node": "Enviar_Email_Resend",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "respuesta",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Enviar_Email_Resend": {
+        "main": [
+          [
+            {
+              "node": "respuesta",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "Leo Osterrietch",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-07-23T12:36:32.831Z",
+        "id": 473,
+        "workflowId": "bx5bqyUigVr3Hlvf",
+        "versionId": "e6aa3b6f-b2f2-47b3-8d47-8681929222d0",
+        "event": "activated",
+        "userId": "9b194ba8-440e-4a8a-b5ba-e6a5ba26f7b6"
+      },
+      {
+        "createdAt": "2026-07-23T12:36:32.804Z",
+        "id": 472,
+        "workflowId": "bx5bqyUigVr3Hlvf",
+        "versionId": "e6aa3b6f-b2f2-47b3-8d47-8681929222d0",
+        "event": "deactivated",
+        "userId": "9b194ba8-440e-4a8a-b5ba-e6a5ba26f7b6"
+      }
+    ]
+  }
+}

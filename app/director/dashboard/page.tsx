@@ -38,6 +38,8 @@ import { ObjectivesDashboard } from "@/components/dashboard/ObjectivesDashboard"
 import { getObjectivesDashboard } from "@/lib/tracking/objetivos"
 import { AdvisorFilter } from "@/components/dashboard/advisor-filter"
 import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter"
+import { HandoffsPanel } from "@/components/dashboard/HandoffsPanel"
+import { getHandoffsDashboardData } from "@/lib/queries/handoffs"
 
 const DashboardCharts = dynamic(() => import("@/components/dashboard-charts").then(m => m.DashboardCharts), {
   ssr: false,
@@ -78,11 +80,12 @@ export default async function DashboardPage({
   }
 
   const currentYear = new Date().getFullYear()
-  const [dashboardData, propertiesData, pipelineData, objectivesData] = await Promise.all([
+  const [dashboardData, propertiesData, pipelineData, objectivesData, handoffsData] = await Promise.all([
     getDashboardData(profile.agency_id, agentId, from, to),
     getPropertiesDashboardData(profile.agency_id),
     getPipelineDashboardData(profile.agency_id),
     getObjectivesDashboard(profile.agency_id, currentYear),
+    getHandoffsDashboardData(profile.agency_id, agentId, from, to),
   ])
 
   return (
@@ -122,8 +125,11 @@ export default async function DashboardPage({
       </div>
 
       <PerformanceMetricsGrid kpis={dashboardData.kpis} />
-      
-      <PerformanceCharts 
+
+      {/* Derivaciones del bot que ningún asesor atendió todavía — arriba porque es urgente */}
+      <HandoffsPanel data={handoffsData} basePath="/director" scope="agencia" />
+
+      <PerformanceCharts
         data={dashboardData.charts.performanceEvolution} 
         channels={dashboardData.charts.channelDistribution}
       />
