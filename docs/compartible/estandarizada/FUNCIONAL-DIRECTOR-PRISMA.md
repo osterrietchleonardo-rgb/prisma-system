@@ -220,6 +220,8 @@ Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos bo
 
 **Formulario de registro (igual que el asesor):** zona/barrio, propiedad de Tokko o de colaboración, vincular cliente (Tokko o WhatsApp), registro manual de lead nuevo y origen de consulta. El registro manual pide **nombre completo, celular, email y etiqueta**. El celular se carga eligiendo el **país** (lista con bandera) y escribiendo el número natural; el sistema lo normaliza al formato de WhatsApp (para AR agrega el "9" móvil aunque no se ponga el 15) y muestra el preview. Lleva **doble verificación** de nombre/celular/email (se reescriben sin copiar/pegar, con aviso ✅/❌) y una **casilla de certificación** obligatoria de que los datos son veraces. Como director, al cargar podés **elegir a qué asesor** corresponde.
 
+> **Excepción en Prospección:** el email figura como *(Opcional)* y se puede dejar vacío **sólo** cuando la actividad es Prospección, porque en el primer contacto el asesor muchas veces tiene únicamente el celular. En Prelisting, Prebuying, Captación, Reserva y Cierre sigue siendo obligatorio igual que antes. Y aunque sea opcional no se afloja el control: si el asesor escribe un email, tiene que estar bien formado y doble-verificado igual que siempre.
+
 ### Solapa "Objetivos" (fijar metas mensuales)
 
 **Qué es:** acá definís, **por asesor y por mes**, la meta de **Facturación** (en USD) y **Captación** (cantidad de propiedades captadas) durante el año.
