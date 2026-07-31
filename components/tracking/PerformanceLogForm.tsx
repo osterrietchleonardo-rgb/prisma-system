@@ -122,7 +122,9 @@ export function PerformanceLogForm({
   const onSubmit = async (values: PerformanceLogFormData) => {
     setIsSubmitting(true);
     try {
-      let finalValues = { ...values };
+      // `const` y no `let`: nunca se reasigna, sólo se le escribe una propiedad
+      // (`wa_contact_id`) más abajo, y eso `const` lo permite igual.
+      const finalValues = { ...values };
 
       // Cliente obligatorio: sin cliente no se puede armar la tarjeta del
       // pipeline. Se valida sobre lo que el usuario ELIGIÓ, no sobre el
