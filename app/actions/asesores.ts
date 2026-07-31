@@ -157,14 +157,21 @@ export async function desvincularAsesor(agentId: string, motivo?: string) {
     throw new Error(updateError.message)
   }
 
-  // Bloquear el email para impedir reingreso (best-effort; no rompe si falla).
+  // Bloquear el email para impedir reingreso.
+  //
+  // `bloqueado_por` va en NULL a proposito: es una FK contra `admin_vakdor_users`
+  // (los admins internos de Vakdor), NO contra `profiles`. Pasarle el id del
+  // director hacia fallar el INSERT con violacion de FK (23503) en TODAS las
+  // desvinculaciones, y como es best-effort fallaba mudo: la tabla quedaba
+  // vacia y el email nunca se bloqueaba de verdad. Quien ejecuto la accion ya
+  // queda registrado en `equipo_acciones` (abajo), asi que no se pierde nada.
   if (asesor.email) {
     const { error: blockError } = await admin.from("emails_bloqueados").insert({
       email: asesor.email,
       tipo_entidad: "asesor",
       entidad_id: agentId,
       razon: motivo?.trim() || "Desvinculado por el director",
-      bloqueado_por: directorId,
+      bloqueado_por: null,
       bloqueado_at: now,
     })
     if (blockError) console.error("No se pudo registrar el email bloqueado:", blockError)
