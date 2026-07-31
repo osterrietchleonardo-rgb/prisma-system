@@ -156,11 +156,13 @@ export default function CalendarioPage() {
       setLoading(true)
       
       // Get agents for filter
+      // Sin los desvinculados. El .eq de rol ya estaba: no se toca.
       const { data: agentsData } = await supabase
         .from("profiles")
         .select("id, full_name, avatar_url")
         .eq("agency_id", agencyId)
         .eq("role", "asesor")
+        .neq("estado", "eliminado")
       
       setAgents(agentsData || [])
 

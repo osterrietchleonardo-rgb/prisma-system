@@ -118,10 +118,14 @@ export function NewVisitDialog({
         
         if (propsData) setProperties(propsData)
 
-        // Fetch all profiles for the agency to match assigned_agent by email
+        // La lista completa (incluidos desvinculados) hace falta para emparejar
+        // el asesor de Tokko de una propiedad por email y para resolver el
+        // perfil activo. El desplegable de "Asesor Responsable" filtra en el
+        // render, no aca: si filtraramos la consulta, una propiedad de un
+        // ex-asesor perderia el nombre de su agente.
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("id, full_name, email")
+          .select("id, full_name, email, estado")
           .eq("agency_id", agencyId)
         
         if (profiles) setAllAgencyProfiles(profiles)
@@ -608,9 +612,13 @@ export function NewVisitDialog({
                       <SelectValue placeholder="Seleccionar asesor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {allAgencyProfiles?.map(agent => (
-                        <SelectItem key={agent.id} value={agent.id}>{agent.full_name}</SelectItem>
-                      ))}
+                      {/* Se excluye a los desvinculados. No se filtra por rol:
+                          hay visitas a cargo de directores (verificado). */}
+                      {allAgencyProfiles
+                        ?.filter(a => a.estado !== "eliminado")
+                        .map(agent => (
+                          <SelectItem key={agent.id} value={agent.id}>{agent.full_name}</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   <p className="text-[10px] text-muted-foreground italic">
