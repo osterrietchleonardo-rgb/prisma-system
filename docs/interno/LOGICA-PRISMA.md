@@ -324,6 +324,17 @@ Los **pausados no se filtran**: la pausa es reversible y la persona sigue siendo
 
 **Su historial no se pierde.** Los KPIs de la agencia (facturación, cierres, captaciones) se calculan desde `performance_logs` por `agency_id`, **no** desde la lista de asesores, así que desvincular a alguien **no mueve los totales**: sus operaciones siguen sumando al año. Lo único que desaparece es su fila del ranking y su nombre de los desplegables. Por la misma razón, la actividad pasada de un ex-asesor **sigue mostrando su nombre** en el feed del Dashboard (la lista se filtra en memoria, no en la consulta).
 
+**Desvincular ≠ eliminar definitivamente.** Son dos acciones con propósitos opuestos:
+
+| | Desvincular | Eliminar definitivamente |
+|---|---|---|
+| Para quién | persona real que se fue | duplicado / cargado por error |
+| Qué hace | marca `estado='eliminado'`, bloquea el email | **borra la fila** de `profiles` |
+| Historial | se conserva (queda en el filtro "Eliminados") | se pierde, sin rastro del perfil |
+| Límite | ninguno | **se niega** si el perfil tiene trabajo real encima |
+
+El borrado definitivo **no puede destruir el historial de alguien real**: antes de ejecutarse mide qué tiene el perfil asociado y sólo permite avanzar si no hay nada de trabajo (ni leads, ni propiedades, ni actividad). Esto es obligatorio porque 7 de las 33 FKs contra `profiles` son `ON DELETE CASCADE` — entre ellas `performance_logs` —, así que un borrado sin control borraría la actividad registrada en silencio.
+
 #### Propiedades y Leads
 - **`properties`** — Propiedades sincronizadas (id, tokko_id, agency_id, assigned_agent_id, title, description, price, currency, property_type, status, address, city, bedrooms, bathrooms, total_area, covered_area, images[], tokko_data, embedding vector(768))
 - **`leads`** — Leads del CRM (id, agency_id, assigned_agent_id, full_name, email, phone, source, status, pipeline_stage, notes, tokko_contact_id, first_response_time, chat_analysis)
