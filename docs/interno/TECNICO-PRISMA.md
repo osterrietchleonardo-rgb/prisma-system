@@ -251,6 +251,29 @@ El cliente Admin se usa solo en operaciones privilegiadas controladas: insercion
   - `desvincularAsesor(id, motivo)` — `estado='eliminado'` + `tokens_invalidos_desde` + email en `emails_bloqueados`. Registra `desvinculacion`. (Más fuerte que la pausa.)
   - `setClasificacionAsesor(id, clasificacion)` — etiqueta secundaria del asesor: `'client_director' | 'client_support' | null` (null = "Asesor"). Escribe **solo** `profiles.clasificacion`; **no toca `role` ni `estado`** (no cambia permisos ni accesos). Es un toggle desde la tarjeta del director: volver a tocar el botón activo manda `null`. Constraint en BD (`profiles_clasificacion_check`) + validación en el action. (Migración `20260723180000_add_clasificacion_asesores.sql`.)
   - `getUltimaAccionPausa(id)` — devuelve motivo/fecha/nombre-de-quién-pausó de la última acción **si** es una `pausa` vigente (para mostrarla en el panel del director; el asesor pausado nunca la ve porque queda deslogueado).
+- **Filtrado de desvinculados en el panel del director** — regla: `profiles.estado = 'eliminado'` **no figura en ninguna lista de asesores**. Los `pausado` **no** se filtran (siguen siendo del equipo). Aplicado en:
+
+  | Superficie | Archivo | Cómo |
+  |---|---|---|
+  | Ranking del Dashboard + `AdvisorFilter` | `lib/queries/dashboard.ts` | filtro **en memoria** (ver abajo) |
+  | Matriz de Objetivos | `lib/tracking/objetivos.ts` | `.neq("estado","eliminado")` |
+  | Editor de metas | `actions/tracking/objetivos.ts` | `.neq(...)` |
+  | Desplegable de Tracking | `actions/tracking/getTrackingOptions.ts` | `.neq(...)` |
+  | Filtro de Pipeline + asignar asesor en Leads | `lib/queries/director.ts` (`getAgencyAgents`) | `.neq(...)` |
+  | Filtro del Calendario | `app/director/calendario/page.tsx` | `.neq(...)` |
+  | Desplegable "Asesor Responsable" | `components/calendar/NewVisitDialog.tsx` | filtro **en el render** |
+  | Créditos IA por integrante | `components/ai-credits-dashboard.tsx` | `.neq(...)` |
+  | Filtro de asesor de Tracking (solapa Actividad) | `components/tracking/TrackingPerformanceView.tsx` | cruce contra la lista vigente |
+
+  **Tres decisiones que no son obvias y conviene no "corregir":**
+  1. **`getDashboardData` trae la lista completa y filtra en memoria.** La misma lista resuelve el nombre del autor de cada actividad del feed y la cartera al filtrar por un asesor: filtrando en la consulta, la actividad pasada de un ex-asesor quedaba **sin nombre**. Convive con `opts.incluirDesvinculados` (default `false`); el único que pasa `true` es `getAgencyAdvisorsPerformanceAction`, porque la página de Asesores muestra a los eliminados a propósito.
+  2. **En `NewVisitDialog` se filtra el render, no la consulta** — esa lista también empareja por email el asesor de Tokko de una propiedad; filtrarla dejaba sin agente a las propiedades de un ex-asesor.
+  3. **No se filtra por rol** en `getAgencyAgents` ni en el desplegable de visitas, aunque digan "asesor": verificado en producción que hay leads, propiedades y visitas a cargo de **directores**; sacarlos dejaría esas fichas sin selección, con riesgo de borrar la asignación al guardar.
+
+  **Fuera de alcance a propósito:** `lib/tokko-sync.ts` (mapas email→perfil de la ingesta: filtrar dejaría sin dueño a propiedades/leads que en Tokko pertenecen al ex-asesor) y el filtro de asesor de WhatsApp (`components/whatsapp/ConversationsList.tsx`, que sale de los emails de las conversaciones y no de `profiles`).
+
+  **Trampa conocida:** `.neq("estado","eliminado")` en PostgREST **también descarta las filas con `estado` NULL** (`NULL <> 'x'` no es verdadero). Hoy no hay ninguna y la columna tiene default `'activo'` + CHECK, pero si alguna vez se inserta un perfil con `estado` NULL explícito, ese asesor **desaparecería** de los desplegables. Los filtros en memoria (puntos 1 y 2) no tienen este problema.
+- **`asesor_huella_datos(p_id uuid)`** (migración `20260730120000_borrado_definitivo_asesor.sql`) — función SQL que devuelve `(tabla, columna, filas)` para cada FK que apunta a `public.profiles` con `filas > 0`, recorriendo `pg_constraint` (no una lista hardcodeada). Pensada como verificación previa de un borrado real de perfil: **33 tablas** apuntan a `profiles` y 7 son `ON DELETE CASCADE` — entre ellas `performance_logs` —, así que borrar a alguien con historial destruiría su actividad en silencio. `SECURITY DEFINER`; **ojo:** revocar de `PUBLIC` no alcanza, hay que revocar explícito a `anon` y `authenticated` (Supabase les concede EXECUTE por defecto en el esquema `public`). Queda solo en `postgres` y `service_role`. `equipo_acciones.tipo_accion` acepta además `'eliminacion_definitiva'`. **Todavía sin consumidor en la app:** la acción y el botón de borrado definitivo no están implementados.
 - **Google OAuth:** `signInWithOAuth` con state (`role`, `inviteCode`, `agencyName`) → mismo callback.
 - **Guards de layout:** los layouts `(director)`/`(asesor)` revalidan sesión, estado de cuenta/agencia y coincidencia rol↔ruta. Endpoint de apoyo: `GET /api/auth/check-status`.
 
