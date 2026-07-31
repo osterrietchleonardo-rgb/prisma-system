@@ -38,6 +38,10 @@ export async function getAgencyAdvisorsPerformanceAction() {
 
   if (!profile?.agency_id) throw new Error("Agency not found")
 
-  const data = await getDashboardData(profile.agency_id)
+  // La pagina de Asesores muestra a proposito a los desvinculados (tiene un
+  // filtro "Eliminados" para la trazabilidad), asi que necesita sus numeros.
+  const data = await getDashboardData(profile.agency_id, undefined, undefined, undefined, {
+    incluirDesvinculados: true,
+  })
   return data.advisors
 }
