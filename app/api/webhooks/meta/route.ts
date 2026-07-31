@@ -98,6 +98,8 @@ export async function POST(req: Request) {
                 let content = ''
                 if (message.type === 'text') content = message.text.body
                 else if (message.type === 'image') content = message.image.caption || 'Imagen recibida'
+                else if (message.type === 'audio') content = message.audio?.voice ? 'Mensaje de voz recibido' : 'Audio recibido'
+                else if (message.type === 'video') content = message.video?.caption || 'Video recibido'
                 else if (message.type === 'interactive') {
                     content = message.interactive.button_reply?.title || message.interactive.list_reply?.title || 'Respuesta interactiva'
                 } else continue // Ignorar otros tipos por ahora
@@ -249,6 +251,21 @@ export async function POST(req: Request) {
                             type: message.type,
                             wamid,
                             received_at: new Date().toISOString(),
+                            // ADITIVO: Meta NO manda una URL para los adjuntos, manda un media_id.
+                            // Para bajar el archivo hacen falta 2 llamadas a la Graph API:
+                            //   1) GET /{version}/{media_id}          -> devuelve una `url` de vida corta
+                            //   2) GET <esa url> con Authorization: Bearer <token de la instancia>
+                            // El token NO viaja en este payload a proposito (quedaria en los logs de
+                            // n8n); n8n lo lee de whatsapp_instances.token con su credencial de Postgres.
+                            // Es null para los mensajes de texto. Nadie lo consume hoy: es opt-in.
+                            media: message[message.type]?.id
+                                ? {
+                                      id: message[message.type].id,
+                                      mime_type: message[message.type].mime_type ?? null,
+                                      caption: message[message.type].caption ?? null,
+                                      voice: message[message.type].voice ?? null,
+                                  }
+                                : null,
                         },
                         // Metadatos de la conversacion (etiquetas, score, estado)
                         conversation: {
