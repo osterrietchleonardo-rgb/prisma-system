@@ -39,6 +39,25 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
     const data = registerSchema.parse(rawData)
     const supabase = createClient()
     const adminClient = createAdminClient()
+
+    // 0.a Email bloqueado → no se puede volver a registrar con esa dirección.
+    //     La tabla la escribe `desvincularAsesor` (y el panel de Vakdor) al dar
+    //     de baja a alguien; hasta ahora SOLO se escribía y se listaba, nadie la
+    //     consultaba, asi que el "bloqueo de email" no bloqueaba nada. Se chequea
+    //     antes de tocar el codigo de invitacion para no gastarlo.
+    //     `desbloqueado_at` no nulo = lo reactivo Vakdor, ya no cuenta.
+    const emailNormalizado = data.email.trim().toLowerCase()
+    const { data: bloqueado } = await adminClient
+      .from('emails_bloqueados')
+      .select('id')
+      .ilike('email', emailNormalizado)
+      .is('desbloqueado_at', null)
+      .maybeSingle()
+
+    if (bloqueado) {
+      return { error: "Este email no puede registrarse. Contactá al equipo de PRISMA." }
+    }
+
     // 0. Validar el código ANTES de crear el usuario (evita emails prematuros).
     //    - "crear": SOLO vale un código de admin (tabla director_invites).
     //    - "unirme": SOLO vale un código de agencia (tabla agency_invites); el rol sale de ahí.

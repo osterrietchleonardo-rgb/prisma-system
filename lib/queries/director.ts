@@ -189,10 +189,18 @@ export async function getAgencyAgents(options: { agencyId: string }) {
   const { agencyId } = options;
   const supabase = createClient()
   
+  // Alimenta el filtro de asesor del Pipeline y el selector de "asignar asesor"
+  // de Leads: se excluye a los desvinculados.
+  //
+  // NO se filtra por rol a proposito, aunque el desplegable diga "asesor": hay
+  // leads y propiedades asignados a directores (verificado en produccion), y
+  // sacarlos de la lista dejaria esas fichas sin nada seleccionado en el modal,
+  // con riesgo de borrar la asignacion al guardar.
   const { data, error } = await supabase
     .from("profiles")
     .select("id, full_name, avatar_url, role")
     .eq("agency_id", agencyId)
+    .neq("estado", "eliminado")
     .order("full_name")
 
   if (error) throw error

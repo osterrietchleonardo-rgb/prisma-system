@@ -61,7 +61,7 @@ export async function getTrackingOptions() {
   // RLS no se la mostraría — pero solo para los teléfonos que ya son suyos.
   const phones = Array.from(new Set((convs ?? []).map((c) => c.contact_phone).filter(Boolean)));
 
-  let waContacts: { id: string; name: string | null; phone: string }[] = [];
+  const waContacts: { id: string; name: string | null; phone: string }[] = [];
   if (phones.length > 0) {
     const admin = createAdminClient();
     const { data: contactRows } = await admin
@@ -88,11 +88,14 @@ export async function getTrackingOptions() {
   // Fetch agents if director
   let agents = null;
   if (profile.role === "director") {
+    // Sin los desvinculados: no se le puede asignar una actividad ni una visita
+    // a alguien que ya no es del equipo.
     const { data: agentsData } = await supabase
       .from("profiles")
       .select("id, full_name")
       .eq("agency_id", profile.agency_id)
-      .eq("role", "asesor");
+      .eq("role", "asesor")
+      .neq("estado", "eliminado");
     agents = agentsData;
   }
 

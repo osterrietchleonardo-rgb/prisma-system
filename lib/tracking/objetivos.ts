@@ -93,11 +93,13 @@ export async function getObjectivesByAgency(agencyId: string, year: number): Pro
 export async function getObjectivesDashboard(agencyId: string, year: number): Promise<AdvisorObjectives[]> {
   const supabase = createClient();
 
+  // Los desvinculados no figuran: ya no tienen objetivos que cumplir.
   const { data: profiles } = await supabase
     .from("profiles")
     .select("id, full_name")
     .eq("agency_id", agencyId)
-    .eq("role", "asesor");
+    .eq("role", "asesor")
+    .neq("estado", "eliminado");
 
   const [objectives, achieved] = await Promise.all([
     getObjectivesByAgency(agencyId, year),

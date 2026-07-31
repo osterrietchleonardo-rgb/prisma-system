@@ -1,6 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
 
-export async function getDashboardData(agencyId: string, agentId?: string, startDate?: string, endDate?: string) {
+export async function getDashboardData(
+  agencyId: string,
+  agentId?: string,
+  startDate?: string,
+  endDate?: string,
+  opts?: { incluirDesvinculados?: boolean }
+) {
   const supabase = createClient()
   
   // 1. WhatsApp Conversations (Top of Funnel)
@@ -40,12 +46,25 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
   const { data: rawLogs } = await logsQuery;
   const perfLogs = rawLogs?.filter(l => l.status !== 'eliminada') || [];
 
-  // 3. Profiles — only asesores (directors are excluded from the leaderboard)
-  const { data: agencyProfiles } = await supabase
+  // 3. Profiles — only asesores (directors are excluded from the leaderboard).
+  //
+  // Se traen TODOS, incluidos los desvinculados, porque esta lista tambien
+  // resuelve el nombre del autor de cada actividad del feed (mas abajo). Si se
+  // filtrara en la consulta, una actividad vieja de un ex-asesor apareceria sin
+  // nombre: su historial es de la inmobiliaria y tiene que seguir legible.
+  const { data: todosLosAsesores } = await supabase
     .from("profiles")
-    .select("id, email, full_name, avatar_url")
+    .select("id, email, full_name, avatar_url, estado")
     .eq("agency_id", agencyId)
     .eq("role", "asesor");
+
+  // El ranking y el desplegable de asesor si los excluyen: ya no son del equipo.
+  // Sus performance_logs igual siguen sumando a los KPIs de la agencia, que se
+  // calculan por agency_id mas arriba y no dependen de esta lista.
+  // La pagina de Asesores es la unica que los pide (tiene su filtro propio).
+  const agencyProfiles = opts?.incluirDesvinculados
+    ? todosLosAsesores
+    : (todosLosAsesores ?? []).filter((p) => p.estado !== "eliminado");
 
   // 4. Inventory (Tokko Properties)
   const { data: properties } = await supabase
@@ -124,7 +143,9 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
   // Process Cartera (Tokko)
   properties?.forEach(p => {
     const agentEmail = (p.assigned_agent as any)?.email;
-    const isOwner = agentId ? (agencyProfiles?.find(prof => prof.id === agentId)?.email === agentEmail) : true;
+    // Lista completa a proposito: si se filtra por un asesor ya desvinculado
+    // (p. ej. un link guardado), su cartera tiene que seguir resolviendose.
+    const isOwner = agentId ? (todosLosAsesores?.find(prof => prof.id === agentId)?.email === agentEmail) : true;
     
     if (isOwner && p.status === 'Active') {
       metrics.cartera.activa++;
@@ -418,7 +439,9 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
     advisors,
     activity: perfLogs?.slice(0, 10).map(l => ({
         ...l,
-        profiles: agencyProfiles?.find(p => p.id === l.agent_id)
+        // Lista completa: la actividad de un ex-asesor tiene que seguir
+        // mostrando su nombre, no quedar huerfana.
+        profiles: todosLosAsesores?.find(p => p.id === l.agent_id)
     })) || []
   }
 }

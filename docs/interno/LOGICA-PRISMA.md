@@ -314,7 +314,26 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 - **`profiles`** — Perfil de usuario (id, email, full_name, role, agency_id, phone, avatar_url, status, created_at)
 - **`agencies`** — Agencias inmobiliarias (id, name, logo_url, tokko_api_key, address, phone, email, invite_code, owner_id, performance_config, marketing_ai_config, buscador_ia_config, created_at)
 - **`agency_invites`** — Códigos de invitación (agency_id, code, **role** [`director`/`asesor`], **invitee_name**, is_used, used_at, used_by). El `role` define qué será la persona al registrarse; `invitee_name` es el nombre del invitado (visible antes de usarse). RLS: cualquier **director** de la agencia ve y crea códigos (lista compartida); validación pública por código sin usar. Un director puede **borrar** cualquier código de su agencia (usado o no) desde Configuración → el borrado limpia la lista pero **no** desvincula a quien ya lo usó.
-- **`equipo_acciones`** — Bitácora de acciones del director sobre asesores (agency_id, asesor_id, ejecutado_por, tipo_accion [`pausa`/`reanudacion`/`desvinculacion`], motivo, created_at). Da trazabilidad: quién hizo qué, a quién, cuándo y por qué. Solo se accede desde el servidor (RLS deny-all).
+- **`equipo_acciones`** — Bitácora de acciones del director sobre asesores (agency_id, asesor_id, ejecutado_por, tipo_accion [`pausa`/`reanudacion`/`desvinculacion`/`eliminacion_definitiva`], motivo, created_at). Da trazabilidad: quién hizo qué, a quién, cuándo y por qué. Solo se accede desde el servidor (RLS deny-all).
+
+##### Regla: qué pasa con un asesor desvinculado
+
+Un asesor con `profiles.estado = 'eliminado'` **no figura en ninguna lista de asesores del panel del director**: ni en el ranking del Dashboard, ni en Objetivos, ni en los desplegables donde se elige a alguien (filtros de Dashboard/Tracking/Pipeline/Calendario, asignar lead, asignar visita, créditos de IA). La única excepción es la **página de Asesores**, que tiene su propio filtro por estado y funciona como registro histórico.
+
+Los **pausados no se filtran**: la pausa es reversible y la persona sigue siendo del equipo.
+
+**Su historial no se pierde.** Los KPIs de la agencia (facturación, cierres, captaciones) se calculan desde `performance_logs` por `agency_id`, **no** desde la lista de asesores, así que desvincular a alguien **no mueve los totales**: sus operaciones siguen sumando al año. Lo único que desaparece es su fila del ranking y su nombre de los desplegables. Por la misma razón, la actividad pasada de un ex-asesor **sigue mostrando su nombre** en el feed del Dashboard (la lista se filtra en memoria, no en la consulta).
+
+**Desvincular ≠ eliminar definitivamente.** Son dos acciones con propósitos opuestos:
+
+| | Desvincular | Eliminar definitivamente |
+|---|---|---|
+| Para quién | persona real que se fue | duplicado / cargado por error |
+| Qué hace | marca `estado='eliminado'`, bloquea el email | **borra la fila** de `profiles` |
+| Historial | se conserva (queda en el filtro "Eliminados") | se pierde, sin rastro del perfil |
+| Límite | ninguno | **se niega** si el perfil tiene trabajo real encima |
+
+El borrado definitivo **no puede destruir el historial de alguien real**: antes de ejecutarse mide qué tiene el perfil asociado y sólo permite avanzar si no hay nada de trabajo (ni leads, ni propiedades, ni actividad). Esto es obligatorio porque 7 de las 33 FKs contra `profiles` son `ON DELETE CASCADE` — entre ellas `performance_logs` —, así que un borrado sin control borraría la actividad registrada en silencio.
 
 #### Propiedades y Leads
 - **`properties`** — Propiedades sincronizadas (id, tokko_id, agency_id, assigned_agent_id, title, description, price, currency, property_type, status, address, city, bedrooms, bathrooms, total_area, covered_area, images[], tokko_data, embedding vector(768))
