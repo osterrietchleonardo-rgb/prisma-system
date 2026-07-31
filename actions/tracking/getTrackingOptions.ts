@@ -88,11 +88,14 @@ export async function getTrackingOptions() {
   // Fetch agents if director
   let agents = null;
   if (profile.role === "director") {
+    // Sin los desvinculados: no se le puede asignar una actividad ni una visita
+    // a alguien que ya no es del equipo.
     const { data: agentsData } = await supabase
       .from("profiles")
       .select("id, full_name")
       .eq("agency_id", profile.agency_id)
-      .eq("role", "asesor");
+      .eq("role", "asesor")
+      .neq("estado", "eliminado");
     agents = agentsData;
   }
 
