@@ -135,12 +135,12 @@ Ejecutar por Management API, contra los dos perfiles reales de Lorena Perez:
 ```sql
 -- Duplicado (debe dar SOLO rastros administrativos)
 SELECT * FROM public.asesor_huella_datos('8b3a3d3d-9d99-4bcd-891f-fd27c0e20e92');
--- Perfil bueno (debe dar leads=48, properties=17, wa_conversations=12, ...)
+-- Perfil bueno (debe dar leads, properties, wa_conversations con valores altos)
 SELECT * FROM public.asesor_huella_datos('3df58653-60fe-448f-8dc8-531af75e7eae');
 ```
 
 Esperado duplicado: exactamente 2 filas → `equipo_acciones/asesor_id = 2` y `agency_invites/used_by = 1`.
-Esperado bueno: al menos `leads/assigned_agent_id = 48`, `properties/assigned_agent_id = 17`, `wa_conversations/agent_id = 12`.
+Esperado bueno: filas en `leads/assigned_agent_id`, `properties/assigned_agent_id` y `wa_conversations/agent_id` (al 2026-07-31: 49, 17 y 12 — el de leads sube solo, no es un valor fijo).
 
 **Confirmar que `tabla` viene sin prefijo `public.`** — de eso depende la lista blanca de la Task 5.
 
@@ -978,9 +978,9 @@ Expected: build exitoso.
 
 - [ ] **Step 7: Probar el caso que DEBE fallar**
 
-Con `npm run dev`, entrar a `/director/asesores` como director de Central Real Estate. Abrir el menú ⋮ del perfil **bueno** de Lorena (`lperez@maxre.com.ar`, 48 leads) → "Eliminar definitivamente".
+Con `npm run dev`, entrar a `/director/asesores` como director de Central Real Estate. Abrir el menú ⋮ del perfil **bueno** de Lorena (`lperez@maxre.com.ar`, el que tiene todos los leads y propiedades) → "Eliminar definitivamente".
 
-Esperado: el diálogo muestra el recuadro rojo con "48 leads, 17 propiedades, 12 conversaciones de WhatsApp…", **no** aparece el campo de motivo, y el botón de confirmar está deshabilitado.
+Esperado: el diálogo muestra el recuadro rojo listando sus leads, propiedades y conversaciones de WhatsApp, **no** aparece el campo de motivo, y el botón de confirmar está deshabilitado.
 
 - [ ] **Step 8: Probar el caso que DEBE permitir (sin confirmar todavía)**
 
@@ -1067,7 +1067,7 @@ SELECT count(*) AS leads_del_perfil_bueno FROM leads
 WHERE assigned_agent_id = '3df58653-60fe-448f-8dc8-531af75e7eae';
 ```
 
-Anotar los valores. El último tiene que dar **48** y tiene que seguir dando 48 después del borrado.
+Anotar los valores **en el momento**, justo antes de borrar. No hardcodear el número: la inmobiliaria está trabajando y ese conteo sube solo (era 48 el 2026-07-30 y 49 al día siguiente). Lo que se verifica es que **no cambie por el borrado**, comparando contra la lectura tomada recién.
 
 - [ ] **Step 3: Ejecutar el borrado del duplicado**
 
@@ -1080,7 +1080,8 @@ Desde la app en local, con el diálogo de la Task 6, borrar `lorenap@maxre.com.a
 SELECT id FROM profiles WHERE id = '8b3a3d3d-9d99-4bcd-891f-fd27c0e20e92';
 SELECT id FROM auth.users WHERE id = '8b3a3d3d-9d99-4bcd-891f-fd27c0e20e92';
 
--- Debe seguir dando 48
+-- Debe dar EXACTAMENTE el mismo numero que en el Step 2 (no un valor fijo:
+-- la inmobiliaria carga leads todo el tiempo)
 SELECT count(*) FROM leads WHERE assigned_agent_id = '3df58653-60fe-448f-8dc8-531af75e7eae';
 
 -- Debe quedar la constancia, con asesor_id NULL y la identidad en el motivo
@@ -1129,7 +1130,7 @@ git commit -m "docs(asesores): filtrado de desvinculados y borrado definitivo en
 - [ ] Los KPIs de la agencia no cambiaron
 - [ ] El desplegable de Pipeline ya no lista directores
 - [ ] En "Nueva visita", una propiedad de Tokko sigue emparejando su asesor por email
-- [ ] "Eliminar definitivamente" se niega sobre el perfil con 48 leads
-- [ ] Los 48 leads del perfil bueno siguen intactos después del borrado
+- [ ] "Eliminar definitivamente" se niega sobre el perfil con leads y propiedades
+- [ ] Los leads del perfil bueno siguen igual que en la lectura previa al borrado
 - [ ] `git status` no muestra archivos ajenos commiteados (`.agents/AGENTS.md`, `.claude/skills/*`, `.gitignore`, `roomix-sync/*`)
 - [ ] **Merge a `main` sólo con el OK explícito de Leonardo**

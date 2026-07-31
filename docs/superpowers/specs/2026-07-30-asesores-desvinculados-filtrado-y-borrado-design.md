@@ -185,7 +185,7 @@ Cualquier fila fuera de esa lista — un lead, una propiedad, una conversación,
 
 **Si hay trabajo real → se niega** con un mensaje que dice exactamente qué encontró:
 
-> No se puede eliminar definitivamente: este asesor tiene 48 leads y 17 propiedades a su nombre. Eso no es un duplicado. Usá "Desvincular" para que conserve su historial.
+> No se puede eliminar definitivamente: este asesor tiene 49 leads y 17 propiedades a su nombre. Eso no es un duplicado. Usá "Desvincular" para que conserve su historial.
 
 **Si está limpio → borra en orden:**
 
@@ -227,6 +227,6 @@ Donde un registro viejo sigue mostrando el nombre de un desvinculado (detalle de
 1. `npm run build` sin errores nuevos.
 2. Con el duplicado de Lorena presente: confirmar que **no** aparece en ranking, objetivos, ni en los 8 desplegables de §3.4, y que **sí** aparece en la página de Asesores con el filtro "Eliminados".
 3. Confirmar que los KPIs de la agencia (facturación, cierres) **no cambian** antes y después del filtrado.
-4. Probar "Eliminar definitivamente" contra el perfil **bueno** de Lorena (48 leads): debe **negarse** con el mensaje de §5.2.
-5. Probar contra el duplicado: debe permitir, y tras borrar, verificar por Management API que la fila de `profiles` y el usuario de `auth.users` ya no existen, y que los 48 leads del perfil bueno siguen intactos.
+4. Probar "Eliminar definitivamente" contra el perfil **bueno** de Lorena (el que tiene los leads): debe **negarse** con el mensaje de §5.2.
+5. Probar contra el duplicado: debe permitir, y tras borrar, verificar por Management API que la fila de `profiles` y el usuario de `auth.users` ya no existen, y que los leads del perfil bueno siguen igual que antes del borrado.
 6. Ejecutar el borrado del duplicado de Lorena en producción y reportar el detalle exacto de qué se borró.
