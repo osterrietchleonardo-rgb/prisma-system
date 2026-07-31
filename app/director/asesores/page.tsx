@@ -18,12 +18,13 @@ import {
   PauseCircle,
   PlayCircle,
   AlertTriangle,
+  Trash2,
   Filter,
   Users,
   RotateCcw
 } from "lucide-react"
 import { getAgentPerformanceAction, getAgencyAdvisorsPerformanceAction } from "@/app/actions/performance"
-import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa, setClasificacionAsesor, type ClasificacionAsesor } from "@/app/actions/asesores"
+import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa, setClasificacionAsesor, getHuellaDatosAsesor, eliminarAsesorDefinitivamente, type ClasificacionAsesor } from "@/app/actions/asesores"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -103,6 +104,13 @@ export default function AsesoresPage() {
   const [clasificando, setClasificando] = useState<string | null>(null)
   // Diálogo de desvinculación: asesor elegido + motivo
   const [agentToUnlink, setAgentToUnlink] = useState<Record<string, any> | null>(null)
+
+  // Borrado definitivo (duplicados / cargas por error)
+  const [agentToDelete, setAgentToDelete] = useState<Record<string, any> | null>(null)
+  const [deleteReason, setDeleteReason] = useState("")
+  const [borrando, setBorrando] = useState<string | null>(null)
+  const [verificandoHuella, setVerificandoHuella] = useState(false)
+  const [huella, setHuella] = useState<{ puedeBorrarse: boolean; bloqueantes: { etiqueta: string; filas: number }[] } | null>(null)
   const [unlinkReason, setUnlinkReason] = useState("")
   // Info de la pausa vigente del asesor abierto en el panel (motivo/fecha/quién)
   const [pauseInfo, setPauseInfo] = useState<{ motivo: string | null; created_at: string; ejecutado_por_nombre: string | null } | null>(null)
@@ -193,6 +201,46 @@ export default function AsesoresPage() {
       toast.error(e.message || "Error al desvincular asesor")
     } finally {
       setDesvinculando(null)
+    }
+  }
+
+  // Al abrir el diálogo de borrado se mide qué tiene el perfil encima, para
+  // mostrárselo al director antes de que confirme. La autorización real la
+  // vuelve a hacer el servidor: esto es solo para la pantalla.
+  const abrirDialogoBorrado = async (agent: Record<string, any>) => {
+    setAgentToDelete(agent)
+    setDeleteReason("")
+    setHuella(null)
+    setVerificandoHuella(true)
+    try {
+      setHuella(await getHuellaDatosAsesor(agent.id))
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo verificar el asesor")
+      setAgentToDelete(null)
+    } finally {
+      setVerificandoHuella(false)
+    }
+  }
+
+  // Confirmado el borrado definitivo (con motivo obligatorio).
+  const handleConfirmBorrado = async () => {
+    if (!agentToDelete) return
+    if (!deleteReason.trim()) {
+      toast.error("Escribí el motivo del borrado")
+      return
+    }
+    try {
+      setBorrando(agentToDelete.id)
+      const res = await eliminarAsesorDefinitivamente(agentToDelete.id, deleteReason)
+      toast.success(`Perfil de ${res.borrado.nombre || res.borrado.email} eliminado definitivamente.`)
+      setAgentToDelete(null)
+      setDeleteReason("")
+      setSelectedAgent(null)
+      fetchAgents()
+    } catch (e: any) {
+      toast.error(e.message || "Error al eliminar el perfil")
+    } finally {
+      setBorrando(null)
     }
   }
 
@@ -578,6 +626,13 @@ export default function AsesoresPage() {
                       >
                         <XCircle className="h-4 w-4 mr-2" /> Desvincular asesor
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive cursor-pointer"
+                        disabled={borrando === agent.id}
+                        onClick={(e) => { e.stopPropagation(); abrirDialogoBorrado(agent); }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" /> Eliminar definitivamente
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -915,6 +970,89 @@ export default function AsesoresPage() {
               disabled={desvinculando === agentToUnlink?.id || !unlinkReason.trim()}
             >
               <XCircle className="h-4 w-4" /> Desvincular
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Borrado definitivo: solo para duplicados o perfiles cargados por error.
+          El servidor se niega si el perfil tiene trabajo real encima; acá se le
+          muestra al director el resultado de esa verificación antes de decidir. */}
+      <Dialog open={!!agentToDelete} onOpenChange={(open) => { if (!open) { setAgentToDelete(null); setDeleteReason("") } }}>
+        <DialogContent className="bg-card border-destructive/40">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" /> Eliminar definitivamente
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 pt-2">
+                <p>
+                  Vas a <strong>borrar por completo</strong> el perfil de{" "}
+                  <strong>{agentToDelete?.full_name}</strong>
+                  {agentToDelete?.email ? <> (<span className="font-mono">{agentToDelete.email}</span>)</> : null}.
+                </p>
+                <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+                  <strong>Se pierde el historial de esa persona.</strong> No queda en la lista de
+                  &quot;Eliminados&quot;, no se puede recuperar y no hay forma de deshacerlo. Es para
+                  perfiles <strong>duplicados o cargados por error</strong>.
+                </p>
+                <p className="text-muted-foreground">
+                  Si es una persona real que se fue de la inmobiliaria, cerrá esto y usá{" "}
+                  <strong>Desvincular</strong>: así conservás todo su historial.
+                </p>
+
+                {verificandoHuella && <p>Verificando si tiene datos asociados…</p>}
+
+                {huella && !huella.puedeBorrarse && (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+                    <p className="font-medium">No se puede eliminar definitivamente.</p>
+                    <p>
+                      Este asesor tiene{" "}
+                      {huella.bloqueantes.map((b) => `${b.filas} ${b.etiqueta}`).join(", ")} a su
+                      nombre, así que no es un duplicado. Usá <strong>Desvincular</strong>.
+                    </p>
+                  </div>
+                )}
+
+                {huella?.puedeBorrarse && (
+                  <p className="rounded-md border border-border bg-muted/40 p-3">
+                    Verificado: este perfil <strong>no tiene ningún dato de trabajo</strong> asociado
+                    (ni leads, ni propiedades, ni actividad). Se puede borrar sin perder nada del
+                    resto del equipo.
+                  </p>
+                )}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+
+          {huella?.puedeBorrarse && (
+            <div className="space-y-2 py-2">
+              <label className="text-sm font-medium">Motivo del borrado</label>
+              <Textarea
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="Ej: perfil duplicado, se registró dos veces por error"
+                className="min-h-[80px]"
+              />
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setAgentToDelete(null); setDeleteReason("") }}
+              disabled={borrando === agentToDelete?.id}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              className="gap-2"
+              onClick={handleConfirmBorrado}
+              disabled={!huella?.puedeBorrarse || !deleteReason.trim() || borrando === agentToDelete?.id}
+            >
+              <Trash2 className="h-4 w-4" />
+              {borrando === agentToDelete?.id ? "Eliminando…" : "Eliminar definitivamente"}
             </Button>
           </DialogFooter>
         </DialogContent>
