@@ -80,23 +80,41 @@ function saveCheckpoint(set) {
 // ─── Filas a reescribir: por defecto, solo las que quedaron cortadas ───────────
 async function loadPending() {
   const rows = [];
-  let from = 0; const step = 1000;
+  // Paginado POR CLAVE (`id > último`), no por `.range(offset)`. Con offsets grandes Postgres tiene
+  // que recorrer y descartar todas las filas anteriores en cada página, y pasadas las ~100.000 filas
+  // la consulta moría con "canceling statement due to statement timeout": el catch cortaba el barrido
+  // y devolvía una lista PARCIAL, así que las propiedades del final del orden por id no entraban nunca
+  // a la cola (visto en 3 corridas seguidas). Por clave, cada página cuesta lo mismo.
+  let ultimoId = '';
+  let leidas = 0;
+  const step = 1000;
   while (true) {
-    const { data, error } = await supabase
-      .from('roomix_properties')
-      .select('id, slug, canonical_url, description')
-      .order('id', { ascending: true })
-      .range(from, from + step - 1);
-    if (error) { log('❌', 'Error leyendo filas:', error.message); break; }
+    let data, error;
+    for (let intento = 1; intento <= 3; intento++) {
+      const q = supabase
+        .from('roomix_properties')
+        .select('id, slug, canonical_url, description')
+        .order('id', { ascending: true })
+        .limit(step);
+      ({ data, error } = ultimoId ? await q.gt('id', ultimoId) : await q);
+      if (!error) break;
+      log('⏳', `Lectura fallida (${intento}/3): ${error.message}`);
+      await sleep(2000 * intento);
+    }
+    // Sin la lista completa no se arranca: mejor abortar que dejar propiedades afuera en silencio.
+    if (error) { log('❌', 'No se pudo leer el catálogo completo:', error.message); process.exit(1); }
+
     for (const r of (data || [])) {
       if (TODAS || (r.description || '').length >= CORTE_SOSPECHOSO) rows.push(r);
     }
+    leidas += (data || []).length;
     if (!data || data.length < step) break;
+    ultimoId = data[data.length - 1].id;
     // Con --limit no hace falta barrer las 129k filas: cortamos apenas hay candidatas de sobra.
     if (LIMIT > 0 && rows.length >= LIMIT * 3) break;
-    from += step;
-    if (from % 20000 === 0) log('…', `leídas ${from} filas, candidatas ${rows.length}`);
+    if (leidas % 20000 === 0) log('…', `leídas ${leidas} filas, candidatas ${rows.length}`);
   }
+  log('🔎', `Catálogo barrido completo: ${leidas} filas leídas`);
   return rows;
 }
 
