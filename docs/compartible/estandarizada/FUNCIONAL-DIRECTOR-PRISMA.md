@@ -282,6 +282,24 @@ Vas a ver un **asistente de configuración** que te guía paso a paso para conec
 
 Arriba a la derecha, un **indicador de conexión** te muestra si la instancia está conectada.
 
+### El bot entiende fotos y audios
+
+Cuando un cliente manda una **foto** (la captura de un aviso, el frente de un edificio, un plano) o un **audio**, el bot la mira o lo escucha y responde sobre eso, sin quedarse callado. Los **videos** también entran al chat, aunque todavía no se analiza su contenido.
+
+Sigue valiendo la regla de siempre: **el bot no inventa**. Si de una captura no puede confirmar una publicación, lo dice y pide el link en lugar de improvisar datos.
+
+> ⚠️ **Por qué importa:** antes de julio de 2026 esto no funcionaba y **más de la mitad de los clientes que mandaban una foto se quedaban sin ninguna respuesta**, sin que quedara ningún aviso de error. Si notás conversaciones cortadas de antes de esa fecha, puede ser esta la causa.
+
+### Cuando el bot no contesta: qué mirar
+
+El bot tiene un **filtro de seguridad** que descarta spam, publicidad de otros rubros e intentos de manipulación. Ese filtro es el que decide si el mensaje llega o no al asistente, y cuando descarta **no queda ningún error visible**: la conversación simplemente no avanza.
+
+Por eso, si un cliente dice que escribió y nadie le contestó:
+1. Fijate en la bandeja si el mensaje del cliente está pero no hay respuesta del bot.
+2. Avisale a soporte con el teléfono y la hora: se puede revisar exactamente por qué se descartó.
+
+> 💡 **Un caso real:** los leads que llegan de MercadoLibre, ZonaProp o Argenprop entran con un **link** en el mensaje, y el filtro los estaba tomando por publicidad. Cinco consultas reales quedaron sin respuesta antes de detectarlo. Ya está corregido, y esos leads ahora tienen prioridad — son los más valiosos que recibe la agencia.
+
 ### Avisos automáticos por email al asesor
 
 Cuando el bot detecta que un cliente avanza, **le manda un email al asesor asignado** (remitente "PRISMA IA") y **le deriva esa conversación a su bandeja** de WhatsApp para que tome el control. Pasa en 3 casos:

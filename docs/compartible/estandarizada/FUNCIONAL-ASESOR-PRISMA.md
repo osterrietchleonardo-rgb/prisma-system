@@ -241,6 +241,16 @@ Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos boto
 > 📎 **Enviar archivos:** con el chat en **control manual** (bot pausado), al lado de la caja de mensaje tenés un **clip 📎** para adjuntar una foto, un PDF, un audio o un video. El archivo queda **en espera** con una vista previa (podés **Cambiar** el archivo o **Quitarlo** con la ✕ si te equivocaste) y se manda recién cuando tocás **Enviar** — así podés escribir un texto para que vaya **junto al archivo**. Solo funciona dentro de las 24 hs desde el último mensaje del cliente (regla de WhatsApp).
 > 💡 Activá las **notificaciones push** en Configuración para enterarte al instante de mensajes nuevos.
 
+### El bot ahora entiende fotos y audios
+
+Si un cliente manda una **foto** (una captura de una publicación, el frente de un edificio, un plano) o un **audio**, el bot ya no se queda callado: **mira la foto o escucha el audio y responde sobre eso**.
+
+- Con una foto, describe lo que ve y sigue la conversación. Si es la captura de un aviso de otro portal, te lo va a decir — pero **no va a inventar datos** que no tenga: si no está el link, avisa que no puede confirmar la publicación.
+- Con un audio o una nota de voz, lo transcribe y contesta como si te lo hubieran escrito.
+- Los **videos** también entran al chat, aunque por ahora el bot no analiza el contenido.
+
+> 💡 **Tip:** si un cliente te manda una captura de una propiedad de otra inmobiliaria, pedile el **link**. Con el link el bot puede buscar la propiedad de verdad en la cartera; con la sola imagen no.
+
 ### Avisos por email cuando un cliente avanza
 
 Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y además **te pasa esa conversación a tu bandeja** de WhatsApp para que tomes el control. Esto ocurre en 3 momentos:

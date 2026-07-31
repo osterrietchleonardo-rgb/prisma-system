@@ -726,6 +726,36 @@ PRISMA inyecta 8 templates automáticos para cada agencia:
 
 Cada template tiene el prefijo `ag{agency_id[0:6]}_` para aislamiento multi-tenant en la cuenta de WhatsApp Business.
 
+### 9.2b El pipeline tiene tres modelos, no uno (31/07/2026)
+
+Entre el mensaje del lead y lo que le llega al cliente pasan **tres IA distintas**, y cada una puede romper de una forma propia:
+
+1. **Clasificador de entrada** (`Analizar conversación` → switch `REGLAS`) — decide **si el bot contesta o no**. De sus 14 categorías, **10 no van a ningún lado: el cliente queda sin respuesta y la ejecución figura como exitosa**, sin error ni alerta. Es el punto ciego más peligroso del flujo.
+2. **Agente orquestador** (`Agente IA CEO`) — conversa, califica, llama herramientas y decide derivar.
+3. **Estructurador de salida** (`Formato_Mensajes`) — parte la respuesta en hasta 9 mensajes sueltos de WhatsApp. Lo que escribe **va directo al cliente sin ningún filtro posterior**.
+
+Reglas que salieron de los incidentes del 30-31/07/2026:
+- **Un lead que llega de un portal (MercadoLibre, ZonaProp, Argenprop) nunca es spam.** Es el lead más valioso del negocio y el que dispara el flujo de propiedad por link. El clasificador lo bloqueaba por traer "un enlace externo": 5 leads reales quedaron sin respuesta.
+- **Ante la duda, el clasificador deja pasar.** Un falso positivo de spam cuesta una venta; un falso negativo lo absorbe el agente, que tiene sus propias reglas anti-manipulación.
+- **Una respuesta corta dentro de una conversación en curso es una persona contestando**, no un mensaje incoherente. Y un cliente quejándose del servicio no es hostil: es exactamente al que hay que derivar.
+- **Ningún nodo cuya salida llegue directo al cliente puede correr en el modelo más barato.** El clasificador en `nano` sobre-bloqueaba leads legítimos y a la vez dejaba pasar ataques reales; el estructurador en `nano` llegó a inventar una respuesta entera.
+- **Los ejemplos de un prompt nunca se cargan como un turno previo del asistente.** El estructurador tenía un ejemplo cargado así y se lo mandó tal cual a una clienta: tres propiedades inexistentes, con otro nombre y otra ciudad.
+
+### 9.2c Adjuntos: qué pasa cuando el cliente manda una foto o un audio (31/07/2026)
+
+Antes se perdían. **6 de cada 11 fotos recibidas quedaban sin ninguna respuesta**, y los audios directamente no entraban al sistema.
+
+La causa de fondo: **WhatsApp no manda el archivo ni una URL, manda un identificador**. Para ver la foto hay que pedirle a Meta la dirección de descarga y después bajarla, siempre autenticado. Ese circuito no existía: venía de la época en que PRISMA usaba otro proveedor de chat, que sí mandaba el archivo directo.
+
+Cómo funciona ahora:
+1. El webhook de PRISMA guarda el mensaje y **le pasa a n8n el identificador del adjunto**.
+2. n8n busca **el token de esa agencia** (cada inmobiliaria baja sus adjuntos con su propio token, no hay uno compartido).
+3. Le pide a Meta la dirección de descarga y baja el archivo.
+4. Si es **imagen**, una IA la describe y esa descripción entra al contexto del agente. Si es **audio**, se transcribe.
+5. El agente responde sabiendo qué había en la foto o qué dijo el cliente en la nota de voz.
+
+Verificado en producción con una captura de pantalla de un portal (el agente la reconoció y aclaró que sin el link no podía validar la publicación — sin inventar nada) y con una nota de voz (transcripta y respondida). **Video** también entra al sistema; su tratamiento con IA queda pendiente.
+
 ### 9.3 Tabla `n8n_chat_histories`
 
 Almacena el historial de conversación en el formato que n8n (LangChain) espera:

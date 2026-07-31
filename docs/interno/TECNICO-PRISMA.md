@@ -355,7 +355,7 @@ Lead → Evolution/Meta → webhook PRISMA → identifica instancia (agency_id)
    → si bot OFF: guarda en n8n_chat_histories (contexto para reactivación)
 ```
 - `POST /api/webhooks/evolution` — identifica por `evo_instance_name`.
-- `GET/POST /api/webhooks/meta` — verificación GET por `WHATSAPP_WEBHOOK_VERIFY_TOKEN`; POST maneja `message_template_status_update` y `messages` (text/image/interactive), identifica por `phone_number_id`.
+- `GET/POST /api/webhooks/meta` — verificación GET por `WHATSAPP_WEBHOOK_VERIFY_TOKEN`; POST maneja `message_template_status_update` y `messages` (text/image/**audio**/**video**/interactive), identifica por `phone_number_id`. Los tipos no contemplados siguen cayendo en `else continue` (sticker, ubicación, contactos…): no se guardan ni disparan n8n.
 - Ambos webhooks: `export const maxDuration = 60` (para que Vercel no mate la función antes de terminar los reintentos a n8n).
 - **Dedup por `wamid`:** antes de procesar, se consulta `wa_messages` por `wamid`; si existe, se ignora (Meta/Evolution pueden reentregar el mismo mensaje sin duplicar ni re-disparar n8n).
 
@@ -365,6 +365,31 @@ Lead → Evolution/Meta → webhook PRISMA → identifica instancia (agency_id)
 - **Reproceso `POST /api/n8n/retry-pending`** (auth: **cron** `Authorization: Bearer CRON_SECRET` **o** manual `N8N_REPLY_SECRET` por header `x-retry-secret`/`?secret=` — falla cerrado si no matchea ninguno; `?limit=1..100`, default 25; `?maxAgeHours=N` opcional): drena la cola, re-dispara con `callN8n`; éxito → `status='reprocessed'`; sigue fallando → suma `attempts` y guarda `last_error`. Con `maxAgeHours` solo reprocesa lo caído en las últimas N horas (evita contestarle a un lead un mensaje viejo); sin el parámetro, drena todo (uso manual).
 - **Cron automático `.github/workflows/n8n-retry-pending.yml`**: cada 15 min hace `POST /api/n8n/retry-pending?maxAgeHours=3&limit=50` con `Authorization: Bearer CRON_SECRET` (mismos secrets `SITE_DOMAIN`+`CRON_SECRET` que los demás crons). Reinyecta automáticamente los caídos recientes; lo más antiguo que 3h queda `pending` para revisión/decisión manual (o se cierra con `status='discarded'`).
 - **Origen:** caso real Ivana Marti (23/06/2026): el disparo único falló transitoriamente, el `.catch` lo tragó y el lead quedó sin respuesta y sin rastro en n8n. Esta arquitectura lo vuelve recuperable.
+
+### 9.1.2 Adjuntos entrantes (imagen, audio, video) — `media_id` y descarga en n8n (31/07/2026)
+
+**El problema:** Meta **no manda una URL** para los adjuntos, manda un **`media_id`**. El payload a n8n nunca incluyó ese id, así que el nodo `obtener imagen` recibía `null` y mataba la ejecución entera. Medido: **6 de 11 imágenes recibidas en 14 días quedaron sin ninguna respuesta al cliente**. El audio era peor: caía en el `else continue` del webhook, no se guardaba en la base ni disparaba n8n (0 audios en 14 días).
+
+**Lado app** (`app/api/webhooks/meta/route.ts`, aditivo):
+- `message.media = { id, mime_type, caption, voice }` en el `enrichedPayload`. Es `null` en los mensajes de texto. Escrito como `message[message.type]?.id` para cubrir image/audio/video (y document el día que se habilite) sin ramificar por tipo.
+- Se aceptan `audio` y `video`. Las notas de voz se distinguen de un archivo de audio por `audio.voice` (`"Mensaje de voz recibido"` vs `"Audio recibido"`).
+- `wa_messages.metadata` ya guardaba el objeto crudo de Meta, así que el `media_id` de los mensajes históricos **no se perdió**.
+
+**Lado n8n** (workflow `PRISMA`, id `aNowZdPO_xMlGwKRb54ir`):
+- `Set valores` copia campo por campo y `push_mensajes` guarda solo `body.conversacion.message` en Redis ⇒ **lo que no se mapea ahí muere antes del buffer**. Se agregó `body.conversacion.message.media_id` (tipo *string*, `{{ $json.body.message.media?.id || '' }}`; string y no object a propósito: con `null` un assignment de tipo object puede tirar error de conversión y el 99% del tráfico es texto).
+- Cadena nueva, idéntica en imagen y audio:
+  `tipo de mensaje[imagen] → Token_Meta → Resolver_Media → obtener imagen → analizar imagen → contenido - imagen`
+  `tipo de mensaje[audio]  → Token_Meta_audio → Resolver_Media_audio → obtener audio → transcribir audio → contenido - audio`
+- **`Token_Meta` / `Token_Meta_audio`** (Postgres, credencial `MEMORIA_PRISMA`): `SELECT token, phone_number_id FROM whatsapp_instances WHERE agency_id = $1`. **El token es dinámico por agencia**, no una credencial fija: cada agencia baja sus adjuntos con su propio token. Están duplicados a propósito (uno por rama) para que un mismo `Resolver_Media` no dispare las dos descargas.
+- **`Resolver_Media*`**: `GET https://graph.facebook.com/v20.0/{media_id}` → devuelve una `url` de vida corta en `lookaside.fbsbx.com`.
+- **`obtener imagen` / `obtener audio`**: descargan esa url con **Response Format = File**. El `Authorization: Bearer` va **también acá**, no solo al resolver: sin él Meta rechaza la descarga.
+- **Contrapartida asumida:** con el token por expresión (`{{ $('Token_Meta').item.json.token }}`) **queda escrito en el runData de cada ejecución**. Es el precio de que sea por agencia; con una credencial de n8n no pasaría, pero sería un token fijo. Mitigación: purgado de ejecuciones viejas.
+
+**Nodos eliminados** (quedaban de la época de Chatwoot, leían `messages.attachments.data_url`, que ya no existe): `set valores - imagen/audio`, `extraer datos binarios - imagen/audio`, `Convert to File - imagen/audio` y `convertir a mp3`. El workflow pasó de 92 a **87 nodos**.
+- `extraer datos binarios - imagen` tenía `encoding: utf8` (su gemelo de audio usaba `base64`): un JPEG por utf8 se corrompe, así que aunque se hubiera arreglado la URL la imagen habría llegado rota igual.
+- `convertir a mp3` reconstruía el binario a mano con `binaryData.data`; cuando n8n guarda binarios por referencia ese campo no trae el payload y **el archivo llegaba vacío** a Whisper (`Invalid file format`, con `fileSize: null` como síntoma). La descarga ya entrega `File.ogg` con mime y extensión válidos, así que el nodo sobraba.
+
+**Otros dos arreglos de la misma pasada:** `analizar imagen` tenía el tope por defecto de n8n de **300 tokens de salida**; con un modelo de razonamiento el razonamiento se los comía enteros y devolvía `status: incomplete` sin texto (subido a 4000). Y `contenido - imagen`/`contenido - audio` leían el texto como `output[0].content[0].text` y referenciaban los nodos eliminados; ahora buscan el bloque correcto (`output.find(o => o.type === 'message')`) con texto de respaldo, así una salida vacía no frena la ejecución.
 
 ### 9.2 Flujo de respuesta (`POST /api/n8n/reply`)
 Auth por `N8N_REPLY_SECRET`. Verifica anti-cruce de instancias; si el bot fue pausado, descarta. Normaliza `media_type`; calcula delay de tipeo (~40 ms/char, 800–4000 ms); envía vía Evolution (`sendText`/`sendMedia`) o Meta (`graph.facebook.com/v20.0/{phone_number_id}/messages`); persiste `wa_messages` (role `bot`); actualiza conversación; **broadcast Realtime** al canal `agency-{id}` (evento `refresh-whatsapp`).
@@ -412,6 +437,34 @@ Qué ensuciaba en los mails al asesor: `apto_credito` mostraba la URL de la fich
 - **Alcance:** lo resuelve RLS (`wa_conversations_access_policy`): director ve toda la agencia, asesor solo donde `agent_id = auth.uid()`. El dashboard del asesor además pasa `agentId = user.id`.
 - **Filtros:** respeta los del dashboard (`agentId` + `from`/`to` en director, `from`/`to` en asesor). `DatePeriodFilter` manda `yyyy-MM-dd`, así que `to` se extiende a `T23:59:59.999Z` para no ocultar los handoffs del día en curso.
 - **Severidad:** `reciente` <2 h · `demorado` 2–24 h · `critico` ≥24 h. Componente: `components/dashboard/HandoffsPanel.tsx`.
+
+### 9.2.3 Los tres LLM del pipeline y por qué el bot puede quedar mudo (31/07/2026)
+
+Entre el mensaje del lead y la respuesta al cliente hay **tres modelos**, no uno. Cada uno falló de una forma distinta el 30-31/07/2026 y los tres se reescribieron.
+
+**1. `Analizar conversación` — clasificador de entrada (compuerta de seguridad).**
+Devuelve `{"categoria_principal": "..."}` y alimenta el switch **`REGLAS`**. De sus **14 salidas solo 4 llegan al agente** (RELEVANTE_ALTA/MEDIA, SEMI_RELEVANTE_CONSULTIVA, IRRELEVANTE_BENIGNO). **Las otras 10 no van a ningún nodo: el cliente queda sin respuesta, sin error y con la ejecución en `success`.**
+- *El bug:* el prompt definía `SPAM_COMERCIAL_EXTERNO` con *"Confirma si: … enlaces o números externos"*. Un lead que llega de MercadoLibre/ZonaProp/Argenprop **es** un enlace externo con texto de plantilla ⇒ se lo clasificaba como spam ⇒ silencio. Medido sobre 282 ejecuciones: **22 links de portal antes del 30/07 → 100% contestados; después → 5 de 26 ignorados (19%)**. También caían respuestas cortas legítimas ("No, no", "Esos valores") como INCOHERENTE y un cliente frustrado como CONTENIDO_HOSTIL, o sea justo el que había que derivar.
+- *El fix:* árbol de decisión con **REGLA CERO — ante la duda, `RELEVANTE_MEDIA_PRIORIDAD`** (nunca una etiqueta que silencie), más un paso "NUNCA BLOQUEAR" que declara que un link de portal es el lead más valioso, que una respuesta corta con historial es una persona contestando, y que una queja va a RELEVANTE para que el agente derive.
+- **GOTCHA DE MODELO:** el disparador fue pasar este nodo a `gpt-5.4-nano`. Probado contra los mensajes reales y 9 ataques sintéticos: **nano bloquea 5 de 9 ataques** (deja pasar prompt injection, extracción de datos y social engineering) **y a la vez sobre-bloquea leads legítimos**; **mini bloquea 9 de 9** sin sobre-bloquear. **Este nodo no puede ir en nano.**
+
+**2. `Agente IA CEO` — orquestador.** Prompt reescrito de 47.619 a ~41.800 chars con las 53 reglas de negocio verificadas presentes. Lo estructural: bloque **PRECEDENCIA** al inicio (antes había tres reglas que decían "gana a todas" sin orden); **saludo obligatorio en el primer mensaje** aunque el cliente mande un link (fallaba siempre en ese caso: la sección del link le daba una frase citable y el saludo vivía en otra sección); **REGLA DEL EMAIL DEL ASESOR** — antes de `Gestion_Handoff` hay que llamar a `Cartera_Propiedades` con el link para obtener `asesor.email_asesor`, porque sin ese dato el handoff **no queda asignado a nadie** (el sub-workflow devuelve *"No se pudo derivar: la propiedad no tiene asesor asignado"*); regla de insistencia única (un dato se pregunta máximo dos veces); y no derivar por un dato que se puede averiguar.
+- `{{ $json.working_hours }}` renderizaba **vacío** ("Atendemos en .") porque `$json` en el agente es la salida de `Memoria Lead`, no de `CONTEXTO_PRISMA`. Corregido.
+
+**3. `Formato_Mensajes` — estructurador de salida.** Ver 9.2.4.
+
+**Modelos y topes (31/07/2026):** agente `gpt-5.4-mini` con `reasoningEffort: medium` y **`maxTokens: 8000`**; clasificador y estructurador `gpt-5.4-mini`; analizadores de métricas y `Cartera_Propiedades` en `gpt-5.4-nano`; `analizar imagen` en `gpt-4.1-mini`.
+- **Regla general aprendida:** en modelos de razonamiento los tokens de razonamiento **se descuentan del presupuesto de salida**. Con `maxTokens` corto la respuesta sale **vacía** y el auto-fixing parser manda al cliente una disculpa tipo *"no puedo completar la tarea porque la salida anterior no cumplió el formato"*. Pasó con el agente (2048 con effort high, contexto de 16.460 tokens tras una llamada a `Cartera_Propiedades`) y con `analizar imagen` (300 por defecto). El tope es un techo, no una reserva: subirlo no cuesta si no se usa, y chocarlo se paga igual pero sin resultado.
+- Cualquier nodo cuya salida llegue **directo al cliente sin filtro** (estructurador y el modelo del auto-fixing parser) no debe ir en nano.
+
+### 9.2.4 `Formato_Mensajes` — el estructurador de 9 partes
+
+Segundo LLM después del agente. Recibe solo `{{ $json.output.Mensaje }}` (**no tiene nodo de memoria**), parte la respuesta en 13 claves (`part_1`, `part_2`, `part_3/3.1/3.2`, `part_4/4.1/4.2`, `part_5`…`part_9`) y cada una sale como **un mensaje separado de WhatsApp** vía `respuesta1..respuesta10`. Mapeo: `part_3*` = URL de la imagen (`media_url`), `part_4*` = su caption (`media_type: image`).
+
+- **El bug grave:** el nodo tenía **dos** bloques en `messages.messageValues`. El `[1]` era de tipo **`AIMessagePromptTemplate`** — un JSON completo con tres propiedades inventadas de La Plata (fichas `LP-001/002/003`, dirigido a un tal "Leo", cerrando con *"¿Querés que agendemos visita?"*). Al ser AIMessage el modelo lo lee como **"esto es lo que yo dije antes"** y cuando duda lo repite textual: **le llegaron 5 mensajes con propiedades inexistentes a una clienta real** (31/07, 01:52). Nunca hubo cruce de `conversation_id`.
+- **Lección de verificación:** al reemplazar un prompt por API hay que comprobar que **el texto viejo NO está**, no solo que el nuevo sí, y revisar `len(messageValues)`. Los ejemplos van dentro del system message rotulados como ejemplos, **nunca como `AIMessagePromptTemplate`**.
+- **Cómo quedó:** router puro (1.737 tokens, era 3.232). Regla madre: todo el texto debe existir textualmente en el mensaje del agente; si el agente no cerró con pregunta, **`part_9` va vacío**. Antes `part_9` era "siempre obligatorio" con dos ejemplos que empujaban visita, y se comprobó que **inventaba CTAs** (el agente escribió *"te aclaro cualquier otro dato"* y el estructurador mandó *"¿Qué te gustaría revisar?"*). Prohibido reformatear los bloques de propiedad.
+- **Escape de JSON en los `respuesta*`:** los 10 nodos armaban el body a mano y el valor se interpolaba crudo, así que un salto de línea, una comilla o una barra invertida rompían el JSON. Los parches previos (`.replace(/[\r\n]+/g," ")` en 9 nodos y `.replaceAll('"', ',')` en `respuesta1`, que convertía las comillas del cliente en comas) se reemplazaron por **`{{ JSON.stringify(<accesor> || '') }}`** — sin las comillas del template, porque `stringify` ya las agrega. Verificado: con un texto de ficha con saltos, comilla y barra, la versión nueva produce JSON válido en los 10 y reconstruye el texto idéntico; la anterior fallaba en los 10. Efecto visible: **la ficha vuelve a llegar en varias líneas**.
 
 ### 9.3 Templates de seguimiento (`POST /api/whatsapp/dispatch`)
 Auth por `DISPATCH_SECRET`. Prefijo por agencia `ag{agency_id[0:6]}_`. 8 templates: `seg_f1_seguimiento`, `seg_f2_valor`, `seg_f3_breakup`, `visita_recordatorio_24h/3h/1h`, `visita_post_noshow`, `reactivacion_snoozed`. Persiste en `wa_messages` + `n8n_chat_histories` + registra en `follow_ups_history` (con snapshot del estado). Broadcast Realtime.
