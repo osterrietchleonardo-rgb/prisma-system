@@ -88,7 +88,7 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
         icon={FileText}
         color="amber-500"
         metrics={[
-          { label: "Volumen Tasaciones", value: kpis.tasaciones },
+          { label: "Fichas ACM", value: kpis.acm },
           { label: "Pipeline Potencial", value: formatUSD(kpis.pipelineCaptacion) },
           { label: "Ticket Promedio", value: formatUSD(kpis.ticketPromedioTasacion) },
         ]}

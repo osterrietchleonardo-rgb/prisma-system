@@ -4,7 +4,8 @@ export interface AdvisorStats {
   name: string;
   wa_chats?: number;
   prospeccion?: number;
-  tasaciones?: number;
+  /** Fichas ACM generadas en el periodo. Reemplaza a la vieja `tasaciones` (logs prelisting). */
+  acm?: number;
   compradores?: number;
   captaciones: number;
   reservas?: number;
@@ -32,7 +33,7 @@ export function classifyByDefaultRules(stats: AdvisorStats): AdvisorClassificati
   const facturacion = stats.facturacion || 0;
   const transacciones = (stats.transacciones || 0) + (stats.reservas || 0);
   const captaciones = stats.captaciones || 0;
-  const tasaciones = stats.tasaciones || 0;
+  const acm = stats.acm || 0;
   const consultas = (stats.wa_chats || 0) + (stats.prospeccion || 0);
 
   if (facturacion >= 10000 || transacciones >= 4) {
@@ -47,15 +48,15 @@ export function classifyByDefaultRules(stats: AdvisorStats): AdvisorClassificati
       reason: `Facturación US$${facturacion.toFixed(0)} con ${transacciones} transacción(es) cerrada(s).`,
     };
   }
-  if (consultas >= 20 && (tasaciones >= 3 || captaciones >= 3)) {
+  if (consultas >= 20 && (acm >= 3 || captaciones >= 3)) {
     return {
       category: "En Desarrollo",
-      reason: `${consultas} consultas y actividad de captación/tasación (${captaciones} captaciones, ${tasaciones} tasaciones).`,
+      reason: `${consultas} consultas y actividad de captación/análisis (${captaciones} captaciones, ${acm} ACM).`,
     };
   }
   return {
     category: "Requiere Atención",
-    reason: "Aún no alcanza los umbrales de facturación, transacciones ni de actividad (consultas/captaciones/tasaciones).",
+    reason: "Aún no alcanza los umbrales de facturación, transacciones ni de actividad (consultas/captaciones/ACM).",
   };
 }
 
@@ -68,6 +69,9 @@ async function classifyWithCustomRules(
   stats: AdvisorStats,
   customInstructions: string
 ): Promise<AdvisorClassification> {
+  // OJO con `tasaciones`: la métrica pasó a llamarse `acm`, pero las reglas personalizadas que el
+  // director ya escribió y tiene guardadas siguen diciendo "tasaciones". Se mandan las DOS claves con
+  // el mismo valor para que esas reglas no se rompan solas. Es un alias legacy: en la UI ya no se ofrece.
   const prompt = `
     Eres un clasificador de rendimiento comercial inmobiliario. Tu única función es determinar la categoría de un asesor a partir de los datos del mes. La clasificación es determinista y reproducible.
 
@@ -79,7 +83,8 @@ async function classifyWithCustomRules(
     transacciones    =  ${stats.transacciones + (stats.reservas || 0)}
     captaciones      =  ${stats.captaciones}
     cartera_activa   =  ${stats.cartera_activa || 0}
-    tasaciones       =  ${stats.tasaciones || 0}
+    acm              =  ${stats.acm || 0}
+    tasaciones       =  ${stats.acm || 0}
     consultas        =  ${(stats.wa_chats || 0) + (stats.prospeccion || 0)}
     rotacion_pct     =  ${stats.rotacion.toFixed(1)}
 

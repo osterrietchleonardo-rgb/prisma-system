@@ -86,7 +86,7 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 - **Handoffs sin atender:** los clientes que el bot le pasó a un asesor y **todavía nadie respondió** (ver detalle abajo).
 - **Gráficos:** evolución temporal (barras) y distribución por canal de origen (dona).
 - **Objetivos vs Alcanzado:** la sección de metas mensuales (ver detalle abajo), justo antes del ranking.
-- **Ranking de asesores:** quién rinde más en tu equipo.
+- **Ranking de asesores:** quién rinde más en tu equipo. **Vos ves todo, incluida la facturación de cada uno.**
 - **Inteligencia Conversacional:** el análisis profundo de WhatsApp (ver sección 22; vive acá adentro, no en el menú).
 - **Embudo (Pipeline):** resumen de leads por etapa.
 - **Leads y Propiedades:** secciones con el detalle de leads recientes y de la cartera.
@@ -126,6 +126,8 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 - Un **gráfico de evolución** del total de la inmobiliaria: barras de objetivo vs alcanzado por mes, más una línea con el % de cumplimiento.
 
 > 💡 **Tip:** si la sección dice que no hay objetivos cargados, andá a **Tracking Performance → Objetivos** y cargalos. El "alcanzado" se llena solo con la actividad del equipo.
+
+> 🔒 **Qué ve el asesor de todo esto.** Vos ves la tabla completa. Cada asesor, en su propio dashboard, ve **solo su fila** de "Objetivos vs Alcanzado" y su propio gráfico: las metas y el cumplimiento de sus compañeros no los ve. En el **Ranking** sí ve la tabla entera (posición, chats, ACM, captaciones, cierres, cartera, rotación y la clasificación de todos), pero la columna **Facturación** solo la ve en su propia fila; en las demás le figura **"Privado"**. Es así por diseño: el asesor sabe dónde está parado, sin enterarse de cuánto factura el de al lado.
 
 ---
 
@@ -193,6 +195,10 @@ Tenés **3 solapas**:
 1. **Actividad:** el historial de actividad del equipo (ver, filtrar, cargar nuevas). Como director ves un **filtro por asesor** (desplegable en orden alfabético) que te permite ver solo la actividad de un asesor específico o de todos. También tenés un **filtro de fechas** (mismo selector que el Dashboard: presets Hoy/Mes/Trimestre/Año/Últimos 30 o rango a mano) para acotar el historial a un período; se combina con el resto de los filtros y **"Limpiar"** lo resetea.
 2. **Objetivos:** dónde fijás las metas mensuales por asesor (ver detalle abajo).
 3. **Configuración IA:** ajustás las escalas (qué puntaje da cada acción: llamada, captación, prelisting, etc.). Esto define cómo se calculan los KPIs.
+
+> 📌 **Cambio (jul-2026): "tasaciones" ahora es "ACM".** En el Ranking del Dashboard la columna **Tasac.** pasó a llamarse **ACM**, y en las tarjetas el "Volumen Tasaciones" pasó a ser **Fichas ACM**. Cambió también de dónde sale el número: antes contaba las actividades de tipo Prelisting que el equipo cargaba a mano; **ahora cuenta las fichas de ACM que el asesor genera de verdad** en el módulo ACM. Es un dato más honesto, porque no depende de que alguien se acuerde de cargarlo.
+>
+> Si escribiste **reglas propias** en Configuración IA, la variable pasó a llamarse `acm`. **Tus reglas viejas que decían `tasaciones` siguen funcionando igual** (les dejamos el nombre viejo andando a propósito), pero cuando las edites conviene pasarlas a `acm`.
 
 ### Dos formas de ver la actividad: Lista y Pipeline
 

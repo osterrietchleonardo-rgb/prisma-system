@@ -2039,10 +2039,11 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 - **Componentes Clave:**
   - `PerformanceMetricsGrid`: Tarjetas (KPIs) con leads, captaciones, reservas y cierres (total y variación porcentual).
   - `PerformanceCharts`: Gráfico de evolución temporal (barras) y distribución por canal de origen (dona).
-  - `ObjectivesDashboard`: Sección "Objetivos vs Alcanzado" (antes del Ranking). Tabla por asesor con 3 filas por mes (Objetivo / Alcanzado / % cumplido) + gráfico `ComposedChart` (barras objetivo vs alcanzado y línea de %). Filtro de año y toggle de métrica (Facturación / Captación). Re-carga al cambiar año vía server action `getObjectivesDashboardForYear`.
-  - `PerformanceLeaderboard`: Ranking de los asesores de la agencia.
+  - `ObjectivesDashboard`: Sección "Objetivos vs Alcanzado" (antes del Ranking). Tabla por asesor con 3 filas por mes (Objetivo / Alcanzado / % cumplido) + gráfico `ComposedChart` (barras objetivo vs alcanzado y línea de %). Filtro de año y toggle de métrica (Facturación / Captación). Re-carga al cambiar año vía server action `getObjectivesDashboardForYear`. Prop `alcance` (`"agencia"` por defecto | `"propio"`): solo cambia los textos; el recorte de filas se hace en el server (ver §27.2 → "Privacidad entre asesores").
+  - `PerformanceLeaderboard`: Ranking de los asesores de la agencia. La columna **ACM** cuenta fichas ACM generadas (antes era "Tasac." = logs `prelisting`).
   - `DashboardActivity`: Feed en tiempo real de los últimos eventos (ej. nuevo lead, propiedad sincronizada, etc.).
 - **Datos:** Llama a `getDashboardData(agency_id)` sin filtrar por asesor. Los objetivos se traen con `getObjectivesDashboard(agency_id, año)` (`lib/tracking/objetivos.ts`), que cruza `performance_objectives` (lo planificado) con lo derivado de `performance_logs` (lo alcanzado). Presente en el dashboard de director **y** de asesor.
+- **El director ve todo sin recortes.** La privacidad descrita en §27.2 ("Privacidad entre asesores") aplica solo al dashboard del asesor.
 
 #### 2. Pipeline / CRM (`/director/pipeline`)
 - **Objetivo:** Gestión visual (Kanban) de los leads y oportunidades.
@@ -2154,7 +2155,16 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 El módulo del asesor hereda y reutiliza gran parte de los componentes de UI del director, pero con una capa estricta de filtros aplicada a nivel base de datos (y reforzada en UI) para garantizar que el Asesor solo vea **su propia información** o información compartida públicamente por la agencia.
 
 #### 1. Dashboard Asesor (`/asesor/dashboard`)
-- **Diferencia con Director:** Llama a `getDashboardData(agency_id, user.id)`. Solo muestra los KPIs y gráficos de las propiedades, leads y actividades asignadas a este asesor en particular. Sin embargo, muestra el ranking global (`PerformanceLeaderboard`) y la sección **Objetivos vs Alcanzado** (`ObjectivesDashboard`, a nivel agencia) para que el asesor conozca su posición y las metas del equipo. El asesor **no** puede editar objetivos (la carga es exclusiva del director en Tracking Performance).
+- **Diferencia con Director:** Llama a `getDashboardData(agency_id, user.id)`. Solo muestra los KPIs y gráficos de las propiedades, leads y actividades asignadas a este asesor en particular. Sin embargo, muestra el ranking global (`PerformanceLeaderboard`) para que el asesor conozca su posición, y la sección **Objetivos vs Alcanzado** (`ObjectivesDashboard`) **acotada a su propia fila**. El asesor **no** puede editar objetivos (la carga es exclusiva del director en Tracking Performance).
+
+##### Privacidad entre asesores (jul-2026)
+
+Dos recortes, ambos hechos **en el servidor**. Es deliberado y no es negociable: si el dato se mandara al navegador y solo se ocultara en pantalla, seguiría viajando en el payload RSC y cualquiera lo leería desde las herramientas del navegador. Tapar en el componente cliente **no** es ocultar.
+
+1. **Ranking — solo la facturación propia.** El asesor sigue viendo la tabla completa (posición, chats, ACM, compradores, captaciones, reservas, cierres, cartera, rotación y la clasificación IA de todos). Lo único que se tapa es la columna **Facturación**: la suya con el monto, las demás con **"Privado"**. En `app/asesor/dashboard/page.tsx` se ordena por facturación real y **recién después** se mapean las filas ajenas a `facturacion: null` + `classificationReason: null`.
+   - El **motivo** de la clasificación se tapa junto con el monto porque el texto lo cita literal (`"Facturación US$12.500 y 3 transacción(es)..."`). La **categoría** (Elite / Sólido / …) sí queda visible.
+   - `PerformanceLeaderboard` no re-ordena cuando detecta alguna `facturacion` en `null`: respeta el orden que ya mandó el server, que es el único que conoce los montos reales.
+2. **Objetivos — solo su fila.** La página filtra `objectivesData` por `agentId === user.id` y pasa `alcance="propio"`. El recargar-por-año también viene filtrado desde el origen: `getObjectivesDashboardForYear` (`actions/tracking/objetivos.ts`) lee el `role` del perfil y devuelve solo la fila propia a **todo el que no sea director** (default seguro ante roles nuevos). El gráfico pasa a ser el del asesor y el título dice "mis objetivos".
 - **Filtro de fechas (`DatePeriodFilter`):** el asesor elige el **período** (presets Hoy/Mes/Trimestre/Año/Últimos 30, o rango a mano) y el dashboard **recalcula KPIs y ranking sobre ese rango**. El filtro escribe `from`/`to` en la URL; la página los pasa a `getDashboardData(agency_id, user.id, from, to)` (y también al leaderboard de agencia). Filtra por `fecha_actividad` de los logs y `created_at` de WhatsApp; los **objetivos siguen siendo por año** (no dependen del filtro). Mismo componente y comportamiento que ya tenía el director.
 
 #### 2. Pipeline Asesor (`/asesor/pipeline`)
