@@ -220,6 +220,8 @@ Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos bo
 
 **Formulario de registro (igual que el asesor):** zona/barrio, propiedad de Tokko o de colaboración, vincular cliente (Tokko o WhatsApp), registro manual de lead nuevo y origen de consulta. El registro manual pide **nombre completo, celular, email y etiqueta**. El celular se carga eligiendo el **país** (lista con bandera) y escribiendo el número natural; el sistema lo normaliza al formato de WhatsApp (para AR agrega el "9" móvil aunque no se ponga el 15) y muestra el preview. Lleva **doble verificación** de nombre/celular/email (se reescriben sin copiar/pegar, con aviso ✅/❌) y una **casilla de certificación** obligatoria de que los datos son veraces. Como director, al cargar podés **elegir a qué asesor** corresponde.
 
+> **Excepción en Prospección:** el email figura como *(Opcional)* y se puede dejar vacío **sólo** cuando la actividad es Prospección, porque en el primer contacto el asesor muchas veces tiene únicamente el celular. En Prelisting, Prebuying, Captación, Reserva y Cierre sigue siendo obligatorio igual que antes. Y aunque sea opcional no se afloja el control: si el asesor escribe un email, tiene que estar bien formado y doble-verificado igual que siempre.
+
 ### Solapa "Objetivos" (fijar metas mensuales)
 
 **Qué es:** acá definís, **por asesor y por mes**, la meta de **Facturación** (en USD) y **Captación** (cantidad de propiedades captadas) durante el año.
@@ -281,6 +283,24 @@ Vas a ver un **asistente de configuración** que te guía paso a paso para conec
 - **⚙️ Configuración IA:** definís el comportamiento del bot (cómo responde, conocimiento, etc.).
 
 Arriba a la derecha, un **indicador de conexión** te muestra si la instancia está conectada.
+
+### El bot entiende fotos y audios
+
+Cuando un cliente manda una **foto** (la captura de un aviso, el frente de un edificio, un plano) o un **audio**, el bot la mira o lo escucha y responde sobre eso, sin quedarse callado. Los **videos** también entran al chat, aunque todavía no se analiza su contenido.
+
+Sigue valiendo la regla de siempre: **el bot no inventa**. Si de una captura no puede confirmar una publicación, lo dice y pide el link en lugar de improvisar datos.
+
+> ⚠️ **Por qué importa:** antes de julio de 2026 esto no funcionaba y **más de la mitad de los clientes que mandaban una foto se quedaban sin ninguna respuesta**, sin que quedara ningún aviso de error. Si notás conversaciones cortadas de antes de esa fecha, puede ser esta la causa.
+
+### Cuando el bot no contesta: qué mirar
+
+El bot tiene un **filtro de seguridad** que descarta spam, publicidad de otros rubros e intentos de manipulación. Ese filtro es el que decide si el mensaje llega o no al asistente, y cuando descarta **no queda ningún error visible**: la conversación simplemente no avanza.
+
+Por eso, si un cliente dice que escribió y nadie le contestó:
+1. Fijate en la bandeja si el mensaje del cliente está pero no hay respuesta del bot.
+2. Avisale a soporte con el teléfono y la hora: se puede revisar exactamente por qué se descartó.
+
+> 💡 **Un caso real:** los leads que llegan de MercadoLibre, ZonaProp o Argenprop entran con un **link** en el mensaje, y el filtro los estaba tomando por publicidad. Cinco consultas reales quedaron sin respuesta antes de detectarlo. Ya está corregido, y esos leads ahora tienen prioridad — son los más valiosos que recibe la agencia.
 
 ### Avisos automáticos por email al asesor
 
@@ -473,7 +493,7 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 
 **Qué trae la ficha:**
 - **Portada** con la propiedad de referencia y la fecha.
-- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes) y todas las fotos + características.
+- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes), una **descripción breve** de la propiedad (resumida en pocas líneas, sin la letra chica ni los datos de contacto de quien publicó el aviso) y todas las fotos + características.
 - **Hoja final** con la **matriz comparativa de valores por m²** (con **promedios de superficie, precio y $/m²**), el gráfico **"La Pirámide del Precio"** (por qué un precio alto apaga la demanda), las **conclusiones** revisadas y los **datos de contacto** de quien la generó.
 - En la tarjeta de contacto, sobre el nombre: si la ficha la hizo el **director** dice "Director/a"; si la hizo un **asesor**, aparece **la clasificación que le pusiste** (Client Director / Client Support, o "Asesor/a" si no le asignaste ninguna, desde la pestaña **Asesores**).
 - El **logo** y el **aviso legal** en el pie de cada hoja (si están cargados). El logo se **recorta y agranda solo** para que se vea grande y nítido, cualquiera sea el archivo que subas.

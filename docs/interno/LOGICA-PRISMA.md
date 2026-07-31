@@ -726,6 +726,36 @@ PRISMA inyecta 8 templates automáticos para cada agencia:
 
 Cada template tiene el prefijo `ag{agency_id[0:6]}_` para aislamiento multi-tenant en la cuenta de WhatsApp Business.
 
+### 9.2b El pipeline tiene tres modelos, no uno (31/07/2026)
+
+Entre el mensaje del lead y lo que le llega al cliente pasan **tres IA distintas**, y cada una puede romper de una forma propia:
+
+1. **Clasificador de entrada** (`Analizar conversación` → switch `REGLAS`) — decide **si el bot contesta o no**. De sus 14 categorías, **10 no van a ningún lado: el cliente queda sin respuesta y la ejecución figura como exitosa**, sin error ni alerta. Es el punto ciego más peligroso del flujo.
+2. **Agente orquestador** (`Agente IA CEO`) — conversa, califica, llama herramientas y decide derivar.
+3. **Estructurador de salida** (`Formato_Mensajes`) — parte la respuesta en hasta 9 mensajes sueltos de WhatsApp. Lo que escribe **va directo al cliente sin ningún filtro posterior**.
+
+Reglas que salieron de los incidentes del 30-31/07/2026:
+- **Un lead que llega de un portal (MercadoLibre, ZonaProp, Argenprop) nunca es spam.** Es el lead más valioso del negocio y el que dispara el flujo de propiedad por link. El clasificador lo bloqueaba por traer "un enlace externo": 5 leads reales quedaron sin respuesta.
+- **Ante la duda, el clasificador deja pasar.** Un falso positivo de spam cuesta una venta; un falso negativo lo absorbe el agente, que tiene sus propias reglas anti-manipulación.
+- **Una respuesta corta dentro de una conversación en curso es una persona contestando**, no un mensaje incoherente. Y un cliente quejándose del servicio no es hostil: es exactamente al que hay que derivar.
+- **Ningún nodo cuya salida llegue directo al cliente puede correr en el modelo más barato.** El clasificador en `nano` sobre-bloqueaba leads legítimos y a la vez dejaba pasar ataques reales; el estructurador en `nano` llegó a inventar una respuesta entera.
+- **Los ejemplos de un prompt nunca se cargan como un turno previo del asistente.** El estructurador tenía un ejemplo cargado así y se lo mandó tal cual a una clienta: tres propiedades inexistentes, con otro nombre y otra ciudad.
+
+### 9.2c Adjuntos: qué pasa cuando el cliente manda una foto o un audio (31/07/2026)
+
+Antes se perdían. **6 de cada 11 fotos recibidas quedaban sin ninguna respuesta**, y los audios directamente no entraban al sistema.
+
+La causa de fondo: **WhatsApp no manda el archivo ni una URL, manda un identificador**. Para ver la foto hay que pedirle a Meta la dirección de descarga y después bajarla, siempre autenticado. Ese circuito no existía: venía de la época en que PRISMA usaba otro proveedor de chat, que sí mandaba el archivo directo.
+
+Cómo funciona ahora:
+1. El webhook de PRISMA guarda el mensaje y **le pasa a n8n el identificador del adjunto**.
+2. n8n busca **el token de esa agencia** (cada inmobiliaria baja sus adjuntos con su propio token, no hay uno compartido).
+3. Le pide a Meta la dirección de descarga y baja el archivo.
+4. Si es **imagen**, una IA la describe y esa descripción entra al contexto del agente. Si es **audio**, se transcribe.
+5. El agente responde sabiendo qué había en la foto o qué dijo el cliente en la nota de voz.
+
+Verificado en producción con una captura de pantalla de un portal (el agente la reconoció y aclaró que sin el link no podía validar la publicación — sin inventar nada) y con una nota de voz (transcripta y respondida). **Video** también entra al sistema; su tratamiento con IA queda pendiente.
+
 ### 9.3 Tabla `n8n_chat_histories`
 
 Almacena el historial de conversación en el formato que n8n (LangChain) espera:
@@ -2076,7 +2106,7 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
     - **Propiedad (Tokko):** Desplegable con las propiedades de la cartera de Tokko, filtradas por asesor asignado.
     - **Propiedad (Colaboración):** Campo de texto para registrar actividades con propiedades externas a la cartera de Tokko (ej. una colaboración con otra inmobiliaria).
     - **Vincular Cliente:** Búsqueda entre leads de Tokko y contactos de WhatsApp asignados al asesor.
-    - **Registro Manual de Lead (componente compartido `ManualContactFields`):** Alternativa para registrar contactos nuevos (amigos, vecinos, referidos) que no existen en la base de datos. Pide **nombre completo, celular, email y etiqueta (opcional)**. **Celular con selector de país + normalización E.164:** un `SearchableSelect` lista los países (vía `getPhoneCountries`, con bandera emoji y código de llamada; default AR) y el usuario escribe el número en formato local; `lib/whatsapp/phone.ts` lo normaliza a E.164 sin "+" con `libphonenumber-js` (`normalizePhoneE164`) y muestra el preview formateado (`formatPhoneInternational`). Para Argentina se fuerza el "9" de móvil tras validar (si el número queda como `54`+área sin `9`), porque los contactos son siempre celulares de WhatsApp. Para evitar cargas falsas/desprolijas, nombre, celular y email tienen **doble verificación**: se reescriben en un segundo campo (sin copiar/pegar — se bloquean `onPaste`/`onDrop`) y el sistema valida en tiempo real que coincidan (indicador ✅/❌); en el celular la comparación es sobre el **E.164 normalizado** (no el texto), así dos formas de escribir el mismo número se consideran iguales. Antes de habilitar la creación, exige tildar una **casilla de certificación** declarando que los datos son reales y obtenidos legítimamente (`isValid` agrupa coincidencias + formatos válidos + certificación). El teléfono se reporta hacia arriba ya en E.164. Para el director, muestra un desplegable de asesores; para el asesor, se autocompleta con su cuenta. El lead se crea vía `createManualContact.ts` (contacto en `wa_contacts` con email en `metadata`, y conversación en `wa_conversations`).
+    - **Registro Manual de Lead (componente compartido `ManualContactFields`):** Alternativa para registrar contactos nuevos (amigos, vecinos, referidos) que no existen en la base de datos. Pide **nombre completo, celular, email y etiqueta (opcional)**. **Celular con selector de país + normalización E.164:** un `SearchableSelect` lista los países (vía `getPhoneCountries`, con bandera emoji y código de llamada; default AR) y el usuario escribe el número en formato local; `lib/whatsapp/phone.ts` lo normaliza a E.164 sin "+" con `libphonenumber-js` (`normalizePhoneE164`) y muestra el preview formateado (`formatPhoneInternational`). Para Argentina se fuerza el "9" de móvil tras validar (si el número queda como `54`+área sin `9`), porque los contactos son siempre celulares de WhatsApp. Para evitar cargas falsas/desprolijas, nombre, celular y email tienen **doble verificación**: se reescriben en un segundo campo (sin copiar/pegar — se bloquean `onPaste`/`onDrop`) y el sistema valida en tiempo real que coincidan (indicador ✅/❌); en el celular la comparación es sobre el **E.164 normalizado** (no el texto), así dos formas de escribir el mismo número se consideran iguales. Antes de habilitar la creación, exige tildar una **casilla de certificación** declarando que los datos son reales y obtenidos legítimamente (`isValid` agrupa coincidencias + formatos válidos + certificación). **Excepción por etapa: en `prospeccion` el email es opcional** (prop `emailRequired={activityType !== "prospeccion"}`), porque en el primer contacto el asesor muchas veces sólo tiene el celular; en prelisting/prebuying/captación/reserva/cierre sigue siendo obligatorio. La excepción es sólo *poder dejarlo vacío*: si el asesor escribe algo en cualquiera de los dos campos de email, se le exige el mismo formato + doble verificación de siempre. El teléfono se reporta hacia arriba ya en E.164. Para el director, muestra un desplegable de asesores; para el asesor, se autocompleta con su cuenta. El lead se crea vía `createManualContact.ts` (contacto en `wa_contacts` con email en `metadata`, y conversación en `wa_conversations`).
   - **Origen de Consulta:** Lista exhaustiva de canales: Acciones indirectas, Alianzas Estratégicas, Argenprop, Arquitectos/Agrimensores, Buzoneo/Folletos, Chatbot, Cliente Antiguo, Constructor, Dueño Vende, Email Marketing, Eventos, Facebook, Familiar/Amigo, Google Ads, Google Maps, Guardia, Instagram, Landing Page, Letrero, Llamadas en frío, MercadoLibre, OLX, Open House, Portal propio, Prensa, Radio, Referido colegas, Referido cliente, Redes de contacto, Señalética, Telemarketing, TikTok, Tokko CRM, Voz a voz, WhatsApp orgánico, YouTube, ZonaProp, Otros.
   - **Server Action:** `actions/whatsapp/createManualContact.ts` — crea el contacto en `wa_contacts` + `wa_conversations` y devuelve el resultado al formulario.
   - **Si el teléfono ya existe en la agencia (jul-2026):** la acción busca **a nivel agencia** (no solo entre lo que ve el asesor) y decide por el dueño del **chat** (`wa_conversations.agent_id`): si está **sin asignar**, el chat queda para el asesor; si es **de otro asesor**, no se toca nada y devuelve un `warning` que el formulario muestra como aviso, pero **el registro se guarda igual**. La agenda (`wa_contacts`) nunca se reescribe. Detalle del porqué en TECNICO § 9.6.

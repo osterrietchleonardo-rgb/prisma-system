@@ -108,6 +108,11 @@ export function PerformanceLogForm({
   const { watch, setValue, register, formState: { errors } } = form;
   const activityType = watch("type");
 
+  // En prospección el asesor recién está conociendo al cliente: muchas veces
+  // sólo tiene el celular. De la segunda etapa en adelante el email vuelve a
+  // ser obligatorio, porque a esa altura ya debería tenerlo.
+  const emailObligatorio = activityType !== "prospeccion";
+
   // Sync metadata when specific fields change
   const handleMetadataChange = (key: string, value: any) => {
     const currentMetadata = watch("metadata") || {};
@@ -117,7 +122,9 @@ export function PerformanceLogForm({
   const onSubmit = async (values: PerformanceLogFormData) => {
     setIsSubmitting(true);
     try {
-      let finalValues = { ...values };
+      // `const` y no `let`: nunca se reasigna, sólo se le escribe una propiedad
+      // (`wa_contact_id`) más abajo, y eso `const` lo permite igual.
+      const finalValues = { ...values };
 
       // Cliente obligatorio: sin cliente no se puede armar la tarjeta del
       // pipeline. Se valida sobre lo que el usuario ELIGIÓ, no sobre el
@@ -141,7 +148,11 @@ export function PerformanceLogForm({
       // Si seleccionó nuevo contacto manual, lo creamos primero
       if (clientType === "manual") {
         if (!manualContact.isValid) {
-          toast.error("Completá y verificá los datos del contacto (nombre, celular y email deben coincidir) y certificá que son veraces.");
+          toast.error(
+            values.type === "prospeccion"
+              ? "Completá y verificá los datos del contacto (nombre y celular deben coincidir; el email es opcional, pero si lo cargás también tiene que coincidir) y certificá que son veraces."
+              : "Completá y verificá los datos del contacto (nombre, celular y email deben coincidir) y certificá que son veraces."
+          );
           setIsSubmitting(false);
           return;
         }
@@ -623,7 +634,7 @@ export function PerformanceLogForm({
 
             {clientType === "manual" && (
               <div className="animate-in fade-in slide-in-from-top-2 space-y-4 pt-2">
-                <ManualContactFields onChange={setManualContact} />
+                <ManualContactFields onChange={setManualContact} emailRequired={emailObligatorio} />
 
                 {isDirector && (
                   <div className="space-y-2">

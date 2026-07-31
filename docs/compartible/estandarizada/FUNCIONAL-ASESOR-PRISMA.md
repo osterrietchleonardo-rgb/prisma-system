@@ -178,6 +178,7 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
    - **Propiedad (Colaboración):** texto libre para propiedades de **otra inmobiliaria** (colaboración).
    - **Vincular Cliente:** buscá entre tus leads de Tokko y tus contactos de WhatsApp.
    - **Registro Manual de Lead:** si el contacto es nuevo (un amigo, vecino, referido) y no está en el sistema, cargalo a mano. Pide **nombre completo**, **celular**, **email** y **etiqueta** (opcional). Para el celular elegís el **país** de una lista (con bandera) y escribís el número **como lo marcás normalmente** (ej.: `221 15 308 9334`); el sistema lo convierte solo al formato que pide WhatsApp y te muestra abajo cómo va a quedar (ej.: *"Se guardará como +54 9 221 308 9334"*). Para Argentina agrega solo el "9" de celular aunque no pongas el 15. **Doble verificación:** nombre, celular y email se cargan dos veces y el sistema avisa en el momento si coinciden (✅) o no (❌); en el campo de verificación **no se puede copiar/pegar**, hay que reescribirlo. Antes de crear el contacto tenés que tildar la **casilla de certificación** declarando que los datos son reales, veraces y obtenidos legítimamente. Se crea solo, asignado a tu cuenta.
+     - 💡 **El email es opcional en Prospección.** Cuando la actividad que estás cargando es **Prospección**, el email aparece como *(Opcional)* y podés dejarlo vacío: en el primer contacto muchas veces sólo tenés el celular. En las demás etapas (Prelisting, Prebuying, Captación, Reserva y Cierre) el email sigue siendo obligatorio, porque a esa altura ya deberías tenerlo. Ojo: si igual lo cargás en Prospección, tenés que escribirlo bien y verificarlo como siempre — o lo dejás vacío, o lo dejás completo y verificado.
 2. **Origen de Consulta:** elegí el canal de la lista (Instagram, WhatsApp orgánico, Referido cliente, Portal propio, Cartel, etc.).
 
 **Filtros del historial:** además de buscar por cliente/propiedad y filtrar por tipo de actividad, tenés un **filtro de fechas** (mismo selector que el Dashboard). Elegí un preset (Hoy, Este Mes, Este Trimestre, Este Año, Últimos 30 días) o un rango a mano para ver solo la actividad de ese período; con **"Limpiar"** volvés a ver todo.
@@ -240,6 +241,16 @@ Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos boto
 > 💡 **Tip:** cuando un cliente escribe, el bot de IA puede responder solo. Si tomás el control manual, el bot se pausa para esa conversación y no pisa tus respuestas.
 > 📎 **Enviar archivos:** con el chat en **control manual** (bot pausado), al lado de la caja de mensaje tenés un **clip 📎** para adjuntar una foto, un PDF, un audio o un video. El archivo queda **en espera** con una vista previa (podés **Cambiar** el archivo o **Quitarlo** con la ✕ si te equivocaste) y se manda recién cuando tocás **Enviar** — así podés escribir un texto para que vaya **junto al archivo**. Solo funciona dentro de las 24 hs desde el último mensaje del cliente (regla de WhatsApp).
 > 💡 Activá las **notificaciones push** en Configuración para enterarte al instante de mensajes nuevos.
+
+### El bot ahora entiende fotos y audios
+
+Si un cliente manda una **foto** (una captura de una publicación, el frente de un edificio, un plano) o un **audio**, el bot ya no se queda callado: **mira la foto o escucha el audio y responde sobre eso**.
+
+- Con una foto, describe lo que ve y sigue la conversación. Si es la captura de un aviso de otro portal, te lo va a decir — pero **no va a inventar datos** que no tenga: si no está el link, avisa que no puede confirmar la publicación.
+- Con un audio o una nota de voz, lo transcribe y contesta como si te lo hubieran escrito.
+- Los **videos** también entran al chat, aunque por ahora el bot no analiza el contenido.
+
+> 💡 **Tip:** si un cliente te manda una captura de una propiedad de otra inmobiliaria, pedile el **link**. Con el link el bot puede buscar la propiedad de verdad en la cartera; con la sola imagen no.
 
 ### Avisos por email cuando un cliente avanza
 
@@ -442,7 +453,7 @@ Con los comparables a la vista podés armar una **ficha profesional** para pasar
 
 **Qué trae la ficha:**
 - Una **portada** con la propiedad de referencia y la fecha.
-- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes) y todas las fotos + características.
+- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes), una **descripción breve** de la propiedad (resumida en pocas líneas, sin la letra chica ni los datos de contacto de quien publicó el aviso) y todas las fotos + características.
 - Una **hoja final** con la **matriz comparativa de valores por m²** (con los **promedios de superficie, precio y $/m²** de la muestra), un gráfico de **"La Pirámide del Precio"** que muestra cómo cae la demanda cuando el precio se aleja del valor de mercado, las **conclusiones** (las que revisaste) y tus **datos de contacto** para que el cliente te escriba (WhatsApp / email).
 - Sobre tu nombre, en la tarjeta de contacto, aparece **tu clasificación** (Client Director / Client Support, la que te puso tu director; si no tenés, dice "Asesor/a").
 - Tu **logo** y el **aviso legal** en el pie de cada hoja (si el director los cargó en la configuración de marca).

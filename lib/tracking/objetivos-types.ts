@@ -31,14 +31,14 @@ export interface AdvisorObjectives {
 
 /**
  * Devuelve qué meses están cerrados (no editables) para un año dado.
- * Regla confirmada: mes en curso + futuros editables; meses ya cerrados, no.
- * Años pasados: todos cerrados. Años futuros: todos editables.
+ * Regla: el año en curso completo (Ene-Dic) es editable para poder ajustar
+ * objetivos retroactivamente. Años pasados: todos cerrados.
+ * Años futuros: todos editables.
  * month es 1-12. `now` se inyecta para testeo; default = ahora.
  */
 export function isMonthLocked(year: number, month: number, now: Date = new Date()): boolean {
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // 1-12
   if (year < currentYear) return true;
-  if (year > currentYear) return false;
-  return month < currentMonth;
+  // Año actual y futuros: todos los meses editables
+  return false;
 }

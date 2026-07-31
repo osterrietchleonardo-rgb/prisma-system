@@ -4,6 +4,7 @@ import { Playfair_Display, Inter } from "next/font/google";
 import type { Metadata } from "next";
 import PrintButton from "./PrintButton";
 import type { AcmFichaSnapshot, FichaBrand, FichaComparable } from "@/lib/acm/ficha";
+import { condensarDescripcion } from "@/lib/acm/descripcion";
 
 export const dynamic = "force-dynamic";
 
@@ -121,7 +122,11 @@ export default async function FichaAcmPage({ params }: { params: { token: string
 
   return (
     <div className={`${playfair.variable} ${inter.variable} acm-root`}>
-      <style>{CSS}</style>
+      {/* El CSS va por dangerouslySetInnerHTML (no como hijo de texto): con `{CSS}` React escapa el
+          `>` del selector `body > *` a `&gt;` en el HTML del servidor y NO en el del cliente, lo que
+          rompía la hidratación de la hoja ("Text content does not match server-rendered HTML").
+          Seguro: `CSS` es una constante de este mismo archivo, no entra nada del usuario. */}
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
       <PrintButton accent={accent} onAccent={onAccent} fileName={nombreArchivo} />
 
       {/* ══════════ PORTADA ══════════ */}
@@ -350,6 +355,10 @@ function ComparableSheet({
 }) {
   const hero = c.images[0] || null;
   const rest = c.images.slice(1, 7);
+  // Descripción condensada acá (no en el snapshot) para que las fichas YA creadas —que guardaron
+  // el texto crudo del aviso, con letra chica y contacto de la inmobiliaria publicante— también
+  // salgan prolijas. Determinista: sin IA y sin costo.
+  const descripcion = condensarDescripcion(c.descripcion || "");
   const specs = [
     { label: "Tipo", value: c.tipo || "—" },
     { label: "Superficie", value: c.m2 ? `${c.m2} m²` : "—" },
@@ -405,6 +414,8 @@ function ComparableSheet({
             </div>
           ))}
         </div>
+
+        {descripcion && <p className="comp-desc">{descripcion}</p>}
 
         {hero ? (
           <div className="gallery">
@@ -506,6 +517,14 @@ const CSS = `
 .spec-label { font-size: 8.5px; text-transform: uppercase; letter-spacing: .05em; color: #8a8a8a; margin-top: 3px; }
 
 /* Galería — protagonista: la foto principal LLENA el alto disponible de la hoja (look profesional). */
+/* Descripción del comparable: sutil y de alto ACOTADO (3 líneas, ~47px). La hoja es un A4 exacto
+   y la galería es el único elemento flexible, así que este bloque le come alto a la foto y NUNCA
+   desborda la hoja. El clamp es la red de seguridad para fichas viejas con el texto crudo largo. */
+.comp-desc {
+  flex: 0 0 auto; margin: 0 0 2px; font-size: 10.5px; line-height: 1.5; color: #6f6f6f;
+  max-height: 47px; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+}
 .gallery { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; margin: 6px 0 12px; }
 .gallery-hero { flex: 1 1 auto; width: 100%; min-height: 200px; object-fit: cover; border-radius: 12px; background: #f0efe9; display: block; }
 .gallery-grid { flex: 0 0 auto; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 8px; }
