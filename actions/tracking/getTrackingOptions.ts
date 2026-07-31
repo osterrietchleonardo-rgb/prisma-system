@@ -61,7 +61,7 @@ export async function getTrackingOptions() {
   // RLS no se la mostraría — pero solo para los teléfonos que ya son suyos.
   const phones = Array.from(new Set((convs ?? []).map((c) => c.contact_phone).filter(Boolean)));
 
-  let waContacts: { id: string; name: string | null; phone: string }[] = [];
+  const waContacts: { id: string; name: string | null; phone: string }[] = [];
   if (phones.length > 0) {
     const admin = createAdminClient();
     const { data: contactRows } = await admin

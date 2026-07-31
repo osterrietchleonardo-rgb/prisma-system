@@ -141,7 +141,7 @@ export function NewVisitDialog({
   const handlePropertyChange = (propertyId: string) => {
     const property = properties.find(p => p.id === propertyId)
     if (property) {
-      let updatedData = {
+      const updatedData = {
         ...formData,
         propiedad_titulo: property.title,
         zona_propiedad: property.city || property.address || ""
