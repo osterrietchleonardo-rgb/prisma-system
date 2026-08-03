@@ -4,7 +4,7 @@
 // del Sujeto cargado (manual, por link o desde la cartera).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import type { Sujeto, TipoPropiedad, Amenidades } from "@/lib/tasacion/types";
+import type { Sujeto, TipoPropiedad, Amenidades, Operacion } from "@/lib/tasacion/types";
 
 // Ambientes = dormitorios + 1 (living/cocina). 0 si no hay dato.
 export function sujetoAmbientes(s: Partial<Sujeto>): number | null {
@@ -27,9 +27,36 @@ export function sujetoDormitorios(s: Partial<Sujeto>): number | null {
 
 // Antigüedad en años. 0 se trata como "sin dato" (el form arranca en 0), NO como "a estrenar":
 // así no se puntúa antigüedad contra un default que el asesor no cargó. Solo compara si hay dato.
+// "A estrenar" y "en pozo" se declaran con sus casillas (ver sujetoEstadoObra), no con este número.
 export function sujetoAntiguedad(s: Partial<Sujeto>): number | null {
+  if (s.a_estrenar || s.en_pozo) return null; // sin uso: los años no aplican
   const a = s.antiguedad_anios ?? 0;
   return a > 0 ? a : null;
+}
+
+// ── Estado de obra ──
+// Gate del ACM: una propiedad a estrenar vale bastante más por m² que una usada del mismo
+// barrio (+18% a +36% de mediana US$/m² según el barrio), así que no son comparables entre sí.
+export type EstadoObra = "off" | "usada" | "estrenar" | "pozo" | "estrenar_pozo";
+
+// Terreno/lote queda afuera del gate: la antigüedad no le aplica y Tokko igual le pone age=0
+// (47 de los 49 lotes de la cartera), así que filtrar los dejaría casi sin comparables.
+export function sujetoEstadoObra(s: Partial<Sujeto>): EstadoObra {
+  if (s.tipo_propiedad === "terreno") return "off";
+  const estrenar = Boolean(s.a_estrenar);
+  const pozo = Boolean(s.en_pozo);
+  if (estrenar && pozo) return "estrenar_pozo";
+  if (estrenar) return "estrenar";
+  if (pozo) return "pozo";
+  return "usada";
+}
+
+// ¿Entran los avisos SIN antigüedad declarada cuando el sujeto es a estrenar / en pozo?
+// En venta NO: la red sí carga el dato (41% vacío) y los sin dato se comportan como usados.
+// En alquiler SÍ: el 99,8% de los avisos de alquiler de la red no trae antigüedad, así que
+// descartarlos dejaría al asesor sin comparables.
+export function obraAdmiteSinDato(operacion: Operacion): boolean {
+  return operacion === "alquiler";
 }
 
 // Texto descriptivo para el embedding (mismo estilo con el que se indexan properties/roomix).

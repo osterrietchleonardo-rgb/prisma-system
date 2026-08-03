@@ -10,6 +10,8 @@ import {
   sujetoAmbientes,
   sujetoDormitorios,
   sujetoAntiguedad,
+  sujetoEstadoObra,
+  obraAdmiteSinDato,
   sujetoM2,
   sujetoToEmbeddingText,
   propTypePatterns,
@@ -64,6 +66,9 @@ export async function POST(req: Request) {
     const ambientes = sujetoAmbientes(sujeto);
     const dormitorios = sujetoDormitorios(sujeto);
     const antiguedad = sujetoAntiguedad(sujeto);
+    // Estado de obra: a estrenar / en pozo solo comparan contra su mismo estado.
+    const obra = sujetoEstadoObra(sujeto);
+    const obraSinDato = obraAdmiteSinDato(operacion);
     const banos = sujeto.banos && sujeto.banos > 0 ? sujeto.banos : null;
     const loc = locPatterns(sujeto);
     const amen = amenityTokens(sujeto.amenidades);
@@ -98,6 +103,8 @@ export async function POST(req: Request) {
         p_amenities: amen,
         p_exclude_id: excludeId,
         p_exclude_ph: excludePh,
+        p_obra: obra,
+        p_obra_sin_dato: obraSinDato,
         p_limit: limit,
       }),
       supabase.rpc("acm_match_roomix", {
@@ -112,6 +119,8 @@ export async function POST(req: Request) {
         p_loc_patterns: loc,
         p_amenities: amen,
         p_exclude_ph: excludePh,
+        p_obra: obra,
+        p_obra_sin_dato: obraSinDato,
         p_limit: limit,
       }),
     ]);
@@ -147,7 +156,9 @@ export async function POST(req: Request) {
     ]);
 
     const tipoLabel = sujeto.tipo_propiedad || "—";
-    const sujetoForChecklist = { tipo: tipoLabel, zona: sujetoZona, m2, ambientes, dormitorios, banos, antiguedad, amenities: sujetoAmenLabels };
+    // En el checklist el estado de obra pisa el número de años (fmtAnios: 0 = a estrenar, -1 = en pozo).
+    const antiguedadLabel = sujeto.en_pozo ? -1 : sujeto.a_estrenar ? 0 : antiguedad;
+    const sujetoForChecklist = { tipo: tipoLabel, zona: sujetoZona, m2, ambientes, dormitorios, banos, antiguedad: antiguedadLabel, amenities: sujetoAmenLabels };
 
     const cartera: AcmComparable[] = (carteraFull.data || [])
       .map((p: any): AcmComparable | null => {

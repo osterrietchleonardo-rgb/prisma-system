@@ -30,6 +30,8 @@ interface CarteraItem {
   m2: number | null;
   room_amount: number | null;
   antiguedad: number | null;
+  a_estrenar: boolean;
+  en_pozo: boolean;
   amenidades: Amenidades;
 }
 
@@ -72,6 +74,8 @@ function carteraToSujeto(p: CarteraItem, base: Sujeto): Sujeto {
     dormitorios,
     banos: p.bathrooms || 0,
     antiguedad_anios: p.antiguedad ?? base.antiguedad_anios,
+    a_estrenar: Boolean(p.a_estrenar),
+    en_pozo: Boolean(p.en_pozo),
     amenidades: p.amenidades || base.amenidades,
     moneda: (p.currency as any) === "ARS" ? "ARS" : "USD",
   };
