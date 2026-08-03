@@ -29,8 +29,13 @@ export async function GET() {
       const tags: string[] = Array.isArray(p.tokko_data?.tags)
         ? p.tokko_data.tags.map((t: any) => String(t?.name || "")).filter(Boolean)
         : [];
+      // Antigüedad de Tokko: 0 = a estrenar · -1 = en pozo/construcción · >0 = años.
+      // El -1 antes se perdía (el regex solo tomaba positivos) y el pozo quedaba como "sin dato".
       const ageRaw = p.tokko_data?.age;
-      const antiguedad = ageRaw != null && /^\d+$/.test(String(ageRaw)) ? Number(ageRaw) : null;
+      const ageNum = ageRaw != null && /^-?\d+$/.test(String(ageRaw)) ? Number(ageRaw) : null;
+      const antiguedad = ageNum != null && ageNum > 0 ? ageNum : null;
+      const a_estrenar = ageNum === 0;
+      const en_pozo = ageNum != null && ageNum < 0;
       const operacion = p.status === "Alquiler" || p.status === "Temporary rent" ? "alquiler" : "venta";
 
       return {
@@ -48,6 +53,8 @@ export async function GET() {
         m2: p.total_area ? Number(p.total_area) : p.covered_area ? Number(p.covered_area) : null,
         room_amount: (p.tokko_data?.room_amount ?? null) as number | null,
         antiguedad,
+        a_estrenar,
+        en_pozo,
         amenidades: tokkoTagsToAmenidades(tags),
         servicios: tags, // lista cruda (por si se quiere mostrar)
         image: Array.isArray(p.images) ? (typeof p.images[0] === "string" ? p.images[0] : p.images[0]?.url ?? null) : null,

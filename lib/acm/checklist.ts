@@ -30,8 +30,13 @@ function estado(score: number | null): ChecklistItem["estado"] {
 }
 
 const fmtNum = (v: number | null | undefined, suf = "") => (v && v > 0 ? `${v}${suf}` : "—");
-// La antigüedad admite 0 ("a estrenar") como valor válido a mostrar.
-const fmtAnios = (v: number | null | undefined) => (v !== null && v !== undefined && v >= 0 ? `${v} años` : "—");
+// La antigüedad admite el estado de obra como valor válido: 0 = a estrenar, negativo = en pozo.
+const fmtAnios = (v: number | null | undefined) => {
+  if (v === null || v === undefined) return "—";
+  if (v < 0) return "En pozo";
+  if (v === 0) return "A estrenar";
+  return `${v} años`;
+};
 
 export function buildChecklist(args: {
   sub: SubScores;

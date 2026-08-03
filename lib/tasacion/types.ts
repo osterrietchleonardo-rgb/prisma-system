@@ -32,6 +32,10 @@ export interface Sujeto {
   
   // Características físicas
   antiguedad_anios: number;
+  // Estado de obra. Si alguna está en true, la propiedad no tiene uso y `antiguedad_anios`
+  // se ignora: el ACM la compara solo contra propiedades del mismo estado.
+  a_estrenar?: boolean;
+  en_pozo?: boolean;
   estado_conservacion: EstadoConservacion;
   calidad_construccion: CalidadConstruccion;
   dormitorios: number;
