@@ -51,6 +51,27 @@ export default async function AsesorDashboardPage({
     getHandoffsDashboardData(profile.agency_id, user.id, from, to),  // solo las derivaciones propias
   ])
 
+  // ── Privacidad del asesor ──────────────────────────────────────────────────
+  // El asesor ve el ranking completo (posición, chats, ACM, captaciones, cierres, rotación...)
+  // pero la FACTURACIÓN es solo la suya. El resto llega en `null` y la tabla muestra "Privado".
+  //
+  // Se tapa acá, en el server component, y NO en el componente cliente: si se mandara el número
+  // y solo se ocultara en pantalla, seguiría viajando en el payload y cualquiera lo leería desde
+  // las herramientas del navegador. Ordenamos ANTES de tapar, así el ranking sigue siendo el real.
+  const rankingAdvisors = [...agencyData.advisors]
+    .sort((a: any, b: any) => (b.facturacion || 0) - (a.facturacion || 0))
+    .map((a: any) =>
+      a.id === user.id
+        ? a
+        // El motivo de la clasificación también se va: el texto cita el monto exacto.
+        : { ...a, facturacion: null, classificationReason: null }
+    )
+
+  // Objetivos: el asesor solo ve su propia fila (metas y cumplimiento del resto = privados).
+  // Filtrado en el server por el mismo motivo. El recargar-por-año también viene ya filtrado
+  // desde `getObjectivesDashboardForYear`, que resuelve el rol del usuario logueado.
+  const misObjetivos = objectivesData.filter((o) => o.agentId === user.id)
+
   return (
     <div id="dashboard-content" className="space-y-8 animate-in fade-in duration-500 px-4 md:px-8 py-8 bg-background">
 
@@ -97,11 +118,11 @@ export default async function AsesorDashboardPage({
         channels={myData.charts.channelDistribution}
       />
 
-      {/* Objetivos vs alcanzado de la inmobiliaria */}
-      <ObjectivesDashboard initialData={objectivesData} initialYear={currentYear} />
+      {/* Objetivos vs alcanzado — solo la fila del asesor logueado */}
+      <ObjectivesDashboard initialData={misObjetivos} initialYear={currentYear} alcance="propio" />
 
-      {/* Leaderboard: full agency ranking so the asesor can see their position */}
-      <PerformanceLeaderboard advisors={agencyData.advisors} />
+      {/* Ranking completo de la agencia para que vea su posición, con la facturación ajena tapada */}
+      <PerformanceLeaderboard advisors={rankingAdvisors} />
 
       {/* Recent agency activity — capped height with internal scroll */}
       <div className="max-h-[480px] overflow-y-auto rounded-xl scrollbar-thin scrollbar-thumb-accent/20">
