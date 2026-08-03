@@ -105,6 +105,9 @@ export async function POST(req: Request) {
         p_exclude_ph: excludePh,
         p_obra: obra,
         p_obra_sin_dato: obraSinDato,
+        p_barrio: sujetoZona,
+        p_zona_niveles: true,
+        p_m2_cubierta: true,
         p_limit: limit,
       }),
       supabase.rpc("acm_match_roomix", {
@@ -121,6 +124,11 @@ export async function POST(req: Request) {
         p_exclude_ph: excludePh,
         p_obra: obra,
         p_obra_sin_dato: obraSinDato,
+        p_barrio: sujetoZona,
+        p_zona_niveles: true,
+        p_m2_cubierta: true,
+        p_dedup: true,
+        p_excluir_sujeto: true,
         p_limit: limit,
       }),
     ]);
