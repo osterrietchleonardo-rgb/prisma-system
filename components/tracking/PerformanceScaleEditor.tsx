@@ -54,7 +54,7 @@ Asignar 'Sólido' si se cumplen TODAS las siguientes:
 PASO 3 — ¿EN DESARROLLO?
 ──────────────────────────────────────────────────
 Asignar 'En Desarrollo' si se cumple AL MENOS UNA de las siguientes:
-  [3A]  consultas >= 20  Y  (acm >= 3 O captaciones >= 3)  Y  facturacion_usd < 3000
+  [3A]  consultas >= 20  Y  (prelisting >= 3 O captaciones >= 3)  Y  facturacion_usd < 3000
   [3B]  captaciones >= 4  Y  cartera_activa >= 5  Y  transacciones == 0
   [3C]  transacciones >= 1  Y  facturacion_usd < 3000
 
@@ -234,7 +234,8 @@ export function PerformanceScaleEditor({ initialConfig }: PerformanceScaleEditor
                     <div className="flex flex-col leading-tight"><span className="text-accent font-bold">transacciones</span><span className="text-[10px] opacity-70">Suma de Reservas + Cierres en el mes</span></div>
                     <div className="flex flex-col leading-tight"><span className="text-accent font-bold">captaciones</span><span className="text-[10px] opacity-70">Propiedades nuevas publicadas</span></div>
                     <div className="flex flex-col leading-tight"><span className="text-accent font-bold">cartera_activa</span><span className="text-[10px] opacity-70">Stock total de propiedades activas</span></div>
-                    <div className="flex flex-col leading-tight"><span className="text-accent font-bold">acm</span><span className="text-[10px] opacity-70">Fichas ACM generadas</span></div>
+                    <div className="flex flex-col leading-tight"><span className="text-accent font-bold">prelisting</span><span className="text-[10px] opacity-70">Prelistings cargados en Tracking Performance</span></div>
+                    <div className="flex flex-col leading-tight"><span className="text-accent font-bold">acm</span><span className="text-[10px] opacity-70">Fichas ACM generadas (se cuentan solas)</span></div>
                     <div className="flex flex-col leading-tight"><span className="text-accent font-bold">consultas</span><span className="text-[10px] opacity-70">Chats de WhatsApp + Prospección activa</span></div>
                     <div className="flex flex-col leading-tight"><span className="text-accent font-bold">rotacion_pct</span><span className="text-[10px] opacity-70">% de cartera vendida (Automático)</span></div>
                   </div>
@@ -294,11 +295,12 @@ export function PerformanceScaleEditor({ initialConfig }: PerformanceScaleEditor
                   <span className="text-xs font-bold uppercase">Top & Mid Funnel</span>
                 </div>
                 <p className="text-[11px] text-purple-200/60 leading-relaxed mb-2">
-                  La IA lee: consultas totales por WhatsApp, prospección activa, fichas ACM y compradores calificados.
+                  La IA lee: consultas totales por WhatsApp, prospección activa, prelistings, fichas ACM y compradores calificados.
                 </p>
                 <div className="flex flex-wrap gap-1">
                   <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-400 border-purple-500/20">wa_chats</Badge>
                   <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-400 border-purple-500/20">prospeccion</Badge>
+                  <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-400 border-purple-500/20">prelisting</Badge>
                   <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-400 border-purple-500/20">acm</Badge>
                 </div>
               </div>

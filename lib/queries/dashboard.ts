@@ -64,8 +64,12 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
 
   // 4.b Fichas ACM creadas.
   //
-  // Reemplazan a "tasaciones" (logs de tipo prelisting) como metrica visible del asesor:
-  // el ACM se cuenta cuando la ficha se genera de verdad, no cuando alguien carga un log a mano.
+  // Metrica NUEVA e INDEPENDIENTE del prelisting: son dos cosas distintas y conviven.
+  //  - prelisting = actividad que el asesor carga a mano en Tracking Performance (tiene monto,
+  //    de ahi salen el Pipeline Potencial y el Ticket Promedio).
+  //  - acm        = ficha del modulo ACM, se cuenta sola al generarla.
+  // Lo unico que desaparecio es el NOMBRE "tasaciones", que estaba mal puesto: esa columna
+  // contaba prelistings.
   //
   // shared_acm_reports tiene RLS ENCENDIDA Y SIN POLITICAS (ver la migracion): ni anon ni
   // authenticated la leen. Solo la service key. Por eso va con admin client, siempre acotado
@@ -210,8 +214,9 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
 
     // Prelisting
     consultasWa: metrics.prospeccion.waChats,
-    // Fichas ACM generadas. Antes esta clave era `tasaciones` (logs prelisting); el pipeline y el
-    // ticket promedio de abajo SI siguen saliendo de los logs prelisting, que es de donde sale el monto.
+    // `prelisting` es la vieja clave `tasaciones` renombrada: mismo dato (logs type='prelisting'),
+    // nombre correcto. `acm` es la metrica nueva y va aparte.
+    prelisting: metrics.prelisting.volumen,
     acm: acmTotal,
     pipelineCaptacion: metrics.prelisting.pipeline,
     ticketPromedioTasacion,
@@ -277,6 +282,7 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
         return acc + 1;
     }, 0);
     
+    const prelisting = pLogs.filter(l => l.type === 'prelisting').length;
     const compradores = pLogs.filter(l => l.type === 'prebuying').length;
     const reservas = pLogs.filter(l => l.type === 'reserva').length;
     const prospeccion = pLogs.filter(l => l.type === 'prospeccion').length;
@@ -293,6 +299,7 @@ export async function getDashboardData(agencyId: string, agentId?: string, start
       avatar_url: p.avatar_url,
       wa_chats: waCountsByAgent[p.id] || 0,
       prospeccion,
+      prelisting,
       acm: acmByAgent[p.id] || 0,
       compradores,
       captaciones: caps,

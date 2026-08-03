@@ -127,7 +127,7 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 > 💡 **Tip:** si la sección dice que no hay objetivos cargados, andá a **Tracking Performance → Objetivos** y cargalos. El "alcanzado" se llena solo con la actividad del equipo.
 
-> 🔒 **Qué ve el asesor de todo esto.** Vos ves la tabla completa. Cada asesor, en su propio dashboard, ve **solo su fila** de "Objetivos vs Alcanzado" y su propio gráfico: las metas y el cumplimiento de sus compañeros no los ve. En el **Ranking** sí ve la tabla entera (posición, chats, ACM, captaciones, cierres, cartera, rotación y la clasificación de todos), pero la columna **Facturación** solo la ve en su propia fila; en las demás le figura **"Privado"**. Es así por diseño: el asesor sabe dónde está parado, sin enterarse de cuánto factura el de al lado.
+> 🔒 **Qué ve el asesor de todo esto.** Vos ves la tabla completa. Cada asesor, en su propio dashboard, ve **solo su fila** de "Objetivos vs Alcanzado" y su propio gráfico: las metas y el cumplimiento de sus compañeros no los ve. En el **Ranking** sí ve la tabla entera (posición, chats, prelistings, ACM, captaciones, cierres, cartera, rotación y la clasificación de todos), pero la columna **Facturación** solo la ve en su propia fila; en las demás le figura **"Privado"**. Es así por diseño: el asesor sabe dónde está parado, sin enterarse de cuánto factura el de al lado.
 
 ---
 
@@ -196,9 +196,12 @@ Tenés **3 solapas**:
 2. **Objetivos:** dónde fijás las metas mensuales por asesor (ver detalle abajo).
 3. **Configuración IA:** ajustás las escalas (qué puntaje da cada acción: llamada, captación, prelisting, etc.). Esto define cómo se calculan los KPIs.
 
-> 📌 **Cambio (jul-2026): "tasaciones" ahora es "ACM".** En el Ranking del Dashboard la columna **Tasac.** pasó a llamarse **ACM**, y en las tarjetas el "Volumen Tasaciones" pasó a ser **Fichas ACM**. Cambió también de dónde sale el número: antes contaba las actividades de tipo Prelisting que el equipo cargaba a mano; **ahora cuenta las fichas de ACM que el asesor genera de verdad** en el módulo ACM. Es un dato más honesto, porque no depende de que alguien se acuerde de cargarlo.
+> 📌 **Cambio (jul-2026): se fue el nombre "Tasaciones" y apareció ACM como métrica aparte.** Son **dos cosas distintas y ahora ves las dos**:
 >
-> Si escribiste **reglas propias** en Configuración IA, la variable pasó a llamarse `acm`. **Tus reglas viejas que decían `tasaciones` siguen funcionando igual** (les dejamos el nombre viejo andando a propósito), pero cuando las edites conviene pasarlas a `acm`.
+> - **Prelist.** — los **prelistings que tu equipo carga a mano** en Tracking Performance. Es exactamente el mismo número que antes: solo le cambiamos el nombre, porque la columna decía "Tasac." pero nunca contó tasaciones. En las tarjetas es "Volumen Prelisting", y de ahí siguen saliendo el Pipeline Potencial y el Ticket Promedio.
+> - **ACM** — las **fichas de ACM que el asesor genera de verdad** en el módulo ACM. Es columna nueva en el Ranking y 4ta línea de la tarjeta Prelisting. **No se carga a mano: se cuenta sola.** Por eso es un dato más honesto, no depende de que alguien se acuerde de registrarlo.
+>
+> Si escribiste **reglas propias** en Configuración IA: la variable vieja `tasaciones` ahora se llama `prelisting`, y se sumó `acm` como variable nueva. **Tus reglas viejas siguen funcionando igual** — dejamos el nombre `tasaciones` andando a propósito y apunta a los prelistings, que es lo que siempre midió. Cuando las edites, conviene pasarlas a `prelisting` y decidir si querés que `acm` cuente también.
 
 ### Dos formas de ver la actividad: Lista y Pipeline
 
