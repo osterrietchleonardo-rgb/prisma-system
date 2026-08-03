@@ -60,6 +60,8 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [logToEdit, setLogToEdit] = useState<PerformanceLog | null>(null);
   const [agencyConfig, setAgencyConfig] = useState<AgencyPerformanceConfig | null>(null);
+  // Ids de los asesores que siguen en el equipo. null = todavia no cargo.
+  const [asesoresVigentes, setAsesoresVigentes] = useState<Set<string> | null>(null);
   const [viewMode, setViewMode] = useState<"lista" | "pipeline">("lista");
   const [moves, setMoves] = useState<PipelineMove[]>([]);
 
@@ -137,6 +139,18 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
       if (agency?.performance_config) {
         setAgencyConfig(agency.performance_config);
       }
+
+      // Asesores que siguen en el equipo. El desplegable de asesor se arma con
+      // los que aparecen en los registros, no con la tabla de perfiles, asi que
+      // sin este cruce un desvinculado con actividad historica reaparece ahi.
+      const { data: vigentes } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("agency_id", profile.agency_id)
+        .eq("role", "asesor")
+        .neq("estado", "eliminado");
+
+      setAsesoresVigentes(new Set((vigentes ?? []).map((v) => v.id)));
     }
   }, []);
 
@@ -152,13 +166,16 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
     const map = new Map<string, string>();
     for (const log of logs) {
       if (log.agent_id && log.profiles?.full_name && !map.has(log.agent_id)) {
+        // Mientras la lista vigente no cargo (null) no se descarta a nadie,
+        // para no dejar el filtro vacio en el primer render.
+        if (asesoresVigentes && !asesoresVigentes.has(log.agent_id)) continue;
         map.set(log.agent_id, log.profiles.full_name);
       }
     }
     return Array.from(map.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, 'es'));
-  }, [logs, isDirector]);
+  }, [logs, isDirector, asesoresVigentes]);
 
   const filteredLogs = logs.filter(log => {
     const matchesFilter = filter === "todos" || log.type === filter;

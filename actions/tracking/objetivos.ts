@@ -69,11 +69,13 @@ export async function getObjectivesDashboardForYear(year: number): Promise<Advis
 export async function getAgencyAdvisors() {
   const { agencyId } = await getDirectorContext();
   const supabase = createClient();
+  // Mismo criterio que la matriz: al desvinculado no se le cargan metas.
   const { data } = await supabase
     .from("profiles")
     .select("id, full_name, email")
     .eq("agency_id", agencyId)
     .eq("role", "asesor")
+    .neq("estado", "eliminado")
     .order("full_name", { ascending: true });
   return (data || []).map((p: any) => ({ id: p.id, name: p.full_name || p.email || "Asesor" }));
 }
