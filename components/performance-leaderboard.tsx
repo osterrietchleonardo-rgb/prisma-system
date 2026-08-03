@@ -14,7 +14,9 @@ import {
   Target,
   DollarSign,
   Briefcase,
-  Zap
+  Zap,
+  Lock,
+  ClipboardList
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,16 +27,25 @@ interface AdvisorSummary {
   name: string;
   wa_chats: number;
   prospeccion: number;
-  tasaciones: number;
+  /** Logs de actividad `prelisting` cargados en Tracking Performance. La columna se llamaba "Tasac.". */
+  prelisting: number;
+  /** Fichas del módulo ACM. Métrica aparte del prelisting: se cuenta sola al generar la ficha. */
+  acm: number;
   compradores: number;
   captaciones: number;
   reservas: number;
   transacciones: number;
-  facturacion: number;
+  /**
+   * `null` = la facturación de ese asesor está oculta para quien mira.
+   * El asesor solo ve el número de su propia fila; el resto llega en null
+   * DESDE EL SERVIDOR (no se manda y se tapa: nunca viaja al navegador).
+   */
+  facturacion: number | null;
   cartera_activa: number;
   rotacion: number;
   classification: string;
-  classificationReason: string;
+  /** `null` cuando el motivo está oculto: el texto suele citar la facturación exacta. */
+  classificationReason: string | null;
 }
 
 interface PerformanceLeaderboardProps {
@@ -42,8 +53,13 @@ interface PerformanceLeaderboardProps {
 }
 
 export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps) {
-  // Sort by facturacion descending
-  const sortedAdvisors = [...advisors].sort((a, b) => b.facturacion - a.facturacion);
+  // Orden por facturación descendente. Si alguna viene oculta (null) no se puede ordenar acá
+  // sin inventar posiciones, así que se respeta el orden que ya mandó el servidor —que sí
+  // conoce los montos reales y las ordenó bien antes de taparlas.
+  const hayFacturacionOculta = advisors.some((a) => a.facturacion === null);
+  const sortedAdvisors = hayFacturacionOculta
+    ? advisors
+    : [...advisors].sort((a, b) => (b.facturacion ?? 0) - (a.facturacion ?? 0));
 
   const getBadgeColor = (classification: string) => {
     const cls = classification?.toLowerCase() || "";
@@ -86,13 +102,14 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-sm text-left min-w-[1000px]">
+          <table className="w-full text-sm text-left min-w-[1080px]">
             <thead className="bg-muted/30 text-muted-foreground/70 border-b border-accent/5">
               <tr>
                 <th className="px-6 py-4 font-bold min-w-[200px] sticky left-0 bg-muted/95 backdrop-blur-md z-20 border-r border-accent/10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]">Asesor</th>
                 <MetricHeader icon={MessageSquare} label="Chats" tooltip="WhatsApp Recibidos" />
                 <MetricHeader icon={TrendingUp} label="Prosp." tooltip="Prospección Activa" />
-                <MetricHeader icon={FileText} label="Tasac." tooltip="Tasaciones Realizadas" />
+                <MetricHeader icon={FileText} label="Prelist." tooltip="Prelistings cargados en Tracking Performance" />
+                <MetricHeader icon={ClipboardList} label="ACM" tooltip="Fichas ACM generadas" />
                 <MetricHeader icon={Search} label="Comp." tooltip="Compradores Calificados" />
                 <MetricHeader icon={Home} label="Capt." tooltip="Propiedades Captadas" />
                 <MetricHeader icon={Target} label="Res." tooltip="Reservas Logradas" />
@@ -124,7 +141,10 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
                     <span className="font-medium text-indigo-400/80">{advisor.prospeccion}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <span className="font-medium text-amber-400/80">{advisor.tasaciones}</span>
+                    <span className="font-medium text-amber-400/80">{advisor.prelisting}</span>
+                  </td>
+                  <td className="px-3 py-4 text-center">
+                    <span className="font-medium text-teal-400/80">{advisor.acm}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
                     <span className="font-medium text-purple-400/80">{advisor.compradores}</span>
@@ -153,9 +173,16 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
                     </span>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <span className="font-bold text-accent whitespace-nowrap">
-                      {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(advisor.facturacion)}
-                    </span>
+                    {advisor.facturacion === null ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/50 whitespace-nowrap">
+                        <Lock className="h-3 w-3" />
+                        Privado
+                      </span>
+                    ) : (
+                      <span className="font-bold text-accent whitespace-nowrap">
+                        {new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(advisor.facturacion)}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <TooltipProvider>
@@ -172,9 +199,17 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
                               <TrendingUp className="h-3 w-3 text-accent" />
                               <p className="text-[10px] uppercase font-bold text-accent tracking-tighter">Análisis de Desempeño</p>
                             </div>
-                            <p className="text-xs text-muted-foreground leading-relaxed italic">
-                              "{advisor.classificationReason}"
-                            </p>
+                            {advisor.classificationReason ? (
+                              <p className="text-xs text-muted-foreground leading-relaxed italic">
+                                "{advisor.classificationReason}"
+                              </p>
+                            ) : (
+                              // El motivo cita la facturación exacta ("Facturación US$12.500 y 3
+                              // transacciones..."), así que se oculta junto con ella.
+                              <p className="text-xs text-muted-foreground/60 leading-relaxed italic">
+                                El detalle de esta clasificación es privado.
+                              </p>
+                            )}
                           </div>
                         </TooltipContent>
                       </Tooltip>
@@ -184,7 +219,8 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
               ))}
               {sortedAdvisors.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-6 py-16 text-center">
+                  {/* 13 columnas: Asesor + 11 métricas + Clasificación */}
+                  <td colSpan={13} className="px-6 py-16 text-center">
                     <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
                       <LayoutDashboard className="h-10 w-10 opacity-20" />
                       <p className="italic text-sm font-light">No hay actividad registrada en este período.</p>

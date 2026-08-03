@@ -37,6 +37,11 @@ async function getDirectorContext() {
 /**
  * Datos de objetivos vs alcanzado para el dashboard, por año.
  * Disponible para director y asesor (resuelve la agencia del usuario logueado).
+ *
+ * El asesor recibe SOLO su propia fila: los objetivos y el cumplimiento del resto del equipo
+ * son privados. El recorte se hace acá, en el server action, y no en el componente: es el mismo
+ * dato que se manda al navegador cuando el asesor cambia el año, así que si no se filtra en el
+ * origen la tabla se vería filtrada pero los números ajenos igual viajarían en la respuesta.
  */
 export async function getObjectivesDashboardForYear(year: number): Promise<AdvisorObjectives[]> {
   const supabase = createClient();
@@ -45,12 +50,19 @@ export async function getObjectivesDashboardForYear(year: number): Promise<Advis
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("agency_id")
+    .select("agency_id, role")
     .eq("id", user.id)
     .single();
 
   if (!profile?.agency_id) return [];
-  return getObjectivesDashboard(profile.agency_id, year);
+
+  const todos = await getObjectivesDashboard(profile.agency_id, year);
+  // Cualquiera que no sea director ve únicamente lo suyo (default seguro: si mañana aparece
+  // un rol nuevo, no se filtra información del equipo por olvido).
+  if (profile.role !== "director") {
+    return todos.filter((o) => o.agentId === user.id);
+  }
+  return todos;
 }
 
 /** Asesores de la agencia del director (para armar las filas del editor). */

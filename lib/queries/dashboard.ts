@@ -1,4 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
+
+// El filtro de periodo manda las fechas como "yyyy-MM-dd" (DatePeriodFilter).
+// Comparar eso contra un timestamptz con <= corta a la medianoche y se pierde
+// el ultimo dia entero, asi que lo estiramos al final del dia.
+function finDelDia(fecha: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T23:59:59.999` : fecha
+}
 
 export async function getDashboardData(
   agencyId: string,
@@ -72,6 +80,41 @@ export async function getDashboardData(
     .select("assigned_agent, price, created_at, status")
     .eq("agency_id", agencyId)
     .eq("is_active", true);
+
+  // 4.b Fichas ACM creadas.
+  //
+  // Metrica NUEVA e INDEPENDIENTE del prelisting: son dos cosas distintas y conviven.
+  //  - prelisting = actividad que el asesor carga a mano en Tracking Performance (tiene monto,
+  //    de ahi salen el Pipeline Potencial y el Ticket Promedio).
+  //  - acm        = ficha del modulo ACM, se cuenta sola al generarla.
+  // Lo unico que desaparecio es el NOMBRE "tasaciones", que estaba mal puesto: esa columna
+  // contaba prelistings.
+  //
+  // shared_acm_reports tiene RLS ENCENDIDA Y SIN POLITICAS (ver la migracion): ni anon ni
+  // authenticated la leen. Solo la service key. Por eso va con admin client, siempre acotado
+  // por agency_id — nunca puede devolver fichas de otra inmobiliaria.
+  const acmAdmin = createAdminClient()
+  let acmQuery = acmAdmin
+    .from("shared_acm_reports")
+    .select("created_by")
+    .eq("agency_id", agencyId)
+
+  if (agentId) acmQuery = acmQuery.eq("created_by", agentId)
+  if (startDate) acmQuery = acmQuery.gte("created_at", startDate)
+  if (endDate) acmQuery = acmQuery.lte("created_at", finDelDia(endDate))
+
+  const { data: acmRows, error: acmError } = await acmQuery
+  if (acmError) {
+    // Que falte el conteo de ACM no puede tumbar el dashboard entero: se muestra 0 y queda en el log.
+    console.error("Dashboard: no se pudieron contar las fichas ACM:", acmError.message)
+  }
+
+  const acmByAgent = (acmRows || []).reduce((acc: Record<string, number>, r: any) => {
+    if (r.created_by) acc[r.created_by] = (acc[r.created_by] || 0) + 1
+    return acc
+  }, {})
+  // Total del alcance pedido (agencia entera, o solo el asesor si vino agentId).
+  const acmTotal = (acmRows || []).length
 
   // Group metrics by category
   const metrics: any = {
@@ -192,7 +235,10 @@ export async function getDashboardData(
 
     // Prelisting
     consultasWa: metrics.prospeccion.waChats,
-    tasaciones: metrics.prelisting.volumen,
+    // `prelisting` es la vieja clave `tasaciones` renombrada: mismo dato (logs type='prelisting'),
+    // nombre correcto. `acm` es la metrica nueva y va aparte.
+    prelisting: metrics.prelisting.volumen,
+    acm: acmTotal,
     pipelineCaptacion: metrics.prelisting.pipeline,
     ticketPromedioTasacion,
     
@@ -257,7 +303,7 @@ export async function getDashboardData(
         return acc + 1;
     }, 0);
     
-    const tasaciones = pLogs.filter(l => l.type === 'prelisting').length;
+    const prelisting = pLogs.filter(l => l.type === 'prelisting').length;
     const compradores = pLogs.filter(l => l.type === 'prebuying').length;
     const reservas = pLogs.filter(l => l.type === 'reserva').length;
     const prospeccion = pLogs.filter(l => l.type === 'prospeccion').length;
@@ -274,7 +320,8 @@ export async function getDashboardData(
       avatar_url: p.avatar_url,
       wa_chats: waCountsByAgent[p.id] || 0,
       prospeccion,
-      tasaciones,
+      prelisting,
+      acm: acmByAgent[p.id] || 0,
       compradores,
       captaciones: caps,
       reservas,

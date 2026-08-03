@@ -72,14 +72,15 @@
 - **Tarjetas (KPIs):** tus leads, captaciones, reservas y cierres, con la variación respecto al período anterior.
 - **Handoffs sin atender:** los clientes que el bot te derivó y **todavía no respondiste** (ver detalle abajo).
 - **Gráficos:** evolución en el tiempo y distribución de tus leads por canal de origen.
-- **Objetivos vs Alcanzado:** la tabla de metas mensuales del equipo (Facturación y Captación) con lo planificado, lo logrado y el % cumplido por mes, más un gráfico de evolución. Podés filtrar por año y cambiar de métrica.
-- **Ranking del equipo:** aunque solo veas tus números, el ranking te muestra **tu posición** frente al resto de la agencia.
+- **Objetivos vs Alcanzado:** **tus** metas mensuales (Facturación y Captación) con lo planificado, lo logrado y el % cumplido mes por mes, más un gráfico de tu evolución. Podés filtrar por año y cambiar de métrica. Solo ves tu fila: las metas de tus compañeros son privadas.
+- **Ranking del equipo:** aunque solo veas tus números, el ranking te muestra **tu posición** frente al resto de la agencia. Ves todas las columnas de todos (chats, prelistings, ACM, captaciones, cierres, cartera, rotación y la clasificación), con **una excepción: la Facturación**. La tuya la ves con el monto; la de los demás dice **"Privado"**. Es a propósito: cada uno ve lo que factura, nadie ve lo que factura el otro.
 
 **Cómo usarlo:**
 - Revisalo al empezar el día para saber dónde estás parado.
 - Usá el **filtro de fechas** para comparar cómo venís: por ejemplo "Este Mes" contra "Este Año", o un día concreto de mucha actividad.
 - Si un KPI bajó respecto al período anterior, mirá qué actividad podés reforzar.
 - En "Objetivos vs Alcanzado" mirás cómo vas contra la meta del mes: lo "alcanzado" se llena solo con la actividad que cargás.
+- En el ranking hay **dos columnas parecidas pero distintas**: **Prelist.** cuenta los prelistings que vos cargás en Tracking Performance (antes esa columna decía "Tasac."), y **ACM** cuenta las **fichas de ACM que generaste**. La de ACM no se carga a mano: se suma sola cada vez que armás una ficha en el módulo ACM.
 
 > 💡 Los **objetivos** los define el director (vos no los editás). Tu trabajo es cargar bien tu actividad para que el "alcanzado" refleje la realidad.
 
