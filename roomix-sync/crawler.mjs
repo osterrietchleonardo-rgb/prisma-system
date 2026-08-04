@@ -514,8 +514,7 @@ function parseAgent(html) {
 // en los <script>self.__next_f.push([1,"..."])</script>. Ese objeto tiene barrio/ciudad/
 // región estructurados, antigüedad, expensas, m² total y cubierto, piso, fecha de
 // publicación, teléfono, índices geo H3, el LINK ORIGINAL del portal (ZonaProp/ML), etc.
-// El JSON-LD se queda como respaldo. Anclamos la extracción al slug de la propiedad para
-// no confundirnos con objetos de "propiedades similares" que la página también embebe.
+// El JSON-LD se queda como respaldo.
 function buildRscBlob(html) {
   const pushes = [...html.matchAll(/self\.__next_f\.push\(\[1,"((?:[^"\\]|\\.)*)"\]\)/g)].map(m => m[1]);
   return pushes.join('')
@@ -526,16 +525,30 @@ function buildRscBlob(html) {
 function parseInternal(html, slug) {
   try {
     const blob = buildRscBlob(html);
-    // Ventana del objeto principal: anclada al slug (id único de la ficha). operation_type
-    // viene ~1500 chars antes del slug; phone/h3 vienen después. Tomamos un margen amplio.
-    let win = blob;
-    const slugIdx = slug ? blob.indexOf(`"slug":"${slug}"`) : -1;
-    if (slugIdx !== -1) {
-      win = blob.slice(Math.max(0, slugIdx - 2200), slugIdx + 900);
+    // Ventana del objeto de detalle: anclada a "characteristics-section", el id del <div> de
+    // la ficha que Roomix usa para inyectar TODO el objeto "property" de una sola vez (operación,
+    // tipo, precio, expensas, ubicación completa, superficies, antigüedad, piso, fecha de
+    // publicación, teléfono, geo H3 y el link original del portal — verificado: los campos caen
+    // entre +300 y +1650 caracteres del ancla). GOTCHA real (detectado ago-2026): antes anclábamos
+    // al slug de la propiedad, pero Roomix reordenó el payload y este bloque quedó ~80.000
+    // caracteres más adelante. La ventana vieja seguía "encontrando" cosas (total_area_m2,
+    // location_city, un operation_type) porque hay un objeto previo parcial cerca del slug —
+    // así que no tiraba error, pero perdía en silencio cubierta/antigüedad/expensas/fecha/
+    // teléfono/piso: 0% de captura desde el crawl de agosto. Si el marcador no está en la página,
+    // se cae al respaldo viejo por slug/operation_type (por si algún template lo omite).
+    let win = null;
+    const csIdx = blob.indexOf('"characteristics-section"');
+    if (csIdx !== -1) {
+      win = blob.slice(csIdx, csIdx + 2200);
     } else {
-      const opIdx = blob.indexOf('"operation_type"');
-      if (opIdx === -1) return null;
-      win = blob.slice(Math.max(0, opIdx - 400), opIdx + 2000);
+      const slugIdx = slug ? blob.indexOf(`"slug":"${slug}"`) : -1;
+      if (slugIdx !== -1) {
+        win = blob.slice(Math.max(0, slugIdx - 2200), slugIdx + 900);
+      } else {
+        const opIdx = blob.indexOf('"operation_type"');
+        if (opIdx === -1) return null;
+        win = blob.slice(Math.max(0, opIdx - 400), opIdx + 2000);
+      }
     }
     const str = (re) => { const m = win.match(re); return m && m[1] != null ? m[1] : null; };
     const num = (re) => { const m = win.match(re); return m && m[1] != null ? parseFloat(m[1]) : null; };
