@@ -14,6 +14,7 @@ import {
   origenPlantilla,
   esPlantillaDelSistema,
 } from '@/lib/whatsapp/clasificaciones'
+import { buscarOCrearConversacion } from '@/lib/whatsapp/conversations'
 
 // =============================================
 // Helper: Director-only access guard
@@ -1558,14 +1559,6 @@ export async function sendCampaignMessage(
 
     // 5. Buscar o crear la conversación (el duplicado ya fue descartado arriba)
     let conversation_id: string;
-    const { data: convData } = await supabase
-      .from('wa_conversations')
-      .select('id, clasificacion, clasificaciones_historial')
-      .eq('agency_id', agency_id)
-      .eq('contact_phone', cleanPhone)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
 
     // La plantilla que se manda queda como clasificación del lead, así después se puede
     // filtrar la bandeja por "quiénes recibieron esta plantilla" sin pedirle ningún dato
@@ -1573,6 +1566,47 @@ export async function sendCampaignMessage(
     // recordatorios de visita, reactivación) NO clasifican: no son campañas suyas.
     const clasifPlantilla = esPlantillaDelSistema(input.template_name) ? null : input.template_name
     const origenClasif = origenPlantilla(input.template_name)
+
+    // Heredar la clasificación del contacto en la agenda (si existe), para que el
+    // chat creado por la campaña aparezca ya clasificado en bandeja y Leads WhatsApp.
+    const { data: contactClasif } = await supabase
+      .from('wa_contacts')
+      .select('clasificacion, clasificaciones_historial')
+      .eq('agency_id', agency_id)
+      .eq('phone', cleanPhone)
+      .maybeSingle()
+
+    const clasifOrigen = contactClasif?.clasificacion ?? null
+    const at = new Date().toISOString()
+    const historial: Array<{ clasificacion: string; origen: string; at: string }> = []
+    if (clasifOrigen) historial.push({ clasificacion: clasifOrigen, origen: 'inicial', at })
+    if (clasifPlantilla && clasifPlantilla !== clasifOrigen) {
+      historial.push({ clasificacion: clasifPlantilla, origen: origenClasif, at })
+    }
+
+    // Atomico a proposito: el envío puede cruzarse con un mensaje entrante del
+    // mismo lead. Ver lib/whatsapp/conversations.ts.
+    const { conv: convRow, creada, error: errConv } = await buscarOCrearConversacion<{
+      id: string; clasificacion: string | null; clasificaciones_historial: unknown
+    }>(supabase, {
+      agency_id,
+      contact_phone: cleanPhone,
+      columnas: 'id, clasificacion, clasificaciones_historial',
+      nueva: {
+        instance_id: instance.id,
+        contact_name: input.name,
+        bot_active: input.bot_active ?? true,
+        unread_count: 0,
+        clasificacion: clasifOrigen,
+        clasificaciones_historial: historial,
+      },
+    })
+
+    if (!convRow) {
+      return { success: false, error: `Mensaje enviado pero falló crear conversación: ${(errConv as { message?: string })?.message}` }
+    }
+
+    const convData = creada ? null : convRow
 
     if (convData) {
       conversation_id = convData.id;
@@ -1585,42 +1619,8 @@ export async function sendCampaignMessage(
         .update(updateConv)
         .eq('id', conversation_id)
     } else {
-      // Heredar la clasificación del contacto en la agenda (si existe), para que el
-      // chat creado por la campaña aparezca ya clasificado en bandeja y Leads WhatsApp.
-      const { data: contactClasif } = await supabase
-        .from('wa_contacts')
-        .select('clasificacion, clasificaciones_historial')
-        .eq('agency_id', agency_id)
-        .eq('phone', cleanPhone)
-        .maybeSingle()
-
-      const clasifOrigen = contactClasif?.clasificacion ?? null
-      const at = new Date().toISOString()
-      const historial: Array<{ clasificacion: string; origen: string; at: string }> = []
-      if (clasifOrigen) historial.push({ clasificacion: clasifOrigen, origen: 'inicial', at })
-      if (clasifPlantilla && clasifPlantilla !== clasifOrigen) {
-        historial.push({ clasificacion: clasifPlantilla, origen: origenClasif, at })
-      }
-
-      const { data: newConv, error: createConvErr } = await supabase
-        .from('wa_conversations')
-        .insert({
-          agency_id,
-          instance_id: instance.id,
-          contact_phone: cleanPhone,
-          contact_name: input.name,
-          bot_active: input.bot_active ?? true,
-          unread_count: 0,
-          clasificacion: clasifOrigen,
-          clasificaciones_historial: historial,
-        })
-        .select('id')
-        .single()
-
-      if (createConvErr || !newConv) {
-        return { success: false, error: `Mensaje enviado pero falló crear conversación: ${createConvErr?.message}` }
-      }
-      conversation_id = newConv.id;
+      // Recién creada: ya nació con la clasificación heredada del contacto.
+      conversation_id = convRow.id;
     }
 
     // Y también en la agenda, para que el filtro de Contactos lo encuentre por la plantilla.

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CLASIFICACION_MANUAL } from "@/lib/whatsapp/clasificacion";
+import { buscarOCrearConversacion } from "@/lib/whatsapp/conversations";
 
 interface ManualContactInput {
   name: string;
@@ -68,11 +69,17 @@ export async function createManualContact(input: ManualContactInput) {
       .eq('phone', input.phone)
       .maybeSingle();
 
+    // Por agency_id, no por instance_id: es la clave por la que la base garantiza
+    // que hay un solo chat por teléfono. Buscar por instancia dejaba fuera los chats
+    // de la misma agencia atados a otra instancia (o sin instancia) y se creaba uno
+    // paralelo.
     const { data: existingConv } = await admin
       .from("wa_conversations")
       .select("id, agent_id")
-      .eq("instance_id", instance.id)
+      .eq("agency_id", agency_id)
       .eq("contact_phone", input.phone)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
     // De quién es el lead lo dice SIEMPRE la conversación (`wa_conversations`):
@@ -133,13 +140,18 @@ export async function createManualContact(input: ManualContactInput) {
 
     // 3. Insert or update wa_conversations (ya buscada arriba)
     if (!existingConv) {
-      const { error: convError } = await supabase
-        .from("wa_conversations")
-        .insert({
-          agency_id,
+      // Atomico a proposito: el alta manual puede cruzarse con un mensaje entrante
+      // del mismo teléfono. Ver lib/whatsapp/conversations.ts.
+      // El INSERT va con la sesión del asesor (respeta la RLS); las lecturas con
+      // admin, que es lo único que ve los chats de otros asesores.
+      const { error: convError } = await buscarOCrearConversacion(supabase, {
+        agency_id,
+        contact_phone: input.phone,
+        columnas: "id, agent_id",
+        readClient: admin,
+        nueva: {
           instance_id: instance.id,
           agent_id: assigned_agent_id,
-          contact_phone: input.phone,
           contact_name: input.name,
           status: 'active',
           bot_active: false, // Manual so we don't trigger the bot automatically
@@ -153,8 +165,9 @@ export async function createManualContact(input: ManualContactInput) {
           requires_follow_up: false,
           follow_ups_sent: 0,
           funnel_status: 'open',
-        });
-        
+        },
+      });
+
       if (convError) {
         console.error("Error creating wa_conversation:", convError);
         // We do not throw to avoid crashing if it's just a duplicate issue that we missed
