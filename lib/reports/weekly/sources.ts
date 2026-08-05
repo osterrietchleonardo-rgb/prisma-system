@@ -77,13 +77,22 @@ export async function fetchConsultas(agencyId: string, w: WeekWindow): Promise<n
   // La lista puede ser grande (1.397 en la semana de la campaña): se pagina de a 500
   // para no pasarse del largo máximo de URL de PostgREST.
   for (let i = 0; i < ids.length; i += 500) {
-    const { data } = await db
-      .from("wa_messages")
-      .select("conversation_id")
-      .eq("agency_id", agencyId)
-      .eq("role", "lead")
-      .in("conversation_id", ids.slice(i, i + 500))
-    for (const m of data ?? []) conMensaje.add(m.conversation_id)
+    const idsChunk = ids.slice(i, i + 500)
+    // Un solo chunk de 500 conversaciones puede devolver más de 1.000 mensajes 'lead'
+    // (954 filas medido en Central para la ventana 27-jul/2-ago, al borde del techo de
+    // PostgREST), así que también hay que paginar esta consulta con .range().
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await db
+        .from("wa_messages")
+        .select("conversation_id")
+        .eq("agency_id", agencyId)
+        .eq("role", "lead")
+        .in("conversation_id", idsChunk)
+        .range(desde, desde + 999)
+      if (error) throw new Error(`fetchConsultas: ${error.message}`)
+      for (const m of data ?? []) conMensaje.add(m.conversation_id)
+      if (!data || data.length < 1000) break
+    }
   }
   return conMensaje.size
 }
@@ -296,12 +305,15 @@ export async function fetchResendEmails(w: WeekWindow): Promise<ResendEmail[] | 
       return at >= w.startUtc && at <= w.endUtc && esDerivacion(e.subject)
     })
 
-    // El teléfono del lead solo está en el detalle. De a 5 en paralelo para no
-    // castigar el rate limit ni el tiempo del endpoint.
+    // El teléfono del lead solo está en el detalle. De a 2 en paralelo: con 5, Resend
+    // devuelve 429 (rate limit) en ~25% de las llamadas y el retry de telefonoDelEmail
+    // (sin backoff) cae dentro de la misma ventana saturada y no lo resuelve, dejando
+    // phoneKey en null de forma no determinística. Medido contra la API real: con 2,
+    // 0 errores. Ver docs/interno/TECNICO-PRISMA.md §9.10.
     const salida: ResendEmail[] = []
-    for (let i = 0; i < enVentana.length; i += 5) {
+    for (let i = 0; i < enVentana.length; i += 2) {
       const lote = await Promise.all(
-        enVentana.slice(i, i + 5).map(async (e) => ({
+        enVentana.slice(i, i + 2).map(async (e) => ({
           id: e.id,
           to: (e.to?.[0] ?? "").toLowerCase(),
           subject: e.subject,
