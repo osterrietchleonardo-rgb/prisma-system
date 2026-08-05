@@ -6,16 +6,18 @@
 // No comparte NADA con el chat: si esto fallara, el chat sigue funcionando igual.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import dynamic from "next/dynamic"
-import { Loader2, MapPin, X } from "lucide-react"
+import { Loader2, MapPin, Pencil, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { MapaFiltros } from "./mapa-filtros"
 import { MapaResultados } from "./mapa-resultados"
 import { MapaFicha } from "./mapa-ficha"
-import { serializarBBox } from "@/lib/mapa/bbox"
+import { MapaZonasPanel } from "./mapa-zonas-panel"
+import type { Trazo } from "./mapa-lapiz"
+import { bboxDePoligono, serializarBBox } from "@/lib/mapa/bbox"
 import { agruparPorUbicacion } from "@/lib/mapa/agrupar"
 import { filtrarPorTrazos } from "@/lib/mapa/filtro-poligono"
-import type { BBox, FiltrosMapa, GrupoUbicacion, PropiedadMapa, RespuestaMapa } from "@/lib/mapa/tipos"
+import type { BBox, FiltrosMapa, GrupoUbicacion, PropiedadMapa, RespuestaMapa, ZonaGuardada } from "@/lib/mapa/tipos"
 
 // Leaflet toca `window` al importarse: sin ssr:false el build se cae.
 const MapaLienzo = dynamic(() => import("./mapa-lienzo"), {
@@ -43,7 +45,9 @@ export function MapaTab() {
   const [propiedades, setPropiedades] = useState<PropiedadMapa[]>([])
   const [truncado, setTruncado] = useState(false)
   const [cargando, setCargando] = useState(false)
-  const [trazos, setTrazos] = useState<unknown[]>([])
+  const [trazos, setTrazos] = useState<Trazo[]>([])
+  const [lapizActivo, setLapizActivo] = useState(false)
+  const [encuadrarA, setEncuadrarA] = useState<BBox | null>(null)
   const [grupoAbierto, setGrupoAbierto] = useState<GrupoUbicacion | null>(null)
   const [fichaId, setFichaId] = useState<string | null>(null)
 
@@ -95,9 +99,28 @@ export function MapaTab() {
 
   // ── El lapiz recorta en el navegador: cero consultas nuevas ──
   const visibles = useMemo(
-    () => filtrarPorTrazos(propiedades, trazos),
+    () => filtrarPorTrazos(propiedades, trazos.map((t) => t.poligono)),
     [propiedades, trazos],
   )
+
+  // Un trazo que no encierra nada casi siempre es un error de pulso: hay que avisarlo,
+  // porque si no el usuario ve la pantalla vacia y no entiende por que.
+  const trazoVacio = trazos.length > 0 && visibles.length === 0 && propiedades.length > 0
+
+  const agregarTrazo = useCallback((t: Trazo) => {
+    setTrazos((prev) => [...prev, t])
+    setLapizActivo(false)
+    const b = bboxDePoligono(t.poligono)
+    if (b) setEncuadrarA(b)
+  }, [])
+
+  const aplicarZona = useCallback((z: ZonaGuardada) => {
+    const trazo: Trazo = { id: `zona_${z.id}`, poligono: z.geojson as Trazo["poligono"] }
+    setTrazos([trazo])
+    const b = bboxDePoligono(z.geojson)
+    if (b) setEncuadrarA(b)
+    else toast.error("Esa zona no tiene un trazo válido")
+  }, [])
 
   // Con el tope pasado no se dibujan puntos sueltos: solo los globitos con las cantidades.
   const grupos = useMemo(
@@ -115,10 +138,53 @@ export function MapaTab() {
     <div className="flex h-[calc(100vh-13rem)] min-h-[560px] flex-col gap-3">
       <MapaFiltros filtros={filtros} onCambio={setFiltros} />
 
-      <div className="grid flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[1fr_22rem]">
+      <div className="grid flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[15rem_1fr_22rem]">
+        {/* ── Mis zonas ── */}
+        <div className="hidden overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 lg:block">
+          <MapaZonasPanel
+            trazos={trazos}
+            filtros={filtros}
+            onBorrarTrazo={(id) => setTrazos((t) => t.filter((x) => x.id !== id))}
+            onLimpiarTrazos={() => setTrazos([])}
+            onAplicarZona={aplicarZona}
+          />
+        </div>
+
         {/* ── El mapa ── */}
         <div className="relative overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <MapaLienzo grupos={grupos} onMover={onMover} onAbrirGrupo={onAbrirGrupo} />
+          <MapaLienzo
+            grupos={grupos}
+            onMover={onMover}
+            onAbrirGrupo={onAbrirGrupo}
+            encuadrarA={encuadrarA}
+            lapizActivo={lapizActivo}
+            trazos={trazos}
+            onTrazo={agregarTrazo}
+          />
+
+          {/* ── El lápiz ── */}
+          <button
+            onClick={() => setLapizActivo((v) => !v)}
+            title={lapizActivo ? "Salir del lápiz" : "Dibujar una zona a mano alzada"}
+            className={`absolute right-3 top-3 z-[500] flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-colors ${
+              lapizActivo ? "bg-sky-600 text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+            }`}
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+
+          {lapizActivo && (
+            <div className="pointer-events-none absolute left-1/2 top-3 z-[500] -translate-x-1/2 rounded-lg bg-sky-600/95 px-3 py-1.5 text-xs font-medium text-white shadow">
+              Dibujá la zona sin soltar. Podés hacer varios trazos: se suman.
+            </div>
+          )}
+
+          {trazoVacio && (
+            <div className="absolute left-1/2 top-14 z-[500] flex -translate-x-1/2 items-center gap-2 rounded-lg bg-zinc-900/95 px-3 py-1.5 text-xs text-white shadow">
+              Ninguna propiedad en esta zona.
+              <button className="underline" onClick={() => setTrazos([])}>borrar el trazo</button>
+            </div>
+          )}
 
           {/* Contador. Sale del MISMO estado que la lista, para que no puedan discrepar. */}
           <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-lg bg-white/90 px-3 py-1.5 text-xs font-medium shadow dark:bg-zinc-900/90">
@@ -134,13 +200,13 @@ export function MapaTab() {
           </div>
 
           {truncado && (
-            <div className="absolute left-1/2 top-3 z-[500] -translate-x-1/2 rounded-lg bg-amber-500/95 px-3 py-1.5 text-xs font-medium text-white shadow">
+            <div className="absolute bottom-3 left-1/2 z-[500] -translate-x-1/2 rounded-lg bg-amber-500/95 px-3 py-1.5 text-center text-xs font-medium text-white shadow">
               Hay demasiadas propiedades acá. Acercate para verlas una por una.
             </div>
           )}
 
           {!hayTiles && (
-            <div className="absolute right-3 top-3 z-[500] max-w-[15rem] rounded-lg bg-zinc-900/90 px-3 py-2 text-[11px] text-white shadow">
+            <div className="absolute bottom-3 right-3 z-[500] max-w-[15rem] rounded-lg bg-zinc-900/90 px-3 py-2 text-[11px] text-white shadow">
               Falta la clave del proveedor de mapas: se ve el fondo gris, pero los puntos, el
               lápiz y la lista funcionan igual.
             </div>

@@ -27,3 +27,27 @@ export function parsearBBox(s: string | null | undefined): BBox | null {
 
   return { sur, oeste, norte, este }
 }
+
+/**
+ * Rectangulo que encierra un trazo. Se usa para acomodar el mapa cuando el usuario
+ * aplica una zona guardada. Devuelve null si el trazo no tiene puntos usables.
+ */
+export function bboxDePoligono(poligono: unknown): BBox | null {
+  const anillo = (poligono as { coordinates?: unknown[][][] })?.coordinates?.[0]
+  if (!Array.isArray(anillo) || anillo.length === 0) return null
+
+  let sur = Infinity, norte = -Infinity, oeste = Infinity, este = -Infinity
+
+  for (const par of anillo) {
+    if (!Array.isArray(par) || par.length < 2) continue
+    const [lng, lat] = par as number[]
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue
+    if (lat < sur) sur = lat
+    if (lat > norte) norte = lat
+    if (lng < oeste) oeste = lng
+    if (lng > este) este = lng
+  }
+
+  if (!Number.isFinite(sur) || !Number.isFinite(oeste)) return null
+  return { sur, oeste, norte, este }
+}

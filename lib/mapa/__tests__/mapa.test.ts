@@ -7,7 +7,7 @@
 import { test, describe } from "node:test"
 import assert from "node:assert/strict"
 
-import { parsearBBox, serializarBBox } from "../bbox.ts"
+import { bboxDePoligono, parsearBBox, serializarBBox } from "../bbox.ts"
 import { leerFiltros } from "../filtros.ts"
 import { filtrarPorTrazos } from "../filtro-poligono.ts"
 import { agruparPorUbicacion } from "../agrupar.ts"
@@ -58,6 +58,29 @@ describe("serializarBBox", () => {
   test("ida y vuelta devuelve lo mismo", () => {
     const original = { sur: -34.6, oeste: -58.44, norte: -34.56, este: -58.4 }
     assert.deepEqual(parsearBBox(serializarBBox(original)), original)
+  })
+})
+
+describe("bboxDePoligono", () => {
+  test("encierra el trazo", () => {
+    assert.deepEqual(
+      bboxDePoligono({ type: "Polygon", coordinates: [[[-58.44, -34.60], [-58.40, -34.60], [-58.40, -34.56], [-58.44, -34.60]]] }),
+      { sur: -34.6, oeste: -58.44, norte: -34.56, este: -58.4 },
+    )
+  })
+
+  test("un trazo sin puntos usables devuelve null en vez de romper", () => {
+    assert.equal(bboxDePoligono({}), null)
+    assert.equal(bboxDePoligono({ type: "Polygon", coordinates: [[]] }), null)
+    assert.equal(bboxDePoligono(null), null)
+  })
+
+  test("ignora los pares con basura en vez de contaminar el rectangulo", () => {
+    const b = bboxDePoligono({
+      type: "Polygon",
+      coordinates: [[[-58.44, -34.60], ["a", "b"], [-58.40, -34.56]]],
+    })
+    assert.deepEqual(b, { sur: -34.6, oeste: -58.44, norte: -34.56, este: -58.4 })
   })
 })
 

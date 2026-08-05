@@ -11,6 +11,7 @@ import "leaflet/dist/leaflet.css"
 import "leaflet.markercluster/dist/MarkerCluster.css"
 import "leaflet.markercluster/dist/MarkerCluster.Default.css"
 
+import { MapaLapiz, TrazosDibujados, type Trazo } from "./mapa-lapiz"
 import type { BBox, FuenteMapa, GrupoUbicacion } from "@/lib/mapa/tipos"
 
 /** Centro por defecto: CABA. Se puede navegar a cualquier lado (hay 3 propiedades en Florida). */
@@ -92,6 +93,9 @@ export interface MapaLienzoProps {
   onAbrirGrupo: (g: GrupoUbicacion) => void
   /** Cuando llega un rectangulo nuevo, el mapa se acomoda a el. */
   encuadrarA?: BBox | null
+  lapizActivo?: boolean
+  trazos?: Trazo[]
+  onTrazo?: (t: Trazo) => void
   /** Se monta dentro del MapContainer: ahi adentro `useMap()` tiene el mapa. */
   children?: React.ReactNode
 }
@@ -101,6 +105,9 @@ export default function MapaLienzo({
   onMover,
   onAbrirGrupo,
   encuadrarA = null,
+  lapizActivo = false,
+  trazos = [],
+  onTrazo,
   children,
 }: MapaLienzoProps) {
   const clave = process.env.NEXT_PUBLIC_MAPTILER_KEY
@@ -140,6 +147,9 @@ export default function MapaLienzo({
       <MarkerClusterGroup chunkedLoading maxClusterRadius={45} showCoverageOnHover={false}>
         {marcadores}
       </MarkerClusterGroup>
+
+      <TrazosDibujados trazos={trazos} />
+      {onTrazo && <MapaLapiz activo={lapizActivo} onTrazo={onTrazo} />}
 
       {children}
     </MapContainer>
