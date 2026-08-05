@@ -700,6 +700,30 @@ Versión anterior del endpoint de respuesta, usa `BOT_REPLY_SECRET` para auth. E
 
 Detalle de implementación en TECNICO-PRISMA § 9.2.2 y § 9.2.3.
 
+### 8.5 Informe semanal: la misma derivación, leída una vez por semana
+
+El informe semanal al director fundador (TECNICO-PRISMA § 9.10) no agrega una señal nueva:
+**lee los mismos eventos de derivación de §8.4**, agrupados por semana en vez de mostrarse en
+tiempo real. Lo que sí hay que tener presente es que **no todas las derivaciones son iguales**,
+y esa diferencia es la que explica por qué el informe muestra tres señales separadas en vez de
+un único porcentaje:
+
+- **Handoff** (`Gestion_Handoff`): apaga el bot y deja el mensaje interno (§8.4, regla 3). El
+  asesor **tiene que** entrar al chat para que el cliente reciba alguna respuesta — no hay nadie
+  más atendiendo. Por eso acá "no respondió" significa, sin ambigüedad, que el cliente quedó sin
+  nadie: es la métrica dura del panel de handoffs sin atender.
+- **Aviso de visita / de link** (`Avisar_Asesor`): manda el email al asesor pero **deja el bot
+  encendido** — el cliente sigue conversando con el bot mientras tanto. El asesor no está
+  obligado a entrar al chat (puede llamar por teléfono, coordinar por afuera), así que la
+  ausencia de mensajes suyos en PRISMA **no prueba** que no haya hecho nada. Tratar este caso
+  con la misma regla 5 de §8.4 ("no atendido si nadie escribió") daría falsos negativos.
+
+Por esta diferencia de fondo, el informe no mezcla ambas cosas en un solo número: los handoffs se
+miden por tiempo hasta la primera respuesta en el chat (como ya lo hace el panel), y los avisos
+de visita/link se miden con tres señales independientes (chat, visita cargada, email leído) para
+no penalizar al asesor por no haber usado PRISMA en un caso donde el sistema nunca le exigió
+volver a escribir ahí.
+
 ---
 
 ## 9. Motor de Automatización n8n
