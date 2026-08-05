@@ -115,10 +115,14 @@ SELECT count(*) FROM roomix_properties
 WHERE is_active AND lat BETWEEN -34.60 AND -34.56 AND lng BETWEEN -58.44 AND -58.40;
 ```
 
-Anotar acá el tiempo y el tipo de scan:
+**MEDIDO el 2026-08-05.** La tabla creció desde el spec: **156.803 filas / 70.809 activas**
+(el 3-ago eran 141.010 / 47.187).
 
-> **Antes del índice:** `___ ms` — plan: `___`
-> (medición previa del spec, 2026-08-03: **261 ms**, `Parallel Seq Scan`, 42.941 filas descartadas)
+> **Antes del índice:** `267 ms` en caliente, `1.189 ms` en la segunda corrida, `1.687 ms` en frío
+> — plan: `Parallel Seq Scan`, 48.291 filas descartadas por worker.
+>
+> El crecimiento se pagó caro: +50% de filas activas hizo que la consulta pasara de 261 ms a
+> 1.687 ms (×6,5), no de 261 a 390 como proyectaba el spec.
 
 - [ ] 2.2 Agregar las columnas a `properties` y rellenarlas desde `tokko_data`:
 
@@ -470,9 +474,19 @@ Leaflet necesita `window`: **todo se carga con `dynamic(..., { ssr: false })`** 
       (`consultor-results.tsx`): `own` dorado, `agency` gris, `roomix` azul.
       **Etiqueta visible de `roomix`: "Colaboración".**
 
-- [ ] 7.4 **Puntos apilados** (spec §3: hasta 98 avisos en la misma coordenada exacta):
-      agrupar por `lat,lng` redondeado a 6 decimales; al clickear, si hay más de una, abrir
-      la **lista** de todas, no una sola tarjeta.
+- [ ] 7.4 **Un pin por ubicación, no por aviso** (spec §5.5). Agrupar por `lat,lng` redondeado a
+      6 decimales. Al clickear, abrir la **lista** de todo lo que hay en ese punto, cada uno con
+      su inmobiliaria a la vista. Nunca una sola tarjeta cuando hay varias.
+      - Si en el punto hay una propiedad de la cartera → el pin va **dorado** (la propia manda) y
+        su ficha avisa "también publicada en la red de colaboración por X".
+      - Los avisos de **inmobiliarias distintas** con mismo precio + m² + tipo se muestran juntos
+        y marcados como probable misma propiedad. **No se esconde ninguno.**
+      - Los de **una misma inmobiliaria** van por separado: son unidades distintas del edificio
+        (caso verificado: 3 deptos de Fuschetto, pisos 1/2/3, mismo precio y m²).
+      - **Nada se borra ni se modifica en la base.** El agrupado es solo al dibujar.
+
+      Esta lógica va en `lib/mapa/agrupar.ts` **con sus tests** (Tarea 4), no suelta en el
+      componente: es la parte donde más fácil se esconden propiedades reales sin querer.
 
 - [ ] 7.5 `components/mapa/mapa-filtros.tsx` — operación (arranca en **Venta**), tipo, precio
       min/max + moneda, ambientes, y las 3 casillas de fuente tildadas por defecto.

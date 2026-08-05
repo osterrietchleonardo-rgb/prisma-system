@@ -183,7 +183,34 @@ Abre `UnifiedPropertyCard` (la tarjeta que ya existe, con carrusel de fotos y "V
 completa"). **Si en esa coordenada exacta hay varias propiedades, abre la lista de todas** — no
 una sola. Es el caso de los edificios (hasta 98 en un mismo punto).
 
-### 5.5 Panel de resultados
+### 5.5 Duplicados — un pin por ubicación, no por aviso
+
+**Nada se borra ni se modifica en la base. El agrupado es solo al dibujar.**
+
+Medido el 2026-08-05 sobre las 70.809 activas de colaboración:
+
+| Caso | Cuántos | Qué es |
+|---|---|---|
+| Misma coordenada + precio + m² + tipo, **varias inmobiliarias** | 572 grupos | La **misma propiedad** publicada por 2 o más inmobiliarias. Verificado: una casa en Barrancas de San Benito publicada por LAMS y por Pernice, misma superficie y precio, una dice "4 ambientes" y la otra "6" |
+| Ídem, **una sola inmobiliaria** | 5.153 grupos | En general **NO son duplicados**: son unidades distintas del mismo edificio. Verificado: 3 departamentos de Fuschetto en Convención 1400, mismo precio y m², **pisos 1, 2 y 3** |
+| Propiedad de la cartera **también en colaboración** | 151 | Verificado: tu "2 ambientes a estrenar en Núñez" (Deheza 2300, US$186.000) aparece también publicada por RE/MAX TITANIUM al mismo precio |
+
+**La regla:** el mapa dibuja **un pin por coordenada**, no uno por aviso. Al clickearlo se abre la
+**lista** de todo lo que hay en esa ubicación, cada uno con su inmobiliaria a la vista.
+
+- Los avisos de **inmobiliarias distintas** que parecen la misma propiedad se muestran juntos en
+  esa lista, marcados como tal — no se esconde ninguno. El asesor decide.
+- Los de **una misma inmobiliaria** se listan por separado: son unidades distintas del edificio.
+  Agruparlos borraría propiedades reales del mapa (el caso Fuschetto).
+- Si en esa coordenada hay una propiedad **de la cartera**, el pin es **dorado** (la propia manda)
+  y su ficha avisa que también está publicada en la red de colaboración.
+
+> **Por qué no se deduplica más agresivamente:** el campo `floor` (el que distinguiría unidades
+> de un mismo edificio) solo está cargado en el 45% de los avisos. Con esa cobertura, cualquier
+> regla automática que "limpie" duplicados termina escondiendo propiedades reales. Se prefiere
+> mostrar de más y avisar, antes que ocultar sin que el asesor se entere.
+
+### 5.6 Panel de resultados
 
 Muestra siempre las mismas propiedades visibles en el mapa, ordenadas por precio. Es la lista
 que el asesor le muestra al cliente.
