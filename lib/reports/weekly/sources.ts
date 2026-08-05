@@ -55,15 +55,22 @@ export async function fetchAgencias(): Promise<Agencia[]> {
  */
 export async function fetchConsultas(agencyId: string, w: WeekWindow): Promise<number> {
   const db = getAdminDb()
-  const { data: nuevas, error } = await db
-    .from("wa_conversations")
-    .select("id")
-    .eq("agency_id", agencyId)
-    .gte("created_at", w.startUtc)
-    .lte("created_at", w.endUtc)
-  if (error) throw new Error(`fetchConsultas: ${error.message}`)
-
-  const ids = (nuevas ?? []).map((c) => c.id)
+  const ids: string[] = []
+  // PostgREST corta en 1.000 filas por default: una semana de campaña masiva ya superó
+  // eso (1.397 conversaciones el 20-jul), así que hay que paginar igual que en
+  // fetchConversaciones/fetchMensajesDesde.
+  for (let desde = 0; ; desde += 1000) {
+    const { data, error } = await db
+      .from("wa_conversations")
+      .select("id")
+      .eq("agency_id", agencyId)
+      .gte("created_at", w.startUtc)
+      .lte("created_at", w.endUtc)
+      .range(desde, desde + 999)
+    if (error) throw new Error(`fetchConsultas: ${error.message}`)
+    for (const c of data ?? []) ids.push(c.id)
+    if (!data || data.length < 1000) break
+  }
   if (!ids.length) return 0
 
   const conMensaje = new Set<string>()
@@ -332,14 +339,24 @@ export function esVisita(subject: string): boolean {
   return /^Quiere visitar/i.test(subject)
 }
 
+/**
+ * Un reintento: con ~30-60 llamadas en lotes de 5 en paralelo, una falla transitoria de
+ * Resend (rate-limit, timeout) dejaba el teléfono en null de forma no determinística entre
+ * corridas, y ese número se muestra literal al director (cobertura de pipeline, señales
+ * chat/visita). El modo de falla es conservador (resta, no infla), pero no debería depender
+ * de la suerte de la red.
+ */
 async function telefonoDelEmail(id: string, auth: Record<string, string>): Promise<string | null> {
-  try {
-    const res = await fetch(`https://api.resend.com/emails/${id}`, { headers: auth })
-    if (!res.ok) return null
-    const json = await res.json()
-    const texto = String(json.html ?? "").replace(/<[^>]+>/g, " ")
-    return phoneKey(texto.match(/\b\d{10,14}\b/)?.[0] ?? null)
-  } catch {
-    return null
+  for (let intento = 0; intento < 2; intento++) {
+    try {
+      const res = await fetch(`https://api.resend.com/emails/${id}`, { headers: auth })
+      if (!res.ok) continue
+      const json = await res.json()
+      const texto = String(json.html ?? "").replace(/<[^>]+>/g, " ")
+      return phoneKey(texto.match(/\b\d{10,14}\b/)?.[0] ?? null)
+    } catch {
+      // sigue al reintento
+    }
   }
+  return null
 }
