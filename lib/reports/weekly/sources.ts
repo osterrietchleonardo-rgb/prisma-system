@@ -155,16 +155,25 @@ export async function fetchMensajesDesde(
   const db = getAdminDb()
   const filas: { conversationId: string; role: string; content: string | null; at: string }[] = []
   for (let i = 0; i < conversationIds.length; i += 200) {
-    const { data, error } = await db
-      .from("wa_messages")
-      .select("conversation_id, role, content, created_at")
-      .eq("agency_id", agencyId)
-      .in("conversation_id", conversationIds.slice(i, i + 200))
-      .gte("created_at", sinceUtc)
-      .order("created_at", { ascending: true })
-    if (error) throw new Error(`fetchMensajesDesde: ${error.message}`)
-    for (const m of data ?? []) {
-      filas.push({ conversationId: m.conversation_id, role: m.role, content: m.content, at: m.created_at })
+    const idsChunk = conversationIds.slice(i, i + 200)
+    // PostgREST corta en 1.000 filas por default: una sola tanda de 200 conversaciones puede
+    // mover más mensajes que eso en una semana (pasó con Central, con handoffs + derivaciones
+    // por email juntos), así que hay que paginar con .range() como en fetchConversaciones, o
+    // se pierden mensajes en silencio y "atendido" da mal.
+    for (let desde = 0; ; desde += 1000) {
+      const { data, error } = await db
+        .from("wa_messages")
+        .select("conversation_id, role, content, created_at")
+        .eq("agency_id", agencyId)
+        .in("conversation_id", idsChunk)
+        .gte("created_at", sinceUtc)
+        .order("created_at", { ascending: true })
+        .range(desde, desde + 999)
+      if (error) throw new Error(`fetchMensajesDesde: ${error.message}`)
+      for (const m of data ?? []) {
+        filas.push({ conversationId: m.conversation_id, role: m.role, content: m.content, at: m.created_at })
+      }
+      if (!data || data.length < 1000) break
     }
   }
   return filas
@@ -302,9 +311,16 @@ export async function fetchResendEmails(w: WeekWindow): Promise<ResendEmail[] | 
   }
 }
 
-/** Resend devuelve "2026-08-02 13:52:20.042000+00", que no es ISO válido para comparar. */
+/**
+ * Resend devuelve "2026-08-02 13:52:20.042000+00", que no es ISO válido para comparar:
+ * al espacio en vez de "T" se suma un offset de zona horaria sin minutos ("+00" en vez de
+ * "+00:00"), que V8 no parsea (Date pasa a Invalid Date y toISOString() explota). Se
+ * normalizan las dos cosas antes de construir el Date.
+ */
 function aIso(fecha: string): string {
-  return new Date(fecha.replace(" ", "T")).toISOString()
+  const conT = fecha.replace(" ", "T")
+  const conOffsetCompleto = conT.replace(/([+-]\d{2})$/, "$1:00")
+  return new Date(conOffsetCompleto).toISOString()
 }
 
 /** Los dos asuntos que genera Avisar_Asesor. El del handoff sale de la base, no de acá. */
