@@ -13,7 +13,8 @@ import { toast } from "sonner"
 import { AiCreditBadge } from "@/components/ai-credit-badge"
 import { ConsultorResultsSection, MatchedPropertiesResponse, UnifiedProperty } from "@/components/shared/consultor-results"
 import { BuscadorNotasSettings } from "@/components/consultor/buscador-notas-settings"
-import { NotebookPen } from "lucide-react"
+import { NotebookPen, Map } from "lucide-react"
+import { MapaTab } from "@/components/mapa/mapa-tab"
 interface Property {
   id: string
   title: string
@@ -66,7 +67,7 @@ export default function ConsultorIAPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [agencyId, setAgencyId] = useState<string>("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [view, setView] = useState<"chat" | "notas">("chat")
+  const [view, setView] = useState<"chat" | "notas" | "mapa">("chat")
   
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -289,9 +290,22 @@ export default function ConsultorIAPage() {
         >
           <NotebookPen className="w-4 h-4" /> Notas
         </button>
+        <button
+          onClick={() => setView("mapa")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors",
+            view === "mapa" ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Map className="w-4 h-4" /> Mapa
+        </button>
       </div>
 
-      {view === "notas" ? (
+      {view === "mapa" ? (
+        <div className="flex-1 min-h-0 overflow-y-auto p-3">
+          <MapaTab />
+        </div>
+      ) : view === "notas" ? (
         <div className="flex-1 min-h-0 overflow-y-auto">
           <BuscadorNotasSettings />
         </div>
