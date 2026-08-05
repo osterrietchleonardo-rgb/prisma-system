@@ -352,11 +352,12 @@ export function esVisita(subject: string): boolean {
 }
 
 /**
- * Un reintento: con ~30-60 llamadas en lotes de 5 en paralelo, una falla transitoria de
+ * Un reintento: con ~30-60 llamadas en lotes de 2 en paralelo, una falla transitoria de
  * Resend (rate-limit, timeout) dejaba el teléfono en null de forma no determinística entre
  * corridas, y ese número se muestra literal al director (cobertura de pipeline, señales
  * chat/visita). El modo de falla es conservador (resta, no infla), pero no debería depender
- * de la suerte de la red.
+ * de la suerte de la red. (Antes era lotes de 5: eso solo era rate-limitado el 25-37% de
+ * las veces contra la API real de Resend, medido en la revisión final de esta rama.)
  */
 async function telefonoDelEmail(id: string, auth: Record<string, string>): Promise<string | null> {
   for (let intento = 0; intento < 2; intento++) {
