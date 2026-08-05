@@ -4,6 +4,7 @@ import {
   origenPlantilla,
   esPlantillaDelSistema,
 } from '@/lib/whatsapp/clasificaciones'
+import { buscarOCrearConversacion } from '@/lib/whatsapp/conversations'
 
 // Lógica compartida de envío de una campaña por goteo.
 // La usan: el cron (/api/cron/campaigns) y el botón "Lanzar ahora" (/api/campaigns/launch).
@@ -283,48 +284,44 @@ export async function processCampaign(
       bodyParams.forEach((val, idx) => { fullText = fullText.replace(`{{${idx + 1}}}`, val) })
 
       const cleanPhone = r.phone.replace(/\D/g, '')
-      const { data: conv } = await supabase
-        .from('wa_conversations')
-        .select('id, clasificacion, clasificaciones_historial')
-        .eq('agency_id', campaign.agency_id)
-        .eq('contact_phone', cleanPhone)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
 
+      const { data: contactClasif } = await supabase
+        .from('wa_contacts').select('clasificacion').eq('agency_id', campaign.agency_id).eq('phone', cleanPhone).maybeSingle()
+      // Si la campaña tiene segmento, manda el segmento. Si va a todos los contactos
+      // (sin segmento), se respeta la del contacto en vez de dejar el chat sin clasificar.
+      // Gana el segmento de la campaña (el nombre del lote importado); si no tiene,
+      // la del contacto en la agenda; y como último respaldo el nombre de la plantilla.
+      const clasifInicial = campaign.audience_clasificacion ?? contactClasif?.clasificacion ?? clasifPlantilla
+      const atNuevo = new Date().toISOString()
+      const historialNuevo = clasifInicial
+        ? [{ clasificacion: clasifInicial, origen: origenCampaign, at: atNuevo }]
+        : []
 
-      let conversationId: string | undefined
-      if (!conv) {
-        const { data: contactClasif } = await supabase
-          .from('wa_contacts').select('clasificacion').eq('agency_id', campaign.agency_id).eq('phone', cleanPhone).maybeSingle()
-        // Si la campaña tiene segmento, manda el segmento. Si va a todos los contactos
-        // (sin segmento), se respeta la del contacto en vez de dejar el chat sin clasificar.
-        // Gana el segmento de la campaña (el nombre del lote importado); si no tiene,
-        // la del contacto en la agenda; y como último respaldo el nombre de la plantilla.
-        const clasifInicial = campaign.audience_clasificacion ?? contactClasif?.clasificacion ?? clasifPlantilla
-        const atNuevo = new Date().toISOString()
-        const historialNuevo = clasifInicial
-          ? [{ clasificacion: clasifInicial, origen: origenCampaign, at: atNuevo }]
-          : []
-        const { data: newConv } = await supabase
-          .from('wa_conversations')
-          .insert({
-            agency_id: campaign.agency_id,
-            instance_id: instance.id,
-            contact_phone: cleanPhone,
-            contact_name: r.name,
-            // El director decide al crear la campaña si los chats nuevos nacen con
-            // el bot IA prendido o apagado (ej: reclutamiento → apagado). Default true.
-            bot_active: campaign.bot_active_on_reply ?? true,
-            unread_count: 0,
-            clasificacion: clasifInicial,
-            clasificaciones_historial: historialNuevo,
-          })
-          .select('id')
-          .single()
-        conversationId = newConv?.id
-      } else {
-        conversationId = conv.id
+      // Atomico a proposito: el goteo de la campaña puede cruzarse con un mensaje
+      // entrante del mismo lead. Ver lib/whatsapp/conversations.ts.
+      const { conv: convRow, creada } = await buscarOCrearConversacion<{
+        id: string; clasificacion: string | null; clasificaciones_historial: unknown
+      }>(supabase, {
+        agency_id: campaign.agency_id,
+        contact_phone: cleanPhone,
+        columnas: 'id, clasificacion, clasificaciones_historial',
+        nueva: {
+          instance_id: instance.id,
+          contact_name: r.name,
+          // El director decide al crear la campaña si los chats nuevos nacen con
+          // el bot IA prendido o apagado (ej: reclutamiento → apagado). Default true.
+          bot_active: campaign.bot_active_on_reply ?? true,
+          unread_count: 0,
+          clasificacion: clasifInicial,
+          clasificaciones_historial: historialNuevo,
+        },
+      })
+
+      // Si la acabamos de crear ya nace alineada con la campaña; solo hay que
+      // alinear la que ya existía.
+      const conv = creada ? null : convRow
+      const conversationId: string | undefined = convRow?.id
+      if (conv) {
         // El chat ya existía: se alinea con la campaña en curso.
         //  - instance_id: SIEMPRE. Es lo que ata el chat a la instancia; sin esto se creaban
         //    chats duplicados para el mismo teléfono.

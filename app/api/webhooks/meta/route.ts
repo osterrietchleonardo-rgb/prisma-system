@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { CLASIFICACION_CONSULTA } from '@/lib/whatsapp/clasificacion'
 import { triggerN8nWithSafetyNet } from '@/lib/whatsapp/n8nTrigger'
 import { actualizarEstadoEntrega } from '@/lib/whatsapp/delivery-status'
+import { buscarOCrearConversacion } from '@/lib/whatsapp/conversations'
 
 // El disparo a n8n hace hasta 3 intentos (timeout 15s c/u). Subimos el límite de
 // la función para que Vercel no la mate antes de terminar los reintentos.
@@ -116,42 +117,40 @@ export async function POST(req: Request) {
                     continue
                 }
 
-                // Buscar o crear la conversacion
+                // Buscar o crear la conversacion.
+                // Atomico a proposito: dos mensajes del mismo lead en paralelo tienen que
+                // terminar en UN solo chat. Ver lib/whatsapp/conversations.ts.
                 let conversation_id: string
                 let botIsActive = true
-                                const { data: conv } = await supabase
-                    .from('wa_conversations')
-                    .select('id, bot_active, unread_count, instance_id')
-                    .eq('agency_id', instance.agency_id)
-                    .eq('contact_phone', contactPhone)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle()
+                const { conv, creada, error: errConv } = await buscarOCrearConversacion<{
+                    id: string; bot_active: boolean; unread_count: number; instance_id: string | null
+                }>(supabase, {
+                    agency_id: instance.agency_id,
+                    contact_phone: contactPhone,
+                    columnas: 'id, bot_active, unread_count, instance_id',
+                    nueva: {
+                        instance_id: instance.id,
+                        contact_name: contactName,
+                        status: 'active',
+                        bot_active: true,
+                        unread_count: 1,
+                        clasificacion: CLASIFICACION_CONSULTA,
+                        last_message_at: new Date().toISOString(),
+                        last_inbound_at: new Date().toISOString(),
+                        next_follow_up_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+                        requires_follow_up: true,
+                        follow_ups_sent: 0,
+                        funnel_status: 'open'
+                    }
+                })
 
                 if (!conv) {
-                    const { data: newConv } = await supabase
-                        .from('wa_conversations')
-                        .insert({
-                            agency_id: instance.agency_id,
-                            instance_id: instance.id,
-                            contact_phone: contactPhone,
-                            contact_name: contactName,
-                            status: 'active',
-                            bot_active: true,
-                            unread_count: 1,
-                            clasificacion: CLASIFICACION_CONSULTA,
-                            last_message_at: new Date().toISOString(),
-                            last_inbound_at: new Date().toISOString(),
-                            next_follow_up_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-                            requires_follow_up: true,
-                            follow_ups_sent: 0,
-                            funnel_status: 'open'
-                        })
-                        .select()
-                        .single()
-                    
-                    if (!newConv) continue
-                    conversation_id = newConv.id
+                    console.error('[Meta Webhook] No se pudo obtener la conversacion:', errConv)
+                    continue
+                }
+
+                if (creada) {
+                    conversation_id = conv.id
                 } else {
                     conversation_id = conv.id
                     botIsActive = conv.bot_active
