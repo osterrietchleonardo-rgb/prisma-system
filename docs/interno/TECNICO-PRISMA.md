@@ -555,6 +555,21 @@ Formato LangChain: `session_id` = conversation_id; `message` = `{ type:'human'|'
 - **Detección de columnas flexible:** teléfono por nombre (regex `tel|cel|phone|whats|movil|numero|contacto`, incluye `csTelefono1/2`) o por heurística de valor; **nombre opcional**. Soporta varias columnas de teléfono (toma el primer válido por fila).
 - **Normalización AR:** `lib/whatsapp/phone-ar.ts` (`normalizeArgPhone`) **delega en `normalizePhoneE164(raw,"AR")`** de `lib/whatsapp/phone.ts` (fuente única compartida con el alta manual de contactos): convierte cualquier formato (con/sin +, 0 de trunk, 15 de móvil, áreas 11/221/2227…) al formato WhatsApp y **fuerza el "9" móvil** aunque se cargue el celular sin el 15. Mantiene un fallback de último recurso para planillas sucias.
 
+### 9.10 Informe semanal al director (`GET /api/cron/weekly-report`)
+- **Disparo:** GitHub Action `.github/workflows/weekly-report.yml`, lunes **11:00 UTC** (8:00 AR) + `workflow_dispatch` manual. Pega a `GET /api/cron/weekly-report` con `Authorization: Bearer CRON_SECRET`. No usa Vercel Cron porque el plan es free (mismo patrón que `campaigns-drip.yml` y `tokko-sync.yml`).
+- **Destinatario:** `agencies.owner_id` de cada agencia con `estado='activo'` (uno por agencia, resuelto vía `profiles.email`). Los directores que se sumaron después con un código de invitación **no** reciben el informe — solo el director fundador.
+- **Ventana:** siempre la semana anterior completa (lunes 00:00 a domingo 23:59:59, hora AR), calculada en `lib/reports/weekly/window.ts` (`previousWeek()`). Es determinista respecto de "ahora": volver a disparar el workflow el mismo lunes manda el mismo informe, no uno distinto.
+- **Query params de diagnóstico:** `?dry=1` calcula y devuelve el HTML sin mandar nada por Resend (nunca llega al `fetch` de envío); `&agency=<uuid>` acota la corrida a una sola inmobiliaria. Con `dry=1` y una sola agencia matcheada, la respuesta es el HTML crudo (para abrirlo en el navegador); sin ese acotamiento devuelve JSON con un resultado por agencia.
+- **Origen de cada métrica (`lib/reports/weekly/report.ts` + `sources.ts`):**
+  - Consultas y handoffs salen de `wa_conversations`/`wa_messages` (misma marca `"Handoff activado"` que usa `Gestion_Handoff`, ver §9.2.2).
+  - **Las derivaciones por visita y por link salen de la API de Resend** (`fetchResendEmails`), no de la base: `Avisar_Asesor` (§ tool "Aviso_Asesor" en `agente-principal-prompt-definitivo.md`) manda el email pero no escribe nada en `wa_messages`. Se reconocen por **asunto**: `esVisita()`/`esDerivacion()` matchean `^Quiere visitar` y `^Nuevo interesado en tu propiedad`.
+  - **Riesgo del contrato de asuntos:** si alguien cambia esos dos asuntos en el flujo de n8n, las secciones B/C del informe se van a cero sin error visible. Por eso el pie del email siempre avisa cuántos handoffs siguen sin respuesta (esa cifra no depende de Resend).
+  - Si en algún momento se le agrega a `Avisar_Asesor` un mensaje interno como el que ya deja `Gestion_Handoff`, conviene migrar esas dos secciones a la base y dejar de depender de Resend.
+- **Gotchas reales encontrados verificando contra producción (Task 8, 05/08/2026), los dos en `sources.ts`:**
+  - `aIso()` no parseaba el formato de fecha real de Resend cuando el offset viene sin minutos (`"2026-08-02 13:52:20.042000+00"`, en vez de `"+00:00"`): V8 tira `Invalid Date` y `toISOString()` explota. `fetchResendEmails` atrapaba la excepción y devolvía `null` **en todas las corridas reales**, dejando las secciones B y C siempre vacías. Fix: normalizar el offset a `+00:00` antes de construir el `Date`.
+  - `fetchMensajesDesde` no paginaba con `.range()`: PostgREST corta en 1.000 filas por default, y una sola tanda de 200 conversaciones (handoffs + derivaciones por email juntos) ya superaba eso en la semana de Central Real Estate. Los mensajes usados para calcular "atendido" se truncaban en silencio y el conteo de handoffs sin atender salía mal. Fix: mismo patrón `.range()` que ya usa `fetchConversaciones`.
+- **`resendOk`:** el informe siempre sale (nunca bloquea a las demás secciones) aunque Resend falle; el HTML muestra "No se pudo leer el registro de emails esta semana" en B y C cuando `resendOk=false`.
+
 ---
 
 ## 10. Subsistema de IA

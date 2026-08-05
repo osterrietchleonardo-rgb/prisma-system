@@ -1,0 +1,20 @@
+name: PRISMA Informe Semanal
+
+on:
+  schedule:
+    # Lunes 11:00 UTC = 8:00 de la mañana en Argentina.
+    # El endpoint calcula solo la semana anterior (lunes a domingo), así que no hay
+    # riesgo de mandar el informe equivocado si GitHub demora la corrida.
+    - cron: '0 11 * * 1'
+  workflow_dispatch:
+    # Permite dispararlo a mano desde la pestaña Actions.
+
+jobs:
+  informe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar informe semanal a los directores
+        run: |
+          curl -sS --fail-with-body -X GET \
+            "https://${{ secrets.SITE_DOMAIN }}/api/cron/weekly-report" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

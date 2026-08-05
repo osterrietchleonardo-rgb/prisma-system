@@ -129,6 +129,23 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 > 🔒 **Qué ve el asesor de todo esto.** Vos ves la tabla completa. Cada asesor, en su propio dashboard, ve **solo su fila** de "Objetivos vs Alcanzado" y su propio gráfico: las metas y el cumplimiento de sus compañeros no los ve. En el **Ranking** sí ve la tabla entera (posición, chats, prelistings, ACM, captaciones, cierres, cartera, rotación y la clasificación de todos), pero la columna **Facturación** solo la ve en su propia fila; en las demás le figura **"Privado"**. Es así por diseño: el asesor sabe dónde está parado, sin enterarse de cuánto factura el de al lado.
 
+### Tu informe de los lunes
+
+**Qué es:** todos los lunes a la mañana te llega un email con lo que pasó la semana anterior. No hay que entrar a ningún lado ni pedirlo: llega solo, y lo recibís únicamente vos (el director fundador de la agencia).
+
+**Qué muestra:**
+- Arriba de todo, cinco números: cuántas consultas nuevas entraron, cuántas conversaciones le pasó el sistema a un asesor, cuántos clientes pidieron coordinar una visita, qué porcentaje de esas derivaciones fue atendido, y cuántos de esos clientes quedaron cargados en Tracking Performance.
+- Después, el detalle por asesor de **Handoffs**: cuánto tardó cada uno en contestarle al cliente (menos de una hora, entre una y cuatro, entre cuatro y un día, más de un día, o directamente sin atender). Acá el bot ya se apagó, así que si nadie contestó, el cliente se quedó esperando — es la misma información que ves a diario en "Handoffs sin atender" (arriba en esta sección), resumida por semana.
+- Una sección de **Coordinación de visita** con tres columnas en vez de un solo número. Es a propósito: cuando un cliente pide visitar una propiedad, el asistente le avisa por email al asesor pero sigue conversando con el cliente. El asesor puede haberlo llamado por teléfono sin escribir nada en el sistema, así que las tres columnas te dicen qué rastro dejó: si escribió en el chat, si quedó la visita cargada, o si al menos abrió el email. La columna **"Sin rastro"** son los casos donde no hay ninguna señal de que alguien haya hecho algo: son los que conviene preguntar.
+- La última sección te muestra cuántos de los clientes que el sistema derivó esa semana terminaron cargados como actividad en Tracking Performance. Si ese número es bajo, significa que los clientes están llegando pero no se están registrando.
+
+**Cómo usarlo:**
+- No hace falta que hagas nada para recibirlo: se manda solo, con la semana ya cerrada (lunes a domingo).
+- Es un buen punto de partida para la charla semanal con el equipo: te da, de un vistazo, quién está respondiendo rápido y quién se está quedando atrás.
+- Si un asesor te aparece con muchos "sin atender" o mucho "sin rastro", valen las mismas preguntas que en "Handoffs sin atender": puede ser que esté respondiendo por su WhatsApp personal en vez de por PRISMA, y el sistema no lo puede ver.
+
+> 💡 **Tip:** el número de "Coordinación de visita" no es lo mismo que "Handoffs". Un handoff apaga el bot; un aviso de visita no. Por eso pueden pedirte cosas distintas: en un handoff, si nadie respondió, el cliente quedó realmente sin nadie; en una coordinación de visita, "sin rastro" quiere decir que no hay evidencia dentro de PRISMA, pero el asesor pudo haber llamado igual.
+
 ---
 
 ## 5. Pulso de Mercado
