@@ -412,15 +412,33 @@ async function fetchSitemaps(context) {
 
 // Lee id+lastmod de TODA la BD una sola vez (Map id→lastmod). Sirve para el diff
 // EN MEMORIA zona por zona, sin re-leer las 54k filas en cada zona.
+//
+// Paginado POR CLAVE (`id > último`), no por `.range(offset)`: con offset, Postgres tiene que
+// recorrer y descartar todas las filas anteriores en cada página, y pasadas ~100k filas la
+// consulta moría con "canceling statement due to statement timeout". Antes ese error solo
+// cortaba el barrido (`break`) y devolvía el mapa a medias, EN SILENCIO — la tabla ya pasó las
+// 150k filas, así que dejaba de ver el final del catálogo: lo trataba como "nuevo" y lo
+// re-crawleaba de más, en vez de avanzar sobre lo que de verdad falta. Por clave, cada página
+// cuesta lo mismo sin importar cuán grande sea la tabla.
 async function loadExistingMap() {
   const map = new Map();
-  let from = 0; const step = 1000;
+  let ultimoId = '';
+  const step = 1000;
   while (true) {
-    const { data, error } = await supabase.from('roomix_properties').select('id, lastmod').order('id', { ascending: true }).range(from, from + step - 1);
-    if (error) { log('❌', 'Error leyendo catálogo:', error.message); break; }
+    let data, error;
+    for (let intento = 1; intento <= 3; intento++) {
+      const q = supabase.from('roomix_properties').select('id, lastmod').order('id', { ascending: true }).limit(step);
+      ({ data, error } = ultimoId ? await q.gt('id', ultimoId) : await q);
+      if (!error) break;
+      log('⏳', `Lectura de catálogo fallida (${intento}/3): ${error.message}`);
+      await sleep(2000 * intento);
+    }
+    // Sin el catálogo completo no se puede diferenciar nuevo/existente con confianza: mejor
+    // abortar la corrida entera que crawlear/borrar mal con un mapa a medias.
+    if (error) { log('❌', 'No se pudo leer el catálogo completo, aborto la corrida:', error.message); process.exit(1); }
     for (const r of (data || [])) map.set(r.id, r.lastmod);
     if (!data || data.length < step) break;
-    from += step;
+    ultimoId = data[data.length - 1].id;
   }
   return map;
 }
