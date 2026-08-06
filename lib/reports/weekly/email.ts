@@ -48,7 +48,7 @@ function tabla(encabezados: string[], filas: string[][]): string {
     })
     .join("")
 
-  return `<table style="width:100%;border-collapse:collapse"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`
+  return `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;min-width:480px;border-collapse:collapse"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table></div>`
 }
 
 function filasAgente(rows: AgentRow[]): string[][] {
@@ -85,13 +85,15 @@ export function renderReport(r: WeeklyReport): { subject: string; html: string }
   // silencio. Se avisa en vez de mostrar ceros como si fueran reales.
   const sospechaDeAsuntos = r.resendOk && r.handoffs.total > 0 && r.visitas.total === 0 && r.links.total === 0
 
-  const resumen = `<table style="width:100%;border-collapse:collapse;margin-top:18px"><tr>
+  const resumen = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:18px">
+  <table style="width:100%;min-width:480px;border-collapse:collapse"><tr>
     ${kpi(String(r.consultas), "Consultas")}
     ${kpi(String(r.handoffs.total), "Handoffs")}
     ${kpi(r.resendOk ? String(r.visitas.total) : "—", "Visitas")}
     ${kpi(pct === null || pct === undefined ? "—" : `${pct}%`, "Atendidos")}
     ${kpi(`${r.pipeline.cargados}/${r.pipeline.derivados}`, "En pipeline")}
-  </tr></table>`
+  </tr></table>
+  </div>`
 
   const secHandoffs = seccion(
     "A · Handoffs",
@@ -140,7 +142,18 @@ export function renderReport(r: WeeklyReport): { subject: string; html: string }
     cuerpoPipeline,
   )
 
-  const html = `<div style="background:#f4f7f9;padding:24px 0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif">
+  // Sin el meta viewport, los clientes de mail en el celular (Gmail app, Apple Mail)
+  // renderizan el email a ancho de escritorio y lo alejan con zoom en vez de acomodarlo
+  // a la pantalla; el contenedor del cliente no siempre deja hacer scroll horizontal
+  // para compensar, así que las tarjetas/columnas que quedan afuera son inalcanzables.
+  const html = `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="margin:0;padding:0">
+<div style="background:#f4f7f9;padding:24px 0;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif">
   <div style="max-width:680px;margin:0 auto;background:#fff;border:1px solid ${BORDE};border-radius:16px;overflow:hidden">
     <div style="background:${AZUL};padding:26px 28px">
       <div style="color:#fff;font-size:20px;font-weight:700;letter-spacing:2px">PRISMA<span style="color:${COBRE}"> IA</span></div>
@@ -161,7 +174,9 @@ export function renderReport(r: WeeklyReport): { subject: string; html: string }
       </div>
     </div>
   </div>
-</div>`
+</div>
+</body>
+</html>`
 
   const subject = `PRISMA · ${r.agencyName} — semana del ${r.window.label}${sinAtender ? ` · ${sinAtender} sin atender` : ""}`
   return { subject, html }
