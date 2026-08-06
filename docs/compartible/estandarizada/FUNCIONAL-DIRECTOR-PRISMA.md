@@ -577,6 +577,7 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 
 > 💡 **Tip:** probalo después de subir documentos para verificar que el Tutor "aprendió" bien tu material.
 > 💰 1 crédito por mensaje.
+> 📱 **En el celular** la conversación ocupa toda la pantalla. Las charlas anteriores se abren con la **pestañita del reloj ⏱ pegada al borde izquierdo**; al elegir una, el panel se cierra solo, y también se cierra tocando fuera de él. Lo mismo vale para el Buscador IA.
 
 ---
 

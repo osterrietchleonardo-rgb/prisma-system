@@ -385,7 +385,7 @@ export default function ConsultorIAPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
+                          className="h-11 w-11 md:h-8 md:w-8 text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
                           onClick={(e) => { 
                             e.stopPropagation(); 
                             setRenamingId(s.id); 
@@ -399,7 +399,7 @@ export default function ConsultorIAPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          className="h-11 w-11 md:h-8 md:w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                           onClick={(e) => { e.stopPropagation(); setDeletingId(s.id); }}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -418,7 +418,8 @@ export default function ConsultorIAPage() {
       {!isSidebarOpen && (
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="absolute left-0 top-20 z-40 bg-accent text-accent-foreground p-1.5 rounded-r-lg shadow-lg hover:pr-3 transition-all"
+          className="absolute left-0 top-20 z-40 bg-accent text-accent-foreground p-3 md:p-1.5 rounded-r-lg shadow-lg hover:pr-3 transition-all"
+          aria-label="Abrir el historial"
         >
           <History className="w-5 h-5 flex-shrink-0" />
         </button>
@@ -528,7 +529,7 @@ export default function ConsultorIAPage() {
           </div>
         </ScrollArea>
 
-        <CardFooter className="p-4 md:p-8 bg-gradient-to-t from-background via-background/80 to-transparent relative z-10 border-t">
+        <CardFooter className="flex-col items-stretch p-4 md:p-8 bg-gradient-to-t from-background via-background/80 to-transparent relative z-10 border-t">
           <form 
             onSubmit={(e) => { e.preventDefault(); handleSend(); }}
             className="flex items-center gap-3 w-full bg-card p-2 pl-5 pr-2 rounded-3xl border border-accent/20 shadow-2xl max-w-4xl mx-auto focus-within:ring-2 ring-accent/20 transition-all"

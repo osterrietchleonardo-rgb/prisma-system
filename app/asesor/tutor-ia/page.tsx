@@ -14,6 +14,7 @@ interface Message {
   role: "user" | "assistant"
   content: string
   sources?: { title: string; type: string; similarity: number }[]
+  created_at?: string
 }
 
 interface Session {
@@ -36,7 +37,7 @@ export default function AdvisorTutorIAPage() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renamingTitle, setRenamingTitle] = useState("")
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -64,8 +65,23 @@ export default function AdvisorTutorIAPage() {
     }
   }, [messages, isLoading])
 
+  // En escritorio el historial arranca abierto; en celular queda como cajón superpuesto cerrado.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      setIsSidebarOpen(true)
+    }
+  }, [])
+
+  // En celular, cerrar el cajón al elegir/crear una conversación para que se vea el chat.
+  const closeSidebarOnMobile = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setIsSidebarOpen(false)
+    }
+  }
+
   const loadSession = async (id: string) => {
     if (renamingId) return
+    closeSidebarOnMobile()
     setIsLoading(true)
     setCurrentSessionId(id)
     try {
@@ -75,7 +91,8 @@ export default function AdvisorTutorIAPage() {
         setMessages(data.messages.map((m: any) => ({
           role: m.role,
           content: m.content,
-          sources: m.metadata?.sources
+          sources: m.metadata?.sources,
+          created_at: m.created_at
         })))
       }
     } catch (e) {
@@ -86,6 +103,7 @@ export default function AdvisorTutorIAPage() {
   }
 
   const startNewChat = () => {
+    closeSidebarOnMobile()
     setCurrentSessionId(null)
     setMessages([{
       role: "assistant",
@@ -137,7 +155,7 @@ export default function AdvisorTutorIAPage() {
 
     if (!customMessage) setInput("")
     
-    setMessages(prev => [...prev, { role: "user", content: userMessage }])
+    setMessages(prev => [...prev, { role: "user", content: userMessage, created_at: new Date().toISOString() }])
     setIsLoading(true)
 
     try {
@@ -165,7 +183,8 @@ export default function AdvisorTutorIAPage() {
       setMessages(prev => [...prev, { 
         role: "assistant", 
         content: data.text,
-        sources: data.sources 
+        sources: data.sources,
+        created_at: new Date().toISOString() 
       }])
 
       // Auto-refresh credit badge after consumption
@@ -176,7 +195,8 @@ export default function AdvisorTutorIAPage() {
       toast.error("Error al comunicarse con el Tutor IA.")
       setMessages(prev => [...prev, { 
         role: "assistant", 
-        content: "Lo siento, hubo un error técnico al procesar tu consulta. Por favor, intenta de nuevo." 
+        content: "Lo siento, hubo un error técnico al procesar tu consulta. Por favor, intenta de nuevo.",
+        created_at: new Date().toISOString() 
       }])
     } finally {
       setIsLoading(false)
@@ -190,10 +210,22 @@ export default function AdvisorTutorIAPage() {
 
   return (
     <div className="flex h-full overflow-hidden bg-background">
-      {/* Sidebar de Historial */}
+      {/* Fondo oscuro (solo celular) para cerrar el cajón del historial */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in"
+        />
+      )}
+
+      {/* Sidebar de Historial — cajón superpuesto en celular, columna fija en escritorio */}
       <aside className={cn(
         "bg-muted/50 border-r transition-all duration-300 flex flex-col overflow-hidden",
-        isSidebarOpen ? "w-80" : "w-0"
+        // Celular: cajón fijo que se desliza desde la izquierda
+        "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[85vw] max-md:max-w-xs max-md:shadow-2xl",
+        isSidebarOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
+        // Escritorio: empuja el contenido, se colapsa por ancho
+        isSidebarOpen ? "md:w-80" : "md:w-0"
       )}>
         <div className="p-4 border-b flex items-center justify-between">
           <div className="flex items-center gap-2 font-bold text-accent">
@@ -295,7 +327,7 @@ export default function AdvisorTutorIAPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
+                          className="h-11 w-11 md:h-8 md:w-8 text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation()
                             setRenamingId(s.id)
@@ -309,7 +341,7 @@ export default function AdvisorTutorIAPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          className="h-11 w-11 md:h-8 md:w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                           onClick={(e) => { e.stopPropagation(); setDeletingId(s.id); }}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -328,7 +360,8 @@ export default function AdvisorTutorIAPage() {
       {!isSidebarOpen && (
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="absolute left-0 top-20 z-40 bg-accent text-accent-foreground p-1.5 rounded-r-lg shadow-lg hover:pr-3 transition-all"
+          className="absolute left-0 top-20 z-40 bg-accent text-accent-foreground p-3 md:p-1.5 rounded-r-lg shadow-lg hover:pr-3 transition-all"
+          aria-label="Abrir el historial"
         >
           <History className="w-5 h-5 flex-shrink-0" />
         </button>
@@ -410,12 +443,17 @@ export default function AdvisorTutorIAPage() {
                              )} />
                           )}
 
-                          <div className={cn(
+                          {/* Hora real del mensaje (created_at). El saludo inicial no la tiene → no se muestra.
+                              Idioma fijo + suppressHydrationWarning: sin eso el servidor y el navegador
+                              escriben la hora distinto y React descarta el HTML del servidor. */}
+                          {message.created_at && (
+                          <div suppressHydrationWarning className={cn(
                              "text-[10px] mt-1 text-right opacity-40",
                              message.role === "user" ? "text-accent" : "text-muted-foreground"
                           )}>
-                             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                             {new Date(message.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
                           </div>
+                          )}
                         </div>
                       );
                     })}
@@ -456,7 +494,7 @@ export default function AdvisorTutorIAPage() {
           </div>
         </ScrollArea>
 
-        <CardFooter className="p-4 md:p-8 bg-gradient-to-t from-background via-background/80 to-transparent relative z-10 border-t">
+        <CardFooter className="flex-col items-stretch p-4 md:p-8 bg-gradient-to-t from-background via-background/80 to-transparent relative z-10 border-t">
           <form 
             onSubmit={(e) => { e.preventDefault(); handleSend(); }}
             className="flex items-center gap-3 w-full bg-card p-2 pl-5 pr-2 rounded-[1.5rem] border border-accent/20 focus-within:ring-4 focus-within:ring-accent/10 transition-all shadow-xl max-w-4xl mx-auto"

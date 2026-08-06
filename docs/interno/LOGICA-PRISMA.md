@@ -964,6 +964,30 @@ Se corrigió la vista de celular del Buscador IA (afecta asesor `app/asesor/cons
 - **Encabezado:** deja de desbordar con `min-w-0` + `truncate` en título/subtítulo y `shrink-0` en el ícono y el badge de créditos.
 - **Tarjetas de propiedades (`consultor-results.tsx`):** las flechas del carrusel pasan de solo-hover a visibles siempre en celular (`opacity-100 md:opacity-0 md:group-hover:opacity-100`), porque en touch no hay hover. El footer del modal de detalle apila en pantallas angostas (`flex-col sm:flex-row`).
 
+### 10.6.b El Tutor IA recibe el mismo tratamiento (Agosto 2026)
+
+El arreglo de § 10.6 **nunca se había aplicado al Tutor IA**, que comparte la estructura del Buscador. En un teléfono de 390px el historial arrancaba abierto (`useState(true)`) como columna fija de `w-80`: se comía 320px, empujaba la conversación fuera de la pantalla y, como el contenedor tiene `overflow-hidden`, **no había forma de scrollear hasta ella**. La página quedaba inutilizable hasta dar con el `‹` de cerrar.
+
+Se portó el patrón completo a `app/director/tutor/page.tsx` y `app/asesor/tutor-ia/page.tsx`: arranca cerrado, se abre solo en `md+` por `useEffect`, en celular es cajón superpuesto (`max-md:fixed` + `translate-x`), con fondo oscuro para cerrar tocando afuera y `closeSidebarOnMobile()` en `loadSession`/`startNewChat`.
+
+**El pie del chat estaba mal armado en las 4 páginas** (los dos Buscadores y los dos Tutores). `CardFooter` es `flex items-center` —una fila— y contenía el `<form>` y el `<p>` de "Cada respuesta consume 1 crédito IA", ambos con `w-full`: se repartían el ancho, el campo de texto se achicaba y **el botón de enviar se montaba encima**. El `mt-2` del párrafo delataba que la intención era apilarlos. Se corrige con `flex-col items-stretch`, lo que además arregla la compu, donde el texto de créditos aparecía al costado del campo en vez de debajo.
+
+**Objetivos táctiles:** el botón que abre el historial medía 32px y es la única entrada al historial en celular; pasa a 44px (`p-3 md:p-1.5`) y gana `aria-label`. Renombrar y eliminar de cada conversación pasan de 32 a 44px en celular (`h-11 w-11 md:h-8 md:w-8`). En escritorio quedan como estaban.
+
+**La burbuja de la bandeja (§ 8.4.c) no se muestra acá:** estas dos pantallas tienen su propio botón de enviar abajo a la derecha y la burbuja se le montaba encima. `consultor`, `consultor-ia`, `tutor` y `tutor-ia` se sumaron a `RUTAS_SIN_BURBUJA`.
+
+### 10.6.c Los dos errores de consola del Tutor (Agosto 2026)
+
+Eran preexistentes y ninguno rompía nada, pero uno escondía un dato falso.
+
+**La hora de los mensajes del Tutor era mentira.** El código lo decía: `{/* Timestamp mock */}` con `new Date()`, o sea **la hora actual debajo de todos los mensajes**, incluso los de hace meses. El tipo `Message` ni siquiera guardaba `created_at`. Como además no se fijaba el idioma, el servidor escribía `"05:00 p. m."` y el navegador lo mismo pero con un espacio invisible distinto (ICU de Node vs Chrome): React detectaba la diferencia, **descartaba el HTML del servidor y redibujaba esa rama en el cliente** ("There was an error while hydrating this Suspense boundary").
+
+Se copió el patrón que el Buscador ya tenía bien: `created_at?: string` en `Message`, se completa al cargar la sesión y al mandar/recibir cada mensaje, y se muestra **solo si existe** (el saludo inicial no la tiene) con `'es-AR'`, `hour12: false` y `suppressHydrationWarning`. Verificado: con el reloj en 17:27, tres conversaciones distintas muestran 18:23, 11:57 y 15:33 — sus horas reales de la base.
+
+**Los dos 403 de `/api/asesor/creditos`.** El director no tiene cuota personal de asesor, así que el endpoint respondía 403 y el hook `use-asesor-creditos` lo silenciaba a propósito. Funcionaba bien, pero el navegador registra todo 4xx: quedaba un error rojo en **todas** las pantallas de director con badge de créditos (Tutor, Buscador, Marketing, Contratos). Ahora el endpoint responde **200 con `{ aplica: false }`** — no es un error, simplemente no aplica — y el hook corta ahí devolviendo `null` (sin ese corte, `porcentaje` quedaría `undefined` y el badge se dibujaría con NaN). No se filtra ningún dato: la respuesta va vacía. `app/asesor/configuracion/page.tsx` también contempla el nuevo valor.
+
+> En desarrollo cada pedido aparecía **dos veces** porque React llama los efectos dos veces a propósito; en producción salía una sola.
+
 ### 10.7 Mejoras Junio 29 (modelo, piso, free-text, compuerta de datos, ficha compartible)
 
 Rama `feat/buscador-ia-venta-piso-conversacional`. Cambios solo aditivos, sin romper el flujo previo.

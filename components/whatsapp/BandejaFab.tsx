@@ -13,9 +13,10 @@ import { MessageSquare } from "lucide-react"
 
 // Dónde NO se muestra: en la propia bandeja no tiene sentido, y en estas otras
 // pantallas ya hay algo fijo abajo a la derecha que taparía (el botón de enviar
-// del chat, la barra de guardar de tracking).
+// del chat de WhatsApp, del Buscador IA y del Tutor IA, y la barra de guardar
+// de tracking).
 const RUTAS_SIN_BURBUJA =
-  /\/(whatsapp|asesor-ia-whatsapp|leads-whatsapp|tracking-performance)/
+  /\/(whatsapp|asesor-ia-whatsapp|leads-whatsapp|tracking-performance|consultor|consultor-ia|tutor|tutor-ia)/
 
 /** Cada cuánto se vuelve a preguntar el contador. */
 const REFRESCO_MS = 120_000

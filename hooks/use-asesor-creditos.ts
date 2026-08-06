@@ -27,12 +27,18 @@ export function useAsesorCreditos() {
     try {
       const res = await fetch("/api/asesor/creditos")
       if (!res.ok) {
-        // Si no es asesor (ej. director viendo la misma ruta), silenciar
         setData(null)
         return
       }
-      const json: AsesorCreditData = await res.json()
-      setData(json)
+      const json: AsesorCreditData | { aplica: false } = await res.json()
+      // El director no tiene cuota personal: el endpoint responde `aplica: false`
+      // y el badge no se dibuja. Ojo, sin este corte `porcentaje` sería undefined.
+      if ("aplica" in json && json.aplica === false) {
+        setData(null)
+        setError(null)
+        return
+      }
+      setData(json as AsesorCreditData)
       setError(null)
     } catch (err) {
       console.error("[useAsesorCreditos] fetch error:", err)
