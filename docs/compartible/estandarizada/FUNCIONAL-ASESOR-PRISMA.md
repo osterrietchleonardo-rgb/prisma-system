@@ -243,6 +243,16 @@ Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos boto
 > 📎 **Enviar archivos:** con el chat en **control manual** (bot pausado), al lado de la caja de mensaje tenés un **clip 📎** para adjuntar una foto, un PDF, un audio o un video. El archivo queda **en espera** con una vista previa (podés **Cambiar** el archivo o **Quitarlo** con la ✕ si te equivocaste) y se manda recién cuando tocás **Enviar** — así podés escribir un texto para que vaya **junto al archivo**. Solo funciona dentro de las 24 hs desde el último mensaje del cliente (regla de WhatsApp).
 > 💡 Activá las **notificaciones push** en Configuración para enterarte al instante de mensajes nuevos.
 
+### Desde el celular
+
+La bandeja está pensada para que en el teléfono veas **la conversación y nada más**. Arriba del chat quedan solo cuatro cosas: la **flecha para volver** a la lista, el **nombre del cliente**, el **interruptor del bot** y el botón de **información ⓘ**.
+
+- **El interruptor del bot** dice *IA* cuando el bot está respondiendo y *Manual* cuando lo apagaste. Se toca y cambia al instante.
+- **El botón ⓘ** abre la ficha completa del cliente: sus etiquetas, el teléfono, el score, quién lo está atendiendo, la línea de tiempo, la visita agendada y las propiedades recomendadas. Ahí también **agregás o sacás etiquetas**, tocando las pastillas de "Agregar etiqueta".
+- **Para escribir** tenés una sola barra abajo, que se agranda sola a medida que escribís. El **clip 📎** adjunta un archivo y el **candado 🔒** cambia a **nota interna**: la barra se pone amarilla y avisa *"el cliente no la ve"*, así no hay forma de mandarle una nota por error. Tocás el candado de nuevo y volvés a escribirle al cliente.
+
+> 💡 **Tip:** desde cualquier pantalla del celular vas a ver un **círculo flotante abajo a la derecha**. Te lleva directo a la bandeja, y si tiene un **número rojo** son las conversaciones que el bot te derivó y **todavía nadie respondió**. Si aparece un número ahí, es plata esperando.
+
 ### El bot ahora entiende fotos y audios
 
 Si un cliente manda una **foto** (una captura de una publicación, el frente de un edificio, un plano) o un **audio**, el bot ya no se queda callado: **mira la foto o escucha el audio y responde sobre eso**.

@@ -310,6 +310,18 @@ Vas a ver un **asistente de configuración** que te guía paso a paso para conec
 
 Arriba a la derecha, un **indicador de conexión** te muestra si la instancia está conectada.
 
+### Desde el celular
+
+El chat en el teléfono está armado para que veas **la conversación y nada más**. Arriba quedan solo cuatro cosas: la **flecha para volver**, el **nombre del cliente**, el **interruptor del bot** y el botón de **información ⓘ**.
+
+- **El interruptor del bot** dice *IA* cuando está respondiendo y *Manual* cuando lo apagaste.
+- **El botón ⓘ** abre la ficha completa: etiquetas, teléfono, score, quién lo atiende, línea de tiempo, visita agendada y propiedades recomendadas. Las **etiquetas se agregan y se sacan desde ahí**.
+- **Para escribir** hay una sola barra abajo que se agranda sola. El **clip 📎** adjunta archivos y el **candado 🔒** cambia a **nota interna**: la barra se pone amarilla y avisa *"el cliente no la ve"*, así nadie del equipo le manda una nota al cliente por error.
+
+Todo lo que dejó de estar arriba (teléfono, email del asesor, score, etiquetas) **no se borró**: está adentro del ⓘ. Desde la computadora se ve exactamente igual que siempre.
+
+> 💡 **Tip para el equipo:** en el celular aparece un **círculo flotante abajo a la derecha** que lleva directo a la bandeja. El **número rojo** son las conversaciones que el bot derivó a una persona y **nadie contestó todavía** — el mismo dato del panel de handoffs del dashboard. Es el número que conviene mirar todos los días: cada uno es un cliente esperando.
+
 ### El bot entiende fotos y audios
 
 Cuando un cliente manda una **foto** (la captura de un aviso, el frente de un edificio, un plano) o un **audio**, el bot la mira o lo escucha y responde sobre eso, sin quedarse callado. Los **videos** también entran al chat, aunque todavía no se analiza su contenido.

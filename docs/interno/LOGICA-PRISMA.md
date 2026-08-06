@@ -700,6 +700,26 @@ Versión anterior del endpoint de respuesta, usa `BOT_REPLY_SECRET` para auth. E
 
 Detalle de implementación en TECNICO-PRISMA § 9.2.2 y § 9.2.3.
 
+### 8.4.b Vista de celular del chat (actualización Agosto 2026)
+
+Afecta a `components/whatsapp/ActiveChat.tsx`, que es el **mismo componente** para las cuatro entradas al chat (director `/director/asesor-ia-whatsapp`, asesor `/asesor/whatsapp`, y las fichas `/{rol}/leads-whatsapp/[id]`). El corte celular/escritorio es `md` (768px), el mismo que ya usaba el botón de volver. **De 768px para arriba no cambió nada.**
+
+- **El header pasó de tres renglones a uno.** En un teléfono de 390px el encabezado ocupaba ~130px con nombre, teléfono, email del asesor, score, botón de sincronizar, clasificación, etiquetas y dos toggles. Ahora son 61px con lo único que se usa mientras se atiende: **volver · nombre · toggle del bot · ⓘ**. El resto no se borró, se movió al panel de Info.
+- **El toggle del bot subió al renglón principal.** Antes vivía en la tercera fila y achicado (`scale-90`); prender o apagar la IA es la acción más frecuente del chat y tiene que estar a mano.
+- **Clasificación y etiquetas se editan dentro del panel de Info** (bloque `md:hidden` arriba de `LeadTraceability`). Para agregar no se usa el popover de escritorio sino pastillas grandes tocables: un menú flotante adentro de un panel deslizante es frágil y difícil de apuntar con el dedo.
+- **Se eliminó un botón roto.** El botón "Info" de la tercera fila (visible solo en `<lg`) hacía `setActiveTab('info')`, que ocultaba la columna del chat sin renderizar ninguna columna de info: en celular **dejaba la pantalla en blanco**. Se borró junto con el estado `activeTab`, que no tenía ningún otro uso. El ⓘ del renglón principal (Sheet) siempre funcionó y es el que queda.
+- **La zona de escribir es una sola barra.** Con el bot apagado, el celular mostraba caja de mensaje de 2 renglones + separador + fila de nota interna (~180px). Ahora hay una barra de un renglón —`📎 · 🔒 · texto · ➤`— y la caja **crece sola** hasta 120px (`useEffect` sobre `scrollHeight`; el `min-h` de escritorio se conserva con `md:min-h-[80px]`, así que allá se ve igual que antes). El botón 🔒 alterna a **modo nota interna**: la barra se pone amarilla, aparece el cartel "el cliente no la ve" y el enviar guarda la nota en vez de mandarla al cliente. En escritorio el 🔒 no existe y la nota conserva su fila propia.
+- **La ventana de 24 h cerrada ya no bloquea las notas en celular.** Antes el aviso rojo reemplazaba la caja de mensaje pero la fila de nota seguía abajo. Ahora, con la barra unificada, la caja queda deshabilitada con el aviso y el 🔒 sigue disponible, para no perder la posibilidad de tomar notas.
+
+### 8.4.c Burbuja flotante de acceso a la bandeja (Agosto 2026)
+
+`components/whatsapp/BandejaFab.tsx`, montada en los layouts de asesor y director. Círculo de 56px abajo a la derecha, **solo en celular** (`md:hidden`), con un globito rojo que muestra los **handoffs sin atender**.
+
+- El número sale de `GET /api/whatsapp/handoffs-pendientes`, que reusa `getHandoffsDashboardData` — la misma definición de "sin atender" de la regla 5 de § 8.4. Si cambia esa definición, cambia el globito solo.
+- Se refresca cada **2 minutos** y al volver a la pestaña. No más seguido: esa consulta trae hasta 500 marcas de handoff más todos los mensajes posteriores.
+- **No se muestra en cuatro lugares:** la propia bandeja (no tendría sentido), las fichas de lead y el chat abierto (taparía el botón de enviar) y Tracking (ya tiene una barra fija abajo). La regla vive en la constante `RUTAS_SIN_BURBUJA`.
+- Si el fetch falla, la burbuja sigue funcionando como atajo, sin contador.
+
 ### 8.5 Informe semanal: la misma derivación, leída una vez por semana
 
 El informe semanal al director fundador (TECNICO-PRISMA § 9.10) no agrega una señal nueva:

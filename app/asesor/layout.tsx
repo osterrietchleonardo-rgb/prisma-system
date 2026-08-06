@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AsesorSidebar } from "@/components/asesor-sidebar"
 import { AsesorHeader } from "@/components/asesor-header"
+import { BandejaFab } from "@/components/whatsapp/BandejaFab"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getTokenIssuedAt } from "@/lib/auth/session"
 
@@ -125,6 +126,9 @@ export default async function AsesorLayout({
           {children}
         </main>
       </div>
+
+      {/* Atajo a la bandeja de WhatsApp (solo celular) */}
+      <BandejaFab href="/asesor/whatsapp" />
     </div>
   )
 }
