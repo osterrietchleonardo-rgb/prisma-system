@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DirectorSidebar } from "@/components/director-sidebar"
 import { DirectorHeader } from "@/components/director-header"
+import { BandejaFab } from "@/components/whatsapp/BandejaFab"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getTokenIssuedAt } from "@/lib/auth/session"
 
@@ -128,6 +129,9 @@ export default async function DirectorLayout({
           {children}
         </main>
       </div>
+
+      {/* Atajo a la bandeja de WhatsApp (solo celular) */}
+      <BandejaFab href="/director/asesor-ia-whatsapp" />
     </div>
   )
 }

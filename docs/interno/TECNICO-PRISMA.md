@@ -326,6 +326,7 @@ Patrón estándar de un endpoint protegido:
 - `GET/POST /api/webhooks/evolution`, `GET/POST /api/webhooks/meta`.
 - `POST /api/n8n/reply`, `POST /api/messages/bot-reply` (legacy).
 - `POST /api/whatsapp/dispatch` (templates), `POST /api/whatsapp/ai-settings/knowledge-upload`.
+- `GET /api/whatsapp/handoffs-pendientes` — devuelve `{ pendientes: number }` para el globito rojo de la burbuja flotante del celular (`components/whatsapp/BandejaFab.tsx`). **Reusa `getHandoffsDashboardData` a propósito**, para que el número sea siempre el mismo que muestra el panel del dashboard. Alcance: el director cuenta toda la inmobiliaria, el asesor solo las suyas (`agentId = user.id`). Sin sesión responde 401; si la consulta falla, 500 con `pendientes: 0` (la burbuja sigue sirviendo de atajo sin contador).
 
 **Contratos**
 - `GET/POST /api/contratos`, `GET/PUT/DELETE /api/contratos/[id]`, `POST /api/contratos/[id]/pdf`, `GET/POST /api/contratos/[id]/signatures`.
