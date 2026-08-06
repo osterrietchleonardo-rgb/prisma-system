@@ -68,7 +68,8 @@ en el formulario del sujeto.
   `incluir_linderos`.
 - `app/api/acm/comparables/route.ts`: `p_zona_min = body.incluir_linderos ? 50 : 70`.
   Al ausentarse el campo, el comportamiento es **estricto** — es el punto del arreglo.
-- `step1-sujeto.tsx`: la casilla.
+- `subject-input.tsx`: la casilla, justo debajo de la de "Considerar PH" (que vive ahí,
+  no en `step1-sujeto.tsx`).
 - `comparables-result.tsx`: chip "lindero" cuando el ítem `zona` del checklist tiene
   `score === 50`. Corregir además el comentario de la línea 124, que todavía afirma que
   la zona es un filtro duro de peso 0 (dejó de serlo el 3-ago: pesa 20).
@@ -141,7 +142,10 @@ comparables y (b) opcionalmente sale en la ficha que recibe el cliente.
 
 ### Interfaz
 
-En `step1-sujeto.tsx`, arriba del botón "Buscar comparables":
+En un componente propio, `app/asesor/acm/components/fotos-ia.tsx`, montado desde
+`subject-input.tsx` arriba del botón "Buscar comparables" (ese archivo ya tiene 368 líneas
+y tres modos de carga; el bloque de fotos es una unidad aparte con su propia
+responsabilidad):
 
 - Bloque **"Fotos de la propiedad (opcional)"**: selector múltiple de imágenes, máximo 4,
   vista previa en miniatura con botón de quitar. Formatos `image/jpeg|png|webp`.
