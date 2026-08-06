@@ -170,16 +170,35 @@ En `step1-sujeto.tsx`, arriba del botón "Buscar comparables":
 
 Reglas duras, en el system/instrucción:
 
-- Describí **únicamente lo que se ve en las fotos**. Si algo no se ve, no lo afirmes.
-- Nunca contradigas los datos cargados del sujeto (te los paso como contexto).
-- Tono de aviso profesional argentino, español rioplatense. Sin superlativos vacíos
-  ("espectacular", "único", "soñado"), sin signos de exclamación.
-- **No omitas ni disimules lo que está deteriorado**, pero decilo con honestidad y sin
-  castigar: "cocina original, con posibilidad de actualización" en lugar de "cocina
-  vieja" o de no mencionarla.
-- Sin precio, sin datos de contacto, sin nombre de inmobiliaria.
-- Entre 400 y 600 caracteres, en un solo párrafo corrido.
-- Si el asesor indicó un foco, priorizalo sin ignorar el resto.
+Análisis visual previo: Observá detenidamente las imágenes buscando indicadores de luminosidad (fuentes de luz natural, sombras), estado de conservación (pisos, paredes, humedad) y distribución espacial.
+
+Describí únicamente lo que se ve en las fotos basándote en el análisis anterior. Si algo no se ve, no lo afirmes.
+
+Nunca contradigas los datos cargados del sujeto (te los paso como contexto).
+
+Tono de aviso profesional argentino, español rioplatense. Sin superlativos vacíos ("espectacular", "único", "soñado"), sin signos de exclamación.
+
+No omitas ni disimules lo que está deteriorado, pero decilo con honestidad y sin castigar: "cocina original, con posibilidad de actualización" en lugar de "cocina vieja" o de no mencionarla.
+
+Sin precio, sin datos de contacto, sin nombre de inmobiliaria.
+
+Entre 400 y 600 caracteres, en un solo párrafo corrido.
+
+Si el asesor indicó un foco, priorizalo sin ignorar el resto de las características clave.
+
+**Formato de salida (contrato duro):** el análisis visual previo es un paso **interno**.
+Devolvé **únicamente el párrafo final**, sin encabezados, sin viñetas, sin repetir las
+consignas y sin prefijos del tipo "Análisis:" o "Descripción:". Nada de markdown.
+
+Detalles de armado del prompt en el código:
+
+- La cantidad de imágenes se interpola según cuántas subió el asesor (1 a 4). **Nunca
+  hardcodear "4"**: si el prompt afirma que hay más fotos de las que hay, el modelo
+  completa el hueco y describe ambientes que no vio.
+- El servidor sanea la respuesta antes de devolverla: quita cercos de markdown y, si
+  aparece un prefijo tipo `Análisis…` / `Descripción:`, se queda con el último párrafo.
+  Es la red de seguridad por si el modelo igual filtra el paso previo — el asesor nunca
+  debería ver el andamiaje del prompt en el cuadro de texto.
 
 ### Cómo afina la búsqueda
 
