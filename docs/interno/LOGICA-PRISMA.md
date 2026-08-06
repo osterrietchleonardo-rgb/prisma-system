@@ -964,6 +964,20 @@ Se corrigió la vista de celular del Buscador IA (afecta asesor `app/asesor/cons
 - **Encabezado:** deja de desbordar con `min-w-0` + `truncate` en título/subtítulo y `shrink-0` en el ícono y el badge de créditos.
 - **Tarjetas de propiedades (`consultor-results.tsx`):** las flechas del carrusel pasan de solo-hover a visibles siempre en celular (`opacity-100 md:opacity-0 md:group-hover:opacity-100`), porque en touch no hay hover. El footer del modal de detalle apila en pantallas angostas (`flex-col sm:flex-row`).
 
+### 10.6.b El Tutor IA recibe el mismo tratamiento (Agosto 2026)
+
+El arreglo de § 10.6 **nunca se había aplicado al Tutor IA**, que comparte la estructura del Buscador. En un teléfono de 390px el historial arrancaba abierto (`useState(true)`) como columna fija de `w-80`: se comía 320px, empujaba la conversación fuera de la pantalla y, como el contenedor tiene `overflow-hidden`, **no había forma de scrollear hasta ella**. La página quedaba inutilizable hasta dar con el `‹` de cerrar.
+
+Se portó el patrón completo a `app/director/tutor/page.tsx` y `app/asesor/tutor-ia/page.tsx`: arranca cerrado, se abre solo en `md+` por `useEffect`, en celular es cajón superpuesto (`max-md:fixed` + `translate-x`), con fondo oscuro para cerrar tocando afuera y `closeSidebarOnMobile()` en `loadSession`/`startNewChat`.
+
+**El pie del chat estaba mal armado en las 4 páginas** (los dos Buscadores y los dos Tutores). `CardFooter` es `flex items-center` —una fila— y contenía el `<form>` y el `<p>` de "Cada respuesta consume 1 crédito IA", ambos con `w-full`: se repartían el ancho, el campo de texto se achicaba y **el botón de enviar se montaba encima**. El `mt-2` del párrafo delataba que la intención era apilarlos. Se corrige con `flex-col items-stretch`, lo que además arregla la compu, donde el texto de créditos aparecía al costado del campo en vez de debajo.
+
+**Objetivos táctiles:** el botón que abre el historial medía 32px y es la única entrada al historial en celular; pasa a 44px (`p-3 md:p-1.5`) y gana `aria-label`. Renombrar y eliminar de cada conversación pasan de 32 a 44px en celular (`h-11 w-11 md:h-8 md:w-8`). En escritorio quedan como estaban.
+
+**La burbuja de la bandeja (§ 8.4.c) no se muestra acá:** estas dos pantallas tienen su propio botón de enviar abajo a la derecha y la burbuja se le montaba encima. `consultor`, `consultor-ia`, `tutor` y `tutor-ia` se sumaron a `RUTAS_SIN_BURBUJA`.
+
+> Pendiente conocido (preexistente, no se tocó): el Tutor tira un **error de hidratación** ("Text content does not match server-rendered HTML") y dos peticiones **403**. El sospechoso del primero son las fechas del historial formateadas con `toLocaleDateString()`, que el servidor y el navegador resuelven distinto.
+
 ### 10.7 Mejoras Junio 29 (modelo, piso, free-text, compuerta de datos, ficha compartible)
 
 Rama `feat/buscador-ia-venta-piso-conversacional`. Cambios solo aditivos, sin romper el flujo previo.

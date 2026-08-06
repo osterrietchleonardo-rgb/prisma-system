@@ -36,7 +36,7 @@ export default function AdvisorTutorIAPage() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renamingTitle, setRenamingTitle] = useState("")
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -64,8 +64,23 @@ export default function AdvisorTutorIAPage() {
     }
   }, [messages, isLoading])
 
+  // En escritorio el historial arranca abierto; en celular queda como cajón superpuesto cerrado.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      setIsSidebarOpen(true)
+    }
+  }, [])
+
+  // En celular, cerrar el cajón al elegir/crear una conversación para que se vea el chat.
+  const closeSidebarOnMobile = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setIsSidebarOpen(false)
+    }
+  }
+
   const loadSession = async (id: string) => {
     if (renamingId) return
+    closeSidebarOnMobile()
     setIsLoading(true)
     setCurrentSessionId(id)
     try {
@@ -86,6 +101,7 @@ export default function AdvisorTutorIAPage() {
   }
 
   const startNewChat = () => {
+    closeSidebarOnMobile()
     setCurrentSessionId(null)
     setMessages([{
       role: "assistant",
@@ -190,10 +206,22 @@ export default function AdvisorTutorIAPage() {
 
   return (
     <div className="flex h-full overflow-hidden bg-background">
-      {/* Sidebar de Historial */}
+      {/* Fondo oscuro (solo celular) para cerrar el cajón del historial */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="md:hidden fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in"
+        />
+      )}
+
+      {/* Sidebar de Historial — cajón superpuesto en celular, columna fija en escritorio */}
       <aside className={cn(
         "bg-muted/50 border-r transition-all duration-300 flex flex-col overflow-hidden",
-        isSidebarOpen ? "w-80" : "w-0"
+        // Celular: cajón fijo que se desliza desde la izquierda
+        "max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-50 max-md:w-[85vw] max-md:max-w-xs max-md:shadow-2xl",
+        isSidebarOpen ? "max-md:translate-x-0" : "max-md:-translate-x-full",
+        // Escritorio: empuja el contenido, se colapsa por ancho
+        isSidebarOpen ? "md:w-80" : "md:w-0"
       )}>
         <div className="p-4 border-b flex items-center justify-between">
           <div className="flex items-center gap-2 font-bold text-accent">
@@ -295,7 +323,7 @@ export default function AdvisorTutorIAPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
+                          className="h-11 w-11 md:h-8 md:w-8 text-muted-foreground hover:text-accent hover:bg-accent/10 transition-colors"
                           onClick={(e) => {
                             e.stopPropagation()
                             setRenamingId(s.id)
@@ -309,7 +337,7 @@ export default function AdvisorTutorIAPage() {
                         <Button 
                           variant="ghost" 
                           size="icon" 
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          className="h-11 w-11 md:h-8 md:w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                           onClick={(e) => { e.stopPropagation(); setDeletingId(s.id); }}
                         >
                           <Trash2 className="w-4 h-4" />
@@ -328,7 +356,8 @@ export default function AdvisorTutorIAPage() {
       {!isSidebarOpen && (
         <button 
           onClick={() => setIsSidebarOpen(true)}
-          className="absolute left-0 top-20 z-40 bg-accent text-accent-foreground p-1.5 rounded-r-lg shadow-lg hover:pr-3 transition-all"
+          className="absolute left-0 top-20 z-40 bg-accent text-accent-foreground p-3 md:p-1.5 rounded-r-lg shadow-lg hover:pr-3 transition-all"
+          aria-label="Abrir el historial"
         >
           <History className="w-5 h-5 flex-shrink-0" />
         </button>
@@ -456,7 +485,7 @@ export default function AdvisorTutorIAPage() {
           </div>
         </ScrollArea>
 
-        <CardFooter className="p-4 md:p-8 bg-gradient-to-t from-background via-background/80 to-transparent relative z-10 border-t">
+        <CardFooter className="flex-col items-stretch p-4 md:p-8 bg-gradient-to-t from-background via-background/80 to-transparent relative z-10 border-t">
           <form 
             onSubmit={(e) => { e.preventDefault(); handleSend(); }}
             className="flex items-center gap-3 w-full bg-card p-2 pl-5 pr-2 rounded-[1.5rem] border border-accent/20 focus-within:ring-4 focus-within:ring-accent/10 transition-all shadow-xl max-w-4xl mx-auto"
