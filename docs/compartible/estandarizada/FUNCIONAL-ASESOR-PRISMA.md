@@ -373,6 +373,7 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 > 💡 **Tip:** es ideal para capacitarte y resolver dudas de procedimiento sin molestar a nadie.
 > 💰 Cada mensaje consume 1 crédito.
+> 📱 **En el celular** la conversación ocupa toda la pantalla. Tus charlas anteriores están guardadas: se abren con la **pestañita del reloj ⏱ pegada al borde izquierdo**. Elegís una y el panel se cierra solo; también se cierra tocando fuera de él. Lo mismo vale para el Buscador IA.
 
 ---
 
