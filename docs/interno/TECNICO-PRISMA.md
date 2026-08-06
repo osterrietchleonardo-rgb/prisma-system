@@ -205,6 +205,12 @@ Intercepta todas las requests:
 3. **Refresh de sesión** Supabase en cada request, **salvo** en dos casos que se excluyen a propósito (ver §5.1.1): los prefetch de Next.js (`next-router-prefetch: 1`) y los archivos estáticos de `/public` (excluidos ya en el `matcher`).
 4. **Redirección inteligente:** autenticado en `/auth/*` → su dashboard; no autenticado en ruta protegida → `/auth/login?next=<pathname+search>` (el middleware **guarda el destino** para volver ahí tras el login; ver §6).
 
+#### 5.1.0 El formulario de login no puede enviarse antes de hidratar
+
+`components/auth-login-form.tsx` es un `<form onSubmit={handleSubmit}>`. Mientras React no hidrata, ese handler no existe: apretar *Ingresar* (o Enter) disparaba un **envío nativo GET al mismo `/auth/login`**, y el navegador dejaba `?email=…&password=…` en la barra de direcciones y en el historial. Se detectó ago-2026 haciendo pruebas automatizadas, que clickean antes de que la página termine de cargar — un usuario con conexión lenta reproduce lo mismo.
+
+Dos defensas: el botón nace `disabled` y se habilita en un `useEffect` (`listo`), así no hay envío posible antes de hidratar; y el `<form>` lleva `method="post"`, de modo que cualquier envío nativo que se escape manda las credenciales en el cuerpo y **nunca en la URL**.
+
 #### 5.1.1 Por qué el prefetch no refresca el token
 Supabase tiene la rotación de refresh token activada (`refresh_token_rotation_enabled: true`). Cuando varios requests llegan en paralelo con el token de acceso ya vencido, todos intentan refrescar con el **mismo** refresh token; los que caen fuera de la ventana de reuso reciben `refresh_token_already_used` y Supabase **revoca la familia entera** de tokens, dejando la sesión muerta (`refresh_token_not_found` en la siguiente navegación).
 

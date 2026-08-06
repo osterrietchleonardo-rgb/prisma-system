@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { login, signInWithGoogle } from "@/lib/actions/auth"
@@ -29,8 +29,16 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Hasta que React no toma el control del formulario, apretar "Ingresar" lo
+  // enviaría de forma nativa y el navegador dejaría email y CONTRASEÑA en la
+  // URL y en el historial. Con esto el botón no se puede tocar antes de tiempo.
+  const [listo, setListo] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  useEffect(() => {
+    setListo(true)
+  }, [])
 
   // Show error banners from admin-suspended redirects
   const errorParam = searchParams.get("error")
@@ -125,7 +133,9 @@ export default function LoginForm() {
             {suspendedMsg}
           </div>
         )}
-        <form onSubmit={handleSubmit} className="grid gap-4">
+        {/* method="post" es la red de seguridad: si algún envío nativo se
+            escapara igual, las credenciales viajan en el cuerpo y nunca en la URL. */}
+        <form onSubmit={handleSubmit} method="post" className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" name="email" type="email" placeholder="nombre@ejemplo.com" required disabled={loading} className="bg-background/50" />
@@ -143,7 +153,7 @@ export default function LoginForm() {
             <Input id="password" name="password" type="password" required disabled={loading} className="bg-background/50" />
           </div>
           {error && <p className="text-sm text-destructive font-medium">{error}</p>}
-          <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={loading}>
+          <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={loading || !listo}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Ingresar
           </Button>
