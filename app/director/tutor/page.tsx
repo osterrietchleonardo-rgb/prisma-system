@@ -13,6 +13,7 @@ interface Message {
   role: "user" | "assistant"
   content: string
   sources?: { title: string; type: string; similarity: number }[]
+  created_at?: string
 }
 
 interface Session {
@@ -89,7 +90,8 @@ export default function TutorIAPage() {
         setMessages(data.messages.map((m: any) => ({
           role: m.role,
           content: m.content,
-          sources: m.metadata?.sources
+          sources: m.metadata?.sources,
+          created_at: m.created_at
         })))
       }
     } catch (e) {
@@ -151,7 +153,7 @@ export default function TutorIAPage() {
 
     const userMessage = input.trim()
     setInput("")
-    setMessages(prev => [...prev, { role: "user", content: userMessage }])
+    setMessages(prev => [...prev, { role: "user", content: userMessage, created_at: new Date().toISOString() }])
     setIsLoading(true)
 
     try {
@@ -179,7 +181,8 @@ export default function TutorIAPage() {
       setMessages(prev => [...prev, { 
         role: "assistant", 
         content: data.text,
-        sources: data.sources 
+        sources: data.sources,
+        created_at: new Date().toISOString() 
       }])
 
       // Auto-refresh credit badge after consumption
@@ -190,7 +193,8 @@ export default function TutorIAPage() {
       console.error("Error:", error)
       setMessages(prev => [...prev, { 
         role: "assistant", 
-        content: "Lo siento, hubo un error técnico al procesar tu consulta. Por favor, intenta de nuevo." 
+        content: "Lo siento, hubo un error técnico al procesar tu consulta. Por favor, intenta de nuevo.",
+        created_at: new Date().toISOString() 
       }])
     } finally {
       setIsLoading(false)
@@ -438,13 +442,17 @@ export default function TutorIAPage() {
                              )} />
                           )}
 
-                          {/* Timestamp mock */}
-                          <div className={cn(
+                          {/* Hora real del mensaje (created_at). El saludo inicial no la tiene → no se muestra.
+                              Idioma fijo + suppressHydrationWarning: sin eso el servidor y el navegador
+                              escriben la hora distinto y React descarta el HTML del servidor. */}
+                          {message.created_at && (
+                          <div suppressHydrationWarning className={cn(
                              "text-[10px] mt-1 text-right opacity-40",
                              message.role === "user" ? "text-accent" : "text-muted-foreground"
                           )}>
-                             {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                             {new Date(message.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false })}
                           </div>
+                          )}
                         </div>
                       );
                     })}

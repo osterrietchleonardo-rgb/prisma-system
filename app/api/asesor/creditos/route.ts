@@ -31,8 +31,13 @@ export async function GET() {
     return NextResponse.json({ error: "Perfil no encontrado" }, { status: 404 })
   }
 
+  // El director no tiene cuota personal de asesor: no es un error, simplemente no aplica.
+  // Se responde 200 con `aplica: false` a propósito. Con 403 el navegador registraba un
+  // error rojo en la consola en TODAS las pantallas de director que muestran el badge de
+  // créditos (Tutor, Buscador, Marketing, Contratos), aunque el badge ya lo ignoraba.
+  // No se filtra ningún dato: la respuesta va vacía.
   if (profile.role !== "asesor") {
-    return NextResponse.json({ error: "Solo disponible para asesores" }, { status: 403 })
+    return NextResponse.json({ aplica: false })
   }
 
   const agencyId = profile.agency_id

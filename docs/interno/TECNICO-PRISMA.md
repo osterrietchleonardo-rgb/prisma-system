@@ -792,7 +792,7 @@ Dos scripts nuevos en `roomix-sync/`, mismo patrón que `backfill-descripcion.mj
 | `analisis_chat_ia` | 1 | Gemini 3.5 Flash | $0.75 in / $4.50 out |
 | `documentos_ia` | 1 | Gemini Embedding 004 | $0.02 in |
 
-**Cuota por asesor:** `GET /api/asesor/creditos` calcula límite mensual = pool de asesores de la agencia / nº de asesores activos; renueva el 1° de cada mes. Dashboard director en `components/ai-credits-dashboard.tsx`.
+**Cuota por asesor:** `GET /api/asesor/creditos` calcula límite mensual = pool de asesores de la agencia / nº de asesores activos; renueva el 1° de cada mes. Dashboard director en `components/ai-credits-dashboard.tsx`. **Si quien pregunta no es asesor** (el director, que no tiene cuota personal) responde **200 con `{ aplica: false }`**, no 403: no es un error y con 403 el navegador ensuciaba la consola en todas las pantallas de director que muestran el badge. Quien consuma este endpoint debe cortar ante `aplica === false` antes de leer `porcentaje` (lo hacen `hooks/use-asesor-creditos.ts` y `app/asesor/configuracion/page.tsx`).
 
 ---
 

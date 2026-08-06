@@ -976,7 +976,17 @@ Se portó el patrón completo a `app/director/tutor/page.tsx` y `app/asesor/tuto
 
 **La burbuja de la bandeja (§ 8.4.c) no se muestra acá:** estas dos pantallas tienen su propio botón de enviar abajo a la derecha y la burbuja se le montaba encima. `consultor`, `consultor-ia`, `tutor` y `tutor-ia` se sumaron a `RUTAS_SIN_BURBUJA`.
 
-> Pendiente conocido (preexistente, no se tocó): el Tutor tira un **error de hidratación** ("Text content does not match server-rendered HTML") y dos peticiones **403**. El sospechoso del primero son las fechas del historial formateadas con `toLocaleDateString()`, que el servidor y el navegador resuelven distinto.
+### 10.6.c Los dos errores de consola del Tutor (Agosto 2026)
+
+Eran preexistentes y ninguno rompía nada, pero uno escondía un dato falso.
+
+**La hora de los mensajes del Tutor era mentira.** El código lo decía: `{/* Timestamp mock */}` con `new Date()`, o sea **la hora actual debajo de todos los mensajes**, incluso los de hace meses. El tipo `Message` ni siquiera guardaba `created_at`. Como además no se fijaba el idioma, el servidor escribía `"05:00 p. m."` y el navegador lo mismo pero con un espacio invisible distinto (ICU de Node vs Chrome): React detectaba la diferencia, **descartaba el HTML del servidor y redibujaba esa rama en el cliente** ("There was an error while hydrating this Suspense boundary").
+
+Se copió el patrón que el Buscador ya tenía bien: `created_at?: string` en `Message`, se completa al cargar la sesión y al mandar/recibir cada mensaje, y se muestra **solo si existe** (el saludo inicial no la tiene) con `'es-AR'`, `hour12: false` y `suppressHydrationWarning`. Verificado: con el reloj en 17:27, tres conversaciones distintas muestran 18:23, 11:57 y 15:33 — sus horas reales de la base.
+
+**Los dos 403 de `/api/asesor/creditos`.** El director no tiene cuota personal de asesor, así que el endpoint respondía 403 y el hook `use-asesor-creditos` lo silenciaba a propósito. Funcionaba bien, pero el navegador registra todo 4xx: quedaba un error rojo en **todas** las pantallas de director con badge de créditos (Tutor, Buscador, Marketing, Contratos). Ahora el endpoint responde **200 con `{ aplica: false }`** — no es un error, simplemente no aplica — y el hook corta ahí devolviendo `null` (sin ese corte, `porcentaje` quedaría `undefined` y el badge se dibujaría con NaN). No se filtra ningún dato: la respuesta va vacía. `app/asesor/configuracion/page.tsx` también contempla el nuevo valor.
+
+> En desarrollo cada pedido aparecía **dos veces** porque React llama los efectos dos veces a propósito; en producción salía una sola.
 
 ### 10.7 Mejoras Junio 29 (modelo, piso, free-text, compuerta de datos, ficha compartible)
 
