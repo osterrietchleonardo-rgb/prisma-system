@@ -38,6 +38,12 @@ export interface RespuestaMapa {
   /** true cuando habia mas propiedades que el tope y la respuesta viene cortada. */
   truncado: boolean
   total_devuelto: number
+  /**
+   * Fuentes que quedaron sin consultar porque no distinguen el tipo elegido
+   * (la red de colaboracion, por ejemplo, no tiene lotes). Se avisa en pantalla:
+   * "no hay" y "no se pudo preguntar" no son lo mismo.
+   */
+  sin_ese_tipo: { cartera: boolean; colaboracion: boolean }
 }
 
 export interface ZonaGuardada {

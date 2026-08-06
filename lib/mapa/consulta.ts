@@ -3,6 +3,7 @@
 // Se separa del endpoint HTTP a proposito, para poder verificarla contra la base real
 // con un script, sin necesidad de sesion ni cookies.
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { valoresDeTipo } from "./tipos-propiedad.ts"
 import type { BBox, FiltrosMapa, PropiedadMapa, RespuestaMapa } from "./tipos.ts"
 
 /** Tope duro de puntos por respuesta, contando las dos fuentes JUNTAS. */
@@ -87,15 +88,26 @@ export async function consultarMapa(
     p_norte: bbox.norte,
     p_este: bbox.este,
     p_operacion: filtros.operacion,
-    p_tipo: filtros.tipo,
     p_precio_min: filtros.precio_min,
     p_precio_max: filtros.precio_max,
     p_moneda: filtros.moneda,
     p_ambientes_min: filtros.ambientes_min,
   }
 
-  const quiereCartera = filtros.fuentes.includes("own") || filtros.fuentes.includes("agency")
-  const quiereColaboracion = filtros.fuentes.includes("roomix")
+  // Una etiqueta de pantalla puede tapar varios valores de la base, y no siempre las dos
+  // fuentes tienen el tipo elegido (la red no distingue lotes). Ver tipos-propiedad.ts.
+  const tiposCartera = valoresDeTipo(filtros.tipo, "cartera")
+  const tiposColab = valoresDeTipo(filtros.tipo, "colaboracion")
+
+  // Lista vacia = esa fuente no tiene este tipo. NO se consulta: la base tendria que
+  // recorrer el rectangulo entero para devolver cero, y eso es lo que hacia saltar el
+  // "canceling statement due to statement timeout" (16.439 ms medidos).
+  const carteraSinEseTipo = tiposCartera !== null && tiposCartera.length === 0
+  const colabSinEseTipo = tiposColab !== null && tiposColab.length === 0
+
+  const quiereCartera =
+    (filtros.fuentes.includes("own") || filtros.fuentes.includes("agency")) && !carteraSinEseTipo
+  const quiereColaboracion = filtros.fuentes.includes("roomix") && !colabSinEseTipo
 
   // Las dos consultas van EN PARALELO. Se le podria pedir a la colaboracion solo lo que
   // sobra despues de contar la cartera, pero eso obliga a esperar una para lanzar la otra
@@ -103,11 +115,20 @@ export async function consultarMapa(
   // las dos juntas y se recorta despues: mismo resultado, la mitad de espera.
   const [resCartera, resColaboracion] = await Promise.all([
     quiereCartera
-      ? admin.rpc("mapa_cartera", { ...comunes, p_agency_id: agencyId, p_limit: TOPE_PUNTOS })
+      ? admin.rpc("mapa_cartera", {
+          ...comunes,
+          p_tipos: tiposCartera,
+          p_agency_id: agencyId,
+          p_limit: TOPE_PUNTOS,
+        })
       : null,
     // Se pide uno de mas: si vuelve, es que habia mas de los que entran en el tope.
     quiereColaboracion
-      ? admin.rpc("mapa_colaboracion", { ...comunes, p_limit: TOPE_PUNTOS + 1 })
+      ? admin.rpc("mapa_colaboracion", {
+          ...comunes,
+          p_tipos: tiposColab,
+          p_limit: TOPE_PUNTOS + 1,
+        })
       : null,
   ])
 
@@ -126,5 +147,12 @@ export async function consultarMapa(
   const truncado = quiereColaboracion && filasColab.length > resto
 
   const propiedades = [...propias, ...colaboracion]
-  return { propiedades, truncado, total_devuelto: propiedades.length }
+  return {
+    propiedades,
+    truncado,
+    total_devuelto: propiedades.length,
+    // Se avisa cuando una fuente quedo afuera por el tipo elegido, para que el usuario
+    // no crea que no hay nada cuando en realidad no se pudo preguntar.
+    sin_ese_tipo: { cartera: carteraSinEseTipo, colaboracion: colabSinEseTipo },
+  }
 }

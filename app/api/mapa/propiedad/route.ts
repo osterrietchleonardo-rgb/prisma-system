@@ -22,13 +22,13 @@ export async function GET(req: Request) {
     // ── Red de colaboracion ──
     if (id.startsWith("roomix_")) {
       const slug = id.slice("roomix_".length)
+      // La lista de columnas va en UNA sola cadena, sin partirla con +: el cliente de
+      // Supabase deduce los tipos leyendo el texto literal, y una concatenacion le deja
+      // el tipo en `string`. Ahi devuelve GenericStringError y se pierde el chequeo de
+      // TypeScript sobre cada columna.
       const { data: r, error } = await admin
         .from("roomix_properties")
-        .select(
-          "slug, title, description, operation, price, currency, property_type, rooms, bedrooms, " +
-            "bathrooms, area_m2, address, neighborhood, lat, lng, amenities, images, " +
-            "roomix_agency_name, roomix_agency_logo, roomix_agency_source_url, canonical_url",
-        )
+        .select("slug, title, description, operation, price, currency, property_type, rooms, bedrooms, bathrooms, area_m2, address, neighborhood, lat, lng, amenities, images, roomix_agency_name, roomix_agency_logo, roomix_agency_source_url, canonical_url")
         .eq("slug", slug)
         .maybeSingle()
       if (error) throw error
@@ -68,11 +68,7 @@ export async function GET(req: Request) {
     //    se saltea RLS, asi que el aislamiento por agencia lo tiene que poner la consulta.
     const { data: p, error } = await admin
       .from("properties")
-      .select(
-        "id, title, description, price, currency, property_type, status, bedrooms, bathrooms, " +
-          "total_area, covered_area, address, city, images, lat, lng, assigned_agent_id, " +
-          "assigned_agent, tokko_data, agent_profile:profiles(full_name, email)",
-      )
+      .select("id, title, description, price, currency, property_type, status, bedrooms, bathrooms, total_area, covered_area, address, city, images, lat, lng, assigned_agent_id, assigned_agent, tokko_data, agent_profile:profiles(full_name, email)")
       .eq("id", id)
       .eq("agency_id", agencyId)
       .maybeSingle()

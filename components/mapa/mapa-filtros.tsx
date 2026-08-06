@@ -6,11 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TIPOS_MAPA } from "@/lib/mapa/tipos-propiedad"
 import type { FiltrosMapa, FuenteMapa } from "@/lib/mapa/tipos"
-
-const TIPOS = [
-  "Departamento", "Casa", "PH", "Lote", "Oficina", "Local Comercial", "Cochera", "Galpon",
-]
 
 // En pantalla la red externa se llama SIEMPRE "Colaboracion", nunca por su nombre interno.
 const ETIQUETAS: Record<FuenteMapa, string> = {
@@ -71,7 +68,9 @@ export function MapaFiltros({
           <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__todos__">Todos</SelectItem>
-            {TIPOS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            {TIPOS_MAPA.map((t) => (
+              <SelectItem key={t.valor} value={t.valor}>{t.etiqueta}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>

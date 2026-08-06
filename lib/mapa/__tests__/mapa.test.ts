@@ -11,6 +11,7 @@ import { bboxDePoligono, parsearBBox, serializarBBox } from "../bbox.ts"
 import { leerFiltros } from "../filtros.ts"
 import { filtrarPorTrazos } from "../filtro-poligono.ts"
 import { agruparPorUbicacion } from "../agrupar.ts"
+import { TIPOS_MAPA, esTipoValido, etiquetaDeTipo, valoresDeTipo } from "../tipos-propiedad.ts"
 import type { PropiedadMapa } from "../tipos.ts"
 
 // ─────────────────────────── bbox ───────────────────────────
@@ -122,6 +123,67 @@ describe("leerFiltros", () => {
   test("solo acepta Venta o Alquiler", () => {
     assert.equal(leer("operacion=Alquiler").operacion, "Alquiler")
     assert.equal(leer("operacion=cualquiera").operacion, "Venta")
+  })
+
+  test("acepta un tipo de la lista", () => {
+    assert.equal(leer("tipo=departamento").tipo, "departamento")
+  })
+
+  test("un tipo inventado se ignora, no se pasa a la consulta", () => {
+    // Este era el bug: "Departamento" llegaba tal cual a la base, no coincidia con
+    // ningun valor y la consulta escaneaba el rectangulo entero hasta el timeout.
+    assert.equal(leer("tipo=Departamento").tipo, null)
+    assert.equal(leer("tipo=Local Comercial").tipo, null)
+    assert.equal(leer("tipo=").tipo, null)
+  })
+})
+
+// ─────────────── tipos de propiedad (etiqueta -> valores reales) ───────────────
+
+describe("tipos-propiedad", () => {
+  test("todos los valores de la lista se validan a si mismos", () => {
+    for (const t of TIPOS_MAPA) assert.ok(esTipoValido(t.valor), `${t.valor} deberia ser valido`)
+  })
+
+  test("los valores son unicos", () => {
+    const vals = TIPOS_MAPA.map((t) => t.valor)
+    assert.equal(new Set(vals).size, vals.length)
+  })
+
+  test("cada opcion existe al menos en UNA de las dos fuentes", () => {
+    for (const t of TIPOS_MAPA) {
+      assert.ok(
+        t.cartera.length > 0 || t.colaboracion.length > 0,
+        `${t.valor} no existe en ninguna fuente: no habria que ofrecerlo`,
+      )
+    }
+  })
+
+  test("sin tipo elegido no hay filtro (null, no lista vacia)", () => {
+    assert.equal(valoresDeTipo(null, "cartera"), null)
+    assert.equal(valoresDeTipo(null, "colaboracion"), null)
+  })
+
+  test("un tipo inventado se trata como 'sin filtro', no como 'sin resultados'", () => {
+    // Devolver [] dejaria el mapa vacio sin explicacion por un parametro mal escrito.
+    assert.equal(valoresDeTipo("inventado", "cartera"), null)
+  })
+
+  test("Departamento traduce a los valores reales de cada tabla", () => {
+    assert.deepEqual(valoresDeTipo("departamento", "cartera"), ["Departamento", "Condo"])
+    assert.deepEqual(valoresDeTipo("departamento", "colaboracion"), ["Apartment"])
+  })
+
+  test("Lote existe en la cartera pero NO en la red: lista vacia, no null", () => {
+    // La diferencia importa: [] significa "no preguntes, no lo distingue".
+    assert.deepEqual(valoresDeTipo("lote", "cartera"), ["Lote"])
+    assert.deepEqual(valoresDeTipo("lote", "colaboracion"), [])
+  })
+
+  test("etiquetaDeTipo devuelve el texto de pantalla y null si no existe", () => {
+    assert.equal(etiquetaDeTipo("casa"), "Casa / PH")
+    assert.equal(etiquetaDeTipo("inventado"), null)
+    assert.equal(etiquetaDeTipo(null), null)
   })
 })
 
