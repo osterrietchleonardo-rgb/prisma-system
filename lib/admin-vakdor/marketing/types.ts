@@ -81,3 +81,14 @@ export interface NuevaIdeaInput {
   brief?: Record<string, unknown>
   origen?: "motor" | "manual"
 }
+
+import type { ClaveEstructura, ClaveComentario } from "./voz"
+
+/** Qué receta produjo una pieza: sirve para rotar, para no repetir y para auditar después. */
+export interface Receta {
+  estructura: ClaveEstructura | null
+  escenas: string[]
+  comentario_tipo: ClaveComentario | null
+  modelo: string
+  revision: { aprobado: boolean; reintentos: number; fallos?: string[] }
+}
