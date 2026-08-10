@@ -9,57 +9,93 @@
 // instrucción de formato — cosa que no hace siempre. Este texto va al cuadro
 // que edita el asesor y de ahí a la ficha que se le imprime al cliente: este
 // módulo es la única barrera entre ese razonamiento filtrado y lo que se ve.
+//
+// Estrategia (reescrita después de dos rondas de revisión que rompieron un
+// enfoque de "enumerar marcadores de markdown" y de "etiqueta en cualquier
+// parte del texto" — ninguno de los dos escala):
+//   1) Normalizar el markdown ANTES de decidir nada, en una sola pasada: sacar
+//      cercos/énfasis en cualquier posición y la decoración de arranque de
+//      CADA línea (#, >, -, backtick, espacios), sea cual sea la combinación.
+//      Un marcador nuevo que no se nos ocurrió deja de ser un agujero.
+//   2) Una etiqueta (de andamiaje o de cierre) solo cuenta si arranca la línea
+//      o el párrafo, nunca en medio de una oración — "...buena luz. Como
+//      resultado: apto para invertir." es prosa real y no se toca.
+//   3) Si un párrafo arranca con vocabulario de razonamiento, se descarta SOLO
+//      la oración que lo contiene (hasta su punto de cierre) y se conserva lo
+//      que sigue. Si no queda nada después de esa oración, el párrafo entero
+//      era andamiaje: se descarta sin rescatar nada. Nunca se devuelve el
+//      razonamiento como si fuera la descripción — vacío es una salida válida
+//      (el ACM no se bloquea por esto; Task 6 lo trata como análisis fallido).
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Tope duro de lo que se guarda. El prompt pide 400-600; esto es el techo. */
 export const MAX_DESC_IA = 700
 
 /**
- * Párrafos que son andamiaje del prompt (el paso de razonamiento), no la
- * descripción en sí. Nota: "observación/observaciones" NO está acá a propósito
- * — es una forma legítima de arrancar un dato real de la propiedad (ej.
- * "Observaciones: apto profesional, sin cochera."), no una palabra reservada.
+ * Vocabulario de razonamiento cuando arranca un párrafo (después de
+ * normalizado el markdown). Nota: "observación/observaciones" NO está acá a
+ * propósito — es una forma legítima de arrancar un dato real de la propiedad
+ * (ej. "Observaciones: apto profesional, sin cochera."), no una palabra
+ * reservada del prompt.
  */
-const RE_ANDAMIAJE = /^\s*(an[áa]lisis|paso\s*1|razonamiento)\b/i
+const RE_ANDAMIAJE_INICIO = /^\s*(an[áa]lisis|paso\s*1|razonamiento)\b\s*:?\s*/i
+
+/** Etiqueta de "acá empieza lo final", válida solo si arranca el párrafo. */
+const RE_ETIQUETA_INICIO = /^\s*(descripci[óo]n(?:\s+final)?|texto\s*final|resultado)\b\s*:?\s*/i
 
 /**
- * Etiqueta de "acá empieza lo final" (Descripción, Descripción final, Texto
- * final, Resultado), buscada en CUALQUIER punto del texto, no solo al arranque
- * de un párrafo. El modelo suele mezclar el análisis y la descripción en la
- * misma prosa corrida —sin línea en blanco que las separe—, así que buscar la
- * etiqueta solo al inicio del string no alcanza para cortar el razonamiento
- * previo. Con flag global para poder tomar la ÚLTIMA aparición.
+ * Deja el texto en una forma canónica antes de evaluar nada: saca cercos de
+ * markdown y énfasis (```, *, _) en cualquier posición, y la decoración de
+ * arranque de cada línea (encabezados #, citas >, viñetas -, backticks
+ * sueltos, espacios), sea cual sea la combinación. Normalizar así —en vez de
+ * enumerar "## ", "**" o "_" como casos separados— es lo que evita que un
+ * marcador nuevo rompa el saneado en la próxima vuelta.
  */
-const RE_ETIQUETA_FINAL = /\b(descripci[óo]n(?:\s+final)?|texto\s*final|resultado)\s*:\s*/gi
+function normalizarMarkdown(texto: string): string {
+  const sinCercosNiEnfasis = texto.replace(/```[a-z]*\n?/gi, "").replace(/[*_]/g, "")
+
+  return sinCercosNiEnfasis
+    .split("\n")
+    .map((linea) => linea.replace(/^[\s#>`-]+/, ""))
+    .join("\n")
+}
+
+/**
+ * Un párrafo que arranca con vocabulario de razonamiento puede seguir, en la
+ * misma oración o en las siguientes, con la descripción real: el modelo no
+ * siempre la separa con una segunda etiqueta (el prompt le prohíbe imprimir
+ * cualquier prefijo, así que la forma más común de desobedecer es filtrar el
+ * "Análisis:" y seguir derecho, sin rotular nada más). Se descarta únicamente
+ * la primera oración —la que contiene el andamiaje— y se conserva lo que
+ * sigue. Si no queda nada después de esa oración, todo el párrafo era
+ * razonamiento: se devuelve vacío, nunca el razonamiento tal cual.
+ */
+function sacarClausulaAndamiaje(parrafo: string): string {
+  const marcador = RE_ANDAMIAJE_INICIO.exec(parrafo)
+  if (!marcador) return parrafo
+
+  const resto = parrafo.slice(marcador[0].length)
+  const finOracion = resto.search(/[.!?](\s+|$)/)
+  if (finOracion === -1) return "" // era una sola oración de andamiaje, sin nada más
+
+  const puntuacion = resto.slice(finOracion).match(/^[.!?]\s*/)
+  const avance = finOracion + (puntuacion ? puntuacion[0].length : 1)
+  return resto.slice(avance).trim()
+}
 
 export function sanearDescripcionIA(texto: string): string {
   if (!texto) return ""
 
-  // 1) Cercos de markdown y énfasis (```, **, __) en cualquier posición del
-  // texto, no solo pegados al borde: el modelo a veces le mete markdown a la
-  // etiqueta ("**Análisis:**") aunque el prompt pide texto plano, y un cerco
-  // que no arranca en la primera línea (por texto previo) igual hay que sacarlo.
-  let t = texto.replace(/```[a-z]*\n?/gi, "").replace(/\*+/g, "").replace(/__/g, "")
+  const normalizado = normalizarMarkdown(texto)
 
-  // 2) Si en algún punto aparece una etiqueta de cierre, nos quedamos con todo
-  // lo que viene DESPUÉS de la ÚLTIMA: así se descarta el análisis previo esté
-  // en su propio párrafo o mezclado en la misma prosa que la descripción real.
-  const etiquetas = [...t.matchAll(RE_ETIQUETA_FINAL)]
-  if (etiquetas.length) {
-    const ultima = etiquetas[etiquetas.length - 1]
-    t = t.slice((ultima.index ?? 0) + ultima[0].length)
-  }
+  const parrafos = normalizado.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
+  const limpios = parrafos
+    .map((p) => (RE_ANDAMIAJE_INICIO.test(p) ? sacarClausulaAndamiaje(p) : p))
+    .map((p) => p.replace(RE_ETIQUETA_INICIO, "").trim())
+    .filter(Boolean)
 
-  // 3) Red de seguridad estructural para cuando NO hubo etiqueta explícita:
-  // descartar los párrafos que arrancan con vocabulario de razonamiento.
-  const parrafos = t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean)
-  const utiles = parrafos.filter((p) => !RE_ANDAMIAJE.test(p))
+  const t = limpios.join(" ")
 
-  // Si TODO parecía andamiaje, nos quedamos con el último párrafo: es preferible
-  // devolver algo editable a devolver vacío.
-  t = (utiles.length ? utiles : parrafos.slice(-1)).join(" ")
-
-  // 4) Aplastar saltos de línea y espacios repetidos.
   return t.replace(/\s*\n\s*/g, " ").replace(/\s{2,}/g, " ").trim()
 }
 

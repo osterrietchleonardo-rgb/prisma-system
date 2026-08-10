@@ -55,6 +55,55 @@ describe("sanearDescripcionIA", () => {
     const t = "Nota:\n```\nDepartamento luminoso al frente.\n```"
     expect(sanearDescripcionIA(t)).toBe("Nota: Departamento luminoso al frente.")
   })
+
+  it("descarta el análisis aunque el modelo NUNCA imprima una segunda etiqueta de cierre", () => {
+    // Este es el caso realista: el prompt le PROHÍBE al modelo imprimir
+    // "Descripción:", así que la desobediencia parcial más probable es que
+    // filtre el "Análisis:" y siga derecho con el texto final, sin rotularlo.
+    const t = "Análisis: se observan pisos de madera y buena luz. El departamento tiene dos ambientes, es luminoso y de buena categoría."
+    expect(sanearDescripcionIA(t)).toBe("El departamento tiene dos ambientes, es luminoso y de buena categoría.")
+  })
+
+  it("descarta el análisis con encabezados markdown (##), no solo negrita", () => {
+    const t = "## Análisis\nSe observan pisos de madera y buena luz.\n\n## Descripción final\nDepto luminoso, dos ambientes."
+    expect(sanearDescripcionIA(t)).toBe("Depto luminoso, dos ambientes.")
+  })
+
+  it("descarta el análisis con itálica simple (_texto_), no solo negrita (__/**)", () => {
+    const t = "_Análisis:_ se observan pisos de madera y buena luz.\n\n_Descripción final:_ Depto luminoso, dos ambientes."
+    expect(sanearDescripcionIA(t)).toBe("Depto luminoso, dos ambientes.")
+  })
+
+  it("descarta el análisis con una combinación de marcadores no probada antes (blockquote + negrita)", () => {
+    // No es un marcador más para enumerar: prueba que la normalización de
+    // arranque de línea (#, >, -, backtick, espacios) es genérica, no una
+    // lista de casos especiales.
+    const t = "> **Análisis:** se observan pisos de madera y buena luz.\n\n> **Descripción final:** Depto luminoso, dos ambientes."
+    expect(sanearDescripcionIA(t)).toBe("Depto luminoso, dos ambientes.")
+  })
+
+  it("NO toca una etiqueta que aparece en medio de una oración real (prosa inmobiliaria normal)", () => {
+    // Regresión de la ronda anterior: "buscar la etiqueta en cualquier parte
+    // del texto" se comía descripciones legítimas. "Como resultado:" es
+    // prosa argentina normal, no un separador de andamiaje.
+    const t = "El departamento tiene dos ambientes, cocina integrada y buena luz natural. Como resultado: apto para invertir o vivir."
+    expect(sanearDescripcionIA(t)).toBe(t)
+  })
+
+  it("NO toca 'descripción' cuando aparece en medio de una oración real", () => {
+    const t = "El living es amplio y tiene buena descripción: los ambientes están bien distribuidos y con luz natural."
+    expect(sanearDescripcionIA(t)).toBe(t)
+  })
+
+  it("devuelve vacío (nunca el razonamiento) cuando el párrafo es 100% andamiaje, sin nada rescatable", () => {
+    const t = "Análisis: se observan pisos de madera y buena luz natural en el living."
+    expect(sanearDescripcionIA(t)).toBe("")
+  })
+
+  it("no regresión: una descripción inmobiliaria realista, limpia y de varios párrafos sale intacta", () => {
+    const t = "Departamento de dos ambientes al frente, con muy buena luz natural durante todo el día. Living comedor integrado con cocina, piso de madera en buen estado de conservación. Dormitorio con placard, baño completo. Edificio con portero y ascensor, a metros del subte."
+    expect(sanearDescripcionIA(t)).toBe(t)
+  })
 })
 
 describe("recortarAPalabra", () => {
