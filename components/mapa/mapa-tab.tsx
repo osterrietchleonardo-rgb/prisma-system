@@ -9,6 +9,7 @@ import dynamic from "next/dynamic"
 import { Loader2, MapPin, Pencil, X } from "lucide-react"
 import { toast } from "sonner"
 
+import { MapaBuscador } from "./mapa-buscador"
 import { MapaFiltros } from "./mapa-filtros"
 import { MapaResultados } from "./mapa-resultados"
 import { MapaFicha } from "./mapa-ficha"
@@ -18,6 +19,7 @@ import { bboxDePoligono, serializarBBox } from "@/lib/mapa/bbox"
 import { agruparPorUbicacion } from "@/lib/mapa/agrupar"
 import { filtrarPorTrazos } from "@/lib/mapa/filtro-poligono"
 import { etiquetaDeTipo } from "@/lib/mapa/tipos-propiedad"
+import type { Lugar } from "@/lib/mapa/lugares"
 import type { BBox, FiltrosMapa, GrupoUbicacion, PropiedadMapa, RespuestaMapa, ZonaGuardada } from "@/lib/mapa/tipos"
 
 // Leaflet toca `window` al importarse: sin ssr:false el build se cae.
@@ -117,6 +119,23 @@ export function MapaTab() {
     if (b) setEncuadrarA(b)
   }, [])
 
+  // Elegir un lugar del buscador. Un barrio o una direccion SOLO mueven el mapa; una
+  // zona guardada ademas recorta, porque para eso se dibujo.
+  const irALugar = useCallback((l: Lugar) => {
+    if (l.tipo === "zona" && l.geojson) {
+      const trazo: Trazo = { id: `lugar_${l.id}`, poligono: l.geojson as Trazo["poligono"] }
+      setTrazos([trazo])
+      const b = bboxDePoligono(l.geojson)
+      if (b) setEncuadrarA(b)
+      else toast.error("Esa zona no tiene un trazo válido")
+      return
+    }
+    // Un barrio nuevo con el trazo viejo puesto mostraria cero propiedades sin explicar
+    // por que: el trazo de antes no encierra nada de donde acabamos de aterrizar.
+    setTrazos([])
+    setEncuadrarA(l.bbox)
+  }, [])
+
   const aplicarZona = useCallback((z: ZonaGuardada) => {
     const trazo: Trazo = { id: `zona_${z.id}`, poligono: z.geojson as Trazo["poligono"] }
     setTrazos([trazo])
@@ -155,6 +174,8 @@ export function MapaTab() {
 
   return (
     <div className="flex h-[calc(100vh-13rem)] min-h-[560px] flex-col gap-3">
+      <MapaBuscador onElegir={irALugar} />
+
       <MapaFiltros filtros={filtros} onCambio={setFiltros} />
 
       {avisoTipo && (

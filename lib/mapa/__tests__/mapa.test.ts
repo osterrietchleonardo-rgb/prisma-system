@@ -12,6 +12,7 @@ import { leerFiltros } from "../filtros.ts"
 import { filtrarPorTrazos } from "../filtro-poligono.ts"
 import { agruparPorUbicacion } from "../agrupar.ts"
 import { consultarMapa, TOPE_PUNTOS } from "../consulta.ts"
+import { normalizarTexto, recuadroDePunto, sacarBarriosRepetidos, unirLugares } from "../lugares.ts"
 import { TIPOS_MAPA, esTipoValido, etiquetaDeTipo, tipoEnCastellano, valoresDeTipo } from "../tipos-propiedad.ts"
 import type { PropiedadMapa } from "../tipos.ts"
 
@@ -406,5 +407,81 @@ describe("consultarMapa · aviso de resultados recortados", () => {
     const r = await consultarMapa(supabaseFalso({}), PARAMS_BASE)
     assert.equal(r.propiedades.length, 0)
     assert.equal(r.truncado, false, "cero resultados no es un recorte")
+  })
+})
+
+// ─────────────────────── buscador de lugares ───────────────────────
+
+describe("normalizarTexto", () => {
+  test("saca los acentos: Nuñez y Núñez son el mismo barrio", () => {
+    assert.equal(normalizarTexto("Núñez"), normalizarTexto("Nuñez"))
+    assert.equal(normalizarTexto("Núñez"), "nunez")
+  })
+
+  test("ignora mayusculas y espacios de los costados", () => {
+    assert.equal(normalizarTexto("  Villa URQUIZA "), "villa urquiza")
+  })
+
+  test("da lo MISMO que lower(unaccent(btrim())) de Postgres", () => {
+    // Los pares salen de la base real: si esto se desincroniza, el buscador muestra
+    // repetido el mismo barrio (uno vendria del catalogo y otro de la cartera).
+    for (const [crudo, esperado] of [
+      ["Núñez", "nunez"],
+      ["Belgrano R", "belgrano r"],
+      ["Barrio Vicente López", "barrio vicente lopez"],
+      ["Countries/B.Cerrado (G. Rodriguez)", "countries/b.cerrado (g. rodriguez)"],
+    ]) {
+      assert.equal(normalizarTexto(crudo), esperado)
+    }
+  })
+})
+
+describe("recuadroDePunto", () => {
+  test("arma un recuadro centrado en el punto", () => {
+    const b = recuadroDePunto(-34.6, -58.4)
+    assert.ok(b.sur < -34.6 && b.norte > -34.6)
+    assert.ok(b.oeste < -58.4 && b.este > -58.4)
+    assert.equal(Math.round(((b.norte - b.sur) / 2) * 1e6) / 1e6, 0.0045)
+  })
+})
+
+describe("unirLugares", () => {
+  const lugar = (tipo: any, nombre: string): any => ({
+    id: `${tipo}:${nombre}`, tipo, nombre, detalle: "", bbox: { sur: 0, oeste: 0, norte: 0, este: 0 },
+  })
+
+  test("el que viene primero gana", () => {
+    const r = unirLugares([lugar("zona", "Palermo")], [lugar("zona", "PALERMO")])
+    assert.equal(r.length, 1)
+    assert.equal(r[0].nombre, "Palermo")
+  })
+
+  test("mismo nombre pero distinto tipo NO es repetido", () => {
+    const r = unirLugares([lugar("zona", "Belgrano")], [lugar("barrio", "Belgrano")])
+    assert.equal(r.length, 2)
+  })
+
+  test("respeta el orden de las listas", () => {
+    const r = unirLugares([lugar("zona", "A")], [lugar("cartera", "B")], [lugar("barrio", "C")])
+    assert.deepEqual(r.map((l: any) => l.tipo), ["zona", "cartera", "barrio"])
+  })
+})
+
+describe("sacarBarriosRepetidos", () => {
+  const lugar = (tipo: any, nombre: string): any => ({
+    id: `${tipo}:${nombre}`, tipo, nombre, detalle: "", bbox: { sur: 0, oeste: 0, norte: 0, este: 0 },
+  })
+
+  test("si el barrio ya esta en tu cartera, no se repite el de la red", () => {
+    const red = sacarBarriosRepetidos(
+      [lugar("barrio", "Núñez"), lugar("barrio", "Palermo")],
+      [lugar("cartera", "Nuñez")],
+    )
+    assert.deepEqual(red.map((l: any) => l.nombre), ["Palermo"])
+  })
+
+  test("sin cartera no saca nada", () => {
+    const red = sacarBarriosRepetidos([lugar("barrio", "Palermo")], [])
+    assert.equal(red.length, 1)
   })
 })
