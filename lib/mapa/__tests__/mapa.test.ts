@@ -12,6 +12,7 @@ import { leerFiltros } from "../filtros.ts"
 import { filtrarPorTrazos } from "../filtro-poligono.ts"
 import { agruparPorUbicacion } from "../agrupar.ts"
 import { buscarEnPropiedades } from "../buscar-propiedades.ts"
+import { COLORES, colorDe, cortesDeEscala, formatearM2, tramosDeReferencia } from "../precio-m2.ts"
 import { consultarMapa, TOPE_PUNTOS } from "../consulta.ts"
 import { normalizarTexto, precioCreible, recuadroDePunto, sacarBarriosRepetidos, unirLugares } from "../lugares.ts"
 import { TIPOS_MAPA, esTipoValido, etiquetaDeTipo, tipoEnCastellano, valoresDeTipo } from "../tipos-propiedad.ts"
@@ -582,5 +583,58 @@ describe("buscarEnPropiedades", () => {
 
   test("lo que no coincide se va", () => {
     assert.equal(buscarEnPropiedades([prop()], "chacarita").length, 0)
+  })
+})
+
+// ─────────────────────── escala de colores del $/m2 ───────────────────────
+
+describe("cortesDeEscala", () => {
+  test("parte los valores en cinco grupos", () => {
+    const cortes = cortesDeEscala([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
+    assert.equal(cortes.length, 4)
+    // Los cortes tienen que venir de menor a mayor: si no, el color sale al reves.
+    for (let i = 1; i < cortes.length; i++) assert.ok(cortes[i] >= cortes[i - 1])
+  })
+
+  test("sin datos no hay escala", () => {
+    assert.deepEqual(cortesDeEscala([]), [])
+  })
+
+  test("no rompe con un solo valor", () => {
+    assert.equal(cortesDeEscala([2000]).length, 4)
+  })
+})
+
+describe("colorDe", () => {
+  const cortes = cortesDeEscala([1000, 2000, 3000, 4000, 5000])
+
+  test("lo barato va verde y lo caro rojo", () => {
+    assert.equal(colorDe(1000, cortes), COLORES[0])
+    assert.equal(colorDe(5000, cortes), COLORES[COLORES.length - 1])
+  })
+
+  test("sin escala usa el color del medio en vez de romper", () => {
+    assert.equal(colorDe(2500, []), COLORES[2])
+  })
+})
+
+describe("formatearM2", () => {
+  test("dolares y pesos con su simbolo, sin decimales", () => {
+    assert.equal(formatearM2(2040.7, "USD"), "US$ 2.041")
+    assert.equal(formatearM2(1500, "ARS"), "$ 1.500")
+  })
+})
+
+describe("tramosDeReferencia", () => {
+  test("son cinco y salen de los MISMOS cortes con los que se pinta", () => {
+    const valores = [1000, 2000, 3000, 4000, 5000]
+    const tramos = tramosDeReferencia(valores, cortesDeEscala(valores), "USD")
+    assert.equal(tramos.length, 5)
+    assert.ok(tramos[0].texto.startsWith("hasta"))
+    assert.ok(tramos[4].texto.startsWith("desde"))
+  })
+
+  test("sin datos no se dibuja referencia", () => {
+    assert.deepEqual(tramosDeReferencia([], [], "USD"), [])
   })
 })

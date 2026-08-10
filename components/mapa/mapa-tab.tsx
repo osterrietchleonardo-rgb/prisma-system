@@ -6,7 +6,7 @@
 // No comparte NADA con el chat: si esto fallara, el chat sigue funcionando igual.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import dynamic from "next/dynamic"
-import { Loader2, MapPin, Pencil, X } from "lucide-react"
+import { DollarSign, Loader2, MapPin, Pencil, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { MapaBuscador } from "./mapa-buscador"
@@ -14,6 +14,7 @@ import { MapaFiltros } from "./mapa-filtros"
 import { MapaResultados } from "./mapa-resultados"
 import { MapaFicha } from "./mapa-ficha"
 import { MapaListaModal } from "./mapa-lista-modal"
+import { MapaPanelPrecios } from "./mapa-panel-precios"
 import { MapaZonasPanel } from "./mapa-zonas-panel"
 import type { Trazo } from "./mapa-lapiz"
 import { bboxDePoligono, serializarBBox } from "@/lib/mapa/bbox"
@@ -21,6 +22,7 @@ import { agruparPorUbicacion } from "@/lib/mapa/agrupar"
 import { filtrarPorTrazos } from "@/lib/mapa/filtro-poligono"
 import { etiquetaDeTipo } from "@/lib/mapa/tipos-propiedad"
 import type { Lugar } from "@/lib/mapa/lugares"
+import { cortesDeEscala, tramosDeReferencia, type BarrioPrecio, type CeldaPrecio } from "@/lib/mapa/precio-m2"
 import type { BBox, FiltrosMapa, GrupoUbicacion, PropiedadMapa, RespuestaMapa, ZonaGuardada } from "@/lib/mapa/tipos"
 
 // Leaflet toca `window` al importarse: sin ssr:false el build se cae.
@@ -58,7 +60,13 @@ export function MapaTab() {
   const [fichaId, setFichaId] = useState<string | null>(null)
   const [sinEseTipo, setSinEseTipo] = useState({ cartera: false, colaboracion: false })
 
+  const [verPrecios, setVerPrecios] = useState(false)
+  const [celdas, setCeldas] = useState<CeldaPrecio[]>([])
+  const [barriosPrecio, setBarriosPrecio] = useState<BarrioPrecio[]>([])
+  const [cargandoPrecios, setCargandoPrecios] = useState(false)
+
   const enVuelo = useRef<AbortController | null>(null)
+  const enVueloPrecios = useRef<AbortController | null>(null)
 
   // ── Traer las propiedades del rectangulo visible ──
   useEffect(() => {
@@ -104,6 +112,48 @@ export function MapaTab() {
 
     return () => ctrl.abort()
   }, [bbox, filtros])
+
+  // ── El mapa de calor de $/m2 ──
+  //
+  // Va aparte de las propiedades a proposito: sale de tablas precalculadas, no depende de
+  // los filtros de tipo ni de precio, y solo se pide con la capa prendida. Mezclarlo en la
+  // consulta de propiedades obligaria a traerlo siempre, aunque nadie lo mire.
+  useEffect(() => {
+    if (!verPrecios || !bbox) {
+      setCeldas([])
+      setBarriosPrecio([])
+      return
+    }
+    enVueloPrecios.current?.abort()
+    const ctrl = new AbortController()
+    enVueloPrecios.current = ctrl
+    setCargandoPrecios(true)
+
+    const qs = new URLSearchParams({
+      bbox: serializarBBox(bbox),
+      operacion: filtros.operacion,
+      moneda: filtros.moneda,
+    })
+    fetch(`/api/mapa/precio-m2?${qs}`, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("No se pudo traer el precio por m²"))))
+      .then((d) => {
+        if (ctrl.signal.aborted) return
+        setCeldas(d.celdas || [])
+        setBarriosPrecio(d.barrios || [])
+      })
+      .catch((e) => { if (e.name !== "AbortError") toast.error(e.message) })
+      .finally(() => { if (enVueloPrecios.current === ctrl) setCargandoPrecios(false) })
+
+    return () => ctrl.abort()
+  }, [verPrecios, bbox, filtros.operacion, filtros.moneda])
+
+  // La escala se arma con lo que hay EN PANTALLA: ver cortesDeEscala().
+  const valoresM2 = useMemo(() => celdas.map((c) => c.mediana_m2), [celdas])
+  const cortesPrecio = useMemo(() => cortesDeEscala(valoresM2), [valoresM2])
+  const tramosPrecio = useMemo(
+    () => tramosDeReferencia(valoresM2, cortesPrecio, filtros.moneda),
+    [valoresM2, cortesPrecio, filtros.moneda],
+  )
 
   // ── El lapiz recorta en el navegador: cero consultas nuevas ──
   const visibles = useMemo(
@@ -234,6 +284,9 @@ export function MapaTab() {
             puntos del mapa se veian dibujados ENCIMA de la ficha abierta. */}
         <div className="relative isolate overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
           <MapaLienzo
+            celdasPrecio={verPrecios ? celdas : undefined}
+            cortesPrecio={cortesPrecio}
+            monedaPrecio={filtros.moneda}
             grupos={grupos}
             onMover={onMover}
             onAbrirGrupo={onAbrirGrupo}
@@ -254,6 +307,16 @@ export function MapaTab() {
             }`}
           >
             <Pencil className="h-4 w-4" />
+          </button>
+
+          <button
+            onClick={() => setVerPrecios((v) => !v)}
+            title={verPrecios ? "Ocultar el precio por m²" : "Ver el precio por m² por manzana"}
+            className={`absolute right-3 top-16 z-[500] flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-colors ${
+              verPrecios ? "bg-emerald-600 text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+            }`}
+          >
+            <DollarSign className="h-4 w-4" />
           </button>
 
           {lapizActivo && (
@@ -299,9 +362,18 @@ export function MapaTab() {
           )}
         </div>
 
-        {/* ── Panel de resultados ── */}
+        {/* ── Panel de la derecha: la lista, o el ranking de precios si esta prendido ── */}
         <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <MapaResultados propiedades={visibles} onAbrir={setFichaId} />
+          {verPrecios ? (
+            <MapaPanelPrecios
+              barrios={barriosPrecio}
+              tramos={tramosPrecio}
+              moneda={filtros.moneda}
+              cargando={cargandoPrecios}
+            />
+          ) : (
+            <MapaResultados propiedades={visibles} onAbrir={setFichaId} />
+          )}
         </div>
       </div>
 

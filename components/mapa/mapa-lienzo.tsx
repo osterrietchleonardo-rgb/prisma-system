@@ -3,7 +3,7 @@
 // El mapa en si. Este archivo SOLO se puede cargar con dynamic(..., { ssr: false }):
 // Leaflet toca `window` al importarse y tira el build si corre en el servidor.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Rectangle, Tooltip, useMap, useMapEvents } from "react-leaflet"
 import MarkerClusterGroup from "react-leaflet-cluster"
 import L from "leaflet"
 
@@ -14,6 +14,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css"
 import "leaflet.markercluster/dist/MarkerCluster.Default.css"
 
 import { MapaLapiz, TrazosDibujados, type Trazo } from "./mapa-lapiz"
+import { colorDe, formatearM2, type CeldaPrecio } from "@/lib/mapa/precio-m2"
 import type { BBox, FuenteMapa, GrupoUbicacion } from "@/lib/mapa/tipos"
 
 /** Centro por defecto: CABA. Se puede navegar a cualquier lado (hay 3 propiedades en Florida). */
@@ -302,6 +303,49 @@ function ControlVolver() {
 
 // ─────────────────────────────── el lienzo ───────────────────────────────
 
+/**
+ * Capa de precios: un rectangulo por cuadricula, pintado de verde a rojo.
+ *
+ * Va ANTES que los marcadores en el arbol para que quede por debajo: si tapara los
+ * globitos, no se podrian clickear. `interactive: false` ademas deja pasar el arrastre
+ * del mapa; solo el tooltip responde al pasar por encima.
+ */
+function CapaDePrecios({
+  celdas,
+  cortes,
+  moneda,
+}: {
+  celdas: CeldaPrecio[]
+  cortes: number[]
+  moneda: string
+}) {
+  return (
+    <>
+      {celdas.map((c) => (
+        <Rectangle
+          key={`${c.sur},${c.oeste}`}
+          bounds={[[c.sur, c.oeste], [c.norte, c.este]]}
+          pathOptions={{
+            color: colorDe(c.mediana_m2, cortes),
+            weight: 0.5,
+            fillOpacity: 0.45,
+            // El borde del mismo color: con borde oscuro, a la distancia la cuadricula se
+            // ve como una reja y tapa el mapa.
+            fillColor: colorDe(c.mediana_m2, cortes),
+          }}
+          interactive
+        >
+          <Tooltip direction="top" opacity={1}>
+            <span className="font-semibold">{formatearM2(c.mediana_m2, moneda)}/m²</span>
+            <br />
+            {c.propiedades} {c.propiedades === 1 ? "propiedad" : "propiedades"}
+          </Tooltip>
+        </Rectangle>
+      ))}
+    </>
+  )
+}
+
 export interface MapaLienzoProps {
   grupos: GrupoUbicacion[]
   onMover: (b: BBox) => void
@@ -310,6 +354,10 @@ export interface MapaLienzoProps {
   onAbrirCumulo: (gs: GrupoUbicacion[]) => void
   /** Que fondo quedo puesto, para poder avisarlo en pantalla. */
   onProveedor: (p: "maptiler" | "osm") => void
+  /** Cuadriculas del mapa de calor de $/m2. Vacio = capa apagada. */
+  celdasPrecio?: CeldaPrecio[]
+  cortesPrecio?: number[]
+  monedaPrecio?: string
   /** Cuando llega un rectangulo nuevo, el mapa se acomoda a el. */
   encuadrarA?: BBox | null
   lapizActivo?: boolean
@@ -325,6 +373,9 @@ export default function MapaLienzo({
   onAbrirGrupo,
   onAbrirCumulo,
   onProveedor,
+  celdasPrecio,
+  cortesPrecio = [],
+  monedaPrecio = "USD",
   encuadrarA = null,
   lapizActivo = false,
   trazos = [],
@@ -396,6 +447,11 @@ export default function MapaLienzo({
       preferCanvas
     >
       <FondoDelMapa onProveedor={onProveedor} />
+
+      {/* Antes de los marcadores: queda por debajo y no les roba el click. */}
+      {celdasPrecio && celdasPrecio.length > 0 && (
+        <CapaDePrecios celdas={celdasPrecio} cortes={cortesPrecio} moneda={monedaPrecio} />
+      )}
 
       <Vigia onMover={onMover} />
       <Encuadrar a={encuadrarA} />
