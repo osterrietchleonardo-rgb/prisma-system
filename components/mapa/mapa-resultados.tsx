@@ -48,10 +48,20 @@ export function MapaResultados({
   propiedades,
   onAbrir,
   onEnfocar,
+  desplazable = true,
 }: {
   propiedades: PropiedadMapa[]
   onAbrir: (id: string) => void
   onEnfocar?: (p: PropiedadMapa) => void
+  /**
+   * Si esta lista se encarga de su propio scroll.
+   *
+   * ScrollArea es `overflow-hidden` con un visor de `h-full`: necesita que le llegue una
+   * altura REAL por la cadena de padres. En el panel de la derecha llega; adentro de una
+   * ventana flotante no, y entonces recorta la lista sin dejar scrollear. Ahi se pasa
+   * `desplazable={false}` y el scroll lo pone la ventana con un alto explicito.
+   */
+  desplazable?: boolean
 }) {
   const ubicadas = propiedades.filter((p) => p.lat !== null && p.lng !== null)
   const sinUbicacion = propiedades.filter((p) => p.lat === null || p.lng === null)
@@ -75,9 +85,8 @@ export function MapaResultados({
     )
   }
 
-  return (
-    <ScrollArea className="h-full">
-      <div className="space-y-2 p-2">
+  const contenido = (
+    <div className="space-y-2 p-2">
         {sinUbicacion.length > 0 && (
           <p className="px-1 pb-1 text-[11px] text-amber-600 dark:text-amber-500">
             {sinUbicacion.length}{" "}
@@ -119,7 +128,8 @@ export function MapaResultados({
             </button>
           )
         })}
-      </div>
-    </ScrollArea>
+    </div>
   )
+
+  return desplazable ? <ScrollArea className="h-full">{contenido}</ScrollArea> : contenido
 }

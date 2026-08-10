@@ -2,12 +2,18 @@
 
 // Mapa · la ventana que lista propiedades: la del globito y la de un punto con varias.
 //
-// Las dos tenian el mismo defecto: la lista no scrolleaba. MapaResultados scrollea solo
-// (tiene su ScrollArea con h-full), pero h-full necesita que el padre TENGA una altura,
-// y estaba metido en un div de alto automatico. La cadena que hace falta es
-// `flex flex-col` en la ventana + `min-h-0 flex-1` en el cuerpo: sin el min-h-0 un hijo
-// flexible nunca se achica por debajo de su contenido y la lista desborda en vez de
-// scrollear.
+// Las dos tenian el mismo defecto: la lista no scrolleaba, quedaba recortada.
+//
+// El primer intento fue armar bien la cadena de flex (`flex flex-col` + `min-h-0 flex-1`)
+// y dejar que scrolleara el ScrollArea de la lista. NO ALCANZO: ese componente es
+// `overflow-hidden` con un visor de `h-full`, y `h-full` es un porcentaje que necesita
+// que el padre tenga una altura RESUELTA. Adentro de una ventana que se mide por
+// `max-h-[80vh]` eso no pasa de forma confiable, asi que el visor quedaba en cero y el
+// overflow-hidden recortaba sin barra.
+//
+// Ahora el scroll lo pone esta ventana, con alto explicito y overflow propio, y la lista
+// se dibuja sin su ScrollArea (`desplazable={false}`). Un div con max-height y
+// overflow-y-auto scrollea siempre, sin depender de ninguna cadena.
 import { useMemo, useState } from "react"
 import { MapPin, Search, X } from "lucide-react"
 import { MapaResultados } from "./mapa-resultados"
@@ -87,15 +93,18 @@ export function MapaListaModal({
           </div>
         )}
 
-        {/* min-h-0 es lo que habilita el scroll: sin el, este hijo crece con la lista y
-            la ventana desborda en vez de scrollear. */}
-        <div className="min-h-0 flex-1">
+        {/* El scroll va ACA, con un alto explicito y overflow propio. No se delega en el
+            ScrollArea de la lista: ese es `overflow-hidden` y necesita que le baje una
+            altura real por la cadena de padres, cosa que adentro de una ventana flotante
+            no pasa. El resultado era una lista recortada que no scrolleaba.
+            overscroll-contain evita que al llegar al final se empiece a mover el mapa. */}
+        <div className="max-h-[60vh] min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {filtradas.length === 0 ? (
             <p className="p-6 text-center text-sm text-zinc-500">
               Ninguna coincide con “{consulta.trim()}”.
             </p>
           ) : (
-            <MapaResultados propiedades={filtradas} onAbrir={onAbrir} />
+            <MapaResultados propiedades={filtradas} onAbrir={onAbrir} desplazable={false} />
           )}
         </div>
       </div>
