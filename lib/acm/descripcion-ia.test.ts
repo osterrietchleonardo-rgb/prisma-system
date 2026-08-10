@@ -31,6 +31,30 @@ describe("sanearDescripcionIA", () => {
   it("no rompe con espacios en blanco solamente", () => {
     expect(sanearDescripcionIA("   \n\n   ")).toBe("")
   })
+
+  it("descarta el análisis aunque esté mezclado en el mismo párrafo, sin salto de línea de por medio", () => {
+    // Forma de salida real: el modelo mete el "Análisis:" y la "Descripción:"
+    // en la misma prosa corrida, sin línea en blanco que las separe.
+    const t = "Análisis: se observan pisos de madera y buena luz. Descripción: Departamento de dos ambientes, luminoso."
+    expect(sanearDescripcionIA(t)).toBe("Departamento de dos ambientes, luminoso.")
+  })
+
+  it("descarta el análisis aunque las etiquetas vengan envueltas en markdown (negrita)", () => {
+    const t = "**Análisis:**\nSe observan pisos de madera y buena luz.\n\n**Descripción final:**\nDepto luminoso, dos ambientes."
+    expect(sanearDescripcionIA(t)).toBe("Depto luminoso, dos ambientes.")
+  })
+
+  it("no descarta un párrafo legítimo que arranca con 'Observaciones:' solo porque comparte texto con el análisis", () => {
+    // "Observaciones" no es palabra reservada del andamiaje: es una forma
+    // normal de arrancar un dato real de la propiedad (ver hallazgo Minor).
+    const t = "Análisis visual: se observan pisos de madera.\n\nObservaciones: apto profesional, sin cochera.\n\nDepartamento luminoso al frente."
+    expect(sanearDescripcionIA(t)).toBe("Observaciones: apto profesional, sin cochera. Departamento luminoso al frente.")
+  })
+
+  it("saca los cercos de markdown aunque no estén pegados al borde del string", () => {
+    const t = "Nota:\n```\nDepartamento luminoso al frente.\n```"
+    expect(sanearDescripcionIA(t)).toBe("Nota: Departamento luminoso al frente.")
+  })
 })
 
 describe("recortarAPalabra", () => {
@@ -64,5 +88,17 @@ describe("recortarAPalabra", () => {
     const r = recortarAPalabra("uno dos tres", 8)
     expect(r).toBe("uno dos")
     expect(r.endsWith(" ")).toBe(false)
+  })
+
+  it("no rompe con vacío", () => {
+    expect(recortarAPalabra("", 700)).toBe("")
+  })
+
+  it("no deja una coma colgando cuando el corte cae justo después de ella", () => {
+    // Con max=21 el límite de palabra cae exactamente después de la coma:
+    // "Departamento amplio," queda como una frase rota en la hoja impresa.
+    const r = recortarAPalabra("Departamento amplio, luminoso.", 21)
+    expect(r).toBe("Departamento amplio")
+    expect(r.endsWith(",")).toBe(false)
   })
 })
