@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { login, signInWithGoogle } from "@/lib/actions/auth"
@@ -11,12 +11,34 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Globe as Google, Loader2 } from "lucide-react"
 import AuthLoadingOverlay from "@/components/auth-loading-overlay"
 
+/**
+ * Solo se acepta como destino una ruta interna de la app.
+ * Sin esta validación se abre un open redirect: un mail malicioso podría
+ * mandar al asesor a un login falso después de iniciar sesión.
+ */
+export function rutaInternaSegura(valor: string | null | undefined): string | null {
+  if (!valor) return null
+  if (!valor.startsWith("/")) return null // http://…, javascript:…, rutas relativas
+  if (valor.startsWith("//") || valor.startsWith("/\\")) return null // //evil.com
+  if (/[\x00-\x1f\x7f]/.test(valor)) return null
+  if (valor.startsWith("/auth")) return null // evita volver al propio login
+  return valor
+}
+
 export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Hasta que React no toma el control del formulario, apretar "Ingresar" lo
+  // enviaría de forma nativa y el navegador dejaría email y CONTRASEÑA en la
+  // URL y en el historial. Con esto el botón no se puede tocar antes de tiempo.
+  const [listo, setListo] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
+
+  useEffect(() => {
+    setListo(true)
+  }, [])
 
   // Show error banners from admin-suspended redirects
   const errorParam = searchParams.get("error")
@@ -26,6 +48,9 @@ export default function LoginForm() {
       : errorParam === "session_revoked"
       ? "Tu sesión fue revocada por el administrador. Ingresá nuevamente."
       : null
+
+  // Destino original guardado por el middleware al expulsar (?next=/asesor/…)
+  const destinoOriginal = rutaInternaSegura(searchParams.get("next"))
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -71,7 +96,9 @@ export default function LoginForm() {
       // Esperamos el mínimo de visibilidad antes de navegar
       await minDisplay
 
-      if (role === "director") {
+      if (destinoOriginal) {
+        router.push(destinoOriginal)
+      } else if (role === "director") {
         router.push("/director/dashboard")
       } else if (role === "asesor") {
         router.push("/asesor/dashboard")
@@ -106,7 +133,9 @@ export default function LoginForm() {
             {suspendedMsg}
           </div>
         )}
-        <form onSubmit={handleSubmit} className="grid gap-4">
+        {/* method="post" es la red de seguridad: si algún envío nativo se
+            escapara igual, las credenciales viajan en el cuerpo y nunca en la URL. */}
+        <form onSubmit={handleSubmit} method="post" className="grid gap-4">
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" name="email" type="email" placeholder="nombre@ejemplo.com" required disabled={loading} className="bg-background/50" />
@@ -124,7 +153,7 @@ export default function LoginForm() {
             <Input id="password" name="password" type="password" required disabled={loading} className="bg-background/50" />
           </div>
           {error && <p className="text-sm text-destructive font-medium">{error}</p>}
-          <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={loading}>
+          <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={loading || !listo}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Ingresar
           </Button>

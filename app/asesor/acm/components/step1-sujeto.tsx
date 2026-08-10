@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
 interface Step1SujetoProps {
@@ -28,6 +29,14 @@ export function Step1Sujeto({ sujeto, onChange, onNext, hideNextButton }: Step1S
 
   const isValido = () => {
     return sujeto.direccion && sujeto.barrio && sujeto.m2_cubiertos > 0;
+  };
+
+  // Estado de obra: si la propiedad no tiene uso, los años de antigüedad no aplican (se limpian).
+  const sinUso = Boolean(sujeto.a_estrenar || sujeto.en_pozo);
+  const setEstadoObra = (campo: "a_estrenar" | "en_pozo", valor: boolean) => {
+    const next = { ...sujeto, [campo]: valor };
+    if (next.a_estrenar || next.en_pozo) next.antiguedad_anios = 0;
+    onChange(next);
   };
 
   return (
@@ -125,15 +134,41 @@ export function Step1Sujeto({ sujeto, onChange, onNext, hideNextButton }: Step1S
       <div className="space-y-4">
         <h3 className="text-lg font-bold border-b border-accent/10 pb-2">3. Características</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="space-y-2">
+          {/* Antigüedad + estado de obra. Una propiedad sin uso vale bastante más por m² que
+              una usada del mismo barrio, así que el ACM las compara por separado. */}
+          <div className="space-y-2 col-span-2">
             <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Antigüedad (Años)</Label>
-            <Input 
-              type="number"
-              min="0"
-              className="bg-card/50 border-accent/10 focus-visible:ring-accent"
-              value={sujeto.antiguedad_anios || ''}
-              onChange={(e) => onChange({...sujeto, antiguedad_anios: Number(e.target.value)})}
-            />
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <Input
+                type="number"
+                min="0"
+                disabled={sinUso}
+                className="bg-card/50 border-accent/10 focus-visible:ring-accent sm:w-28 disabled:opacity-50"
+                value={sujeto.antiguedad_anios || ''}
+                onChange={(e) => onChange({...sujeto, antiguedad_anios: Number(e.target.value)})}
+              />
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={Boolean(sujeto.a_estrenar)}
+                    onCheckedChange={(v) => setEstadoObra("a_estrenar", v === true)}
+                  />
+                  A estrenar
+                </label>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={Boolean(sujeto.en_pozo)}
+                    onCheckedChange={(v) => setEstadoObra("en_pozo", v === true)}
+                  />
+                  En pozo
+                </label>
+              </div>
+            </div>
+            {sinUso && (
+              <p className="text-xs text-muted-foreground">
+                Se compara solo contra propiedades del mismo estado (las usadas quedan afuera).
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Estado</Label>

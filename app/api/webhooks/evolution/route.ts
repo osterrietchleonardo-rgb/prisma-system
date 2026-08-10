@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { CLASIFICACION_CONSULTA } from '@/lib/whatsapp/clasificacion'
 import { triggerN8nWithSafetyNet } from '@/lib/whatsapp/n8nTrigger'
+import { actualizarEstadoEntrega } from '@/lib/whatsapp/delivery-status'
+import { buscarOCrearConversacion } from '@/lib/whatsapp/conversations'
 
 // El disparo a n8n hace hasta 3 intentos (timeout 15s c/u). Subimos el límite de
 // la función para que Vercel no la mate antes de terminar los reintentos.
@@ -23,6 +25,25 @@ export async function POST(req: Request) {
 
     const payload = await req.json()
     console.log(`[Evolution Webhook] Evento recibido: ${payload.event} para instancia: ${payload.instance}`)
+
+    // Actualización de estado de entrega de un mensaje SALIENTE (sent/delivered/read/failed).
+    // Evolution reemite los MESSAGES_UPDATE de Meta. Actualizamos wa_messages por wamid para
+    // que el chat muestre si el mensaje realmente llegó (clave con el número en calidad ROJA,
+    // donde Meta acepta pero descarta en silencio).
+    if (payload.event === 'messages.update') {
+      const upd = payload.data || {}
+      const wamid: string | undefined =
+        upd.key?.id || upd.keyId || upd.wamid || upd.id
+      const rawStatus =
+        upd.status ?? upd.update?.status ?? upd.message?.status
+      const errMsg =
+        upd.error?.message || upd.errors?.[0]?.title || upd.update?.error || null
+
+      if (wamid) {
+        await actualizarEstadoEntrega(supabase, wamid, rawStatus, errMsg)
+      }
+      return NextResponse.json({ success: true, message: 'status update processed' })
+    }
 
     // Solo procesar mensajes entrantes del lead
     if (payload.event !== 'messages.upsert') {
@@ -90,59 +111,58 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Instance not found' }, { status: 404 })
     }
 
-    // 2. Buscar o crear la conversación
-    let conversation_id: string
-    let botIsActive = true
+    // 2. Buscar o crear la conversación.
+    // Atomico a proposito: dos mensajes del mismo lead en paralelo tienen que
+    // terminar en UN solo chat. Ver lib/whatsapp/conversations.ts.
+    const COLUMNAS_CONV = 'id, bot_active, etiquetas, score, status, unread_count, funnel_status, next_follow_up_at, follow_ups_sent, opt_out, follow_ups_history, instance_id'
 
+    const { conv: convRow, creada, error: errConv } = await buscarOCrearConversacion<{
+      id: string
+      bot_active: boolean
+      instance_id: string | null
+      unread_count: number | null
+      etiquetas: string[] | null
+      score: number | null
+      status: string | null
+    }>(supabase, {
+      agency_id: instance.agency_id,
+      contact_phone: contactPhone,
+      columnas: COLUMNAS_CONV,
+      nueva: {
+        instance_id: instance.id,
+        contact_name: contactName,
+        status: 'active',
+        bot_active: true,
+        score: 0,
+        unread_count: 1,
+        etiquetas: [],
+        clasificacion: CLASIFICACION_CONSULTA,
+        last_message_at: new Date().toISOString(),
+        last_inbound_at: new Date().toISOString(),
+        next_follow_up_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+        requires_follow_up: true,
+        follow_ups_sent: 0,
+        funnel_status: 'open',
+      },
+    })
 
-    const { data: convs } = await supabase
-      .from('wa_conversations')
-      .select('id, bot_active, etiquetas, score, status, unread_count, funnel_status, next_follow_up_at, follow_ups_sent, opt_out, follow_ups_history')
-      .eq('instance_id', instance.id)
-      .eq('contact_phone', contactPhone)
-      .order('last_message_at', { ascending: false })
-      .limit(1)
-
-    const conv = convs && convs.length > 0 ? convs[0] : null
-
-    // Declarar fuera del bloque para que sea accesible globalmente
-    let newConv: typeof conv = null
-
-    if (!conv) {
-      const { data: createdConv, error: newConvErr } = await supabase
-        .from('wa_conversations')
-        .insert({
-          agency_id: instance.agency_id,
-          instance_id: instance.id,
-          contact_phone: contactPhone,
-          contact_name: contactName,
-          status: 'active',
-          bot_active: true,
-          score: 0,
-          unread_count: 1,
-          etiquetas: [],
-          clasificacion: CLASIFICACION_CONSULTA,
-          last_message_at: new Date().toISOString(),
-          last_inbound_at: new Date().toISOString(),
-          next_follow_up_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
-          requires_follow_up: true,
-          follow_ups_sent: 0,
-          funnel_status: 'open',
-        })
-        .select()
-        .single()
-
-      if (newConvErr || !createdConv) {
-        console.error('[Evolution Webhook] Error creando conversación:', newConvErr)
-        return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 })
-      }
-      newConv = createdConv
-      conversation_id = createdConv.id
-      botIsActive = true // Conversación nueva → bot activo por defecto
-    } else {
-      conversation_id = conv.id
-      botIsActive = conv.bot_active
+    if (!convRow) {
+      console.error('[Evolution Webhook] Error creando conversación:', errConv)
+      return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 })
     }
+
+    // `conv` = la conversación que YA existía (null si la acabamos de crear). El
+    // resto del handler usa esa distinción para decidir si actualizar o no.
+    const conv = creada ? null : convRow
+    const newConv = creada ? convRow : null
+
+    if (conv && !conv.instance_id) {
+      await supabase.from('wa_conversations').update({ instance_id: instance.id }).eq('id', conv.id)
+    }
+
+    const conversation_id: string = convRow.id
+    // Conversación nueva → bot activo por defecto
+    const botIsActive: boolean = creada ? true : convRow.bot_active
 
     const activeConv = conv ?? newConv
 

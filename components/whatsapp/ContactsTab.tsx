@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { importContacts, sendCampaignMessage, updateContactCampaignStatus, deleteContact } from "@/app/actions/whatsapp"
 import { getClasificacionStyle } from "@/lib/whatsapp/clasificacion"
+import { clasificacionesDe } from "@/lib/whatsapp/clasificaciones"
 import { normalizeArgPhone } from "@/lib/whatsapp/phone-ar"
 import type { WATemplate, WAContact } from "@/types/whatsapp"
 import { CampaignState } from "./CampaignState"
@@ -318,15 +319,21 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
     CampaignState.setActiveTab('campanas')
   }
 
+  // Las opciones salen de TODAS las clasificaciones que tuvo cada lead, no solo la de
+  // origen: si importaste una lista "Oferta-Julio", tiene que poder elegirse aunque
+  // esos contactos hayan entrado antes como "Whatsapp-Consulta".
   const clasifOptions = Array.from(
-    new Set(contacts.map(c => c.clasificacion).filter(Boolean) as string[])
+    new Set(contacts.flatMap(c => clasificacionesDe(c)))
   ).sort()
 
   const filteredContacts = contacts.filter(c => {
+    // Un lead aparece en el filtro de CUALQUIERA de sus clasificaciones: el que entró
+    // por consulta y después recibió la campaña "Oferta" sale en los dos.
+    const todas = clasificacionesDe(c)
     if (filterClasif !== "all") {
       if (filterClasif === "__none__") {
-        if (c.clasificacion) return false
-      } else if (c.clasificacion !== filterClasif) {
+        if (todas.length > 0) return false
+      } else if (!todas.includes(filterClasif)) {
         return false
       }
     }
@@ -335,7 +342,7 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
     return (
       c.name?.toLowerCase().includes(q) ||
       c.phone.includes(searchTerm) ||
-      (c.clasificacion?.toLowerCase().includes(q) ?? false)
+      todas.some(t => t.toLowerCase().includes(q))
     )
   })
 
@@ -464,11 +471,35 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
                      <td className="p-3">{contact.phone}</td>
                      <td className="p-3">
                        {(() => {
-                         const cl = getClasificacionStyle(contact.clasificacion)
+                         // Todas las clasificaciones por las que pasó el lead, en orden:
+                         // 1. de dónde vino, 2. en qué listas lo importaste, 3. qué
+                         // plantillas recibió. Numeradas para que se lea el recorrido.
+                         const todas = clasificacionesDe(contact)
+                         if (todas.length === 0) {
+                           const cl = getClasificacionStyle(null)
+                           return (
+                             <Badge variant="outline" className={`text-[9px] font-bold px-1.5 py-0 whitespace-nowrap ${cl.className}`}>
+                               {cl.label}
+                             </Badge>
+                           )
+                         }
                          return (
-                           <Badge variant="outline" className={`text-[9px] font-bold px-1.5 py-0 whitespace-nowrap ${cl.className}`}>
-                             {cl.label}
-                           </Badge>
+                           <div className="flex flex-wrap items-center gap-1 max-w-[240px]">
+                             {todas.map((valor, i) => {
+                               const cl = getClasificacionStyle(valor)
+                               return (
+                                 <Badge
+                                   key={valor}
+                                   variant="outline"
+                                   title={i === 0 ? "Origen del lead" : `Clasificación ${i + 1}`}
+                                   className={`text-[9px] font-bold px-1.5 py-0 whitespace-nowrap ${cl.className}`}
+                                 >
+                                   <span className="opacity-60 mr-0.5">{i + 1}.</span>
+                                   {cl.label}
+                                 </Badge>
+                               )
+                             })}
+                           </div>
                          )
                        })()}
                      </td>

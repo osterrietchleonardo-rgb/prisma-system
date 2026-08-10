@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
     mesSel,
     fxPeriodo: kpis.fx,
     fxFalta: kpis.fx === null,
+    fxLive: data.fxLive,
     kpisUsd: {
       ingresos: kpis.ingresos,
       costosIa: kpis.costosIa,

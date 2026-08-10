@@ -83,9 +83,10 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 
 **Qué muestra:** es una vista larga que reúne varias secciones, en este orden:
 - **Tarjetas (KPIs):** leads, captaciones, reservas y cierres totales, con variación porcentual.
+- **Handoffs sin atender:** los clientes que el bot le pasó a un asesor y **todavía nadie respondió** (ver detalle abajo).
 - **Gráficos:** evolución temporal (barras) y distribución por canal de origen (dona).
 - **Objetivos vs Alcanzado:** la sección de metas mensuales (ver detalle abajo), justo antes del ranking.
-- **Ranking de asesores:** quién rinde más en tu equipo.
+- **Ranking de asesores:** quién rinde más en tu equipo. **Vos ves todo, incluida la facturación de cada uno.**
 - **Inteligencia Conversacional:** el análisis profundo de WhatsApp (ver sección 22; vive acá adentro, no en el menú).
 - **Embudo (Pipeline):** resumen de leads por etapa.
 - **Leads y Propiedades:** secciones con el detalle de leads recientes y de la cartera.
@@ -94,6 +95,26 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 **Cómo usarlo:**
 - Es tu tablero de control diario. El ranking te ayuda a detectar quién necesita apoyo y quién está rindiendo.
 - Los KPIs se nutren de lo que el equipo carga en **Tracking Performance** y de los leads/visitas.
+
+### Handoffs sin atender
+
+**Qué es:** cuando un cliente le pide al bot hablar con una persona (o el bot se da cuenta de que no puede resolverlo), la conversación se le **pasa a un asesor** y se le manda un mail avisándole. A eso le decimos "handoff". Esta sección te muestra **cuáles de esos clientes siguen esperando** que alguien les conteste.
+
+**Qué muestra:**
+- Cuatro números arriba: **sin atender**, **críticos** (más de 24 horas esperando), **esperando respuesta** (el cliente siguió escribiendo y nadie le contestó) y **cuánto tarda tu equipo en promedio** en responder.
+- Abajo, la lista de clientes que esperan, **del que más tiempo lleva al que menos**, con el nombre del cliente, el asesor a cargo y hace cuánto espera.
+- Un semáforo: **azul** recién derivado, **amarillo** más de 2 horas, **rojo** más de un día.
+- La etiqueta naranja **"X sin responder"** es la más grave: significa que el cliente escribió mensajes después de que lo derivamos y nadie le contestó.
+
+**Cómo usarlo:**
+- Miralo todos los días, es lo primero que conviene revisar. Un cliente que pidió hablar con una persona es un cliente **caliente**: ya levantó la mano.
+- Tocá cualquier fila y vas directo a esa conversación de WhatsApp.
+- Si un mismo asesor te aparece seguido en rojo, ahí tenés una conversación pendiente con él.
+- Los filtros de arriba del dashboard (asesor y fechas) también aplican acá: podés mirar solo los handoffs de una persona o de un período.
+
+> ⚠️ **Importante:** que el asesor haya recibido el mail no cuenta como atendido. Cuenta solo cuando **escribe en la conversación desde PRISMA**. Si tu equipo responde desde su WhatsApp personal, el sistema no lo ve y te va a figurar como pendiente.
+
+> 💡 **Tip:** si la sección no aparece es porque no hubo ninguna derivación en el período elegido. Si aparece con el cartel verde, están todas atendidas.
 
 ### Objetivos vs Alcanzado
 
@@ -105,6 +126,25 @@ Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, m
 - Un **gráfico de evolución** del total de la inmobiliaria: barras de objetivo vs alcanzado por mes, más una línea con el % de cumplimiento.
 
 > 💡 **Tip:** si la sección dice que no hay objetivos cargados, andá a **Tracking Performance → Objetivos** y cargalos. El "alcanzado" se llena solo con la actividad del equipo.
+
+> 🔒 **Qué ve el asesor de todo esto.** Vos ves la tabla completa. Cada asesor, en su propio dashboard, ve **solo su fila** de "Objetivos vs Alcanzado" y su propio gráfico: las metas y el cumplimiento de sus compañeros no los ve. En el **Ranking** sí ve la tabla entera (posición, chats, prelistings, ACM, captaciones, cierres, cartera, rotación y la clasificación de todos), pero la columna **Facturación** solo la ve en su propia fila; en las demás le figura **"Privado"**. Es así por diseño: el asesor sabe dónde está parado, sin enterarse de cuánto factura el de al lado.
+
+### Tu informe de los lunes
+
+**Qué es:** todos los lunes a la mañana te llega un email con lo que pasó la semana anterior. No hay que entrar a ningún lado ni pedirlo: llega solo, y lo recibís únicamente vos (el director fundador de la agencia).
+
+**Qué muestra:**
+- Arriba de todo, cinco números: cuántas consultas nuevas entraron, cuántas conversaciones le pasó el sistema a un asesor, cuántos clientes pidieron coordinar una visita, qué porcentaje de esas derivaciones fue atendido, y cuántos de esos clientes quedaron cargados en Tracking Performance.
+- Después, el detalle por asesor de **Handoffs**: cuánto tardó cada uno en contestarle al cliente (menos de una hora, entre una y cuatro, entre cuatro y un día, más de un día, o directamente sin atender). Acá el bot ya se apagó, así que si nadie contestó, el cliente se quedó esperando — es la misma información que ves a diario en "Handoffs sin atender" (arriba en esta sección), resumida por semana.
+- Una sección de **Coordinación de visita** con tres columnas en vez de un solo número. Es a propósito: cuando un cliente pide visitar una propiedad, el asistente le avisa por email al asesor pero sigue conversando con el cliente. El asesor puede haberlo llamado por teléfono sin escribir nada en el sistema, así que las tres columnas te dicen qué rastro dejó: si escribió en el chat, si quedó la visita cargada, o si al menos abrió el email. La columna **"Sin rastro"** son los casos donde no hay ninguna señal de que alguien haya hecho algo: son los que conviene preguntar.
+- La última sección te muestra cuántos de los clientes que el sistema derivó esa semana terminaron cargados como actividad en Tracking Performance. Si ese número es bajo, significa que los clientes están llegando pero no se están registrando.
+
+**Cómo usarlo:**
+- No hace falta que hagas nada para recibirlo: se manda solo, con la semana ya cerrada (lunes a domingo).
+- Es un buen punto de partida para la charla semanal con el equipo: te da, de un vistazo, quién está respondiendo rápido y quién se está quedando atrás.
+- Si un asesor te aparece con muchos "sin atender" o mucho "sin rastro", valen las mismas preguntas que en "Handoffs sin atender": puede ser que esté respondiendo por su WhatsApp personal en vez de por PRISMA, y el sistema no lo puede ver.
+
+> 💡 **Tip:** el número de "Coordinación de visita" no es lo mismo que "Handoffs". Un handoff apaga el bot; un aviso de visita no. Por eso pueden pedirte cosas distintas: en un handoff, si nadie respondió, el cliente quedó realmente sin nadie; en una coordinación de visita, "sin rastro" quiere decir que no hay evidencia dentro de PRISMA, pero el asesor pudo haber llamado igual.
 
 ---
 
@@ -169,11 +209,44 @@ En la ficha de cada propiedad, debajo de la descripción de Tokko, está el bloq
 **Qué es:** el registro de actividad comercial del equipo, que **alimenta el Dashboard**. Como director, además podés definir cuánto puntúa cada acción y **fijar los objetivos mensuales** de cada asesor.
 
 Tenés **3 solapas**:
-1. **Actividad:** el historial de actividad del equipo (ver, filtrar, cargar nuevas).
+1. **Actividad:** el historial de actividad del equipo (ver, filtrar, cargar nuevas). Como director ves un **filtro por asesor** (desplegable en orden alfabético) que te permite ver solo la actividad de un asesor específico o de todos. También tenés un **filtro de fechas** (mismo selector que el Dashboard: presets Hoy/Mes/Trimestre/Año/Últimos 30 o rango a mano) para acotar el historial a un período; se combina con el resto de los filtros y **"Limpiar"** lo resetea.
 2. **Objetivos:** dónde fijás las metas mensuales por asesor (ver detalle abajo).
 3. **Configuración IA:** ajustás las escalas (qué puntaje da cada acción: llamada, captación, prelisting, etc.). Esto define cómo se calculan los KPIs.
 
+> 📌 **Cambio (jul-2026): se fue el nombre "Tasaciones" y apareció ACM como métrica aparte.** Son **dos cosas distintas y ahora ves las dos**:
+>
+> - **Prelist.** — los **prelistings que tu equipo carga a mano** en Tracking Performance. Es exactamente el mismo número que antes: solo le cambiamos el nombre, porque la columna decía "Tasac." pero nunca contó tasaciones. En las tarjetas es "Volumen Prelisting", y de ahí siguen saliendo el Pipeline Potencial y el Ticket Promedio.
+> - **ACM** — las **fichas de ACM que el asesor genera de verdad** en el módulo ACM. Es columna nueva en el Ranking y 4ta línea de la tarjeta Prelisting. **No se carga a mano: se cuenta sola.** Por eso es un dato más honesto, no depende de que alguien se acuerde de registrarlo.
+>
+> Si escribiste **reglas propias** en Configuración IA: la variable vieja `tasaciones` ahora se llama `prelisting`, y se sumó `acm` como variable nueva. **Tus reglas viejas siguen funcionando igual** — dejamos el nombre `tasaciones` andando a propósito y apunta a los prelistings, que es lo que siempre midió. Cuando las edites, conviene pasarlas a `prelisting` y decidir si querés que `acm` cuente también.
+
+### Dos formas de ver la actividad: Lista y Pipeline
+
+Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos botones: **Lista** y **Pipeline**.
+
+- **Lista** es lo de siempre: el historial de actividades del equipo, una fila por registro.
+- **Pipeline** es un **tablero**: cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy. Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
+
+**Cómo leerlo como director — es la foto del equipo:**
+- El número arriba de cada columna te dice **cuántos clientes hay en cada etapa**. Ahí ves el embudo real: si tenés 40 en Prospección y 2 en Reserva, sabés exactamente dónde se está trabando el equipo.
+- Cada tarjeta muestra, además del cliente y la propiedad, **el nombre del asesor** que la trabaja.
+- Con el **filtro por asesor** (el desplegable de la fila de abajo) ves el tablero de una sola persona: útil para una reunión de seguimiento uno a uno.
+- Las tarjetas van **de la más reciente a la más antigua**. Las que quedan abajo de todo en una columna son, literalmente, **los clientes que nadie tocó hace más tiempo**.
+- Si un cliente entró por Tokko y también por WhatsApp, es **una sola tarjeta** (se unen por el celular): no se te duplica el embudo.
+
+**Mover un cliente de etapa:** se arrastra la tarjeta, o se usa el menú de **tres puntitos → "Mover a…"**. Si la etapa destino es nueva para ese cliente, se abre el formulario y pide los datos de esa etapa (queda registrada como una actividad normal). Si es una etapa por la que ya pasó, se mueve sin pedir nada.
+
+> ⚠️ **Mover tarjetas no toca tus números.** Volver un cliente para atrás **no borra actividades ni cambia ningún KPI** del Dashboard. Queda registrado quién lo movió y cuándo, pero las métricas y el ranking se siguen calculando solo con la actividad realmente cargada. Es una herramienta de orden, no una forma de maquillar resultados.
+
+**Trazabilidad por cliente:** al tocar una tarjeta se abre un panel con **toda la historia de ese cliente** en orden: cada actividad cargada y cada movimiento de etapa, con fecha y con acceso a editar. Es la auditoría completa del caso.
+
+> ⚠️ **Ahora el cliente es obligatorio** al cargar cualquier actividad (para el equipo y para vos). Sin cliente vinculado no se puede armar la tarjeta. Las actividades viejas sin cliente se siguen viendo en la vista Lista y el tablero avisa cuántas son con un cartel amarillo; hay que editarlas y vincularles el cliente.
+
+> 💡 **Tip de gestión:** abrí el Pipeline filtrado por un asesor antes de cada reunión. En 5 segundos ves cuántos clientes tiene en cada etapa y cuáles están frenados hace semanas — mucho más rápido que leer el historial fila por fila.
+
 **Formulario de registro (igual que el asesor):** zona/barrio, propiedad de Tokko o de colaboración, vincular cliente (Tokko o WhatsApp), registro manual de lead nuevo y origen de consulta. El registro manual pide **nombre completo, celular, email y etiqueta**. El celular se carga eligiendo el **país** (lista con bandera) y escribiendo el número natural; el sistema lo normaliza al formato de WhatsApp (para AR agrega el "9" móvil aunque no se ponga el 15) y muestra el preview. Lleva **doble verificación** de nombre/celular/email (se reescriben sin copiar/pegar, con aviso ✅/❌) y una **casilla de certificación** obligatoria de que los datos son veraces. Como director, al cargar podés **elegir a qué asesor** corresponde.
+
+> **Excepción en Prospección:** el email figura como *(Opcional)* y se puede dejar vacío **sólo** cuando la actividad es Prospección, porque en el primer contacto el asesor muchas veces tiene únicamente el celular. En Prelisting, Prebuying, Captación, Reserva y Cierre sigue siendo obligatorio igual que antes. Y aunque sea opcional no se afloja el control: si el asesor escribe un email, tiene que estar bien formado y doble-verificado igual que siempre.
 
 ### Solapa "Objetivos" (fijar metas mensuales)
 
@@ -226,10 +299,46 @@ Vas a ver un **asistente de configuración** que te guía paso a paso para conec
 - **📣 Campañas:** dos modos:
   - **Campaña automática por segmento (recomendada para masivo):** elegís una **clasificación** (ej. `reclutamiento`) + una **plantilla** y tocás **"Crear campaña"** (queda lista, en cola, sin enviar). Después confirmás con **"🚀 Lanzar ahora"**: empieza a enviar **en el acto** y sigue **solo, en goteo diario, hasta tu límite real de Meta**, marca enviados y **no repite**, hasta terminar todo el segmento (aunque cierres el navegador). **No tenés que entrar a GitHub ni a ningún lado.** Podés **pausar/eliminar** y ver el **progreso** (enviados/total, en cola, errores). El estado de cada lead se ve en **Contactos** (EN COLA → ENVIADO/ERROR + fecha).
   - **Envío manual puntual:** solo para **grupos chicos o individuales** (corre en el navegador, hay que dejar la pestaña abierta).
-  - **🤖 Bot IA en las respuestas (en los dos modos):** antes de enviar, un **interruptor** decide si los chats que cree esa campaña nacen con la **IA prendida** (cuando el contacto responde, el bot le contesta — ideal para **captación de clientes**) o **apagada** (los chats quedan en **modo manual** — ideal para **reclutamiento** u otros envíos que **no son clientes**, donde no querés que la IA responda). Viene **prendido por defecto**. **Solo afecta a chats nuevos**: si la persona ya tenía un chat abierto, no se le cambia nada. En el listado de campañas se ve una etiqueta **"Bot IA"** / **"Sin bot"**.
+  - **🤖 Bot IA en las respuestas (en los dos modos):** antes de enviar, un **interruptor** decide si los chats que cree esa campaña nacen con la **IA prendida** (cuando el contacto responde, el bot le contesta — ideal para **captación de clientes**) o **apagada** (los chats quedan en **modo manual** — ideal para **reclutamiento** u otros envíos que **no son clientes**, donde no querés que la IA responda). Viene **prendido por defecto**. En el listado de campañas se ve una etiqueta **"Bot IA"** / **"Sin bot"**.
+    > ⚠️ **Tenelo en cuenta:** el interruptor se aplica a **todos** los chats de la campaña, también a los de gente que **ya tenía un chat abierto**. Si un asesor le había puesto el bot a mano de otra forma, la campaña se lo cambia. Es a propósito: manda la campaña.
+    > 🧭 **La clasificación se acumula, no se pisa.** Un lead puede tener varias y la columna las muestra en orden: `1. Whatsapp-Consulta` `2. Oferta-Julio` `3. oferta_julio_2026`. Es el recorrido: de dónde vino, en qué listas lo importaste y qué plantillas recibió.
+    > - **Filtrás por cualquiera de ellas.** Si buscás `Whatsapp-Consulta` te aparece; si buscás la plantilla `oferta_julio_2026`, ese mismo lead **también** aparece. Sirve para ver en la bandeja quiénes recibieron una plantilla puntual, sin necesidad de una columna por campaña.
+    > - **Al importar no se duplica nada.** Si el teléfono ya está en la agenda, se le **suma** la clasificación de la lista nueva: mismo contacto, mismo chat, sin perder de dónde venía. Antes esos contactos se salteaban y quedaban fuera del lote.
+    > - **Las plantillas que mandás clasifican solas**, no tenés que cargar nada. Si la campaña va a un segmento, manda **el nombre que le pusiste al lote** cuando importaste (ej. `Oferta-Julio`), no el nombre técnico de la plantilla: un solo badge, no dos parecidos. El nombre de la plantilla se usa solo cuando la campaña va a todos los contactos, o en el envío manual puntual.
+    > - Los seguimientos automáticos del sistema (recordatorios de visita, reactivación) **no** clasifican, para no ensuciar la lista.
 - **⚙️ Configuración IA:** definís el comportamiento del bot (cómo responde, conocimiento, etc.).
 
 Arriba a la derecha, un **indicador de conexión** te muestra si la instancia está conectada.
+
+### Desde el celular
+
+El chat en el teléfono está armado para que veas **la conversación y nada más**. Arriba quedan solo cuatro cosas: la **flecha para volver**, el **nombre del cliente**, el **interruptor del bot** y el botón de **información ⓘ**.
+
+- **El interruptor del bot** dice *IA* cuando está respondiendo y *Manual* cuando lo apagaste.
+- **El botón ⓘ** abre la ficha completa: etiquetas, teléfono, score, quién lo atiende, línea de tiempo, visita agendada y propiedades recomendadas. Las **etiquetas se agregan y se sacan desde ahí**.
+- **Para escribir** hay una sola barra abajo que se agranda sola. El **clip 📎** adjunta archivos y el **candado 🔒** cambia a **nota interna**: la barra se pone amarilla y avisa *"el cliente no la ve"*, así nadie del equipo le manda una nota al cliente por error.
+
+Todo lo que dejó de estar arriba (teléfono, email del asesor, score, etiquetas) **no se borró**: está adentro del ⓘ. Desde la computadora se ve exactamente igual que siempre.
+
+> 💡 **Tip para el equipo:** en el celular aparece un **círculo flotante abajo a la derecha** que lleva directo a la bandeja. El **número rojo** son las conversaciones que el bot derivó a una persona y **nadie contestó todavía** — el mismo dato del panel de handoffs del dashboard. Es el número que conviene mirar todos los días: cada uno es un cliente esperando.
+
+### El bot entiende fotos y audios
+
+Cuando un cliente manda una **foto** (la captura de un aviso, el frente de un edificio, un plano) o un **audio**, el bot la mira o lo escucha y responde sobre eso, sin quedarse callado. Los **videos** también entran al chat, aunque todavía no se analiza su contenido.
+
+Sigue valiendo la regla de siempre: **el bot no inventa**. Si de una captura no puede confirmar una publicación, lo dice y pide el link en lugar de improvisar datos.
+
+> ⚠️ **Por qué importa:** antes de julio de 2026 esto no funcionaba y **más de la mitad de los clientes que mandaban una foto se quedaban sin ninguna respuesta**, sin que quedara ningún aviso de error. Si notás conversaciones cortadas de antes de esa fecha, puede ser esta la causa.
+
+### Cuando el bot no contesta: qué mirar
+
+El bot tiene un **filtro de seguridad** que descarta spam, publicidad de otros rubros e intentos de manipulación. Ese filtro es el que decide si el mensaje llega o no al asistente, y cuando descarta **no queda ningún error visible**: la conversación simplemente no avanza.
+
+Por eso, si un cliente dice que escribió y nadie le contestó:
+1. Fijate en la bandeja si el mensaje del cliente está pero no hay respuesta del bot.
+2. Avisale a soporte con el teléfono y la hora: se puede revisar exactamente por qué se descartó.
+
+> 💡 **Un caso real:** los leads que llegan de MercadoLibre, ZonaProp o Argenprop entran con un **link** en el mensaje, y el filtro los estaba tomando por publicidad. Cinco consultas reales quedaron sin respuesta antes de detectarlo. Ya está corregido, y esos leads ahora tienen prioridad — son los más valiosos que recibe la agencia.
 
 ### Avisos automáticos por email al asesor
 
@@ -240,6 +349,8 @@ Cuando el bot detecta que un cliente avanza, **le manda un email al asesor asign
 - **Visita agendada:** el cliente coordinó una visita y se deriva al asesor para el seguimiento.
 
 Así el equipo no pierde oportunidades: el asesor se entera por email aunque no tenga PRISMA abierto.
+
+> 🔐 Si al abrir un link de PRISMA (por ejemplo, el del aviso de lead) la app pide **iniciar sesión de nuevo**, después de entrar lleva **directo a donde iba** el usuario, sin dejarlo en la pantalla de inicio. Con la sesión ya abierta, entra sin que le pida nada.
 
 ### Seguimientos automáticos
 
@@ -327,9 +438,16 @@ Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **
 **Qué podés hacer:**
 - **Invitar asesores:** generá un **código de invitación**. El asesor se registra con ese código y queda vinculado a tu agencia.
 - **Ver el rendimiento real de cada asesor:** cada tarjeta muestra datos reales tomados de la actividad cargada (Captaciones, Cierres, Cartera activa y % de Rotación), más una etiqueta de estado (Activo / Pausado / Desvinculado). Al hacer clic se abre un panel con su embudo de conversión.
+- **Clasificar a un asesor (Client Director / Client Support):** en cada tarjeta tenés dos botones. Tocá uno y el asesor queda marcado con esa clasificación (la ves arriba, en "Rol:"). Tocá **el mismo botón otra vez** y se deselecciona. Si no elegís ninguno, queda simplemente como **Asesor**. Es una **etiqueta interna tuya, para ordenar al equipo: no cambia los permisos ni lo que la persona ve en el sistema** (sigue entrando como asesor, exactamente igual que antes).
 - **Pausar un asesor (temporal):** para cuando necesitás dejarlo fuera un tiempo (licencia, motivos internos) sin darlo de baja. Al pausar te pide un **motivo obligatorio**. El asesor pausado **queda deslogueado y no puede volver a entrar** hasta que lo reactivés; si intenta ingresar ve "Tu cuenta ha sido suspendida" (nunca ve el motivo). El mismo botón cambia a **Reactivar** para devolverle el acceso al instante. Su **email no se bloquea**, así que reactivarlo es inmediato.
 - **Desvincular un asesor:** lo quita del equipo y **le bloquea el acceso al sistema con ese email** (no podrá volver a ingresar). Al desvincular también te pide un **motivo**. Es una acción más fuerte que la pausa y pide confirmación.
 - **Trazabilidad:** cada pausa, reactivación y desvinculación queda registrada con **motivo, fecha y qué director la hizo**. Mientras un asesor está pausado, en su ficha (panel lateral) ves el **motivo, la fecha y quién lo pausó** (esto lo ves solo vos como director; el asesor no).
+- **El desvinculado desaparece del resto del sistema:** apenas lo desvinculás deja de aparecer en el **ranking del Dashboard**, en los **Objetivos**, y en **todas las listas donde elegís un asesor** (filtros de Dashboard, Tracking, Pipeline y Calendario; asignar un lead; asignar una visita; créditos de IA). Así no se te mezcla gente que ya no está con tu equipo actual. **Donde sí lo seguís viendo es acá, en Asesores, filtrando por "Eliminados"**: esa lista es tu registro histórico y no se toca.
+- **Sus números NO se pierden:** lo que ese asesor cerró, captó o facturó **sigue sumando a los totales de la inmobiliaria**. Si hizo 3 cierres el año pasado, esos 3 cierres siguen contando en la facturación del año. Lo único que desaparece es su nombre de las listas; la plata que entró por su trabajo queda.
+- **Los pausados sí siguen apareciendo en todos lados.** La pausa es temporal y la persona sigue siendo de tu equipo, así que la seguís viendo en el ranking y podés seguir asignándole cosas para cuando vuelva.
+- **Eliminar definitivamente (solo para perfiles cargados por error):** en el menú **⋮** de cada tarjeta. Es para cuando un asesor **se cargó dos veces** o se creó por equivocación. **Borra el perfil por completo: se pierde el historial de esa persona**, no queda ni en la lista de "Eliminados" y no hay forma de deshacerlo. El cartel te lo avisa antes de confirmar y te pide un **motivo**.
+  - **No podés borrar por error a alguien real:** antes de dejarte confirmar, el sistema revisa si esa persona tiene trabajo cargado. Si tiene aunque sea un lead, una propiedad o una visita, **te frena** y te dice exactamente qué encontró (por ejemplo *"tiene 49 leads, 17 propiedades a su nombre"*). Ahí la opción correcta es **Desvincular**, que le conserva todo.
+  - Solo te deja avanzar cuando el perfil **no tiene nada** — que es justo lo que pasa con un duplicado.
 
 **Invitaciones (Configuración → Inmobiliaria):** hay dos cajitas, **Invitación de Asesores** e **Invitación de Directores**.
 - En cualquiera: escribí el **nombre de la persona** a invitar y apretá **Generar Código**. El nombre queda pegado al código (lo ves aunque todavía no se haya registrado).
@@ -383,8 +501,27 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 > ℹ️ Si cambiás de modo (a mano / cartera / link), el formulario **se limpia** para no mezclar datos de una carga con otra.
 
-> 💡 Tipo, operación **y barrio** son filtros estrictos: **todos los comparables son del mismo barrio** que la propiedad analizada (reconoce sub-barrios como Belgrano R/C y no le afectan los acentos). El **checklist compara todo lo que tiene dato real** (suma **dormitorios** y **antigüedad**; si falta un dato, dice "sin dato" y no baja el puntaje). Trae **hasta 50 por bloque**, ordenados por comparabilidad, de **tu cartera** y de la **red de colaboración**.
+> 💡 Tipo y operación son filtros estrictos. El **barrio puntúa por cercanía** en vez de ser un sí/no: mismo barrio exacto primero, después el sub-barrio de al lado (Belgrano R, Belgrano Chico) y por último el barrio limítrofe (Núñez, Colegiales), siempre con **menos puntaje**, de modo que uno de otro barrio nunca le gana a uno del mismo. Esto recupera comparables que se perdían porque la red carga la **misma cuadra** con barrios distintos. Además el sistema compara **metros cubiertos contra metros cubiertos** (antes los medía contra la superficie total, con terreno incluido, y las casas con lote grande quedaban afuera), muestra **un solo aviso** cuando está repetido y **ya no devuelve la propiedad analizada como comparable de sí misma**. El **checklist compara todo lo que tiene dato real** (suma **dormitorios** y **antigüedad**; si falta un dato, dice "sin dato" y no baja el puntaje). Trae **hasta 50 por bloque**, ordenados por comparabilidad, de **tu cartera** y de la **red de colaboración**.
+> 🏠 **¿Considerar PH? (solo en Casas):** al analizar una **Casa** aparece la casilla **"Considerar PH"**, tildada por defecto (no cambia nada). Como los **PH** suelen figurar como "casa" en los portales, si querés comparar **solo casas puras**, **destildala** antes de buscar. En cualquier otro tipo de propiedad la casilla no aparece.
+> 🏗️ **¿A estrenar o en pozo?** Al lado de "Antigüedad" hay dos casillas, **"A estrenar"** y **"En pozo"** (se pueden tildar las dos); al tildar alguna, el campo de años se apaga. Una propiedad sin uso vale **entre 18 % y 36 % más el m²** que una usada del mismo barrio (medido con datos reales de la red), así que mezclarlas desvía la tasación. Tildada, compara **solo contra propiedades del mismo estado**; sin tildar, deja afuera las a estrenar y las de pozo. Si la propiedad se elige **desde la cartera**, la casilla **se tilda sola** según lo que figure en Tokko. En **terrenos** no aplica.
 > 💰 No consume créditos por buscar comparables.
+
+> 📄 **Al imprimir o guardar el informe como PDF**, el archivo se descarga con un **nombre claro**: **`ACM - Dirección - Mes Año`** (ej. `ACM - Arcos 2825 - Julio 2026`), así cada tasación queda con su nombre y no se pisan en la carpeta de descargas (fallback `ACM - Mes Año` si falta la dirección).
+
+### Mis ACM (historial de tu equipo)
+
+Arriba de todo tenés dos solapas: **Nuevo ACM** y **Mis ACM**.
+
+**Cada análisis se guarda solo**, sin que nadie tenga que apretar "guardar". Como director, en **Mis ACM** ves **todos los ACM de tu agencia** —los tuyos y los de cada asesor, con el nombre de quién lo hizo—; el asesor solo ve los suyos.
+
+Cada fila guarda la propiedad analizada y **todos los comparables** que aparecieron (cartera + red de colaboración, con su % y su checklist):
+
+- **Tocá una fila** y se abre la **misma pantalla de resultados**, tal como quedó ese día (aunque después esas publicaciones hayan cambiado o se hayan dado de baja).
+- Si de ese ACM salió una **ficha para el cliente**, la fila tiene el botón **"Ficha"** con el link directo.
+- Si desde el mismo ACM se arma **otra ficha**, queda **una fila por cada ficha**.
+- Se puede **borrar** del historial; si la ficha ya se compartió, **el link sigue funcionando**.
+
+> 💡 Sirve para dos cosas: que nadie repita trabajo ya hecho, y que vos veas **qué se está tasando, en qué zonas y con qué comparables** se lo está mostrando al cliente.
 
 ### Crear una ficha para el cliente
 
@@ -392,14 +529,16 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 
 1. Tocá **"Crear ficha"** (arriba a la derecha de los resultados).
 2. **Marcá** los comparables a incluir (se pueden mezclar los de la **cartera** y los de la **red de colaboración**). Cada uno ocupa **una hoja** con **todas sus fotos** y características.
-3. Tocá **"Crear ficha"** en la barra de abajo: se abre un **link público** listo para compartir.
-4. En esa página están **"Descargar PDF"** (para enviar por mail/WhatsApp) y **"Compartir"** (copia el link).
+3. Tocá **"Continuar"** en la barra de abajo: se abre una ventana con las **conclusiones del estudio** ya calculadas, que podés **editar, ampliar o sacar** (destildá "Incluir la sección de conclusiones").
+4. Tocá **"Crear ficha"**: se abre un **link público** listo para compartir.
+5. En esa página están **"Descargar PDF"** (para enviar por mail/WhatsApp) y **"Compartir"** (copia el link).
 
 **Qué trae la ficha:**
-- **Portada** con la propiedad de referencia, los datos de quien la crea y la fecha.
-- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes) y todas las fotos + características.
-- **Hoja final** con la **comparación de valores por m²** (promedio y desvío de cada comparable respecto del cierre de **su propia zona**) y los **datos de contacto** de quien la generó.
-- El **logo** y el **aviso legal** en el pie de cada hoja (si están cargados).
+- **Portada** con la propiedad de referencia y la fecha.
+- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes), una **descripción breve** de la propiedad (resumida en pocas líneas, sin la letra chica ni los datos de contacto de quien publicó el aviso) y todas las fotos + características.
+- **Hoja final** con la **matriz comparativa de valores por m²** (con **promedios de superficie, precio y $/m²**), el gráfico **"La Pirámide del Precio"** (por qué un precio alto apaga la demanda), las **conclusiones** revisadas y los **datos de contacto** de quien la generó.
+- En la tarjeta de contacto, sobre el nombre: si la ficha la hizo el **director** dice "Director/a"; si la hizo un **asesor**, aparece **la clasificación que le pusiste** (Client Director / Client Support, o "Asesor/a" si no le asignaste ninguna, desde la pestaña **Asesores**).
+- El **logo** y el **aviso legal** en el pie de cada hoja (si están cargados). El logo se **recorta y agranda solo** para que se vea grande y nítido, cualquiera sea el archivo que subas.
 
 > 💡 **Tip:** la ficha toma los **colores, el logo y el aviso legal** que definís en **Marketing IA → Identidad Visual**. Si el logo o el aviso legal no están cargados, simplemente no aparecen (y si no hay colores, usa un diseño elegante por defecto). Configurarlos una vez mejora todas las fichas que creen tus asesores.
 > 💰 Crear la ficha **no consume créditos**.
@@ -411,12 +550,14 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 **Qué es:** la agenda de visitas de la agencia. Como director **ves las visitas de todos** y podés **filtrar por asesor**.
 
 **Cómo agendar una visita (botón "Agendar Visita"):**
-1. **Información del lead** — 3 formas: desde **Tokko**, desde **WhatsApp**, o **carga manual** (nombre completo, celular, email y etiqueta). El celular se carga con **selector de país** + número natural (normalizado al formato WhatsApp con preview). La carga manual exige **doble verificación** de nombre/celular/email (reescribir sin copiar/pegar, con aviso ✅/❌) y tildar la **casilla de certificación** de que los datos son veraces antes de agendar.
+1. **Información del lead** — 3 formas: desde **Tokko** (desplegable con los leads de la agencia que recopila nombre, teléfono y email con tarjeta de vista previa), desde **WhatsApp**, o **carga manual** (nombre completo, celular, email y etiqueta). El celular se carga con **selector de país** + número natural (normalizado al formato WhatsApp con preview). La carga manual exige **doble verificación** de nombre/celular/email (reescribir sin copiar/pegar, con aviso ✅/❌) y tildar la **casilla de certificación** de que los datos son veraces antes de agendar.
 2. **Detalle de la cita:** fecha, hora.
    - **Propiedad (Tokko):** si elegís un asesor, la lista se filtra automáticamente a **sus** propiedades.
    - **Propiedad (Colaboración):** texto libre para una propiedad externa.
 3. **Calificación y perfil:** operación, presupuesto, calificación (HOT/WARM/COLD), intereses, objeciones, decisores.
 4. **Gestión y asignación:** elegís el **asesor responsable** y el **origen de consulta**.
+
+> **Contactos repetidos:** si el celular ya existe en la inmobiliaria, la visita se agenda igual. El sistema mira de quién es el **chat**: si no es de nadie, pasa a ser del asesor que agenda; si ya es de otro asesor, le avisa de quién es y lo deja agendar sin tocarle nada. Vos, como director, ves toda la agenda y todos los chats de la agencia, y podés reasignar. Los contactos que importás desde **Contactos** quedan a tu nombre en la agenda y **no aparecen en ninguna bandeja hasta que se envía la campaña**.
 
 **Acciones sobre visitas futuras (solo las tuyas):**
 - Igual que el asesor, podés **Reprogramar / Editar** y **Cancelar**, pero **solo en las visitas que tenés asignadas a vos** (las que agendaste para vos mismo). En las visitas de tus asesores ves el **detalle completo** pero **sin** botones de acción (esas las maneja el asesor responsable).
@@ -436,6 +577,7 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 
 > 💡 **Tip:** probalo después de subir documentos para verificar que el Tutor "aprendió" bien tu material.
 > 💰 1 crédito por mensaje.
+> 📱 **En el celular** la conversación ocupa toda la pantalla. Las charlas anteriores se abren con la **pestañita del reloj ⏱ pegada al borde izquierdo**; al elegir una, el panel se cierra solo, y también se cierra tocando fuera de él. Lo mismo vale para el Buscador IA.
 
 ---
 
@@ -467,6 +609,8 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 ### Compartir ficha con el cliente
 
 Cuando vos o tus asesores hacen una búsqueda en el **Buscador IA** y abren el detalle de una propiedad (en los resultados), tienen el botón **"Compartir ficha"**: genera una **página de presentación profesional y de lujo** (con un link que se copia solo) para mandarle al cliente por WhatsApp. Muestra fotos, precio, datos, y la **tarjeta de contacto del asesor que la generó** (su WhatsApp y email), pintada con los **colores y el logo de tu inmobiliaria**.
+
+En las propiedades de la **red de colaboración**, la descripción se muestra **resumida y ordenada** por secciones (Superficie · Interior · Ubicación · Edificio), siempre completa y **sin la letra chica ni los datos de contacto de la inmobiliaria que publicó el aviso**: el cliente ve la propiedad, no a la competencia.
 
 > 🎨 **Importante para vos:** esos colores, la tipografía y el logo salen de **Marketing IA → Configuración IA**. Si los configurás bien, **todas las fichas que compartan tus asesores salen con tu identidad de marca**. Si no, usan un diseño elegante por defecto.
 > 🔒 El cliente externo **no** ve de qué portal salió la propiedad (es info interna), ni puede acceder al sistema desde el link: es solo una vitrina de presentación de solo lectura.

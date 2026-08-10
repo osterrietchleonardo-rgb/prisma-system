@@ -33,6 +33,8 @@ interface Metricas {
   mesSel: string
   fxPeriodo: number | null
   fxFalta: boolean
+  fxEsAuto?: boolean
+  fxLive?: number | null
   kpisUsd: {
     ingresos: number; costosIa: number; gastosFijos: number; gastosVariables: number
     costosTotal: number; mc: number; ebit: number; dol: number | null; margenPct: number | null
@@ -310,14 +312,17 @@ export default function FinanzasClient() {
       </div>
       {syncMsg && <div style={{ marginBottom: 16, fontSize: 12, color: "rgba(255,255,255,0.5)" }}>{syncMsg}</div>}
 
-      {/* Aviso FX faltante en ARS */}
-      {moneda === "ARS" && data.fxFalta && (
-        <div style={{ ...card, padding: "12px 16px", marginBottom: 16, borderColor: "rgba(245,158,11,0.3)", background: "rgba(245,158,11,0.08)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ color: "#fbbf24", fontSize: 13 }}>⚠ No cargaste el tipo de cambio de {mesLabel(mesSel)}. Cargalo para ver los montos en pesos:</span>
-          <input placeholder="USD→ARS (ej. 1250)" value={fxInput} onChange={(e) => setFxInput(e.target.value)} style={{ ...inputStyle, width: 140 }} />
-          <button onClick={saveFx} style={{ ...inputStyle, cursor: "pointer", background: "#B87333", border: "none", fontWeight: 600 }}>Guardar</button>
+      {/* Banner de información de tipo de cambio / FX (100% Automático) */}
+      {fx !== null ? (
+        <div style={{ ...card, padding: "10px 16px", marginBottom: 16, borderColor: "rgba(16,185,129,0.3)", background: "rgba(16,185,129,0.06)", display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12.5, color: "#34d399", fontWeight: 600 }}>
+            ⚡ Cotización automática en vivo de Pulso de Mercado (dolarapi.com): ${fx.toLocaleString("es-AR")} ARS/USD (Dólar Blue)
+          </span>
+          <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>
+            Actualización automática
+          </span>
         </div>
-      )}
+      ) : null}
 
       {/* KPIs fila 1 */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 14 }}>

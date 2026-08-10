@@ -189,7 +189,8 @@ export default function AsesorConfiguracionPage() {
         const res = await fetch("/api/asesor/creditos")
         if (res.ok) {
           const d = await res.json()
-          setCreditData(d)
+          // `aplica: false` = quien pregunta no es asesor y no tiene cuota propia.
+          if (d?.aplica !== false) setCreditData(d)
         }
       } finally {
         setCreditLoading(false)

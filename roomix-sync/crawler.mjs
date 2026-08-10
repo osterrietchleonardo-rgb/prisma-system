@@ -17,6 +17,7 @@ import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { condensarDescripcion } from './condensar-descripcion.mjs';
 
 chromium.use(stealthPlugin());
 
@@ -411,15 +412,33 @@ async function fetchSitemaps(context) {
 
 // Lee id+lastmod de TODA la BD una sola vez (Map id→lastmod). Sirve para el diff
 // EN MEMORIA zona por zona, sin re-leer las 54k filas en cada zona.
+//
+// Paginado POR CLAVE (`id > último`), no por `.range(offset)`: con offset, Postgres tiene que
+// recorrer y descartar todas las filas anteriores en cada página, y pasadas ~100k filas la
+// consulta moría con "canceling statement due to statement timeout". Antes ese error solo
+// cortaba el barrido (`break`) y devolvía el mapa a medias, EN SILENCIO — la tabla ya pasó las
+// 150k filas, así que dejaba de ver el final del catálogo: lo trataba como "nuevo" y lo
+// re-crawleaba de más, en vez de avanzar sobre lo que de verdad falta. Por clave, cada página
+// cuesta lo mismo sin importar cuán grande sea la tabla.
 async function loadExistingMap() {
   const map = new Map();
-  let from = 0; const step = 1000;
+  let ultimoId = '';
+  const step = 1000;
   while (true) {
-    const { data, error } = await supabase.from('roomix_properties').select('id, lastmod').order('id', { ascending: true }).range(from, from + step - 1);
-    if (error) { log('❌', 'Error leyendo catálogo:', error.message); break; }
+    let data, error;
+    for (let intento = 1; intento <= 3; intento++) {
+      const q = supabase.from('roomix_properties').select('id, lastmod').order('id', { ascending: true }).limit(step);
+      ({ data, error } = ultimoId ? await q.gt('id', ultimoId) : await q);
+      if (!error) break;
+      log('⏳', `Lectura de catálogo fallida (${intento}/3): ${error.message}`);
+      await sleep(2000 * intento);
+    }
+    // Sin el catálogo completo no se puede diferenciar nuevo/existente con confianza: mejor
+    // abortar la corrida entera que crawlear/borrar mal con un mapa a medias.
+    if (error) { log('❌', 'No se pudo leer el catálogo completo, aborto la corrida:', error.message); process.exit(1); }
     for (const r of (data || [])) map.set(r.id, r.lastmod);
     if (!data || data.length < step) break;
-    from += step;
+    ultimoId = data[data.length - 1].id;
   }
   return map;
 }
@@ -513,8 +532,7 @@ function parseAgent(html) {
 // en los <script>self.__next_f.push([1,"..."])</script>. Ese objeto tiene barrio/ciudad/
 // región estructurados, antigüedad, expensas, m² total y cubierto, piso, fecha de
 // publicación, teléfono, índices geo H3, el LINK ORIGINAL del portal (ZonaProp/ML), etc.
-// El JSON-LD se queda como respaldo. Anclamos la extracción al slug de la propiedad para
-// no confundirnos con objetos de "propiedades similares" que la página también embebe.
+// El JSON-LD se queda como respaldo.
 function buildRscBlob(html) {
   const pushes = [...html.matchAll(/self\.__next_f\.push\(\[1,"((?:[^"\\]|\\.)*)"\]\)/g)].map(m => m[1]);
   return pushes.join('')
@@ -525,16 +543,30 @@ function buildRscBlob(html) {
 function parseInternal(html, slug) {
   try {
     const blob = buildRscBlob(html);
-    // Ventana del objeto principal: anclada al slug (id único de la ficha). operation_type
-    // viene ~1500 chars antes del slug; phone/h3 vienen después. Tomamos un margen amplio.
-    let win = blob;
-    const slugIdx = slug ? blob.indexOf(`"slug":"${slug}"`) : -1;
-    if (slugIdx !== -1) {
-      win = blob.slice(Math.max(0, slugIdx - 2200), slugIdx + 900);
+    // Ventana del objeto de detalle: anclada a "characteristics-section", el id del <div> de
+    // la ficha que Roomix usa para inyectar TODO el objeto "property" de una sola vez (operación,
+    // tipo, precio, expensas, ubicación completa, superficies, antigüedad, piso, fecha de
+    // publicación, teléfono, geo H3 y el link original del portal — verificado: los campos caen
+    // entre +300 y +1650 caracteres del ancla). GOTCHA real (detectado ago-2026): antes anclábamos
+    // al slug de la propiedad, pero Roomix reordenó el payload y este bloque quedó ~80.000
+    // caracteres más adelante. La ventana vieja seguía "encontrando" cosas (total_area_m2,
+    // location_city, un operation_type) porque hay un objeto previo parcial cerca del slug —
+    // así que no tiraba error, pero perdía en silencio cubierta/antigüedad/expensas/fecha/
+    // teléfono/piso: 0% de captura desde el crawl de agosto. Si el marcador no está en la página,
+    // se cae al respaldo viejo por slug/operation_type (por si algún template lo omite).
+    let win = null;
+    const csIdx = blob.indexOf('"characteristics-section"');
+    if (csIdx !== -1) {
+      win = blob.slice(csIdx, csIdx + 2200);
     } else {
-      const opIdx = blob.indexOf('"operation_type"');
-      if (opIdx === -1) return null;
-      win = blob.slice(Math.max(0, opIdx - 400), opIdx + 2000);
+      const slugIdx = slug ? blob.indexOf(`"slug":"${slug}"`) : -1;
+      if (slugIdx !== -1) {
+        win = blob.slice(Math.max(0, slugIdx - 2200), slugIdx + 900);
+      } else {
+        const opIdx = blob.indexOf('"operation_type"');
+        if (opIdx === -1) return null;
+        win = blob.slice(Math.max(0, opIdx - 400), opIdx + 2000);
+      }
     }
     const str = (re) => { const m = win.match(re); return m && m[1] != null ? m[1] : null; };
     const num = (re) => { const m = win.match(re); return m && m[1] != null ? parseFloat(m[1]) : null; };
@@ -600,7 +632,24 @@ function resolveOperation(internal, jsonLd, title) {
   return titleOp || internalOp || bfOp;
 }
 
-function mapToRow(jsonLd, agent, entry, internal) {
+// La descripción del JSON-LD viene CORTADA por Roomix a 500 caracteres, y corta a mitad de
+// palabra ("...- 2 dormitorios - El pri"): así se veía en la ficha compartida y en el ACM.
+// El texto COMPLETO está en el cuerpo de la ficha (div.whitespace-pre-wrap), sin tags adentro.
+function parseDescripcionCompleta(html) {
+  const m = html.match(/<div class="whitespace-pre-wrap[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+  if (!m) return null;
+  const texto = m[1]
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(Number(d)))
+    .trim();
+  return texto || null;
+}
+
+function mapToRow(jsonLd, agent, entry, internal, descripcionCompleta) {
   const off = jsonLd.offers || {}, me = jsonLd.mainEntity || {}, add = me.address || {};
   const geo = jsonLd.geo || me.geo || {}, fs = me.floorSize || jsonLd.floorSize || {};
 
@@ -614,7 +663,11 @@ function mapToRow(jsonLd, agent, entry, internal) {
 
   return {
     id: entry.id, slug: entry.slug, canonical_url: entry.loc,
-    title: jsonLd.name || null, description: jsonLd.description || null,
+    title: jsonLd.name || null,
+    // Descripción: se arma con el texto COMPLETO de la ficha y se condensa a ≤500 caracteres
+    // ordenados (Superficie · Interior · Ubicación · Edificio), sin la letra chica ni el
+    // contacto de la inmobiliaria publicante. Respaldo: el JSON-LD cortado, como antes.
+    description: condensarDescripcion(descripcionCompleta || jsonLd.description || '') || jsonLd.description || null,
     operation: resolveOperation(internal, jsonLd, jsonLd.name),
     price: off.price ? parseFloat(off.price) : null, currency: off.priceCurrency || null,
     property_type: me['@type'] || null,                 // se mantiene el valor JSON-LD (no romper ACM)
@@ -685,7 +738,7 @@ async function extractProperty(page, entry, retries = 0) {
     if (!jsonLd) { log('⚠️', `Sin JSON-LD: ${entry.id}`); return null; }
 
     const internal = parseInternal(html, entry.slug);
-    const row = mapToRow(jsonLd, parseAgent(html), entry, internal);
+    const row = mapToRow(jsonLd, parseAgent(html), entry, internal, parseDescripcionCompleta(html));
     const txt = [row.title, row.description, row.neighborhood, (row.amenities || []).join(', ')].filter(Boolean).join(' ').trim();
     if (txt) row.embedding = await generateEmbedding(txt);
 
@@ -856,4 +909,4 @@ if (isMain) {
   main().catch(err => { console.error('💥 Fatal:', err); process.exit(1); });
 }
 
-export { parseInternal, parseJsonLd, parseAgent, mapToRow, resolveOperation, deriveCountry, buildRscBlob, collectSeed, initBrowser, extractProperty, processBatch };
+export { parseInternal, parseJsonLd, parseAgent, mapToRow, parseDescripcionCompleta, resolveOperation, deriveCountry, buildRscBlob, collectSeed, initBrowser, extractProperty, processBatch };

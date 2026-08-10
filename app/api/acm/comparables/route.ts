@@ -3,12 +3,15 @@
 // El precio se devuelve aparte (NO entra en el %).
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { generateEmbedding } from "@/lib/gemini";
 import {
   sujetoAmbientes,
   sujetoDormitorios,
   sujetoAntiguedad,
+  sujetoEstadoObra,
+  obraAdmiteSinDato,
   sujetoM2,
   sujetoToEmbeddingText,
   propTypePatterns,
@@ -44,13 +47,17 @@ function propAmenities(tokko_data: any): string[] {
 
 export async function POST(req: Request) {
   try {
-    const { agencyId } = await requireTenant();
+    const { userId, agencyId } = await requireTenant();
     const supabase = await createClient();
 
     const body = await req.json();
     const sujeto = (body.sujeto || {}) as Partial<Sujeto>;
     const operacion: Operacion = body.operacion === "alquiler" ? "alquiler" : "venta";
     const excludeId: string | null = body.exclude_id || null; // si el sujeto vino de la cartera
+    // Considerar PH: por defecto SÍ (no cambia nada). Solo se excluyen los PH cuando el
+    // sujeto es Casa Y el cliente destildó la casilla. Cualquier otro caso → false.
+    const considerarPh = body.considerar_ph !== false;
+    const excludePh = sujeto.tipo_propiedad === "casa" && considerarPh === false;
     // Sin límites artificiales: el gate de barrio ya acota el universo; traemos todos los
     // comparables del barrio (tope alto por performance del render, configurable por request).
     const limit = Math.min(Number(body.limit) || 50, 100);
@@ -59,6 +66,9 @@ export async function POST(req: Request) {
     const ambientes = sujetoAmbientes(sujeto);
     const dormitorios = sujetoDormitorios(sujeto);
     const antiguedad = sujetoAntiguedad(sujeto);
+    // Estado de obra: a estrenar / en pozo solo comparan contra su mismo estado.
+    const obra = sujetoEstadoObra(sujeto);
+    const obraSinDato = obraAdmiteSinDato(operacion);
     const banos = sujeto.banos && sujeto.banos > 0 ? sujeto.banos : null;
     const loc = locPatterns(sujeto);
     const amen = amenityTokens(sujeto.amenidades);
@@ -92,6 +102,12 @@ export async function POST(req: Request) {
         p_loc_patterns: loc,
         p_amenities: amen,
         p_exclude_id: excludeId,
+        p_exclude_ph: excludePh,
+        p_obra: obra,
+        p_obra_sin_dato: obraSinDato,
+        p_barrio: sujetoZona,
+        p_zona_niveles: true,
+        p_m2_cubierta: true,
         p_limit: limit,
       }),
       supabase.rpc("acm_match_roomix", {
@@ -105,6 +121,14 @@ export async function POST(req: Request) {
         p_antiguedad: antiguedad,
         p_loc_patterns: loc,
         p_amenities: amen,
+        p_exclude_ph: excludePh,
+        p_obra: obra,
+        p_obra_sin_dato: obraSinDato,
+        p_barrio: sujetoZona,
+        p_zona_niveles: true,
+        p_m2_cubierta: true,
+        p_dedup: true,
+        p_excluir_sujeto: true,
         p_limit: limit,
       }),
     ]);
@@ -140,7 +164,9 @@ export async function POST(req: Request) {
     ]);
 
     const tipoLabel = sujeto.tipo_propiedad || "—";
-    const sujetoForChecklist = { tipo: tipoLabel, zona: sujetoZona, m2, ambientes, dormitorios, banos, antiguedad, amenities: sujetoAmenLabels };
+    // En el checklist el estado de obra pisa el número de años (fmtAnios: 0 = a estrenar, -1 = en pozo).
+    const antiguedadLabel = sujeto.en_pozo ? -1 : sujeto.a_estrenar ? 0 : antiguedad;
+    const sujetoForChecklist = { tipo: tipoLabel, zona: sujetoZona, m2, ambientes, dormitorios, banos, antiguedad: antiguedadLabel, amenities: sujetoAmenLabels };
 
     const cartera: AcmComparable[] = (carteraFull.data || [])
       .map((p: any): AcmComparable | null => {
@@ -222,9 +248,34 @@ export async function POST(req: Request) {
       .filter((x): x is AcmComparable => x !== null)
       .sort((a, b) => b.match_pct - a.match_pct);
 
+    // Historial "Mis ACM": guardamos la búsqueda con su snapshot de comparables para poder reabrirla.
+    // Si falla, la búsqueda igual se devuelve (el historial no puede romper el ACM).
+    let searchId: string | null = null;
+    try {
+      const { data: saved, error: saveErr } = await createAdminClient()
+        .from("acm_searches")
+        .insert({
+          agency_id: agencyId,
+          user_id: userId,
+          operacion,
+          sujeto,
+          exclude_id: excludeId,
+          resultados: { cartera, roomix, con_semantica: Boolean(embStr) },
+          total_cartera: cartera.length,
+          total_roomix: roomix.length,
+        })
+        .select("id")
+        .single();
+      if (saveErr) throw saveErr;
+      searchId = saved?.id ?? null;
+    } catch (e) {
+      console.error("ACM: no se pudo guardar la búsqueda en el historial:", e);
+    }
+
     return NextResponse.json({
       cartera,
       roomix,
+      search_id: searchId,
       meta: {
         operacion,
         con_semantica: Boolean(embStr),

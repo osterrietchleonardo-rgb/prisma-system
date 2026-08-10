@@ -145,11 +145,17 @@ El middleware intercepta TODAS las requests y aplica:
    - Rutas públicas excluidas: `/`, `/auth/*`, `/api/webhooks/*`, `/api/n8n/*`, `/api/cron/*`, `/api/messages/*`, `/api/whatsapp/dispatch`
    - Rutas protegidas: Todo bajo `/(director)/*` y `/(asesor)/*` requiere sesión activa
    
-3. **Refresh de Sesión:** Refresca tokens de Supabase en cada request
+3. **Refresh de Sesión:** Refresca tokens de Supabase en cada request, con dos exclusiones deliberadas:
+   - **Prefetch de Next.js** (header `next-router-prefetch: 1`): los links que el navegador precarga no son navegaciones reales.
+   - **Archivos estáticos de `/public`** (logos, `og-image`, `sw.js`): excluidos directamente en el `matcher`.
+
+   El motivo es la rotación de refresh token de Supabase: si varios requests paralelos refrescan con el mismo token, los que llegan tarde reciben `refresh_token_already_used` y Supabase revoca la familia entera, dejando la sesión muerta. Era lo que echaba a los asesores desde el celular. La protección no se debilita: los layouts de `/asesor` y `/director` validan la sesión igual.
+
+   Config de Auth asociada: `jwt_exp` 24 h, `security_refresh_token_reuse_interval` 30 s, `sessions_timebox` y `sessions_inactivity_timeout` en 0 (la sesión no caduca). Detalle completo en TECNICO §5.1.1.
 
 4. **Redirección Inteligente:**
    - Si el usuario está autenticado y va a `/auth/*` → redirige a su dashboard
-   - Si no está autenticado y va a ruta protegida → redirige a `/auth/login`
+   - Si no está autenticado y va a ruta protegida → redirige a `/auth/login?next=<ruta+query>`, **guardando el destino** para volver ahí después de loguearse (ver 4.2)
 
 ### 3.2 Headers de Seguridad (`next.config.mjs`)
 
@@ -222,7 +228,8 @@ La pantalla de registro tiene dos pestañas según la **intención** (`mode`), n
 4. Verificación de estado:
    - Si `profile.status === 'pausado'` → error "Cuenta pausada"
    - Si `profile.status === 'eliminado'` → error "Cuenta eliminada"
-5. Redirige a `/director/dashboard` o `/asesor/dashboard` según rol
+5. Redirige al **destino guardado** si el middleware pasó un `?next` válido (ej. el chat de un lead abierto desde el email de aviso); si no, a `/director/dashboard` o `/asesor/dashboard` según rol
+   - `next` se valida con `rutaInternaSegura()` (`components/auth-login-form.tsx`): solo rutas internas (empieza con `/`, no `//` ni `/\`, no `/auth`, sin caracteres de control) → evita **open redirect**
 
 ### 4.4 Login con Google (OAuth)
 
@@ -277,7 +284,7 @@ Endpoint que los layouts consultan para verificar si la cuenta sigue activa. Ret
 
 | Sección | Ruta | Descripción |
 |---|---|---|
-| Mi Dashboard | `/asesor/dashboard` | KPIs personales |
+| Mi Dashboard | `/asesor/dashboard` | KPIs personales (con filtro de fechas) |
 | Pulso de Mercado | `/asesor/mercado` | Datos de mercado |
 | Mi Pipeline | `/asesor/pipeline` | Leads asignados |
 | Mis Propiedades | `/asesor/propiedades` | Propiedades asignadas |
@@ -307,7 +314,26 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 - **`profiles`** — Perfil de usuario (id, email, full_name, role, agency_id, phone, avatar_url, status, created_at)
 - **`agencies`** — Agencias inmobiliarias (id, name, logo_url, tokko_api_key, address, phone, email, invite_code, owner_id, performance_config, marketing_ai_config, buscador_ia_config, created_at)
 - **`agency_invites`** — Códigos de invitación (agency_id, code, **role** [`director`/`asesor`], **invitee_name**, is_used, used_at, used_by). El `role` define qué será la persona al registrarse; `invitee_name` es el nombre del invitado (visible antes de usarse). RLS: cualquier **director** de la agencia ve y crea códigos (lista compartida); validación pública por código sin usar. Un director puede **borrar** cualquier código de su agencia (usado o no) desde Configuración → el borrado limpia la lista pero **no** desvincula a quien ya lo usó.
-- **`equipo_acciones`** — Bitácora de acciones del director sobre asesores (agency_id, asesor_id, ejecutado_por, tipo_accion [`pausa`/`reanudacion`/`desvinculacion`], motivo, created_at). Da trazabilidad: quién hizo qué, a quién, cuándo y por qué. Solo se accede desde el servidor (RLS deny-all).
+- **`equipo_acciones`** — Bitácora de acciones del director sobre asesores (agency_id, asesor_id, ejecutado_por, tipo_accion [`pausa`/`reanudacion`/`desvinculacion`/`eliminacion_definitiva`], motivo, created_at). Da trazabilidad: quién hizo qué, a quién, cuándo y por qué. Solo se accede desde el servidor (RLS deny-all).
+
+##### Regla: qué pasa con un asesor desvinculado
+
+Un asesor con `profiles.estado = 'eliminado'` **no figura en ninguna lista de asesores del panel del director**: ni en el ranking del Dashboard, ni en Objetivos, ni en los desplegables donde se elige a alguien (filtros de Dashboard/Tracking/Pipeline/Calendario, asignar lead, asignar visita, créditos de IA). La única excepción es la **página de Asesores**, que tiene su propio filtro por estado y funciona como registro histórico.
+
+Los **pausados no se filtran**: la pausa es reversible y la persona sigue siendo del equipo.
+
+**Su historial no se pierde.** Los KPIs de la agencia (facturación, cierres, captaciones) se calculan desde `performance_logs` por `agency_id`, **no** desde la lista de asesores, así que desvincular a alguien **no mueve los totales**: sus operaciones siguen sumando al año. Lo único que desaparece es su fila del ranking y su nombre de los desplegables. Por la misma razón, la actividad pasada de un ex-asesor **sigue mostrando su nombre** en el feed del Dashboard (la lista se filtra en memoria, no en la consulta).
+
+**Desvincular ≠ eliminar definitivamente.** Son dos acciones con propósitos opuestos:
+
+| | Desvincular | Eliminar definitivamente |
+|---|---|---|
+| Para quién | persona real que se fue | duplicado / cargado por error |
+| Qué hace | marca `estado='eliminado'`, bloquea el email | **borra la fila** de `profiles` |
+| Historial | se conserva (queda en el filtro "Eliminados") | se pierde, sin rastro del perfil |
+| Límite | ninguno | **se niega** si el perfil tiene trabajo real encima |
+
+El borrado definitivo **no puede destruir el historial de alguien real**: antes de ejecutarse mide qué tiene el perfil asociado y sólo permite avanzar si no hay nada de trabajo (ni leads, ni propiedades, ni actividad). Esto es obligatorio porque 7 de las 33 FKs contra `profiles` son `ON DELETE CASCADE` — entre ellas `performance_logs` —, así que un borrado sin control borraría la actividad registrada en silencio.
 
 #### Propiedades y Leads
 - **`properties`** — Propiedades sincronizadas (id, tokko_id, agency_id, assigned_agent_id, title, description, price, currency, property_type, status, address, city, bedrooms, bathrooms, total_area, covered_area, images[], tokko_data, embedding vector(768))
@@ -319,12 +345,12 @@ El esquema está definido en `supabase/schema.sql`. Las tablas principales son:
 
 #### WhatsApp
 - **`whatsapp_instances`** — Instancias de WhatsApp (id, agency_id, token, phone_number_id, business_id, evo_instance_name, integration_type, templates_status, flows_active)
-- **`wa_conversations`** — Conversaciones/chats (id, agency_id, instance_id, contact_phone, contact_name, status, bot_active, unread_count, last_message_at, last_inbound_at, etiquetas[], **clasificacion** (origen del lead), score, pipeline_stage, funnel_status, visit_status [none|scheduled|confirmed|completed|no_show|cancelled], visit_scheduled_at, visit_address, follow_ups_sent, follow_ups_history, requires_follow_up, recovery_stage, next_follow_up_at, opt_out, metricas jsonb). `visit_status`/`visit_scheduled_at`/`visit_address` los gobierna el calendario vía trigger (ver §26.5), no el bot.
+- **`wa_conversations`** — Conversaciones/chats. **Un solo chat por teléfono y agencia** (`UNIQUE (agency_id, contact_phone)`, ago-2026): lo garantiza la base, no el código, porque dos mensajes del mismo lead atendidos en paralelo pueden crear dos chats. Campos: (id, agency_id, instance_id, contact_phone, contact_name, status, bot_active, unread_count, last_message_at, last_inbound_at, etiquetas[], **clasificacion** (origen del lead), score, pipeline_stage, funnel_status, visit_status [none|scheduled|confirmed|completed|no_show|cancelled], visit_scheduled_at, visit_address, follow_ups_sent, follow_ups_history, requires_follow_up, recovery_stage, next_follow_up_at, opt_out, metricas jsonb). `visit_status`/`visit_scheduled_at`/`visit_address` los gobierna el calendario vía trigger (ver §26.5), no el bot.
 - **`wa_contacts`** — Agenda de contactos para campañas (id, agency_id, **agent_id** (dueño), phone, name, tags[], **clasificacion**, metadata, campaign_statuses, last_campaign_*). Tabla **separada** de `wa_conversations`: la solapa "Contactos" lee de acá; se sincroniza por teléfono con las conversaciones. `UNIQUE (agency_id, phone)`. **Visibilidad por asesor:** cada asesor ve **solo sus contactos** (los que cargó/importó, o los del lead que tiene asignado); el **director ve todos** los de la agencia. Lo garantiza la RLS (no un filtro de la pantalla).
 - **`wa_messages`** — Mensajes individuales (id, conversation_id, agency_id, content, role, message_type, wamid, metadata)
 - **`wa_templates`** — Templates de WhatsApp (id, agency_id, template_name, status, components, rejection_reason, meta_template_id)
 - **`n8n_chat_histories`** — Historial de chat para n8n (session_id = conversation_id, message jsonb)
-- **`wa_campaigns`** / **`wa_campaign_recipients`** — Campañas masivas por **goteo diario**: la campaña apunta a una clasificación (segmento) + una plantilla, y guarda `bot_active_on_reply` (si los chats nuevos nacen con el bot IA prendido o apagado); cada destinatario tiene su estado (pending/sent/error). Un cron envía cada día hasta el **límite real de Meta**, marca enviados y **no repite** (idempotente, aunque se pause/reanude).
+- **`wa_campaigns`** / **`wa_campaign_recipients`** — Campañas masivas por **goteo diario**: la campaña apunta a una clasificación (segmento) + una plantilla, y guarda `bot_active_on_reply` (si los chats nuevos nacen con el bot IA prendido o apagado); cada destinatario tiene su estado (`pending` → `sending` → `sent`/`error`, + `claimed_at`). Un cron envía cada día hasta el **límite real de Meta** y **no repite**: el lead se reserva (`sending`) *antes* de mandar nada, así ni un corte a mitad de corrida ni dos corridas superpuestas pueden mandarle la plantilla dos veces (ver 9.4).
 
 > **Clasificación del lead (`clasificacion`):** identifica el origen y se muestra como badge de color (con filtro) en Leads WhatsApp, Contactos y la bandeja. Valores: `Whatsapp-Consulta` (entró por consulta de WhatsApp), `Whatsapp-Manual` (alta manual desde Tracking o Calendario), o **personalizada** (definida por el usuario al importar en Contactos; "Importado" por defecto). Registros previos quedan en "Sin clasificar". Se mantiene sincronizada por teléfono entre `wa_conversations` y `wa_contacts`.
 
@@ -506,6 +532,7 @@ Evolution API actúa como intermediario entre PRISMA y WhatsApp Business.
    - Construye `enrichedPayload` con toda la información
    - Dispara POST a `N8N_WEBHOOK_URL` vía `triggerN8nWithSafetyNet` (**3 intentos**, timeout 15s c/u, backoff 500/1000ms)
    - **Red de contención (anti "lead perdido"):** si los 3 intentos fallan, el disparo se guarda en `wa_n8n_dead_letter` (`status='pending'`) en vez de perderse. Se reprocesa con `POST /api/n8n/retry-pending` (manual o cron). Ambos webhooks usan `maxDuration=60` para no ser cortados por Vercel a mitad de los reintentos.
+   - **Reproceso automático:** el cron `.github/workflows/n8n-retry-pending.yml` corre cada 15 min y reinyecta a n8n lo caído en las **últimas 3 horas** (`?maxAgeHours=3`), para que un blip de red/reinicio de n8n no deje un lead sin respuesta. Lo más viejo que eso NO se reenvía solo (contestarle a alguien un mensaje de días atrás es peor que no contestar): queda `pending` para decisión manual, o se cierra marcándolo `status='discarded'`.
    - El payload incluye:
      ```json
      {
@@ -658,6 +685,65 @@ Body: {
 
 Versión anterior del endpoint de respuesta, usa `BOT_REPLY_SECRET` para auth. Envía solo via Evolution API.
 
+### 8.4 Reglas del handoff (derivación del bot a un humano)
+
+**Cuándo deriva:** el cliente pide hablar con una persona, está molesto, es un colega/inmobiliaria externa, quiere negociar precio, o consulta/cancela una visita ya coordinada.
+
+**Reglas de negocio:**
+1. **Nunca se apaga el bot sin haber avisado al asesor.** Primero sale el email; recién si salió se apaga el bot. Un cliente sin bot y sin asesor avisado es la peor combinación posible: nadie lo atiende y no queda rastro.
+2. **Sin asesor asignado no hay derivación.** Si la propiedad no tiene asesor (o el link no matcheó ninguna propiedad de la cartera), el bot **sigue atendiendo** y recibe la instrucción explícita de *no prometerle al cliente que lo van a contactar*. Antes prometía el contacto y no avisaba a nadie.
+3. **Toda derivación deja rastro** con un mensaje interno en la conversación. Ese rastro es lo que alimenta el panel de handoffs sin atender.
+4. **La derivación asigna la conversación** al asesor de la propiedad (`agent_id`), para que aparezca en su bandeja y en su dashboard.
+5. **Una derivación no atendida es una venta que se está perdiendo.** Se considera atendida solo cuando alguien de la inmobiliaria escribe en la conversación después del handoff; que el asesor haya recibido el email no alcanza.
+
+> Contexto: la auditoría del 29/07/2026 encontró 35 de 45 derivaciones sin ninguna respuesta del asesor dentro de PRISMA, 28 de ellas con más de 24 h, y clientes reclamando por WhatsApp que nadie los había contactado. De ahí salieron el panel y estas reglas.
+
+Detalle de implementación en TECNICO-PRISMA § 9.2.2 y § 9.2.3.
+
+### 8.4.b Vista de celular del chat (actualización Agosto 2026)
+
+Afecta a `components/whatsapp/ActiveChat.tsx`, que es el **mismo componente** para las cuatro entradas al chat (director `/director/asesor-ia-whatsapp`, asesor `/asesor/whatsapp`, y las fichas `/{rol}/leads-whatsapp/[id]`). El corte celular/escritorio es `md` (768px), el mismo que ya usaba el botón de volver. **De 768px para arriba no cambió nada.**
+
+- **El header pasó de tres renglones a uno.** En un teléfono de 390px el encabezado ocupaba ~130px con nombre, teléfono, email del asesor, score, botón de sincronizar, clasificación, etiquetas y dos toggles. Ahora son 61px con lo único que se usa mientras se atiende: **volver · nombre · toggle del bot · ⓘ**. El resto no se borró, se movió al panel de Info.
+- **El toggle del bot subió al renglón principal.** Antes vivía en la tercera fila y achicado (`scale-90`); prender o apagar la IA es la acción más frecuente del chat y tiene que estar a mano.
+- **Clasificación y etiquetas se editan dentro del panel de Info** (bloque `md:hidden` arriba de `LeadTraceability`). Para agregar no se usa el popover de escritorio sino pastillas grandes tocables: un menú flotante adentro de un panel deslizante es frágil y difícil de apuntar con el dedo.
+- **Se eliminó un botón roto.** El botón "Info" de la tercera fila (visible solo en `<lg`) hacía `setActiveTab('info')`, que ocultaba la columna del chat sin renderizar ninguna columna de info: en celular **dejaba la pantalla en blanco**. Se borró junto con el estado `activeTab`, que no tenía ningún otro uso. El ⓘ del renglón principal (Sheet) siempre funcionó y es el que queda.
+- **La zona de escribir es una sola barra.** Con el bot apagado, el celular mostraba caja de mensaje de 2 renglones + separador + fila de nota interna (~180px). Ahora hay una barra de un renglón —`📎 · 🔒 · texto · ➤`— y la caja **crece sola** hasta 120px (`useEffect` sobre `scrollHeight`; el `min-h` de escritorio se conserva con `md:min-h-[80px]`, así que allá se ve igual que antes). El botón 🔒 alterna a **modo nota interna**: la barra se pone amarilla, aparece el cartel "el cliente no la ve" y el enviar guarda la nota en vez de mandarla al cliente. En escritorio el 🔒 no existe y la nota conserva su fila propia.
+- **La ventana de 24 h cerrada ya no bloquea las notas en celular.** Antes el aviso rojo reemplazaba la caja de mensaje pero la fila de nota seguía abajo. Ahora, con la barra unificada, la caja queda deshabilitada con el aviso y el 🔒 sigue disponible, para no perder la posibilidad de tomar notas.
+
+### 8.4.c Burbuja flotante de acceso a la bandeja (Agosto 2026)
+
+`components/whatsapp/BandejaFab.tsx`, montada en los layouts de asesor y director. Círculo de 56px abajo a la derecha, **solo en celular** (`md:hidden`), con un globito rojo que muestra los **handoffs sin atender**.
+
+- El número sale de `GET /api/whatsapp/handoffs-pendientes`, que reusa `getHandoffsDashboardData` — la misma definición de "sin atender" de la regla 5 de § 8.4. Si cambia esa definición, cambia el globito solo.
+- Se refresca cada **2 minutos** y al volver a la pestaña. No más seguido: esa consulta trae hasta 500 marcas de handoff más todos los mensajes posteriores.
+- **No se muestra en cuatro lugares:** la propia bandeja (no tendría sentido), las fichas de lead y el chat abierto (taparía el botón de enviar) y Tracking (ya tiene una barra fija abajo). La regla vive en la constante `RUTAS_SIN_BURBUJA`.
+- Si el fetch falla, la burbuja sigue funcionando como atajo, sin contador.
+
+### 8.5 Informe semanal: la misma derivación, leída una vez por semana
+
+El informe semanal al director fundador (TECNICO-PRISMA § 9.10) no agrega una señal nueva:
+**lee los mismos eventos de derivación de §8.4**, agrupados por semana en vez de mostrarse en
+tiempo real. Lo que sí hay que tener presente es que **no todas las derivaciones son iguales**,
+y esa diferencia es la que explica por qué el informe muestra tres señales separadas en vez de
+un único porcentaje:
+
+- **Handoff** (`Gestion_Handoff`): apaga el bot y deja el mensaje interno (§8.4, regla 3). El
+  asesor **tiene que** entrar al chat para que el cliente reciba alguna respuesta — no hay nadie
+  más atendiendo. Por eso acá "no respondió" significa, sin ambigüedad, que el cliente quedó sin
+  nadie: es la métrica dura del panel de handoffs sin atender.
+- **Aviso de visita / de link** (`Avisar_Asesor`): manda el email al asesor pero **deja el bot
+  encendido** — el cliente sigue conversando con el bot mientras tanto. El asesor no está
+  obligado a entrar al chat (puede llamar por teléfono, coordinar por afuera), así que la
+  ausencia de mensajes suyos en PRISMA **no prueba** que no haya hecho nada. Tratar este caso
+  con la misma regla 5 de §8.4 ("no atendido si nadie escribió") daría falsos negativos.
+
+Por esta diferencia de fondo, el informe no mezcla ambas cosas en un solo número: los handoffs se
+miden por tiempo hasta la primera respuesta en el chat (como ya lo hace el panel), y los avisos
+de visita/link se miden con tres señales independientes (chat, visita cargada, email leído) para
+no penalizar al asesor por no haber usado PRISMA en un caso donde el sistema nunca le exigió
+volver a escribir ahí.
+
 ---
 
 ## 9. Motor de Automatización n8n
@@ -703,6 +789,36 @@ PRISMA inyecta 8 templates automáticos para cada agencia:
 
 Cada template tiene el prefijo `ag{agency_id[0:6]}_` para aislamiento multi-tenant en la cuenta de WhatsApp Business.
 
+### 9.2b El pipeline tiene tres modelos, no uno (31/07/2026)
+
+Entre el mensaje del lead y lo que le llega al cliente pasan **tres IA distintas**, y cada una puede romper de una forma propia:
+
+1. **Clasificador de entrada** (`Analizar conversación` → switch `REGLAS`) — decide **si el bot contesta o no**. De sus 14 categorías, **10 no van a ningún lado: el cliente queda sin respuesta y la ejecución figura como exitosa**, sin error ni alerta. Es el punto ciego más peligroso del flujo.
+2. **Agente orquestador** (`Agente IA CEO`) — conversa, califica, llama herramientas y decide derivar.
+3. **Estructurador de salida** (`Formato_Mensajes`) — parte la respuesta en hasta 9 mensajes sueltos de WhatsApp. Lo que escribe **va directo al cliente sin ningún filtro posterior**.
+
+Reglas que salieron de los incidentes del 30-31/07/2026:
+- **Un lead que llega de un portal (MercadoLibre, ZonaProp, Argenprop) nunca es spam.** Es el lead más valioso del negocio y el que dispara el flujo de propiedad por link. El clasificador lo bloqueaba por traer "un enlace externo": 5 leads reales quedaron sin respuesta.
+- **Ante la duda, el clasificador deja pasar.** Un falso positivo de spam cuesta una venta; un falso negativo lo absorbe el agente, que tiene sus propias reglas anti-manipulación.
+- **Una respuesta corta dentro de una conversación en curso es una persona contestando**, no un mensaje incoherente. Y un cliente quejándose del servicio no es hostil: es exactamente al que hay que derivar.
+- **Ningún nodo cuya salida llegue directo al cliente puede correr en el modelo más barato.** El clasificador en `nano` sobre-bloqueaba leads legítimos y a la vez dejaba pasar ataques reales; el estructurador en `nano` llegó a inventar una respuesta entera.
+- **Los ejemplos de un prompt nunca se cargan como un turno previo del asistente.** El estructurador tenía un ejemplo cargado así y se lo mandó tal cual a una clienta: tres propiedades inexistentes, con otro nombre y otra ciudad.
+
+### 9.2c Adjuntos: qué pasa cuando el cliente manda una foto o un audio (31/07/2026)
+
+Antes se perdían. **6 de cada 11 fotos recibidas quedaban sin ninguna respuesta**, y los audios directamente no entraban al sistema.
+
+La causa de fondo: **WhatsApp no manda el archivo ni una URL, manda un identificador**. Para ver la foto hay que pedirle a Meta la dirección de descarga y después bajarla, siempre autenticado. Ese circuito no existía: venía de la época en que PRISMA usaba otro proveedor de chat, que sí mandaba el archivo directo.
+
+Cómo funciona ahora:
+1. El webhook de PRISMA guarda el mensaje y **le pasa a n8n el identificador del adjunto**.
+2. n8n busca **el token de esa agencia** (cada inmobiliaria baja sus adjuntos con su propio token, no hay uno compartido).
+3. Le pide a Meta la dirección de descarga y baja el archivo.
+4. Si es **imagen**, una IA la describe y esa descripción entra al contexto del agente. Si es **audio**, se transcribe.
+5. El agente responde sabiendo qué había en la foto o qué dijo el cliente en la nota de voz.
+
+Verificado en producción con una captura de pantalla de un portal (el agente la reconoció y aclaró que sin el link no podía validar la publicación — sin inventar nada) y con una nota de voz (transcripta y respondida). **Video** también entra al sistema; su tratamiento con IA queda pendiente.
+
 ### 9.3 Tabla `n8n_chat_histories`
 
 Almacena el historial de conversación en el formato que n8n (LangChain) espera:
@@ -723,11 +839,33 @@ Almacena el historial de conversación en el formato que n8n (LangChain) espera:
 Para bases grandes (ej. 15.000 leads) respetando el límite de Meta:
 1. **Audiencia por segmento:** se elige una **clasificación** (ej. `reclutamiento`) + una **plantilla**. Al crear, la campaña queda **pausada** (no envía todavía): se inscribe **todo el segmento** en `wa_campaign_recipients` (estado `pending`) y se marca **EN COLA** en la solapa Contactos.
 2. **Lanzar ahora:** el director confirma con el botón **"Lanzar ahora"** (`/api/campaigns/launch`), que activa la campaña y manda un **primer lote en el acto**. De ahí en más se envía sola. **No requiere entrar a GitHub.**
-3. **Envío automático (goteo):** un cron (`/api/cron/campaigns`, disparado por GitHub Action cada hora) envía cada día **hasta el límite real de Meta** (leído de la WABA: `whatsapp_business_manager_messaging_limit`), marca cada lead como **enviado/error** (idempotente: nunca reenvía, ni al día siguiente ni si se pausó/reanudó), y crea el chat en la bandeja. Cuando se agota el segmento → **finalizada**.
+3. **Envío automático (goteo):** un cron (`/api/cron/campaigns`, disparado por GitHub Action cada hora) envía cada día **hasta el límite real de Meta** (leído de la WABA: `whatsapp_business_manager_messaging_limit`), marca cada lead como **enviado/error** y crea el chat en la bandeja. Cuando se agota el segmento → **finalizada**.
+   - **Una sola plantilla por lead (fix jul-2026):** antes se mandaba la plantilla y **recién después** se marcaba al lead. Cualquier corte en esa ventana (la corrida se muere sola a los 300s) dejaba al lead en `pending` con el mensaje ya entregado, y la corrida siguiente se lo reenviaba. **No era idempotente.** Daño real en la campaña de reclutamiento de Central RE: 1.085 plantillas a 601 leads (484 de más; 124 leads la recibieron 3 veces). Ahora cada lead se **reserva** (`pending → sending`) **antes** de tocar Meta, y se marca `sent` apenas Meta acepta, antes de crear el chat. Si algo falla después del envío el lead queda en `sending` y **nadie lo reenvía**: el criterio es *ante la duda, no enviar*. Esos casos se ven en el panel (cuentan como pendientes) y la campaña no pasa a finalizada mientras haya reservados.
 4. **Control y trazabilidad:** lanzar/pausar/eliminar; la tarjeta muestra progreso (enviados/total, en cola, errores, últimas 24h). El estado por-lead se ve en Contactos (EN COLA → ENVIADO/ERROR + fecha, por plantilla).
-5. **Bot IA prendido/apagado por campaña:** al crear, el director elige con un interruptor si los chats que cree la campaña nacen con la IA **prendida** (clientes) o **apagada** (reclutamiento u otros no-clientes; el chat queda en modo manual y la IA no responde). Se guarda en `wa_campaigns.bot_active_on_reply` (default `true`) y se aplica al `bot_active` del chat **solo cuando es nuevo**; si el chat ya existía, no se toca. El webhook ya respeta `bot_active` (si está OFF, guarda el mensaje del lead pero no dispara la IA).
-6. **Límite:** lo verifica el sistema contra Meta (no lo carga el cliente). Techo del goteo serverless ~9.600/día.
+5. **Bot IA prendido/apagado por campaña:** al crear, el director elige con un interruptor si los chats que cree la campaña nacen con la IA **prendida** (clientes) o **apagada** (reclutamiento u otros no-clientes; el chat queda en modo manual y la IA no responde). Se guarda en `wa_campaigns.bot_active_on_reply` (default `true`). El webhook ya respeta `bot_active` (si está OFF, guarda el mensaje del lead pero no dispara la IA).
+   - **Chats que ya existían (jul-2026):** la campaña los alinea con su configuración. `instance_id` **siempre** (es lo que ata el chat a la instancia; sin esto se creaban chats duplicados). `bot_active`: **lo decide la campaña**, a propósito pisa el interruptor manual del asesor. `clasificacion`: la campaña la asigna pero **nunca la borra** — si la campaña va a todos los contactos (sin segmento) se conserva la que tenía el lead (antes quedaba en `null`).
+   - **Clasificaciones acumuladas (jul-2026):** un lead pasa por varios lugares y antes cada paso **pisaba** al anterior. Ahora se **acumulan** en `clasificaciones_historial` (`[{clasificacion, origen, at}]`), tanto en `wa_conversations` como en `wa_contacts`. La columna `clasificacion` (singular) **no se toca**: sigue siendo el **origen** del lead, así todo lo que ya la lee sigue funcionando. Ver §9.4b.
+6. **Límite:** lo verifica el sistema contra Meta (no lo carga el cliente). Techo real del goteo serverless **~2.400/día**: cada envío cuesta ~2,3s (Meta + escrituras + espera anti-flood) y la corrida corta sola a los 240s, así que salen ~90-100 por corrida × 24 corridas. Para bases muy grandes o tiers altos hace falta un worker dedicado.
 6. **Importación:** acepta cualquier formato de teléfono argentino (normaliza con `libphonenumber-js`), columnas flexibles (incluye `csTelefono1/2`), nombre opcional, dedupe por teléfono.
+
+### 9.4b Clasificaciones acumuladas (recorrido del lead)
+Un mismo lead pasa por varios lugares: **entra** por `Whatsapp-Consulta`, después lo **importás** en la lista "Oferta-Julio", después **recibe** la plantilla `oferta_julio_2026`. Antes la columna guardaba **un solo valor** y cada paso pisaba al anterior. Peor: al importar una lista, los teléfonos que **ya existían se salteaban enteros**, así que nunca quedaban registrados en ese lote y el filtro no los encontraba (el director veía 300 de 500).
+
+- **Modelo:** `clasificaciones_historial` jsonb `[{clasificacion, origen, at}]` en `wa_conversations` **y** `wa_contacts`. La columna `clasificacion` (singular) **no se toca**: es el **origen** y sigue alimentando todo lo que ya la leía. La lista es **aditiva**. Helper único: `lib/whatsapp/clasificaciones.ts` (`clasificacionesDe`, `sumarClasificacion`, `coincideClasificacion`, `esPlantillaDelSistema`).
+- **Quién suma una clasificación:**
+
+  | Origen | Qué hace |
+  |---|---|
+  | Chat entrante / alta manual | Siembra la primera (`Whatsapp-Consulta` / `Whatsapp-Manual`) |
+  | Importar lista | Si el teléfono ya existe: **no duplica** contacto ni chat, le **suma** la del lote conservando su origen. Si es nuevo: la del lote |
+  | Campaña por segmento | Suma **el segmento** — o sea el nombre que el director le puso al lote al importar. **Gana sobre el nombre de la plantilla**, para no dejar dos badges que dicen casi lo mismo (`Reclutamientormx0726` + `reclutamiento_22062026`) |
+  | Campaña sin segmento (a todos los contactos) | Como no hay lote, el respaldo es el **nombre de la plantilla** |
+  | Envío manual puntual | Suma el **nombre de la plantilla** enviada (no se le pide ningún dato extra al director) |
+  | Plantillas del sistema | **Nada.** Se reconocen por el prefijo `ag<6 hex>_` (`esPlantillaDelSistema`): seguimiento, recordatorios de visita, reactivación. No son campañas del cliente |
+
+- **Lectura:** los filtros de **Contactos** y **Bandeja** traen al lead si coincide **cualquiera** de sus clasificaciones (`coincideClasificacion`), y la búsqueda por texto también las mira. La UI muestra el recorrido numerado (`1. Whatsapp-Consulta` `2. Oferta-Julio`).
+- **Inscripción de campañas:** `enroll_campaign_recipients` matchea con `clasificacion = X` **OR** `clasificaciones_historial @> [{"clasificacion":"X"}]`. Es indispensable que sea igual que el filtro: si no, el director ve 500 en el filtro y la campaña le manda a 300. Índices GIN `jsonb_path_ops` en ambas tablas (verificado: usa Bitmap Index Scan, no seq scan).
+- Migraciones: `20260722160000_clasificaciones_historial.sql` (chats), `20260722180000_clasificaciones_acumuladas_contactos.sql` (agenda + índices), `20260722181000_enroll_por_cualquier_clasificacion.sql`.
 
 ---
 
@@ -745,6 +883,7 @@ Asistente avanzado de búsqueda de propiedades. Ahora opera bajo un formato de "
 
 El Buscador IA se nutre de la tabla `roomix_properties`, la cual es alimentada diariamente por un **Docker Worker Automático** (carpeta `roomix-sync`).
 - **Tecnología del Crawler:** Utiliza Playwright (en modo Stealth) para bypassear bloqueos anti-bot y extrae datos estructurados JSON-LD de las fichas de Roomix.
+- **Descripción (jul-29):** el JSON-LD de Roomix trae la descripción **cortada a 500 caracteres, a mitad de palabra** (era lo que se veía cortado en la ficha compartida y el motivo por el que la hoja del ACM no muestra descripción). Ahora el crawler lee el **texto completo** del cuerpo de la ficha y lo **condensa a ≤500 caracteres ordenados** por secciones (Superficie · Interior · Ubicación · Edificio), sin letra chica ni contacto de la inmobiliaria publicante. Es determinista (sin IA). Detalle y backfill de las filas viejas en TECNICO §11.3.
 - **Worker de Producción:** Se ejecuta como un contenedor Docker en Easypanel, utilizando `node-cron` (disparándose a las 03:00 AM) y `child_process.spawn` para aislar el proceso y evitar fugas de memoria del Chromium.
 - **Despliegue & Health Check:** El Worker levanta un mini servidor HTTP nativo en el puerto 80 (`cron.js`) y ejecuta Node directamente (`CMD ["node", "cron.js"]` en `Dockerfile`) para cumplir con los requerimientos de Health Check de Easypanel, evitando errores de tipo SIGTERM y garantizando que el proceso se mantenga vivo.
 - **Concurrencia Segura (Cron):** Implementa un "semáforo" (lock) en el cron de Node para prevenir la ejecución paralela múltiple en extracciones que duren más de 24 horas, evitando baneos por exceso de requests concurrentes.
@@ -824,6 +963,30 @@ Se corrigió la vista de celular del Buscador IA (afecta asesor `app/asesor/cons
 - **Fondo oscuro (backdrop) solo en celular** (`md:hidden`) para cerrar el cajón tocando afuera; además se cierra solo al elegir/crear una búsqueda (`closeSidebarOnMobile()` en `loadSession` y `startNewChat`).
 - **Encabezado:** deja de desbordar con `min-w-0` + `truncate` en título/subtítulo y `shrink-0` en el ícono y el badge de créditos.
 - **Tarjetas de propiedades (`consultor-results.tsx`):** las flechas del carrusel pasan de solo-hover a visibles siempre en celular (`opacity-100 md:opacity-0 md:group-hover:opacity-100`), porque en touch no hay hover. El footer del modal de detalle apila en pantallas angostas (`flex-col sm:flex-row`).
+
+### 10.6.b El Tutor IA recibe el mismo tratamiento (Agosto 2026)
+
+El arreglo de § 10.6 **nunca se había aplicado al Tutor IA**, que comparte la estructura del Buscador. En un teléfono de 390px el historial arrancaba abierto (`useState(true)`) como columna fija de `w-80`: se comía 320px, empujaba la conversación fuera de la pantalla y, como el contenedor tiene `overflow-hidden`, **no había forma de scrollear hasta ella**. La página quedaba inutilizable hasta dar con el `‹` de cerrar.
+
+Se portó el patrón completo a `app/director/tutor/page.tsx` y `app/asesor/tutor-ia/page.tsx`: arranca cerrado, se abre solo en `md+` por `useEffect`, en celular es cajón superpuesto (`max-md:fixed` + `translate-x`), con fondo oscuro para cerrar tocando afuera y `closeSidebarOnMobile()` en `loadSession`/`startNewChat`.
+
+**El pie del chat estaba mal armado en las 4 páginas** (los dos Buscadores y los dos Tutores). `CardFooter` es `flex items-center` —una fila— y contenía el `<form>` y el `<p>` de "Cada respuesta consume 1 crédito IA", ambos con `w-full`: se repartían el ancho, el campo de texto se achicaba y **el botón de enviar se montaba encima**. El `mt-2` del párrafo delataba que la intención era apilarlos. Se corrige con `flex-col items-stretch`, lo que además arregla la compu, donde el texto de créditos aparecía al costado del campo en vez de debajo.
+
+**Objetivos táctiles:** el botón que abre el historial medía 32px y es la única entrada al historial en celular; pasa a 44px (`p-3 md:p-1.5`) y gana `aria-label`. Renombrar y eliminar de cada conversación pasan de 32 a 44px en celular (`h-11 w-11 md:h-8 md:w-8`). En escritorio quedan como estaban.
+
+**La burbuja de la bandeja (§ 8.4.c) no se muestra acá:** estas dos pantallas tienen su propio botón de enviar abajo a la derecha y la burbuja se le montaba encima. `consultor`, `consultor-ia`, `tutor` y `tutor-ia` se sumaron a `RUTAS_SIN_BURBUJA`.
+
+### 10.6.c Los dos errores de consola del Tutor (Agosto 2026)
+
+Eran preexistentes y ninguno rompía nada, pero uno escondía un dato falso.
+
+**La hora de los mensajes del Tutor era mentira.** El código lo decía: `{/* Timestamp mock */}` con `new Date()`, o sea **la hora actual debajo de todos los mensajes**, incluso los de hace meses. El tipo `Message` ni siquiera guardaba `created_at`. Como además no se fijaba el idioma, el servidor escribía `"05:00 p. m."` y el navegador lo mismo pero con un espacio invisible distinto (ICU de Node vs Chrome): React detectaba la diferencia, **descartaba el HTML del servidor y redibujaba esa rama en el cliente** ("There was an error while hydrating this Suspense boundary").
+
+Se copió el patrón que el Buscador ya tenía bien: `created_at?: string` en `Message`, se completa al cargar la sesión y al mandar/recibir cada mensaje, y se muestra **solo si existe** (el saludo inicial no la tiene) con `'es-AR'`, `hour12: false` y `suppressHydrationWarning`. Verificado: con el reloj en 17:27, tres conversaciones distintas muestran 18:23, 11:57 y 15:33 — sus horas reales de la base.
+
+**Los dos 403 de `/api/asesor/creditos`.** El director no tiene cuota personal de asesor, así que el endpoint respondía 403 y el hook `use-asesor-creditos` lo silenciaba a propósito. Funcionaba bien, pero el navegador registra todo 4xx: quedaba un error rojo en **todas** las pantallas de director con badge de créditos (Tutor, Buscador, Marketing, Contratos). Ahora el endpoint responde **200 con `{ aplica: false }`** — no es un error, simplemente no aplica — y el hook corta ahí devolviendo `null` (sin ese corte, `porcentaje` quedaría `undefined` y el badge se dibujaría con NaN). No se filtra ningún dato: la respuesta va vacía. `app/asesor/configuracion/page.tsx` también contempla el nuevo valor.
+
+> En desarrollo cada pedido aparecía **dos veces** porque React llama los efectos dos veces a propósito; en producción salía una sola.
 
 ### 10.7 Mejoras Junio 29 (modelo, piso, free-text, compuerta de datos, ficha compartible)
 
@@ -975,20 +1138,16 @@ Es un **multi-generador todo-en-uno**. El usuario elige IPC + tipo de copy (`vid
 
 **Endpoint:** `POST /api/marketing-ia/generate-image`  
 **Archivo:** `app/api/marketing-ia/generate-image/route.ts`  
-**Modelo:** Gemini 3 Pro Image (Nano Banana Pro)
+**Modelo:** Gemini 3 Pro Image (Nano Banana Pro) + Superposición Sharp
 
 **Flujo:**
-1. Obtiene branding de la agencia (`marketing_ai_config`): colores, logo, tipografía, **directiva creativa** y **aviso legal**
-2. Si hay logo → lo descarga y envía como imagen de referencia al modelo
-3. Construye prompt con:
-   - Formato: reels (1080x1920), post (1080x1080), historia (1080x1920)
-   - Estilo: moderno, lujoso, cálido, corporativo, vibrante
-   - Hook del copy a incluir en la imagen
-   - **Directiva creativa** del director (obligatoria)
-   - **Aviso legal** (si está cargado): texto legal en letra pequeña y legible en la franja inferior, sin tapar otros elementos
-4. Genera imagen via `generateImage(prompt, 'pro', imageParts)`
-5. Sube a Supabase Storage (`marketing-images`) y guarda en `generated_images`
-6. Costo desde la tabla central: ~$0.134/imagen (Nano Banana Pro, 1K/2K) · $0.24 (4K)
+1. Obtiene la configuración de branding de la agencia desde Configuración IA (`marketing_ai_config`): colores, logo (`logo_url`), tipografía, posición/tamaño del logo, **directiva creativa** y **aviso legal** (con fallback a `agencies.logo_url`).
+2. Construye el prompt a Gemini solicitando generar la imagen publicitaria con la propiedad, el hook y el **aviso legal** en la franja inferior, ordenándole expresamente abarcar todo el lienzo de forma fotorrealista continua sin dibujar recuadros blancos ni cajas vacías artificiales.
+3. Genera la imagen base via `generateImage(prompt, 'pro', [])` sin enviar el logo como entrada de imagen multimodal (evitando alucinaciones, deformaciones o duplicados del logo por parte de la IA).
+4. **Superposición determinista de logo (Sharp)**: Si hay un logo configurado (`logo_url`), rescata el archivo PNG (mediante HTTP fetch con fallback a descarga directa desde Supabase Storage `marketing-images`), lee la resolución nativa exacta devuelta por Gemini (`baseMeta.width` y `baseMeta.height`), lo redimensiona conservando transparencia y aspecto según el tamaño elegido (`small`: 12%, `medium`: 16%, `large`: 22% del ancho de imagen), calcula la esquina configurada (`top-left`, `top-right`, `bottom-left`, `bottom-right`) suspendiendo el logo de forma segura por encima de la franja del aviso legal (~11% de offset vertical), y superpone digitalmente el logo nítido sobre la imagen final **1 sola vez**.
+5. **Previsualización UI (`object-contain`)**: En la galería e inspección de anuncios (`marketing-history.tsx` e `image-generator-form.tsx`), las imágenes se sirven con `object-contain` para garantizar que la pantalla muestre la pieza publicitaria completa sin recortes en bordes superior/inferior.
+6. Sube la imagen a Supabase Storage (`marketing-images`) y guarda en `generated_images`.
+7. Costo desde la tabla central: ~$0.134/imagen (Nano Banana Pro, 1K/2K) · $0.24 (4K).
 
 ### 13.5 Settings de Marketing
 
@@ -1116,12 +1275,22 @@ Columnas: (Asesor — solo director), Contrato, **Código** (badge mono), Client
 > - **Nueva lógica:** se elige UNA propiedad sujeto por **(a) formulario manual**, **(b) link de cualquier portal** (botón "Analizar", extracción server-side) o **(c) desplegable de la cartera** de la agencia. El backend busca **comparables reales** en `properties` (cartera) + `roomix_properties` (red de colaboración) con **filtros duros + embedding (Gemini 768d)**, devolviendo cada comparable con **% de comparabilidad** y un **checklist** (qué coincide y qué no). El **precio queda FUERA del %**.
 > - **Funciones SQL:** `acm_match_properties` y `acm_match_roomix` (base `20260625130000_acm_match_functions.sql`; **reescritas en `20260702120000_acm_barrio_gate_and_dims.sql`**, jul-2026). Filtros duros (gate): misma operación + mismo tipo + m² ±40% + ambientes ±1 **+ mismo barrio**. % ponderado (jul-2026): Superficie 22 · Ambientes 16 · **Dormitorios 14** · Baños 12 · **Antigüedad 14** · Amenities 12 (Jaccard ES+EN) · Semántica 10; los pesos se redistribuyen si falta dato. Tipo, operación **y zona** son gates (salen del % y se muestran como "filtro").
 > - **Barrio como filtro duro + más variables (jul-2026):** el comparable ahora se **limita al barrio del sujeto** (antes la zona era un puntaje y podía traer otro barrio con menos puntos). Si el sujeto es de Belgrano, **todos** los comparables (cartera + red) son de Belgrano; Palermo→Palermo; La Plata→La Plata. Insensible a acentos (Nuñez=Núñez) y respeta la jerarquía real de barrios (Belgrano R/C∈Belgrano, Las Cañitas∈Palermo). El **checklist suma Dormitorios y Antigüedad** con dato real (nada inventado): antigüedad de Tokko en la cartera y de la red; solo comparan cuando hay dato en ambos lados. **Piso no se agrega** (la cartera no tiene el piso real de la unidad). **Sin límite artificial:** hasta 50 comparables por fuente (antes 20), ordenados por comparabilidad.
+> - **Excluir PH en comparables de Casa (jul-2026, rama `feat/acm-excluir-ph-casas`):** al analizar una **Casa** aparece una casilla **"Considerar PH"** (tildada por defecto = incluye PH, como siempre). Los PH suelen figurar como "casa"/"House" en los portales, pero no siempre son comparables con casas; si el asesor la **destilda**, se excluyen. La detección es por la **sigla "PH" como palabra suelta** (regex `\mph\M`, insensible a mayúsculas) en **tipo + título + descripción** del aviso — no confunde palabras que llevan "ph" adentro ni matchea "propiedad horizontal". El filtro corre **dentro de las funciones SQL** (parámetro `p_exclude_ph`), **antes del ranking y del límite**, así el conteo queda correcto y no se caen casas puras. Solo aplica a Casa; en cualquier otro tipo la casilla no se muestra y no afecta. Por defecto no cambia nada (casilla tildada).
 > - **Endpoints nuevos:** `app/api/acm/comparables`, `app/api/acm/extract`, `app/api/acm/cartera`. Librerías en `lib/acm/` (`extract.ts`, `subject.ts`, `checklist.ts`, `tokko.ts`).
+> - **A estrenar solo con a estrenar (ago-2026, rama `feat/acm-filtro-a-estrenar`):** una propiedad **sin uso vale bastante más por m²** que una usada del mismo barrio, así que mezclarlas distorsionaba el ACM. Medido sobre la red (venta, USD, mediana US$/m²): Palermo 3.448 vs 2.642 (**+31 %**), Belgrano 3.495 vs 2.692 (+30 %), Caballito 2.758 vs 2.033 (+36 %), Villa Urquiza 2.657 vs 2.258 (+18 %), Almagro 2.461 vs 1.885 (+31 %). En el paso 1 hay dos casillas nuevas al lado de Antigüedad: **"A estrenar"** y **"En pozo"** (se pueden tildar las dos, una o ninguna; al tildar alguna, el campo de años se deshabilita). **Sin tildar = usada** → se excluyen los comparables a estrenar y en pozo. **Tildada = sin uso** → solo entran comparables del/los estado(s) tildado(s). Antes esto era **imposible de expresar**: el formulario arranca en 0 y `sujetoAntiguedad()` trataba el 0 como "sin dato", así que un depto a estrenar elegido de la cartera perdía esa información antes de llegar al SQL. Los avisos **sin antigüedad declarada** entran siempre para un sujeto usado (su mediana US$/m² se comporta como la de usadas), y para un sujeto sin uso entran **solo en alquiler** (en venta se descartan; en alquiler el 99,8 % de la red no carga el dato y descartarlos dejaría 0 comparables). **Terreno/lote queda afuera del filtro**: la antigüedad no le aplica y Tokko igual le pone `age=0` (47 de los 49 lotes de la cartera), así que filtrarlos los dejaría casi sin comparables.
+> - **Zona por niveles + superficie comparable + sin duplicados (ago-2026, rama `feat/acm-zona-y-superficie`, migración `20260803180000_acm_zona_niveles_y_superficie.sql`):** tres arreglos que aparecieron investigando por qué el ACM no traía comparables reales de una casa en Belgrano.
+>   1. **Cubiertos contra cubiertos.** El sujeto entraba con sus **m² cubiertos** (`sujetoM2` = cubiertos+semicubiertos) pero el candidato se filtraba por su **superficie TOTAL** (`roomix.area_m2` = `total_area_m2`, incluye terreno y descubierto; en la cartera, `coalesce(total_area, covered_area)`). Peras contra manzanas: en casas con lote grande el total se va de la banda ±40% y la casa desaparece. Medido en Belgrano (casas en venta): de **156 candidatas, 19 casas reales quedaban afuera solo por esto** (ej. 405 m² totales / 246 cubiertos, o 507/298). En toda la red, **2 de cada 3 casas** con dato de cubierta tienen el total 15%+ más grande. Ahora se compara `coalesce(covered_area_m2, area_m2)`; donde no hay cubierta declarada (69% de la red) cae al total, igual que antes.
+>   2. **Zona en 3 niveles, no un gate binario.** El gate era `like '%belgrano%'`: metía en la misma bolsa a Belgrano (mediana US$3.311/m²), Belgrano R (3.047), Belgrano C (3.121) y Belgrano Chico (4.190) —un spread del **37%**— y a la vez dejaba afuera a Núñez (3.571, apenas **8%** de diferencia) aunque roomix etiquete la **misma cuadra** a veces Belgrano y a veces Núñez (caso verificado: Victorino de la Plaza 1200 está cargada dos veces, una con cada barrio; y una casa a metros del sujeto en Lidoro Quinteros al 1000 figura como Núñez). Ahora la zona **puntúa**: **100** mismo barrio exacto · **70** sub-barrio hermano (Belgrano ↔ Belgrano R, Palermo Soho ↔ Palermo Hollywood) · **50** limítrofe (Belgrano ↔ Núñez). Peso 20 en el %, así un comparable de Núñez **nunca le gana** a uno de Belgrano en igualdad de condiciones. Si el barrio del sujeto (texto libre) no se resuelve, **se cae al gate viejo por patrones**: nunca se queda sin comparables.
+>   3. **Un aviso, un comparable.** La red repite el mismo aviso (se vieron 3 copias idénticas de la misma casa ocupando lugares del top y ensuciando la mediana de $/m²) y además devolvía **la propiedad base como comparable de sí misma** (82%, porque `exclude_id` solo aplicaba a la cartera). Dedup por dirección+precio+medidas quedándose con la fila más completa y fresca, y exclusión del sujeto por m² cubiertos (±1%) + baños + antigüedad (±2 años).
+>   - **Mapa de barrios derivado de los datos, no escrito a mano** (tabla `acm_barrio_relacion` + `acm_refrescar_barrios_relacion()`, re-ejecutable tras cada crawl): dos barrios son limítrofes si comparten celdas de ~300 m **y** sus centroides están a ≤3 km (roomix trae coordenadas en el **99,3%** de los avisos). Umbral calibrado contra pares conocidos: vecinos reales Núñez/Saavedra 1,44 km · Belgrano/Núñez 2,00 · Colegiales/Palermo 2,64; NO vecinos Belgrano/Palermo 3,67 · Belgrano/Recoleta 6,16. **Trampa resuelta:** la jerarquía padre/hijo sale de `city`, pero miles de filas traen `city='Capital Federal'`, lo que hacía hermanos a **todos** los barrios de CABA (Belgrano hermano de Barracas y Puerto Madero) — se descartan los contenedores genéricos y los hermanos deben pasar también el control de distancia (≤2,5 km).
+>   - Los tres van detrás de flags SQL (`p_m2_cubierta`, `p_zona_niveles`, `p_dedup`, `p_excluir_sujeto`) que **por defecto dejan el comportamiento idéntico al anterior**; los activa la app al llamar la RPC.
 > - **Extracción por link en cascada:** Tier 1 (server-side: JSON-LD → OpenGraph → IA). Tier 2 (servicio con navegador stealth `roomix-sync/extractor-server.mjs`, env `ACM_EXTRACTOR_URL`) para portales que bloquean (ML/ZonaProp/Argenprop). Ver `roomix-sync/ACM-EXTRACTOR-EASYPANEL.md`.
 > - **Sin datos inventados + IA que interpreta (jul-2026):** el extractor ya **no pone valores por defecto**. Antes asumía "venta" y "USD" y no los corregía nunca → un alquiler en pesos de ML salía como venta en dólares. Ahora la moneda y la operación quedan **vacías si no se pueden verificar** (el asesor las completa), y **Gemini lee toda la página** (título, link, descripción, datos del portal y texto) y **razona** cada dato en vez de adivinar por palabras sueltas. Además trae el **máximo de variables que encuentre** (superficies cubierta/semicubierta/descubierta/terreno, antigüedad, piso, orientación, amenities) y las **expensas** (parte del costo mensual). Aplica al ACM y al agente de WhatsApp que reusa el mismo extractor.
+> - **Reconocer bien "la propiedad del link" (jul-2026):** cuando el lead pega un aviso, el sistema busca esa misma propiedad en la cartera. Pasaba que si el extractor leía mal **un** dato del aviso (típico: el barrio venía como "Capital Federal" en vez de "Caballito"), el buscador **no reconocía** la propiedad exacta aunque coincidiera precio y calle, y la mostraba como una comparable más (puesto ~4) mientras marcaba otra más cara como "la del link" (caso real: lead "Vi", aviso de 60.000 USD, marcó una de 154.000). Se arregló en dos frentes, **sin aflojar el filtro** (si el dato viene bien, sigue funcionando igual): (1) **el extractor ahora elige el barrio con criterio** —descarta la zona general y se queda con el barrio real que corrobora el link—; (2) **doble verificación: ni el buscador ni la IA deciden solos.** El buscador trae las candidatas con los datos de comparación (mismo precio, misma calle, mismos ambientes, misma zona que el aviso) y la **IA razona**: si reconoce la propiedad del aviso —aunque el buscador no la haya puesto primera— la sube al primer lugar y la marca; y nunca marca una como "la del link" si no coincide de verdad en los hechos. Aplica al agente de WhatsApp (link).
 > - **Fix robustez del link (jun-2026):** el Tier 2 se invoca **una sola vez** como máximo (antes podía llamarse dos veces y, con `maxDuration=60` del route, la función se cortaba y devolvía HTML de error no-JSON → el front rompía con `Unexpected token 'A'… is not valid JSON`). Tiempos acotados (fetch 12s + servicio 38s) para entrar bajo 60s y el cliente (`subject-input.tsx`) ahora tolera respuestas no-JSON con mensaje claro. **Cartera con buscador:** el modo "Desde la cartera" pasó de `<Select>` simple a **combobox con búsqueda por texto** (título/dirección/ciudad). **Reset por solapa:** al cambiar de modo (manual/cartera/link) se limpia el formulario (`onReset` en `AcmModule`). Todo aplica a asesor y director (`/director/acm` reusa `AcmModule`).
 > - **Reservado a futuro:** la grilla MCM de valuación (`lib/tasacion/calculos.ts`, `step3-grilla.tsx`, `step4-resultado.tsx`) **se conserva en el repo pero NO se renderiza**; se reusará para el informe con marca. Lo descrito en 15.1/15.2 queda como referencia histórica.
 > - **Ficha pública de comparables (jul-2026, rama `feat/acm-ficha-comparables`):** desde la lista de comparables, **"Crear ficha"** habilita **seleccionar** los comparables deseados (cartera + red juntas) y **"Crear"** arma un **link público de lujo** (`/ficha-acm/[token]`) para compartirle al cliente, con opción **Descargar PDF** (imprime la misma ficha; una hoja A4 por comparable). Cada comparable ocupa **una hoja** con **todas sus fotos** y características; arriba, un **banner de pulso de mercado** con el **precio de cierre por m²** del barrio **y del segmento de 1/2/3 ambientes** (datos reales de `mercado_barrios` + `mercado_stats`); al final, una **comparación calculada** de $/m² donde **cada comparable se mide contra el cierre de su propio barrio** (promedio y desvío de la muestra — **sin IA**, todo por fórmula, solo comparables en USD). Respeta la **marca de la agencia** (colores/logo/aviso legal de `marketing_ai_config`; si no hay logo o aviso legal, no se muestran) e incluye la **tarjeta de contacto** del asesor/director que la genera. Todo el snapshot se **congela** en la tabla `shared_acm_reports` (mismo molde que `shared_properties`), así el link sobrevive aunque cambie la publicación original. Endpoint `POST /api/acm/ficha`; cálculos deterministas en `lib/acm/ficha.ts`. No consume créditos.
+> - **Mejoras de la ficha (jul-2026, rama `feat/acm-ficha-mejoras`):** antes de crear la ficha, al tocar **"Continuar"** se muestran las **conclusiones del estudio** ya calculadas para que el asesor/director las **revise**: puede editarlas, agregar las propias o **sacar la sección entera** para que no salga en la ficha (el botón manda la lista final; vacía = sin sección). La **hoja final** ahora muestra en la matriz los **promedios de superficie, precio y $/m²** de la muestra, y agrega **"La Pirámide del Precio"** (gráfico propio, sin foto pixelada) que ilustra cómo se apaga la demanda a medida que el precio se aleja del valor de mercado y **resalta el escalón** donde cae el desvío promedio de la muestra. Se **quitó "Preparado por"** de la portada. En la **tarjeta de contacto**, el subtítulo sobre el nombre: para el **director** es "Director/a"; para el **asesor** es su **clasificación** (Client Director / Client Support, la que le puso el director en "Asesores"; "Asesor/a" si no tiene). El **logo** de la agencia se **recorta** (endpoint `/api/brand-logo` con `sharp().trim()`, saca el aire transparente/blanco) para que se vea **grande y nítido** sea cual sea el archivo, y en el pie va sobre un **chip del color de marca** para que no se pierda si el logo es claro.
 
 > **Nota (revisión jun-2026):** existen **dos implementaciones** de tasaciones y conviene no confundirlas:
 > - **La que está viva y se usa hoy** es el **Wizard MCM client-side** (ver 15.2) que corre en `/asesor/tasaciones` y `/director/tasaciones`, calcula con `lib/tasacion/calculos.ts` y persiste en la tabla `tasaciones`.
@@ -1159,6 +1328,10 @@ La pantalla de Tasaciones es un **wizard de 4 pasos** (Método Comparativo de Me
 | 2 | `step2-comparables.tsx` | Alta de comparables (mín. 3): manual o importados desde Tokko (`/api/tokko-proxy/property`) |
 | 3 | `step3-grilla.tsx` | Matriz de homogeneización editable (factores por columna, outliers, exclusiones, ponderado) |
 | 4 | `step4-resultado.tsx` | Informe final: rango min/sugerido/máx, gráfico de dispersión, tabla de testigos, imprimir/PDF |
+
+- **Nombre del PDF (jul-2026):** al imprimir/guardar el informe, el PDF se descarga como **`ACM - <Dirección> - <Mes Año>`** (ej. `ACM - Arcos 2825 - Julio 2026`) en vez de un nombre fijo que se pisaba. `handlePrint` setea el `document.title` (`nombreArchivoAcm()`) antes de `window.print()` y lo restaura; sanea caracteres inválidos de Windows; fallback `ACM - <Mes Año>` sin dirección.
+
+- **Historial "Mis ACM" (jul-2026):** la página tiene dos solapas, **"Nuevo ACM"** y **"Mis ACM"**. Cada búsqueda que hace un asesor o el director **se guarda sola** (tabla `acm_searches`) con la propiedad analizada y **todos los comparables encontrados** (cartera + colaboración, con su % y checklist), así se puede **reabrir tal cual** aunque después cambien o se den de baja las publicaciones. Al tocar una fila del historial se abre la **misma pantalla de resultados**. Si de esa búsqueda salió una **ficha pública**, la fila muestra el link directo; si se crea una **segunda ficha** desde la misma búsqueda, se **duplica la fila** con la ficha nueva (una fila por ficha). El **asesor ve las suyas**; el **director ve las de toda la agencia** con el nombre de quién la hizo. Se pueden borrar del historial (la ficha compartida sigue viva).
 
 - El cálculo es **client-side** (`lib/tasacion/calculos.ts`, `lib/tasacion/types.ts`), reactivo vía `useMemo`.
 - Persistencia: tabla `tasaciones` en Supabase (borrador/finalizada) con autoguardado entre pasos e historial (últimas 10 por usuario).
@@ -1576,6 +1749,16 @@ Sistema de auth **completamente separado** de Supabase Auth:
 | `/api/admin-vakdor/finance/fx` | GET/POST | Tipo de cambio USD→ARS por mes |
 | `/api/admin-vakdor/finance/sync` | POST | Sincronización manual de costos (botón del panel) |
 | `/api/cron/finance-sync` | GET | Sincronización automática 2×/día (colgada de `tokko-sync.yml`, auth `CRON_SECRET`) |
+| `/api/admin-vakdor/marketing` | GET/POST | Lista ideas / alta manual (tablero) |
+| `/api/admin-vakdor/marketing/[id]/estado` | POST | Mover idea de columna |
+| `/api/admin-vakdor/marketing/[id]/desarrollar` | POST | Generar contenido rápido in-app (Claude) |
+| `/api/admin-vakdor/marketing/[id]/reformular` | POST | Reescribir contenido (Claude) |
+| `/api/admin-vakdor/marketing/[id]/programar` | POST | Fijar fecha de publicación |
+| `/api/admin-vakdor/marketing/[id]/asset` | GET | URL firmada de un asset del bucket privado |
+| `/api/admin-vakdor/marketing/[id]/publicar` | POST | Publicar ya (blog o LinkedIn) |
+| `/api/admin-vakdor/marketing/generar` | POST | Motor de ideas (funda ideas con GA/Search/copywriter) |
+| `/api/admin-vakdor/marketing/publicar-programadas` | POST | Cron: publica aprobadas con fecha vencida (auth `assertCron`, workflow `marketing-publish.yml` cada 30 min) |
+| `/api/admin-vakdor/marketing/metricas` | GET | Embudo de 8 pasos de vakdor.com + GA4/GSC/Buffer/Clarity + análisis IA guardado (`?periodo=7d\|30d\|90d`). Detalle en TÉCNICO 16.3.1 |
 
 ### 23.1 Módulo Finanzas
 
@@ -1611,6 +1794,25 @@ Sección dentro del Dashboard del dueño (`/admin-vakdor/dashboard`). Objetivo: 
 - **Análisis del agente IA** — toma una muestra de las conversaciones reales más recientes, las compara contra el **prompt vigente del agente** (solo lectura) y marca fortalezas, desvíos (distinguiendo lo ya corregido de lo que sigue abierto) y mejoras óptimas.
 
 **Nota:** las fuentes que fallan no rompen la corrida (se muestran "no disponible" y el resto sigue). Detalle técnico (tablas, endpoints, tokens) en TÉCNICO §16.2.
+
+### 23.4 Marketing — "Agente IA de Marketing" (`/admin-vakdor/marketing`)
+
+Sala de control del contenido orgánico de Vakdor (LinkedIn, Instagram y blog). Objetivo: llevar una idea de contenido desde que se piensa hasta que se publica, sin salir de un solo lugar.
+
+**Embudo (TOFU/MOFU/BOFU):** cada idea lleva una **etapa del embudo** (etiqueta de color en la tarjeta): **TOFU** = descubrimiento (dolor amplio, sin vender), **MOFU** = nutrición (el mecanismo/método PRISMA), **BOFU** = empujón a la reunión (prueba + CTA a agendar). El contenido se **adapta a la etapa** (un TOFU no vende, un BOFU cierra). Se elige al crear la idea y el motor de ideas balancea las tres. Hay filtro por etapa en el calendario.
+
+**Cómo funciona (en criollo):** es un **tablero tipo Trello** con columnas *Idea → En proceso → En revisión → Aprobada → Publicada* (más *Rechazada* al costado). Cada tarjeta es una pieza de contenido. Leonardo (o el "motor de ideas") llena la columna Idea; al mover una tarjeta a **"En proceso"**, un **robot que corre en la compu de Vakdor (el worker)** la agarra y le hace el trabajo pesado: escribe el contenido con la voz de Vakdor y le arma las **imágenes de marca**. Cuando termina, la deja en **"En revisión"** para que Leonardo la mire. Si la aprueba y le pone fecha, se **publica sola** a la hora programada.
+
+- **Qué imágenes arma según el tipo de pieza:** un **carrusel** → varias placas 1080×1080 (portada + desarrollo + placa final con el CTA) y un PDF con todas juntas; un **lead magnet** (imán de leads) → un **PDF tipo scorecard/checklist** con la marca, para descargar; cualquier otra → una **portada única** (blog 1200×630 / redes 1080×1080). Todo con el logo de Vakdor y el color cobre.
+- **Publicar un artículo de blog = las dos cosas de una:** al tocar "Publicar (web + LinkedIn)", el artículo se publica en la **web de Vakdor** (artículo completo + su imagen de portada) **y** en tu **LinkedIn** (un post que resume el ángulo del artículo — hook + storytelling — con la misma portada). El post de LinkedIn **no lleva links ni menciona el artículo**: es una pieza de valor por sí misma (el engagement lleva a tu perfil, y ahí están tus links). El worker prepara esa versión de LinkedIn cuando desarrolla el artículo, así la ves en el visor y la podés ajustar antes. Programar un artículo también hace las dos publicaciones.
+- **Publicar (resto):** **LinkedIn** se postea a través de Buffer: los **carruseles** se publican como **carrusel real de LinkedIn** (Buffer los sube como "documento" PDF deslizable, usando el `carousel.pdf` que arma el worker + la primera slide como portada); las demás piezas van como texto + imagen. El **primer comentario** de LinkedIn (donde va el link) hoy se pega a mano porque la API gratis de Buffer no lo permite. Se puede **publicar al toque** (botón) o **programar** (fecha + un cron cada 30 min publica solo lo aprobado y vencido). *(Instagram todavía no tiene publicación automática.)*
+- **Ver la pieza de verdad ("Ver contenido"):** el visor muestra la pieza tal como es — un **carrusel** se ve **slide por slide** (con flechas y puntos) y se puede **descargar el PDF**; un **lead magnet** muestra el **PDF entero embebido** + descargar; los demás, su imagen. Arriba de todo va la **"Descripción del posteo"**: el texto con hook + storytelling que acompaña a la pieza (toda pieza — artículo, carrusel, lead magnet — tiene su descripción, además de los assets), con botón para copiarla.
+- **Reformular / desarrollar rápido:** desde el tablero, botones que usan Claude en la app para reescribir o generar un borrador de texto al toque (sin esperar al worker). En carrusel/lead magnet, "Reformular" trae un check **"También regenerar imágenes/PDF"**: si lo marcás, además de cambiar el texto, la tarjeta vuelve a "En proceso" y el **worker rehace la pieza completa** (descripción + slides/PDF) siguiendo tu indicación, y la devuelve a "En revisión". Si no lo marcás, solo cambia el texto (rápido).
+
+- **Escribe con las skills reales:** el worker no improvisa — lee las **skills reales de Vakdor** (vakdor-copywriter, vakdor-carousel, Vakdor-LeadMagnet) y las sigue al pie en cada pieza, así el contenido mantiene la voz y las estructuras de la marca.
+- **Decide con datos reales (análisis diario):** una vez por día, el sistema mira **el rendimiento real de tus posts de LinkedIn** (vía Buffer: qué publicaciones tuvieron más engagement/comentarios) y usa ese ranking para dar forma a las ideas y al contenido del día — reforzando lo que funciona y evitando lo que no. Todo con números reales, nada inventado.
+
+**Regla de fondo:** todo lo que necesita las herramientas de diseño reales (imágenes de marca, PDFs) corre en la máquina de Vakdor, no en el servidor de la app. La app se encarga del tablero, publicar y programar. Detalle técnico (tablas, endpoints, worker, formatos) en TÉCNICO §16.3; estado y pendientes en `docs/interno/marketing-handoff.md`.
 
 ---
 
@@ -1932,10 +2134,11 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 - **Componentes Clave:**
   - `PerformanceMetricsGrid`: Tarjetas (KPIs) con leads, captaciones, reservas y cierres (total y variación porcentual).
   - `PerformanceCharts`: Gráfico de evolución temporal (barras) y distribución por canal de origen (dona).
-  - `ObjectivesDashboard`: Sección "Objetivos vs Alcanzado" (antes del Ranking). Tabla por asesor con 3 filas por mes (Objetivo / Alcanzado / % cumplido) + gráfico `ComposedChart` (barras objetivo vs alcanzado y línea de %). Filtro de año y toggle de métrica (Facturación / Captación). Re-carga al cambiar año vía server action `getObjectivesDashboardForYear`.
-  - `PerformanceLeaderboard`: Ranking de los asesores de la agencia.
+  - `ObjectivesDashboard`: Sección "Objetivos vs Alcanzado" (antes del Ranking). Tabla por asesor con 3 filas por mes (Objetivo / Alcanzado / % cumplido) + gráfico `ComposedChart` (barras objetivo vs alcanzado y línea de %). Filtro de año y toggle de métrica (Facturación / Captación). Re-carga al cambiar año vía server action `getObjectivesDashboardForYear`. Prop `alcance` (`"agencia"` por defecto | `"propio"`): solo cambia los textos; el recorte de filas se hace en el server (ver §27.2 → "Privacidad entre asesores").
+  - `PerformanceLeaderboard`: Ranking de los asesores de la agencia. Dos columnas distintas: **"Prelist."** = logs `type='prelisting'` cargados a mano (es la vieja "Tasac." renombrada, mismo dato) y **"ACM"** = fichas de `shared_acm_reports`, que se cuentan solas al generarlas.
   - `DashboardActivity`: Feed en tiempo real de los últimos eventos (ej. nuevo lead, propiedad sincronizada, etc.).
 - **Datos:** Llama a `getDashboardData(agency_id)` sin filtrar por asesor. Los objetivos se traen con `getObjectivesDashboard(agency_id, año)` (`lib/tracking/objetivos.ts`), que cruza `performance_objectives` (lo planificado) con lo derivado de `performance_logs` (lo alcanzado). Presente en el dashboard de director **y** de asesor.
+- **El director ve todo sin recortes.** La privacidad descrita en §27.2 ("Privacidad entre asesores") aplica solo al dashboard del asesor.
 
 #### 2. Pipeline / CRM (`/director/pipeline`)
 - **Objetivo:** Gestión visual (Kanban) de los leads y oportunidades.
@@ -1965,7 +2168,7 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 #### 5. Configuración y Asesores (`/director/configuracion`, `/director/asesores`)
 - **Objetivo:** Setup inicial y gestión del equipo.
 - **Lógica Interna:**
-  - **Asesores:** Invitar nuevos asesores mediante códigos. Cada tarjeta muestra performance real (Captaciones/Cierres/Cartera/Rotación, de `getDashboardData`) y un panel con el embudo de conversión. La única acción de gestión es **Desvincular asesor** (server action `desvincularAsesor`): pone `estado='eliminado'` + `tokens_invalidos_desde` y bloquea el email en `emails_bloqueados`, dejándolo sin acceso al sistema.
+  - **Asesores:** Invitar nuevos asesores mediante códigos. Cada tarjeta muestra performance real (Captaciones/Cierres/Cartera/Rotación, de `getDashboardData`) y un panel con el embudo de conversión. La única acción de gestión es **Desvincular asesor** (server action `desvincularAsesor`): pone `estado='eliminado'` + `tokens_invalidos_desde` y bloquea el email en `emails_bloqueados`, dejándolo sin acceso al sistema. Cada tarjeta también permite **clasificar** al asesor como *Client Director* o *Client Support* (`setClasificacionAsesor` → `profiles.clasificacion`, toggle: volver a tocar el botón activo lo deja en NULL = "Asesor"). Es una **etiqueta secundaria de organización interna: no modifica `role` ni `estado`**, así que no cambia permisos, rutas ni lo que ve el asesor.
   - **Configuración:** Token de Tokko, Instancia de WhatsApp, Branding (logo y colores para Marketing IA), y facturación.
 
 #### 6. Herramientas IA (Marketing, Contratos, Tasaciones)
@@ -1976,6 +2179,17 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 #### 7. Tracking Performance (`/director/tracking-performance`, `/asesor/tracking-performance`)
 - **Objetivo:** Registrar actividad comercial diaria (llamadas, prelistings, captaciones, etc.) para nutrir el Dashboard, y fijar los objetivos mensuales del equipo.
 - **Lógica Interna:** Utiliza tabs. El asesor ve **Actividad**; el director ve además **Objetivos** y **Configuración IA** (escalas de performance: qué puntaje da cada acción).
+- **Filtro por asesor (solo director, 2026-07):** en la solapa Actividad, un `Select` desplegable (componente `@/components/ui/select`) permite filtrar los logs por asesor individual o ver todos. La lista de asesores se computa con `useMemo` extrayendo pares únicos `agent_id`/`profiles.full_name` de los logs ya cargados (no re-consulta), ordenados alfabéticamente con `localeCompare('es')`. El filtro aplica `matchesAdvisor` sobre `log.agent_id` en el pipeline de filtros client-side (junto con tipo, estado y búsqueda). Solo se renderiza si `isDirector && advisorOptions.length > 0`. Layout: los filtros de tipo/estado van en fila 1 (con `overflow-x-auto` para scroll horizontal en mobile), y el select de asesor + búsqueda van en fila 2.
+- **Filtro de fechas (asesor y director, 2026-07):** en la misma fila 2 se reutiliza `DatePeriodFilter` (el mismo del Dashboard; escribe `from`/`to` en la URL). `TrackingPerformanceView` los lee con `useSearchParams` y suma `matchesDate` al pipeline client-side: compara el día de `fecha_actividad` (`slice(0,10)`) contra el rango; sin params = muestra todo. "Limpiar" hace `router.push(pathname)`. Como la vista es cliente y usa `useSearchParams`, las dos `page.tsx` la envuelven en `<Suspense>` (si no, el build de Next falla al prerender).
+- **Vista Pipeline (tablero por etapas, jul-2026):** dentro de la solapa *Actividad* hay un switch **Lista | Pipeline** (al lado del filtro de fechas). El tablero muestra **un cliente = una tarjeta**, parado en su etapa actual, y se puede mover entre las 6 columnas (`prospeccion → prelisting → prebuying → captacion → reserva → cierre`, orden lineal fijo). Archivos: `lib/tracking/pipeline.ts` (lógica pura, sin I/O), `components/tracking/pipeline/*` (`PipelineBoard`, `PipelineColumn`, `PipelineCard`, `PipelineStageDialog`, `PipelineClientSheet`), `actions/tracking/movePipelineCard.ts`.
+  - **Es una proyección, no una tabla nueva de actividad.** `performance_logs` no se modifica; solo se suma `tracking_pipeline_moves`, que registra los movimientos manuales (ver TECNICO §4.2).
+  - **Identidad del cliente:** las actividades se agrupan por **celular normalizado** con `normalizePhoneE164()` (único normalizador permitido). Manda el contacto de WhatsApp sobre el lead de Tokko, porque `wa_contacts.phone` está siempre cargado y `leads.phone` no. Si no se puede normalizar, la clave cae a `lead:<uuid>` / `wa:<uuid>`. Así un mismo cliente que entró por Tokko y por WhatsApp genera **una sola tarjeta**.
+  - **En qué columna cae:** la etapa del **evento más reciente por `created_at`** (momento en que se registró), comparando sus actividades contra sus movimientos manuales. Se usa `created_at` y no `fecha_actividad` porque un movimiento manual no tiene fecha de actividad, y lo último que hizo el asesor tiene que mandar aunque cargue una actividad con fecha retroactiva. Las actividades `eliminada` no cuentan para nadie, tampoco para el director.
+  - **Orden dentro de la columna:** por `lastEventAt` (el `created_at` más nuevo entre actividades y movimientos), **de la más actual a la más antigua**. Es el mismo criterio con el que se decide la columna, así orden y etapa nunca se contradicen. El tablero tiene **alto fijo** (`h-[calc(100vh-22rem)]`) y el scroll pasa **dentro de cada columna**: si el alto fuera automático, al acumularse tarjetas scrollearía la página y los encabezados de las etapas se irían de la vista.
+  - **LA REGLA del movimiento (vale igual para adelante que para atrás):** si la etapa destino **ya tiene actividad** de ese cliente → solo se registra el movimiento en `tracking_pipeline_moves` (no crea actividad, no toca métricas). Si **no la tiene** → se abre un popup con el **mismo `PerformanceLogForm`** de siempre (props `forcedType` / `lockedClient` / `defaults`), y se guarda con la misma `savePerformanceLog`. **Ninguna métrica del Dashboard cambia de valor por mover una tarjeta.**
+  - **Comportamiento de los filtros:** el tablero recibe los logs filtrados **solo por asesor**; la etapa de cada tarjeta se calcula siempre con **todo** el historial del cliente (si el rango de fechas recortara el historial, un cliente que cerró en mayo aparecería parado en prospección al filtrar julio). Los filtros de fecha y búsqueda deciden **qué tarjetas se ven**, nunca en qué columna caen. Los filtros de tipo de actividad y de estado se **ocultan** en modo Pipeline (las columnas *son* los tipos, y la etapa se calcula siempre sobre las no eliminadas).
+  - **Cliente obligatorio:** `PerformanceLogForm` ahora rechaza el envío si no se eligió cliente (aplica también al botón *Nueva Actividad* de siempre, para no tener dos comportamientos del mismo formulario). Sin cliente no hay tarjeta: esos registros se cuentan aparte y el tablero muestra un aviso ámbar invitando a editarlos y vincularles un cliente. Caso borde ya existente que **no se rompe**: si `createManualContact` no puede enlazar el contacto porque el celular ya es de otro asesor, el registro **se guarda igual** y ahora además avisa que no va a aparecer en el tablero.
+  - **Panel de trazabilidad:** al hacer clic en una tarjeta se abre un lateral con las actividades y los movimientos manuales **intercalados** por cuándo se registraron, con acceso a editar cada actividad.
 - **Tab "Objetivos" (solo director, `PerformanceObjectivesEditor`):**
   - Matriz asesores × 12 meses para cargar la meta mensual de **Facturación** (USD) y **Captación** (cantidad). Toggle de métrica + filtro de año.
   - **Edición temporal:** solo el mes en curso y los futuros son editables (`isMonthLocked`); meses cerrados se bloquean y los años anteriores quedan en solo lectura (historial de planificaciones).
@@ -1988,9 +2202,10 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
     - **Propiedad (Tokko):** Desplegable con las propiedades de la cartera de Tokko, filtradas por asesor asignado.
     - **Propiedad (Colaboración):** Campo de texto para registrar actividades con propiedades externas a la cartera de Tokko (ej. una colaboración con otra inmobiliaria).
     - **Vincular Cliente:** Búsqueda entre leads de Tokko y contactos de WhatsApp asignados al asesor.
-    - **Registro Manual de Lead (componente compartido `ManualContactFields`):** Alternativa para registrar contactos nuevos (amigos, vecinos, referidos) que no existen en la base de datos. Pide **nombre completo, celular, email y etiqueta (opcional)**. **Celular con selector de país + normalización E.164:** un `SearchableSelect` lista los países (vía `getPhoneCountries`, con bandera emoji y código de llamada; default AR) y el usuario escribe el número en formato local; `lib/whatsapp/phone.ts` lo normaliza a E.164 sin "+" con `libphonenumber-js` (`normalizePhoneE164`) y muestra el preview formateado (`formatPhoneInternational`). Para Argentina se fuerza el "9" de móvil tras validar (si el número queda como `54`+área sin `9`), porque los contactos son siempre celulares de WhatsApp. Para evitar cargas falsas/desprolijas, nombre, celular y email tienen **doble verificación**: se reescriben en un segundo campo (sin copiar/pegar — se bloquean `onPaste`/`onDrop`) y el sistema valida en tiempo real que coincidan (indicador ✅/❌); en el celular la comparación es sobre el **E.164 normalizado** (no el texto), así dos formas de escribir el mismo número se consideran iguales. Antes de habilitar la creación, exige tildar una **casilla de certificación** declarando que los datos son reales y obtenidos legítimamente (`isValid` agrupa coincidencias + formatos válidos + certificación). El teléfono se reporta hacia arriba ya en E.164. Para el director, muestra un desplegable de asesores; para el asesor, se autocompleta con su cuenta. El lead se crea vía `createManualContact.ts` (contacto en `wa_contacts` con email en `metadata`, y conversación en `wa_conversations`).
+    - **Registro Manual de Lead (componente compartido `ManualContactFields`):** Alternativa para registrar contactos nuevos (amigos, vecinos, referidos) que no existen en la base de datos. Pide **nombre completo, celular, email y etiqueta (opcional)**. **Celular con selector de país + normalización E.164:** un `SearchableSelect` lista los países (vía `getPhoneCountries`, con bandera emoji y código de llamada; default AR) y el usuario escribe el número en formato local; `lib/whatsapp/phone.ts` lo normaliza a E.164 sin "+" con `libphonenumber-js` (`normalizePhoneE164`) y muestra el preview formateado (`formatPhoneInternational`). Para Argentina se fuerza el "9" de móvil tras validar (si el número queda como `54`+área sin `9`), porque los contactos son siempre celulares de WhatsApp. Para evitar cargas falsas/desprolijas, nombre, celular y email tienen **doble verificación**: se reescriben en un segundo campo (sin copiar/pegar — se bloquean `onPaste`/`onDrop`) y el sistema valida en tiempo real que coincidan (indicador ✅/❌); en el celular la comparación es sobre el **E.164 normalizado** (no el texto), así dos formas de escribir el mismo número se consideran iguales. Antes de habilitar la creación, exige tildar una **casilla de certificación** declarando que los datos son reales y obtenidos legítimamente (`isValid` agrupa coincidencias + formatos válidos + certificación). **Excepción por etapa: en `prospeccion` el email es opcional** (prop `emailRequired={activityType !== "prospeccion"}`), porque en el primer contacto el asesor muchas veces sólo tiene el celular; en prelisting/prebuying/captación/reserva/cierre sigue siendo obligatorio. La excepción es sólo *poder dejarlo vacío*: si el asesor escribe algo en cualquiera de los dos campos de email, se le exige el mismo formato + doble verificación de siempre. El teléfono se reporta hacia arriba ya en E.164. Para el director, muestra un desplegable de asesores; para el asesor, se autocompleta con su cuenta. El lead se crea vía `createManualContact.ts` (contacto en `wa_contacts` con email en `metadata`, y conversación en `wa_conversations`).
   - **Origen de Consulta:** Lista exhaustiva de canales: Acciones indirectas, Alianzas Estratégicas, Argenprop, Arquitectos/Agrimensores, Buzoneo/Folletos, Chatbot, Cliente Antiguo, Constructor, Dueño Vende, Email Marketing, Eventos, Facebook, Familiar/Amigo, Google Ads, Google Maps, Guardia, Instagram, Landing Page, Letrero, Llamadas en frío, MercadoLibre, OLX, Open House, Portal propio, Prensa, Radio, Referido colegas, Referido cliente, Redes de contacto, Señalética, Telemarketing, TikTok, Tokko CRM, Voz a voz, WhatsApp orgánico, YouTube, ZonaProp, Otros.
-  - **Server Action:** `actions/whatsapp/createManualContact.ts` — crea el contacto en `wa_conversations` y devuelve el resultado al formulario.
+  - **Server Action:** `actions/whatsapp/createManualContact.ts` — crea el contacto en `wa_contacts` + `wa_conversations` y devuelve el resultado al formulario.
+  - **Si el teléfono ya existe en la agencia (jul-2026):** la acción busca **a nivel agencia** (no solo entre lo que ve el asesor) y decide por el dueño del **chat** (`wa_conversations.agent_id`): si está **sin asignar**, el chat queda para el asesor; si es **de otro asesor**, no se toca nada y devuelve un `warning` que el formulario muestra como aviso, pero **el registro se guarda igual**. La agenda (`wa_contacts`) nunca se reescribe. Detalle del porqué en TECNICO § 9.6.
 
 #### 8. Asistentes Conversacionales (Tutor y Consultor IA)
 - **Tutor IA (`/director/tutor`):** Chat interactivo para hacer preguntas sobre manuales o documentos internos subidos a la base de conocimiento (RAG). Consume 1 crédito por mensaje. Usa el modelo configurado y retorna las "sources" (fuentes) utilizadas.
@@ -2003,9 +2218,9 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 
   **Formulario "Agendar Visita" (`NewVisitDialog.tsx`):**
   - **Información del Lead — 3 alternativas:**
-    1. **Buscar desde Tokko:** Desplegable con leads de Tokko asignados al asesor (o todos si es director).
+    1. **Buscar desde Tokko:** Desplegable con leads de Tokko asignados al asesor (o todos si es director). `getTrackingOptions` consulta `id, full_name, phone, email`. El buscador muestra el teléfono y email en la lista, y al seleccionar un lead despliega una tarjeta de vista previa con sus datos completos (Nombre, Teléfono con badge de presencia/alerta y Email) para recopilar correctamente la información previa al envío.
     2. **Buscar desde WhatsApp:** Desplegable con contactos de `wa_conversations` de la agencia.
-    3. **Carga Manual (componente compartido `ManualContactFields`):** Nombre completo, celular (formato internacional obligatorio), email y etiqueta (opcional). Igual que en Tracking, nombre/celular/email llevan **doble verificación** (reescritura sin copiar/pegar + validación de coincidencia y formato en tiempo real) y una **casilla de certificación** obligatoria. Crea automáticamente el contacto en `wa_contacts`/`wa_conversations` vía `createManualContact.ts` y guarda el email también en `scheduled_visits`.
+    3. **Carga Manual (componente compartido `ManualContactFields`):** Nombre completo, celular (formato internacional obligatorio), email y etiqueta (opcional). Igual que en Tracking, nombre/celular/email llevan **doble verificación** (reescritura sin copiar/pegar + validación de coincidencia y formato en tiempo real) y una **casilla de certificación** obligatoria. Crea automáticamente el contacto en `wa_contacts`/`wa_conversations` vía `createManualContact.ts` y guarda el email también en `scheduled_visits`. Si el celular ya estaba cargado por otro asesor, se avisa por pantalla y **la visita se agenda igual** (no se le pisa el contacto al otro asesor).
   - **Detalle de la Cita:**
     - Fecha y hora.
     - **Propiedad (Tokko):** Desplegable filtrado por las propiedades asignadas al asesor activo (matcheo por email entre `properties.assigned_agent.email` y `profiles.email`). Si es director y selecciona un asesor del desplegable, la lista se filtra automáticamente a las propiedades de ese asesor.
@@ -2035,7 +2250,17 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
 El módulo del asesor hereda y reutiliza gran parte de los componentes de UI del director, pero con una capa estricta de filtros aplicada a nivel base de datos (y reforzada en UI) para garantizar que el Asesor solo vea **su propia información** o información compartida públicamente por la agencia.
 
 #### 1. Dashboard Asesor (`/asesor/dashboard`)
-- **Diferencia con Director:** Llama a `getDashboardData(agency_id, user.id)`. Solo muestra los KPIs y gráficos de las propiedades, leads y actividades asignadas a este asesor en particular. Sin embargo, muestra el ranking global (`PerformanceLeaderboard`) y la sección **Objetivos vs Alcanzado** (`ObjectivesDashboard`, a nivel agencia) para que el asesor conozca su posición y las metas del equipo. El asesor **no** puede editar objetivos (la carga es exclusiva del director en Tracking Performance).
+- **Diferencia con Director:** Llama a `getDashboardData(agency_id, user.id)`. Solo muestra los KPIs y gráficos de las propiedades, leads y actividades asignadas a este asesor en particular. Sin embargo, muestra el ranking global (`PerformanceLeaderboard`) para que el asesor conozca su posición, y la sección **Objetivos vs Alcanzado** (`ObjectivesDashboard`) **acotada a su propia fila**. El asesor **no** puede editar objetivos (la carga es exclusiva del director en Tracking Performance).
+
+##### Privacidad entre asesores (jul-2026)
+
+Dos recortes, ambos hechos **en el servidor**. Es deliberado y no es negociable: si el dato se mandara al navegador y solo se ocultara en pantalla, seguiría viajando en el payload RSC y cualquiera lo leería desde las herramientas del navegador. Tapar en el componente cliente **no** es ocultar.
+
+1. **Ranking — solo la facturación propia.** El asesor sigue viendo la tabla completa (posición, chats, prelistings, ACM, compradores, captaciones, reservas, cierres, cartera, rotación y la clasificación IA de todos). Lo único que se tapa es la columna **Facturación**: la suya con el monto, las demás con **"Privado"**. En `app/asesor/dashboard/page.tsx` se ordena por facturación real y **recién después** se mapean las filas ajenas a `facturacion: null` + `classificationReason: null`.
+   - El **motivo** de la clasificación se tapa junto con el monto porque el texto lo cita literal (`"Facturación US$12.500 y 3 transacción(es)..."`). La **categoría** (Elite / Sólido / …) sí queda visible.
+   - `PerformanceLeaderboard` no re-ordena cuando detecta alguna `facturacion` en `null`: respeta el orden que ya mandó el server, que es el único que conoce los montos reales.
+2. **Objetivos — solo su fila.** La página filtra `objectivesData` por `agentId === user.id` y pasa `alcance="propio"`. El recargar-por-año también viene filtrado desde el origen: `getObjectivesDashboardForYear` (`actions/tracking/objetivos.ts`) lee el `role` del perfil y devuelve solo la fila propia a **todo el que no sea director** (default seguro ante roles nuevos). El gráfico pasa a ser el del asesor y el título dice "mis objetivos".
+- **Filtro de fechas (`DatePeriodFilter`):** el asesor elige el **período** (presets Hoy/Mes/Trimestre/Año/Últimos 30, o rango a mano) y el dashboard **recalcula KPIs y ranking sobre ese rango**. El filtro escribe `from`/`to` en la URL; la página los pasa a `getDashboardData(agency_id, user.id, from, to)` (y también al leaderboard de agencia). Filtra por `fecha_actividad` de los logs y `created_at` de WhatsApp; los **objetivos siguen siendo por año** (no dependen del filtro). Mismo componente y comportamiento que ya tenía el director.
 
 #### 2. Pipeline Asesor (`/asesor/pipeline`)
 - Mismo Kanban visual (`PipelineClient`), pero la consulta SQL de carga inicial se restringe estrictamente a `assigned_agent_id = user.id`.

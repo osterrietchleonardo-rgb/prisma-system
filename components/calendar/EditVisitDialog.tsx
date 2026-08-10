@@ -171,18 +171,18 @@ export function EditVisitDialog({ visit, open, onOpenChange, onSuccess, agencyId
               <MapPin className="h-4 w-4" /> Propiedad
             </Label>
             <div className="space-y-2">
-              <Popover>
+               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left bg-accent/5 border-accent/10 h-auto p-3">
+                  <Button variant="outline" className="w-full justify-start text-left bg-accent/5 border-accent/10 h-auto p-3 min-w-0 overflow-hidden">
                     {formData.propiedad_titulo ? (
-                      <div className="flex flex-col">
+                      <div className="flex flex-col min-w-0 overflow-hidden">
                         <span className="font-bold line-clamp-1">{formData.propiedad_titulo}</span>
-                        <span className="text-xs text-muted-foreground">{formData.zona_propiedad}</span>
+                        <span className="text-xs text-muted-foreground line-clamp-1">{formData.zona_propiedad}</span>
                       </div>
                     ) : "Seleccionar desde base de datos..."}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0" align="start">
+                <PopoverContent className="w-[400px] max-w-[90vw] p-0" align="start">
                   <div className="p-2 border-b">
                     <div className="relative">
                       <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -203,13 +203,13 @@ export function EditVisitDialog({ visit, open, onOpenChange, onSuccess, agencyId
                           key={prop.id}
                           type="button"
                           className={cn(
-                            "w-full text-left p-2 rounded-sm text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5",
+                            "w-full text-left p-2 rounded-sm text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5 min-w-0 overflow-hidden",
                             formData.propiedad_titulo === prop.title && "bg-accent/10"
                           )}
                           onClick={() => handlePropertyChange(prop.id)}
                         >
-                          <span className="font-semibold">{prop.title}</span>
-                          <span className="text-xs text-muted-foreground line-clamp-1">{prop.address}</span>
+                          <span className="font-semibold line-clamp-1 text-xs">{prop.title}</span>
+                          <span className="text-[11px] text-muted-foreground line-clamp-1">{prop.address}</span>
                         </button>
                       ))
                     )}

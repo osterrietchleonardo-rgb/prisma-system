@@ -118,10 +118,14 @@ export function NewVisitDialog({
         
         if (propsData) setProperties(propsData)
 
-        // Fetch all profiles for the agency to match assigned_agent by email
+        // La lista completa (incluidos desvinculados) hace falta para emparejar
+        // el asesor de Tokko de una propiedad por email y para resolver el
+        // perfil activo. El desplegable de "Asesor Responsable" filtra en el
+        // render, no aca: si filtraramos la consulta, una propiedad de un
+        // ex-asesor perderia el nombre de su agente.
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("id, full_name, email")
+          .select("id, full_name, email, estado")
           .eq("agency_id", agencyId)
         
         if (profiles) setAllAgencyProfiles(profiles)
@@ -137,7 +141,7 @@ export function NewVisitDialog({
   const handlePropertyChange = (propertyId: string) => {
     const property = properties.find(p => p.id === propertyId)
     if (property) {
-      let updatedData = {
+      const updatedData = {
         ...formData,
         propiedad_titulo: property.title,
         zona_propiedad: property.city || property.address || ""
@@ -242,6 +246,11 @@ export function NewVisitDialog({
           setLoading(false);
           return;
         }
+
+        // El número ya era de otro asesor: se avisa, pero la visita se agenda igual.
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
       }
       
       const insertData: any = {
@@ -303,8 +312,9 @@ export function NewVisitDialog({
       setClientType("ninguno");
       setSelectedLeadId(null);
     } catch (error: any) {
+      // El detalle técnico va al log; en pantalla, algo legible.
       console.error(error)
-      toast.error("Error al agendar visita: " + error.message)
+      toast.error("No pudimos agendar la visita. Revisá los datos e intentá de nuevo; si sigue fallando, avisale al equipo de Vakdor.")
     } finally {
       setLoading(false)
     }
@@ -355,18 +365,42 @@ export function NewVisitDialog({
             )}
 
             {clientType === "tokko" && (
-               <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+               <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                   <Label>Buscar Lead de Tokko</Label>
                   <SearchableSelect 
                     options={trackingOptions.leads.map(l => ({
-                      label: l.full_name || 'Sin nombre',
-                      value: l.id
+                      label: `${l.full_name || 'Sin nombre'}${l.phone ? ` (${l.phone})` : ''}`,
+                      value: l.id,
+                      description: l.email || undefined
                     }))}
                     value={selectedLeadId || undefined}
                     onChange={(val) => setSelectedLeadId(val)}
                     placeholder="Buscar Lead de Tokko..."
                     emptyMessage="No se encontraron leads."
                   />
+                  {selectedLeadId && (() => {
+                    const selectedLead = trackingOptions.leads.find(l => l.id === selectedLeadId);
+                    if (!selectedLead) return null;
+                    const phone = selectedLead.phone || selectedLead.cellphone;
+                    const email = selectedLead.email;
+                    return (
+                      <div className="p-3 rounded-lg border border-accent/20 bg-accent/5 space-y-1 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm">{selectedLead.full_name || selectedLead.name || 'Sin nombre'}</span>
+                          {phone ? (
+                            <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-bold">
+                              📞 {phone}
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-medium">
+                              ⚠️ Sin teléfono registrado
+                            </span>
+                          )}
+                        </div>
+                        {email && <p className="text-muted-foreground">✉️ {email}</p>}
+                      </div>
+                    );
+                  })()}
                </div>
             )}
 
@@ -413,20 +447,22 @@ export function NewVisitDialog({
                   className="bg-accent/5 border-accent/10"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <Label htmlFor="propiedad_titulo">Seleccionar Propiedad (Tokko)</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
                       role="combobox"
-                      className="w-full justify-between bg-accent/5 border-accent/10 h-10 font-normal"
+                      className="w-full justify-between bg-accent/5 border-accent/10 h-10 font-normal min-w-0 overflow-hidden"
                     >
-                      {formData.propiedad_titulo || "Seleccionar propiedad..."}
+                      <span className="truncate text-left flex-1">
+                        {formData.propiedad_titulo || "Seleccionar propiedad..."}
+                      </span>
                       <Briefcase className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0 bg-card border-accent/20 shadow-2xl" align="start">
+                  <PopoverContent className="w-[400px] max-w-[90vw] p-0 bg-card border-accent/20 shadow-2xl" align="start">
                     <div className="p-2 border-b border-accent/10">
                       <div className="relative">
                         <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -449,19 +485,40 @@ export function NewVisitDialog({
                             key={prop.id}
                             type="button"
                             className={cn(
-                              "w-full text-left p-2 rounded-sm text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5",
+                              "w-full text-left p-2 rounded-sm text-sm hover:bg-accent hover:text-accent-foreground transition-colors flex flex-col gap-0.5 min-w-0 overflow-hidden",
                               formData.propiedad_titulo === prop.title && "bg-accent/10"
                             )}
                             onClick={() => handlePropertyChange(prop.id)}
                           >
-                            <span className="font-semibold">{prop.title}</span>
-                            <span className="text-xs text-muted-foreground line-clamp-1">{prop.address}</span>
+                            <span className="font-semibold line-clamp-1 text-xs">{prop.title}</span>
+                            <span className="text-[11px] text-muted-foreground line-clamp-1">{prop.address}</span>
                           </button>
                         ))
                       )}
                     </div>
                   </PopoverContent>
                 </Popover>
+
+                {formData.propiedad_titulo && (() => {
+                  const selectedProp = properties.find(p => p.title === formData.propiedad_titulo);
+                  return (
+                    <div className="p-2.5 rounded-lg border border-accent/20 bg-accent/5 space-y-1 text-xs mt-2 min-w-0 overflow-hidden">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <span className="font-semibold text-xs text-accent line-clamp-1 flex-1">{formData.propiedad_titulo}</span>
+                        {selectedProp?.city && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/10 text-accent font-medium shrink-0">
+                            {selectedProp.city}
+                          </span>
+                        )}
+                      </div>
+                      {selectedProp?.address && (
+                        <p className="text-[11px] text-muted-foreground line-clamp-1 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 shrink-0 opacity-70" /> {selectedProp.address}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="propiedad_colaboracion">Propiedad (Colaboración)</Label>
@@ -555,9 +612,13 @@ export function NewVisitDialog({
                       <SelectValue placeholder="Seleccionar asesor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {allAgencyProfiles?.map(agent => (
-                        <SelectItem key={agent.id} value={agent.id}>{agent.full_name}</SelectItem>
-                      ))}
+                      {/* Se excluye a los desvinculados. No se filtra por rol:
+                          hay visitas a cargo de directores (verificado). */}
+                      {allAgencyProfiles
+                        ?.filter(a => a.estado !== "eliminado")
+                        .map(agent => (
+                          <SelectItem key={agent.id} value={agent.id}>{agent.full_name}</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   <p className="text-[10px] text-muted-foreground italic">

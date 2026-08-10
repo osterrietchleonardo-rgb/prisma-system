@@ -12,6 +12,7 @@ import { EmptyState } from "./EmptyState"
 import { toast } from "sonner"
 import { markConversationRead, deleteConversation } from "@/app/actions/whatsapp"
 import { getClasificacionStyle } from "@/lib/whatsapp/clasificacion"
+import { clasificacionesDe } from "@/lib/whatsapp/clasificaciones"
 import {
   Select,
   SelectContent,
@@ -109,12 +110,17 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
           .select("*, assigned_agent:profiles!wa_conversations_agent_id_fkey(email)")
           .eq("instance_id", instance.id)
           .order("last_message_at", { ascending: false })
+          .limit(1000)
 
         if (error) {
           console.error("Error loading conversations with agents:", error)
           setDebugError(error.message)
+        } else {
+          // Se recupero: hay que limpiar el error, si no la pantalla queda
+          // trabada para siempre por un fallo pasajero de un solo refresco.
+          setDebugError(null)
         }
-        
+
         if (data) {
           setConversations(data as any[])
         }
@@ -127,10 +133,13 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
 
     load()
 
-    // Refresh param: Auto-refresh cada 5 segundos
+    // Auto-refresh de respaldo. El canal realtime de abajo es el que trae los
+    // mensajes al instante; esto solo cubre el caso de que la suscripcion se
+    // caiga (tipico en celular, cuando el navegador suspende la pestaña).
+    // Estaba en 5s: 720 consultas por hora y por asesor sobre la tabla entera.
     const interval = setInterval(() => {
       load()
-    }, 5 * 1000)
+    }, 30 * 1000)
 
     let channel: any = null
     let broadcastChannel: any = null
@@ -259,7 +268,9 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
 
   const clasifOptions = useMemo(() => {
     const set = new Set<string>()
-    conversations.forEach((c) => { if (c?.clasificacion) set.add(c.clasificacion) })
+    // Todas las clasificaciones del recorrido, no solo la de origen: así se puede
+    // filtrar la bandeja por una plantilla enviada ("quiénes recibieron Oferta-Julio").
+    conversations.forEach((c) => { if (c) clasificacionesDe(c).forEach((v) => set.add(v)) })
     return Array.from(set).sort()
   }, [conversations])
 
@@ -269,10 +280,12 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
       if (!c) return false;
       // Búsqueda por nombre o teléfono
       const searchTerm = search.toLowerCase()
-      const matchesSearch = 
-        (c.contact_phone || "").toLowerCase().includes(searchTerm) || 
-        (c.contact_name || "").toLowerCase().includes(searchTerm)
-      
+      const clasificaciones = clasificacionesDe(c)
+      const matchesSearch =
+        (c.contact_phone || "").toLowerCase().includes(searchTerm) ||
+        (c.contact_name || "").toLowerCase().includes(searchTerm) ||
+        clasificaciones.some((v) => v.toLowerCase().includes(searchTerm))
+
       if (!matchesSearch) return false
 
       // Filtro por tab (bot/pausado/etc)
@@ -286,11 +299,11 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
         if (email !== filterAgentEmail) return false;
       }
 
-      // Filtro por clasificación
+      // Filtro por clasificación: coincide con CUALQUIERA de las que tuvo el lead.
       if (filterClasif !== "all") {
         if (filterClasif === "__none__") {
-          if (c.clasificacion) return false;
-        } else if (c.clasificacion !== filterClasif) {
+          if (clasificaciones.length > 0) return false;
+        } else if (!clasificaciones.includes(filterClasif)) {
           return false;
         }
       }
@@ -299,7 +312,28 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
     })
   }, [conversations, search, tab, filterAgentEmail, filterClasif])
 
-  if (debugError) return <div style={{color:'red',padding:'20px',fontSize:'18px', backgroundColor: 'white', border: '2px solid red'}}>DEBUG ERROR: {debugError}</div>
+  // Solo tomamos la pantalla si ademas no hay nada para mostrar: si ya habia
+  // conversaciones cargadas, un refresco fallido no tiene por que borrar la
+  // bandeja. El texto es para el asesor, no para el que programa.
+  if (debugError && conversations.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
+        <MessageSquare className="h-10 w-10 text-muted-foreground/50" />
+        <p className="font-medium">No pudimos cargar las conversaciones</p>
+        <p className="text-sm text-muted-foreground max-w-xs">
+          Puede ser una demora momentánea. Probá de nuevo en unos segundos.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-1 inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
+        >
+          <RefreshCw className="h-4 w-4" />
+          Reintentar
+        </button>
+        <p className="text-[11px] text-muted-foreground/60 mt-2">{debugError}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
@@ -479,18 +513,27 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
                       )}
                     </div>
 
-                    {conv.clasificacion && (
-                      <div className="flex flex-wrap gap-1">
-                        {(() => {
-                          const cl = getClasificacionStyle(conv.clasificacion)
-                          return (
-                            <span className={`text-[8px] px-1.5 rounded uppercase font-black tracking-tighter border ${cl.className}`}>
-                              {cl.label}
-                            </span>
-                          )
-                        })()}
-                      </div>
-                    )}
+                    {(() => {
+                      // Recorrido del lead: de dónde vino y qué campañas/plantillas recibió.
+                      const todas = clasificacionesDe(conv)
+                      if (todas.length === 0) return null
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          {todas.map((valor, i) => {
+                            const cl = getClasificacionStyle(valor)
+                            return (
+                              <span
+                                key={valor}
+                                title={i === 0 ? "Origen del lead" : `Clasificación ${i + 1}`}
+                                className={`text-[8px] px-1.5 rounded uppercase font-black tracking-tighter border ${cl.className}`}
+                              >
+                                {cl.label}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
 
                     {conv.etiquetas && conv.etiquetas.length > 0 && (
                       <div className="flex flex-wrap gap-1">

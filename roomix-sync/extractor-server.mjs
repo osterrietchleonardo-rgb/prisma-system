@@ -408,6 +408,36 @@ function pageScore(r) {
   return ld * 100000 + txt;
 }
 
+// ─── Barrio por COHERENCIA (no por prioridad de fuente) ───
+// Junta los barrios candidatos de TODAS las fuentes (JSON-LD, IA, texto de ubicación),
+// descarta la "zona general" (Capital Federal, CABA, Buenos Aires, Argentina, Provincia,
+// Zona Norte/Sur/…) y elige el de MAYOR coherencia: el que corrobora el slug de la URL
+// y/o repiten varias fuentes. Si ninguno es un barrio real, devuelve '' (mejor vacío que
+// una zona general que después rompe el match de la propiedad del link).
+const ZONA_GENERAL = /^(capital federal|ciudad(\s+aut[oó]noma)?\s+de\s+buenos\s+aires|c\.?a\.?b\.?a\.?|buenos aires|argentina|gran buenos aires|g\.?b\.?a\.?|provincia(\s+de\s+buenos\s+aires)?|zona\s+(norte|sur|oeste|este)|amba)$/i;
+function normBarrio(s) {
+  return (s || '').toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
+}
+function pickBarrioCoherente(cands, url) {
+  let slug = '';
+  try { slug = normBarrio(decodeURIComponent(url || '')); } catch { slug = normBarrio(url || ''); }
+  // "Caballito, Capital Federal" -> "Caballito"; descarta vacíos y zona general
+  const limpios = (cands || [])
+    .map((c) => (c || '').toString().split(',')[0].trim())
+    .filter((c) => c && !ZONA_GENERAL.test(c));
+  if (!limpios.length) return '';
+  const score = (c) => {
+    const n = normBarrio(c);
+    if (!n) return -1;
+    let s = limpios.filter((o) => normBarrio(o) === n).length; // cuántas fuentes coinciden
+    if (slug.includes(n)) s += 3;                              // corroborado por la URL = fuerte
+    return s;
+  };
+  return limpios.slice().sort((a, b) => score(b) - score(a))[0];
+}
+
 async function extract(url, maxAttempts = 5, debug = false) {
   let best = { html: '', text: '', title: '' };
   let bestScore = -1;
@@ -447,7 +477,8 @@ async function extract(url, maxAttempts = 5, debug = false) {
 
   // 1) Deterministas: NÚMEROS duros y datos estructurados exactos del portal (precio, m², ambientes).
   //    No inventan moneda/operación: solo las ponen si el portal las declara explícitamente.
-  apply(fromJsonLd(html));
+  const ldRes = fromJsonLd(html);
+  apply(ldRes);
   apply(fromOpenGraph(html));
   apply(fromVisibleText(text));
 
@@ -482,12 +513,20 @@ async function extract(url, maxAttempts = 5, debug = false) {
   // Dirección/barrio reales del bloque de ubicación (ML deja el TÍTULO en dirección).
   const loc = fromLocationText(text);
   if (loc && loc.sujeto) {
-    if (!merged.sujeto.barrio && loc.sujeto.barrio) merged.sujeto.barrio = loc.sujeto.barrio;
     // Si la dirección actual parece un título (larga o con "!") y hay una calle real, la reemplazamos.
     const cur = merged.sujeto.direccion || '';
     const curEsTitulo = !cur || cur.length > 45 || /[!¡]/.test(cur);
     if (loc.sujeto.direccion && curEsTitulo) merged.sujeto.direccion = loc.sujeto.direccion;
   }
+
+  // BARRIO por COHERENCIA (no por prioridad de fuente): junta los candidatos de JSON-LD, IA y
+  // texto de ubicación, descarta la zona general (Capital Federal, CABA, Argentina…) y elige el
+  // que corrobora la URL o repiten varias fuentes. Antes ganaba el JSON-LD aunque trajera la zona
+  // general ("Capital Federal, Argentina"), tapando el barrio real y rompiendo el match del link.
+  merged.sujeto.barrio = pickBarrioCoherente(
+    [ldRes?.sujeto?.barrio, iaRes?.sujeto?.barrio, loc?.sujeto?.barrio],
+    url,
+  ) || '';
 
   // Amenidades: las razona la IA (objeto de 9 banderas), ya quedaron en merged.sujeto.amenidades
   // vía el override de arriba. Sin mapeo por palabras clave.

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { performanceLogSchema, PerformanceLogFormData, PerformanceLog } from "@/lib/tracking/types";
+import { performanceLogSchema, PerformanceLogFormData, PerformanceLog, ActivityType } from "@/lib/tracking/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,9 +25,26 @@ interface Props {
   onSuccess: () => void;
   logToEdit?: PerformanceLog | null;
   isDirector?: boolean;
+  /** Fija la etapa y oculta el selector. Lo usa el popup del tablero. */
+  forcedType?: ActivityType;
+  /** Fija el cliente y oculta el selector. Lo usa el popup del tablero. */
+  lockedClient?: {
+    label: string;
+    leadId: string | null;
+    waContactId: string | null;
+  };
+  /** Precarga la propiedad del último registro del cliente (editable). */
+  defaults?: { propertyId: string | null; propiedadRef: string | null };
 }
 
-export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }: Props) {
+export function PerformanceLogForm({
+  onSuccess,
+  logToEdit,
+  isDirector = false,
+  forcedType,
+  lockedClient,
+  defaults,
+}: Props) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reason, setReason] = useState("");
 
@@ -41,11 +58,11 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
       fecha_actividad: logToEdit.fecha_actividad ? logToEdit.fecha_actividad.split("T")[0] : new Date().toISOString().split("T")[0],
       metadata: logToEdit.metadata || {},
     } : {
-      type: "prospeccion",
-      propiedad_ref: "",
-      property_id: null,
-      lead_id: null,
-      wa_contact_id: null,
+      type: forcedType ?? "prospeccion",
+      propiedad_ref: defaults?.propiedadRef ?? "",
+      property_id: defaults?.propertyId ?? null,
+      lead_id: lockedClient?.leadId ?? null,
+      wa_contact_id: lockedClient?.waContactId ?? null,
       monto_operacion: 0,
       comision_generada: 0,
       fecha_actividad: new Date().toISOString().split("T")[0],
@@ -60,7 +77,9 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
     agents?: any[];
   }>({ properties: [], leads: [], waContacts: [], agents: [] });
 
-  const [clientType, setClientType] = useState<"ninguno" | "tokko" | "whatsapp" | "manual">("ninguno");
+  const [clientType, setClientType] = useState<"ninguno" | "tokko" | "whatsapp" | "manual">(
+    lockedClient ? (lockedClient.waContactId ? "whatsapp" : "tokko") : "ninguno"
+  );
 
   // Manual contact form state (con doble verificación + certificación)
   const [manualContact, setManualContact] = useState<ManualContactData>({
@@ -89,6 +108,11 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
   const { watch, setValue, register, formState: { errors } } = form;
   const activityType = watch("type");
 
+  // En prospección el asesor recién está conociendo al cliente: muchas veces
+  // sólo tiene el celular. De la segunda etapa en adelante el email vuelve a
+  // ser obligatorio, porque a esa altura ya debería tenerlo.
+  const emailObligatorio = activityType !== "prospeccion";
+
   // Sync metadata when specific fields change
   const handleMetadataChange = (key: string, value: any) => {
     const currentMetadata = watch("metadata") || {};
@@ -98,12 +122,37 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
   const onSubmit = async (values: PerformanceLogFormData) => {
     setIsSubmitting(true);
     try {
-      let finalValues = { ...values };
+      // `const` y no `let`: nunca se reasigna, sólo se le escribe una propiedad
+      // (`wa_contact_id`) más abajo, y eso `const` lo permite igual.
+      const finalValues = { ...values };
+
+      // Cliente obligatorio: sin cliente no se puede armar la tarjeta del
+      // pipeline. Se valida sobre lo que el usuario ELIGIÓ, no sobre el
+      // resultado de resolverlo (ver el caso del alta manual más abajo).
+      if (clientType === "ninguno") {
+        toast.error("Vinculá un cliente: elegí un lead de Tokko, un contacto de WhatsApp, o cargalo como contacto nuevo.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (clientType === "tokko" && !values.lead_id) {
+        toast.error("Elegí el lead de Tokko de la lista.");
+        setIsSubmitting(false);
+        return;
+      }
+      if (clientType === "whatsapp" && !values.wa_contact_id) {
+        toast.error("Elegí el contacto de WhatsApp de la lista.");
+        setIsSubmitting(false);
+        return;
+      }
 
       // Si seleccionó nuevo contacto manual, lo creamos primero
       if (clientType === "manual") {
         if (!manualContact.isValid) {
-          toast.error("Completá y verificá los datos del contacto (nombre, celular y email deben coincidir) y certificá que son veraces.");
+          toast.error(
+            values.type === "prospeccion"
+              ? "Completá y verificá los datos del contacto (nombre y celular deben coincidir; el email es opcional, pero si lo cargás también tiene que coincidir) y certificá que son veraces."
+              : "Completá y verificá los datos del contacto (nombre, celular y email deben coincidir) y certificá que son veraces."
+          );
           setIsSubmitting(false);
           return;
         }
@@ -116,13 +165,24 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
           agent_id: isDirector && manualAgentId ? manualAgentId : undefined
         });
 
-        if (!result.success || !result.wa_contact_id) {
+        if (!result.success) {
           toast.error(result.error || "Error al crear el contacto manualmente.");
           setIsSubmitting(false);
           return;
         }
-        
-        finalValues.wa_contact_id = result.wa_contact_id;
+
+        // El número ya era de otro asesor: se avisa, pero el registro se guarda igual.
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
+
+        // Puede venir vacío si el lead es de otro asesor y no hay contacto que
+        // enlazar; el registro se guarda igual, solo sin el vínculo. En ese
+        // caso no va a generar tarjeta en el tablero, y hay que avisarlo.
+        finalValues.wa_contact_id = result.wa_contact_id ?? null;
+        if (!result.wa_contact_id) {
+          toast.warning("La actividad se guarda, pero no va a aparecer en el tablero: ese celular ya es de otro asesor.");
+        }
       }
 
       if (logToEdit) {
@@ -159,24 +219,32 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
         <div className="grid grid-cols-1 gap-4">
           <div className="space-y-2">
             <Label htmlFor="type">Tipo de Actividad *</Label>
-            <Select onValueChange={(v) => {
-              setValue("type", v as any);
-              setValue("metadata", {}); // Reset metadata on type change
-              setValue("monto_operacion", 0);
-              setValue("comision_generada", 0);
-            }} value={watch("type")}>
-              <SelectTrigger className="h-12 text-base">
-                <SelectValue placeholder="Seleccionar actividad..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="prospeccion">Prospección</SelectItem>
-                <SelectItem value="prelisting">Prelisting</SelectItem>
-                <SelectItem value="prebuying">Prebuying</SelectItem>
-                <SelectItem value="captacion">Captación</SelectItem>
-                <SelectItem value="reserva">Reserva</SelectItem>
-                <SelectItem value="cierre">Cierre</SelectItem>
-              </SelectContent>
-            </Select>
+            {forcedType ? (
+              // Viene del tablero: la etapa la decide la columna donde soltaste
+              // la tarjeta, así que se muestra pero no se cambia acá.
+              <div className="h-12 px-3 flex items-center rounded-md border border-accent/20 bg-accent/5 text-base font-semibold capitalize">
+                {forcedType}
+              </div>
+            ) : (
+              <Select onValueChange={(v) => {
+                setValue("type", v as any);
+                setValue("metadata", {}); // Reset metadata on type change
+                setValue("monto_operacion", 0);
+                setValue("comision_generada", 0);
+              }} value={watch("type")}>
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue placeholder="Seleccionar actividad..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="prospeccion">Prospección</SelectItem>
+                  <SelectItem value="prelisting">Prelisting</SelectItem>
+                  <SelectItem value="prebuying">Prebuying</SelectItem>
+                  <SelectItem value="captacion">Captación</SelectItem>
+                  <SelectItem value="reserva">Reserva</SelectItem>
+                  <SelectItem value="cierre">Cierre</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
       </section>
@@ -441,7 +509,7 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
         <div className="space-y-4">
           <header className="flex items-center gap-2 text-accent/70 font-semibold">
              <MapPin className="w-4 h-4" />
-             <h3 className="text-xs uppercase tracking-wider">Activos Vinculados (Opcional)</h3>
+             <h3 className="text-xs uppercase tracking-wider">Propiedad (opcional) y Cliente</h3>
           </header>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -507,9 +575,16 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
           <div className="space-y-4 p-4 border border-white/5 rounded-2xl bg-white/5">
             <div className="flex items-center gap-2 mb-2">
               <User className="w-4 h-4 text-accent" />
-              <Label className="text-sm font-medium">Vincular Cliente</Label>
+              <Label className="text-sm font-medium">Vincular Cliente *</Label>
             </div>
             
+            {lockedClient ? (
+              // Viene del tablero: la tarjeta ES el cliente, no se cambia acá.
+              <div className="px-3 py-2.5 rounded-md border border-accent/20 bg-accent/5 text-sm font-semibold">
+                {lockedClient.label}
+              </div>
+            ) : (
+              <>
             <Select value={clientType} onValueChange={(v: any) => {
               setClientType(v);
               if (v !== "tokko") setValue("lead_id", null);
@@ -559,7 +634,7 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
 
             {clientType === "manual" && (
               <div className="animate-in fade-in slide-in-from-top-2 space-y-4 pt-2">
-                <ManualContactFields onChange={setManualContact} />
+                <ManualContactFields onChange={setManualContact} emailRequired={emailObligatorio} />
 
                 {isDirector && (
                   <div className="space-y-2">
@@ -577,6 +652,8 @@ export function PerformanceLogForm({ onSuccess, logToEdit, isDirector = false }:
                   </div>
                 )}
               </div>
+            )}
+              </>
             )}
           </div>
 

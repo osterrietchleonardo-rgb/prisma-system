@@ -1,0 +1,18 @@
+name: PRISMA Marketing Auto-Publish
+
+on:
+  schedule:
+    # Cada 30 minutos (UTC). Publica ideas aprobadas cuya fecha programada ya venció.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    # Permite dispararlo manualmente desde la pestaña Actions de GitHub.
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger marketing auto-publish
+        run: |
+          curl -sS -X POST "https://${{ secrets.SITE_DOMAIN }}/api/admin-vakdor/marketing/publicar-programadas" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"

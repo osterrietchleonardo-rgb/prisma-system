@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil, Building2, Link2, Search, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -29,6 +30,8 @@ interface CarteraItem {
   m2: number | null;
   room_amount: number | null;
   antiguedad: number | null;
+  a_estrenar: boolean;
+  en_pozo: boolean;
   amenidades: Amenidades;
 }
 
@@ -37,6 +40,8 @@ interface SubjectInputProps {
   onChange: (s: Sujeto) => void;
   operacion: Operacion;
   onOperacionChange: (o: Operacion) => void;
+  considerarPh: boolean;
+  onConsiderarPhChange: (v: boolean) => void;
   onBuscar: () => void;
   loading: boolean;
   excludeId: string | null;
@@ -69,6 +74,8 @@ function carteraToSujeto(p: CarteraItem, base: Sujeto): Sujeto {
     dormitorios,
     banos: p.bathrooms || 0,
     antiguedad_anios: p.antiguedad ?? base.antiguedad_anios,
+    a_estrenar: Boolean(p.a_estrenar),
+    en_pozo: Boolean(p.en_pozo),
     amenidades: p.amenidades || base.amenidades,
     moneda: (p.currency as any) === "ARS" ? "ARS" : "USD",
   };
@@ -79,6 +86,8 @@ export function SubjectInput({
   onChange,
   operacion,
   onOperacionChange,
+  considerarPh,
+  onConsiderarPhChange,
   onBuscar,
   loading,
   excludeId,
@@ -232,6 +241,24 @@ export function SubjectInput({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Considerar PH: solo visible cuando el tipo es Casa. Los PH figuran como "casa"
+          en los portales, pero no siempre son comparables → el cliente decide. */}
+      {sujeto.tipo_propiedad === "casa" && (
+        <label className="flex items-start gap-3 p-4 rounded-2xl border border-accent/10 bg-card/20 cursor-pointer">
+          <Checkbox
+            checked={considerarPh}
+            onCheckedChange={(v) => onConsiderarPhChange(v === true)}
+            className="mt-0.5"
+          />
+          <span className="text-sm">
+            <span className="font-bold">Considerar PH como comparables</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              Los PH figuran como “casa” en los portales. Destildá si querés comparar solo casas puras.
+            </span>
+          </span>
+        </label>
+      )}
 
       {/* Modo cartera */}
       {modo === "cartera" && (

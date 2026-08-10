@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   Check, X, Minus, ChevronDown, ExternalLink, Building2, Network, ArrowLeft, MapPin, Ruler, DoorOpen,
-  FileText, Loader2, CheckSquare, Square,
+  FileText, Loader2, CheckSquare, Square, Plus, Trash2, Sparkles,
 } from "lucide-react";
 
 interface Props {
@@ -17,6 +17,10 @@ interface Props {
   cartera: AcmComparable[];
   roomix: AcmComparable[];
   conSemantica: boolean;
+  /** Fila del historial "Mis ACM" a la que pertenece esta búsqueda (para colgarle la ficha). */
+  searchId?: string | null;
+  /** Avisa qué fila del historial quedó asociada a la ficha recién creada. */
+  onFichaCreada?: (searchId: string | null) => void;
   onVolver: () => void;
 }
 
@@ -161,12 +165,18 @@ function Section({
 
 const MAX_FICHA = 12;
 
-export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSemantica, onVolver }: Props) {
+export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSemantica, searchId, onFichaCreada, onVolver }: Props) {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  // Revisión de conclusiones antes de crear la ficha (paso previo).
+  const [revisando, setRevisando] = useState(false);      // modal abierto
+  const [cargandoPrev, setCargandoPrev] = useState(false); // pidiendo el cálculo
+  const [conclusiones, setConclusiones] = useState<string[]>([]);
+  const [incluirConclusiones, setIncluirConclusiones] = useState(true);
 
   const byId = useMemo(() => {
     const m = new Map<string, AcmComparable>();
@@ -192,10 +202,39 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
   const cancelar = () => {
     setSelecting(false);
     setSelected(new Set());
+    setRevisando(false);
+  };
+
+  const seleccionados = () => [...selected].map((id) => byId.get(id)).filter(Boolean) as AcmComparable[];
+
+  /** Paso previo: calcula las conclusiones (sin guardar nada) y las muestra para revisar/editar. */
+  const revisarConclusiones = async () => {
+    const comparables = seleccionados();
+    if (comparables.length === 0) {
+      toast.error("Seleccioná al menos un comparable.");
+      return;
+    }
+    setCargandoPrev(true);
+    try {
+      const res = await fetch("/api/acm/ficha", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operacion, sujeto, comparables, preview: true }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "No se pudieron calcular las conclusiones.");
+      setConclusiones(Array.isArray(data.conclusiones) ? data.conclusiones : []);
+      setIncluirConclusiones(true);
+      setRevisando(true);
+    } catch (e: any) {
+      toast.error("Error preparando la ficha: " + e.message);
+    } finally {
+      setCargandoPrev(false);
+    }
   };
 
   const crearFicha = async () => {
-    const comparables = [...selected].map((id) => byId.get(id)).filter(Boolean) as AcmComparable[];
+    const comparables = seleccionados();
     if (comparables.length === 0) {
       toast.error("Seleccioná al menos un comparable.");
       return;
@@ -205,10 +244,15 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
       const res = await fetch("/api/acm/ficha", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operacion, sujeto, comparables }),
+        body: JSON.stringify({
+          operacion, sujeto, comparables, search_id: searchId ?? null,
+          // [] = el asesor decidió que la sección de conclusiones no aparezca en la ficha.
+          conclusiones: incluirConclusiones ? conclusiones.filter((t) => t.trim()) : [],
+        }),
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || "No se pudo crear la ficha.");
+      onFichaCreada?.(data.search_id ?? searchId ?? null);
       toast.success("Ficha creada. Abriendo…");
       window.open(data.path, "_blank");
       cancelar();
@@ -288,12 +332,97 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
             <Button
               size="sm"
               className="bg-accent text-accent-foreground hover:bg-accent/90"
-              disabled={creating || selected.size === 0}
-              onClick={crearFicha}
+              disabled={cargandoPrev || selected.size === 0}
+              onClick={revisarConclusiones}
             >
-              {creating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileText className="w-4 h-4 mr-1" />}
-              {creating ? "Creando…" : "Crear ficha"}
+              {cargandoPrev ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileText className="w-4 h-4 mr-1" />}
+              {cargandoPrev ? "Preparando…" : "Continuar"}
             </Button>
+          </div>,
+          document.body
+        )}
+
+      {/* Revisión de conclusiones antes de generar la ficha */}
+      {revisando && mounted &&
+        createPortal(
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-card border border-accent/20 shadow-2xl">
+              <div className="p-5 border-b border-accent/10">
+                <h3 className="text-lg font-black flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-accent" /> Conclusiones del estudio
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Se calcularon con los comparables que elegiste. Podés editarlas, agregar las tuyas o sacar la sección
+                  para que no aparezca en la ficha del cliente.
+                </p>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={() => setIncluirConclusiones((v) => !v)}
+                    className="text-accent"
+                    aria-label={incluirConclusiones ? "Sacar la sección de conclusiones" : "Incluir la sección de conclusiones"}
+                  >
+                    {incluirConclusiones ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-muted-foreground/50" />}
+                  </button>
+                  Incluir la sección de conclusiones en la ficha
+                </label>
+
+                {incluirConclusiones && (
+                  <div className="space-y-3 pt-1">
+                    {conclusiones.length === 0 && (
+                      <p className="text-sm text-muted-foreground italic">
+                        Sin conclusiones. Agregá una o dejá la sección afuera.
+                      </p>
+                    )}
+                    {conclusiones.map((t, i) => (
+                      <div key={i} className="flex gap-2 items-start">
+                        <textarea
+                          value={t}
+                          onChange={(e) =>
+                            setConclusiones((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
+                          }
+                          rows={3}
+                          className="flex-1 rounded-xl border border-accent/20 bg-background/50 p-3 text-sm leading-relaxed resize-y focus:outline-none focus:ring-1 focus:ring-accent"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setConclusiones((prev) => prev.filter((_, j) => j !== i))}
+                          className="mt-1 p-2 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                          aria-label="Eliminar conclusión"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-accent/20"
+                      onClick={() => setConclusiones((prev) => [...prev, ""])}
+                    >
+                      <Plus className="w-4 h-4 mr-1" /> Agregar conclusión
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-5 border-t border-accent/10 flex justify-end gap-3">
+                <Button variant="ghost" onClick={() => setRevisando(false)} disabled={creating}>
+                  Volver
+                </Button>
+                <Button
+                  className="bg-accent text-accent-foreground hover:bg-accent/90"
+                  disabled={creating}
+                  onClick={crearFicha}
+                >
+                  {creating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileText className="w-4 h-4 mr-1" />}
+                  {creating ? "Creando…" : "Crear ficha"}
+                </Button>
+              </div>
+            </div>
           </div>,
           document.body
         )}

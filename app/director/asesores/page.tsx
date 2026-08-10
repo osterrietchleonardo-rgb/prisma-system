@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { 
   UserPlus, 
   Search, 
@@ -17,12 +17,23 @@ import {
   Briefcase,
   PauseCircle,
   PlayCircle,
-  AlertTriangle
+  AlertTriangle,
+  Trash2,
+  Filter,
+  Users,
+  RotateCcw
 } from "lucide-react"
 import { getAgentPerformanceAction, getAgencyAdvisorsPerformanceAction } from "@/app/actions/performance"
-import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa } from "@/app/actions/asesores"
+import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa, setClasificacionAsesor, getHuellaDatosAsesor, eliminarAsesorDefinitivamente, type ClasificacionAsesor } from "@/app/actions/asesores"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Card,
   CardContent,
@@ -60,10 +71,22 @@ import { createClient } from "@/lib/supabase"
 import { QRCodeSVG } from "qrcode.react"
 // import { cn } from "@/lib/utils" // Unused
 
+// Clasificaciones que el director puede asignar a cada asesor.
+// Si no elige ninguna, el asesor queda simplemente como "Asesor".
+const CLASIFICACIONES: { valor: ClasificacionAsesor; label: string }[] = [
+  { valor: "client_director", label: "Client Director" },
+  { valor: "client_support", label: "Client Support" },
+]
+
+const labelClasificacion = (valor?: string | null) =>
+  CLASIFICACIONES.find((c) => c.valor === valor)?.label ?? "Asesor"
+
 export default function AsesoresPage() {
   const [agents, setAgents] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [selectedAdvisorFilter, setSelectedAdvisorFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
   const [copied, setCopied] = useState(false)
@@ -77,8 +100,17 @@ export default function AsesoresPage() {
   const [pauseReason, setPauseReason] = useState("")
   const [pausing, setPausing] = useState(false)
   const [reanudando, setReanudando] = useState<string | null>(null)
+  // Asesor cuya clasificación se está guardando (para deshabilitar sus botones)
+  const [clasificando, setClasificando] = useState<string | null>(null)
   // Diálogo de desvinculación: asesor elegido + motivo
   const [agentToUnlink, setAgentToUnlink] = useState<Record<string, any> | null>(null)
+
+  // Borrado definitivo (duplicados / cargas por error)
+  const [agentToDelete, setAgentToDelete] = useState<Record<string, any> | null>(null)
+  const [deleteReason, setDeleteReason] = useState("")
+  const [borrando, setBorrando] = useState<string | null>(null)
+  const [verificandoHuella, setVerificandoHuella] = useState(false)
+  const [huella, setHuella] = useState<{ puedeBorrarse: boolean; bloqueantes: { etiqueta: string; filas: number }[] } | null>(null)
   const [unlinkReason, setUnlinkReason] = useState("")
   // Info de la pausa vigente del asesor abierto en el panel (motivo/fecha/quién)
   const [pauseInfo, setPauseInfo] = useState<{ motivo: string | null; created_at: string; ejecutado_por_nombre: string | null } | null>(null)
@@ -172,6 +204,46 @@ export default function AsesoresPage() {
     }
   }
 
+  // Al abrir el diálogo de borrado se mide qué tiene el perfil encima, para
+  // mostrárselo al director antes de que confirme. La autorización real la
+  // vuelve a hacer el servidor: esto es solo para la pantalla.
+  const abrirDialogoBorrado = async (agent: Record<string, any>) => {
+    setAgentToDelete(agent)
+    setDeleteReason("")
+    setHuella(null)
+    setVerificandoHuella(true)
+    try {
+      setHuella(await getHuellaDatosAsesor(agent.id))
+    } catch (e: any) {
+      toast.error(e.message || "No se pudo verificar el asesor")
+      setAgentToDelete(null)
+    } finally {
+      setVerificandoHuella(false)
+    }
+  }
+
+  // Confirmado el borrado definitivo (con motivo obligatorio).
+  const handleConfirmBorrado = async () => {
+    if (!agentToDelete) return
+    if (!deleteReason.trim()) {
+      toast.error("Escribí el motivo del borrado")
+      return
+    }
+    try {
+      setBorrando(agentToDelete.id)
+      const res = await eliminarAsesorDefinitivamente(agentToDelete.id, deleteReason)
+      toast.success(`Perfil de ${res.borrado.nombre || res.borrado.email} eliminado definitivamente.`)
+      setAgentToDelete(null)
+      setDeleteReason("")
+      setSelectedAgent(null)
+      fetchAgents()
+    } catch (e: any) {
+      toast.error(e.message || "Error al eliminar el perfil")
+    } finally {
+      setBorrando(null)
+    }
+  }
+
   // Confirmada la pausa desde el diálogo (con motivo obligatorio).
   const handleConfirmPausar = async () => {
     if (!agentToPause) return
@@ -205,6 +277,23 @@ export default function AsesoresPage() {
       toast.error(e.message || "Error al reactivar asesor")
     } finally {
       setReanudando(null)
+    }
+  }
+
+  // Clasifica al asesor. Si toca el botón que ya estaba activo, lo deselecciona
+  // (vuelve a quedar como "Asesor").
+  const handleClasificar = async (agent: Record<string, any>, valor: ClasificacionAsesor) => {
+    const nuevo = agent.clasificacion === valor ? null : valor
+    try {
+      setClasificando(agent.id)
+      await setClasificacionAsesor(agent.id, nuevo)
+      setAgents((prev) => prev.map((a) => (a.id === agent.id ? { ...a, clasificacion: nuevo } : a)))
+      setSelectedAgent((prev) => (prev?.id === agent.id ? { ...prev, clasificacion: nuevo } : prev))
+      toast.success(nuevo ? `Clasificado como ${labelClasificacion(nuevo)}` : "Clasificación quitada. Queda como Asesor.")
+    } catch (e: any) {
+      toast.error(e.message || "Error al clasificar al asesor")
+    } finally {
+      setClasificando(null)
     }
   }
 
@@ -275,10 +364,47 @@ export default function AsesoresPage() {
     toast.success("Código copiado")
   }
 
-  const filteredAgents = agents.filter(a => 
-    a.full_name?.toLowerCase().includes(search.toLowerCase()) || 
-    a.email?.toLowerCase().includes(search.toLowerCase())
-  )
+  const sortedAdvisorOptions = useMemo(() => {
+    return [...agents].sort((a, b) => 
+      (a.full_name || "").localeCompare(b.full_name || "", "es", { sensitivity: "base" })
+    )
+  }, [agents])
+
+  const filteredAgents = useMemo(() => {
+    return agents.filter((agent) => {
+      // 1. Búsqueda por texto (nombre o email)
+      const matchesSearch =
+        !search.trim() ||
+        agent.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+        agent.email?.toLowerCase().includes(search.toLowerCase())
+
+      // 2. Filtro por Asesor específico
+      const matchesAdvisor =
+        selectedAdvisorFilter === "all" || agent.id === selectedAdvisorFilter
+
+      // 3. Filtro por Estado (activo, pausado, eliminado)
+      const matchesStatus =
+        statusFilter === "all"
+          ? true
+          : statusFilter === "activo"
+          ? agent.estado !== "pausado" && agent.estado !== "eliminado"
+          : statusFilter === "pausado"
+          ? agent.estado === "pausado"
+          : statusFilter === "eliminado"
+          ? agent.estado === "eliminado"
+          : true
+
+      return matchesSearch && matchesAdvisor && matchesStatus
+    })
+  }, [agents, search, selectedAdvisorFilter, statusFilter])
+
+  const hasActiveFilters = search.trim() !== "" || selectedAdvisorFilter !== "all" || statusFilter !== "all"
+
+  const resetFilters = () => {
+    setSearch("")
+    setSelectedAdvisorFilter("all")
+    setStatusFilter("all")
+  }
 
   return (
     <div className="flex flex-col h-full space-y-4 p-4 md:p-8 pt-6">
@@ -287,7 +413,7 @@ export default function AsesoresPage() {
           <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
             Equipo de Asesores
             <Badge variant="secondary" className="bg-accent/10 text-accent font-medium border-none">
-              {agents.length} Miembros
+              {hasActiveFilters ? `${filteredAgents.length} de ${agents.length}` : `${agents.length}`} Miembros
             </Badge>
           </h2>
           <p className="text-muted-foreground mt-1">
@@ -344,14 +470,87 @@ export default function AsesoresPage() {
         </div>
       </div>
 
-      <div className="relative w-full md:w-96 mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input 
-          placeholder="Buscar asesor por nombre..." 
-          className="pl-10 bg-card/50 border-accent/10"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      {/* Barra de Filtros (Búsqueda, Asesor ordenado alfabéticamente, Estado) */}
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 mb-4">
+        {/* Búsqueda por texto */}
+        <div className="relative flex-1 min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Buscar por nombre o email..." 
+            className="pl-9 bg-card/50 border-accent/10 focus-visible:ring-accent"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* Filtro por Asesor (Orden Alfabético) */}
+        <div className="w-full sm:w-[220px]">
+          <Select value={selectedAdvisorFilter} onValueChange={setSelectedAdvisorFilter}>
+            <SelectTrigger className="bg-card/50 border-accent/10 focus:ring-accent">
+              <div className="flex items-center gap-2 truncate">
+                <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+                <SelectValue placeholder="Todos los asesores" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="bg-card border-accent/20 max-h-[300px]">
+              <SelectItem value="all" className="cursor-pointer font-medium">
+                Todos los asesores
+              </SelectItem>
+              {sortedAdvisorOptions.map((agent) => (
+                <SelectItem key={agent.id} value={agent.id} className="cursor-pointer">
+                  {agent.full_name || agent.email || "Sin nombre"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Filtro por Estado */}
+        <div className="w-full sm:w-[200px]">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="bg-card/50 border-accent/10 focus:ring-accent">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+                <SelectValue placeholder="Todos los estados" />
+              </div>
+            </SelectTrigger>
+            <SelectContent className="bg-card border-accent/20">
+              <SelectItem value="all" className="cursor-pointer font-medium">
+                Todos los estados
+              </SelectItem>
+              <SelectItem value="activo" className="cursor-pointer">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-green-500"></span>
+                  Activo
+                </span>
+              </SelectItem>
+              <SelectItem value="pausado" className="cursor-pointer">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                  Pausado
+                </span>
+              </SelectItem>
+              <SelectItem value="eliminado" className="cursor-pointer">
+                <span className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-destructive"></span>
+                  Deshabilitado
+                </span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Botón limpiar filtros */}
+        {hasActiveFilters && (
+          <Button
+            variant="ghost"
+            onClick={resetFilters}
+            className="h-10 px-3 text-xs text-muted-foreground hover:text-foreground gap-1.5 self-start sm:self-auto"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            Limpiar filtros
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -367,6 +566,19 @@ export default function AsesoresPage() {
               </CardHeader>
             </Card>
           ))}
+        </div>
+      ) : filteredAgents.length === 0 ? (
+        <div className="py-16 text-center bg-card/20 rounded-2xl border border-dashed border-accent/15 space-y-3 mt-4">
+          <Users className="h-12 w-12 text-muted-foreground/30 mx-auto" />
+          <p className="text-base font-semibold text-foreground">No se encontraron asesores</p>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            No hay ningún asesor que coincida con los filtros aplicados.
+          </p>
+          {hasActiveFilters && (
+            <Button variant="outline" size="sm" onClick={resetFilters} className="mt-2 border-accent/20">
+              Limpiar filtros
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 pt-4">
@@ -414,6 +626,13 @@ export default function AsesoresPage() {
                       >
                         <XCircle className="h-4 w-4 mr-2" /> Desvincular asesor
                       </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive cursor-pointer"
+                        disabled={borrando === agent.id}
+                        onClick={(e) => { e.stopPropagation(); abrirDialogoBorrado(agent); }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" /> Eliminar definitivamente
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -423,6 +642,36 @@ export default function AsesoresPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-5 pt-4 space-y-4">
+                {/* Clasificación del asesor (se puede seleccionar y deseleccionar) */}
+                <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">
+                    Rol: <span className="text-foreground">{labelClasificacion(agent.clasificacion)}</span>
+                  </p>
+                  <div className="flex gap-1.5">
+                    {CLASIFICACIONES.map(({ valor, label }) => {
+                      const activo = agent.clasificacion === valor
+                      return (
+                        <Button
+                          key={valor}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={clasificando === agent.id}
+                          onClick={(e) => { e.stopPropagation(); handleClasificar(agent, valor) }}
+                          className={`h-7 flex-1 px-2 text-[10px] font-semibold ${
+                            activo
+                              ? "bg-accent/15 text-accent border-accent/40 hover:bg-accent/20"
+                              : "border-accent/10 text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {activo && <Check className="h-3 w-3 mr-1" />}
+                          {label}
+                        </Button>
+                      )
+                    })}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-3 gap-2">
                   <div className="flex flex-col items-center p-2 rounded-lg bg-accent/5 border border-accent/10">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Capt.</span>
@@ -721,6 +970,89 @@ export default function AsesoresPage() {
               disabled={desvinculando === agentToUnlink?.id || !unlinkReason.trim()}
             >
               <XCircle className="h-4 w-4" /> Desvincular
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Borrado definitivo: solo para duplicados o perfiles cargados por error.
+          El servidor se niega si el perfil tiene trabajo real encima; acá se le
+          muestra al director el resultado de esa verificación antes de decidir. */}
+      <Dialog open={!!agentToDelete} onOpenChange={(open) => { if (!open) { setAgentToDelete(null); setDeleteReason("") } }}>
+        <DialogContent className="bg-card border-destructive/40">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" /> Eliminar definitivamente
+            </DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 pt-2">
+                <p>
+                  Vas a <strong>borrar por completo</strong> el perfil de{" "}
+                  <strong>{agentToDelete?.full_name}</strong>
+                  {agentToDelete?.email ? <> (<span className="font-mono">{agentToDelete.email}</span>)</> : null}.
+                </p>
+                <p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+                  <strong>Se pierde el historial de esa persona.</strong> No queda en la lista de
+                  &quot;Eliminados&quot;, no se puede recuperar y no hay forma de deshacerlo. Es para
+                  perfiles <strong>duplicados o cargados por error</strong>.
+                </p>
+                <p className="text-muted-foreground">
+                  Si es una persona real que se fue de la inmobiliaria, cerrá esto y usá{" "}
+                  <strong>Desvincular</strong>: así conservás todo su historial.
+                </p>
+
+                {verificandoHuella && <p>Verificando si tiene datos asociados…</p>}
+
+                {huella && !huella.puedeBorrarse && (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-destructive">
+                    <p className="font-medium">No se puede eliminar definitivamente.</p>
+                    <p>
+                      Este asesor tiene{" "}
+                      {huella.bloqueantes.map((b) => `${b.filas} ${b.etiqueta}`).join(", ")} a su
+                      nombre, así que no es un duplicado. Usá <strong>Desvincular</strong>.
+                    </p>
+                  </div>
+                )}
+
+                {huella?.puedeBorrarse && (
+                  <p className="rounded-md border border-border bg-muted/40 p-3">
+                    Verificado: este perfil <strong>no tiene ningún dato de trabajo</strong> asociado
+                    (ni leads, ni propiedades, ni actividad). Se puede borrar sin perder nada del
+                    resto del equipo.
+                  </p>
+                )}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+
+          {huella?.puedeBorrarse && (
+            <div className="space-y-2 py-2">
+              <label className="text-sm font-medium">Motivo del borrado</label>
+              <Textarea
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="Ej: perfil duplicado, se registró dos veces por error"
+                className="min-h-[80px]"
+              />
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setAgentToDelete(null); setDeleteReason("") }}
+              disabled={borrando === agentToDelete?.id}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              className="gap-2"
+              onClick={handleConfirmBorrado}
+              disabled={!huella?.puedeBorrarse || !deleteReason.trim() || borrando === agentToDelete?.id}
+            >
+              <Trash2 className="h-4 w-4" />
+              {borrando === agentToDelete?.id ? "Eliminando…" : "Eliminar definitivamente"}
             </Button>
           </DialogFooter>
         </DialogContent>

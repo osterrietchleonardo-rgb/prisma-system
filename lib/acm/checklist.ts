@@ -18,9 +18,10 @@ export interface SubScores {
   sc_semantica: number | null;
 }
 
-// Pesos base del % (deben coincidir con los de las funciones SQL acm_match_*). La ZONA ya NO
-// pesa: es un filtro duro (todos los comparables son del mismo barrio) → se muestra como "filtro".
-const PESOS = { superficie: 22, ambientes: 16, dormitorios: 14, banos: 12, antiguedad: 14, amenities: 12, semantica: 10 } as const;
+// Pesos base del % (deben coincidir con los de las funciones SQL acm_match_*). La ZONA volvió a
+// pesar: dejó de ser un filtro binario y ahora puntúa por nivel (100 mismo barrio · 70 sub-barrio
+// hermano · 50 limítrofe), así un comparable de Núñez nunca le gana a uno de Belgrano.
+const PESOS = { zona: 20, superficie: 22, ambientes: 16, dormitorios: 14, banos: 12, antiguedad: 14, amenities: 12, semantica: 10 } as const;
 
 function estado(score: number | null): ChecklistItem["estado"] {
   if (score === null || score === undefined) return "na";
@@ -30,8 +31,13 @@ function estado(score: number | null): ChecklistItem["estado"] {
 }
 
 const fmtNum = (v: number | null | undefined, suf = "") => (v && v > 0 ? `${v}${suf}` : "—");
-// La antigüedad admite 0 ("a estrenar") como valor válido a mostrar.
-const fmtAnios = (v: number | null | undefined) => (v !== null && v !== undefined && v >= 0 ? `${v} años` : "—");
+// La antigüedad admite el estado de obra como valor válido: 0 = a estrenar, negativo = en pozo.
+const fmtAnios = (v: number | null | undefined) => {
+  if (v === null || v === undefined) return "—";
+  if (v < 0) return "En pozo";
+  if (v === 0) return "A estrenar";
+  return `${v} años`;
+};
 
 export function buildChecklist(args: {
   sub: SubScores;
@@ -63,15 +69,16 @@ export function buildChecklist(args: {
       peso: 0,
       score: null,
     },
-    // Zona es filtro duro (gate): todo comparable es del mismo barrio que el sujeto → "filtro".
+    // Zona: 100 = mismo barrio · 70 = sub-barrio hermano (Belgrano R) · 50 = limítrofe (Núñez).
+    // Las búsquedas viejas guardadas traen sc_zona = 100 fijo, así que se siguen viendo igual.
     {
       dimension: "zona",
       label: "Zona / barrio",
       sujeto_val: sujeto.zona || "—",
       comp_val: comp.zona || sujeto.zona || "—",
-      estado: "match",
-      peso: 0,
-      score: null,
+      estado: estado(sub.sc_zona),
+      peso: sub.sc_zona === null ? 0 : PESOS.zona,
+      score: sub.sc_zona,
     },
     {
       dimension: "superficie",

@@ -88,9 +88,11 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
         icon={FileText}
         color="amber-500"
         metrics={[
-          { label: "Volumen Tasaciones", value: kpis.tasaciones },
+          { label: "Volumen Prelisting", value: kpis.prelisting },
           { label: "Pipeline Potencial", value: formatUSD(kpis.pipelineCaptacion) },
           { label: "Ticket Promedio", value: formatUSD(kpis.ticketPromedioTasacion) },
+          // Métrica aparte del prelisting: se cuenta sola al generar la ficha en el módulo ACM.
+          { label: "Fichas ACM", value: kpis.acm },
         ]}
       />
 

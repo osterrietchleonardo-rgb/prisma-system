@@ -4,7 +4,10 @@ export interface AdvisorStats {
   name: string;
   wa_chats?: number;
   prospeccion?: number;
-  tasaciones?: number;
+  /** Logs `prelisting` del periodo. Es la vieja `tasaciones` renombrada: mismo dato, nombre correcto. */
+  prelisting?: number;
+  /** Fichas ACM generadas en el periodo. Métrica NUEVA, independiente de `prelisting`. */
+  acm?: number;
   compradores?: number;
   captaciones: number;
   reservas?: number;
@@ -32,7 +35,7 @@ export function classifyByDefaultRules(stats: AdvisorStats): AdvisorClassificati
   const facturacion = stats.facturacion || 0;
   const transacciones = (stats.transacciones || 0) + (stats.reservas || 0);
   const captaciones = stats.captaciones || 0;
-  const tasaciones = stats.tasaciones || 0;
+  const prelisting = stats.prelisting || 0;
   const consultas = (stats.wa_chats || 0) + (stats.prospeccion || 0);
 
   if (facturacion >= 10000 || transacciones >= 4) {
@@ -47,15 +50,19 @@ export function classifyByDefaultRules(stats: AdvisorStats): AdvisorClassificati
       reason: `Facturación US$${facturacion.toFixed(0)} con ${transacciones} transacción(es) cerrada(s).`,
     };
   }
-  if (consultas >= 20 && (tasaciones >= 3 || captaciones >= 3)) {
+  // Este umbral sigue mirando `prelisting`, que es exactamente lo que miraba antes con el nombre
+  // `tasaciones`. NO se le sumó `acm` a propósito: cambiar la regla movería de categoría a asesores
+  // que hoy están clasificados, y eso es una decisión del director, no un efecto colateral del rename.
+  // `acm` queda disponible como variable para las reglas personalizadas.
+  if (consultas >= 20 && (prelisting >= 3 || captaciones >= 3)) {
     return {
       category: "En Desarrollo",
-      reason: `${consultas} consultas y actividad de captación/tasación (${captaciones} captaciones, ${tasaciones} tasaciones).`,
+      reason: `${consultas} consultas y actividad de captación/prelisting (${captaciones} captaciones, ${prelisting} prelistings).`,
     };
   }
   return {
     category: "Requiere Atención",
-    reason: "Aún no alcanza los umbrales de facturación, transacciones ni de actividad (consultas/captaciones/tasaciones).",
+    reason: "Aún no alcanza los umbrales de facturación, transacciones ni de actividad (consultas/captaciones/prelistings).",
   };
 }
 
@@ -68,6 +75,10 @@ async function classifyWithCustomRules(
   stats: AdvisorStats,
   customInstructions: string
 ): Promise<AdvisorClassification> {
+  // OJO con `tasaciones`: esa variable SIEMPRE contó prelistings (el nombre estaba mal puesto). Ahora
+  // se llama `prelisting`, y `acm` es una métrica nueva y distinta. Las reglas personalizadas que el
+  // director ya tiene guardadas dicen "tasaciones", así que se sigue mandando como alias
+  // — apuntando a `prelisting`, que es lo que esas reglas siempre quisieron decir. En la UI ya no se ofrece.
   const prompt = `
     Eres un clasificador de rendimiento comercial inmobiliario. Tu única función es determinar la categoría de un asesor a partir de los datos del mes. La clasificación es determinista y reproducible.
 
@@ -79,7 +90,9 @@ async function classifyWithCustomRules(
     transacciones    =  ${stats.transacciones + (stats.reservas || 0)}
     captaciones      =  ${stats.captaciones}
     cartera_activa   =  ${stats.cartera_activa || 0}
-    tasaciones       =  ${stats.tasaciones || 0}
+    prelisting       =  ${stats.prelisting || 0}
+    acm              =  ${stats.acm || 0}
+    tasaciones       =  ${stats.prelisting || 0}
     consultas        =  ${(stats.wa_chats || 0) + (stats.prospeccion || 0)}
     rotacion_pct     =  ${stats.rotacion.toFixed(1)}
 

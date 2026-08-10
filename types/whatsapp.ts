@@ -1,3 +1,5 @@
+import type { ClasificacionEntry } from '@/lib/whatsapp/clasificaciones'
+
 // =============================================
 // WhatsApp Module — Types
 // Corresponde al schema de P1 (Supabase)
@@ -56,6 +58,8 @@ export interface WAConversation {
   unread_count: number
   etiquetas: string[]
   clasificacion: string | null  // Origen del lead: Whatsapp-Consulta / Whatsapp-Manual / personalizada
+  /** Recorrido completo: origen + listas importadas + plantillas recibidas. Ver lib/whatsapp/clasificaciones.ts */
+  clasificaciones_historial?: ClasificacionEntry[]
   pipeline_stage: string  // NOW a native column in wa_conversations
   
   // Motor Inactividad
@@ -92,6 +96,10 @@ export interface WAMessage {
   wamid: string | null
   metadata: Record<string, unknown>
   created_at: string
+  // Estado real de entrega (solo salientes): lo actualiza el webhook de Meta/Evolution.
+  status?: 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | null
+  status_error?: string | null
+  status_at?: string | null
 }
 
 export interface WATemplate {
@@ -117,6 +125,8 @@ export interface WAContact {
   metadata: Record<string, unknown>
   tags: string[]
   clasificacion: string | null  // Origen del lead: Whatsapp-Consulta / Whatsapp-Manual / personalizada
+  /** Recorrido completo: origen + listas importadas + plantillas recibidas. Ver lib/whatsapp/clasificaciones.ts */
+  clasificaciones_historial?: ClasificacionEntry[]
   last_campaign_status: string | null
   last_campaign_template: string | null
   last_campaign_sent_at: string | null

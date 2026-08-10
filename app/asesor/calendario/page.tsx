@@ -172,6 +172,9 @@ export default function AsesorCalendarioPage() {
   const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 })
 
   const calendarDays = eachDayOfInterval({ start: startDate, end: endDate })
+  // Un mes ocupa 4, 5 o 6 semanas segun en que dia arranque (ej: agosto 2026 arranca
+  // el lunes 27 de julio y necesita 6 filas). La grilla se arma con las filas reales.
+  const totalWeeks = calendarDays.length / 7
 
   const getDayVisits = (day: Date) => {
     const dateStr = format(day, "yyyy-MM-dd")
@@ -179,7 +182,7 @@ export default function AsesorCalendarioPage() {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4 px-4 md:px-8 pt-6 pb-4">
+    <div className="flex flex-col min-h-full space-y-4 px-4 md:px-8 pt-6 pb-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
@@ -249,7 +252,8 @@ export default function AsesorCalendarioPage() {
         </DialogContent>
       </Dialog>
 
-      <Card className="border-accent/10 bg-card/30 backdrop-blur-md shadow-2xl overflow-hidden">
+      {/* shrink-0: sin esto la tarjeta se comprime dentro del flex y recorta la ultima semana */}
+      <Card className="shrink-0 border-accent/10 bg-card/30 backdrop-blur-md shadow-2xl overflow-hidden">
         {/* Calendar Header */}
         <div className="p-4 flex flex-wrap items-center justify-between border-b border-accent/10 bg-accent/5 gap-4">
           <div className="flex items-center gap-4 flex-wrap">
@@ -330,7 +334,10 @@ export default function AsesorCalendarioPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-7 grid-rows-5 h-[calc(100vh-400px)] min-h-[500px]">
+        <div
+          className="grid grid-cols-7 min-h-[calc(100vh-400px)]"
+          style={{ gridTemplateRows: `repeat(${totalWeeks}, minmax(6.5rem, 1fr))` }}
+        >
           {calendarDays.map((day, idx) => {
             const dayVisits = getDayVisits(day)
             const isToday = isSameDay(day, new Date())

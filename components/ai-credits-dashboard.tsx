@@ -146,10 +146,13 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
   // ─── Fetch de integrantes de la agencia ───────────────────────────────────
   useEffect(() => {
     if (!agencyId) return
+    // Sin los desvinculados: ya no consumen creditos. Se mantienen los
+    // directores, que el panel muestra a proposito junto a los asesores.
     supabase
       .from("profiles")
       .select("id,full_name,email,role")
       .eq("agency_id", agencyId)
+      .neq("estado", "eliminado")
       .then(({ data }) => setMembers((data ?? []) as AgencyMember[]))
   }, [agencyId])
 

@@ -57,6 +57,15 @@ export async function POST(req: Request) {
     const operacion: string = body.operacion === "alquiler" ? "alquiler" : "venta";
     const sujeto = (body.sujeto || {}) as any;
     const comparablesIn = (Array.isArray(body.comparables) ? body.comparables : []) as AcmComparable[];
+    const searchId: string | null = typeof body.search_id === "string" ? body.search_id : null; // fila del historial "Mis ACM"
+    // preview=true: calcula todo y devuelve las conclusiones para que el asesor las revise ANTES de
+    // crear la ficha (no guarda nada, no consume token).
+    const preview: boolean = body.preview === true;
+    // Conclusiones ya revisadas por el asesor: si viene un array, reemplaza a las calculadas
+    // (array vacío = decidió que la sección de conclusiones NO aparezca en la ficha).
+    const conclusionesIn: string[] | null = Array.isArray(body.conclusiones)
+      ? body.conclusiones.filter((t: any) => typeof t === "string" && t.trim()).map((t: string) => t.trim())
+      : null;
 
     if (comparablesIn.length === 0) {
       return NextResponse.json({ error: "Elegí al menos un comparable para armar la ficha." }, { status: 400 });
@@ -72,7 +81,7 @@ export async function POST(req: Request) {
       .map((c) => c.id.replace(/^roomix_/, ""));
 
     // ── Enriquecer con fotos/amenities/descripción + marca + contacto + pulso, en paralelo ──
-    const [carteraFullRes, roomixFullRes, profileRes, agencyRes, barriosRes, cabaStatRes] = await Promise.all([
+    const [carteraFullRes, roomixFullRes, profileRes, agencyRes, barriosRes, cabaStatRes, cierreRes] = await Promise.all([
       carteraIds.length
         ? supabase
             .from("properties")
@@ -83,13 +92,19 @@ export async function POST(req: Request) {
       roomixIds.length
         ? supabase.from("roomix_properties").select("id, description, images, amenities").in("id", roomixIds)
         : Promise.resolve({ data: [] as any[] }),
-      supabase.from("profiles").select("full_name, email, phone, avatar_url, role").eq("id", userId).single(),
+      supabase.from("profiles").select("full_name, email, phone, avatar_url, role, clasificacion").eq("id", userId).single(),
       supabase.from("agencies").select("id, name, marketing_ai_config").eq("id", agencyId).single(),
       supabase.from("mercado_barrios").select("barrio, precio_m2_usd, precio_cierre_m2_usd, fuente"),
       supabase
         .from("mercado_stats")
         .select("id, valor")
         .in("id", ["monoambiente_cierre", "dos_ambientes_cierre", "tres_ambientes_cierre", "promedio_caba_cierre"]),
+      supabase
+        .from("mercado_cierre_mensual")
+        .select("brecha_general_pct")
+        .order("periodo", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     const carteraById: Record<string, any> = {};
@@ -107,11 +122,14 @@ export async function POST(req: Request) {
       const row = (cabaStatRes.data || []).find((s: any) => s.id === id);
       return row?.valor != null ? Number(row.valor) : null;
     };
+    const brechaGeneral = cierreRes?.data?.brecha_general_pct != null ? Number(cierreRes.data.brecha_general_pct) : null;
+
     const ambStats: AmbienteStats = {
       monoambiente_cierre: statById("monoambiente_cierre"),
       dos_ambientes_cierre: statById("dos_ambientes_cierre"),
       tres_ambientes_cierre: statById("tres_ambientes_cierre"),
       promedio_caba_cierre: statById("promedio_caba_cierre"),
+      brecha_general_pct: brechaGeneral,
     };
 
     // ── Armar los comparables de la ficha (respetando el orden de selección) ──
@@ -162,6 +180,17 @@ export async function POST(req: Request) {
     });
 
     const comparison = computeComparison(comparables, ambStats);
+    if (conclusionesIn) comparison.conclusiones = conclusionesIn;
+
+    // Modo revisión: devolvemos las conclusiones calculadas y cortamos acá (no se guarda la ficha).
+    if (preview) {
+      return NextResponse.json({
+        preview: true,
+        conclusiones: comparison.conclusiones,
+        promedio_m2: comparison.promedio_m2,
+        desvio_prom_pct: comparison.desvio_prom_pct,
+      });
+    }
 
     // ── Marca de la agencia (Marketing IA → Configuración IA), con aviso legal ──
     const mk = (agencyRes.data?.marketing_ai_config as any) || {};
@@ -191,6 +220,7 @@ export async function POST(req: Request) {
         phone: profile?.phone || "",
         avatar_url: profile?.avatar_url || null,
         role: profile?.role || "asesor",
+        clasificacion: (profile as any)?.clasificacion || null,
       },
       agency: { id: agencyRes.data?.id || agencyId, name: agencyRes.data?.name || "" },
       brand,
@@ -207,7 +237,35 @@ export async function POST(req: Request) {
     });
     if (insErr) throw insErr;
 
-    return NextResponse.json({ token, path: `/ficha-acm/${token}` });
+    // Historial "Mis ACM": la primera ficha se pega a la fila de la búsqueda; si esa búsqueda YA tenía
+    // ficha, duplicamos la fila (misma propiedad y mismos comparables) para que quede una por ficha.
+    let historialId: string | null = searchId;
+    if (searchId) {
+      try {
+        const { data: row } = await admin
+          .from("acm_searches")
+          .select("id, agency_id, user_id, operacion, sujeto, exclude_id, resultados, total_cartera, total_roomix, ficha_token")
+          .eq("id", searchId)
+          .eq("agency_id", agencyId)
+          .maybeSingle();
+
+        if (row && row.ficha_token) {
+          const { id: _id, ficha_token: _ft, ...copia } = row as any;
+          const { data: nueva } = await admin
+            .from("acm_searches")
+            .insert({ ...copia, user_id: userId, ficha_token: token })
+            .select("id")
+            .single();
+          historialId = nueva?.id ?? searchId;
+        } else if (row) {
+          await admin.from("acm_searches").update({ ficha_token: token }).eq("id", searchId);
+        }
+      } catch (e) {
+        console.error("ACM: no se pudo vincular la ficha al historial:", e);
+      }
+    }
+
+    return NextResponse.json({ token, path: `/ficha-acm/${token}`, search_id: historialId });
   } catch (error: any) {
     console.error("Crear ficha ACM error:", error);
     return NextResponse.json({ error: error.message }, { status: error.message === "Unauthorized" ? 401 : 500 });

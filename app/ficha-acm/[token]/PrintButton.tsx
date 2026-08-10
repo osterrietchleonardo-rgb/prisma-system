@@ -4,8 +4,21 @@ import { useState } from "react";
 
 // Barra de acciones (solo pantalla; se oculta al imprimir vía .no-print).
 // "Descargar PDF" = imprimir la misma ficha → "Guardar como PDF" del navegador.
-export default function PrintButton({ accent, onAccent }: { accent: string; onAccent: string }) {
+export default function PrintButton({ accent, onAccent, fileName }: { accent: string; onAccent: string; fileName: string }) {
   const [copied, setCopied] = useState(false);
+
+  // El navegador usa el document.title como nombre del PDF: lo seteamos justo antes de imprimir y lo restauramos.
+  const handlePrint = () => {
+    const anterior = document.title;
+    const restaurar = () => { document.title = anterior; };
+    document.title = fileName;
+    window.addEventListener("afterprint", restaurar, { once: true });
+    try {
+      window.print();
+    } finally {
+      setTimeout(restaurar, 1000);
+    }
+  };
 
   const doShare = async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -38,7 +51,7 @@ export default function PrintButton({ accent, onAccent }: { accent: string; onAc
         {copied ? "¡Link copiado!" : "Compartir"}
       </button>
       <button
-        onClick={() => window.print()}
+        onClick={handlePrint}
         className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-bold shadow-lg transition-transform active:scale-95"
         style={{ backgroundColor: accent, color: onAccent }}
       >

@@ -77,6 +77,17 @@ export async function middleware(request: NextRequest) {
       }
     }
 
+    // Next.js precarga (prefetch) los links visibles en pantalla: al abrir una
+    // página se disparan varios requests en paralelo que no son navegaciones
+    // reales. Si cada uno intenta refrescar el token, se rotan varios refresh
+    // tokens a la vez y Supabase revoca la familia entera
+    // (refresh_token_already_used → refresh_token_not_found), que es lo que
+    // echaba a los asesores desde el celular. El layout de cada área protegida
+    // valida la sesión igual, así que saltear el prefetch no abre ningún hueco.
+    if (request.headers.get('next-router-prefetch') === '1') {
+      return response
+    }
+
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -112,7 +123,11 @@ export async function middleware(request: NextRequest) {
     // 2. PROTECTED ROUTES
     if (url.pathname.startsWith('/director') || url.pathname.startsWith('/asesor')) {
       if (!user) {
-        return NextResponse.redirect(new URL('/auth/login', request.url))
+        // Guardamos a dónde quería ir para volver ahí después de iniciar sesión
+        // (ej: el link del email de aviso que abre el chat de un lead).
+        const loginUrl = new URL('/auth/login', request.url)
+        loginUrl.searchParams.set('next', `${url.pathname}${url.search}`)
+        return NextResponse.redirect(loginUrl)
       }
       // Account status (pausado/eliminado) checked in layout.tsx server components
     }
@@ -125,6 +140,9 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico).*)',
+    // Los archivos estáticos de /public (logos, og-image, sw.js) no necesitan
+    // sesión: hacerlos pasar por acá agregaba una llamada de red a Supabase por
+    // cada imagen, sumando refrescos concurrentes del token sin ningún motivo.
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf)$|sw\\.js).*)',
   ],
 }

@@ -2,14 +2,15 @@
 import { useEffect, useState, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
-const ESTADOS = ["", "pendiente", "en_revision", "resuelta", "descartada"]
+const ESTADOS = ["", "pendiente", "en_revision", "en_proceso", "resuelta", "pospuesta"]
 const CATEGORIAS = ["", "sugerencia", "error", "consulta", "otro"]
 
 const ESTADO_BADGE: Record<string, { bg: string; color: string }> = {
   pendiente: { bg: "rgba(239,68,68,0.15)", color: "#f87171" },
   en_revision: { bg: "rgba(245,158,11,0.15)", color: "#fbbf24" },
+  en_proceso: { bg: "rgba(59,130,246,0.15)", color: "#60a5fa" },
   resuelta: { bg: "rgba(16,185,129,0.15)", color: "#34d399" },
-  descartada: { bg: "rgba(107,114,128,0.15)", color: "#9ca3af" },
+  pospuesta: { bg: "rgba(107,114,128,0.15)", color: "#9ca3af" },
 }
 
 export default function SugerenciasClient() {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { 
   TrendingUp, 
   Plus, 
@@ -9,21 +9,35 @@ import {
   LayoutDashboard,
   Filter,
   Trash2,
-  Edit2
+  Edit2,
+  Users,
+  LayoutGrid,
+  List
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { PerformanceScaleEditor } from "@/components/tracking/PerformanceScaleEditor";
 import { PerformanceObjectivesEditor } from "@/components/tracking/PerformanceObjectivesEditor";
 import { PerformanceHistoryList } from "@/components/tracking/PerformanceHistoryList";
 import { PerformanceLogDrawer } from "@/components/tracking/PerformanceLogDrawer";
+import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { getPerformanceLogs } from "@/lib/tracking/queries";
-import { AgencyPerformanceConfig, PerformanceLog } from "@/lib/tracking/types";
+import { getPerformanceLogs, getPipelineMoves } from "@/lib/tracking/queries";
+import { AgencyPerformanceConfig, PerformanceLog, PipelineMove } from "@/lib/tracking/types";
+import { PipelineBoard } from "@/components/tracking/pipeline/PipelineBoard";
+import type { PipelineCard } from "@/lib/tracking/pipeline";
 import { deletePerformanceLog } from "@/actions/tracking/deletePerformanceLog";
 import { toast } from "sonner";
 import {
@@ -46,7 +60,11 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [logToEdit, setLogToEdit] = useState<PerformanceLog | null>(null);
   const [agencyConfig, setAgencyConfig] = useState<AgencyPerformanceConfig | null>(null);
-  
+  // Ids de los asesores que siguen en el equipo. null = todavia no cargo.
+  const [asesoresVigentes, setAsesoresVigentes] = useState<Set<string> | null>(null);
+  const [viewMode, setViewMode] = useState<"lista" | "pipeline">("lista");
+  const [moves, setMoves] = useState<PipelineMove[]>([]);
+
   // Deletion states
   const [logToDelete, setLogToDelete] = useState<PerformanceLog | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -56,12 +74,21 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
   const [filter, setFilter] = useState<"todos" | "prospeccion" | "prelisting" | "prebuying" | "captacion" | "reserva" | "cierre">("todos");
   const [statusFilter, setStatusFilter] = useState<"todos" | "original" | "modificada" | "eliminada">("todos");
   const [search, setSearch] = useState("");
+  const [advisorFilter, setAdvisorFilter] = useState<string>("all");
+
+  // Filtro de fechas (comparte el mismo DatePeriodFilter que el dashboard: from/to en la URL)
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
 
   const fetchLogs = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await getPerformanceLogs();
+      const [data, movesData] = await Promise.all([getPerformanceLogs(), getPipelineMoves()]);
       setLogs(data);
+      setMoves(movesData);
     } catch (error) {
       console.error("Error fetching logs:", error);
     } finally {
@@ -112,6 +139,18 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
       if (agency?.performance_config) {
         setAgencyConfig(agency.performance_config);
       }
+
+      // Asesores que siguen en el equipo. El desplegable de asesor se arma con
+      // los que aparecen en los registros, no con la tabla de perfiles, asi que
+      // sin este cruce un desvinculado con actividad historica reaparece ahi.
+      const { data: vigentes } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("agency_id", profile.agency_id)
+        .eq("role", "asesor")
+        .neq("estado", "eliminado");
+
+      setAsesoresVigentes(new Set((vigentes ?? []).map((v) => v.id)));
     }
   }, []);
 
@@ -121,19 +160,72 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
     window.dispatchEvent(new CustomEvent('prisma-header-title', { detail: "Tracking Performance" }));
   }, [fetchLogs, fetchAgencyConfig]);
 
+  // Derive unique advisors from logs for the director filter dropdown
+  const advisorOptions = useMemo(() => {
+    if (!isDirector) return [];
+    const map = new Map<string, string>();
+    for (const log of logs) {
+      if (log.agent_id && log.profiles?.full_name && !map.has(log.agent_id)) {
+        // Mientras la lista vigente no cargo (null) no se descarta a nadie,
+        // para no dejar el filtro vacio en el primer render.
+        if (asesoresVigentes && !asesoresVigentes.has(log.agent_id)) continue;
+        map.set(log.agent_id, log.profiles.full_name);
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  }, [logs, isDirector, asesoresVigentes]);
+
   const filteredLogs = logs.filter(log => {
     const matchesFilter = filter === "todos" || log.type === filter;
     const matchesStatus = statusFilter === "todos" || log.status === statusFilter || (statusFilter === "original" && !log.status);
-    
-    const matchesSearch = 
-      !search || 
+    const matchesAdvisor = advisorFilter === "all" || log.agent_id === advisorFilter;
+
+    // Rango de fechas: compara el día (yyyy-MM-dd) de fecha_actividad contra from/to. Sin params → todo.
+    const logDay = log.fecha_actividad ? String(log.fecha_actividad).slice(0, 10) : "";
+    const matchesDate = (!fromParam || logDay >= fromParam) && (!toParam || logDay <= toParam);
+
+    const matchesSearch =
+      !search ||
       log.propiedad_ref?.toLowerCase().includes(search.toLowerCase()) ||
-      Object.values(log.metadata || {}).some(val => 
+      Object.values(log.metadata || {}).some(val =>
         val?.toString().toLowerCase().includes(search.toLowerCase())
       );
 
-    return matchesFilter && matchesSearch && matchesStatus;
+    return matchesFilter && matchesSearch && matchesStatus && matchesAdvisor && matchesDate;
   });
+
+  // El tablero recibe los logs filtrados SOLO por asesor: la etapa de cada
+  // tarjeta se calcula siempre con todo el historial del cliente. Si el rango
+  // de fechas recortara el historial, un cliente que cerró en mayo aparecería
+  // parado en prospección al filtrar julio.
+  const pipelineLogs = useMemo(
+    () => logs.filter((log) => advisorFilter === "all" || log.agent_id === advisorFilter),
+    [logs, advisorFilter]
+  );
+
+  // El filtro decide QUÉ TARJETAS ves, nunca en qué columna caen.
+  const cardFilter = useCallback(
+    (card: PipelineCard) => {
+      const matchesDate =
+        (!fromParam && !toParam) ||
+        card.activityDates.some((d) => {
+          const day = String(d).slice(0, 10);
+          return (!fromParam || day >= fromParam) && (!toParam || day <= toParam);
+        });
+
+      const term = search.toLowerCase();
+      const matchesSearch =
+        !search ||
+        card.clientName.toLowerCase().includes(term) ||
+        (card.clientPhone ?? "").includes(term) ||
+        (card.propertyLabel ?? "").toLowerCase().includes(term);
+
+      return matchesDate && matchesSearch;
+    },
+    [fromParam, toParam, search]
+  );
 
   return (
     <div id="tracking-performance-page" className="w-full p-4 md:p-8 flex flex-col gap-6 md:gap-8 pb-32">
@@ -177,70 +269,125 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
 
         <TabsContent value="actividad" className="space-y-6 mt-0 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <Card className="bg-card/30 border-accent/10 backdrop-blur-md p-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <div className="tracking-tabs-list flex bg-muted/30 p-1 rounded-xl border border-white/5">
+            <div className="flex flex-col gap-4">
+              {/* Row 1: Activity type tabs + Status tabs */}
+              {viewMode === "lista" && (
+              <div className="flex flex-col lg:flex-row lg:items-center gap-2 overflow-x-auto">
+                <div className="tracking-tabs-list flex bg-muted/30 p-1 rounded-xl border border-white/5 shrink-0">
                     <button 
                       onClick={() => setFilter("todos")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'todos' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'todos' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Todos
                     </button>
                     <button 
                       onClick={() => setFilter("prospeccion")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prospeccion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'prospeccion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Prospección
                     </button>
                     <button 
                       onClick={() => setFilter("prelisting")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prelisting' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'prelisting' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Prelisting
                     </button>
                     <button 
                       onClick={() => setFilter("prebuying")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'prebuying' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'prebuying' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Prebuying
                     </button>
                     <button 
                       onClick={() => setFilter("captacion")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'captacion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'captacion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Captación
                     </button>
                     <button 
                       onClick={() => setFilter("reserva")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'reserva' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'reserva' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Reserva
                     </button>
                     <button 
                       onClick={() => setFilter("cierre")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${filter === 'cierre' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'cierre' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Cierre
                     </button>
                 </div>
                 {isDirector && (
-                  <div className="tracking-tabs-list flex bg-muted/30 p-1 rounded-xl border border-white/5 ml-2">
-                    <button onClick={() => setStatusFilter("todos")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'todos' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Todos</button>
-                    <button onClick={() => setStatusFilter("original")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'original' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Originales</button>
-                    <button onClick={() => setStatusFilter("modificada")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'modificada' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Modificadas</button>
-                    <button onClick={() => setStatusFilter("eliminada")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${statusFilter === 'eliminada' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Eliminadas</button>
+                  <div className="tracking-tabs-list flex bg-muted/30 p-1 rounded-xl border border-white/5 shrink-0">
+                    <button onClick={() => setStatusFilter("todos")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${statusFilter === 'todos' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Todos</button>
+                    <button onClick={() => setStatusFilter("original")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${statusFilter === 'original' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Originales</button>
+                    <button onClick={() => setStatusFilter("modificada")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${statusFilter === 'modificada' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Modificadas</button>
+                    <button onClick={() => setStatusFilter("eliminada")} className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${statusFilter === 'eliminada' ? 'bg-accent/15 text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Eliminadas</button>
                   </div>
                 )}
               </div>
+              )}
 
-              <div className="relative w-full md:w-[320px]">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground/50" />
-                <Input 
-                  placeholder="Buscar por cliente o propiedad..." 
-                  className="pl-10 bg-background/30 border-white/5 focus:border-accent/50 transition-all rounded-xl h-10"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
+              {/* Row 2: Advisor filter + Search */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                {isDirector && advisorOptions.length > 0 && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <Select value={advisorFilter} onValueChange={setAdvisorFilter}>
+                      <SelectTrigger className="w-full sm:w-[220px] h-10 text-xs bg-background/30 backdrop-blur-sm border-white/5 focus:border-accent/50 rounded-xl">
+                        <SelectValue placeholder="Todos los asesores" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los asesores</SelectItem>
+                        {advisorOptions.map((advisor) => (
+                          <SelectItem key={advisor.id} value={advisor.id}>
+                            {advisor.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                <div className="relative w-full sm:w-[320px]">
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground/50" />
+                  <Input
+                    placeholder="Buscar por cliente o propiedad..."
+                    className="pl-10 bg-background/30 border-white/5 focus:border-accent/50 transition-all rounded-xl h-10"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center gap-2 sm:ml-auto">
+                  <div className="flex bg-muted/30 p-1 rounded-xl border border-white/5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("lista")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${viewMode === "lista" ? "bg-accent text-white shadow-lg shadow-accent/20" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <List className="w-3.5 h-3.5" />
+                      Lista
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewMode("pipeline")}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${viewMode === "pipeline" ? "bg-accent text-white shadow-lg shadow-accent/20" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      Pipeline
+                    </button>
+                  </div>
+                  <DatePeriodFilter />
+                  {(fromParam || toParam) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-9 text-xs text-accent font-semibold shrink-0"
+                      onClick={() => router.push(pathname)}
+                    >
+                      Limpiar
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </Card>
@@ -250,9 +397,21 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                <Loader2 className="w-10 h-10 animate-spin text-accent/50" />
                <p className="font-medium tracking-wide">Analizando historial de performance...</p>
             </div>
+          ) : viewMode === "pipeline" ? (
+            <PipelineBoard
+              logs={pipelineLogs}
+              moves={moves}
+              isDirector={isDirector}
+              cardFilter={cardFilter}
+              onRefresh={fetchLogs}
+              onEditLog={(log) => {
+                setLogToEdit(log);
+                setIsDrawerOpen(true);
+              }}
+            />
           ) : (
-            <PerformanceHistoryList 
-              logs={filteredLogs} 
+            <PerformanceHistoryList
+              logs={filteredLogs}
               onRefresh={fetchLogs} 
               isDirector={isDirector}
               onEdit={(log) => {

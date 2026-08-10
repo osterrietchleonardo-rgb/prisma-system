@@ -32,6 +32,12 @@ import {
 interface Props {
   initialData: AdvisorObjectives[];
   initialYear: number;
+  /**
+   * "agencia" (default) = vista del director: todas las filas y el gráfico con el total del equipo.
+   * "propio" = vista del asesor: `initialData` ya viene con su fila sola desde el server, esto solo
+   * ajusta los textos para que no diga "total inmobiliaria" sobre un gráfico que es suyo.
+   */
+  alcance?: "agencia" | "propio";
 }
 
 const fmtValue = (n: number, unit: "usd" | "count") => {
@@ -53,7 +59,8 @@ const pctColor = (pct: number | null) => {
   return "text-red-400/90";
 };
 
-export function ObjectivesDashboard({ initialData, initialYear }: Props) {
+export function ObjectivesDashboard({ initialData, initialYear, alcance = "agencia" }: Props) {
+  const esPropio = alcance === "propio";
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState<number>(initialYear);
   const [metric, setMetric] = useState<ObjectiveMetric>("facturacion");
@@ -115,7 +122,11 @@ export function ObjectivesDashboard({ initialData, initialYear }: Props) {
             </div>
             <div>
               <CardTitle className="text-lg">Objetivos vs Alcanzado</CardTitle>
-              <CardDescription>Metas mensuales por asesor y su cumplimiento real.</CardDescription>
+              <CardDescription>
+                {esPropio
+                  ? "Tus metas mensuales y tu cumplimiento real."
+                  : "Metas mensuales por asesor y su cumplimiento real."}
+              </CardDescription>
             </div>
           </div>
 
@@ -161,9 +172,19 @@ export function ObjectivesDashboard({ initialData, initialYear }: Props) {
           <div className="h-48 flex flex-col items-center justify-center gap-3 text-muted-foreground/60">
             <Target className="w-10 h-10 opacity-20" />
             <p className="italic text-sm text-center px-6">
-              Aún no hay objetivos de {metricMeta.label.toLowerCase()} cargados para {year}.
-              <br />
-              Cárgalos desde Tracking Performance → Objetivos.
+              {esPropio ? (
+                <>
+                  Todavía no tenés objetivos de {metricMeta.label.toLowerCase()} cargados para {year}.
+                  <br />
+                  Los define tu director desde Tracking Performance.
+                </>
+              ) : (
+                <>
+                  Aún no hay objetivos de {metricMeta.label.toLowerCase()} cargados para {year}.
+                  <br />
+                  Cárgalos desde Tracking Performance → Objetivos.
+                </>
+              )}
             </p>
           </div>
         ) : (
@@ -239,7 +260,7 @@ export function ObjectivesDashboard({ initialData, initialYear }: Props) {
             {/* Gráfico de evolución */}
             <div className="p-5 border-t border-accent/5">
               <p className="text-sm font-semibold text-foreground/80 mb-3">
-                Evolución {metricMeta.label} {year} — total inmobiliaria
+                Evolución {metricMeta.label} {year} — {esPropio ? "mis objetivos" : "total inmobiliaria"}
               </p>
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">

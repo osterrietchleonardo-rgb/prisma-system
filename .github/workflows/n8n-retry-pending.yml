@@ -1,0 +1,22 @@
+name: PRISMA n8n Retry Pending
+
+on:
+  schedule:
+    # Cada 15 min (UTC). Drena la red de contención `wa_n8n_dead_letter`:
+    # reinyecta a n8n los mensajes de leads cuyo disparo original falló
+    # (n8n caído/reiniciando, timeout, blip de red).
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    # Permite dispararlo manualmente desde la pestaña Actions de GitHub.
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger n8n retry-pending endpoint
+        run: |
+          # maxAgeHours=3: solo reprocesa lo caído en las últimas 3 horas, para
+          # no responderle a un lead un mensaje viejo. Lo más antiguo que eso
+          # queda pendiente para revisión/decisión manual.
+          curl -sS -X POST "https://${{ secrets.SITE_DOMAIN }}/api/n8n/retry-pending?maxAgeHours=3&limit=50" \
+               -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

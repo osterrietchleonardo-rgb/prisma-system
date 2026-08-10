@@ -8,6 +8,13 @@ import type {
   CreateTemplateInput,
 } from '@/types/whatsapp'
 import { injectCoreTemplates } from './whatsapp-templates'
+import {
+  sumarClasificacion,
+  origenImportacion,
+  origenPlantilla,
+  esPlantillaDelSistema,
+} from '@/lib/whatsapp/clasificaciones'
+import { buscarOCrearConversacion } from '@/lib/whatsapp/conversations'
 
 // =============================================
 // Helper: Director-only access guard
@@ -1434,7 +1441,7 @@ export async function sendCampaignMessage(
     // 1. Obtener la instancia y credenciales
     const { data: instance, error: instanceError } = await supabase
       .from('whatsapp_instances')
-      .select('token, phone_number_id, business_id')
+      .select('id, token, phone_number_id, business_id')
       .eq('agency_id', agency_id)
       .limit(1)
       .single()
@@ -1487,6 +1494,8 @@ export async function sendCampaignMessage(
       .select('id')
       .eq('agency_id', agency_id)
       .eq('contact_phone', cleanPhone)
+      .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle()
 
     if (preCheckConv) {
@@ -1550,44 +1559,87 @@ export async function sendCampaignMessage(
 
     // 5. Buscar o crear la conversación (el duplicado ya fue descartado arriba)
     let conversation_id: string;
-    const { data: convData } = await supabase
-      .from('wa_conversations')
-      .select('id')
+
+    // La plantilla que se manda queda como clasificación del lead, así después se puede
+    // filtrar la bandeja por "quiénes recibieron esta plantilla" sin pedirle ningún dato
+    // extra al director. Las plantillas que dispara el sistema (seguimientos,
+    // recordatorios de visita, reactivación) NO clasifican: no son campañas suyas.
+    const clasifPlantilla = esPlantillaDelSistema(input.template_name) ? null : input.template_name
+    const origenClasif = origenPlantilla(input.template_name)
+
+    // Heredar la clasificación del contacto en la agenda (si existe), para que el
+    // chat creado por la campaña aparezca ya clasificado en bandeja y Leads WhatsApp.
+    const { data: contactClasif } = await supabase
+      .from('wa_contacts')
+      .select('clasificacion, clasificaciones_historial')
       .eq('agency_id', agency_id)
-      .eq('contact_phone', cleanPhone)
+      .eq('phone', cleanPhone)
       .maybeSingle()
+
+    const clasifOrigen = contactClasif?.clasificacion ?? null
+    const at = new Date().toISOString()
+    const historial: Array<{ clasificacion: string; origen: string; at: string }> = []
+    if (clasifOrigen) historial.push({ clasificacion: clasifOrigen, origen: 'inicial', at })
+    if (clasifPlantilla && clasifPlantilla !== clasifOrigen) {
+      historial.push({ clasificacion: clasifPlantilla, origen: origenClasif, at })
+    }
+
+    // Atomico a proposito: el envío puede cruzarse con un mensaje entrante del
+    // mismo lead. Ver lib/whatsapp/conversations.ts.
+    const { conv: convRow, creada, error: errConv } = await buscarOCrearConversacion<{
+      id: string; clasificacion: string | null; clasificaciones_historial: unknown
+    }>(supabase, {
+      agency_id,
+      contact_phone: cleanPhone,
+      columnas: 'id, clasificacion, clasificaciones_historial',
+      nueva: {
+        instance_id: instance.id,
+        contact_name: input.name,
+        bot_active: input.bot_active ?? true,
+        unread_count: 0,
+        clasificacion: clasifOrigen,
+        clasificaciones_historial: historial,
+      },
+    })
+
+    if (!convRow) {
+      return { success: false, error: `Mensaje enviado pero falló crear conversación: ${(errConv as { message?: string })?.message}` }
+    }
+
+    const convData = creada ? null : convRow
 
     if (convData) {
       conversation_id = convData.id;
-      // El chat ya existe: NO tocamos su bot_active para no pisar la configuración
-      // que el asesor/director haya puesto a mano en esa conversación.
+      // instance_id: siempre, es lo que ata el chat a la instancia y evita chats duplicados.
+      const updateConv: Record<string, unknown> = { instance_id: instance.id }
+      const histConv = sumarClasificacion(convData, clasifPlantilla, origenClasif)
+      if (histConv) updateConv.clasificaciones_historial = histConv
+      await supabase
+        .from('wa_conversations')
+        .update(updateConv)
+        .eq('id', conversation_id)
     } else {
-      // Heredar la clasificación del contacto en la agenda (si existe), para que el
-      // chat creado por la campaña aparezca ya clasificado en bandeja y Leads WhatsApp.
-      const { data: contactClasif } = await supabase
+      // Recién creada: ya nació con la clasificación heredada del contacto.
+      conversation_id = convRow.id;
+    }
+
+    // Y también en la agenda, para que el filtro de Contactos lo encuentre por la plantilla.
+    if (clasifPlantilla) {
+      const { data: contactoRow } = await supabase
         .from('wa_contacts')
-        .select('clasificacion')
+        .select('id, clasificacion, clasificaciones_historial')
         .eq('agency_id', agency_id)
         .eq('phone', cleanPhone)
         .maybeSingle()
-
-      const { data: newConv, error: createConvErr } = await supabase
-        .from('wa_conversations')
-        .insert({
-          agency_id,
-          contact_phone: cleanPhone,
-          contact_name: input.name,
-          bot_active: input.bot_active ?? true,
-          unread_count: 0,
-          clasificacion: contactClasif?.clasificacion ?? null
-        })
-        .select('id')
-        .single()
-        
-      if (createConvErr || !newConv) {
-        return { success: false, error: `Mensaje enviado pero falló crear conversación: ${createConvErr?.message}` }
+      if (contactoRow) {
+        const histCont = sumarClasificacion(contactoRow, clasifPlantilla, origenClasif)
+        if (histCont) {
+          await supabase
+            .from('wa_contacts')
+            .update({ clasificaciones_historial: histCont })
+            .eq('id', contactoRow.id)
+        }
       }
-      conversation_id = newConv.id;
     }
 
     // 6. Guardar en wa_messages
@@ -1670,47 +1722,72 @@ export async function importContacts(
       deduped.push({ ...c, phone })
     }
 
-    // 2. Filtrar los que YA existen en la agenda (por teléfono) para no resubir repetidos.
+    // 2. Separar los que YA existen en la agenda (por teléfono).
+    //    Antes se los salteaba enteros: quedaban con su clasificación vieja y NUNCA
+    //    figuraban en el lote que acabás de importar, así que el filtro no los traía.
+    //    Ahora no se duplica el contacto (ni se crea un chat nuevo): se le SUMA la
+    //    clasificación del lote a su recorrido, conservando la de origen.
     const phones = deduped.map((c) => c.phone)
-    const existingSet = new Set<string>()
-    // Chunk para no exceder límites de la query .in()
+    const existentes = new Map<string, { id: string; clasificacion: string | null; clasificaciones_historial: unknown }>()
     for (let i = 0; i < phones.length; i += 500) {
       const chunk = phones.slice(i, i + 500)
       const { data: existing } = await supabase
         .from('wa_contacts')
-        .select('phone')
+        .select('id, phone, clasificacion, clasificaciones_historial')
         .eq('agency_id', agency_id)
         .in('phone', chunk)
-      for (const e of existing || []) existingSet.add(e.phone)
+      for (const e of existing || []) existentes.set(e.phone, e)
     }
 
-    const toInsert = deduped.filter((c) => !existingSet.has(c.phone))
-    const skipped = deduped.length - toInsert.length
+    const toInsert = deduped.filter((c) => !existentes.has(c.phone))
 
-    if (toInsert.length === 0) {
-      return { success: true, data: { inserted: 0, skipped } }
+    // 3. A los que ya existían: sumarles la clasificación del lote (si no la tenían).
+    const origen = origenImportacion(clasifValue)
+    let actualizados = 0
+    for (const c of deduped) {
+      const yaEsta = existentes.get(c.phone)
+      if (!yaEsta) continue
+      const historial = sumarClasificacion(yaEsta, clasifValue, origen)
+      if (!historial) continue // ya tenía esta clasificación: no se toca
+      const { error: updErr } = await supabase
+        .from('wa_contacts')
+        .update({ clasificaciones_historial: historial })
+        .eq('id', yaEsta.id)
+      if (updErr) {
+        console.error(`[import] no se pudo sumar la clasificación a ${c.phone}:`, updErr.message)
+        continue
+      }
+      actualizados++
     }
 
-    const formattedContacts = toInsert.map((c) => ({
-      agency_id,
-      agent_id: owner_id,
-      phone: c.phone,
-      name: c.name,
-      metadata: c.metadata,
-      tags: c.tags || [],
-      clasificacion: clasifValue,
-    }))
+    if (toInsert.length > 0) {
+      const at = new Date().toISOString()
+      const formattedContacts = toInsert.map((c) => ({
+        agency_id,
+        agent_id: owner_id,
+        phone: c.phone,
+        name: c.name,
+        metadata: c.metadata,
+        tags: c.tags || [],
+        clasificacion: clasifValue,
+        clasificaciones_historial: [{ clasificacion: clasifValue, origen, at }],
+      }))
 
-    const { error } = await supabase
-      .from('wa_contacts')
-      .insert(formattedContacts)
+      const { error } = await supabase
+        .from('wa_contacts')
+        .insert(formattedContacts)
 
-    if (error) {
-      console.error("Error inserting contacts:", error)
-      return { success: false, error: error.message }
+      if (error) {
+        console.error("Error inserting contacts:", error)
+        return { success: false, error: error.message }
+      }
     }
 
-    return { success: true, data: { inserted: toInsert.length, skipped } }
+    // `skipped` = los que ya estaban y tampoco necesitaron cambio (ya tenían esta
+    // clasificación). Los actualizados se informan aparte para que el director vea
+    // que no se perdieron.
+    const skipped = deduped.length - toInsert.length - actualizados
+    return { success: true, data: { inserted: toInsert.length, skipped, actualizados } }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error desconocido'
     return { success: false, error: message }

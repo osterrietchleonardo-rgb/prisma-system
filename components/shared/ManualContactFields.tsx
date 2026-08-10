@@ -27,6 +27,14 @@ interface Props {
   onChange: (data: ManualContactData) => void;
   /** Clases extra para los inputs, para adaptarse al estilo del formulario host */
   inputClassName?: string;
+  /**
+   * Si el email es obligatorio. Por defecto sí, que es la regla general.
+   * Se pone en false sólo donde el dato todavía no existe (prospección: el
+   * asesor recién conoce al cliente y muchas veces sólo tiene el celular).
+   * Ojo: opcional NO significa laxo. Si el asesor escribe un email, se le
+   * exige el mismo rigor que siempre (formato válido + doble verificación).
+   */
+  emailRequired?: boolean;
 }
 
 // Bloquea pegar / arrastrar texto en los campos de verificación
@@ -36,7 +44,7 @@ const blockPaste = (e: React.ClipboardEvent | React.DragEvent) => {
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function ManualContactFields({ onChange, inputClassName }: Props) {
+export function ManualContactFields({ onChange, inputClassName, emailRequired = true }: Props) {
   const [name, setName] = useState("");
   const [nameConfirm, setNameConfirm] = useState("");
   const [country, setCountry] = useState<CountryCode>("AR");
@@ -76,12 +84,22 @@ export function ManualContactFields({ onChange, inputClassName }: Props) {
   const phoneFormatOk = !!phoneE164;
   const emailFormatOk = emailRegex.test(email.trim());
 
+  /** Los dos campos de email en blanco: la única forma de "saltearlo". */
+  const emailEnBlanco = nEmail === "" && emailConfirm.trim() === "";
+  /**
+   * Cuando el email es opcional se permite dejarlo vacío, pero no a medias:
+   * apenas se escribe algo en cualquiera de los dos campos vuelve a exigirse
+   * formato válido + coincidencia, igual que cuando es obligatorio.
+   */
+  const emailOk = emailRequired
+    ? emailMatch && emailFormatOk
+    : emailEnBlanco || (emailMatch && emailFormatOk);
+
   const isValid =
     nameMatch &&
     phoneMatch &&
     phoneFormatOk &&
-    emailMatch &&
-    emailFormatOk &&
+    emailOk &&
     certified;
 
   // Reportar hacia arriba sin provocar loops (ref con el último onChange)
@@ -237,7 +255,7 @@ export function ManualContactFields({ onChange, inputClassName }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label className="flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5 opacity-60" /> Email *
+            <Mail className="w-3.5 h-3.5 opacity-60" /> Email {emailRequired ? "*" : "(Opcional)"}
           </Label>
           <Input
             type="email"
@@ -246,12 +264,18 @@ export function ManualContactFields({ onChange, inputClassName }: Props) {
             placeholder="juan@ejemplo.com"
             className={inputClassName}
             autoComplete="off"
-            required
+            required={emailRequired}
           />
+          {!emailRequired && (
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Podés dejarlo vacío. Si lo cargás, hay que verificarlo igual.
+            </p>
+          )}
         </div>
         <div className="space-y-2">
           <Label className="flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 opacity-60" /> Verificar Email *
+            <ShieldCheck className="w-3.5 h-3.5 opacity-60" /> Verificar Email{" "}
+            {emailRequired ? "*" : "(Opcional)"}
           </Label>
           <Input
             type="email"
@@ -262,16 +286,20 @@ export function ManualContactFields({ onChange, inputClassName }: Props) {
             placeholder="Reescribí el email"
             className={inputClassName}
             autoComplete="off"
-            required
+            required={emailRequired}
           />
           <MatchHint
-            show={emailConfirm.trim() !== ""}
+            // Con el email opcional también avisamos cuando se escribió sólo el
+            // primer campo: si no, el botón "no anda" y no se ve por qué.
+            show={emailConfirm.trim() !== "" || (!emailRequired && email.trim() !== "")}
             match={emailMatch && emailFormatOk}
             okLabel="El email coincide"
             errLabel={
-              emailConfirm.trim() !== "" && !emailFormatOk
+              !emailFormatOk && (emailRequired || email.trim() !== "")
                 ? "El email no tiene un formato válido"
-                : "El email no coincide"
+                : emailConfirm.trim() === ""
+                  ? "Reescribí el email para verificarlo"
+                  : "El email no coincide"
             }
           />
         </div>

@@ -106,8 +106,10 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   // Tag popover
   const [tagOpen, setTagOpen] = useState(false)
 
-  // Mobile info tab
-  const [activeTab, setActiveTab] = useState<"chat" | "info">("chat")
+  // En celular la barra de abajo es una sola: este flag la pasa a "nota interna".
+  // En pantallas md+ la nota tiene su propia fila y este flag queda siempre en false.
+  const [noteMode, setNoteMode] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -119,11 +121,13 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   }, [initialConv])
 
   // Al cambiar de conversación, descartar cualquier archivo en espera
+  // y volver la barra de abajo a modo mensaje.
   useEffect(() => {
     setPendingFile((prev) => {
       if (prev) URL.revokeObjectURL(prev.previewUrl)
       return null
     })
+    setNoteMode(false)
   }, [conv.id])
 
   // Load messages
@@ -262,6 +266,15 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
 
     return () => clearInterval(interval)
   }, [conv.id])
+
+  // La caja de escribir crece sola con el texto (en celular arranca en un renglón).
+  // El tope lo pone el max-h de la clase, así nunca se come la conversación.
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${el.scrollHeight}px`
+  }, [msgText, noteText, noteMode, conv.bot_active])
 
   // ---- Actions ----
 
@@ -494,7 +507,9 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   // Acción unificada del botón Enviar / Enter: si hay archivo en espera lo manda,
   // si no, envía el texto.
   const handleSend = () => {
-    if (pendingFile) {
+    if (noteMode) {
+      handleAddNote()
+    } else if (pendingFile) {
       handleSendPendingFile()
     } else {
       handleSendMessage()
@@ -581,22 +596,26 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
   return (
     <div className="flex flex-1 h-full min-w-0 overflow-hidden">
       {/* ====== CHAT COLUMN ====== */}
-      <div className={`flex-col flex-1 min-w-0 h-full lg:flex ${activeTab === 'info' ? 'hidden' : 'flex'}`}>
+      <div className="flex flex-col flex-1 min-w-0 h-full">
         {/* ====== HEADER ====== */}
-        <div className="px-4 py-3 border-b bg-card/50 flex-shrink-0">
-          <div className="flex items-center gap-3">
+        {/* En celular queda un solo renglón: volver · nombre · toggle del bot · info.
+            Todo el detalle (teléfono, asesor, score, clasificación, etiquetas) vive
+            adentro del panel de Info para no comerse la conversación. */}
+        <div className="px-3 py-2 md:px-4 md:py-3 border-b bg-card/50 flex-shrink-0">
+          <div className="flex items-center gap-2 md:gap-3">
             {/* Back button (mobile) */}
             {onBack && (
               <button
                 onClick={onBack}
-                className="md:hidden p-1.5 rounded-lg hover:bg-muted transition-colors"
+                aria-label="Volver a la lista de chats"
+                className="md:hidden -ml-1 p-1.5 rounded-lg hover:bg-muted transition-colors flex-shrink-0"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
             )}
 
             {/* Avatar */}
-            <div className="w-10 h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-sm flex-shrink-0">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-accent/10 text-accent flex items-center justify-center font-bold text-sm flex-shrink-0">
               {initial}
             </div>
 
@@ -606,9 +625,9 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                 <span className="font-semibold text-sm truncate">
                   {conv.contact_name || conv.contact_phone}
                 </span>
-                <div className={`w-2 h-2 rounded-full ${statusColor}`} />
+                <div className={`hidden md:block w-2 h-2 rounded-full flex-shrink-0 ${statusColor}`} />
               </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="hidden md:flex items-center gap-2 flex-wrap">
               <p className="text-xs text-muted-foreground">{conv.contact_phone}</p>
               {(() => {
                 const agentData = (conv as any).assigned_agent;
@@ -626,25 +645,25 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
             </div>
 
             <div
-              className={`px-2 py-1 rounded-md text-xs font-bold ${scoreColor}`}
+              className={`hidden md:block px-2 py-1 rounded-md text-xs font-bold ${scoreColor}`}
             >
               {conv.score}pts
             </div>
 
-            {/* Refresh button for messages */}
+            {/* Refresh button for messages (los mensajes ya se refrescan solos cada 5 s) */}
             <Button
               variant="ghost"
               size="icon"
               onClick={handleRefreshMessages}
               disabled={loading}
-              className="h-8 w-8 text-muted-foreground hover:text-accent"
+              className="hidden md:flex h-8 w-8 text-muted-foreground hover:text-accent"
               title="Sincronizar mensajes"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             </Button>
 
-            {/* Bot toggle */}
-            <div className="hidden sm:flex items-center gap-2 border-r pr-3 mr-1">
+            {/* Bot toggle (compu) */}
+            <div className="hidden md:flex items-center gap-2 border-r pr-3 mr-1">
               <div className="text-right">
                 <p className="text-xs font-semibold">Asesor IA</p>
                 <p className="text-[10px] text-muted-foreground">
@@ -655,6 +674,24 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                 checked={conv.bot_active}
                 onCheckedChange={handleToggleBot}
                 disabled={switchingBot}
+                className="data-[state=checked]:bg-green-500"
+              />
+            </div>
+
+            {/* Bot toggle (celular) — compacto pero bien visible */}
+            <div className="flex md:hidden items-center gap-1.5 flex-shrink-0">
+              <span
+                className={`text-[11px] font-bold ${
+                  conv.bot_active ? "text-green-600 dark:text-green-500" : "text-muted-foreground"
+                }`}
+              >
+                {conv.bot_active ? "IA" : "Manual"}
+              </span>
+              <Switch
+                checked={conv.bot_active}
+                onCheckedChange={handleToggleBot}
+                disabled={switchingBot}
+                aria-label="Prender o apagar el Asesor IA"
                 className="data-[state=checked]:bg-green-500"
               />
             </div>
@@ -679,6 +716,63 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                   </SheetTitle>
                 </SheetHeader>
                 <div className="flex-1 overflow-y-auto">
+                  {/* Clasificación y etiquetas: en celular viven acá adentro.
+                      En pantallas md+ siguen estando en el header del chat. */}
+                  <div className="md:hidden p-4 border-b space-y-3">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {conv.clasificacion && (() => {
+                        const cl = getClasificacionStyle(conv.clasificacion)
+                        return (
+                          <Badge variant="outline" className={`text-xs px-2 py-1 font-bold ${cl.className}`}>
+                            {cl.label}
+                          </Badge>
+                        )
+                      })()}
+                      {(conv.etiquetas || []).map((tag) => (
+                        <Badge
+                          key={tag}
+                          variant="secondary"
+                          className="text-xs pl-2.5 pr-1.5 py-1 gap-1.5"
+                        >
+                          {tag}
+                          <button
+                            onClick={() => handleRemoveTag(tag)}
+                            aria-label={`Quitar la etiqueta ${tag}`}
+                            className="p-0.5 rounded-full hover:bg-destructive/15"
+                          >
+                            <X className="w-3.5 h-3.5 text-muted-foreground" />
+                          </button>
+                        </Badge>
+                      ))}
+                      {!conv.clasificacion && (conv.etiquetas || []).length === 0 && (
+                        <p className="text-xs text-muted-foreground">Todavía no tiene etiquetas.</p>
+                      )}
+                    </div>
+
+                    {(() => {
+                      const disponibles = ALL_TAGS.filter((t) => !(conv.etiquetas || []).includes(t))
+                      if (disponibles.length === 0) return null
+                      return (
+                        <div className="space-y-1.5">
+                          <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+                            Agregar etiqueta
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {disponibles.map((tag) => (
+                              <button
+                                key={tag}
+                                onClick={() => handleAddTag(tag)}
+                                className="text-xs px-3 py-1.5 rounded-full border border-dashed border-muted-foreground/40 text-muted-foreground hover:border-accent hover:text-accent transition-colors"
+                              >
+                                + {tag}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+
                   <LeadTraceability conversation={conv} messages={messages} onDeleteChat={onDeleteChat} />
                 </div>
               </SheetContent>
@@ -698,7 +792,8 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+          {/* Clasificación y etiquetas: solo en compu. En celular están en el panel de Info. */}
+          <div className="hidden md:flex items-center gap-1.5 mt-2 flex-wrap">
             {conv.clasificacion && (() => {
               const cl = getClasificacionStyle(conv.clasificacion)
               return (
@@ -747,30 +842,6 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                 </div>
               </PopoverContent>
             </Popover>
-
-            {/* Mobile bot toggle */}
-            <div className="sm:hidden flex items-center gap-2 ml-auto">
-              <span className="text-[10px] text-muted-foreground">
-                {conv.bot_active ? "IA ON" : "Manual"}
-              </span>
-              <Switch
-                checked={conv.bot_active}
-                onCheckedChange={handleToggleBot}
-                disabled={switchingBot}
-                className="data-[state=checked]:bg-green-500 scale-90"
-              />
-            </div>
-
-            {/* Info toggle (mobile) */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="lg:hidden ml-1 h-7 px-2 text-xs"
-              onClick={() => setActiveTab('info')}
-            >
-              <Info className="w-3.5 h-3.5 mr-1" />
-              Info
-            </Button>
           </div>
         </div>
 
@@ -862,16 +933,35 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
               </Button>
             </div>
           ) : (
-            /* Manual mode: message + note inputs */
-            <div className="p-3 space-y-3">
-              {/* Direct message */}
+            /* Manual mode: mensaje + nota interna */
+            <div className="p-2 md:p-3 space-y-2 md:space-y-3">
+              {/* Barra de escritura */}
               {(() => {
-                const is24hWindowOpen = conv.last_inbound_at 
+                const is24hWindowOpen = conv.last_inbound_at
                   ? (new Date().getTime() - new Date(conv.last_inbound_at).getTime()) / (1000 * 60 * 60) <= 24
                   : false;
 
-                return is24hWindowOpen ? (
+                // En celular esta misma barra sirve para el mensaje y para la nota interna.
+                const enviando = noteMode ? sendingNote : sending || uploadingFile
+                const puedeEnviar = noteMode
+                  ? !!noteText.trim()
+                  : is24hWindowOpen && (!!msgText.trim() || !!pendingFile)
+
+                return (
                   <div className="flex flex-col gap-2">
+                    {/* Aviso de ventana de 24 hs cerrada */}
+                    {!is24hWindowOpen && (
+                      <div className="p-2.5 md:p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-md text-xs text-center border border-red-100 dark:border-red-900/50">
+                        <span className="font-semibold">Ventana de 24 hs cerrada.</span>{" "}
+                        <span className="md:hidden">
+                          Pasaron más de 24 hs desde el último mensaje del cliente. Solo podés mandarle plantillas.
+                        </span>
+                        <span className="hidden md:inline">
+                          No podés enviar mensajes de texto libre porque pasaron más de 24hs desde el último mensaje del cliente. Podés usar plantillas.
+                        </span>
+                      </div>
+                    )}
+
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -881,7 +971,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                     />
 
                     {/* Archivo en espera (se envía al tocar Enviar) */}
-                    {pendingFile && (
+                    {pendingFile && !noteMode && is24hWindowOpen && (
                       <div className="flex items-center gap-3 rounded-lg border border-accent/30 bg-accent/5 p-2">
                         {pendingFile.mediaType === 'image' ? (
                           <img
@@ -924,24 +1014,67 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                       </div>
                     )}
 
-                    <div className="flex gap-2">
+                    {/* Aviso de modo nota (celular) */}
+                    {noteMode && (
+                      <div className="md:hidden flex items-center gap-1.5 px-1 text-[11px] font-bold text-yellow-700 dark:text-yellow-400">
+                        <Lock className="w-3 h-3 flex-shrink-0" />
+                        Nota interna — el cliente no la ve
+                      </div>
+                    )}
+
+                    {/* La barra. Con la ventana cerrada, en compu se esconde (allá la nota
+                        interna tiene su propia fila); en celular queda para poder tomar notas. */}
+                    <div className={`flex gap-2 items-end ${!is24hWindowOpen ? "md:hidden" : ""}`}>
                       <Button
                         variant="outline"
                         onClick={handlePickFile}
-                        disabled={uploadingFile || sending}
-                        className="self-end h-10 w-10 p-0 text-muted-foreground hover:text-accent"
+                        disabled={uploadingFile || sending || noteMode || !is24hWindowOpen}
+                        className="self-end h-10 w-10 p-0 flex-shrink-0 text-muted-foreground hover:text-accent"
                         title="Adjuntar archivo"
                         aria-label="Adjuntar archivo"
                       >
                         <Paperclip className="w-4 h-4" />
                       </Button>
+
+                      {/* Pasar de mensaje a nota interna y volver (solo celular) */}
+                      <Button
+                        variant="outline"
+                        onClick={() => setNoteMode((v) => !v)}
+                        aria-pressed={noteMode}
+                        title={noteMode ? "Volver a escribirle al cliente" : "Escribir una nota interna"}
+                        aria-label={noteMode ? "Volver a escribirle al cliente" : "Escribir una nota interna"}
+                        className={`md:hidden self-end h-10 w-10 p-0 flex-shrink-0 ${
+                          noteMode
+                            ? "border-yellow-400 bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-950/40 dark:text-yellow-300 dark:border-yellow-700"
+                            : "text-muted-foreground hover:text-yellow-700"
+                        }`}
+                      >
+                        <Lock className="w-4 h-4" />
+                      </Button>
+
                       <Textarea
-                        value={msgText}
-                        aria-label="Mensaje al lead"
-                        onChange={(e) => setMsgText(e.target.value)}
-                        placeholder={pendingFile ? "Agrega un mensaje al archivo (opcional)..." : "Escribe un mensaje o adjunta un archivo..."}
-                        rows={2}
-                        className="resize-none text-sm flex-1"
+                        ref={textareaRef}
+                        value={noteMode ? noteText : msgText}
+                        aria-label={noteMode ? "Nota interna" : "Mensaje al lead"}
+                        onChange={(e) =>
+                          noteMode ? setNoteText(e.target.value) : setMsgText(e.target.value)
+                        }
+                        disabled={!noteMode && !is24hWindowOpen}
+                        placeholder={
+                          noteMode
+                            ? "Nota interna (solo la ve el equipo)..."
+                            : !is24hWindowOpen
+                              ? "No podés escribirle: la ventana de 24 hs está cerrada"
+                              : pendingFile
+                                ? "Agrega un mensaje al archivo (opcional)..."
+                                : "Escribe un mensaje o adjunta un archivo..."
+                        }
+                        rows={1}
+                        className={`resize-none text-sm flex-1 min-h-[40px] md:min-h-[80px] max-h-[120px] ${
+                          noteMode
+                            ? "border-yellow-400 bg-yellow-50/60 focus-visible:ring-yellow-400 dark:bg-yellow-950/20 dark:border-yellow-700"
+                            : ""
+                        }`}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault()
@@ -951,10 +1084,13 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                       />
                       <Button
                         onClick={handleSend}
-                        disabled={(!msgText.trim() && !pendingFile) || sending || uploadingFile}
-                        className="bg-accent hover:bg-accent/90 text-white self-end h-10 w-10 p-0"
+                        disabled={!puedeEnviar || enviando}
+                        aria-label={noteMode ? "Guardar nota interna" : "Enviar mensaje"}
+                        className={`text-white self-end h-10 w-10 p-0 flex-shrink-0 ${
+                          noteMode ? "bg-yellow-500 hover:bg-yellow-600" : "bg-accent hover:bg-accent/90"
+                        }`}
                       >
-                        {uploadingFile ? (
+                        {enviando ? (
                           <RefreshCw className="w-4 h-4 animate-spin" />
                         ) : (
                           <Send className="w-4 h-4" />
@@ -962,17 +1098,14 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                       </Button>
                     </div>
                   </div>
-                ) : (
-                  <div className="p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-md text-xs text-center border border-red-100 dark:border-red-900/50">
-                    <span className="font-semibold">Ventana de 24hs cerrada.</span> No podés enviar mensajes de texto libre porque pasaron más de 24hs desde el último mensaje del cliente. Podés usar plantillas.
-                  </div>
                 );
               })()}
 
-              <Separator />
+              <Separator className="hidden md:block" />
 
-              {/* Internal note */}
-              <div className="flex gap-2">
+              {/* Nota interna: en compu tiene su propia fila.
+                  En celular se escribe desde la misma barra con el botón del candado. */}
+              <div className="hidden md:flex gap-2">
                 <div className="relative flex-1">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-yellow-600" />
                   <Input
@@ -1067,9 +1200,34 @@ function MediaContent({ msg }: { msg: WAMessage }) {
 // Message Bubble
 // =============================================
 
+// Indicador de entrega para mensajes salientes (bot / equipo).
+// Refleja el estado REAL que reporta Meta por webhook, no solo "guardado en Prisma".
+function DeliveryStatus({ msg }: { msg: WAMessage }) {
+  const s = msg.status
+  if (!s) return null
+  if (s === 'failed') {
+    return (
+      <span
+        className="inline-flex items-center gap-0.5 text-red-600 dark:text-red-400 font-semibold"
+        title={msg.status_error || 'Meta no entregó este mensaje (número con reputación baja o fuera de la ventana de 24 h).'}
+      >
+        ✗ No entregado
+      </span>
+    )
+  }
+  if (s === 'pending') {
+    return <span className="text-muted-foreground" title="Enviándose…">🕓</span>
+  }
+  // sent / delivered / read
+  const label = s === 'read' ? '✓✓ Leído' : s === 'delivered' ? '✓✓ Entregado' : '✓ Enviado'
+  const color = s === 'read' ? 'text-sky-500' : 'text-muted-foreground'
+  return <span className={color} title={label}>{label}</span>
+}
+
 function MessageBubble({ msg }: { msg: WAMessage }) {
   const time = formatTime(msg.created_at)
   const isMedia = ['image', 'video', 'audio', 'document'].includes(msg.message_type || '')
+  const isOutbound = msg.role === 'bot' || msg.role === 'human'
 
   if (msg.role === "lead") {
     return (
@@ -1109,7 +1267,10 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
               <p className="text-sm px-4 py-2.5 text-muted-foreground italic">Mensaje multimedia</p>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">{time}</p>
+          <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1.5">
+            <span>{time}</span>
+            <DeliveryStatus msg={msg} />
+          </p>
         </div>
       </div>
     )
@@ -1133,7 +1294,10 @@ function MessageBubble({ msg }: { msg: WAMessage }) {
               <p className="text-sm px-4 py-2.5 text-muted-foreground italic">Mensaje multimedia</p>
             )}
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">{time}</p>
+          <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1.5">
+            <span>{time}</span>
+            <DeliveryStatus msg={msg} />
+          </p>
         </div>
       </div>
     )

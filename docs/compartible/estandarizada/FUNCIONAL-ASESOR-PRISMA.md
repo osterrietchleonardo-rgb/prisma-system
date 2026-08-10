@@ -45,6 +45,11 @@
 > 💡 **Tip:** también podés registrarte/ingresar con tu cuenta de Google.
 > ⚠️ Si tu cuenta aparece como "pausada" o "eliminada", no vas a poder entrar: contactá a tu director.
 
+**Una vez que entrás, quedás adentro.** No hace falta volver a iniciar sesión cada vez que abrís la app o cambiás de pantalla, ni en la computadora ni en el celular. La sesión se mantiene hasta que vos toques **"Cerrar Sesión"**.
+
+> 💡 **Tip para el celular:** guardá PRISMA en la pantalla de inicio (en el navegador, "Agregar a pantalla de inicio"). Se abre como una app y mantiene tu sesión.
+> ⚠️ Si abrís PRISMA desde el link de un mail, algunos celulares lo abren en un navegador interno de la app de correo, que no comparte tu sesión y te va a pedir la clave de nuevo. Para evitarlo, elegí **"Abrir en el navegador"** desde el menú de esa pantalla.
+
 ---
 
 ## 2. Cómo moverte por PRISMA
@@ -63,19 +68,38 @@
 **Qué es:** tu vista panorámica de rendimiento personal.
 
 **Qué muestra:**
+- **Filtro de fechas (arriba a la derecha):** elegí el **período** que querés ver. Tenés atajos rápidos (**Hoy, Este Mes, Este Trimestre, Este Año, Últimos 30 días**) o podés marcar un **rango a mano** en el calendario. Para una **fecha puntual**, tocá el mismo día dos veces. Tus tarjetas y el ranking se recalculan según lo que elijas; con **"Limpiar"** volvés a ver todo.
 - **Tarjetas (KPIs):** tus leads, captaciones, reservas y cierres, con la variación respecto al período anterior.
+- **Handoffs sin atender:** los clientes que el bot te derivó y **todavía no respondiste** (ver detalle abajo).
 - **Gráficos:** evolución en el tiempo y distribución de tus leads por canal de origen.
-- **Objetivos vs Alcanzado:** la tabla de metas mensuales del equipo (Facturación y Captación) con lo planificado, lo logrado y el % cumplido por mes, más un gráfico de evolución. Podés filtrar por año y cambiar de métrica.
-- **Ranking del equipo:** aunque solo veas tus números, el ranking te muestra **tu posición** frente al resto de la agencia.
+- **Objetivos vs Alcanzado:** **tus** metas mensuales (Facturación y Captación) con lo planificado, lo logrado y el % cumplido mes por mes, más un gráfico de tu evolución. Podés filtrar por año y cambiar de métrica. Solo ves tu fila: las metas de tus compañeros son privadas.
+- **Ranking del equipo:** aunque solo veas tus números, el ranking te muestra **tu posición** frente al resto de la agencia. Ves todas las columnas de todos (chats, prelistings, ACM, captaciones, cierres, cartera, rotación y la clasificación), con **una excepción: la Facturación**. La tuya la ves con el monto; la de los demás dice **"Privado"**. Es a propósito: cada uno ve lo que factura, nadie ve lo que factura el otro.
 
 **Cómo usarlo:**
 - Revisalo al empezar el día para saber dónde estás parado.
+- Usá el **filtro de fechas** para comparar cómo venís: por ejemplo "Este Mes" contra "Este Año", o un día concreto de mucha actividad.
 - Si un KPI bajó respecto al período anterior, mirá qué actividad podés reforzar.
 - En "Objetivos vs Alcanzado" mirás cómo vas contra la meta del mes: lo "alcanzado" se llena solo con la actividad que cargás.
+- En el ranking hay **dos columnas parecidas pero distintas**: **Prelist.** cuenta los prelistings que vos cargás en Tracking Performance (antes esa columna decía "Tasac."), y **ACM** cuenta las **fichas de ACM que generaste**. La de ACM no se carga a mano: se suma sola cada vez que armás una ficha en el módulo ACM.
 
 > 💡 Los **objetivos** los define el director (vos no los editás). Tu trabajo es cargar bien tu actividad para que el "alcanzado" refleje la realidad.
 
 > 💡 **Tip:** tus números se nutren de lo que cargás en **Tracking Performance** y de los leads/visitas que gestionás. Cuanto mejor cargues tu actividad, más fiel es tu dashboard.
+
+### Handoffs sin atender
+
+**Qué es:** cuando un cliente le pide al bot hablar con una persona, la conversación **te la pasa a vos** y te llega un mail. Acá ves cuáles de esos clientes **te siguen esperando**.
+
+**Qué muestra:** la lista de clientes que esperan tu respuesta, del que más tiempo lleva al que menos, con hace cuánto espera cada uno y un semáforo: **azul** recién derivado, **amarillo** más de 2 horas, **rojo** más de un día. La etiqueta naranja **"X sin responder"** significa que el cliente te siguió escribiendo y todavía no le contestaste.
+
+**Cómo usarlo:**
+- Es lo primero que conviene mirar cada mañana. Estos clientes **ya levantaron la mano**: pidieron hablar con una persona. Son los más fáciles de convertir.
+- Tocá cualquier fila y entrás directo a esa conversación para responder.
+- Empezá por los rojos y por los que tienen la etiqueta naranja: son los que más tiempo llevan esperando.
+
+> ⚠️ **Ojo:** para que salga de la lista tenés que **responder desde PRISMA**. Si le escribís desde tu WhatsApp personal, el sistema no lo registra y te va a seguir figurando como pendiente (y a tu director también).
+
+> 💡 Si la sección no aparece, es que no tenés ninguna derivación en el período elegido.
 
 ---
 
@@ -155,7 +179,34 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
    - **Propiedad (Colaboración):** texto libre para propiedades de **otra inmobiliaria** (colaboración).
    - **Vincular Cliente:** buscá entre tus leads de Tokko y tus contactos de WhatsApp.
    - **Registro Manual de Lead:** si el contacto es nuevo (un amigo, vecino, referido) y no está en el sistema, cargalo a mano. Pide **nombre completo**, **celular**, **email** y **etiqueta** (opcional). Para el celular elegís el **país** de una lista (con bandera) y escribís el número **como lo marcás normalmente** (ej.: `221 15 308 9334`); el sistema lo convierte solo al formato que pide WhatsApp y te muestra abajo cómo va a quedar (ej.: *"Se guardará como +54 9 221 308 9334"*). Para Argentina agrega solo el "9" de celular aunque no pongas el 15. **Doble verificación:** nombre, celular y email se cargan dos veces y el sistema avisa en el momento si coinciden (✅) o no (❌); en el campo de verificación **no se puede copiar/pegar**, hay que reescribirlo. Antes de crear el contacto tenés que tildar la **casilla de certificación** declarando que los datos son reales, veraces y obtenidos legítimamente. Se crea solo, asignado a tu cuenta.
+     - 💡 **El email es opcional en Prospección.** Cuando la actividad que estás cargando es **Prospección**, el email aparece como *(Opcional)* y podés dejarlo vacío: en el primer contacto muchas veces sólo tenés el celular. En las demás etapas (Prelisting, Prebuying, Captación, Reserva y Cierre) el email sigue siendo obligatorio, porque a esa altura ya deberías tenerlo. Ojo: si igual lo cargás en Prospección, tenés que escribirlo bien y verificarlo como siempre — o lo dejás vacío, o lo dejás completo y verificado.
 2. **Origen de Consulta:** elegí el canal de la lista (Instagram, WhatsApp orgánico, Referido cliente, Portal propio, Cartel, etc.).
+
+**Filtros del historial:** además de buscar por cliente/propiedad y filtrar por tipo de actividad, tenés un **filtro de fechas** (mismo selector que el Dashboard). Elegí un preset (Hoy, Este Mes, Este Trimestre, Este Año, Últimos 30 días) o un rango a mano para ver solo la actividad de ese período; con **"Limpiar"** volvés a ver todo.
+
+### Dos formas de ver lo mismo: Lista y Pipeline
+
+Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos botones: **Lista** y **Pipeline**.
+
+- **Lista** es lo de siempre: el historial de actividades, una fila por cada cosa que cargaste.
+- **Pipeline** es un **tablero**: cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy. Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
+
+**Cómo leerlo:**
+- Cada tarjeta te muestra el nombre del cliente, su celular, la propiedad y cuántas actividades le cargaste.
+- Arriba de cada columna hay un **número**: cuántos clientes tenés en esa etapa. De un vistazo ves dónde se te está juntando el trabajo.
+- Las tarjetas están ordenadas **de la más reciente a la más antigua**, así lo último que tocaste queda siempre arriba. Si tenés muchas, **scrolleás dentro de la columna** y el tablero no se te va de la pantalla.
+- Si un cliente entró por Tokko y también te escribió por WhatsApp, **es una sola tarjeta**: el sistema los une por el celular.
+
+**Cómo mover un cliente de etapa:** arrastrá la tarjeta a la columna que quieras, o tocá los **tres puntitos** de la tarjeta y elegí **"Mover a…"** (esto último es lo más cómodo desde el celular). Ahí pasa una de dos cosas:
+
+- **Si es una etapa nueva para ese cliente** → se abre el formulario pidiéndote los datos de esa etapa (por ejemplo, al pasarlo a Reserva te pide el monto). Se guarda como una actividad más, igual que si la hubieras cargado a mano.
+- **Si es una etapa por la que ya pasó** (por ejemplo, lo volvés para atrás porque se enfrió) → **no te pide nada**, la tarjeta se mueve y listo.
+
+> ⚠️ **Importante:** mover una tarjeta **para atrás no borra ni inventa nada**. Tus números del Dashboard quedan exactamente igual. El tablero es para que ordenes tu cabeza, no para inflar ni bajar tus métricas.
+
+**Ver todo lo que pasó con un cliente:** tocá la tarjeta (en el nombre) y se abre un panel lateral con **toda su historia** en orden: cada actividad que cargaste y cada vez que lo moviste de etapa, con la fecha. Desde ahí también podés editar cualquier actividad.
+
+> ⚠️ **Ahora el cliente es obligatorio.** Para guardar cualquier actividad tenés que vincular un cliente (un lead de Tokko, un contacto de WhatsApp, o cargarlo a mano). Es lo que permite armar la tarjeta. Si tenés actividades viejas sin cliente, el tablero te lo avisa con un cartel amarillo: entrá a la vista Lista, editalas y vinculales el cliente para que aparezcan.
 
 > 💡 **Tip:** cargá tu actividad **todos los días**. Es la diferencia entre un dashboard que refleja tu esfuerzo real y uno que te subvalora.
 > 💡 La pestaña de "Configuración IA" de las escalas de puntaje la define el director; vos solo cargás actividad.
@@ -192,6 +243,26 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 > 📎 **Enviar archivos:** con el chat en **control manual** (bot pausado), al lado de la caja de mensaje tenés un **clip 📎** para adjuntar una foto, un PDF, un audio o un video. El archivo queda **en espera** con una vista previa (podés **Cambiar** el archivo o **Quitarlo** con la ✕ si te equivocaste) y se manda recién cuando tocás **Enviar** — así podés escribir un texto para que vaya **junto al archivo**. Solo funciona dentro de las 24 hs desde el último mensaje del cliente (regla de WhatsApp).
 > 💡 Activá las **notificaciones push** en Configuración para enterarte al instante de mensajes nuevos.
 
+### Desde el celular
+
+La bandeja está pensada para que en el teléfono veas **la conversación y nada más**. Arriba del chat quedan solo cuatro cosas: la **flecha para volver** a la lista, el **nombre del cliente**, el **interruptor del bot** y el botón de **información ⓘ**.
+
+- **El interruptor del bot** dice *IA* cuando el bot está respondiendo y *Manual* cuando lo apagaste. Se toca y cambia al instante.
+- **El botón ⓘ** abre la ficha completa del cliente: sus etiquetas, el teléfono, el score, quién lo está atendiendo, la línea de tiempo, la visita agendada y las propiedades recomendadas. Ahí también **agregás o sacás etiquetas**, tocando las pastillas de "Agregar etiqueta".
+- **Para escribir** tenés una sola barra abajo, que se agranda sola a medida que escribís. El **clip 📎** adjunta un archivo y el **candado 🔒** cambia a **nota interna**: la barra se pone amarilla y avisa *"el cliente no la ve"*, así no hay forma de mandarle una nota por error. Tocás el candado de nuevo y volvés a escribirle al cliente.
+
+> 💡 **Tip:** desde cualquier pantalla del celular vas a ver un **círculo flotante abajo a la derecha**. Te lleva directo a la bandeja, y si tiene un **número rojo** son las conversaciones que el bot te derivó y **todavía nadie respondió**. Si aparece un número ahí, es plata esperando.
+
+### El bot ahora entiende fotos y audios
+
+Si un cliente manda una **foto** (una captura de una publicación, el frente de un edificio, un plano) o un **audio**, el bot ya no se queda callado: **mira la foto o escucha el audio y responde sobre eso**.
+
+- Con una foto, describe lo que ve y sigue la conversación. Si es la captura de un aviso de otro portal, te lo va a decir — pero **no va a inventar datos** que no tenga: si no está el link, avisa que no puede confirmar la publicación.
+- Con un audio o una nota de voz, lo transcribe y contesta como si te lo hubieran escrito.
+- Los **videos** también entran al chat, aunque por ahora el bot no analiza el contenido.
+
+> 💡 **Tip:** si un cliente te manda una captura de una propiedad de otra inmobiliaria, pedile el **link**. Con el link el bot puede buscar la propiedad de verdad en la cartera; con la sola imagen no.
+
 ### Avisos por email cuando un cliente avanza
 
 Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y además **te pasa esa conversación a tu bandeja** de WhatsApp para que tomes el control. Esto ocurre en 3 momentos:
@@ -201,6 +272,8 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 - **Visita agendada:** el cliente coordinó una visita y queda derivado a vos para el seguimiento.
 
 > 💡 **Tip:** mantené tu **bandeja de entrada de email a mano**: estos avisos llegan al instante y te permiten entrar al chat cuando el lead está caliente. La conversación ya te queda asignada en WhatsApp Bandeja.
+
+> 🔐 Si al abrir un link de PRISMA (por ejemplo, el del aviso de lead) la app te pide **iniciar sesión de nuevo**, después de entrar te lleva **directo a donde ibas** —no te deja tirado en el inicio—. Si ya tenés la sesión abierta, entrás sin que te pida nada.
 
 ---
 
@@ -268,7 +341,7 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 **Cómo agendar una visita (botón "Agendar Visita"):**
 1. **Información del lead** — 3 formas:
-   - **Desde Tokko:** desplegable con tus leads de Tokko.
+   - **Desde Tokko:** desplegable con tus leads de Tokko (recopila nombre, teléfono y email, con tarjeta de vista previa).
    - **Desde WhatsApp:** desplegable con tus contactos de WhatsApp.
    - **Carga Manual:** **nombre completo**, **celular**, **email** y **etiqueta** (opcional). Igual que en Tracking: el celular se carga eligiendo el **país** y escribiendo el número natural (el sistema lo normaliza al formato de WhatsApp y muestra el preview), y los tres datos clave llevan **doble verificación** (se reescriben, sin copiar/pegar, con aviso ✅/❌) más la **casilla de certificación** obligatoria antes de agendar. El contacto se crea solo para mantener el seguimiento.
 2. **Detalle de la cita:** fecha y hora.
@@ -276,6 +349,10 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
    - **Propiedad (Colaboración):** texto libre para una propiedad de otra inmobiliaria.
 3. **Calificación y perfil:** tipo de operación, presupuesto, calificación (HOT/WARM/COLD), intereses clave, objeciones, decisores.
 4. **Origen de consulta:** de la lista de canales.
+
+> **Buscá primero en "Contacto WhatsApp".** El desplegable te muestra **todos los chats que tenés asignados**, así que si el cliente ya te escribió por WhatsApp lo vas a encontrar ahí y no hace falta que lo cargues a mano.
+>
+> **Si igual lo cargás a mano y el celular ya estaba en la inmobiliaria:** no es un error y **no te frena**, la visita se agenda igual. Si el lead ya era de otro asesor, vas a ver un aviso con su nombre (para que se pongan de acuerdo) y no se toca nada de su chat. Si el chat **no era de nadie**, pasa a ser tuyo y desde ese momento lo ves en tu bandeja.
 
 **Acciones sobre una visita futura:**
 - **Reprogramar / Editar:** cambiás lo que necesites. **Te pide un motivo obligatorio.**
@@ -296,6 +373,7 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 > 💡 **Tip:** es ideal para capacitarte y resolver dudas de procedimiento sin molestar a nadie.
 > 💰 Cada mensaje consume 1 crédito.
+> 📱 **En el celular** la conversación ocupa toda la pantalla. Tus charlas anteriores están guardadas: se abren con la **pestañita del reloj ⏱ pegada al borde izquierdo**. Elegís una y el panel se cierra solo; también se cierra tocando fuera de él. Lo mismo vale para el Buscador IA.
 
 ---
 
@@ -332,6 +410,8 @@ Cuando hacés una búsqueda en el **Buscador IA** y abrís el detalle de una pro
 
 Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tarjeta de contacto** (tu nombre, tu WhatsApp y tu email) con los **colores y el logo de tu inmobiliaria**. El cliente la abre sin tener que registrarse en nada.
 
+**Sobre la descripción:** en las propiedades de la **red de colaboración** (las que no son de tu cartera), la descripción de la ficha se muestra **resumida y ordenada** por secciones (Superficie · Interior · Ubicación · Edificio), con lo importante del aviso y **sin la letra chica** (matrículas, textos legales ni los datos de contacto de la inmobiliaria que publicó). Antes se cortaba a la mitad de una frase; ahora siempre termina completa.
+
 > 💡 **Tip:** es ideal para mandar por WhatsApp — al pegar el link aparece una vista previa con la foto y el título.
 > 🔒 El cliente **no** ve de qué portal salió la propiedad (eso es info interna tuya). Tampoco puede entrar al sistema desde ahí: es solo una vitrina de presentación.
 > 🎨 Los colores y el logo salen de lo que el director cargó en **Marketing IA → Configuración IA**. Si todavía no lo configuró, la ficha usa un diseño elegante por defecto.
@@ -352,10 +432,31 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 2. Elegí la **operación** (Venta / Alquiler) y apretá **Buscar comparables**.
 3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
 
-> 💡 El **tipo**, la **operación** y ahora también el **barrio** son filtros estrictos: **todos los comparables son del mismo barrio** que la propiedad que analizás (si es de Belgrano, todos de Belgrano). Reconoce los sub-barrios (Belgrano R/C cuentan como Belgrano) y no le molestan los acentos (Nuñez = Núñez).
+> 💡 El **tipo** y la **operación** son filtros estrictos. El **barrio** ahora **puntúa por cercanía** en vez de ser un sí/no: primero los del **mismo barrio exacto**, después los del **sub-barrio de al lado** (si tu propiedad es de Belgrano, un Belgrano R o un Belgrano Chico entran pero puntúan menos) y por último los de un **barrio limítrofe** (Núñez, Colegiales, Saavedra). **Un comparable de otro barrio nunca le gana a uno del mismo barrio** si el resto es igual, así que en el % ya ves qué tan cerca está de verdad. Esto sirve porque muchos avisos de una misma cuadra están cargados con barrios distintos: en el límite de Belgrano y Núñez hay casas de la misma cuadra publicadas con uno u otro nombre, y antes la mitad no aparecía. No le molestan los acentos (Nuñez = Núñez).
+
+> 📐 **Cargá bien los metros cubiertos.** El sistema compara **cubiertos contra cubiertos**. Antes comparaba tus metros cubiertos contra la superficie **total** del aviso (que incluye el terreno y el patio), así que las casas con lote grande se quedaban afuera aunque fueran perfectamente comparables — en una prueba real en Belgrano se perdían **19 casas** por este motivo.
+
+> 🔁 **Sin repetidos y sin tu propia propiedad.** Si el mismo aviso está cargado varias veces en la red, ahora ves **uno solo**. Y si la propiedad que estás analizando también está publicada, **ya no aparece como comparable de sí misma**.
 > 💡 El **checklist compara todo lo que tiene dato real**: además de zona/superficie/ambientes/baños/amenities, ahora suma **dormitorios** y **antigüedad**. Si de un comparable falta un dato, ese renglón dice "sin dato" y no baja el puntaje.
 > 💡 Trae **hasta 50 comparables por bloque** (cartera y red), ordenados por comparabilidad (los mejores arriba). Para **venta**, la mayoría suele salir de tu propia cartera.
+> 🏠 **¿Considerar PH? (solo en Casas):** cuando la propiedad que analizás es una **Casa**, aparece la casilla **"Considerar PH"**. Viene **tildada**, así que por defecto no cambia nada. Como en los portales los **PH** figuran muchas veces como "casa", si querés comparar **solo casas puras**, **destildala** antes de buscar y los PH quedan afuera. En cualquier otro tipo de propiedad la casilla no aparece.
+> 🏗️ **¿A estrenar o en pozo?** Al lado de "Antigüedad" tenés dos casillas: **"A estrenar"** y **"En pozo"**. Tildá la que corresponda (podés tildar las dos) y el campo de años se apaga solo, porque ya no hace falta. **¿Para qué sirve?** Una propiedad sin uso vale bastante más el m² que una usada del mismo barrio —**entre 18 % y 36 % más**, medido con datos reales—, así que mezclarlas te desvía la tasación. Con la casilla tildada, PRISMA compara **solo contra propiedades del mismo estado**; sin tildar, compara solo contra usadas y deja afuera las a estrenar y las de pozo. **Si elegís la propiedad desde tu cartera, la casilla se tilda sola** cuando en Tokko figura como a estrenar o en pozo. En **terrenos** no se aplica (la antigüedad no les corresponde).
 > 💰 Buscar comparables **no consume créditos**.
+
+> 📄 **Al imprimir o guardar el informe como PDF**, el archivo ahora se descarga con un **nombre claro**: **`ACM - Dirección - Mes Año`** (por ejemplo, `ACM - Arcos 2825 - Julio 2026`). Así cada tasación queda con su propio nombre y no se pisan entre sí en tu carpeta de descargas. Si todavía no cargaste la dirección, sale como `ACM - Mes Año`.
+
+### Mis ACM (tu historial)
+
+Arriba de todo tenés dos solapas: **Nuevo ACM** y **Mis ACM**.
+
+**Cada análisis que hacés se guarda solo.** No tenés que apretar "guardar" ni nada: en el momento en que buscás comparables, ese ACM queda en **Mis ACM** con la propiedad que analizaste y **todos los comparables** que aparecieron (los de tu cartera y los de la red de colaboración, con su % y su checklist).
+
+- **Tocá cualquier fila** y volvés a la **misma pantalla de resultados**, tal como quedó ese día.
+- Si de ese ACM armaste una **ficha para el cliente**, la fila te muestra el botón **"Ficha"** para abrir el link directo.
+- Si armás **otra ficha** desde el mismo ACM (por ejemplo con otros comparables), te queda **una fila por cada ficha**, así no perdés ninguna.
+- Podés **borrar** un ACM del historial con el tacho. Ojo: si ya compartiste la ficha con el cliente, **el link sigue funcionando**.
+
+> 💡 Es la forma de retomar una tasación que empezaste la semana pasada sin volver a cargar todo, y de tener a mano lo que ya le mostraste a cada cliente.
 
 ### Crear una ficha para tu cliente
 
@@ -363,13 +464,15 @@ Con los comparables a la vista podés armar una **ficha profesional** para pasar
 
 1. Tocá **"Crear ficha"** (arriba a la derecha de los resultados).
 2. **Marcá** los comparables que quieras incluir (podés mezclar los de **tu cartera** y los de la **red de colaboración**). Cada uno ocupará **una hoja** con **todas sus fotos** y características.
-3. Tocá **"Crear ficha"** en la barra de abajo: se abre un **link público** listo para compartir.
-4. En esa página tenés **"Descargar PDF"** (para mandar por mail o WhatsApp) y **"Compartir"** (copia el link).
+3. Tocá **"Continuar"** en la barra de abajo: se abre una ventana con las **conclusiones del estudio** ya calculadas. Podés **editarlas, agregar las tuyas o sacar la sección** (destildá "Incluir la sección de conclusiones") para que no aparezcan en la ficha.
+4. Tocá **"Crear ficha"**: se abre un **link público** listo para compartir.
+5. En esa página tenés **"Descargar PDF"** (para mandar por mail o WhatsApp) y **"Compartir"** (copia el link).
 
 **Qué trae la ficha:**
-- Una **portada** con la propiedad de referencia, tus datos y la fecha.
-- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes) y todas las fotos + características.
-- Una **hoja final** con la **comparación de valores por m²** (el promedio y cuánto se desvía cada comparable respecto del cierre de **su propia zona**) y tus **datos de contacto** para que el cliente te escriba (WhatsApp / email).
+- Una **portada** con la propiedad de referencia y la fecha.
+- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes), una **descripción breve** de la propiedad (resumida en pocas líneas, sin la letra chica ni los datos de contacto de quien publicó el aviso) y todas las fotos + características.
+- Una **hoja final** con la **matriz comparativa de valores por m²** (con los **promedios de superficie, precio y $/m²** de la muestra), un gráfico de **"La Pirámide del Precio"** que muestra cómo cae la demanda cuando el precio se aleja del valor de mercado, las **conclusiones** (las que revisaste) y tus **datos de contacto** para que el cliente te escriba (WhatsApp / email).
+- Sobre tu nombre, en la tarjeta de contacto, aparece **tu clasificación** (Client Director / Client Support, la que te puso tu director; si no tenés, dice "Asesor/a").
 - Tu **logo** y el **aviso legal** en el pie de cada hoja (si el director los cargó en la configuración de marca).
 
 > 💡 **Tip:** la ficha usa los **colores y el logo** de tu agencia (los configura el director en **Marketing IA → Identidad Visual**). Si todavía no están cargados, sale con un diseño elegante por defecto.
