@@ -79,6 +79,10 @@ export function MapaBuscador({ onElegir }: { onElegir: (l: Lugar) => void }) {
 
   const caja = useRef<HTMLDivElement>(null)
   const enVuelo = useRef<AbortController | null>(null)
+  // Enter apretado ANTES de que llegaran las sugerencias. Sin esto el Enter se perdia en
+  // silencio: uno escribe "Belgrano", da Enter por reflejo, y el mapa no se mueve ni
+  // avisa nada. Queda anotado y se resuelve solo cuando llegan los resultados.
+  const enterEnEspera = useRef(false)
 
   const lista = [...propios, ...direcciones]
 
@@ -119,6 +123,14 @@ export function MapaBuscador({ onElegir }: { onElegir: (l: Lugar) => void }) {
   // que ya no es la que el usuario esta mirando.
   useEffect(() => setResaltado(0), [texto])
 
+  // Se cobra el Enter que quedo esperando: en cuanto hay una sugerencia, se elige la
+  // primera, que es la que el usuario habria elegido igual.
+  useEffect(() => {
+    if (!enterEnEspera.current || lista.length === 0) return
+    enterEnEspera.current = false
+    elegir(lista[0])
+  })
+
   useEffect(() => {
     const afuera = (e: MouseEvent) => {
       if (caja.current && !caja.current.contains(e.target as Node)) setAbierto(false)
@@ -144,8 +156,19 @@ export function MapaBuscador({ onElegir }: { onElegir: (l: Lugar) => void }) {
   }
 
   const teclas = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") return setAbierto(false)
-    if (!lista.length) return
+    if (e.key === "Escape") {
+      enterEnEspera.current = false
+      return setAbierto(false)
+    }
+    if (!lista.length) {
+      // Todavia no llego nada. Si esta buscando, el Enter se guarda; si ya termino y no
+      // hay resultados, no hay nada que elegir.
+      if (e.key === "Enter" && texto.trim().length >= MINIMO) {
+        e.preventDefault()
+        enterEnEspera.current = buscando
+      }
+      return
+    }
     if (e.key === "ArrowDown") {
       e.preventDefault()
       setResaltado((i) => (i + 1) % lista.length)
@@ -167,7 +190,12 @@ export function MapaBuscador({ onElegir }: { onElegir: (l: Lugar) => void }) {
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
         <input
           value={texto}
-          onChange={(e) => { setTexto(e.target.value); setAbierto(true) }}
+          onChange={(e) => {
+            // Si sigue escribiendo cambio de idea: el Enter viejo ya no aplica.
+            enterEnEspera.current = false
+            setTexto(e.target.value)
+            setAbierto(true)
+          }}
           onFocus={() => setAbierto(true)}
           onKeyDown={teclas}
           placeholder="Buscar un barrio, una zona guardada o una dirección…"

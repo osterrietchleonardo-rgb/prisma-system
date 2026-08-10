@@ -99,3 +99,29 @@ export function sacarBarriosRepetidos(deLaRed: Lugar[], deLaCartera: Lugar[]): L
   const mios = new Set(deLaCartera.map((l) => normalizarTexto(l.nombre)))
   return deLaRed.filter((l) => !mios.has(normalizarTexto(l.nombre)))
 }
+
+// ───────────────────────────── precios que no son precios ─────────────────────────────
+
+/**
+ * Si el numero que trae la propiedad se puede mostrar como precio.
+ *
+ * La red de colaboracion recibe cargas de muchas inmobiliarias y algunas ponen un valor
+ * de relleno. Contado sobre las 79.014 en venta y dolares el 2026-08-10:
+ *
+ *   price = 1        63      "US$ 1 · Departamento 370 m² · Arribeños 1500"
+ *   price < 100      76
+ *   100 a 1.000     112
+ *   1.000 o mas  78.826   (el 99,76%)
+ *
+ * No son propiedades falsas: existen y hay que mostrarlas. Lo falso es el numero, y
+ * mostrarlo hace que el asesor le pase a un cliente un precio que no existe. Van como
+ * "Consultar", igual que las que directamente no traen precio.
+ *
+ * El corte depende de la operacion: en VENTA nada real cuesta menos de 1.000, pero un
+ * ALQUILER de 500 dolares es de lo mas comun. Por eso ahi solo se descarta el 1 pelado.
+ */
+export function precioCreible(p: { price: number | null; status: string | null }): boolean {
+  if (!p.price || p.price <= 1) return false
+  if (p.status === "Venta" && p.price < 1000) return false
+  return true
+}

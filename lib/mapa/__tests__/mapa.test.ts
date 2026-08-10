@@ -12,7 +12,7 @@ import { leerFiltros } from "../filtros.ts"
 import { filtrarPorTrazos } from "../filtro-poligono.ts"
 import { agruparPorUbicacion } from "../agrupar.ts"
 import { consultarMapa, TOPE_PUNTOS } from "../consulta.ts"
-import { normalizarTexto, recuadroDePunto, sacarBarriosRepetidos, unirLugares } from "../lugares.ts"
+import { normalizarTexto, precioCreible, recuadroDePunto, sacarBarriosRepetidos, unirLugares } from "../lugares.ts"
 import { TIPOS_MAPA, esTipoValido, etiquetaDeTipo, tipoEnCastellano, valoresDeTipo } from "../tipos-propiedad.ts"
 import type { PropiedadMapa } from "../tipos.ts"
 
@@ -504,5 +504,37 @@ describe("leerFiltros · barrio", () => {
     // vacio sin motivo visible.
     assert.equal(leerFiltros(new URLSearchParams("barrio=")).barrio, null)
     assert.equal(leerFiltros(new URLSearchParams("barrio=%20%20")).barrio, null)
+  })
+})
+
+describe("precioCreible", () => {
+  const venta = (price: number | null) => ({ price, status: "Venta" })
+  const alquiler = (price: number | null) => ({ price, status: "Alquiler" })
+
+  test("US$ 1 no es un precio, es relleno", () => {
+    assert.equal(precioCreible(venta(1)), false)
+    assert.equal(precioCreible(alquiler(1)), false)
+  })
+
+  test("en venta, menos de 1.000 no existe", () => {
+    assert.equal(precioCreible(venta(111)), false)
+    assert.equal(precioCreible(venta(999)), false)
+    assert.equal(precioCreible(venta(1000)), true)
+  })
+
+  test("en alquiler, 500 es un precio de lo mas normal", () => {
+    // El corte de venta NO puede aplicarse al alquiler: dejaria como "Consultar" a los
+    // alquileres baratos, que son la mayoria de la red.
+    assert.equal(precioCreible(alquiler(500)), true)
+    assert.equal(precioCreible(alquiler(2)), true)
+  })
+
+  test("sin precio tampoco es creible", () => {
+    assert.equal(precioCreible(venta(null)), false)
+    assert.equal(precioCreible(venta(0)), false)
+  })
+
+  test("los precios normales pasan", () => {
+    assert.equal(precioCreible(venta(185000)), true)
   })
 })

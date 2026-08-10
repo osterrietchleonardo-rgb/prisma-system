@@ -8,6 +8,7 @@
 // para que nunca desaparezcan en silencio.
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MapPinOff } from "lucide-react"
+import { precioCreible } from "@/lib/mapa/lugares"
 import { tipoEnCastellano } from "@/lib/mapa/tipos-propiedad"
 import type { FuenteMapa, PropiedadMapa } from "@/lib/mapa/tipos"
 
@@ -36,7 +37,9 @@ const SIN_FOTO =
   )
 
 function precio(p: PropiedadMapa) {
-  if (!p.price) return "Consultar"
+  // "US$ 1" no es un precio barato: es un dato de relleno de quien cargo la propiedad.
+  // Ver precioCreible() para los numeros.
+  if (!precioCreible(p)) return "Consultar"
   const simbolo = p.currency === "ARS" ? "$" : "US$"
   return `${simbolo} ${p.price.toLocaleString("es-AR")}`
 }
@@ -58,8 +61,8 @@ export function MapaResultados({
   // 2026-08-10 sobre Palermo/Recoleta: 199 sin precio contra 38.758 con precio creible,
   // y aun asi las 199 eran lo unico visible.
   const ordenadas = [...ubicadas, ...sinUbicacion].sort((a, b) => {
-    const pa = a.price || 0
-    const pb = b.price || 0
+    const pa = precioCreible(a) ? a.price! : 0
+    const pb = precioCreible(b) ? b.price! : 0
     if (pa === 0 || pb === 0) return pa === pb ? 0 : pa === 0 ? 1 : -1
     return pa - pb
   })
