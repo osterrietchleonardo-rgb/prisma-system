@@ -15,6 +15,9 @@ create table if not exists marketing_recursos (
 create index if not exists marketing_recursos_tipo_activo_idx
   on marketing_recursos (tipo, activo);
 
+create unique index if not exists marketing_recursos_tipo_clave_titulo_idx
+  on marketing_recursos (tipo, coalesce(clave, titulo));
+
 alter table marketing_recursos enable row level security;
 -- Sin políticas públicas: solo service_role (mismo criterio que marketing_ideas).
 
@@ -31,7 +34,8 @@ $$Escribís como alguien que está adentro del rubro inmobiliario, no como un co
 5. DETALLE ESPECÍFICO. Al menos dos anclas concretas por pieza: una hora, un día de la semana, un plazo, un tipo de propiedad, una cantidad. "Un sábado a la noche", "en dos minutos", "hace seis meses", "un tres ambientes".
 6. CERRÁ EN LA CONSECUENCIA, no en un pedido. Que la última línea deje al lector con el costo de no hacer nada, no con un favor pedido.
 
-Español rioplatense natural y hablado: "el pibe nuevo", "cortar la venta en seco", "te lo confirmo y te aviso". Sin solemnidad y sin jerga de consultora.$$);
+Español rioplatense natural y hablado: "el pibe nuevo", "cortar la venta en seco", "te lo confirmo y te aviso". Sin solemnidad y sin jerga de consultora.$$)
+on conflict (tipo, coalesce(clave, titulo)) do nothing;
 
 insert into marketing_recursos (tipo, clave, titulo, detalle) values
 ('estructura','confesion','Confesión',
@@ -49,7 +53,8 @@ insert into marketing_recursos (tipo, clave, titulo, detalle) values
 ('estructura','carta_director','Carta al director',
  'Le hablás directo a una persona concreta, en segunda persona, como si le estuvieras escribiendo solo a él. Íntimo y directo, sin audiencia de por medio.'),
 ('estructura','numero_duele','El número que duele',
- 'Arrancás con un número del negocio y desplegás todo lo que ese número implica hacia atrás. El número tiene que ser verificable o presentado como estimación honesta.');
+ 'Arrancás con un número del negocio y desplegás todo lo que ese número implica hacia atrás. El número tiene que ser verificable o presentado como estimación honesta.')
+on conflict (tipo, coalesce(clave, titulo)) do nothing;
 
 insert into marketing_recursos (tipo, clave, titulo, detalle) values
 ('comentario','dato_crudo','Dato crudo con contexto',
@@ -61,7 +66,8 @@ insert into marketing_recursos (tipo, clave, titulo, detalle) values
 ('comentario','micro_caso','Micro-caso en tres líneas',
  'La escena contada en tres líneas, sin moraleja ni cierre. Que el lector saque la conclusión.'),
 ('comentario','pregunta_binaria','Pregunta binaria concreta',
- 'Una pregunta de dos opciones específicas del negocio. Prohibido "¿y vos qué opinás?" y cualquier variante genérica.');
+ 'Una pregunta de dos opciones específicas del negocio. Prohibido "¿y vos qué opinás?" y cualquier variante genérica.')
+on conflict (tipo, coalesce(clave, titulo)) do nothing;
 
 insert into marketing_recursos (tipo, titulo, detalle) values
 ('escena','Menú automático a una consulta concreta','Preguntan por un tres ambientes en una zona puntual y el bot contesta con un menú de opciones genérico.'),
@@ -93,4 +99,5 @@ insert into marketing_recursos (tipo, titulo, detalle) values
 ('escena','La operación que se cayó en silencio','Nadie registró por qué se perdió, así que el mes que viene se pierde igual por lo mismo.'),
 ('escena','El teléfono mal cargado','Un dígito de más al anotar y el lead queda inalcanzable para siempre.'),
 ('escena','La campaña que entra y se desborda','Se invierte en pauta, entran sesenta consultas y se contestan veintidós.'),
-('escena','El cliente que ya contó todo','Repite su búsqueda por tercera vez porque cada vez lo atiende una persona distinta.');
+('escena','El cliente que ya contó todo','Repite su búsqueda por tercera vez porque cada vez lo atiende una persona distinta.')
+on conflict (tipo, coalesce(clave, titulo)) do nothing;
