@@ -10,9 +10,22 @@ export interface FunnelStageData {
   key: string
   label: string
   sublabel: string
+  /** Personas distintas que llegaron a esta etapa (activeUsers de GA4, no eventos). */
   count: number
+  /** Veces que ocurrió (eventCount). Una misma persona puede repetir. */
+  eventCount: number
   conversionFromStartPct: number
   dropoffPct: number
+}
+
+/** Estado real de cada fuente de datos, para que el panel no muestre badges inventados. */
+export interface SourceHealth {
+  ga4: "ok" | "parcial" | "error"
+  gsc: "ok" | "error"
+  buffer: "ok" | "error" | "sin_token"
+  clarity: "ok" | "cache" | "error" | "sin_token"
+  /** Días que realmente cubre Clarity (su API solo admite 1, 2 o 3). */
+  clarityDias: number
 }
 
 export interface GscQuery {
@@ -81,6 +94,9 @@ export interface ClarityMetricsPayload {
 
 export interface MarketingMetricsPayload {
   funnel: FunnelStageData[]
+  /** Personas que llenaron el formulario y el pre-filtro les negó el calendario. */
+  noCalificados: number
+  sources: SourceHealth
   periodo: "7d" | "30d" | "90d"
   gscQueries: GscQuery[]
   bufferStats: {
@@ -122,9 +138,18 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 3
 }
 
 /**
+ * Clarity solo devuelve 1, 2 o 3 días (no acepta 7/30/90) y su plan permite
+ * apenas 10 llamadas por día. Por eso siempre se piden 3 días y se cachea:
+ * abrir el panel varias veces no debe consumir la cuota.
+ */
+const CLARITY_DIAS = 3
+const CLARITY_CACHE_MS = 6 * 60 * 60 * 1000
+let clarityCache: { data: ClarityMetricsPayload; at: number } | null = null
+
+/**
  * Consulta en tiempo real a Microsoft Clarity Live Insights API
  */
-export async function fetchClarityMetrics(): Promise<ClarityMetricsPayload> {
+export async function fetchClarityMetrics(): Promise<{ data: ClarityMetricsPayload; estado: SourceHealth["clarity"] }> {
   const defaultRes: ClarityMetricsPayload = {
     rageClicksPct: 0,
     deadClicksPct: 0,
@@ -137,17 +162,21 @@ export async function fetchClarityMetrics(): Promise<ClarityMetricsPayload> {
     popularPages: [],
   }
 
-  try {
-    const token = process.env.CLARITY_API_KEY
-    if (!token) return defaultRes
+  const token = process.env.CLARITY_API_KEY
+  if (!token) return { data: defaultRes, estado: "sin_token" }
 
-    const res = await fetchWithTimeout("https://www.clarity.ms/export-data/api/v1/project-live-insights", {
+  if (clarityCache && Date.now() - clarityCache.at < CLARITY_CACHE_MS) {
+    return { data: clarityCache.data, estado: "cache" }
+  }
+
+  try {
+    const res = await fetchWithTimeout(`https://www.clarity.ms/export-data/api/v1/project-live-insights?numOfDays=${CLARITY_DIAS}`, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       cache: "no-store",
     }, 3500)
 
     if (res.ok) {
-      const data = await res.json()
+      const crudo = await res.json()
       let rageClicksPct = 0
       let deadClicksPct = 0
       let quickBacksPct = 0
@@ -158,7 +187,7 @@ export async function fetchClarityMetrics(): Promise<ClarityMetricsPayload> {
       let scriptErrorsPct = 0
       let popularPages: Array<{ url: string; visitsCount: number }> = []
 
-      for (const item of data) {
+      for (const item of crudo) {
         if (item.metricName === "RageClickCount") {
           rageClicksPct = item.information?.[0]?.sessionsWithMetricPercentage ?? 0
         }
@@ -187,7 +216,7 @@ export async function fetchClarityMetrics(): Promise<ClarityMetricsPayload> {
         }
       }
 
-      return {
+      const data: ClarityMetricsPayload = {
         rageClicksPct,
         deadClicksPct,
         quickBacksPct,
@@ -198,12 +227,17 @@ export async function fetchClarityMetrics(): Promise<ClarityMetricsPayload> {
         scriptErrorsPct,
         popularPages,
       }
+      clarityCache = { data, at: Date.now() }
+      return { data, estado: "ok" }
     }
+    console.error("Clarity respondió", res.status)
   } catch (err) {
     console.error("Clarity fetch error:", err)
   }
 
-  return defaultRes
+  // Si falló pero hay algo cacheado (aunque esté vencido), es mejor que ceros.
+  if (clarityCache) return { data: clarityCache.data, estado: "cache" }
+  return { data: defaultRes, estado: "error" }
 }
 
 /**
@@ -211,6 +245,8 @@ export async function fetchClarityMetrics(): Promise<ClarityMetricsPayload> {
  */
 export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
   funnel: FunnelStageData[]
+  noCalificados: number
+  estado: SourceHealth["ga4"]
   overallStats: OverallGa4Stats
   trafficSources: TrafficSource[]
   deviceBreakdown: DeviceBreakdown
@@ -219,133 +255,168 @@ export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
   const days = getPeriodDays(periodo)
   const startDate = `${days}daysAgo`
 
-  let funnelRows: any[] = []
+  let eventRows: any[] = []
+  let pageEventRows: any[] = []
   let overallRows: any[] = []
   let trafficRows: any[] = []
   let deviceRows: any[] = []
   let topPageRows: any[] = []
+  let okReports = 0
+  let totalReports = 0
 
   try {
     const token = await getGoogleAccessToken("https://www.googleapis.com/auth/analytics.readonly")
 
-    // Run parallel reports for GA4
-    const [resFunnel, resOverall, resTraffic, resDevices, resPages] = await Promise.all([
-      fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dateRanges: [{ startDate, endDate: "today" }],
-          dimensions: [{ name: "eventName" }, { name: "pagePath" }],
-          metrics: [{ name: "eventCount" }, { name: "activeUsers" }],
-          limit: 300,
-        }),
-        cache: "no-store",
-      }, 3500),
+    const runReport = async (body: Record<string, unknown>): Promise<any[]> => {
+      const res = await fetchWithTimeout(
+        `https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ dateRanges: [{ startDate, endDate: "today" }], ...body }),
+          cache: "no-store",
+        },
+        3500
+      )
+      if (!res.ok) throw new Error(`GA4 ${res.status}: ${await res.text()}`)
+      return (await res.json()).rows ?? []
+    }
 
-      fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dateRanges: [{ startDate, endDate: "today" }],
-          metrics: [{ name: "activeUsers" }, { name: "newUsers" }, { name: "sessions" }, { name: "screenPageViews" }, { name: "bounceRate" }],
-        }),
-        cache: "no-store",
-      }, 3500),
-
-      fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dateRanges: [{ startDate, endDate: "today" }],
-          dimensions: [{ name: "sessionDefaultChannelGroup" }],
-          metrics: [{ name: "sessions" }, { name: "activeUsers" }],
-          limit: 10,
-        }),
-        cache: "no-store",
-      }, 3500),
-
-      fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dateRanges: [{ startDate, endDate: "today" }],
-          dimensions: [{ name: "deviceCategory" }],
-          metrics: [{ name: "activeUsers" }, { name: "sessions" }],
-        }),
-        cache: "no-store",
-      }, 3500),
-
-      fetchWithTimeout(`https://analyticsdata.googleapis.com/v1beta/properties/${GA_PROPERTY_ID}:runReport`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          dateRanges: [{ startDate, endDate: "today" }],
-          dimensions: [{ name: "pagePath" }],
-          metrics: [{ name: "screenPageViews" }, { name: "activeUsers" }, { name: "newUsers" }, { name: "bounceRate" }, { name: "userEngagementDuration" }],
-          limit: 8,
-        }),
-        cache: "no-store",
-      }, 3500),
+    // allSettled: si un reporte se cae (timeout), los otros cuatro igual se muestran.
+    const reports = await Promise.allSettled([
+      // Eventos SIN pagePath: es la única forma de contar personas sin duplicarlas
+      // (sumar activeUsers a través de varias rutas contaría dos veces al mismo).
+      runReport({
+        dimensions: [{ name: "eventName" }],
+        metrics: [{ name: "activeUsers" }, { name: "eventCount" }],
+        limit: 300,
+      }),
+      // Eventos POR ruta: se usa para el paso 1 (Home) y como respaldo histórico.
+      runReport({
+        dimensions: [{ name: "eventName" }, { name: "pagePath" }],
+        metrics: [{ name: "activeUsers" }, { name: "eventCount" }],
+        limit: 500,
+      }),
+      runReport({
+        metrics: [{ name: "activeUsers" }, { name: "newUsers" }, { name: "sessions" }, { name: "screenPageViews" }, { name: "bounceRate" }],
+      }),
+      runReport({
+        dimensions: [{ name: "sessionDefaultChannelGroup" }],
+        metrics: [{ name: "sessions" }, { name: "activeUsers" }],
+        limit: 10,
+      }),
+      runReport({
+        dimensions: [{ name: "deviceCategory" }],
+        metrics: [{ name: "activeUsers" }, { name: "sessions" }],
+      }),
+      runReport({
+        dimensions: [{ name: "pagePath" }],
+        metrics: [{ name: "screenPageViews" }, { name: "activeUsers" }, { name: "newUsers" }, { name: "bounceRate" }, { name: "userEngagementDuration" }],
+        limit: 8,
+      }),
     ])
 
-    if (resFunnel.ok) funnelRows = (await resFunnel.json()).rows ?? []
-    if (resOverall.ok) overallRows = (await resOverall.json()).rows ?? []
-    if (resTraffic.ok) trafficRows = (await resTraffic.json()).rows ?? []
-    if (resDevices.ok) deviceRows = (await resDevices.json()).rows ?? []
-    if (resPages.ok) topPageRows = (await resPages.json()).rows ?? []
+    totalReports = reports.length
+    const rowsOf = (i: number): any[] => {
+      const r = reports[i]
+      if (r.status === "fulfilled") {
+        okReports++
+        return r.value
+      }
+      console.error(`GA4 reporte ${i} falló:`, r.reason)
+      return []
+    }
+    eventRows = rowsOf(0)
+    pageEventRows = rowsOf(1)
+    overallRows = rowsOf(2)
+    trafficRows = rowsOf(3)
+    deviceRows = rowsOf(4)
+    topPageRows = rowsOf(5)
   } catch (err) {
     console.error("GA4 fetch error:", err)
   }
 
-  // 1. Funnel Processing
-  let homeCount = 0
-  let demoCount = 0
-  let video100Count = 0
-  let callPageCount = 0
-  let formCount = 0
-  let meetingCount = 0
+  const estado: SourceHealth["ga4"] =
+    totalReports === 0 ? "error" : okReports === totalReports ? "ok" : okReports === 0 ? "error" : "parcial"
 
-  for (const r of funnelRows) {
-    const eventName = r.dimensionValues?.[0]?.value ?? ""
-    const pagePath = r.dimensionValues?.[1]?.value ?? ""
-    const count = Number(r.metricValues?.[0]?.value ?? 0)
+  // ---------------------------------------------------------------------------
+  // EMBUDO REAL DE VAKDOR.COM (8 pasos), medido en PERSONAS (activeUsers).
+  // Los nombres de evento son los que dispara el sitio (ver website/src/lib/analytics.ts).
+  // ---------------------------------------------------------------------------
 
-    if (pagePath === "/" || pagePath === "/home" || pagePath === "") {
-      if (eventName === "page_view" || eventName === "session_start") homeCount += count
+  /** Personas / veces de un evento, sin abrir por ruta (no duplica usuarios). */
+  const byEvent = new Map<string, { users: number; events: number }>()
+  for (const r of eventRows) {
+    const name = r.dimensionValues?.[0]?.value ?? ""
+    byEvent.set(name, {
+      users: Number(r.metricValues?.[0]?.value ?? 0),
+      events: Number(r.metricValues?.[1]?.value ?? 0),
+    })
+  }
+  const ev = (name: string) => byEvent.get(name) ?? { users: 0, events: 0 }
+
+  /** page_view de una ruta exacta (para el paso 1 y los respaldos históricos). */
+  const pageView = (matches: (path: string) => boolean) => {
+    let users = 0
+    let events = 0
+    for (const r of pageEventRows) {
+      const name = r.dimensionValues?.[0]?.value ?? ""
+      const path = r.dimensionValues?.[1]?.value ?? ""
+      if (name !== "page_view" || !matches(path)) continue
+      users += Number(r.metricValues?.[0]?.value ?? 0)
+      events += Number(r.metricValues?.[1]?.value ?? 0)
     }
-    if (pagePath.includes("/demostracion") || pagePath.includes("/demo")) {
-      if (eventName === "page_view" || eventName === "session_start") demoCount += count
-    }
-    if (eventName === "video_complete") {
-      video100Count += count
-    }
-    if (pagePath.includes("/call") || pagePath.includes("/contact") || pagePath.includes("/agendar")) {
-      if (eventName === "page_view" || eventName === "session_start") callPageCount += count
-    }
-    if (eventName === "form_submit" || eventName === "clic_agendar_demo") {
-      formCount += count
-    }
-    if (eventName === "schedule_call" || eventName === "generate_lead") {
-      meetingCount += count
-    }
+    return { users, events }
   }
 
+  /**
+   * Los eventos del embudo son nuevos. Para que los períodos de 30 y 90 días no
+   * queden en cero, cada etapa toma el mayor entre el evento propio y su respaldo
+   * histórico (la vista de página equivalente, que mide exactamente lo mismo).
+   */
+  const mejor = (...opciones: { users: number; events: number }[]) =>
+    opciones.reduce((a, b) => (b.users > a.users ? b : a))
+
+  const home = pageView((p) => p === "/" || p === "/home")
+  const demo = mejor(ev("view_demostracion"), pageView((p) => p.startsWith("/demostracion")))
+  const video100 = mejor(ev("vsl_watch_100"), ev("video_complete"))
+  // clic_agendar_demo es el evento que ya venía disparando GTM en ese mismo botón.
+  const clickAgendar = mejor(ev("click_agendar_cta"), ev("clic_agendar_demo"))
+  const formulario = mejor(ev("view_prefilter_form"), pageView((p) => p.startsWith("/call")))
+  const envioForm = mejor(ev("prefilter_submit"), ev("generate_lead"))
+  const calendario = ev("view_calendar")
+  const reserva = ev("schedule_call")
+
+  const noCalificados = ev("prefilter_no_calificado").users
+
   const rawStages = [
-    { key: "home", label: "Home", sublabel: "vakdor.com/", count: homeCount },
-    { key: "demo", label: "Demostración", sublabel: "/demostracion", count: demoCount },
-    { key: "video_100", label: "Video 100%", sublabel: "Reproducción completa (video_complete)", count: video100Count },
-    { key: "call", label: "Página /call", sublabel: "/call (Agendar)", count: callPageCount },
-    { key: "form", label: "Formulario", sublabel: "Formulario completado", count: formCount },
-    { key: "meeting", label: "Reunión Solicitada", sublabel: "Lead cualificado CAPI", count: meetingCount },
+    { key: "home", label: "Home", sublabel: "vakdor.com/", ...home },
+    { key: "demo", label: "Ve la demostración", sublabel: "/demostracion", ...demo },
+    { key: "video_100", label: "Termina el video", sublabel: "VSL completo al 100%", ...video100 },
+    { key: "click_agendar", label: 'Aprieta "Agendar"', sublabel: "CTA hacia el formulario", ...clickAgendar },
+    { key: "form_view", label: "Llega al formulario", sublabel: "Pre-filtro en pantalla (/call)", ...formulario },
+    { key: "form_submit", label: "Envía el formulario", sublabel: "Pre-filtro completado", ...envioForm },
+    { key: "calendar_view", label: "Llega al calendario", sublabel: "Solo leads calificados", ...calendario },
+    { key: "schedule", label: "Confirma la reserva", sublabel: "Reunión agendada", ...reserva },
   ]
 
-  const topCount = rawStages[0].count
-  const funnel = rawStages.map((stage, idx) => {
-    const prevCount = idx === 0 ? stage.count : rawStages[idx - 1].count
-    const conversionFromStartPct = topCount > 0 ? Math.min(100, Math.round((stage.count / topCount) * 1000) / 10) : 0
-    const dropoffPct = idx === 0 ? 0 : (prevCount > 0 ? Math.max(0, Math.round((1 - stage.count / prevCount) * 1000) / 10) : 0)
+  const topCount = rawStages[0].users
+  const funnel: FunnelStageData[] = rawStages.map((stage, idx) => {
+    const prevCount = idx === 0 ? stage.users : rawStages[idx - 1].users
+    // Sin tope al 100%: alguien puede entrar directo a /demostracion desde un
+    // anuncio sin pasar por la home, y esconderlo falsearía el dato.
+    const conversionFromStartPct = topCount > 0 ? Math.round((stage.users / topCount) * 1000) / 10 : 0
+    const dropoffPct = idx === 0 ? 0 : prevCount > 0 ? Math.max(0, Math.round((1 - stage.users / prevCount) * 1000) / 10) : 0
 
-    return { ...stage, conversionFromStartPct, dropoffPct }
+    return {
+      key: stage.key,
+      label: stage.label,
+      sublabel: stage.sublabel,
+      count: stage.users,
+      eventCount: stage.events,
+      conversionFromStartPct,
+      dropoffPct,
+    }
   })
 
   // 2. Overall GA4 Stats
@@ -397,13 +468,13 @@ export async function fetchGa4Metrics(periodo: "7d" | "30d" | "90d"): Promise<{
     return { path, views, users, newUsers, bounceRatePct, avgTimeSeconds }
   })
 
-  return { funnel, overallStats, trafficSources, deviceBreakdown, topPagesPerformance }
+  return { funnel, noCalificados, estado, overallStats, trafficSources, deviceBreakdown, topPagesPerformance }
 }
 
 /**
  * Consulta a Google Search Console.
  */
-export async function fetchGscQueries(periodo: "7d" | "30d" | "90d"): Promise<GscQuery[]> {
+export async function fetchGscQueries(periodo: "7d" | "30d" | "90d"): Promise<{ data: GscQuery[]; estado: SourceHealth["gsc"] }> {
   try {
     const token = await getGoogleAccessToken("https://www.googleapis.com/auth/webmasters.readonly")
     const days = getPeriodDays(periodo)
@@ -430,32 +501,40 @@ export async function fetchGscQueries(periodo: "7d" | "30d" | "90d"): Promise<Gs
     if (res.ok) {
       const data = await res.json()
       const rows = data.rows ?? []
-      return rows.map((r: any) => ({
-        query: r.keys?.[0] ?? "",
-        clicks: Number(r.clicks ?? 0),
-        impressions: Number(r.impressions ?? 0),
-        position: r.position != null ? Math.round(r.position * 10) / 10 : 0,
-      }))
+      return {
+        data: rows.map((r: any) => ({
+          query: r.keys?.[0] ?? "",
+          clicks: Number(r.clicks ?? 0),
+          impressions: Number(r.impressions ?? 0),
+          position: r.position != null ? Math.round(r.position * 10) / 10 : 0,
+        })),
+        estado: "ok",
+      }
     }
+    console.error("GSC respondió", res.status)
   } catch (err) {
     console.error("GSC fetch error:", err)
   }
 
-  return []
+  return { data: [], estado: "error" }
 }
 
 /**
  * Consulta a Buffer (GraphQL API)
  */
 export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise<{
-  totalPosts: number
-  totalImpressions: number
-  reach: number
-  totalReactions: number
-  totalComments: number
-  avgEngagementRate: number
-  publicaciones: BufferPublishedPost[]
+  data: {
+    totalPosts: number
+    totalImpressions: number
+    reach: number
+    totalReactions: number
+    totalComments: number
+    avgEngagementRate: number
+    publicaciones: BufferPublishedPost[]
+  }
+  estado: SourceHealth["buffer"]
 }> {
+  let estado: SourceHealth["buffer"] = "sin_token"
   let postCount = 0
   let totalImpressions = 0
   let reach = 0
@@ -502,6 +581,7 @@ export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise
       )
 
       if (res.ok) {
+        estado = "ok"
         const body = await res.json()
         const metrics = body?.data?.aggregatedPostMetrics?.metrics ?? []
         postCount = metrics.find((m: any) => m.type === "postCount")?.value ?? 0
@@ -510,20 +590,28 @@ export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise
         totalReactions = metrics.find((m: any) => m.type === "reactions")?.value ?? 0
         totalComments = metrics.find((m: any) => m.type === "comments")?.value ?? 0
         avgEngagementRate = metrics.find((m: any) => m.type === "engagementRate")?.value ?? 0
+      } else {
+        estado = "error"
+        console.error("Buffer respondió", res.status)
       }
     }
   } catch (err) {
+    estado = "error"
     console.error("Buffer fetch error:", err)
   }
 
   return {
-    totalPosts: postCount,
-    totalImpressions,
-    reach,
-    totalReactions,
-    totalComments,
-    avgEngagementRate,
-    publicaciones: [],
+    data: {
+      totalPosts: postCount,
+      totalImpressions,
+      reach,
+      totalReactions,
+      totalComments,
+      avgEngagementRate,
+      // Buffer solo devuelve totales agregados: no hay ranking por publicación.
+      publicaciones: [],
+    },
+    estado,
   }
 }
 
@@ -568,7 +656,7 @@ export async function fetchMarketingContentStats(): Promise<ContentDistribution>
  * Orquestador de payload
  */
 export async function loadMarketingMetricsPayload(periodo: "7d" | "30d" | "90d"): Promise<MarketingMetricsPayload> {
-  const [ga4, gscQueries, bufferStats, contentDistribution, clarityStats] = await Promise.all([
+  const [ga4, gsc, buffer, contentDistribution, clarity] = await Promise.all([
     fetchGa4Metrics(periodo),
     fetchGscQueries(periodo),
     fetchBufferRanking(periodo),
@@ -578,15 +666,23 @@ export async function loadMarketingMetricsPayload(periodo: "7d" | "30d" | "90d")
 
   return {
     funnel: ga4.funnel,
+    noCalificados: ga4.noCalificados,
+    sources: {
+      ga4: ga4.estado,
+      gsc: gsc.estado,
+      buffer: buffer.estado,
+      clarity: clarity.estado,
+      clarityDias: CLARITY_DIAS,
+    },
     periodo,
-    gscQueries,
-    bufferStats,
+    gscQueries: gsc.data,
+    bufferStats: buffer.data,
     contentDistribution,
     overallStats: ga4.overallStats,
     trafficSources: ga4.trafficSources,
     deviceBreakdown: ga4.deviceBreakdown,
     topPagesPerformance: ga4.topPagesPerformance,
-    clarityStats,
+    clarityStats: clarity.data,
     updatedAt: new Date().toISOString(),
   }
 }
