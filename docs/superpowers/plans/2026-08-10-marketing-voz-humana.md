@@ -421,7 +421,7 @@ Español rioplatense natural. Segunda persona. Cero emojis. Viñetas con •.`
  */
 export const MULETILLAS: readonly string[] = [
   "en un mundo donde", "hoy más que nunca", "la realidad es que",
-  "no es casualidad que", "el secreto está en", "imaginá por un momento",
+  "el secreto está en", "imaginá por un momento",
   "y acá está la clave", "spoiler", "déjame decirte", "aprovechar al máximo",
   "revolucionar", "potenciar", "sinergia", "qué opinás",
 ] as const
@@ -1426,7 +1426,7 @@ export function normalizar(texto) {
   return (texto || "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9ñ\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
