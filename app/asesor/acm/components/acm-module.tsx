@@ -66,6 +66,7 @@ export function AcmModule() {
     setSujeto(SUJETO_INICIAL);
     setOperacion("venta");
     setConsiderarPh(true);
+    setIncluirLinderos(false);
     setExcludeId(null);
   };
 
