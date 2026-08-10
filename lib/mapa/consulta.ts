@@ -122,12 +122,11 @@ export async function consultarMapa(
           p_limit: TOPE_PUNTOS,
         })
       : null,
-    // Se pide uno de mas: si vuelve, es que habia mas de los que entran en el tope.
     quiereColaboracion
       ? admin.rpc("mapa_colaboracion", {
           ...comunes,
           p_tipos: tiposColab,
-          p_limit: TOPE_PUNTOS + 1,
+          p_limit: TOPE_PUNTOS,
         })
       : null,
   ])
@@ -144,7 +143,23 @@ export async function consultarMapa(
   const filasColab = (resColaboracion?.data as FilaMapa[] | null) ?? []
   const resto = Math.max(TOPE_PUNTOS - propias.length, 0)
   const colaboracion = filasColab.slice(0, resto).map((f) => aPropiedadMapa(f, true, userId))
-  const truncado = quiereColaboracion && filasColab.length > resto
+
+  // "Vino llena la bandeja" = puede haber mas afuera.
+  //
+  // Antes esto se resolvia pidiendo TOPE_PUNTOS + 1 y mirando si volvia el de mas. NO
+  // FUNCIONA: PostgREST —la capa REST de Supabase— recorta toda respuesta a 1.000 filas
+  // por su cuenta, sin avisar, aunque la funcion SQL tenga LIMIT 1001. Medido el
+  // 2026-08-10 sobre el mismo rectangulo (Chacarita a Recoleta, 40.036 coincidencias):
+  //
+  //   p_limit=999 -> 999 filas    p_limit=1001 -> 1000 filas
+  //   p_limit=1000 -> 1000 filas  p_limit=2000 -> 1000 filas
+  //
+  // Como el de mas nunca llegaba, `truncado` daba siempre false y el mapa mostraba
+  // 1.000 de 40.036 diciendo "1000 propiedades a la vista", como si fueran todas.
+  //
+  // Ahora se toma como recortado el hecho de llenar el cupo. Puede dar una falsa alarma
+  // en el caso exacto de que haya justo 1.000: preferible a esconder 39.000.
+  const truncado = quiereColaboracion && filasColab.length > 0 && filasColab.length >= resto
 
   const propiedades = [...propias, ...colaboracion]
   return {

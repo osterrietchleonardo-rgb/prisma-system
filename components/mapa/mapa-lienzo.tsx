@@ -38,20 +38,59 @@ const COLOR: Record<FuenteMapa, string> = {
  * defecto para que el mapa nunca aparezca en gris. MapTiler (mas lindo, con los nombres
  * de calles mejor puestos) se usa solo si hay clave Y esa clave contesta.
  *
- * El 2026-08-06 la clave cargada devolvia 403 "Key usage restricted" en todas las
- * peticiones —con y sin cabecera Referer— y por eso el mapa se veia vacio. Ahora, si
- * las baldosas de MapTiler fallan, se cambia solo a OpenStreetMap en vez de dejar el
- * fondo en blanco.
+ * POR QUE NO ALCANZA CON ESCUCHAR EL ERROR DE LA BALDOSA
+ * Cuando la clave no sirve, MapTiler NO devuelve un error que el navegador pueda ver:
+ * devuelve un 403 con una imagen PNG valida adentro, un papel tapiz que dice
+ * "Invalid key / Get a valid key at www.maptiler.com". El navegador la carga contenta,
+ * asi que el evento `tileerror` de Leaflet nunca se dispara y el mapa se queda
+ * tapizado para siempre. Medido el 2026-08-10 sobre la baldosa de Buenos Aires:
+ *
+ *   clave buena -> HTTP 200, 117.379 bytes (mapa de verdad)
+ *   clave mala  -> HTTP 403,  10.260 bytes (el cartel "Invalid key")
+ *
+ * Por eso se le pregunta por el ESTADO HTTP con fetch, que si distingue 200 de 403
+ * (MapTiler responde con Access-Control-Allow-Origin: * en ambos casos, asi que el
+ * navegador puede leerlo). Ojo: fetch lo gobierna `connect-src` de la politica de
+ * contenido, no `img-src`; los dos tienen que permitir api.maptiler.com.
+ *
+ * Se arranca mostrando MapTiler y se baja a OpenStreetMap solo si la prueba falla:
+ * asi el caso normal no parpadea, y el caso roto se corrige en un par de decimas.
+ *
+ * Antecedente: el 2026-08-06 la clave devolvia 403 porque en MapTiler el origen
+ * permitido era `vakdor.com` a secas, que no cubre subdominios. Se corrigio a
+ * `*.vakdor.com` + `localhost` el 2026-08-10.
  */
 const OSM = {
   url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 }
 
+/** El planeta entero en 256px: la baldosa mas barata que hay para probar la clave. */
+const baldosaDePrueba = (clave: string) =>
+  `https://api.maptiler.com/maps/streets-v2/1/0/0.png?key=${clave}`
+
 function FondoDelMapa({ onProveedor }: { onProveedor: (p: "maptiler" | "osm") => void }) {
   const clave = process.env.NEXT_PUBLIC_MAPTILER_KEY
   const [maptilerRoto, setMaptilerRoto] = useState(false)
   const usaMaptiler = Boolean(clave) && !maptilerRoto
+
+  useEffect(() => {
+    if (!clave) return
+    let vivo = true
+    const caer = () => {
+      if (vivo) setMaptilerRoto(true)
+    }
+    fetch(baldosaDePrueba(clave))
+      .then((r) => {
+        if (!r.ok) caer()
+      })
+      // Sin red, con la politica de contenido bloqueando, o con MapTiler caido:
+      // en todos esos casos OpenStreetMap es mejor que un fondo dudoso.
+      .catch(caer)
+    return () => {
+      vivo = false
+    }
+  }, [clave])
 
   useEffect(() => {
     onProveedor(usaMaptiler ? "maptiler" : "osm")
@@ -60,7 +99,8 @@ function FondoDelMapa({ onProveedor }: { onProveedor: (p: "maptiler" | "osm") =>
   if (usaMaptiler) {
     return (
       <TileLayer
-        // Si la clave no sirve, Leaflet avisa por cada baldosa: con la primera alcanza.
+        // Red de seguridad secundaria: esto si atrapa las caidas de red de verdad
+        // (DNS, timeout), donde no llega a haber ninguna imagen.
         eventHandlers={{ tileerror: () => setMaptilerRoto(true) }}
         url={`https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=${clave}`}
         attribution='&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

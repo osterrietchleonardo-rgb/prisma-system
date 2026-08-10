@@ -11,6 +11,7 @@ import { bboxDePoligono, parsearBBox, serializarBBox } from "../bbox.ts"
 import { leerFiltros } from "../filtros.ts"
 import { filtrarPorTrazos } from "../filtro-poligono.ts"
 import { agruparPorUbicacion } from "../agrupar.ts"
+import { consultarMapa, TOPE_PUNTOS } from "../consulta.ts"
 import { TIPOS_MAPA, esTipoValido, etiquetaDeTipo, tipoEnCastellano, valoresDeTipo } from "../tipos-propiedad.ts"
 import type { PropiedadMapa } from "../tipos.ts"
 
@@ -348,5 +349,62 @@ describe("agruparPorUbicacion", () => {
     const g = agruparPorUbicacion([aviso({ id: "sin", lat: null, lng: null }), aviso({ id: "con" })])
     assert.equal(g.length, 1)
     assert.deepEqual(g[0].propiedades.map((p: any) => p.id), ["con"])
+  })
+})
+
+// ─────────────────────── el aviso de "hay mas" ───────────────────────
+//
+// Regresion del 2026-08-10. La deteccion original pedia TOPE_PUNTOS + 1 filas y miraba
+// si volvia la de mas. PostgREST recorta toda respuesta a 1.000 filas por su cuenta, asi
+// que la de mas no volvia NUNCA: el mapa mostraba 1.000 de 40.036 diciendo "1000
+// propiedades a la vista". Estos tests fuerzan el tope contra un Supabase de mentira.
+
+/** Un Supabase falso que devuelve las filas que se le pidan, sin tocar la red. */
+function supabaseFalso(filasPorFuncion: Record<string, number>) {
+  const fila = (i: number) => ({
+    ref: `r${i}`, title: null, price: 1, currency: "USD", property_type: "Apartment",
+    status: "Venta", bedrooms: null, bathrooms: null, total_area: null,
+    address: null, city: null, foto: null, lat: -34.6, lng: -58.4,
+    assigned_agent_id: null, agent_name: "", agent_email: "",
+    agencia_nombre: null, canonical_url: null,
+  })
+  return {
+    rpc: async (nombre: string, params: any) => ({
+      data: Array.from(
+        { length: Math.min(filasPorFuncion[nombre] ?? 0, params.p_limit, TOPE_PUNTOS) },
+        (_, i) => fila(i),
+      ),
+      error: null,
+    }),
+  } as any
+}
+
+const PARAMS_BASE = {
+  bbox: { sur: -34.7, oeste: -58.5, norte: -34.5, este: -58.3 },
+  filtros: {
+    operacion: "Venta", tipo: null, precio_min: null, precio_max: null,
+    moneda: "USD", ambientes_min: null, fuentes: ["own", "agency", "roomix"],
+  } as any,
+  agencyId: "a", userId: "u",
+}
+
+describe("consultarMapa · aviso de resultados recortados", () => {
+  test("avisa cuando la colaboracion llena el cupo (aunque PostgREST corte en 1000)", async () => {
+    // 40.036 disponibles, pero la capa REST solo deja pasar 1.000.
+    const r = await consultarMapa(supabaseFalso({ mapa_colaboracion: 40036 }), PARAMS_BASE)
+    assert.equal(r.propiedades.length, TOPE_PUNTOS)
+    assert.equal(r.truncado, true, "con el cupo lleno el mapa TIENE que avisar")
+  })
+
+  test("no avisa cuando entra todo con lugar de sobra", async () => {
+    const r = await consultarMapa(supabaseFalso({ mapa_colaboracion: 120 }), PARAMS_BASE)
+    assert.equal(r.propiedades.length, 120)
+    assert.equal(r.truncado, false)
+  })
+
+  test("no avisa cuando la colaboracion no devuelve nada", async () => {
+    const r = await consultarMapa(supabaseFalso({}), PARAMS_BASE)
+    assert.equal(r.propiedades.length, 0)
+    assert.equal(r.truncado, false, "cero resultados no es un recorte")
   })
 })

@@ -125,11 +125,11 @@ export function MapaTab() {
     else toast.error("Esa zona no tiene un trazo válido")
   }, [])
 
-  // Con el tope pasado no se dibujan puntos sueltos: solo los globitos con las cantidades.
-  const grupos = useMemo(
-    () => (truncado ? [] : agruparPorUbicacion(visibles)),
-    [visibles, truncado],
-  )
+  // Pasado el tope se siguen dibujando los globitos, con el contador avisando que son
+  // una muestra. Antes se borraba todo y quedaba el mapa vacio: sobre una ciudad entera
+  // eso es casi siempre, y un mapa en blanco no le sirve a nadie. Mil puntos de muestra
+  // + un cartel que aclara que son mil de muchos mas es mas util y igual de honesto.
+  const grupos = useMemo(() => agruparPorUbicacion(visibles), [visibles])
 
   const onMover = useCallback((b: BBox) => setBbox(b), [])
   const onAbrirGrupo = useCallback((g: GrupoUbicacion) => {
@@ -224,6 +224,10 @@ export function MapaTab() {
               </span>
             ) : (
               <>
+                {/* El "+" no es decorativo: pasado el tope, este numero es el del tope,
+                    no el de la zona. Sin el signo el mapa afirma que hay 1.000 cuando
+                    puede haber 40.000. */}
+                {truncado && "+"}
                 {visibles.length} {visibles.length === 1 ? "propiedad" : "propiedades"} a la vista
               </>
             )}
@@ -231,7 +235,7 @@ export function MapaTab() {
 
           {truncado && (
             <div className="absolute bottom-3 left-1/2 z-[500] -translate-x-1/2 rounded-lg bg-amber-500/95 px-3 py-1.5 text-center text-xs font-medium text-white shadow">
-              Hay demasiadas propiedades acá. Acercate para verlas una por una.
+              Estás viendo una muestra. Acercate para verlas todas.
             </div>
           )}
 
