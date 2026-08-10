@@ -6,9 +6,11 @@
 export function normalizar(texto: string): string {
   return texto
     .toLowerCase()
+    // NFD + strip de combining marks folds accents AND ñ -> n. Es lo que queremos:
+    // ambos lados de la comparación reciben el mismo trato, así que el matching es consistente.
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9ñ\s]/g, " ")
+    .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
 }

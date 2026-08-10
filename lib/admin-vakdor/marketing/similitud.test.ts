@@ -5,6 +5,11 @@ describe("normalizar", () => {
   it("baja a minúsculas, saca tildes y puntuación", () => {
     expect(normalizar("¿Tenés QUÉ, dónde?")).toBe("tenes que donde")
   })
+
+  it("pliega la ñ a n (NFD ya la descompuso) y lo hace igual de los dos lados", () => {
+    expect(normalizar("El año pasado")).toBe("el ano pasado")
+    expect(similitud("El año pasado no cerró", "el ano pasado no cerro")).toBe(1)
+  })
 })
 
 describe("similitud", () => {
