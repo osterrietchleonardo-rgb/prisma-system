@@ -1758,6 +1758,7 @@ Sistema de auth **completamente separado** de Supabase Auth:
 | `/api/admin-vakdor/marketing/[id]/publicar` | POST | Publicar ya (blog o LinkedIn) |
 | `/api/admin-vakdor/marketing/generar` | POST | Motor de ideas (funda ideas con GA/Search/copywriter) |
 | `/api/admin-vakdor/marketing/publicar-programadas` | POST | Cron: publica aprobadas con fecha vencida (auth `assertCron`, workflow `marketing-publish.yml` cada 30 min) |
+| `/api/admin-vakdor/marketing/metricas` | GET | Embudo de 8 pasos de vakdor.com + GA4/GSC/Buffer/Clarity + análisis IA guardado (`?periodo=7d\|30d\|90d`). Detalle en TÉCNICO 16.3.1 |
 
 ### 23.1 Módulo Finanzas
 

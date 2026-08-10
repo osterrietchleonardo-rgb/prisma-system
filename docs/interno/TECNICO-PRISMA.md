@@ -879,6 +879,33 @@ Sala de control del contenido orgánico de Vakdor (LinkedIn/Instagram/blog). Tab
 - **Reformular con visuales:** el recuadro de reformular (en `en_revision`) tiene un check **"También regenerar imágenes/PDF"** (solo carrusel/lead_magnet). Si se marca, el route `[id]/reformular` NO genera texto: llama `regenerarVisuales(id, comentario)` (limpia `contenido`+`assets`, guarda `comentario`, → `en_proceso`) y el **worker** rehace descripción + slides/PDF alineados al comentario (prompt `ajusteIdea` en `content.mjs`) y la devuelve a `en_revision`. Sin marcar, reformula solo el texto (para carrusel/lead_magnet, ese texto es la descripción del posteo, no las slides).
 - **Regla dura de arquitectura:** todo lo que usa skills reales o Playwright (ideas, contenido fiel, imágenes de marca) corre **LOCAL/EasyPanel**; la app en Vercel hace tablero, develop rápido (texto), publicar, calendario y cron. Estado y pendientes: `docs/interno/marketing-handoff.md`.
 
+#### 16.3.1 Bloque "Métricas & Inteligencia IA" (embudo de vakdor.com)
+
+Vive en `components/admin-vakdor/marketing-metrics-section.tsx` (UI) + `lib/admin-vakdor/marketing/metricas.ts` (datos) + `app/api/admin-vakdor/marketing/metricas/route.ts` (lectura) + `app/api/cron/marketing-metrics/route.ts` (análisis IA). **La fuente de los números es GA4, no Meta**: Meta recibe los mismos eventos por la API de Conversiones para optimizar campañas, pero el panel no muestra cifras de Meta.
+
+- **Embudo de 8 etapas**, medido en **personas** (`activeUsers`), no en eventos. Los eventos los dispara el repo del sitio (`Sitio web - Vakdor`, `website/src/lib/analytics.ts`):
+
+  | # | Etapa | Evento GA4 | Respaldo histórico |
+  |---|---|---|---|
+  | 1 | Home | `page_view` en `/` | — |
+  | 2 | Ve la demostración | `view_demostracion` | `page_view` en `/demostracion` |
+  | 3 | Termina el video | `vsl_watch_100` | `video_complete` |
+  | 4 | Aprieta "Agendar" | `click_agendar_cta` | `clic_agendar_demo` (GTM) |
+  | 5 | Llega al formulario | `view_prefilter_form` | `page_view` en `/call` |
+  | 6 | Envía el formulario | `prefilter_submit` | `generate_lead` |
+  | 7 | Llega al calendario | `view_calendar` | — |
+  | 8 | Confirma la reserva | `schedule_call` | — |
+
+  Aparte, **`prefilter_no_calificado`** = los que enviaron el formulario y el pre-filtro NO les abrió el calendario. Es un evento propio (no un parámetro) justamente para poder medirlo sin registrar dimensiones personalizadas en GA4.
+
+- **Por qué dos reportes de GA4 para el embudo:** uno con dimensión `eventName` sola (los pasos 2-8) y otro con `eventName`+`pagePath` (el paso 1 y los respaldos). Abrir por ruta y sumar `activeUsers` a través de las filas **cuenta dos veces a la misma persona**; sin abrir por ruta no se puede aislar la home. Los 6 reportes van con `Promise.allSettled`: si uno se cae por timeout, los otros cinco igual se muestran y el badge pasa a "GA4 incompleto".
+- **GOTCHA de atribución (Measurement Protocol):** un evento server-side sin `session_id` (cookie `_ga_<ID>`) y sin `page_location` entra a GA4 **con 0 sesiones y ruta `(not set)`**, así que no arma embudo. Por eso `website/src/lib/ga-server.ts` manda siempre `client_id` + `session_id` + `page_location` + `engagement_time_msec`. Si en GA4 aparece un evento con `usuarios=0` pero `eventos>0`, es un evento viejo, previo a este fix.
+- **GOTCHA Clarity:** su API acepta **solo 1, 2 o 3 días** (ignora el selector de 7/30/90) y permite **10 consultas por día**. Se pide siempre `numOfDays=3` y se cachea 6 h en memoria; la tarjeta avisa el rango real y el badge distingue "en vivo" de "cacheado".
+- **Badges de estado:** salen del objeto `sources` del payload (`ga4|gsc|buffer|clarity`), no están fijos en el código. *(Antes decían "GA4 En Vivo / CAPI Activo / Clarity Conectado" siempre, incluso con todas las fuentes caídas.)*
+- **Buffer:** `aggregatedPostMetrics` devuelve **solo totales del período**, no el detalle post por post. Por eso `publicaciones` va vacío y el prompt de la IA le prohíbe explícitamente hablar de publicaciones concretas, ganchos o formatos ganadores (los inventaba). El ranking real por post lo calcula el worker aparte, en `marketing_insights`.
+- **Cron `/api/cron/marketing-metrics`:** lo dispara `.github/workflows/tokko-sync.yml` a las **10:00 y 21:00 UTC = 07:00 y 18:00 AR**. Genera el análisis de Gemini para los **tres períodos** (7d/30d/90d) y los guarda en `marketing_ai_analysis` (`periodo` PK). Los payloads se piden de a uno a propósito, para que Clarity se consulte una sola vez y no queme 3 de las 10 llamadas diarias.
+- **Env vars que necesita:** `CLIENT_EMAIL`/`PRIVATE_KEY`/`TOKEN_URI` (GA4 + GSC), `CLARITY_API_KEY`, `BUFFER_API_KEY`. Del lado del sitio: `GA4_API_SECRET` y `API_CONVERSIONES_TOKEN` en el proyecto Vercel de vakdor.com.
+
 ---
 
 ## 17. Frontend: estructura y convenciones
