@@ -1,5 +1,43 @@
 import { describe, it, expect } from "vitest"
-import { sanearDescripcionIA, recortarAPalabra, MAX_DESC_IA } from "./descripcion-ia"
+import { sanearDescripcionIA, recortarAPalabra, extraerDescripcion, MAX_DESC_IA } from "./descripcion-ia"
+
+describe("extraerDescripcion", () => {
+  it("extrae el campo 'descripcion' de un JSON válido", () => {
+    const crudo = JSON.stringify({ analisis: "se observan pisos de madera", descripcion: "Depto luminoso, dos ambientes." })
+    expect(extraerDescripcion(crudo)).toBe("Depto luminoso, dos ambientes.")
+  })
+
+  it("devuelve vacío si el JSON está roto", () => {
+    expect(extraerDescripcion("{esto no es json")).toBe("")
+  })
+
+  it("devuelve vacío con el string vacío", () => {
+    expect(extraerDescripcion("")).toBe("")
+  })
+
+  it("devuelve vacío si falta el campo 'descripcion'", () => {
+    expect(extraerDescripcion(JSON.stringify({ analisis: "solo esto" }))).toBe("")
+  })
+
+  it("devuelve vacío si 'descripcion' no es un string (number)", () => {
+    expect(extraerDescripcion(JSON.stringify({ analisis: "x", descripcion: 123 }))).toBe("")
+  })
+
+  it("devuelve vacío si 'descripcion' no es un string (null)", () => {
+    expect(extraerDescripcion(JSON.stringify({ analisis: "x", descripcion: null }))).toBe("")
+  })
+
+  it("devuelve vacío si 'descripcion' ya viene vacía en el JSON", () => {
+    expect(extraerDescripcion(JSON.stringify({ analisis: "x", descripcion: "" }))).toBe("")
+  })
+
+  it("con 'descripcion' vacía pero 'analisis' lleno, nunca devuelve el análisis", () => {
+    // Esta es la trampa: NO hay que rescatar texto de 'analisis' cuando falta
+    // 'descripcion'. Rescatar es exactamente el adivinar que este diseño elimina.
+    const crudo = JSON.stringify({ analisis: "Se observan pisos de madera y buena luz.", descripcion: "" })
+    expect(extraerDescripcion(crudo)).toBe("")
+  })
+})
 
 describe("sanearDescripcionIA", () => {
   it("deja intacto un párrafo limpio", () => {
@@ -11,13 +49,9 @@ describe("sanearDescripcionIA", () => {
     expect(sanearDescripcionIA("```\nTexto real.\n```")).toBe("Texto real.")
   })
 
-  it("descarta el bloque de análisis previo si el modelo lo imprime", () => {
-    const t = "Análisis visual: se observan pisos de madera y ventanas amplias.\n\nDepartamento luminoso al frente."
-    expect(sanearDescripcionIA(t)).toBe("Departamento luminoso al frente.")
-  })
-
-  it("saca el prefijo 'Descripción:'", () => {
-    expect(sanearDescripcionIA("Descripción: Casa en dos plantas.")).toBe("Casa en dos plantas.")
+  it("saca los cercos de markdown aunque no estén pegados al borde del string", () => {
+    const t = "Nota:\n```\nDepartamento luminoso al frente.\n```"
+    expect(sanearDescripcionIA(t)).toBe("Nota: Departamento luminoso al frente.")
   })
 
   it("junta los saltos de línea en un solo párrafo", () => {
@@ -32,76 +66,16 @@ describe("sanearDescripcionIA", () => {
     expect(sanearDescripcionIA("   \n\n   ")).toBe("")
   })
 
-  it("descarta el análisis aunque esté mezclado en el mismo párrafo, sin salto de línea de por medio", () => {
-    // Forma de salida real: el modelo mete el "Análisis:" y la "Descripción:"
-    // en la misma prosa corrida, sin línea en blanco que las separe.
-    const t = "Análisis: se observan pisos de madera y buena luz. Descripción: Departamento de dos ambientes, luminoso."
-    expect(sanearDescripcionIA(t)).toBe("Departamento de dos ambientes, luminoso.")
-  })
-
-  it("descarta el análisis aunque las etiquetas vengan envueltas en markdown (negrita)", () => {
-    const t = "**Análisis:**\nSe observan pisos de madera y buena luz.\n\n**Descripción final:**\nDepto luminoso, dos ambientes."
-    expect(sanearDescripcionIA(t)).toBe("Depto luminoso, dos ambientes.")
-  })
-
-  it("no descarta un párrafo legítimo que arranca con 'Observaciones:' solo porque comparte texto con el análisis", () => {
-    // "Observaciones" no es palabra reservada del andamiaje: es una forma
-    // normal de arrancar un dato real de la propiedad (ver hallazgo Minor).
-    const t = "Análisis visual: se observan pisos de madera.\n\nObservaciones: apto profesional, sin cochera.\n\nDepartamento luminoso al frente."
-    expect(sanearDescripcionIA(t)).toBe("Observaciones: apto profesional, sin cochera. Departamento luminoso al frente.")
-  })
-
-  it("saca los cercos de markdown aunque no estén pegados al borde del string", () => {
-    const t = "Nota:\n```\nDepartamento luminoso al frente.\n```"
-    expect(sanearDescripcionIA(t)).toBe("Nota: Departamento luminoso al frente.")
-  })
-
-  it("descarta el análisis aunque el modelo NUNCA imprima una segunda etiqueta de cierre", () => {
-    // Este es el caso realista: el prompt le PROHÍBE al modelo imprimir
-    // "Descripción:", así que la desobediencia parcial más probable es que
-    // filtre el "Análisis:" y siga derecho con el texto final, sin rotularlo.
-    const t = "Análisis: se observan pisos de madera y buena luz. El departamento tiene dos ambientes, es luminoso y de buena categoría."
-    expect(sanearDescripcionIA(t)).toBe("El departamento tiene dos ambientes, es luminoso y de buena categoría.")
-  })
-
-  it("descarta el análisis con encabezados markdown (##), no solo negrita", () => {
-    const t = "## Análisis\nSe observan pisos de madera y buena luz.\n\n## Descripción final\nDepto luminoso, dos ambientes."
-    expect(sanearDescripcionIA(t)).toBe("Depto luminoso, dos ambientes.")
-  })
-
-  it("descarta el análisis con itálica simple (_texto_), no solo negrita (__/**)", () => {
-    const t = "_Análisis:_ se observan pisos de madera y buena luz.\n\n_Descripción final:_ Depto luminoso, dos ambientes."
-    expect(sanearDescripcionIA(t)).toBe("Depto luminoso, dos ambientes.")
-  })
-
-  it("descarta el análisis con una combinación de marcadores no probada antes (blockquote + negrita)", () => {
-    // No es un marcador más para enumerar: prueba que la normalización de
-    // arranque de línea (#, >, -, backtick, espacios) es genérica, no una
-    // lista de casos especiales.
-    const t = "> **Análisis:** se observan pisos de madera y buena luz.\n\n> **Descripción final:** Depto luminoso, dos ambientes."
-    expect(sanearDescripcionIA(t)).toBe("Depto luminoso, dos ambientes.")
-  })
-
-  it("NO toca una etiqueta que aparece en medio de una oración real (prosa inmobiliaria normal)", () => {
-    // Regresión de la ronda anterior: "buscar la etiqueta en cualquier parte
-    // del texto" se comía descripciones legítimas. "Como resultado:" es
-    // prosa argentina normal, no un separador de andamiaje.
-    const t = "El departamento tiene dos ambientes, cocina integrada y buena luz natural. Como resultado: apto para invertir o vivir."
-    expect(sanearDescripcionIA(t)).toBe(t)
-  })
-
-  it("NO toca 'descripción' cuando aparece en medio de una oración real", () => {
-    const t = "El living es amplio y tiene buena descripción: los ambientes están bien distribuidos y con luz natural."
-    expect(sanearDescripcionIA(t)).toBe(t)
-  })
-
-  it("devuelve vacío (nunca el razonamiento) cuando el párrafo es 100% andamiaje, sin nada rescatable", () => {
-    const t = "Análisis: se observan pisos de madera y buena luz natural en el living."
-    expect(sanearDescripcionIA(t)).toBe("")
-  })
-
   it("no regresión: una descripción inmobiliaria realista, limpia y de varios párrafos sale intacta", () => {
     const t = "Departamento de dos ambientes al frente, con muy buena luz natural durante todo el día. Living comedor integrado con cocina, piso de madera en buen estado de conservación. Dormitorio con placard, baño completo. Edificio con portero y ascensor, a metros del subte."
+    expect(sanearDescripcionIA(t)).toBe(t)
+  })
+
+  it("YA NO se borra una descripción legítima que arranca con 'Análisis de la ubicación:'", () => {
+    // Con salida estructurada, este texto YA ES la descripción (viene del campo
+    // 'descripcion' del JSON, separado de 'analisis'): no hay ninguna regla de
+    // andamiaje que deba tocarlo. "Análisis" es una palabra normal de un aviso.
+    const t = "Análisis de la ubicación: el edificio está a dos cuadras del subte, con buena conectividad y comercios cercanos."
     expect(sanearDescripcionIA(t)).toBe(t)
   })
 })
