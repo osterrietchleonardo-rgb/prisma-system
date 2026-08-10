@@ -3,7 +3,7 @@ import path from "path"
 
 export default defineConfig({
   test: {
-    include: ["lib/reports/weekly/**/*.test.ts"],
+    include: ["lib/**/*.test.ts"],
     environment: "node",
   },
   resolve: {
