@@ -11,6 +11,7 @@ import { bboxDePoligono, parsearBBox, serializarBBox } from "../bbox.ts"
 import { leerFiltros } from "../filtros.ts"
 import { filtrarPorTrazos } from "../filtro-poligono.ts"
 import { agruparPorUbicacion } from "../agrupar.ts"
+import { buscarEnPropiedades } from "../buscar-propiedades.ts"
 import { consultarMapa, TOPE_PUNTOS } from "../consulta.ts"
 import { normalizarTexto, precioCreible, recuadroDePunto, sacarBarriosRepetidos, unirLugares } from "../lugares.ts"
 import { TIPOS_MAPA, esTipoValido, etiquetaDeTipo, tipoEnCastellano, valoresDeTipo } from "../tipos-propiedad.ts"
@@ -536,5 +537,50 @@ describe("precioCreible", () => {
 
   test("los precios normales pasan", () => {
     assert.equal(precioCreible(venta(185000)), true)
+  })
+})
+
+// ─────────────────── buscar dentro de la lista de un globito ───────────────────
+
+describe("buscarEnPropiedades", () => {
+  const prop = (extra: any = {}): any => ({
+    id: "1", title: "Depto luminoso", description: null, price: 185000, currency: "USD",
+    property_type: "Apartment", status: "Venta", bedrooms: 3, bathrooms: 1, total_area: 75,
+    address: "Juncal 1300", city: "Recoleta", images: [], similarity: 0, source: "roomix",
+    agent_name: "", agent_email: "", lat: -34.6, lng: -58.4, ...extra,
+  })
+
+  test("sin consulta devuelve la MISMA lista, no una copia", () => {
+    const lista = [prop()]
+    assert.equal(buscarEnPropiedades(lista, ""), lista)
+    assert.equal(buscarEnPropiedades(lista, "   "), lista)
+  })
+
+  test("encuentra por calle sin importar mayusculas", () => {
+    assert.equal(buscarEnPropiedades([prop()], "JUNCAL").length, 1)
+  })
+
+  test("encuentra por el tipo EN CASTELLANO, que es lo que se ve en pantalla", () => {
+    // En la base dice "Apartment"; en la lista se lee "Departamento".
+    assert.equal(buscarEnPropiedades([prop()], "departamento").length, 1)
+  })
+
+  test("encuentra por barrio sin acento", () => {
+    assert.equal(buscarEnPropiedades([prop({ city: "Núñez" })], "nunez").length, 1)
+  })
+
+  test("encuentra el precio como se lee, con puntos", () => {
+    assert.equal(buscarEnPropiedades([prop()], "185.000").length, 1)
+    assert.equal(buscarEnPropiedades([prop()], "185000").length, 1)
+  })
+
+  test("varias palabras se exigen TODAS, no cualquiera", () => {
+    const lista = [prop(), prop({ id: "2", address: "Juncal 900", city: "Palermo" })]
+    // Con "o" en vez de "y", "juncal palermo" devolveria las dos.
+    assert.deepEqual(buscarEnPropiedades(lista, "juncal palermo").map((p: any) => p.id), ["2"])
+  })
+
+  test("lo que no coincide se va", () => {
+    assert.equal(buscarEnPropiedades([prop()], "chacarita").length, 0)
   })
 })

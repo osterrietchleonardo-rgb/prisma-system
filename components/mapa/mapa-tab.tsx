@@ -13,6 +13,7 @@ import { MapaBuscador } from "./mapa-buscador"
 import { MapaFiltros } from "./mapa-filtros"
 import { MapaResultados } from "./mapa-resultados"
 import { MapaFicha } from "./mapa-ficha"
+import { MapaListaModal } from "./mapa-lista-modal"
 import { MapaZonasPanel } from "./mapa-zonas-panel"
 import type { Trazo } from "./mapa-lapiz"
 import { bboxDePoligono, serializarBBox } from "@/lib/mapa/bbox"
@@ -306,70 +307,31 @@ export function MapaTab() {
 
       {/* ── Varias propiedades en el mismo punto: se listan todas, no se elige una ── */}
       {grupoAbierto && (
-        <div
-          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setGrupoAbierto(null)}
-        >
-          <div
-            className="max-h-[80vh] w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <MapPin className="h-4 w-4" />
-                {grupoAbierto.propiedades.length} propiedades en esta ubicación
-              </div>
-              <button onClick={() => setGrupoAbierto(null)} aria-label="Cerrar">
-                <X className="h-4 w-4 text-zinc-500" />
-              </button>
-            </div>
-
-            {grupoAbierto.posibles_repetidas.length > 0 && (
-              <p className="border-b border-zinc-200 bg-amber-50 px-4 py-2 text-[11px] text-amber-800 dark:border-zinc-800 dark:bg-amber-950/40 dark:text-amber-300">
+        <MapaListaModal
+          propiedades={grupoAbierto.propiedades}
+          titulo="propiedades en esta ubicación"
+          aviso={
+            grupoAbierto.posibles_repetidas.length > 0 ? (
+              <p className="shrink-0 border-b border-zinc-200 bg-amber-50 px-4 py-2 text-[11px] text-amber-800 dark:border-zinc-800 dark:bg-amber-950/40 dark:text-amber-300">
                 Ojo: {grupoAbierto.posibles_repetidas.length}{" "}
                 {grupoAbierto.posibles_repetidas.length === 1 ? "aviso parece estar" : "avisos parecen estar"}{" "}
                 publicado por más de una inmobiliaria. No se ocultó ninguno.
               </p>
-            )}
-
-            <div className="max-h-[60vh]">
-              <MapaResultados
-                propiedades={grupoAbierto.propiedades}
-                onAbrir={(id) => { setGrupoAbierto(null); setFichaId(id) }}
-              />
-            </div>
-          </div>
-        </div>
+            ) : undefined
+          }
+          onAbrir={(id) => { setGrupoAbierto(null); setFichaId(id) }}
+          onCerrar={() => setGrupoAbierto(null)}
+        />
       )}
 
       {/* ── Click en un globito: todas las propiedades que tenia adentro ── */}
       {cumuloAbierto && (
-        <div
-          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setCumuloAbierto(null)}
-        >
-          <div
-            className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-zinc-900"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <MapPin className="h-4 w-4" />
-                {cumuloAbierto.length} propiedades en esta zona
-              </div>
-              <button onClick={() => setCumuloAbierto(null)} aria-label="Cerrar">
-                <X className="h-4 w-4 text-zinc-500" />
-              </button>
-            </div>
-
-            <div className="min-h-0 flex-1">
-              <MapaResultados
-                propiedades={cumuloAbierto}
-                onAbrir={(id) => { setCumuloAbierto(null); setFichaId(id) }}
-              />
-            </div>
-          </div>
-        </div>
+        <MapaListaModal
+          propiedades={cumuloAbierto}
+          titulo="propiedades en esta zona"
+          onAbrir={(id) => { setCumuloAbierto(null); setFichaId(id) }}
+          onCerrar={() => setCumuloAbierto(null)}
+        />
       )}
 
       {fichaId && <MapaFicha id={fichaId} onClose={() => setFichaId(null)} />}
