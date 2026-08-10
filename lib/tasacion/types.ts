@@ -36,6 +36,11 @@ export interface Sujeto {
   // se ignora: el ACM la compara solo contra propiedades del mismo estado.
   a_estrenar?: boolean;
   en_pozo?: boolean;
+  // Descripción generada por la IA a partir de las fotos y editada por el asesor.
+  // Entra al texto que se embebe para buscar comparables por similitud descriptiva.
+  descripcion_ia?: string;
+  // Si va o no en la ficha que recibe el cliente. Solo aplica si hay descripcion_ia.
+  incluir_desc_ficha?: boolean;
   estado_conservacion: EstadoConservacion;
   calidad_construccion: CalidadConstruccion;
   dormitorios: number;
