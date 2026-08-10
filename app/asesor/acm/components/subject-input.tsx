@@ -42,6 +42,8 @@ interface SubjectInputProps {
   onOperacionChange: (o: Operacion) => void;
   considerarPh: boolean;
   onConsiderarPhChange: (v: boolean) => void;
+  incluirLinderos: boolean;
+  onIncluirLinderosChange: (v: boolean) => void;
   onBuscar: () => void;
   loading: boolean;
   excludeId: string | null;
@@ -88,6 +90,8 @@ export function SubjectInput({
   onOperacionChange,
   considerarPh,
   onConsiderarPhChange,
+  incluirLinderos,
+  onIncluirLinderosChange,
   onBuscar,
   loading,
   excludeId,
@@ -259,6 +263,24 @@ export function SubjectInput({
           </span>
         </label>
       )}
+
+      {/* Barrios linderos: apagado por defecto. Con el gate estricto entran el mismo barrio
+          y sus sub-barrios (Belgrano R, Palermo Soho); los limítrofes (Núñez, Saavedra)
+          solo si el asesor los pide. */}
+      <label className="flex items-start gap-3 p-4 rounded-2xl border border-accent/10 bg-card/20 cursor-pointer">
+        <Checkbox
+          checked={incluirLinderos}
+          onCheckedChange={(v) => onIncluirLinderosChange(v === true)}
+          className="mt-0.5"
+        />
+        <span className="text-sm">
+          <span className="font-bold">Incluir barrios linderos</span>
+          <span className="block text-xs text-muted-foreground mt-0.5">
+            Por defecto se comparan solo propiedades del mismo barrio. Tildá si necesitás
+            ampliar a los barrios vecinos; los que entren van marcados como “lindero”.
+          </span>
+        </span>
+      </label>
 
       {/* Modo cartera */}
       {modo === "cartera" && (

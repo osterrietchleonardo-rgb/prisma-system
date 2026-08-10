@@ -47,6 +47,9 @@ export function AcmModule() {
   const [sujeto, setSujeto] = useState<Sujeto>(SUJETO_INICIAL);
   const [operacion, setOperacion] = useState<Operacion>("venta");
   const [considerarPh, setConsiderarPh] = useState(true); // ACM: considerar PH como comparables (solo aplica a Casa)
+  // Barrios linderos: apagado por defecto. Un comparable de Núñez en un ACM de Belgrano
+  // es técnicamente defendible pero le rompe la confianza al cliente, así que se pide.
+  const [incluirLinderos, setIncluirLinderos] = useState(false);
   const [excludeId, setExcludeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"input" | "results">("input");
@@ -72,7 +75,7 @@ export function AcmModule() {
       const res = await fetch("/api/acm/comparables", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sujeto, operacion, exclude_id: excludeId, considerar_ph: considerarPh }),
+        body: JSON.stringify({ sujeto, operacion, exclude_id: excludeId, considerar_ph: considerarPh, incluir_linderos: incluirLinderos }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -166,6 +169,8 @@ export function AcmModule() {
               onOperacionChange={setOperacion}
               considerarPh={considerarPh}
               onConsiderarPhChange={setConsiderarPh}
+              incluirLinderos={incluirLinderos}
+              onIncluirLinderosChange={setIncluirLinderos}
               onBuscar={handleBuscar}
               loading={loading}
               excludeId={excludeId}

@@ -43,6 +43,8 @@ function ComparableCard({
   c: AcmComparable; selectable?: boolean; selected?: boolean; onToggle?: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // El ítem "zona" del checklist trae el nivel: 100 mismo barrio · 70 sub-barrio · 50 limítrofe.
+  const esLindero = c.checklist.some((i) => i.dimension === "zona" && i.score === 50);
   return (
     <div
       className={`rounded-2xl border overflow-hidden transition-colors ${
@@ -74,6 +76,11 @@ function ComparableCard({
               <p className="font-bold truncate">{c.titulo || c.direccion}</p>
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 <MapPin className="w-3 h-3" /> {c.zona || c.direccion || "—"}
+                {esLindero && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 text-[10px] font-bold uppercase tracking-wide">
+                    lindero
+                  </span>
+                )}
               </p>
             </div>
             <div className="text-right shrink-0">
@@ -121,7 +128,8 @@ function ComparableCard({
                 <span className="text-foreground">{item.comp_val}</span>
               </span>
               <span className="shrink-0 tabular-nums text-muted-foreground w-12 text-right">
-                {/* Las dimensiones con peso 0 son filtros duros (tipo, operación, zona/barrio). */}
+                {/* Peso 0 = filtro duro (tipo y operación). La zona dejó de serlo el 3-ago-2026:
+                    puntúa 100/70/50 según mismo barrio, sub-barrio o lindero. */}
                 {item.peso === 0 ? "filtro" : item.score !== null ? `${item.score}%` : "n/a"}
               </span>
             </div>

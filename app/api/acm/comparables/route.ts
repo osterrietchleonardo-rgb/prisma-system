@@ -58,6 +58,10 @@ export async function POST(req: Request) {
     // sujeto es Casa Y el cliente destildó la casilla. Cualquier otro caso → false.
     const considerarPh = body.considerar_ph !== false;
     const excludePh = sujeto.tipo_propiedad === "casa" && considerarPh === false;
+    // Zona: por defecto ESTRICTO (mismo barrio + sub-barrios). Los barrios limítrofes
+    // (zona_score 50) solo entran si el asesor los pidió explícitamente. Si el campo no
+    // viene en el body, se comporta estricto: es el arreglo, no un default heredado.
+    const zonaMin = body.incluir_linderos === true ? 50 : 70;
     // Sin límites artificiales: el gate de barrio ya acota el universo; traemos todos los
     // comparables del barrio (tope alto por performance del render, configurable por request).
     const limit = Math.min(Number(body.limit) || 50, 100);
@@ -107,6 +111,7 @@ export async function POST(req: Request) {
         p_obra_sin_dato: obraSinDato,
         p_barrio: sujetoZona,
         p_zona_niveles: true,
+        p_zona_min: zonaMin,
         p_m2_cubierta: true,
         p_limit: limit,
       }),
@@ -126,6 +131,7 @@ export async function POST(req: Request) {
         p_obra_sin_dato: obraSinDato,
         p_barrio: sujetoZona,
         p_zona_niveles: true,
+        p_zona_min: zonaMin,
         p_m2_cubierta: true,
         p_dedup: true,
         p_excluir_sujeto: true,
