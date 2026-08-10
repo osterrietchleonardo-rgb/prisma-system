@@ -52,7 +52,17 @@ export function MapaResultados({
 }) {
   const ubicadas = propiedades.filter((p) => p.lat !== null && p.lng !== null)
   const sinUbicacion = propiedades.filter((p) => p.lat === null || p.lng === null)
-  const ordenadas = [...ubicadas, ...sinUbicacion].sort((a, b) => (a.price || 0) - (b.price || 0))
+  // Las que no tienen precio van AL FINAL. Antes se ordenaba con `a.price || 0`, o sea
+  // que "sin precio" valia cero y se iba al primer puesto: la primera pantalla quedaba
+  // llena de "Consultar" y las que si tienen precio no se veian nunca. Medido el
+  // 2026-08-10 sobre Palermo/Recoleta: 199 sin precio contra 38.758 con precio creible,
+  // y aun asi las 199 eran lo unico visible.
+  const ordenadas = [...ubicadas, ...sinUbicacion].sort((a, b) => {
+    const pa = a.price || 0
+    const pb = b.price || 0
+    if (pa === 0 || pb === 0) return pa === pb ? 0 : pa === 0 ? 1 : -1
+    return pa - pb
+  })
 
   if (propiedades.length === 0) {
     return (

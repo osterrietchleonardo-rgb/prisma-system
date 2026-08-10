@@ -226,18 +226,18 @@ export function MapaTab() {
               <>
                 {/* El "+" no es decorativo: pasado el tope, este numero es el del tope,
                     no el de la zona. Sin el signo el mapa afirma que hay 1.000 cuando
-                    puede haber 40.000. */}
+                    puede haber 40.000. El aviso va PEGADO al numero y no en un cartel
+                    aparte: centrado abajo se montaba justo encima de este contador. */}
                 {truncado && "+"}
                 {visibles.length} {visibles.length === 1 ? "propiedad" : "propiedades"} a la vista
+                {truncado && (
+                  <span className="ml-1.5 border-l border-zinc-300 pl-1.5 font-normal text-amber-600 dark:border-zinc-700 dark:text-amber-500">
+                    es una muestra, acercate para verlas todas
+                  </span>
+                )}
               </>
             )}
           </div>
-
-          {truncado && (
-            <div className="absolute bottom-3 left-1/2 z-[500] -translate-x-1/2 rounded-lg bg-amber-500/95 px-3 py-1.5 text-center text-xs font-medium text-white shadow">
-              Estás viendo una muestra. Acercate para verlas todas.
-            </div>
-          )}
 
           {proveedor === "osm" && (
             <div className="pointer-events-none absolute bottom-3 right-3 z-[500] rounded-lg bg-zinc-900/80 px-2.5 py-1 text-[10px] text-white shadow">
