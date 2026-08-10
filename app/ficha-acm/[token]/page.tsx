@@ -398,7 +398,7 @@ function ComparableSheet({
           <div className="comp-head-l">
             <span className="comp-index" style={{ color: accent }}>Comparable {letra(index)}</span>
             <h2 className="comp-title" style={{ fontFamily: "var(--font-display)", color: primary }}>{c.titulo || c.direccion || "Comparable"}</h2>
-            <p className="muted">{[c.direccion, c.zona].filter(Boolean).join(" · ")}</p>
+            <p className="muted">{[c.direccion, c.zona].filter(Boolean).join(" · ")}{c.zona_score === 50 && <span className="comp-lindero">Barrio lindero</span>}</p>
           </div>
           <div className="comp-price">
             <div className="comp-price-val" style={{ color: primary }}>{fmtMoney(c.precio, c.moneda)}</div>
@@ -509,6 +509,7 @@ const CSS = `
 .comp-price { text-align: right; flex-shrink: 0; }
 .comp-price-val { font-size: 18px; font-weight: 800; }
 .comp-match { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.comp-lindero { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; background: #f5ead6; color: #8a6320; vertical-align: middle; }
 
 /* Ficha técnica */
 .specs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin: 11px 0; }

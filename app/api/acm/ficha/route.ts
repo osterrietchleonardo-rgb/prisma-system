@@ -176,6 +176,7 @@ export async function POST(req: Request) {
         images,
         responsable: c.responsable || "",
         pulso: matchBarrioPulso(c.zona || c.direccion || "", c.ambientes ?? null, barrios, ambStats),
+        zona_score: (c.checklist || []).find((i: any) => i.dimension === "zona")?.score ?? null,
       };
     });
 
