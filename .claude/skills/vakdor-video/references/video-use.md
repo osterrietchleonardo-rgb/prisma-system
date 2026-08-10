@@ -53,6 +53,20 @@ Motor: **whisper.cpp** (gratis, offline, español) + **ffmpeg** + **Python** (lo
 10. **Sub-agentes en paralelo para múltiples animaciones.** Nunca secuencial. Ver `animations.md`.
 11. **Confirmación de estrategia antes de ejecutar.** Nunca tocar el corte sin OK del usuario.
 12. **Todo output de sesión va en `<carpeta-del-fuente>/edit/`.** Nunca dentro de la skill.
+13. **Las máscaras de privacidad van ANTES de los overlays** (se tapa la fuente, nunca los
+    gráficos que ponemos nosotros) y **DESPUÉS del concat**. → `render.py`.
+14. **Se mide el encuadre antes de poner nada encima**, y nada informativo entra en la danger
+    zone de la plataforma. → `frame_map.py`, `caption_margin_v()`.
+15. **El cap de bitrate se aplica UNA sola vez**, en el archivo final. Los pasos intermedios van
+    en calidad alta: capear en cada paso suma una generación de compresión por paso.
+    Y el color se etiqueta con `-x264-params`, no solo con `-color_primaries` (ver
+    `produccion.md` §7). → `export.py`.
+16. **La mezcla se mide, nunca se pone un volumen fijo**, y `loudnorm` va al FINAL, sobre una
+    mezcla que ya está bien. → `mix_audio.py`.
+
+> Las reglas de **qué** poner y dónde (la regla de oro de los gráficos, la estructura de
+> retención, las marcas mal transcritas, lo que no se hace) están en **`produccion.md`**.
+> Estas doce y cuatro son de correctitud; ésas son de criterio. Las dos se leen.
 
 ---
 
@@ -64,11 +78,14 @@ Motor: **whisper.cpp** (gratis, offline, español) + **ffmpeg** + **Python** (lo
 └── edit/
     ├── project.md               ← memoria; se agrega por sesión
     ├── takes_packed.md          ← transcript phrase-level (vista de lectura)
-    ├── edl.json                 ← decisiones de corte
+    ├── edl.json                 ← cortes + máscaras + overlays + audio
     ├── transcripts/<name>.json  ← whisper word-level cacheado (+ silences)
+    ├── mapa/                    ← tira de contactos y regla (frame_map.py)
+    ├── audio/                   ← camas y efectos de la mezcla
     ├── animations/slot_<id>/    ← una animación por slot
-    ├── verify/                  ← frames/timelines de debug
+    ├── verify/                  ← frames/timelines de debug + recortes de máscaras
     ├── master.srt               ← subtítulos en timeline de salida
+    ├── master.ass               ← lo que se quema (margen en px reales + cobre)
     ├── preview.mp4
     └── final.mp4
 ```
@@ -79,6 +96,15 @@ Motor: **whisper.cpp** (gratis, offline, español) + **ffmpeg** + **Python** (lo
 
 Todos se corren con `python "<skill>/helpers/<script>.py"`. `<edit>` = carpeta `edit/` junto al fuente.
 
+- **`prep.py <video> [--transcript t.json] [--master OUT --use-sibling]`**
+  Ficha del archivo, pistas duplicadas de OBS, micrófono limpio al lado, y si el take ya viene
+  editado (*overlay-only*) o hay silencio real para sacar.
+- **`frame_map.py <video> [--crop x,y,w,h --at <seg>]`**
+  Cortes de plano, tira de contactos, regla con rejilla y danger zones, recorte en nativo.
+- **`privacy.py <video> --masks <edl.json> [-o out] [--verify DIR] [--print-filter]`**
+  Máscaras de blur. Con `--verify` sobre el archivo FINAL, saca recortes nativos de cada borde.
+- **`mix_audio.py <video> -o out.mp4 --bgm cama.wav [--duck 12] [--sfx sfx.json]`**
+  Mezcla medida con sidechain. El video se copia tal cual (no se recomprime).
 - **`transcribe.py <video> --edit-dir <edit> [--lang es] [--model medium]`**
   whisper.cpp word-level, cacheado. Escribe `transcripts/<stem>.json` con `words`, `phrases`, `silences`.
 - **`transcribe_batch.py <dir> --edit-dir <edit> [--workers 4]`** — transcribe todos los videos del dir.
@@ -92,13 +118,27 @@ Todos se corren con `python "<skill>/helpers/<script>.py"`. `<edit>` = carpeta `
 
 ## El proceso (8 pasos)
 
-1. **Inventario.** `ffprobe` cada fuente. `transcribe_batch.py`. `pack_transcripts.py`. Un par de `timeline_view` para primera impresión.
-2. **Pre-scan de problemas.** Una pasada por `takes_packed.md` anotando slips, mis-speaks, frases a evitar.
+1. **Inventario.** `prep.py` cada fuente (ficha, pistas de OBS, micrófono hermano, y si hay que
+   cortar o es *overlay-only*). `frame_map.py` para medir el encuadre y las danger zones ANTES de
+   pensar dónde va un gráfico. `transcribe_batch.py`. `pack_transcripts.py`. Un par de
+   `timeline_view` para primera impresión.
+2. **Pre-scan de problemas.** Una pasada por `takes_packed.md` anotando slips, mis-speaks, frases
+   a evitar, y **marcas mal transcritas** (van al diccionario, no a mano). En paralelo, una
+   pasada por la tira de contactos anotando **todo dato privado visible**: teléfonos de clientes,
+   chats, precios, correos, rutas, tokens.
 3. **Conversar.** Describir en español claro lo que ves. Preguntar según el material: tipo de contenido, largo/aspecto objetivo, estética/marca, ritmo, momentos a preservar/cortar, subtítulos, animaciones, grade. Sin checklist fijo.
 4. **Proponer estrategia** (4–8 frases): forma, tomas, dirección de corte, plan de animación, grade, estilo de subtítulos, largo estimado. **Esperar confirmación.**
-5. **Ejecutar.** Armar `edl.json`. Drill con `timeline_view` en momentos ambiguos. Animaciones en sub-agentes paralelos. Grade por-segmento. Componer con `render.py`.
+5. **Ejecutar.** Armar `edl.json` (cortes, máscaras, grade, overlays, audio). Drill con
+   `timeline_view` en momentos ambiguos; medir en nativo con `frame_map.py --crop` lo que haya
+   que tapar. Animaciones en sub-agentes paralelos. Componer con `render.py`.
 6. **Preview.** `render.py --preview`.
 7. **Auto-eval (antes de mostrar).** `timeline_view` sobre la SALIDA en cada corte (±1.5s): discontinuidad/flash, pico de waveform (pop que pasó el fade), subtítulo tapado por overlay, overlay desalineado. Muestrear primeros 2s, últimos 2s, y 2–3 puntos medios. `ffprobe` de duración vs EDL. Si algo falla: arreglar → re-render → re-eval. Máximo 3 pasadas; si persiste, avisar al usuario.
+   Además, sobre el archivo final:
+   - `privacy.py <final> --masks edl.json --verify <edit>/verify/` y mirar el **borde** de cada
+     recorte: si se lee texto nítido, la caja quedó chica.
+   - que **ningún gráfico repita** lo que dice la voz en ese segundo (`produccion.md` §1).
+   - que nada informativo caiga en la danger zone.
+   - `ffprobe` de color: los cuatro campos en bt709/tv, y el bitrate por debajo del cap.
 8. **Iterar + persistir.** Feedback en lenguaje natural, re-planear, re-render. Nunca re-transcribir. Render final con confirmación. Agregar sección a `project.md`.
 
 ---
@@ -143,14 +183,37 @@ testimonio · documental · o inventá.
     {"source": "vsl", "start": 2.42, "end": 6.85, "beat": "HOOK", "quote": "...", "reason": "..."}
   ],
   "grade": "luxury",
+  "masks": [
+    {"from": 18.4, "to": 21.8,
+     "rects": [[250, 300, 600, 470]], "rects_end": [[250, 300, 830, 600]],
+     "note": "chat con el teléfono del cliente; la cámara deriva"},
+    {"from": 21.8, "to": 22.5, "rects": "full", "note": "barrido"}
+  ],
   "overlays": [
     {"file": "edit/animations/slot_1/render.mp4", "start_in_output": 0.0, "duration": 5.0}
   ],
-  "subtitles": "edit/master.srt"
+  "subtitles": "edit/master.srt",
+  "audio": {
+    "bgm": ["edit/audio/cama_a.wav", "edit/audio/cama_b.wav"],
+    "swap": 30.0, "duck_lu": 12,
+    "sfx": [{"file": "edit/audio/whoosh.wav", "at": 18.6, "rel_db": -9}]
+  }
 }
 ```
-`grade` = nombre de preset o filtro ffmpeg crudo. `overlays` = clips de animación. `subtitles`
-opcional (si no está y pasás `--build-subtitles`, se arma desde los transcripts).
+
+- Las rutas relativas se resuelven **contra la carpeta del EDL**, no contra el cwd.
+- `grade` = nombre de preset o filtro ffmpeg crudo.
+- `masks` = privacidad. Los tiempos van en **tiempo de la FUENTE** (`source` es opcional si hay
+  una sola); el corte las lleva solas a la salida. Si ya las mediste sobre el archivo cortado,
+  poné `"timeline": "output"`. Detalle y los 4 errores caros en `produccion.md` §4.
+- `overlays` = clips de animación, en tiempo de salida.
+- `subtitles` opcional (si no está y pasás `--build-subtitles`, se arma desde los transcripts).
+- `audio` = mezcla. Máximo 2 camas (la segunda marca el giro del video, y entonces `swap` es
+  obligatorio). `duck_lu`: 8 presente, 12 normal, 15-16 discreta. `rel_db` de los efectos en
+  `produccion.md` §6.
+
+Banderas útiles de `render.py`: `--profile social|master|intermediate` (el final; `social` es el
+que capea para redes), `--no-masks` y `--no-audio` para aislar un problema.
 
 ---
 
@@ -198,3 +261,12 @@ Al arrancar, leer `project.md` si existe y resumir la última sesión antes de p
 - Re-transcribir fuentes cacheadas.
 - Asumir qué tipo de video es. Mirar, preguntar, editar.
 - Editar antes de confirmar la estrategia.
+- Poner un gráfico antes de medir el encuadre (le tapás la cara a alguien).
+- Tapar con caja negra en vez de blur (matás el movimiento, que es la demo).
+- Ajustar la caja de blur exacta al texto (se lee en el filo por el borde).
+- Perseguir con la caja un texto que se mueve (temblor + renglones al aire). Anclar y crecer.
+- Verificar las máscaras con tiempos de la fuente sobre el archivo ya cortado.
+- Poner la música a un volumen fijo, o normalizar la suma para "arreglarla".
+- Exportar al máximo bitrate (la recompresión de la plataforma pega más fuerte).
+- Capear el bitrate en pasos intermedios (una generación de compresión por paso).
+- Dar por buena la etiqueta de color sin verla en `ffprobe`.

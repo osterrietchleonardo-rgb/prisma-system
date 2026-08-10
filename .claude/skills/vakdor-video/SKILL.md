@@ -1,6 +1,6 @@
 ---
 name: vakdor-video
-description: Super skill de video de Vakdor — crea y EDITA videos en cualquier formato (vertical, horizontal/LinkedIn/YouTube, cuadrado). Tres modos: (A) Reel/Video de Propiedad desde fotos+datos con Remotion; (B) Editor rápido de un crudo a video de marca (saca silencios, subtítulos, marca); (C) Editor conversacional PRO de CUALQUIER video (VSL, testimonio, ad, tutorial): transcribe con whisper.cpp local (gratis), elige tomas, corta, color grade, subtítulos y overlays de animación (PIL/Remotion/HyperFrames/Manim). Usar SIEMPRE que pidan un reel, video de propiedad, video para IG/TikTok/LinkedIn/YouTube, "editá este video", "sacá los silencios", "ponele subtítulos", "editá mi VSL", "video horizontal", transcribir, color/grade. Hermana en video de vakdor-carousel: misma marca (brand.json), copy delegado a vakdor-copywriter.
+description: Super skill de video de Vakdor — crea y EDITA videos en cualquier formato (vertical, horizontal/LinkedIn/YouTube, cuadrado). Tres modos: (A) Reel/Video de Propiedad desde fotos+datos con Remotion; (B) Editor rápido de un crudo a video de marca (saca silencios, subtítulos, marca); (C) Editor conversacional PRO de CUALQUIER video (VSL, testimonio, ad, tutorial): transcribe con whisper.cpp local (gratis), elige tomas, corta, color grade, subtítulos y overlays de animación (PIL/Remotion/HyperFrames/Manim). Incluye producción completa: TAPAR datos privados con blur (teléfonos, chats, precios, correos, tokens en pantalla), medir el encuadre y las danger zones de TikTok/Reels antes de poner gráficos, mezcla de música y efectos MEDIDA en LUFS con sidechain sobre la voz, y export a la spec de redes (bitrate capeado, bt709, faststart, -14 LUFS). Usar SIEMPRE que pidan un reel, video de propiedad, video para IG/TikTok/LinkedIn/YouTube, "editá este video", "sacá los silencios", "ponele subtítulos", "editá mi VSL", "video horizontal", transcribir, color/grade, "tapá los datos", "censurá", "difuminá", "ponele música", "mezclá el audio", "por qué se ve mal en Instagram", "no se lee el subtítulo". Hermana en video de vakdor-carousel: misma marca (brand.json), copy delegado a vakdor-copywriter.
 ---
 
 # Vakdor Video — Super Skill de Video
@@ -76,24 +76,41 @@ El motor "video-use" con **whisper.cpp** (gratis, offline, español) en vez de E
 Agnóstico de formato, marca opcional, salida en `edit/` junto al fuente. Para VSLs, ads,
 testimonios, tutoriales, material de cliente — vertical u horizontal.
 
-> **Antes de arrancar el Modo C, leé `references/video-use.md`** (playbook completo + las 12
-> Reglas Duras de producción). Animaciones en `references/animations.md`. Formatos en `references/formats.md`.
+> **Antes de arrancar el Modo C, leé `references/video-use.md`** (playbook completo + las 16
+> Reglas Duras de correctitud) y **`references/produccion.md`** (el criterio: dónde puede ir un
+> gráfico, qué se tapa, cómo se mide el audio, con qué se exporta).
+> Animaciones en `references/animations.md`. Formatos en `references/formats.md`.
 
 **Regla de oro del Modo C:** preguntar → confirmar la estrategia en español → recién ahí editar.
 Nunca tocar el corte sin OK.
 
 **Flujo mínimo** (helpers en `helpers/`, `<edit>` = carpeta `edit/` junto al fuente):
-1. `transcribe_batch.py <dir> --edit-dir <edit>` — transcribe (word-level, cacheado).
-2. `pack_transcripts.py --edit-dir <edit>` — arma `takes_packed.md` (frases por silencios reales).
-3. **Conversar + proponer estrategia + esperar OK.**
-4. Armar `edit/edl.json` (cortes, grade, overlays, subtítulos). Formato en `references/video-use.md`.
-5. `render.py <edl.json> -o <edit>/preview.mp4 --preview --build-subtitles --edit-dir <edit>`.
-6. Auto-eval sobre la salida (cortes, pops, subtítulos) → arreglar → re-render.
-7. Render final + `render.py ... -o final.mp4`.
+1. `prep.py <video>` — ficha, pistas de OBS, y si el take ya viene editado (*overlay-only*).
+2. `frame_map.py <video>` — cortes de plano, tira de contactos y **regla con danger zones**.
+   Se mide el encuadre ANTES de decidir dónde va un gráfico.
+3. `transcribe_batch.py <dir> --edit-dir <edit>` — transcribe (word-level, cacheado).
+4. `pack_transcripts.py --edit-dir <edit>` — arma `takes_packed.md` (frases por silencios reales).
+5. **Conversar + proponer estrategia + esperar OK.**
+6. Armar `edit/edl.json` (cortes, **máscaras**, grade, overlays, subtítulos, **audio**).
+   Formato en `references/video-use.md`.
+7. `render.py <edl.json> -o <edit>/preview.mp4 --preview --build-subtitles --edit-dir <edit>`.
+8. Auto-eval sobre la salida (cortes, pops, subtítulos, fugas de privacidad) → arreglar → re-render.
+9. Render final: `render.py ... -o final.mp4` (perfil `social` por defecto: capea el bitrate,
+   etiqueta bt709 y deja `+faststart`).
 
-**Reglas Duras críticas** (todas en `references/video-use.md`, ya implementadas en `render.py`):
+**Reglas Duras críticas** (las 16 en `references/video-use.md`, ya implementadas en `render.py`):
 subtítulos AL FINAL · extract por-segmento → concat lossless · fades 30ms · overlays PTS-shift ·
-nunca cortar dentro de una palabra · **cache de transcript por fuente** · **confirmar estrategia antes de ejecutar**.
+nunca cortar dentro de una palabra · **máscaras antes de los overlays** · **nada informativo en
+la danger zone** · **el cap de bitrate una sola vez** · **la mezcla se mide** · cache de
+transcript por fuente · **confirmar estrategia antes de ejecutar**.
+
+**Privacidad y audio (opcionales, van en el EDL):**
+```
+"masks": [{"from": 18.4, "to": 21.8, "rects": [[250,300,600,470]], "rects_end": [[250,300,830,600]]}]
+"audio": {"bgm": ["cama.wav"], "duck_lu": 12, "sfx": [{"file": "whoosh.wav", "at": 18.6, "rel_db": -9}]}
+```
+Verificar la privacidad SIEMPRE sobre el archivo final:
+`privacy.py <final.mp4> --masks edl.json --verify <edit>/verify/`
 
 **Animaciones (opcionales, vos decidís por video):** 4 vías disponibles — PIL, Remotion,
 HyperFrames, Manim (ver `references/animations.md` y `references/manim.md`). Cada una = un slot en
@@ -111,10 +128,15 @@ HyperFrames, Manim (ver `references/animations.md` y `references/manim.md`). Cad
 
 ```
 SKILL.md · install.md · requirements.txt
-references/  video-use.md · animations.md · formats.md · manim.md
-helpers/     whisper_parse · transcribe · transcribe_batch · pack_transcripts · silences ·
-             edl · grade · render · timeline_view
-tests/       test_whisper_parse · test_edl · test_render_helpers
+references/  video-use.md (correctitud) · produccion.md (criterio) ·
+             animations.md · formats.md · manim.md
+helpers/     ── material ──   prep · frame_map
+             ── voz ──        whisper_parse · transcribe · transcribe_batch · pack_transcripts ·
+                              silences · subtitles
+             ── imagen ──     privacy · grade · timeline_view
+             ── armado ──     edl · render · export
+             ── audio ──      mix_audio
+tests/       test_whisper_parse · test_edl · test_render_helpers · test_produccion
 assets/      brand.json (+ logos)
 engine/      motor Remotion de A/B (multi-formato: format.ts + PropertyReel/EditedReel responsivos)
 ```

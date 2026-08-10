@@ -1,7 +1,10 @@
 """Subtítulos premium: corrige términos mal transcritos (diccionario) y resalta palabras
 clave en cobre (marca). Genera un archivo .ass (permite color por palabra, que el SRT no)."""
 from __future__ import annotations
-import re
+import os, re, sys
+
+sys.path.insert(0, os.path.dirname(__file__))
+from frame_map import caption_margin_v, danger_zone  # noqa: E402
 
 # Color de marca en formato ASS (&HAABBGGRR). Cobre #C07C41 -> BGR 417CC0.
 ACCENT_ASS = "&H00417CC0"
@@ -70,10 +73,22 @@ def _ass_time(t: float) -> str:
 
 
 def build_ass(cues: list[dict], width: int = 1920, height: int = 1080,
-              fontsize: int = 54, margin_v: int = 210, corrections: dict | None = None,
+              fontsize: int = 54, margin_v: int | None = None, corrections: dict | None = None,
               keywords: list[str] | None = None, emphasis: bool = True) -> str:
+    """Subtítulos .ass en píxeles reales del video (PlayRes = resolución real).
+
+    `margin_v=None` calcula el margen inferior respetando la danger zone de la
+    plataforma: en horizontal queda donde estaba, y en vertical sube lo
+    necesario para no caer debajo de la botonera de TikTok/Reels. Los márgenes
+    laterales salen de la misma tabla.
+    """
     corrections = DEFAULT_CORRECTIONS if corrections is None else corrections
     keywords = DEFAULT_KEYWORDS if keywords is None else keywords
+    dz = danger_zone(width, height)
+    if margin_v is None:
+        margin_v = caption_margin_v(width, height, fontsize)
+    margin_l = max(60, dz["left"])
+    margin_r = max(60, dz["right"])
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {width}
@@ -83,7 +98,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Inter,{fontsize},{WHITE_ASS},&H000000FF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,3.5,0,2,120,120,{margin_v},1
+Style: Default,Inter,{fontsize},{WHITE_ASS},&H000000FF,&H00101010,&H80000000,-1,0,0,0,100,100,0,0,1,3.5,0,2,{margin_l},{margin_r},{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, MarginL, MarginR, Effect, Text

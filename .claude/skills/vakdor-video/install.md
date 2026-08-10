@@ -33,9 +33,25 @@ Las 4 vías están listas; se elige por slot. Ninguna es obligatoria.
 
 ## 5. ffmpeg / node — ya presentes
 - `ffmpeg -version`  (8.1.1)  ·  `ffprobe -version`  ·  `node --version` (v24)
+- Los helpers de producción (`prep`, `frame_map`, `privacy`, `mix_audio`, `export`) **no
+  necesitan nada extra**: solo ffmpeg/ffprobe y la librería estándar de Python.
+- Filtros de ffmpeg que se usan y conviene tener (los trae el build full de gyan.dev):
+  `gblur`, `ebur128`, `loudnorm`, `sidechaincompress`, `volumedetect`, `silencedetect`, `ass`.
+  Verificar: `ffmpeg -hide_banner -filters | grep -E "gblur|ebur128|sidechaincompress"`
+
+## 6. Tests de los helpers
+```
+python -m pytest tests/ -q
+```
+Son todos de funciones puras (no tocan ffmpeg ni disco): corren en menos de un segundo.
 
 ## Verificación completa (una línea)
 ```
 python -c "import PIL, numpy; print('py ok')" && python -m yt_dlp --version && py -3.12 -m manim --version && node --version && ls C:\whisper-cpp\main.exe
 ```
 Debe imprimir: `py ok`, versión de yt-dlp, `Manim Community v0.20.x`, `v24.x`, y el path del binario whisper.
+
+## Nota sobre `auto-editor`
+La skill **no lo usa** y no hace falta instalarlo. El corte de silencios a ciegas se reemplazó
+por el corte por EDL (límites de palabra + padding), que no parte palabras. `prep.py` te dice
+cuándo el material ya viene editado y no hay nada que cortar.
