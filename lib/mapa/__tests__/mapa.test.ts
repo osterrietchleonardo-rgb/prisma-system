@@ -11,7 +11,7 @@ import { bboxDePoligono, parsearBBox, serializarBBox } from "../bbox.ts"
 import { leerFiltros } from "../filtros.ts"
 import { filtrarPorTrazos } from "../filtro-poligono.ts"
 import { agruparPorUbicacion } from "../agrupar.ts"
-import { TIPOS_MAPA, esTipoValido, etiquetaDeTipo, valoresDeTipo } from "../tipos-propiedad.ts"
+import { TIPOS_MAPA, esTipoValido, etiquetaDeTipo, tipoEnCastellano, valoresDeTipo } from "../tipos-propiedad.ts"
 import type { PropiedadMapa } from "../tipos.ts"
 
 // ─────────────────────────── bbox ───────────────────────────
@@ -178,6 +178,19 @@ describe("tipos-propiedad", () => {
     // La diferencia importa: [] significa "no preguntes, no lo distingue".
     assert.deepEqual(valoresDeTipo("lote", "cartera"), ["Lote"])
     assert.deepEqual(valoresDeTipo("lote", "colaboracion"), [])
+  })
+
+  test("los valores crudos de la base se muestran en castellano", () => {
+    assert.equal(tipoEnCastellano("Apartment"), "Departamento")
+    assert.equal(tipoEnCastellano("Accommodation"), "Comercial y otros")
+    assert.equal(tipoEnCastellano("Bussiness Premises"), "Local comercial")
+  })
+
+  test("los que ya estan en castellano pasan derecho, y el vacio no dice 'undefined'", () => {
+    assert.equal(tipoEnCastellano("Casa"), "Casa")
+    assert.equal(tipoEnCastellano("Oficina"), "Oficina")
+    assert.equal(tipoEnCastellano(null), "")
+    assert.equal(tipoEnCastellano(""), "")
   })
 
   test("etiquetaDeTipo devuelve el texto de pantalla y null si no existe", () => {

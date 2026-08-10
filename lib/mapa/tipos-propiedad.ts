@@ -63,6 +63,34 @@ export const TIPOS_MAPA: TipoMapa[] = [
   },
 ]
 
+/**
+ * Como se dice en castellano un valor crudo de la base.
+ *
+ * Las dos tablas guardan los tipos en ingles a medias ("Apartment", "Accommodation",
+ * "Bussiness Premises" con doble s, tal como los manda Tokko). En la lista del mapa
+ * eso se leia literal y quedaba "Apartment · 1 amb. · 50 m2".
+ */
+const EN_CASTELLANO: Record<string, string> = {
+  // red de colaboracion
+  Apartment: "Departamento",
+  House: "Casa / PH",
+  Accommodation: "Comercial y otros",
+  // cartera propia
+  Condo: "Departamento",
+  "Weekend House": "Casa de fin de semana",
+  "Bussiness Premises": "Local comercial",
+  "Commercial Building": "Edificio comercial",
+  Warehouse: "Galpón",
+  Garage: "Cochera",
+  Lote: "Lote / Terreno",
+}
+
+export function tipoEnCastellano(valorDeLaBase: string | null | undefined): string {
+  if (!valorDeLaBase) return ""
+  // Los que ya vienen en castellano (Departamento, Casa, Oficina, Hotel) pasan derecho.
+  return EN_CASTELLANO[valorDeLaBase] ?? valorDeLaBase
+}
+
 export function esTipoValido(v: string): boolean {
   return TIPOS_MAPA.some((t) => t.valor === v)
 }

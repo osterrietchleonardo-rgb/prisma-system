@@ -8,6 +8,7 @@
 // para que nunca desaparezcan en silencio.
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MapPinOff } from "lucide-react"
+import { tipoEnCastellano } from "@/lib/mapa/tipos-propiedad"
 import type { FuenteMapa, PropiedadMapa } from "@/lib/mapa/tipos"
 
 const ETIQUETA_FUENTE: Record<FuenteMapa, string> = {
@@ -22,8 +23,17 @@ const COLOR_FUENTE: Record<FuenteMapa, string> = {
   roomix: "bg-blue-600",
 }
 
+// Dibujo propio en vez de una foto de archivo de internet: la politica de contenido de
+// la app solo deja imagenes de dominios conocidos, y una de Unsplash salia rota.
 const SIN_FOTO =
-  "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=400"
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="64" viewBox="0 0 80 64">
+       <rect width="80" height="64" fill="#e4e4e7"/>
+       <path d="M22 40l10-12 8 9 6-6 12 15H22z" fill="#a1a1aa"/>
+       <circle cx="28" cy="22" r="4" fill="#a1a1aa"/>
+     </svg>`,
+  )
 
 function precio(p: PropiedadMapa) {
   if (!p.price) return "Consultar"
@@ -88,7 +98,7 @@ export function MapaResultados({
                 <p className="truncate text-sm font-semibold">{precio(p)}</p>
                 <p className="truncate text-xs text-zinc-500">{p.address || p.city || "Sin dirección"}</p>
                 <p className="truncate text-[11px] text-zinc-400">
-                  {[p.property_type, p.bedrooms ? `${p.bedrooms} amb.` : null, p.total_area ? `${p.total_area} m²` : null]
+                  {[tipoEnCastellano(p.property_type), p.bedrooms ? `${p.bedrooms} amb.` : null, p.total_area ? `${p.total_area} m²` : null]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>

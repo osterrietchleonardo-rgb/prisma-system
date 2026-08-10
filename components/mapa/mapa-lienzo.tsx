@@ -96,26 +96,42 @@ function pin(fuente: FuenteMapa, cuantas: number) {
 /**
  * Globito de un grupo de puntos cercanos.
  *
- * Se dibuja a mano en vez de usar el de la libreria, que pinta verde / amarillo / rojo
- * segun cuantas propiedades hay adentro. Ese semaforo se leia como si el color dijera
- * algo de las propiedades (baratas, caras, disponibles) cuando en realidad solo cuenta
- * cuantas son. Aca todos los globitos son del mismo color de la app y lo unico que
- * cambia es el tamaño, que es lo que de verdad significa "hay mas".
+ * Se dibuja a mano por dos razones. La primera, que el de la libreria pinta verde /
+ * amarillo / rojo segun cuantas propiedades hay adentro, y ese semaforo se leia como si
+ * el color dijera algo de las propiedades (baratas, caras, disponibles) cuando en
+ * realidad solo cuenta cuantas son. La segunda, que eran enormes: a la altura de una
+ * ciudad entera el mapa quedaba tapado de circulos y no se veia nada abajo.
+ *
+ * Aca el color dice lo mismo que en los pines sueltos —de donde salen las propiedades—
+ * y el tamaño dice cuantas hay. Se usa la misma prioridad que un pin: si adentro hay
+ * aunque sea una tuya, el globito va dorado, para que no se te pierda entre las ajenas.
  */
-function iconoDeGrupo(cluster: { getChildCount: () => number }) {
-  const n = cluster.getChildCount()
-  const d = n < 10 ? 36 : n < 100 ? 44 : 52
-  const texto = n > 999 ? "+999" : String(n)
-  return L.divIcon({
-    className: "",
-    iconSize: [d, d],
-    iconAnchor: [d / 2, d / 2],
-    html: `<div style="width:${d}px;height:${d}px;border-radius:50%;background:#0284c7;
-      border:3px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;
-      align-items:center;justify-content:center;cursor:pointer">
-        <span style="color:#fff;font-size:${n > 999 ? 11 : 13}px;font-weight:700">${texto}</span>
-      </div>`,
-  })
+function armarIconoDeGrupo(buscarFuente: (lat: number, lng: number) => FuenteMapa | undefined) {
+  return (cluster: L.MarkerCluster) => {
+    const n = cluster.getChildCount()
+
+    let fuente: FuenteMapa = "roomix"
+    for (const marcador of cluster.getAllChildMarkers()) {
+      const { lat, lng } = marcador.getLatLng()
+      const f = buscarFuente(lat, lng)
+      if (f === "own") { fuente = "own"; break }
+      if (f === "agency") fuente = "agency"
+    }
+
+    const d = n < 10 ? 28 : n < 100 ? 34 : 40
+    const texto = n > 999 ? "+999" : String(n)
+    return L.divIcon({
+      className: "",
+      iconSize: [d, d],
+      iconAnchor: [d / 2, d / 2],
+      html: `<div style="width:${d}px;height:${d}px;border-radius:50%;
+        background:${COLOR[fuente]}e6;border:2px solid rgba(255,255,255,.9);
+        box-shadow:0 1px 4px rgba(0,0,0,.35);display:flex;align-items:center;
+        justify-content:center;cursor:pointer">
+          <span style="color:#fff;font-size:${n > 999 ? 10 : 12}px;font-weight:700">${texto}</span>
+        </div>`,
+    })
+  }
 }
 
 function leerBBox(mapa: L.Map): BBox {
@@ -231,8 +247,10 @@ function ControlVolver() {
       ref={cortarEventos}
       onClick={volver}
       title="Volver a la vista anterior"
+      // Debajo del +/- de Leaflet, que ocupa la esquina de arriba a la izquierda: antes
+      // se le montaba encima y tapaba el boton de alejar.
       // z-800: por encima de las capas de Leaflet, que llegan hasta 700 (los globos).
-      className="absolute left-3 top-3 z-[800] flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-lg transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+      className="absolute left-3 top-[5.25rem] z-[800] flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-lg transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
         <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
@@ -293,6 +311,20 @@ export default function MapaLienzo({
     for (const g of grupos) m.set(g.clave, g)
     return m
   }, [grupos])
+
+  // El icono del globito se arma UNA sola vez: la libreria lo guarda al crear la capa y
+  // no lo vuelve a leer. Por eso la busqueda va por un ref, que siempre apunta al mapa
+  // de grupos vigente aunque cambien los filtros.
+  const buscarPorClave = useRef(porClave)
+  buscarPorClave.current = porClave
+
+  const iconoDeGrupo = useMemo(
+    () =>
+      armarIconoDeGrupo((lat, lng) =>
+        buscarPorClave.current.get(`${lat.toFixed(6)},${lng.toFixed(6)}`)?.fuente_del_pin,
+      ),
+    [],
+  )
 
   const alClickearCumulo = useRef<(e: { layer: L.MarkerCluster }) => void>(() => {})
   alClickearCumulo.current = (e) => {
