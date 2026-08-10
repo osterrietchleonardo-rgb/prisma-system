@@ -40,6 +40,7 @@ const FILTROS_INICIALES: FiltrosMapa = {
   moneda: "USD",
   ambientes_min: null,
   fuentes: ["own", "agency", "roomix"],
+  barrio: null,
 }
 
 export function MapaTab() {
@@ -79,6 +80,7 @@ export function MapaTab() {
     if (filtros.precio_min !== null) qs.set("precio_min", String(filtros.precio_min))
     if (filtros.precio_max !== null) qs.set("precio_max", String(filtros.precio_max))
     if (filtros.ambientes_min !== null) qs.set("ambientes_min", String(filtros.ambientes_min))
+    if (filtros.barrio) qs.set("barrio", filtros.barrio)
 
     fetch(`/api/mapa/propiedades?${qs}`, { signal: ctrl.signal })
       .then(async (r) => {
@@ -134,6 +136,17 @@ export function MapaTab() {
     // por que: el trazo de antes no encierra nada de donde acabamos de aterrizar.
     setTrazos([])
     setEncuadrarA(l.bbox)
+
+    // Un barrio ademas FILTRA. Acercarse no alcanza: en el recuadro de Belgrano el 46%
+    // de lo que entra es de los barrios vecinos, y en el de Palermo el 65% (medido el
+    // 2026-08-10). Quien busco "Belgrano" quiere Belgrano.
+    //
+    // Una direccion NO filtra: es un punto, no un barrio, y ademas puede caer en un
+    // barrio que no tenga nada. Ahi el filtro dejaria la pantalla vacia.
+    setFiltros((f) => ({
+      ...f,
+      barrio: l.tipo === "barrio" || l.tipo === "cartera" ? l.nombre : null,
+    }))
   }, [])
 
   const aplicarZona = useCallback((z: ZonaGuardada) => {
@@ -175,6 +188,24 @@ export function MapaTab() {
   return (
     <div className="flex h-[calc(100vh-13rem)] min-h-[560px] flex-col gap-3">
       <MapaBuscador onElegir={irALugar} />
+
+      {filtros.barrio && (
+        <div className="-mt-1 flex items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 py-1 pl-3 pr-1.5 text-xs font-medium text-white">
+            Solo {filtros.barrio}
+            <button
+              onClick={() => setFiltros((f) => ({ ...f, barrio: null }))}
+              title="Ver también los barrios vecinos"
+              className="rounded-full p-0.5 transition-colors hover:bg-white/25"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </span>
+          <span className="text-[11px] text-zinc-500">
+            se esconden las propiedades de los barrios vecinos
+          </span>
+        </div>
+      )}
 
       <MapaFiltros filtros={filtros} onCambio={setFiltros} />
 

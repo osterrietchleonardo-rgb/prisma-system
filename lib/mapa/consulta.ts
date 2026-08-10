@@ -3,6 +3,7 @@
 // Se separa del endpoint HTTP a proposito, para poder verificarla contra la base real
 // con un script, sin necesidad de sesion ni cookies.
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizarTexto } from "./lugares.ts"
 import { valoresDeTipo } from "./tipos-propiedad.ts"
 import type { BBox, FiltrosMapa, PropiedadMapa, RespuestaMapa } from "./tipos.ts"
 
@@ -82,6 +83,11 @@ export async function consultarMapa(
 ): Promise<RespuestaMapa> {
   const { bbox, filtros, agencyId, userId } = params
 
+  // El barrio viaja normalizado (minusculas, sin acentos) porque las dos tablas lo
+  // escriben distinto: la cartera "Nuñez" y la red "Núñez". Las funciones SQL comparan
+  // normalizado contra normalizado.
+  const barrio = filtros.barrio ? normalizarTexto(filtros.barrio) : null
+
   const comunes = {
     p_sur: bbox.sur,
     p_oeste: bbox.oeste,
@@ -92,6 +98,7 @@ export async function consultarMapa(
     p_precio_max: filtros.precio_max,
     p_moneda: filtros.moneda,
     p_ambientes_min: filtros.ambientes_min,
+    p_barrio: barrio,
   }
 
   // Una etiqueta de pantalla puede tapar varios valores de la base, y no siempre las dos

@@ -485,3 +485,24 @@ describe("sacarBarriosRepetidos", () => {
     assert.equal(red.length, 1)
   })
 })
+
+describe("leerFiltros · barrio", () => {
+  test("lo toma tal cual viene, con acentos y todo", () => {
+    const f = leerFiltros(new URLSearchParams("barrio=Núñez"))
+    assert.equal(f.barrio, "Núñez")
+    // Lo que viaja a la base es la version normalizada, y tiene que dar el mismo valor
+    // que guarda mapa_barrios.normalizado.
+    assert.equal(normalizarTexto(f.barrio!), "nunez")
+  })
+
+  test("sin barrio en la URL no hay filtro", () => {
+    assert.equal(leerFiltros(new URLSearchParams("operacion=Venta")).barrio, null)
+  })
+
+  test("un barrio vacio es no-filtrar, no filtrar-por-nada", () => {
+    // `barrio=` mandaria "" a la consulta y ningun barrio se llama "": el mapa quedaria
+    // vacio sin motivo visible.
+    assert.equal(leerFiltros(new URLSearchParams("barrio=")).barrio, null)
+    assert.equal(leerFiltros(new URLSearchParams("barrio=%20%20")).barrio, null)
+  })
+})

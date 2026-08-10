@@ -25,6 +25,7 @@ export function leerFiltros(sp: URLSearchParams): FiltrosMapa {
   // tal cual a la consulta y, al no coincidir con ningun valor de la base, el mapa
   // quedaba vacio despues de 16 segundos de espera (ver tipos-propiedad.ts).
   const tipo = sp.get("tipo")?.trim()
+  const barrio = sp.get("barrio")?.trim()
 
   return {
     operacion,
@@ -35,5 +36,9 @@ export function leerFiltros(sp: URLSearchParams): FiltrosMapa {
     ambientes_min: numeroOpcional(sp.get("ambientes_min")),
     // Sin fuentes el mapa quedaria vacio sin explicacion: se vuelve a las tres.
     fuentes: pedidas.length > 0 ? pedidas : [...FUENTES_VALIDAS],
+    // A diferencia del tipo, aca no hay lista blanca posible: son 2.009 barrios y crecen
+    // con cada sync. Un nombre inventado simplemente no coincide con ninguno y el mapa
+    // queda vacio, que es la respuesta correcta a "mostrame Barrio Inexistente".
+    barrio: barrio || null,
   }
 }

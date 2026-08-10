@@ -25,6 +25,14 @@ export interface FiltrosMapa {
   moneda: "USD" | "ARS"
   ambientes_min: number | null
   fuentes: FuenteMapa[]
+  /**
+   * Barrio elegido en el buscador, tal como se escribe ("Núñez"). null = sin filtro.
+   *
+   * Se guarda la grafia que se muestra, no la normalizada: el chip de la pantalla y el
+   * parametro de la consulta salen del mismo dato, y normalizarTexto() —que da lo mismo
+   * que lower(unaccent(...)) de Postgres— hace la traduccion al consultar.
+   */
+  barrio: string | null
 }
 
 /** Una propiedad del mapa: la misma forma que ya usa el chat, mas la ubicacion. */
