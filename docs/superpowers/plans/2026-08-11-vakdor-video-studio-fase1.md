@@ -1538,6 +1538,327 @@ git commit -m "feat(studio): cut y transcribe pasan a lib/ y se enchufan al pipe
 
 ---
 
+### Task 10: `enhance.mjs` — limpieza de imagen medida y estabilización
+
+Para video grabado con celular o que pasó por WhatsApp. **Medido con VMAF el 11-ago-2026** sobre 8 s
+del VSL comprimido a 500 kbps: sin tratar 77,47 · solo `cas` 78,13 · `hqdn3d`+`cas`+`unsharp`
+**83,48** (+6,0 puntos). `nlmeans` se descartó: tardó más de 2 minutos para 8 segundos.
+
+**Files:**
+- Create: `.claude/skills/vakdor-video/engine/lib/enhance.mjs`
+- Test: `.claude/skills/vakdor-video/engine/tests/enhance.test.mjs`
+- Modify: `.claude/skills/vakdor-video/engine/studio.mjs` (flags `--limpiar` y `--estabilizar`)
+
+**Interfaces:**
+- Produces: `NIVELES_LIMPIEZA` — `{ suave, normal, fuerte }`, cada uno `{ hqdn3d, cas, unsharp }`.
+- Produces: `filtroDeLimpieza(nivel) -> string`. `nivel` `null` o `"no"` devuelve `""`.
+- Produces: `estabilizar({ entrada, salida, suavizado }) -> Promise<{ salida }>` — dos pasadas de
+  vidstab. Se ejecuta **antes** de `compose`, porque necesita su propio análisis del archivo entero.
+
+- [ ] **Step 1: Escribir la prueba que falla**
+
+`tests/enhance.test.mjs`:
+
+```js
+import { test, before, after } from "node:test";
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { NIVELES_LIMPIEZA, filtroDeLimpieza, estabilizar } from "../lib/enhance.mjs";
+import { crearClipDePrueba, dirTemporal } from "./helpers.mjs";
+
+let dir, clip;
+before(() => {
+  dir = dirTemporal();
+  clip = crearClipDePrueba({ segundos: 3, salida: path.join(dir, "e.mp4") });
+});
+after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+test("los 3 niveles y el apagado", () => {
+  assert.deepEqual(Object.keys(NIVELES_LIMPIEZA).sort(), ["fuerte", "normal", "suave"]);
+  assert.equal(filtroDeLimpieza(null), "");
+  assert.equal(filtroDeLimpieza("no"), "");
+});
+
+test("la cadena medida usa hqdn3d + cas + unsharp, NO nlmeans", () => {
+  const f = filtroDeLimpieza("normal");
+  assert.ok(f.includes("hqdn3d"));
+  assert.ok(f.includes("cas"));
+  assert.ok(f.includes("unsharp"));
+  assert.ok(!f.includes("nlmeans"), "nlmeans se descarto por lento (2 min para 8 s)");
+});
+
+test("ffmpeg acepta los 3 niveles", () => {
+  for (const n of Object.keys(NIVELES_LIMPIEZA)) {
+    const r = spawnSync("ffmpeg", ["-v", "error", "-i", clip, "-vf", filtroDeLimpieza(n),
+      "-frames:v", "2", "-f", "null", "-"], { encoding: "utf8" });
+    assert.equal(r.status, 0, `ffmpeg rechazo el nivel "${n}": ${r.stderr}`);
+  }
+});
+
+test("estabilizar hace las 2 pasadas y no cambia las dimensiones", async () => {
+  const salida = path.join(dir, "estab.mp4");
+  await estabilizar({ entrada: clip, salida, suavizado: 30 });
+  const dims = spawnSync("ffprobe", ["-v", "error", "-select_streams", "v:0",
+    "-show_entries", "stream=width,height", "-of", "csv=p=0", salida], { encoding: "utf8" }).stdout.trim();
+  assert.equal(dims, "1920,1080");
+});
+
+test("estabilizar limpia el archivo .trf temporal", async () => {
+  const salida = path.join(dir, "estab2.mp4");
+  await estabilizar({ entrada: clip, salida, suavizado: 20 });
+  const sobrantes = fs.readdirSync(dir).filter((f) => f.endsWith(".trf"));
+  assert.deepEqual(sobrantes, [], `quedaron temporales: ${sobrantes.join(", ")}`);
+});
+```
+
+- [ ] **Step 2: Correr y verificar que falla**
+
+```bash
+cd ".claude/skills/vakdor-video/engine" && node --test tests/enhance.test.mjs
+```
+
+Esperado: FALLA con `Cannot find module '../lib/enhance.mjs'`.
+
+- [ ] **Step 3: Implementar `lib/enhance.mjs`**
+
+```js
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+
+/**
+ * Cadena MEDIDA con VMAF sobre video comprimido tipo WhatsApp (ver Task 10 del plan):
+ *   sin tratar 77,47 | solo cas 78,13 | hqdn3d+cas+unsharp 83,48
+ * `nlmeans` da mejor denoise pero tarda mas de 2 min para 8 s: descartado para produccion.
+ */
+export const NIVELES_LIMPIEZA = {
+  suave:  { hqdn3d: "2:1.5:4:4",   cas: 0.3, unsharp: "5:5:0.4:5:5:0.0" },
+  normal: { hqdn3d: "3:3:6:6",     cas: 0.4, unsharp: "5:5:0.6:5:5:0.0" },
+  fuerte: { hqdn3d: "5:4:9:9",     cas: 0.6, unsharp: "5:5:0.9:5:5:0.0" },
+};
+
+export function filtroDeLimpieza(nivel) {
+  if (!nivel || nivel === "no") return "";
+  const n = NIVELES_LIMPIEZA[nivel];
+  if (!n) {
+    throw new Error(
+      `El nivel de limpieza "${nivel}" no existe. Validos: ${Object.keys(NIVELES_LIMPIEZA).join(", ")}.`
+    );
+  }
+  return [`hqdn3d=${n.hqdn3d}`, `cas=strength=${n.cas}`, `unsharp=${n.unsharp}`].join(",");
+}
+
+const correr = (args) =>
+  new Promise((resolve, reject) => {
+    const p = spawn("ffmpeg", args);
+    let err = "";
+    p.stderr.on("data", (d) => (err += d));
+    p.on("error", (e) => reject(new Error(`No pude ejecutar ffmpeg: ${e.message}`)));
+    p.on("close", (c) => (c === 0 ? resolve() : reject(new Error(`ffmpeg fallo (${c}):\n${err.slice(-1500)}`))));
+  });
+
+/** Estabilizacion vidstab en 2 pasadas. Corre ANTES de compose: necesita analizar el archivo entero. */
+export async function estabilizar({ entrada, salida, suavizado = 30 }) {
+  const trf = path.join(path.dirname(salida), `.vidstab-${Date.now()}.trf`);
+  try {
+    await correr(["-y", "-v", "error", "-i", entrada,
+      "-vf", `vidstabdetect=shakiness=5:accuracy=15:result=${trf}`, "-f", "null", "-"]);
+    await correr(["-y", "-v", "error", "-i", entrada,
+      "-vf", `vidstabtransform=input=${trf}:smoothing=${suavizado}:zoom=1,unsharp=5:5:0.5`,
+      "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "copy", salida]);
+    return { salida };
+  } finally {
+    fs.rmSync(trf, { force: true });
+  }
+}
+```
+
+- [ ] **Step 4: Enchufar en `studio.mjs`**
+
+`--limpiar=suave|normal|fuerte` agrega `filtroDeLimpieza()` a la cadena base de `compose`
+(justo después del formato, antes del color). `--estabilizar` corre `estabilizar()` sobre la entrada
+antes de todo lo demás y usa su salida. Sumar al reporte final: `Limpieza: normal. Estabilizacion: si.`
+
+- [ ] **Step 5: Correr y verificar que pasan**
+
+```bash
+cd ".claude/skills/vakdor-video/engine" && node --test tests/enhance.test.mjs
+```
+
+Esperado: `pass 5`, `fail 0`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add .claude/skills/vakdor-video/engine/lib/enhance.mjs \
+        .claude/skills/vakdor-video/engine/tests/enhance.test.mjs \
+        .claude/skills/vakdor-video/engine/studio.mjs
+git commit -m "feat(studio): enhance.mjs con limpieza medida por VMAF (+6 puntos) y estabilizacion"
+```
+
+---
+
+### Task 11: `drift` y `dolly` — flotación de cámara en mano y acercamiento continuo
+
+**Files:**
+- Modify: `.claude/skills/vakdor-video/engine/lib/camera.mjs` (agregar 2 funciones)
+- Modify: `.claude/skills/vakdor-video/engine/tests/camera.test.mjs` (agregar pruebas)
+- Modify: `.claude/skills/vakdor-video/engine/lib/compose.mjs` (reconocer `drift` y `dolly`)
+
+**Interfaces:**
+- Produces: `filtroDrift({ ancho, alto, intensidad })` — `intensidad` 0 a 1, default 0.5.
+- Produces: `filtroDolly({ pct, duracionSec, fps, ancho, alto, direccion })` — `direccion` `"in"` o `"out"`.
+
+- [ ] **Step 1: Agregar las pruebas que fallan**
+
+Agregar al final de `tests/camera.test.mjs`:
+
+```js
+import { filtroDrift, filtroDolly } from "../lib/camera.mjs";
+
+test("drift es determinista: mismo input, mismo filtro", () => {
+  const a = filtroDrift({ ancho: 1920, alto: 1080, intensidad: 0.5 });
+  const b = filtroDrift({ ancho: 1920, alto: 1080, intensidad: 0.5 });
+  assert.equal(a, b, "el drift no puede usar azar: el render tiene que ser repetible");
+  assert.ok(!a.includes("random"), "nada de aleatoriedad");
+});
+
+test("drift y dolly pasan por ffmpeg sin cambiar dimensiones", () => {
+  aplicar(filtroDrift({ ancho: 1920, alto: 1080, intensidad: 0.5 }), "drift");
+  aplicar(filtroDolly({ pct: 6, duracionSec: 2, fps: 30, ancho: 1920, alto: 1080, direccion: "out" }), "dolly");
+});
+
+test("mas intensidad = mas desplazamiento", () => {
+  const suave = filtroDrift({ ancho: 1920, alto: 1080, intensidad: 0.2 });
+  const fuerte = filtroDrift({ ancho: 1920, alto: 1080, intensidad: 1 });
+  const num = (s) => Number(s.match(/\+([0-9.]+)\*sin/)[1]);
+  assert.ok(num(fuerte) > num(suave));
+});
+```
+
+- [ ] **Step 2: Correr y verificar que falla**
+
+```bash
+cd ".claude/skills/vakdor-video/engine" && node --test tests/camera.test.mjs
+```
+
+Esperado: FALLA con `filtroDrift is not a function` (o error de import).
+
+- [ ] **Step 3: Agregar las dos funciones a `lib/camera.mjs`**
+
+```js
+/**
+ * Flotacion sutil tipo camara en mano. Tres senos de periodo distinto para que
+ * no se note el ciclo. DETERMINISTA a proposito: nada de azar, si no el render
+ * no seria repetible.
+ */
+export function filtroDrift({ ancho, alto, intensidad = 0.5 }) {
+  const amp = Math.max(0, Math.min(1, intensidad));
+  const ax = (18 * amp).toFixed(2), ax2 = (9 * amp).toFixed(2), ay = (12 * amp).toFixed(2);
+  // Se agranda un 10% para tener margen donde flotar sin mostrar bordes negros.
+  const W = Math.round((ancho * 1.1) / 2) * 2, H = Math.round((alto * 1.1) / 2) * 2;
+  return [
+    `scale=${W}:${H}:flags=bilinear`,
+    `crop=${ancho}:${alto}:x='(iw-ow)/2+${ax}*sin(2*PI*n/210)+${ax2}*sin(2*PI*n/97)':y='(ih-oh)/2+${ay}*sin(2*PI*n/173)':exact=1`,
+    "setsar=1",
+  ].join(",");
+}
+
+/** Acercamiento o alejamiento continuo. Es el zoom, con nombre de cine. */
+export function filtroDolly({ pct, duracionSec, fps, ancho, alto, direccion = "in", multiplicador }) {
+  return filtroZoom({
+    tipo: direccion === "out" ? "zoomOut" : "zoomIn",
+    pct, duracionSec, fps, ancho, alto,
+    multiplicador: multiplicador ?? MULTIPLICADOR_DEFAULT,
+  });
+}
+```
+
+- [ ] **Step 4: Reconocerlos en `compose.mjs`**
+
+En `movimientoDe`, agregar antes del `throw`:
+
+```js
+if (c.fx === "drift") return filtroDrift({ ancho, alto, intensidad: c.intensidad ?? 0.5 });
+if (c.fx === "dolly")
+  return filtroDolly({ pct: c.pct ?? 6, duracionSec: c.dur ?? 4, direccion: c.direccion ?? "in", ...comun });
+```
+
+Y agregar `"dolly"` al set `MOVIMIENTOS_CON_DURACION`. `drift` no entra: no tiene sobre-muestreo caro.
+
+- [ ] **Step 5: Correr y verificar que pasan**
+
+```bash
+cd ".claude/skills/vakdor-video/engine" && node --test tests/camera.test.mjs tests/compose.test.mjs
+```
+
+Esperado: `fail 0`.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add .claude/skills/vakdor-video/engine/lib/camera.mjs \
+        .claude/skills/vakdor-video/engine/lib/compose.mjs \
+        .claude/skills/vakdor-video/engine/tests/camera.test.mjs
+git commit -m "feat(studio): drift (flotacion de camara en mano) y dolly"
+```
+
+---
+
+### Task 12: Experimento — desenfoque de fondo con máscara fija (con criterio de corte)
+
+**Esto es un experimento, no una promesa.** Separar figura de fondo frame a frame no es viable
+(19 min = 34.200 frames). La hipótesis es que con cámara fija alcanza una máscara ovalada suave.
+**Si no pasa el criterio, se descarta y se documenta por qué.** No se entrega algo que se vea mal.
+
+**Files:**
+- Create: `.claude/skills/vakdor-video/engine/lib/bokeh.mjs` (solo si pasa el criterio)
+- Test: `.claude/skills/vakdor-video/engine/tests/bokeh.test.mjs`
+- Modify: `docs/superpowers/specs/2026-08-11-vakdor-video-studio-hibrido-design.md` (anotar el resultado)
+
+**Interfaces:**
+- Produces: `filtroBokeh({ ancho, alto, centroX, centroY, radioX, radioY, fuerza }) -> string`.
+
+- [ ] **Step 1: Construir el prototipo y mirarlo**
+
+Técnica: se duplica el stream, una copia va desenfocada, y se mezclan con una máscara ovalada
+suave generada con `geq` sobre una fuente `color`:
+
+```bash
+ffmpeg -y -i entrada.mp4 -filter_complex "\
+[0:v]split=3[base][blur][mk];\
+[blur]gblur=sigma=18[bg];\
+[mk]geq=lum='255*(1-exp(-0.5*pow(hypot((X-W/2)/(W*0.22),(Y-H*0.55)/(H*0.42)),2)))':cb=128:cr=128,format=gray[mask];\
+[bg][base][mask]maskedmerge[vout]" -map "[vout]" -frames:v 1 prueba.png
+```
+
+Extraer 3 frames del resultado (uno donde estés centrado, uno donde te muevas, uno donde gesticules)
+y **mirarlos**. El criterio de corte es concreto:
+
+- El borde entre vos y el fondo desenfocado **no puede tener halo visible**.
+- Si movés la cabeza dentro del cuadro, **la oreja o el hombro no pueden quedar desenfocados**.
+
+- [ ] **Step 2: Decidir**
+
+Si pasa: escribir `lib/bokeh.mjs` con la función, sus pruebas de aceptación por ffmpeg (mismo patrón
+que `grade.test.mjs`), y enchufarlo en `studio.mjs` como `--bokeh`.
+
+Si no pasa: **no escribir el módulo.** Agregar al spec, en la tabla de decisiones descartadas, la
+fila con el motivo y los frames que lo muestran. Commitear solo esa documentación.
+
+- [ ] **Step 3: Commit (en cualquiera de los dos casos)**
+
+```bash
+# si paso
+git commit -m "feat(studio): bokeh.mjs, desenfoque de fondo con mascara fija"
+# si no paso
+git commit -m "docs(studio): descarto el bokeh por mascara fija, con la evidencia"
+```
+
+---
+
 ## Cierre de la Fase 1
 
 - [ ] **Verificación sobre el video real de Leonardo**
