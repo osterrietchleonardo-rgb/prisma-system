@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
     ideas.push({
       titulo, fuente, formato,
       funnel: FUNNELS.includes(funnel) ? funnel : null,
+      estructura: typeof it.estructura === "string" ? it.estructura : null,
       angulo: typeof it.angulo === "string" ? it.angulo : null,
       gancho: typeof it.gancho === "string" ? it.gancho : null,
       motivo: typeof it.motivo === "string" ? it.motivo : null,
