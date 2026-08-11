@@ -493,11 +493,21 @@ const CSS = `
 .cover-meta-block strong { font-size: 18px; }
 /* Descripción del sujeto en la portada. Mismo criterio que .comp-desc: la hoja es un A4
    EXACTO, así que además del tope de 700 caracteres al guardar va un clamp duro. Aunque
-   alguien pegue a mano un texto larguísimo, la portada no puede desbordar. */
+   alguien pegue a mano un texto larguísimo, la portada no puede desbordar.
+   A diferencia de ComparableSheet, la portada NO tiene una "esponja" visual (ahí es la
+   foto de .gallery quien absorbe el sobrante); acá el único colchón es el propio
+   flex:1 1 auto de .cover-body dentro de .sheet. Por eso el clamp quedó en 7 líneas
+   (no 8): medido con la altura de impresión FORZADA (.sheet con height:297mm fijo +
+   overflow:hidden, no el min-height de pantalla que puede crecer sin que se note el
+   desborde) y el peor caso real —descripción de 689 caracteres en palabras largas que
+   llena el clamp entero + dirección/barrio/tipo larguísimos que ocupan 2 líneas cada
+   uno— el margen hasta el pie de página dio 318px sobre un clamp de 165px: de sobra,
+   pero 7 líneas en vez de 8 suma otro colchón por las dudas sin perder casi nada de
+   texto real. */
 .cover-desc {
   margin-top: 26px; font-size: 12.5px; line-height: 1.65; color: #5c5c5c; max-width: 88%;
-  max-height: 165px; overflow: hidden;
-  display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical;
+  max-height: 145px; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical;
 }
 
 /* Banner de pulso / consolidado (informativo, no llamativo) */

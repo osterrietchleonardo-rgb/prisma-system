@@ -40,6 +40,13 @@ export const SUJETO_INICIAL: Sujeto = {
   },
   ocupacion: "libre",
   moneda: "USD",
+  // Descripción de la IA de visión (fotos) y si va o no en la ficha del cliente. Viven DENTRO
+  // de `sujeto` (no en estado aparte) a propósito: `sujeto` es lo único que efectivamente viaja
+  // a /api/acm/ficha (revisarConclusiones y crearFicha en comparables-result.tsx lo postean tal
+  // cual), así que un estado separado quedaba huérfano — se fusionaba solo para la búsqueda de
+  // comparables (/api/acm/comparables) y nunca llegaba a la creación de la ficha ni al render.
+  descripcion_ia: "",
+  incluir_desc_ficha: true,
 };
 
 // Componente principal del ACM (lo reutilizan tanto el asesor como el director).
@@ -50,10 +57,6 @@ export function AcmModule() {
   // Barrios linderos: apagado por defecto. Un comparable de Núñez en un ACM de Belgrano
   // es técnicamente defendible pero le rompe la confianza al cliente, así que se pide.
   const [incluirLinderos, setIncluirLinderos] = useState(false);
-  // Descripción de la IA de visión (fotos) y si va o no en la ficha del cliente.
-  // El componente FotosIA no guarda nada que le sobreviva: este módulo es el dueño.
-  const [descripcionIa, setDescripcionIa] = useState("");
-  const [incluirDescFicha, setIncluirDescFicha] = useState(true);
   const [excludeId, setExcludeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"input" | "results">("input");
@@ -71,8 +74,6 @@ export function AcmModule() {
     setOperacion("venta");
     setConsiderarPh(true);
     setIncluirLinderos(false);
-    setDescripcionIa("");
-    setIncluirDescFicha(true);
     setExcludeId(null);
   };
 
@@ -83,7 +84,7 @@ export function AcmModule() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sujeto: { ...sujeto, descripcion_ia: descripcionIa.trim(), incluir_desc_ficha: incluirDescFicha },
+          sujeto: { ...sujeto, descripcion_ia: (sujeto.descripcion_ia || "").trim() },
           operacion,
           exclude_id: excludeId,
           considerar_ph: considerarPh,
@@ -184,10 +185,10 @@ export function AcmModule() {
               onConsiderarPhChange={setConsiderarPh}
               incluirLinderos={incluirLinderos}
               onIncluirLinderosChange={setIncluirLinderos}
-              descripcionIa={descripcionIa}
-              onDescripcionIaChange={setDescripcionIa}
-              incluirDescFicha={incluirDescFicha}
-              onIncluirDescFichaChange={setIncluirDescFicha}
+              descripcionIa={sujeto.descripcion_ia ?? ""}
+              onDescripcionIaChange={(v) => setSujeto((s) => ({ ...s, descripcion_ia: v }))}
+              incluirDescFicha={sujeto.incluir_desc_ficha ?? true}
+              onIncluirDescFichaChange={(v) => setSujeto((s) => ({ ...s, incluir_desc_ficha: v }))}
               onBuscar={handleBuscar}
               loading={loading}
               excludeId={excludeId}
