@@ -65,6 +65,11 @@ export async function POST(req: Request) {
     // Sin límites artificiales: el gate de barrio ya acota el universo; traemos todos los
     // comparables del barrio (tope alto por performance del render, configurable por request).
     const limit = Math.min(Number(body.limit) || 50, 100);
+    // Con una descripción real de la propiedad, la similitud descriptiva deja de ser
+    // redundante con las dimensiones duras (tipo/m²/ambientes ya se puntúan aparte) y
+    // pasa a aportar señal propia: de 10 a 20 puntos sobre ~130.
+    const tieneDesc = Boolean((sujeto.descripcion_ia || "").trim());
+    const pesoSemantica = tieneDesc ? 20 : 10;
 
     const m2 = sujetoM2(sujeto);
     const ambientes = sujetoAmbientes(sujeto);
@@ -112,6 +117,7 @@ export async function POST(req: Request) {
         p_barrio: sujetoZona,
         p_zona_niveles: true,
         p_zona_min: zonaMin,
+        p_peso_semantica: pesoSemantica,
         p_m2_cubierta: true,
         p_limit: limit,
       }),
@@ -132,6 +138,7 @@ export async function POST(req: Request) {
         p_barrio: sujetoZona,
         p_zona_niveles: true,
         p_zona_min: zonaMin,
+        p_peso_semantica: pesoSemantica,
         p_m2_cubierta: true,
         p_dedup: true,
         p_excluir_sujeto: true,
@@ -191,6 +198,7 @@ export async function POST(req: Request) {
           checklist: buildChecklist({
             sub: subs,
             operacion,
+            pesoSemantica,
             sujeto: sujetoForChecklist,
             comp: { tipo: p.property_type || "", zona: [p.city, p.address].filter(Boolean).join(" "), m2: candM2, ambientes: candAmb, dormitorios: candDorm, banos: p.bathrooms ?? null, antiguedad: candAnt, amenities: compAmen },
           }),
@@ -231,6 +239,7 @@ export async function POST(req: Request) {
           checklist: buildChecklist({
             sub: subs,
             operacion,
+            pesoSemantica,
             sujeto: sujetoForChecklist,
             comp: { tipo: r.property_type || "", zona: [r.neighborhood, r.address].filter(Boolean).join(" "), m2: candM2, ambientes: candAmb, dormitorios: candDorm, banos: r.bathrooms ?? null, antiguedad: candAnt, amenities: compAmen },
           }),

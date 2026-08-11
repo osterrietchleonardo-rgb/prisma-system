@@ -21,7 +21,9 @@ export interface SubScores {
 // Pesos base del % (deben coincidir con los de las funciones SQL acm_match_*). La ZONA volvió a
 // pesar: dejó de ser un filtro binario y ahora puntúa por nivel (100 mismo barrio · 70 sub-barrio
 // hermano · 50 limítrofe), así un comparable de Núñez nunca le gana a uno de Belgrano.
-const PESOS = { zona: 20, superficie: 22, ambientes: 16, dormitorios: 14, banos: 12, antiguedad: 14, amenities: 12, semantica: 10 } as const;
+// El semántico NO está acá: es variable (10, o 20 cuando el sujeto trae descripción de la IA) y
+// llega por argumento.
+const PESOS = { zona: 20, superficie: 22, ambientes: 16, dormitorios: 14, banos: 12, antiguedad: 14, amenities: 12 } as const;
 
 function estado(score: number | null): ChecklistItem["estado"] {
   if (score === null || score === undefined) return "na";
@@ -42,10 +44,12 @@ const fmtAnios = (v: number | null | undefined) => {
 export function buildChecklist(args: {
   sub: SubScores;
   operacion: string;
+  /** Peso del ítem semántico: 20 si el sujeto trae descripción de la IA, 10 si no. */
+  pesoSemantica: number;
   sujeto: { tipo: string; zona: string; m2: number | null; ambientes: number | null; dormitorios: number | null; banos: number | null; antiguedad: number | null; amenities: string[] };
   comp: { tipo: string; zona: string; m2: number | null; ambientes: number | null; dormitorios: number | null; banos: number | null; antiguedad: number | null; amenities: string[] };
 }): ChecklistItem[] {
-  const { sub, sujeto, comp, operacion } = args;
+  const { sub, sujeto, comp, operacion, pesoSemantica } = args;
   const amenSujeto = sujeto.amenities.length ? sujeto.amenities.join(", ") : "—";
   const amenComp = comp.amenities.length ? comp.amenities.join(", ") : "—";
 
@@ -140,7 +144,7 @@ export function buildChecklist(args: {
       sujeto_val: "—",
       comp_val: sub.sc_semantica !== null ? `${sub.sc_semantica}%` : "—",
       estado: estado(sub.sc_semantica),
-      peso: PESOS.semantica,
+      peso: pesoSemantica,
       score: sub.sc_semantica,
     },
   ];
