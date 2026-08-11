@@ -4,6 +4,7 @@ import { getAdminDb } from "@/lib/admin-vakdor/logger"
 import { resumenParaMemoria, insertarIdeasMotor } from "@/lib/admin-vakdor/marketing/store"
 import { generarTexto } from "@/lib/admin-vakdor/marketing/claude"
 import { BRAND_SYSTEM } from "@/lib/admin-vakdor/marketing/brand-prompt"
+import { canonDeVoz, traerRecursos } from "@/lib/admin-vakdor/marketing/recursos"
 import type { NuevaIdeaInput, FuenteIdea, FormatoIdea, FunnelStage } from "@/lib/admin-vakdor/marketing/types"
 
 export const dynamic = "force-dynamic"
@@ -27,14 +28,22 @@ export async function POST(request: NextRequest) {
     insights = typeof data?.resumen === "string" ? data.resumen : ""
   } catch { /* falla suave */ }
 
+  const canon = await canonDeVoz()
+  const estructuras = await traerRecursos("estructura")
+  const escenas = await traerRecursos("escena")
+
   const user = [
     `Generá 5 ideas de contenido para Vakdor (mezcla LinkedIn y blog).`,
-    insights ? `DATOS REALES DE RENDIMIENTO (Buffer) — priorizá ángulos/temas parecidos a los que MÁS rinden y evitá el patrón de los que menos; no inventes:\n${insights}` : "",
-    `Balanceá el EMBUDO: asigná a cada idea una etapa "funnel": "tofu" (descubrimiento, dolor amplio, sin vender), "mofu" (nutrición, el mecanismo/método PRISMA), "bofu" (empujón a la reunión, prueba + CTA a agendar). Mezclá las 3 etapas.`,
+    `CANON DE VOZ (toda idea tiene que poder escribirse con esta voz):\n${canon}`,
+    `ESTRUCTURAS NARRATIVAS DISPONIBLES (asigná una distinta a cada idea):\n${estructuras.map((e) => `- ${e.clave}: ${e.titulo}`).join("\n")}`,
+    `ESCENAS DEL RUBRO (el gancho de cada idea tiene que apoyarse en una de éstas, no en una generalidad):\n${escenas.slice(0, 30).map((e) => `- ${e.titulo}: ${e.detalle}`).join("\n")}`,
+    insights ? `DATOS REALES DE RENDIMIENTO (Buffer) — priorizá los patrones que más rinden y evitá los que menos; no inventes:\n${insights}` : "",
+    `Balanceá el EMBUDO: asigná a cada idea una etapa "funnel": "tofu" (descubrimiento, dolor amplio, sin vender), "mofu" (nutrición, el mecanismo/método PRISMA), "bofu" (empujón a ver la demostración). Mezclá las 3 etapas.`,
     `NO repitas estos ángulos/títulos ya usados:\n${evitar}`,
+    `El "gancho" de cada idea tiene que ser una escena concreta, NUNCA una tesis abstracta.`,
     `Devolvé SOLO un array JSON válido, sin texto extra, con objetos:`,
-    `{"titulo": string, "fuente": "linkedin"|"blog", "formato": "post_texto"|"carrusel"|"articulo_blog", "funnel": "tofu"|"mofu"|"bofu", "angulo": string, "gancho": string, "motivo": string}`,
-  ].join("\n\n")
+    `{"titulo": string, "fuente": "linkedin"|"blog", "formato": "post_texto"|"carrusel"|"articulo_blog", "funnel": "tofu"|"mofu"|"bofu", "estructura": string, "angulo": string, "gancho": string, "motivo": string}`,
+  ].filter(Boolean).join("\n\n")
 
   let raw: string
   try {
