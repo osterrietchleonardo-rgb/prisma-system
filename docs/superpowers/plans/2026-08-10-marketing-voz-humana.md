@@ -1038,6 +1038,7 @@ git commit -m "feat(marketing): memoria con el texto completo de las ultimas pie
 **Files:**
 - Modify: `lib/admin-vakdor/marketing/claude.ts` (reescritura completa)
 - Modify: `lib/admin-vakdor/marketing/brand-prompt.ts:25` (regla de CTA)
+- Modify: `app/api/admin-vakdor/marketing/[id]/desarrollar/route.ts:35` (llamador con la firma vieja: `generarTexto(BRAND_SYSTEM, user, 4000)` → `{ maxTokens: 4000 }`; sin este cambio no compila el repo)
 - Test: `lib/admin-vakdor/marketing/claude.test.ts`
 
 **Interfaces:**
