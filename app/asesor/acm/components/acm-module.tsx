@@ -50,6 +50,10 @@ export function AcmModule() {
   // Barrios linderos: apagado por defecto. Un comparable de Núñez en un ACM de Belgrano
   // es técnicamente defendible pero le rompe la confianza al cliente, así que se pide.
   const [incluirLinderos, setIncluirLinderos] = useState(false);
+  // Descripción de la IA de visión (fotos) y si va o no en la ficha del cliente.
+  // El componente FotosIA no guarda nada que le sobreviva: este módulo es el dueño.
+  const [descripcionIa, setDescripcionIa] = useState("");
+  const [incluirDescFicha, setIncluirDescFicha] = useState(true);
   const [excludeId, setExcludeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"input" | "results">("input");
@@ -67,6 +71,8 @@ export function AcmModule() {
     setOperacion("venta");
     setConsiderarPh(true);
     setIncluirLinderos(false);
+    setDescripcionIa("");
+    setIncluirDescFicha(true);
     setExcludeId(null);
   };
 
@@ -76,7 +82,13 @@ export function AcmModule() {
       const res = await fetch("/api/acm/comparables", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sujeto, operacion, exclude_id: excludeId, considerar_ph: considerarPh, incluir_linderos: incluirLinderos }),
+        body: JSON.stringify({
+          sujeto: { ...sujeto, descripcion_ia: descripcionIa.trim(), incluir_desc_ficha: incluirDescFicha },
+          operacion,
+          exclude_id: excludeId,
+          considerar_ph: considerarPh,
+          incluir_linderos: incluirLinderos,
+        }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -172,6 +184,10 @@ export function AcmModule() {
               onConsiderarPhChange={setConsiderarPh}
               incluirLinderos={incluirLinderos}
               onIncluirLinderosChange={setIncluirLinderos}
+              descripcionIa={descripcionIa}
+              onDescripcionIaChange={setDescripcionIa}
+              incluirDescFicha={incluirDescFicha}
+              onIncluirDescFichaChange={setIncluirDescFicha}
               onBuscar={handleBuscar}
               loading={loading}
               excludeId={excludeId}

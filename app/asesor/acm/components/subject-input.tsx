@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil, Building2, Link2, Search, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { FotosIA } from "./fotos-ia";
 
 type Modo = "manual" | "cartera" | "link";
 
@@ -44,6 +45,10 @@ interface SubjectInputProps {
   onConsiderarPhChange: (v: boolean) => void;
   incluirLinderos: boolean;
   onIncluirLinderosChange: (v: boolean) => void;
+  descripcionIa: string;
+  onDescripcionIaChange: (v: string) => void;
+  incluirDescFicha: boolean;
+  onIncluirDescFichaChange: (v: boolean) => void;
   onBuscar: () => void;
   loading: boolean;
   excludeId: string | null;
@@ -92,6 +97,10 @@ export function SubjectInput({
   onConsiderarPhChange,
   incluirLinderos,
   onIncluirLinderosChange,
+  descripcionIa,
+  onDescripcionIaChange,
+  incluirDescFicha,
+  onIncluirDescFichaChange,
   onBuscar,
   loading,
   excludeId,
@@ -372,6 +381,18 @@ export function SubjectInput({
       <div className="pt-2">
         <Step1Sujeto sujeto={sujeto} onChange={onChange} hideNextButton />
       </div>
+
+      {/* Fotos + IA: opcional, no bloquea nada. Con key={modo} se remonta al cambiar de
+          solapa (manual/cartera/link), así las fotos ya elegidas no quedan colgadas
+          cuando onReset() vacía el sujeto. */}
+      <FotosIA
+        key={modo}
+        sujeto={sujeto}
+        descripcion={descripcionIa}
+        incluirEnFicha={incluirDescFicha}
+        onDescripcionChange={onDescripcionIaChange}
+        onIncluirEnFichaChange={onIncluirDescFichaChange}
+      />
 
       {/* Acción principal */}
       <div className="pt-2 flex justify-end border-t border-accent/10">
