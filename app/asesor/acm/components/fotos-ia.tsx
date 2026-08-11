@@ -51,12 +51,19 @@ export function FotosIA({
   const [foco, setFoco] = useState("");
   const [analizando, setAnalizando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // El análisis se hace una sola vez: una vez que hay texto, no se ofrece rehacerlo.
-  const yaAnalizo = descripcion.trim().length > 0;
+  const [info, setInfo] = useState<string | null>(null);
+  // El análisis se hace una sola vez: se marca en `analizar()` cuando la llamada
+  // a la IA responde OK (nunca en el catch/finally, para que un fallo siga
+  // siendo reintentable). NO se infiere de `descripcion` porque el asesor puede
+  // borrar todo el texto para reescribirlo a mano; el hecho de que ya se analizó
+  // no depende de si el texto sigue ahí. Solo se resetea con el remount por
+  // `key={modo}` (cambio de solapa), que es el reset legítimo del formulario.
+  const [analizado, setAnalizado] = useState(false);
 
   const agregar = async (files: FileList | null, input: HTMLInputElement) => {
     if (!files?.length) return;
     setError(null);
+    setInfo(null);
     const elegidos = [...files];
     const libres = MAX_FOTOS - fotos.length;
     const aProcesar = elegidos.slice(0, libres);
@@ -87,6 +94,9 @@ export function FotosIA({
       );
     } else if (descartadasPorTope > 0) {
       setError(`Ya llegaste al máximo de ${MAX_FOTOS} fotos, no se agregaron ${descartadasPorTope} más.`);
+    } else if (fotos.length + nuevas.length >= MAX_FOTOS) {
+      // Aviso neutral (no es un error): explica por qué el recuadro de "agregar" desaparece.
+      setInfo(`Llegaste al máximo de ${MAX_FOTOS} fotos.`);
     }
   };
 
@@ -103,11 +113,16 @@ export function FotosIA({
           sujeto,
         }),
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || "No se pudo analizar las fotos.");
+      // Guardado: si la respuesta no es JSON (timeout de plataforma, página de
+      // gateway — el endpoint tiene maxDuration=60), `.json()` tira un SyntaxError
+      // que no es un TypeError y se escapaba con el mensaje técnico del navegador.
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j) throw new Error(j?.error || "No se pudo analizar las fotos.");
       onDescripcionChange(j.descripcion);
+      // Recién acá cuenta como analizado: un fallo (catch) nunca llega a esta línea,
+      // así que el botón sigue disponible para reintentar.
+      setAnalizado(true);
     } catch (e: any) {
-      // Un fallo no cuenta como análisis: el botón sigue disponible para reintentar.
       // Si se cortó la conexión, fetch tira un TypeError con un mensaje técnico del
       // navegador ("Failed to fetch"): no le sirve al asesor, se cambia por uno en
       // español. Los demás errores ya vienen en español (los que arma este mismo
@@ -137,7 +152,7 @@ export function FotosIA({
           <div key={i} className="relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={f.preview} alt={`Foto ${i + 1}`} className="w-20 h-20 rounded-xl object-cover" />
-            {!yaAnalizo && (
+            {!analizado && (
               <button
                 type="button"
                 onClick={() => setFotos((prev) => prev.filter((_, j) => j !== i))}
@@ -149,7 +164,7 @@ export function FotosIA({
             )}
           </div>
         ))}
-        {fotos.length < MAX_FOTOS && !yaAnalizo && (
+        {fotos.length < MAX_FOTOS && !analizado && (
           <label className="w-20 h-20 rounded-xl border border-dashed border-accent/30 flex items-center justify-center cursor-pointer hover:bg-accent/5">
             <ImagePlus className="w-5 h-5 text-muted-foreground" />
             <input
@@ -163,7 +178,7 @@ export function FotosIA({
         )}
       </div>
 
-      {fotos.length > 0 && !yaAnalizo && (
+      {fotos.length > 0 && !analizado && (
         <>
           <div className="space-y-1">
             <Label className="text-xs font-bold">¿En qué querés que se enfoque el análisis?</Label>
@@ -183,8 +198,9 @@ export function FotosIA({
       )}
 
       {error && <p className="text-xs text-destructive">{error}</p>}
+      {!error && info && <p className="text-xs text-muted-foreground">{info}</p>}
 
-      {yaAnalizo && (
+      {analizado && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-xs font-bold">Descripción (editable)</Label>
