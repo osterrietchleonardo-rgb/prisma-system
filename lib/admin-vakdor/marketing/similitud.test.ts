@@ -10,6 +10,12 @@ describe("normalizar", () => {
     expect(normalizar("El año pasado")).toBe("el ano pasado")
     expect(similitud("El año pasado no cerró", "el ano pasado no cerro")).toBe(1)
   })
+
+  it("no explota con entrada vacía o nula (paridad con el worker)", () => {
+    expect(normalizar("")).toBe("")
+    expect(normalizar(undefined as unknown as string)).toBe("")
+    expect(normalizar(null as unknown as string)).toBe("")
+  })
 })
 
 describe("similitud", () => {

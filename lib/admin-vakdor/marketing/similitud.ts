@@ -4,7 +4,7 @@
  */
 
 export function normalizar(texto: string): string {
-  return texto
+  return (texto || "")
     .toLowerCase()
     // NFD + strip de combining marks folds accents AND ñ -> n. Es lo que queremos:
     // ambos lados de la comparación reciben el mismo trato, así que el matching es consistente.
