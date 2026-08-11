@@ -6,7 +6,7 @@
 // No comparte NADA con el chat: si esto fallara, el chat sigue funcionando igual.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import dynamic from "next/dynamic"
-import { DollarSign, Loader2, MapPin, Pencil, X } from "lucide-react"
+import { DollarSign, List, Loader2, MapPin, Pencil, SlidersHorizontal, Star, X } from "lucide-react"
 import { toast } from "sonner"
 
 import { MapaBuscador } from "./mapa-buscador"
@@ -46,6 +46,41 @@ const FILTROS_INICIALES: FiltrosMapa = {
   barrio: null,
 }
 
+/** Boton de la barra: prende y apaga un panel, y avisa si tiene algo puesto. */
+function BotonPanel({
+  icono: Icono,
+  texto,
+  activo,
+  marca,
+  onClick,
+}: {
+  icono: typeof MapPin
+  texto: string
+  activo: boolean
+  /** Numerito naranja: cuantos filtros o trazos hay puestos. */
+  marca?: number
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium shadow-lg transition-colors ${
+        activo
+          ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900"
+          : "bg-white text-zinc-700 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+      }`}
+    >
+      <Icono className="h-3.5 w-3.5" />
+      {texto}
+      {marca !== undefined && (
+        <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white">
+          {marca}
+        </span>
+      )}
+    </button>
+  )
+}
+
 export function MapaTab() {
   const [filtros, setFiltros] = useState<FiltrosMapa>(FILTROS_INICIALES)
   const [bbox, setBbox] = useState<BBox | null>(null)
@@ -59,6 +94,12 @@ export function MapaTab() {
   const [cumuloAbierto, setCumuloAbierto] = useState<PropiedadMapa[] | null>(null)
   const [fichaId, setFichaId] = useState<string | null>(null)
   const [sinEseTipo, setSinEseTipo] = useState({ cartera: false, colaboracion: false })
+
+  // Que paneles estan abiertos. Arrancan CERRADOS a proposito: lo primero que tiene que
+  // ver el asesor es el mapa entero, y abre lo que necesita.
+  const [verFiltros, setVerFiltros] = useState(false)
+  const [verZonas, setVerZonas] = useState(false)
+  const [verLista, setVerLista] = useState(false)
 
   const [verPrecios, setVerPrecios] = useState(false)
   const [manzanas, setManzanas] = useState<ManzanaPrecio[]>([])
@@ -237,6 +278,19 @@ export function MapaTab() {
   const [proveedor, setProveedor] = useState<"maptiler" | "osm">("osm")
   const onProveedor = useCallback((p: "maptiler" | "osm") => setProveedor(p), [])
 
+  // Cuantos filtros hay puestos, para avisarlo en el boton: con la barra escondida, un
+  // filtro olvidado explica una pantalla vacia y nadie lo veria.
+  const filtrosActivos = useMemo(() => {
+    let n = 0
+    if (filtros.tipo) n++
+    if (filtros.precio_min !== null) n++
+    if (filtros.precio_max !== null) n++
+    if (filtros.ambientes_min !== null) n++
+    if (filtros.barrio) n++
+    if (filtros.fuentes.length < 3) n++
+    return n || undefined
+  }, [filtros])
+
   const etiquetaTipo = etiquetaDeTipo(filtros.tipo)
   const avisoTipo = etiquetaTipo && (sinEseTipo.cartera || sinEseTipo.colaboracion)
     ? sinEseTipo.colaboracion && !sinEseTipo.cartera
@@ -245,38 +299,98 @@ export function MapaTab() {
     : null
 
   return (
-    <div className="flex h-[calc(100vh-13rem)] min-h-[560px] flex-col gap-3">
-      <MapaBuscador onElegir={irALugar} />
+    /* EL MAPA OCUPA TODO. Antes los paneles laterales se comian 616 px de ancho fijo
+       (240 de "Mis zonas" + 352 de resultados + separaciones) y el buscador con los
+       filtros otros ~160 de alto. En una notebook de 1366x768 el mapa quedaba en
+       750x404 px: menos de un tercio de la pantalla.
 
-      {filtros.barrio && (
-        <div className="-mt-1 flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 py-1 pl-3 pr-1.5 text-xs font-medium text-white">
-            Solo {filtros.barrio}
-            <button
-              onClick={() => setFiltros((f) => ({ ...f, barrio: null }))}
-              title="Ver también los barrios vecinos"
-              className="rounded-full p-0.5 transition-colors hover:bg-white/25"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </span>
-          <span className="text-[11px] text-zinc-500">
-            se esconden las propiedades de los barrios vecinos
-          </span>
+       Ahora los paneles FLOTAN sobre el mapa en vez de empujarlo. La diferencia no es
+       estetica: si empujaran, cada vez que se abre o cierra uno el mapa cambiaria de
+       tamano, con el cambiaria el rectangulo visible, y eso dispara una consulta nueva y
+       hace parpadear los pines. Flotando, el mapa no se entera de nada.
+
+       `isolate` no es decorativo: Leaflet pone sus capas en z-index 400 a 700, y sin
+       aislar competian de igual a igual con el modal de la ficha (z-50). Por eso los
+       puntos del mapa se veian dibujados ENCIMA de la ficha abierta. */
+    <div className="relative isolate h-[calc(100vh-11rem)] min-h-[560px] overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+      <MapaLienzo
+        manzanasPrecio={verPrecios ? manzanas : undefined}
+        celdasPrecio={verPrecios ? celdas : undefined}
+        cortesPrecio={cortesPrecio}
+        monedaPrecio={filtros.moneda}
+        grupos={grupos}
+        onMover={onMover}
+        onAbrirGrupo={onAbrirGrupo}
+        onAbrirCumulo={onAbrirCumulo}
+        onProveedor={onProveedor}
+        encuadrarA={encuadrarA}
+        lapizActivo={lapizActivo}
+        trazos={trazos}
+        onTrazo={agregarTrazo}
+      />
+
+      {/* ── Barra de arriba: buscador y los tres botones ──
+          `pointer-events-none` en el contenedor y `auto` en cada control: sin eso, la
+          franja transparente se comeria el arrastre del mapa en toda la parte de arriba. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[600] space-y-2 p-3">
+        <div className="pointer-events-auto w-full max-w-md">
+          <MapaBuscador onElegir={irALugar} />
         </div>
-      )}
 
-      <MapaFiltros filtros={filtros} onCambio={setFiltros} />
+        {filtros.barrio && (
+          <div className="pointer-events-auto flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 py-1 pl-3 pr-1.5 text-xs font-medium text-white shadow">
+              Solo {filtros.barrio}
+              <button
+                onClick={() => setFiltros((f) => ({ ...f, barrio: null }))}
+                title="Ver también los barrios vecinos"
+                className="rounded-full p-0.5 transition-colors hover:bg-white/25"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          </div>
+        )}
 
-      {avisoTipo && (
-        <p className="-mt-1 rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
-          {avisoTipo}
-        </p>
-      )}
+        <div className="pointer-events-auto flex flex-wrap items-center gap-2">
+          <BotonPanel
+            icono={SlidersHorizontal}
+            texto="Filtros"
+            activo={verFiltros}
+            marca={filtrosActivos}
+            onClick={() => setVerFiltros((v) => !v)}
+          />
+          <BotonPanel
+            icono={Star}
+            texto="Mis zonas"
+            activo={verZonas}
+            marca={trazos.length || undefined}
+            onClick={() => setVerZonas((v) => !v)}
+          />
+          <BotonPanel
+            icono={List}
+            texto={verPrecios ? "Ranking" : "Resultados"}
+            activo={verLista}
+            onClick={() => setVerLista((v) => !v)}
+          />
+        </div>
 
-      <div className="grid flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[15rem_1fr_22rem]">
-        {/* ── Mis zonas ── */}
-        <div className="hidden overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 lg:block">
+        {verFiltros && (
+          <div className="pointer-events-auto w-full max-w-4xl rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
+            <MapaFiltros filtros={filtros} onCambio={setFiltros} />
+          </div>
+        )}
+
+        {avisoTipo && (
+          <p className="pointer-events-auto w-fit rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800 shadow dark:bg-amber-950/90 dark:text-amber-300">
+            {avisoTipo}
+          </p>
+        )}
+      </div>
+
+      {/* ── Mis zonas: flota a la izquierda ── */}
+      {verZonas && (
+        <div className="absolute bottom-14 left-3 top-40 z-[650] w-60 overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
           <MapaZonasPanel
             trazos={trazos}
             filtros={filtros}
@@ -285,94 +399,12 @@ export function MapaTab() {
             onAplicarZona={aplicarZona}
           />
         </div>
+      )}
 
-        {/* ── El mapa ──
-            `isolate` no es decorativo: Leaflet pone sus capas en z-index 400 a 700, y sin
-            aislar competian de igual a igual con el modal de la ficha (z-50). Por eso los
-            puntos del mapa se veian dibujados ENCIMA de la ficha abierta. */}
-        <div className="relative isolate overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-          <MapaLienzo
-            manzanasPrecio={verPrecios ? manzanas : undefined}
-            celdasPrecio={verPrecios ? celdas : undefined}
-            cortesPrecio={cortesPrecio}
-            monedaPrecio={filtros.moneda}
-            grupos={grupos}
-            onMover={onMover}
-            onAbrirGrupo={onAbrirGrupo}
-            onAbrirCumulo={onAbrirCumulo}
-            onProveedor={onProveedor}
-            encuadrarA={encuadrarA}
-            lapizActivo={lapizActivo}
-            trazos={trazos}
-            onTrazo={agregarTrazo}
-          />
-
-          {/* ── El lápiz ── */}
-          <button
-            onClick={() => setLapizActivo((v) => !v)}
-            title={lapizActivo ? "Salir del lápiz" : "Dibujar una zona a mano alzada"}
-            className={`absolute right-3 top-3 z-[500] flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-colors ${
-              lapizActivo ? "bg-sky-600 text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
-            }`}
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-
-          <button
-            onClick={() => setVerPrecios((v) => !v)}
-            title={verPrecios ? "Ocultar el precio por m²" : "Ver el precio por m² por manzana"}
-            className={`absolute right-3 top-16 z-[500] flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-colors ${
-              verPrecios ? "bg-emerald-600 text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
-            }`}
-          >
-            <DollarSign className="h-4 w-4" />
-          </button>
-
-          {lapizActivo && (
-            <div className="pointer-events-none absolute left-1/2 top-3 z-[500] -translate-x-1/2 rounded-lg bg-sky-600/95 px-3 py-1.5 text-xs font-medium text-white shadow">
-              Dibujá la zona sin soltar. Podés hacer varios trazos: se suman.
-            </div>
-          )}
-
-          {trazoVacio && (
-            <div className="absolute left-1/2 top-14 z-[500] flex -translate-x-1/2 items-center gap-2 rounded-lg bg-zinc-900/95 px-3 py-1.5 text-xs text-white shadow">
-              Ninguna propiedad en esta zona.
-              <button className="underline" onClick={() => setTrazos([])}>borrar el trazo</button>
-            </div>
-          )}
-
-          {/* Contador. Sale del MISMO estado que la lista, para que no puedan discrepar. */}
-          <div className="pointer-events-none absolute bottom-3 left-3 z-[500] rounded-lg bg-white/90 px-3 py-1.5 text-xs font-medium shadow dark:bg-zinc-900/90">
-            {cargando ? (
-              <span className="flex items-center gap-1.5 text-zinc-500">
-                <Loader2 className="h-3 w-3 animate-spin" /> buscando…
-              </span>
-            ) : (
-              <>
-                {/* El "+" no es decorativo: pasado el tope, este numero es el del tope,
-                    no el de la zona. Sin el signo el mapa afirma que hay 1.000 cuando
-                    puede haber 40.000. El aviso va PEGADO al numero y no en un cartel
-                    aparte: centrado abajo se montaba justo encima de este contador. */}
-                {truncado && "+"}
-                {visibles.length} {visibles.length === 1 ? "propiedad" : "propiedades"} a la vista
-                {truncado && (
-                  <span className="ml-1.5 border-l border-zinc-300 pl-1.5 font-normal text-amber-600 dark:border-zinc-700 dark:text-amber-500">
-                    es una muestra, acercate para verlas todas
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-
-          {proveedor === "osm" && (
-            <div className="pointer-events-none absolute bottom-3 right-3 z-[500] rounded-lg bg-zinc-900/80 px-2.5 py-1 text-[10px] text-white shadow">
-              Fondo: OpenStreetMap
-            </div>
-          )}
-        </div>
-
-        {/* ── Panel de la derecha: la lista, o el ranking de precios si esta prendido ── */}
-        <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+      {/* ── Resultados (o el ranking de precios): flota a la derecha ──
+          Arranca en top-16 para no taparle los botones del lápiz y de los precios. */}
+      {verLista && (
+        <div className="absolute bottom-14 right-3 top-16 z-[650] w-80 overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
           {verPrecios ? (
             <MapaPanelPrecios
               barrios={barriosPrecio}
@@ -385,7 +417,70 @@ export function MapaTab() {
             <MapaResultados propiedades={visibles} onAbrir={setFichaId} />
           )}
         </div>
+      )}
+
+      {/* ── El lápiz ── */}
+      <button
+        onClick={() => setLapizActivo((v) => !v)}
+        title={lapizActivo ? "Salir del lápiz" : "Dibujar una zona a mano alzada"}
+        className={`absolute right-3 top-3 z-[700] flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-colors ${
+          lapizActivo ? "bg-sky-600 text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+        }`}
+      >
+        <Pencil className="h-4 w-4" />
+      </button>
+
+      <button
+        onClick={() => setVerPrecios((v) => !v)}
+        title={verPrecios ? "Ocultar el precio por m²" : "Ver el precio por m² por manzana"}
+        className={`absolute right-16 top-3 z-[700] flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-colors ${
+          verPrecios ? "bg-emerald-600 text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+        }`}
+      >
+        <DollarSign className="h-4 w-4" />
+      </button>
+
+      {lapizActivo && (
+        <div className="pointer-events-none absolute left-1/2 top-3 z-[700] -translate-x-1/2 rounded-lg bg-sky-600/95 px-3 py-1.5 text-xs font-medium text-white shadow">
+          Dibujá la zona sin soltar. Podés hacer varios trazos: se suman.
+        </div>
+      )}
+
+      {trazoVacio && (
+        <div className="absolute left-1/2 top-14 z-[700] flex -translate-x-1/2 items-center gap-2 rounded-lg bg-zinc-900/95 px-3 py-1.5 text-xs text-white shadow">
+          Ninguna propiedad en esta zona.
+          <button className="underline" onClick={() => setTrazos([])}>borrar el trazo</button>
+        </div>
+      )}
+
+      {/* Contador. Sale del MISMO estado que la lista, para que no puedan discrepar. */}
+      <div className="pointer-events-none absolute bottom-3 left-3 z-[600] rounded-lg bg-white/90 px-3 py-1.5 text-xs font-medium shadow dark:bg-zinc-900/90">
+        {cargando ? (
+          <span className="flex items-center gap-1.5 text-zinc-500">
+            <Loader2 className="h-3 w-3 animate-spin" /> buscando…
+          </span>
+        ) : (
+          <>
+            {/* El "+" no es decorativo: pasado el tope, este numero es el del tope, no el
+                de la zona. Sin el signo el mapa afirma que hay 1.000 cuando puede haber
+                40.000. El aviso va PEGADO al numero y no en un cartel aparte: centrado
+                abajo se montaba justo encima de este contador. */}
+            {truncado && "+"}
+            {visibles.length} {visibles.length === 1 ? "propiedad" : "propiedades"} a la vista
+            {truncado && (
+              <span className="ml-1.5 border-l border-zinc-300 pl-1.5 font-normal text-amber-600 dark:border-zinc-700 dark:text-amber-500">
+                es una muestra, acercate para verlas todas
+              </span>
+            )}
+          </>
+        )}
       </div>
+
+      {proveedor === "osm" && (
+        <div className="pointer-events-none absolute bottom-3 right-3 z-[600] rounded-lg bg-zinc-900/80 px-2.5 py-1 text-[10px] text-white shadow">
+          Fondo: OpenStreetMap
+        </div>
+      )}
 
       {/* ── Varias propiedades en el mismo punto: se listan todas, no se elige una ── */}
       {grupoAbierto && (
