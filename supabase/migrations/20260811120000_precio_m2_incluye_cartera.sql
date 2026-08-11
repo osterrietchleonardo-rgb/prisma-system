@@ -83,3 +83,72 @@ END;
 $$;
 
 SELECT refrescar_precio_m2_manzanas();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Correccion del mismo dia: la regla de repetidas dejaba manzanas vacias.
+--
+-- La version anterior descartaba una propiedad propia si habia una igual en la red a menos
+-- de 60 m. Pero 60 m cruzan la calle: la gemela podia estar en la manzana de ENFRENTE, y
+-- entonces la manzana propia se quedaba sin nada. Verificado: "San Martín al 3700"
+-- (US$70.000, 69 m2) desaparecia y su manzana quedaba sin precio.
+--
+-- Ahora la comparacion es DENTRO de la misma manzana, que es donde la duplicacion importa:
+-- ahi si contarla dos veces le da doble peso a la mediana. Si la gemela esta en otra
+-- manzana, cada una aporta a la suya y esta bien que asi sea.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION refrescar_precio_m2_manzanas()
+RETURNS integer
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  n integer;
+BEGIN
+  DELETE FROM mapa_precio_m2_manzanas;
+
+  CREATE TEMP TABLE _crudas ON COMMIT DROP AS
+  SELECT
+    'red'::text AS fuente,
+    CASE WHEN r.operation = 'rent' THEN 'Alquiler' ELSE 'Venta' END AS operacion,
+    r.currency::text AS moneda,
+    m.id             AS manzana,
+    r.price          AS precio,
+    r.area_m2        AS superficie,
+    r.price / r.area_m2 AS m2
+  FROM roomix_properties r
+  JOIN mapa_manzanas m ON ST_Contains(m.geom, ST_SetSRID(ST_MakePoint(r.lng, r.lat), 4326))
+  WHERE r.is_active AND r.area_m2 >= 15 AND r.price >= 1000 AND r.currency IS NOT NULL
+  UNION ALL
+  SELECT
+    'propia',
+    -- En la cartera "Alquiler" incluye tambien "Temporary rent".
+    CASE WHEN p.status = 'Venta' THEN 'Venta' ELSE 'Alquiler' END,
+    p.currency,
+    m.id,
+    p.price,
+    p.total_area,
+    p.price / p.total_area
+  FROM properties p
+  JOIN mapa_manzanas m ON ST_Contains(m.geom, ST_SetSRID(ST_MakePoint(p.lng, p.lat), 4326))
+  WHERE p.is_active AND p.total_area >= 15 AND p.price >= 1000 AND p.currency IS NOT NULL;
+
+  INSERT INTO mapa_precio_m2_manzanas (manzana_id, operacion, moneda, propiedades, mediana_m2)
+  SELECT c.manzana, c.operacion, c.moneda, count(*)::integer,
+         round(percentile_cont(0.5) WITHIN GROUP (ORDER BY c.m2)::numeric, 0)
+  FROM _crudas c
+  WHERE c.fuente = 'red'
+     -- La propia entra salvo que la MISMA manzana ya tenga esa publicacion por la red.
+     OR NOT EXISTS (
+       SELECT 1 FROM _crudas r
+       WHERE r.fuente = 'red'
+         AND r.manzana = c.manzana
+         AND r.precio = c.precio
+         AND r.superficie = c.superficie
+     )
+  GROUP BY c.manzana, c.operacion, c.moneda;
+
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END;
+$$;
+
+SELECT refrescar_precio_m2_manzanas();
