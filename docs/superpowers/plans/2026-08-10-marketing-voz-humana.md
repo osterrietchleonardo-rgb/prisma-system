@@ -16,7 +16,10 @@
 - Nunca `git add -A`. Commitear solo los archivos nombrados en cada tarea.
 - Modelo: **`claude-sonnet-5`** exacto. Sin sufijo de fecha.
 - `thinking: { type: "adaptive" }` explícito. **Prohibido** `budget_tokens`, `temperature`, `top_p`, `top_k` — devuelven 400 en Sonnet 5.
-- `max_tokens` ≤ 8000 en todas las llamadas (por encima de ~16000 haría falta streaming).
+- `max_tokens` = **8000** (el tope) en las llamadas que generan o reescriben una pieza. El "pensamiento"
+  adaptativo de Sonnet 5 consume del MISMO presupuesto de salida, así que un límite dimensionado solo para el
+  texto visible trunca el JSON a la mitad (verificado: 4175 de 6000 tokens se fueron en thinking y el lead magnet
+  se cortó en medio de una tabla). Un ceiling no se cobra: solo se pagan los tokens realmente producidos.
 - Al leer la respuesta hay que **filtrar los bloques por `type === "text"`**: Sonnet 5 devuelve también bloques `thinking`. Leer `content[0].text` a ciegas rompe.
 - Reglas de formato del contenido generado, inquebrantables: segunda persona (vos/tenés), párrafos de 2-3 líneas, **cero emojis**, viñetas con `•`, **sin links en el cuerpo** (van al primer comentario).
 - La fórmula **"X no es Y" NO se prohíbe nunca** — es la del post de mayor rendimiento histórico. No agregarla a la lista de muletillas bajo ninguna circunstancia.
@@ -606,7 +609,7 @@ Crear `lib/admin-vakdor/marketing/similitud.ts`:
  */
 
 export function normalizar(texto: string): string {
-  return texto
+  return (texto || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -1855,7 +1858,7 @@ function extraerTexto(content) {
   return content.filter((b) => b.type === "text" && typeof b.text === "string").map((b) => b.text).join("").trim();
 }
 
-async function llamar(client, system, user, { maxTokens = 4000, effort, cachearSystem = true } = {}) {
+async function llamar(client, system, user, { maxTokens = 8000, effort, cachearSystem = true } = {}) {
   const bloque = { type: "text", text: system };
   if (cachearSystem) bloque.cache_control = { type: "ephemeral" };
   const params = {
@@ -1872,7 +1875,7 @@ async function llamar(client, system, user, { maxTokens = 4000, effort, cachearS
 
 /** Cierre parcial para pasarle a revisar() de revision.mjs. */
 export function llamador(client, system) {
-  return (prompt) => llamar(client, system, prompt, { maxTokens: 4000 });
+  return (prompt) => llamar(client, system, prompt, { maxTokens: 8000 });
 }
 ```
 
