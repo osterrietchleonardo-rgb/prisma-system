@@ -332,7 +332,9 @@ export function MapaTab() {
       {/* ── Barra de arriba: buscador y los tres botones ──
           `pointer-events-none` en el contenedor y `auto` en cada control: sin eso, la
           franja transparente se comeria el arrastre del mapa en toda la parte de arriba. */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[600] space-y-2 p-3">
+      {/* pl-14 deja pasar el control de zoom de Leaflet, que vive pegado arriba a la
+          izquierda: sin ese margen el buscador se le monta encima. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[600] space-y-2 p-3 pl-14">
         <div className="pointer-events-auto w-full max-w-md">
           <MapaBuscador onElegir={irALugar} />
         </div>
@@ -388,9 +390,10 @@ export function MapaTab() {
         )}
       </div>
 
-      {/* ── Mis zonas: flota a la izquierda ── */}
+      {/* ── Mis zonas: flota a la izquierda ──
+          Baja cuando la barra de filtros esta desplegada: si no, se le mete abajo. */}
       {verZonas && (
-        <div className="absolute bottom-14 left-3 top-40 z-[650] w-60 overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
+        <div className={`absolute bottom-14 left-3 z-[650] w-60 overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 ${verFiltros ? "top-[19rem]" : "top-32"}`}>
           <MapaZonasPanel
             trazos={trazos}
             filtros={filtros}

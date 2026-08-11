@@ -291,7 +291,7 @@ function ControlVolver() {
       // Debajo del +/- de Leaflet, que ocupa la esquina de arriba a la izquierda: antes
       // se le montaba encima y tapaba el boton de alejar.
       // z-800: por encima de las capas de Leaflet, que llegan hasta 700 (los globos).
-      className="absolute left-3 top-[5.25rem] z-[800] flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-lg transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+      className="absolute bottom-12 left-3 z-[800] flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-lg transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
         <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
