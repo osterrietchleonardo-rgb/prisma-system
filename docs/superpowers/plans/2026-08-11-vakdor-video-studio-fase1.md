@@ -647,10 +647,21 @@ test("ffmpeg acepta los 4 movimientos y no cambia las dimensiones", () => {
 });
 
 test("el zoom no deja frames congelados (la medicion del spec)", () => {
-  const salida = aplicar(
-    filtroZoom({ tipo: "zoomIn", pct: 2, duracionSec: 2, fps: 30, ancho: 1920, alto: 1080, multiplicador: 3 }),
-    "suavidad"
-  );
+  // OJO: esta prueba EXIGE una fuente FIJA. `crearClipDePrueba` usa testsrc2, que se
+  // mueve solo: con esa fuente la diferencia entre frames nunca da cero y la prueba
+  // pasaria siempre, aunque el zoom trepidara. Con imagen fija, la unica diferencia
+  // entre frames es el zoom, que es justo lo que hay que medir.
+  const quieto = path.join(dir, "quieto.mp4");
+  spawnSync("ffmpeg", ["-y", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1920x1080",
+    "-frames:v", "1", path.join(dir, "quieto.png")]);
+  spawnSync("ffmpeg", ["-y", "-v", "error", "-loop", "1", "-i", path.join(dir, "quieto.png"),
+    "-t", "2", "-r", "30", "-c:v", "libx264", "-crf", "12", "-pix_fmt", "yuv420p", quieto]);
+
+  const vf = filtroZoom({ tipo: "zoomIn", pct: 2, duracionSec: 2, fps: 30, ancho: 1920, alto: 1080, multiplicador: 3 });
+  const salida = path.join(dir, "suavidad.mp4");
+  const r = spawnSync("ffmpeg", ["-y", "-v", "error", "-i", quieto, "-vf", vf,
+    "-c:v", "libx264", "-crf", "12", "-pix_fmt", "yuv420p", salida], { encoding: "utf8" });
+  assert.equal(r.status, 0, `ffmpeg fallo: ${r.stderr}`);
   const out = spawnSync("ffmpeg", ["-v", "error", "-i", salida, "-vf",
     "tblend=all_mode=difference,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-",
     "-f", "null", "-"], { encoding: "utf8" }).stdout;
