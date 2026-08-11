@@ -6,3 +6,5 @@ whisper.cpp/
 .props.resolved.json
 .props.test.json
 .edit.props.json
+.thumb.props.json
+.batch.props.*.json
