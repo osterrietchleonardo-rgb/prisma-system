@@ -22,9 +22,19 @@ const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
 // Recuadros conocidos. El de CABA se estiro hasta el norte del conurbano porque ahi esta
 // buena parte del inventario (Vicente Lopez, Olivos, San Isidro).
+// Los recuadros salen de MEDIR donde esta el inventario sin manzana, no de adivinar:
+//   SELECT neighborhood, count(*) FROM roomix_properties r
+//   WHERE ... AND NOT EXISTS (SELECT 1 FROM mapa_manzanas m WHERE ST_Contains(m.geom, punto))
+//   GROUP BY 1 ORDER BY 2 DESC
 const ZONAS = {
   caba: { sur: -34.71, oeste: -58.55, norte: -34.52, este: -58.33 },
-  "caba-norte": { sur: -34.55, oeste: -58.56, norte: -34.45, este: -58.42 },
+  // Vicente Lopez, Olivos, San Isidro, Tigre, Nordelta, Escobar, Pilar.
+  "zona-norte": { sur: -34.52, oeste: -58.95, norte: -34.30, este: -58.45 },
+  "la-plata": { sur: -35.00, oeste: -58.10, norte: -34.85, este: -57.88 },
+  cordoba: { sur: -31.48, oeste: -64.28, norte: -31.32, este: -64.12 },
+  rosario: { sur: -33.00, oeste: -60.75, norte: -32.85, este: -60.60 },
+  // Oeste y sur del conurbano: Moron, Ramos, Lomas, Quilmes, Berazategui.
+  "gba-oeste-sur": { sur: -34.85, oeste: -58.75, norte: -34.60, este: -58.30 },
 }
 
 const LADO = 0.04       // grados de lado de cada baldosa
