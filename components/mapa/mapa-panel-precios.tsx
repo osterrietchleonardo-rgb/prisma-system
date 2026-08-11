@@ -12,11 +12,14 @@ export function MapaPanelPrecios({
   barrios,
   tramos,
   moneda,
+  unidad,
   cargando,
 }: {
   barrios: BarrioPrecio[]
   tramos: { color: string; texto: string }[]
   moneda: string
+  /** Con que se esta pintando: manzanas reales o la cuadricula de respaldo. */
+  unidad: "manzana" | "cuadricula"
   cargando: boolean
 }) {
   const caro = barrios[0]
@@ -26,6 +29,12 @@ export function MapaPanelPrecios({
     <div className="flex h-full flex-col">
       <div className="shrink-0 border-b border-zinc-200 px-3 py-2 dark:border-zinc-800">
         <p className="text-[10px] uppercase tracking-wider text-zinc-500">Precio por m²</p>
+        {/* Se dice con que se esta pintando. La cuadricula corta manzanas al medio y junta
+            las dos veredas de una avenida: quien lee el color tiene que saber cual de las
+            dos esta viendo. */}
+        <p className="text-[9px] text-zinc-400">
+          {unidad === "manzana" ? "por manzana real" : "por cuadrícula aproximada"}
+        </p>
       </div>
 
       {/* Referencia. Muestra los NUMEROS y no solo los colores: la escala se recalcula con

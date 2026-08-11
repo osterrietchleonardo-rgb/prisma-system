@@ -22,7 +22,7 @@ import { agruparPorUbicacion } from "@/lib/mapa/agrupar"
 import { filtrarPorTrazos } from "@/lib/mapa/filtro-poligono"
 import { etiquetaDeTipo } from "@/lib/mapa/tipos-propiedad"
 import type { Lugar } from "@/lib/mapa/lugares"
-import { cortesDeEscala, tramosDeReferencia, type BarrioPrecio, type CeldaPrecio } from "@/lib/mapa/precio-m2"
+import { cortesDeEscala, tramosDeReferencia, type BarrioPrecio, type CeldaPrecio, type ManzanaPrecio } from "@/lib/mapa/precio-m2"
 import type { BBox, FiltrosMapa, GrupoUbicacion, PropiedadMapa, RespuestaMapa, ZonaGuardada } from "@/lib/mapa/tipos"
 
 // Leaflet toca `window` al importarse: sin ssr:false el build se cae.
@@ -61,7 +61,9 @@ export function MapaTab() {
   const [sinEseTipo, setSinEseTipo] = useState({ cartera: false, colaboracion: false })
 
   const [verPrecios, setVerPrecios] = useState(false)
+  const [manzanas, setManzanas] = useState<ManzanaPrecio[]>([])
   const [celdas, setCeldas] = useState<CeldaPrecio[]>([])
+  const [unidadPrecio, setUnidadPrecio] = useState<"manzana" | "cuadricula">("cuadricula")
   const [barriosPrecio, setBarriosPrecio] = useState<BarrioPrecio[]>([])
   const [cargandoPrecios, setCargandoPrecios] = useState(false)
 
@@ -120,6 +122,7 @@ export function MapaTab() {
   // consulta de propiedades obligaria a traerlo siempre, aunque nadie lo mire.
   useEffect(() => {
     if (!verPrecios || !bbox) {
+      setManzanas([])
       setCeldas([])
       setBarriosPrecio([])
       return
@@ -138,7 +141,9 @@ export function MapaTab() {
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("No se pudo traer el precio por m²"))))
       .then((d) => {
         if (ctrl.signal.aborted) return
+        setManzanas(d.manzanas || [])
         setCeldas(d.celdas || [])
+        setUnidadPrecio(d.unidad === "manzana" ? "manzana" : "cuadricula")
         setBarriosPrecio(d.barrios || [])
       })
       .catch((e) => { if (e.name !== "AbortError") toast.error(e.message) })
@@ -148,7 +153,10 @@ export function MapaTab() {
   }, [verPrecios, bbox, filtros.operacion, filtros.moneda])
 
   // La escala se arma con lo que hay EN PANTALLA: ver cortesDeEscala().
-  const valoresM2 = useMemo(() => celdas.map((c) => c.mediana_m2), [celdas])
+  const valoresM2 = useMemo(
+    () => (manzanas.length > 0 ? manzanas : celdas).map((c) => c.mediana_m2),
+    [manzanas, celdas],
+  )
   const cortesPrecio = useMemo(() => cortesDeEscala(valoresM2), [valoresM2])
   const tramosPrecio = useMemo(
     () => tramosDeReferencia(valoresM2, cortesPrecio, filtros.moneda),
@@ -284,6 +292,7 @@ export function MapaTab() {
             puntos del mapa se veian dibujados ENCIMA de la ficha abierta. */}
         <div className="relative isolate overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
           <MapaLienzo
+            manzanasPrecio={verPrecios ? manzanas : undefined}
             celdasPrecio={verPrecios ? celdas : undefined}
             cortesPrecio={cortesPrecio}
             monedaPrecio={filtros.moneda}
@@ -369,6 +378,7 @@ export function MapaTab() {
               barrios={barriosPrecio}
               tramos={tramosPrecio}
               moneda={filtros.moneda}
+              unidad={unidadPrecio}
               cargando={cargandoPrecios}
             />
           ) : (

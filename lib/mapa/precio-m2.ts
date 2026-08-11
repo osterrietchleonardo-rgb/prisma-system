@@ -8,6 +8,14 @@ export interface CeldaPrecio extends BBox {
   propiedades: number
 }
 
+/** Una manzana real: el contorno viene como pares [lat, lng], listo para Leaflet. */
+export interface ManzanaPrecio {
+  id: number
+  contorno: [number, number][]
+  mediana_m2: number
+  propiedades: number
+}
+
 export interface BarrioPrecio {
   nombre: string
   mediana_m2: number

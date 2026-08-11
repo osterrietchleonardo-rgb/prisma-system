@@ -3,7 +3,7 @@
 // El mapa en si. Este archivo SOLO se puede cargar con dynamic(..., { ssr: false }):
 // Leaflet toca `window` al importarse y tira el build si corre en el servidor.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { MapContainer, TileLayer, Marker, Rectangle, Tooltip, useMap, useMapEvents } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Polygon, Rectangle, Tooltip, useMap, useMapEvents } from "react-leaflet"
 import MarkerClusterGroup from "react-leaflet-cluster"
 import L from "leaflet"
 
@@ -14,7 +14,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css"
 import "leaflet.markercluster/dist/MarkerCluster.Default.css"
 
 import { MapaLapiz, TrazosDibujados, type Trazo } from "./mapa-lapiz"
-import { colorDe, formatearM2, type CeldaPrecio } from "@/lib/mapa/precio-m2"
+import { colorDe, formatearM2, type CeldaPrecio, type ManzanaPrecio } from "@/lib/mapa/precio-m2"
 import type { BBox, FuenteMapa, GrupoUbicacion } from "@/lib/mapa/tipos"
 
 /** Centro por defecto: CABA. Se puede navegar a cualquier lado (hay 3 propiedades en Florida). */
@@ -311,28 +311,44 @@ function ControlVolver() {
  * del mapa; solo el tooltip responde al pasar por encima.
  */
 function CapaDePrecios({
+  manzanas,
   celdas,
   cortes,
   moneda,
 }: {
+  manzanas: ManzanaPrecio[]
   celdas: CeldaPrecio[]
   cortes: number[]
   moneda: string
 }) {
+  const pinta = (valor: number) => ({
+    color: colorDe(valor, cortes),
+    fillColor: colorDe(valor, cortes),
+    weight: 0.6,
+    fillOpacity: 0.45,
+  })
+
   return (
     <>
+      {/* Manzanas de verdad: el contorno lo dan las calles, asi que el color se corta
+          donde se corta el mercado. Las dos veredas de una avenida quedan separadas. */}
+      {manzanas.map((m) => (
+        <Polygon key={`m${m.id}`} positions={m.contorno} pathOptions={pinta(m.mediana_m2)}>
+          <Tooltip direction="top" opacity={1}>
+            <span className="font-semibold">{formatearM2(m.mediana_m2, moneda)}/m2</span>
+            <br />
+            {m.propiedades} {m.propiedades === 1 ? "propiedad" : "propiedades"} en la manzana
+          </Tooltip>
+        </Polygon>
+      ))}
+
       {celdas.map((c) => (
         <Rectangle
           key={`${c.sur},${c.oeste}`}
           bounds={[[c.sur, c.oeste], [c.norte, c.este]]}
-          pathOptions={{
-            color: colorDe(c.mediana_m2, cortes),
-            weight: 0.5,
-            fillOpacity: 0.45,
-            // El borde del mismo color: con borde oscuro, a la distancia la cuadricula se
-            // ve como una reja y tapa el mapa.
-            fillColor: colorDe(c.mediana_m2, cortes),
-          }}
+          // El borde del mismo color: con borde oscuro, a la distancia se ve como una
+          // reja y tapa el mapa.
+          pathOptions={pinta(c.mediana_m2)}
           interactive
         >
           <Tooltip direction="top" opacity={1}>
@@ -354,7 +370,9 @@ export interface MapaLienzoProps {
   onAbrirCumulo: (gs: GrupoUbicacion[]) => void
   /** Que fondo quedo puesto, para poder avisarlo en pantalla. */
   onProveedor: (p: "maptiler" | "osm") => void
-  /** Cuadriculas del mapa de calor de $/m2. Vacio = capa apagada. */
+  /** Manzanas reales del mapa de calor. Tienen prioridad sobre la cuadricula. */
+  manzanasPrecio?: ManzanaPrecio[]
+  /** Cuadriculas: el respaldo donde todavia no se cargaron las manzanas. */
   celdasPrecio?: CeldaPrecio[]
   cortesPrecio?: number[]
   monedaPrecio?: string
@@ -373,6 +391,7 @@ export default function MapaLienzo({
   onAbrirGrupo,
   onAbrirCumulo,
   onProveedor,
+  manzanasPrecio,
   celdasPrecio,
   cortesPrecio = [],
   monedaPrecio = "USD",
@@ -449,8 +468,13 @@ export default function MapaLienzo({
       <FondoDelMapa onProveedor={onProveedor} />
 
       {/* Antes de los marcadores: queda por debajo y no les roba el click. */}
-      {celdasPrecio && celdasPrecio.length > 0 && (
-        <CapaDePrecios celdas={celdasPrecio} cortes={cortesPrecio} moneda={monedaPrecio} />
+      {((manzanasPrecio?.length ?? 0) > 0 || (celdasPrecio?.length ?? 0) > 0) && (
+        <CapaDePrecios
+          manzanas={manzanasPrecio ?? []}
+          celdas={celdasPrecio ?? []}
+          cortes={cortesPrecio}
+          moneda={monedaPrecio}
+        />
       )}
 
       <Vigia onMover={onMover} />

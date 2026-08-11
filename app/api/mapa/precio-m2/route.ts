@@ -9,6 +9,7 @@ import { parsearBBox } from "@/lib/mapa/bbox"
 
 export const dynamic = "force-dynamic"
 
+const TOPE_MANZANAS = 1500
 const TOPE_CELDAS = 3000
 const TOPE_BARRIOS = 40
 
@@ -37,11 +38,13 @@ export async function GET(req: Request) {
     }
 
     const admin = createAdminClient()
-    const [resCeldas, resBarrios] = await Promise.all([
+    const [resManzanas, resCeldas, resBarrios] = await Promise.all([
+      admin.rpc("mapa_precio_m2_por_manzana", { ...comunes, p_limit: TOPE_MANZANAS }),
       admin.rpc("mapa_precio_m2", { ...comunes, p_limit: TOPE_CELDAS }),
       admin.rpc("mapa_ranking_barrios", { ...comunes, p_limit: TOPE_BARRIOS }),
     ])
 
+    if (resManzanas.error) throw resManzanas.error
     if (resCeldas.error) throw resCeldas.error
     if (resBarrios.error) throw resBarrios.error
 
@@ -58,7 +61,29 @@ export async function GET(req: Request) {
       propiedades: b.propiedades,
     }))
 
-    return NextResponse.json({ celdas, barrios, operacion, moneda })
+    const manzanas = (resManzanas.data || [])
+      .filter((m: any) => Array.isArray(m.contorno) && m.contorno.length >= 4)
+      .map((m: any) => ({
+        id: m.id,
+        contorno: m.contorno,
+        mediana_m2: Number(m.mediana_m2),
+        propiedades: m.propiedades,
+      }))
+
+    // Las manzanas reales GANAN. No se mezclan con la cuadricula: una celda cuadrada
+    // encima de las manzanas volveria a pintar de un color las dos veredas de una
+    // avenida, que es justo el error que las manzanas vienen a corregir. Donde todavia
+    // no hay manzanas cargadas se sigue mostrando la cuadricula, que es mejor que nada.
+    const hayManzanas = manzanas.length > 0
+
+    return NextResponse.json({
+      manzanas,
+      celdas: hayManzanas ? [] : celdas,
+      unidad: hayManzanas ? "manzana" : "cuadricula",
+      barrios,
+      operacion,
+      moneda,
+    })
   } catch (e: any) {
     console.error("Mapa precio m2 error:", e)
     return NextResponse.json(
