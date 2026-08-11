@@ -35,7 +35,13 @@ export const MAX_DESC_IA = 700
 export function extraerDescripcion(crudo: string): string {
   if (!crudo) return ""
   try {
-    const parseado = JSON.parse(crudo)
+    // Gemini a veces envuelve el JSON en un cerco de markdown (```json ... ```)
+    // aunque se pida responseMimeType: "application/json" — es una rareza conocida
+    // del modelo. Esto es desenvolver un contenedor (estructural), no adivinar
+    // contenido: si después de sacar el cerco sigue sin ser JSON válido, se
+    // devuelve "" igual que siempre. No es el rescate baneado.
+    const sinCerco = crudo.trim().replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/, "")
+    const parseado = JSON.parse(sinCerco)
     return typeof parseado?.descripcion === "string" ? parseado.descripcion : ""
   } catch {
     return ""

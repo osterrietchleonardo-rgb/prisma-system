@@ -37,6 +37,24 @@ describe("extraerDescripcion", () => {
     const crudo = JSON.stringify({ analisis: "Se observan pisos de madera y buena luz.", descripcion: "" })
     expect(extraerDescripcion(crudo)).toBe("")
   })
+
+  it("saca el cerco de markdown ```json ... ``` antes de parsear (rareza conocida de Gemini)", () => {
+    const json = JSON.stringify({ analisis: "se observan pisos de madera", descripcion: "Depto luminoso, dos ambientes." })
+    const crudo = "```json\n" + json + "\n```"
+    expect(extraerDescripcion(crudo)).toBe("Depto luminoso, dos ambientes.")
+  })
+
+  it("saca el cerco de markdown sin el identificador de lenguaje (``` a secas)", () => {
+    const json = JSON.stringify({ analisis: "x", descripcion: "Casa amplia con jardín." })
+    const crudo = "```\n" + json + "\n```"
+    expect(extraerDescripcion(crudo)).toBe("Casa amplia con jardín.")
+  })
+
+  it("con cerco pero JSON igual roto adentro, sigue sin rescatar nada", () => {
+    // El contrato de no-rescate se mantiene: sacar el cerco es estructural,
+    // pero si lo de adentro no es JSON válido, la salida sigue siendo "".
+    expect(extraerDescripcion("```json\n{esto no es json\n```")).toBe("")
+  })
 })
 
 describe("sanearDescripcionIA", () => {
