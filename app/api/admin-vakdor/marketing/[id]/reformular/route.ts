@@ -12,7 +12,14 @@ export const dynamic = "force-dynamic"
 
 /** Revisa contra rúbrica y reescribe UNA sola vez si no aprueba. */
 async function revisarYCorregir(texto: string, etapa: EtapaEmbudo, systemBase: string): Promise<string> {
-  const previas = await textosRecientes(15)
+  let previas: Awaited<ReturnType<typeof textosRecientes>> = []
+  try {
+    previas = await textosRecientes(15)
+  } catch (e) {
+    // Falla suave: sin memoria no se puede chequear repetición de apertura,
+    // pero el resto de la revisión sigue en pie.
+    console.error(`revisarYCorregir(textosRecientes): ${(e as Error).message}`)
+  }
   const hooks = previas.map((p) => p.hook).filter(Boolean)
   const hookNuevo = texto.split("\n").map((l) => l.trim()).find((l) => l) ?? ""
 
@@ -22,11 +29,14 @@ async function revisarYCorregir(texto: string, etapa: EtapaEmbudo, systemBase: s
   const muletillas = detectarMuletillas(texto)
   if (muletillas.length) fallos.push(`7: muletillas de IA detectadas: ${muletillas.join(", ")}`)
 
-  const veredicto = await generarTexto(systemBase, promptRevision(texto, etapa, hooks), { maxTokens: 1000, effort: "low" })
   try {
+    const veredicto = await generarTexto(systemBase, promptRevision(texto, etapa, hooks), { maxTokens: 1000, effort: "low" })
     const parsed = JSON.parse(veredicto.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as { aprobado?: boolean; fallos?: string[] }
     if (parsed.aprobado === false) fallos.push(...(parsed.fallos ?? []))
-  } catch { /* falla suave: si el veredicto no parsea, se queda con los chequeos locales */ }
+  } catch (e) {
+    // Falla suave: si el juez no responde o el veredicto no parsea, se queda con los chequeos locales.
+    console.error(`revisarYCorregir(veredicto): ${(e as Error).message}`)
+  }
 
   if (fallos.length === 0) return texto
 

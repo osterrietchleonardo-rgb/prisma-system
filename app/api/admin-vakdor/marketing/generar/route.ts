@@ -4,7 +4,8 @@ import { getAdminDb } from "@/lib/admin-vakdor/logger"
 import { resumenParaMemoria, insertarIdeasMotor } from "@/lib/admin-vakdor/marketing/store"
 import { generarTexto } from "@/lib/admin-vakdor/marketing/claude"
 import { BRAND_SYSTEM } from "@/lib/admin-vakdor/marketing/brand-prompt"
-import { canonDeVoz, traerRecursos } from "@/lib/admin-vakdor/marketing/recursos"
+import { canonDeVoz, traerRecursos, type Recurso } from "@/lib/admin-vakdor/marketing/recursos"
+import { CLAVES_ESTRUCTURA, type ClaveEstructura } from "@/lib/admin-vakdor/marketing/voz"
 import type { NuevaIdeaInput, FuenteIdea, FormatoIdea, FunnelStage } from "@/lib/admin-vakdor/marketing/types"
 
 export const dynamic = "force-dynamic"
@@ -28,15 +29,24 @@ export async function POST(request: NextRequest) {
     insights = typeof data?.resumen === "string" ? data.resumen : ""
   } catch { /* falla suave */ }
 
-  const canon = await canonDeVoz()
-  const estructuras = await traerRecursos("estructura")
-  const escenas = await traerRecursos("escena")
+  let canon = ""
+  let estructuras: Recurso[] = []
+  let escenas: Recurso[] = []
+  try {
+    canon = await canonDeVoz()
+    estructuras = await traerRecursos("estructura")
+    escenas = await traerRecursos("escena")
+  } catch (e) {
+    // Falla suave, igual que los insights: sin banco se generan ideas igual,
+    // solo que sin la voz ni las escenas. Peor contenido, no una ruta caida.
+    console.error(`generar(recursos): ${(e as Error).message}`)
+  }
 
   const user = [
     `Generá 5 ideas de contenido para Vakdor (mezcla LinkedIn y blog).`,
-    `CANON DE VOZ (toda idea tiene que poder escribirse con esta voz):\n${canon}`,
-    `ESTRUCTURAS NARRATIVAS DISPONIBLES (asigná una distinta a cada idea):\n${estructuras.map((e) => `- ${e.clave}: ${e.titulo}`).join("\n")}`,
-    `ESCENAS DEL RUBRO (el gancho de cada idea tiene que apoyarse en una de éstas, no en una generalidad):\n${escenas.slice(0, 30).map((e) => `- ${e.titulo}: ${e.detalle}`).join("\n")}`,
+    canon ? `CANON DE VOZ (toda idea tiene que poder escribirse con esta voz):\n${canon}` : "",
+    estructuras.length ? `ESTRUCTURAS NARRATIVAS DISPONIBLES (asigná una distinta a cada idea):\n${estructuras.map((e) => `- ${e.clave}: ${e.titulo}`).join("\n")}` : "",
+    escenas.length ? `ESCENAS DEL RUBRO (el gancho de cada idea tiene que apoyarse en una de éstas, no en una generalidad):\n${escenas.slice(0, 30).map((e) => `- ${e.titulo}: ${e.detalle}`).join("\n")}` : "",
     insights ? `DATOS REALES DE RENDIMIENTO (Buffer) — priorizá los patrones que más rinden y evitá los que menos; no inventes:\n${insights}` : "",
     `Balanceá el EMBUDO: asigná a cada idea una etapa "funnel": "tofu" (descubrimiento, dolor amplio, sin vender), "mofu" (nutrición, el mecanismo/método PRISMA), "bofu" (empujón a ver la demostración). Mezclá las 3 etapas.`,
     `NO repitas estos ángulos/títulos ya usados:\n${evitar}`,
@@ -70,7 +80,9 @@ export async function POST(request: NextRequest) {
     ideas.push({
       titulo, fuente, formato,
       funnel: FUNNELS.includes(funnel) ? funnel : null,
-      estructura: typeof it.estructura === "string" ? it.estructura : null,
+      estructura: CLAVES_ESTRUCTURA.includes(it.estructura as ClaveEstructura)
+        ? (it.estructura as string)
+        : null,
       angulo: typeof it.angulo === "string" ? it.angulo : null,
       gancho: typeof it.gancho === "string" ? it.gancho : null,
       motivo: typeof it.motivo === "string" ? it.motivo : null,
