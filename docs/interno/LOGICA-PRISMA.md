@@ -2390,6 +2390,16 @@ de OpenStreetMap: la manzana es el polígono que encierran las calles. Donde tod
 manzanas cargadas se muestra una cuadrícula aproximada, y la pantalla aclara cuál de las
 dos se está viendo.
 
+El precio de una manzana se calcula con **todo lo que hay en ella**: propiedades de la red,
+de la cartera propia, o mezcladas. Se descartan las repetidas —una misma propiedad puede
+estar publicada por la agencia y en la red a la vez, y contarla dos veces la haría pesar el
+doble—, detectadas por precio y superficie idénticos a menos de 60 m.
+
+Una manzana queda **sin precio** en dos casos, los dos correctos: si sus propiedades no
+traen superficie cargada (sin metros no hay precio por metro), o si son de otra operación o
+moneda que la que se está mirando (con el mapa en Venta y dólares, una manzana con solo
+alquileres en pesos no tiene nada que mostrar).
+
 Se usa **mediana** y no promedio: un penthouse corre el promedio de toda la manzana. La
 transparencia indica cuántas propiedades sostienen el dato — el color dice cuánto vale el
 metro, la transparencia dice cuánto creerle.
