@@ -611,6 +611,61 @@ PRISMA es **modular**: tu agencia puede tener algunos módulos **habilitados o d
 
 ---
 
+## 23. El Mapa del Buscador IA
+
+Dentro del Buscador IA, además del chat, tenés una solapa **Mapa**. Sirve para lo que el
+chat no puede: **ver dónde está todo** y mostrárselo al cliente.
+
+### Lo básico
+
+Cada globito es un grupo de propiedades. El número te dice cuántas hay ahí. Tocalo y se
+abre la lista, con foto y precio, para elegir. Si hay muchas, arriba tenés una cajita para
+filtrar por calle, tipo, precio o inmobiliaria.
+
+Los colores te dicen de quién es cada una:
+
+- **Ámbar** — tuyas
+- **Gris** — de la agencia
+- **Azul** — de la red de colaboración
+
+### Buscar un lugar
+
+Arriba de todo hay un buscador. Escribí un barrio, una dirección, o el nombre de una zona
+que hayas guardado. **No te preocupes por los acentos ni por escribir mal**: si ponés
+"cavallito" te va a encontrar Caballito igual.
+
+Cuando elegís un **barrio**, el mapa se acerca y además esconde las propiedades de los
+barrios vecinos. Vas a ver un cartelito azul que dice "Solo Belgrano" — tocá la cruz para
+volver a ver todo.
+
+### Cuánto vale el metro
+
+El botón con el **signo $** pinta el mapa de colores: verde donde el metro es más barato y
+rojo donde es más caro, manzana por manzana. Al costado te aparece el ranking de barrios,
+del más caro al más barato.
+
+Dos cosas para leerlo bien:
+
+- Los colores **se recalculan según lo que estés mirando**. El mismo verde no significa lo
+  mismo en toda la ciudad que dentro de un barrio. Por eso al lado de cada color están los
+  números.
+- Las manzanas **más transparentes** tienen una o dos propiedades publicadas nada más. El
+  dato existe, pero es flojo: no lo uses para cerrar un precio.
+
+### Dibujar tu propia zona
+
+El **lápiz** te deja dibujar una zona a mano alzada, sin soltar. Podés hacer varios trazos
+y se suman. Después la guardás con nombre y la volvés a usar cuando quieras.
+
+**Tus zonas son tuyas**: nadie más las ve, ni el director.
+
+### Cosas que te van a pasar
+
+- **"+1000 propiedades a la vista"**: ese "+" significa que hay más de las que entran en
+  pantalla. Acercate un poco y vas a verlas todas.
+- **"Consultar" en vez de un precio**: la propiedad existe, pero quien la cargó puso un
+  precio que no es real (a veces ponen 1 dólar). Preferimos no mostrarte un número falso.
+
 ## FIN DE LA GUÍA
 
 Esta guía refleja el sistema PRISMA tal como funciona hoy. Si tu pantalla se ve distinta a lo descripto, puede que tu agencia tenga una función deshabilitada o que haya una actualización: consultá con tu director.
