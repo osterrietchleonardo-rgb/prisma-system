@@ -800,10 +800,25 @@ export async function traerRecursos(tipo: TipoRecurso): Promise<Recurso[]> {
 export async function marcarUsados(ids: string[]): Promise<void> {
   if (ids.length === 0) return
   const db = getAdminDb()
-  const { data } = await db.from("marketing_recursos").select("id, usos").in("id", ids)
+  const { data, error } = await db.from("marketing_recursos").select("id, usos").in("id", ids)
+  if (error) {
+    // No tiramos: una pieza ya escrita no debe morir porque no se pudo actualizar un contador.
+    // Pero tiene que verse: si esto falla en silencio, la rotacion deja de avanzar y el
+    // generador vuelve a repetir estructuras y escenas sin dejar rastro.
+    console.error(`marcarUsados(leer): ${error.message}`)
+    return
+  }
   const ahora = new Date().toISOString()
+  const fallidos: string[] = []
   for (const fila of (data ?? []) as { id: string; usos: number }[]) {
-    await db.from("marketing_recursos").update({ usos: fila.usos + 1, ultimo_uso: ahora }).eq("id", fila.id)
+    const { error: errUpdate } = await db
+      .from("marketing_recursos")
+      .update({ usos: fila.usos + 1, ultimo_uso: ahora })
+      .eq("id", fila.id)
+    if (errUpdate) fallidos.push(fila.id)
+  }
+  if (fallidos.length > 0) {
+    console.error(`marcarUsados(escribir): fallaron ${fallidos.length}/${(data ?? []).length} recursos: ${fallidos.join(", ")}`)
   }
 }
 
@@ -1624,10 +1639,25 @@ export async function traerRecursos(db, tipo) {
 
 export async function marcarUsados(db, ids) {
   if (!ids.length) return;
-  const { data } = await db.from("marketing_recursos").select("id, usos").in("id", ids);
+  const { data, error } = await db.from("marketing_recursos").select("id, usos").in("id", ids);
+  if (error) {
+    // No tiramos: una pieza ya escrita no debe morir porque no se pudo actualizar un contador.
+    // Pero tiene que verse: si falla en silencio, la rotacion deja de avanzar y el generador
+    // vuelve a repetir estructuras y escenas sin dejar rastro.
+    console.error(`marcarUsados(leer): ${error.message}`);
+    return;
+  }
   const ahora = new Date().toISOString();
+  const fallidos = [];
   for (const fila of data ?? []) {
-    await db.from("marketing_recursos").update({ usos: fila.usos + 1, ultimo_uso: ahora }).eq("id", fila.id);
+    const { error: errUpdate } = await db
+      .from("marketing_recursos")
+      .update({ usos: fila.usos + 1, ultimo_uso: ahora })
+      .eq("id", fila.id);
+    if (errUpdate) fallidos.push(fila.id);
+  }
+  if (fallidos.length > 0) {
+    console.error(`marcarUsados(escribir): fallaron ${fallidos.length}/${(data ?? []).length} recursos: ${fallidos.join(", ")}`);
   }
 }
 
