@@ -163,6 +163,10 @@ export default async function FichaAcmPage({ params }: { params: { token: string
               <span className="muted">{comparables.length} {comparables.length === 1 ? "comparable analizado" : "comparables analizados"}</span>
             </div>
           </div>
+
+          {subject.descripcion && (
+            <p className="cover-desc">{subject.descripcion}</p>
+          )}
         </div>
 
         <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
@@ -487,6 +491,14 @@ const CSS = `
 .cover-meta-block { display: flex; flex-direction: column; gap: 3px; }
 .cover-meta-block .label { font-size: 11px; text-transform: uppercase; letter-spacing: .2em; color: #8a8a8a; }
 .cover-meta-block strong { font-size: 18px; }
+/* Descripción del sujeto en la portada. Mismo criterio que .comp-desc: la hoja es un A4
+   EXACTO, así que además del tope de 700 caracteres al guardar va un clamp duro. Aunque
+   alguien pegue a mano un texto larguísimo, la portada no puede desbordar. */
+.cover-desc {
+  margin-top: 26px; font-size: 12.5px; line-height: 1.65; color: #5c5c5c; max-width: 88%;
+  max-height: 165px; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical;
+}
 
 /* Banner de pulso / consolidado (informativo, no llamativo) */
 .pulso { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 10px var(--pad); gap: 16px; }

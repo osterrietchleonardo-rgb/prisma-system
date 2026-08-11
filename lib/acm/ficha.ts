@@ -96,7 +96,11 @@ export interface FichaBrand {
   legal_notice: string; // aviso legal ("" si no está configurado → no se muestra)
 }
 export interface AcmFichaSnapshot {
-  subject: { direccion: string; barrio: string; tipo: string; m2: number | null; dormitorios: number | null; banos: number | null };
+  subject: {
+    direccion: string; barrio: string; tipo: string; m2: number | null; dormitorios: number | null; banos: number | null;
+    /** Descripción de la IA editada por el asesor. Solo viaja si la tildó para la ficha. */
+    descripcion?: string | null;
+  };
   operacion: string;
   comparables: FichaComparable[];
   comparison: FichaComparison;

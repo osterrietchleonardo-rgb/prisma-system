@@ -17,6 +17,7 @@ import {
   type FichaComparable,
   type MercadoBarrioLite,
 } from "@/lib/acm/ficha";
+import { recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -211,6 +212,11 @@ export async function POST(req: Request) {
         m2: sujeto.m2_cubiertos ? Number(sujeto.m2_cubiertos) : null,
         dormitorios: sujeto.dormitorios ?? null,
         banos: sujeto.banos ?? null,
+        // Solo va si el asesor tildó la casilla. El tope de 700 ya se aplicó al generarla,
+        // pero se re-aplica acá porque el texto pudo editarse a mano.
+        descripcion: sujeto.incluir_desc_ficha && sujeto.descripcion_ia
+          ? recortarAPalabra(String(sujeto.descripcion_ia).trim(), MAX_DESC_IA)
+          : null,
       },
       operacion,
       comparables,
