@@ -2285,6 +2285,51 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 
 ---
 
+## 28. Buscador IA · solapa Mapa
+
+El Buscador IA tiene dos solapas independientes: **Chat** (el consultor de siempre) y
+**Mapa**. No comparten estado: si el mapa fallara, el chat sigue funcionando igual.
+
+### Qué muestra
+
+Los pines salen de dos fuentes que se consultan en paralelo y se unen:
+
+- **Cartera propia** (`properties`), filtrada por agencia. Se separa en "Mías" y "Agencia"
+  según quién tenga asignada la propiedad.
+- **Red de colaboración** (`roomix_properties`), compartida. En pantalla SIEMPRE se la
+  llama "Colaboración", nunca por el nombre de la red.
+
+Tope de 1.000 puntos por respuesta contando las dos juntas. La cartera propia se arma
+primero, así nunca queda afuera por el tope. Cuando se llena el cupo se sigue dibujando la
+muestra y el contador lo dice con un "+": el mapa no puede afirmar que hay 1.000 cuando
+puede haber 40.000.
+
+### Buscador de lugares
+
+Una cajita arriba del mapa sugiere mientras se tipea, tolerante a acentos y a errores de
+tipeo ("cavallito" encuentra Caballito, "nunez" encuentra Núñez). Cuatro fuentes, en orden
+de prioridad: zonas guardadas propias, barrios de la cartera, barrios de la red, y
+direcciones. Elegir un **barrio** vuela al barrio Y filtra por él; elegir una **dirección**
+solo vuela, porque un domicilio es un punto y filtrar dejaría la pantalla vacía si ahí no
+hay nada publicado.
+
+### Precio por m² (mapa de calor)
+
+Se pinta el precio mediano por metro sobre cada **manzana real**, de verde (barato) a rojo
+(caro), con el ranking de barrios al costado. Las manzanas se derivan del grafo de calles
+de OpenStreetMap: la manzana es el polígono que encierran las calles. Donde todavía no hay
+manzanas cargadas se muestra una cuadrícula aproximada, y la pantalla aclara cuál de las
+dos se está viendo.
+
+Se usa **mediana** y no promedio: un penthouse corre el promedio de toda la manzana. La
+transparencia indica cuántas propiedades sostienen el dato — el color dice cuánto vale el
+metro, la transparencia dice cuánto creerle.
+
+### Zonas a mano alzada
+
+El lápiz recorta en el navegador, sin consultas nuevas. Las zonas guardadas son
+**privadas**: cada usuario ve solo las suyas, ni el director ve las de un asesor.
+
 ## FIN DEL DOCUMENTO
 
 Este documento cubre la lógica completa del sistema PRISMA al nivel de código fuente. Cada endpoint, cada flujo de datos, cada integración y cada mecanismo de seguridad han sido documentados basándose en el análisis directo del código, sin alteración ni ejecución del mismo.
