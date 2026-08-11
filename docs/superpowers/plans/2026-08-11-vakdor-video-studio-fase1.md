@@ -275,7 +275,9 @@ export function probarEncoder(nombre) {
 export async function elegirEncoder({ forzar, calidad = "rapido" } = {}) {
   if (forzar) {
     const e = ENCODERS.find((x) => x.nombre === forzar);
-    if (!e) throw new Error(`El encoder "${forzar}" no esta en la lista conocida.`);
+    // "no esta disponible" (nombre desconocido) vs "no funciona" (conocido pero falla al correr).
+    // Los dos textos tienen que matchear el regex de la prueba: /no funciona|no esta disponible/i
+    if (!e) throw new Error(`El encoder "${forzar}" no esta disponible.`);
     if (!(await probarEncoder(forzar)))
       throw new Error(`El encoder "${forzar}" no funciona en esta maquina.`);
     return { nombre: e.nombre, esGpu: e.esGpu, args: e.args(calidad) };
