@@ -1266,7 +1266,23 @@ Agregar el import arriba del archivo:
 import { canonDeVoz, traerRecursos } from "@/lib/admin-vakdor/marketing/recursos"
 ```
 
-- [ ] **Step 2: Verificar que compila**
+- [ ] **Step 2: Persistir la estructura elegida**
+
+El prompt nuevo pide un campo `"estructura"` por idea, pero el loop que arma
+`NuevaIdeaInput` no lo lee, asi que se descarta en silencio. El resto de la
+cadena ya existe: `NuevaIdeaInput.estructura` esta en `types.ts` y
+`insertarIdeasMotor` ya escribe la columna. Falta el eslabon del parseo.
+
+En el loop que arma cada idea, agregar junto a `angulo`/`gancho`/`motivo`:
+
+```ts
+      estructura: typeof it.estructura === "string" ? it.estructura : null,
+```
+
+Sin esto, la estructura narrativa elegida al generar la idea nunca llega a la
+fila, y el worker no tiene que leer: la rotacion se corta en el primer salto.
+
+Verificar:
 
 ```bash
 npx tsc --noEmit
