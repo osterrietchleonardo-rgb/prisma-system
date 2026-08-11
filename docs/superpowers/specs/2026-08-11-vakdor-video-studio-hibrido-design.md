@@ -164,9 +164,17 @@ Valores admitidos, para que no haya interpretación libre:
 ### Anclaje por palabra
 
 Un efecto se puede ubicar de dos formas: `"t": 12.4` (segundo exacto) o `"palabra": "trazabilidad"`
-(el frame exacto donde se pronuncia). Groq devuelve el tiempo de cada palabra, así que el anclaje es
-real, no aproximado. Si la palabra se repite, `"ocurrencia": 2` elige cuál. Si se regraba el video y
-la palabra cae en otro momento, el efecto se re-ancla solo.
+(el frame exacto donde se pronuncia). Si la palabra se repite, `"ocurrencia": 2` elige cuál. Si se
+regraba el video y la palabra cae en otro momento, el efecto se re-ancla solo.
+
+**Verificado contra la API de Groq el 11-ago-2026, con voz real de Leonardo:** pidiendo
+`timestamp_granularities[]=word` la respuesta trae cada palabra con su `start` y `end` propios (87
+palabras en 25 segundos de audio). El anclaje es real, no interpolado.
+
+**Gotcha que hay que corregir al portar:** el `transcribe-groq.mjs` de hoy **no** pide esa
+granularidad — reparte los tiempos dividiendo el texto de cada segmento, así que sus tiempos por
+palabra son estimados. Además, si se pide *solo* `word`, el campo `segments` vuelve `null` y se
+pierden las líneas del SRT: hay que pedir `word` **y** `segment` juntas.
 
 ### Validación y errores
 
@@ -186,7 +194,7 @@ la palabra cae en otro momento, el efecto se re-ancla solo.
 
 | Efecto | Técnica |
 |---|---|
-| Zoom lento in/out | `crop` animado por expresión de tiempo + `scale` de vuelta al tamaño de salida. Se usa crop y no `zoompan` porque `zoompan` produce jitter visible en 1080p |
+| Zoom lento in/out | `zoompan` con **sobre-muestreo 3×** (`scale=5760:3240` antes). Ver la medición en §12 |
 | Jump cut de escala | Crop fijo a 1.15×/1.25× durante ese tramo. Cambia el plano sin mover la cámara |
 | Whip pan | 6–8 frames de desplazamiento acelerado + `gblur` direccional que sube y baja |
 | Push | Escala 1.0 → 1.06 con easing en 8 frames |
@@ -283,9 +291,50 @@ memoria.
 |---|---|
 | Híbrido en vez de todo Remotion | Todo Remotion tarda ~1 hora en un VSL de 19 min |
 | Híbrido en vez de todo ffmpeg | ffmpeg solo hace rectángulos y texto plano: no da el nivel de diseño pedido |
-| `crop` animado en vez de `zoompan` | `zoompan` tiene jitter conocido en 1080p |
+| `zoompan` con sobre-muestreo 3× en vez de `crop` animado | Medido, no supuesto: ver §12 |
 | Efectos con alfa por tramo en vez de una capa continua | Una capa ProRes 4444 de 19 min ocuparía más de 100 GB |
 | Receta editable en vez de automático puro | Permite corregir un efecto suelto sin volver a correr todo, y hace el resultado repetible |
 | Karaoke ASS para videos largos | Da el efecto kinético a velocidad de GPU |
 | No se toca `PropertyReel` / `EditedReel` / helpers Python | Funcionan hoy; el Studio se suma al costado |
 | Sin croma / sin segmentación por IA | Leonardo graba con fondo real y Remotion no separa figura de fondo |
+
+---
+
+## 12. Medición del zoom lento (11-ago-2026)
+
+El zoom lento es el efecto más usado, así que se midió en vez de suponer. Fuente: imagen fija de
+1920×1080 con mucho detalle, zoom del 2% en 3 s (misma velocidad por frame que un zoom del 8% en
+45 s, el caso real). Métrica: diferencia entre frames consecutivos. Si el zoom es parejo la
+diferencia varía suave; si escalona, hay frames idénticos al anterior seguidos de saltos.
+
+| Técnica | Coef. de variación | Frames sin cambio |
+|---|---|---|
+| `crop` con expresión de tiempo | **no funciona** — ffmpeg no evalúa `t` en el ancho/alto de `crop` | — |
+| `scale eval=frame` (paso de 2 px) + crop | 1,96 | 48 de 89 |
+| `scale eval=frame` (paso de 1 px) + crop | 2,02 | 35 de 89 |
+| `zoompan` con sobre-muestreo 2× | 0,55 | 10 de 89 |
+| **`zoompan` con sobre-muestreo 3×** | **0,32** | **0 de 89** |
+| `zoompan` con sobre-muestreo 4× | 0,25 | 0 de 89 |
+
+**Conclusión:** 3× es el punto justo. 4× solo mejora 0,07 y cuesta 36% más de tiempo.
+
+### Costo real medido (clip de 20 s, encode con `h264_amf`)
+
+| Sobre-muestreo | Velocidad | Un video de 19 min tardaría |
+|---|---|---|
+| 2× | 1,96× tiempo real | ~10 min |
+| 3× | 0,76× tiempo real | ~25 min |
+
+**Consecuencia de diseño (obligatoria):** el sobre-muestreo se aplica **solo a los tramos que
+tienen zoom**, nunca a la línea de tiempo completa. Con un 30% del video con zoom, el costo baja a
+unos 8 minutos. Además el multiplicador es un parámetro: default 3×, y baja a 2× automáticamente
+cuando el total de tramos con zoom supera los 6 minutos.
+
+Esto **corrige la estimación de la §8**: los 4–6 minutos valen para un video sin zoom o con zoom en
+tramos cortos. Con zoom extendido hay que contar el costo de esta tabla.
+
+### Descartado por no estar disponible
+
+`scale_vulkan` habría permitido hacer el sobre-muestreo en la GPU. Se probó en esta máquina y el
+dispositivo Vulkan no inicializa (`Error parsing global options`). `scale_cuda` y `scale_qsv`
+existen en el build pero requieren GPU NVIDIA/Intel. Queda como mejora si cambia el hardware.
