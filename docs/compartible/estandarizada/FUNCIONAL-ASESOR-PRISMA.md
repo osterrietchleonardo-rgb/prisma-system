@@ -651,6 +651,10 @@ Dos cosas para leerlo bien:
   números.
 - Las manzanas **más transparentes** tienen una o dos propiedades publicadas nada más. El
   dato existe, pero es flojo: no lo uses para cerrar un precio.
+- Si una manzana tiene propiedades pero **no te sale el cartelito con el precio**, es por
+  una de dos razones: esas propiedades no tienen la superficie cargada (sin metros no se
+  puede calcular el precio por metro), o son de otra operación o moneda que la que estás
+  mirando. Probá cambiando arriba entre Venta y Alquiler, o entre dólares y pesos.
 
 ### Dibujar tu propia zona
 
