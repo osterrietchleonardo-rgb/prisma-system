@@ -1,0 +1,47 @@
+name: PRISMA Mapa · trazar manzanas nuevas
+
+# Traza las manzanas que le faltan al mapa, guiado por donde estan las propiedades de la
+# base. Nadie tiene que pedir una zona: si la red publica en un lugar nuevo, esa baldosa
+# aparece sola en la lista y se traza esa misma noche.
+#
+# POR QUE UNA ACCION DE GITHUB Y NO EL CRON DE LA APP
+# Esto sale a internet a bajar calles de OpenStreetMap y despues hace geometria pesada en
+# la base. Son decenas de minutos por tanda: no entra en el tiempo de una funcion de
+# Vercel. El recalculo de precios —que si es rapido— vive aparte en mapa-refrescar.yml.
+#
+# POR QUE DE A TANDAS
+# Overpass es comunitario y gratuito, y contesta 429 si se lo golpea seguido. Medido el
+# 2026-08-11 habia 2.071 baldosas pendientes; de a 80 por noche el mapa se completa solo
+# en unas semanas, empezando por donde hay mas propiedades esperando.
+
+on:
+  schedule:
+    # 03:30 UTC (00:30 en Argentina): antes del recalculo de precios de las 08:00 UTC, asi
+    # las manzanas trazadas esta noche ya tienen precio a la manana.
+    - cron: '30 3 * * *'
+  workflow_dispatch:
+    inputs:
+      cuantas:
+        description: 'Cuantas baldosas trazar en esta corrida'
+        required: false
+        default: '80'
+
+jobs:
+  trazar:
+    runs-on: ubuntu-latest
+    # Una tanda de 80 baldosas ronda los 40 minutos con las pausas y los reintentos.
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Armar el .env que lee el script
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" > .env
+          echo "SUPABASE_API_KEY_MANAGEMENT=${{ secrets.SUPABASE_API_KEY_MANAGEMENT }}" >> .env
+
+      - name: Trazar las manzanas pendientes
+        run: node scripts/cargar-manzanas-pendientes.mjs ${{ github.event.inputs.cuantas || 80 }}

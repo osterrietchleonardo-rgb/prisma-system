@@ -53,7 +53,8 @@ export function MapaPanelPrecios({
           ))}
           <p className="pt-1 text-[9px] leading-tight text-zinc-400">
             La escala compara contra lo que se ve en pantalla: al acercarte, los colores se
-            recalculan.
+            recalculan. Las zonas mas transparentes tienen una o dos propiedades: el dato
+            existe, pero es flojo.
           </p>
         </div>
       )}

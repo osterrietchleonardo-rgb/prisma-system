@@ -321,11 +321,15 @@ function CapaDePrecios({
   cortes: number[]
   moneda: string
 }) {
-  const pinta = (valor: number) => ({
+  // Una manzana sostenida por UNA propiedad se pinta mas transparente que una con veinte.
+  // El color dice cuanto vale el metro; la transparencia dice cuanto hay que creerle.
+  // Sin esto, un aviso suelto y caro se ve igual de rotundo que una manzana con muestra
+  // de verdad, y el asesor no tiene como distinguirlos de un vistazo.
+  const pinta = (valor: number, propiedades: number) => ({
     color: colorDe(valor, cortes),
     fillColor: colorDe(valor, cortes),
     weight: 0.6,
-    fillOpacity: 0.45,
+    fillOpacity: propiedades >= 3 ? 0.45 : propiedades === 2 ? 0.3 : 0.2,
   })
 
   return (
@@ -333,7 +337,7 @@ function CapaDePrecios({
       {/* Manzanas de verdad: el contorno lo dan las calles, asi que el color se corta
           donde se corta el mercado. Las dos veredas de una avenida quedan separadas. */}
       {manzanas.map((m) => (
-        <Polygon key={`m${m.id}`} positions={m.contorno} pathOptions={pinta(m.mediana_m2)}>
+        <Polygon key={`m${m.id}`} positions={m.contorno} pathOptions={pinta(m.mediana_m2, m.propiedades)}>
           <Tooltip direction="top" opacity={1}>
             <span className="font-semibold">{formatearM2(m.mediana_m2, moneda)}/m2</span>
             <br />
@@ -348,7 +352,7 @@ function CapaDePrecios({
           bounds={[[c.sur, c.oeste], [c.norte, c.este]]}
           // El borde del mismo color: con borde oscuro, a la distancia se ve como una
           // reja y tapa el mapa.
-          pathOptions={pinta(c.mediana_m2)}
+          pathOptions={pinta(c.mediana_m2, c.propiedades)}
           interactive
         >
           <Tooltip direction="top" opacity={1}>
