@@ -231,7 +231,7 @@ interface Vista {
  * lejos como para que uno pueda perderse. Si no, la pila se llenaria de micro-pasos y
  * el boton no serviria para nada.
  */
-function ControlVolver() {
+function ControlVolver({ panelesAbiertos }: { panelesAbiertos: boolean }) {
   const mapa = useMap()
   const pila = useRef<Vista[]>([])
   const antes = useRef<Vista | null>(null)
@@ -291,7 +291,11 @@ function ControlVolver() {
       // Debajo del +/- de Leaflet, que ocupa la esquina de arriba a la izquierda: antes
       // se le montaba encima y tapaba el boton de alejar.
       // z-800: por encima de las capas de Leaflet, que llegan hasta 700 (los globos).
-      className="absolute bottom-12 left-3 z-[800] flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-lg transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+      className={`absolute bottom-12 left-3 z-[800] flex items-center gap-1.5 rounded-full bg-white px-3 py-2 text-xs font-medium text-zinc-700 shadow-lg transition-colors hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800 ${
+        // En el celular los paneles suben desde abajo y tapan esta esquina: el boton se
+        // esconde en vez de quedar flotando encima de la lista.
+        panelesAbiertos ? "hidden sm:flex" : ""
+      }`}
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
         <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
@@ -374,6 +378,12 @@ export interface MapaLienzoProps {
   onAbrirCumulo: (gs: GrupoUbicacion[]) => void
   /** Que fondo quedo puesto, para poder avisarlo en pantalla. */
   onProveedor: (p: "maptiler" | "osm") => void
+  /**
+   * Hay algun panel abierto. En el celular los paneles suben desde abajo y tapan la
+   * esquina donde vive "Volver": ahi el boton se esconde en vez de quedar flotando
+   * encima de la lista. En pantalla grande los paneles van a los costados y no molesta.
+   */
+  panelesAbiertos?: boolean
   /** Manzanas reales del mapa de calor. Tienen prioridad sobre la cuadricula. */
   manzanasPrecio?: ManzanaPrecio[]
   /** Cuadriculas: el respaldo donde todavia no se cargaron las manzanas. */
@@ -395,6 +405,7 @@ export default function MapaLienzo({
   onAbrirGrupo,
   onAbrirCumulo,
   onProveedor,
+  panelesAbiertos = false,
   manzanasPrecio,
   celdasPrecio,
   cortesPrecio = [],
@@ -483,7 +494,7 @@ export default function MapaLienzo({
 
       <Vigia onMover={onMover} />
       <Encuadrar a={encuadrarA} />
-      <ControlVolver />
+      <ControlVolver panelesAbiertos={panelesAbiertos} />
 
       <MarkerClusterGroup
         ref={grupoRef}

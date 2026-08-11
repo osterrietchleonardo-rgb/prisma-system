@@ -71,7 +71,9 @@ function BotonPanel({
       }`}
     >
       <Icono className="h-3.5 w-3.5" />
-      {texto}
+      {/* El texto se esconde en pantalla chica: con las tres etiquetas los botones se
+          apilaban en tres filas y tapaban un tercio del mapa. */}
+      <span className="hidden sm:inline">{texto}</span>
       {marca !== undefined && (
         <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white">
           {marca}
@@ -312,8 +314,21 @@ export function MapaTab() {
        `isolate` no es decorativo: Leaflet pone sus capas en z-index 400 a 700, y sin
        aislar competian de igual a igual con el modal de la ficha (z-50). Por eso los
        puntos del mapa se veian dibujados ENCIMA de la ficha abierta. */
-    <div className="relative isolate h-[calc(100vh-11rem)] min-h-[560px] overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+    <div
+      /* `dvh` y no `vh`: en el celular `100vh` NO descuenta la barra de direcciones del
+         navegador, asi que el fondo del mapa quedaba cortado y la pagina scrolleaba sola
+         mientras uno queria mover el mapa. `dvh` es la unidad que si la contempla.
+
+         El minimo de 560 px tambien se saca en el celular: en una pantalla de 640 px de
+         alto obligaba a que el mapa fuera mas grande que el espacio disponible, y eso era
+         justamente lo que generaba el scroll. */
+      className="relative isolate h-[calc(100dvh-9.5rem)] overflow-hidden rounded-xl border border-zinc-200 sm:h-[calc(100vh-11rem)] sm:min-h-[560px] dark:border-zinc-800"
+      /* Con el lapiz activo el navegador no se queda con el gesto del dedo: sin esto,
+         arrastrar para dibujar hace scroll de la pagina en vez de trazar. */
+      style={{ touchAction: lapizActivo ? "none" : undefined }}
+    >
       <MapaLienzo
+        panelesAbiertos={verLista || verZonas}
         manzanasPrecio={verPrecios ? manzanas : undefined}
         celdasPrecio={verPrecios ? celdas : undefined}
         cortesPrecio={cortesPrecio}
@@ -335,7 +350,9 @@ export function MapaTab() {
       {/* pl-14 deja pasar el control de zoom de Leaflet, que vive pegado arriba a la
           izquierda: sin ese margen el buscador se le monta encima. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[600] space-y-2 p-3 pl-14">
-        <div className="pointer-events-auto w-full max-w-md">
+        {/* pr-24 en el celular: ahi los botones del lápiz y de los precios estan a la
+            misma altura y se le montaban encima al buscador. */}
+        <div className="pointer-events-auto w-full max-w-md pr-24 sm:pr-0">
           <MapaBuscador onElegir={irALugar} />
         </div>
 
@@ -378,7 +395,7 @@ export function MapaTab() {
         </div>
 
         {verFiltros && (
-          <div className="pointer-events-auto w-full max-w-4xl rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
+          <div className="pointer-events-auto max-h-[55dvh] w-full max-w-4xl overflow-y-auto overscroll-contain rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
             <MapaFiltros filtros={filtros} onCambio={setFiltros} />
           </div>
         )}
@@ -393,7 +410,11 @@ export function MapaTab() {
       {/* ── Mis zonas: flota a la izquierda ──
           Baja cuando la barra de filtros esta desplegada: si no, se le mete abajo. */}
       {verZonas && (
-        <div className={`absolute bottom-14 left-3 z-[650] w-60 overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 ${verFiltros ? "top-[19rem]" : "top-32"}`}>
+        <div
+          className={`absolute inset-x-2 bottom-7 z-[650] h-[55%] overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur sm:inset-x-auto sm:left-3 sm:h-auto sm:w-60 dark:border-zinc-800 dark:bg-zinc-900/95 ${
+            verFiltros ? "sm:top-[19rem]" : "sm:top-32"
+          } sm:bottom-14`}
+        >
           <MapaZonasPanel
             trazos={trazos}
             filtros={filtros}
@@ -406,8 +427,11 @@ export function MapaTab() {
 
       {/* ── Resultados (o el ranking de precios): flota a la derecha ──
           Arranca en top-16 para no taparle los botones del lápiz y de los precios. */}
+      {/* En el celular sube desde abajo y ocupa un 55%: queda medio mapa a la vista, que
+          es lo que hace falta para relacionar la lista con los pines. Al costado solo
+          desde tablet para arriba, donde hay ancho de sobra. */}
       {verLista && (
-        <div className="absolute bottom-14 right-3 top-16 z-[650] w-80 overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
+        <div className="absolute inset-x-2 bottom-7 z-[650] h-[55%] overflow-hidden rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur sm:inset-x-auto sm:bottom-14 sm:right-3 sm:top-16 sm:h-auto sm:w-80 dark:border-zinc-800 dark:bg-zinc-900/95">
           {verPrecios ? (
             <MapaPanelPrecios
               barrios={barriosPrecio}
@@ -457,7 +481,9 @@ export function MapaTab() {
       )}
 
       {/* Contador. Sale del MISMO estado que la lista, para que no puedan discrepar. */}
-      <div className="pointer-events-none absolute bottom-3 left-3 z-[600] rounded-lg bg-white/90 px-3 py-1.5 text-xs font-medium shadow dark:bg-zinc-900/90">
+      <div className={`pointer-events-none absolute bottom-3 left-3 z-[600] rounded-lg bg-white/90 ${
+        verLista || verZonas ? "hidden sm:block" : ""
+      } px-3 py-1.5 text-xs font-medium shadow dark:bg-zinc-900/90`}>
         {cargando ? (
           <span className="flex items-center gap-1.5 text-zinc-500">
             <Loader2 className="h-3 w-3 animate-spin" /> buscando…
@@ -471,7 +497,9 @@ export function MapaTab() {
             {truncado && "+"}
             {visibles.length} {visibles.length === 1 ? "propiedad" : "propiedades"} a la vista
             {truncado && (
-              <span className="ml-1.5 border-l border-zinc-300 pl-1.5 font-normal text-amber-600 dark:border-zinc-700 dark:text-amber-500">
+              /* La frase larga se esconde en el celular: el "+" ya avisa que es una
+                 muestra, y el cartel entero le comia media pantalla de ancho. */
+              <span className="ml-1.5 hidden border-l border-zinc-300 pl-1.5 font-normal text-amber-600 sm:inline dark:border-zinc-700 dark:text-amber-500">
                 es una muestra, acercate para verlas todas
               </span>
             )}
