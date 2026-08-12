@@ -10,6 +10,28 @@ import { hookRepetido } from "@/lib/admin-vakdor/marketing/similitud"
 
 export const dynamic = "force-dynamic"
 
+/**
+ * Defensa contra el modelo citando su propia reescritura: el prompt de reescritura marca
+ * el texto de entrada con delimitadores `"""`, y a veces el modelo los ecoa en la respuesta
+ * como si la estuviera citando. Saca una línea `"""` inicial/final (y las líneas en blanco
+ * pegadas al borde) sin tocar nada del contenido real. Espejo de limpiarComillasEnvolventes
+ * en marketing-worker/revision.mjs.
+ */
+function limpiarComillasEnvolventes(texto: string): string {
+  const lineas = (texto ?? "").split("\n")
+  while (lineas.length && lineas[0].trim() === "") lineas.shift()
+  if (lineas.length && lineas[0].trim() === '"""') {
+    lineas.shift()
+    while (lineas.length && lineas[0].trim() === "") lineas.shift()
+  }
+  while (lineas.length && lineas[lineas.length - 1].trim() === "") lineas.pop()
+  if (lineas.length && lineas[lineas.length - 1].trim() === '"""') {
+    lineas.pop()
+    while (lineas.length && lineas[lineas.length - 1].trim() === "") lineas.pop()
+  }
+  return lineas.join("\n").trim()
+}
+
 /** Revisa contra rúbrica y reescribe UNA sola vez si no aprueba. */
 async function revisarYCorregir(texto: string, etapa: EtapaEmbudo, systemBase: string): Promise<string> {
   let previas: Awaited<ReturnType<typeof textosRecientes>> = []
@@ -40,16 +62,17 @@ async function revisarYCorregir(texto: string, etapa: EtapaEmbudo, systemBase: s
 
   if (fallos.length === 0) return texto
 
-  return await generarTexto(
+  const corregido = await generarTexto(
     systemBase,
     [
       `Reescribí esta pieza corrigiendo SOLO los fallos listados. Mantené el argumento y la extensión.`,
       `FALLOS:\n${fallos.map((f) => `- ${f}`).join("\n")}`,
       `PIEZA:\n"""\n${texto}\n"""`,
-      `Devolvé SOLO la pieza corregida, sin explicaciones.`,
+      `Devolvé SOLO la pieza corregida, sin explicaciones. No envuelvas la respuesta entre comillas triples ni ningún otro delimitador: las comillas triples de arriba marcan dónde empieza y termina el texto de ENTRADA, no deben aparecer en tu respuesta.`,
     ].join("\n\n"),
     { maxTokens: 8000 },
   )
+  return limpiarComillasEnvolventes((corregido || texto).trim())
 }
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
