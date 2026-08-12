@@ -6,6 +6,8 @@ import path from "node:path";
 import { construirGrafo, componer } from "../lib/compose.mjs";
 import { cargarReceta } from "../lib/recipe.mjs";
 import { probe } from "../lib/probe.mjs";
+import { filtroZoom } from "../lib/camera.mjs";
+import { FORMATOS } from "../lib/reframe.mjs";
 import { crearClipDePrueba, dirTemporal } from "./helpers.mjs";
 
 let dir, clip, info;
@@ -71,7 +73,7 @@ test("dos movimientos de camara que se superponen no duplican el tramo comun", (
     ] },
     { durationSec: 6, palabras: [] }
   );
-  const { tramos } = construirGrafo({ receta, info });
+  const { tramos, avisos } = construirGrafo({ receta, info });
 
   // Sin huecos ni superposiciones: cada tramo arranca donde termino el anterior.
   let cursor = 0;
@@ -86,6 +88,42 @@ test("dos movimientos de camara que se superponen no duplican el tramo comun", (
   // no debe generar un tramo propio con zoompan duplicado.
   const conZoom = tramos.filter((t) => t.filtro.includes("zoompan"));
   assert.equal(conZoom.length, 1, "el movimiento superpuesto no deberia generar un segundo tramo con zoom");
+
+  // Y no deberia desaparecer en silencio: tiene que quedar un aviso.
+  assert.equal(avisos.length, 1, "el movimiento saltado deberia dejar un aviso");
+  assert.match(avisos[0], /zoomOut/);
+});
+
+test("un movimiento acortado por una superposicion parcial usa la duracion real, no la pedida", () => {
+  const { receta } = cargarReceta(
+    { camara: [
+      { t: 1, dur: 3, fx: "zoomIn", pct: 8 },   // cubre 1-4
+      { t: 3, dur: 3, fx: "zoomOut", pct: 8 },  // pedido 3-6 (3s), pero el cursor ya esta en 4: solo quedan 4-6 (2s)
+    ] },
+    { durationSec: 6, palabras: [] }
+  );
+  const { tramos, multiplicador } = construirGrafo({ receta, info });
+
+  // Tiling exacto: sin huecos ni superposiciones.
+  let cursor = 0;
+  for (const t of tramos) {
+    assert.equal(t.desde, cursor, `hueco o superposicion antes del tramo [${t.desde},${t.hasta}]`);
+    cursor = t.hasta;
+  }
+  assert.equal(cursor, info.durationSec, "los tramos no cubren el video completo");
+
+  const tramoAcortado = tramos.find((t) => t.desde === 4 && t.hasta === 6);
+  assert.ok(tramoAcortado, "deberia existir el tramo 4-6 (lo que le quedo al segundo movimiento)");
+
+  const { ancho, alto } = FORMATOS[receta.formato];
+  const conDuracionReal = filtroZoom({
+    tipo: "zoomOut", pct: 8, duracionSec: 2, fps: info.fps, ancho, alto, multiplicador,
+  });
+  const conDuracionPedida = filtroZoom({
+    tipo: "zoomOut", pct: 8, duracionSec: 3, fps: info.fps, ancho, alto, multiplicador,
+  });
+  assert.equal(tramoAcortado.filtro, conDuracionReal, "el filtro tiene que armarse con los 2s reales del tramo");
+  assert.notEqual(tramoAcortado.filtro, conDuracionPedida, "no tiene que usar los 3s originalmente pedidos");
 });
 
 test("un movimiento cuya duracion se pasa del final del video se recorta, no se pierde", () => {
