@@ -904,6 +904,13 @@ function resolverTiempo(item, palabras, avisos, etiqueta) {
   const buscada = normalizar(item.palabra);
   const cuales = palabras.filter((p) => normalizar(p.texto) === buscada);
   const n = item.ocurrencia ?? 1;
+  // OJO: `??` NO atrapa el 0 (esta definido, solo es falsy). Sin esta guarda,
+  // `ocurrencia: 0` llega a cuales[-1] y tira un TypeError crudo en ingles que
+  // aborta el render entero. Number.isInteger tambien descarta 1.5, "dos" y NaN.
+  if (!Number.isInteger(n) || n < 1) {
+    avisos.push(`La "ocurrencia" de la palabra "${item.palabra}" tiene que ser un numero entero de 1 o mas, y vino ${JSON.stringify(item.ocurrencia)}. Salteo ese efecto.`);
+    return null;
+  }
   if (cuales.length < n) {
     avisos.push(
       cuales.length === 0
@@ -915,9 +922,19 @@ function resolverTiempo(item, palabras, avisos, etiqueta) {
   return cuales[n - 1].inicioSec;
 }
 
+// La receta la edita a mano una persona no tecnica: un JSON mal cerrado no puede
+// contestar un SyntaxError en ingles que ni siquiera dice que archivo es.
+function cargarJsonDeArchivo(ruta) {
+  try {
+    return JSON.parse(fs.readFileSync(ruta, "utf8"));
+  } catch (e) {
+    throw new Error(`La receta "${ruta}" tiene un error de formato en el JSON: ${e.message}`);
+  }
+}
+
 export function cargarReceta(origen, { durationSec, palabras = [] }) {
   const cruda = typeof origen === "string"
-    ? JSON.parse(fs.readFileSync(origen, "utf8"))
+    ? cargarJsonDeArchivo(origen)
     : (origen ?? {});
   const baseDir = typeof origen === "string" ? path.dirname(origen) : process.cwd();
 
