@@ -23,6 +23,15 @@
 
 **Ruta base de todo el código:** `.claude/skills/vakdor-video/engine/`
 
+> ⚠️ **El código mergeado manda, no este plan.** Durante la ejecución las revisiones
+> encontraron defectos que venían de este documento, no de las implementaciones: pruebas que no
+> podían fallar, un efecto que no hacía nada, aserciones imposibles de satisfacer y errores que
+> abortaban un render entero por un dedazo. Los más importantes están corregidos acá abajo, pero
+> algunos bloques de código de las Tareas 7 y 8 quedaron desactualizados a propósito: la versión
+> buena es la que está en `engine/`. Si alguna vez se re-ejecuta este plan, hay que leer el código
+> real primero. El detalle de cada defecto está en el ledger de la ejecución y en los mensajes de
+> los commits `docs(studio):`.
+
 ---
 
 ### Task 1: Andamiaje de pruebas + `probe.mjs`
