@@ -25,9 +25,67 @@ Lo primero se construye tal cual. **Lo segundo se descartó por evidencia**, y e
 
 ---
 
-## Feature B — Detección de fotos que no son de la propiedad
+## Feature B — Tercera capa de comparación: fotos contra fotos
 
-**Qué hace:** marca los comparables cuyas fotos **no muestran la propiedad** — renders de pozo, solo palier o escalera, planos — en dos momentos:
+> **Corregido el 12-ago-2026.** La primera versión de esta sección convertía la comparación en un
+> **puntaje automático de ±5**. Eso fue un malentendido mío, no lo que Leonardo pidió: él pidió
+> agregar el análisis como **una capa más de comparación que el asesor lee y juzga**. La distinción
+> es la que decide si funciona o no, porque las mediciones separaron dos cosas: las descripciones de
+> las fotos **eran fieles** (la IA describió bien lo que había, en las cuatro rondas), pero
+> **destilarlas a un número que ordene bien falló**. Mostrarlas funciona; puntuarlas no.
+
+**El ACM compara en tres capas.** Las dos primeras ya existen; esta es la tercera:
+
+1. **Filtros duros** — variable del sujeto contra variable del comparable (tipo, operación, zona, m², ambientes, dormitorios, baños, antigüedad, amenities).
+2. **Texto de la publicación** — embedding del sujeto contra embedding del título y la descripción del aviso.
+3. **Fotos contra fotos** (nueva) — lo que la IA vio en las fotos del sujeto contra lo que vio en las fotos del comparable.
+
+**Qué hace:** para los comparables del **top 10 con `match_pct >= 90`**, analiza hasta 4 de sus fotos con el mismo prompt que se usa para el sujeto, y muestra las dos descripciones **lado a lado** en la tarjeta del comparable:
+
+```
+Av. Cabildo 2500, Belgrano            94%
+3 amb · 78 m² · USD 195.000
+
+── Comparación por fotos ──
+
+TU PROPIEDAD
+Cocina reciclada con isla, pisos de madera en buen estado,
+muy buena luz natural en ambientes principales.
+
+ESTE COMPARABLE
+Cocina original de los años 80 sin actualizar, pisos con
+desgaste visible, luz escasa por contrafrente.
+```
+
+**NO toca el `match_pct`.** El asesor lee y decide qué le sirve.
+
+**Solo aparece si el sujeto tiene descripción por fotos.** Sin eso no hay contra qué comparar.
+
+### Por qué esta capa hace falta: el % está apretado arriba
+
+Medido sobre los 2.205 comparables de los 51 ACM reales de Central:
+
+| Rango de `match_pct` | Cuántos |
+|---|---|
+| 95–98% | 254 |
+| 90–94% | 450 |
+| 85–89% | 602 |
+| 80–84% | 374 |
+| menos de 80% | 525 |
+
+**Un tercio de todos los comparables está arriba del 90%, y el techo real es 98** — ninguno llega a 100. Las dos primeras capas ya no distinguen nada en la punta, que es justo donde el asesor tiene que elegir. Por eso un ACM puede tener 54 comparables sobre 90%: no es un error de conteo, es compresión del puntaje. La tercera capa existe para desempatar ahí, con lo único que todavía no se estaba mirando.
+
+### Sub-función que salió gratis: fotos que no son de la propiedad
+
+Al analizar las fotos del comparable, la IA responde también si **muestran la propiedad**. Acertó **6 de 6** en las cuatro rondas de medición, incluido un test de estrés no planeado. Cuando la respuesta es que no, en vez de la descripción se muestra el motivo ("render de pozo", "solo espacios comunes", "planos"): comparar contra fotos que no son de la propiedad no tiene sentido.
+
+Y se avisa **antes de crear la ficha del cliente** si algún comparable seleccionado está marcado. **Nunca saca nada solo** — el asesor decide.
+
+**Por qué esto importa más de lo que parece:** en la validación sobre San Telmo, **4 de 7 comparables reales tenían fotos de palier, escaleras o planos** mezcladas entre sus primeras 4 imágenes. No es un caso raro de laboratorio: es lo que hay. Y esas fotos van a la ficha que ve el dueño de la propiedad — un render de un edificio que todavía no existe, presentado como comparable, destruye la credibilidad del informe entero.
+
+### Momentos (versión anterior de esta sección, sigue vigente)
+
+Marca los comparables cuyas fotos **no muestran la propiedad** en dos momentos:
 
 1. **En la lista de resultados del asesor:** un chip que dice qué pasa ("render de pozo", "solo espacios comunes").
 2. **Antes de crear la ficha del cliente:** si un comparable seleccionado está marcado, se avisa y el asesor decide si lo saca o lo deja.
@@ -62,7 +120,9 @@ La causa raíz es estructural, no de ajuste: **la IA calificó mal al sujeto mis
 
 **Decisión:** no se implementa el ±5. Habría movido tasaciones 5 puntos en la dirección equivocada, con toda la autoridad de un número.
 
-**Lo que sobrevivió:** la pregunta "¿estas fotos muestran la propiedad?" acertó **6 de 6 en las cuatro rondas**, incluido un test de estrés no planeado en la ronda 4. Es lo único que se construye de la Feature B.
+**Lo que sí sobrevivió, y es la clave de la Feature B:** las cuatro rondas fallaron todas en el mismo punto —**convertir la comparación en un número**— y ninguna falló en el paso anterior. Las descripciones que la IA generó a partir de las fotos fueron **fieles a lo que las fotos mostraban**, verificado a mano contra las imágenes en cada ronda. Por eso la tercera capa muestra las dos descripciones y deja juzgar al asesor: se apoya exactamente en lo que se probó que funciona, y evita lo que se probó que no.
+
+La pregunta "¿estas fotos muestran la propiedad?" acertó **6 de 6 en las cuatro rondas**, incluido un test de estrés no planeado en la ronda 4.
 
 ---
 
