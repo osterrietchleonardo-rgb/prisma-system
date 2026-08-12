@@ -667,8 +667,12 @@ test("el zoom no deja frames congelados (la medicion del spec)", () => {
   const out = spawnSync("ffmpeg", ["-v", "error", "-i", salida, "-vf",
     "tblend=all_mode=difference,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-",
     "-f", "null", "-"], { encoding: "utf8" }).stdout;
-  const vals = [...out.matchAll(/YAVG=([0-9.]+)/g)].map((m) => Number(m[1]));
-  assert.ok(vals.length > 10, "no pude medir los frames");
+  // OJO con el patron: ffmpeg escribe los valores casi nulos en notacion
+  // cientifica (4.1e-06). Un regex de [0-9.]+ lo trunca a "4.1", que queda POR
+  // ENCIMA del umbral, y un frame realmente congelado se cuenta como sano:
+  // falso negativo justo en la direccion que esta prueba existe para detectar.
+  const vals = [...out.matchAll(/YAVG=([0-9.eE+-]+)/g)].map((m) => Number(m[1]));
+  assert.ok(vals.length > 10, `no pude medir los frames de "${salida}" (encontre ${vals.length})`);
   const media = vals.reduce((a, b) => a + b, 0) / vals.length;
   const congelados = vals.filter((v) => v < media * 0.35).length;
   assert.ok(congelados <= vals.length * 0.05, `${congelados}/${vals.length} frames congelados, el zoom escalona`);
