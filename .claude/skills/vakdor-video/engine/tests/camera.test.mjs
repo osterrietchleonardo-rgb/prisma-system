@@ -24,6 +24,22 @@ const aplicar = (vf, nombre) => {
   return salida;
 };
 
+// Usado por las 2 pruebas que miden "suavidad" (diferencia entre frames consecutivos).
+// [0-9.eE+-]+ (no solo [0-9.]+): los valores casi-cero -- justo el rango que interesa
+// para detectar frames congelados -- ffmpeg los imprime en notacion cientifica (ej.
+// "4.0027e-05"). Un regex sin la 'e' corta el exponente y deja "4.0027", inflando un
+// valor casi nulo en uno ~100.000x mas grande, que es un falso negativo: un frame
+// realmente congelado dejaria de contarse como congelado. Un solo lugar para este
+// parseo: si hay que corregirlo de nuevo, se corrige una vez, no dos.
+function medirDiferenciasDeFrames(archivo) {
+  const out = spawnSync("ffmpeg", ["-v", "error", "-i", archivo, "-vf",
+    "tblend=all_mode=difference,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-",
+    "-f", "null", "-"], { encoding: "utf8" }).stdout;
+  const vals = [...out.matchAll(/YAVG=([0-9.eE+-]+)/g)].map((m) => Number(m[1]));
+  assert.ok(vals.length > 10, `no pude medir los frames de "${archivo}" (encontre ${vals.length})`);
+  return vals;
+}
+
 test("el multiplicador baja a 2x cuando hay mucho zoom", () => {
   assert.equal(elegirMultiplicador(60), 3);
   assert.equal(elegirMultiplicador(359), 3);
@@ -66,11 +82,7 @@ test("el zoom no deja frames congelados (la medicion del spec)", () => {
   const r = spawnSync("ffmpeg", ["-y", "-v", "error", "-i", quieto, "-vf", vf,
     "-c:v", "libx264", "-crf", "12", "-pix_fmt", "yuv420p", salida], { encoding: "utf8" });
   assert.equal(r.status, 0, `ffmpeg fallo: ${r.stderr}`);
-  const out = spawnSync("ffmpeg", ["-v", "error", "-i", salida, "-vf",
-    "tblend=all_mode=difference,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-",
-    "-f", "null", "-"], { encoding: "utf8" }).stdout;
-  const vals = [...out.matchAll(/YAVG=([0-9.]+)/g)].map((m) => Number(m[1]));
-  assert.ok(vals.length > 10, "no pude medir los frames");
+  const vals = medirDiferenciasDeFrames(salida);
   const media = vals.reduce((a, b) => a + b, 0) / vals.length;
   const congelados = vals.filter((v) => v < media * 0.35).length;
   assert.ok(congelados <= vals.length * 0.05, `${congelados}/${vals.length} frames congelados, el zoom escalona`);
@@ -93,14 +105,7 @@ test("el whip pan MUEVE la imagen de verdad, no solo la desenfoca", () => {
     "-t", "1", "-r", "30", "-c:v", "libx264", "-crf", "12", "-pix_fmt", "yuv420p", quieto]);
 
   const medir = (archivo) => {
-    const out = spawnSync("ffmpeg", ["-v", "error", "-i", archivo, "-vf",
-      "tblend=all_mode=difference,signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=-",
-      "-f", "null", "-"], { encoding: "utf8" }).stdout;
-    // [0-9.eE+-]+ (no solo [0-9.]+): un baseline quieto de verdad da valores
-    // casi cero que ffmpeg imprime en notacion cientifica (ej. "4.0027e-05").
-    // El regex sin la 'e' corta el exponente y deja "4.0027", inflando un
-    // valor casi nulo en uno grande -- se detecto midiendo a mano (ver reporte).
-    const vals = [...out.matchAll(/YAVG=([0-9.eE+-]+)/g)].map((m) => Number(m[1]));
+    const vals = medirDiferenciasDeFrames(archivo);
     return vals.reduce((a, b) => a + b, 0) / vals.length;
   };
 
