@@ -25,6 +25,15 @@ export async function GET() {
 
     if (error) throw error;
 
+    // Normaliza `images` (jsonb): en la práctica es un array de URLs, pero hay filas viejas
+    // con objetos {url}. Devolvemos siempre string[] así el front no tiene que adivinar la forma.
+    const normalizarImagenes = (images: any): string[] => {
+      if (!Array.isArray(images)) return [];
+      return images
+        .map((im: any) => (typeof im === "string" ? im : im?.url))
+        .filter((u: any): u is string => typeof u === "string" && u.length > 0);
+    };
+
     const items = (data || []).map((p: any) => {
       const tags: string[] = Array.isArray(p.tokko_data?.tags)
         ? p.tokko_data.tags.map((t: any) => String(t?.name || "")).filter(Boolean)
@@ -57,7 +66,11 @@ export async function GET() {
         en_pozo,
         amenidades: tokkoTagsToAmenidades(tags),
         servicios: tags, // lista cruda (por si se quiere mostrar)
-        image: Array.isArray(p.images) ? (typeof p.images[0] === "string" ? p.images[0] : p.images[0]?.url ?? null) : null,
+        // Fotos existentes de la propiedad, para el selector "elegí fotos de la cartera" del
+        // ACM. Solo son URLs públicas (las mismas que ya se ven en la ficha de la propiedad);
+        // el endpoint que analiza fotos NO recibe estas URLs, recibe índice + id de propiedad
+        // y las resuelve él mismo del lado del servidor (ver app/api/acm/analizar-fotos).
+        images: normalizarImagenes(p.images),
       };
     });
 

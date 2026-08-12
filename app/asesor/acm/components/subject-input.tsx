@@ -34,6 +34,7 @@ interface CarteraItem {
   a_estrenar: boolean;
   en_pozo: boolean;
   amenidades: Amenidades;
+  images: string[];
 }
 
 interface SubjectInputProps {
@@ -392,6 +393,7 @@ export function SubjectInput({
         incluirEnFicha={incluirDescFicha}
         onDescripcionChange={onDescripcionIaChange}
         onIncluirEnFichaChange={onIncluirDescFichaChange}
+        carteraProperty={modo === "cartera" && carteraSel ? { propertyId: carteraSel.id, images: carteraSel.images } : null}
       />
 
       {/* Acción principal */}

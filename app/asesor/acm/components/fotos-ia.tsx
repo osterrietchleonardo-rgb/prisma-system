@@ -2,27 +2,37 @@
 
 // ACM · Fotos de la propiedad + análisis con IA de visión.
 //
-// Hasta 4 fotos opcionales. Se achican en el navegador antes de subirlas (menos espera y
-// menos costo) y NO se guardan en ningún lado: van al endpoint, vuelve el texto y se
-// descartan. El análisis se hace UNA sola vez; si el texto no convence, se edita a mano.
-import { useState } from "react";
-import { Loader2, ImagePlus, X, Sparkles } from "lucide-react";
+// Hasta 4 fotos opcionales, de dos orígenes que coexisten (4 en total entre ambos):
+//  - Subidas a mano: se achican en el navegador antes de mandarlas (menos espera y costo).
+//  - Elegidas de la cartera (solo si el sujeto vino del modo "cartera"): el asesor tilda
+//    fotos que la propiedad YA tiene cargadas. El navegador solo manda propertyId + índice,
+//    nunca la URL — el servidor la resuelve él mismo (ver app/api/acm/analizar-fotos).
+//
+// Ninguna foto se guarda en ningún lado: van al endpoint, vuelve el texto y se descartan.
+// El análisis se hace UNA sola vez; si el texto no convence, se edita a mano.
+import { useEffect, useState } from "react";
+import { Loader2, ImagePlus, X, Sparkles, Building2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import type { Sujeto } from "@/lib/tasacion/types";
 import { MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
 
 const MAX_FOTOS = 4;
 const MAX_LADO = 1280;
 
-interface FotoLocal {
-  preview: string; // data URL (achicada) solo para la miniatura, no se manda al endpoint
-  data: string; // base64 ya redimensionado (sin el prefijo data:...;base64,)
-  mimeType: string;
+/** Propiedad de la cartera cuyas fotos existentes se pueden elegir (solo modo "cartera"). */
+interface CarteraFotoProp {
+  propertyId: string;
+  images: string[];
 }
+
+type FotoLocal =
+  | { kind: "upload"; preview: string; data: string; mimeType: string }
+  | { kind: "cartera"; preview: string; propertyId: string; index: number };
 
 /** Redimensiona a 1280px de lado mayor y devuelve JPEG base64 (sin el prefijo data:). */
 async function achicar(file: File): Promise<FotoLocal> {
@@ -35,17 +45,19 @@ async function achicar(file: File): Promise<FotoLocal> {
   canvas.height = h;
   canvas.getContext("2d")!.drawImage(bitmap, 0, 0, w, h);
   const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
-  return { preview: dataUrl, data: dataUrl.split(",")[1], mimeType: "image/jpeg" };
+  return { kind: "upload", preview: dataUrl, data: dataUrl.split(",")[1], mimeType: "image/jpeg" };
 }
 
 export function FotosIA({
-  sujeto, descripcion, incluirEnFicha, onDescripcionChange, onIncluirEnFichaChange,
+  sujeto, descripcion, incluirEnFicha, onDescripcionChange, onIncluirEnFichaChange, carteraProperty,
 }: {
   sujeto: Sujeto;
   descripcion: string;
   incluirEnFicha: boolean;
   onDescripcionChange: (v: string) => void;
   onIncluirEnFichaChange: (v: boolean) => void;
+  /** Propiedad de origen si el sujeto vino de la cartera; null en manual/link o sin selección aún. */
+  carteraProperty?: CarteraFotoProp | null;
 }) {
   const [fotos, setFotos] = useState<FotoLocal[]>([]);
   const [foco, setFoco] = useState("");
@@ -65,6 +77,35 @@ export function FotosIA({
   // Un remount real (cambio de solapa vía `key={modo}`, o "Nuevo ACM") sigue
   // siendo el único reset legítimo.
   const [analizado, setAnalizado] = useState(() => descripcion.trim().length > 0);
+
+  // Si el asesor cambia de propiedad dentro del modo cartera (misma solapa, así que este
+  // componente NO se remonta), las fotos de cartera ya tildadas quedan apuntando a índices de
+  // OTRA propiedad: se descartan. Las subidas a mano no dependen de la propiedad y se conservan.
+  useEffect(() => {
+    setFotos((prev) => (prev.some((f) => f.kind === "cartera") ? prev.filter((f) => f.kind !== "cartera") : prev));
+    // Un aviso de "llegaste al máximo" o un error de la selección anterior (de la propiedad
+    // vieja) quedarían pegados en pantalla mostrando un estado que ya no es cierto: se
+    // descartan cada vez que cambia la propiedad de origen, se hayan sacado fotos o no.
+    setInfo(null);
+    setError(null);
+  }, [carteraProperty?.propertyId]);
+
+  const alternarFotoCartera = (index: number, url: string) => {
+    if (!carteraProperty) return;
+    setError(null);
+    const yaElegida = fotos.some((f) => f.kind === "cartera" && f.index === index);
+    if (yaElegida) {
+      setFotos((prev) => prev.filter((f) => !(f.kind === "cartera" && f.index === index)));
+      setInfo(null);
+      return;
+    }
+    if (fotos.length >= MAX_FOTOS) {
+      setInfo(`Llegaste al máximo de ${MAX_FOTOS} fotos.`);
+      return;
+    }
+    setInfo(null);
+    setFotos((prev) => [...prev, { kind: "cartera", preview: url, propertyId: carteraProperty.propertyId, index }]);
+  };
 
   const agregar = async (files: FileList | null, input: HTMLInputElement) => {
     if (!files?.length) return;
@@ -115,7 +156,11 @@ export function FotosIA({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fotos: fotos.map(({ data, mimeType }) => ({ data, mimeType })),
+          // Subidas viajan con su base64; las de cartera solo con propertyId + index (el
+          // servidor resuelve la URL él mismo, ver comentario arriba del archivo).
+          fotos: fotos.map((f) =>
+            f.kind === "upload" ? { data: f.data, mimeType: f.mimeType } : { propertyId: f.propertyId, index: f.index }
+          ),
           foco,
           sujeto,
         }),
@@ -152,16 +197,63 @@ export function FotosIA({
       <div>
         <Label className="text-sm font-bold">Fotos de la propiedad (opcional)</Label>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Hasta {MAX_FOTOS}. La IA las mira y redacta una descripción que afina la búsqueda de
-          comparables. Las fotos no se guardan.
+          Hasta {MAX_FOTOS}{carteraProperty ? ", subidas o elegidas de las que ya tiene cargadas la propiedad" : ""}.
+          La IA las mira y redacta una descripción que afina la búsqueda de comparables. Las fotos no se guardan.
         </p>
       </div>
+
+      {/* Elegir de la cartera: solo si el sujeto vino del modo cartera. Desaparece junto con
+          el resto de la UI de "antes de analizar" una vez que `analizado` es true. */}
+      {carteraProperty && !analizado && (
+        <div className="space-y-1.5">
+          <Label className="text-xs font-bold">Elegí fotos ya cargadas de esta propiedad</Label>
+          {carteraProperty.images.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Esta propiedad todavía no tiene fotos cargadas en el sistema. Subí desde tu dispositivo abajo.
+            </p>
+          ) : (
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 max-h-52 overflow-y-auto p-1.5 rounded-xl border border-accent/10 bg-card/10">
+              {carteraProperty.images.map((url, idx) => {
+                const elegida = fotos.some((f) => f.kind === "cartera" && f.index === idx);
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => alternarFotoCartera(idx, url)}
+                    className={cn(
+                      "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
+                      elegida ? "border-accent" : "border-transparent opacity-80 hover:opacity-100"
+                    )}
+                    aria-label={elegida ? `Sacar foto ${idx + 1} de la selección` : `Elegir foto ${idx + 1}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`Foto ${idx + 1} de la propiedad`} className="w-full h-full object-cover" />
+                    {elegida && (
+                      <div className="absolute inset-0 bg-accent/40 flex items-center justify-center">
+                        <Check className="w-5 h-5 text-white drop-shadow" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {fotos.map((f, i) => (
           <div key={i} className="relative">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={f.preview} alt={`Foto ${i + 1}`} className="w-20 h-20 rounded-xl object-cover" />
+            {f.kind === "cartera" && (
+              <span
+                className="absolute bottom-1 left-1 bg-black/60 rounded-full p-0.5 leading-none"
+                title="Foto de la cartera"
+              >
+                <Building2 className="w-3 h-3 text-white" />
+              </span>
+            )}
             {!analizado && (
               <button
                 type="button"
