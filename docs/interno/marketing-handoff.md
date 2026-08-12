@@ -51,13 +51,39 @@
 - **Análisis diario (`marketing-worker/insights.mjs` + tabla `marketing_insights`):** 1×/día trae los posts publicados de LinkedIn de Buffer (query `Posts` status `sent`, con text + engagement por post), arma el ranking (qué rinde más/menos) y lo cachea en Supabase. Se inyecta en los prompts del worker Y en el motor `generar`. Verificado con datos reales: 40 posts, top = "Tu equipo te interrumpe 15 veces al día…" (6.85%). Migración `20260718121000_marketing_insights.sql`.
 - **Nota:** el análisis usa la API de Buffer directo (misma key `BUFFER_API_KEY`); cubre lo que pedías de "leer Buffer + métricas 1×/día". La skill vakdor-metricas es el equivalente interactivo (mismo dato).
 
+## ✅ Motor de voz humana (rama `feat/marketing-voz-humana`, prueba end-to-end ago-2026)
+
+Antes, todas las piezas salían con el mismo molde (hook → fricción → quiebre → solución → prueba → CTA), lo que se notaba como "todo escrito por la misma fórmula". Ahora cada pieza sortea su propia forma de un banco de recursos, y pasa por una revisión antes de quedar lista.
+
+- **Cómo ampliar el banco de escenas (sin tocar código ni redeployar):** el banco vive en la tabla `marketing_recursos` de Supabase. Para agregar una escena nueva alcanza con un `insert` directo:
+  ```sql
+  insert into marketing_recursos (tipo, titulo, detalle)
+  values ('escena', 'Título corto de la escena', 'La situación concreta desarrollada en 1-2 frases, con un detalle específico (hora/día/tipo de propiedad).');
+  ```
+  Entra a la rotación automáticamente en el próximo ciclo del worker — no hace falta reiniciar nada. Lo mismo aplica para agregar una `estructura` o un `comentario` nuevos (con `clave` corta en minúsculas) o para editar el `canon` (fila única `tipo='canon'`). Para sacar una escena/estructura/comentario de circulación sin borrarla, poner `activo=false` en vez de borrar la fila (así no se pierde el historial de usos).
+- **Qué significa cada campo de `receta`** (columna jsonb en `marketing_ideas`, se llena sola al procesar la idea):
+  - `estructura`: la forma narrativa que usó esa pieza (una de las 8 del banco, ej. `confesion`, `contraste`).
+  - `escenas`: los 2 ids de `marketing_recursos` (tipo `escena`) que sirvieron de apoyo.
+  - `comentario_tipo`: el tipo del primer comentario (una de las 5 claves, ej. `pregunta_binaria`).
+  - `modelo`: el modelo de IA que escribió la pieza (`claude-sonnet-5`).
+  - `revision`: `{aprobado, reintentos, fallos}` — si `aprobado=true` y `reintentos=0`, pasó la revisión a la primera; si `reintentos=1`, falló algún punto de la rúbrica (los motivos están en `fallos`) y se reescribió una vez antes de quedar lista.
+- **`ANTHROPIC_API_KEY` tiene que estar en 3 lugares** (si falta en cualquiera de los 3, esa parte del sistema no genera nada):
+  1. **Local:** `.env` de PRISMA-SYSTEM (ya confirmado presente).
+  2. **EasyPanel:** variables del servicio del worker de Marketing (pendiente de confirmar por Leo — no se puede chequear desde acá).
+  3. **Vercel:** variables de entorno del proyecto (pendiente de confirmar por Leo). **Sin esta variable en Vercel + un redeploy, los botones "Desarrollar"/"Reformular" del panel fallan en producción** (son los que corren in-app, no en el worker).
+- **Prueba end-to-end (ago-2026):** se insertaron 3 ideas de prueba (una por etapa del embudo) y se corrió el worker hasta procesarlas. Las 3 terminaron con contenido, portada y `receta` completos: 3 estructuras distintas, 6 escenas distintas (sin repetir entre piezas), 3 tipos de primer comentario distintos, y el link `vakdor.com/demostracion` apareció únicamente en el comentario de la pieza BOFU (nunca en un cuerpo de post). Detalle completo (texto de las 3 piezas + verificación punto por punto) en `docs/superpowers/sdd/2026-08-10-marketing-voz-humana/task-12-report.md`.
+
+## ⚠️ Problemas conocidos (encontrados en la prueba end-to-end, no bloquean el uso normal)
+- El worker intenta clasificar los posts de Buffer para el análisis diario de rendimiento, pero le falta pasar el cliente de IA en esa llamada puntual — falla en silencio en cada ciclo y el "ranking de qué rinde más" nunca se termina de armar. No afecta la generación de contenido ni las piezas de la prueba.
+- En 2 de las 3 piezas de la prueba, que necesitaron una reescritura tras la revisión, el texto final quedó envuelto en tres comillas (`"""`) al principio y al final — un detalle a limpiar antes de publicar esas piezas puntuales, revisando el texto en el visor. No pasa en las piezas que aprueban a la primera.
+
 ## ⏭️ QUÉ FALTA (infra)
 1. **Deploy del worker a EasyPanel** (always-on, sin depender de la PC de Leo) — **igual que el acm-extractor**: Dockerfile con base `mcr.microsoft.com/playwright`, instalar las deps (playwright/@anthropic-ai/sdk/@supabase/supabase-js/pdfkit/marked), env vars como secrets, `CMD ["node","watch.mjs"]`. El worker ya es host-agnóstico (logos data-URI, sin rutas absolutas en el render).
 2. **Primer comentario LinkedIn automático:** requiere plan pago de Buffer. Decisión de Leo (por ahora se pega a mano).
 3. **(Opcional) lead-magnet como document post** de LinkedIn: hoy va como texto+imagen (portada); se podría publicar el `magnet.pdf` como documento igual que el carrusel si conviene.
 
 ## Datos clave verificados (para no re-investigar)
-- **Modelo Claude:** `claude-opus-4-8` (sin temperature, sin streaming, max_tokens 4000).
+- **Modelo Claude (ago-2026):** `claude-sonnet-5` (sin `temperature`/`top_p`/`top_k`, thinking adaptativo, `max_tokens` al techo de 8000 porque el thinking consume el mismo presupuesto que el texto visible). Antes era `claude-opus-4-8`.
 - **Blog vakdor-app:** `PROJECT_URL` (=https://upggigryxdvcmnuwafyl.supabase.co) + `SERVICE_ROLE_SECRET`. Bucket público `blog-images`. URL pública: `{PROJECT_URL}/storage/v1/object/public/blog-images/<path>`.
 - **Buffer LinkedIn:** POST `https://api.buffer.com/graphql`, `Authorization: Bearer BUFFER_API_KEY`. Mutación `createPost(input: CreatePostInput!)` → union `PostActionPayload` (`PostActionSuccess{post{id,status}}` / errores con `message`). Input: `channelId` (LinkedIn personal = `6a4aca1140483446287320b8`), `text`, `schedulingType:"automatic"`, `mode:"shareNow"` (ahora) / `"customScheduled"`+`dueAt` (programar), `assets:[{image:{url}}]`, `saveToDraft` (true=probar sin publicar), `metadata:{linkedin:{firstComment}}` (SOLO plan pago). `deletePost(input:{id})` para borrar.
 - **Rama/deploy:** todo en `main` (mergeado desde `feat/marketing-pipeline`; main había avanzado con tracking/marketing-ia de otra sesión, merge fue limpio sin conflictos). Build OK. Repo privado `osterrietchleonardo-rgb/prisma-system`.
