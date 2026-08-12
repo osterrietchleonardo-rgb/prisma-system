@@ -32,7 +32,7 @@ Devolvé SOLO el JSON, sin texto extra ni fences de markdown.`
 
   let raw: string
   try {
-    raw = await generarTexto(BRAND_SYSTEM, user, { maxTokens: 4000 })
+    raw = await generarTexto(BRAND_SYSTEM, user, { maxTokens: 8000 })
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 })
   }

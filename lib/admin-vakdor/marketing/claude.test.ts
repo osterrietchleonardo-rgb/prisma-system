@@ -20,7 +20,7 @@ describe("construirParams", () => {
 
   it("nunca pide más de 8000 tokens de salida", () => {
     expect((construirParams("S", "U", { maxTokens: 99000 }) as any).max_tokens).toBe(8000)
-    expect((construirParams("S", "U") as any).max_tokens).toBe(4000)
+    expect((construirParams("S", "U") as any).max_tokens).toBe(8000)
   })
 
   it("cachea el system cuando se pide (bloque grande de skills)", () => {

@@ -30,7 +30,7 @@ async function revisarYCorregir(texto: string, etapa: EtapaEmbudo, systemBase: s
   if (muletillas.length) fallos.push(`7: muletillas de IA detectadas: ${muletillas.join(", ")}`)
 
   try {
-    const veredicto = await generarTexto(systemBase, promptRevision(texto, etapa, hooks), { maxTokens: 1000, effort: "low" })
+    const veredicto = await generarTexto(systemBase, promptRevision(texto, etapa, hooks), { maxTokens: 2000, effort: "low" })
     const parsed = JSON.parse(veredicto.match(/\{[\s\S]*\}/)?.[0] ?? "{}") as { aprobado?: boolean; fallos?: string[] }
     if (parsed.aprobado === false) fallos.push(...(parsed.fallos ?? []))
   } catch (e) {
@@ -48,7 +48,7 @@ async function revisarYCorregir(texto: string, etapa: EtapaEmbudo, systemBase: s
       `PIEZA:\n"""\n${texto}\n"""`,
       `Devolvé SOLO la pieza corregida, sin explicaciones.`,
     ].join("\n\n"),
-    { maxTokens: 4000 },
+    { maxTokens: 8000 },
   )
 }
 

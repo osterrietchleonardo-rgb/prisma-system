@@ -22,7 +22,9 @@ export function construirParams(system: string, user: string, opts: OpcionesLlam
 
   const params: Record<string, unknown> = {
     model: MODELO,
-    max_tokens: Math.min(opts.maxTokens ?? 4000, MAX_TOKENS_TECHO),
+    // El thinking adaptativo consume el MISMO presupuesto de salida que el texto visible:
+    // un límite pensado solo para el texto trunca la respuesta. Por eso el default es el techo.
+    max_tokens: Math.min(opts.maxTokens ?? MAX_TOKENS_TECHO, MAX_TOKENS_TECHO),
     thinking: { type: "adaptive" },
     system: [bloqueSystem],
     messages: [{ role: "user", content: user }],
