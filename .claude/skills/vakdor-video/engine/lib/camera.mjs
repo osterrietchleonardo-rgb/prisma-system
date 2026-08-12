@@ -41,24 +41,34 @@ export function filtroEscalaFija({ escala, ancho, alto }) {
 }
 
 /**
- * Barrido rapido de camara: ~8 frames de desplazamiento + desenfoque horizontal.
- * PROBADO: `gblur` NO acepta expresiones en `sigma` (da "Unable to parse sigma option value").
- * Por eso el desenfoque se hace en 3 escalones con `enable=between(n,...)`, que si funciona.
- * `crop` en cambio SI evalua `n` por frame en x/y — ahi va el desplazamiento continuo.
+ * Barrido rapido de camara: desplazamiento horizontal + desenfoque horizontal.
+ * DOS COSAS MEDIDAS que no hay que "simplificar":
+ *  - `gblur` NO acepta expresiones en `sigma`, por eso el desenfoque va en 3
+ *    escalones con `enable=between(n,...)`.
+ *  - El crop necesita LUGAR para moverse. Con `crop=w=iw` ffmpeg clampea la x a 0
+ *    y el paneo no existe (verificado: x=0 y x=500 dan el mismo md5). Por eso se
+ *    escala 1.3x proporcional antes y se recorta de vuelta al tamano original.
  */
-export function filtroWhipPan({ fps, ancho, direccion = "der" }) {
+export function filtroWhipPan({ fps, ancho, alto, direccion = "der", desenfoque = true }) {
   const frames = Math.max(4, Math.round(fps * 0.27)); // ~8 frames a 30fps
-  const signo = direccion === "izq" ? "-" : "";
   const a = Math.max(1, Math.round(frames * 0.25));
   const b = Math.max(a + 1, Math.round(frames * 0.65));
-  const desplazamiento = `${signo}(${ancho}*0.35)*if(lt(n,${frames}),sin(PI*n/${frames}),0)`;
-  return [
-    `gblur=sigma=8:sigmaV=0:enable='between(n,1,${a})'`,
-    `gblur=sigma=22:sigmaV=0:enable='between(n,${a + 1},${b})'`,
-    `gblur=sigma=8:sigmaV=0:enable='between(n,${b + 1},${frames})'`,
-    `crop=w=iw:h=ih:x='${desplazamiento}':y=0:exact=1`,
-    "setsar=1",
-  ].join(",");
+  const op = direccion === "izq" ? "-" : "+";
+
+  const W = Math.round((ancho * 1.3) / 2) * 2;
+  const H = Math.round((alto * 1.3) / 2) * 2;
+  const x = `(iw-ow)/2${op}(iw-ow)/2*if(lt(n,${frames}),sin(PI*n/${frames}),0)`;
+
+  const partes = [`scale=${W}:${H}:flags=bilinear`];
+  if (desenfoque) {
+    partes.push(
+      `gblur=sigma=8:sigmaV=0:enable='between(n,1,${a})'`,
+      `gblur=sigma=22:sigmaV=0:enable='between(n,${a + 1},${b})'`,
+      `gblur=sigma=8:sigmaV=0:enable='between(n,${b + 1},${frames})'`
+    );
+  }
+  partes.push(`crop=${ancho}:${alto}:x='${x}':y='(ih-oh)/2':exact=1`, "setsar=1");
+  return partes.join(",");
 }
 
 /** Empuje corto y firme para entrar a una idea fuerte. */
