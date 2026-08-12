@@ -465,7 +465,9 @@ before(() => {
 after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 test("los 4 formatos con sus medidas", () => {
-  assert.deepEqual(Object.keys(FORMATOS).sort(), ["1:1", "16:9", "4:5", "9:16"]);
+  // Orden lexicografico real de JS: ':' (0x3A) va DESPUES de '6' (0x36),
+  // asi que "16:9" queda antes que "1:1". Verificado.
+  assert.deepEqual(Object.keys(FORMATOS).sort(), ["16:9", "1:1", "4:5", "9:16"]);
   assert.deepEqual(FORMATOS["9:16"], { ancho: 1080, alto: 1920 });
 });
 
