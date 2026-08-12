@@ -41,6 +41,13 @@ export interface Sujeto {
   descripcion_ia?: string;
   // Si va o no en la ficha que recibe el cliente. Solo aplica si hay descripcion_ia.
   incluir_desc_ficha?: boolean;
+  // Si el ACM buscó también en barrios linderos (zona_score 50) o se quedó estricto
+  // (mismo barrio + sub-barrios). Vive acá, no en estado aparte, por el mismo motivo que
+  // descripcion_ia: `sujeto` es lo que efectivamente se guarda en acm_searches.sujeto, así
+  // que es el único lugar desde el que "Mis ACM" puede reconstruir qué modo produjo cada
+  // resultado. Ausente/undefined en una búsqueda vieja = estricto (nunca hereda el default
+  // 50 de la función SQL).
+  incluir_linderos?: boolean;
   estado_conservacion: EstadoConservacion;
   calidad_construccion: CalidadConstruccion;
   dormitorios: number;

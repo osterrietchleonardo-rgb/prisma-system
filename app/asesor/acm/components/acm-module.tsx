@@ -47,6 +47,7 @@ export const SUJETO_INICIAL: Sujeto = {
   // comparables (/api/acm/comparables) y nunca llegaba a la creación de la ficha ni al render.
   descripcion_ia: "",
   incluir_desc_ficha: true,
+  incluir_linderos: false,
 };
 
 // Componente principal del ACM (lo reutilizan tanto el asesor como el director).
@@ -84,11 +85,13 @@ export function AcmModule() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sujeto: { ...sujeto, descripcion_ia: (sujeto.descripcion_ia || "").trim() },
+          // incluir_linderos viaja DENTRO de sujeto (no aparte) para que quede en el
+          // snapshot de acm_searches.sujeto y "Mis ACM" pueda reabrir la búsqueda sabiendo
+          // qué modo la produjo — ver el comentario de Sujeto.incluir_linderos.
+          sujeto: { ...sujeto, descripcion_ia: (sujeto.descripcion_ia || "").trim(), incluir_linderos: incluirLinderos },
           operacion,
           exclude_id: excludeId,
           considerar_ph: considerarPh,
-          incluir_linderos: incluirLinderos,
         }),
       });
       const data = await res.json();
@@ -115,6 +118,9 @@ export function AcmModule() {
       setSujeto({ ...SUJETO_INICIAL, ...(data.sujeto || {}) });
       setOperacion(data.operacion === "alquiler" ? "alquiler" : "venta");
       setExcludeId(data.exclude_id ?? null);
+      // Restaura el modo de zona con el que se hizo esta búsqueda (ver Sujeto.incluir_linderos).
+      // Ausente (búsquedas guardadas antes de este fix) = false = estricto, el default seguro.
+      setIncluirLinderos(Boolean(data.sujeto?.incluir_linderos));
       setResults({ cartera: data.cartera || [], roomix: data.roomix || [], conSemantica: Boolean(data.con_semantica) });
       setSearchId(data.id);
       setView("results");

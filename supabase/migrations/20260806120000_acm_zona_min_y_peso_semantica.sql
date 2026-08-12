@@ -18,6 +18,11 @@
 
 
 -- Cambia la firma de las dos funciones de matching → drop de las versiones actuales.
+-- OJO para la próxima migración que cambie estas firmas: p_zona_min y p_peso_semantica son
+-- smallint (no integer, a diferencia de todos los demás parámetros numéricos de acá abajo).
+-- Un `drop function if exists` que ponga `integer` en esas dos posiciones no hace match, no
+-- tira error, y deja un overload duplicado colgado en vez de reemplazar la función — hay que
+-- copiar los tipos tal cual están en el CREATE OR REPLACE de más abajo.
 drop function if exists public.acm_match_properties(uuid, text, text, text[], numeric, integer, integer, integer, integer, text[], text[], uuid, boolean, text, boolean, text, boolean, boolean, integer);
 drop function if exists public.acm_match_roomix(text, text, text[], numeric, integer, integer, integer, integer, text[], text[], boolean, text, boolean, text, boolean, boolean, boolean, boolean, integer);
 

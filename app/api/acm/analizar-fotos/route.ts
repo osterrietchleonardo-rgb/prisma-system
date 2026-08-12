@@ -13,7 +13,12 @@ export const maxDuration = 60;
 
 const MIMES_OK = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FOTOS = 4;
-const MAX_BYTES_TOTAL = 6 * 1024 * 1024; // 6 MB ya redimensionadas en el navegador
+// Vercel corta el body de la request en 4.5 MB (docs/interno/TECNICO-PRISMA.md §10.8) ANTES
+// de que este handler corra: un tope acá por encima de eso nunca se alcanza, porque la
+// plataforma ya devolvió un 413 no-JSON y el asesor ve el fallback genérico en vez de este
+// mensaje. Con 4 fotos a 1280px / calidad 0.82 el body real ronda 1.5 MB, así que 3.5 MB deja
+// margen real y sigue por debajo del techo de la plataforma.
+const MAX_BYTES_TOTAL = 3.5 * 1024 * 1024;
 const MAX_FOCO = 300;
 
 export async function POST(req: Request) {
@@ -106,8 +111,14 @@ FORMATO DE SALIDA: devolvé un JSON con dos campos. En "analisis" va el análisi
 
     return NextResponse.json({ descripcion });
   } catch (e: any) {
+    // Log completo solo del lado del servidor. El error crudo más probable acá es un
+    // 429/503 de Gemini, que trae texto en inglés con el modelo y el endpoint de Google
+    // adentro: no le sirve al asesor y de paso expone de más. Al navegador SIEMPRE un
+    // mensaje fijo en español, salvo el 401 (que ya viene controlado desde requireTenant).
     console.error("ACM analizar-fotos error:", e);
-    const status = e.message === "Unauthorized" ? 401 : 500;
-    return NextResponse.json({ error: e.message || "No se pudo analizar las fotos." }, { status });
+    if (e.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    return NextResponse.json({ error: "No se pudo analizar las fotos. Probá de nuevo en un momento." }, { status: 500 });
   }
 }

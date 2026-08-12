@@ -165,10 +165,14 @@ responsabilidad):
 - `requireTenant()`; `dynamic = "force-dynamic"`; `maxDuration = 60`.
 - Body: `fotos` (array de `{ data: base64, mimeType }`, máximo 4), `foco` (string ≤300),
   y los datos ya cargados del sujeto (tipo, barrio, m², ambientes, dormitorios, baños).
-- Valida: máximo 4 imágenes, mime en la lista blanca, peso total ≤6 MB. Rechaza con 400 y
-  mensaje claro.
+- Valida: máximo 4 imágenes, mime en la lista blanca, peso total ≤3,5 MB (el body de Vercel
+  corta en 4,5 MB — con margen para no chocar con el límite de la plataforma antes de que
+  este mensaje llegue a mostrarse). Rechaza con 400 y mensaje claro.
 - Llama a `gemini-3.5-flash` con las imágenes como `inlineData` más el prompt.
 - Devuelve `{ descripcion }`. **No persiste las imágenes en ningún lado.**
+- Cualquier falla que no sea uno de esos 400 (típicamente un 429/503 de Gemini) se loguea
+  completa en el servidor y al navegador viaja un mensaje fijo en español — nunca el texto
+  crudo del proveedor, que además de ilegible expone modelo y endpoint de Google sin motivo.
 
 ### Prompt
 
@@ -190,19 +194,43 @@ Entre 400 y 600 caracteres, en un solo párrafo corrido.
 
 Si el asesor indicó un foco, priorizalo sin ignorar el resto de las características clave.
 
-**Formato de salida (contrato duro):** el análisis visual previo es un paso **interno**.
-Devolvé **únicamente el párrafo final**, sin encabezados, sin viñetas, sin repetir las
-consignas y sin prefijos del tipo "Análisis:" o "Descripción:". Nada de markdown.
+**Formato de salida (contrato duro): salida estructurada, no texto libre.** El análisis
+visual previo es un paso **interno** que el modelo necesita para razonar, pero no puede
+colarse en lo que lee el cliente. En vez de pedirle al modelo que se autocensure en texto
+corrido, el endpoint le pide JSON con `responseMimeType: "application/json"` +
+`responseSchema` de dos campos: `analisis` (el paso previo, se descarta) y `descripcion`
+(el párrafo final, la única parte que se usa). El razonamiento tiene su propio lugar en la
+respuesta, así que no hay nada que filtrar del texto final.
 
-Detalles de armado del prompt en el código:
+> **Por qué no es una regex que limpia texto corrido.** El primer diseño era justamente eso:
+> el modelo escribe todo seguido y un sanitizador en el servidor detecta un prefijo tipo
+> `Análisis…` / `Descripción:` y se queda con el último párrafo. Se implementó y falló dos
+> rondas seguidas, verificado ejecutando el código — en las dos direcciones a la vez: seguía
+> filtrando andamiaje (listas numeradas enteras; como el prompt pide analizar tres cosas, el
+> modelo escribe 2-3 oraciones de análisis y el limpiador solo sacaba la primera) y además
+> borraba descripciones legítimas que arrancaban con palabras normales de un aviso
+> inmobiliario ("Análisis de la ubicación: el edificio está a dos cuadras del subte…" → `""`,
+> y el asesor veía "la IA no devolvió texto"). La causa es estructural: mirando texto suelto
+> hay que **adivinar** qué oración es razonamiento y cuál es contenido, y no hay punto medio
+> entre "más agresivo" (borra contenido bueno) y "más suave" (deja pasar andamiaje). Salida
+> estructurada saca la adivinanza del problema en vez de afinarla. Detalle completo en
+> `docs/superpowers/plans/2026-08-06-acm-zona-estricta-y-fotos-ia.md`, bloque REDISEÑADO de
+> la Task 4.
 
-- La cantidad de imágenes se interpola según cuántas subió el asesor (1 a 4). **Nunca
-  hardcodear "4"**: si el prompt afirma que hay más fotos de las que hay, el modelo
-  completa el hueco y describe ambientes que no vio.
-- El servidor sanea la respuesta antes de devolverla: quita cercos de markdown y, si
-  aparece un prefijo tipo `Análisis…` / `Descripción:`, se queda con el último párrafo.
-  Es la red de seguridad por si el modelo igual filtra el paso previo — el asesor nunca
-  debería ver el andamiaje del prompt en el cuadro de texto.
+Lo que hace el código (`lib/acm/descripcion-ia.ts`), ya sin adivinar nada:
+
+- `extraerDescripcion(crudo)` parsea el JSON (tolerando el cerco ` ```json ` que Gemini a
+  veces agrega aunque se pida `responseMimeType: "application/json"`) y devuelve el campo
+  `descripcion`. Si el JSON no parsea o falta el campo, devuelve `""` — sin heurísticas de
+  rescate; vacío es una salida segura porque el ACM nunca se bloquea por esto.
+- `sanearDescripcionIA(texto)` es higiene de formato pura sobre un campo que ya se sabe que
+  es la descripción: saca restos de markdown, aplasta saltos de línea y espacios repetidos.
+  Sin reglas de andamiaje, sin cortar por etiquetas, sin descartar párrafos.
+- `recortarAPalabra(texto, max)` recorta al tope duro (`MAX_DESC_IA = 700`) sin cortar
+  palabras a la mitad.
+- Detalle de armado del prompt en el código: la cantidad de imágenes se interpola según
+  cuántas subió el asesor (1 a 4). **Nunca hardcodear "4"**: si el prompt afirma que hay más
+  fotos de las que hay, el modelo completa el hueco y describe ambientes que no vio.
 
 ### Cómo afina la búsqueda
 

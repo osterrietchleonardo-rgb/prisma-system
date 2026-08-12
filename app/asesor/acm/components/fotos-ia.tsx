@@ -13,10 +13,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import type { Sujeto } from "@/lib/tasacion/types";
+import { MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
 
 const MAX_FOTOS = 4;
 const MAX_LADO = 1280;
-const MAX_DESC = 700;
 
 interface FotoLocal {
   preview: string; // data URL (achicada) solo para la miniatura, no se manda al endpoint
@@ -54,11 +54,17 @@ export function FotosIA({
   const [info, setInfo] = useState<string | null>(null);
   // El análisis se hace una sola vez: se marca en `analizar()` cuando la llamada
   // a la IA responde OK (nunca en el catch/finally, para que un fallo siga
-  // siendo reintentable). NO se infiere de `descripcion` porque el asesor puede
-  // borrar todo el texto para reescribirlo a mano; el hecho de que ya se analizó
-  // no depende de si el texto sigue ahí. Solo se resetea con el remount por
-  // `key={modo}` (cambio de solapa), que es el reset legítimo del formulario.
-  const [analizado, setAnalizado] = useState(false);
+  // siendo reintentable). El estado en sí NO se infiere de `descripcion` en cada
+  // render (el asesor puede borrar todo el texto para reescribirlo a mano, y eso
+  // no debe resucitar el botón de analizar). Lo que SÍ se infiere una única vez,
+  // al montar, es el valor inicial: si el componente se remonta con una
+  // `descripcion` ya cargada (volver de "Editar" tras buscar comparables, o
+  // reabrir un ACM guardado desde "Mis ACM"), tiene que arrancar en `analizado`
+  // para no dejar la descripción, el contador y la casilla de la ficha
+  // invisibles mientras el valor sigue viajando a la búsqueda y a la ficha.
+  // Un remount real (cambio de solapa vía `key={modo}`, o "Nuevo ACM") sigue
+  // siendo el único reset legítimo.
+  const [analizado, setAnalizado] = useState(() => descripcion.trim().length > 0);
 
   const agregar = async (files: FileList | null, input: HTMLInputElement) => {
     if (!files?.length) return;
@@ -103,6 +109,7 @@ export function FotosIA({
   const analizar = async () => {
     setAnalizando(true);
     setError(null);
+    setInfo(null); // saca el "Llegaste al máximo de 4 fotos": el bloque de resultado la reemplaza.
     try {
       const r = await fetch("/api/acm/analizar-fotos", {
         method: "POST",
@@ -125,8 +132,11 @@ export function FotosIA({
     } catch (e: any) {
       // Si se cortó la conexión, fetch tira un TypeError con un mensaje técnico del
       // navegador ("Failed to fetch"): no le sirve al asesor, se cambia por uno en
-      // español. Los demás errores ya vienen en español (los que arma este mismo
-      // componente o los que devuelve el endpoint en `error`).
+      // español. Los demás errores ya vienen en español: los que arma este mismo
+      // componente (throw de arriba) o el catch-all del endpoint, que devuelve un
+      // mensaje fijo en español para cualquier falla que no sea uno de los 400
+      // validados (ver app/api/acm/analizar-fotos/route.ts) — nunca el texto crudo
+      // de Gemini.
       setError(
         e instanceof TypeError
           ? "No se pudo conectar. Revisá tu conexión a internet y probá de nuevo."
@@ -155,7 +165,10 @@ export function FotosIA({
             {!analizado && (
               <button
                 type="button"
-                onClick={() => setFotos((prev) => prev.filter((_, j) => j !== i))}
+                onClick={() => {
+                  setFotos((prev) => prev.filter((_, j) => j !== i));
+                  setInfo(null); // el recuadro de "agregar" vuelve a aparecer: el aviso de tope quedaría desactualizado.
+                }}
                 className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-background border border-accent/20 flex items-center justify-center"
                 aria-label="Quitar foto"
               >
@@ -205,12 +218,12 @@ export function FotosIA({
           <div className="flex items-center justify-between">
             <Label className="text-xs font-bold">Descripción (editable)</Label>
             <span className="text-[11px] text-muted-foreground tabular-nums">
-              {descripcion.length}/{MAX_DESC}
+              {descripcion.length}/{MAX_DESC_IA}
             </span>
           </div>
           <Textarea
             value={descripcion}
-            maxLength={MAX_DESC}
+            maxLength={MAX_DESC_IA}
             rows={5}
             onChange={(e) => onDescripcionChange(e.target.value)}
             className="bg-card/50 border-accent/10 text-sm"

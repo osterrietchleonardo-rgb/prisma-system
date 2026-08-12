@@ -59,9 +59,11 @@ export async function POST(req: Request) {
     const considerarPh = body.considerar_ph !== false;
     const excludePh = sujeto.tipo_propiedad === "casa" && considerarPh === false;
     // Zona: por defecto ESTRICTO (mismo barrio + sub-barrios). Los barrios limítrofes
-    // (zona_score 50) solo entran si el asesor los pidió explícitamente. Si el campo no
-    // viene en el body, se comporta estricto: es el arreglo, no un default heredado.
-    const zonaMin = body.incluir_linderos === true ? 50 : 70;
+    // (zona_score 50) solo entran si el asesor los pidió explícitamente. Viaja DENTRO de
+    // `sujeto` (no aparte) para que quede persistido en acm_searches.sujeto y "Mis ACM"
+    // pueda reabrir la búsqueda con el modo correcto. Si el campo no viene, se comporta
+    // estricto: es el arreglo, nunca hereda el default 50 de la función SQL.
+    const zonaMin = sujeto.incluir_linderos === true ? 50 : 70;
     // Sin límites artificiales: el gate de barrio ya acota el universo; traemos todos los
     // comparables del barrio (tope alto por performance del render, configurable por request).
     const limit = Math.min(Number(body.limit) || 50, 100);
