@@ -32,6 +32,12 @@ function resolverTiempo(item, palabras, avisos, etiqueta) {
   const buscada = normalizar(item.palabra);
   const cuales = palabras.filter((p) => normalizar(p.texto) === buscada);
   const n = item.ocurrencia ?? 1;
+  if (!Number.isInteger(n) || n < 1) {
+    avisos.push(
+      `La ocurrencia "${item.ocurrencia}" pedida para la palabra "${item.palabra}" no es valida (tiene que ser un numero entero de 1 en adelante). Salteo ese efecto de ${etiqueta}.`
+    );
+    return null;
+  }
   if (cuales.length < n) {
     avisos.push(
       cuales.length === 0
@@ -43,9 +49,18 @@ function resolverTiempo(item, palabras, avisos, etiqueta) {
   return cuales[n - 1].inicioSec;
 }
 
+function cargarJsonDeArchivo(ruta) {
+  const texto = fs.readFileSync(ruta, "utf8");
+  try {
+    return JSON.parse(texto);
+  } catch (e) {
+    throw new Error(`La receta "${ruta}" tiene un error de formato en el JSON: ${e.message}`);
+  }
+}
+
 export function cargarReceta(origen, { durationSec, palabras = [] }) {
   const cruda = typeof origen === "string"
-    ? JSON.parse(fs.readFileSync(origen, "utf8"))
+    ? cargarJsonDeArchivo(origen)
     : (origen ?? {});
   const baseDir = typeof origen === "string" ? path.dirname(origen) : process.cwd();
 
@@ -66,6 +81,7 @@ export function cargarReceta(origen, { durationSec, palabras = [] }) {
     throw new Error(`La calidad "${receta.calidad}" no existe. Validas: ${CALIDADES.join(", ")}.`);
   if (!MODOS_SUBS.includes(receta.subtitulos.modo))
     throw new Error(`El modo de subtitulos "${receta.subtitulos.modo}" no existe. Validos: ${MODOS_SUBS.join(", ")}.`);
+  // "ninguno" es vocabulario valido de la receta (sin grade): filtroDeColor ya lo maneja devolviendo cadena vacia.
   if (receta.grade.preset && receta.grade.preset !== "ninguno" && !PRESETS_COLOR[receta.grade.preset])
     throw new Error(`El preset de color "${receta.grade.preset}" no existe. Validos: ${Object.keys(PRESETS_COLOR).join(", ")}.`);
 
