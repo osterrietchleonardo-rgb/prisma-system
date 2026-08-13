@@ -10,14 +10,32 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { probe } from "./lib/probe.mjs";
-import { cargarReceta, CALIDADES, RECETA_DEFAULT } from "./lib/recipe.mjs";
+import { cargarReceta, CALIDADES, RECETA_DEFAULT, cargarJsonDeArchivo } from "./lib/recipe.mjs";
 import { construirGrafo, componer } from "./lib/compose.mjs";
 import { elegirEncoder } from "./lib/encoder.mjs";
 import { FORMATOS } from "./lib/reframe.mjs";
 import { cortarSilencios } from "./lib/cut.mjs";
 import { transcribir } from "./lib/transcribe.mjs";
 import { NIVELES_LIMPIEZA, estabilizar } from "./lib/enhance.mjs";
+
+// Nombre de la carpeta de cache del corte/transcripcion, siempre al lado del --out.
+const CACHE_DIRNAME = ".studio-cache";
+
+/**
+ * Clave deterministica para el cache de corte/transcripcion: combina la ruta resuelta
+ * del archivo, su mtime (si el archivo de origen cambia, la clave cambia sola — no hace
+ * falta invalidar nada a mano) y cualquier parametro extra que afecte el resultado (los
+ * de corte: db/min/pad; el idioma de transcripcion). A proposito NO es un randomUUID: acá
+ * se necesita la MISMA clave entre corridas para poder reusar, lo opuesto de lib/cut.mjs
+ * y lib/enhance.mjs (esos SI usan randomUUID, porque sus temporales nunca se reusan).
+ */
+function claveDeCache(archivo, extra = "") {
+  const st = fs.statSync(archivo);
+  const firma = `${path.resolve(archivo)}|${st.mtimeMs}|${extra}`;
+  return createHash("sha1").update(firma).digest("hex").slice(0, 16);
+}
 
 export function parsearArgs(argv) {
   return Object.fromEntries(argv.map((a) => {
@@ -38,7 +56,7 @@ const MARGEN_SEEK_RAPIDO = 5;
 async function main() {
   const args = parsearArgs(process.argv.slice(2));
   if (!args.in || !args.out) {
-    console.error("Uso: node studio.mjs --in=crudo.mp4 --out=final.mp4 [--receta=receta.json] [--check] [--preview=SEG] [--sin-corte] [--srt=archivo.srt] [--limpiar=suave|normal|fuerte] [--estabilizar]");
+    console.error("Uso: node studio.mjs --in=crudo.mp4 --out=final.mp4 [--receta=receta.json] [--check] [--preview=SEG] [--sin-corte] [--srt=archivo.srt] [--limpiar=suave|normal|fuerte] [--estabilizar] [--rehacer]");
     process.exit(1);
   }
   if (args.srt && !fs.existsSync(args.srt)) {
@@ -49,8 +67,22 @@ async function main() {
   const infoOriginal = await probe(args.in);
   console.log(`Entrada: ${path.basename(args.in)} — ${infoOriginal.width}x${infoOriginal.height} @ ${infoOriginal.fps}fps, ${infoOriginal.durationSec.toFixed(1)}s`);
 
-  // Temporales que este pipeline pueda crear (corte + preview): se borran SIEMPRE
-  // en el finally de abajo, exito o error, nunca dependiendo del "exit" del proceso.
+  // El bloque "corte" de la receta se lee ACA, antes de cortar, con el parser crudo de
+  // recipe.mjs (no el `cargarReceta` completo: ese todavia no puede correr porque
+  // necesita la duracion POST-corte). Si no se lee aca, un `"corte": {"pad": 0.3}` en el
+  // receta.json queda escrito pero nunca llega a `cortarSilencios` — un control que
+  // aparenta existir y no hace nada.
+  const crudaReceta = args.receta ? args.receta : {};
+  const recetaCruda = typeof crudaReceta === "string" ? cargarJsonDeArchivo(crudaReceta) : crudaReceta;
+  const corteCfg = { ...RECETA_DEFAULT.corte, ...(recetaCruda.corte ?? {}) };
+  const paramsCorte = `db=${corteCfg.db}, min=${corteCfg.min}s, pad=${corteCfg.pad}s`;
+  const cacheDir = path.join(path.dirname(args.out), CACHE_DIRNAME);
+
+  // Temporales EFIMEROS (estabilizacion, preview): se borran SIEMPRE en el finally de
+  // abajo, exito o error. El corte y la transcripcion NO entran aca cuando van al cache
+  // (mas abajo): esos tienen que SOBREVIVIR a esta corrida para que la proxima corrida
+  // los pueda reusar. --rehacer los ignora, pero los vuelve a escribir en el MISMO
+  // lugar (no crea basura nueva, solo pisa lo que ya habia).
   const temporales = [];
   try {
     // --check es una validacion rapida y gratuita de la receta: nunca corta ni
@@ -65,7 +97,10 @@ async function main() {
       // Corre ANTES que todo lo demas (incluso antes de cortar silencios): vidstab
       // necesita analizar el archivo entero de una sola pasada, y el resto del
       // pipeline (corte, transcripcion, compose) tiene que trabajar ya sobre el
-      // video estabilizado, no sobre el crudo con temblor.
+      // video estabilizado, no sobre el crudo con temblor. Por eso el corte se
+      // cachea por el contenido de `entradaTrabajo` en ESE momento (ya estabilizado
+      // si corresponde), no por `args.in`: si no, --estabilizar reusaria por error
+      // un corte hecho sobre el video SIN estabilizar.
       if (args.estabilizar) {
         const salidaEstab = path.join(path.dirname(args.out), `.studio-estab-${process.pid}-${Date.now()}.mp4`);
         temporales.push(salidaEstab);
@@ -77,41 +112,78 @@ async function main() {
         console.log("Estabilizacion: no.");
       }
 
-      // --- Paso 1: sacar silencios ---
+      // --- Paso 1: sacar silencios (con cache) ---
       if (args["sin-corte"]) {
         console.log("Corte: salteado (--sin-corte).");
       } else {
-        const salidaCorte = path.join(path.dirname(args.out), `.studio-corte-${process.pid}-${Date.now()}.mp4`);
-        temporales.push(salidaCorte);
-        const rc = await cortarSilencios({
-          entrada: entradaTrabajo,
-          salida: salidaCorte,
-          db: RECETA_DEFAULT.corte.db,
-          min: RECETA_DEFAULT.corte.min,
-          pad: RECETA_DEFAULT.corte.pad,
-        });
-        entradaTrabajo = rc.salida;
-        info = await probe(entradaTrabajo);
-        const antesMin = infoOriginal.durationSec / 60;
-        const despuesMin = rc.duracionFinal / 60;
-        console.log(`Corte: de ${antesMin.toFixed(1)} min a ${despuesMin.toFixed(1)} min (${(antesMin - despuesMin).toFixed(1)} min de silencios).`);
+        fs.mkdirSync(cacheDir, { recursive: true });
+        const claveCorte = claveDeCache(entradaTrabajo, `${corteCfg.db}|${corteCfg.min}|${corteCfg.pad}`);
+        const salidaCache = path.join(cacheDir, `corte-${claveCorte}.mp4`);
+
+        if (!args.rehacer && fs.existsSync(salidaCache)) {
+          entradaTrabajo = salidaCache;
+          info = await probe(entradaTrabajo);
+          console.log(`Corte: reusando el corte de una corrida anterior (cache). Duracion: ${(info.durationSec / 60).toFixed(1)} min. Parametros: ${paramsCorte}.`);
+        } else {
+          const rc = await cortarSilencios({
+            entrada: entradaTrabajo,
+            salida: salidaCache,
+            db: corteCfg.db,
+            min: corteCfg.min,
+            pad: corteCfg.pad,
+          });
+          entradaTrabajo = rc.salida;
+          info = await probe(entradaTrabajo);
+          const antesMin = infoOriginal.durationSec / 60;
+          const despuesMin = rc.duracionFinal / 60;
+          // Math.max(0, ...): el re-encode del corte puede dar una duracion final
+          // MICROSCOPICAMENTE mas larga que la original (redondeo de frames), lo que
+          // sin este clamp mostraba un confuso "-0.0 min de silencios" en clips sin
+          // silencio real.
+          const minutosDeSilencio = Math.max(0, antesMin - despuesMin);
+          console.log(`Corte: de ${antesMin.toFixed(1)} min a ${despuesMin.toFixed(1)} min (${minutosDeSilencio.toFixed(1)} min de silencios). Parametros: ${paramsCorte}.`);
+
+          // Un tramo que fallo al recortar desaparece del video final: eso NO puede
+          // pasar sin que quede bien visible en el reporte (footage perdido en
+          // silencio es peor que un corte que tarda mas o que falla entero).
+          if (rc.tramosFallidos.length) {
+            const segsPerdidos = rc.tramosFallidos.reduce((a, t) => a + (t.hasta - t.desde), 0);
+            console.log(`AVISO: ${rc.tramosFallidos.length} tramo(s) de corte FALLARON y se perdieron del video final (~${segsPerdidos.toFixed(1)}s de metraje). Revisa el video de origen en esos rangos:`);
+            for (const t of rc.tramosFallidos) {
+              const ultimaLinea = t.error.split("\n").filter(Boolean).slice(-1)[0] || t.error;
+              console.log(`  - ${t.desde.toFixed(1)}s a ${t.hasta.toFixed(1)}s: ${ultimaLinea}`);
+            }
+          }
+        }
       }
 
-      // --- Paso 2: transcribir (para anclar efectos a la palabra hablada) ---
+      // --- Paso 2: transcribir (para anclar efectos a la palabra hablada; con cache) ---
       if (args.srt) {
-        console.log(`Transcripcion: se usa el SRT provisto (${args.srt}). No se llama a Groq: sin anclaje por palabra.`);
+        console.log(`Transcripcion: se usa el SRT provisto (${args.srt}). ADVERTENCIA: un .srt no trae tiempos por palabra, asi que esta corrida queda SIN anclaje por palabra.`);
       } else if (process.env.GROQ_API_KEY) {
-        const t = await transcribir({ entrada: entradaTrabajo, apiKey: process.env.GROQ_API_KEY, idioma: "es" });
-        palabras = t.palabras;
-        console.log(palabras.length
-          ? `Transcripcion: ${palabras.length} palabras.`
-          : "Transcripcion: Groq no devolvio tiempos por palabra. Sigo sin anclaje por palabra.");
+        fs.mkdirSync(cacheDir, { recursive: true });
+        const clavePalabras = claveDeCache(entradaTrabajo, "palabras-es");
+        const palabrasCache = path.join(cacheDir, `palabras-${clavePalabras}.json`);
+
+        if (!args.rehacer && fs.existsSync(palabrasCache)) {
+          palabras = JSON.parse(fs.readFileSync(palabrasCache, "utf8"));
+          console.log(`Transcripcion: reusando la transcripcion de una corrida anterior (cache). ${palabras.length} palabras.`);
+        } else {
+          const t = await transcribir({ entrada: entradaTrabajo, apiKey: process.env.GROQ_API_KEY, idioma: "es" });
+          palabras = t.palabras;
+          // Se guarda ANTES de imprimir el resultado, no despues: asi si algo de mas
+          // abajo tira, la transcripcion (que costo plata) no se pierde para la
+          // proxima corrida.
+          fs.writeFileSync(palabrasCache, JSON.stringify(palabras), "utf8");
+          console.log(palabras.length
+            ? `Transcripcion: ${palabras.length} palabras.`
+            : "Transcripcion: Groq no devolvio tiempos por palabra. Sigo sin anclaje por palabra.");
+        }
       } else {
         console.log("Transcripcion: no hay GROQ_API_KEY. Sigo sin transcribir y sin anclaje por palabra (pasa --srt o definila).");
       }
     }
 
-    const crudaReceta = args.receta ? args.receta : {};
     const { receta, avisos } = cargarReceta(crudaReceta, { durationSec: info.durationSec, palabras });
     if (args.formato) receta.formato = args.formato;
     if (args.calidad) receta.calidad = args.calidad;
@@ -143,6 +215,14 @@ async function main() {
     }
 
     if (args.check) {
+      // --check no corta ni transcribe (es una validacion rapida y gratuita, no un
+      // render), asi que no puede prometer mas certeza de la que tiene: la duracion
+      // usada aca es la del video SIN cortar, y el anclaje por palabra nunca se
+      // resuelve. Esto tiene que quedar dicho en criollo, no dado por sabido — es
+      // el texto que lee alguien no tecnico para decidir si su receta esta bien.
+      console.log("\nAviso de --check: esta validacion se hizo SIN cortar silencios y SIN transcribir.");
+      console.log(`  - La duracion usada fue la del video ORIGINAL (${infoOriginal.durationSec.toFixed(1)}s), no la del video final (que va a ser mas corto si hay silencios). Un efecto que valida bien aca podria caer fuera del video final una vez que se corten los silencios de verdad.`);
+      console.log("  - No se transcribio: cualquier efecto anclado por PALABRA figura aca como \"no encontrado\", aunque una corrida real (sin --check) probablemente lo resuelva.");
       console.log("\n--check: la receta es valida y el grafo se puede construir. No renderice nada.");
       return;
     }

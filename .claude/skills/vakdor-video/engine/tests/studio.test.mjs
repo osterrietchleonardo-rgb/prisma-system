@@ -32,6 +32,10 @@ after(() => fs.rmSync(dir, { recursive: true, force: true }));
 const archivosResiduales = (d) =>
   fs.readdirSync(d).filter((f) =>
     f.startsWith(".preview-fuente") || f.startsWith(".studio-corte") || f.startsWith(".studio-estab") || f.endsWith(".trf"));
+// El cache de corte/transcripcion (Fix 4 del round 1 de revision) vive en una
+// subcarpeta ".studio-cache" DENTRO de `dir` y es INTENCIONALMENTE persistente entre
+// corridas (para eso sirve un cache) — no es un residuo, asi que `archivosResiduales`
+// (que barre la carpeta plana) nunca lo va a marcar solo por existir.
 
 test("parsea flags con y sin valor", () => {
   const a = parsearArgs(["--in=x.mp4", "--formato=9:16", "--check"]);
@@ -283,4 +287,72 @@ test("--limpiar y --estabilizar combinados: ambos quedan aplicados en el reporte
   assert.match(r.stdout, /Limpieza:\s*suave\.\s*Estabilizacion:\s*si\./i, r.stdout);
   assert.ok(fs.existsSync(salida));
   assert.deepEqual(archivosResiduales(dir), []);
+});
+
+// --- Fix round 1 de revision (findings 1-5) ---
+
+test("--check avisa explicitamente que valido contra la duracion SIN CORTAR y sin transcribir", () => {
+  // Finding 5: --check no puede sonar mas seguro de lo que es. Antes esto quedaba
+  // implicito (nadie lo decia); ahora tiene que decirlo en criollo, dos veces
+  // (duracion sin cortar, anclaje por palabra no resuelto).
+  const salida = path.join(dir, "check-aviso.mp4");
+  const r = spawnSync("node", [STUDIO, `--in=${clip}`, `--out=${salida}`, "--check"],
+    { encoding: "utf8", env: SIN_GROQ });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /SIN CORTAR/i, r.stdout);
+  assert.match(r.stdout, /ORIGINAL/i, r.stdout);
+  assert.match(r.stdout, /no se transcribio/i, r.stdout);
+  assert.match(r.stdout, /anclado por PALABRA/i, r.stdout);
+});
+
+test("receta.corte se respeta: los parametros que aparecen en el reporte son los de la receta, no los defaults", () => {
+  // Finding 3: un "corte": {...} en la receta no puede quedar escrito y ser ignorado.
+  // Uso db/min/pad que no son los defaults (-30/0.6/0.15) para que la prueba solo
+  // pueda pasar si esos 3 numeros de verdad viajaron hasta cortarSilencios.
+  const receta = path.join(dir, "corte-custom.json");
+  fs.writeFileSync(receta, JSON.stringify({ corte: { db: -25, min: 0.4, pad: 0.22 } }));
+  const salida = path.join(dir, "corte-custom.mp4");
+  // clipChico (no `clip`): asi la clave de cache de esta combinacion nunca choca con
+  // la que ya haya generado otra prueba de arriba sobre `clip` con los params default.
+  const r = spawnSync("node", [STUDIO, `--in=${clipChico}`, `--out=${salida}`, `--receta=${receta}`],
+    { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /db=-25/, r.stdout);
+  assert.match(r.stdout, /min=0\.4s/, r.stdout);
+  assert.match(r.stdout, /pad=0\.22s/, r.stdout);
+});
+
+test("el corte se cachea entre corridas: la 2da corrida con el mismo --in reusa el corte y lo dice", () => {
+  // Finding 4: iterar con --preview sobre el mismo --in no puede recortar y transcribir
+  // el video ENTERO cada vez. Clip propio (no compartido con otras pruebas) para que la
+  // clave de cache de esta prueba sea inequivocamente "primera vez" en su 1ra corrida.
+  const clipCache = crearClipDePrueba({ segundos: 3, ancho: 320, alto: 240, salida: path.join(dir, "cache-in.mp4") });
+  const salida1 = path.join(dir, "cache-out-1.mp4");
+  const salida2 = path.join(dir, "cache-out-2.mp4");
+
+  const r1 = spawnSync("node", [STUDIO, `--in=${clipCache}`, `--out=${salida1}`],
+    { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
+  assert.equal(r1.status, 0, r1.stderr);
+  assert.doesNotMatch(r1.stdout, /reusando/i, "la primera corrida no puede decir que reusa nada (todavia no hay cache)");
+
+  const r2 = spawnSync("node", [STUDIO, `--in=${clipCache}`, `--out=${salida2}`],
+    { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
+  assert.equal(r2.status, 0, r2.stderr);
+  assert.match(r2.stdout, /Corte:.*reusando.*cache/i, r2.stdout);
+  assert.ok(fs.existsSync(salida2), "reusar el cache del corte igual tiene que terminar en un video renderizado");
+});
+
+test("--rehacer ignora el cache y fuerza un corte nuevo", () => {
+  const clipR = crearClipDePrueba({ segundos: 3, ancho: 320, alto: 240, salida: path.join(dir, "rehacer-in.mp4") });
+  const salida1 = path.join(dir, "rehacer-out-1.mp4");
+  const salida2 = path.join(dir, "rehacer-out-2.mp4");
+
+  const r1 = spawnSync("node", [STUDIO, `--in=${clipR}`, `--out=${salida1}`],
+    { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
+  assert.equal(r1.status, 0, r1.stderr);
+
+  const r2 = spawnSync("node", [STUDIO, `--in=${clipR}`, `--out=${salida2}`, "--rehacer"],
+    { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
+  assert.equal(r2.status, 0, r2.stderr);
+  assert.doesNotMatch(r2.stdout, /reusando/i, "--rehacer no puede reusar el cache aunque exista");
 });

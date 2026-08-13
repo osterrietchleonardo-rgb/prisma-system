@@ -10,6 +10,7 @@
 // puede llamar a process.exit ni depender del evento "exit" del proceso).
 
 import { spawnSync, spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -43,6 +44,23 @@ export async function detectarSilencios({ entrada, db = -30, min = 0.6 }) {
   return sil;
 }
 
+/** Corta UN tramo con re-encode preciso (-ss/-to DESPUES de -i, frame-exact). Expuesta
+ *  (no solo interna) para que los tests puedan inyectar un reemplazo con `_cortarUnTramo`
+ *  y simular un fallo puntual SIN tener que corromper un archivo de video de verdad para
+ *  forzarlo — probar el "camino de fallo" de un tramo especifico contra ffmpeg real no es
+ *  reproducible de forma confiable. */
+export function cortarUnTramo({ entrada, ss, ee, segFile }) {
+  return spawnSync("ffmpeg", [
+    "-ss", ss.toFixed(3),
+    "-to", ee.toFixed(3),
+    "-i", entrada,
+    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "16",
+    "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
+    "-avoid_negative_ts", "make_zero",
+    "-y", segFile,
+  ], { encoding: "utf8" });
+}
+
 /** Ejecuta ffmpeg como proceso async y rechaza con el stderr si el codigo de salida no es 0. */
 function correrFfmpeg(args) {
   return new Promise((resolve, reject) => {
@@ -60,10 +78,15 @@ function correrFfmpeg(args) {
 /**
  * Detecta los silencios de `entrada`, los saca (con colchon `pad` a cada lado) y
  * devuelve el video resultante ya concatenado y normalizado en loudness (-14 LUFS).
- * Devuelve { salida, tramos, duracionFinal }. `tramos` son los pares [inicio, fin]
- * (en el tiempo ORIGINAL de `entrada`) que se conservaron, ya fusionados/limpiados.
+ * Devuelve { salida, tramos, duracionFinal, tramosFallidos }. `tramos` son los pares
+ * [inicio, fin] (en el tiempo ORIGINAL de `entrada`) que se intentaron conservar, ya
+ * fusionados/limpiados. `tramosFallidos` son los que ffmpeg NO pudo recortar (fallo
+ * puntual de ese segmento): esos tramos quedan afuera del video final SIN abortar todo
+ * el corte, pero el caller (studio.mjs) tiene que avisarlo bien fuerte — footage que
+ * desaparece del video sin ningun aviso es peor que un corte que tarda mas o falla entero.
+ * `_cortarUnTramo` es un punto de inyeccion para tests (default: `cortarUnTramo` real).
  */
-export async function cortarSilencios({ entrada, salida, db = -30, min = 0.6, pad = 0.15 }) {
+export async function cortarSilencios({ entrada, salida, db = -30, min = 0.6, pad = 0.15, _cortarUnTramo = cortarUnTramo }) {
   const dur = duracionDe(entrada);
   const sil = await detectarSilencios({ entrada, db, min });
 
@@ -92,10 +115,16 @@ export async function cortarSilencios({ entrada, salida, db = -30, min = 0.6, pa
     throw new Error("No quedo ningun tramo despues de sacar los silencios (revisa db/min/pad).");
   }
 
-  const tmpDir = path.join(path.dirname(salida), "_cut_exact_tmp");
-  fs.rmSync(tmpDir, { recursive: true, force: true });
+  // Nombre unico por corrida (randomUUID, mismo patron que lib/enhance.mjs con su .trf):
+  // dos `cortarSilencios` concurrentes escribiendo hacia la misma carpeta de salida no
+  // pueden compartir este directorio — el `rmSync` de arranque de UNA corrida borraria
+  // los segmentos a medio escribir de la OTRA. Con un nombre unico, esa colision no existe.
+  const tmpDir = path.join(path.dirname(salida), `_cut_exact_tmp_${randomUUID()}`);
   fs.mkdirSync(tmpDir, { recursive: true });
 
+  // Declarado FUERA del try: `tramosFallidos` tiene que sobrevivir al bloque para
+  // llegar hasta el `return` de abajo (el finally solo limpia el tmpDir, no el resultado).
+  const tramosFallidos = [];
   try {
     // 3) Cortar cada tramo con re-encode preciso: -ss/-to DESPUES de -i (frame-exact)
     // es lo que evita los duplicados por I-frames que da un "-ss antes de -i" + copy.
@@ -103,16 +132,14 @@ export async function cortarSilencios({ entrada, salida, db = -30, min = 0.6, pa
     for (let i = 0; i < merged.length; i++) {
       const [ss, ee] = merged[i];
       const segFile = path.join(tmpDir, `seg_${String(i).padStart(4, "0")}.ts`);
-      const r = spawnSync("ffmpeg", [
-        "-ss", ss.toFixed(3),
-        "-to", ee.toFixed(3),
-        "-i", entrada,
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "16",
-        "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
-        "-avoid_negative_ts", "make_zero",
-        "-y", segFile,
-      ], { stdio: "pipe" });
-      if (r.status !== 0) continue; // segmento fallido: se lo salta (igual que el original)
+      const r = _cortarUnTramo({ entrada, ss, ee, segFile });
+      if (r.status !== 0) {
+        // Segmento fallido: NO se lo salta en silencio. Se registra con el detalle real
+        // de ffmpeg para que el caller pueda avisar que ese tramo de footage se perdio.
+        const detalle = (r.stderr || "").toString().trim().slice(-500) || `ffmpeg salio con codigo ${r.status}`;
+        tramosFallidos.push({ indice: i, desde: ss, hasta: ee, error: detalle });
+        continue;
+      }
       segFiles.push(segFile);
     }
     if (segFiles.length === 0) {
@@ -162,5 +189,5 @@ export async function cortarSilencios({ entrada, salida, db = -30, min = 0.6, pa
   }
 
   const duracionFinal = duracionDe(salida);
-  return { salida, tramos: merged, duracionFinal };
+  return { salida, tramos: merged, duracionFinal, tramosFallidos };
 }

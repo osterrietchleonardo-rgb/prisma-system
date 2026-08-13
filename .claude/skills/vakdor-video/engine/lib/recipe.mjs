@@ -51,7 +51,11 @@ function resolverTiempo(item, palabras, avisos, etiqueta) {
   return cuales[n - 1].inicioSec;
 }
 
-function cargarJsonDeArchivo(ruta) {
+// Exportada: studio.mjs necesita leer el bloque `corte` de la receta ANTES de tener
+// la duracion post-corte (que a su vez necesita para llamar a `cargarReceta` completo),
+// asi que lee el JSON crudo por su cuenta con esta misma funcion en vez de duplicar el
+// parseo (y su mensaje de error) a mano.
+export function cargarJsonDeArchivo(ruta) {
   const texto = fs.readFileSync(ruta, "utf8");
   try {
     return JSON.parse(texto);
