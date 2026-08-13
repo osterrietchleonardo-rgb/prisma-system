@@ -14,7 +14,7 @@ const STUDIO = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "st
 // para trabajo real de produccion), estas pruebas dispararian llamadas reales sin
 // querer. Blanquear la key ademas prueba a proposito el camino "segui sin transcribir".
 const SIN_GROQ = { ...process.env, GROQ_API_KEY: "" };
-let dir, clip, clipLargo;
+let dir, clip, clipLargo, clipChico;
 before(() => {
   dir = dirTemporal();
   clip = crearClipDePrueba({ segundos: 8, salida: path.join(dir, "in.mp4") });
@@ -22,11 +22,16 @@ before(() => {
   // el render extra no vuelva lenta la prueba. Sirve para verificar que el recorte
   // de preview arranca EXACTO donde se pide y no en el keyframe mas cercano.
   clipLargo = crearClipDePrueba({ segundos: 30, ancho: 640, alto: 360, salida: path.join(dir, "largo.mp4") });
+  // Chico y corto a proposito: --estabilizar hace 2 pasadas de vidstab ADEMAS del
+  // corte y el compose normales, y las pruebas de wiring de Task 10 no necesitan
+  // resolucion real para verificar que el flag se enchufo bien.
+  clipChico = crearClipDePrueba({ segundos: 3, ancho: 480, alto: 270, salida: path.join(dir, "chico.mp4") });
 });
 after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 const archivosResiduales = (d) =>
-  fs.readdirSync(d).filter((f) => f.startsWith(".preview-fuente") || f.startsWith(".studio-corte"));
+  fs.readdirSync(d).filter((f) =>
+    f.startsWith(".preview-fuente") || f.startsWith(".studio-corte") || f.startsWith(".studio-estab") || f.endsWith(".trf"));
 
 test("parsea flags con y sin valor", () => {
   const a = parsearArgs(["--in=x.mp4", "--formato=9:16", "--check"]);
@@ -212,4 +217,70 @@ test("--srt con un archivo que no existe falla con un mensaje claro, no con un s
   assert.notEqual(r.status, 0);
   assert.match(r.stdout + r.stderr, /no-existe\.srt/);
   assert.equal(fs.existsSync(salida), false);
+});
+
+// --- Task 10: wiring de --limpiar y --estabilizar (fuera del brief original de
+// studio.mjs, pero siguiendo el mismo patron de --formato/--calidad de arriba). ---
+
+test("sin --limpiar ni --estabilizar, el reporte los declara apagados", () => {
+  const salida = path.join(dir, "sin-limpieza.mp4");
+  const r = spawnSync("node", [STUDIO, `--in=${clip}`, `--out=${salida}`, "--sin-corte"],
+    { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Limpieza:\s*no\.\s*Estabilizacion:\s*no\./i, r.stdout);
+});
+
+test("--limpiar invalido por CLI falla con mensaje claro, no en silencio", () => {
+  const salida = path.join(dir, "cli-limpiar-malo.mp4");
+  const r = spawnSync("node", [STUDIO, `--in=${clip}`, `--out=${salida}`, "--limpiar=medio", "--sin-corte"],
+    { encoding: "utf8", env: SIN_GROQ });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout + r.stderr, /medio/, "el mensaje tiene que nombrar el valor invalido");
+  assert.match(r.stdout + r.stderr, /suave.*normal.*fuerte|fuerte.*normal.*suave/i, "el mensaje tiene que listar los validos");
+  assert.equal(fs.existsSync(salida), false, "un nivel de limpieza invalido no puede terminar escribiendo un video");
+});
+
+test("--limpiar=normal queda en el reporte y no deja temporales propios", () => {
+  const salida = path.join(dir, "con-limpieza.mp4");
+  const r = spawnSync("node", [STUDIO, `--in=${clip}`, `--out=${salida}`, "--limpiar=normal", "--sin-corte"],
+    { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Limpieza:\s*normal\./i, r.stdout);
+  assert.ok(fs.existsSync(salida));
+  assert.deepEqual(archivosResiduales(dir), [], "la limpieza es un filtro en el grafo, no tiene que dejar temporales");
+});
+
+test("--estabilizar corre antes que todo lo demas, queda en el reporte y limpia su .trf", () => {
+  const salida = path.join(dir, "estabilizado.mp4");
+  const r = spawnSync("node", [STUDIO, `--in=${clipChico}`, `--out=${salida}`, "--estabilizar", "--sin-corte"],
+    { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Estabilizacion:\s*aplicada/i, r.stdout);
+  assert.match(r.stdout, /Limpieza:\s*no\.\s*Estabilizacion:\s*si\./i, r.stdout);
+  assert.ok(fs.existsSync(salida));
+  // OJO: el pipeline COMPLETO reformatea al formato de la receta (16:9 = 1920x1080
+  // por default), asi que las dimensiones del archivo final NO tienen por que
+  // coincidir con las del clip de entrada (480x270) — eso ya lo confirma
+  // filtroDeFormato/construirGrafo, no es lo que esta prueba de wiring audita. Lo
+  // que SI corresponde verificar aca es que la duracion no se rompio (estabilizar
+  // trabaja sobre el archivo entero, sin recortar ni duplicar) y que no queda
+  // basura de los pasos intermedios. La preservacion real de dimensiones por
+  // `estabilizar()` ya se prueba de forma aislada en enhance.test.mjs.
+  const datos = spawnSync("ffprobe", ["-v", "error", "-select_streams", "v:0",
+    "-show_entries", "stream=width,height:format=duration", "-of", "csv=p=0", salida], { encoding: "utf8" }).stdout;
+  assert.match(datos, /1920,1080/, "el formato 16:9 por default tiene que aplicarse igual con --estabilizar");
+  const dur = Number(datos.trim().split("\n").pop());
+  assert.ok(Math.abs(dur - 3) < 0.5, `la duracion del clip (3s) no puede cambiar de forma silenciosa, dio ${dur}s`);
+  assert.deepEqual(archivosResiduales(dir), [],
+    "ni el .studio-estab-*.mp4 intermedio ni el .trf de vidstab pueden sobrevivir al pipeline");
+});
+
+test("--limpiar y --estabilizar combinados: ambos quedan aplicados en el reporte", () => {
+  const salida = path.join(dir, "combo.mp4");
+  const r = spawnSync("node", [STUDIO, `--in=${clipChico}`, `--out=${salida}`,
+    "--limpiar=suave", "--estabilizar", "--sin-corte"], { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Limpieza:\s*suave\.\s*Estabilizacion:\s*si\./i, r.stdout);
+  assert.ok(fs.existsSync(salida));
+  assert.deepEqual(archivosResiduales(dir), []);
 });

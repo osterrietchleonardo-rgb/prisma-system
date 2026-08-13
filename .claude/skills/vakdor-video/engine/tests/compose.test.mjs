@@ -26,6 +26,24 @@ test("sin camara ni color, el grafo solo ajusta el formato", () => {
   assert.ok(!filtroVideo.includes("eq="));
 });
 
+test("la limpieza entra al grafo, entre el formato y el color", () => {
+  const { receta } = cargarReceta({ limpieza: "normal", grade: { preset: "moody" } }, { durationSec: 6, palabras: [] });
+  const { filtroVideo } = construirGrafo({ receta, info });
+  assert.ok(filtroVideo.includes("hqdn3d"));
+  assert.ok(filtroVideo.includes("cas"));
+  const posFormato = filtroVideo.indexOf("scale");
+  const posLimpieza = filtroVideo.indexOf("hqdn3d");
+  const posColor = filtroVideo.indexOf("eq=");
+  assert.ok(posFormato < posLimpieza && posLimpieza < posColor,
+    `orden esperado formato < limpieza < color, dio ${posFormato},${posLimpieza},${posColor}`);
+});
+
+test("sin --limpiar, el grafo no agrega nada de limpieza (receta sin el campo)", () => {
+  const { receta } = cargarReceta({}, { durationSec: 6, palabras: [] });
+  const { filtroVideo } = construirGrafo({ receta, info });
+  assert.ok(!filtroVideo.includes("hqdn3d"));
+});
+
 test("el color entra al grafo", () => {
   const { receta } = cargarReceta({ grade: { preset: "moody" } }, { durationSec: 6, palabras: [] });
   const { filtroVideo } = construirGrafo({ receta, info });

@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { filtroDeColor } from "./grade.mjs";
+import { filtroDeLimpieza } from "./enhance.mjs";
 import { filtroDeFormato, FORMATOS } from "./reframe.mjs";
 import { filtroZoom, filtroEscalaFija, filtroWhipPan, filtroPush, elegirMultiplicador } from "./camera.mjs";
 import { elegirEncoder } from "./encoder.mjs";
@@ -12,6 +13,7 @@ export function construirGrafo({ receta, info }) {
   const formato = filtroDeFormato({
     anchoOrigen: info.width, altoOrigen: info.height, formato: receta.formato,
   });
+  const limpieza = filtroDeLimpieza(receta.limpieza);
   const color = filtroDeColor(receta.grade.preset, { vignette: receta.grade.vignette });
 
   const segundosConZoom = receta.camara
@@ -63,8 +65,10 @@ export function construirGrafo({ receta, info }) {
   if (cursor < info.durationSec) tramos.push({ desde: cursor, hasta: info.durationSec, filtro: "" });
   if (tramos.length === 0) tramos.push({ desde: 0, hasta: info.durationSec, filtro: "" });
 
-  // `base` es lo que se le aplica a TODOS los tramos: formato + color.
-  const filtroVideo = [formato, color].filter(Boolean).join(",");
+  // `base` es lo que se le aplica a TODOS los tramos: formato + limpieza + color, en
+  // ese orden (limpiar la imagen ANTES de gradear color: el denoise/sharpen de
+  // `filtroDeLimpieza` esta medido sobre imagen sin gradear, ver lib/enhance.mjs).
+  const filtroVideo = [formato, limpieza, color].filter(Boolean).join(",");
   return { filtroVideo, tramos, multiplicador, avisos };
 }
 

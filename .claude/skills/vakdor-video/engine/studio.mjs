@@ -17,6 +17,7 @@ import { elegirEncoder } from "./lib/encoder.mjs";
 import { FORMATOS } from "./lib/reframe.mjs";
 import { cortarSilencios } from "./lib/cut.mjs";
 import { transcribir } from "./lib/transcribe.mjs";
+import { NIVELES_LIMPIEZA, estabilizar } from "./lib/enhance.mjs";
 
 export function parsearArgs(argv) {
   return Object.fromEntries(argv.map((a) => {
@@ -37,7 +38,7 @@ const MARGEN_SEEK_RAPIDO = 5;
 async function main() {
   const args = parsearArgs(process.argv.slice(2));
   if (!args.in || !args.out) {
-    console.error("Uso: node studio.mjs --in=crudo.mp4 --out=final.mp4 [--receta=receta.json] [--check] [--preview=SEG] [--sin-corte] [--srt=archivo.srt]");
+    console.error("Uso: node studio.mjs --in=crudo.mp4 --out=final.mp4 [--receta=receta.json] [--check] [--preview=SEG] [--sin-corte] [--srt=archivo.srt] [--limpiar=suave|normal|fuerte] [--estabilizar]");
     process.exit(1);
   }
   if (args.srt && !fs.existsSync(args.srt)) {
@@ -57,8 +58,25 @@ async function main() {
     let entradaTrabajo = args.in;
     let info = infoOriginal;
     let palabras = [];
+    let estabilizado = false;
 
     if (!args.check) {
+      // --- Paso 0: estabilizar (si se pide) ---
+      // Corre ANTES que todo lo demas (incluso antes de cortar silencios): vidstab
+      // necesita analizar el archivo entero de una sola pasada, y el resto del
+      // pipeline (corte, transcripcion, compose) tiene que trabajar ya sobre el
+      // video estabilizado, no sobre el crudo con temblor.
+      if (args.estabilizar) {
+        const salidaEstab = path.join(path.dirname(args.out), `.studio-estab-${process.pid}-${Date.now()}.mp4`);
+        temporales.push(salidaEstab);
+        const re = await estabilizar({ entrada: entradaTrabajo, salida: salidaEstab });
+        entradaTrabajo = re.salida;
+        estabilizado = true;
+        console.log("Estabilizacion: aplicada (vidstab, 2 pasadas).");
+      } else {
+        console.log("Estabilizacion: no.");
+      }
+
       // --- Paso 1: sacar silencios ---
       if (args["sin-corte"]) {
         console.log("Corte: salteado (--sin-corte).");
@@ -66,7 +84,7 @@ async function main() {
         const salidaCorte = path.join(path.dirname(args.out), `.studio-corte-${process.pid}-${Date.now()}.mp4`);
         temporales.push(salidaCorte);
         const rc = await cortarSilencios({
-          entrada: args.in,
+          entrada: entradaTrabajo,
           salida: salidaCorte,
           db: RECETA_DEFAULT.corte.db,
           min: RECETA_DEFAULT.corte.min,
@@ -97,16 +115,21 @@ async function main() {
     const { receta, avisos } = cargarReceta(crudaReceta, { durationSec: info.durationSec, palabras });
     if (args.formato) receta.formato = args.formato;
     if (args.calidad) receta.calidad = args.calidad;
+    if (args.limpiar) receta.limpieza = args.limpiar;
 
     // cargarReceta valida formato/calidad ANTES de que --formato/--calidad los
     // pisen. Si no se revalida aca, un typo como --formato=9x16 llega crudo a
     // construirGrafo (que revienta con un TypeError de JS, sin decir cual es el
     // problema) y un typo como --calidad=turbo no revienta nunca: se vuelve
-    // "rapido" en silencio y el reporte final no lo menciona.
+    // "rapido" en silencio y el reporte final no lo menciona. Mismo trato para
+    // --limpiar: NIVELES_LIMPIEZA no la conoce "cargarReceta" (no es parte de su
+    // esquema), asi que "no" es valido ademas de los 3 niveles.
     if (!FORMATOS[receta.formato])
       throw new Error(`El formato "${receta.formato}" no existe. Validos: ${Object.keys(FORMATOS).join(", ")}.`);
     if (!CALIDADES.includes(receta.calidad))
       throw new Error(`La calidad "${receta.calidad}" no existe. Validas: ${CALIDADES.join(", ")}.`);
+    if (receta.limpieza && receta.limpieza !== "no" && !NIVELES_LIMPIEZA[receta.limpieza])
+      throw new Error(`El nivel de limpieza "${receta.limpieza}" no existe. Validos: ${Object.keys(NIVELES_LIMPIEZA).join(", ")}, no.`);
 
     const { filtroVideo, tramos, multiplicador, avisos: avisosGrafo } = construirGrafo({ receta, info });
     const todosLosAvisos = [...avisos, ...avisosGrafo];
@@ -168,7 +191,7 @@ async function main() {
         entrada = tmp;
 
         const r = await componer({ entrada, salida: args.out, receta: recetaEfectiva, info: infoEfectiva, encoder });
-        reportarFinal({ args, r, receta, recetaEfectiva, avisos: todosLosAvisos, recorte });
+        reportarFinal({ args, r, receta, recetaEfectiva, avisos: todosLosAvisos, recorte, estabilizado });
       } finally {
         // Se borra siempre, incluso si el corte o el render fallaron a mitad de camino:
         // un preview no tiene que dejar basura en la carpeta de salida.
@@ -178,7 +201,7 @@ async function main() {
     }
 
     const r = await componer({ entrada, salida: args.out, receta: recetaEfectiva, info: infoEfectiva, encoder });
-    reportarFinal({ args, r, receta, recetaEfectiva, avisos: todosLosAvisos, recorte });
+    reportarFinal({ args, r, receta, recetaEfectiva, avisos: todosLosAvisos, recorte, estabilizado });
   } finally {
     for (const f of temporales) fs.rmSync(f, { force: true });
   }
@@ -188,9 +211,12 @@ async function main() {
  * mezclan avisos de camara/efectos/b-roll bajo una sola cuenta ambigua, y los
  * efectos que quedaron afuera de la ventana de preview se cuentan aparte de
  * los avisos de la receta (son cosas distintas, con causas distintas). */
-function reportarFinal({ args, r, receta, recetaEfectiva, avisos, recorte }) {
+function reportarFinal({ args, r, receta, recetaEfectiva, avisos, recorte, estabilizado }) {
   console.log(`\nListo: ${args.out}`);
   console.log(`Tardo ${r.segundos.toFixed(1)} segundos con el encoder ${r.encoder}.`);
+
+  const limpieza = receta.limpieza && receta.limpieza !== "no" ? receta.limpieza : "no";
+  console.log(`Limpieza: ${limpieza}. Estabilizacion: ${estabilizado ? "si" : "no"}.`);
 
   const aplicados = recetaEfectiva.camara.length;
   const fueraDeVentana = recorte ? receta.camara.length - recetaEfectiva.camara.length : 0;
