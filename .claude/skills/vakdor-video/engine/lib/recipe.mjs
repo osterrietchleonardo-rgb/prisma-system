@@ -16,7 +16,9 @@ export const RECETA_DEFAULT = {
 };
 
 const ESTILOS = ["autoridad", "dinamico", "demo"];
-const CALIDADES = ["auto", "max", "rapido"];
+// Exportada: studio.mjs la reusa para validar --calidad ANTES de que el valor
+// pisado por CLI llegue a construirGrafo/componer (que ya no lo revalidan).
+export const CALIDADES = ["auto", "max", "rapido"];
 const MODOS_SUBS = ["karaoke", "premium", "simple", "no"];
 
 /** Saca acentos y pasa a minusculas, para que el anclaje no falle por tipeo. */

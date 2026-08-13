@@ -11,9 +11,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { probe } from "./lib/probe.mjs";
-import { cargarReceta } from "./lib/recipe.mjs";
+import { cargarReceta, CALIDADES } from "./lib/recipe.mjs";
 import { construirGrafo, componer } from "./lib/compose.mjs";
 import { elegirEncoder } from "./lib/encoder.mjs";
+import { FORMATOS } from "./lib/reframe.mjs";
 
 export function parsearArgs(argv) {
   return Object.fromEntries(argv.map((a) => {
@@ -46,14 +47,25 @@ async function main() {
   if (args.formato) receta.formato = args.formato;
   if (args.calidad) receta.calidad = args.calidad;
 
-  const { filtroVideo, tramos, multiplicador } = construirGrafo({ receta, info });
+  // cargarReceta valida formato/calidad ANTES de que --formato/--calidad los
+  // pisen. Si no se revalida aca, un typo como --formato=9x16 llega crudo a
+  // construirGrafo (que revienta con un TypeError de JS, sin decir cual es el
+  // problema) y un typo como --calidad=turbo no revienta nunca: se vuelve
+  // "rapido" en silencio y el reporte final no lo menciona.
+  if (!FORMATOS[receta.formato])
+    throw new Error(`El formato "${receta.formato}" no existe. Validos: ${Object.keys(FORMATOS).join(", ")}.`);
+  if (!CALIDADES.includes(receta.calidad))
+    throw new Error(`La calidad "${receta.calidad}" no existe. Validas: ${CALIDADES.join(", ")}.`);
+
+  const { filtroVideo, tramos, multiplicador, avisos: avisosGrafo } = construirGrafo({ receta, info });
+  const todosLosAvisos = [...avisos, ...avisosGrafo];
   console.log(`Receta: formato ${receta.formato}, estilo ${receta.estilo}, color ${receta.grade.preset}`);
   console.log(`Grafo: ${tramos.length} tramo(s), sobre-muestreo ${multiplicador}x`);
   if (process.env.STUDIO_DEBUG) console.log(filtroVideo);
 
-  if (avisos.length) {
+  if (todosLosAvisos.length) {
     console.log("\nAvisos:");
-    for (const a of avisos) console.log(`  - ${a}`);
+    for (const a of todosLosAvisos) console.log(`  - ${a}`);
   }
 
   if (args.check) {
@@ -105,7 +117,7 @@ async function main() {
       entrada = tmp;
 
       const r = await componer({ entrada, salida: args.out, receta: recetaEfectiva, info: infoEfectiva, encoder });
-      reportarFinal({ args, r, receta, recetaEfectiva, avisos, recorte });
+      reportarFinal({ args, r, receta, recetaEfectiva, avisos: todosLosAvisos, recorte });
     } finally {
       // Se borra siempre, incluso si el corte o el render fallaron a mitad de camino:
       // un preview no tiene que dejar basura en la carpeta de salida.
@@ -115,7 +127,7 @@ async function main() {
   }
 
   const r = await componer({ entrada, salida: args.out, receta: recetaEfectiva, info: infoEfectiva, encoder });
-  reportarFinal({ args, r, receta, recetaEfectiva, avisos, recorte });
+  reportarFinal({ args, r, receta, recetaEfectiva, avisos: todosLosAvisos, recorte });
 }
 
 /** Imprime el reporte final. Cada numero se calcula por separado: nunca se
@@ -130,7 +142,11 @@ function reportarFinal({ args, r, receta, recetaEfectiva, avisos, recorte }) {
   const fueraDeVentana = recorte ? receta.camara.length - recetaEfectiva.camara.length : 0;
   const detalleVentana = recorte ? ` Fuera de la ventana de preview (no se aplicaron): ${fueraDeVentana}.` : "";
   console.log(`Efectos de camara aplicados: ${aplicados}.${detalleVentana}`);
-  console.log(`Avisos totales (camara + efectos + b-roll, ver arriba): ${avisos.length}.`);
+  // "Avisos totales" cubre la receta COMPLETA (camara + efectos + b-roll: lo que
+  // valida cargarReceta) mas los que agrega construirGrafo (camara tapada por
+  // otro movimiento). Esta fase solo RENDERIZA los de camara, por eso se aclara:
+  // que la receta tenga avisos de efectos/b-roll no significa que se hayan aplicado.
+  console.log(`Avisos totales de la receta: ${avisos.length} (esta fase solo aplica los movimientos de camara).`);
 }
 
 // Guard de punto de entrada: `studio.mjs` se importa desde el test para probar

@@ -46,6 +46,31 @@ test("--check falla con codigo != 0 si la receta esta mal", () => {
   assert.match(r.stdout + r.stderr, /21:9/);
 });
 
+test("--formato invalido por CLI falla con mensaje claro, no con un TypeError crudo", () => {
+  // La receta que carga cargarReceta es valida (formato por defecto), pero
+  // --formato la pisa DESPUES de esa validacion. Sin revalidar, esto llegaba
+  // crudo a construirGrafo y reventaba con "Cannot destructure property 'ancho'
+  // of undefined" — un mensaje en ingles que no dice cual es el problema real.
+  const salida = path.join(dir, "cli-formato-malo.mp4");
+  const r = spawnSync("node", [STUDIO, `--in=${clip}`, `--out=${salida}`, "--formato=9x16"],
+    { encoding: "utf8" });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout + r.stderr, /9x16/, "el mensaje tiene que nombrar el valor invalido");
+  assert.doesNotMatch(r.stdout + r.stderr, /TypeError|Cannot destructure/, "no puede escaparse un stack trace crudo de JS");
+  assert.equal(fs.existsSync(salida), false, "un formato invalido no puede terminar escribiendo un video");
+});
+
+test("--calidad invalida por CLI falla en vez de caer en silencio a 'rapido'", () => {
+  // Antes: --calidad=turbo no rompia nada. receta.calidad === "max" ? "max" :
+  // "rapido" convertia CUALQUIER valor no reconocido en "rapido" sin avisar.
+  const salida = path.join(dir, "cli-calidad-mala.mp4");
+  const r = spawnSync("node", [STUDIO, `--in=${clip}`, `--out=${salida}`, "--calidad=turbo"],
+    { encoding: "utf8" });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stdout + r.stderr, /turbo/, "el mensaje tiene que nombrar el valor invalido");
+  assert.equal(fs.existsSync(salida), false, "una calidad invalida no puede terminar escribiendo un video");
+});
+
 test("--preview con un clip mas corto que la ventana no revienta y se recorta al largo real", () => {
   // OJO: la ventana de preview mide 20s y este clip dura 8s, asi que la ventana
   // pedida (--preview=4) NO puede terminar siendo "corta" respecto del propio
@@ -76,6 +101,29 @@ test("--preview arranca EXACTO en la ventana pedida, no en el keyframe mas cerca
     "-of", "csv=p=0", salida], { encoding: "utf8" }).stdout.trim());
   assert.ok(Math.abs(dur - 20) < 0.6, `la ventana de preview tendria que durar ~20s, dio ${dur}s`);
   assert.deepEqual(archivosResiduales(dir), [], "el recorte temporal de preview tiene que borrarse");
+});
+
+test("el reporte cuenta bien los efectos de camara dentro y fuera de la ventana de preview", () => {
+  // clipLargo dura 30s. --preview=15 pide el centro en 15s, ventana de 20s
+  // ancho: [5s, 25s). Dos movimientos caen ADENTRO (t=10, t=20) y dos caen
+  // AFUERA (t=2, t=27). Si el filtro de la ventana tuviera un operando
+  // cambiado o una comparacion invertida, este numero (no 0-0 como en las
+  // otras pruebas de preview, que usan camara: []) lo delataria.
+  const receta = path.join(dir, "ventana-camara.json");
+  fs.writeFileSync(receta, JSON.stringify({
+    camara: [
+      { t: 2, fx: "jumpCutClose" },
+      { t: 10, fx: "jumpCutClose" },
+      { t: 20, fx: "jumpCutWide" },
+      { t: 27, fx: "jumpCutClose" },
+    ],
+  }));
+  const salida = path.join(dir, "ventana-camara.mp4");
+  const r = spawnSync("node", [STUDIO, `--in=${clipLargo}`, `--out=${salida}`,
+    `--receta=${receta}`, "--preview=15"], { encoding: "utf8", timeout: 180000 });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Efectos de camara aplicados:\s*2\b/, r.stdout);
+  assert.match(r.stdout, /Fuera de la ventana de preview \(no se aplicaron\):\s*2\b/, r.stdout);
 });
 
 test("el temporal de preview se borra aunque el render falle DESPUES de crearse", () => {
