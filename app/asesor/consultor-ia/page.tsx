@@ -12,6 +12,8 @@ import { createClient } from "@/lib/supabase"
 import { toast } from "sonner"
 import { AiCreditBadge } from "@/components/ai-credit-badge"
 import { ConsultorResultsSection, MatchedPropertiesResponse, UnifiedProperty } from "@/components/shared/consultor-results"
+import { Map } from "lucide-react"
+import { MapaTab } from "@/components/mapa/mapa-tab"
 
 interface Property {
   id: string
@@ -61,6 +63,7 @@ export default function AdvisorConsultorIAPage() {
       content: "¡Hola! Soy tu Buscador IA. Estoy listo para ayudarte a encontrar la propiedad ideal en tu cartera. ¿Qué estás buscando hoy?"
     }
   ])
+  const [view, setView] = useState<"chat" | "mapa">("chat")
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [sessions, setSessions] = useState<Session[]>([])
@@ -256,7 +259,35 @@ export default function AdvisorConsultorIAPage() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden bg-background">
+    <div className="flex flex-col h-full overflow-hidden bg-background">
+      {/* Barra de solapas: Buscador / Mapa */}
+      <div className="flex items-center gap-1 border-b bg-card/30 backdrop-blur-sm px-3 shrink-0">
+        <button
+          onClick={() => setView("chat")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors",
+            view === "chat" ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Bot className="w-4 h-4" /> Buscador
+        </button>
+        <button
+          onClick={() => setView("mapa")}
+          className={cn(
+            "flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors",
+            view === "mapa" ? "border-accent text-accent" : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Map className="w-4 h-4" /> Mapa
+        </button>
+      </div>
+
+      {view === "mapa" ? (
+        <div className="flex-1 min-h-0 overflow-y-auto p-3">
+          <MapaTab />
+        </div>
+      ) : (
+    <div className="flex flex-1 min-h-0 overflow-hidden bg-background">
       {/* Fondo oscuro (solo celular) para cerrar el cajón del historial */}
       {isSidebarOpen && (
         <div
@@ -505,6 +536,8 @@ export default function AdvisorConsultorIAPage() {
           </p>
         </CardFooter>
       </div>
+    </div>
+      )}
     </div>
   )
 }

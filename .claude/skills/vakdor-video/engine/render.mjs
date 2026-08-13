@@ -35,6 +35,10 @@ if (!propsPath || !outPath) {
 
 const props = JSON.parse(fs.readFileSync(propsPath, "utf8"));
 
+// Formato de salida (vertical|horizontal|cuadrado). Si no viene por --format ni en el
+// props.json, la composicion usa "vertical". Las dimensiones salen de calculateMetadata.
+if (args.format) props.format = args.format;
+
 // Preparar carpeta de fotos servidas
 const publicCurrent = path.join(__dirname, "public", "current");
 fs.rmSync(publicCurrent, { recursive: true, force: true });

@@ -996,6 +996,68 @@ Sincroniza las visitas (`scheduled_visits`) hacia el Google Calendar personal de
 
 ---
 
+## 21. Mapa del Buscador IA
+
+Rutas: `/director/consultor` y `/asesor/consultor-ia`, solapa "Mapa".
+Componentes en `components/mapa/`, lógica pura en `lib/mapa/` (81 tests con `node --test`).
+
+### Tablas y funciones
+
+| Objeto | Para qué |
+|---|---|
+| `mapa_zonas` | zonas a mano alzada, privadas por `user_id` |
+| `mapa_barrios` | catálogo de barrios buscable (normalizado, con recuadro) |
+| `mapa_manzanas` | polígonos de manzana derivados de OSM (PostGIS) |
+| `mapa_precio_m2_manzanas` / `_celdas` / `_barrios` | precio por m² precalculado |
+| `mapa_baldosas_intentos` | control de la cola de trazado automático |
+| `mapa_cartera()` / `mapa_colaboracion()` | los pines del rectángulo visible |
+| `mapa_buscar_barrios()` / `_cartera()` | sugerencias del buscador |
+| `mapa_precio_m2_por_manzana()` / `mapa_ranking_barrios()` | el mapa de calor |
+| `refrescar_*()` | rearman lo precalculado |
+
+### Índices que NO son opcionales
+
+Cada uno de estos nació de un `statement timeout` real, no de una optimización preventiva:
+
+- `idx_roomix_geo_filtros` — GiST compuesto (`btree_gist`) que mezcla `point(lng,lat)` con
+  operación, tipo, moneda y precio. Sin él, un filtro que no coincide con nada obliga a
+  recorrer el rectángulo entero: 16.439 ms medidos para devolver cero.
+- `idx_roomix_barrio_normalizado` — índice de expresión sobre `barrio_normalizado()`. Sin
+  él, filtrar por barrio tardaba 8.337 ms y se cancelaba solo. `unaccent()` no se puede
+  indexar directamente (depende de un diccionario configurable): va envuelta con el
+  diccionario explícito para volverla inmutable, y calificada con su esquema.
+- `idx_mapa_manzanas_geom`, `idx_precio_m2_celdas_geo`, `idx_mapa_barrios_trgm`.
+
+### Trampas verificadas
+
+- **PostgREST recorta toda respuesta a 1.000 filas**, aunque la función SQL pida más. El
+  truco de "pedir uno de más para saber si hay más" NO funciona: hay que tomar como
+  recortado el hecho de llenar el cupo.
+- **La política de contenido (`next.config.mjs`) gobierna el mapa.** Los proveedores de
+  baldosas van en `img-src`; `api.maptiler.com` va TAMBIÉN en `connect-src` porque se le
+  consulta el estado con `fetch`. Verificar con `curl` no sirve: ignora la CSP.
+- **MapTiler con clave inválida devuelve 403 con una imagen PNG válida adentro** (el cartel
+  "Invalid key"). El evento `tileerror` de Leaflet nunca se dispara. Hay que mirar el
+  estado HTTP.
+- **La clave de MapTiler exige la cabecera `Origin`**, que el servidor no manda: el
+  geocoder se llama desde el navegador, no desde el backend. Los orígenes permitidos deben
+  incluir `*.vakdor.com` (`vakdor.com` a secas NO cubre subdominios) y `localhost`.
+- **`100vh` no descuenta la barra de direcciones en el celular**: va `dvh`.
+
+### Tareas automáticas
+
+| Workflow | Cuándo | Qué hace |
+|---|---|---|
+| `mapa-manzanas.yml` | 03:30 UTC | traza manzanas nuevas donde hay propiedades sin cubrir, de a 80 baldosas |
+| `mapa-refrescar.yml` | 08:00 UTC | recalcula barrios, cuadrícula, ranking y precio por manzana |
+
+Secretos necesarios: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_API_KEY_MANAGEMENT`,
+`SITE_DOMAIN`, `CRON_SECRET`. En Vercel: `NEXT_PUBLIC_MAPTILER_KEY` (sin ella el mapa usa
+OpenStreetMap, que funciona igual).
+
+La cola de trazado la arma la base sola: busca las propiedades que no caen dentro de
+ninguna manzana. Si la red publica en una zona nueva, se traza esa misma noche.
+
 ## FIN DEL DOCUMENTO
 
 Documento técnico de PRISMA basado en análisis directo del código fuente, sin ejecución ni modificación del sistema. Para la lógica detallada endpoint por endpoint, ver `LOGICA-PRISMA.md`.

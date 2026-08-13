@@ -760,6 +760,47 @@ PRISMA es **modular**: tu agencia puede tener módulos **habilitados o deshabili
 
 ---
 
+## 27. El Mapa del Buscador IA
+
+Tus asesores tienen, dentro del Buscador IA, una solapa **Mapa** con todas las propiedades
+—las de la agencia y las de la red de colaboración— ubicadas geográficamente.
+
+### Para qué sirve, en tu lugar
+
+- **Mostrarle al cliente dónde está todo**, en vez de describírselo.
+- **Saber cuánto vale el metro en cada manzana**, con el ranking de barrios del más caro al
+  más barato. Es el dato que sostiene una tasación cuando el cliente discute el precio.
+- **Ver dónde tenés cartera y dónde no**, de un vistazo.
+
+### El precio por metro cuadrado
+
+El mapa pinta cada manzana de verde (barato) a rojo (caro) según el precio mediano
+publicado. No es un promedio: usamos la mediana, porque un solo departamento caro correría
+el número de toda la manzana.
+
+Lo que conviene que sepas para usarlo bien:
+
+- Es **precio de publicación, no de cierre**. Es lo que se está pidiendo en esa manzana.
+- Las manzanas **más transparentes** tienen una o dos propiedades: el dato existe pero es
+  flojo, y no debería usarse solo para fijar un precio.
+- Se actualiza **todas las noches** con lo que haya en el sistema.
+
+### Privacidad entre agencias
+
+Las zonas que dibuja un asesor son **suyas**: ni vos ni otro asesor las ven. Y el catálogo
+de barrios que alimenta el buscador se arma únicamente con la red compartida, nunca con la
+cartera de las agencias: ninguna inmobiliaria puede deducir en qué barrios trabajan las
+demás.
+
+### Qué necesita mantenimiento
+
+Casi nada, pero conviene que lo sepas:
+
+- El dibujo de las manzanas se completa solo, guiado por dónde hay propiedades. Cuando la
+  red publica en una zona nueva, esa zona se dibuja esa misma noche.
+- Si alguna noche fallara alguna de las dos tareas automáticas, GitHub avisa por mail. El
+  mapa sigue funcionando: solo quedarían los precios del día anterior.
+
 ## FIN DE LA GUÍA
 
 Esta guía refleja el sistema PRISMA tal como funciona hoy. Para la guía operativa de tu equipo, compartiles el documento **«PRISMA - Guía del Asesor»**.
