@@ -128,21 +128,38 @@ Esperado: `HTTP 201`. **Gotcha conocido del entorno:** el script tira un assert 
 
 - [ ] **Step 7: Verificar que la firma nueva quedó aplicada**
 
+`apply-sql.mjs` lee el SQL con `readFileSync`, así que **no acepta stdin ni heredoc** (en Windows
+falla). Toda verificación va a un archivo temporal y se le pasa la ruta:
+
 ```bash
-node scratch/apply-sql.mjs /dev/stdin <<'SQL'
+cat > scratch/_check-firma.sql <<'SQL'
 select p.proname, pg_get_function_identity_arguments(p.oid) as args
 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
 where n.nspname = 'public' and p.proname in ('acm_match_properties','acm_match_roomix');
 SQL
+node scratch/apply-sql.mjs scratch/_check-firma.sql
 ```
 
 Esperado: las dos filas incluyen `p_zona_min smallint, p_peso_semantica smallint` antes de `p_limit`.
+Los archivos `scratch/_*.sql` son temporales de verificación: **no se commitean** (`scratch/` ya
+está fuera del árbol versionado para este tipo de archivos — confirmar con `git status` antes del commit).
 
 - [ ] **Step 8: Verificar con datos reales que el filtro funciona**
 
 Belgrano es el caso reportado. Con `p_zona_min => 70` no puede aparecer ningún comparable de Núñez ni Saavedra; con `50` sí.
 
-```sql
+Misma restricción que el Step 7: archivo temporal + ruta, nunca heredoc a `apply-sql.mjs`.
+
+**Dos gotchas verificados de esta consulta:**
+1. En SQL crudo hay que escribir `p_zona_min => 70::smallint`. Sin el cast, Postgres tira
+   `function does not exist`: `int4 → int2` es un cast de categoría *assignment*, no *implicit*.
+   La app no sufre esto (PostgREST castea el JSON al tipo declarado), solo las verificaciones a mano.
+2. `p_limit => 100` **no muestra la diferencia**: el ranking por `match_pct` llena los primeros 100
+   con matches del mismo barrio antes de llegar a los de zona 50. Hay que pedir `p_limit => 2000`
+   para ver la población completa.
+
+```bash
+cat > scratch/_check-zona.sql <<'SQL'
 -- Cuenta de barrios devueltos con el gate estricto (esperado: 0 filas de Nuñez/Saavedra)
 select r.neighborhood, count(*)
 from acm_match_roomix(
@@ -150,13 +167,15 @@ from acm_match_roomix(
   p_type_patterns => array['%apartment%','%accommodation%','%condo%'],
   p_m2 => 80, p_rooms => 3, p_dormitorios => 2, p_bathrooms => 2,
   p_barrio => 'Belgrano', p_zona_niveles => true, p_m2_cubierta => true,
-  p_dedup => true, p_zona_min => 70, p_limit => 100
+  p_dedup => true, p_zona_min => 70::smallint, p_limit => 2000
 ) m
 join roomix_properties r on r.id = m.id
 group by 1 order by 2 desc;
+SQL
+node scratch/apply-sql.mjs scratch/_check-zona.sql
 ```
 
-Repetir con `p_zona_min => 50` y confirmar que ahí **sí** aparecen Núñez y/o Saavedra. Si con 70 aparece alguno, el filtro del Step 3 quedó mal.
+Repetir el mismo bloque cambiando a `p_zona_min => 50` y confirmar que ahí **sí** aparecen Núñez y/o Saavedra. Si con 70 aparece alguno, el filtro del Step 3 quedó mal.
 
 - [ ] **Step 9: Commit**
 
@@ -355,12 +374,46 @@ git commit -m "feat(acm): chip de barrio lindero en la ficha del cliente"
 
 Red de seguridad del contrato de salida del prompt: si el modelo filtra el paso de análisis previo, el asesor no debe ver el andamiaje.
 
+> **REDISEÑADO el 10-ago-2026, decisión de Leonardo.** El diseño original —limpiar el andamiaje
+> del texto corrido con regex— se intentó dos veces y **falló en las dos direcciones a la vez**,
+> verificado ejecutando el código: seguía filtrando razonamiento (listas numeradas enteras; y como
+> el prompt pide analizar 3 cosas, el modelo escribe 2-3 oraciones de análisis y el limpiador solo
+> sacaba la primera) y además borraba descripciones legítimas (`"Análisis de la ubicación: el
+> edificio está a dos cuadras del subte…"` → `""`, y el asesor veía "la IA no devolvió texto").
+>
+> La causa es estructural, no de implementación: mirando texto suelto hay que **adivinar** qué
+> oración es razonamiento y cuál es contenido, y "análisis", "se observa" y "como resultado" son
+> palabras normales de un aviso inmobiliario. Más agresivo borra lo bueno; más suave deja pasar lo
+> malo. No hay punto medio.
+>
+> **Nuevo diseño:** la Task 6 le pide a Gemini **salida estructurada** (`responseMimeType:
+> "application/json"` + `responseSchema`) con dos campos, `analisis` y `descripcion`. El
+> razonamiento tiene su propio lugar, así que no necesita colarse en el párrafo final, y el
+> endpoint simplemente descarta ese campo. El contenido del prompt no cambia: el paso de análisis
+> previo, el tono y las consignas quedan igual — cambia solo cómo viene empaquetada la respuesta.
+>
+> Esto **achica** el alcance de este módulo. Ya no adivina nada:
+> - `extraerDescripcion(crudo)` — parsea el JSON y devuelve el campo `descripcion`. Si el JSON no
+>   parsea o falta el campo, devuelve `""`. **No intenta rescatar el texto con heurísticas:** un
+>   rescate es exactamente el adivinar que este rediseño elimina, y devolver vacío es seguro
+>   (restricción global: si la IA falla se muestra el error y "Buscar comparables" sigue andando).
+> - `sanearDescripcionIA(texto)` — queda como higiene de formato sobre un campo que ya se sabe que
+>   es la descripción: normaliza espacios/saltos y saca restos de markdown. **Sin reglas de
+>   andamiaje, sin cortar por etiquetas, sin descartar párrafos.** Todo lo que fue whack-a-mole se
+>   borra.
+> - `recortarAPalabra(texto, max)` — sin cambios. Ya estaba bien y sus tests pasaron las dos rondas.
+>
+> Los tests de andamiaje/etiquetas/párrafos se eliminan junto con el código que probaban. Se
+> conservan y se refuerzan los de `recortarAPalabra` y los de higiene de formato, y se agregan los
+> de `extraerDescripcion` (JSON válido; JSON roto; campo ausente; campo vacío; JSON con la
+> descripción vacía pero `analisis` lleno).
+
 **Files:**
 - Create: `lib/acm/descripcion-ia.ts`
 - Test: `lib/acm/descripcion-ia.test.ts`
 
 **Interfaces:**
-- Produces: `MAX_DESC_IA = 700`; `sanearDescripcionIA(texto: string): string`; `recortarAPalabra(texto: string, max: number): string`.
+- Produces: `MAX_DESC_IA = 700`; `extraerDescripcion(crudo: string): string`; `sanearDescripcionIA(texto: string): string`; `recortarAPalabra(texto: string, max: number): string`.
 
 - [ ] **Step 1: Escribir el test que falla**
 
@@ -576,7 +629,8 @@ git commit -m "feat(acm): la descripcion de la IA entra al texto del embedding d
 - Reference: `lib/gemini.ts:49` (`extractTextFromDocument`, patrón de `inlineData`)
 
 **Interfaces:**
-- Consumes: `sanearDescripcionIA`, `recortarAPalabra`, `MAX_DESC_IA` del Task 4.
+- Consumes: `extraerDescripcion`, `sanearDescripcionIA`, `recortarAPalabra`, `MAX_DESC_IA` del Task 4.
+- El import correspondiente del Step 1 incluye `extraerDescripcion`.
 - Produces: `POST /api/acm/analizar-fotos` con body `{ fotos: {data: string, mimeType: string}[], foco?: string, sujeto?: Partial<Sujeto> }` → `200 { descripcion: string }` | `400 { error }` | `500 { error }`.
 
 - [ ] **Step 1: Escribir el endpoint**
@@ -652,17 +706,37 @@ Sin precio, sin datos de contacto, sin nombre de inmobiliaria.
 Entre 400 y 600 caracteres, en un solo párrafo corrido.
 ${foco ? `\nEl asesor pidió enfocarse en: ${foco}. Priorizalo sin ignorar el resto de las características clave.` : ""}
 
-FORMATO DE SALIDA: el análisis visual previo es un paso interno. Devolvé únicamente el párrafo final, sin encabezados, sin viñetas, sin repetir las consignas, sin prefijos como "Análisis:" o "Descripción:" y sin markdown.`;
+FORMATO DE SALIDA: devolvé un JSON con dos campos. En "analisis" va el análisis visual previo (es un paso interno, nadie lo ve). En "descripcion" va únicamente el párrafo final, sin encabezados, sin viñetas, sin repetir las consignas, sin prefijos como "Análisis:" o "Descripción:" y sin markdown.`;
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
+    // Salida estructurada: el análisis previo tiene su propio campo, así que no puede
+    // colarse en el párrafo final. Sin esto habría que adivinar, mirando texto corrido,
+    // qué oración es razonamiento y cuál es contenido — y "análisis", "se observa" o
+    // "como resultado" son palabras normales de un aviso inmobiliario. Se probó y falla
+    // en las dos direcciones: filtra andamiaje y borra descripciones buenas.
+    const model = genAI.getGenerativeModel({
+      model: "gemini-3.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            analisis: { type: "string" },
+            descripcion: { type: "string" },
+          },
+          required: ["analisis", "descripcion"],
+        },
+      },
+    });
 
     const result = await model.generateContent([
       ...fotos.map((f: any) => ({ inlineData: { data: f.data, mimeType: f.mimeType } })),
       prompt,
     ]);
 
-    const crudo = result.response.text();
+    // `analisis` se descarta acá: existe para darle al modelo dónde poner el razonamiento,
+    // no para mostrarlo.
+    const crudo = extraerDescripcion(result.response.text());
     const descripcion = recortarAPalabra(sanearDescripcionIA(crudo), MAX_DESC_IA);
     if (!descripcion) {
       return NextResponse.json({ error: "La IA no devolvió texto. Probá de nuevo." }, { status: 500 });
