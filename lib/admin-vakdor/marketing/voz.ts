@@ -101,6 +101,10 @@ export function promptRevision(texto: string, etapa: EtapaEmbudo, hooksPrevios: 
   return [
     `Sos el editor. Evaluá esta pieza (etapa del embudo: ${etapa.toUpperCase()}) contra la rúbrica.`,
     `RÚBRICA:\n${RUBRICA.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
+    // Sin esto, el criterio 6 le pedía al juez que evaluara una regla que nunca le dijimos: la
+    // instrucción de CTA por etapa iba solo al prompt de escritura. Acá va la hoja de respuestas.
+    `REGLA DE CIERRE DE ESTA ETAPA (es la respuesta del criterio 6):\n${instruccionCta(etapa)}`,
+    `Para el criterio 6 juzgá SOLO el cuerpo: el primer comentario no está incluido en la PIEZA y se revisa aparte. Que no haya link en el cuerpo NO es un fallo.`,
     hooksPrevios.length ? `APERTURAS YA USADAS (no puede parecerse a ninguna):\n${hooksPrevios.map((h) => `- ${h}`).join("\n")}` : "",
     `PIEZA:\n"""\n${texto}\n"""`,
     `Devolvé SOLO JSON: {"aprobado": true|false, "fallos": ["<nro de criterio>: <qué falla y en qué línea>"]}`,

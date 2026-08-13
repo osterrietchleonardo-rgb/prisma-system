@@ -72,4 +72,15 @@ describe("rúbrica", () => {
     expect(p).toContain("hook viejo uno")
     expect(p).toMatch(/"aprobado"/)
   })
+
+  // El criterio 6 le pedía al juez que evaluara una regla que nunca le habíamos dicho.
+  it("le da al juez la regla de CTA de la etapa (la respuesta del criterio 6)", () => {
+    expect(promptRevision("PIEZA", "bofu", [])).toContain(instruccionCta("bofu"))
+    expect(promptRevision("PIEZA", "tofu", [])).toContain(instruccionCta("tofu"))
+    expect(promptRevision("PIEZA", "mofu", [])).toContain(instruccionCta("mofu"))
+  })
+
+  it("aclara que el primer comentario no está en la PIEZA, para no pedir el link en el cuerpo", () => {
+    expect(promptRevision("PIEZA", "bofu", [])).toMatch(/primer comentario no está incluido/i)
+  })
 })

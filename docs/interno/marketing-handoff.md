@@ -44,7 +44,7 @@
 ## ✅ Embudo TOFU/MOFU/BOFU + estructura copywriter + desarrollo solo-worker (main)
 - **Desarrollo solo por el worker:** mover a "En proceso" ya NO dispara el desarrollo in-app (texto sin imágenes, que volcaba las slides como texto y no generaba imagen en blog). Desarrolla el worker (estructura + imágenes de marca). Se quitó ese botón.
 - **Estructura vakdor-copywriter:** las descripciones de LinkedIn (post, carrusel, versión LinkedIn del blog) siguen la estructura de `platform_structures.md` (hook→fricción→quiebre→solución→prueba→CTA, 1500-2500 car).
-- **Embudo:** columna `funnel` (`tofu|mofu|bofu`) + badge de color en la tarjeta/visor + selector en Nueva idea + filtro en calendario + el motor balancea las 3 etapas. El worker adapta el contenido a la etapa (`funnelInstruccion`): TOFU no vende, MOFU muestra el mecanismo, BOFU empuja a la reunión. Verificado (TOFU vs BOFU dan tono/CTA distintos).
+- **Embudo:** columna `funnel` (`tofu|mofu|bofu`) + badge de color en la tarjeta/visor + selector en Nueva idea + filtro en calendario + el motor balancea las 3 etapas. El worker adapta el contenido a la etapa (`instruccionCta`): TOFU no vende, MOFU muestra el mecanismo, BOFU manda a **ver el video de la demostración** (`vakdor.com/demostracion`, y el link va **solo en el primer comentario**). Verificado (TOFU vs BOFU dan tono/CTA distintos).
 
 ## ✅ Skills reales + análisis diario (main)
 - **Skills reales (`marketing-worker/skills.mjs`):** el worker carga los `.md` reales de vakdor-copywriter (+ platform_structures/angles/hooks), vakdor-carousel y Vakdor-LeadMagnet (~85K car) y los sigue al pie. Van como bloque de system **cacheado** (`cache_control: ephemeral`) → se escribe 1 vez por ráfaga, las piezas siguientes leen barato (verificado: cache_write 42.764 la 1ª, cache_read después). `SKILLS_DIR` override para EasyPanel.
@@ -60,22 +60,32 @@ Antes, todas las piezas salían con el mismo molde (hook → fricción → quieb
   insert into marketing_recursos (tipo, titulo, detalle)
   values ('escena', 'Título corto de la escena', 'La situación concreta desarrollada en 1-2 frases, con un detalle específico (hora/día/tipo de propiedad).');
   ```
-  Entra a la rotación automáticamente en el próximo ciclo del worker — no hace falta reiniciar nada. Lo mismo aplica para agregar una `estructura` o un `comentario` nuevos (con `clave` corta en minúsculas) o para editar el `canon` (fila única `tipo='canon'`). Para sacar una escena/estructura/comentario de circulación sin borrarla, poner `activo=false` en vez de borrar la fila (así no se pierde el historial de usos).
+  Entra a la rotación automáticamente en el próximo ciclo del worker — no hace falta reiniciar nada.
+
+  **Qué se puede agregar solo con SQL y qué no** (importante, para no romper el generador):
+  - **Escenas: libres.** Agregá todas las que quieras con el `insert` de arriba. Es la única fila que se lee entera desde la base (`titulo` + `detalle`), así que una escena nueva funciona sola.
+  - **Editar el `canon`** (fila única `tipo='canon'`): libre también, se lee entero desde la base.
+  - **Estructuras y tipos de comentario nuevos: NO alcanza con el `insert`, hace falta tocar el código.** De esas filas el generador solo usa la `clave`; el texto que se le manda a la IA está escrito en el código (`voz.mjs` / `voz.ts`). Si agregás una `clave` que el código no conoce, el prompt sale con la palabra `undefined` adentro y la pieza sale mal. O sea: primero se agrega el texto en el código, después la fila.
+  - Para sacar una escena/estructura/comentario de circulación sin borrarla, poner `activo=false` en vez de borrar la fila (así no se pierde el historial de usos).
 - **Qué significa cada campo de `receta`** (columna jsonb en `marketing_ideas`, se llena sola al procesar la idea):
   - `estructura`: la forma narrativa que usó esa pieza (una de las 8 del banco, ej. `confesion`, `contraste`).
   - `escenas`: los 2 ids de `marketing_recursos` (tipo `escena`) que sirvieron de apoyo.
   - `comentario_tipo`: el tipo del primer comentario (una de las 5 claves, ej. `pregunta_binaria`).
   - `modelo`: el modelo de IA que escribió la pieza (`claude-sonnet-5`).
-  - `revision`: `{aprobado, reintentos, fallos}` — si `aprobado=true` y `reintentos=0`, pasó la revisión a la primera; si `reintentos=1`, falló algún punto de la rúbrica (los motivos están en `fallos`) y se reescribió una vez antes de quedar lista.
+  - `revision`: `{aprobado, reintentos, fallos, reescritura_descartada}` — si `aprobado=true` y `reintentos=0`, pasó la revisión a la primera; si `reintentos=1`, falló algún punto de la rúbrica (los motivos están en `fallos`) y se reescribió una vez antes de quedar lista. Si además `reescritura_descartada=true`, la reescritura volvió rota (vacía o cortada a la mitad) y se dejó el texto original: los `fallos` siguen ahí sin corregir, conviene mirar esa pieza a mano.
 - **`ANTHROPIC_API_KEY` tiene que estar en 3 lugares** (si falta en cualquiera de los 3, esa parte del sistema no genera nada):
   1. **Local:** `.env` de PRISMA-SYSTEM (ya confirmado presente).
   2. **EasyPanel:** variables del servicio del worker de Marketing (pendiente de confirmar por Leo — no se puede chequear desde acá).
   3. **Vercel:** variables de entorno del proyecto (pendiente de confirmar por Leo). **Sin esta variable en Vercel + un redeploy, los botones "Desarrollar"/"Reformular" del panel fallan en producción** (son los que corren in-app, no en el worker).
 - **Prueba end-to-end (ago-2026):** se insertaron 3 ideas de prueba (una por etapa del embudo) y se corrió el worker hasta procesarlas. Las 3 terminaron con contenido, portada y `receta` completos: 3 estructuras distintas, 6 escenas distintas (sin repetir entre piezas), 3 tipos de primer comentario distintos, y el link `vakdor.com/demostracion` apareció únicamente en el comentario de la pieza BOFU (nunca en un cuerpo de post). Detalle completo (texto de las 3 piezas + verificación punto por punto) en `docs/superpowers/sdd/2026-08-10-marketing-voz-humana/task-12-report.md`.
 
-## ⚠️ Problemas conocidos (encontrados en la prueba end-to-end, no bloquean el uso normal)
-- El worker intenta clasificar los posts de Buffer para el análisis diario de rendimiento, pero le falta pasar el cliente de IA en esa llamada puntual — falla en silencio en cada ciclo y el "ranking de qué rinde más" nunca se termina de armar. No afecta la generación de contenido ni las piezas de la prueba.
-- En 2 de las 3 piezas de la prueba, que necesitaron una reescritura tras la revisión, el texto final quedó envuelto en tres comillas (`"""`) al principio y al final — un detalle a limpiar antes de publicar esas piezas puntuales, revisando el texto en el visor. No pasa en las piezas que aprueban a la primera.
+## ✅ Arreglado (venía de la prueba end-to-end)
+- **El "ranking de qué rinde más" ya se arma.** Al worker le faltaba pasar el cliente de IA en esa llamada y fallaba en silencio en cada ciclo. Corregido. Además, ahora el análisis se intenta **una sola vez por día**: si un día no hay datos suficientes o falla, no se vuelve a intentar hasta el día siguiente (antes lo reintentaba cada 20 segundos, y cada reintento era una llamada paga).
+- **Ya no se cuelan las tres comillas (`"""`) en el texto.** Cuando una pieza necesitaba reescritura, el texto final podía quedar envuelto en `"""` y había que limpiarlo a mano. Corregido: el texto se limpia solo. Y si la reescritura vuelve vacía o cortada a la mitad, **se conserva el texto bueno anterior** en vez de pisarlo.
+
+## ⚠️ Pendientes conocidos (no bloquean el uso normal)
+- **Tipos de comentario 100% editables desde la base:** hoy, agregar un `comentario` nuevo requiere tocar el código además de la fila (ver arriba). Queda como mejora: mover ese texto a la columna `detalle` para que sea igual de libre que las escenas.
+- **Artículos de blog:** la revisión de calidad (la rúbrica de 7 puntos) se le aplica al artículo de la web, no al post de LinkedIn que lo acompaña. El post de LinkedIn del blog sale sin esa revisión. Conocido, queda para la próxima pasada.
 
 ## ⏭️ QUÉ FALTA (infra)
 1. **Deploy del worker a EasyPanel** (always-on, sin depender de la PC de Leo) — **igual que el acm-extractor**: Dockerfile con base `mcr.microsoft.com/playwright`, instalar las deps (playwright/@anthropic-ai/sdk/@supabase/supabase-js/pdfkit/marked), env vars como secrets, `CMD ["node","watch.mjs"]`. El worker ya es host-agnóstico (logos data-URI, sin rutas absolutas en el render).

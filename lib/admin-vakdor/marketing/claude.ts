@@ -42,11 +42,25 @@ export function extraerTexto(content: unknown[]): string {
     .trim()
 }
 
+/**
+ * `stop_reason: "max_tokens"` = la respuesta viene cortada a la mitad. Los caminos que parsean
+ * JSON explotan solos (JSON.parse tira), pero los de texto crudo — la reescritura de la revisión —
+ * devuelven una pieza a medio escribir que NO es falsy y pisa en silencio a una completa.
+ * Se trata como fallo de la llamada: quien llama decide (acá, conservar el texto original).
+ */
+export function verificarNoTruncada(stopReason: unknown, maxTokens: unknown): void {
+  if (stopReason === "max_tokens") {
+    throw new Error(`respuesta truncada por max_tokens (${String(maxTokens)}): el thinking adaptativo consumió el presupuesto de salida`)
+  }
+}
+
 export async function generarTexto(system: string, user: string, opts: OpcionesLlamada = {}): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error("Falta ANTHROPIC_API_KEY")
   const client = new Anthropic({ apiKey })
+  const params = construirParams(system, user, opts)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const res = await client.messages.create(construirParams(system, user, opts) as any)
+  const res = await client.messages.create(params as any)
+  verificarNoTruncada((res as { stop_reason?: unknown }).stop_reason, params.max_tokens)
   return extraerTexto(res.content as unknown[])
 }

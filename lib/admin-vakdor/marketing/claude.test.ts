@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { construirParams, extraerTexto, MODELO } from "./claude"
+import { construirParams, extraerTexto, verificarNoTruncada, MODELO } from "./claude"
 
 describe("construirParams", () => {
   it("usa Sonnet 5 con thinking adaptativo", () => {
@@ -56,5 +56,21 @@ describe("extraerTexto", () => {
 
   it("si solo hay thinking devuelve string vacío en vez de romper", () => {
     expect(extraerTexto([{ type: "thinking", thinking: "x" }])).toBe("")
+  })
+})
+
+describe("verificarNoTruncada", () => {
+  // Una respuesta cortada por max_tokens NO es falsy: sin este chequeo, media pieza pisaba
+  // en silencio a una completa (el camino de texto crudo no tiene un JSON.parse que explote).
+  it("tira si la respuesta se cortó por max_tokens", () => {
+    expect(() => verificarNoTruncada("max_tokens", 8000)).toThrow(/max_tokens/)
+    expect(() => verificarNoTruncada("max_tokens", 8000)).toThrow(/8000/)
+  })
+
+  it("no tira con un final normal", () => {
+    expect(() => verificarNoTruncada("end_turn", 8000)).not.toThrow()
+    expect(() => verificarNoTruncada("stop_sequence", 8000)).not.toThrow()
+    expect(() => verificarNoTruncada(null, 8000)).not.toThrow()
+    expect(() => verificarNoTruncada(undefined, 8000)).not.toThrow()
   })
 })
