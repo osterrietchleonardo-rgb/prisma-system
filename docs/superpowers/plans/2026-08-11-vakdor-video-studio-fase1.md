@@ -1833,15 +1833,22 @@ export function filtroDolly({ pct, duracionSec, fps, ancho, alto, direccion = "i
 
 - [ ] **Step 4: Reconocerlos en `compose.mjs`**
 
-En `movimientoDe`, agregar antes del `throw`:
+`movimientoDe` cambió de firma durante la revisión de la Tarea 7: ahora es
+`movimientoDe(c, duracionReal)`, donde `duracionReal` es `hasta - desde`, la duración **real** del
+tramo. Puede ser más corta que `c.dur` si el tramo se topa con el final del video o con otro
+movimiento. Los efectos con animación tienen que armarse con esa duración, no con `c.dur`, si no
+corren a la velocidad equivocada.
+
+Agregar antes del `throw`:
 
 ```js
 if (c.fx === "drift") return filtroDrift({ ancho, alto, intensidad: c.intensidad ?? 0.5 });
 if (c.fx === "dolly")
-  return filtroDolly({ pct: c.pct ?? 6, duracionSec: c.dur ?? 4, direccion: c.direccion ?? "in", ...comun });
+  return filtroDolly({ pct: c.pct ?? 6, duracionSec: duracionReal, direccion: c.direccion ?? "in", ...comun });
 ```
 
-Y agregar `"dolly"` al set `MOVIMIENTOS_CON_DURACION`. `drift` no entra: no tiene sobre-muestreo caro.
+Y agregar `"dolly"` al set `MOVIMIENTOS_CON_DURACION`, porque paga el sobre-muestreo del zoom.
+`drift` no entra: solo escala un 10% y no usa `zoompan`.
 
 - [ ] **Step 5: Correr y verificar que pasan**
 
