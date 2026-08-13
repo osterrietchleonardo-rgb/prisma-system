@@ -34,6 +34,24 @@
 -- aplicarse SOLO (una única sentencia), nunca junto a otras sentencias en el mismo request —
 -- si se manda junto con otro SQL en la misma llamada a /database/query, Postgres las envuelve
 -- en una transacción implícita y esta sentencia falla con "cannot run inside a transaction block".
+--
+-- ══════════════════════════════════════════════════════════════════════════════════════════
+-- ⚠️  APLICAR ESTE ARCHIVO SOLO — EN SU PROPIA LLAMADA A /database/query, SIN NINGÚN OTRO SQL
+--     EN EL MISMO REQUEST. No alcanza con que la sentencia falle fuerte si se manda mal: si
+--     CONCURRENTLY se interrumpe a mitad de camino por CUALQUIER motivo (timeout de la conexión,
+--     DDL concurrente sobre la misma tabla, el proceso que la corre muere), NO tira un error
+--     visible en el resultado final — deja un índice INVALID que Postgres crea igual pero el
+--     planner directamente ignora. El síntoma es silencio total: todo sigue "funcionando", solo
+--     que a la velocidad VIEJA, sin ningún error que avise que el índice no se terminó de
+--     construir. Verificar SIEMPRE después de aplicar, con:
+--
+--       select indexrelid::regclass, indisvalid from pg_index
+--       where indexrelid = 'idx_roomix_zona_operacion'::regclass;
+--
+--     `indisvalid` tiene que dar `true`. Si da `false`: `DROP INDEX idx_roomix_zona_operacion;`
+--     y volver a correr este archivo (nunca `REINDEX`, que sí toma el lock exclusivo que
+--     CONCURRENTLY existe para evitar).
+-- ══════════════════════════════════════════════════════════════════════════════════════════
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_roomix_zona_operacion
   ON public.roomix_properties (
     (public.acm_norm(btrim(coalesce(nullif(neighborhood, ''), city, '')))),

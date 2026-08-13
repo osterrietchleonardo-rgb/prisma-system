@@ -25,6 +25,7 @@
 // tiene que poder apagarse si el asesor la ve ordenando mal en la práctica.
 // ─────────────────────────────────────────────────────────────────────────────
 import { SchemaType, type Schema } from "@google/generative-ai";
+import { recortarAPalabra, MAX_DESC_IA } from "./descripcion-ia";
 
 export const MAX_FOTOS_ANALISIS = 4;
 /** Tope de comparables analizados por corrida (dato real: 12.8 comparables ≥90% en promedio,
@@ -189,7 +190,14 @@ export function extraerAnalisisFotos(crudo: string): AnalisisFotoIA {
       // veces devuelve el NOMBRE del campo ("motivo_no_evaluable") como si fuera su propio
       // valor, en vez de null. El campo solo tiene sentido cuando es false: se fuerza acá en
       // vez de confiar en que el modelo lo deje vacío.
-      motivo_no_evaluable: fmi ? null : typeof j?.motivo_no_evaluable === "string" ? j.motivo_no_evaluable : null,
+      // Recortado igual que `descripcion` (mismo tope, `MAX_DESC_IA`): es texto libre del
+      // modelo sin ningún tope propio, y se muestra tal cual en la tarjeta del comparable y en
+      // la lista de advertencias antes de crear la ficha — un texto desmedido rompería esa UI.
+      motivo_no_evaluable: fmi
+        ? null
+        : typeof j?.motivo_no_evaluable === "string"
+          ? recortarAPalabra(j.motivo_no_evaluable, MAX_DESC_IA)
+          : null,
       estado_conservacion: estado,
       calidad_terminaciones: terminaciones,
       luminosidad,
@@ -198,6 +206,26 @@ export function extraerAnalisisFotos(crudo: string): AnalisisFotoIA {
   } catch {
     return { descripcion: "", atributos: null };
   }
+}
+
+// ── Coerción de valores leídos de la caché (acm_fotos_analisis_cache) ──────────────────────
+// Las columnas `estado_conservacion` / `calidad_terminaciones` / `luminosidad` son `text`
+// nullable SIN CHECK en la base (deliberado: evita otra migración de producción solo para
+// esto). El código que las escribe siempre manda uno de los niveles válidos, pero nada en el
+// schema lo garantiza — un `null` viejo, una fila tocada a mano, o un futuro `INSERT` que se
+// salte este módulo pasarían de largo. Sin coercionar, `fotos-comparables/route.ts` hacía
+// `as any` y un valor así llegaba intacto hasta `ORDEN_ESTADO[valor]` → `undefined` →
+// `NaN` en el % de la tarjeta y en el comparador de orden (inestable). Coercionar acá, en el
+// único lugar que lee la caché, hace que un dato corrupto se trate igual que "sin_evidencia"
+// (ya es un valor esperado en todo el resto del código) en vez de propagar `undefined`.
+export function coercionarEstado(v: unknown): EstadoConservacionFoto {
+  return NIVELES_ESTADO.includes(v as EstadoConservacionFoto) ? (v as EstadoConservacionFoto) : "sin_evidencia";
+}
+export function coercionarTerminaciones(v: unknown): CalidadTerminacionesFoto {
+  return NIVELES_TERMINACIONES.includes(v as CalidadTerminacionesFoto) ? (v as CalidadTerminacionesFoto) : "sin_evidencia";
+}
+export function coercionarLuminosidad(v: unknown): LuminosidadFoto {
+  return NIVELES_LUMINOSIDAD.includes(v as LuminosidadFoto) ? (v as LuminosidadFoto) : "sin_evidencia";
 }
 
 // ── Fórmula de ajuste ±5 (calibracion-final.md: estado_conservacion 70% + luminosidad 30%,

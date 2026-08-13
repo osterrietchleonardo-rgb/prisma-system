@@ -154,8 +154,11 @@ export async function POST(req: Request) {
     // se manda un flag en `meta` para que el front avise que el resultado está incompleto.
     if (carteraRes.error) console.error("acm_match_properties error:", carteraRes.error);
     if (roomixRes.error) console.error("acm_match_roomix error:", roomixRes.error);
-    const carteraFallo = Boolean(carteraRes.error);
-    const roomixFallo = Boolean(roomixRes.error);
+    // `let`, no `const`: la segunda tanda de queries (re-traer las filas completas, más abajo)
+    // puede fallar independientemente del RPC y también tiene que poder marcar el fallo — ver
+    // hallazgo I3 de la revisión final.
+    let carteraFallo = Boolean(carteraRes.error);
+    let roomixFallo = Boolean(roomixRes.error);
 
     const carteraRanked = carteraRes.data || [];
     const roomixRanked = roomixRes.data || [];
@@ -180,9 +183,33 @@ export async function POST(req: Request) {
               "id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, tokko_data, assigned_agent"
             )
             .in("id", carteraIds)
-        : Promise.resolve({ data: [] as any[] }),
-      roomixIds.length ? supabase.from("roomix_properties").select("*").in("id", roomixIds) : Promise.resolve({ data: [] as any[] }),
+        : Promise.resolve({ data: [] as any[], error: null as any }),
+      roomixIds.length
+        ? supabase
+            .from("roomix_properties")
+            // Columnas puntuales, NO "*": un "*" trae también la columna `embedding` (768
+            // dimensiones) para hasta 100 filas — un peso extra que es, de por sí, un candidato
+            // plausible al mismo timeout que esta rama existe para dejar de esconder (hallazgo
+            // I3 de la revisión final). Lista acotada a lo que efectivamente lee el `.map` de
+            // abajo (líneas ~265-280).
+            .select(
+              "id, title, address, neighborhood, property_type, area_m2, bedrooms, bathrooms, price, currency, images, canonical_url, roomix_agency_name, date_posted, amenities"
+            )
+            .in("id", roomixIds)
+        : Promise.resolve({ data: [] as any[], error: null as any }),
     ]);
+
+    // Mismo motivo que el RPC de arriba: si esta segunda tanda falla, el resultado quedaría
+    // vacío (`carteraFull.data || []` → `[]`) con un 200 limpio y CERO comparables — exactamente
+    // el estado que este flag existe para evitar. Antes de este fix, `.error` acá nunca se leía.
+    if (carteraFull.error) {
+      console.error("ACM properties (full-row) error:", carteraFull.error);
+      carteraFallo = true;
+    }
+    if (roomixFull.error) {
+      console.error("ACM roomix_properties (full-row) error:", roomixFull.error);
+      roomixFallo = true;
+    }
 
     const tipoLabel = sujeto.tipo_propiedad || "—";
     // En el checklist el estado de obra pisa el número de años (fmtAnios: 0 = a estrenar, -1 = en pozo).
@@ -283,7 +310,13 @@ export async function POST(req: Request) {
           operacion,
           sujeto,
           exclude_id: excludeId,
-          resultados: { cartera, roomix, con_semantica: Boolean(embStr) },
+          // `cartera_fallo`/`roomix_fallo` viajan DENTRO de `resultados` (mismo criterio que
+          // `con_semantica`, ya guardado acá): es el único campo de esta fila que
+          // `/api/acm/searches/[id]` devuelve tal cual. Sin esto, reabrir una búsqueda que
+          // falló parcialmente desde "Mis ACM" mostraba el resultado incompleto SIN el banner
+          // rojo — exactamente el bug que 1a9d480 arregló para la búsqueda en vivo, resucitado
+          // en el historial (hallazgo I2 de la revisión final).
+          resultados: { cartera, roomix, con_semantica: Boolean(embStr), cartera_fallo: carteraFallo, roomix_fallo: roomixFallo },
           total_cartera: cartera.length,
           total_roomix: roomix.length,
         })

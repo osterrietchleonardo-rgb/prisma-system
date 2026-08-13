@@ -354,7 +354,6 @@ export function ComparablesResult({
   const hayDescripcionSujeto = Boolean(sujeto.descripcion_ia?.trim());
   const [capaFotosActiva, setCapaFotosActiva] = useState(true);
   const [fotosResultados, setFotosResultados] = useState<Map<string, FotoResultadoComparable>>(new Map());
-  const [cargandoFotos, setCargandoFotos] = useState(false);
 
   // Top N por match_pct (≥ piso), de cartera + roomix combinados — mismo criterio sin
   // importar la fuente. Datos reales: 12.8 comparables ≥90% en promedio, máximo 54; el tope
@@ -384,7 +383,6 @@ export function ComparablesResult({
     fetchEnCursoRef.current = top10Key;
 
     const controller = new AbortController();
-    setCargandoFotos(true);
     fetch("/api/acm/fotos-comparables", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -401,7 +399,17 @@ export function ComparablesResult({
       }),
       signal: controller.signal,
     })
-      .then((r) => r.json())
+      // Guardado: sin chequear r.ok/data.error, un 401 (sesión vencida) o un 500 del propio
+      // endpoint devuelven JSON válido `{error:"..."}` y el `.then` de abajo "tendría éxito" con
+      // un `resultados` vacío — las 10 tarjetas quedarían en "Comparando fotos con la IA..." para
+      // siempre, sin ningún toast (mismo patrón que ya usa `analizar()` en fotos-ia.tsx).
+      .then(async (r) => {
+        const data = await r.json().catch(() => null);
+        if (!r.ok || !data || data.error) {
+          throw new Error(data?.error || "No se pudo comparar las fotos de los comparables.");
+        }
+        return data;
+      })
       .then((data) => {
         const nuevo = new Map(fotosResultados);
         for (const r of data.resultados || []) {
@@ -411,9 +419,29 @@ export function ComparablesResult({
       })
       .catch((e) => {
         if (e?.name === "AbortError") return; // cleanup legítimo, no un fallo real
+        console.error("ACM fotos-comparables (cliente):", e);
         toast.error("No se pudo comparar las fotos de los comparables. El resto del ACM sigue funcionando igual.");
-      })
-      .finally(() => setCargandoFotos(false));
+        // Libera la firma: sin esto, un error real (401, 500) deja `fetchEnCursoRef` apuntando
+        // para siempre a esta corrida y nada la vuelve a pedir — ni recargar el switch, porque
+        // la firma (top10Key) no cambió y el guard de arriba la sigue viendo "en vuelo".
+        if (fetchEnCursoRef.current === top10Key) fetchEnCursoRef.current = "";
+        // Estado terminal para cada tarjeta que seguía "cargando": sin esto quedan girando para
+        // siempre en vez de avisar que este comparable puntual no se pudo comparar.
+        setFotosResultados((prev) => {
+          const nuevo = new Map(prev);
+          for (const c of top10) {
+            if (!nuevo.has(c.id)) {
+              nuevo.set(c.id, {
+                descripcion: null,
+                atributos: null,
+                cache: false,
+                error: "No se pudo comparar las fotos de este comparable.",
+              });
+            }
+          }
+          return nuevo;
+        });
+      });
 
     return () => {
       controller.abort();
@@ -468,6 +496,14 @@ export function ComparablesResult({
       .map(({ c, atributos }) => ({ id: c.id, titulo: c.titulo || c.direccion, motivo: atributos!.motivo_no_evaluable }));
   }, [selected, byId, fotosPorId]);
   const [entendidoAdvertencia, setEntendidoAdvertencia] = useState(false);
+  // Si el set de comparables con advertencia cambia (se saca uno flageado y aparece/queda otro,
+  // o un análisis en vuelo termina de resolver y agrega un comparable nuevo a la lista), el "ya
+  // lo sé" tildado deja de servir: era para OTRO conjunto de advertencias. `revisarConclusiones`
+  // ya lo resetea al abrir el modal, pero esto cubre el caso en que el set cambia CON el modal
+  // ya abierto (ej. "Sacar de la ficha" de un ítem, o una respuesta async que llega tarde).
+  useEffect(() => {
+    setEntendidoAdvertencia(false);
+  }, [advertenciasFotos]);
 
   const toggle = (id: string) => {
     setSelected((prev) => {

@@ -92,6 +92,16 @@ function carteraToSujeto(p: CarteraItem, base: Sujeto): Sujeto {
     en_pozo: Boolean(p.en_pozo),
     amenidades: p.amenidades || base.amenidades,
     moneda: (p.currency as any) === "ARS" ? "ARS" : "USD",
+    // La descripción/anclaje de fotos son de la propiedad VIEJA (la que estaba en `base` antes
+    // de este cambio de selección): nunca son válidos para la propiedad nueva. Se resetean acá,
+    // de forma estructural (no dependiendo de que algún efecto en fotos-ia.tsx se acuerde de
+    // limpiarlos) — así ningún llamador de `carteraToSujeto` puede arrastrar sin querer la
+    // condición de A hacia la búsqueda o la ficha de B (hallazgo C1 de la revisión final: el
+    // ancla movía puntos de forma invisible, sin ningún texto en pantalla que lo delatara).
+    descripcion_ia: "",
+    atributos_fotos_ia: null,
+    anclaje_estado_conservacion: undefined,
+    anclaje_luminosidad: undefined,
   };
 }
 

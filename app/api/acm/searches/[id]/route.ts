@@ -31,6 +31,11 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       cartera: Array.isArray(r.cartera) ? r.cartera : [],
       roomix: Array.isArray(r.roomix) ? r.roomix : [],
       con_semantica: Boolean(r.con_semantica),
+      // Ausente en búsquedas guardadas ANTES de este fix (viejo `resultados` sin estos campos):
+      // `Boolean(undefined)` da `false`, el mismo default seguro que ya tenía el front
+      // hardcodeado — ninguna búsqueda vieja pasa a mostrar un banner que antes no tenía.
+      cartera_fallo: Boolean(r.cartera_fallo),
+      roomix_fallo: Boolean(r.roomix_fallo),
       ficha_token: row.ficha_token,
       created_at: row.created_at,
     });

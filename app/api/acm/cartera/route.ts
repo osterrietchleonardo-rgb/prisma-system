@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { tokkoTagsToAmenidades } from "@/lib/acm/tokko";
+import { normalizarImagenes } from "@/lib/acm/fotos-descarga";
 
 export const dynamic = "force-dynamic";
 
@@ -24,15 +25,6 @@ export async function GET() {
       .limit(1000);
 
     if (error) throw error;
-
-    // Normaliza `images` (jsonb): en la práctica es un array de URLs, pero hay filas viejas
-    // con objetos {url}. Devolvemos siempre string[] así el front no tiene que adivinar la forma.
-    const normalizarImagenes = (images: any): string[] => {
-      if (!Array.isArray(images)) return [];
-      return images
-        .map((im: any) => (typeof im === "string" ? im : im?.url))
-        .filter((u: any): u is string => typeof u === "string" && u.length > 0);
-    };
 
     const items = (data || []).map((p: any) => {
       const tags: string[] = Array.isArray(p.tokko_data?.tags)

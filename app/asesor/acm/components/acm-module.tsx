@@ -149,13 +149,20 @@ export function AcmModule() {
       // Ausente (búsquedas guardadas antes de este fix) = false = estricto, el default seguro.
       setIncluirLinderos(Boolean(data.sujeto?.incluir_linderos));
       // Búsqueda del historial: es un snapshot ya guardado, no hay una llamada en vivo que
-      // pueda fallar ahora — no aplica el flag de fallo (siempre false acá).
+      // pueda fallar AHORA — pero si la búsqueda ORIGINAL falló parcialmente (cartera y/o red
+      // no completaron, ej. timeout), ese fallo quedó guardado dentro del propio snapshot
+      // (ver /api/acm/comparables y /api/acm/searches/[id]) y hay que seguir mostrándolo: un
+      // estudio incompleto sigue incompleto al reabrirlo, y sin el banner el asesor podría armar
+      // y mandar una ficha con datos que nunca terminaron de traerse (hallazgo I2 de la revisión
+      // final — antes esto se hardcodeaba en `false` con el argumento de que "un snapshot no
+      // puede fallar", que es cierto para la LECTURA de hoy pero ignora que la búsqueda que lo
+      // generó sí pudo haber fallado).
       setResults({
         cartera: data.cartera || [],
         roomix: data.roomix || [],
         conSemantica: Boolean(data.con_semantica),
-        carteraFallo: false,
-        roomixFallo: false,
+        carteraFallo: Boolean(data.cartera_fallo),
+        roomixFallo: Boolean(data.roomix_fallo),
       });
       setSearchId(data.id);
       setView("results");

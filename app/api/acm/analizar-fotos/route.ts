@@ -13,23 +13,22 @@
 //    rechaza el request entero.
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { requireTenant } from "@/lib/auth/tenant-validation";
-import { extraerDescripcion, sanearDescripcionIA, recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
+import { sanearDescripcionIA, recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
 import {
   construirPromptAnalisisFotos,
   contextoParaPrompt,
   extraerAnalisisFotos,
   SCHEMA_ANALISIS_FOTOS,
 } from "@/lib/acm/analisis-fotos";
+import { normalizarImagenes, descargarFotoValidada, HOSTS_CARTERA } from "@/lib/acm/fotos-descarga";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const MIMES_OK = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FOTOS = 4;
-const MAX_LADO = 1280; // mismo tope que `achicar()` en el navegador (fotos-ia.tsx)
 // Vercel corta el body de la request en 4.5 MB (docs/interno/TECNICO-PRISMA.md §10.8) ANTES
 // de que este handler corra: un tope acá por encima de eso nunca se alcanza, porque la
 // plataforma ya devolvió un 413 no-JSON y el asesor ve el fallback genérico en vez de este
@@ -39,59 +38,17 @@ const MAX_LADO = 1280; // mismo tope que `achicar()` en el navegador (fotos-ia.t
 const MAX_BYTES_TOTAL = 3.5 * 1024 * 1024;
 const MAX_FOCO = 300;
 
-/** Normaliza `properties.images` (jsonb): array de strings o de {url}. */
-function normalizarImagenes(images: any): string[] {
-  if (!Array.isArray(images)) return [];
-  return images
-    .map((im: any) => (typeof im === "string" ? im : im?.url))
-    .filter((u: any): u is string => typeof u === "string" && u.length > 0);
-}
-
-// `properties.images` no la escribe un humano de confianza: la puebla el sync de Tokko desde
-// una API externa (lib/tokko-sync.ts:71, `p.photos.map(f => f.image)`). Aunque el propertyId +
-// index ya vienen scopeados por agencia (nunca hay URL en el body del cliente), una URL corrupta
-// o hostil colada en esa columna igual llegaría a este `fetch()` sin este freno — mismo host
-// que ya está en la allowlist de `next/image` (next.config.mjs) porque son los mismos orígenes
-// reales de fotos de propiedad en todo el sistema.
-const HOSTS_PERMITIDOS = [/^static\.tokkobroker\.com$/, /\.supabase\.co$/];
-const MAX_BYTES_FOTO_CARTERA = 8 * 1024 * 1024; // por-foto, antes de re-achicar con sharp
-
-/** Descarga una foto de la cartera y la re-achica al mismo formato que las subidas a mano. */
+/** Descarga una foto de la cartera y la re-achica al mismo formato que las subidas a mano.
+ *  Wrapper fino sobre el helper compartido (`lib/acm/fotos-descarga.ts`, ver comentario ahí de
+ *  por qué está centralizado): acá solo se agrega el chequeo de "índice/propiedad inexistente",
+ *  específico de este endpoint. `properties.images` no la escribe un humano de confianza (la
+ *  puebla el sync de Tokko desde una API externa, `lib/tokko-sync.ts:71`), así que aunque el
+ *  propertyId + index ya vienen scopeados por agencia (nunca hay URL en el body del cliente),
+ *  una URL corrupta u hostil colada en esa columna igual necesita la allowlist de host del
+ *  helper. */
 async function resolverFotoCartera(url: string | undefined): Promise<{ data: string; mimeType: string }> {
   if (!url) throw new Error("foto de cartera inexistente");
-
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error("URL de foto inválida");
-  }
-  if (parsed.protocol !== "https:" || !HOSTS_PERMITIDOS.some((re) => re.test(parsed.hostname))) {
-    throw new Error("host de foto no permitido");
-  }
-
-  // No seguir redirecciones: un host de la allowlist podría responder 302 hacia un destino
-  // interno y `fetch` lo seguiría sin volver a pasar por el chequeo de arriba.
-  const res = await fetch(parsed, { redirect: "error" });
-  if (!res.ok) throw new Error(`no se pudo descargar (${res.status})`);
-
-  const contentLength = Number(res.headers.get("content-length") || 0);
-  if (contentLength > MAX_BYTES_FOTO_CARTERA) throw new Error("foto de cartera demasiado pesada");
-
-  const buffer = Buffer.from(await res.arrayBuffer());
-  if (buffer.byteLength > MAX_BYTES_FOTO_CARTERA) throw new Error("foto de cartera demasiado pesada");
-
-  // El content-type se valida DESPUÉS de descargar (no evita la descarga en sí, la allowlist de
-  // host de arriba es la que hace ese trabajo) — queda como defensa adicional contra un host
-  // permitido sirviendo algo que no es una imagen.
-  const contentType = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-  if (!contentType.startsWith("image/")) throw new Error("la URL no es una imagen");
-
-  const resized = await sharp(buffer)
-    .resize({ width: MAX_LADO, height: MAX_LADO, fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 82 })
-    .toBuffer();
-  return { data: resized.toString("base64"), mimeType: "image/jpeg" };
+  return descargarFotoValidada(url, HOSTS_CARTERA);
 }
 
 export async function POST(req: Request) {
@@ -188,7 +145,7 @@ export async function POST(req: Request) {
     // `analisis` se descarta acá: existe para darle al modelo dónde poner el razonamiento,
     // no para mostrarlo.
     const { descripcion: crudoDescripcion, atributos } = extraerAnalisisFotos(crudo);
-    const descripcion = recortarAPalabra(sanearDescripcionIA(crudoDescripcion || extraerDescripcion(crudo)), MAX_DESC_IA);
+    const descripcion = recortarAPalabra(sanearDescripcionIA(crudoDescripcion), MAX_DESC_IA);
     if (!descripcion) {
       return NextResponse.json({ error: "La IA no devolvió texto. Probá de nuevo." }, { status: 500 });
     }

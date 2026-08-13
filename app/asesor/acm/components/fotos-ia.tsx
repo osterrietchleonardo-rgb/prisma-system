@@ -10,7 +10,7 @@
 //
 // Ninguna foto se guarda en ningún lado: van al endpoint, vuelve el texto y se descartan.
 // El análisis se hace UNA sola vez; si el texto no convence, se edita a mano.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, ImagePlus, X, Sparkles, Building2, Check, ScanEye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -100,13 +100,32 @@ export function FotosIA({
   // Si el asesor cambia de propiedad dentro del modo cartera (misma solapa, así que este
   // componente NO se remonta), las fotos de cartera ya tildadas quedan apuntando a índices de
   // OTRA propiedad: se descartan. Las subidas a mano no dependen de la propiedad y se conservan.
+  //
+  // `analizado` también se resetea acá — es estado LOCAL de este componente, así que sin este
+  // reset seguiría en `true` después de cambiar de propiedad (aunque `descripcion`/`atributosIA`
+  // ya vengan vacíos desde el padre, ver `carteraToSujeto` en subject-input.tsx), dejando el
+  // botón "Analizar fotos con IA" y la grilla de fotos de cartera ocultos para siempre — sin
+  // forma de volver a analizar la propiedad nueva (hallazgo C1 de la revisión final).
+  //
+  // Guardado con un ref (en vez de resetear siempre que corre el efecto): el primer render de
+  // este componente TAMBIÉN dispara el efecto, y ahí NO hay que pisar `analizado` — si el
+  // componente se remonta con `carteraProperty` y `descripcion` ya cargados (volver de "Editar",
+  // o reabrir un ACM guardado), el `useState` perezoso de `analizado` ya calculó el valor
+  // correcto y este efecto no debe deshacerlo. Solo un cambio de propiedad DESPUÉS del primer
+  // render (mismo montaje, otra selección) cuenta como el caso que hay que limpiar.
+  const propertyIdPrevRef = useRef(carteraProperty?.propertyId);
   useEffect(() => {
+    const cambioDePropiedad = propertyIdPrevRef.current !== carteraProperty?.propertyId;
+    propertyIdPrevRef.current = carteraProperty?.propertyId;
+    if (!cambioDePropiedad) return;
+
     setFotos((prev) => (prev.some((f) => f.kind === "cartera") ? prev.filter((f) => f.kind !== "cartera") : prev));
     // Un aviso de "llegaste al máximo" o un error de la selección anterior (de la propiedad
     // vieja) quedarían pegados en pantalla mostrando un estado que ya no es cierto: se
     // descartan cada vez que cambia la propiedad de origen, se hayan sacado fotos o no.
     setInfo(null);
     setError(null);
+    setAnalizado(false);
   }, [carteraProperty?.propertyId]);
 
   const alternarFotoCartera = (index: number, url: string) => {

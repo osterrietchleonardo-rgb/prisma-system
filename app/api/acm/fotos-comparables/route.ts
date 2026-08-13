@@ -19,7 +19,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
@@ -31,21 +30,26 @@ import {
   SCHEMA_ANALISIS_FOTOS,
   MAX_FOTOS_ANALISIS,
   MAX_COMPARABLES_ANALISIS,
+  coercionarEstado,
+  coercionarTerminaciones,
+  coercionarLuminosidad,
   type AtributosFotoIA,
 } from "@/lib/acm/analisis-fotos";
+import {
+  normalizarImagenes,
+  primerasFotosPermitidas,
+  descargarFotoValidada,
+  HOSTS_CARTERA,
+  HOSTS_ROOMIX,
+} from "@/lib/acm/fotos-descarga";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-// Mismo motivo que HOSTS_PERMITIDOS de app/api/acm/analizar-fotos: `properties.images` y
-// `roomix_properties.images` no las puebla un humano de confianza (sync de Tokko y crawler de
-// roomix respectivamente), así que aunque el id ya venga scopeado por agencia (o sea la red de
-// colaboración, sin scope), una URL corrupta u hostil colada en esas columnas igual llegaría a
-// este `fetch()` sin este freno. `cdn.roomix.ai` es el CDN real de fotos de la red de
-// colaboración (mismo host que ya está en la allowlist de `next/image`, next.config.mjs).
-const HOSTS_PERMITIDOS = [/^static\.tokkobroker\.com$/, /\.supabase\.co$/, /^cdn\.roomix\.ai$/];
-const MAX_BYTES_FOTO = 8 * 1024 * 1024; // por-foto, antes de re-achicar con sharp
-const MAX_LADO = 1280;
+// Un comparable puede venir de la cartera propia (fotos de Tokko/Supabase) o de la red de
+// colaboración (CDN de roomix): la allowlist combina los hosts de las dos fuentes porque acá no
+// se sabe de antemano cuál va a resolver cada URL.
+const HOSTS_PERMITIDOS = [...HOSTS_CARTERA, ...HOSTS_ROOMIX];
 
 interface ComparableIn {
   id: string;
@@ -65,55 +69,8 @@ interface ResultadoComparable {
   error: string | null;
 }
 
-function normalizarImagenes(images: any): string[] {
-  if (!Array.isArray(images)) return [];
-  return images
-    .map((im: any) => (typeof im === "string" ? im : im?.url))
-    .filter((u: any): u is string => typeof u === "string" && u.length > 0);
-}
-
-/** Primeras N URLs de `images` que pasan la allowlist de host, en el orden en que están guardadas
- *  (sin curar — es la misma política que se validó en la ronda de holdout de San Telmo). */
-function primerasFotosPermitidas(images: string[], n: number): string[] {
-  const out: string[] = [];
-  for (const url of images) {
-    if (out.length >= n) break;
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol === "https:" && HOSTS_PERMITIDOS.some((re) => re.test(parsed.hostname))) out.push(url);
-    } catch {
-      // URL inválida: se descarta, no corta el resto.
-    }
-  }
-  return out;
-}
-
 function fotosHash(urls: string[]): string {
   return crypto.createHash("sha256").update(urls.join("|")).digest("hex").slice(0, 32);
-}
-
-/** Descarga una foto (ya validada contra la allowlist) y la re-achica al mismo formato que el
- *  resto del módulo de fotos+IA. */
-async function descargarFoto(url: string): Promise<{ data: string; mimeType: string }> {
-  // No seguir redirecciones: un host de la allowlist podría responder 302 hacia un destino
-  // interno y `fetch` lo seguiría sin volver a pasar por el chequeo de host.
-  const res = await fetch(url, { redirect: "error" });
-  if (!res.ok) throw new Error(`no se pudo descargar (${res.status})`);
-
-  const contentLength = Number(res.headers.get("content-length") || 0);
-  if (contentLength > MAX_BYTES_FOTO) throw new Error("foto demasiado pesada");
-
-  const buffer = Buffer.from(await res.arrayBuffer());
-  if (buffer.byteLength > MAX_BYTES_FOTO) throw new Error("foto demasiado pesada");
-
-  const contentType = (res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-  if (!contentType.startsWith("image/")) throw new Error("la URL no es una imagen");
-
-  const resized = await sharp(buffer)
-    .resize({ width: MAX_LADO, height: MAX_LADO, fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 82 })
-    .toBuffer();
-  return { data: resized.toString("base64"), mimeType: "image/jpeg" };
 }
 
 export async function POST(req: Request) {
@@ -139,13 +96,24 @@ export async function POST(req: Request) {
     const [carteraRes, roomixRes] = await Promise.all([
       carteraIds.length
         ? supabase.from("properties").select("id, images").eq("agency_id", agencyId).in("id", carteraIds)
-        : Promise.resolve({ data: [] as any[] }),
-      roomixIds.length ? supabase.from("roomix_properties").select("id, images").in("id", roomixIds) : Promise.resolve({ data: [] as any[] }),
+        : Promise.resolve({ data: [] as any[], error: null as any }),
+      roomixIds.length
+        ? supabase.from("roomix_properties").select("id, images").in("id", roomixIds)
+        : Promise.resolve({ data: [] as any[], error: null as any }),
     ]);
+
+    // Si la lectura de imágenes falla (cartera y/o roomix), NO hay que reportarlo como "esta
+    // propiedad no tiene fotos" — eso es una afirmación sobre el DATO, y acá lo que falló es la
+    // LECTURA. Sin esta distinción el asesor ve un mensaje factualmente falso en la tarjeta
+    // (ver hallazgo I4 de la revisión final).
+    if (carteraRes.error) console.error("ACM fotos-comparables: no se pudo leer fotos de cartera:", carteraRes.error);
+    if (roomixRes.error) console.error("ACM fotos-comparables: no se pudo leer fotos de roomix:", roomixRes.error);
+    const carteraLecturaFallo = Boolean(carteraRes.error);
+    const roomixLecturaFallo = Boolean(roomixRes.error);
 
     const imagenesPorId = new Map<string, string[]>(); // key: `${fuente}:${propertyId}`
     for (const p of carteraRes.data || []) imagenesPorId.set(`cartera:${p.id}`, normalizarImagenes(p.images));
-    for (const r of roomixRes.data || []) imagenesPorId.set(`roomix:${r.id}`, Array.isArray(r.images) ? r.images.filter((u: any) => typeof u === "string") : []);
+    for (const r of roomixRes.data || []) imagenesPorId.set(`roomix:${r.id}`, normalizarImagenes(r.images));
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({
@@ -161,9 +129,20 @@ export async function POST(req: Request) {
         const propId = c.source === "roomix" ? c.id.replace(/^roomix_/, "") : c.id;
         try {
           const imagenes = imagenesPorId.get(`${c.source}:${propId}`) || [];
-          const urls = primerasFotosPermitidas(imagenes, MAX_FOTOS_ANALISIS);
+          const urls = primerasFotosPermitidas(imagenes, MAX_FOTOS_ANALISIS, HOSTS_PERMITIDOS);
           if (urls.length === 0) {
-            return { id: c.id, descripcion: null, atributos: null, cache: false, error: "Esta propiedad no tiene fotos para comparar." };
+            // Si la lectura de esta fuente falló, "no tiene fotos" sería una afirmación falsa
+            // sobre el dato — acá no se sabe si tiene o no, solo que no se pudo averiguar.
+            const lecturaFallo = c.source === "cartera" ? carteraLecturaFallo : roomixLecturaFallo;
+            return {
+              id: c.id,
+              descripcion: null,
+              atributos: null,
+              cache: false,
+              error: lecturaFallo
+                ? "No se pudo leer las fotos de esta propiedad. Probá de nuevo."
+                : "Esta propiedad no tiene fotos para comparar.",
+            };
           }
           const hash = fotosHash(urls);
 
@@ -181,11 +160,16 @@ export async function POST(req: Request) {
               id: c.id,
               descripcion: cacheado.descripcion,
               atributos: {
-                fotos_muestran_interior: cacheado.fotos_muestran_interior,
+                fotos_muestran_interior: Boolean(cacheado.fotos_muestran_interior),
                 motivo_no_evaluable: cacheado.motivo_no_evaluable,
-                estado_conservacion: cacheado.estado_conservacion as any,
-                calidad_terminaciones: cacheado.calidad_terminaciones as any,
-                luminosidad: cacheado.luminosidad as any,
+                // Coercionado, no `as any`: las columnas son `text` nullable sin CHECK (ver
+                // migración 20260812120000) — un valor null/corrupto acá indexaba a `undefined`
+                // → `NaN%` en la tarjeta y desestabilizaba el comparador de orden (hallazgo M8
+                // de la revisión final). `coercionar*` lo trata como "sin_evidencia", un valor
+                // que el resto del código ya sabe manejar.
+                estado_conservacion: coercionarEstado(cacheado.estado_conservacion),
+                calidad_terminaciones: coercionarTerminaciones(cacheado.calidad_terminaciones),
+                luminosidad: coercionarLuminosidad(cacheado.luminosidad),
               },
               cache: true,
               error: null,
@@ -193,7 +177,7 @@ export async function POST(req: Request) {
           }
 
           // ── Sin caché: descargar (server-side, nunca vía el cliente) y analizar ──
-          const descargas = await Promise.allSettled(urls.map(descargarFoto));
+          const descargas = await Promise.allSettled(urls.map((url) => descargarFotoValidada(url, HOSTS_PERMITIDOS)));
           const fotos = descargas
             .filter((r): r is PromiseFulfilledResult<{ data: string; mimeType: string }> => r.status === "fulfilled")
             .map((r) => r.value);
