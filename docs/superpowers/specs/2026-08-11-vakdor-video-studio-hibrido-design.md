@@ -333,6 +333,40 @@ cuando el total de tramos con zoom supera los 6 minutos.
 Esto **corrige la estimación de la §8**: los 4–6 minutos valen para un video sin zoom o con zoom en
 tramos cortos. Con zoom extendido hay que contar el costo de esta tabla.
 
+---
+
+## 13. Bokeh con máscara fija: probado y descartado (13-ago-2026)
+
+La hipótesis era que, con cámara fija, alcanzaba una máscara ovalada suave para dejar a Leonardo
+nítido y desenfocar la pared, sin necesidad de segmentar la figura frame a frame (inviable: 34.200
+frames en el VSL). Se construyó el prototipo con `geq` + `maskedmerge` y se aplicó a cuatro frames
+reales del VSL. **No pasa el criterio de corte.** No se escribe el módulo.
+
+Evidencia en `docs/superpowers/specs/evidencia/`:
+`2026-08-13-bokeh-descartado-antes-despues.jpg` y `2026-08-13-bokeh-descartado-al-moverse.jpg`.
+
+**Por qué falla, en orden de gravedad:**
+
+1. **No hay nada que desenfocar.** El fondo es una pared lisa de color parejo. Desenfocar una
+   superficie sin detalle no produce ningún cambio visible. El bokeh de un lente real se ve porque
+   el fondo tiene textura, profundidad y luces; acá no hay ninguna de las tres.
+2. **Lo único que se ve es una viñeta.** El borde del óvalo oscurece las esquinas. Eso no es
+   profundidad de campo, es un efecto distinto y no pedido, que además se nota más que el
+   supuesto bokeh.
+3. **Se come las manos.** En el frame donde Leonardo gesticula, las manos quedan fuera del óvalo y
+   se apagan. Es exactamente el criterio de corte que se había fijado: si al moverse una parte del
+   cuerpo se desenfoca, no se entrega.
+4. **Apaga los subtítulos.** La línea de subtítulos vive en la zona baja del cuadro, fuera del
+   óvalo, así que pierde contraste.
+
+**Qué habría que tener para que funcione:** segmentación real de la figura (un modelo de matting
+por frame) y un fondo con textura. Lo primero no existe en este stack y frame a frame es inviable
+por costo; lo segundo depende de dónde se grabe, no del software.
+
+**Conclusión honesta:** el desenfoque de fondo no es un problema de código en este caso. Se
+resuelve grabando con un fondo que tenga profundidad, o con un lente que lo haga ópticamente. Si
+alguna vez se graba con croma verde, la vía es reemplazar el fondo, no desenfocarlo.
+
 ### Descartado por no estar disponible
 
 `scale_vulkan` habría permitido hacer el sobre-muestreo en la GPU. Se probó en esta máquina y el
