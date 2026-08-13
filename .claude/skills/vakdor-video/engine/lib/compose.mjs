@@ -2,10 +2,15 @@ import { spawn } from "node:child_process";
 import { filtroDeColor } from "./grade.mjs";
 import { filtroDeLimpieza } from "./enhance.mjs";
 import { filtroDeFormato, FORMATOS } from "./reframe.mjs";
-import { filtroZoom, filtroEscalaFija, filtroWhipPan, filtroPush, elegirMultiplicador } from "./camera.mjs";
+import {
+  filtroZoom, filtroEscalaFija, filtroWhipPan, filtroPush,
+  filtroDrift, filtroDolly, elegirMultiplicador,
+} from "./camera.mjs";
 import { elegirEncoder } from "./encoder.mjs";
 
-const MOVIMIENTOS_CON_DURACION = new Set(["zoomIn", "zoomOut", "push"]);
+// El `dolly` esta aca porque por dentro ES un zoom: paga el mismo sobre-muestreo.
+// El `drift` NO entra: solo escala un 10% y no usa zoompan, asi que no cuesta.
+const MOVIMIENTOS_CON_DURACION = new Set(["zoomIn", "zoomOut", "push", "dolly"]);
 
 /** Parte la linea de tiempo en tramos: solo los que tienen movimiento pagan el sobre-muestreo. */
 export function construirGrafo({ receta, info }) {
@@ -34,6 +39,9 @@ export function construirGrafo({ receta, info }) {
     if (c.fx === "jumpCutClose") return filtroEscalaFija({ escala: c.escala ?? 1.18, ancho, alto });
     if (c.fx === "jumpCutWide")  return filtroEscalaFija({ escala: c.escala ?? 0.88, ancho, alto });
     if (c.fx === "whipPan")      return filtroWhipPan({ fps: info.fps, ancho, alto, direccion: c.direccion ?? "der" });
+    if (c.fx === "drift")        return filtroDrift({ ancho, alto, intensidad: c.intensidad ?? 0.5 });
+    if (c.fx === "dolly")
+      return filtroDolly({ pct: c.pct ?? 6, duracionSec: duracionReal, direccion: c.direccion ?? "in", multiplicador, ...comun });
     throw new Error(`Movimiento de camara desconocido: "${c.fx}".`);
   };
 

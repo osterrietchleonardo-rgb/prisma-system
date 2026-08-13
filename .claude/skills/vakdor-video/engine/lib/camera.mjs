@@ -75,3 +75,41 @@ export function filtroWhipPan({ fps, ancho, alto, direccion = "der", desenfoque 
 export function filtroPush({ pct, duracionSec, fps, ancho, alto }) {
   return filtroZoom({ tipo: "zoomIn", pct, duracionSec, fps, ancho, alto, multiplicador: 2 });
 }
+
+/**
+ * Flotacion sutil, tipo camara en mano. Tres senos de periodo distinto y primo entre si
+ * para que el ciclo no se note repetirse.
+ *
+ * DETERMINISTA a proposito: nada de azar. Si usara random(), dos renders del mismo video
+ * no darian el mismo archivo y no se podria reproducir un resultado ni comparar dos
+ * versiones. La prueba lo verifica.
+ *
+ * No usa `zoompan`, asi que NO paga el sobre-muestreo caro del zoom: solo agranda un 10%
+ * para tener margen donde flotar sin mostrar bordes negros.
+ */
+export function filtroDrift({ ancho, alto, intensidad = 0.5 }) {
+  const amp = Math.max(0, Math.min(1, intensidad));
+  const ax = (18 * amp).toFixed(2);
+  const ax2 = (9 * amp).toFixed(2);
+  const ay = (12 * amp).toFixed(2);
+  const W = Math.round((ancho * 1.1) / 2) * 2;
+  const H = Math.round((alto * 1.1) / 2) * 2;
+  return [
+    `scale=${W}:${H}:flags=bilinear`,
+    `crop=${ancho}:${alto}:x='(iw-ow)/2+${ax}*sin(2*PI*n/210)+${ax2}*sin(2*PI*n/97)':y='(ih-oh)/2+${ay}*sin(2*PI*n/173)':exact=1`,
+    "setsar=1",
+  ].join(",");
+}
+
+/**
+ * Acercamiento o alejamiento continuo. Es el zoom con nombre de cine: mismo mecanismo
+ * medido (zoompan con sobre-muestreo), distinto uso narrativo.
+ * `duracionSec` tiene que ser la duracion REAL del tramo, no la pedida en la receta.
+ */
+export function filtroDolly({ pct, duracionSec, fps, ancho, alto, direccion = "in", multiplicador }) {
+  return filtroZoom({
+    tipo: direccion === "out" ? "zoomOut" : "zoomIn",
+    pct, duracionSec, fps, ancho, alto,
+    multiplicador: multiplicador ?? MULTIPLICADOR_DEFAULT,
+  });
+}
