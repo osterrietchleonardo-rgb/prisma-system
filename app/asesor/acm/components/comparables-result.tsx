@@ -27,6 +27,10 @@ interface Props {
   cartera: AcmComparable[];
   roomix: AcmComparable[];
   conSemantica: boolean;
+  /** true = la búsqueda en cartera/red falló (ej. timeout) y el resultado de esa fuente está
+   *  incompleto — nunca hay que mostrarlo como si fuera un resultado completo y válido. */
+  carteraFallo?: boolean;
+  roomixFallo?: boolean;
   /** Fila del historial "Mis ACM" a la que pertenece esta búsqueda (para colgarle la ficha). */
   searchId?: string | null;
   /** Avisa qué fila del historial quedó asociada a la ficha recién creada. */
@@ -321,7 +325,9 @@ function Section({
 
 const MAX_FICHA = 12;
 
-export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSemantica, searchId, onFichaCreada, onVolver }: Props) {
+export function ComparablesResult({
+  sujeto, operacion, cartera, roomix, conSemantica, carteraFallo, roomixFallo, searchId, onFichaCreada, onVolver,
+}: Props) {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState(false);
@@ -556,6 +562,35 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
 
   return (
     <div className="space-y-6 animate-in fade-in pb-24">
+      {/* Aviso de búsqueda incompleta: cartera y/o red fallaron (ej. timeout de Postgres en
+          barrios grandes). Se muestra SIEMPRE que haya un fallo, fijo en la pantalla (no un
+          toast que desaparece) — el asesor tiene que poder ver esto en cualquier momento antes
+          de confiar en el resultado o armar una ficha para el cliente con datos incompletos. */}
+      {(carteraFallo || roomixFallo) && (
+        <div className="flex items-start gap-2.5 p-3.5 rounded-2xl border border-red-500/25 bg-red-500/10">
+          <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+          <div className="text-sm text-red-700 dark:text-red-400">
+            <p className="font-bold">
+              {carteraFallo && roomixFallo
+                ? "No pudimos completar la búsqueda ni en tu cartera ni en la red de comparables"
+                : carteraFallo
+                  ? "No pudimos completar la búsqueda en tu cartera"
+                  : "No pudimos completar la búsqueda en la red de comparables"}
+            </p>
+            <p className="mt-0.5 text-red-700/90 dark:text-red-400/90">
+              Lo que ves abajo{" "}
+              {carteraFallo && roomixFallo
+                ? "no incluye ningún comparable de ninguna de las dos fuentes"
+                : carteraFallo
+                  ? "no incluye comparables de tu cartera"
+                  : "no incluye comparables de la red"}
+              {" "}— no es que esta zona no tenga, es que la búsqueda no terminó. Probá de nuevo o angostá los filtros
+              (zona más chica, menos ambientes/m² de tolerancia).
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Sujeto */}
       <div className="flex items-start justify-between gap-4 p-4 rounded-2xl border border-accent/20 bg-accent/5">
         <div>
@@ -614,7 +649,11 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
         title="Cartera de tu agencia"
         icon={Building2}
         items={carteraOrdenada}
-        empty="No se encontraron comparables en tu cartera con estos criterios."
+        empty={
+          carteraFallo
+            ? "La búsqueda en tu cartera no se completó — no hay forma de saber si hay comparables. Probá de nuevo."
+            : "No se encontraron comparables en tu cartera con estos criterios."
+        }
         selectable={selecting}
         selected={selected}
         onToggle={toggle}
@@ -625,7 +664,11 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
         title="Red de colaboración"
         icon={Network}
         items={roomixOrdenado}
-        empty="No se encontraron comparables en la red de colaboración. (Para venta hay pocos avisos en la red; el grueso está en alquiler.)"
+        empty={
+          roomixFallo
+            ? "La búsqueda en la red de colaboración no se completó — no hay forma de saber si hay comparables. Probá de nuevo."
+            : "No se encontraron comparables en la red de colaboración. (Para venta hay pocos avisos en la red; el grueso está en alquiler.)"
+        }
         selectable={selecting}
         selected={selected}
         onToggle={toggle}

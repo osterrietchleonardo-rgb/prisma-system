@@ -61,7 +61,13 @@ export function AcmModule() {
   const [excludeId, setExcludeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"input" | "results">("input");
-  const [results, setResults] = useState<{ cartera: AcmComparable[]; roomix: AcmComparable[]; conSemantica: boolean } | null>(null);
+  const [results, setResults] = useState<{
+    cartera: AcmComparable[];
+    roomix: AcmComparable[];
+    conSemantica: boolean;
+    carteraFallo: boolean;
+    roomixFallo: boolean;
+  } | null>(null);
   // Historial "Mis ACM": id de la búsqueda guardada (para linkearle la ficha) + solapa activa.
   const [tab, setTab] = useState<"nuevo" | "historial">("nuevo");
   const [searchId, setSearchId] = useState<string | null>(null);
@@ -96,11 +102,32 @@ export function AcmModule() {
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setResults({ cartera: data.cartera || [], roomix: data.roomix || [], conSemantica: data.meta?.con_semantica ?? false });
+      const carteraFallo = Boolean(data.meta?.cartera_fallo);
+      const roomixFallo = Boolean(data.meta?.roomix_fallo);
+      setResults({
+        cartera: data.cartera || [],
+        roomix: data.roomix || [],
+        conSemantica: data.meta?.con_semantica ?? false,
+        carteraFallo,
+        roomixFallo,
+      });
       setSearchId(data.search_id ?? null);
       setRefreshKey((k) => k + 1); // la búsqueda quedó guardada en "Mis ACM"
       setView("results");
-      if ((data.meta?.total ?? 0) === 0) toast.info("No se encontraron comparables con estos criterios. Probá ampliar la zona o cambiar la operación.");
+      // La búsqueda en cartera y/o en la red puede fallar (ej. timeout) sin que el endpoint
+      // devuelva un error general — cartera/roomix simplemente vienen vacíos. Si no se avisa
+      // acá, el asesor ve "sin comparables" y lo confunde con que la zona no tiene nada.
+      if (carteraFallo || roomixFallo) {
+        toast.error(
+          carteraFallo && roomixFallo
+            ? "No pudimos completar la búsqueda ni en tu cartera ni en la red de comparables. Probá de nuevo o angostá los filtros."
+            : carteraFallo
+              ? "No pudimos completar la búsqueda en tu cartera. Probá de nuevo o angostá los filtros."
+              : "No pudimos completar la búsqueda en la red de comparables. Probá de nuevo o angostá los filtros."
+        );
+      } else if ((data.meta?.total ?? 0) === 0) {
+        toast.info("No se encontraron comparables con estos criterios. Probá ampliar la zona o cambiar la operación.");
+      }
     } catch (e: any) {
       toast.error("Error buscando comparables: " + e.message);
     } finally {
@@ -121,7 +148,15 @@ export function AcmModule() {
       // Restaura el modo de zona con el que se hizo esta búsqueda (ver Sujeto.incluir_linderos).
       // Ausente (búsquedas guardadas antes de este fix) = false = estricto, el default seguro.
       setIncluirLinderos(Boolean(data.sujeto?.incluir_linderos));
-      setResults({ cartera: data.cartera || [], roomix: data.roomix || [], conSemantica: Boolean(data.con_semantica) });
+      // Búsqueda del historial: es un snapshot ya guardado, no hay una llamada en vivo que
+      // pueda fallar ahora — no aplica el flag de fallo (siempre false acá).
+      setResults({
+        cartera: data.cartera || [],
+        roomix: data.roomix || [],
+        conSemantica: Boolean(data.con_semantica),
+        carteraFallo: false,
+        roomixFallo: false,
+      });
       setSearchId(data.id);
       setView("results");
       setTab("nuevo");
@@ -220,6 +255,8 @@ export function AcmModule() {
                 cartera={results.cartera}
                 roomix={results.roomix}
                 conSemantica={results.conSemantica}
+                carteraFallo={results.carteraFallo}
+                roomixFallo={results.roomixFallo}
                 searchId={searchId}
                 onFichaCreada={(nuevoId) => {
                   setSearchId(nuevoId);

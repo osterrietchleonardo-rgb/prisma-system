@@ -148,8 +148,14 @@ export async function POST(req: Request) {
       }),
     ]);
 
+    // Si la búsqueda en cartera o en la red falla (ej. timeout de Postgres, statement_timeout
+    // 8s en producción), NO hay que devolver "0 comparables" en silencio: para el asesor eso es
+    // indistinguible de "esta zona realmente no tiene comparables". Se loguea el error real Y
+    // se manda un flag en `meta` para que el front avise que el resultado está incompleto.
     if (carteraRes.error) console.error("acm_match_properties error:", carteraRes.error);
     if (roomixRes.error) console.error("acm_match_roomix error:", roomixRes.error);
+    const carteraFallo = Boolean(carteraRes.error);
+    const roomixFallo = Boolean(roomixRes.error);
 
     const carteraRanked = carteraRes.data || [];
     const roomixRanked = roomixRes.data || [];
@@ -297,6 +303,11 @@ export async function POST(req: Request) {
         operacion,
         con_semantica: Boolean(embStr),
         total: cartera.length + roomix.length,
+        // Sigue en 200 (hay resultados parciales aprovechables), pero marcado: el front tiene
+        // que avisarle al asesor que la búsqueda no se completó del todo, nunca mostrar el
+        // resultado parcial como si fuera completo.
+        cartera_fallo: carteraFallo,
+        roomix_fallo: roomixFallo,
       },
     });
   } catch (e: any) {
