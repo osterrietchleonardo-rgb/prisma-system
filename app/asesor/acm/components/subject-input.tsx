@@ -13,6 +13,7 @@ import { Pencil, Building2, Link2, Search, Loader2, AlertTriangle } from "lucide
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { FotosIA } from "./fotos-ia";
+import type { AtributosFotoIA, EstadoConservacionFoto, LuminosidadFoto } from "@/lib/acm/analisis-fotos";
 
 type Modo = "manual" | "cartera" | "link";
 
@@ -50,6 +51,11 @@ interface SubjectInputProps {
   onDescripcionIaChange: (v: string) => void;
   incluirDescFicha: boolean;
   onIncluirDescFichaChange: (v: boolean) => void;
+  atributosFotosIa: AtributosFotoIA | null;
+  onAtributosFotosIaChange: (a: AtributosFotoIA | null) => void;
+  anclajeEstado?: EstadoConservacionFoto;
+  anclajeLuminosidad?: LuminosidadFoto;
+  onAnclajeChange: (v: { estado?: EstadoConservacionFoto; luminosidad?: LuminosidadFoto }) => void;
   onBuscar: () => void;
   loading: boolean;
   excludeId: string | null;
@@ -102,6 +108,11 @@ export function SubjectInput({
   onDescripcionIaChange,
   incluirDescFicha,
   onIncluirDescFichaChange,
+  atributosFotosIa,
+  onAtributosFotosIaChange,
+  anclajeEstado,
+  anclajeLuminosidad,
+  onAnclajeChange,
   onBuscar,
   loading,
   excludeId,
@@ -394,6 +405,11 @@ export function SubjectInput({
         onDescripcionChange={onDescripcionIaChange}
         onIncluirEnFichaChange={onIncluirDescFichaChange}
         carteraProperty={modo === "cartera" && carteraSel ? { propertyId: carteraSel.id, images: carteraSel.images } : null}
+        atributosIA={atributosFotosIa}
+        onAtributosIAChange={onAtributosFotosIaChange}
+        anclajeEstado={anclajeEstado}
+        anclajeLuminosidad={anclajeLuminosidad}
+        onAnclajeChange={onAnclajeChange}
       />
 
       {/* Acción principal */}

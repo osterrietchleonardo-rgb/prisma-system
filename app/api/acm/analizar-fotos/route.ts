@@ -12,11 +12,17 @@
 //    scopeada por agency_id. Si el índice no existe o la propiedad no es de esta agencia, se
 //    rechaza el request entero.
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { extraerDescripcion, sanearDescripcionIA, recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
+import {
+  construirPromptAnalisisFotos,
+  contextoParaPrompt,
+  extraerAnalisisFotos,
+  SCHEMA_ANALISIS_FOTOS,
+} from "@/lib/acm/analisis-fotos";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -147,36 +153,17 @@ export async function POST(req: Request) {
 
     const foco = String(body.foco || "").slice(0, MAX_FOCO).trim();
     const s = body.sujeto || {};
-    const contexto = [
-      s.tipo_propiedad && `Tipo: ${s.tipo_propiedad}`,
-      s.barrio && `Barrio: ${s.barrio}`,
-      s.m2_cubiertos && `Superficie cubierta: ${s.m2_cubiertos} m²`,
-      s.dormitorios && `Dormitorios: ${s.dormitorios}`,
-      s.banos && `Baños: ${s.banos}`,
-    ].filter(Boolean).join(" · ");
+    const contexto = contextoParaPrompt(s);
 
     // OJO: la cantidad de fotos se interpola. Si el prompt afirma que hay más de las que
     // hay, el modelo completa el hueco y describe ambientes que nunca vio.
     const cuantas = fotos.length === 1 ? "la imagen" : `las ${fotos.length} imágenes`;
 
-    const prompt = `Sos un redactor inmobiliario argentino. Vas a describir una propiedad a partir de sus fotos.
-
-Análisis visual previo: Observá detenidamente ${cuantas} buscando indicadores de luminosidad (fuentes de luz natural, sombras), estado de conservación (pisos, paredes, humedad) y distribución espacial.
-
-Describí únicamente lo que se ve en las fotos basándote en el análisis anterior. Si algo no se ve, no lo afirmes.
-
-Nunca contradigas los datos cargados de la propiedad.${contexto ? `\nDatos cargados: ${contexto}` : ""}
-
-Tono de aviso profesional argentino, español rioplatense. Sin superlativos vacíos ("espectacular", "único", "soñado"), sin signos de exclamación.
-
-No omitas ni disimules lo que está deteriorado, pero decilo con honestidad y sin castigar: "cocina original, con posibilidad de actualización" en lugar de "cocina vieja" o de no mencionarla.
-
-Sin precio, sin datos de contacto, sin nombre de inmobiliaria.
-
-Entre 400 y 600 caracteres, en un solo párrafo corrido.
-${foco ? `\nEl asesor pidió enfocarse en: ${foco}. Priorizalo sin ignorar el resto de las características clave.` : ""}
-
-FORMATO DE SALIDA: devolvé un JSON con dos campos. En "analisis" va el análisis visual previo (es un paso interno, nadie lo ve). En "descripcion" va únicamente el párrafo final, sin encabezados, sin viñetas, sin repetir las consignas, sin prefijos como "Análisis:" o "Descripción:" y sin markdown.`;
+    // Mismo prompt (y mismo schema) que usa app/api/acm/fotos-comparables para cada
+    // comparable: es lo que permite mostrar las dos descripciones lado a lado con el mismo
+    // criterio, y lo que le da al asesor el anclaje de condición de SU propiedad (Feature B,
+    // 3ra capa de comparación) — ver lib/acm/analisis-fotos.ts.
+    const prompt = construirPromptAnalisisFotos({ cuantas, contexto, foco });
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     // Salida estructurada: el análisis previo tiene su propio campo, así que no puede
@@ -188,14 +175,7 @@ FORMATO DE SALIDA: devolvé un JSON con dos campos. En "analisis" va el análisi
       model: "gemini-3.5-flash",
       generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            analisis: { type: SchemaType.STRING },
-            descripcion: { type: SchemaType.STRING },
-          },
-          required: ["analisis", "descripcion"],
-        },
+        responseSchema: SCHEMA_ANALISIS_FOTOS,
       },
     });
 
@@ -204,15 +184,20 @@ FORMATO DE SALIDA: devolvé un JSON con dos campos. En "analisis" va el análisi
       prompt,
     ]);
 
+    const crudo = result.response.text();
     // `analisis` se descarta acá: existe para darle al modelo dónde poner el razonamiento,
     // no para mostrarlo.
-    const crudo = extraerDescripcion(result.response.text());
-    const descripcion = recortarAPalabra(sanearDescripcionIA(crudo), MAX_DESC_IA);
+    const { descripcion: crudoDescripcion, atributos } = extraerAnalisisFotos(crudo);
+    const descripcion = recortarAPalabra(sanearDescripcionIA(crudoDescripcion || extraerDescripcion(crudo)), MAX_DESC_IA);
     if (!descripcion) {
       return NextResponse.json({ error: "La IA no devolvió texto. Probá de nuevo." }, { status: 500 });
     }
 
-    return NextResponse.json({ descripcion });
+    // `atributos`: la clasificación interna (estado_conservacion, luminosidad, etc.) que
+    // ancla la 3ra capa de comparación (fotos contra fotos). Puede venir null si el JSON no
+    // trajo ese bloque — el asesor sigue viendo su descripción igual, simplemente esa capa
+    // no tiene con qué arrancar hasta que la corrija a mano (ver fotos-ia.tsx).
+    return NextResponse.json({ descripcion, atributos });
   } catch (e: any) {
     // Log completo solo del lado del servidor. El error crudo más probable acá es un
     // 429/503 de Gemini, que trae texto en inglés con el modelo y el endpoint de Google

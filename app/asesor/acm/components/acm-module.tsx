@@ -195,6 +195,17 @@ export function AcmModule() {
               onDescripcionIaChange={(v) => setSujeto((s) => ({ ...s, descripcion_ia: v }))}
               incluirDescFicha={sujeto.incluir_desc_ficha ?? true}
               onIncluirDescFichaChange={(v) => setSujeto((s) => ({ ...s, incluir_desc_ficha: v }))}
+              atributosFotosIa={sujeto.atributos_fotos_ia ?? null}
+              onAtributosFotosIaChange={(a) => setSujeto((s) => ({ ...s, atributos_fotos_ia: a }))}
+              anclajeEstado={sujeto.anclaje_estado_conservacion}
+              anclajeLuminosidad={sujeto.anclaje_luminosidad}
+              onAnclajeChange={(v) =>
+                setSujeto((s) => ({
+                  ...s,
+                  ...(v.estado !== undefined ? { anclaje_estado_conservacion: v.estado } : {}),
+                  ...(v.luminosidad !== undefined ? { anclaje_luminosidad: v.luminosidad } : {}),
+                }))
+              }
               onBuscar={handleBuscar}
               loading={loading}
               excludeId={excludeId}

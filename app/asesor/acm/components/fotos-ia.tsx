@@ -11,15 +11,25 @@
 // Ninguna foto se guarda en ningún lado: van al endpoint, vuelve el texto y se descartan.
 // El análisis se hace UNA sola vez; si el texto no convence, se edita a mano.
 import { useEffect, useState } from "react";
-import { Loader2, ImagePlus, X, Sparkles, Building2, Check } from "lucide-react";
+import { Loader2, ImagePlus, X, Sparkles, Building2, Check, ScanEye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { Sujeto } from "@/lib/tasacion/types";
 import { MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
+import {
+  LABEL_ESTADO,
+  LABEL_LUMINOSIDAD,
+  NIVELES_ESTADO,
+  NIVELES_LUMINOSIDAD,
+  type AtributosFotoIA,
+  type EstadoConservacionFoto,
+  type LuminosidadFoto,
+} from "@/lib/acm/analisis-fotos";
 
 const MAX_FOTOS = 4;
 const MAX_LADO = 1280;
@@ -50,6 +60,7 @@ async function achicar(file: File): Promise<FotoLocal> {
 
 export function FotosIA({
   sujeto, descripcion, incluirEnFicha, onDescripcionChange, onIncluirEnFichaChange, carteraProperty,
+  atributosIA, onAtributosIAChange, anclajeEstado, anclajeLuminosidad, onAnclajeChange,
 }: {
   sujeto: Sujeto;
   descripcion: string;
@@ -58,6 +69,14 @@ export function FotosIA({
   onIncluirEnFichaChange: (v: boolean) => void;
   /** Propiedad de origen si el sujeto vino de la cartera; null en manual/link o sin selección aún. */
   carteraProperty?: CarteraFotoProp | null;
+  /** Clasificación cruda que devolvió la IA a partir de estas mismas fotos (el "antes"). */
+  atributosIA: AtributosFotoIA | null;
+  onAtributosIAChange: (a: AtributosFotoIA | null) => void;
+  /** El anclaje que se usa para comparar contra los comparables — arranca en lo que dijo la
+   *  IA y el asesor lo corrige acá mismo, sin salir de esta revisión. */
+  anclajeEstado?: EstadoConservacionFoto;
+  anclajeLuminosidad?: LuminosidadFoto;
+  onAnclajeChange: (v: { estado?: EstadoConservacionFoto; luminosidad?: LuminosidadFoto }) => void;
 }) {
   const [fotos, setFotos] = useState<FotoLocal[]>([]);
   const [foco, setFoco] = useState("");
@@ -171,6 +190,17 @@ export function FotosIA({
       const j = await r.json().catch(() => null);
       if (!r.ok || !j) throw new Error(j?.error || "No se pudo analizar las fotos.");
       onDescripcionChange(j.descripcion);
+      // Atributos para la 3ra capa (fotos contra fotos): se guardan tal cual los devolvió la
+      // IA, y el anclaje arranca en el mismo valor — el asesor lo corrige acá abajo si hace
+      // falta, sin volver a analizar nada.
+      const atributos: AtributosFotoIA | null = j.atributos ?? null;
+      onAtributosIAChange(atributos);
+      if (atributos) {
+        onAnclajeChange({
+          estado: atributos.estado_conservacion !== "sin_evidencia" ? atributos.estado_conservacion : undefined,
+          luminosidad: atributos.luminosidad !== "sin_evidencia" ? atributos.luminosidad : undefined,
+        });
+      }
       // Recién acá cuenta como analizado: un fallo (catch) nunca llega a esta línea,
       // así que el botón sigue disponible para reintentar.
       setAnalizado(true);
@@ -333,6 +363,65 @@ export function FotosIA({
               </span>
             </span>
           </label>
+
+          {/* Anclaje para comparar con los comparables (3ra capa: fotos contra fotos). Arranca
+              en lo que dijo la IA sobre ESTAS MISMAS fotos y el asesor lo corrige acá, antes de
+              buscar comparables — vos conocés la propiedad mejor que cualquier IA, y este es el
+              único dato que hace falta corregir para que la comparación arranque bien anclada. */}
+          {atributosIA && (
+            <div className="space-y-2 pt-3 border-t border-accent/10">
+              <div className="flex items-center gap-1.5">
+                <ScanEye className="w-3.5 h-3.5 text-accent" />
+                <Label className="text-xs font-bold">Condición para comparar con otros comparables</Label>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Así calificó la IA tu propiedad a partir de estas fotos. Corregilo si no coincide con lo que ves en
+                persona: la comparación con cada comparable sale de acá.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Estado de conservación</Label>
+                  <Select
+                    value={anclajeEstado ?? ""}
+                    onValueChange={(v) => onAnclajeChange({ estado: v as EstadoConservacionFoto })}
+                  >
+                    <SelectTrigger className="bg-card/50 border-accent/10 h-9 text-xs">
+                      <SelectValue placeholder="Elegí una opción" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NIVELES_ESTADO.filter((n) => n !== "sin_evidencia").map((n) => (
+                        <SelectItem key={n} value={n}>{LABEL_ESTADO[n]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Luminosidad</Label>
+                  <Select
+                    value={anclajeLuminosidad ?? ""}
+                    onValueChange={(v) => onAnclajeChange({ luminosidad: v as LuminosidadFoto })}
+                  >
+                    <SelectTrigger className="bg-card/50 border-accent/10 h-9 text-xs">
+                      <SelectValue placeholder="Elegí una opción" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NIVELES_LUMINOSIDAD.filter((n) => n !== "sin_evidencia").map((n) => (
+                        <SelectItem key={n} value={n}>{LABEL_LUMINOSIDAD[n]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {(atributosIA.estado_conservacion === "sin_evidencia" || atributosIA.luminosidad === "sin_evidencia") && (
+                <p className="text-[11px] text-amber-500">
+                  La IA no pudo evaluar {atributosIA.estado_conservacion === "sin_evidencia" && atributosIA.luminosidad === "sin_evidencia"
+                    ? "el estado ni la luminosidad"
+                    : atributosIA.estado_conservacion === "sin_evidencia" ? "el estado de conservación" : "la luminosidad"} con
+                  estas fotos. Completalo vos arriba para poder comparar con los otros comparables.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

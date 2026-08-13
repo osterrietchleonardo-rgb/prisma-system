@@ -1,15 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AcmComparable, ChecklistItem, Sujeto, Operacion } from "@/lib/tasacion/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import {
   Check, X, Minus, ChevronDown, ExternalLink, Building2, Network, ArrowLeft, MapPin, Ruler, DoorOpen,
-  FileText, Loader2, CheckSquare, Square, Plus, Trash2, Sparkles,
+  FileText, Loader2, CheckSquare, Square, Plus, Trash2, Sparkles, ScanEye, ImageOff, AlertTriangle,
 } from "lucide-react";
+import {
+  MAX_COMPARABLES_ANALISIS,
+  PISO_MATCH_PCT_ANALISIS,
+  scoreComparacionFotos,
+  ajustePorScore,
+  aplicarAjuste,
+  type AtributosFotoIA,
+} from "@/lib/acm/analisis-fotos";
 
 interface Props {
   sujeto: Sujeto;
@@ -22,6 +32,23 @@ interface Props {
   /** Avisa qué fila del historial quedó asociada a la ficha recién creada. */
   onFichaCreada?: (searchId: string | null) => void;
   onVolver: () => void;
+}
+
+/** Resultado de analizar las fotos de UN comparable (o el estado de carga/error). */
+interface FotoResultadoComparable {
+  descripcion: string | null;
+  atributos: AtributosFotoIA | null;
+  cache: boolean;
+  error: string | null;
+}
+
+/** El anclaje efectivo del sujeto: si el asesor no corrigió nada, "sin_evidencia" hace que
+ *  `scoreComparacionFotos` devuelva null (no se inventa un ajuste sin dato real). */
+function anclajeSujeto(sujeto: Sujeto) {
+  return {
+    estado_conservacion: sujeto.anclaje_estado_conservacion ?? "sin_evidencia",
+    luminosidad: sujeto.anclaje_luminosidad ?? "sin_evidencia",
+  } as const;
 }
 
 const estadoIcon = (e: ChecklistItem["estado"]) => {
@@ -38,13 +65,25 @@ const fmtPrecio = (c: AcmComparable) =>
   c.precio ? `${c.moneda === "ARS" ? "$" : "US$"} ${c.precio.toLocaleString("es-AR")}` : "Consultar";
 
 function ComparableCard({
-  c, selectable, selected, onToggle,
+  c, selectable, selected, onToggle, sujeto, fotos,
 }: {
   c: AcmComparable; selectable?: boolean; selected?: boolean; onToggle?: (id: string) => void;
+  sujeto: Sujeto;
+  /** undefined = este comparable no entra en el top 10 analizado (o la capa está apagada).
+   *  "cargando" = el pedido está en vuelo. Si no, el resultado (o su error) ya volvió. */
+  fotos?: "cargando" | FotoResultadoComparable;
 }) {
   const [open, setOpen] = useState(false);
   // El ítem "zona" del checklist trae el nivel: 100 mismo barrio · 70 sub-barrio · 50 limítrofe.
   const esLindero = c.checklist.some((i) => i.dimension === "zona" && i.score === 50);
+
+  const atributos = fotos && fotos !== "cargando" ? fotos.atributos : null;
+  const noMuestraInterior = atributos?.fotos_muestran_interior === false;
+  const comparacion =
+    atributos && !noMuestraInterior ? scoreComparacionFotos(anclajeSujeto(sujeto), atributos) : null;
+  const ajuste = comparacion ? ajustePorScore(comparacion.score) : null;
+  const pctAjustado = ajuste ? aplicarAjuste(c.match_pct, ajuste.delta) : null;
+
   return (
     <div
       className={`rounded-2xl border overflow-hidden transition-colors ${
@@ -84,7 +123,14 @@ function ComparableCard({
               </p>
             </div>
             <div className="text-right shrink-0">
-              <p className={`text-2xl font-black leading-none ${pctColor(c.match_pct)}`}>{c.match_pct}%</p>
+              {pctAjustado !== null && pctAjustado !== c.match_pct ? (
+                <p className="text-lg font-black leading-none whitespace-nowrap">
+                  <span className="text-muted-foreground/60 line-through decoration-2">{c.match_pct}%</span>{" "}
+                  <span className={pctColor(pctAjustado)}>{pctAjustado}%</span>
+                </p>
+              ) : (
+                <p className={`text-2xl font-black leading-none ${pctColor(c.match_pct)}`}>{c.match_pct}%</p>
+              )}
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">comparable</p>
             </div>
           </div>
@@ -107,6 +153,62 @@ function ComparableCard({
           </div>
         </div>
       </div>
+
+      {/* Comparación por fotos (3ra capa): lo que la IA vio en las fotos del sujeto contra lo
+          que vio en las de este comparable. Deliverable principal de la Feature B — se muestra
+          siempre que el comparable entró al análisis, no hace falta abrir el checklist. */}
+      {fotos === "cargando" && (
+        <div className="px-4 pb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Comparando fotos con la IA...
+        </div>
+      )}
+      {fotos && fotos !== "cargando" && fotos.error && !atributos && (
+        <p className="px-4 pb-3 text-xs text-muted-foreground italic">{fotos.error}</p>
+      )}
+      {fotos && fotos !== "cargando" && noMuestraInterior && (
+        <div className="mx-4 mb-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-2">
+          <ImageOff className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            <span className="font-bold">Estas fotos no muestran el interior de la propiedad</span>
+            {atributos?.motivo_no_evaluable ? ` — ${atributos.motivo_no_evaluable}` : ""}. No se comparó ni se ajustó el %:
+            comparar contra fotos que no son de la propiedad no tiene sentido.
+          </p>
+        </div>
+      )}
+      {fotos && fotos !== "cargando" && atributos && !noMuestraInterior && (
+        <div className="mx-4 mb-3 p-3 rounded-xl bg-card/50 border border-accent/10 space-y-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-accent">
+            <ScanEye className="w-3.5 h-3.5" /> Comparación por fotos
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3 text-xs leading-relaxed">
+            <div>
+              <p className="font-bold text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Tu propiedad</p>
+              <p className="text-foreground/90">{sujeto.descripcion_ia || "—"}</p>
+            </div>
+            <div>
+              <p className="font-bold text-[10px] uppercase tracking-wide text-muted-foreground mb-1">Este comparable</p>
+              <p className="text-foreground/90">{fotos.descripcion || "—"}</p>
+            </div>
+          </div>
+          {ajuste ? (
+            <p className="text-[11px] text-muted-foreground pt-1 border-t border-accent/5">
+              {pctAjustado === c.match_pct ? (
+                <>El % no cambió: {ajuste.texto}.</>
+              ) : (
+                <>
+                  <span className="font-bold text-foreground">{c.match_pct}% → {pctAjustado}%</span> ({ajuste.delta > 0 ? "+" : ""}
+                  {ajuste.delta} pts): {ajuste.texto}.
+                </>
+              )}
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground pt-1 border-t border-accent/5">
+              No se pudo comparar el estado de conservación con este comparable (falta anclar el estado de tu propiedad o el de
+              este comparable). El % no se ajustó.
+            </p>
+          )}
+        </div>
+      )}
 
       <button
         onClick={() => setOpen((o) => !o)}
@@ -146,10 +248,13 @@ function ComparableCard({
 }
 
 function Section({
-  title, icon: Icon, items, empty, selectable, selected, onToggle,
+  title, icon: Icon, items, empty, selectable, selected, onToggle, sujeto, fotosPorId,
 }: {
   title: string; icon: any; items: AcmComparable[]; empty: string;
   selectable?: boolean; selected?: Set<string>; onToggle?: (id: string) => void;
+  sujeto: Sujeto;
+  /** Mapa id → resultado (o "cargando") solo para los comparables que entraron al top analizado. */
+  fotosPorId: Map<string, "cargando" | FotoResultadoComparable>;
 }) {
   return (
     <div className="space-y-3">
@@ -163,7 +268,15 @@ function Section({
       ) : (
         <div className="space-y-3">
           {items.map((c) => (
-            <ComparableCard key={c.id} c={c} selectable={selectable} selected={selected?.has(c.id)} onToggle={onToggle} />
+            <ComparableCard
+              key={c.id}
+              c={c}
+              selectable={selectable}
+              selected={selected?.has(c.id)}
+              onToggle={onToggle}
+              sujeto={sujeto}
+              fotos={fotosPorId.get(c.id)}
+            />
           ))}
         </div>
       )}
@@ -191,6 +304,109 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
     for (const c of [...cartera, ...roomix]) m.set(c.id, c);
     return m;
   }, [cartera, roomix]);
+
+  // ── 3ra capa: fotos contra fotos ──────────────────────────────────────────────────────
+  // Solo disponible si el sujeto tiene descripción por fotos (sin eso no hay contra qué
+  // comparar). Apagable por el asesor en cualquier momento: es una mitigación SIN probar en
+  // producción (validacion-holdout.md), tiene que poder desactivarse si ordena mal en la
+  // práctica — apagarla no borra lo ya analizado, solo deja de mostrarlo/usarlo.
+  const hayDescripcionSujeto = Boolean(sujeto.descripcion_ia?.trim());
+  const [capaFotosActiva, setCapaFotosActiva] = useState(true);
+  const [fotosResultados, setFotosResultados] = useState<Map<string, FotoResultadoComparable>>(new Map());
+  const [cargandoFotos, setCargandoFotos] = useState(false);
+
+  // Top N por match_pct (≥ piso), de cartera + roomix combinados — mismo criterio sin
+  // importar la fuente. Datos reales: 12.8 comparables ≥90% en promedio, máximo 54; el tope
+  // evita gastar 54 llamadas de visión con el cliente esperando.
+  const top10 = useMemo(() => {
+    return [...cartera, ...roomix]
+      .filter((c) => c.match_pct >= PISO_MATCH_PCT_ANALISIS)
+      .sort((a, b) => b.match_pct - a.match_pct)
+      .slice(0, MAX_COMPARABLES_ANALISIS);
+  }, [cartera, roomix]);
+
+  // Firma estable de "qué hay que analizar" — evita re-pedir si el componente re-renderiza
+  // por otro motivo (ej. tildar un comparable). Cambia si cambia la búsqueda (otro searchId)
+  // o el propio set de ids del top 10.
+  const top10Key = top10.map((c) => c.id).join(",");
+  // Qué firma está en vuelo ahora mismo. Sin esto, el doble-montaje de StrictMode en desarrollo
+  // (monta → limpia → monta) dispara dos POST reales a este endpoint antes de que el primero
+  // termine, y las dos llamadas gastan Gemini de verdad aunque el resultado de una se descarte.
+  const fetchEnCursoRef = useRef("");
+
+  useEffect(() => {
+    if (!capaFotosActiva || !hayDescripcionSujeto || top10.length === 0) return;
+    // Ya están todos resueltos (de una corrida anterior de este mismo efecto, ej. al prender
+    // de nuevo el switch): no repetir el pedido.
+    if (top10.every((c) => fotosResultados.has(c.id))) return;
+    if (fetchEnCursoRef.current === top10Key) return; // ya está pidiéndose esta misma firma
+    fetchEnCursoRef.current = top10Key;
+
+    const controller = new AbortController();
+    setCargandoFotos(true);
+    fetch("/api/acm/fotos-comparables", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        comparables: top10.map((c) => ({
+          id: c.id,
+          source: c.source,
+          tipo: c.tipo,
+          zona: c.zona,
+          m2: c.m2,
+          dormitorios: c.dormitorios,
+          banos: c.banos,
+        })),
+      }),
+      signal: controller.signal,
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        const nuevo = new Map(fotosResultados);
+        for (const r of data.resultados || []) {
+          nuevo.set(r.id, { descripcion: r.descripcion, atributos: r.atributos, cache: Boolean(r.cache), error: r.error });
+        }
+        setFotosResultados(nuevo);
+      })
+      .catch((e) => {
+        if (e?.name === "AbortError") return; // cleanup legítimo, no un fallo real
+        toast.error("No se pudo comparar las fotos de los comparables. El resto del ACM sigue funcionando igual.");
+      })
+      .finally(() => setCargandoFotos(false));
+
+    return () => {
+      controller.abort();
+      // Libera la firma: si esta limpieza es el "monta → limpia" sintético de StrictMode (dev),
+      // el segundo montaje real tiene que poder volver a pedir — si no, la request abortada
+      // nunca se reintenta y esa firma queda sin resolver para siempre.
+      if (fetchEnCursoRef.current === top10Key) fetchEnCursoRef.current = "";
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [capaFotosActiva, hayDescripcionSujeto, top10Key, searchId]);
+
+  // Mapa que consume cada <ComparableCard>: "cargando" mientras está en vuelo, el resultado
+  // una vez que vuelve, y ausente para los que no entraron al top analizado.
+  const fotosPorId = useMemo(() => {
+    const m = new Map<string, "cargando" | FotoResultadoComparable>();
+    if (!capaFotosActiva || !hayDescripcionSujeto) return m;
+    for (const c of top10) {
+      const r = fotosResultados.get(c.id);
+      m.set(c.id, r ?? "cargando");
+    }
+    return m;
+  }, [capaFotosActiva, hayDescripcionSujeto, top10, fotosResultados]);
+
+  // Comparables seleccionados para la ficha cuyas fotos NO muestran la propiedad — se avisa
+  // antes de crear la ficha, nunca se sacan solos.
+  const advertenciasFotos = useMemo(() => {
+    return [...selected]
+      .map((id) => byId.get(id))
+      .filter((c): c is AcmComparable => Boolean(c))
+      .map((c) => ({ c, r: fotosResultados.get(c.id) }))
+      .filter(({ r }) => r?.atributos?.fotos_muestran_interior === false)
+      .map(({ c, r }) => ({ id: c.id, titulo: c.titulo || c.direccion, motivo: r!.atributos!.motivo_no_evaluable }));
+  }, [selected, byId, fotosResultados]);
+  const [entendidoAdvertencia, setEntendidoAdvertencia] = useState(false);
 
   const toggle = (id: string) => {
     setSelected((prev) => {
@@ -233,6 +449,7 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
       if (!res.ok || data.error) throw new Error(data.error || "No se pudieron calcular las conclusiones.");
       setConclusiones(Array.isArray(data.conclusiones) ? data.conclusiones : []);
       setIncluirConclusiones(true);
+      setEntendidoAdvertencia(false); // cada revisión arranca sin el "ya lo sé" tildado
       setRevisando(true);
     } catch (e: any) {
       toast.error("Error preparando la ficha: " + e.message);
@@ -299,6 +516,25 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
         </div>
       </div>
 
+      {/* Interruptor de la 3ra capa (fotos contra fotos): solo aparece si hay algo que
+          comparar. Es una mitigación sin probar en producción — tiene que poder apagarse. */}
+      {hayDescripcionSujeto && (
+        <div className="flex items-start justify-between gap-4 p-3.5 rounded-2xl border border-accent/10 bg-card/20">
+          <div className="flex items-start gap-2.5">
+            <ScanEye className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold">Comparar por fotos (IA)</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Analiza las fotos de los {Math.min(top10.length, MAX_COMPARABLES_ANALISIS)} comparables con mayor % (≥
+                {PISO_MATCH_PCT_ANALISIS}%) y ajusta el % hasta ±5 puntos según qué tan parecida es la condición a la de tu
+                propiedad. Siempre a la vista, nunca en silencio. Apagala si la ves ordenando mal.
+              </p>
+            </div>
+          </div>
+          <Switch checked={capaFotosActiva} onCheckedChange={setCapaFotosActiva} className="shrink-0 mt-0.5" />
+        </div>
+      )}
+
       {selecting && (
         <div className="text-sm text-muted-foreground p-3 rounded-xl bg-card/30 border border-accent/10">
           Marcá los comparables que querés incluir en la ficha para tu cliente. Cada uno ocupará una hoja con todas sus fotos y
@@ -314,6 +550,8 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
         selectable={selecting}
         selected={selected}
         onToggle={toggle}
+        sujeto={sujeto}
+        fotosPorId={fotosPorId}
       />
       <Section
         title="Red de colaboración"
@@ -323,6 +561,8 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
         selectable={selecting}
         selected={selected}
         onToggle={toggle}
+        sujeto={sujeto}
+        fotosPorId={fotosPorId}
       />
 
       {/* Barra de acción flotante al seleccionar — via portal a <body> para escapar el
@@ -366,6 +606,49 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
               </div>
 
               <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                {/* Aviso antes de crear la ficha: alguno de los seleccionados tiene fotos que
+                    NO muestran la propiedad (render de pozo, solo palier, planos). Nunca se
+                    saca nada solo — el asesor decide si lo deja o lo quita. */}
+                {advertenciasFotos.length > 0 && (
+                  <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 space-y-2.5">
+                    <div className="flex gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      <div className="text-xs text-red-700 dark:text-red-400">
+                        <p className="font-bold">
+                          {advertenciasFotos.length === 1
+                            ? "Un comparable seleccionado tiene fotos que no muestran la propiedad"
+                            : `${advertenciasFotos.length} comparables seleccionados tienen fotos que no muestran la propiedad`}
+                        </p>
+                        <p className="mt-0.5">
+                          Van a salir en la ficha del cliente igual, salvo que los saques. Comparar (o mostrarle al cliente)
+                          fotos que no son de la propiedad puede confundirlo o restarle credibilidad al informe.
+                        </p>
+                      </div>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {advertenciasFotos.map((a) => (
+                        <li key={a.id} className="flex items-center justify-between gap-2 text-xs bg-background/40 rounded-lg px-2.5 py-1.5">
+                          <span className="truncate">
+                            <span className="font-semibold">{a.titulo}</span>
+                            {a.motivo ? <span className="text-muted-foreground"> — {a.motivo}</span> : null}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggle(a.id)}
+                            className="shrink-0 text-red-600 font-bold hover:underline"
+                          >
+                            Sacar de la ficha
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer pt-1">
+                      <Checkbox checked={entendidoAdvertencia} onCheckedChange={(v) => setEntendidoAdvertencia(v === true)} />
+                      Entiendo, incluir en la ficha de todos modos
+                    </label>
+                  </div>
+                )}
+
                 <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
                   <button
                     type="button"
@@ -423,7 +706,7 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
                 </Button>
                 <Button
                   className="bg-accent text-accent-foreground hover:bg-accent/90"
-                  disabled={creating}
+                  disabled={creating || (advertenciasFotos.length > 0 && !entendidoAdvertencia)}
                   onClick={crearFicha}
                 >
                   {creating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileText className="w-4 h-4 mr-1" />}
