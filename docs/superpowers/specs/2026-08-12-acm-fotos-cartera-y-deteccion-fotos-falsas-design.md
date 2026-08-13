@@ -118,7 +118,12 @@ Ese 0,96 estaba medido sobre **las mismas 9 propiedades con las que se eligió l
 
 La causa raíz es estructural, no de ajuste: **la IA calificó mal al sujeto mismo**, en el límite "bueno vs excelente" que venía flojo desde la ronda 2. Como cada comparable se puntúa *contra el sujeto*, ese único error de anclaje contaminó las seis comparaciones a la vez. Más ajuste no lo arregla: cualquier escala relativa hereda el error del ancla.
 
-**Decisión:** no se implementa el ±5. Habría movido tasaciones 5 puntos en la dirección equivocada, con toda la autoridad de un número.
+**Decisión inicial (12-ago) y decisión final (12-ago, la que vale):** primero se resolvió no implementar el ±5. Puesta la evidencia delante, **Leonardo reafirmó dos veces que quiere que el análisis también mueva el porcentaje**, y esa es la decisión que se implementó. Queda registrado el desacuerdo técnico y cómo se mitigó:
+
+- **El riesgo, medido:** en el holdout la fórmula ordenó mal el 36% de los pares. No es que ajuste poco: ajusta en la dirección equivocada.
+- **La causa raíz, identificada:** la IA calificó mal **al sujeto**, no a los comparables, y como toda comparación es relativa al sujeto, ese único error de anclaje contaminó las seis de golpe.
+- **La mitigación construida (hipótesis, NO medida):** el asesor corrige la calificación de estado de su propia propiedad antes de comparar. Está parado adentro del departamento; sabe mejor que el modelo si la cocina es buena o excelente. Ataca exactamente lo único que se midió que fallaba.
+- **Los seguros:** el ajuste **siempre muestra el antes y el después** con su motivo (nunca un número que cambió solo), y la capa entera **se puede apagar** si en la práctica ordena mal.
 
 **Lo que sí sobrevivió, y es la clave de la Feature B:** las cuatro rondas fallaron todas en el mismo punto —**convertir la comparación en un número**— y ninguna falló en el paso anterior. Las descripciones que la IA generó a partir de las fotos fueron **fieles a lo que las fotos mostraban**, verificado a mano contra las imágenes en cada ronda. Por eso la tercera capa muestra las dos descripciones y deja juzgar al asesor: se apoya exactamente en lo que se probó que funciona, y evita lo que se probó que no.
 
