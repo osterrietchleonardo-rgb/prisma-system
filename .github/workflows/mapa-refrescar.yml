@@ -1,0 +1,28 @@
+name: PRISMA Mapa · recalcular precio por m2
+
+# Lo que el mapa muestra sale de dos lugares distintos:
+#   - los PINES se leen de la base en vivo, asi que una propiedad nueva aparece sola;
+#   - los COLORES y el ranking de barrios estan precalculados, y sin este recalculo se
+#     quedan con los numeros del dia que se cargaron.
+#
+# Corre despues del sync de la red, no antes: recalcular sobre datos viejos no sirve.
+
+on:
+  schedule:
+    # Todos los dias a las 08:00 UTC (05:00 en Argentina), despues de los syncs de la
+    # madrugada y antes de que alguien abra el mapa a la manana.
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  refrescar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Recalcular barrios, cuadricula y manzanas
+        run: |
+          respuesta=$(curl -sS --fail-with-body -m 300 \
+            "https://${{ secrets.SITE_DOMAIN }}/api/cron/mapa-refrescar?secret=${{ secrets.CRON_SECRET }}")
+          echo "$respuesta"
+          # Si el endpoint contesta ok:false, el paso tiene que fallar: un cron que
+          # "termina bien" habiendo fallado deja los precios viejos sin que nadie se entere.
+          echo "$respuesta" | grep -q '"ok":true'

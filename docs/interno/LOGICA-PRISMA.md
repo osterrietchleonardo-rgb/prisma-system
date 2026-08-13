@@ -1764,6 +1764,7 @@ Sistema de auth **completamente separado** de Supabase Auth:
 | `/api/admin-vakdor/marketing/[id]/publicar` | POST | Publicar ya (blog o LinkedIn) |
 | `/api/admin-vakdor/marketing/generar` | POST | Motor de ideas (funda ideas con GA/Search/copywriter) |
 | `/api/admin-vakdor/marketing/publicar-programadas` | POST | Cron: publica aprobadas con fecha vencida (auth `assertCron`, workflow `marketing-publish.yml` cada 30 min) |
+| `/api/admin-vakdor/marketing/metricas` | GET | Embudo de 8 pasos de vakdor.com + GA4/GSC/Buffer/Clarity + análisis IA guardado (`?periodo=7d\|30d\|90d`). Detalle en TÉCNICO 16.3.1 |
 
 ### 23.1 Módulo Finanzas
 
@@ -2358,6 +2359,61 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 | `/auth/callback` | GET | Público | OAuth callback |
 
 ---
+
+## 28. Buscador IA · solapa Mapa
+
+El Buscador IA tiene dos solapas independientes: **Chat** (el consultor de siempre) y
+**Mapa**. No comparten estado: si el mapa fallara, el chat sigue funcionando igual.
+
+### Qué muestra
+
+Los pines salen de dos fuentes que se consultan en paralelo y se unen:
+
+- **Cartera propia** (`properties`), filtrada por agencia. Se separa en "Mías" y "Agencia"
+  según quién tenga asignada la propiedad.
+- **Red de colaboración** (`roomix_properties`), compartida. En pantalla SIEMPRE se la
+  llama "Colaboración", nunca por el nombre de la red.
+
+Tope de 1.000 puntos por respuesta contando las dos juntas. La cartera propia se arma
+primero, así nunca queda afuera por el tope. Cuando se llena el cupo se sigue dibujando la
+muestra y el contador lo dice con un "+": el mapa no puede afirmar que hay 1.000 cuando
+puede haber 40.000.
+
+### Buscador de lugares
+
+Una cajita arriba del mapa sugiere mientras se tipea, tolerante a acentos y a errores de
+tipeo ("cavallito" encuentra Caballito, "nunez" encuentra Núñez). Cuatro fuentes, en orden
+de prioridad: zonas guardadas propias, barrios de la cartera, barrios de la red, y
+direcciones. Elegir un **barrio** vuela al barrio Y filtra por él; elegir una **dirección**
+solo vuela, porque un domicilio es un punto y filtrar dejaría la pantalla vacía si ahí no
+hay nada publicado.
+
+### Precio por m² (mapa de calor)
+
+Se pinta el precio mediano por metro sobre cada **manzana real**, de verde (barato) a rojo
+(caro), con el ranking de barrios al costado. Las manzanas se derivan del grafo de calles
+de OpenStreetMap: la manzana es el polígono que encierran las calles. Donde todavía no hay
+manzanas cargadas se muestra una cuadrícula aproximada, y la pantalla aclara cuál de las
+dos se está viendo.
+
+El precio de una manzana se calcula con **todo lo que hay en ella**: propiedades de la red,
+de la cartera propia, o mezcladas. Se descartan las repetidas —una misma propiedad puede
+estar publicada por la agencia y en la red a la vez, y contarla dos veces la haría pesar el
+doble—, detectadas por precio y superficie idénticos a menos de 60 m.
+
+Una manzana queda **sin precio** en dos casos, los dos correctos: si sus propiedades no
+traen superficie cargada (sin metros no hay precio por metro), o si son de otra operación o
+moneda que la que se está mirando (con el mapa en Venta y dólares, una manzana con solo
+alquileres en pesos no tiene nada que mostrar).
+
+Se usa **mediana** y no promedio: un penthouse corre el promedio de toda la manzana. La
+transparencia indica cuántas propiedades sostienen el dato — el color dice cuánto vale el
+metro, la transparencia dice cuánto creerle.
+
+### Zonas a mano alzada
+
+El lápiz recorta en el navegador, sin consultas nuevas. Las zonas guardadas son
+**privadas**: cada usuario ve solo las suyas, ni el director ve las de un asesor.
 
 ## FIN DEL DOCUMENTO
 

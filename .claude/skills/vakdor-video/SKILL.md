@@ -1,193 +1,148 @@
 ---
 name: vakdor-video
-description: Experto en crear y EDITAR VIDEOS/reels con la identidad visual de Vakdor usando Remotion (video por código con React). Usar SIEMPRE que el usuario pida un reel, video de propiedad, video para redes (IG/TikTok), ficha en video, EDITAR un video crudo (sacar silencios, subtítulos, marca, recortes, transiciones) o cualquier pieza audiovisual de marca. Triggerea con "reel", "video", "editá este video", "sacá los silencios", "ponele subtítulos", "video de la propiedad", "para Instagram/TikTok". Es la hermana en video de vakdor-carousel: misma marca (brand.json), mismo destino (Prisma - MK), copy delegado a vakdor-copywriter.
+description: Super skill de video de Vakdor — crea y EDITA videos en cualquier formato (vertical, horizontal/LinkedIn/YouTube, cuadrado). Tres modos: (A) Reel/Video de Propiedad desde fotos+datos con Remotion; (B) Editor rápido de un crudo a video de marca (saca silencios, subtítulos, marca); (C) Editor conversacional PRO de CUALQUIER video (VSL, testimonio, ad, tutorial): transcribe con whisper.cpp local (gratis), elige tomas, corta, color grade, subtítulos y overlays de animación (PIL/Remotion/HyperFrames/Manim). Incluye producción completa: TAPAR datos privados con blur (teléfonos, chats, precios, correos, tokens en pantalla), medir el encuadre y las danger zones de TikTok/Reels antes de poner gráficos, mezcla de música y efectos MEDIDA en LUFS con sidechain sobre la voz, y export a la spec de redes (bitrate capeado, bt709, faststart, -14 LUFS). Usar SIEMPRE que pidan un reel, video de propiedad, video para IG/TikTok/LinkedIn/YouTube, "editá este video", "sacá los silencios", "ponele subtítulos", "editá mi VSL", "video horizontal", transcribir, color/grade, "tapá los datos", "censurá", "difuminá", "ponele música", "mezclá el audio", "por qué se ve mal en Instagram", "no se lee el subtítulo". Hermana en video de vakdor-carousel: misma marca (brand.json), copy delegado a vakdor-copywriter.
 ---
 
-# Vakdor Video — Skill de Video con Remotion
+# Vakdor Video — Super Skill de Video
 
-Esta skill tiene **dos modos**, ambos exportan video vertical 1080x1920 con la marca Vakdor/PRISMA.
-El motor es **Remotion** (video por código con React) + **ffmpeg** (análisis de audio).
+Tres modos, todos **multi-formato** (vertical 9:16 · horizontal 16:9 · cuadrado 1:1).
 
-- **Modo A — Reel de Propiedad** (`PropertyReel`): arma un reel desde **fotos + datos** de una propiedad.
-- **Modo B — Editor de Video** (`EditedReel`): toma un **video CRUDO** del usuario y lo edita pro:
-  saca silencios (jump cuts), pone subtítulos automáticos, marca de agua e intro/outro de marca.
+| Modo | Qué hace | Motor | Salida |
+|---|---|---|---|
+| **A — Video de Propiedad** | fotos + datos → video de marca | Remotion | `Prisma - MK` |
+| **B — Editor rápido de crudo** | crudo → video de marca (jump cuts + subs + marca) | Remotion | `Prisma - MK` |
+| **C — Editor conversacional PRO** | *cualquier* video: transcribe → tomas → corta → color → subs → overlays | ffmpeg + whisper.cpp + Python | `edit/` junto al fuente |
 
-La skill arma los datos y la marca; el render lo hace el motor.
+- **Modos A y B** = video **de marca** (Remotion). Salida SIEMPRE a `Prisma - MK` (regla de oro).
+- **Modo C** = editor **general** (VSL, ad, testimonio, tutorial, con o sin marca). Salida en
+  `edit/` **junto al video fuente**. Motor propio (ffmpeg + Python + whisper.cpp), gratis y offline.
 
-> 📜 **Licencia Remotion:** gratis para uso comercial con equipos de **hasta 3 personas** (caso de Leonardo, 1 persona). Si el equipo crece a 4+, hay que pagar licencia (ver `https://www.remotion.dev/docs/license`).
-
----
-
-## ⛔ Regla de Oro de Salida (INQUEBRANTABLE)
-
-Esta skill se INVOCA desde `PRISMA-SYSTEM`, pero **NUNCA** escribe, crea ni renderiza nada
-dentro de `PRISMA-SYSTEM`. Se permite **LEER** de PRISMA-SYSTEM (logos, `.env`, datos), nunca escribir.
-
-TODO el output (motor, videos, props, `copy.md`, registro en memoria) va con ruta absoluta dentro de:
-`C:\Users\LENOVO\Desktop\CODE\Antigravity - Apps\Prisma - MK`
-
-- **Motor de render (una sola vez):** `Prisma - MK\_motor-video\`
-- **Cada video (activo):** `Prisma - MK\Activos de Marketing\[Fecha Actual]\[nombre-del-reel]\`
+> 📦 **Setup (una vez):** ver `install.md` (whisper ya instalado, `pip install -r requirements.txt`,
+> y las 4 vías de animación del Modo C). Motor Remotion en `Prisma - MK\_motor-video\` (Paso 0).
+> 📜 **Licencia Remotion:** gratis hasta 3 personas (caso de Leonardo). 4+ requiere licencia.
 
 ---
 
-## Paso 0 — Setup del motor (idempotente, una sola vez)
+## ⛔ Regla de Oro de Salida
 
-Antes de renderizar, verificar que exista `Prisma - MK\_motor-video\node_modules`.
-Si NO existe (primera vez o motor borrado):
-
-1. Copiar el contenido de `.claude\skills\vakdor-video\engine\` → `Prisma - MK\_motor-video\`.
-2. Copiar los logos `logo-vakdor.png` y `logo-icon.png` desde `Prisma - MK\assets\`
-   → `Prisma - MK\_motor-video\public\`.
-3. Instalar: `npm install --no-audit --no-fund` parado en `Prisma - MK\_motor-video`.
-   (La primera vez Remotion baja un Chromium Headless ~100 MB; es normal.)
-
-Si el motor ya existe pero cambió la composición (editaste `engine\src\`), recopiar solo `src\`,
-`render.mjs`, `remotion.config.ts` y `brand.json` (no hace falta reinstalar).
+Esta skill se INVOCA desde `PRISMA-SYSTEM` pero **NUNCA** escribe dentro de `PRISMA-SYSTEM`
+(solo LEE: logos, `.env`, datos). Modos A/B escriben en `Prisma - MK`. Modo C escribe en la
+carpeta `edit/` junto al video que te den.
 
 ---
 
-## Paso 1 — Cargar la marca
+## Multi-formato (los 3 modos)
 
-Leer `assets\brand.json` (FUENTE ÚNICA de la marca; idéntica a vakdor-carousel):
-fondo `#0A0F1A`, título `#FFFFFF`, texto `#B4BAC5`, acento cobre `#C07C41`, fuente Inter.
-El motor ya consume estos valores vía `engine\brand.json`. Si el usuario dice "cambiá los
-colores/el logo", editar `assets\brand.json` (y recopiar al motor) — NO re-escanear PRISMA-SYSTEM.
+Formatos: `vertical` (1080×1920, TikTok/Reels), `horizontal` (1920×1080, LinkedIn/YouTube/blog),
+`cuadrado` (1080×1080, feed IG). Detalle y plataformas en `references/formats.md`.
 
----
-
-## MODO A — Reel de Propiedad (`PropertyReel`)
-
-### Paso 2 — Definir el contenido (mínimo de preguntas)
-
-El video por defecto es un **Reel de Propiedad** (`PropertyReel`). Necesitás estos datos:
-
-| Campo | Ejemplo | De dónde sale |
-|---|---|---|
-| `operation` | "En Venta" / "En Alquiler" | dato de la propiedad |
-| `title` | "Departamento 3 ambientes" | dato de la propiedad |
-| `location` | "Belgrano, CABA" | dato de la propiedad |
-| `price` | "USD 185.000" | dato de la propiedad |
-| `specs` | ambientes, m², baños, cochera… | dato de la propiedad |
-| `photos` | rutas locales o URLs de las fotos | el usuario / Tokko / tabla `properties` |
-| `cta` | "Coordiná tu visita hoy" | **vakdor-copywriter** |
-| `contact` | "@vakdor · WhatsApp" | el usuario |
-| `secondsPerPhoto` | 2.5 (default) | opcional |
-
-Si faltan datos de la propiedad, pedirlos en UNA sola tanda. Si el usuario da un link de Tokko o
-un ID de `properties`, ofrecer sacar los datos de ahí. No repreguntar lo que ya esté claro.
+- **Modos A/B:** se elige con `--format=vertical|horizontal|cuadrado`. **Si no se especifica,
+  PREGUNTAR** antes de renderizar (no asumir). El layout se adapta solo.
+- **Modo C:** agnóstico; default = conservar el aspecto del fuente; reframe si se pide otro.
 
 ---
 
-## Paso 3 — Copy y ángulo: delegar a vakdor-copywriter
+## MODO A — Video de Propiedad (`PropertyReel`)
 
-Esta skill **NO inventa copy**. El gancho del `cta` (y cualquier texto persuasivo) lo define
-**vakdor-copywriter** con la voz de Vakdor. Activarla para resolver el `cta` antes de renderizar.
-Los datos duros (precio, ambientes, zona) son de la propiedad, no se inventan.
+Reel/video de marca desde **fotos + datos** de una propiedad. Campos (props.json):
+`operation, title, location, price, specs[], photos[], cta, contact, secondsPerPhoto, format`.
+El `cta` y todo texto persuasivo los define **vakdor-copywriter** (esta skill NO inventa copy).
+Los datos duros (precio, ambientes, zona) son de la propiedad.
 
----
+**Render** (parado en `Prisma - MK\_motor-video`):
+```
+node render.mjs --props="<props.json>" --out="<activo>\video.mp4" --format=horizontal
+```
+Duración automática: 2s intro + (Nº fotos × secondsPerPhoto) + 2.5s outro.
 
-## Paso 4 — Armar el activo y los props
+## MODO B — Editor rápido de crudo (`EditedReel`)
 
-1. Crear la carpeta del activo: `Prisma - MK\Activos de Marketing\[Fecha Actual]\[nombre-del-reel]\`
-   (fecha en formato "28 de junio de 2026", igual que carousel).
-2. Si las fotos son archivos locales, copiarlas a una subcarpeta `fotos\` del activo.
-3. Crear `props.json` en la carpeta del activo con los campos del Paso 2.
-   (Hay un molde en `_motor-video\props.example.json`.)
-
----
-
-## Paso 5 — Renderizar
-
-Parado en `Prisma - MK\_motor-video`, ejecutar:
+Toma un video crudo (recorrida, testimonio, pitch) y lo deja de marca: saca silencios
+(ffmpeg silencedetect → jump cuts), subtítulos (whisper local o `.srt`), marca de agua + intro/outro.
 
 ```
-node render.mjs --props="<ruta al props.json del activo>" --out="<ruta del activo>\reel.mp4"
+node edit.mjs --video="<crudo.mp4>" --out="<activo>\final.mp4" --format=horizontal --subtitles
 ```
+Opciones: `--captions=x.srt` · `--silence-db=-30` `--min-silence=0.6` `--pad=0.06` ·
+`--no-intro --no-outro --no-watermark --no-subtitles` · `--title` `--contact` · `--lang=es`.
 
-El wrapper `render.mjs`:
-- copia las fotos locales a `public\current\` (Remotion sirve imágenes desde `public\`),
-- las fotos que ya son URL http las deja igual,
-- renderiza `PropertyReel` (H.264, vertical 1080x1920, 30fps) al `.mp4` pedido.
-
-La **duración se calcula sola**: 2s intro + (Nº fotos × `secondsPerPhoto`) + 2.5s outro.
-
-> Para previsualizar y ajustar en vivo (opcional): `npm run studio` abre el Remotion Studio.
+> Modos A/B: si el motor no existe, hacer el Paso 0 (copiar `engine\` → `_motor-video\`, `npm install`).
 
 ---
 
-## Paso 6 — Cierre (memoria + copy)
+## MODO C — Editor conversacional PRO (cualquier video)
 
-1. **`copy.md`** en la carpeta del activo: descripción del post (IG/TikTok) + primer comentario,
-   unificando el material del reel. El copy de redes lo resuelve vakdor-copywriter.
-2. **Registro en memoria:** anotar el activo (nombre, propiedad, ángulo, fecha, duración) en
-   `Prisma - MK\memoria.md` para no repetir y llevar historial. Revisar ese archivo ANTES de
-   empezar para no repetir ángulos.
+El motor "video-use" con **whisper.cpp** (gratis, offline, español) en vez de ElevenLabs.
+Agnóstico de formato, marca opcional, salida en `edit/` junto al fuente. Para VSLs, ads,
+testimonios, tutoriales, material de cliente — vertical u horizontal.
+
+> **Antes de arrancar el Modo C, leé `references/video-use.md`** (playbook completo + las 16
+> Reglas Duras de correctitud) y **`references/produccion.md`** (el criterio: dónde puede ir un
+> gráfico, qué se tapa, cómo se mide el audio, con qué se exporta).
+> Animaciones en `references/animations.md`. Formatos en `references/formats.md`.
+
+**Regla de oro del Modo C:** preguntar → confirmar la estrategia en español → recién ahí editar.
+Nunca tocar el corte sin OK.
+
+**Flujo mínimo** (helpers en `helpers/`, `<edit>` = carpeta `edit/` junto al fuente):
+1. `prep.py <video>` — ficha, pistas de OBS, y si el take ya viene editado (*overlay-only*).
+2. `frame_map.py <video>` — cortes de plano, tira de contactos y **regla con danger zones**.
+   Se mide el encuadre ANTES de decidir dónde va un gráfico.
+3. `transcribe_batch.py <dir> --edit-dir <edit>` — transcribe (word-level, cacheado).
+4. `pack_transcripts.py --edit-dir <edit>` — arma `takes_packed.md` (frases por silencios reales).
+5. **Conversar + proponer estrategia + esperar OK.**
+6. Armar `edit/edl.json` (cortes, **máscaras**, grade, overlays, subtítulos, **audio**).
+   Formato en `references/video-use.md`.
+7. `render.py <edl.json> -o <edit>/preview.mp4 --preview --build-subtitles --edit-dir <edit>`.
+8. Auto-eval sobre la salida (cortes, pops, subtítulos, fugas de privacidad) → arreglar → re-render.
+9. Render final: `render.py ... -o final.mp4` (perfil `social` por defecto: capea el bitrate,
+   etiqueta bt709 y deja `+faststart`).
+
+**Reglas Duras críticas** (las 16 en `references/video-use.md`, ya implementadas en `render.py`):
+subtítulos AL FINAL · extract por-segmento → concat lossless · fades 30ms · overlays PTS-shift ·
+nunca cortar dentro de una palabra · **máscaras antes de los overlays** · **nada informativo en
+la danger zone** · **el cap de bitrate una sola vez** · **la mezcla se mide** · cache de
+transcript por fuente · **confirmar estrategia antes de ejecutar**.
+
+**Privacidad y audio (opcionales, van en el EDL):**
+```
+"masks": [{"from": 18.4, "to": 21.8, "rects": [[250,300,600,470]], "rects_end": [[250,300,830,600]]}]
+"audio": {"bgm": ["cama.wav"], "duck_lu": 12, "sfx": [{"file": "whoosh.wav", "at": 18.6, "rel_db": -9}]}
+```
+Verificar la privacidad SIEMPRE sobre el archivo final:
+`privacy.py <final.mp4> --masks edl.json --verify <edit>/verify/`
+
+**Animaciones (opcionales, vos decidís por video):** 4 vías disponibles — PIL, Remotion,
+HyperFrames, Manim (ver `references/animations.md` y `references/manim.md`). Cada una = un slot en
+`edit/animations/slot_<id>/`; múltiples animaciones = sub-agentes en paralelo.
 
 ---
 
-## MODO B — Editor de video crudo (`EditedReel`)
+## Copy y marca
 
-Cuando el usuario te pasa un **video grabado por él** (ej. una recorrida de propiedad, un
-testimonio, un pitch a cámara) y quiere que lo dejes profesional. La skill:
+- **Copy** (ganchos, CTA, textos persuasivos): siempre **vakdor-copywriter**. Esta skill no inventa copy.
+- **Marca:** `assets/brand.json` (fondo `#0A0F1A`, título `#FFFFFF`, texto `#B4BAC5`, acento cobre
+  `#C07C41`, fuente Inter). Fuente única; si cambia el color/logo, editar ahí (y recopiar al motor).
 
-1. **Detecta los silencios** con ffmpeg (`silencedetect`) y arma los **jump cuts** (corta los
-   "ehhh", pausas y muletillas largas, pega los tramos buenos).
-2. **Subtítulos automáticos** (opcional): transcribe el audio con **Whisper local** (gratis,
-   offline, anda en español) y los pone estilo TikTok (palabra por palabra, la activa en cobre).
-   Alternativa sin Whisper: pasarle un `.srt` ya hecho con `--captions`.
-3. **Marca de agua** (logos Vakdor/PRISMA) + **intro y outro** de marca.
-
-### Qué hace Remotion y qué no (honesto)
-- ✅ Recorte/trim, pegar tramos, velocidad, volumen, subtítulos, marca, transiciones, render final.
-- ⚠️ La **detección de silencios** la hace **ffmpeg**, no Remotion (Remotion arma y renderiza).
-- ⚠️ No es un editor de timeline a mano (Descript/Premiere): es **automático y por parámetros**.
-  La calidad del corte depende de afinar el umbral (`--silence-db`, `--min-silence`).
-
-### Uso
-
-Parado en `Prisma - MK\_motor-video`:
+## Estructura de la skill
 
 ```
-node edit.mjs --video="C:\ruta\al\crudo.mp4" --out="<carpeta del activo>\final.mp4" --subtitles
+SKILL.md · install.md · requirements.txt
+references/  video-use.md (correctitud) · produccion.md (criterio) ·
+             animations.md · formats.md · manim.md
+helpers/     ── material ──   prep · frame_map
+             ── voz ──        whisper_parse · transcribe · transcribe_batch · pack_transcripts ·
+                              silences · subtitles
+             ── imagen ──     privacy · grade · timeline_view
+             ── armado ──     edl · render · export
+             ── audio ──      mix_audio
+tests/       test_whisper_parse · test_edl · test_render_helpers · test_produccion
+assets/      brand.json (+ logos)
+engine/      motor Remotion de A/B (multi-formato: format.ts + PropertyReel/EditedReel responsivos)
 ```
 
-**Opciones** (ver cabecera de `edit.mjs` para la lista completa):
-- `--subtitles` → subtítulos con Whisper (la 1ª vez baja/compila Whisper; modelo con `--model=base|small|medium`).
-- `--captions="x.srt"` → subtítulos desde un SRT (sin Whisper).
-- `--silence-db=-30` `--min-silence=0.6` `--pad=0.06` → afinan el corte de silencios.
-- `--no-intro` `--no-outro` `--no-watermark` `--no-subtitles` → apagan partes.
-- `--title="..."` `--contact="..."` → textos de intro/outro.
-- `--lang=es` → idioma de la transcripción.
+## Composiciones Remotion (`engine/`)
 
-> Importante: el video crudo y la salida viven en `Prisma - MK` (regla de oro). `edit.mjs` copia
-> el crudo a `public\current\` para que Remotion lo lea, y limpia al terminar.
-
-### Límite de aspecto
-`EditedReel` exporta vertical 1080x1920 (reel). Si el crudo es horizontal, se recorta a vertical
-(`objectFit: cover`). Para mantener el formato original (16:9) hay que registrar una variante
-horizontal en `Root.tsx` — pedir si se necesita.
-
----
-
-## Composiciones disponibles
-
-- **`PropertyReel`** — reel vertical desde fotos de una propiedad (intro de marca → fotos con
-  Ken Burns y specs → outro con CTA y precio).
-- **`EditedReel`** — edición de un video crudo (intro → tramos sin silencio con marca de agua y
-  subtítulos → outro). 
-- Se puede extender con más plantillas (ej. "mercado en video", "testimonios") agregando
-  componentes en `engine\src\` y registrándolos en `engine\src\Root.tsx`.
-
-## Detalle técnico del motor (`engine\`)
-
-- `src\PropertyReel.tsx` — composición del reel de propiedad (Ken Burns, lower-thirds, logos).
-- `src\EditedReel.tsx` — composición del editor (OffthreadVideo con trimBefore/trimAfter por tramo,
-  subtítulos con `@remotion/captions`, marca de agua, intro/outro).
-- `src\brand.ts` + `brand.json` — colores de marca que consumen las composiciones.
-- `src\Root.tsx` / `src\index.ts` — registro de composiciones Remotion.
-- `render.mjs` — wrapper del Modo A (resuelve fotos y dispara el render).
-- `edit.mjs` — orquestador del Modo B: ffmpeg silencedetect → tramos → (Whisper/SRT → subtítulos
-  re-mapeados a la línea editada) → render de `EditedReel`. Llama al CLI de Remotion por su JS
-  directo con `node` (para no romper con los espacios de "Prisma - MK").
-- `remotion.config.ts` — calidad de salida (H.264, CRF 18).
+- **`PropertyReel`** — Modo A. Prop `format`; dimensiones vía `calculateMetadata`; layout escalado por `unit()`.
+- **`EditedReel`** — Modo B. Ídem `format`; subtítulos con posición relativa al alto.
+- `render.mjs` / `edit.mjs` reciben `--format`. `format.ts` centraliza dimensiones y el factor de escala.

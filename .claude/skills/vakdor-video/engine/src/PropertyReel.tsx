@@ -13,6 +13,7 @@ import {
 } from "remotion";
 import { loadFont } from "@remotion/google-fonts/Inter";
 import { BRAND } from "./brand";
+import { FORMATS, unit, resolveFormat, VideoFormat } from "./format";
 
 const { fontFamily } = loadFont();
 
@@ -32,6 +33,7 @@ export type PropertyReelProps = {
   cta: string; // "Coordiná tu visita hoy"
   contact: string; // "@vakdor · wa.me/549..."
   secondsPerPhoto: number; // 2.5
+  format: VideoFormat; // vertical | horizontal | cuadrado
 };
 
 export const propertyReelDefaults: PropertyReelProps = {
@@ -54,17 +56,21 @@ export const propertyReelDefaults: PropertyReelProps = {
   cta: "Coordiná tu visita hoy",
   contact: "@vakdor · WhatsApp",
   secondsPerPhoto: 2.5,
+  format: "vertical",
 };
 
-// La duracion total se calcula segun cuantas fotos haya.
+// Duracion segun cantidad de fotos + dimensiones segun formato.
 export const calcReelMetadata: CalculateMetadataFunction<
   PropertyReelProps
 > = ({ props }) => {
   const perPhoto = Math.round((props.secondsPerPhoto || 2.5) * FPS);
   const nPhotos = Math.max(props.photos.length, 1);
+  const { width, height } = FORMATS[resolveFormat(props.format)];
   return {
     durationInFrames: INTRO + perPhoto * nPhotos + OUTRO,
     fps: FPS,
+    width,
+    height,
   };
 };
 
@@ -76,34 +82,38 @@ const Backdrop: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: BRAND.background }} />
 );
 
-const Logos: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => (
-  <>
-    <Img
-      src={staticFile("logo-vakdor.png")}
-      style={{
-        position: "absolute",
-        top: 80,
-        left: 70,
-        width: 96,
-        height: 96,
-        objectFit: "contain",
-        opacity,
-      }}
-    />
-    <Img
-      src={staticFile("logo-icon.png")}
-      style={{
-        position: "absolute",
-        top: 80,
-        right: 70,
-        width: 96,
-        height: 96,
-        objectFit: "contain",
-        opacity,
-      }}
-    />
-  </>
-);
+const Logos: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => {
+  const { width, height } = useVideoConfig();
+  const u = unit(width, height);
+  return (
+    <>
+      <Img
+        src={staticFile("logo-vakdor.png")}
+        style={{
+          position: "absolute",
+          top: 80 * u,
+          left: 70 * u,
+          width: 96 * u,
+          height: 96 * u,
+          objectFit: "contain",
+          opacity,
+        }}
+      />
+      <Img
+        src={staticFile("logo-icon.png")}
+        style={{
+          position: "absolute",
+          top: 80 * u,
+          right: 70 * u,
+          width: 96 * u,
+          height: 96 * u,
+          objectFit: "contain",
+          opacity,
+        }}
+      />
+    </>
+  );
+};
 
 const Vignette: React.FC = () => (
   <AbsoluteFill
@@ -117,9 +127,10 @@ const Vignette: React.FC = () => (
 // ---------- INTRO ----------
 const Intro: React.FC<{ props: PropertyReelProps }> = ({ props }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
+  const u = unit(width, height);
   const appear = spring({ frame, fps, config: { damping: 200 } });
-  const lineW = interpolate(appear, [0, 1], [0, 260]);
+  const lineW = interpolate(appear, [0, 1], [0, 260 * u]);
   const fadeOut = interpolate(frame, [INTRO - 12, INTRO], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -130,7 +141,7 @@ const Intro: React.FC<{ props: PropertyReelProps }> = ({ props }) => {
     <AbsoluteFill
       style={{
         opacity: fadeOut,
-        padding: 90,
+        padding: 90 * u,
         justifyContent: "center",
         fontFamily,
       }}
@@ -139,9 +150,9 @@ const Intro: React.FC<{ props: PropertyReelProps }> = ({ props }) => {
       <div
         style={{
           color: BRAND.accent,
-          fontSize: 38,
+          fontSize: 38 * u,
           fontWeight: 700,
-          letterSpacing: 6,
+          letterSpacing: 6 * u,
           textTransform: "uppercase",
           transform: `translateY(${rise}px)`,
           opacity: appear,
@@ -152,16 +163,16 @@ const Intro: React.FC<{ props: PropertyReelProps }> = ({ props }) => {
       <div
         style={{
           width: lineW,
-          height: 8,
+          height: 8 * u,
           backgroundColor: BRAND.accent,
-          margin: "34px 0",
+          margin: `${34 * u}px 0`,
           borderRadius: 4,
         }}
       />
       <div
         style={{
           color: BRAND.title,
-          fontSize: 96,
+          fontSize: 96 * u,
           fontWeight: 800,
           lineHeight: 1.05,
           transform: `translateY(${rise}px)`,
@@ -173,9 +184,9 @@ const Intro: React.FC<{ props: PropertyReelProps }> = ({ props }) => {
       <div
         style={{
           color: BRAND.text,
-          fontSize: 48,
+          fontSize: 48 * u,
           fontWeight: 500,
-          marginTop: 28,
+          marginTop: 28 * u,
           transform: `translateY(${rise}px)`,
           opacity: appear,
         }}
@@ -196,6 +207,8 @@ const PhotoClip: React.FC<{
   index: number;
 }> = ({ src, durationInFrames, spec, title, price, index }) => {
   const frame = useCurrentFrame();
+  const { width, height } = useVideoConfig();
+  const u = unit(width, height);
   const zoomDir = index % 2 === 0 ? 1 : -1;
   const scale = interpolate(
     frame,
@@ -239,11 +252,11 @@ const PhotoClip: React.FC<{
         <div
           style={{
             position: "absolute",
-            top: 120,
-            left: 70,
+            top: 120 * u,
+            left: 70 * u,
             display: "flex",
             alignItems: "baseline",
-            gap: 16,
+            gap: 16 * u,
             fontFamily,
             transform: `translateY(${-barRise}px)`,
             opacity: interpolate(frame, [10, 28], [0, 1], {
@@ -253,11 +266,11 @@ const PhotoClip: React.FC<{
           }}
         >
           <span
-            style={{ color: BRAND.accent, fontSize: 84, fontWeight: 800 }}
+            style={{ color: BRAND.accent, fontSize: 84 * u, fontWeight: 800 }}
           >
             {spec.value}
           </span>
-          <span style={{ color: BRAND.title, fontSize: 40, fontWeight: 600 }}>
+          <span style={{ color: BRAND.title, fontSize: 40 * u, fontWeight: 600 }}>
             {spec.label}
           </span>
         </div>
@@ -267,26 +280,26 @@ const PhotoClip: React.FC<{
       <div
         style={{
           position: "absolute",
-          bottom: 130,
-          left: 70,
-          right: 70,
+          bottom: 130 * u,
+          left: 70 * u,
+          right: 70 * u,
           fontFamily,
           transform: `translateY(${barRise}px)`,
         }}
       >
         <div
           style={{
-            width: 120,
-            height: 6,
+            width: 120 * u,
+            height: 6 * u,
             backgroundColor: BRAND.accent,
             borderRadius: 3,
-            marginBottom: 22,
+            marginBottom: 22 * u,
           }}
         />
         <div
           style={{
             color: BRAND.title,
-            fontSize: 56,
+            fontSize: 56 * u,
             fontWeight: 700,
             lineHeight: 1.1,
           }}
@@ -296,9 +309,9 @@ const PhotoClip: React.FC<{
         <div
           style={{
             color: BRAND.accent,
-            fontSize: 64,
+            fontSize: 64 * u,
             fontWeight: 800,
-            marginTop: 10,
+            marginTop: 10 * u,
           }}
         >
           {price}
@@ -311,7 +324,8 @@ const PhotoClip: React.FC<{
 // ---------- OUTRO (CTA) ----------
 const Outro: React.FC<{ props: PropertyReelProps }> = ({ props }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
+  const { fps, width, height } = useVideoConfig();
+  const u = unit(width, height);
   const appear = spring({ frame, fps, config: { damping: 200 } });
   const rise = interpolate(appear, [0, 1], [50, 0]);
   const pill = spring({ frame: frame - 8, fps, config: { damping: 180 } });
@@ -321,7 +335,7 @@ const Outro: React.FC<{ props: PropertyReelProps }> = ({ props }) => {
       style={{
         justifyContent: "center",
         alignItems: "center",
-        padding: 90,
+        padding: 90 * u,
         textAlign: "center",
         fontFamily,
       }}
@@ -329,17 +343,17 @@ const Outro: React.FC<{ props: PropertyReelProps }> = ({ props }) => {
       <Logos opacity={appear} />
       <div
         style={{
-          width: interpolate(appear, [0, 1], [0, 200]),
-          height: 8,
+          width: interpolate(appear, [0, 1], [0, 200 * u]),
+          height: 8 * u,
           backgroundColor: BRAND.accent,
           borderRadius: 4,
-          marginBottom: 40,
+          marginBottom: 40 * u,
         }}
       />
       <div
         style={{
           color: BRAND.title,
-          fontSize: 80,
+          fontSize: 80 * u,
           fontWeight: 800,
           lineHeight: 1.1,
           transform: `translateY(${rise}px)`,
@@ -351,9 +365,9 @@ const Outro: React.FC<{ props: PropertyReelProps }> = ({ props }) => {
       <div
         style={{
           color: BRAND.text,
-          fontSize: 52,
+          fontSize: 52 * u,
           fontWeight: 700,
-          marginTop: 24,
+          marginTop: 24 * u,
           opacity: appear,
         }}
       >
@@ -361,12 +375,12 @@ const Outro: React.FC<{ props: PropertyReelProps }> = ({ props }) => {
       </div>
       <div
         style={{
-          marginTop: 56,
+          marginTop: 56 * u,
           backgroundColor: BRAND.accent,
           color: BRAND.title,
-          fontSize: 44,
+          fontSize: 44 * u,
           fontWeight: 700,
-          padding: "30px 64px",
+          padding: `${30 * u}px ${64 * u}px`,
           borderRadius: 999,
           transform: `scale(${interpolate(pill, [0, 1], [0.8, 1])})`,
           opacity: pill,

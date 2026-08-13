@@ -965,17 +965,59 @@ Panel económico/contable (solo dueño): P&L, márgenes, **apalancamiento operat
 
 Sala de control del contenido orgánico de Vakdor (LinkedIn/Instagram/blog). Tablero kanban de ideas con 6 estados (`idea·en_proceso·en_revision·aprobada·publicada·rechazada`).
 
-- **Tabla `marketing_ideas`** (RLS on **sin policies**, solo `service_role`): `fuente` (`linkedin|instagram|blog`), `formato` (`post_texto|carrusel|imagen|encuesta|articulo_linkedin|reel|lead_magnet|articulo_blog`), `funnel` (`tofu|mofu|bofu`, etapa del embudo — el worker adapta el mensaje: TOFU=descubrimiento/dolor amplio, MOFU=nutrición/mecanismo PRISMA, BOFU=empujón a la reunión; el motor `generar` balancea las 3 etapas), `contenido`, `blog` (jsonb: title/slug/meta_description/seo_keywords/featured_image_url…), `assets` (jsonb `[{tipo:'png'|'pdf', path, url?, orden}]`), `hashtags`, `primer_comentario`, `programada_para`, `publicado_en`, `historial`, `origen` (`motor|manual`). Bucket **privado** `marketing-assets` (firma temporal); los assets del worker viven en el bucket **público** `blog-images` del proyecto **vakdor-app** (por eso cada asset lleva `url`).
-- **Código app** en `lib/admin-vakdor/marketing/`: `store.ts` (CRUD + `listarProgramadasVencidas` + `firmarAsset`), `types.ts`, `claude.ts` + `brand-prompt.ts` (develop/reformular in-app, modelo **`claude-opus-4-8`**), `blog-client.ts` (publica en `blog_posts` de vakdor-app), `buffer-client.ts` (LinkedIn vía Buffer + helpers **`resolverImagenLinkedIn(blog, assets)`** —imagen: `blog.featured_image_url` → fallback `assets[].url` público— y **`resolverDocumentoLinkedIn(titulo, assets)`** —carrusel: `carousel.pdf` como documento + primera slide png como `thumbnailUrl`).
+- **Tabla `marketing_ideas`** (RLS on **sin policies**, solo `service_role`): `fuente` (`linkedin|instagram|blog`), `formato` (`post_texto|carrusel|imagen|encuesta|articulo_linkedin|reel|lead_magnet|articulo_blog`), `funnel` (`tofu|mofu|bofu`, etapa del embudo — el worker adapta el mensaje: TOFU=descubrimiento/dolor amplio, MOFU=nutrición/mecanismo PRISMA, BOFU=**ver el video de la demostración** (`vakdor.com/demostracion`, link solo en el primer comentario); el motor `generar` balancea las 3 etapas), `contenido`, `blog` (jsonb: title/slug/meta_description/seo_keywords/featured_image_url…), `assets` (jsonb `[{tipo:'png'|'pdf', path, url?, orden}]`), `hashtags`, `primer_comentario`, `programada_para`, `publicado_en`, `historial`, `origen` (`motor|manual`). Bucket **privado** `marketing-assets` (firma temporal); los assets del worker viven en el bucket **público** `blog-images` del proyecto **vakdor-app** (por eso cada asset lleva `url`).
+- **Código app** en `lib/admin-vakdor/marketing/`: `store.ts` (CRUD + `listarProgramadasVencidas` + `firmarAsset`), `types.ts`, `claude.ts` + `brand-prompt.ts` (develop/reformular in-app, modelo **`claude-sonnet-5`**, env `ANTHROPIC_API_KEY`), `blog-client.ts` (publica en `blog_posts` de vakdor-app), `buffer-client.ts` (LinkedIn vía Buffer + helpers **`resolverImagenLinkedIn(blog, assets)`** —imagen: `blog.featured_image_url` → fallback `assets[].url` público— y **`resolverDocumentoLinkedIn(titulo, assets)`** —carrusel: `carousel.pdf` como documento + primera slide png como `thumbnailUrl`).
 - **Endpoints** `app/api/admin-vakdor/marketing/*`: `GET/POST /` (listar/alta), `POST [id]/estado` (mover), `POST [id]/desarrollar` (contenido rápido in-app), `POST [id]/reformular`, `POST [id]/programar`, `GET [id]/asset` (firma el bucket privado; valida `path` que empiece con `ideas/<id>/`), `POST [id]/publicar` (blog o LinkedIn), `POST generar` (motor de ideas), `POST publicar-programadas` (cron).
+  - **`desarrollar` y `reformular` escriben con la voz nueva desde el PRIMER borrador** (`system = BRAND_SYSTEM + canonDeVoz()` y `instruccionCta(etapa)` en el user prompt). Antes redactaban planos con solo `BRAND_SYSTEM` y la revisión intentaba parchear la voz después, en una sola pasada. `desarrollar` además dejó de pedir "conclusión con CTA a /call" y el primer comentario genérico ("pregunta o estadística cruda… el link a vakdor.com va acá si corresponde"): ahora el cierre y el link los dicta `instruccionCta(idea.funnel)`.
 - **Publicación:** **artículo de blog (`fuente=blog`) → CROSS-POST**: se publica en la **web** (`blog_posts` de vakdor-app, artículo + `featured_image_url`=portada) **y** en **LinkedIn** (post teaser standalone `blog.linkedin_post` + la misma portada, **sin links** — el link vive en el perfil, no en el post/comentario). Centralizado en `lib/admin-vakdor/marketing/publisher.ts` (`publicarArticuloBlog`), usado por el botón manual **y** el cron (programar un artículo también cross-postea). El worker genera la versión LinkedIn (`linkedin_post`/`linkedin_primer_comentario`/`linkedin_hashtags` en el jsonb `blog`); si falta portada o post, se publica la web y se omite LinkedIn con motivo. *(Fix: el botón manual antes no mandaba la portada y exigía `category` que el worker no setea → ahora pasa la portada y defaultea `category`='General'.)* LinkedIn → Buffer `createPost` (`BUFFER_API_KEY`, canal personal `6a4aca1140483446287320b8`): si la idea es **`carrusel`** con `carousel.pdf`, se publica como **document post** (asset `document{url,title,thumbnailUrl}` — LinkedIn lo muestra deslizable); si no, texto+imagen (`resolverImagenLinkedIn`). Verificado contra la API real de Buffer (draft con `DocumentAsset` mimeType `application/pdf`). El **primer comentario requiere plan pago** de Buffer (por ahora se pega a mano). **Cron** `POST publicar-programadas` (auth `assertCron`) + workflow `.github/workflows/marketing-publish.yml` (cada 30 min) publica todas las `aprobada` con `programada_para` vencida — un solo cron para blog+LinkedIn (imagen o documento), un fallo por idea no corta el resto.
 - **WORKER** (`Prisma - MK/marketing-worker/`, corre **local o en EasyPanel — NUNCA en Vercel**, porque usa Playwright + skills de marca): observa `en_proceso` cada 20s → por idea, desarrolla contenido con Claude si falta + genera **assets de marca según `formato`** → sube al bucket público (cada asset con `url`) → pasa a `en_revision`. **Modular:** `watch.mjs` (orquestador + Supabase + subida), `content.mjs` (prompts Claude: base / carrusel / lead-magnet), `render.mjs` (Playwright: portada + slides, y `carousel.pdf` con pdfkit), `vakdor-pdf.mjs` (Markdown→PDF A4 on-brand, copia autocontenida de la skill Vakdor-PDF). **Formatos:** `carrusel` = N slides 1080×1080 (portada+cuerpo+CTA final) + `carousel.pdf`; `lead_magnet` = `magnet.pdf` (scorecard con tabla/casillas, vía Vakdor-PDF) + portada; resto = portada única (blog 1200×630 OG / social 1080×1080). Deps en Prisma-MK: `playwright`, `@anthropic-ai/sdk`, `@supabase/supabase-js`, `pdfkit`, `marked`. **Los carruseles NO se autopublican** (Buffer LinkedIn solo acepta 1 imagen, no documentos; IG sin ruta) → quedan como assets para uso manual + preview en el visor.
 - **Skills reales en el worker (`skills.mjs`):** el worker CARGA el contenido real de las skills (`vakdor-copywriter/SKILL.md` + `platform_structures`/`angles`/`hooks`, `vakdor-carousel/SKILL.md`, `Vakdor-LeadMagnet/SKILL.md`, ~85K car) y las sigue al pie por pieza. Se inyectan como **bloque de system con `cache_control: ephemeral`** (prompt caching): se escribe 1 vez por ráfaga (`cache_creation`) y las piezas siguientes lo leen barato (`cache_read`). `SKILLS_DIR` override para EasyPanel (bundlear los .md). Copywriter → todas; carousel → carrusel; leadmagnet → lead_magnet.
-- **Análisis diario de rendimiento (`insights.mjs` + tabla `marketing_insights`):** 1×/día el worker trae los posts publicados de LinkedIn vía Buffer (query `Posts($input:PostsInput!)` filtrando `status:["sent"]`, cada post con `text` + `metrics{engagementRate,reactions,comments,impressions}`), arma un ranking determinista (qué rinde más / menos) y lo **cachea en `marketing_insights`** (`fecha` PK, RLS on sin policies). Ese resumen se inyecta en los prompts del worker (contenido) y en el motor `generar` (ideas) → decisiones con **datos reales, nada inventado**. Falla suave (sin Buffer/datos → `""`).
+- **Análisis diario de rendimiento (`insights.mjs` + tabla `marketing_insights`):** 1×/día el worker trae los posts publicados de LinkedIn vía Buffer (query `Posts($input:PostsInput!)` filtrando `status:["sent"]`, cada post con `text` + `metrics{engagementRate,reactions,comments,impressions}`), arma un ranking determinista (qué rinde más / menos) y lo **cachea en `marketing_insights`** (`fecha` PK, RLS on sin policies). Ese resumen se inyecta en los prompts del worker (contenido) y en el motor `generar` (ideas) → decisiones con **datos reales, nada inventado**. Falla suave (sin Buffer/datos → `""`). **`watch.mjs` pasa el cliente Anthropic como tercer argumento** (`insightsDelDia(db, E.BUFFER_API_KEY, anthropic)`) — sin él la clasificación fallaba suave en cada ciclo y el resumen quedaba siempre en `""`. **Un intento por día, incluso si sale mal:** `insightsDelDia` memoiza el resultado del día en memoria (`intentoDelDia`, reseteable con `reiniciarCacheInsights()` en tests) y lo marca **antes** de gastar. El cache de Supabase solo guarda los resúmenes buenos, así que un día sin datos o con la clasificación fallada no escribía nada y el ciclo de 20s repetía el fetch de Buffer **más una clasificación paga de 40 posts con Sonnet 5**, indefinidamente y sin log que lo explicara (~3 llamadas pagas por minuto). Ahora el resultado negativo también se cachea y se loguea el motivo.
+
+- **Motor de voz humana (`voz.ts`/`voz.mjs` — espejo app/worker, tabla `marketing_recursos`):** desde ago-2026 el worker ya no escribe sobre una plantilla única (hook/fricción/quiebre/solución/prueba/CTA); cada pieza sortea su propia forma. Fuente de verdad = tabla `marketing_recursos` (RLS on, sin policies, solo `service_role`), con `tipo` en 4 valores:
+  - **`canon`** (1 fila, `clave='v1'`): las reglas de voz inquebrantables — abrir con escena concreta (nunca tesis abstracta), tomar posición, giro de concesión, vivencia de campo sin inventar cifras, ≥2 detalles concretos (hora/día/plazo/tipo de propiedad), cerrar en la consecuencia. Español rioplatense, 2ª persona, cero emojis.
+  - **`estructura`** (8 filas): la forma narrativa de la pieza — `confesion`, `concesion_vuelta`, `escena_campo`, `contraste`, `autopsia`, `mito_realidad`, `carta_director`, `numero_duele`.
+  - **`escena`** (30 filas): situaciones concretas del rubro inmobiliario para anclar la pieza (ej. "El lead del sábado a la noche", "La cartera se va en el celular"); el worker usa 2 por pieza.
+  - **`comentario`** (5 filas): el tipo de primer comentario — `dato_crudo`, `opinion_filosa`, `matiz`, `micro_caso`, `pregunta_binaria`.
+  - **Rotación determinista** (`recursos.mjs`/`recursos.ts`, función `elegirRecursos`): para cada pieza se excluyen la estructura y las escenas usadas en las últimas 15 piezas con contenido; si al excluir no queda ninguna, recicla las menos usadas (nunca bloquea la generación). Entre los candidatos frescos, ordena por `usos` (menor primero) y a igual `usos` por `ultimo_uso` (más antiguo primero) — así el banco entero rota antes de repetirse.
+  - **Flujo de generación por pieza:** canon (siempre) → 1 estructura: **la de `idea.estructura` si la idea la trae** (validada contra las 8 claves al generarse la idea), si no una sorteada no usada en las últimas 15 → 2 escenas sorteadas (no usadas en las últimas 15) → 1 tipo de comentario sorteado → memoria anti-repetición (texto completo de las últimas 15 piezas, para no repetir apertura/argumento/escena/estructura) → escritura con Claude (`claude-sonnet-5`) → revisión contra una rúbrica de 7 puntos: 1) primera línea = escena concreta, 2) hay una posición discutible, 3) hay un giro, 4) ≥2 detalles específicos, 5) no repite piezas anteriores (chequeo local de similitud de apertura + veredicto del modelo), 6) el CTA corresponde a la etapa del embudo y el link está donde va, 7) sin muletillas de IA. Si falla algún punto, se reescribe **una sola vez** (no hay loop) corrigiendo solo lo señalado.
+  - **Dónde vive la revisión:** en el **worker**, `marketing-worker/revision.mjs` (función `revisar`). En la **app** no hay `revision.ts`: la misma lógica está inline en `app/api/admin-vakdor/marketing/[id]/reformular/route.ts` (función `revisarYCorregir`), y lo que sí es espejo compartido es `voz.mjs`/`voz.ts` (rúbrica, `promptRevision`, `instruccionCta`, muletillas).
+  - **Qué le llega al juez:** `promptRevision` incluye la **rúbrica + `instruccionCta(etapa)`** (sin eso, el criterio 6 pedía juzgar una regla que nunca se le decía) y aclara que el primer comentario **no** está en la PIEZA. La mitad de la regla que el juez no puede ver la cubre `chequeoCta(etapa, cuerpo, primerComentario)` en `revision.mjs`, un **chequeo determinista**: en BOFU el link `vakdor.com` no puede estar en el cuerpo y sí tiene que estar en el primer comentario; en TOFU/MOFU no va en ninguno de los dos. Sus fallos entran a la misma lista `fallos` de la rúbrica (y por eso están redactados aclarando que el comentario se edita aparte, para que la reescritura del cuerpo no "corrija" metiendo el link ahí).
+  - **La reescritura no pisa al original si vuelve rota** (`reescrituraUsable`, piso del 60% de la longitud previa, evaluado **después** de sanear): una respuesta que es solo `"""` no es falsy y sobrevivía al `|| texto`, y una respuesta cortada por `stop_reason: "max_tokens"` volvía a medio escribir y reemplazaba una pieza completa sin que nada lo dijera. Ahora el corte por `max_tokens` lo detectan los helpers de llamada (`llamar` en `content.mjs`, `verificarNoTruncada` en `claude.ts`) y **tiran**: en el develop eso marca la idea, en la revisión significa "conservá el texto original" (queda en `receta.revision.reescritura_descartada`).
+  - **Tope de reintentos del worker** (`watch.mjs`, `MAX_INTENTOS = 3`): un fallo determinista (p.ej. `carrusel: la ultima slide no tiene cta`) dejaba la idea en `en_proceso` para siempre y el ciclo de 20s la regeneraba con Sonnet 5 indefinidamente. Ahora se cuentan los intentos en memoria; al tercero se saca de la cola de ese proceso y se anota un evento `error` en `historial` (no se toca `estado`: mover a `rechazada` es decisión del director, no del worker).
+  - **Columna `receta` (jsonb) en `marketing_ideas`:** lo que se usó para escribir esa pieza, guardado en forma plana (no el objeto en memoria): `{"estructura":"<clave>", "escenas":["<id>","<id>"], "comentario_tipo":"<clave>", "modelo":"claude-sonnet-5", "revision":{"aprobado":true|false,"reintentos":0|1,"fallos":["..."],"reescritura_descartada":true|false}}`. Sirve para auditar qué estructura/escenas/comentario tocó cada pieza y si pasó la rúbrica a la primera o necesitó reescritura. `reescritura_descartada:true` = hubo fallos, se intentó reescribir y la reescritura volvió rota (vacía, mutilada o truncada), así que **quedó el texto original** con sus fallos anotados.
+  - **CTA por etapa del embudo** (`instruccionCta`, aplica al cuerpo; `instruccionComentario`, aplica al primer comentario): **TOFU** (descubrimiento) — no nombra el producto ni la empresa, no pide reunión, cierra en la consecuencia de no actuar o en una pregunta; sin links ni en el cuerpo ni en el comentario. **MOFU** (nutrición) — explica el mecanismo (Método P-R-I-S-M-A), puede nombrar PRISMA como el camino, sin cierre agresivo ni pedido de reunión; sin links ni en el cuerpo ni en el comentario. **BOFU** (decisión) — cierra contando qué se ve en el video de demostración y qué duda resuelve; el link `https://vakdor.com/demostracion` va **solo en el primer comentario, nunca en el cuerpo del post** (LinkedIn penaliza el alcance de los posts con link externo); urgencia sin ruego.
 - **Gotcha logos (worker):** los logos se embeben como **data-URI base64**, no `file://`. Las rutas `file://` con espacios (`Antigravity - Apps`, `Prisma - MK`) no cargaban en el navegador headless → las portadas salían **sin logos**; el data-URI además es host-agnóstico (corre en EasyPanel sin rutas absolutas de Windows).
 - **Visor "Ver contenido" (`marketing-client.tsx` → `PreviewPieza`):** por `formato` — **carrusel** = galería slide por slide (todas las PNG por `orden`, flechas ◀▶ + puntos) + **Descargar PDF**; **lead_magnet** = `magnet.pdf` embebido en `<iframe>` + descargar; resto = portada. Descarga forzada con `?download=<nombre>` (Content-Disposition de Supabase Storage). El `contenido` se muestra etiquetado **"Descripción del posteo"** (el worker lo desarrolla como post con hook + storytelling, no un pie de foto).
 - **Reformular con visuales:** el recuadro de reformular (en `en_revision`) tiene un check **"También regenerar imágenes/PDF"** (solo carrusel/lead_magnet). Si se marca, el route `[id]/reformular` NO genera texto: llama `regenerarVisuales(id, comentario)` (limpia `contenido`+`assets`, guarda `comentario`, → `en_proceso`) y el **worker** rehace descripción + slides/PDF alineados al comentario (prompt `ajusteIdea` en `content.mjs`) y la devuelve a `en_revision`. Sin marcar, reformula solo el texto (para carrusel/lead_magnet, ese texto es la descripción del posteo, no las slides).
 - **Regla dura de arquitectura:** todo lo que usa skills reales o Playwright (ideas, contenido fiel, imágenes de marca) corre **LOCAL/EasyPanel**; la app en Vercel hace tablero, develop rápido (texto), publicar, calendario y cron. Estado y pendientes: `docs/interno/marketing-handoff.md`.
+
+#### 16.3.1 Bloque "Métricas & Inteligencia IA" (embudo de vakdor.com)
+
+Vive en `components/admin-vakdor/marketing-metrics-section.tsx` (UI) + `lib/admin-vakdor/marketing/metricas.ts` (datos) + `app/api/admin-vakdor/marketing/metricas/route.ts` (lectura) + `app/api/cron/marketing-metrics/route.ts` (análisis IA). **La fuente de los números es GA4, no Meta**: Meta recibe los mismos eventos por la API de Conversiones para optimizar campañas, pero el panel no muestra cifras de Meta.
+
+- **Embudo de 8 etapas**, medido en **personas** (`activeUsers`), no en eventos. Los eventos los dispara el repo del sitio (`Sitio web - Vakdor`, `website/src/lib/analytics.ts`):
+
+  | # | Etapa | Evento GA4 | Respaldo histórico |
+  |---|---|---|---|
+  | 1 | Home | `page_view` en `/` | — |
+  | 2 | Ve la demostración | `view_demostracion` | `page_view` en `/demostracion` |
+  | 3 | Termina el video | `vsl_watch_100` | `video_complete` |
+  | 4 | Aprieta "Agendar" | `click_agendar_cta` | `clic_agendar_demo` (GTM) |
+  | 5 | Llega al formulario | `view_prefilter_form` | `page_view` en `/call` |
+  | 6 | Envía el formulario | `prefilter_submit` | `generate_lead` |
+  | 7 | Llega al calendario | `view_calendar` | — |
+  | 8 | Confirma la reserva | `schedule_call` | — |
+
+  Aparte, **`prefilter_no_calificado`** = los que enviaron el formulario y el pre-filtro NO les abrió el calendario. Es un evento propio (no un parámetro) justamente para poder medirlo sin registrar dimensiones personalizadas en GA4.
+
+- **Por qué dos reportes de GA4 para el embudo:** uno con dimensión `eventName` sola (los pasos 2-8) y otro con `eventName`+`pagePath` (el paso 1 y los respaldos). Abrir por ruta y sumar `activeUsers` a través de las filas **cuenta dos veces a la misma persona**; sin abrir por ruta no se puede aislar la home. Los 6 reportes van con `Promise.allSettled`: si uno se cae por timeout, los otros cinco igual se muestran y el badge pasa a "GA4 incompleto".
+- **GOTCHA de atribución (Measurement Protocol):** un evento server-side sin `session_id` (cookie `_ga_<ID>`) y sin `page_location` entra a GA4 **con 0 sesiones y ruta `(not set)`**, así que no arma embudo. Por eso `website/src/lib/ga-server.ts` manda siempre `client_id` + `session_id` + `page_location` + `engagement_time_msec`. Si en GA4 aparece un evento con `usuarios=0` pero `eventos>0`, es un evento viejo, previo a este fix.
+- **GOTCHA Clarity:** su API acepta **solo 1, 2 o 3 días** (ignora el selector de 7/30/90) y permite **10 consultas por día**. Se pide siempre `numOfDays=3` y se cachea 6 h en memoria; la tarjeta avisa el rango real y el badge distingue "en vivo" de "cacheado".
+- **Badges de estado:** salen del objeto `sources` del payload (`ga4|gsc|buffer|clarity`), no están fijos en el código. *(Antes decían "GA4 En Vivo / CAPI Activo / Clarity Conectado" siempre, incluso con todas las fuentes caídas.)*
+- **Buffer:** `aggregatedPostMetrics` devuelve **solo totales del período**, no el detalle post por post. Por eso `publicaciones` va vacío y el prompt de la IA le prohíbe explícitamente hablar de publicaciones concretas, ganchos o formatos ganadores (los inventaba). El ranking real por post lo calcula el worker aparte, en `marketing_insights`.
+- **Cron `/api/cron/marketing-metrics`:** lo dispara `.github/workflows/tokko-sync.yml` a las **10:00 y 21:00 UTC = 07:00 y 18:00 AR**. Genera el análisis de Gemini para los **tres períodos** (7d/30d/90d) y los guarda en `marketing_ai_analysis` (`periodo` PK). Los payloads se piden de a uno a propósito, para que Clarity se consulte una sola vez y no queme 3 de las 10 llamadas diarias.
+- **Env vars que necesita:** `CLIENT_EMAIL`/`PRIVATE_KEY`/`TOKEN_URI` (GA4 + GSC), `CLARITY_API_KEY`, `BUFFER_API_KEY`. Del lado del sitio: `GA4_API_SECRET` y `API_CONVERSIONES_TOKEN` en el proyecto Vercel de vakdor.com.
 
 ---
 
@@ -1006,7 +1048,7 @@ Sala de control del contenido orgánico de Vakdor (LinkedIn/Instagram/blog). Tab
 | Grupo | Variables |
 |---|---|
 | Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` |
-| IA | `GEMINI_API_KEY`, `OPENAI_API_KEY` |
+| IA | `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (develop/reformular in-app y motor de voz del worker de Marketing, modelo `claude-sonnet-5`) |
 | Tokko | `TOKKO_API_KEY` (fallback global) |
 | WhatsApp/Evolution | `EVOLUTION_API_URL`, `EVOLUTION_API_KEY`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` |
 | n8n | `N8N_WEBHOOK_URL`, `N8N_REPLY_SECRET`, `APP_URL` |
@@ -1045,8 +1087,74 @@ Sincroniza las visitas (`scheduled_visits`) hacia el Google Calendar personal de
 - **Marketing IA — vincular propiedad al IPC "vender":** ✅ **implementado (jun-2026).** El `PropertySelector` busca sobre la cartera completa de la agencia (`tokko-search` sobre tabla local) y el copy **sí usa** los datos reales de la propiedad asociada (`buildPropertyDirective`), con criterio psicológico y sin inventar. Ya no es función reservada.
 - **Endpoints de debug** (`/api/debug/*`): validar que no queden expuestos en producción.
 - **Inconsistencia documental:** el diagrama §26.3 de `LOGICA-PRISMA.md` describe el flujo vectorial original del Consultor; el vigente es el de §10.3 (ya anotado en el doc).
+- ~~**Worker de Marketing — `insightsDelDia` sin cliente Anthropic**~~ **RESUELTO (ago-2026):** `watch.mjs` ya pasa `anthropic` como tercer argumento. En la misma pasada se cacheó el resultado **negativo** del día (ver §16.3): antes, un día sin datos no escribía cache y el ciclo de 20s repetía el fetch de Buffer + una clasificación paga de 40 posts, para siempre.
+- ~~**Worker de Marketing — comillas triples colándose en el cuerpo tras la reescritura**~~ **RESUELTO (ago-2026, commit `7764fe9`):** `revisar()` sanea las `"""` envolventes con `limpiarComillasEnvolventes`. Complementado después con la validación posterior al saneo (ver §16.3): una reescritura vacía o mutilada ya no pisa al texto original.
+- **Worker de Marketing — la rúbrica del blog se aplica al artículo, no al post de LinkedIn (deuda conocida, ago-2026):** para `fuente=blog`, `revisarYRegistrar` corre sobre `d.contenido` (el artículo en Markdown para la web); el post de LinkedIn que lo acompaña (`blog.linkedin_post`) **no pasa por la rúbrica de 7 puntos**. Diferido a propósito en la pasada de fixes del 12-ago-2026.
+- **Worker de Marketing — el tipo de `comentario` no es data-driven:** de las filas `tipo='comentario'` de `marketing_recursos` solo se lee la `clave`; el texto sale del map `cuerpos` hardcodeado en `voz.mjs`/`voz.ts`. Agregar una clave nueva solo con SQL mete `undefined` en el prompt. Fix futuro: leer el `detalle` de la fila (como ya hacen `canon` y `escena`).
 
 ---
+
+## 21. Mapa del Buscador IA
+
+Rutas: `/director/consultor` y `/asesor/consultor-ia`, solapa "Mapa".
+Componentes en `components/mapa/`, lógica pura en `lib/mapa/` (81 tests con `node --test`).
+
+### Tablas y funciones
+
+| Objeto | Para qué |
+|---|---|
+| `mapa_zonas` | zonas a mano alzada, privadas por `user_id` |
+| `mapa_barrios` | catálogo de barrios buscable (normalizado, con recuadro) |
+| `mapa_manzanas` | polígonos de manzana derivados de OSM (PostGIS) |
+| `mapa_precio_m2_manzanas` / `_celdas` / `_barrios` | precio por m² precalculado |
+| `mapa_baldosas_intentos` | control de la cola de trazado automático |
+| `mapa_cartera()` / `mapa_colaboracion()` | los pines del rectángulo visible |
+| `mapa_buscar_barrios()` / `_cartera()` | sugerencias del buscador |
+| `mapa_precio_m2_por_manzana()` / `mapa_ranking_barrios()` | el mapa de calor |
+| `refrescar_*()` | rearman lo precalculado |
+
+### Índices que NO son opcionales
+
+Cada uno de estos nació de un `statement timeout` real, no de una optimización preventiva:
+
+- `idx_roomix_geo_filtros` — GiST compuesto (`btree_gist`) que mezcla `point(lng,lat)` con
+  operación, tipo, moneda y precio. Sin él, un filtro que no coincide con nada obliga a
+  recorrer el rectángulo entero: 16.439 ms medidos para devolver cero.
+- `idx_roomix_barrio_normalizado` — índice de expresión sobre `barrio_normalizado()`. Sin
+  él, filtrar por barrio tardaba 8.337 ms y se cancelaba solo. `unaccent()` no se puede
+  indexar directamente (depende de un diccionario configurable): va envuelta con el
+  diccionario explícito para volverla inmutable, y calificada con su esquema.
+- `idx_mapa_manzanas_geom`, `idx_precio_m2_celdas_geo`, `idx_mapa_barrios_trgm`.
+
+### Trampas verificadas
+
+- **PostgREST recorta toda respuesta a 1.000 filas**, aunque la función SQL pida más. El
+  truco de "pedir uno de más para saber si hay más" NO funciona: hay que tomar como
+  recortado el hecho de llenar el cupo.
+- **La política de contenido (`next.config.mjs`) gobierna el mapa.** Los proveedores de
+  baldosas van en `img-src`; `api.maptiler.com` va TAMBIÉN en `connect-src` porque se le
+  consulta el estado con `fetch`. Verificar con `curl` no sirve: ignora la CSP.
+- **MapTiler con clave inválida devuelve 403 con una imagen PNG válida adentro** (el cartel
+  "Invalid key"). El evento `tileerror` de Leaflet nunca se dispara. Hay que mirar el
+  estado HTTP.
+- **La clave de MapTiler exige la cabecera `Origin`**, que el servidor no manda: el
+  geocoder se llama desde el navegador, no desde el backend. Los orígenes permitidos deben
+  incluir `*.vakdor.com` (`vakdor.com` a secas NO cubre subdominios) y `localhost`.
+- **`100vh` no descuenta la barra de direcciones en el celular**: va `dvh`.
+
+### Tareas automáticas
+
+| Workflow | Cuándo | Qué hace |
+|---|---|---|
+| `mapa-manzanas.yml` | 03:30 UTC | traza manzanas nuevas donde hay propiedades sin cubrir, de a 80 baldosas |
+| `mapa-refrescar.yml` | 08:00 UTC | recalcula barrios, cuadrícula, ranking y precio por manzana |
+
+Secretos necesarios: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_API_KEY_MANAGEMENT`,
+`SITE_DOMAIN`, `CRON_SECRET`. En Vercel: `NEXT_PUBLIC_MAPTILER_KEY` (sin ella el mapa usa
+OpenStreetMap, que funciona igual).
+
+La cola de trazado la arma la base sola: busca las propiedades que no caen dentro de
+ninguna manzana. Si la red publica en una zona nueva, se traza esa misma noche.
 
 ## FIN DEL DOCUMENTO
 
