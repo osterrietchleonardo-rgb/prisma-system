@@ -11,10 +11,12 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { probe } from "./lib/probe.mjs";
-import { cargarReceta, CALIDADES } from "./lib/recipe.mjs";
+import { cargarReceta, CALIDADES, RECETA_DEFAULT } from "./lib/recipe.mjs";
 import { construirGrafo, componer } from "./lib/compose.mjs";
 import { elegirEncoder } from "./lib/encoder.mjs";
 import { FORMATOS } from "./lib/reframe.mjs";
+import { cortarSilencios } from "./lib/cut.mjs";
+import { transcribir } from "./lib/transcribe.mjs";
 
 export function parsearArgs(argv) {
   return Object.fromEntries(argv.map((a) => {
@@ -35,99 +37,151 @@ const MARGEN_SEEK_RAPIDO = 5;
 async function main() {
   const args = parsearArgs(process.argv.slice(2));
   if (!args.in || !args.out) {
-    console.error("Uso: node studio.mjs --in=crudo.mp4 --out=final.mp4 [--receta=receta.json] [--check] [--preview=SEG]");
+    console.error("Uso: node studio.mjs --in=crudo.mp4 --out=final.mp4 [--receta=receta.json] [--check] [--preview=SEG] [--sin-corte] [--srt=archivo.srt]");
+    process.exit(1);
+  }
+  if (args.srt && !fs.existsSync(args.srt)) {
+    console.error(`No existe el archivo de subtitulos: ${args.srt}`);
     process.exit(1);
   }
 
-  const info = await probe(args.in);
-  console.log(`Entrada: ${path.basename(args.in)} — ${info.width}x${info.height} @ ${info.fps}fps, ${info.durationSec.toFixed(1)}s`);
+  const infoOriginal = await probe(args.in);
+  console.log(`Entrada: ${path.basename(args.in)} — ${infoOriginal.width}x${infoOriginal.height} @ ${infoOriginal.fps}fps, ${infoOriginal.durationSec.toFixed(1)}s`);
 
-  const crudaReceta = args.receta ? args.receta : {};
-  const { receta, avisos } = cargarReceta(crudaReceta, { durationSec: info.durationSec, palabras: [] });
-  if (args.formato) receta.formato = args.formato;
-  if (args.calidad) receta.calidad = args.calidad;
+  // Temporales que este pipeline pueda crear (corte + preview): se borran SIEMPRE
+  // en el finally de abajo, exito o error, nunca dependiendo del "exit" del proceso.
+  const temporales = [];
+  try {
+    // --check es una validacion rapida y gratuita de la receta: nunca corta ni
+    // transcribe (cortar tarda, transcribir pega a una API que cuesta plata).
+    let entradaTrabajo = args.in;
+    let info = infoOriginal;
+    let palabras = [];
 
-  // cargarReceta valida formato/calidad ANTES de que --formato/--calidad los
-  // pisen. Si no se revalida aca, un typo como --formato=9x16 llega crudo a
-  // construirGrafo (que revienta con un TypeError de JS, sin decir cual es el
-  // problema) y un typo como --calidad=turbo no revienta nunca: se vuelve
-  // "rapido" en silencio y el reporte final no lo menciona.
-  if (!FORMATOS[receta.formato])
-    throw new Error(`El formato "${receta.formato}" no existe. Validos: ${Object.keys(FORMATOS).join(", ")}.`);
-  if (!CALIDADES.includes(receta.calidad))
-    throw new Error(`La calidad "${receta.calidad}" no existe. Validas: ${CALIDADES.join(", ")}.`);
-
-  const { filtroVideo, tramos, multiplicador, avisos: avisosGrafo } = construirGrafo({ receta, info });
-  const todosLosAvisos = [...avisos, ...avisosGrafo];
-  console.log(`Receta: formato ${receta.formato}, estilo ${receta.estilo}, color ${receta.grade.preset}`);
-  console.log(`Grafo: ${tramos.length} tramo(s), sobre-muestreo ${multiplicador}x`);
-  if (process.env.STUDIO_DEBUG) console.log(filtroVideo);
-
-  if (todosLosAvisos.length) {
-    console.log("\nAvisos:");
-    for (const a of todosLosAvisos) console.log(`  - ${a}`);
-  }
-
-  if (args.check) {
-    console.log("\n--check: la receta es valida y el grafo se puede construir. No renderice nada.");
-    return;
-  }
-
-  let entrada = args.in, recorte = null;
-  if (args.preview !== undefined) {
-    const centro = Number(args.preview) || 0;
-    const desde = Math.max(0, centro - VENTANA_PREVIEW / 2);
-    recorte = { desde, dur: Math.min(VENTANA_PREVIEW, info.durationSec - desde) };
-    console.log(`\nPreview: ${recorte.desde.toFixed(1)}s a ${(recorte.desde + recorte.dur).toFixed(1)}s`);
-  }
-
-  const encoder = await elegirEncoder({
-    forzar: typeof args.encoder === "string" ? args.encoder : undefined,
-    calidad: receta.calidad === "max" ? "max" : "rapido",
-  });
-  console.log(`Encoder: ${encoder.nombre}${encoder.esGpu ? " (GPU)" : " (CPU)"}`);
-
-  const infoEfectiva = recorte ? { ...info, durationSec: recorte.dur } : info;
-  const recetaEfectiva = recorte
-    ? { ...receta,
-        camara: receta.camara.filter((c) => c.t >= recorte.desde && c.t < recorte.desde + recorte.dur)
-                             .map((c) => ({ ...c, t: c.t - recorte.desde })) }
-    : receta;
-
-  if (recorte) {
-    const tmp = path.join(path.dirname(args.out), `.preview-fuente-${process.pid}-${Date.now()}.mp4`);
-    try {
-      const saltoRapido = Math.max(0, recorte.desde - MARGEN_SEEK_RAPIDO);
-      const saltoFino = recorte.desde - saltoRapido;
-      // Reencodeo corto (solo la ventana pedida) en vez de "-c copy": asi el
-      // recorte arranca exacto donde se pide y el corrimiento de los efectos
-      // de camara cae exacto, no aproximado al keyframe mas cercano.
-      const corte = spawnSync("ffmpeg", [
-        "-y", "-v", "error",
-        "-ss", String(saltoRapido), "-i", args.in,
-        "-ss", String(saltoFino), "-t", String(recorte.dur),
-        "-map", "0:v:0", "-map", "0:a?",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac",
-        tmp,
-      ], { encoding: "utf8" });
-      if (corte.status !== 0) {
-        const detalle = corte.error ? corte.error.message : corte.stderr;
-        throw new Error(`No pude recortar la ventana de preview: ${detalle}`);
+    if (!args.check) {
+      // --- Paso 1: sacar silencios ---
+      if (args["sin-corte"]) {
+        console.log("Corte: salteado (--sin-corte).");
+      } else {
+        const salidaCorte = path.join(path.dirname(args.out), `.studio-corte-${process.pid}-${Date.now()}.mp4`);
+        temporales.push(salidaCorte);
+        const rc = await cortarSilencios({
+          entrada: args.in,
+          salida: salidaCorte,
+          db: RECETA_DEFAULT.corte.db,
+          min: RECETA_DEFAULT.corte.min,
+          pad: RECETA_DEFAULT.corte.pad,
+        });
+        entradaTrabajo = rc.salida;
+        info = await probe(entradaTrabajo);
+        const antesMin = infoOriginal.durationSec / 60;
+        const despuesMin = rc.duracionFinal / 60;
+        console.log(`Corte: de ${antesMin.toFixed(1)} min a ${despuesMin.toFixed(1)} min (${(antesMin - despuesMin).toFixed(1)} min de silencios).`);
       }
-      entrada = tmp;
 
-      const r = await componer({ entrada, salida: args.out, receta: recetaEfectiva, info: infoEfectiva, encoder });
-      reportarFinal({ args, r, receta, recetaEfectiva, avisos: todosLosAvisos, recorte });
-    } finally {
-      // Se borra siempre, incluso si el corte o el render fallaron a mitad de camino:
-      // un preview no tiene que dejar basura en la carpeta de salida.
-      fs.rmSync(tmp, { force: true });
+      // --- Paso 2: transcribir (para anclar efectos a la palabra hablada) ---
+      if (args.srt) {
+        console.log(`Transcripcion: se usa el SRT provisto (${args.srt}). No se llama a Groq: sin anclaje por palabra.`);
+      } else if (process.env.GROQ_API_KEY) {
+        const t = await transcribir({ entrada: entradaTrabajo, apiKey: process.env.GROQ_API_KEY, idioma: "es" });
+        palabras = t.palabras;
+        console.log(palabras.length
+          ? `Transcripcion: ${palabras.length} palabras.`
+          : "Transcripcion: Groq no devolvio tiempos por palabra. Sigo sin anclaje por palabra.");
+      } else {
+        console.log("Transcripcion: no hay GROQ_API_KEY. Sigo sin transcribir y sin anclaje por palabra (pasa --srt o definila).");
+      }
     }
-    return;
-  }
 
-  const r = await componer({ entrada, salida: args.out, receta: recetaEfectiva, info: infoEfectiva, encoder });
-  reportarFinal({ args, r, receta, recetaEfectiva, avisos: todosLosAvisos, recorte });
+    const crudaReceta = args.receta ? args.receta : {};
+    const { receta, avisos } = cargarReceta(crudaReceta, { durationSec: info.durationSec, palabras });
+    if (args.formato) receta.formato = args.formato;
+    if (args.calidad) receta.calidad = args.calidad;
+
+    // cargarReceta valida formato/calidad ANTES de que --formato/--calidad los
+    // pisen. Si no se revalida aca, un typo como --formato=9x16 llega crudo a
+    // construirGrafo (que revienta con un TypeError de JS, sin decir cual es el
+    // problema) y un typo como --calidad=turbo no revienta nunca: se vuelve
+    // "rapido" en silencio y el reporte final no lo menciona.
+    if (!FORMATOS[receta.formato])
+      throw new Error(`El formato "${receta.formato}" no existe. Validos: ${Object.keys(FORMATOS).join(", ")}.`);
+    if (!CALIDADES.includes(receta.calidad))
+      throw new Error(`La calidad "${receta.calidad}" no existe. Validas: ${CALIDADES.join(", ")}.`);
+
+    const { filtroVideo, tramos, multiplicador, avisos: avisosGrafo } = construirGrafo({ receta, info });
+    const todosLosAvisos = [...avisos, ...avisosGrafo];
+    console.log(`Receta: formato ${receta.formato}, estilo ${receta.estilo}, color ${receta.grade.preset}`);
+    console.log(`Grafo: ${tramos.length} tramo(s), sobre-muestreo ${multiplicador}x`);
+    if (process.env.STUDIO_DEBUG) console.log(filtroVideo);
+
+    if (todosLosAvisos.length) {
+      console.log("\nAvisos:");
+      for (const a of todosLosAvisos) console.log(`  - ${a}`);
+    }
+
+    if (args.check) {
+      console.log("\n--check: la receta es valida y el grafo se puede construir. No renderice nada.");
+      return;
+    }
+
+    let entrada = entradaTrabajo, recorte = null;
+    if (args.preview !== undefined) {
+      const centro = Number(args.preview) || 0;
+      const desde = Math.max(0, centro - VENTANA_PREVIEW / 2);
+      recorte = { desde, dur: Math.min(VENTANA_PREVIEW, info.durationSec - desde) };
+      console.log(`\nPreview: ${recorte.desde.toFixed(1)}s a ${(recorte.desde + recorte.dur).toFixed(1)}s`);
+    }
+
+    const encoder = await elegirEncoder({
+      forzar: typeof args.encoder === "string" ? args.encoder : undefined,
+      calidad: receta.calidad === "max" ? "max" : "rapido",
+    });
+    console.log(`Encoder: ${encoder.nombre}${encoder.esGpu ? " (GPU)" : " (CPU)"}`);
+
+    const infoEfectiva = recorte ? { ...info, durationSec: recorte.dur } : info;
+    const recetaEfectiva = recorte
+      ? { ...receta,
+          camara: receta.camara.filter((c) => c.t >= recorte.desde && c.t < recorte.desde + recorte.dur)
+                               .map((c) => ({ ...c, t: c.t - recorte.desde })) }
+      : receta;
+
+    if (recorte) {
+      const tmp = path.join(path.dirname(args.out), `.preview-fuente-${process.pid}-${Date.now()}.mp4`);
+      try {
+        const saltoRapido = Math.max(0, recorte.desde - MARGEN_SEEK_RAPIDO);
+        const saltoFino = recorte.desde - saltoRapido;
+        // Reencodeo corto (solo la ventana pedida) en vez de "-c copy": asi el
+        // recorte arranca exacto donde se pide y el corrimiento de los efectos
+        // de camara cae exacto, no aproximado al keyframe mas cercano.
+        const corte = spawnSync("ffmpeg", [
+          "-y", "-v", "error",
+          "-ss", String(saltoRapido), "-i", entradaTrabajo,
+          "-ss", String(saltoFino), "-t", String(recorte.dur),
+          "-map", "0:v:0", "-map", "0:a?",
+          "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac",
+          tmp,
+        ], { encoding: "utf8" });
+        if (corte.status !== 0) {
+          const detalle = corte.error ? corte.error.message : corte.stderr;
+          throw new Error(`No pude recortar la ventana de preview: ${detalle}`);
+        }
+        entrada = tmp;
+
+        const r = await componer({ entrada, salida: args.out, receta: recetaEfectiva, info: infoEfectiva, encoder });
+        reportarFinal({ args, r, receta, recetaEfectiva, avisos: todosLosAvisos, recorte });
+      } finally {
+        // Se borra siempre, incluso si el corte o el render fallaron a mitad de camino:
+        // un preview no tiene que dejar basura en la carpeta de salida.
+        fs.rmSync(tmp, { force: true });
+      }
+      return;
+    }
+
+    const r = await componer({ entrada, salida: args.out, receta: recetaEfectiva, info: infoEfectiva, encoder });
+    reportarFinal({ args, r, receta, recetaEfectiva, avisos: todosLosAvisos, recorte });
+  } finally {
+    for (const f of temporales) fs.rmSync(f, { force: true });
+  }
 }
 
 /** Imprime el reporte final. Cada numero se calcula por separado: nunca se
