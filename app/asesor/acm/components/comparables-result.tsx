@@ -51,6 +51,42 @@ function anclajeSujeto(sujeto: Sujeto) {
   } as const;
 }
 
+/** Resultado de aplicar la 3ra capa a UN comparable puntual. Fuente única de verdad para el
+ *  badge de la tarjeta, el reordenamiento de la lista y el % que viaja a la ficha — los tres
+ *  tienen que salir del mismo cálculo o el orden, la tarjeta y la ficha podrían mostrar cosas
+ *  distintas entre sí (el bug que ya mordió esta rama una vez: un dato viviendo en un solo
+ *  lugar y leído desde otro que nunca lo recibía). null = no hay ajuste aplicable (sin
+ *  analizar, fotos que no muestran la propiedad, o sin evidencia suficiente para puntuar).
+ */
+interface ComparacionFotos {
+  atributos: AtributosFotoIA;
+  noMuestraInterior: boolean;
+  ajuste: ReturnType<typeof ajustePorScore> | null;
+  pctAjustado: number;
+}
+
+function comparacionFotos(
+  c: AcmComparable,
+  sujeto: Sujeto,
+  fotos: "cargando" | FotoResultadoComparable | undefined
+): ComparacionFotos | null {
+  if (!fotos || fotos === "cargando" || !fotos.atributos) return null;
+  const atributos = fotos.atributos;
+  if (atributos.fotos_muestran_interior === false) {
+    return { atributos, noMuestraInterior: true, ajuste: null, pctAjustado: c.match_pct };
+  }
+  const comparacion = scoreComparacionFotos(anclajeSujeto(sujeto), atributos);
+  if (!comparacion) return { atributos, noMuestraInterior: false, ajuste: null, pctAjustado: c.match_pct };
+  const ajuste = ajustePorScore(comparacion.score);
+  return { atributos, noMuestraInterior: false, ajuste, pctAjustado: aplicarAjuste(c.match_pct, ajuste.delta) };
+}
+
+/** El % que efectivamente cuenta para ordenar la lista y para lo que viaja a la ficha: el
+ *  ajustado si hay uno aplicable, si no el original — nunca null, siempre un número usable. */
+function pctEfectivo(c: AcmComparable, sujeto: Sujeto, fotos: "cargando" | FotoResultadoComparable | undefined): number {
+  return comparacionFotos(c, sujeto, fotos)?.pctAjustado ?? c.match_pct;
+}
+
 const estadoIcon = (e: ChecklistItem["estado"]) => {
   if (e === "match") return <Check className="w-3.5 h-3.5 text-green-500" />;
   if (e === "parcial") return <Minus className="w-3.5 h-3.5 text-amber-500" />;
@@ -77,12 +113,11 @@ function ComparableCard({
   // El ítem "zona" del checklist trae el nivel: 100 mismo barrio · 70 sub-barrio · 50 limítrofe.
   const esLindero = c.checklist.some((i) => i.dimension === "zona" && i.score === 50);
 
-  const atributos = fotos && fotos !== "cargando" ? fotos.atributos : null;
-  const noMuestraInterior = atributos?.fotos_muestran_interior === false;
-  const comparacion =
-    atributos && !noMuestraInterior ? scoreComparacionFotos(anclajeSujeto(sujeto), atributos) : null;
-  const ajuste = comparacion ? ajustePorScore(comparacion.score) : null;
-  const pctAjustado = ajuste ? aplicarAjuste(c.match_pct, ajuste.delta) : null;
+  const resultado = comparacionFotos(c, sujeto, fotos);
+  const atributos = resultado?.atributos ?? null;
+  const noMuestraInterior = resultado?.noMuestraInterior ?? false;
+  const ajuste = resultado?.ajuste ?? null;
+  const pctAjustado = resultado && !noMuestraInterior ? resultado.pctAjustado : null;
 
   return (
     <div
@@ -396,16 +431,36 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
     return m;
   }, [capaFotosActiva, hayDescripcionSujeto, top10, fotosResultados]);
 
+  // Reordena cada lista por el % EFECTIVO (ajustado si la capa está activa y el comparable
+  // entró al análisis, original si no) — es lo que pidió Leonardo: el ajuste tiene que
+  // "llegar hasta el final", no quedarse solo como cartel en la tarjeta. Con la capa apagada
+  // `pctEfectivo` devuelve siempre el original, así que el orden vuelve a ser el de siempre
+  // sin ninguna rama especial acá — apagar es apagar de verdad, para el orden también.
+  const carteraOrdenada = useMemo(
+    () => [...cartera].sort((a, b) => pctEfectivo(b, sujeto, fotosPorId.get(b.id)) - pctEfectivo(a, sujeto, fotosPorId.get(a.id))),
+    [cartera, sujeto, fotosPorId]
+  );
+  const roomixOrdenado = useMemo(
+    () => [...roomix].sort((a, b) => pctEfectivo(b, sujeto, fotosPorId.get(b.id)) - pctEfectivo(a, sujeto, fotosPorId.get(a.id))),
+    [roomix, sujeto, fotosPorId]
+  );
+
   // Comparables seleccionados para la ficha cuyas fotos NO muestran la propiedad — se avisa
-  // antes de crear la ficha, nunca se sacan solos.
+  // antes de crear la ficha, nunca se sacan solos. Lee de `fotosPorId` (gateada por
+  // `capaFotosActiva`), NO del `fotosResultados` crudo: con la capa apagada, el switch dice
+  // "todo vuelve al original" y eso incluye esta advertencia — si no, apagar la capa seguiría
+  // bloqueando la ficha con un aviso de un análisis que el asesor decidió dejar de usar.
   const advertenciasFotos = useMemo(() => {
     return [...selected]
       .map((id) => byId.get(id))
       .filter((c): c is AcmComparable => Boolean(c))
-      .map((c) => ({ c, r: fotosResultados.get(c.id) }))
-      .filter(({ r }) => r?.atributos?.fotos_muestran_interior === false)
-      .map(({ c, r }) => ({ id: c.id, titulo: c.titulo || c.direccion, motivo: r!.atributos!.motivo_no_evaluable }));
-  }, [selected, byId, fotosResultados]);
+      .map((c) => {
+        const r = fotosPorId.get(c.id);
+        return { c, atributos: r && r !== "cargando" ? r.atributos : null };
+      })
+      .filter(({ atributos }) => atributos?.fotos_muestran_interior === false)
+      .map(({ c, atributos }) => ({ id: c.id, titulo: c.titulo || c.direccion, motivo: atributos!.motivo_no_evaluable }));
+  }, [selected, byId, fotosPorId]);
   const [entendidoAdvertencia, setEntendidoAdvertencia] = useState(false);
 
   const toggle = (id: string) => {
@@ -429,7 +484,18 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
     setRevisando(false);
   };
 
-  const seleccionados = () => [...selected].map((id) => byId.get(id)).filter(Boolean) as AcmComparable[];
+  // El % que viaja al backend de la ficha (preview Y creación final) es el EFECTIVO al momento
+  // de armar el pedido — la corrección del anclaje que hizo el asesor, ya resuelta a un número.
+  // Si la capa está apagada, `pctEfectivo` devuelve el original sin ninguna rama especial: así
+  // "apagar es apagar de verdad" alcanza también a una ficha creada después de apagarla.
+  // El snapshot de la ficha (`shared_acm_reports`) guarda este número tal cual — es lo único
+  // que ve el cliente, nunca el "antes → después": ese detalle de trabajo queda en la lista del
+  // asesor, no en el documento que recibe el dueño de la propiedad.
+  const seleccionados = () =>
+    [...selected]
+      .map((id) => byId.get(id))
+      .filter((c): c is AcmComparable => Boolean(c))
+      .map((c) => ({ ...c, match_pct: pctEfectivo(c, sujeto, fotosPorId.get(c.id)) }));
 
   /** Paso previo: calcula las conclusiones (sin guardar nada) y las muestra para revisar/editar. */
   const revisarConclusiones = async () => {
@@ -527,7 +593,9 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
               <p className="text-xs text-muted-foreground mt-0.5">
                 Analiza las fotos de los {Math.min(top10.length, MAX_COMPARABLES_ANALISIS)} comparables con mayor % (≥
                 {PISO_MATCH_PCT_ANALISIS}%) y ajusta el % hasta ±5 puntos según qué tan parecida es la condición a la de tu
-                propiedad. Siempre a la vista, nunca en silencio. Apagala si la ves ordenando mal.
+                propiedad — reordena la lista y es el número que va a la ficha del cliente. Vos siempre ves el antes/después
+                acá; al cliente le llega solo el número final. Apagala si la ves ordenando mal: todo vuelve al original,
+                orden y ficha incluidos.
               </p>
             </div>
           </div>
@@ -545,7 +613,7 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
       <Section
         title="Cartera de tu agencia"
         icon={Building2}
-        items={cartera}
+        items={carteraOrdenada}
         empty="No se encontraron comparables en tu cartera con estos criterios."
         selectable={selecting}
         selected={selected}
@@ -556,7 +624,7 @@ export function ComparablesResult({ sujeto, operacion, cartera, roomix, conSeman
       <Section
         title="Red de colaboración"
         icon={Network}
-        items={roomix}
+        items={roomixOrdenado}
         empty="No se encontraron comparables en la red de colaboración. (Para venta hay pocos avisos en la red; el grueso está en alquiler.)"
         selectable={selecting}
         selected={selected}
