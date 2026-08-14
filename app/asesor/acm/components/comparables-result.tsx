@@ -20,6 +20,8 @@ import {
   aplicarAjuste,
   type AtributosFotoIA,
 } from "@/lib/acm/analisis-fotos";
+import type { FichaZona } from "@/lib/acm/ficha";
+import { RevisionZona } from "./revision-zona";
 
 interface Props {
   sujeto: Sujeto;
@@ -339,6 +341,11 @@ export function ComparablesResult({
   const [cargandoPrev, setCargandoPrev] = useState(false); // pidiendo el cálculo
   const [conclusiones, setConclusiones] = useState<string[]>([]);
   const [incluirConclusiones, setIncluirConclusiones] = useState(true);
+  // Hoja del entorno: el texto viene de la IA y el asesor lo edita acá adentro; `zonaCentro`
+  // son las coordenadas ya geocodificadas, que sirven para pedirle el mapa al servidor.
+  const [zona, setZona] = useState<FichaZona | null>(null);
+  const [incluirZona, setIncluirZona] = useState(true);
+  const [zonaCentro, setZonaCentro] = useState<{ lat: number; lon: number } | null>(null);
 
   const byId = useMemo(() => {
     const m = new Map<string, AcmComparable>();
@@ -557,6 +564,10 @@ export function ComparablesResult({
       if (!res.ok || data.error) throw new Error(data.error || "No se pudieron calcular las conclusiones.");
       setConclusiones(Array.isArray(data.conclusiones) ? data.conclusiones : []);
       setIncluirConclusiones(true);
+      // Si no hubo datos de zona, la casilla arranca destildada: no tiene nada que incluir.
+      setZona(data.zona ?? null);
+      setZonaCentro(data.zona_centro ?? null);
+      setIncluirZona(Boolean(data.zona));
       setEntendidoAdvertencia(false); // cada revisión arranca sin el "ya lo sé" tildado
       setRevisando(true);
     } catch (e: any) {
@@ -564,6 +575,24 @@ export function ComparablesResult({
     } finally {
       setCargandoPrev(false);
     }
+  };
+
+  /**
+   * URL del PNG del mapa. Se arma acá y no en el servidor porque el endpoint pide sesión: la
+   * tiene el navegador del asesor. La ficha pública después sirve esa misma imagen desde el
+   * caché del CDN, sin volver a pedir tiles.
+   */
+  const urlDelMapa = (): string | null => {
+    if (!zonaCentro || !zona) return null;
+    const pois = zona.pois
+      .filter((p) => p.lat != null && p.lon != null)
+      .map((p) => ({ categoria: p.categoria, lat: p.lat, lon: p.lon }));
+    const q = new URLSearchParams({
+      lat: String(zonaCentro.lat),
+      lon: String(zonaCentro.lon),
+      pois: JSON.stringify(pois),
+    });
+    return `/api/acm/mapa-zona?${q.toString()}`;
   };
 
   const crearFicha = async () => {
@@ -581,6 +610,8 @@ export function ComparablesResult({
           operacion, sujeto, comparables, search_id: searchId ?? null,
           // [] = el asesor decidió que la sección de conclusiones no aparezca en la ficha.
           conclusiones: incluirConclusiones ? conclusiones.filter((t) => t.trim()) : [],
+          incluir_zona: incluirZona && Boolean(zona),
+          zona: incluirZona && zona ? { ...zona, mapa_url: urlDelMapa() } : null,
         }),
       });
       const data = await res.json();
@@ -744,11 +775,12 @@ export function ComparablesResult({
             <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-card border border-accent/20 shadow-2xl">
               <div className="p-5 border-b border-accent/10">
                 <h3 className="text-lg font-black flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-accent" /> Conclusiones del estudio
+                  <Sparkles className="w-5 h-5 text-accent" /> Revisá antes de crear la ficha
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Se calcularon con los comparables que elegiste. Podés editarlas, agregar las tuyas o sacar la sección
-                  para que no aparezca en la ficha del cliente.
+                  El análisis del entorno lo escribió la IA con datos reales del barrio, y las conclusiones se
+                  calcularon con los comparables que elegiste. Podés editar todo, o sacar cualquiera de las dos
+                  secciones para que no aparezca en la ficha del cliente.
                 </p>
               </div>
 
@@ -795,6 +827,15 @@ export function ComparablesResult({
                     </label>
                   </div>
                 )}
+
+                <RevisionZona
+                  zona={zona}
+                  incluir={incluirZona}
+                  onIncluir={setIncluirZona}
+                  onRelato={(v) => setZona((z) => (z ? { ...z, relato: v } : z))}
+                />
+
+                <div className="h-px bg-accent/10" />
 
                 <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
                   <button
