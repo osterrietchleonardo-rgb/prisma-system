@@ -1,6 +1,6 @@
 ---
 name: vakdor-video
-description: Super skill de video de Vakdor — crea y EDITA videos en cualquier formato (vertical, horizontal/LinkedIn/YouTube, cuadrado). Tres modos: (A) Reel/Video de Propiedad desde fotos+datos con Remotion; (B) Editor rápido de un crudo a video de marca (saca silencios, subtítulos, marca); (C) Editor conversacional PRO de CUALQUIER video (VSL, testimonio, ad, tutorial): transcribe con whisper.cpp local (gratis), elige tomas, corta, color grade, subtítulos y overlays de animación (PIL/Remotion/HyperFrames/Manim). Incluye producción completa: TAPAR datos privados con blur (teléfonos, chats, precios, correos, tokens en pantalla), medir el encuadre y las danger zones de TikTok/Reels antes de poner gráficos, mezcla de música y efectos MEDIDA en LUFS con sidechain sobre la voz, y export a la spec de redes (bitrate capeado, bt709, faststart, -14 LUFS). Usar SIEMPRE que pidan un reel, video de propiedad, video para IG/TikTok/LinkedIn/YouTube, "editá este video", "sacá los silencios", "ponele subtítulos", "editá mi VSL", "video horizontal", transcribir, color/grade, "tapá los datos", "censurá", "difuminá", "ponele música", "mezclá el audio", "por qué se ve mal en Instagram", "no se lee el subtítulo". Hermana en video de vakdor-carousel: misma marca (brand.json), copy delegado a vakdor-copywriter.
+description: Super skill de video de Vakdor — crea y EDITA videos en cualquier formato (vertical, horizontal/LinkedIn/YouTube, cuadrado). Cuatro modos: (A) Reel/Video de Propiedad desde fotos+datos con Remotion; (B) Editor rápido de un crudo a video de marca (saca silencios, subtítulos, marca); (C) Editor conversacional PRO de CUALQUIER video (VSL, testimonio, ad, tutorial): transcribe con whisper.cpp local (gratis), elige tomas, corta, color grade, subtítulos y overlays de animación (PIL/Remotion/HyperFrames/Manim); (D) VIDEO STUDIO (`studio.mjs`, un solo comando): movimiento de cámara real sobre video hablado — zoom lento medido, dolly, drift tipo cámara en mano, jump cut de escala, whip pan — más color, limpieza de imagen medida con VMAF, estabilización, 4 formatos con zonas seguras, y efectos anclados a UNA PALABRA HABLADA vía receta.json; con `--check` gratis e instantáneo y `--preview` para juzgar un efecto sin renderizar todo. Incluye producción completa: TAPAR datos privados con blur (teléfonos, chats, precios, correos, tokens en pantalla), medir el encuadre y las danger zones de TikTok/Reels antes de poner gráficos, mezcla de música y efectos MEDIDA en LUFS con sidechain sobre la voz, y export a la spec de redes (bitrate capeado, bt709, faststart, -14 LUFS). Usar SIEMPRE que pidan un reel, video de propiedad, video para IG/TikTok/LinkedIn/YouTube, "editá este video", "sacá los silencios", "ponele subtítulos", "editá mi VSL", "video horizontal", transcribir, color/grade, "tapá los datos", "censurá", "difuminá", "ponele música", "mezclá el audio", "por qué se ve mal en Instagram", "no se lee el subtítulo", "ponele zoom", "movimiento de cámara", "que no se vea estático", "acercamiento lento", "cambio de plano", "que aparezca algo cuando digo tal palabra", "pasalo a vertical", "limpiá la imagen", "se ve pixelado", "estabilizá". Hermana en video de vakdor-carousel: misma marca (brand.json), copy delegado a vakdor-copywriter.
 ---
 
 # Vakdor Video — Super Skill de Video
@@ -28,6 +28,101 @@ Tres modos, todos **multi-formato** (vertical 9:16 · horizontal 16:9 · cuadrad
 Esta skill se INVOCA desde `PRISMA-SYSTEM` pero **NUNCA** escribe dentro de `PRISMA-SYSTEM`
 (solo LEE: logos, `.env`, datos). Modos A/B escriben en `Prisma - MK`. Modo C escribe en la
 carpeta `edit/` junto al video que te den.
+
+---
+
+## MODO D — Video Studio (`studio.mjs`) ⭐ el más nuevo
+
+**Para editar un video grabado a cámara** (VSL, testimonio, pitch) con movimiento de cámara, color
+y limpieza de imagen. Un solo comando reemplaza los cuatro que había que correr en orden.
+
+```bash
+# parado en .claude/skills/vakdor-video/engine
+node studio.mjs --in=crudo.mp4 --out=final.mp4 --receta=receta.json
+```
+
+**Antes de renderizar nada, usar siempre estos dos:**
+
+| Flag | Para qué |
+|---|---|
+| `--check` | Valida la receta y arma el grafo **sin renderizar**. Un segundo en vez de veinte minutos para encontrar un error de tipeo. **No gasta ni un peso de API.** |
+| `--preview=125` | Renderiza 20 segundos alrededor del segundo 125. Para juzgar un efecto sin esperar el video entero. La primera vez corta y transcribe; después reusa el caché. |
+
+**El resto de los flags:** `--formato=16:9\|9:16\|1:1\|4:5` · `--calidad=auto\|max\|rapido` ·
+`--limpiar=suave\|normal\|fuerte` · `--estabilizar` · `--sin-corte` · `--srt=archivo.srt` ·
+`--rehacer` (ignora el caché) · `--encoder=...`
+
+### La receta
+
+Un `receta.json` describe todo el video. Lo escribe Claude leyendo la transcripción y lo corrige
+Leonardo. Lo distintivo: un efecto se ancla a **una palabra hablada**, no solo a un segundo.
+
+```json
+{
+  "formato": "16:9",
+  "estilo": "autoridad",
+  "grade": { "preset": "cinematic" },
+  "camara": [
+    { "t": 0, "dur": 45, "fx": "zoomIn", "pct": 8 },
+    { "palabra": "control", "fx": "jumpCutClose", "escala": 1.18 },
+    { "t": 95, "dur": 20, "fx": "drift", "intensidad": 0.5 }
+  ]
+}
+```
+
+`camara[].fx`: `zoomIn` · `zoomOut` · `dolly` · `push` · `drift` · `jumpCutClose` · `jumpCutWide` ·
+`whipPan`. Los tiempos son del video **ya cortado**, nunca del crudo.
+
+### Portada y cierre: el gotcha del audio
+
+Al pegar portada + cuerpo + cierre con `concat`, **las tres partes tienen que tener
+el MISMO layout de audio**. Si el video se grabó en mono y las portadas se generan
+en estéreo (que es el default de `anullsrc`), `concat` mezcla formatos incompatibles
+y el tramo final **suena a ruido en vez de a silencio**. No da error: sale un mp4
+perfecto que hace un ruido raro al final.
+
+Se detecta midiendo, no escuchando: `volumedetect` sobre los últimos segundos tiene
+que dar −91 dB. Si da −3 dB, es esto.
+
+La forma correcta es leer el layout del cuerpo y generar las portadas igual:
+
+```bash
+CH=$(ffprobe -v error -select_streams a:0 -show_entries stream=channels -of csv=p=0 cuerpo.mp4)
+LAYOUT=$([ "$CH" = "1" ] && echo mono || echo stereo)
+ffmpeg ... -f lavfi -i "anullsrc=r=48000:cl=$LAYOUT" ... -ac $CH ...
+```
+
+### Dónde va cada cosa en el cuadro (9:16)
+
+| | Altura | Por qué |
+|---|---|---|
+| Visualización / panel | hasta 740 px | sobre la pared, arriba de la cabeza |
+| Subtítulo | ~1585 px | debajo de la cara, sin meterse en el último 12% |
+| Subtítulo con panel activo | ~1790 px | el video baja, la altura de siempre le cae en la cara |
+
+El último 12% del cuadro es donde Instagram y TikTok ponen el texto del posteo y
+los botones: lo que quede ahí, no se lee.
+
+### Reglas que no se negocian
+
+- **`--check` primero, siempre.** Es gratis e instantáneo.
+- **Nada falla en silencio.** Si un tramo del corte falla, el reporte lo grita y ese corte **no se
+  cachea**, para que el aviso no desaparezca en la corrida siguiente.
+- **La transcripción cuesta plata.** Se cachea por archivo + fecha + parámetros de corte. `--rehacer`
+  solo si de verdad hace falta.
+- **Los 9 presets de color son los mismos que en Remotion**, así que un mismo look se ve igual venga
+  del motor que venga.
+
+### 📐 Antes de editar un reel, leer esto
+
+**`references/estilo-reel-vakdor.md`** — la receta destilada de editar videos reales de Leonardo:
+estructura (portada → cuerpo → cierre), cuándo va cada pieza gráfica, los valores de cámara que
+quedaron después de dos rondas de "está muy movido", dónde va cada cosa en el cuadro, cómo se
+escribe el copy, y **el inventario completo de lo que la skill puede hacer** para no limitarse a
+lo ya usado.
+
+Diseño completo y mediciones en `docs/superpowers/specs/2026-08-11-vakdor-video-studio-hibrido-design.md`.
+Ahí está por qué el zoom usa sobre-muestreo 3× y por qué el bokeh se descartó.
 
 ---
 
