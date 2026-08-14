@@ -73,6 +73,36 @@ Leonardo. Lo distintivo: un efecto se ancla a **una palabra hablada**, no solo a
 `camara[].fx`: `zoomIn` · `zoomOut` · `dolly` · `push` · `drift` · `jumpCutClose` · `jumpCutWide` ·
 `whipPan`. Los tiempos son del video **ya cortado**, nunca del crudo.
 
+### Portada y cierre: el gotcha del audio
+
+Al pegar portada + cuerpo + cierre con `concat`, **las tres partes tienen que tener
+el MISMO layout de audio**. Si el video se grabó en mono y las portadas se generan
+en estéreo (que es el default de `anullsrc`), `concat` mezcla formatos incompatibles
+y el tramo final **suena a ruido en vez de a silencio**. No da error: sale un mp4
+perfecto que hace un ruido raro al final.
+
+Se detecta midiendo, no escuchando: `volumedetect` sobre los últimos segundos tiene
+que dar −91 dB. Si da −3 dB, es esto.
+
+La forma correcta es leer el layout del cuerpo y generar las portadas igual:
+
+```bash
+CH=$(ffprobe -v error -select_streams a:0 -show_entries stream=channels -of csv=p=0 cuerpo.mp4)
+LAYOUT=$([ "$CH" = "1" ] && echo mono || echo stereo)
+ffmpeg ... -f lavfi -i "anullsrc=r=48000:cl=$LAYOUT" ... -ac $CH ...
+```
+
+### Dónde va cada cosa en el cuadro (9:16)
+
+| | Altura | Por qué |
+|---|---|---|
+| Visualización / panel | hasta 740 px | sobre la pared, arriba de la cabeza |
+| Subtítulo | ~1585 px | debajo de la cara, sin meterse en el último 12% |
+| Subtítulo con panel activo | ~1790 px | el video baja, la altura de siempre le cae en la cara |
+
+El último 12% del cuadro es donde Instagram y TikTok ponen el texto del posteo y
+los botones: lo que quede ahí, no se lee.
+
 ### Reglas que no se negocian
 
 - **`--check` primero, siempre.** Es gratis e instantáneo.
