@@ -1291,6 +1291,12 @@ Columnas: (Asesor — solo director), Contrato, **Código** (badge mono), Client
 > - **Reservado a futuro:** la grilla MCM de valuación (`lib/tasacion/calculos.ts`, `step3-grilla.tsx`, `step4-resultado.tsx`) **se conserva en el repo pero NO se renderiza**; se reusará para el informe con marca. Lo descrito en 15.1/15.2 queda como referencia histórica.
 > - **Ficha pública de comparables (jul-2026, rama `feat/acm-ficha-comparables`):** desde la lista de comparables, **"Crear ficha"** habilita **seleccionar** los comparables deseados (cartera + red juntas) y **"Crear"** arma un **link público de lujo** (`/ficha-acm/[token]`) para compartirle al cliente, con opción **Descargar PDF** (imprime la misma ficha; una hoja A4 por comparable). Cada comparable ocupa **una hoja** con **todas sus fotos** y características; arriba, un **banner de pulso de mercado** con el **precio de cierre por m²** del barrio **y del segmento de 1/2/3 ambientes** (datos reales de `mercado_barrios` + `mercado_stats`); al final, una **comparación calculada** de $/m² donde **cada comparable se mide contra el cierre de su propio barrio** (promedio y desvío de la muestra — **sin IA**, todo por fórmula, solo comparables en USD). Respeta la **marca de la agencia** (colores/logo/aviso legal de `marketing_ai_config`; si no hay logo o aviso legal, no se muestran) e incluye la **tarjeta de contacto** del asesor/director que la genera. Todo el snapshot se **congela** en la tabla `shared_acm_reports` (mismo molde que `shared_properties`), así el link sobrevive aunque cambie la publicación original. Endpoint `POST /api/acm/ficha`; cálculos deterministas en `lib/acm/ficha.ts`. No consume créditos.
 > - **Mejoras de la ficha (jul-2026, rama `feat/acm-ficha-mejoras`):** antes de crear la ficha, al tocar **"Continuar"** se muestran las **conclusiones del estudio** ya calculadas para que el asesor/director las **revise**: puede editarlas, agregar las propias o **sacar la sección entera** para que no salga en la ficha (el botón manda la lista final; vacía = sin sección). La **hoja final** ahora muestra en la matriz los **promedios de superficie, precio y $/m²** de la muestra, y agrega **"La Pirámide del Precio"** (gráfico propio, sin foto pixelada) que ilustra cómo se apaga la demanda a medida que el precio se aleja del valor de mercado y **resalta el escalón** donde cae el desvío promedio de la muestra. Se **quitó "Preparado por"** de la portada. En la **tarjeta de contacto**, el subtítulo sobre el nombre: para el **director** es "Director/a"; para el **asesor** es su **clasificación** (Client Director / Client Support, la que le puso el director en "Asesores"; "Asesor/a" si no tiene). El **logo** de la agencia se **recorta** (endpoint `/api/brand-logo` con `sharp().trim()`, saca el aire transparente/blanco) para que se vea **grande y nítido** sea cual sea el archivo, y en el pie va sobre un **chip del color de marca** para que no se pierda si el logo es claro.
+> - **Zona estricta por defecto + fotos analizadas por IA (ago-2026, rama `feat/acm-zona-estricta-y-fotos-ia`):** dos cambios que salieron de auditar 36 ACM reales de Central.
+>   - **Por qué la zona se puso estricta.** De 618 comparables que el ACM había traído para propiedades de Belgrano, **70 en realidad eran de Núñez, Saavedra o Colegiales** (barrios limítrofes, admitidos por el gate de zona por niveles de ago-2026). El precio casi no cambia por incluirlos (mediana US$3.790/m² vs US$3.714/m², **−2%**), pero el efecto sobre el cliente es otro: ve un barrio que no es el suyo en su propia tasación y **descarta el informe entero**, sin importar que el número esté bien. Ahí el costo no es de precisión, es de confianza. Por eso el ACM ahora **solo trae el mismo barrio y sus sub-barrios** (Belgrano ↔ Belgrano R/C/Chico/Las Cañitas) salvo que el asesor tilde **"Incluir barrios linderos"**; cuando lo hace, esos comparables quedan **marcados con un chip "lindero"** en la lista de resultados y, si los elige para la ficha, con **"Barrio lindero"** en la hoja que recibe el cliente — la información no se esconde, solo deja de colarse sin pedirse. Verificado contra la cartera real de Central: sin la casilla, cero comparables de barrios vecinos; con la casilla, aparecen los mismos que reportaba la auditoría (Núñez, Saavedra, Colegiales), siempre marcados.
+>   - **Qué hacen las fotos en el matching.** El asesor puede adjuntar hasta 4 fotos de la propiedad y opcionalmente decirle a la IA en qué fijarse (ej. "estado de la cocina y del jardín"). Gemini describe **solo lo que ve** — tiene instrucción explícita de no ocultar lo que está deteriorado, pero de decirlo sin castigar la propiedad ("cocina original, con posibilidad de actualización" en vez de "cocina vieja"). Esa descripción **no se publica tal cual**: el asesor la lee, la corrige o la reescribe, y recién ahí decide (con una casilla aparte) si va a la ficha del cliente. Una vez que hay descripción, entra al ACM de dos formas: (1) se suma al texto que arma la comparación por similitud (así el sistema busca comparables que también se parezcan en lo que las fotos muestran, no solo en m²/ambientes/barrio), y (2) esa dimensión de "parecido descriptivo" **pasa a pesar el doble** en el % de comparabilidad (dejó de ser redundante con las dimensiones duras, que ya se puntúan aparte, y empieza a aportar algo que antes no tenía de dónde salir). El análisis se hace **una sola vez** por juego de fotos — no hay botón para repetirlo — y las fotos en sí **nunca se guardan** en ningún lado: se usan para el análisis y se descartan.
+>   - **Fotos elegidas directamente de la cartera (ago-2026).** Cuando la propiedad sujeto viene **desde la cartera** de la agencia, el asesor ya no tiene que salir a buscar las fotos en su computadora o celular: aparecen las que la propiedad ya tiene cargadas y tilda hasta 4 con un toque. Sigue pudiendo combinarlas con fotos subidas a mano (el tope de 4 es entre las dos fuentes) y, si la carga es a mano o por link, sigue subiendo las fotos como antes — este cambio solo agrega una forma más rápida, no saca ninguna.
+>   - **Tercera capa: comparar las fotos del sujeto contra las fotos de cada comparable, no solo la descripción escrita.** Para los comparables más fuertes (**90% o más** de coincidencia), el sistema también les analiza las fotos y muestra, lado a lado, lo que la IA vio en la propiedad del asesor y lo que vio en cada comparable. Con esa comparación **ajusta el % hasta 5 puntos**, siempre mostrando el antes y el después con el motivo — nunca en silencio — y ese % ajustado es el que ordena la lista y el que finalmente ve el cliente en la ficha. El asesor puede **corregir cómo la IA calificó su propia propiedad** (estado de conservación, luminosidad) justo después de analizarla, y esa corrección es la base contra la que se miden todos los comparables — cambiarla cambia las comparaciones. Cuando las fotos de un comparable **no muestran la propiedad de verdad** (un render de un pozo, una foto del palier, planos), el sistema avisa en vez de comparar y no ajusta nada; si igual se lo elige para la ficha del cliente, **vuelve a avisar antes de crearla**. Nada se saca solo. Toda la capa se puede **apagar con un switch**, y al apagarla todo vuelve exactamente al orden y al % de siempre (lista, tarjetas y ficha). Es un ajuste hecho a partir de una lectura de fotos por IA — puede equivocarse — así que está pensado como ayuda para elegir, no como un número más certero que el resto del checklist.
+>   - **El timeout silencioso de la búsqueda en la red, corregido (ago-2026).** Con barrios grandes (Palermo, Belgrano) y la búsqueda semántica activada (que se suma cuando hay descripción por fotos), la consulta a la red de comparables podía superar el límite de tiempo de la base de datos, y Postgres la cancelaba entera — pero la app, en vez de avisar, mostraba **0 comparables de la red** como si esa zona simplemente no tuviera ninguno. Se corrigió en dos frentes: un índice nuevo que deja resolver la zona primero (la búsqueda en Palermo bajó de un promedio de ~8,8s a ~4,8s, con resultados idénticos comprobados) y que la app **ya no esconda el error** — si la búsqueda en la red o en la cartera falla, el asesor ve un aviso claro en vez de un resultado vacío que no distingue "no hay" de "no se pudo buscar".
 
 > **Nota (revisión jun-2026):** existen **dos implementaciones** de tasaciones y conviene no confundirlas:
 > - **La que está viva y se usa hoy** es el **Wizard MCM client-side** (ver 15.2) que corre en `/asesor/tasaciones` y `/director/tasaciones`, calcula con `lib/tasacion/calculos.ts` y persiste en la tabla `tasaciones`.
@@ -2353,6 +2359,61 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 | `/auth/callback` | GET | Público | OAuth callback |
 
 ---
+
+## 28. Buscador IA · solapa Mapa
+
+El Buscador IA tiene dos solapas independientes: **Chat** (el consultor de siempre) y
+**Mapa**. No comparten estado: si el mapa fallara, el chat sigue funcionando igual.
+
+### Qué muestra
+
+Los pines salen de dos fuentes que se consultan en paralelo y se unen:
+
+- **Cartera propia** (`properties`), filtrada por agencia. Se separa en "Mías" y "Agencia"
+  según quién tenga asignada la propiedad.
+- **Red de colaboración** (`roomix_properties`), compartida. En pantalla SIEMPRE se la
+  llama "Colaboración", nunca por el nombre de la red.
+
+Tope de 1.000 puntos por respuesta contando las dos juntas. La cartera propia se arma
+primero, así nunca queda afuera por el tope. Cuando se llena el cupo se sigue dibujando la
+muestra y el contador lo dice con un "+": el mapa no puede afirmar que hay 1.000 cuando
+puede haber 40.000.
+
+### Buscador de lugares
+
+Una cajita arriba del mapa sugiere mientras se tipea, tolerante a acentos y a errores de
+tipeo ("cavallito" encuentra Caballito, "nunez" encuentra Núñez). Cuatro fuentes, en orden
+de prioridad: zonas guardadas propias, barrios de la cartera, barrios de la red, y
+direcciones. Elegir un **barrio** vuela al barrio Y filtra por él; elegir una **dirección**
+solo vuela, porque un domicilio es un punto y filtrar dejaría la pantalla vacía si ahí no
+hay nada publicado.
+
+### Precio por m² (mapa de calor)
+
+Se pinta el precio mediano por metro sobre cada **manzana real**, de verde (barato) a rojo
+(caro), con el ranking de barrios al costado. Las manzanas se derivan del grafo de calles
+de OpenStreetMap: la manzana es el polígono que encierran las calles. Donde todavía no hay
+manzanas cargadas se muestra una cuadrícula aproximada, y la pantalla aclara cuál de las
+dos se está viendo.
+
+El precio de una manzana se calcula con **todo lo que hay en ella**: propiedades de la red,
+de la cartera propia, o mezcladas. Se descartan las repetidas —una misma propiedad puede
+estar publicada por la agencia y en la red a la vez, y contarla dos veces la haría pesar el
+doble—, detectadas por precio y superficie idénticos a menos de 60 m.
+
+Una manzana queda **sin precio** en dos casos, los dos correctos: si sus propiedades no
+traen superficie cargada (sin metros no hay precio por metro), o si son de otra operación o
+moneda que la que se está mirando (con el mapa en Venta y dólares, una manzana con solo
+alquileres en pesos no tiene nada que mostrar).
+
+Se usa **mediana** y no promedio: un penthouse corre el promedio de toda la manzana. La
+transparencia indica cuántas propiedades sostienen el dato — el color dice cuánto vale el
+metro, la transparencia dice cuánto creerle.
+
+### Zonas a mano alzada
+
+El lápiz recorta en el navegador, sin consultas nuevas. Las zonas guardadas son
+**privadas**: cada usuario ve solo las suyas, ni el director ve las de un asesor.
 
 ## FIN DEL DOCUMENTO
 

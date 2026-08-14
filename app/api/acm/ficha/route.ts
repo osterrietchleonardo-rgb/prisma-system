@@ -17,6 +17,8 @@ import {
   type FichaComparable,
   type MercadoBarrioLite,
 } from "@/lib/acm/ficha";
+import { recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
+import { normalizarImagenes } from "@/lib/acm/fotos-descarga";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -32,13 +34,11 @@ function genToken(): string {
 
 const MAX_IMAGES = 16;
 
-// Normaliza el campo images (jsonb) a un array de URLs, sacando vacíos y duplicados.
+// Normaliza el campo images (jsonb) a un array de URLs, sacando vacíos y duplicados. La parte
+// de normalizar (string vs {url}, filtrar basura) es la misma que usa el resto del ACM — ver
+// lib/acm/fotos-descarga.ts; acá se le suma dedup + tope de cantidad, propios de la ficha.
 function allImages(images: any): string[] {
-  if (!Array.isArray(images)) return [];
-  const urls = images
-    .map((i) => (typeof i === "string" ? i : i?.url))
-    .filter((u): u is string => typeof u === "string" && u.length > 0);
-  return Array.from(new Set(urls)).slice(0, MAX_IMAGES);
+  return Array.from(new Set(normalizarImagenes(images))).slice(0, MAX_IMAGES);
 }
 
 // Amenities del comparable de cartera desde tokko_data.tags.
@@ -176,6 +176,7 @@ export async function POST(req: Request) {
         images,
         responsable: c.responsable || "",
         pulso: matchBarrioPulso(c.zona || c.direccion || "", c.ambientes ?? null, barrios, ambStats),
+        zona_score: (c.checklist || []).find((i: any) => i.dimension === "zona")?.score ?? null,
       };
     });
 
@@ -210,6 +211,11 @@ export async function POST(req: Request) {
         m2: sujeto.m2_cubiertos ? Number(sujeto.m2_cubiertos) : null,
         dormitorios: sujeto.dormitorios ?? null,
         banos: sujeto.banos ?? null,
+        // Solo va si el asesor tildó la casilla. El tope de 700 ya se aplicó al generarla,
+        // pero se re-aplica acá porque el texto pudo editarse a mano.
+        descripcion: sujeto.incluir_desc_ficha && sujeto.descripcion_ia
+          ? recortarAPalabra(String(sujeto.descripcion_ia).trim(), MAX_DESC_IA)
+          : null,
       },
       operacion,
       comparables,

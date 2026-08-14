@@ -1,6 +1,6 @@
 import { getAdminDb } from "@/lib/admin-vakdor/logger"
 import type {
-  MarketingIdea, EstadoIdea, NuevaIdeaInput, HistorialEvento,
+  MarketingIdea, EstadoIdea, NuevaIdeaInput, HistorialEvento, Receta,
 } from "./types"
 
 const COLS =
@@ -241,4 +241,56 @@ export async function duplicarIdea(id: string): Promise<MarketingIdea> {
     .single()
   if (error) throw new Error(`duplicarIdea: ${error.message}`)
   return data as unknown as MarketingIdea
+}
+
+export interface PiezaReciente {
+  hook: string
+  entrada: string
+  estructura: string | null
+  escenas: string[]
+}
+
+/** Resume una pieza escrita para usarla como memoria anti-repetición. */
+export function resumirPieza(contenido: string, receta: Receta | null): PiezaReciente {
+  const texto = (contenido ?? "").trim()
+  const hook = texto.split("\n").map((l) => l.trim()).find((l) => l.length > 0) ?? ""
+  return {
+    hook,
+    entrada: texto.slice(0, 400),
+    estructura: receta?.estructura ?? null,
+    escenas: receta?.escenas ?? [],
+  }
+}
+
+/** Bloque de memoria que se inyecta al prompt. "" si no hay nada que recordar. */
+export function formatearMemoria(piezas: PiezaReciente[]): string {
+  if (piezas.length === 0) return ""
+  const items = piezas.map((p, i) => {
+    const marca = p.estructura ? ` [estructura: ${p.estructura}]` : ""
+    return `${i + 1}.${marca}\n   APERTURA: ${p.hook}\n   ENTRADA: ${p.entrada}`
+  })
+  return [
+    "PIEZAS QUE YA ESCRIBISTE. No repitas la apertura, el argumento central, la escena ni la estructura de ninguna de éstas:",
+    ...items,
+  ].join("\n\n")
+}
+
+/** Últimas piezas con contenido, para alimentar la memoria. */
+export async function textosRecientes(limite = 15): Promise<PiezaReciente[]> {
+  const db = getAdminDb()
+  const { data, error } = await db
+    .from("marketing_ideas")
+    .select("contenido, receta")
+    .not("contenido", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(limite)
+  if (error) throw new Error(`textosRecientes: ${error.message}`)
+  return ((data ?? []) as { contenido: string | null; receta: Receta | null }[])
+    .filter((f) => (f.contenido ?? "").trim().length > 0)
+    .map((f) => resumirPieza(f.contenido as string, f.receta))
+}
+
+export async function guardarReceta(id: string, receta: Receta): Promise<void> {
+  const { error } = await getAdminDb().from("marketing_ideas").update({ receta }).eq("id", id)
+  if (error) throw new Error(`guardarReceta: ${error.message}`)
 }

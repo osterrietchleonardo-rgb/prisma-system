@@ -35,6 +35,14 @@ const statusMapping: Record<string, string> = {
   "Temporary Rent": "Alquiler Temporario",
 }
 
+// Tokko manda geo_lat/geo_long como texto ("-34.5809..."), y a veces vacio.
+// Number("") es 0, que caeria en el Golfo de Guinea: por eso 0 tambien se descarta.
+function parseGeo(v: any): number | null {
+  if (v === null || v === undefined || v === "") return null
+  const n = Number(typeof v === "string" ? v.trim() : v)
+  return Number.isFinite(n) && n !== 0 ? n : null
+}
+
 function mapTokkoProperty(p: any, agencyId: string, agencyProfiles: any[] | null) {
   const rawType = p.type?.name || "Desconocido"
   const rawStatus = p.operations?.[0]?.operation_type || "Venta"
@@ -69,6 +77,8 @@ function mapTokkoProperty(p: any, agencyId: string, agencyProfiles: any[] | null
     total_area: totalArea,
     covered_area: coveredArea,
     images: p.photos?.map((f: { image: string }) => f.image) || [],
+    lat: parseGeo(p.geo_lat),
+    lng: parseGeo(p.geo_long),
     tokko_data: stripTokkoSensitive(p),
     is_active: true,
     updated_at: new Date().toISOString(),

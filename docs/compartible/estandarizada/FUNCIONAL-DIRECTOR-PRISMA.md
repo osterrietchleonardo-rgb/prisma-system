@@ -501,7 +501,11 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca de Conocimiento (IA)"** 
 
 > ℹ️ Si cambiás de modo (a mano / cartera / link), el formulario **se limpia** para no mezclar datos de una carga con otra.
 
-> 💡 Tipo y operación son filtros estrictos. El **barrio puntúa por cercanía** en vez de ser un sí/no: mismo barrio exacto primero, después el sub-barrio de al lado (Belgrano R, Belgrano Chico) y por último el barrio limítrofe (Núñez, Colegiales), siempre con **menos puntaje**, de modo que uno de otro barrio nunca le gana a uno del mismo. Esto recupera comparables que se perdían porque la red carga la **misma cuadra** con barrios distintos. Además el sistema compara **metros cubiertos contra metros cubiertos** (antes los medía contra la superficie total, con terreno incluido, y las casas con lote grande quedaban afuera), muestra **un solo aviso** cuando está repetido y **ya no devuelve la propiedad analizada como comparable de sí misma**. El **checklist compara todo lo que tiene dato real** (suma **dormitorios** y **antigüedad**; si falta un dato, dice "sin dato" y no baja el puntaje). Trae **hasta 50 por bloque**, ordenados por comparabilidad, de **tu cartera** y de la **red de colaboración**.
+> 📸 **Fotos de la propiedad (opcional).** Antes de buscar comparables, vos o tus asesores pueden adjuntar **hasta 4 fotos** y, si quieren, indicarle a la IA en qué fijarse (ej. "estado de la cocina y del jardín"). Gemini devuelve una **descripción escrita a partir de lo que ve en las fotos** — sin inventar nada y sin ocultar lo que está deteriorado, pero diciéndolo sin castigar la propiedad. Esa descripción **la edita quien la generó** antes de seguir, y una casilla decide si va a la ficha del cliente o se usa solo para afinar la búsqueda. **El análisis es de una sola vez por juego de fotos** (no hay botón para repetirlo) y las fotos **nunca se guardan**: se analizan y se descartan. Tenerla también **mejora los comparables encontrados**, porque el sistema empieza a comparar también por lo que muestran las fotos. Si la propiedad se eligió **desde la cartera**, no hace falta buscar las fotos a mano: aparece una **grilla con las que esa propiedad ya tiene cargadas** y se tildan hasta 4 (se pueden combinar con fotos subidas a mano; el tope de 4 es entre las dos). En carga a mano o por link, se siguen subiendo las fotos como antes. Después de analizar, también se ve **cómo calificó la IA el estado de conservación y la luminosidad de la propiedad** — se puede corregir con un toque, y esa corrección es la base contra la que se comparan después las fotos de cada comparable (ver más abajo).
+
+> 💡 Tipo y operación son filtros estrictos. El **barrio, por defecto, se compara solo contra el mismo barrio y sus sub-barrios** (Belgrano R, Belgrano Chico si la propiedad es de Belgrano). Los **barrios limítrofes** (Núñez, Colegiales, Saavedra) **quedan afuera salvo que se tilde la casilla "Incluir barrios linderos"**, arriba del botón de buscar. Es intencional: auditando 36 ACM reales se vio que **70 de 618 comparables de Belgrano** en realidad venían de barrios vecinos — el precio casi no cambiaba (−2 %), pero el cliente reconocía el barrio ajeno en su propia tasación y descartaba el informe entero. Si se tilda la casilla, esos comparables **sí aparecen, marcados con un chip "lindero"** para saber cuáles son antes de decidir si se muestran. Además el sistema compara **metros cubiertos contra metros cubiertos** (antes los medía contra la superficie total, con terreno incluido, y las casas con lote grande quedaban afuera), muestra **un solo aviso** cuando está repetido y **ya no devuelve la propiedad analizada como comparable de sí misma**. El **checklist compara todo lo que tiene dato real** (suma **dormitorios** y **antigüedad**; si falta un dato, dice "sin dato" y no baja el puntaje). Trae **hasta 50 por bloque**, ordenados por comparabilidad, de **tu cartera** y de la **red de colaboración**.
+> 🖼️ **Comparación por fotos, para los candidatos más fuertes.** Si se subieron fotos de la propiedad, para los comparables con **90% o más** de coincidencia el sistema también analiza sus fotos y muestra, lado a lado en la tarjeta, **qué vio la IA en la propiedad** y **qué vio en ese comparable**. Con eso ajusta el % hasta **5 puntos para arriba o para abajo**, siempre con el **antes y el después y el motivo** — nunca cambia el número solo. Ese % ajustado es el que ordena la lista y el que el cliente termina viendo en la ficha (ahí sin flechas ni "antes/después", que es información solo para quien tasa). Es un ajuste hecho a partir de leer fotos, así que puede equivocarse: está para ayudar a elegir, no para reemplazar el criterio del asesor o del director, y se puede **apagar** con el switch "Comparar por fotos" — al apagarlo, todo vuelve al orden y al % de siempre. Cuando las fotos de un comparable **no muestran la propiedad de verdad** (un render de un pozo, una foto del palier, planos), avisa en la tarjeta en vez de comparar y no ajusta nada; si igual se lo elige para la ficha, **vuelve a avisar antes de crearla** — nada se saca solo.
+
 > 🏠 **¿Considerar PH? (solo en Casas):** al analizar una **Casa** aparece la casilla **"Considerar PH"**, tildada por defecto (no cambia nada). Como los **PH** suelen figurar como "casa" en los portales, si querés comparar **solo casas puras**, **destildala** antes de buscar. En cualquier otro tipo de propiedad la casilla no aparece.
 > 🏗️ **¿A estrenar o en pozo?** Al lado de "Antigüedad" hay dos casillas, **"A estrenar"** y **"En pozo"** (se pueden tildar las dos); al tildar alguna, el campo de años se apaga. Una propiedad sin uso vale **entre 18 % y 36 % más el m²** que una usada del mismo barrio (medido con datos reales de la red), así que mezclarlas desvía la tasación. Tildada, compara **solo contra propiedades del mismo estado**; sin tildar, deja afuera las a estrenar y las de pozo. Si la propiedad se elige **desde la cartera**, la casilla **se tilda sola** según lo que figure en Tokko. En **terrenos** no aplica.
 > 💰 No consume créditos por buscar comparables.
@@ -534,8 +538,8 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 5. En esa página están **"Descargar PDF"** (para enviar por mail/WhatsApp) y **"Compartir"** (copia el link).
 
 **Qué trae la ficha:**
-- **Portada** con la propiedad de referencia y la fecha.
-- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes), una **descripción breve** de la propiedad (resumida en pocas líneas, sin la letra chica ni los datos de contacto de quien publicó el aviso) y todas las fotos + características.
+- **Portada** con la propiedad de referencia y la fecha. Si se analizaron fotos y se tildó "Incluir esta descripción en la ficha del cliente", **la descripción también aparece en la portada**.
+- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes), una **descripción breve** de la propiedad (resumida en pocas líneas, sin la letra chica ni los datos de contacto de quien publicó el aviso) y todas las fotos + características. Si el comparable es de un **barrio lindero**, la hoja lo muestra con el chip **"Barrio lindero"**.
 - **Hoja final** con la **matriz comparativa de valores por m²** (con **promedios de superficie, precio y $/m²**), el gráfico **"La Pirámide del Precio"** (por qué un precio alto apaga la demanda), las **conclusiones** revisadas y los **datos de contacto** de quien la generó.
 - En la tarjeta de contacto, sobre el nombre: si la ficha la hizo el **director** dice "Director/a"; si la hizo un **asesor**, aparece **la clasificación que le pusiste** (Client Director / Client Support, o "Asesor/a" si no le asignaste ninguna, desde la pestaña **Asesores**).
 - El **logo** y el **aviso legal** en el pie de cada hoja (si están cargados). El logo se **recorta y agranda solo** para que se vea grande y nítido, cualquiera sea el archivo que subas.
@@ -759,6 +763,47 @@ PRISMA es **modular**: tu agencia puede tener módulos **habilitados o deshabili
 > 💡 Para **habilitar o deshabilitar** un módulo de tu agencia, coordinalo con el equipo de PRISMA (Vakdor).
 
 ---
+
+## 27. El Mapa del Buscador IA
+
+Tus asesores tienen, dentro del Buscador IA, una solapa **Mapa** con todas las propiedades
+—las de la agencia y las de la red de colaboración— ubicadas geográficamente.
+
+### Para qué sirve, en tu lugar
+
+- **Mostrarle al cliente dónde está todo**, en vez de describírselo.
+- **Saber cuánto vale el metro en cada manzana**, con el ranking de barrios del más caro al
+  más barato. Es el dato que sostiene una tasación cuando el cliente discute el precio.
+- **Ver dónde tenés cartera y dónde no**, de un vistazo.
+
+### El precio por metro cuadrado
+
+El mapa pinta cada manzana de verde (barato) a rojo (caro) según el precio mediano
+publicado. No es un promedio: usamos la mediana, porque un solo departamento caro correría
+el número de toda la manzana.
+
+Lo que conviene que sepas para usarlo bien:
+
+- Es **precio de publicación, no de cierre**. Es lo que se está pidiendo en esa manzana.
+- Las manzanas **más transparentes** tienen una o dos propiedades: el dato existe pero es
+  flojo, y no debería usarse solo para fijar un precio.
+- Se actualiza **todas las noches** con lo que haya en el sistema.
+
+### Privacidad entre agencias
+
+Las zonas que dibuja un asesor son **suyas**: ni vos ni otro asesor las ven. Y el catálogo
+de barrios que alimenta el buscador se arma únicamente con la red compartida, nunca con la
+cartera de las agencias: ninguna inmobiliaria puede deducir en qué barrios trabajan las
+demás.
+
+### Qué necesita mantenimiento
+
+Casi nada, pero conviene que lo sepas:
+
+- El dibujo de las manzanas se completa solo, guiado por dónde hay propiedades. Cuando la
+  red publica en una zona nueva, esa zona se dibuja esa misma noche.
+- Si alguna noche fallara alguna de las dos tareas automáticas, GitHub avisa por mail. El
+  mapa sigue funcionando: solo quedarían los precios del día anterior.
 
 ## FIN DE LA GUÍA
 

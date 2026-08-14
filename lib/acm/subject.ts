@@ -71,6 +71,7 @@ export function sujetoToEmbeddingText(s: Partial<Sujeto>): string {
     s.banos ? `${s.banos} baños` : "",
     sujetoM2(s) ? `${sujetoM2(s)} m2` : "",
     amen.join(", "),
+    (s.descripcion_ia || "").trim(),
   ]
     .filter(Boolean)
     .join(". ")

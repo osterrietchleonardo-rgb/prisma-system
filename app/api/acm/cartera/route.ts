@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { tokkoTagsToAmenidades } from "@/lib/acm/tokko";
+import { normalizarImagenes } from "@/lib/acm/fotos-descarga";
 
 export const dynamic = "force-dynamic";
 
@@ -57,7 +58,11 @@ export async function GET() {
         en_pozo,
         amenidades: tokkoTagsToAmenidades(tags),
         servicios: tags, // lista cruda (por si se quiere mostrar)
-        image: Array.isArray(p.images) ? (typeof p.images[0] === "string" ? p.images[0] : p.images[0]?.url ?? null) : null,
+        // Fotos existentes de la propiedad, para el selector "elegí fotos de la cartera" del
+        // ACM. Solo son URLs públicas (las mismas que ya se ven en la ficha de la propiedad);
+        // el endpoint que analiza fotos NO recibe estas URLs, recibe índice + id de propiedad
+        // y las resuelve él mismo del lado del servidor (ver app/api/acm/analizar-fotos).
+        images: normalizarImagenes(p.images),
       };
     });
 

@@ -24,5 +24,8 @@ REGLAS DE FORMATO (inquebrantables):
 - Párrafos de 2-3 líneas, con línea en blanco entre ellos. Cero emojis.
 - Viñetas con "•", nunca guiones largos. Sin links en el cuerpo (van al primer comentario).
 - LinkedIn = ultracualificación (hook con calificador de escala, posición fuerte, CTA que no ruega).
+- El CTA depende de la etapa del embudo: TOFU no vende ni manda a ningún lado; MOFU explica el
+  mecanismo; BOFU manda a ver el video de la demostración (el link va SOLO en el primer comentario).
+  Nunca uses CTAs genéricos tipo "Comentá SISTEMA" ni pidas una llamada.
 - Tono base: consultivo + analítico, con dosis de provocador para filtrar.
 `.trim()

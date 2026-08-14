@@ -1,0 +1,448 @@
+"use client";
+
+// ACM · Fotos de la propiedad + análisis con IA de visión.
+//
+// Hasta 4 fotos opcionales, de dos orígenes que coexisten (4 en total entre ambos):
+//  - Subidas a mano: se achican en el navegador antes de mandarlas (menos espera y costo).
+//  - Elegidas de la cartera (solo si el sujeto vino del modo "cartera"): el asesor tilda
+//    fotos que la propiedad YA tiene cargadas. El navegador solo manda propertyId + índice,
+//    nunca la URL — el servidor la resuelve él mismo (ver app/api/acm/analizar-fotos).
+//
+// Ninguna foto se guarda en ningún lado: van al endpoint, vuelve el texto y se descartan.
+// El análisis se hace UNA sola vez; si el texto no convence, se edita a mano.
+import { useEffect, useRef, useState } from "react";
+import { Loader2, ImagePlus, X, Sparkles, Building2, Check, ScanEye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import type { Sujeto } from "@/lib/tasacion/types";
+import { MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
+import {
+  LABEL_ESTADO,
+  LABEL_LUMINOSIDAD,
+  NIVELES_ESTADO,
+  NIVELES_LUMINOSIDAD,
+  type AtributosFotoIA,
+  type EstadoConservacionFoto,
+  type LuminosidadFoto,
+} from "@/lib/acm/analisis-fotos";
+
+const MAX_FOTOS = 4;
+const MAX_LADO = 1280;
+
+/** Propiedad de la cartera cuyas fotos existentes se pueden elegir (solo modo "cartera"). */
+interface CarteraFotoProp {
+  propertyId: string;
+  images: string[];
+}
+
+type FotoLocal =
+  | { kind: "upload"; preview: string; data: string; mimeType: string }
+  | { kind: "cartera"; preview: string; propertyId: string; index: number };
+
+/** Redimensiona a 1280px de lado mayor y devuelve JPEG base64 (sin el prefijo data:). */
+async function achicar(file: File): Promise<FotoLocal> {
+  const bitmap = await createImageBitmap(file);
+  const escala = Math.min(1, MAX_LADO / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * escala);
+  const h = Math.round(bitmap.height * escala);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, w, h);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+  return { kind: "upload", preview: dataUrl, data: dataUrl.split(",")[1], mimeType: "image/jpeg" };
+}
+
+export function FotosIA({
+  sujeto, descripcion, incluirEnFicha, onDescripcionChange, onIncluirEnFichaChange, carteraProperty,
+  atributosIA, onAtributosIAChange, anclajeEstado, anclajeLuminosidad, onAnclajeChange,
+}: {
+  sujeto: Sujeto;
+  descripcion: string;
+  incluirEnFicha: boolean;
+  onDescripcionChange: (v: string) => void;
+  onIncluirEnFichaChange: (v: boolean) => void;
+  /** Propiedad de origen si el sujeto vino de la cartera; null en manual/link o sin selección aún. */
+  carteraProperty?: CarteraFotoProp | null;
+  /** Clasificación cruda que devolvió la IA a partir de estas mismas fotos (el "antes"). */
+  atributosIA: AtributosFotoIA | null;
+  onAtributosIAChange: (a: AtributosFotoIA | null) => void;
+  /** El anclaje que se usa para comparar contra los comparables — arranca en lo que dijo la
+   *  IA y el asesor lo corrige acá mismo, sin salir de esta revisión. */
+  anclajeEstado?: EstadoConservacionFoto;
+  anclajeLuminosidad?: LuminosidadFoto;
+  onAnclajeChange: (v: { estado?: EstadoConservacionFoto; luminosidad?: LuminosidadFoto }) => void;
+}) {
+  const [fotos, setFotos] = useState<FotoLocal[]>([]);
+  const [foco, setFoco] = useState("");
+  const [analizando, setAnalizando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  // El análisis se hace una sola vez: se marca en `analizar()` cuando la llamada
+  // a la IA responde OK (nunca en el catch/finally, para que un fallo siga
+  // siendo reintentable). El estado en sí NO se infiere de `descripcion` en cada
+  // render (el asesor puede borrar todo el texto para reescribirlo a mano, y eso
+  // no debe resucitar el botón de analizar). Lo que SÍ se infiere una única vez,
+  // al montar, es el valor inicial: si el componente se remonta con una
+  // `descripcion` ya cargada (volver de "Editar" tras buscar comparables, o
+  // reabrir un ACM guardado desde "Mis ACM"), tiene que arrancar en `analizado`
+  // para no dejar la descripción, el contador y la casilla de la ficha
+  // invisibles mientras el valor sigue viajando a la búsqueda y a la ficha.
+  // Un remount real (cambio de solapa vía `key={modo}`, o "Nuevo ACM") sigue
+  // siendo el único reset legítimo.
+  const [analizado, setAnalizado] = useState(() => descripcion.trim().length > 0);
+
+  // Si el asesor cambia de propiedad dentro del modo cartera (misma solapa, así que este
+  // componente NO se remonta), las fotos de cartera ya tildadas quedan apuntando a índices de
+  // OTRA propiedad: se descartan. Las subidas a mano no dependen de la propiedad y se conservan.
+  //
+  // `analizado` también se resetea acá — es estado LOCAL de este componente, así que sin este
+  // reset seguiría en `true` después de cambiar de propiedad (aunque `descripcion`/`atributosIA`
+  // ya vengan vacíos desde el padre, ver `carteraToSujeto` en subject-input.tsx), dejando el
+  // botón "Analizar fotos con IA" y la grilla de fotos de cartera ocultos para siempre — sin
+  // forma de volver a analizar la propiedad nueva (hallazgo C1 de la revisión final).
+  //
+  // Guardado con un ref (en vez de resetear siempre que corre el efecto): el primer render de
+  // este componente TAMBIÉN dispara el efecto, y ahí NO hay que pisar `analizado` — si el
+  // componente se remonta con `carteraProperty` y `descripcion` ya cargados (volver de "Editar",
+  // o reabrir un ACM guardado), el `useState` perezoso de `analizado` ya calculó el valor
+  // correcto y este efecto no debe deshacerlo. Solo un cambio de propiedad DESPUÉS del primer
+  // render (mismo montaje, otra selección) cuenta como el caso que hay que limpiar.
+  const propertyIdPrevRef = useRef(carteraProperty?.propertyId);
+  useEffect(() => {
+    const cambioDePropiedad = propertyIdPrevRef.current !== carteraProperty?.propertyId;
+    propertyIdPrevRef.current = carteraProperty?.propertyId;
+    if (!cambioDePropiedad) return;
+
+    setFotos((prev) => (prev.some((f) => f.kind === "cartera") ? prev.filter((f) => f.kind !== "cartera") : prev));
+    // Un aviso de "llegaste al máximo" o un error de la selección anterior (de la propiedad
+    // vieja) quedarían pegados en pantalla mostrando un estado que ya no es cierto: se
+    // descartan cada vez que cambia la propiedad de origen, se hayan sacado fotos o no.
+    setInfo(null);
+    setError(null);
+    setAnalizado(false);
+  }, [carteraProperty?.propertyId]);
+
+  const alternarFotoCartera = (index: number, url: string) => {
+    if (!carteraProperty) return;
+    setError(null);
+    const yaElegida = fotos.some((f) => f.kind === "cartera" && f.index === index);
+    if (yaElegida) {
+      setFotos((prev) => prev.filter((f) => !(f.kind === "cartera" && f.index === index)));
+      setInfo(null);
+      return;
+    }
+    if (fotos.length >= MAX_FOTOS) {
+      setInfo(`Llegaste al máximo de ${MAX_FOTOS} fotos.`);
+      return;
+    }
+    setInfo(null);
+    setFotos((prev) => [...prev, { kind: "cartera", preview: url, propertyId: carteraProperty.propertyId, index }]);
+  };
+
+  const agregar = async (files: FileList | null, input: HTMLInputElement) => {
+    if (!files?.length) return;
+    setError(null);
+    setInfo(null);
+    const elegidos = [...files];
+    const libres = MAX_FOTOS - fotos.length;
+    const aProcesar = elegidos.slice(0, libres);
+    const descartadasPorTope = elegidos.length - aProcesar.length;
+
+    // allSettled (no all): si una foto no se puede leer, las demás del mismo lote
+    // igual se agregan en vez de perderse todas por culpa de una.
+    const resultados = await Promise.allSettled(aProcesar.map(achicar));
+    const nuevas = resultados
+      .filter((r): r is PromiseFulfilledResult<FotoLocal> => r.status === "fulfilled")
+      .map((r) => r.value);
+    const fallidas = resultados.length - nuevas.length;
+
+    if (nuevas.length) setFotos((f) => [...f, ...nuevas]);
+    // Permite volver a elegir el mismo archivo (si no se limpia, el navegador no dispara
+    // onChange de nuevo cuando se selecciona exactamente la misma foto que antes).
+    input.value = "";
+
+    if (fallidas > 0 && descartadasPorTope > 0) {
+      setError(
+        `No se pudo leer ${fallidas === 1 ? "una imagen" : `${fallidas} imágenes`} y no se agregaron ${descartadasPorTope} más por superar el máximo de ${MAX_FOTOS} fotos.`
+      );
+    } else if (fallidas > 0) {
+      setError(
+        fallidas === 1
+          ? "No se pudo leer una de las imágenes. Probá con otro archivo."
+          : `No se pudieron leer ${fallidas} de las imágenes.`
+      );
+    } else if (descartadasPorTope > 0) {
+      setError(`Ya llegaste al máximo de ${MAX_FOTOS} fotos, no se agregaron ${descartadasPorTope} más.`);
+    } else if (fotos.length + nuevas.length >= MAX_FOTOS) {
+      // Aviso neutral (no es un error): explica por qué el recuadro de "agregar" desaparece.
+      setInfo(`Llegaste al máximo de ${MAX_FOTOS} fotos.`);
+    }
+  };
+
+  const analizar = async () => {
+    setAnalizando(true);
+    setError(null);
+    setInfo(null); // saca el "Llegaste al máximo de 4 fotos": el bloque de resultado la reemplaza.
+    try {
+      const r = await fetch("/api/acm/analizar-fotos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          // Subidas viajan con su base64; las de cartera solo con propertyId + index (el
+          // servidor resuelve la URL él mismo, ver comentario arriba del archivo).
+          fotos: fotos.map((f) =>
+            f.kind === "upload" ? { data: f.data, mimeType: f.mimeType } : { propertyId: f.propertyId, index: f.index }
+          ),
+          foco,
+          sujeto,
+        }),
+      });
+      // Guardado: si la respuesta no es JSON (timeout de plataforma, página de
+      // gateway — el endpoint tiene maxDuration=60), `.json()` tira un SyntaxError
+      // que no es un TypeError y se escapaba con el mensaje técnico del navegador.
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j) throw new Error(j?.error || "No se pudo analizar las fotos.");
+      onDescripcionChange(j.descripcion);
+      // Atributos para la 3ra capa (fotos contra fotos): se guardan tal cual los devolvió la
+      // IA, y el anclaje arranca en el mismo valor — el asesor lo corrige acá abajo si hace
+      // falta, sin volver a analizar nada.
+      const atributos: AtributosFotoIA | null = j.atributos ?? null;
+      onAtributosIAChange(atributos);
+      if (atributos) {
+        onAnclajeChange({
+          estado: atributos.estado_conservacion !== "sin_evidencia" ? atributos.estado_conservacion : undefined,
+          luminosidad: atributos.luminosidad !== "sin_evidencia" ? atributos.luminosidad : undefined,
+        });
+      }
+      // Recién acá cuenta como analizado: un fallo (catch) nunca llega a esta línea,
+      // así que el botón sigue disponible para reintentar.
+      setAnalizado(true);
+    } catch (e: any) {
+      // Si se cortó la conexión, fetch tira un TypeError con un mensaje técnico del
+      // navegador ("Failed to fetch"): no le sirve al asesor, se cambia por uno en
+      // español. Los demás errores ya vienen en español: los que arma este mismo
+      // componente (throw de arriba) o el catch-all del endpoint, que devuelve un
+      // mensaje fijo en español para cualquier falla que no sea uno de los 400
+      // validados (ver app/api/acm/analizar-fotos/route.ts) — nunca el texto crudo
+      // de Gemini.
+      setError(
+        e instanceof TypeError
+          ? "No se pudo conectar. Revisá tu conexión a internet y probá de nuevo."
+          : e?.message || "No se pudo analizar las fotos."
+      );
+    } finally {
+      setAnalizando(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3 p-4 rounded-2xl border border-accent/10 bg-card/20">
+      <div>
+        <Label className="text-sm font-bold">Fotos de la propiedad (opcional)</Label>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Hasta {MAX_FOTOS}{carteraProperty ? ", subidas o elegidas de las que ya tiene cargadas la propiedad" : ""}.
+          La IA las mira y redacta una descripción que afina la búsqueda de comparables. Las fotos no se guardan.
+        </p>
+      </div>
+
+      {/* Elegir de la cartera: solo si el sujeto vino del modo cartera. Desaparece junto con
+          el resto de la UI de "antes de analizar" una vez que `analizado` es true. */}
+      {carteraProperty && !analizado && (
+        <div className="space-y-1.5">
+          <Label className="text-xs font-bold">Elegí fotos ya cargadas de esta propiedad</Label>
+          {carteraProperty.images.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Esta propiedad todavía no tiene fotos cargadas en el sistema. Subí desde tu dispositivo abajo.
+            </p>
+          ) : (
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 max-h-52 overflow-y-auto p-1.5 rounded-xl border border-accent/10 bg-card/10">
+              {carteraProperty.images.map((url, idx) => {
+                const elegida = fotos.some((f) => f.kind === "cartera" && f.index === idx);
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => alternarFotoCartera(idx, url)}
+                    className={cn(
+                      "relative aspect-square rounded-lg overflow-hidden border-2 transition-all",
+                      elegida ? "border-accent" : "border-transparent opacity-80 hover:opacity-100"
+                    )}
+                    aria-label={elegida ? `Sacar foto ${idx + 1} de la selección` : `Elegir foto ${idx + 1}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`Foto ${idx + 1} de la propiedad`} className="w-full h-full object-cover" />
+                    {elegida && (
+                      <div className="absolute inset-0 bg-accent/40 flex items-center justify-center">
+                        <Check className="w-5 h-5 text-white drop-shadow" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {fotos.map((f, i) => (
+          <div key={i} className="relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={f.preview} alt={`Foto ${i + 1}`} className="w-20 h-20 rounded-xl object-cover" />
+            {f.kind === "cartera" && (
+              <span
+                className="absolute bottom-1 left-1 bg-black/60 rounded-full p-0.5 leading-none"
+                title="Foto de la cartera"
+              >
+                <Building2 className="w-3 h-3 text-white" />
+              </span>
+            )}
+            {!analizado && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFotos((prev) => prev.filter((_, j) => j !== i));
+                  setInfo(null); // el recuadro de "agregar" vuelve a aparecer: el aviso de tope quedaría desactualizado.
+                }}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-background border border-accent/20 flex items-center justify-center"
+                aria-label="Quitar foto"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        ))}
+        {fotos.length < MAX_FOTOS && !analizado && (
+          <label className="w-20 h-20 rounded-xl border border-dashed border-accent/30 flex items-center justify-center cursor-pointer hover:bg-accent/5">
+            <ImagePlus className="w-5 h-5 text-muted-foreground" />
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              className="hidden"
+              onChange={(e) => agregar(e.target.files, e.target)}
+            />
+          </label>
+        )}
+      </div>
+
+      {fotos.length > 0 && !analizado && (
+        <>
+          <div className="space-y-1">
+            <Label className="text-xs font-bold">¿En qué querés que se enfoque el análisis?</Label>
+            <Input
+              value={foco}
+              maxLength={300}
+              onChange={(e) => setFoco(e.target.value)}
+              placeholder="Ej: estado de la cocina y los baños, luminosidad y vista, calidad de las terminaciones"
+              className="bg-card/50 border-accent/10"
+            />
+          </div>
+          <Button onClick={analizar} disabled={analizando} className="bg-accent hover:bg-accent/90">
+            {analizando ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+            {analizando ? "Analizando fotos..." : "Analizar fotos con IA"}
+          </Button>
+        </>
+      )}
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      {!error && info && <p className="text-xs text-muted-foreground">{info}</p>}
+
+      {analizado && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-bold">Descripción (editable)</Label>
+            <span className="text-[11px] text-muted-foreground tabular-nums">
+              {descripcion.length}/{MAX_DESC_IA}
+            </span>
+          </div>
+          <Textarea
+            value={descripcion}
+            maxLength={MAX_DESC_IA}
+            rows={5}
+            onChange={(e) => onDescripcionChange(e.target.value)}
+            className="bg-card/50 border-accent/10 text-sm"
+          />
+          <label className="flex items-start gap-3 cursor-pointer">
+            <Checkbox
+              checked={incluirEnFicha}
+              onCheckedChange={(v) => onIncluirEnFichaChange(v === true)}
+              className="mt-0.5"
+            />
+            <span className="text-xs">
+              <span className="font-bold">Incluir esta descripción en la ficha del cliente</span>
+              <span className="block text-muted-foreground mt-0.5">
+                Revisala antes: lo que quede acá es lo que va a leer tu cliente.
+              </span>
+            </span>
+          </label>
+
+          {/* Anclaje para comparar con los comparables (3ra capa: fotos contra fotos). Arranca
+              en lo que dijo la IA sobre ESTAS MISMAS fotos y el asesor lo corrige acá, antes de
+              buscar comparables — vos conocés la propiedad mejor que cualquier IA, y este es el
+              único dato que hace falta corregir para que la comparación arranque bien anclada. */}
+          {atributosIA && (
+            <div className="space-y-2 pt-3 border-t border-accent/10">
+              <div className="flex items-center gap-1.5">
+                <ScanEye className="w-3.5 h-3.5 text-accent" />
+                <Label className="text-xs font-bold">Condición para comparar con otros comparables</Label>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Así calificó la IA tu propiedad a partir de estas fotos. Corregilo si no coincide con lo que ves en
+                persona: la comparación con cada comparable sale de acá.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Estado de conservación</Label>
+                  <Select
+                    value={anclajeEstado ?? ""}
+                    onValueChange={(v) => onAnclajeChange({ estado: v as EstadoConservacionFoto })}
+                  >
+                    <SelectTrigger className="bg-card/50 border-accent/10 h-9 text-xs">
+                      <SelectValue placeholder="Elegí una opción" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NIVELES_ESTADO.filter((n) => n !== "sin_evidencia").map((n) => (
+                        <SelectItem key={n} value={n}>{LABEL_ESTADO[n]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground">Luminosidad</Label>
+                  <Select
+                    value={anclajeLuminosidad ?? ""}
+                    onValueChange={(v) => onAnclajeChange({ luminosidad: v as LuminosidadFoto })}
+                  >
+                    <SelectTrigger className="bg-card/50 border-accent/10 h-9 text-xs">
+                      <SelectValue placeholder="Elegí una opción" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {NIVELES_LUMINOSIDAD.filter((n) => n !== "sin_evidencia").map((n) => (
+                        <SelectItem key={n} value={n}>{LABEL_LUMINOSIDAD[n]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {(atributosIA.estado_conservacion === "sin_evidencia" || atributosIA.luminosidad === "sin_evidencia") && (
+                <p className="text-[11px] text-amber-500">
+                  La IA no pudo evaluar {atributosIA.estado_conservacion === "sin_evidencia" && atributosIA.luminosidad === "sin_evidencia"
+                    ? "el estado ni la luminosidad"
+                    : atributosIA.estado_conservacion === "sin_evidencia" ? "el estado de conservación" : "la luminosidad"} con
+                  estas fotos. Completalo vos arriba para poder comparar con los otros comparables.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

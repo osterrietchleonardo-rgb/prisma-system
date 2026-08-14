@@ -429,10 +429,14 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
    - **Desde un link:** pegás el link de un aviso (MercadoLibre, ZonaProp, Argenprop…) y apretás **Analizar**: trae los datos automáticamente. Si el portal bloquea la lectura o tarda demasiado, te avisa con un mensaje claro y completás a mano.
 
 > ℹ️ Si cambiás de forma de carga (a mano / cartera / link), el formulario **se limpia** para no mezclar datos de una con otra.
+
+> 📸 **Fotos de la propiedad (opcional).** Antes de buscar comparables podés adjuntar **hasta 4 fotos** de la propiedad y, si querés, decirle a la IA en qué fijarse (por ejemplo "estado de la cocina y del jardín"). Al tocar **"Analizar fotos con IA"**, Gemini te devuelve una **descripción escrita a partir de lo que ve** — no inventa nada ni oculta lo que está deteriorado, pero lo dice sin castigar la propiedad (por ejemplo, "cocina original, con posibilidad de actualización"). Esa descripción **es tuya**: la podés editar o reescribir del todo antes de seguir, y una casilla te deja elegir si va a la ficha del cliente o se queda solo para afinar la búsqueda. **El análisis se hace una sola vez** (no hay botón para repetirlo): una vez que la IA escribió la descripción, las fotos quedan fijas y el botón de analizar desaparece. Si querés rehacerlo con otras fotos, cambiá de forma de carga (manual / cartera / link) — eso limpia el formulario y arranca de cero. Ojo: si el análisis **falla** (se cayó internet o la IA no respondió), eso no cuenta como analizado y podés reintentar sin perder nada. Las fotos **no se guardan en ningún lado**: se usan para el análisis y se descartan. Tener esta descripción también **ayuda a encontrar mejores comparables**, porque el sistema empieza a comparar también por lo que se ve en las fotos, no solo por m²/ambientes/zona. Si elegiste la propiedad **desde la cartera**, no hace falta que busques las fotos en tu dispositivo: te aparece una **grilla con las fotos que esa propiedad ya tiene cargadas** y tildás hasta 4 con un toque (podés combinarlas con fotos subidas a mano; el tope de 4 es entre las dos). En carga a mano o por link, seguís subiendo las fotos vos, como antes. Después de analizar, también ves **cómo calificó la IA el estado de conservación y la luminosidad de tu propiedad** — corregilo con un toque si no estás de acuerdo; esa corrección es la base contra la que se comparan después las fotos de cada comparable (ver más abajo).
 2. Elegí la **operación** (Venta / Alquiler) y apretá **Buscar comparables**.
 3. Ves los comparables en dos bloques —**Cartera de tu agencia** y **Red de colaboración**— cada uno con su **% grande** y un **checklist** desplegable (barrio, superficie, ambientes, **dormitorios**, baños, **antigüedad**, amenities, tipo y operación). El **precio** se muestra al costado como dato, **no entra en el %**.
 
-> 💡 El **tipo** y la **operación** son filtros estrictos. El **barrio** ahora **puntúa por cercanía** en vez de ser un sí/no: primero los del **mismo barrio exacto**, después los del **sub-barrio de al lado** (si tu propiedad es de Belgrano, un Belgrano R o un Belgrano Chico entran pero puntúan menos) y por último los de un **barrio limítrofe** (Núñez, Colegiales, Saavedra). **Un comparable de otro barrio nunca le gana a uno del mismo barrio** si el resto es igual, así que en el % ya ves qué tan cerca está de verdad. Esto sirve porque muchos avisos de una misma cuadra están cargados con barrios distintos: en el límite de Belgrano y Núñez hay casas de la misma cuadra publicadas con uno u otro nombre, y antes la mitad no aparecía. No le molestan los acentos (Nuñez = Núñez).
+> 💡 El **tipo** y la **operación** son filtros estrictos. El **barrio, por defecto, se compara solo contra el mismo barrio y sus sub-barrios** (si tu propiedad es de Belgrano, un Belgrano R o un Belgrano Chico entran normalmente). Los **barrios limítrofes** (Núñez, Colegiales, Saavedra si tu propiedad es de Belgrano) **no entran salvo que vos lo pidas**: hay una casilla **"Incluir barrios linderos"** arriba del botón de buscar. Es así a propósito — un comparable de otro barrio puede tener el precio correcto, pero si tu cliente lo ve en su propia tasación, deja de confiar en el informe aunque el número esté bien. Si tildás la casilla, esos comparables **sí aparecen, marcados con un chip "lindero"** para que sepas cuáles son y decidas si los mostrás. No le molestan los acentos (Nuñez = Núñez).
+
+> 🖼️ **Comparación por fotos, para los candidatos más fuertes.** Si le subiste fotos a tu propiedad, para los comparables con **90% o más** de coincidencia el sistema también analiza sus fotos y te muestra, lado a lado en la tarjeta, **qué vio la IA en tu propiedad** y **qué vio en ese comparable**. Con eso ajusta el % hasta **5 puntos para arriba o para abajo**, siempre mostrándote el **antes y el después con el motivo** — nunca cambia el número calladito. Ese % ajustado es el que ordena la lista y el que tu cliente termina viendo en la ficha (ahí sin flechas ni "antes/después": eso es información solo para vos). Es un ajuste hecho a partir de leer fotos, así que puede equivocarse: está para ayudarte a elegir, no para reemplazar tu criterio, y lo podés **apagar** con el switch "Comparar por fotos" — al apagarlo, todo vuelve al orden y al % de siempre. Cuando las fotos de un comparable **no muestran la propiedad de verdad** (un render de un pozo, una foto del palier, planos), te avisa en la tarjeta en vez de comparar y no ajusta nada; si igual lo elegís para la ficha, **te lo vuelve a avisar antes de crearla** — nunca se saca nada solo, decidís vos.
 
 > 📐 **Cargá bien los metros cubiertos.** El sistema compara **cubiertos contra cubiertos**. Antes comparaba tus metros cubiertos contra la superficie **total** del aviso (que incluye el terreno y el patio), así que las casas con lote grande se quedaban afuera aunque fueran perfectamente comparables — en una prueba real en Belgrano se perdían **19 casas** por este motivo.
 
@@ -469,8 +473,8 @@ Con los comparables a la vista podés armar una **ficha profesional** para pasar
 5. En esa página tenés **"Descargar PDF"** (para mandar por mail o WhatsApp) y **"Compartir"** (copia el link).
 
 **Qué trae la ficha:**
-- Una **portada** con la propiedad de referencia y la fecha.
-- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes), una **descripción breve** de la propiedad (resumida en pocas líneas, sin la letra chica ni los datos de contacto de quien publicó el aviso) y todas las fotos + características.
+- Una **portada** con la propiedad de referencia y la fecha. Si analizaste fotos y tildaste "Incluir esta descripción en la ficha del cliente", **la descripción también aparece en la portada**.
+- **Una hoja por comparable**, con un **banner de mercado** arriba (el **precio de cierre por m²** del barrio y del segmento de 1/2/3 ambientes), una **descripción breve** de la propiedad (resumida en pocas líneas, sin la letra chica ni los datos de contacto de quien publicó el aviso) y todas las fotos + características. Si el comparable es de un **barrio lindero** (los que solo aparecen con la casilla "Incluir barrios linderos"), la hoja lo muestra con el mismo chip **"Barrio lindero"** para que el cliente lo vea de entrada.
 - Una **hoja final** con la **matriz comparativa de valores por m²** (con los **promedios de superficie, precio y $/m²** de la muestra), un gráfico de **"La Pirámide del Precio"** que muestra cómo cae la demanda cuando el precio se aleja del valor de mercado, las **conclusiones** (las que revisaste) y tus **datos de contacto** para que el cliente te escriba (WhatsApp / email).
 - Sobre tu nombre, en la tarjeta de contacto, aparece **tu clasificación** (Client Director / Client Support, la que te puso tu director; si no tenés, dice "Asesor/a").
 - Tu **logo** y el **aviso legal** en el pie de cada hoja (si el director los cargó en la configuración de marca).
@@ -610,6 +614,65 @@ PRISMA es **modular**: tu agencia puede tener algunos módulos **habilitados o d
 > 💡 Si ves un módulo en gris, **no es un error**: es una configuración de tu agencia. Si lo necesitás, pedíselo a tu director.
 
 ---
+
+## 23. El Mapa del Buscador IA
+
+Dentro del Buscador IA, además del chat, tenés una solapa **Mapa**. Sirve para lo que el
+chat no puede: **ver dónde está todo** y mostrárselo al cliente.
+
+### Lo básico
+
+Cada globito es un grupo de propiedades. El número te dice cuántas hay ahí. Tocalo y se
+abre la lista, con foto y precio, para elegir. Si hay muchas, arriba tenés una cajita para
+filtrar por calle, tipo, precio o inmobiliaria.
+
+Los colores te dicen de quién es cada una:
+
+- **Ámbar** — tuyas
+- **Gris** — de la agencia
+- **Azul** — de la red de colaboración
+
+### Buscar un lugar
+
+Arriba de todo hay un buscador. Escribí un barrio, una dirección, o el nombre de una zona
+que hayas guardado. **No te preocupes por los acentos ni por escribir mal**: si ponés
+"cavallito" te va a encontrar Caballito igual.
+
+Cuando elegís un **barrio**, el mapa se acerca y además esconde las propiedades de los
+barrios vecinos. Vas a ver un cartelito azul que dice "Solo Belgrano" — tocá la cruz para
+volver a ver todo.
+
+### Cuánto vale el metro
+
+El botón con el **signo $** pinta el mapa de colores: verde donde el metro es más barato y
+rojo donde es más caro, manzana por manzana. Al costado te aparece el ranking de barrios,
+del más caro al más barato.
+
+Dos cosas para leerlo bien:
+
+- Los colores **se recalculan según lo que estés mirando**. El mismo verde no significa lo
+  mismo en toda la ciudad que dentro de un barrio. Por eso al lado de cada color están los
+  números.
+- Las manzanas **más transparentes** tienen una o dos propiedades publicadas nada más. El
+  dato existe, pero es flojo: no lo uses para cerrar un precio.
+- Si una manzana tiene propiedades pero **no te sale el cartelito con el precio**, es por
+  una de dos razones: esas propiedades no tienen la superficie cargada (sin metros no se
+  puede calcular el precio por metro), o son de otra operación o moneda que la que estás
+  mirando. Probá cambiando arriba entre Venta y Alquiler, o entre dólares y pesos.
+
+### Dibujar tu propia zona
+
+El **lápiz** te deja dibujar una zona a mano alzada, sin soltar. Podés hacer varios trazos
+y se suman. Después la guardás con nombre y la volvés a usar cuando quieras.
+
+**Tus zonas son tuyas**: nadie más las ve, ni el director.
+
+### Cosas que te van a pasar
+
+- **"+1000 propiedades a la vista"**: ese "+" significa que hay más de las que entran en
+  pantalla. Acercate un poco y vas a verlas todas.
+- **"Consultar" en vez de un precio**: la propiedad existe, pero quien la cargó puso un
+  precio que no es real (a veces ponen 1 dólar). Preferimos no mostrarte un número falso.
 
 ## FIN DE LA GUÍA
 

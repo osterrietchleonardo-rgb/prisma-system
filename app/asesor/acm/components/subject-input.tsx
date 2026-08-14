@@ -12,6 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Pencil, Building2, Link2, Search, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { FotosIA } from "./fotos-ia";
+import type { AtributosFotoIA, EstadoConservacionFoto, LuminosidadFoto } from "@/lib/acm/analisis-fotos";
 
 type Modo = "manual" | "cartera" | "link";
 
@@ -33,6 +35,7 @@ interface CarteraItem {
   a_estrenar: boolean;
   en_pozo: boolean;
   amenidades: Amenidades;
+  images: string[];
 }
 
 interface SubjectInputProps {
@@ -42,6 +45,17 @@ interface SubjectInputProps {
   onOperacionChange: (o: Operacion) => void;
   considerarPh: boolean;
   onConsiderarPhChange: (v: boolean) => void;
+  incluirLinderos: boolean;
+  onIncluirLinderosChange: (v: boolean) => void;
+  descripcionIa: string;
+  onDescripcionIaChange: (v: string) => void;
+  incluirDescFicha: boolean;
+  onIncluirDescFichaChange: (v: boolean) => void;
+  atributosFotosIa: AtributosFotoIA | null;
+  onAtributosFotosIaChange: (a: AtributosFotoIA | null) => void;
+  anclajeEstado?: EstadoConservacionFoto;
+  anclajeLuminosidad?: LuminosidadFoto;
+  onAnclajeChange: (v: { estado?: EstadoConservacionFoto; luminosidad?: LuminosidadFoto }) => void;
   onBuscar: () => void;
   loading: boolean;
   excludeId: string | null;
@@ -78,6 +92,16 @@ function carteraToSujeto(p: CarteraItem, base: Sujeto): Sujeto {
     en_pozo: Boolean(p.en_pozo),
     amenidades: p.amenidades || base.amenidades,
     moneda: (p.currency as any) === "ARS" ? "ARS" : "USD",
+    // La descripción/anclaje de fotos son de la propiedad VIEJA (la que estaba en `base` antes
+    // de este cambio de selección): nunca son válidos para la propiedad nueva. Se resetean acá,
+    // de forma estructural (no dependiendo de que algún efecto en fotos-ia.tsx se acuerde de
+    // limpiarlos) — así ningún llamador de `carteraToSujeto` puede arrastrar sin querer la
+    // condición de A hacia la búsqueda o la ficha de B (hallazgo C1 de la revisión final: el
+    // ancla movía puntos de forma invisible, sin ningún texto en pantalla que lo delatara).
+    descripcion_ia: "",
+    atributos_fotos_ia: null,
+    anclaje_estado_conservacion: undefined,
+    anclaje_luminosidad: undefined,
   };
 }
 
@@ -88,6 +112,17 @@ export function SubjectInput({
   onOperacionChange,
   considerarPh,
   onConsiderarPhChange,
+  incluirLinderos,
+  onIncluirLinderosChange,
+  descripcionIa,
+  onDescripcionIaChange,
+  incluirDescFicha,
+  onIncluirDescFichaChange,
+  atributosFotosIa,
+  onAtributosFotosIaChange,
+  anclajeEstado,
+  anclajeLuminosidad,
+  onAnclajeChange,
   onBuscar,
   loading,
   excludeId,
@@ -260,6 +295,24 @@ export function SubjectInput({
         </label>
       )}
 
+      {/* Barrios linderos: apagado por defecto. Con el gate estricto entran el mismo barrio
+          y sus sub-barrios (Belgrano R, Palermo Soho); los limítrofes (Núñez, Saavedra)
+          solo si el asesor los pide. */}
+      <label className="flex items-start gap-3 p-4 rounded-2xl border border-accent/10 bg-card/20 cursor-pointer">
+        <Checkbox
+          checked={incluirLinderos}
+          onCheckedChange={(v) => onIncluirLinderosChange(v === true)}
+          className="mt-0.5"
+        />
+        <span className="text-sm">
+          <span className="font-bold">Incluir barrios linderos</span>
+          <span className="block text-xs text-muted-foreground mt-0.5">
+            Por defecto se comparan solo propiedades del mismo barrio. Tildá si necesitás
+            ampliar a los barrios vecinos; los que entren van marcados como “lindero”.
+          </span>
+        </span>
+      </label>
+
       {/* Modo cartera */}
       {modo === "cartera" && (
         <div className="space-y-2 p-4 rounded-2xl border border-accent/10 bg-card/20">
@@ -350,6 +403,24 @@ export function SubjectInput({
       <div className="pt-2">
         <Step1Sujeto sujeto={sujeto} onChange={onChange} hideNextButton />
       </div>
+
+      {/* Fotos + IA: opcional, no bloquea nada. Con key={modo} se remonta al cambiar de
+          solapa (manual/cartera/link), así las fotos ya elegidas no quedan colgadas
+          cuando onReset() vacía el sujeto. */}
+      <FotosIA
+        key={modo}
+        sujeto={sujeto}
+        descripcion={descripcionIa}
+        incluirEnFicha={incluirDescFicha}
+        onDescripcionChange={onDescripcionIaChange}
+        onIncluirEnFichaChange={onIncluirDescFichaChange}
+        carteraProperty={modo === "cartera" && carteraSel ? { propertyId: carteraSel.id, images: carteraSel.images } : null}
+        atributosIA={atributosFotosIa}
+        onAtributosIAChange={onAtributosFotosIaChange}
+        anclajeEstado={anclajeEstado}
+        anclajeLuminosidad={anclajeLuminosidad}
+        onAnclajeChange={onAnclajeChange}
+      />
 
       {/* Acción principal */}
       <div className="pt-2 flex justify-end border-t border-accent/10">

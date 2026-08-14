@@ -4,6 +4,8 @@ import { getAdminDb } from "@/lib/admin-vakdor/logger"
 import { guardarDesarrollo } from "@/lib/admin-vakdor/marketing/store"
 import { generarTexto } from "@/lib/admin-vakdor/marketing/claude"
 import { BRAND_SYSTEM } from "@/lib/admin-vakdor/marketing/brand-prompt"
+import { canonDeVoz } from "@/lib/admin-vakdor/marketing/recursos"
+import { instruccionCta, type EtapaEmbudo } from "@/lib/admin-vakdor/marketing/voz"
 
 export const dynamic = "force-dynamic"
 
@@ -14,25 +16,30 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const db = getAdminDb()
   const { data: idea, error } = await db
     .from("marketing_ideas")
-    .select("titulo, fuente, formato, angulo, gancho, estructura, brief")
+    .select("titulo, fuente, formato, funnel, angulo, gancho, estructura, brief")
     .eq("id", params.id).single()
   if (error || !idea) return NextResponse.json({ error: "idea no encontrada" }, { status: 404 })
+
+  const etapa = (idea.funnel as EtapaEmbudo | null) ?? "mofu"
+  const systemBase = `${BRAND_SYSTEM}\n\n${await canonDeVoz()}`
 
   const user = `Pieza a desarrollar — fuente: ${idea.fuente}, formato: ${idea.formato}. Título: ${idea.titulo}. Ángulo: ${idea.angulo ?? ""}. Gancho: ${idea.gancho ?? ""}. Estructura: ${idea.estructura ?? ""}. Brief: ${JSON.stringify(idea.brief ?? {})}.
 
 Desarrollá el CONTENIDO COMPLETO siguiendo la skill vakdor-copywriter al pie (Eje Clave que aterriza en el Resultado, 2ª persona, párrafos cortos, sin emojis, viñetas con •, sin links en el cuerpo).
 
-Si fuente = "linkedin": devolvé SOLO este JSON:
-{"contenido":"<el post/carrusel completo listo para publicar, con saltos de línea>","primer_comentario":"<comentario de engagement: pregunta o estadística cruda, NUNCA 'comentá X'; el link a vakdor.com va acá si corresponde>","hashtags":["#...", 3 a 5 hashtags]}
+${instruccionCta(etapa)}
 
-Si fuente = "blog": generás el ARTÍCULO para la web y su VERSIÓN LinkedIn (un post standalone que NO deriva a la web: hook + storytelling, PROHIBIDO links / "leé el artículo" / mencionar la web; el primer comentario es engagement puro sin links). Devolvé SOLO este JSON:
-{"contenido":"<el artículo en Markdown: ## para H2, ### para H3, listas, intro que responde en las primeras 100 palabras, un H2 de respuesta directa (TL;DR), 3-6 H2, una sección FAQ con H3=pregunta, y conclusión con CTA a /call>","blog":{"title":"<=60 caracteres, keyword al inicio","slug":"kebab-case","meta_description":"<=155 caracteres, dolor + solución + CTA","seo_keywords":["principal","2-4 secundarias"],"read_time_minutes": <número = palabras/200 redondeado>,"linkedin_post":"<post standalone para LinkedIn: hook + storytelling, sin links, sin derivar>","linkedin_primer_comentario":"<engagement: pregunta o dato crudo, sin links>","linkedin_hashtags":["#...", 3 a 5]}}
+Si fuente = "linkedin": devolvé SOLO este JSON:
+{"contenido":"<el post/carrusel completo listo para publicar, con saltos de línea>","primer_comentario":"<seguí la REGLA DE CIERRE de arriba: en BOFU termina con el link https://vakdor.com/demostracion en una línea aparte; en TOFU y MOFU, sin ningún link>","hashtags":["#...", 3 a 5 hashtags]}
+
+Si fuente = "blog": generás el ARTÍCULO para la web y su VERSIÓN LinkedIn (un post standalone que NO deriva a la web: hook + storytelling, PROHIBIDO links / "leé el artículo" / mencionar la web). Devolvé SOLO este JSON:
+{"contenido":"<el artículo en Markdown: ## para H2, ### para H3, listas, intro que responde en las primeras 100 palabras, un H2 de respuesta directa (TL;DR), 3-6 H2, una sección FAQ con H3=pregunta, y un cierre acorde a la REGLA DE CIERRE de arriba>","blog":{"title":"<=60 caracteres, keyword al inicio","slug":"kebab-case","meta_description":"<=155 caracteres, dolor + solución + CTA","seo_keywords":["principal","2-4 secundarias"],"read_time_minutes": <número = palabras/200 redondeado>,"linkedin_post":"<post standalone para LinkedIn: hook + storytelling, sin links, sin derivar>","linkedin_primer_comentario":"<seguí la REGLA DE CIERRE de arriba: el link https://vakdor.com/demostracion solo si la etapa es BOFU>","linkedin_hashtags":["#...", 3 a 5]}}
 
 Devolvé SOLO el JSON, sin texto extra ni fences de markdown.`
 
   let raw: string
   try {
-    raw = await generarTexto(BRAND_SYSTEM, user, 4000)
+    raw = await generarTexto(systemBase, user, { maxTokens: 8000 })
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 502 })
   }

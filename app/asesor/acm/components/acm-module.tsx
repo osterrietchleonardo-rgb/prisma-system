@@ -40,6 +40,14 @@ export const SUJETO_INICIAL: Sujeto = {
   },
   ocupacion: "libre",
   moneda: "USD",
+  // Descripción de la IA de visión (fotos) y si va o no en la ficha del cliente. Viven DENTRO
+  // de `sujeto` (no en estado aparte) a propósito: `sujeto` es lo único que efectivamente viaja
+  // a /api/acm/ficha (revisarConclusiones y crearFicha en comparables-result.tsx lo postean tal
+  // cual), así que un estado separado quedaba huérfano — se fusionaba solo para la búsqueda de
+  // comparables (/api/acm/comparables) y nunca llegaba a la creación de la ficha ni al render.
+  descripcion_ia: "",
+  incluir_desc_ficha: true,
+  incluir_linderos: false,
 };
 
 // Componente principal del ACM (lo reutilizan tanto el asesor como el director).
@@ -47,10 +55,19 @@ export function AcmModule() {
   const [sujeto, setSujeto] = useState<Sujeto>(SUJETO_INICIAL);
   const [operacion, setOperacion] = useState<Operacion>("venta");
   const [considerarPh, setConsiderarPh] = useState(true); // ACM: considerar PH como comparables (solo aplica a Casa)
+  // Barrios linderos: apagado por defecto. Un comparable de Núñez en un ACM de Belgrano
+  // es técnicamente defendible pero le rompe la confianza al cliente, así que se pide.
+  const [incluirLinderos, setIncluirLinderos] = useState(false);
   const [excludeId, setExcludeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"input" | "results">("input");
-  const [results, setResults] = useState<{ cartera: AcmComparable[]; roomix: AcmComparable[]; conSemantica: boolean } | null>(null);
+  const [results, setResults] = useState<{
+    cartera: AcmComparable[];
+    roomix: AcmComparable[];
+    conSemantica: boolean;
+    carteraFallo: boolean;
+    roomixFallo: boolean;
+  } | null>(null);
   // Historial "Mis ACM": id de la búsqueda guardada (para linkearle la ficha) + solapa activa.
   const [tab, setTab] = useState<"nuevo" | "historial">("nuevo");
   const [searchId, setSearchId] = useState<string | null>(null);
@@ -63,6 +80,7 @@ export function AcmModule() {
     setSujeto(SUJETO_INICIAL);
     setOperacion("venta");
     setConsiderarPh(true);
+    setIncluirLinderos(false);
     setExcludeId(null);
   };
 
@@ -72,15 +90,44 @@ export function AcmModule() {
       const res = await fetch("/api/acm/comparables", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sujeto, operacion, exclude_id: excludeId, considerar_ph: considerarPh }),
+        body: JSON.stringify({
+          // incluir_linderos viaja DENTRO de sujeto (no aparte) para que quede en el
+          // snapshot de acm_searches.sujeto y "Mis ACM" pueda reabrir la búsqueda sabiendo
+          // qué modo la produjo — ver el comentario de Sujeto.incluir_linderos.
+          sujeto: { ...sujeto, descripcion_ia: (sujeto.descripcion_ia || "").trim(), incluir_linderos: incluirLinderos },
+          operacion,
+          exclude_id: excludeId,
+          considerar_ph: considerarPh,
+        }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      setResults({ cartera: data.cartera || [], roomix: data.roomix || [], conSemantica: data.meta?.con_semantica ?? false });
+      const carteraFallo = Boolean(data.meta?.cartera_fallo);
+      const roomixFallo = Boolean(data.meta?.roomix_fallo);
+      setResults({
+        cartera: data.cartera || [],
+        roomix: data.roomix || [],
+        conSemantica: data.meta?.con_semantica ?? false,
+        carteraFallo,
+        roomixFallo,
+      });
       setSearchId(data.search_id ?? null);
       setRefreshKey((k) => k + 1); // la búsqueda quedó guardada en "Mis ACM"
       setView("results");
-      if ((data.meta?.total ?? 0) === 0) toast.info("No se encontraron comparables con estos criterios. Probá ampliar la zona o cambiar la operación.");
+      // La búsqueda en cartera y/o en la red puede fallar (ej. timeout) sin que el endpoint
+      // devuelva un error general — cartera/roomix simplemente vienen vacíos. Si no se avisa
+      // acá, el asesor ve "sin comparables" y lo confunde con que la zona no tiene nada.
+      if (carteraFallo || roomixFallo) {
+        toast.error(
+          carteraFallo && roomixFallo
+            ? "No pudimos completar la búsqueda ni en tu cartera ni en la red de comparables. Probá de nuevo o angostá los filtros."
+            : carteraFallo
+              ? "No pudimos completar la búsqueda en tu cartera. Probá de nuevo o angostá los filtros."
+              : "No pudimos completar la búsqueda en la red de comparables. Probá de nuevo o angostá los filtros."
+        );
+      } else if ((data.meta?.total ?? 0) === 0) {
+        toast.info("No se encontraron comparables con estos criterios. Probá ampliar la zona o cambiar la operación.");
+      }
     } catch (e: any) {
       toast.error("Error buscando comparables: " + e.message);
     } finally {
@@ -98,7 +145,25 @@ export function AcmModule() {
       setSujeto({ ...SUJETO_INICIAL, ...(data.sujeto || {}) });
       setOperacion(data.operacion === "alquiler" ? "alquiler" : "venta");
       setExcludeId(data.exclude_id ?? null);
-      setResults({ cartera: data.cartera || [], roomix: data.roomix || [], conSemantica: Boolean(data.con_semantica) });
+      // Restaura el modo de zona con el que se hizo esta búsqueda (ver Sujeto.incluir_linderos).
+      // Ausente (búsquedas guardadas antes de este fix) = false = estricto, el default seguro.
+      setIncluirLinderos(Boolean(data.sujeto?.incluir_linderos));
+      // Búsqueda del historial: es un snapshot ya guardado, no hay una llamada en vivo que
+      // pueda fallar AHORA — pero si la búsqueda ORIGINAL falló parcialmente (cartera y/o red
+      // no completaron, ej. timeout), ese fallo quedó guardado dentro del propio snapshot
+      // (ver /api/acm/comparables y /api/acm/searches/[id]) y hay que seguir mostrándolo: un
+      // estudio incompleto sigue incompleto al reabrirlo, y sin el banner el asesor podría armar
+      // y mandar una ficha con datos que nunca terminaron de traerse (hallazgo I2 de la revisión
+      // final — antes esto se hardcodeaba en `false` con el argumento de que "un snapshot no
+      // puede fallar", que es cierto para la LECTURA de hoy pero ignora que la búsqueda que lo
+      // generó sí pudo haber fallado).
+      setResults({
+        cartera: data.cartera || [],
+        roomix: data.roomix || [],
+        conSemantica: Boolean(data.con_semantica),
+        carteraFallo: Boolean(data.cartera_fallo),
+        roomixFallo: Boolean(data.roomix_fallo),
+      });
       setSearchId(data.id);
       setView("results");
       setTab("nuevo");
@@ -166,6 +231,23 @@ export function AcmModule() {
               onOperacionChange={setOperacion}
               considerarPh={considerarPh}
               onConsiderarPhChange={setConsiderarPh}
+              incluirLinderos={incluirLinderos}
+              onIncluirLinderosChange={setIncluirLinderos}
+              descripcionIa={sujeto.descripcion_ia ?? ""}
+              onDescripcionIaChange={(v) => setSujeto((s) => ({ ...s, descripcion_ia: v }))}
+              incluirDescFicha={sujeto.incluir_desc_ficha ?? true}
+              onIncluirDescFichaChange={(v) => setSujeto((s) => ({ ...s, incluir_desc_ficha: v }))}
+              atributosFotosIa={sujeto.atributos_fotos_ia ?? null}
+              onAtributosFotosIaChange={(a) => setSujeto((s) => ({ ...s, atributos_fotos_ia: a }))}
+              anclajeEstado={sujeto.anclaje_estado_conservacion}
+              anclajeLuminosidad={sujeto.anclaje_luminosidad}
+              onAnclajeChange={(v) =>
+                setSujeto((s) => ({
+                  ...s,
+                  ...(v.estado !== undefined ? { anclaje_estado_conservacion: v.estado } : {}),
+                  ...(v.luminosidad !== undefined ? { anclaje_luminosidad: v.luminosidad } : {}),
+                }))
+              }
               onBuscar={handleBuscar}
               loading={loading}
               excludeId={excludeId}
@@ -180,6 +262,8 @@ export function AcmModule() {
                 cartera={results.cartera}
                 roomix={results.roomix}
                 conSemantica={results.conSemantica}
+                carteraFallo={results.carteraFallo}
+                roomixFallo={results.roomixFallo}
                 searchId={searchId}
                 onFichaCreada={(nuevoId) => {
                   setSearchId(nuevoId);

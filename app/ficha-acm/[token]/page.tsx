@@ -163,6 +163,10 @@ export default async function FichaAcmPage({ params }: { params: { token: string
               <span className="muted">{comparables.length} {comparables.length === 1 ? "comparable analizado" : "comparables analizados"}</span>
             </div>
           </div>
+
+          {subject.descripcion && (
+            <p className="cover-desc">{subject.descripcion}</p>
+          )}
         </div>
 
         <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
@@ -398,7 +402,7 @@ function ComparableSheet({
           <div className="comp-head-l">
             <span className="comp-index" style={{ color: accent }}>Comparable {letra(index)}</span>
             <h2 className="comp-title" style={{ fontFamily: "var(--font-display)", color: primary }}>{c.titulo || c.direccion || "Comparable"}</h2>
-            <p className="muted">{[c.direccion, c.zona].filter(Boolean).join(" · ")}</p>
+            <p className="muted">{[c.direccion, c.zona].filter(Boolean).join(" · ")}{c.zona_score === 50 && <span className="comp-lindero">Barrio lindero</span>}</p>
           </div>
           <div className="comp-price">
             <div className="comp-price-val" style={{ color: primary }}>{fmtMoney(c.precio, c.moneda)}</div>
@@ -487,6 +491,24 @@ const CSS = `
 .cover-meta-block { display: flex; flex-direction: column; gap: 3px; }
 .cover-meta-block .label { font-size: 11px; text-transform: uppercase; letter-spacing: .2em; color: #8a8a8a; }
 .cover-meta-block strong { font-size: 18px; }
+/* Descripción del sujeto en la portada. Mismo criterio que .comp-desc: la hoja es un A4
+   EXACTO, así que además del tope de 700 caracteres al guardar va un clamp duro. Aunque
+   alguien pegue a mano un texto larguísimo, la portada no puede desbordar.
+   A diferencia de ComparableSheet, la portada NO tiene una "esponja" visual (ahí es la
+   foto de .gallery quien absorbe el sobrante); acá el único colchón es el propio
+   flex:1 1 auto de .cover-body dentro de .sheet. Por eso el clamp quedó en 7 líneas
+   (no 8): medido con la altura de impresión FORZADA (.sheet con height:297mm fijo +
+   overflow:hidden, no el min-height de pantalla que puede crecer sin que se note el
+   desborde) y el peor caso real —descripción de 689 caracteres en palabras largas que
+   llena el clamp entero + dirección/barrio/tipo larguísimos que ocupan 2 líneas cada
+   uno— el margen hasta el pie de página dio 318px sobre un clamp de 165px: de sobra,
+   pero 7 líneas en vez de 8 suma otro colchón por las dudas sin perder casi nada de
+   texto real. */
+.cover-desc {
+  margin-top: 26px; font-size: 12.5px; line-height: 1.65; color: #5c5c5c; max-width: 88%;
+  max-height: 145px; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical;
+}
 
 /* Banner de pulso / consolidado (informativo, no llamativo) */
 .pulso { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 10px var(--pad); gap: 16px; }
@@ -509,6 +531,7 @@ const CSS = `
 .comp-price { text-align: right; flex-shrink: 0; }
 .comp-price-val { font-size: 18px; font-weight: 800; }
 .comp-match { display: inline-block; margin-top: 6px; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.comp-lindero { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; background: #f5ead6; color: #8a6320; vertical-align: middle; }
 
 /* Ficha técnica */
 .specs { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin: 11px 0; }

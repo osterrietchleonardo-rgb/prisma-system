@@ -58,9 +58,20 @@ export async function POST(req: Request) {
     // sujeto es Casa Y el cliente destildó la casilla. Cualquier otro caso → false.
     const considerarPh = body.considerar_ph !== false;
     const excludePh = sujeto.tipo_propiedad === "casa" && considerarPh === false;
+    // Zona: por defecto ESTRICTO (mismo barrio + sub-barrios). Los barrios limítrofes
+    // (zona_score 50) solo entran si el asesor los pidió explícitamente. Viaja DENTRO de
+    // `sujeto` (no aparte) para que quede persistido en acm_searches.sujeto y "Mis ACM"
+    // pueda reabrir la búsqueda con el modo correcto. Si el campo no viene, se comporta
+    // estricto: es el arreglo, nunca hereda el default 50 de la función SQL.
+    const zonaMin = sujeto.incluir_linderos === true ? 50 : 70;
     // Sin límites artificiales: el gate de barrio ya acota el universo; traemos todos los
     // comparables del barrio (tope alto por performance del render, configurable por request).
     const limit = Math.min(Number(body.limit) || 50, 100);
+    // Con una descripción real de la propiedad, la similitud descriptiva deja de ser
+    // redundante con las dimensiones duras (tipo/m²/ambientes ya se puntúan aparte) y
+    // pasa a aportar señal propia: de 10 a 20 puntos sobre ~130.
+    const tieneDesc = Boolean((sujeto.descripcion_ia || "").trim());
+    const pesoSemantica = tieneDesc ? 20 : 10;
 
     const m2 = sujetoM2(sujeto);
     const ambientes = sujetoAmbientes(sujeto);
@@ -107,6 +118,8 @@ export async function POST(req: Request) {
         p_obra_sin_dato: obraSinDato,
         p_barrio: sujetoZona,
         p_zona_niveles: true,
+        p_zona_min: zonaMin,
+        p_peso_semantica: pesoSemantica,
         p_m2_cubierta: true,
         p_limit: limit,
       }),
@@ -126,6 +139,8 @@ export async function POST(req: Request) {
         p_obra_sin_dato: obraSinDato,
         p_barrio: sujetoZona,
         p_zona_niveles: true,
+        p_zona_min: zonaMin,
+        p_peso_semantica: pesoSemantica,
         p_m2_cubierta: true,
         p_dedup: true,
         p_excluir_sujeto: true,
@@ -133,8 +148,17 @@ export async function POST(req: Request) {
       }),
     ]);
 
+    // Si la búsqueda en cartera o en la red falla (ej. timeout de Postgres, statement_timeout
+    // 8s en producción), NO hay que devolver "0 comparables" en silencio: para el asesor eso es
+    // indistinguible de "esta zona realmente no tiene comparables". Se loguea el error real Y
+    // se manda un flag en `meta` para que el front avise que el resultado está incompleto.
     if (carteraRes.error) console.error("acm_match_properties error:", carteraRes.error);
     if (roomixRes.error) console.error("acm_match_roomix error:", roomixRes.error);
+    // `let`, no `const`: la segunda tanda de queries (re-traer las filas completas, más abajo)
+    // puede fallar independientemente del RPC y también tiene que poder marcar el fallo — ver
+    // hallazgo I3 de la revisión final.
+    let carteraFallo = Boolean(carteraRes.error);
+    let roomixFallo = Boolean(roomixRes.error);
 
     const carteraRanked = carteraRes.data || [];
     const roomixRanked = roomixRes.data || [];
@@ -159,9 +183,33 @@ export async function POST(req: Request) {
               "id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, tokko_data, assigned_agent"
             )
             .in("id", carteraIds)
-        : Promise.resolve({ data: [] as any[] }),
-      roomixIds.length ? supabase.from("roomix_properties").select("*").in("id", roomixIds) : Promise.resolve({ data: [] as any[] }),
+        : Promise.resolve({ data: [] as any[], error: null as any }),
+      roomixIds.length
+        ? supabase
+            .from("roomix_properties")
+            // Columnas puntuales, NO "*": un "*" trae también la columna `embedding` (768
+            // dimensiones) para hasta 100 filas — un peso extra que es, de por sí, un candidato
+            // plausible al mismo timeout que esta rama existe para dejar de esconder (hallazgo
+            // I3 de la revisión final). Lista acotada a lo que efectivamente lee el `.map` de
+            // abajo (líneas ~265-280).
+            .select(
+              "id, title, address, neighborhood, property_type, area_m2, bedrooms, bathrooms, price, currency, images, canonical_url, roomix_agency_name, date_posted, amenities"
+            )
+            .in("id", roomixIds)
+        : Promise.resolve({ data: [] as any[], error: null as any }),
     ]);
+
+    // Mismo motivo que el RPC de arriba: si esta segunda tanda falla, el resultado quedaría
+    // vacío (`carteraFull.data || []` → `[]`) con un 200 limpio y CERO comparables — exactamente
+    // el estado que este flag existe para evitar. Antes de este fix, `.error` acá nunca se leía.
+    if (carteraFull.error) {
+      console.error("ACM properties (full-row) error:", carteraFull.error);
+      carteraFallo = true;
+    }
+    if (roomixFull.error) {
+      console.error("ACM roomix_properties (full-row) error:", roomixFull.error);
+      roomixFallo = true;
+    }
 
     const tipoLabel = sujeto.tipo_propiedad || "—";
     // En el checklist el estado de obra pisa el número de años (fmtAnios: 0 = a estrenar, -1 = en pozo).
@@ -185,6 +233,7 @@ export async function POST(req: Request) {
           checklist: buildChecklist({
             sub: subs,
             operacion,
+            pesoSemantica,
             sujeto: sujetoForChecklist,
             comp: { tipo: p.property_type || "", zona: [p.city, p.address].filter(Boolean).join(" "), m2: candM2, ambientes: candAmb, dormitorios: candDorm, banos: p.bathrooms ?? null, antiguedad: candAnt, amenities: compAmen },
           }),
@@ -225,6 +274,7 @@ export async function POST(req: Request) {
           checklist: buildChecklist({
             sub: subs,
             operacion,
+            pesoSemantica,
             sujeto: sujetoForChecklist,
             comp: { tipo: r.property_type || "", zona: [r.neighborhood, r.address].filter(Boolean).join(" "), m2: candM2, ambientes: candAmb, dormitorios: candDorm, banos: r.bathrooms ?? null, antiguedad: candAnt, amenities: compAmen },
           }),
@@ -260,7 +310,13 @@ export async function POST(req: Request) {
           operacion,
           sujeto,
           exclude_id: excludeId,
-          resultados: { cartera, roomix, con_semantica: Boolean(embStr) },
+          // `cartera_fallo`/`roomix_fallo` viajan DENTRO de `resultados` (mismo criterio que
+          // `con_semantica`, ya guardado acá): es el único campo de esta fila que
+          // `/api/acm/searches/[id]` devuelve tal cual. Sin esto, reabrir una búsqueda que
+          // falló parcialmente desde "Mis ACM" mostraba el resultado incompleto SIN el banner
+          // rojo — exactamente el bug que 1a9d480 arregló para la búsqueda en vivo, resucitado
+          // en el historial (hallazgo I2 de la revisión final).
+          resultados: { cartera, roomix, con_semantica: Boolean(embStr), cartera_fallo: carteraFallo, roomix_fallo: roomixFallo },
           total_cartera: cartera.length,
           total_roomix: roomix.length,
         })
@@ -280,6 +336,11 @@ export async function POST(req: Request) {
         operacion,
         con_semantica: Boolean(embStr),
         total: cartera.length + roomix.length,
+        // Sigue en 200 (hay resultados parciales aprovechables), pero marcado: el front tiene
+        // que avisarle al asesor que la búsqueda no se completó del todo, nunca mostrar el
+        // resultado parcial como si fuera completo.
+        cartera_fallo: carteraFallo,
+        roomix_fallo: roomixFallo,
       },
     });
   } catch (e: any) {

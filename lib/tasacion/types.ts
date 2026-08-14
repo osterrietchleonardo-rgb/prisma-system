@@ -36,6 +36,30 @@ export interface Sujeto {
   // se ignora: el ACM la compara solo contra propiedades del mismo estado.
   a_estrenar?: boolean;
   en_pozo?: boolean;
+  // Descripción generada por la IA a partir de las fotos y editada por el asesor.
+  // Entra al texto que se embebe para buscar comparables por similitud descriptiva.
+  descripcion_ia?: string;
+  // Si va o no en la ficha que recibe el cliente. Solo aplica si hay descripcion_ia.
+  incluir_desc_ficha?: boolean;
+  // ── 3ra capa de comparación: fotos contra fotos (lib/acm/analisis-fotos.ts) ──
+  // Lo que la IA clasificó a partir de las MISMAS fotos que generaron descripcion_ia. Se guarda
+  // tal cual lo devolvió el modelo, sin corregir — es el "antes" que se le muestra al asesor.
+  atributos_fotos_ia?: import("@/lib/acm/analisis-fotos").AtributosFotoIA | null;
+  // El anclaje que efectivamente se usa para comparar contra cada comparable: arranca en lo
+  // que dijo la IA (atributos_fotos_ia) y el asesor lo corrige con un tap si no coincide con
+  // lo que ve en persona. Mitigación directa del error de anclaje medido en
+  // validacion-holdout.md (el modelo se equivocó calificando al SUJETO mismo en el límite
+  // bueno/excelente, y como el score es relativo al sujeto, ese único error contaminaba las
+  // seis comparaciones a la vez). Ausente = usar atributos_fotos_ia sin corregir.
+  anclaje_estado_conservacion?: import("@/lib/acm/analisis-fotos").EstadoConservacionFoto;
+  anclaje_luminosidad?: import("@/lib/acm/analisis-fotos").LuminosidadFoto;
+  // Si el ACM buscó también en barrios linderos (zona_score 50) o se quedó estricto
+  // (mismo barrio + sub-barrios). Vive acá, no en estado aparte, por el mismo motivo que
+  // descripcion_ia: `sujeto` es lo que efectivamente se guarda en acm_searches.sujeto, así
+  // que es el único lugar desde el que "Mis ACM" puede reconstruir qué modo produjo cada
+  // resultado. Ausente/undefined en una búsqueda vieja = estricto (nunca hereda el default
+  // 50 de la función SQL).
+  incluir_linderos?: boolean;
   estado_conservacion: EstadoConservacion;
   calidad_construccion: CalidadConstruccion;
   dormitorios: number;
