@@ -137,16 +137,24 @@ Las 3 ideas de prueba se borraron. El tablero volvió exactamente a su estado pr
 | publicada | 23 | 23 |
 | rechazada | 15 | 15 |
 
-**Queda pendiente menor:** las portadas que generó el worker para las 3 pruebas siguen en el bucket
-`blog-images`. Son 3 PNG huérfanos, sin fila que los referencie.
+Las 3 portadas que había generado el worker quedaron huérfanas en el bucket `blog-images` y se
+borraron. Se encontraron cruzando las carpetas `linkedin/<id>/` del bucket contra los ids vivos de
+`marketing_ideas`:
+
+| Archivo | Creado | Acción |
+|---|---|---|
+| `linkedin/739531ba…/portada.png` | 14-ago 18:15 | borrado |
+| `linkedin/d3887b5d…/portada.png` | 14-ago 18:16 | borrado |
+| `linkedin/4de56bec…/portada.png` | 14-ago 18:17 | borrado |
+| `linkedin/895b1b89…/portada.png` | **18-jul** 06:00 | **se dejó** — es de la sesión de julio, no de esta prueba |
 
 ## 10. Pendientes anotados
 
-- **Decidir sobre el hallazgo 6** (criterio de "no inventar" en la rúbrica).
-- **`ANTHROPIC_API_KEY` en Vercel y EasyPanel** sigue sin confirmar (viene de
-  `marketing-handoff.md:76-79`). Sin ella en Vercel, "Reformular" falla en producción.
-- **Actualizar `docs/interno/marketing-handoff.md`** con los ejes nuevos y con cómo se agrega un
-  cluster o una escena por SQL, antes del merge a `main`.
+- **Decidir sobre el hallazgo 6** (criterio de "no inventar" en la rúbrica). Es el único pendiente
+  que sale de este trabajo.
+- **`ANTHROPIC_API_KEY` en Vercel: confirmado por Leo el 14-ago-2026.** Queda solo EasyPanel sin
+  confirmar (no se puede chequear desde acá).
 - **El worker no está en git.** Sus cambios se versionan como copias en
   `docs/interno/worker-snapshots/`. Si esa carpeta de `Prisma - MK` se pierde, el snapshot es la
   única copia.
+- **Una portada huérfana de julio** sigue en el bucket (ver tabla de arriba). No es de este trabajo.
