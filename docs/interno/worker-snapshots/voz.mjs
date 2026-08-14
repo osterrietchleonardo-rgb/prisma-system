@@ -1,40 +1,32 @@
+// Espejo de lib/admin-vakdor/marketing/voz.ts en la app: si cambia uno, cambian los dos.
+// El diseño descansa en sincronización manual; mantenlos juntos.
+
 /**
  * Canon de voz del motor de contenido. La fuente de verdad del CONTENIDO
  * (canon, estructuras, escenas) es la tabla `marketing_recursos`; acá vive
  * el fallback mínimo y toda la lógica pura que no depende de la base.
  */
 
-export type EtapaEmbudo = "tofu" | "mofu" | "bofu"
-
-export type ClaveEstructura =
-  | "confesion" | "concesion_vuelta" | "escena_campo" | "contraste"
-  | "autopsia" | "mito_realidad" | "carta_director" | "numero_duele"
-  | "framework_pasos"
-
-export type ClaveComentario =
-  | "dato_crudo" | "opinion_filosa" | "matiz" | "micro_caso" | "pregunta_binaria"
-
-/** El PARA QUÉ de la pieza. No dicta la forma: restringe qué estructuras se sortean. */
-export type ClaveProposito =
-  | "convencer" | "ensenar" | "mostrar_detras" | "probar_con_dato" | "reflexionar"
-
-/** El momento del que habla una escena. Se ata a la etapa del embudo. */
-export type Momento = "dolor" | "intento_fallido" | "resuelto"
-
 /**
- * Set conocido para tipar. NO es un validador: si lo fuera, una estructura insertada
- * en la base se descartaría en silencio y la idea quedaría con `estructura: null`.
- * La validación real la hace `claveValida` contra las claves activas de la base.
+ * Set conocido. NO es un validador: si lo fuera, una estructura insertada en la base
+ * se descartaria en silencio. La validacion real la hace `claveValida` contra las
+ * claves activas de la base, para que ampliar el banco sea SQL y no codigo.
  */
-export const CLAVES_ESTRUCTURA: readonly ClaveEstructura[] = [
+export const CLAVES_ESTRUCTURA = [
   "confesion", "concesion_vuelta", "escena_campo", "contraste",
   "autopsia", "mito_realidad", "carta_director", "numero_duele",
   "framework_pasos",
-] as const
+]
 
-export const CLAVES_COMENTARIO: readonly ClaveComentario[] = [
+export const CLAVES_COMENTARIO = [
   "dato_crudo", "opinion_filosa", "matiz", "micro_caso", "pregunta_binaria",
-] as const
+]
+
+export const CLAVES_PROPOSITO = [
+  "convencer", "ensenar", "mostrar_detras", "probar_con_dato", "reflexionar",
+]
+
+export const MOMENTOS = ["dolor", "intento_fallido", "resuelto"]
 
 /** Se usa solo si la tabla marketing_recursos está vacía o no responde. */
 export const CANON_FALLBACK = `Escribís como alguien que está adentro del rubro inmobiliario.
@@ -51,23 +43,23 @@ Español rioplatense natural. Segunda persona. Cero emojis. Viñetas con •.`
  * nunca — es la del post de mayor rendimiento histórico de Vakdor
  * ("Automatizar no es poner un bot", 3.280 impresiones).
  */
-export const MULETILLAS: readonly string[] = [
+export const MULETILLAS = [
   "en un mundo donde", "hoy más que nunca", "la realidad es que",
   "el secreto está en", "imaginá por un momento",
   "y acá está la clave", "spoiler", "déjame decirte", "aprovechar al máximo",
   "revolucionar", "potenciar", "sinergia", "qué opinás",
-] as const
+]
 
-function normalizar(texto: string): string {
+function normalizar(texto) {
   return texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 }
 
-export function detectarMuletillas(texto: string): string[] {
+export function detectarMuletillas(texto) {
   const plano = normalizar(texto)
   return MULETILLAS.filter((m) => plano.includes(normalizar(m)))
 }
 
-export function instruccionCta(etapa: EtapaEmbudo): string {
+export function instruccionCta(etapa) {
   switch (etapa) {
     case "tofu":
       return `CIERRE (TOFU · descubrimiento): el objetivo es que tome conciencia del problema.
@@ -89,51 +81,41 @@ Urgencia sin ruego: no supliques la visita.`
 
 /**
  * Cada etapa del embudo tira de un momento distinto de la escena. Antes las tres
- * sorteaban de la misma bolsa de dolor y BOFU tenía que improvisar el "así se ve resuelto".
+ * sorteaban de la misma bolsa de dolor y BOFU improvisaba el "asi se ve resuelto".
  */
-export function momentoDeEtapa(etapa: EtapaEmbudo): Momento {
+export function momentoDeEtapa(etapa) {
   switch (etapa) {
     case "tofu": return "dolor"
     case "mofu": return "intento_fallido"
     case "bofu": return "resuelto"
+    default: return "intento_fallido"
   }
 }
 
 /**
- * El propósito NO dicta la forma: restringe qué estructuras pueden sortearse.
- * Si el filtro deja el pool vacío devuelve todas — una estructura menos afín es
- * mejor que ninguna, y bloquear la generación no es una opción.
+ * El proposito NO dicta la forma: restringe que estructuras pueden sortearse.
+ * Si el filtro deja el pool vacio devuelve todas — una estructura menos afin es
+ * mejor que ninguna, y bloquear la generacion no es una opcion.
  */
-export function estructurasCompatibles<T extends { propositos?: string[] }>(
-  estructuras: T[],
-  proposito: string | null,
-): T[] {
+export function estructurasCompatibles(estructuras, proposito) {
   if (!proposito) return estructuras
   const afines = estructuras.filter((e) => (e.propositos ?? []).includes(proposito))
   return afines.length ? afines : estructuras
 }
 
-/**
- * Valida una clave contra las que existen HOY en la base, no contra una lista cerrada
- * en código. Es lo que permite agregar estructuras, comentarios o propósitos con un
- * INSERT y que el motor los acepte sin desplegar.
- */
-export function claveValida(claves: string[], candidata: unknown): string | null {
+/** Valida una clave contra las que existen HOY en la base, no contra una lista de codigo. */
+export function claveValida(claves, candidata) {
   if (typeof candidata !== "string") return null
   const limpia = candidata.trim().toLowerCase()
   return claves.includes(limpia) ? limpia : null
 }
 
 /**
- * `detalle` es el texto que vive en la fila de `marketing_recursos`. Si no viene (o
- * viene vacío) se cae al texto de acá, con el mismo criterio de falla suave que canonDeVoz.
+ * `detalle` es el texto que vive en la fila de marketing_recursos. Si no viene (o viene
+ * vacio) se cae al texto de aca, con el mismo criterio de falla suave que canonDeVoz.
  */
-export function instruccionComentario(
-  clave: ClaveComentario,
-  etapa: EtapaEmbudo,
-  detalle?: string | null,
-): string {
-  const cuerpos: Record<ClaveComentario, string> = {
+export function instruccionComentario(clave, etapa, detalle) {
+  const cuerpos = {
     dato_crudo: "Un número real del negocio con el contexto que lo hace doler. No pidas nada. Dos o tres líneas.",
     opinion_filosa: "Una postura más dura que la del post, que el post no se animó a decir. Controversia sobre el negocio, nunca agravio a personas.",
     matiz: 'La excepción honesta: "esto no aplica si...". Demostrá que conocés los bordes del problema.',
@@ -147,7 +129,7 @@ export function instruccionComentario(
   return `PRIMER COMENTARIO (tipo: ${clave}). ${cuerpo} ${link}`
 }
 
-export const RUBRICA: readonly string[] = [
+export const RUBRICA = [
   "La primera línea es una escena o situación concreta, no una tesis abstracta.",
   "Hay una posición: se afirma algo que alguien podría discutir.",
   "Hay un giro (concesión y vuelta, o expectativa rota).",
@@ -155,9 +137,9 @@ export const RUBRICA: readonly string[] = [
   "No repite la apertura ni el argumento central de las piezas anteriores.",
   "El CTA corresponde a la etapa del embudo y el link está donde corresponde.",
   "No usa muletillas de IA.",
-] as const
+]
 
-export function promptRevision(texto: string, etapa: EtapaEmbudo, hooksPrevios: string[]): string {
+export function promptRevision(texto, etapa, hooksPrevios) {
   return [
     `Sos el editor. Evaluá esta pieza (etapa del embudo: ${etapa.toUpperCase()}) contra la rúbrica.`,
     `RÚBRICA:\n${RUBRICA.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
