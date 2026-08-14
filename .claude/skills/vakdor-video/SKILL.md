@@ -113,6 +113,14 @@ los botones: lo que quede ahí, no se lee.
 - **Los 9 presets de color son los mismos que en Remotion**, así que un mismo look se ve igual venga
   del motor que venga.
 
+### 📐 Antes de editar un reel, leer esto
+
+**`references/estilo-reel-vakdor.md`** — la receta destilada de editar videos reales de Leonardo:
+estructura (portada → cuerpo → cierre), cuándo va cada pieza gráfica, los valores de cámara que
+quedaron después de dos rondas de "está muy movido", dónde va cada cosa en el cuadro, cómo se
+escribe el copy, y **el inventario completo de lo que la skill puede hacer** para no limitarse a
+lo ya usado.
+
 Diseño completo y mediciones en `docs/superpowers/specs/2026-08-11-vakdor-video-studio-hibrido-design.md`.
 Ahí está por qué el zoom usa sobre-muestreo 3× y por qué el bokeh se descartó.
 
