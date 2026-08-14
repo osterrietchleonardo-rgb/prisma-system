@@ -142,7 +142,10 @@ const MINIMO_CATEGORIAS = 3;
  * Devuelve null si no se pudo ubicar la propiedad o si no hay datos suficientes.
  */
 export async function obtenerZona(
-  supabase: { rpc: (fn: string, args: any) => Promise<{ data: any; error: any }> },
+  // PromiseLike y no Promise: el `rpc` de Supabase devuelve un constructor de consulta que se
+  // puede esperar con await, pero no es una Promise (no tiene catch ni finally). Pedir Promise
+  // acá hace que no compile con el cliente real.
+  supabase: { rpc: (fn: string, args: any) => PromiseLike<{ data: any; error: any }> },
   direccion: string,
   barrio: string
 ): Promise<ZonaCalculada | null> {
