@@ -238,7 +238,10 @@ async function poisEspaciosVerdes() {
     const geom = (f.geometry || "").trim()
     if (!geom) return []
     return [{
-      ext_id: String(f.id), nombre: (f.nombre || f.nom_mapa || "Espacio verde").trim(),
+      // Sin nombre se guarda VACIO, no "Espacio verde": el nombre inventado hacía que la
+      // consulta no pudiera distinguir un parque anónimo de uno con nombre propio, y la hoja
+      // terminaba diciendo "el espacio verde más cercano es Espacio verde".
+      ext_id: String(f.id), nombre: (f.nombre || f.nom_mapa || "").trim(),
       subtipo: (f.clasificac || "").trim() || null,
       direccion: (f.ubicacion || "").trim() || null,
       barrio: (f.barrio || "").trim() || null, comuna: Number(f.comuna) || null,
