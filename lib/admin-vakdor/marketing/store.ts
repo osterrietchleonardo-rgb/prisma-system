@@ -20,6 +20,37 @@ export async function listarIdeas(): Promise<MarketingIdea[]> {
   return (data ?? []) as unknown as MarketingIdea[]
 }
 
+export interface Eje {
+  clave: string
+  titulo: string
+}
+
+export interface Ejes {
+  clusters: Eje[]
+  propositos: Eje[]
+}
+
+/**
+ * Los ejes que existen HOY en la base, para los selectores y los badges del panel.
+ * Se leen en cada carga (no se hardcodean) para que agregar un cluster o un propósito
+ * por SQL aparezca en la pantalla sin desplegar.
+ *
+ * Falla suave a listas vacías: sin ejes el tablero se usa igual, solo que sin selectores.
+ */
+export async function listarEjes(): Promise<Ejes> {
+  const db = getAdminDb()
+  const [cl, pr] = await Promise.all([
+    db.from("marketing_clusters").select("clave, titulo").eq("activo", true).order("clave"),
+    db.from("marketing_recursos").select("clave, titulo").eq("tipo", "proposito").eq("activo", true).order("clave"),
+  ])
+  if (cl.error) console.error(`listarEjes(clusters): ${cl.error.message}`)
+  if (pr.error) console.error(`listarEjes(propositos): ${pr.error.message}`)
+  return {
+    clusters: (cl.data ?? []) as Eje[],
+    propositos: ((pr.data ?? []) as Eje[]).filter((p) => typeof p.clave === "string"),
+  }
+}
+
 export async function crearIdeaManual(input: NuevaIdeaInput): Promise<MarketingIdea> {
   const db = getAdminDb()
   const { data, error } = await db
