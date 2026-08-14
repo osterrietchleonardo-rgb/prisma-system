@@ -5,7 +5,7 @@
 // rastrearse a la lista que se le pasó — por eso los datos van en cuadras YA convertidas y no
 // en metros: si el modelo tuviera que dividir por cien, tendríamos aritmética de un LLM en un
 // documento firmado por la inmobiliaria.
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, type GenerationConfig } from "@google/generative-ai";
 import { cuadrasEnPalabras } from "./zona-formato";
 import type { FichaZonaPoi } from "./ficha";
 
@@ -143,6 +143,9 @@ export async function generarRelato(datos: DatosRelato): Promise<string> {
     // Mismo modelo que ya usa el ACM para analizar fotos.
     const model = genAI.getGenerativeModel({
       model: "gemini-3.5-flash",
+      // El cast es porque los tipos de @google/generative-ai instalados son anteriores a
+      // `thinkingConfig`. La API SI lo acepta — verificado midiendo el uso de tokens: con el
+      // pensamiento encendido, `thoughtsTokenCount` era 1.917; apagándolo, desaparece.
       generationConfig: {
         // Temperatura baja: acá no queremos creatividad, queremos que se ciña a la lista.
         temperature: 0.4,
@@ -153,7 +156,7 @@ export async function generarRelato(datos: DatosRelato): Promise<string> {
         // MAX_TOKENS. Para narrar una lista de hechos ya calculados, razonar no aporta nada:
         // apagarlo arregla el corte, sale más rápido y sale más barato.
         thinkingConfig: { thinkingBudget: 0 },
-      },
+      } as GenerationConfig & { thinkingConfig: { thinkingBudget: number } },
     });
     const r = await model.generateContent(construirPromptZona(datos));
     return sanearRelato(r.response.text());
