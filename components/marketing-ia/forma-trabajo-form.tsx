@@ -111,7 +111,8 @@ export function FormaTrabajoForm() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500">
-      <MarketingIAStepper steps={PASOS} currentStep={paso} className="mb-8" />
+      {/* px en celular: el stepper flota la etiqueta del paso activo sobre el círculo y se cortaba contra el borde */}
+      <MarketingIAStepper steps={PASOS} currentStep={paso} className="mb-8 px-14 sm:px-0" />
 
       <Card className="border-accent/10 shadow-xl">
         <CardHeader>
