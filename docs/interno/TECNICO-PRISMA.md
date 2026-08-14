@@ -1161,6 +1161,16 @@ Secretos necesarios: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_API_KEY_MANAGEMENT`,
 `SITE_DOMAIN`, `CRON_SECRET`. En Vercel: `NEXT_PUBLIC_MAPTILER_KEY` (sin ella el mapa usa
 OpenStreetMap, que funciona igual).
 
+**El `CRON_SECRET` va en la cabecera, nunca en la URL.** `assertCron()`
+(`lib/admin-vakdor/cron-auth.ts`) solo lee `Authorization: Bearer <secreto>` y falla
+cerrado; un `?secret=` da **401**. `mapa-refrescar.yml` lo mandaba por la URL y cobraba 401
+en cada corrida programada — 8 segundos y a otra cosa. La falla era invisible desde la
+app: los **pines** se leen de la base en vivo y seguían apareciendo, así que lo único que
+quedaba viejo eran los **colores del precio por m², el ranking de barrios y el catálogo de
+barrios del buscador**, que son los precalculados. Ojo al comparar con otros crons:
+`market-sync.yml` sí usa `?secret=` **porque `/api/mercado/sync` no usa `assertCron()`**,
+lee el parámetro a mano.
+
 La cola de trazado la arma la base sola: busca las propiedades que no caen dentro de
 ninguna manzana. Si la red publica en una zona nueva, se traza esa misma noche.
 
