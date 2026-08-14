@@ -1,5 +1,8 @@
 import { getGoogleAccessToken } from "@/lib/admin-vakdor/finance/google-auth"
 import { getAdminDb } from "@/lib/admin-vakdor/logger"
+import { filtrarOportunidades, type GscOportunidad } from "./gsc-oportunidades"
+
+export type { GscOportunidad }
 
 const GA_PROPERTY_ID = "526455345"
 const GSC_SITE_URL = "https://www.vakdor.com/"
@@ -99,6 +102,8 @@ export interface MarketingMetricsPayload {
   sources: SourceHealth
   periodo: "7d" | "30d" | "90d"
   gscQueries: GscQuery[]
+  /** Búsquedas en posición 4-20: conviene mejorar esas páginas antes de escribir una nueva. */
+  gscOportunidades: GscOportunidad[]
   bufferStats: {
     totalPosts: number
     totalImpressions: number
@@ -520,6 +525,51 @@ export async function fetchGscQueries(periodo: "7d" | "30d" | "90d"): Promise<{ 
 }
 
 /**
+ * Oportunidades SEO (posición 4-20).
+ *
+ * Consulta APARTE de fetchGscQueries: pide la dimensión `page` además de `query`, lo que
+ * multiplica las filas. Meterlo en la otra consulta rompería lo que ya se muestra bien.
+ * Falla suave: sin datos el motor genera ideas igual y el panel muestra el estado.
+ */
+export async function fetchGscOportunidades(
+  periodo: "7d" | "30d" | "90d",
+): Promise<{ data: GscOportunidad[]; estado: SourceHealth["gsc"] }> {
+  try {
+    const token = await getGoogleAccessToken("https://www.googleapis.com/auth/webmasters.readonly")
+    const days = getPeriodDays(periodo)
+    const end = new Date(Date.now() - 86400000)
+    const start = new Date(Date.now() - days * 86400000)
+    const iso = (d: Date) => d.toISOString().slice(0, 10)
+
+    const res = await fetchWithTimeout(
+      `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE_URL)}/searchAnalytics/query`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startDate: iso(start),
+          endDate: iso(end),
+          dimensions: ["query", "page"],
+          rowLimit: 200,
+        }),
+        cache: "no-store",
+      },
+      3500
+    )
+
+    if (res.ok) {
+      const data = await res.json()
+      return { data: filtrarOportunidades(data.rows ?? []), estado: "ok" }
+    }
+    console.error("GSC oportunidades respondió", res.status)
+  } catch (err) {
+    console.error("GSC oportunidades fetch error:", err)
+  }
+
+  return { data: [], estado: "error" }
+}
+
+/**
  * Consulta a Buffer (GraphQL API)
  */
 export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise<{
@@ -656,12 +706,13 @@ export async function fetchMarketingContentStats(): Promise<ContentDistribution>
  * Orquestador de payload
  */
 export async function loadMarketingMetricsPayload(periodo: "7d" | "30d" | "90d"): Promise<MarketingMetricsPayload> {
-  const [ga4, gsc, buffer, contentDistribution, clarity] = await Promise.all([
+  const [ga4, gsc, buffer, contentDistribution, clarity, oportunidades] = await Promise.all([
     fetchGa4Metrics(periodo),
     fetchGscQueries(periodo),
     fetchBufferRanking(periodo),
     fetchMarketingContentStats(),
     fetchClarityMetrics(),
+    fetchGscOportunidades(periodo),
   ])
 
   return {
@@ -676,6 +727,7 @@ export async function loadMarketingMetricsPayload(periodo: "7d" | "30d" | "90d")
     },
     periodo,
     gscQueries: gsc.data,
+    gscOportunidades: oportunidades.data,
     bufferStats: buffer.data,
     contentDistribution,
     overallStats: ga4.overallStats,
