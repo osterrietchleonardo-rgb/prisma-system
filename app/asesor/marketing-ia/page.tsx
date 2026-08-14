@@ -6,7 +6,8 @@ import { IpcManager } from "@/components/marketing-ia/ipc-manager"
 import { CopyGeneratorFlow } from "@/components/marketing-ia/copy-generator-flow"
 import { MarketingHistory } from "@/components/marketing-ia/marketing-history"
 import { AdGuide } from "@/components/marketing-ia/ad-guide"
-import { Bot, UserSearch, History, Sparkles, BookOpen } from "lucide-react"
+import { FormaTrabajoForm } from "@/components/marketing-ia/forma-trabajo-form"
+import { Bot, UserSearch, History, Sparkles, BookOpen, Briefcase } from "lucide-react"
 import { AiCreditBadge } from "@/components/ai-credit-badge"
 
 export default function MarketingIAPage() {
@@ -38,12 +39,15 @@ export default function MarketingIAPage() {
         </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 h-14 bg-muted/50 p-1 rounded-xl overflow-x-auto scrollbar-none">
+        <TabsList className="grid w-full grid-cols-5 h-14 bg-muted/50 p-1 rounded-xl overflow-x-auto scrollbar-none">
           <TabsTrigger value="copys" className="text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <Sparkles className="w-4 h-4 mr-2" /> Crear Anuncio
           </TabsTrigger>
           <TabsTrigger value="ipcs" className="text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <UserSearch className="w-4 h-4 mr-2" /> Clientes Ideales (IPC)
+          </TabsTrigger>
+          <TabsTrigger value="forma-trabajo" className="text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
+            <Briefcase className="w-4 h-4 mr-2" /> Mi Forma de Trabajar
           </TabsTrigger>
           <TabsTrigger value="history" className="text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <History className="w-4 h-4 mr-2" /> Mis Generaciones
@@ -59,6 +63,10 @@ export default function MarketingIAPage() {
 
         <TabsContent value="ipcs" className="mt-8">
           <IpcManager />
+        </TabsContent>
+
+        <TabsContent value="forma-trabajo" className="mt-8">
+          <FormaTrabajoForm />
         </TabsContent>
 
         <TabsContent value="history" className="mt-8">

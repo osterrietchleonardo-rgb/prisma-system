@@ -108,7 +108,12 @@ export interface CopyContent {
   agitacion?: string;
   solucion?: string;
   desarrollo?: string;
-  cta: string;
+  /** Opcional desde los guiones por bloques: ahí el CTA es el último bloque. */
+  cta?: string;
+  // ─── Guiones de video con estructura elegible ───
+  estructura?: EstructuraId;
+  duracion_estimada?: number;
+  bloques?: BloqueGuion[];
 }
 
 export interface CopyDraft {
@@ -157,4 +162,70 @@ export interface GenerateImagePayload {
   format: ImageFormat;
   style: ImageStyle;
   extra_prompt?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Forma de trabajar del asesor (oferta irresistible, fórmula de Hormozi)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type EstructuraId = 'variante_1' | 'variante_2' | 'aida' | 'pas' | 'bab' | 'storytelling';
+
+// OJO: los tres bloques van como `type` y no como `interface` a propósito. Una interface no tiene
+// índice implícito, así que `Partial<PerfilOperacion>` NO sería asignable a `Record<string, unknown>`
+// y el recorrido genérico de campos (lib/marketing-ia/operacion-context.ts) no compilaría.
+
+export type PerfilOperacion = {
+  anios_experiencia: string;
+  matricula: string;
+  zona_dominio: string;
+  especialidad: string;
+  operaciones_cerradas: string;
+  casos_reales: string;
+  servicio_incluye: string;
+  no_prometer: string;
+};
+
+export type CaptacionOperacion = {
+  propiedades_vendidas_6m: string;
+  porcentaje_acm: string;
+  diferencial_confianza: string;
+  compradores_activos: string;
+  tiempo_entrega_acm: string;
+  tiempo_primera_oferta: string;
+  diferencial_esfuerzo: string;
+};
+
+export type VentaOperacion = {
+  diferencial_confianza: string;
+  rebaja_promedio: string;
+  exclusivas_offmarket: string;
+  tiempo_primera_seleccion: string;
+  semanas_hasta_reserva: string;
+  diferencial_esfuerzo: string;
+};
+
+/** Una fila por usuario en la tabla advisor_operations. */
+export interface AdvisorOperation {
+  id: string;
+  user_id: string;
+  perfil: Partial<PerfilOperacion>;
+  captacion: Partial<CaptacionOperacion>;
+  venta: Partial<VentaOperacion>;
+  oferta_captacion: string | null;
+  oferta_venta: string | null;
+  oferta_captacion_editada: boolean;
+  oferta_venta_editada: boolean;
+  ofertas_generadas_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Un bloque de un guion de video ya generado (lo que el asesor lee a cámara). */
+export interface BloqueGuion {
+  id: string;
+  titulo: string;
+  texto: string;
+  segundos: number;
+  indicacion: string;
+  por_que: string;
 }
