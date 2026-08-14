@@ -220,7 +220,29 @@ que sea, resta: hace que el video se vea "editado" en vez de sólido.
 
 ---
 
-## 9. Tiempos reales (12 núcleos, Radeon con h264_amf)
+## 9. Usar la máquina, siempre
+
+**Regla:** en video no se renderiza en CPU por defecto. La máquina de Leonardo tiene **12 núcleos,
+15 GB y una Radeon con `h264_amf`**, y usarla no es una optimización opcional: es la diferencia
+entre 2 minutos y 30 segundos en cada paso, varias veces por video.
+
+| Paso | Cómo se acelera |
+|---|---|
+| Cualquier encode de video | `-c:v h264_amf -quality quality -rc cqp -qp_i 17 -qp_p 17` en vez de `libx264 -preset slow` |
+| Unir portada + cuerpo + cierre | mismo `h264_amf`; el concat baja a ~17 s |
+| Dibujar tarjetas y portadas | `ProcessPoolExecutor` sobre 10 núcleos (`tools/tarjetas.py` ya lo hace) |
+| Elegir encoder | `lib/encoder.mjs` prueba AMF → NVENC → QSV → CPU y avisa cuál usó |
+
+**Lo único que no se puede acelerar hoy:** el sobre-muestreo 3× del zoom es CPU. No hay escalador
+por GPU disponible en este equipo — `scale_vulkan` no inicializa, y `scale_cuda`/`scale_qsv` piden
+NVIDIA o Intel. Ese paso es el techo (~2 m 50 para 36 s de video con movimiento).
+
+**Excepción:** el master de trabajo y las piezas cortas (portada, cierre) pueden ir en CPU si la
+calidad manda, porque duran segundos. Para el cuerpo del video, siempre GPU.
+
+---
+
+## 10. Tiempos reales (12 núcleos, Radeon con h264_amf)
 
 | Paso | Tiempo | Nota |
 |---|---|---|
