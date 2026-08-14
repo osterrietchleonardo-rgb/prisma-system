@@ -150,4 +150,22 @@ describe("rúbrica", () => {
   it("aclara que el primer comentario no está en la PIEZA, para no pedir el link en el cuerpo", () => {
     expect(promptRevision("PIEZA", "bofu", [])).toMatch(/primer comentario no está incluido/i)
   })
+
+  // El criterio extra es solo para artículos: en LinkedIn cada criterio de más sube los
+  // reintentos, y un reintento es una llamada paga en el formato que más se publica.
+  it("con keyword suma el criterio de respuesta temprana", () => {
+    const p = promptRevision("PIEZA", "mofu", [], { keyword: "leads inmobiliarios" })
+    expect(p).toContain("leads inmobiliarios")
+    expect(p).toMatch(/primeras 100 palabras/)
+    expect(p).toMatch(new RegExp(`${RUBRICA.length + 1}\\. La búsqueda objetivo`))
+  })
+
+  it("sin keyword la rúbrica queda igual que hoy", () => {
+    expect(promptRevision("PIEZA", "mofu", [])).not.toMatch(/primeras 100 palabras/)
+  })
+
+  it("una keyword vacía o de espacios no agrega criterio", () => {
+    expect(promptRevision("PIEZA", "mofu", [], { keyword: "  " })).not.toMatch(/primeras 100 palabras/)
+    expect(promptRevision("PIEZA", "mofu", [], { keyword: null })).not.toMatch(/primeras 100 palabras/)
+  })
 })

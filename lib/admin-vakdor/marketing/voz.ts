@@ -157,10 +157,26 @@ export const RUBRICA: readonly string[] = [
   "No usa muletillas de IA.",
 ] as const
 
-export function promptRevision(texto: string, etapa: EtapaEmbudo, hooksPrevios: string[]): string {
+/**
+ * `keyword` suma un criterio extra a la rúbrica. Se pasa SOLO para artículos de blog:
+ * en LinkedIn cada criterio de más sube los reintentos, y un reintento es una llamada
+ * paga en el formato que más se publica.
+ */
+export function promptRevision(
+  texto: string,
+  etapa: EtapaEmbudo,
+  hooksPrevios: string[],
+  { keyword }: { keyword?: string | null } = {},
+): string {
+  const criterios = [...RUBRICA]
+  if (keyword?.trim()) {
+    criterios.push(
+      `La búsqueda objetivo «${keyword.trim()}» aparece en el primer párrafo, y la pregunta que implica queda respondida dentro de las primeras 100 palabras.`,
+    )
+  }
   return [
     `Sos el editor. Evaluá esta pieza (etapa del embudo: ${etapa.toUpperCase()}) contra la rúbrica.`,
-    `RÚBRICA:\n${RUBRICA.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
+    `RÚBRICA:\n${criterios.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
     // Sin esto, el criterio 6 le pedía al juez que evaluara una regla que nunca le dijimos: la
     // instrucción de CTA por etapa iba solo al prompt de escritura. Acá va la hoja de respuestas.
     `REGLA DE CIERRE DE ESTA ETAPA (es la respuesta del criterio 6):\n${instruccionCta(etapa)}`,

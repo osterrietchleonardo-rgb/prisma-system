@@ -4,7 +4,8 @@ import type {
 } from "./types"
 
 const COLS =
-  "id, estado, fuente, formato, funnel, titulo, angulo, estructura, gancho, contenido, " +
+  "id, estado, fuente, formato, funnel, cluster, proposito, keyword_objetivo, " +
+  "titulo, angulo, estructura, gancho, contenido, " +
   "primer_comentario, hashtags, motivo, comentario, brief, blog, assets, " +
   "programada_para, publicado_en, origen, historial, created_at, updated_at"
 
@@ -28,6 +29,9 @@ export async function crearIdeaManual(input: NuevaIdeaInput): Promise<MarketingI
       fuente: input.fuente,
       formato: input.formato,
       funnel: input.funnel ?? null,
+      cluster: input.cluster ?? null,
+      proposito: input.proposito ?? null,
+      keyword_objetivo: input.keyword_objetivo ?? null,
       angulo: input.angulo ?? null,
       estructura: input.estructura ?? null,
       gancho: input.gancho ?? null,
@@ -54,6 +58,9 @@ export async function insertarIdeasMotor(ideas: NuevaIdeaInput[]): Promise<numbe
     fuente: i.fuente,
     formato: i.formato,
     funnel: i.funnel ?? null,
+    cluster: i.cluster ?? null,
+    proposito: i.proposito ?? null,
+    keyword_objetivo: i.keyword_objetivo ?? null,
     angulo: i.angulo ?? null,
     estructura: i.estructura ?? null,
     gancho: i.gancho ?? null,
@@ -225,6 +232,9 @@ export async function duplicarIdea(id: string): Promise<MarketingIdea> {
       fuente: original.fuente,
       formato: original.formato,
       funnel: original.funnel ?? null,
+      cluster: original.cluster ?? null,
+      proposito: original.proposito ?? null,
+      keyword_objetivo: original.keyword_objetivo ?? null,
       angulo: original.angulo ?? null,
       estructura: original.estructura ?? null,
       gancho: original.gancho ?? null,

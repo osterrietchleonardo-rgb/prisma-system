@@ -226,6 +226,46 @@ export function formatearMemoria(piezas) {
   ].join("\n\n");
 }
 
+/**
+ * Territorio de la pieza. Devuelve null (y no tira) si la idea no tiene cluster o si la
+ * tabla no responde: sin territorio el articulo se escribe igual, solo que sin enlazar al pilar.
+ */
+export async function traerCluster(db, clave) {
+  if (!clave) return null;
+  const { data, error } = await db
+    .from("marketing_clusters")
+    .select("clave, titulo, keyword_pilar, url_pilar, areas")
+    .eq("clave", clave)
+    .maybeSingle();
+  if (error) {
+    console.error(`traerCluster(${clave}): ${error.message}`);
+    return null;
+  }
+  return data ?? null;
+}
+
+/**
+ * Articulos de blog ya publicados, para que el nuevo pueda enlazarlos.
+ * La url vive en `publicado_en->blogUrl` (la deja publisher.ts al publicar); las piezas
+ * sin url se saltean, porque un enlace roto es peor que no enlazar.
+ */
+export async function articulosPublicados(db, limite = 8) {
+  const { data, error } = await db
+    .from("marketing_ideas")
+    .select("titulo, publicado_en")
+    .eq("estado", "publicada")
+    .eq("fuente", "blog")
+    .order("updated_at", { ascending: false })
+    .limit(limite);
+  if (error) {
+    console.error(`articulosPublicados: ${error.message}`);
+    return [];
+  }
+  return (data ?? [])
+    .map((f) => ({ titulo: f.titulo, url: f.publicado_en?.blogUrl ?? null }))
+    .filter((a) => typeof a.url === "string" && a.url.startsWith("http"));
+}
+
 export async function textosRecientes(db, limite = 15) {
   const { data, error } = await db
     .from("marketing_ideas")
