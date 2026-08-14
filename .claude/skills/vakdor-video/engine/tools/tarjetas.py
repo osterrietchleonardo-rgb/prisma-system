@@ -18,7 +18,9 @@ Tipos:
   chip       pildora chica con punto de acento
 """
 import json
+import os
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -74,9 +76,17 @@ def barra_acento(d, x, y, alto, ancho=6):
     )
 
 
-def subtitulo(t):
-    """Tarjeta de subtitulo: caja oscura translucida, con las palabras clave en cobre."""
-    partes = t["partes"]  # [{"txt": "...", "clave": bool}, ...]
+def subtitulo(t, p=1.0):
+    """
+    Tarjeta de subtitulo: caja oscura translucida, con las palabras clave en cobre.
+
+    Con `p` (0 a 1) las palabras VAN APARECIENDO al ritmo del habla, no todas
+    juntas: cada parte trae `aparece` (0 a 1) con el momento en que se dice.
+
+    La caja se dibuja SIEMPRE del tamaño de la frase completa. Si creciera con
+    cada palabra estaria saltando todo el tiempo y seria imposible de leer.
+    """
+    partes = t["partes"]  # [{"txt": "...", "clave": bool, "aparece": 0..1}, ...]
     f = fuente(t.get("px", 46))
     pad_x, pad_y, gap = 34, 24, 0
     ancho_txt = sum(ancho_de(p["txt"], f) for p in partes) // SS
@@ -91,10 +101,17 @@ def subtitulo(t):
 
     x = (pad_x + 14) * SS
     y = (pad_y - 6) * SS
-    for p in partes:
-        color = MARCA["acento"] if p["clave"] else MARCA["titulo"]
-        d.text((x, y), p["txt"], font=f, fill=color + (255,))
-        x += ancho_de(p["txt"], f) + gap
+    for parte in partes:
+        ap = parte.get("aparece", 0.0)
+        # transicion corta por palabra: entra en un 8% del largo de la frase
+        vis = min(1.0, max(0.0, (p - ap) / 0.08)) if p is not None else 1.0
+        if vis > 0.02:
+            color = MARCA["acento"] if parte["clave"] else MARCA["titulo"]
+            capa = Image.new("RGBA", img.size, (0, 0, 0, 0))
+            dc = ImageDraw.Draw(capa)
+            dc.text((x, y), parte["txt"], font=f, fill=color + (int(255 * vis),))
+            img = Image.alpha_composite(img, capa)
+        x += ancho_de(parte["txt"], f) + gap
     return reducir(img)
 
 
@@ -301,6 +318,101 @@ def panel(t, p=1.0):
     return reducir(img)
 
 
+def _pegar_logo(img, ruta, ancho, cx, y, alfa=255):
+    """Pega un logo centrado en `cx`, escalado a `ancho` px de ancho real."""
+    lg = Image.open(ruta).convert("RGBA")
+    esc = (ancho * SS) / lg.width
+    lg = lg.resize((int(lg.width * esc), int(lg.height * esc)), Image.LANCZOS)
+    if alfa < 255:
+        a = lg.getchannel("A").point(lambda v: int(v * alfa / 255))
+        lg.putalpha(a)
+    capa = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    capa.paste(lg, (int(cx * SS - lg.width / 2), int(y * SS)), lg)
+    return Image.alpha_composite(img, capa)
+
+
+def portada(t, p=1.0):
+    """
+    Portada de inicio: el gancho. Tiene que decir en 2 segundos por que alguien
+    se queda. Marca chica arriba, gancho grande al medio.
+    """
+    w, h = t.get("w", 1080), t.get("h", 1920)
+    img = _fondo_placa(w, h)
+    q = suavizar(min(1.0, max(0.0, p)))
+
+    if t.get("logo"):
+        img = _pegar_logo(img, t["logo"], 150, w // 2, 250, alfa=int(255 * min(1, q * 2)))
+
+    d = ImageDraw.Draw(img)
+    f = fuente(t.get("px", 104))
+    fk = fuente(34)
+    lineas = t["lineas"]
+    alto_l = int(t.get("px", 104) * 1.22)
+    y0 = (h - alto_l * len(lineas)) // 2 + 60
+
+    if t.get("kicker"):
+        wk = ancho_de(t["kicker"].upper(), fk) // SS
+        d.text((((w - wk) // 2) * SS, (y0 - 110) * SS), t["kicker"].upper(), font=fk,
+               fill=MARCA["acento"] + (255,))
+
+    for i, ln in enumerate(lineas):
+        # cada linea entra un toque despues que la anterior
+        pi = min(1.0, max(0.0, q * len(lineas) * 1.4 - i))
+        if pi <= 0.02:
+            continue
+        cap = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        dc = ImageDraw.Draw(cap)
+        wl = ancho_de(ln["txt"], f) // SS
+        sube = int(22 * (1 - pi))
+        col = MARCA["acento"] if ln.get("fuerte") else MARCA["titulo"]
+        dc.text((((w - wl) // 2) * SS, (y0 + i * alto_l + sube) * SS), ln["txt"], font=f,
+                fill=col + (int(255 * pi),))
+        img = Image.alpha_composite(img, cap)
+
+    if t.get("pie"):
+        d = ImageDraw.Draw(img)
+        fp = fuente(34)
+        wp = ancho_de(t["pie"], fp) // SS
+        d.text((((w - wp) // 2) * SS, (y0 + alto_l * len(lineas) + 80) * SS), t["pie"],
+               font=fp, fill=MARCA["texto"] + (255,))
+    return reducir(img)
+
+
+def cierre(t, p=1.0):
+    """
+    Cierre: marca + una sola cosa para hacer. Dos llamados a la accion es
+    ninguno, asi que va una linea y el contacto, nada mas.
+    """
+    w, h = t.get("w", 1080), t.get("h", 1920)
+    img = _fondo_placa(w, h)
+    q = suavizar(min(1.0, max(0.0, p)))
+    cy = h // 2
+
+    if t.get("logo"):
+        img = _pegar_logo(img, t["logo"], 260, w // 2, cy - 430, alfa=int(255 * min(1, q * 1.6)))
+
+    d = ImageDraw.Draw(img)
+    f = fuente(t.get("px", 68))
+    for i, ln in enumerate(t["lineas"]):
+        wl = ancho_de(ln, f) // SS
+        d.text((((w - wl) // 2) * SS, (cy - 60 + i * int(t.get("px", 68) * 1.3)) * SS), ln,
+               font=f, fill=MARCA["titulo"] + (255,))
+
+    # subrayado de acento que se dibuja solo
+    largo = int(w * 0.32 * q)
+    if largo > 6:
+        d.rounded_rectangle([((w - largo) // 2) * SS, (cy + 150) * SS,
+                             ((w + largo) // 2) * SS, (cy + 156) * SS],
+                            radius=3 * SS, fill=MARCA["acento"] + (255,))
+
+    if t.get("contacto"):
+        fc = fuente(40)
+        wc = ancho_de(t["contacto"], fc) // SS
+        d.text((((w - wc) // 2) * SS, (cy + 210) * SS), t["contacto"], font=fc,
+               fill=MARCA["acento"] + (255,))
+    return reducir(img)
+
+
 def _fondo_placa(w, h):
     """
     Fondo de placa: base oscura OPACA + un halo de acento muy tenue arriba a la
@@ -409,7 +521,18 @@ def comparacion(t, p=1.0):
 
 
 TIPOS = {"subtitulo": subtitulo, "dato": dato, "barra": barra, "frase": frase,
-         "chip": chip, "placa": placa, "comparacion": comparacion, "titular": titular, "panel": panel}
+         "chip": chip, "placa": placa, "comparacion": comparacion, "titular": titular, "panel": panel,
+         "portada": portada, "cierre": cierre}
+
+
+def _un_frame(args):
+    """Dibuja UN frame de una secuencia. Vive afuera para que se pueda repartir
+    entre procesos: dibujar 120 frames de una portada en un solo nucleo tardaba
+    mas que todo el render de video junto, con 11 nucleos al pedo."""
+    t, i, entrada, carpeta = args
+    img = TIPOS[t["tipo"]](t, p=min(1.0, i / max(1, entrada - 1)))
+    img.save(Path(carpeta) / f"f{i:04d}.png")
+    return img.width, img.height
 
 
 def main():
@@ -430,11 +553,11 @@ def main():
             entrada = max(1, int(anim.get("entrada", n)))
             carpeta = salida / t["id"]
             carpeta.mkdir(parents=True, exist_ok=True)
-            w = h = 0
-            for i in range(n):
-                img = fn(t, p=min(1.0, i / max(1, entrada - 1)))
-                img.save(carpeta / f"f{i:04d}.png")
-                w, h = img.width, img.height
+            tareas = [(t, i, entrada, str(carpeta)) for i in range(n)]
+            nucleos = max(1, min(os.cpu_count() or 4, 10))
+            with ProcessPoolExecutor(max_workers=nucleos) as pool:
+                medidas = list(pool.map(_un_frame, tareas, chunksize=4))
+            w, h = medidas[0]
             hechos.append({"id": t["id"], "archivo": str(carpeta / "f%04d.png"),
                            "w": w, "h": h, "secuencia": True, "frames": n})
         else:

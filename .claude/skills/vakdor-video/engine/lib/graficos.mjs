@@ -55,19 +55,39 @@ export function agruparEnFrases(palabras, { maxChars = 30, pausaSeg = 0.45 } = {
   return frases;
 }
 
-/** Convierte frases en specs de tarjeta de subtitulo, con las claves en cobre. */
-export function specDeSubtitulos(frases, { claves = [], px = 46, prefijo = "sub" } = {}) {
-  return frases.map((f, i) => ({
-    id: `${prefijo}${String(i).padStart(2, "0")}`,
-    tipo: "subtitulo",
-    px,
-    desde: f.desde,
-    hasta: f.hasta,
-    partes: f.palabras.map((w, j) => ({
-      txt: (j ? " " : "") + w.texto,
-      clave: esClave(w.texto, claves),
-    })),
-  }));
+/**
+ * Convierte frases en specs de tarjeta de subtitulo, con las claves en cobre.
+ *
+ * Si `porPalabra` esta activo, cada parte lleva `aparece` (0 a 1): el momento
+ * DENTRO de la frase en que esa palabra se dice, para que el subtitulo se revele
+ * al ritmo del habla en vez de aparecer entero. Se calcula del tiempo real de la
+ * palabra, no repartiendo la frase en partes iguales: repartir en partes iguales
+ * se nota enseguida cuando alguien habla rapido y despues frena.
+ */
+export function specDeSubtitulos(
+  frases, { claves = [], px = 46, prefijo = "sub", porPalabra = false, fps = 30 } = {}
+) {
+  return frases.map((f, i) => {
+    const dur = Math.max(0.4, f.hasta - f.desde);
+    const spec = {
+      id: `${prefijo}${String(i).padStart(2, "0")}`,
+      tipo: "subtitulo",
+      px,
+      desde: f.desde,
+      hasta: f.hasta,
+      partes: f.palabras.map((w, j) => ({
+        txt: (j ? " " : "") + w.texto,
+        clave: esClave(w.texto, claves),
+        aparece: porPalabra ? Math.min(1, Math.max(0, (w.inicioSec - f.desde) / dur)) : 0,
+      })),
+    };
+    if (porPalabra) {
+      // La animacion cubre TODA la tarjeta: la ultima palabra puede caer al final.
+      const n = Math.max(2, Math.round(dur * fps));
+      spec.anim = { frames: n, entrada: n };
+    }
+    return spec;
+  });
 }
 
 /**
