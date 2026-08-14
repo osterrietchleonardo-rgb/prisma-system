@@ -15,8 +15,11 @@ import {
   type AcmFichaSnapshot,
   type AmbienteStats,
   type FichaComparable,
+  type FichaZona,
   type MercadoBarrioLite,
 } from "@/lib/acm/ficha";
+import { obtenerZona } from "@/lib/acm/zona";
+import { generarRelato } from "@/lib/acm/zona-relato";
 import { recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
 import { normalizarImagenes } from "@/lib/acm/fotos-descarga";
 
@@ -66,6 +69,13 @@ export async function POST(req: Request) {
     const conclusionesIn: string[] | null = Array.isArray(body.conclusiones)
       ? body.conclusiones.filter((t: any) => typeof t === "string" && t.trim()).map((t: string) => t.trim())
       : null;
+
+    // Hoja del entorno. En `preview` se calcula y se devuelve para que el asesor la revise; al
+    // confirmar, el navegador manda de vuelta el texto ya editado junto con los datos duros.
+    // `incluir_zona === false` = el asesor la destildó y la ficha sale sin esa hoja.
+    const incluirZona: boolean = body.incluir_zona !== false;
+    const zonaIn: FichaZona | null =
+      body.zona && typeof body.zona === "object" ? (body.zona as FichaZona) : null;
 
     if (comparablesIn.length === 0) {
       return NextResponse.json({ error: "Elegí al menos un comparable para armar la ficha." }, { status: 400 });
@@ -185,11 +195,35 @@ export async function POST(req: Request) {
 
     // Modo revisión: devolvemos las conclusiones calculadas y cortamos acá (no se guarda la ficha).
     if (preview) {
+      let zona: FichaZona | null = null;
+      let zonaCentro: { lat: number; lon: number } | null = null;
+
+      if (incluirZona) {
+        try {
+          const calc = await obtenerZona(supabase, sujeto.direccion || "", sujeto.barrio || "");
+          if (calc) {
+            // El relato es lo único que cuesta plata y lo único que puede tardar. Si falla,
+            // devuelve cadena vacía: los datos duros ya están y el asesor puede escribir el
+            // texto a mano.
+            const relato = await generarRelato(calc.zona);
+            // mapa_url va en null: la imagen la pide el navegador del asesor (el endpoint
+            // exige sesión) y su URL vuelve en el pedido de confirmación.
+            zona = { ...calc.zona, relato, mapa_url: null };
+            zonaCentro = calc.centro;
+          }
+        } catch (e) {
+          // La zona NUNCA puede impedir que el asesor arme su ficha.
+          console.error("ACM ficha: no se pudo calcular la zona:", e);
+        }
+      }
+
       return NextResponse.json({
         preview: true,
         conclusiones: comparison.conclusiones,
         promedio_m2: comparison.promedio_m2,
         desvio_prom_pct: comparison.desvio_prom_pct,
+        zona,
+        zona_centro: zonaCentro,
       });
     }
 
@@ -220,6 +254,10 @@ export async function POST(req: Request) {
       operacion,
       comparables,
       comparison,
+      // Lo que el asesor revisó y editó, TAL CUAL. No se recalcula ni se vuelve a llamar a la
+      // IA: lo que él leyó y aprobó es exactamente lo que va a ver el cliente. Sin relato no
+      // hay hoja — los datos duros solos serían una tabla suelta sin nada que la explique.
+      zona: incluirZona && zonaIn?.relato?.trim() ? zonaIn : null,
       agent: {
         full_name: profile?.full_name || "",
         email: profile?.email || "",
