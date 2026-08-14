@@ -72,7 +72,14 @@ guardado — **en vez de publicarse en silencio**. Es el comportamiento buscado.
 
 ## 6. HALLAZGO: las piezas inventan nombres de personas
 
-Las 3 piezas inventaron nombres propios de asesores: "Rodríguez", "Marina", "Sofía".
+Dos de las tres piezas inventaron nombres propios de asesores. Textual:
+
+- **Pieza 3 (bofu):** *"Rodríguez cuenta reservas firmadas. Marina cuenta boletos. El tercero te
+  pasa las comisiones que cobró él este mes, aunque la operación se cerró en marzo."*
+- **Pieza 2 (mofu):** *"Sofía, tu asesora estrella, cierra una visita para el sábado."*
+
+De la pieza 1 solo se leyó la apertura (sin nombres) antes de borrarla, así que **no se verificó
+entera**. El hallazgo se sostiene sobre 2 casos confirmados, no 3.
 
 El canon prohíbe explícitamente inventar "casos con nombre" (punto 4). El texto llega al prompt de
 escritura, pero **la rúbrica de revisión no tiene ningún criterio que lo controle**: sus 7 puntos
