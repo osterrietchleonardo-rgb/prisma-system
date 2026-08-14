@@ -53,9 +53,13 @@ Una hoja A4 nueva, insertada **entre la portada y la primera hoja de comparable*
 │ Juramento de la línea D...    │      700 m               │
 │                               │  🚲  3 Ecobici en 600 m  │
 ├───────────────────────────────┴──────────────────────────┤
-│ [logo]   Fuente: datos abiertos GCBA · ANÁLISIS COMPARATIVO│
+│ [logo]                        ANÁLISIS COMPARATIVO DE MERC.│
 └──────────────────────────────────────────────────────────┘
 ```
+
+**La hoja no nombra ninguna fuente de datos** (decisión de Leonardo). Sin "datos abiertos GCBA", sin
+"OpenStreetMap", sin nombres de organismos. El pie es el mismo pie de marca que ya tienen todas las
+hojas de la ficha. La única excepción es el crédito del mapa: ver "El mapa".
 
 **La división es la regla de oro de esta hoja:**
 
@@ -127,7 +131,7 @@ Si destilda la casilla, la hoja no se genera y la ficha sale como hoy.
 ### El problema que define la arquitectura
 
 Los datasets del gobierno son archivos completos (las escuelas de toda la ciudad, todas las farmacias,
-el GTFS de colectivos son **209 MB** medidos). Bajarlos y parsearlos cada vez que alguien crea una
+todas las farmacias, todas las paradas de colectivo). Bajarlos y parsearlos cada vez que alguien crea una
 ficha es inviable: la ficha tardaría más de un minuto y se caería contra el timeout.
 
 **Se cargan una sola vez a la base**, con un script que se corre a mano y se puede volver a correr
@@ -175,7 +179,9 @@ service role (el script de carga). Nada de tenant: no hay dato de cliente acá.
 ### El script de carga — `scripts/cargar-zona-pois.mjs`
 
 Se corre a mano. Baja, normaliza y hace upsert por categoría. **Se puede correr una categoría sola**
-(`node scripts/cargar-zona-pois.mjs subte`) para no rehacer los 209 MB de colectivos cada vez.
+(`node scripts/cargar-zona-pois.mjs subte`) para no rehacer todo cuando cambia un solo dataset.
+
+Ningún archivo pasa de **~2 MB**: la carga completa es cuestión de segundos.
 
 Fuentes exactas, todas verificadas con HTTP 200:
 
@@ -190,7 +196,7 @@ Fuentes exactas, todas verificadas con HTTP 200:
 | espacio_verde | `.../secretaria-de-desarrollo-urbano/espacios-verdes/espacio_verde_publico.csv` |
 | ciclovia | `.../transporte-y-obras-publicas/ciclovias/ciclovias.csv` |
 | ecobici | `apitransporte.buenosaires.gob.ar/ecobici/gbfs/stationInformation` + `CLIENT_ID`/`CLIENT_SECRET` del `.env` |
-| parada_colectivo | `apitransporte.buenosaires.gob.ar/colectivos/feed-gtfs` (ZIP 209 MB → `stops.txt` + `routes.txt` + `trips.txt` + `stop_times.txt`) |
+| parada_colectivo | `.../transporte-y-obras-publicas/colectivos-paradas/paradas-de-colectivo.csv` (791 KB) |
 
 **Las URLs no se hardcodean a ciegas.** El script las resuelve por el catálogo CKAN
 (`data.buenosaires.gob.ar/api/3/action/package_show?id=<dataset>`), que es lo que hace que sobrevivan a
@@ -208,6 +214,10 @@ y comisarías respecto de la guía original.
    está el borde, así que para esta categoría se calcula contra el **polígono**, no contra el centroide
    — se guardan los dos.
 3. **Las ciclovías son líneas.** Misma lógica: la distancia se mide al trazado, no a un punto.
+4. **Las paradas de colectivo traen la coma como separador decimal** (`"-58,3709946"`, verificado).
+   Parseadas sin reemplazar la coma, todas las paradas de CABA aterrizan en el Golfo de Guinea. Las
+   líneas vienen repartidas en seis columnas (`L1`…`L6`, con su sentido): se juntan en `extra`
+   descartando vacíos.
 
 **Control de calidad obligatorio al cargar:** cada POI trae del propio dataset el barrio que declara
 (columna `bar`/`barrio`). Después de cargar, se cruza contra `zona_barrios` con PostGIS y **se reporta
@@ -254,10 +264,11 @@ Reglas del respaldo, porque es un servidor comunitario y no nuestro:
 
 - Timeout de 20 segundos. Si no contesta, **la hoja no se genera y la ficha sale igual**. Nunca se
   bloquea la creación de la ficha por esto.
-- La hoja dice **"Fuente: OpenStreetMap"** en lugar de "datos abiertos GCBA". El cliente merece saber
-  de dónde salió cada número.
 - Si Overpass devuelve menos de 3 categorías con dato, la hoja no se genera: media hoja vacía es peor
   que ninguna hoja.
+- La hoja **no dice que los datos vinieron de otro lado**. Se ve idéntica a la de CABA. Que la fuente
+  cambie es un detalle interno; queda registrado en el snapshot para poder auditarlo, pero el cliente
+  no lo ve.
 
 ### El mapa
 
@@ -278,6 +289,12 @@ misma cuadra reusan la imagen. La URL guardada va al snapshot.
 **Respetar la política de uso de OSM:** `User-Agent` identificando a PRISMA, y el caché es lo que
 evita el uso abusivo (un puñado de tiles por ficha, no por vista).
 
+**La única fuente que sí se nombra, y por qué.** El dibujo del mapa lleva `© OpenStreetMap` en letra
+chica en una esquina, dentro de la imagen. No es una cita de fuente: es la condición de la licencia
+bajo la que se puede usar ese mapa, igual que el `©Google` que aparece en cualquier mapa de Google.
+Sin eso no se puede usar el mapa legalmente. Ocupa ~8 px de alto y en el A4 impreso no se lee salvo que
+alguien lo busque. **Ninguna otra fuente aparece en ningún lado de la ficha.**
+
 ### Dónde vive el resultado
 
 Un campo nuevo y **opcional** en el snapshot (`lib/acm/ficha.ts`):
@@ -287,7 +304,7 @@ export interface FichaZona {
   barrio: string;
   comuna: number | null;
   area_km2: number | null;
-  fuente: "gcba" | "osm";
+  fuente: "gcba" | "osm";   // interno, para auditar. NO se muestra en la hoja
   relato: string;              // el texto de la IA, ya revisado por el asesor
   pois: FichaZonaPoi[];        // los datos duros, calculados
   mapa_url: string | null;
@@ -332,7 +349,7 @@ responsabilidad clara (calcular la comparación de precios). El entorno es otra 
 | Datos viejos en la base | `actualizado_at` por POI; la hoja no muestra fecha de dataset al cliente, pero se puede auditar |
 
 **Costo:** ~US$0,003 por ficha (un párrafo de `gemini-3.5-flash`, el mismo modelo que ya usa el ACM
-para analizar fotos). Todos los datos son gratis. El GTFS de 209 MB se baja una vez, en local.
+para analizar fotos). Todos los datos son gratis y ninguno pesa más de ~2 MB.
 
 ---
 
@@ -362,6 +379,7 @@ Todo lo de abajo se probó con peticiones reales antes de escribir esta especifi
 | Escuelas en `/datasets/ministerio-de-educacion/...` | **404**. La ruta correcta lleva `/datosabiertos/` |
 | Farmacias en `/datasets/salud/farmacias/` | **404**. Es `/ministerio-de-salud/farmacias/` |
 | Comisarías en `/datasets/seguridad/comisarias/` | **404**. El dataset es `comisarias-policia-ciudad` |
+| Colectivos: hay que bajar el GTFS y cruzar 4 archivos | Innecesario. Existe `paradas-de-colectivo.csv`, **791 KB**, con lat/lon, barrio y hasta 6 líneas por parada. El GTFS pesa 209 MB y no hace falta |
 | Espacios verdes en `/espacio-publico/espacios-verdes/` | **404**. Es `/secretaria-de-desarrollo-urbano/espacios-verdes/` |
 | "las credenciales de API Transporte que ya tienes" | No estaban documentadas. **Se encontraron**: `CLIENT_ID`/`CLIENT_SECRET` del `.env` son de API Transporte y funcionan |
 | El CSV de escuelas no tiene coordenadas | Sí las tiene, pero **en EPSG:9498**, no en lat/lon |
