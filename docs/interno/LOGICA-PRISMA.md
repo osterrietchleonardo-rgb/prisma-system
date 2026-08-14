@@ -2388,6 +2388,14 @@ direcciones. Elegir un **barrio** vuela al barrio Y filtra por él; elegir una *
 solo vuela, porque un domicilio es un punto y filtrar dejaría la pantalla vacía si ahí no
 hay nada publicado.
 
+Una dirección además queda **marcada con la chinche roja** de siempre, con la punta
+clavada en la puerta y el domicilio escrito al lado. Sin ella el mapa se acercaba a la
+zona pero no decía dónde estaba parado uno, que es justo lo que hace falta para leer el
+entorno y comparar contra lo que hay alrededor. La chinche es solo una referencia: no
+filtra, no se puede clickear, y se saca desde su cartelito rojo o eligiendo otro lugar.
+Un barrio o una zona NO la ponen: su centro geométrico no significa nada y un pin en el
+medio de Palermo se leería como una propiedad más.
+
 ### Precio por m² (mapa de calor)
 
 Se pinta el precio mediano por metro sobre cada **manzana real**, de verde (barato) a rojo

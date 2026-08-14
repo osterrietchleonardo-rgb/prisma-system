@@ -16,6 +16,15 @@ export interface Lugar {
   detalle: string
   /** Adonde vuela el mapa. Las direcciones traen un recuadro chico alrededor del punto. */
   bbox: BBox
+  /**
+   * El punto exacto, cuando el lugar ES un punto (una direccion). Con esto se clava el
+   * marcador rojo en la puerta buscada: el recuadro solo dice "por aca cerca", y el
+   * asesor necesita ver DONDE esta parado para leer el entorno y las comparables.
+   *
+   * Un barrio no lo trae a proposito: su centro geometrico no significa nada y un pin
+   * en el medio de Palermo se leeria como una propiedad mas.
+   */
+  punto?: { lat: number; lng: number }
   /** Solo las zonas guardadas: ademas de volar, recortan por el trazo. */
   geojson?: unknown
 }

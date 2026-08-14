@@ -642,6 +642,16 @@ Cuando elegís un **barrio**, el mapa se acerca y además esconde las propiedade
 barrios vecinos. Vas a ver un cartelito azul que dice "Solo Belgrano" — tocá la cruz para
 volver a ver todo.
 
+Cuando elegís una **dirección**, el mapa te clava ahí la **chinche roja** de siempre, con
+el domicilio escrito al lado. Es tu punto de referencia: alrededor te quedan los pines de
+todo lo que hay publicado cerca, así ves el entorno y comparás contra esa puerta. La
+chinche no esconde nada, es solo una marca; para sacarla, tocá la cruz de su cartelito
+rojo o buscá otro lugar.
+
+> **Tip.** Antes de una tasación, buscá la dirección de la propiedad y prendé el botón del
+> **signo $**: te quedan juntas la puerta que vas a tasar, lo que se está pidiendo alrededor
+> y el precio del metro de esa manzana.
+
 ### Cuánto vale el metro
 
 El botón con el **signo $** pinta el mapa de colores: verde donde el metro es más barato y

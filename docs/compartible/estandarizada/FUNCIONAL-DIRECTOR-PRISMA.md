@@ -775,6 +775,10 @@ Tus asesores tienen, dentro del Buscador IA, una solapa **Mapa** con todas las p
 - **Saber cuánto vale el metro en cada manzana**, con el ranking de barrios del más caro al
   más barato. Es el dato que sostiene una tasación cuando el cliente discute el precio.
 - **Ver dónde tenés cartera y dónde no**, de un vistazo.
+- **Pararse en una dirección concreta.** Al buscar un domicilio, el mapa lo marca con la
+  chinche roja de siempre y deja alrededor todo lo publicado cerca. Es la vista con la que
+  un asesor defiende un precio frente al dueño: esta es la puerta, esto es lo que se está
+  pidiendo a la vuelta.
 
 ### El precio por metro cuadrado
 

@@ -1141,6 +1141,14 @@ Cada uno de estos nació de un `statement timeout` real, no de una optimización
   geocoder se llama desde el navegador, no desde el backend. Los orígenes permitidos deben
   incluir `*.vakdor.com` (`vakdor.com` a secas NO cubre subdominios) y `localhost`.
 - **`100vh` no descuenta la barra de direcciones en el celular**: va `dvh`.
+- **La ficha de una propiedad va por un portal a `<body>`** (`mapa-ficha.tsx`). El modal
+  compartido con el chat (`UnifiedPropertyDetail`) es `fixed inset-0 z-50`, y dentro del
+  contenedor del mapa —que es `isolate`— las capas de Leaflet valen de 400 a 700: z-50
+  pierde y **la ficha se dibujaba detrás del mapa**. Las dos salidas fáciles no sirven:
+  subirle el z-index al modal compartido lo cambia también para el chat, y envolverlo en
+  un div con z-index alto le rompe el `backdrop-blur` (ese div pasa a ser el fondo a
+  difuminar, o sea nada). Fuera del contenedor no hay con qué competir. Mismo patrón que
+  la barra flotante del ACM.
 
 ### Tareas automáticas
 

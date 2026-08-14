@@ -95,6 +95,8 @@ export function MapaTab() {
   const [grupoAbierto, setGrupoAbierto] = useState<GrupoUbicacion | null>(null)
   const [cumuloAbierto, setCumuloAbierto] = useState<PropiedadMapa[] | null>(null)
   const [fichaId, setFichaId] = useState<string | null>(null)
+  /** La direccion buscada en la cajita: se marca con el pin rojo de referencia. */
+  const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number; nombre: string } | null>(null)
   const [sinEseTipo, setSinEseTipo] = useState({ cartera: false, colaboracion: false })
 
   // Que paneles estan abiertos. Arrancan CERRADOS a proposito: lo primero que tiene que
@@ -226,6 +228,12 @@ export function MapaTab() {
   // Elegir un lugar del buscador. Un barrio o una direccion SOLO mueven el mapa; una
   // zona guardada ademas recorta, porque para eso se dibujo.
   const irALugar = useCallback((l: Lugar) => {
+    // El pin rojo marca la puerta buscada, para leer el entorno y las comparables de al
+    // lado. Se pone SOLO con una direccion: en un barrio o una zona no hay un punto que
+    // signifique algo, y un pin en el medio se confundiria con una propiedad mas.
+    // Elegir otra cosa lo saca: si no, quedaria una chinche vieja en otro barrio.
+    setUbicacion(l.punto ? { ...l.punto, nombre: l.detalle || l.nombre } : null)
+
     if (l.tipo === "zona" && l.geojson) {
       const trazo: Trazo = { id: `lugar_${l.id}`, poligono: l.geojson as Trazo["poligono"] }
       setTrazos([trazo])
@@ -339,6 +347,7 @@ export function MapaTab() {
         onAbrirCumulo={onAbrirCumulo}
         onProveedor={onProveedor}
         encuadrarA={encuadrarA}
+        ubicacion={ubicacion}
         lapizActivo={lapizActivo}
         trazos={trazos}
         onTrazo={agregarTrazo}
@@ -356,18 +365,36 @@ export function MapaTab() {
           <MapaBuscador onElegir={irALugar} />
         </div>
 
-        {filtros.barrio && (
-          <div className="pointer-events-auto flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 py-1 pl-3 pr-1.5 text-xs font-medium text-white shadow">
-              Solo {filtros.barrio}
-              <button
-                onClick={() => setFiltros((f) => ({ ...f, barrio: null }))}
-                title="Ver también los barrios vecinos"
-                className="rounded-full p-0.5 transition-colors hover:bg-white/25"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </span>
+        {(filtros.barrio || ubicacion) && (
+          <div className="pointer-events-auto flex flex-wrap items-center gap-2">
+            {filtros.barrio && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 py-1 pl-3 pr-1.5 text-xs font-medium text-white shadow">
+                Solo {filtros.barrio}
+                <button
+                  onClick={() => setFiltros((f) => ({ ...f, barrio: null }))}
+                  title="Ver también los barrios vecinos"
+                  className="rounded-full p-0.5 transition-colors hover:bg-white/25"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            )}
+
+            {/* La chinche roja no filtra nada: es una referencia. Igual tiene su X, porque
+                si no la unica forma de sacarla seria buscar otro lugar. */}
+            {ubicacion && (
+              <span className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-full bg-red-600 py-1 pl-2.5 pr-1.5 text-xs font-medium text-white shadow">
+                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{ubicacion.nombre}</span>
+                <button
+                  onClick={() => setUbicacion(null)}
+                  title="Sacar el marcador del mapa"
+                  className="shrink-0 rounded-full p-0.5 transition-colors hover:bg-white/25"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            )}
           </div>
         )}
 
