@@ -119,7 +119,7 @@ export function specDeTitulares(frases, { claves = [], px = 66, prefijo = "ti" }
  *  - `y` con una subida de `subida` px durante la entrada;
  *  - `enable='between(t,desde,hasta)'`, para que solo exista en su tramo.
  */
-export function construirOverlays(tarjetas, { indiceBase = 1, subida = 14, fundido = 0.28 } = {}) {
+export function construirOverlays(tarjetas, { indiceBase = 1, subida = 14, fundido = 0.28, fps = 30 } = {}) {
   const inputs = [];
   const pasos = [];
   let etiqueta = "[base]";
@@ -127,7 +127,14 @@ export function construirOverlays(tarjetas, { indiceBase = 1, subida = 14, fundi
   tarjetas.forEach((t, i) => {
     const idx = indiceBase + i;
     const dur = Math.max(0.4, t.hasta - t.desde);
-    inputs.push("-loop", "1", "-t", dur.toFixed(3), "-i", t.archivo);
+
+    if (t.secuencia) {
+      // Una tarjeta ANIMADA es una secuencia de PNG, uno por frame. Se entra con
+      // `-framerate`, no con `-loop 1 -t`: la duracion sale de cuantos frames hay.
+      inputs.push("-framerate", String(fps), "-i", t.archivo);
+    } else {
+      inputs.push("-loop", "1", "-t", dur.toFixed(3), "-i", t.archivo);
+    }
 
     const fOut = Math.max(0, dur - fundido);
     pasos.push(

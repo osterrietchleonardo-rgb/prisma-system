@@ -119,9 +119,23 @@ def dato(t):
     return reducir(img)
 
 
-def barra(t):
-    """Comparacion tipo 80/20: barra partida + las dos etiquetas."""
-    pct = t.get("pct", 80)
+def suavizar(p):
+    """Curva de entrada: arranca rapido y frena al final (easeOutCubic).
+    Una animacion lineal se lee mecanica; esta se lee intencional."""
+    return 1 - (1 - p) ** 3
+
+
+def barra(t, p=1.0):
+    """
+    Comparacion tipo 80/20: barra partida + las dos etiquetas.
+
+    Con `p` (0 a 1) la barra CRECE y los numeros CUENTAN. Que el 80% se llene
+    delante de los ojos hace que el dato se entienda solo; puesto de golpe es
+    un numero mas.
+    """
+    q = suavizar(min(1.0, max(0.0, p)))
+    pct_obj = t.get("pct", 80)
+    pct = pct_obj * q
     fi = fuente(40)
     fp = fuente(30)
     w, h = t.get("ancho", 760), 200
@@ -134,11 +148,15 @@ def barra(t):
     alto_b = 26
     caja(d, (bx0, by, bx1, by + alto_b), alto_b // 2, (255, 255, 255, 38))
     corte = bx0 + int((bx1 - bx0) * pct / 100)
+    if corte <= bx0 + 2:
+        corte = bx0 + 2  # que no desaparezca del todo al arrancar
     caja(d, (bx0, by, corte, by + alto_b), alto_b // 2, MARCA["acento"] + (255,))
 
-    d.text((36 * SS, 148 * SS), t["izq"], font=fp, fill=MARCA["acento"] + (255,))
-    w_der = ancho_de(t["der"], fp) // SS
-    d.text(((w - 36 - w_der) * SS, 148 * SS), t["der"], font=fp, fill=MARCA["texto"] + (255,))
+    izq = t["izq"].replace("{pct}", f"{round(pct)}")
+    der = t["der"].replace("{resto}", f"{round(100 - pct)}")
+    d.text((36 * SS, 148 * SS), izq, font=fp, fill=MARCA["acento"] + (255,))
+    w_der = ancho_de(der, fp) // SS
+    d.text(((w - 36 - w_der) * SS, 148 * SS), der, font=fp, fill=MARCA["texto"] + (255,))
     return reducir(img)
 
 
@@ -278,7 +296,7 @@ def placa(t):
     return reducir(img)
 
 
-def comparacion(t):
+def comparacion(t, p=1.0):
     """Placa completa de contraste: un numero tachado y el que lo reemplaza.
     Para 'no necesitas 40, necesitas 5'."""
     w, h = t.get("w", 1080), t.get("h", 1920)
@@ -288,6 +306,12 @@ def comparacion(t):
     fn = fuente(190)
     fl = fuente(36)
     cy = h // 2
+    # La animacion cuenta una historia en 3 tiempos: primero esta el 40, despues
+    # se TACHA, y recien entonces aparece el 5. Que se superpongan lo arruina.
+    q = min(1.0, max(0.0, p))
+    p_tachado = suavizar(min(1.0, q / 0.45))              # 0 -> 45%
+    p_flecha = suavizar(min(1.0, max(0.0, (q - 0.40) / 0.25)))
+    p_cinco = suavizar(min(1.0, max(0.0, (q - 0.55) / 0.45)))
 
     # el que se descarta: gris y tachado
     a_txt = t["antes"]
@@ -295,23 +319,35 @@ def comparacion(t):
     xa = (w - wa) // 2
     d.text((xa * SS, (cy - 330) * SS), a_txt, font=fn, fill=(120, 126, 138, 255))
     ym = cy - 330 + 118
-    d.rounded_rectangle([(xa - 16) * SS, (ym - 5) * SS, (xa + wa + 16) * SS, (ym + 5) * SS],
-                        radius=5 * SS, fill=(150, 156, 168, 255))
+    largo = int((wa + 32) * p_tachado)
+    if largo > 4:
+        d.rounded_rectangle([(xa - 16) * SS, (ym - 5) * SS, (xa - 16 + largo) * SS, (ym + 5) * SS],
+                            radius=5 * SS, fill=(150, 156, 168, 255))
     la = t["antes_label"]
     d.text((((w - ancho_de(la, fl) // SS) // 2) * SS, (cy - 130) * SS), la.upper(),
            font=fl, fill=(150, 156, 168, 255))
 
     # la flecha hacia abajo
-    d.polygon([((w // 2 - 22) * SS, (cy - 60) * SS), ((w // 2 + 22) * SS, (cy - 60) * SS),
-               ((w // 2) * SS, (cy - 8) * SS)], fill=MARCA["acento"] + (255,))
+    if p_flecha > 0.02:
+        dy = int(28 * (1 - p_flecha))   # la flecha BAJA hasta su lugar
+        a = int(255 * p_flecha)
+        d.polygon([((w // 2 - 22) * SS, (cy - 60 - dy) * SS), ((w // 2 + 22) * SS, (cy - 60 - dy) * SS),
+                   ((w // 2) * SS, (cy - 8 - dy) * SS)], fill=MARCA["acento"] + (a,))
 
     # el que queda: cobre, grande
-    b_txt = t["despues"]
-    wb = ancho_de(b_txt, fn) // SS
-    d.text((((w - wb) // 2) * SS, (cy + 40) * SS), b_txt, font=fn, fill=MARCA["acento"] + (255,))
-    lb = t["despues_label"]
-    d.text((((w - ancho_de(lb, fl) // SS) // 2) * SS, (cy + 300) * SS), lb.upper(),
-           font=fl, fill=MARCA["titulo"] + (255,))
+    if p_cinco > 0.02:
+        b_txt = t["despues"]
+        cap = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        dc = ImageDraw.Draw(cap)
+        wb = ancho_de(b_txt, fn) // SS
+        sube = int(26 * (1 - p_cinco))   # entra subiendo unos pixeles
+        a = int(255 * p_cinco)
+        dc.text((((w - wb) // 2) * SS, (cy + 40 + sube) * SS), b_txt, font=fn,
+                fill=MARCA["acento"] + (a,))
+        lb = t["despues_label"].upper()
+        dc.text((((w - ancho_de(lb, fl) // SS) // 2) * SS, (cy + 300 + sube) * SS), lb,
+                font=fl, fill=MARCA["titulo"] + (a,))
+        img = Image.alpha_composite(img, cap)
     return reducir(img)
 
 
@@ -326,10 +362,30 @@ def main():
 
     hechos = []
     for t in spec:
-        img = TIPOS[t["tipo"]](t)
-        ruta = salida / f"{t['id']}.png"
-        img.save(ruta)
-        hechos.append({"id": t["id"], "archivo": str(ruta), "w": img.width, "h": img.height})
+        fn = TIPOS[t["tipo"]]
+        anim = t.get("anim")
+        if anim:
+            # Secuencia: un PNG por frame. Es la forma mas simple de animar
+            # cualquier cosa que PIL sepa dibujar, sin levantar un navegador.
+            # `frames` es la duracion COMPLETA en pantalla; `entrada` cuantos de
+            # esos frames dura el movimiento (el resto se queda quieto).
+            n = int(anim["frames"])
+            entrada = max(1, int(anim.get("entrada", n)))
+            carpeta = salida / t["id"]
+            carpeta.mkdir(parents=True, exist_ok=True)
+            w = h = 0
+            for i in range(n):
+                img = fn(t, p=min(1.0, i / max(1, entrada - 1)))
+                img.save(carpeta / f"f{i:04d}.png")
+                w, h = img.width, img.height
+            hechos.append({"id": t["id"], "archivo": str(carpeta / "f%04d.png"),
+                           "w": w, "h": h, "secuencia": True, "frames": n})
+        else:
+            img = fn(t)
+            ruta = salida / f"{t['id']}.png"
+            img.save(ruta)
+            hechos.append({"id": t["id"], "archivo": str(ruta), "w": img.width,
+                           "h": img.height, "secuencia": False})
     print(json.dumps(hechos, ensure_ascii=False))
 
 
