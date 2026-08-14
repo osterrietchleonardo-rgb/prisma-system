@@ -244,6 +244,63 @@ def titular(t):
     return reducir(Image.alpha_composite(sombra, capa))
 
 
+def panel(t, p=1.0):
+    """
+    PANEL DIVIDIDO: el video se achica a la mitad de abajo y arriba queda una
+    zona oscura para explicar. Esto dibuja SOLO la parte de arriba (mas el fondo
+    completo); el video reducido lo pone el compositor encima.
+
+    Cuando conviene: cuando hay que MOSTRAR algo mientras el habla -- un dato que
+    se arma, una lista que crece, una comparacion. La cara sigue estando (que es
+    lo que sostiene la atencion) pero deja de ser el centro por unos segundos.
+
+    Cuando NO conviene: para una frase suelta. Si se usa para todo, el video
+    termina siendo una presentacion con una cara chiquita abajo, y se pierde
+    justo lo que hace que un reel funcione.
+    """
+    w, h = t.get("w", 1080), t.get("h", 1920)
+    alto_zona = t.get("alto_zona", 740)
+    img = _fondo_placa(w, h)
+    d = ImageDraw.Draw(img)
+    q = suavizar(min(1.0, max(0.0, p)))
+
+    y = 150
+    if t.get("kicker"):
+        fk = fuente(32)
+        d.text((90 * SS, y * SS), t["kicker"].upper(), font=fk, fill=MARCA["acento"] + (255,))
+        y += 62
+
+    ft = fuente(t.get("px", 62))
+    for linea in t.get("lineas", []):
+        d.text((90 * SS, y * SS), linea, font=ft, fill=MARCA["titulo"] + (255,))
+        y += int(t.get("px", 62) * 1.28)
+
+    # lista que va apareciendo item por item, de a uno
+    items = t.get("items", [])
+    if items:
+        fi = fuente(38)
+        y += 24
+        for i, it in enumerate(items):
+            pi = min(1.0, max(0.0, q * len(items) - i))
+            if pi <= 0.02:
+                continue
+            cap = Image.new("RGBA", img.size, (0, 0, 0, 0))
+            dc = ImageDraw.Draw(cap)
+            a = int(255 * pi)
+            dx = int(18 * (1 - pi))
+            r = 8
+            dc.ellipse([(96 - r + dx) * SS, (y + 22 - r) * SS, (96 + r + dx) * SS, (y + 22 + r) * SS],
+                       fill=MARCA["acento"] + (a,))
+            dc.text(((126 + dx) * SS, y * SS), it, font=fi, fill=MARCA["titulo"] + (a,))
+            img = Image.alpha_composite(img, cap)
+            y += 66
+
+    # linea que separa la zona de explicacion del video
+    d.rectangle([0, (alto_zona - 2) * SS, w * SS, alto_zona * SS],
+                fill=MARCA["acento"] + (70,))
+    return reducir(img)
+
+
 def _fondo_placa(w, h):
     """
     Fondo de placa: base oscura OPACA + un halo de acento muy tenue arriba a la
@@ -352,7 +409,7 @@ def comparacion(t, p=1.0):
 
 
 TIPOS = {"subtitulo": subtitulo, "dato": dato, "barra": barra, "frase": frase,
-         "chip": chip, "placa": placa, "comparacion": comparacion, "titular": titular}
+         "chip": chip, "placa": placa, "comparacion": comparacion, "titular": titular, "panel": panel}
 
 
 def main():

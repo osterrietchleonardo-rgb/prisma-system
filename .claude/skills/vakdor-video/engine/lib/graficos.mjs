@@ -157,6 +157,39 @@ export function construirOverlays(tarjetas, { indiceBase = 1, subida = 14, fundi
 }
 
 /**
+ * PANEL DIVIDIDO: durante su ventana, el video se achica a la franja de abajo y
+ * arriba queda la zona de explicacion.
+ *
+ * Son dos overlays encadenados sobre la misma base: primero el panel (que tapa
+ * todo el cuadro), despues el video reducido encima. El video reducido sale de
+ * un `split` de la misma base, asi que no hay que volver a decodificar nada.
+ *
+ * `recorteY` es desde donde se recorta el video original antes de achicarlo:
+ * sirve para que quede encuadrada la cara y no el pecho.
+ */
+export function construirPanel({
+  indice, panel, desde, hasta, ancho = 1080, alto = 1920,
+  altoZona = 740, recorteY = 340, entrada = "[base]", salida = "[conPanel]",
+}) {
+  const altoVideo = alto - altoZona;
+  const inputs = ["-loop", "1", "-t", (hasta - desde).toFixed(3), "-i", panel];
+  const ventana = `between(t,${desde.toFixed(3)},${hasta.toFixed(3)})`;
+
+  const filtro = [
+    // una copia de la base para achicar
+    `${entrada}split=2[paraPanel][paraChico]`,
+    `[paraChico]crop=${ancho}:${altoVideo}:0:${recorteY},setpts=PTS-STARTPTS[chico]`,
+    `[${indice}:v]format=rgba,fade=t=in:st=0:d=0.25:alpha=1,` +
+      `fade=t=out:st=${Math.max(0, hasta - desde - 0.25).toFixed(3)}:d=0.25:alpha=1,` +
+      `setpts=PTS-STARTPTS+${desde.toFixed(3)}/TB[panelFx]`,
+    `[paraPanel][panelFx]overlay=0:0:enable='${ventana}':eof_action=pass[conFondo]`,
+    `[conFondo][chico]overlay=0:${altoZona}:enable='${ventana}':eof_action=pass${salida}`,
+  ].join(";");
+
+  return { inputs, filtro, etiquetaFinal: salida };
+}
+
+/**
  * Ubica una tarjeta centrada horizontalmente. `ancla` es la Y del CENTRO, no del
  * borde: pensar en "a que altura del cuadro va" es mas natural que calcular el
  * borde superior, y ademas evita que una tarjeta mas alta que otra baile.
