@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parsearArgs } from "../studio.mjs";
-import { crearClipDePrueba, dirTemporal } from "./helpers.mjs";
+import { crearClipDePrueba, dirTemporal, borrarDirDePrueba } from "./helpers.mjs";
 
 const STUDIO = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "studio.mjs");
 // SIN_GROQ: entorno SIN GROQ_API_KEY para todo proceso hijo que corra studio.mjs. El
@@ -27,7 +27,7 @@ before(() => {
   // resolucion real para verificar que el flag se enchufo bien.
   clipChico = crearClipDePrueba({ segundos: 3, ancho: 480, alto: 270, salida: path.join(dir, "chico.mp4") });
 });
-after(() => fs.rmSync(dir, { recursive: true, force: true }));
+after(() => borrarDirDePrueba(dir));
 
 const archivosResiduales = (d) =>
   fs.readdirSync(d).filter((f) =>

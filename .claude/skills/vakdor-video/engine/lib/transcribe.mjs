@@ -18,6 +18,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { conLock } from "./cache.mjs";
 
 const MAX_CHARS = 46;
 
@@ -141,4 +143,36 @@ export async function transcribir({ entrada, apiKey, idioma = "es" }) {
   } finally {
     fs.rmSync(tmpAudio, { force: true });
   }
+}
+
+/**
+ * Envoltorio de `transcribir` con cache atomico entre procesos (mismo mecanismo que
+ * `cortarConCache` en lib/cut.mjs: ver ese comentario para el porque). Sin este cache,
+ * dos corridas de studio.mjs contra el mismo video (tipico al iterar con --preview)
+ * pagan Groq dos veces por el mismo resultado — el lock (`conLock`, lib/cache.mjs)
+ * hace que solo UNA de las dos llame de verdad a la API.
+ *
+ * Publicacion atomica: las palabras se escriben a un `.json` temporal (nombre unico) y
+ * recien se `fs.renameSync` al nombre final de cache cuando terminaron de escribirse
+ * enteras — un `fs.existsSync(palabrasCache)` de otro proceso jamas ve un JSON a medio
+ * escribir.
+ *
+ * Devuelve `{ yaEstaba, palabras }`.
+ */
+export async function transcribirConCache({
+  entrada, palabrasCache, lockPath, apiKey, idioma = "es",
+  rehacer = false, _transcribir = transcribir, opcionesLock,
+}) {
+  const yaListo = () => !rehacer && fs.existsSync(palabrasCache);
+
+  return conLock(lockPath, yaListo, async () => {
+    if (yaListo()) {
+      return { yaEstaba: true, palabras: JSON.parse(fs.readFileSync(palabrasCache, "utf8")) };
+    }
+    const { palabras } = await _transcribir({ entrada, apiKey, idioma });
+    const tempPalabras = path.join(path.dirname(palabrasCache), `.tmp-palabras-${randomUUID()}.json`);
+    fs.writeFileSync(tempPalabras, JSON.stringify(palabras), "utf8");
+    fs.renameSync(tempPalabras, palabrasCache);
+    return { yaEstaba: false, palabras };
+  }, opcionesLock);
 }

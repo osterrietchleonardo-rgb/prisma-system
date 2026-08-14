@@ -13,6 +13,7 @@ import { spawnSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { conLock } from "./cache.mjs";
 
 function duracionDe(entrada) {
   const r = spawnSync(
@@ -190,4 +191,54 @@ export async function cortarSilencios({ entrada, salida, db = -30, min = 0.6, pa
 
   const duracionFinal = duracionDe(salida);
   return { salida, tramos: merged, duracionFinal, tramosFallidos };
+}
+
+/**
+ * Envoltorio de `cortarSilencios` con cache atomico entre procesos: usa `conLock` (lib/
+ * cache.mjs) para que dos corridas contra el mismo `entrada`+db/min/pad no corten el
+ * mismo video en paralelo (double-billing de tiempo de CPU, o peor: dos procesos
+ * escribiendo al mismo archivo de salida a la vez), y solo publica el resultado en
+ * `salidaCache` si el corte NO tuvo tramos fallidos.
+ *
+ * Publicacion ATOMICA: se corta a un temporal unico (`randomUUID`, misma carpeta que
+ * `salidaCache` para que el rename quede en el mismo filesystem) y se hace
+ * `fs.renameSync` al nombre final recien cuando el corte termino bien. Un
+ * `fs.existsSync(salidaCache)` de otro proceso jamas puede ver un archivo a medio
+ * escribir con ese nombre.
+ *
+ * NO SE CACHEA UN CORTE CON TRAMOS FALLIDOS: un corte que perdio footage no puede
+ * quedar publicado como si fuera bueno — eso volveria a hacer invisible el problema
+ * que arregla `tramosFallidos` (la primera corrida avisa una vez, y todas las
+ * siguientes reusarian el mismo archivo dañado en silencio). En cambio, el resultado
+ * de ESA corrida se devuelve igual (`publicado: false`), para que el caller pueda
+ * seguir usandolo en el render de ahora, pero la proxima corrida vuelve a cortar de
+ * cero.
+ *
+ * Devuelve `{ yaEstaba, publicado, salida, rc? }`. `rc` (el resultado crudo de
+ * `cortarSilencios`) solo viene cuando ESTA llamada hizo el corte (no cuando reusa).
+ */
+export async function cortarConCache({
+  entrada, salidaCache, lockPath, db = -30, min = 0.6, pad = 0.15,
+  rehacer = false, _cortarSilencios = cortarSilencios, opcionesLock,
+}) {
+  const yaListo = () => !rehacer && fs.existsSync(salidaCache);
+
+  return conLock(lockPath, yaListo, async () => {
+    // Doble chequeo (ver conLock): entre que otro proceso publico y que este
+    // consiguio el lock, puede haber pasado. Si ya esta, no lo repetimos.
+    if (yaListo()) return { yaEstaba: true, publicado: true, salida: salidaCache };
+
+    const tempCorte = path.join(path.dirname(salidaCache), `.tmp-corte-${randomUUID()}.mp4`);
+    try {
+      const rc = await _cortarSilencios({ entrada, salida: tempCorte, db, min, pad });
+      if (rc.tramosFallidos.length === 0) {
+        fs.renameSync(tempCorte, salidaCache);
+        return { yaEstaba: false, publicado: true, salida: salidaCache, rc };
+      }
+      return { yaEstaba: false, publicado: false, salida: tempCorte, rc };
+    } catch (e) {
+      fs.rmSync(tempCorte, { force: true });
+      throw e;
+    }
+  }, opcionesLock);
 }

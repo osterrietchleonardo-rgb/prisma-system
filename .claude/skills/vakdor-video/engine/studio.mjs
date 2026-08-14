@@ -16,8 +16,8 @@ import { cargarReceta, CALIDADES, RECETA_DEFAULT, cargarJsonDeArchivo } from "./
 import { construirGrafo, componer } from "./lib/compose.mjs";
 import { elegirEncoder } from "./lib/encoder.mjs";
 import { FORMATOS } from "./lib/reframe.mjs";
-import { cortarSilencios } from "./lib/cut.mjs";
-import { transcribir } from "./lib/transcribe.mjs";
+import { cortarConCache } from "./lib/cut.mjs";
+import { transcribirConCache } from "./lib/transcribe.mjs";
 import { NIVELES_LIMPIEZA, estabilizar } from "./lib/enhance.mjs";
 
 // Nombre de la carpeta de cache del corte/transcripcion, siempre al lado del --out.
@@ -112,28 +112,30 @@ async function main() {
         console.log("Estabilizacion: no.");
       }
 
-      // --- Paso 1: sacar silencios (con cache) ---
+      // --- Paso 1: sacar silencios (con cache atomico + lock entre procesos) ---
       if (args["sin-corte"]) {
         console.log("Corte: salteado (--sin-corte).");
       } else {
         fs.mkdirSync(cacheDir, { recursive: true });
         const claveCorte = claveDeCache(entradaTrabajo, `${corteCfg.db}|${corteCfg.min}|${corteCfg.pad}`);
         const salidaCache = path.join(cacheDir, `corte-${claveCorte}.mp4`);
+        const lockCorte = path.join(cacheDir, `.lock-corte-${claveCorte}`);
 
-        if (!args.rehacer && fs.existsSync(salidaCache)) {
-          entradaTrabajo = salidaCache;
-          info = await probe(entradaTrabajo);
+        const resultado = await cortarConCache({
+          entrada: entradaTrabajo, salidaCache, lockPath: lockCorte,
+          db: corteCfg.db, min: corteCfg.min, pad: corteCfg.pad, rehacer: Boolean(args.rehacer),
+        });
+        entradaTrabajo = resultado.salida;
+        // Si no se publico (tramos fallidos), el resultado sigue siendo un archivo
+        // valido para ESTA corrida, pero es efimero: no queda en el cache para la
+        // proxima, asi que se limpia como cualquier otro temporal.
+        if (!resultado.publicado) temporales.push(resultado.salida);
+        info = await probe(entradaTrabajo);
+
+        if (resultado.yaEstaba) {
           console.log(`Corte: reusando el corte de una corrida anterior (cache). Duracion: ${(info.durationSec / 60).toFixed(1)} min. Parametros: ${paramsCorte}.`);
         } else {
-          const rc = await cortarSilencios({
-            entrada: entradaTrabajo,
-            salida: salidaCache,
-            db: corteCfg.db,
-            min: corteCfg.min,
-            pad: corteCfg.pad,
-          });
-          entradaTrabajo = rc.salida;
-          info = await probe(entradaTrabajo);
+          const rc = resultado.rc;
           const antesMin = infoOriginal.durationSec / 60;
           const despuesMin = rc.duracionFinal / 60;
           // Math.max(0, ...): el re-encode del corte puede dar una duracion final
@@ -153,32 +155,34 @@ async function main() {
               const ultimaLinea = t.error.split("\n").filter(Boolean).slice(-1)[0] || t.error;
               console.log(`  - ${t.desde.toFixed(1)}s a ${t.hasta.toFixed(1)}s: ${ultimaLinea}`);
             }
+            // Sin esto, la PRIMERA corrida avisa el problema y CUALQUIER corrida
+            // siguiente reusaria en silencio ese mismo archivo con footage perdido
+            // (cortarConCache ya decidio no publicarlo — esta linea explica por que).
+            console.log("AVISO: por los tramos fallidos, este corte NO se guarda en el cache. La proxima corrida va a volver a cortar de cero (no va a reusar un video con footage perdido).");
           }
         }
       }
 
-      // --- Paso 2: transcribir (para anclar efectos a la palabra hablada; con cache) ---
+      // --- Paso 2: transcribir (para anclar efectos a la palabra hablada; con cache
+      // atomico + lock entre procesos, mismo mecanismo que el corte) ---
       if (args.srt) {
         console.log(`Transcripcion: se usa el SRT provisto (${args.srt}). ADVERTENCIA: un .srt no trae tiempos por palabra, asi que esta corrida queda SIN anclaje por palabra.`);
       } else if (process.env.GROQ_API_KEY) {
         fs.mkdirSync(cacheDir, { recursive: true });
         const clavePalabras = claveDeCache(entradaTrabajo, "palabras-es");
         const palabrasCache = path.join(cacheDir, `palabras-${clavePalabras}.json`);
+        const lockPalabras = path.join(cacheDir, `.lock-palabras-${clavePalabras}`);
 
-        if (!args.rehacer && fs.existsSync(palabrasCache)) {
-          palabras = JSON.parse(fs.readFileSync(palabrasCache, "utf8"));
-          console.log(`Transcripcion: reusando la transcripcion de una corrida anterior (cache). ${palabras.length} palabras.`);
-        } else {
-          const t = await transcribir({ entrada: entradaTrabajo, apiKey: process.env.GROQ_API_KEY, idioma: "es" });
-          palabras = t.palabras;
-          // Se guarda ANTES de imprimir el resultado, no despues: asi si algo de mas
-          // abajo tira, la transcripcion (que costo plata) no se pierde para la
-          // proxima corrida.
-          fs.writeFileSync(palabrasCache, JSON.stringify(palabras), "utf8");
-          console.log(palabras.length
-            ? `Transcripcion: ${palabras.length} palabras.`
-            : "Transcripcion: Groq no devolvio tiempos por palabra. Sigo sin anclaje por palabra.");
-        }
+        const resultado = await transcribirConCache({
+          entrada: entradaTrabajo, palabrasCache, lockPath: lockPalabras,
+          apiKey: process.env.GROQ_API_KEY, idioma: "es", rehacer: Boolean(args.rehacer),
+        });
+        palabras = resultado.palabras;
+        console.log(resultado.yaEstaba
+          ? `Transcripcion: reusando la transcripcion de una corrida anterior (cache). ${palabras.length} palabras.`
+          : (palabras.length
+              ? `Transcripcion: ${palabras.length} palabras.`
+              : "Transcripcion: Groq no devolvio tiempos por palabra. Sigo sin anclaje por palabra."));
       } else {
         console.log("Transcripcion: no hay GROQ_API_KEY. Sigo sin transcribir y sin anclaje por palabra (pasa --srt o definila).");
       }

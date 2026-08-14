@@ -3,14 +3,14 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { probe } from "../lib/probe.mjs";
-import { crearClipDePrueba, dirTemporal } from "./helpers.mjs";
+import { crearClipDePrueba, dirTemporal, borrarDirDePrueba } from "./helpers.mjs";
 
 let dir, clip;
 before(() => {
   dir = dirTemporal();
   clip = crearClipDePrueba({ segundos: 3, salida: path.join(dir, "clip.mp4") });
 });
-after(() => fs.rmSync(dir, { recursive: true, force: true }));
+after(() => borrarDirDePrueba(dir));
 
 test("probe devuelve duracion, fps, dimensiones y audio", async () => {
   const info = await probe(clip);

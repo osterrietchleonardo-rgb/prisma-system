@@ -7,14 +7,14 @@ import {
   elegirMultiplicador, filtroZoom, filtroEscalaFija, filtroWhipPan, filtroPush,
   filtroDrift, filtroDolly,
 } from "../lib/camera.mjs";
-import { crearClipDePrueba, dirTemporal } from "./helpers.mjs";
+import { crearClipDePrueba, dirTemporal, borrarDirDePrueba } from "./helpers.mjs";
 
 let dir, clip;
 before(() => {
   dir = dirTemporal();
   clip = crearClipDePrueba({ segundos: 2, salida: path.join(dir, "c.mp4") });
 });
-after(() => fs.rmSync(dir, { recursive: true, force: true }));
+after(() => borrarDirDePrueba(dir));
 
 const aplicar = (vf, nombre) => {
   const salida = path.join(dir, `${nombre}.mp4`);

@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { detectarSilencios, cortarSilencios, cortarUnTramo } from "../lib/cut.mjs";
-import { dirTemporal } from "./helpers.mjs";
+import { dirTemporal, borrarDirDePrueba } from "./helpers.mjs";
 
 let dir, conSilencio;
 before(() => {
@@ -19,7 +19,7 @@ before(() => {
     { encoding: "utf8" });
   if (r.status !== 0) throw new Error(r.stderr);
 });
-after(() => fs.rmSync(dir, { recursive: true, force: true }));
+after(() => borrarDirDePrueba(dir));
 
 test("detecta el silencio del medio", async () => {
   const sil = await detectarSilencios({ entrada: conSilencio, db: -30, min: 0.5 });

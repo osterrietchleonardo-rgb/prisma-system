@@ -4,14 +4,14 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { FORMATOS, ZONAS_SEGURAS, filtroDeFormato } from "../lib/reframe.mjs";
-import { crearClipDePrueba, dirTemporal } from "./helpers.mjs";
+import { crearClipDePrueba, dirTemporal, borrarDirDePrueba } from "./helpers.mjs";
 
 let dir, clip;
 before(() => {
   dir = dirTemporal();
   clip = crearClipDePrueba({ segundos: 1, ancho: 1920, alto: 1080, salida: path.join(dir, "h.mp4") });
 });
-after(() => fs.rmSync(dir, { recursive: true, force: true }));
+after(() => borrarDirDePrueba(dir));
 
 test("los 4 formatos con sus medidas", () => {
   assert.deepEqual(Object.keys(FORMATOS).sort(), ["16:9", "1:1", "4:5", "9:16"]);

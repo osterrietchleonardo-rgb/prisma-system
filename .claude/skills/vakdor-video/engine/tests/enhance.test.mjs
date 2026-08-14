@@ -4,14 +4,14 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { NIVELES_LIMPIEZA, filtroDeLimpieza, estabilizar } from "../lib/enhance.mjs";
-import { crearClipDePrueba, dirTemporal } from "./helpers.mjs";
+import { crearClipDePrueba, dirTemporal, borrarDirDePrueba } from "./helpers.mjs";
 
 let dir, clip;
 before(() => {
   dir = dirTemporal();
   clip = crearClipDePrueba({ segundos: 3, salida: path.join(dir, "e.mp4") });
 });
-after(() => fs.rmSync(dir, { recursive: true, force: true }));
+after(() => borrarDirDePrueba(dir));
 
 test("los 3 niveles y el apagado", () => {
   assert.deepEqual(Object.keys(NIVELES_LIMPIEZA).sort(), ["fuerte", "normal", "suave"]);
@@ -85,11 +85,19 @@ test("estabilizar limpia el .trf incluso si la segunda pasada (transform) revien
 });
 
 test("dos estabilizaciones concurrentes en la misma carpeta no chocan de nombre de .trf", async () => {
+  // Clip CHICO y corto a proposito. Lo que esta prueba verifica es que dos corridas no
+  // se pisen el nombre del .trf: la resolucion y la duracion no cambian nada de eso.
+  // Con el clip de 1920x1080 de `before`, dos vidstab en paralelo (4 pasadas de ffmpeg
+  // a la vez) se caian de a ratos cuando la suite completa ya tenia la maquina cargada
+  // -- una prueba que falla sin motivo real es una prueba que nadie vuelve a creer.
+  const chico = crearClipDePrueba({
+    segundos: 1, ancho: 640, alto: 360, conAudio: false, salida: path.join(dir, "conc.mp4"),
+  });
   const salidaA = path.join(dir, "estab-conc-a.mp4");
   const salidaB = path.join(dir, "estab-conc-b.mp4");
   await Promise.all([
-    estabilizar({ entrada: clip, salida: salidaA, suavizado: 10 }),
-    estabilizar({ entrada: clip, salida: salidaB, suavizado: 10 }),
+    estabilizar({ entrada: chico, salida: salidaA, suavizado: 10 }),
+    estabilizar({ entrada: chico, salida: salidaB, suavizado: 10 }),
   ]);
   assert.ok(fs.existsSync(salidaA));
   assert.ok(fs.existsSync(salidaB));

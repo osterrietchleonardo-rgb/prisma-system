@@ -8,7 +8,7 @@ import { cargarReceta } from "../lib/recipe.mjs";
 import { probe } from "../lib/probe.mjs";
 import { filtroZoom } from "../lib/camera.mjs";
 import { FORMATOS } from "../lib/reframe.mjs";
-import { crearClipDePrueba, dirTemporal } from "./helpers.mjs";
+import { crearClipDePrueba, dirTemporal, borrarDirDePrueba } from "./helpers.mjs";
 
 let dir, clip, info;
 before(async () => {
@@ -16,7 +16,7 @@ before(async () => {
   clip = crearClipDePrueba({ segundos: 6, salida: path.join(dir, "in.mp4") });
   info = await probe(clip);
 });
-after(() => fs.rmSync(dir, { recursive: true, force: true }));
+after(() => borrarDirDePrueba(dir));
 
 test("sin camara ni color, el grafo solo ajusta el formato", () => {
   const { receta } = cargarReceta({ grade: { preset: "ninguno" } }, { durationSec: 6, palabras: [] });
