@@ -257,8 +257,12 @@ Un solo `SELECT` con `LATERAL` por categoría: es la forma de que sea una consul
 **Overpass / OpenStreetMap**, en vivo, con las mismas categorías traducidas a tags de OSM
 (`railway=station`, `amenity=school|pharmacy|hospital|police`, `leisure=park`, `highway=bus_stop`).
 
-Verificado sobre Olivos: devuelve farmacias reales con nombre, horario y teléfono. **Se consulta por
-GET, no por POST** (por POST devolvió HTML de error).
+Verificado sobre Olivos: devuelve farmacias reales con nombre, horario y teléfono.
+
+**No se escribe un cliente de Overpass nuevo.** El repo ya tiene uno probado en
+`scripts/cargar-manzanas.mjs:76-113`: POST con `User-Agent` que identifica a PRISMA (Overpass
+responde **406 a quien no se identifica**) y reintentos con espera creciente ante 429 y 504, que son
+respuestas normales de ese servidor y no errores. Se reusa ese patrón tal cual.
 
 Reglas del respaldo, porque es un servidor comunitario y no nuestro:
 
