@@ -149,6 +149,12 @@ export interface FichaZona {
   espacios_verdes_barrio: number | null;
   /** Interno, para auditar de dónde salieron los datos. NO se muestra en la hoja. */
   fuente: "gcba" | "osm";
+  /**
+   * Coordenadas de la propiedad. Se guardan porque las necesita /api/acm/mapa-zona para dibujar
+   * el mapa, y ese endpoint las lee del snapshot: la ficha pública la abre un CLIENTE sin
+   * sesión, así que el mapa no puede depender de nada que esté en el navegador del asesor.
+   */
+  centro: { lat: number; lon: number } | null;
   /** El texto de la IA, ya revisado y editado por el asesor. */
   relato: string;
   pois: FichaZonaPoi[];

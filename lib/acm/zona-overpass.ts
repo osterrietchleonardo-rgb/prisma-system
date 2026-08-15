@@ -29,7 +29,7 @@ export async function zonaPorOverpass(
   lat: number,
   lon: number,
   barrioDeclarado: string
-): Promise<Omit<FichaZona, "relato" | "mapa_url"> | null> {
+): Promise<Omit<FichaZona, "relato" | "mapa_url" | "centro"> | null> {
   // Una sola consulta con todos los radios: cada ida a Overpass cuesta segundos.
   // `nwr` toma nodos, vías y relaciones: muchos hospitales, escuelas y parques están mapeados
   // como polígono y no como punto, y pidiendo solo `node` se perderían.

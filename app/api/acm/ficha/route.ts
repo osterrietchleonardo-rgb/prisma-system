@@ -237,6 +237,9 @@ export async function POST(req: Request) {
     };
 
     const profile = profileRes.data;
+    // El token se genera ANTES del snapshot porque la URL del mapa lo lleva adentro: el mapa se
+    // dibuja leyendo la propia ficha, que es lo que lo hace visible para un cliente sin sesión.
+    const token = genToken();
     const snapshot: AcmFichaSnapshot = {
       subject: {
         direccion: sujeto.direccion || "",
@@ -257,7 +260,10 @@ export async function POST(req: Request) {
       // Lo que el asesor revisó y editó, TAL CUAL. No se recalcula ni se vuelve a llamar a la
       // IA: lo que él leyó y aprobó es exactamente lo que va a ver el cliente. Sin relato no
       // hay hoja — los datos duros solos serían una tabla suelta sin nada que la explique.
-      zona: incluirZona && zonaIn?.relato?.trim() ? zonaIn : null,
+      // La URL del mapa la pone el servidor (no el navegador): apunta a esta misma ficha.
+      zona: incluirZona && zonaIn?.relato?.trim()
+        ? { ...zonaIn, mapa_url: zonaIn.centro ? `/api/acm/mapa-zona?token=${token}` : null }
+        : null,
       agent: {
         full_name: profile?.full_name || "",
         email: profile?.email || "",
@@ -271,7 +277,6 @@ export async function POST(req: Request) {
       created_at: new Date().toISOString(),
     };
 
-    const token = genToken();
     const admin = createAdminClient();
     const { error: insErr } = await admin.from("shared_acm_reports").insert({
       token,

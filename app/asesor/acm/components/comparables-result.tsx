@@ -341,11 +341,10 @@ export function ComparablesResult({
   const [cargandoPrev, setCargandoPrev] = useState(false); // pidiendo el cálculo
   const [conclusiones, setConclusiones] = useState<string[]>([]);
   const [incluirConclusiones, setIncluirConclusiones] = useState(true);
-  // Hoja del entorno: el texto viene de la IA y el asesor lo edita acá adentro; `zonaCentro`
-  // son las coordenadas ya geocodificadas, que sirven para pedirle el mapa al servidor.
+  // Hoja del entorno: el texto lo escribe la IA y el asesor lo edita acá adentro. Las
+  // coordenadas viajan dentro de `zona` (zona.centro), no aparte.
   const [zona, setZona] = useState<FichaZona | null>(null);
   const [incluirZona, setIncluirZona] = useState(true);
-  const [zonaCentro, setZonaCentro] = useState<{ lat: number; lon: number } | null>(null);
 
   const byId = useMemo(() => {
     const m = new Map<string, AcmComparable>();
@@ -566,7 +565,6 @@ export function ComparablesResult({
       setIncluirConclusiones(true);
       // Si no hubo datos de zona, la casilla arranca destildada: no tiene nada que incluir.
       setZona(data.zona ?? null);
-      setZonaCentro(data.zona_centro ?? null);
       setIncluirZona(Boolean(data.zona));
       setEntendidoAdvertencia(false); // cada revisión arranca sin el "ya lo sé" tildado
       setRevisando(true);
@@ -575,24 +573,6 @@ export function ComparablesResult({
     } finally {
       setCargandoPrev(false);
     }
-  };
-
-  /**
-   * URL del PNG del mapa. Se arma acá y no en el servidor porque el endpoint pide sesión: la
-   * tiene el navegador del asesor. La ficha pública después sirve esa misma imagen desde el
-   * caché del CDN, sin volver a pedir tiles.
-   */
-  const urlDelMapa = (): string | null => {
-    if (!zonaCentro || !zona) return null;
-    const pois = zona.pois
-      .filter((p) => p.lat != null && p.lon != null)
-      .map((p) => ({ categoria: p.categoria, lat: p.lat, lon: p.lon }));
-    const q = new URLSearchParams({
-      lat: String(zonaCentro.lat),
-      lon: String(zonaCentro.lon),
-      pois: JSON.stringify(pois),
-    });
-    return `/api/acm/mapa-zona?${q.toString()}`;
   };
 
   const crearFicha = async () => {
@@ -610,8 +590,10 @@ export function ComparablesResult({
           operacion, sujeto, comparables, search_id: searchId ?? null,
           // [] = el asesor decidió que la sección de conclusiones no aparezca en la ficha.
           conclusiones: incluirConclusiones ? conclusiones.filter((t) => t.trim()) : [],
+          // La URL del mapa la arma el servidor con el token de la ficha: el mapa lo tiene que
+          // poder ver un cliente sin sesión.
           incluir_zona: incluirZona && Boolean(zona),
-          zona: incluirZona && zona ? { ...zona, mapa_url: urlDelMapa() } : null,
+          zona: incluirZona && zona ? zona : null,
         }),
       });
       const data = await res.json();

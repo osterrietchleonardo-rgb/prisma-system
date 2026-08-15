@@ -12,9 +12,18 @@
 // entre otros cincuenta dibujos. El estilo claro deja las calles con su nombre y poco más, que
 // es exactamente lo que tiene que hacer el mapa de un informe. Se compararon los dos con la
 // misma dirección antes de elegir.
+//
+// POR QUE SE PIDE CON EL TOKEN DE LA FICHA Y NO CON COORDENADAS SUELTAS
+// La ficha pública la abre el CLIENTE, que no tiene sesión en PRISMA. La primera versión de
+// esto exigía sesión y el mapa salía vacío para todo el mundo menos para el asesor — el error
+// se vio recién al mirar la hoja renderizada sin cookies. Pedirlo por token arregla las dos
+// cosas a la vez: funciona sin sesión y sigue sin ser un proxy abierto de tiles, porque solo
+// dibuja mapas de fichas que existen y con las coordenadas que guardó su propio snapshot (el
+// que llama no elige qué se dibuja).
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { requireTenant } from "@/lib/auth/tenant-validation";
+import { createAdminClient } from "@/lib/supabase/admin";
+import type { AcmFichaSnapshot } from "@/lib/acm/ficha";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -24,14 +33,25 @@ const TILE = 256;
 // 1,5 km de alto, que es donde caen casi todos los puntos que muestra la hoja. En zoom 15
 // entraba el doble de ciudad y los marcadores quedaban todos apelotonados en el centro.
 const ZOOM = 16;
-const ANCHO_TILES = 4;  // 1024 px
-const ALTO_TILES = 3;   //  768 px
-// A 82 mm de ancho impreso, 1024 px son ~317 dpi: nítido en el PDF.
+// VERTICAL, no apaisado: en la hoja el mapa vive en una columna de 82 mm de ancho por 110 mm de
+// alto (proporción 0,75). Con una imagen apaisada, el `object-fit: cover` del CSS recortaba los
+// costados y se comía justo los marcadores que están a los lados de la propiedad.
+// 3 × 4 tiles = 768 × 1024 px, proporción 0,75: entra sin recortar casi nada.
+const ANCHO_TILES = 3;  //  768 px
+const ALTO_TILES = 4;   // 1024 px
+// A 82 mm de ancho impreso, 768 px son ~238 dpi: nítido en el PDF.
 const ANCHO = ANCHO_TILES * TILE;
 const ALTO = ALTO_TILES * TILE;
 
 const UA = "PRISMA-acm/1.0 (inmobiliaria; contacto: osterrietchleonardo@vakdor.com)";
 const MAX_MARCADORES = 12;
+
+// TAMAÑO DE LOS MARCADORES: se dibujan sobre una imagen de 768 px de ancho que en la hoja se
+// muestra a ~310 px, o sea que TODO se ve al 40%. Con radio 9 (que en la imagen suelta parece
+// correcto) el marcador terminaba midiendo 3,6 px en el papel: prácticamente invisible. Los
+// radios de acá están calculados para verse bien YA REDUCIDOS, no en la imagen original.
+const R_POI = 22;   // ~9 px en la hoja
+const R_CASA = 34;  // ~14 px en la hoja
 
 /** lon/lat → coordenadas de tile fraccionarias (Web Mercator). */
 function aTile(lat: number, lon: number, z: number): { x: number; y: number } {
@@ -59,27 +79,26 @@ const COLOR: Record<string, string> = {
 
 export async function GET(req: Request) {
   try {
-    // Endpoint autenticado: no es un proxy abierto de tiles para cualquiera de internet.
-    await requireTenant();
+    const token = new URL(req.url).searchParams.get("token") || "";
+    if (!token) return NextResponse.json({ error: "Falta el token." }, { status: 400 });
 
-    const url = new URL(req.url);
-    const lat = Number(url.searchParams.get("lat"));
-    const lon = Number(url.searchParams.get("lon"));
+    const admin = createAdminClient();
+    const { data } = await admin.from("shared_acm_reports").select("snapshot").eq("token", token).single();
+    const zona = (data?.snapshot as AcmFichaSnapshot | undefined)?.zona;
+    if (!zona?.centro) {
+      return NextResponse.json({ error: "Esta ficha no tiene mapa." }, { status: 404 });
+    }
+
+    const { lat, lon } = zona.centro;
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      return NextResponse.json({ error: "Faltan las coordenadas." }, { status: 400 });
+      return NextResponse.json({ error: "Coordenadas inválidas." }, { status: 400 });
     }
 
-    let pois: Array<{ categoria: string; lat: number; lon: number }> = [];
-    try {
-      const crudo = JSON.parse(url.searchParams.get("pois") || "[]");
-      if (Array.isArray(crudo)) {
-        pois = crudo
-          .filter((p) => Number.isFinite(p?.lat) && Number.isFinite(p?.lon))
-          .slice(0, MAX_MARCADORES); // son marcadores, no una capa de datos
-      }
-    } catch {
-      // Sin marcadores extra: el mapa sale igual, con la propiedad sola.
-    }
+    // Solo los que tienen punto propio: los conteos (farmacias, escuelas) no se dibujan.
+    const pois = zona.pois
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon))
+      .slice(0, MAX_MARCADORES)
+      .map((p) => ({ categoria: p.categoria as string, lat: p.lat as number, lon: p.lon as number }));
 
     const centro = aTile(lat, lon, ZOOM);
     const x0 = Math.floor(centro.x) - Math.floor(ANCHO_TILES / 2);
@@ -91,7 +110,10 @@ export async function GET(req: Request) {
       Array.from({ length: ANCHO_TILES * ALTO_TILES }, async (_, i) => {
         const dx = i % ANCHO_TILES, dy = Math.floor(i / ANCHO_TILES);
         try {
-          const r = await fetch(`https://basemaps.cartocdn.com/light_all/${ZOOM}/${x0 + dx}/${y0 + dy}.png`, {
+          // "voyager" y no "light_all": el segundo es tan claro que en el papel se ve lavado y
+          // no se distinguen las manzanas. Voyager mantiene la limpieza pero deja los parques
+          // en verde y las avenidas marcadas, que es lo que le da contexto al lector.
+          const r = await fetch(`https://basemaps.cartocdn.com/rastertiles/voyager/${ZOOM}/${x0 + dx}/${y0 + dy}.png`, {
             headers: { "User-Agent": UA },
             signal: AbortSignal.timeout(8000),
           });
@@ -119,23 +141,23 @@ export async function GET(req: Request) {
       // borde. Un marcador mordido por el margen parece un error de impresión.
       if (x < 10 || y < 10 || x > ANCHO - 10 || y > ALTO - 10) continue;
       marcas.push(
-        `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9" fill="${COLOR[p.categoria] || "#525252"}" stroke="#ffffff" stroke-width="3"/>`
+        `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${R_POI}" fill="${COLOR[p.categoria] || "#525252"}" stroke="#ffffff" stroke-width="${R_POI / 3}"/>`
       );
     }
 
     // La propiedad va ÚLTIMA para quedar arriba de todo, más grande y con un halo que la separa
     // del resto: es el punto que el cliente busca primero.
     const c = aPixel(lat, lon);
-    marcas.push(`<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="22" fill="#0a1f33" fill-opacity="0.16"/>`);
-    marcas.push(`<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="13" fill="#0a1f33" stroke="#ffffff" stroke-width="4"/>`);
+    marcas.push(`<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${R_CASA * 1.8}" fill="#0a1f33" fill-opacity="0.15"/>`);
+    marcas.push(`<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${R_CASA}" fill="#0a1f33" stroke="#ffffff" stroke-width="${R_CASA / 3}"/>`);
 
     // El crédito es CONDICION DE LA LICENCIA para poder usar estas tiles, no una cita de fuente:
     // la ficha no nombra ninguna otra. Van los dos porque son dos licencias distintas — los
     // datos son de OpenStreetMap y el dibujo es de CARTO. Va chico, sobre una banda
     // semitransparente para que se lea sobre cualquier mapa.
     const credito =
-      `<rect x="${ANCHO - 250}" y="${ALTO - 26}" width="250" height="26" fill="#ffffff" fill-opacity="0.7"/>` +
-      `<text x="${ANCHO - 8}" y="${ALTO - 8}" text-anchor="end" font-family="sans-serif" font-size="13" fill="#4a4a4a">© OpenStreetMap © CARTO</text>`;
+      `<rect x="${ANCHO - 300}" y="${ALTO - 34}" width="300" height="34" fill="#ffffff" fill-opacity="0.72"/>` +
+      `<text x="${ANCHO - 10}" y="${ALTO - 11}" text-anchor="end" font-family="sans-serif" font-size="17" fill="#4a4a4a">© OpenStreetMap © CARTO</text>`;
 
     const svg = Buffer.from(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${ANCHO}" height="${ALTO}">${marcas.join("")}${credito}</svg>`
@@ -159,7 +181,6 @@ export async function GET(req: Request) {
     });
   } catch (e: any) {
     console.error("ACM mapa-zona error:", e);
-    if (e.message === "Unauthorized") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     return NextResponse.json({ error: "No se pudo armar el mapa." }, { status: 500 });
   }
 }

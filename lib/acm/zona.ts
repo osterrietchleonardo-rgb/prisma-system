@@ -169,6 +169,7 @@ export async function obtenerZona(
         area_km2: Number.isFinite(Number(data.area_km2)) ? Number(data.area_km2) : null,
         espacios_verdes_barrio: Number.isFinite(data.espacios_verdes_barrio) ? Number(data.espacios_verdes_barrio) : null,
         fuente: "gcba",
+        centro,
         pois,
       },
     };
@@ -178,5 +179,5 @@ export async function obtenerZona(
   // casos que se resuelven con la base.
   const { zonaPorOverpass } = await import("./zona-overpass");
   const zona = await zonaPorOverpass(centro.lat, centro.lon, barrio);
-  return zona ? { zona, centro } : null;
+  return zona ? { zona: { ...zona, centro }, centro } : null;
 }
