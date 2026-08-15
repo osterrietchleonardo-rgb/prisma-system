@@ -33,6 +33,8 @@ interface FilaBarrio {
   oeste: number
   norte: number
   este: number
+  /** Provincia o ciudad del barrio. Solo la red: la cartera propia es toda de una zona. */
+  donde?: string | null
 }
 
 function aLugar(f: FilaBarrio, tipo: "barrio" | "cartera"): Lugar {
@@ -40,7 +42,7 @@ function aLugar(f: FilaBarrio, tipo: "barrio" | "cartera"): Lugar {
     id: `${tipo}:${f.nombre}`,
     tipo,
     nombre: f.nombre,
-    detalle: tipo === "cartera" ? detalleDeCartera(f.cantidad) : detalleDeBarrio(f.cantidad),
+    detalle: tipo === "cartera" ? detalleDeCartera(f.cantidad) : detalleDeBarrio(f.cantidad, f.donde),
     bbox: { sur: f.sur, oeste: f.oeste, norte: f.norte, este: f.este },
   }
 }

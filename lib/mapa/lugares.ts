@@ -62,8 +62,17 @@ function plural(n: number, singular: string, plural_: string) {
   return `${n.toLocaleString("es-AR")} ${n === 1 ? singular : plural_}`
 }
 
-export function detalleDeBarrio(cantidad: number): string {
-  return plural(cantidad, "propiedad", "propiedades")
+/**
+ * La linea chica de un barrio de la red: "6.615 propiedades · Capital Federal".
+ *
+ * El lugar NO es decorativo. El mismo nombre de barrio existe en muchas ciudades del pais
+ * —hay "Centro" en casi todas— y el catalogo se queda con el mas grande. Sin decirlo, el
+ * que busca "Centro" aterriza en Rosario sin enterarse de por que.
+ */
+export function detalleDeBarrio(cantidad: number, donde?: string | null): string {
+  const cuantas = plural(cantidad, "propiedad", "propiedades")
+  const lugar = donde?.trim()
+  return lugar ? `${cuantas} · ${lugar}` : cuantas
 }
 
 export function detalleDeCartera(cantidad: number): string {

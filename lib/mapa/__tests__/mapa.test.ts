@@ -14,7 +14,7 @@ import { agruparPorUbicacion } from "../agrupar.ts"
 import { buscarEnPropiedades } from "../buscar-propiedades.ts"
 import { COLORES, colorDe, cortesDeEscala, formatearM2, tramosDeReferencia } from "../precio-m2.ts"
 import { consultarMapa, TOPE_PUNTOS } from "../consulta.ts"
-import { normalizarTexto, precioCreible, recuadroDePunto, sacarBarriosRepetidos, unirLugares } from "../lugares.ts"
+import { detalleDeBarrio, normalizarTexto, precioCreible, recuadroDePunto, sacarBarriosRepetidos, unirLugares } from "../lugares.ts"
 import { TIPOS_MAPA, esTipoValido, etiquetaDeTipo, tipoEnCastellano, valoresDeTipo } from "../tipos-propiedad.ts"
 import type { PropiedadMapa } from "../tipos.ts"
 
@@ -468,6 +468,21 @@ describe("recuadroDePunto", () => {
     assert.ok(b.sur < -34.6 && b.norte > -34.6)
     assert.ok(b.oeste < -58.4 && b.este > -58.4)
     assert.equal(Math.round(((b.norte - b.sur) / 2) * 1e6) / 1e6, 0.0045)
+  })
+})
+
+describe("detalleDeBarrio", () => {
+  test("dice de que ciudad es, porque el nombre solo no alcanza", () => {
+    // Hay "Centro" en casi todas las ciudades del pais y el catalogo se queda con el mas
+    // grande: sin esto uno aterriza en Rosario sin enterarse.
+    assert.equal(detalleDeBarrio(6615, "Capital Federal"), "6.615 propiedades · Capital Federal")
+    assert.equal(detalleDeBarrio(1, "Córdoba"), "1 propiedad · Córdoba")
+  })
+
+  test("sin lugar cargado no deja el separador colgado", () => {
+    assert.equal(detalleDeBarrio(12), "12 propiedades")
+    assert.equal(detalleDeBarrio(12, null), "12 propiedades")
+    assert.equal(detalleDeBarrio(12, "   "), "12 propiedades")
   })
 })
 

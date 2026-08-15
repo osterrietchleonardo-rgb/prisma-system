@@ -2384,7 +2384,20 @@ puede haber 40.000.
 Una cajita arriba del mapa sugiere mientras se tipea, tolerante a acentos y a errores de
 tipeo ("cavallito" encuentra Caballito, "nunez" encuentra Núñez). Cuatro fuentes, en orden
 de prioridad: zonas guardadas propias, barrios de la cartera, barrios de la red, y
-direcciones. Elegir un **barrio** vuela al barrio Y filtra por él; elegir una **dirección**
+direcciones.
+
+**De qué Belgrano estamos hablando.** El mismo nombre de barrio existe en muchas ciudades:
+hay "Belgrano" en CABA, Rosario, Bariloche, Carlos Paz y Mendoza, y "Centro" en casi todas.
+El catálogo se queda con el **núcleo**: la zona donde está la masa de propiedades con ese
+nombre. Sin eso, el recuadro de Belgrano abarcaba 181 × 207 km y buscarlo no acercaba a
+ningún lado. Como elegir el núcleo resuelve la ambigüedad en silencio —quien busca "Centro"
+aterriza en Rosario sin enterarse—, la sugerencia **dice dónde queda**: "6.615 propiedades ·
+Capital Federal".
+
+**El buscador y los filtros se suman, no se pisan.** Elegir un barrio no borra los filtros
+puestos ni al revés: se puede pedir 1 ambiente y después Belgrano, o al revés, y quedan los
+dos. El chip azul "Solo Belgrano" y el numerito del botón Filtros muestran, juntos, todo lo
+que está recortando la pantalla en ese momento. Elegir un **barrio** vuela al barrio Y filtra por él; elegir una **dirección**
 solo vuela, porque un domicilio es un punto y filtrar dejaría la pantalla vacía si ahí no
 hay nada publicado.
 

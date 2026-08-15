@@ -1123,10 +1123,12 @@ Cada uno de estos nació de un `statement timeout` real, no de una optimización
   cero. Reemplazó a `idx_roomix_geo_filtros`, que era el mismo sin `rooms`: el planner elige
   el nuevo también para las consultas que no filtran ambientes, así que dejar los dos
   costaba el doble en cada sync nocturno. 29 MB.
-- `idx_roomix_barrio_normalizado` — índice de expresión sobre `barrio_normalizado()`. Sin
-  él, filtrar por barrio tardaba 8.337 ms y se cancelaba solo. `unaccent()` no se puede
-  indexar directamente (depende de un diccionario configurable): va envuelta con el
-  diccionario explícito para volverla inmutable, y calificada con su esquema.
+- `idx_roomix_barrio_filtros` — btree sobre `(barrio_normalizado(neighborhood), operation,
+  rooms)`, que es como se lo consulta siempre. `unaccent()` no se puede indexar
+  directamente (depende de un diccionario configurable): va envuelta con el diccionario
+  explícito para volverla inmutable, y calificada con su esquema. Reemplazó a
+  `idx_roomix_barrio_normalizado`, que era solo la primera columna **y que ninguna consulta
+  del mapa llegó a usar nunca** (ver la trampa de la normalización escrita a mano). 2 MB.
 - `idx_mapa_manzanas_geom`, `idx_precio_m2_celdas_geo`, `idx_mapa_barrios_trgm`.
 
 ### Trampas verificadas
@@ -1144,6 +1146,49 @@ Cada uno de estos nació de un `statement timeout` real, no de una optimización
   geocoder se llama desde el navegador, no desde el backend. Los orígenes permitidos deben
   incluir `*.vakdor.com` (`vakdor.com` a secas NO cubre subdominios) y `localhost`.
 - **`100vh` no descuenta la barra de direcciones en el celular**: va `dvh`.
+- **`is_active` en `roomix_properties` tiene TRES estados, no dos.** De 325.903 filas:
+  204.085 en `true`, 8.732 en `false` y **113.086 en `NULL`** (2026-08-15). El `WHERE
+  r.is_active` de las funciones del mapa deja afuera las dos últimas, que es lo correcto —
+  NULL no es publicado — pero conviene saberlo antes de comparar cualquier conteo contra la
+  tabla cruda. Verificado sobre un rectángulo de Belgrano: 22.847 activas + 117 inactivas +
+  4.880 nulas, y `mapa_colaboracion` devuelve 5.510 filas, las 5.510 activas.
+  **`/api/mapa/propiedad` no filtraba nada**: los pines ya salen filtrados, así que por
+  pantalla no se llegaba a una baja, pero el endpoint acepta cualquier slug y de ahí sale la
+  ficha que el asesor le COMPARTE al cliente. Ahora lleva `.eq("is_active", true)` en las
+  dos fuentes.
+- **El mismo barrio existe en muchas ciudades, y el catálogo agrupa por NOMBRE.** El
+  recuadro de "Belgrano" salía de 181 × 207 km porque juntaba el de CABA (6.612) con los de
+  Rosario (64), Bariloche (19), Carlos Paz (9) y Mendoza (2). Los percentiles 1/99 no
+  alcanzan: los de afuera son el 2,9%, así que el p99 cae dentro de Rosario. Estaba
+  calibrado para ruido, no para homónimos. **No era un caso raro: 446 de 2.647 barrios
+  (17%) tenían el recuadro reventado y 268 pasaban los 100 km** — "Centro" medía
+  1.089 × 1.388 km. Ahora se elige primero el **núcleo** (celda de ~5 km con más
+  propiedades) y se descarta lo que esté a más de 10 km, y recién ahí se aplican los
+  percentiles. Quedó en 13 recuadros grandes, todos legítimos (Pilar, Mar del Plata,
+  Córdoba: partidos de verdad, 12-20 km). **Se elige la celda más poblada y NO la mediana**:
+  la mediana de dos ciudades con la misma cantidad de avisos cae en el campo entre las dos.
+- **Una normalización escrita a mano NO usa el índice de la normalización.**
+  `idx_roomix_barrio_normalizado` estaba sobre `barrio_normalizado(neighborhood)`, que por
+  dentro llama a `unaccent(<diccionario>, …)` — con el argumento explícito, que es lo que la
+  vuelve inmutable e indexable. Las funciones del mapa comparaban con
+  `lower(unaccent(btrim(coalesce(…))))`, el `unaccent` de UN argumento: **otra expresión**,
+  así que el índice nunca aplicó y el barrio se evaluaba fila por fila. Regla: el WHERE
+  tiene que llamar a la MISMA función que indexa, no reescribirla.
+- **Frío contra tibio: la misma consulta son 2.511 ms o 36 ms.** Las filas de
+  `roomix_properties` pesan ~10 KB (fotos, descripción, embedding), así que el costo está en
+  traer páginas de disco, no en pensar. Por eso los timeouts del mapa aparecen justo cuando
+  un asesor entra a una zona que nadie miró hace rato — y desaparecen al reintentar, que es
+  lo que los vuelve difíciles de creer. **Al medir el mapa hay que correr la consulta dos
+  veces y mirar las dos.**
+- **Con barrio, la consulta resuelve el BARRIO primero** (`mapa_colaboracion` es plpgsql con
+  dos caminos, igual que `acm_match_roomix`). Con el barrio como filtro, la base traía del
+  disco las 3.585 filas del rectángulo para quedarse con 808: 2.505 ms y timeout al sumarle
+  ambientes. Resolviendo el barrio con su índice salen 824 filas: **531 ms**.
+- **`5 = ANY(p_ambientes)` dentro del WHERE mata el índice.** Escrito así, la base no puede
+  resolverlo al planificar y toda la condición de ambientes deja de ser indexable. Va
+  hoisteado a una variable plpgsql (`v_hay_cinco`) para que el plan de cada llamada lo vea
+  como constante. Se descartó expandir el array a `{5,6,7,…}`: hay avisos de hasta 527
+  ambientes y cualquier tope elegido a dedo se come en silencio los de arriba.
 - **Ambientes y dormitorios NO son lo mismo, y el mapa los confundía.** El filtro decía
   "Amb. mín." pero en la cartera medía `properties.bedrooms`, que son dormitorios: en el
   84% de las activas de Central los dos números difieren (377 de 451, el ambiente de más es

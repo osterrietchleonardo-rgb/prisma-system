@@ -781,7 +781,11 @@ Tus asesores tienen, dentro del Buscador IA, una solapa **Mapa** con todas las p
   pidiendo a la vuelta.
 - **Acotar a lo que el cliente pide.** Los filtros incluyen botones de ambientes (1 al 5+)
   que se suman, así que un asesor puede dejar en pantalla solo dos y tres ambientes sin
-  arrastrar los de seis.
+  arrastrar los de seis. El buscador de barrio y los filtros se combinan: "1 ambiente en
+  Belgrano" es una sola pantalla, no dos búsquedas.
+- **Saber en qué provincia está el barrio.** Cada sugerencia lo aclara ("Belgrano · Capital
+  Federal"): hay un Belgrano en Rosario, otro en Bariloche y un "Centro" en casi todas las
+  ciudades del país.
 
 > **Un número que cambió.** Hasta agosto de 2026 el mapa decía "ambientes" pero mostraba y
 > filtraba **dormitorios**, que es un ambiente menos. Ya está corregido: donde tus asesores

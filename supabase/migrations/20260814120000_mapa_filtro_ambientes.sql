@@ -66,15 +66,10 @@
 -- borra el anterior en vez de dejar los dos, que costarian el doble en cada sync nocturno.
 -- 24 MB pasan a 29 MB.
 --
--- CONCURRENTLY para no bloquear las escrituras del sync: la tabla son 178.351 avisos.
--- Ojo si esto se corre desde un cliente que abra transaccion: CREATE/DROP INDEX
--- CONCURRENTLY no pueden ir adentro de una.
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_roomix_geo_filtros_amb
-  ON public.roomix_properties
-  USING gist (point(lng, lat), operation, property_type, currency, price, rooms)
-  WHERE is_active;
-
-DROP INDEX CONCURRENTLY IF EXISTS idx_roomix_geo_filtros;
+-- El CREATE vive en su propio archivo — 20260814115000_mapa_indice_ambientes.sql — porque
+-- va CONCURRENTLY y eso no puede correr junto a otras sentencias: el cliente las envuelve
+-- en una transaccion. El DROP si puede ir aca, es instantaneo y no reconstruye nada.
+DROP INDEX IF EXISTS idx_roomix_geo_filtros;
 
 -- La cartera propia no necesita indice: son 451 propiedades activas y el filtro de agencia
 -- ya deja la busqueda en un pañuelo.

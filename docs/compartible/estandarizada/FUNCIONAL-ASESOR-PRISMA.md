@@ -654,6 +654,16 @@ Cuando elegís un **barrio**, el mapa se acerca y además esconde las propiedade
 barrios vecinos. Vas a ver un cartelito azul que dice "Solo Belgrano" — tocá la cruz para
 volver a ver todo.
 
+**Fijate en qué provincia está.** Al lado de la cantidad, cada barrio te dice dónde queda:
+"Belgrano — 6.615 propiedades · Capital Federal". No es un adorno: hay un Belgrano en
+Rosario, otro en Bariloche y otro en Carlos Paz, y hay un "Centro" en casi todas las
+ciudades del país. Ese renglón es el que te dice cuál estás por abrir.
+
+**Los filtros y el buscador se suman.** Podés poner "1 ambiente" y después buscar Belgrano,
+o al revés: quedan los dos. Arriba te va a quedar el cartelito azul del barrio y el botón
+**Filtros** con un numerito de cuántas cosas más están recortando la pantalla. Para sacar
+algo, la cruz del cartelito o el botón del filtro; no hace falta empezar de nuevo.
+
 Cuando elegís una **dirección**, el mapa te clava ahí la **chinche roja** de siempre, con
 el domicilio escrito al lado. Es tu punto de referencia: alrededor te quedan los pines de
 todo lo que hay publicado cerca, así ves el entorno y comparás contra esa puerta. La

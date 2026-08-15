@@ -30,6 +30,15 @@ export async function GET(req: Request) {
         .from("roomix_properties")
         .select("slug, title, description, operation, price, currency, property_type, rooms, bedrooms, bathrooms, area_m2, address, neighborhood, lat, lng, amenities, images, roomix_agency_name, roomix_agency_logo, roomix_agency_source_url, canonical_url")
         .eq("slug", slug)
+        // Solo lo publicado. Los pines ya salen filtrados, asi que por la pantalla no se
+        // llega a una baja; pero este endpoint acepta cualquier slug, y de aca sale la
+        // ficha que el asesor le COMPARTE al cliente. Una propiedad dada de baja no puede
+        // viajar por WhatsApp como si estuviera a la venta.
+        //
+        // `.eq(..., true)` y no "distinto de false": hay 113.086 filas con is_active en
+        // NULL, y NULL no es publicado. Es el mismo criterio que el `WHERE r.is_active` de
+        // las funciones del mapa, donde NULL tampoco pasa.
+        .eq("is_active", true)
         .maybeSingle()
       if (error) throw error
       if (!r) return NextResponse.json({ error: "No encontrada" }, { status: 404 })
@@ -43,7 +52,10 @@ export async function GET(req: Request) {
           currency: r.currency || "USD",
           property_type: r.property_type || "",
           status: r.operation === "rent" ? "Alquiler" : "Venta",
-          bedrooms: r.bedrooms || r.rooms || 0,
+          // `bedrooms` a secas: la ficha los muestra como "Dorm." y el respaldo en `rooms`
+          // ponia los AMBIENTES en su lugar, asi que un 3 ambientes sin dormitorios
+          // cargados se leia como "3 Dorm.". Son cosas distintas — ver lib/mapa/tipos.ts.
+          bedrooms: r.bedrooms || 0,
           bathrooms: r.bathrooms || 0,
           total_area: r.area_m2 ? Number(r.area_m2) : 0,
           address: r.address || r.neighborhood || "",
@@ -71,6 +83,8 @@ export async function GET(req: Request) {
       .select("id, title, description, price, currency, property_type, status, bedrooms, bathrooms, total_area, covered_area, address, city, images, lat, lng, assigned_agent_id, assigned_agent, tokko_data, agent_profile:profiles(full_name, email)")
       .eq("id", id)
       .eq("agency_id", agencyId)
+      // Misma razon que en la red: de aca sale la ficha que se le comparte al cliente.
+      .eq("is_active", true)
       .maybeSingle()
     if (error) throw error
     if (!p) return NextResponse.json({ error: "No encontrada" }, { status: 404 })
