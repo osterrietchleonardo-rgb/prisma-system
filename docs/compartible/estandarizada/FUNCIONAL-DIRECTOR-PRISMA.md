@@ -808,3 +808,15 @@ Casi nada, pero conviene que lo sepas:
 ## FIN DE LA GUÍA
 
 Esta guía refleja el sistema PRISMA tal como funciona hoy. Para la guía operativa de tu equipo, compartiles el documento **«PRISMA - Guía del Asesor»**.
+
+### La hoja del entorno en la ficha del cliente
+
+Las fichas que genera tu equipo ahora incluyen **una hoja dedicada al barrio**, apenas después de la portada: un mapa con la propiedad marcada, lo que tiene alrededor con distancias reales (subte, plazas, escuelas, farmacias, hospital, colectivos, comisaría) y un texto que lo cuenta de forma leíble.
+
+**Por qué le sirve a tu operación.** Es el argumento de zona que hasta ahora cada asesor improvisaba de memoria y contaba distinto: uno se acordaba del subte, otro de las escuelas, otro no decía nada. Ahora sale igual de completo en todas las fichas, sin depender de cuánto conozca el barrio quien la arma.
+
+**De dónde salen los números.** De registros públicos oficiales, no de la impresión de nadie. Las distancias están medidas, no estimadas. El texto lo redacta la IA, pero **solo puede usar esos datos**: tiene prohibido nombrar un lugar que no esté en la lista, opinar sobre el valor de la propiedad o afirmar que la zona es segura o tranquila.
+
+**Quién controla qué.** El asesor lee y edita el texto **antes** de que la ficha exista, con los datos a la vista, y puede sacar la hoja entera si no le sirve. Una vez creada, la ficha no cambia: el link que recibió el cliente muestra siempre lo mismo.
+
+La hoja no menciona de dónde salieron los datos. Es el documento de tu inmobiliaria, no un informe con bibliografía.

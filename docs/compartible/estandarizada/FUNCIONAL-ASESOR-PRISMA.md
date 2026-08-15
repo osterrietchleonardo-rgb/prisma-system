@@ -677,3 +677,17 @@ y se suman. Después la guardás con nombre y la volvés a usar cuando quieras.
 ## FIN DE LA GUÍA
 
 Esta guía refleja el sistema PRISMA tal como funciona hoy. Si tu pantalla se ve distinta a lo descripto, puede que tu agencia tenga una función deshabilitada o que haya una actualización: consultá con tu director.
+
+### La hoja del entorno en la ficha del cliente
+
+Cuando armás una ficha para tu cliente, ahora se suma **una hoja nueva justo después de la portada**: "La propiedad y su entorno".
+
+De un lado están la descripción de la propiedad y un texto que cuenta cómo es el barrio. Del otro, un mapa con la propiedad marcada y una lista de lo que tiene alrededor: la estación de subte más cercana, la plaza, cuántas escuelas y farmacias hay a la vuelta, el hospital, las líneas de colectivo que paran cerca, la comisaría, las estaciones de bici y la ciclovía. Cada cosa con la distancia real.
+
+**Antes de crear la ficha lo revisás vos.** En la misma pantalla donde ya revisás las conclusiones, aparece el texto del barrio para que lo leas y lo cambies si querés. Abajo vas a ver los datos con los que se escribió: esos no se editan, y están ahí justamente para que puedas controlar que el texto diga la verdad. **Leelos.** Si el texto menciona algo que no está en esa lista, corregilo antes de mandarlo.
+
+Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
+
+**Dos cosas para tener en cuenta:**
+- La descripción de la propiedad **ya no aparece en la portada**: se mudó a esta hoja. La portada quedó más limpia.
+- Si la dirección que cargaste no se puede ubicar en el mapa, la hoja no se genera y la ficha se crea igual, sin ella. No es un error: es que sin ubicación no hay nada honesto que contar.

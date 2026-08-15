@@ -2418,3 +2418,24 @@ El lápiz recorta en el navegador, sin consultas nuevas. Las zonas guardadas son
 ## FIN DEL DOCUMENTO
 
 Este documento cubre la lógica completa del sistema PRISMA al nivel de código fuente. Cada endpoint, cada flujo de datos, cada integración y cada mecanismo de seguridad han sido documentados basándose en el análisis directo del código, sin alteración ni ejecución del mismo.
+
+### 15.x Hoja "La propiedad y su entorno" — qué decide qué
+
+**Cuándo sale la hoja.** Solo si se cumplen las cuatro:
+1. Se pudo ubicar la dirección (Georef la encuentra).
+2. Hay al menos **3 categorías** de datos del entorno.
+3. La IA (o el asesor a mano) dejó un texto: **sin relato no hay hoja**, porque los datos duros solos serían una tabla suelta sin nada que la explique.
+4. El asesor dejó tildada la casilla en el paso de revisión.
+
+Si falla cualquiera, **la ficha se crea igual, sin esa hoja**. La zona nunca puede impedir que un asesor arme su ficha: todo el bloque está dentro de un `try` y cualquier caída (Georef, la base, Overpass, Gemini, el mapa) termina en "no hay hoja", nunca en error.
+
+**De dónde salen los datos, en este orden.** Dentro de CABA, de las tablas propias (instantáneo, más completo, y es el 90% de los casos medidos: 48 de los 53 ACM hechos). Fuera de CABA, de OpenStreetMap en vivo. **El cliente no ve la diferencia**: la hoja se imprime con el mismo código y no dice de dónde vino nada. La fuente queda guardada en el snapshot solo para poder auditarla.
+
+**Qué escribe la IA y qué no.** La IA **no produce ni un número**. Nombres, distancias y conteos salen calculados de la base o de OpenStreetMap; la IA solo los narra, y tiene prohibido nombrar cualquier cosa que no esté en la lista que se le pasó. El asesor **revisa y edita ese texto antes** de que la ficha exista, con los datos duros a la vista de solo lectura — sin verlos no tendría cómo darse cuenta de que la IA se inventó una estación.
+
+**Qué NO entra, y por qué.**
+- **Nada en tiempo real** (llegada del subte, bicis disponibles). La ficha es un PDF que el cliente abre tres días después: un dato en vivo queda viejo y hace quedar mal al documento.
+- **Nada de delitos ni seguridad estadística.** El dataset existe, pero poner tasas de delito en un documento firmado por la inmobiliaria es un riesgo comercial y legal que nadie pidió. Al relato también se le prohíbe afirmar que una zona es "segura" o "tranquila".
+- **La hoja no se edita después de creada.** El snapshot es inmutable a propósito: el link que tiene el cliente no puede cambiar bajo sus pies.
+
+**Un cambio que afecta a TODA ficha nueva:** la descripción de la propiedad ya **no va en la portada**, va en esta hoja. La portada queda solo con el título, la propiedad de referencia y la fecha. Las fichas viejas siguen abriendo como siempre.
