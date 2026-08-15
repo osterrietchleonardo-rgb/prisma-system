@@ -8,7 +8,17 @@ export const RECETA_DEFAULT = {
   estilo: "autoridad",
   calidad: "auto",
   corte: { db: -30, min: 0.6, pad: 0.15 },
-  grade: { preset: "cinematic", vignette: null },
+  // Default deliberado: "como salio de la camara, un poco mejor". El grade `natural`
+  // no baja el brillo ni pone viñeta (ver lib/grade.mjs: `cinematic` cerraba a la
+  // mitad el lado de la cara donde no da la luz), y la calidad la aporta la limpieza
+  // `suave`, que esta MEDIDA con VMAF sobre video recomprimido tipo red social
+  // (+6 puntos, ver lib/enhance.mjs) en vez de ser una impresion.
+  grade: { preset: "natural", vignette: null },
+  limpieza: "suave",
+  // "auto": si el video viene en HDR (celular moderno), se lo baja a SDR antes de
+  // gradear. "no" apaga esa conversion — solo para probar, porque sin ella un HDR
+  // sale oscuro y amarillento (ver lib/hdr.mjs).
+  hdr: "auto",
   subtitulos: { modo: "karaoke", posicion: "inferior" },
   camara: [],
   fx: [],
@@ -16,6 +26,7 @@ export const RECETA_DEFAULT = {
 };
 
 const ESTILOS = ["autoridad", "dinamico", "demo"];
+const MODOS_HDR = ["auto", "no"];
 // Exportada: studio.mjs la reusa para validar --calidad ANTES de que el valor
 // pisado por CLI llegue a construirGrafo/componer (que ya no lo revalidan).
 export const CALIDADES = ["auto", "max", "rapido"];
@@ -85,6 +96,8 @@ export function cargarReceta(origen, { durationSec, palabras = [] }) {
     throw new Error(`El estilo "${receta.estilo}" no existe. Validos: ${ESTILOS.join(", ")}.`);
   if (!CALIDADES.includes(receta.calidad))
     throw new Error(`La calidad "${receta.calidad}" no existe. Validas: ${CALIDADES.join(", ")}.`);
+  if (!MODOS_HDR.includes(receta.hdr))
+    throw new Error(`El modo de HDR "${receta.hdr}" no existe. Validos: ${MODOS_HDR.join(", ")}.`);
   if (!MODOS_SUBS.includes(receta.subtitulos.modo))
     throw new Error(`El modo de subtitulos "${receta.subtitulos.modo}" no existe. Validos: ${MODOS_SUBS.join(", ")}.`);
   // "ninguno" es vocabulario valido de la receta (sin grade): filtroDeColor ya lo maneja devolviendo cadena vacia.

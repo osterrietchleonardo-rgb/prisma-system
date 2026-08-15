@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { NIVELES_LIMPIEZA, filtroDeLimpieza, estabilizar } from "../lib/enhance.mjs";
+import { pixFmtIntermedioDe } from "../lib/cut.mjs";
 import { crearClipDePrueba, dirTemporal, borrarDirDePrueba } from "./helpers.mjs";
 
 let dir, clip;
@@ -53,6 +54,15 @@ test("ffmpeg acepta los 3 niveles", () => {
       "-frames:v", "2", "-f", "null", "-"], { encoding: "utf8" });
     assert.equal(r.status, 0, `ffmpeg rechazo el nivel "${n}": ${r.stderr}`);
   }
+});
+
+test("un origen de 10 bits conserva los 10 bits en el paso intermedio", () => {
+  // Aplastar un HDR a 8 bits ANTES del tonemap (que pasa al final, en compose) deja
+  // bandas en los degrades — la pared del fondo es donde primero se ve.
+  assert.equal(pixFmtIntermedioDe("yuv420p10le"), "yuv420p10le");
+  assert.equal(pixFmtIntermedioDe("yuv420p"), "yuv420p");
+  // Sin dato, se comporta como siempre: 8 bits. Un caller viejo no cambia de conducta.
+  assert.equal(pixFmtIntermedioDe(null), "yuv420p");
 });
 
 test("estabilizar hace las 2 pasadas y no cambia las dimensiones", async () => {

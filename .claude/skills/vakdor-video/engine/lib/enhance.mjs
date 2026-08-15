@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { pixFmtIntermedioDe } from "./cut.mjs";
 
 /**
  * Cadena MEDIDA con VMAF sobre video comprimido tipo WhatsApp (11-ago-2026, 8s del VSL
@@ -57,15 +58,25 @@ const escaparRutaDeFiltro = (p) => `'${p.replace(/\\/g, "/").replace(/:/g, "\\:"
  * El nombre del .trf lleva un `randomUUID()` (no solo un timestamp) para que dos corridas
  * concurrentes sobre la misma carpeta de salida nunca escriban al mismo archivo.
  */
-export async function estabilizar({ entrada, salida, suavizado = 30 }) {
+export async function estabilizar({ entrada, salida, suavizado = 30, pixFmtOrigen = null }) {
   const trf = path.join(path.dirname(salida), `.vidstab-${randomUUID()}.trf`);
   const trfEnFiltro = escaparRutaDeFiltro(trf);
   try {
     await correr(["-y", "-v", "error", "-i", entrada,
       "-vf", `vidstabdetect=shakiness=5:accuracy=15:result=${trfEnFiltro}`, "-f", "null", "-"]);
+    // La estabilizacion es un paso INTERMEDIO (corre antes del corte y de compose), asi
+    // que un HDR de 10 bits tiene que salir de aca en 10 bits: el tonemap a SDR recien
+    // pasa al final, en compose (ver lib/hdr.mjs). Aplastarlo aca a 8 bits deja bandas.
+    //
+    // `pixFmtOrigen` viene POR PARAMETRO a proposito, no se sondea aca: quien llama
+    // (studio.mjs) ya lo tiene de su `probe()` inicial, y lanzar un ffprobe extra justo
+    // antes de vidstab suma un proceso mas al momento de mayor presion de memoria de
+    // todo el pipeline. Sin el parametro, el comportamiento es identico al de siempre
+    // (yuv420p) — asi un caller viejo no cambia de conducta sin darse cuenta.
     await correr(["-y", "-v", "error", "-i", entrada,
       "-vf", `vidstabtransform=input=${trfEnFiltro}:smoothing=${suavizado}:zoom=1,unsharp=5:5:0.5`,
-      "-c:v", "libx264", "-crf", "16", "-pix_fmt", "yuv420p", "-c:a", "copy", salida]);
+      "-c:v", "libx264", "-crf", "16", "-pix_fmt", pixFmtIntermedioDe(pixFmtOrigen),
+      "-c:a", "copy", salida]);
     return { salida };
   } finally {
     // force:true: no importa si la 1ra pasada nunca llego a escribir el .trf (fallo

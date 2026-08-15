@@ -73,6 +73,67 @@ Leonardo. Lo distintivo: un efecto se ancla a **una palabra hablada**, no solo a
 `camara[].fx`: `zoomIn` · `zoomOut` · `dolly` · `push` · `drift` · `jumpCutClose` · `jumpCutWide` ·
 `whipPan`. Los tiempos son del video **ya cortado**, nunca del crudo.
 
+### Cómo grabar (iPhone) para no pelearla después
+
+Verificado leyendo los metadatos de los `.mov` reales de Leonardo (`com.apple.quicktime.model=iPhone 15`):
+HEVC 4K 3840×2160 · 30 fps · 36,5 Mbps · 10 bits · HLG/BT.2020.
+
+| Ajuste | Qué poner | Por qué |
+|---|---|---|
+| Modo | **Video**, no Cine | El modo Cine inventa el desenfoque de fondo con un mapa de profundidad. Con un micrófono en cuadro y la mano moviéndose, el borde se emborrona justo ahí. Y no se puede deshacer después. |
+| Resolución | **4K a 30 fps** | 30 es lo que usa el motor. 60 duplica el archivo sin que se note, salvo que quieras cámara lenta. |
+| Formatos | **Alta eficiencia** (HEVC) | Misma calidad en la mitad de espacio. Es lo que ya viene grabando. |
+| HDR | **Encendido** | Da 10 bits de gradación para trabajar. El motor lo convierte solo y bien (abajo). El problema nunca fue grabar en HDR: era ignorarlo. |
+
+**Pasarlo a la PC sin perder calidad:** cable USB o Google **Drive** (no Google *Photos*, que
+recomprime salvo en "calidad original"). Nunca por WhatsApp ni Telegram. Si va por cable, en
+el iPhone: Ajustes → Fotos → *Transferir a Mac o PC* → **Mantener originales** — en
+"Automático" convierte el HEVC/HDR a H.264 al copiarlo y ahí sí se pierde.
+
+Se comprueba en un segundo: si el archivo que llegó tiene los mismos Mbps que el original
+(`ffprobe`), no se recomprimió nada.
+
+### El grade por defecto es `natural`, y es a propósito
+
+`cinematic` (el default viejo) baja el brillo, sube el contraste y pone viñeta. Sobre una
+cara hablando contra una pared eso no se lee como cine: se lee como mal iluminado. Medido
+sobre un frame real, recortes de 70×70:
+
+| Zona | Sin grade | `natural` | `cinematic` |
+|---|---|---|---|
+| Lado iluminado de la cara | 164 | 169 | 136 |
+| **Lado en sombra** | **76** | **79** | **38** |
+| Esquina del cuadro | 186 | 193 | 97 |
+
+`cinematic` se comía la mitad de la luz del lado en sombra. `natural` abre apenas las
+sombras y no toca nada más. **La calidad no viene del grade: viene de `--limpiar`**, que
+está medido con VMAF (+6 puntos sobre video recomprimido tipo red social) — por eso
+`limpieza: "suave"` también es default ahora. Los otros 9 presets siguen ahí para cuando
+un video pida un look.
+
+### El gotcha del HDR: por qué un video salía amarillo
+
+Los celulares graban en **HDR** por defecto (`arib-std-b67`/HLG, primarios `bt2020`, 10 bits).
+Esa señal procesada como si fuera SDR sale **oscura y amarillenta**: el rojo y el verde se
+juntan y el azul se hunde, así que todo tira a un amarillo apagado y la piel queda gris.
+
+Medido sobre un `.mov` real (frame 00:08, la frente):
+
+| | R | G | B |
+|---|---|---|---|
+| sin convertir | 175 | 162 | 146 |
+| convertido a SDR | 179 | 138 | 118 |
+
+El motor **lo detecta y lo convierte solo** — no hay que hacer nada. Lo dice en el reporte
+(`Color de origen: HDR (...)` y `HDR a SDR: si`). Si alguna vez hace falta apagarlo:
+`"hdr": "no"` en la receta.
+
+El tonemap corre **antes** del grade: los presets de color están pensados sobre la curva
+bt709, así que gradear HDR crudo es gradear otra cosa. Ver `engine/lib/hdr.mjs`.
+
+En el **modo helpers** (Python) la conversión pasa en el máster: `python helpers/prep.py
+crudo.mov --master master.mp4`. Con material HDR, ese paso **no es opcional**.
+
 ### Portada y cierre: el gotcha del audio
 
 Al pegar portada + cuerpo + cierre con `concat`, **las tres partes tienen que tener

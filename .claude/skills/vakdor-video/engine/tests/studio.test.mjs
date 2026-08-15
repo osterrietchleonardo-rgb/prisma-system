@@ -226,12 +226,23 @@ test("--srt con un archivo que no existe falla con un mensaje claro, no con un s
 // --- Task 10: wiring de --limpiar y --estabilizar (fuera del brief original de
 // studio.mjs, pero siguiendo el mismo patron de --formato/--calidad de arriba). ---
 
-test("sin --limpiar ni --estabilizar, el reporte los declara apagados", () => {
+test("sin flags, el reporte declara los defaults: limpieza suave y estabilizacion apagada", () => {
+  // La limpieza `suave` es el default de la receta (RECETA_DEFAULT): un video sale con
+  // calidad sin que Leonardo tenga que acordarse de un flag. La estabilizacion NO es
+  // default (cuesta 2 pasadas de ffmpeg y solo hace falta si hay temblor real).
   const salida = path.join(dir, "sin-limpieza.mp4");
   const r = spawnSync("node", [STUDIO, `--in=${clip}`, `--out=${salida}`, "--sin-corte"],
     { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /Limpieza:\s*no\.\s*Estabilizacion:\s*no\./i, r.stdout);
+  assert.match(r.stdout, /Limpieza:\s*suave\.\s*Estabilizacion:\s*no\./i, r.stdout);
+});
+
+test("--limpiar=no apaga la limpieza que viene por defecto", () => {
+  const salida = path.join(dir, "limpieza-apagada.mp4");
+  const r = spawnSync("node", [STUDIO, `--in=${clip}`, `--out=${salida}`, "--limpiar=no", "--sin-corte"],
+    { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /Limpieza:\s*no\./i, r.stdout);
 });
 
 test("--limpiar invalido por CLI falla con mensaje claro, no en silencio", () => {
@@ -260,7 +271,9 @@ test("--estabilizar corre antes que todo lo demas, queda en el reporte y limpia 
     { encoding: "utf8", timeout: 180000, env: SIN_GROQ });
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /Estabilizacion:\s*aplicada/i, r.stdout);
-  assert.match(r.stdout, /Limpieza:\s*no\.\s*Estabilizacion:\s*si\./i, r.stdout);
+  // "suave" es el default de la receta (ver RECETA_DEFAULT): lo que esta prueba audita
+  // es que --estabilizar quede reportado, no que la limpieza este apagada.
+  assert.match(r.stdout, /Limpieza:\s*suave\.\s*Estabilizacion:\s*si\./i, r.stdout);
   assert.ok(fs.existsSync(salida));
   // OJO: el pipeline COMPLETO reformatea al formato de la receta (16:9 = 1920x1080
   // por default), asi que las dimensiones del archivo final NO tienen por que

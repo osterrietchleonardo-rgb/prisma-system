@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { filtroDeColor } from "./grade.mjs";
+import { filtroDeTonemap, argsDeColorDeSalida } from "./hdr.mjs";
 import { filtroDeLimpieza } from "./enhance.mjs";
 import { filtroDeFormato, FORMATOS } from "./reframe.mjs";
 import {
@@ -20,6 +21,7 @@ export function construirGrafo({ receta, info }) {
   });
   const limpieza = filtroDeLimpieza(receta.limpieza);
   const color = filtroDeColor(receta.grade.preset, { vignette: receta.grade.vignette });
+  const tonemap = filtroDeTonemap(info.color, { modo: receta.hdr });
 
   const segundosConZoom = receta.camara
     .filter((c) => MOVIMIENTOS_CON_DURACION.has(c.fx))
@@ -73,11 +75,14 @@ export function construirGrafo({ receta, info }) {
   if (cursor < info.durationSec) tramos.push({ desde: cursor, hasta: info.durationSec, filtro: "" });
   if (tramos.length === 0) tramos.push({ desde: 0, hasta: info.durationSec, filtro: "" });
 
-  // `base` es lo que se le aplica a TODOS los tramos: formato + limpieza + color, en
-  // ese orden (limpiar la imagen ANTES de gradear color: el denoise/sharpen de
-  // `filtroDeLimpieza` esta medido sobre imagen sin gradear, ver lib/enhance.mjs).
-  const filtroVideo = [formato, limpieza, color].filter(Boolean).join(",");
-  return { filtroVideo, tramos, multiplicador, avisos };
+  // `base` es lo que se le aplica a TODOS los tramos: tonemap + formato + limpieza +
+  // color, en ese orden. El tonemap va PRIMERO porque todo lo que viene despues
+  // asume imagen SDR: la limpieza esta medida sobre SDR y el grade (eq/colorbalance)
+  // esta pensado sobre la curva bt709 — gradear HLG crudo es gradear otra cosa
+  // (ver lib/hdr.mjs). Y despues: limpiar ANTES de gradear color, porque el
+  // denoise/sharpen de `filtroDeLimpieza` esta medido sobre imagen sin gradear.
+  const filtroVideo = [tonemap, formato, limpieza, color].filter(Boolean).join(",");
+  return { filtroVideo, tramos, multiplicador, avisos, huboTonemap: Boolean(tonemap) };
 }
 
 /** Ejecuta ffmpeg una sola vez. Separado para que `componer` no use un executor async. */
@@ -97,7 +102,7 @@ function correrFfmpeg(args, alSalir) {
 
 /** Arma el filter_complex definitivo y hace UN solo encode. */
 export async function componer({ entrada, salida, receta, info, encoder = null, alSalir = null }) {
-  const { filtroVideo: base, tramos } = construirGrafo({ receta, info });
+  const { filtroVideo: base, tramos, huboTonemap } = construirGrafo({ receta, info });
   const enc = encoder ?? (await elegirEncoder({
     calidad: receta.calidad === "max" ? "max" : "rapido",
   }));
@@ -121,10 +126,11 @@ export async function componer({ entrada, salida, receta, info, encoder = null, 
     "-filter_complex", partes.join(";"),
     "-map", "[vout]", "-map", "0:a?",
     "-c:v", enc.nombre, ...enc.args,
-    "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+    "-pix_fmt", "yuv420p", ...argsDeColorDeSalida(huboTonemap),
+    "-c:a", "aac", "-b:a", "192k",
     "-movflags", "+faststart", salida,
   ];
 
   const r = await correrFfmpeg(args, alSalir);
-  return { segundos: r.segundos, encoder: enc.nombre };
+  return { segundos: r.segundos, encoder: enc.nombre, huboTonemap };
 }

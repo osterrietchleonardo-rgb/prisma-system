@@ -66,6 +66,11 @@ async function main() {
 
   const infoOriginal = await probe(args.in);
   console.log(`Entrada: ${path.basename(args.in)} — ${infoOriginal.width}x${infoOriginal.height} @ ${infoOriginal.fps}fps, ${infoOriginal.durationSec.toFixed(1)}s`);
+  // Que el HDR se diga en voz alta: es la diferencia entre un video que sale con los
+  // colores del original y uno que sale oscuro y amarillento (ver lib/hdr.mjs).
+  console.log(infoOriginal.esHDR
+    ? `Color de origen: HDR (${infoOriginal.color.transfer}, ${infoOriginal.color.primaries}, ${infoOriginal.pixFmt}). Se convierte a SDR antes de gradear.`
+    : `Color de origen: SDR (${infoOriginal.color.transfer ?? "sin marcar"}). No hace falta convertir.`);
 
   // El bloque "corte" de la receta se lee ACA, antes de cortar, con el parser crudo de
   // recipe.mjs (no el `cargarReceta` completo: ese todavia no puede correr porque
@@ -104,7 +109,11 @@ async function main() {
       if (args.estabilizar) {
         const salidaEstab = path.join(path.dirname(args.out), `.studio-estab-${process.pid}-${Date.now()}.mp4`);
         temporales.push(salidaEstab);
-        const re = await estabilizar({ entrada: entradaTrabajo, salida: salidaEstab });
+        // `pixFmtOrigen`: para que un HDR de 10 bits no se aplaste aca (el tonemap
+        // recien pasa en compose). Sale del probe que ya se hizo, sin sondear de nuevo.
+        const re = await estabilizar({
+          entrada: entradaTrabajo, salida: salidaEstab, pixFmtOrigen: infoOriginal.pixFmt,
+        });
         entradaTrabajo = re.salida;
         estabilizado = true;
         console.log("Estabilizacion: aplicada (vidstab, 2 pasadas).");
@@ -300,7 +309,7 @@ function reportarFinal({ args, r, receta, recetaEfectiva, avisos, recorte, estab
   console.log(`Tardo ${r.segundos.toFixed(1)} segundos con el encoder ${r.encoder}.`);
 
   const limpieza = receta.limpieza && receta.limpieza !== "no" ? receta.limpieza : "no";
-  console.log(`Limpieza: ${limpieza}. Estabilizacion: ${estabilizado ? "si" : "no"}.`);
+  console.log(`Limpieza: ${limpieza}. Estabilizacion: ${estabilizado ? "si" : "no"}. HDR a SDR: ${r.huboTonemap ? "si" : "no"}.`);
 
   const aplicados = recetaEfectiva.camara.length;
   const fueraDeVentana = recorte ? receta.camara.length - recetaEfectiva.camara.length : 0;

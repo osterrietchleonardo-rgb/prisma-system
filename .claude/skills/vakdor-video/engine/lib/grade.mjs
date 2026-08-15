@@ -4,6 +4,15 @@
  * rh/gh/bh (altas). Valores entre -1 y 1.
  */
 export const PRESETS_COLOR = {
+  // El DEFAULT. "Como salio de la camara, un poco mejor": no baja el brillo, no pone
+  // viñeta y abre apenas las sombras, para que el lado de la cara donde no da la luz
+  // no se cierre. Medido sobre un frame real (00:08 del reel 2, recorte de 70x70):
+  //   lado en sombra   sin grade 76  ·  natural 79  ·  cinematic 38
+  //   esquina del cuadro  sin grade 186  ·  natural 193  ·  cinematic 97
+  // `cinematic` se comia la MITAD de la luz del lado en sombra. Para una cara hablando
+  // contra una pared eso no se lee como cine, se lee como mal iluminado. La calidad no
+  // viene de gradear: viene de `--limpiar` (ver lib/enhance.mjs, medido con VMAF).
+  natural:        { curves: "all='0/0.015 0.25/0.28 0.75/0.78 1/1'", eq: "contrast=1.03:saturation=1.02" },
   cinematic:      { eq: "contrast=1.15:brightness=-0.05:saturation=0.90:gamma=0.95", colorbalance: "rs=-0.05:bs=0.08", vignette: true },
   warm:           { eq: "contrast=1.05:saturation=1.10",            colorbalance: "rm=0.10:bm=-0.06" },
   cool:           { eq: "contrast=1.05:saturation=0.90",            colorbalance: "rm=-0.08:bm=0.12" },
@@ -27,6 +36,10 @@ export function filtroDeColor(preset, { vignette = null } = {}) {
     );
   }
   const partes = [];
+  // `curves` va ANTES que `eq`: curves reparte la luz (abre sombras, contiene altas) y
+  // eq ajusta el resultado. Al reves, eq trabaja sobre una distribucion que curves
+  // todavia no armo y el efecto de la curva se pierde a medias.
+  if (p.curves) partes.push(`curves=${p.curves}`);
   if (p.eq) partes.push(`eq=${p.eq}`);
   if (p.colorbalance) partes.push(`colorbalance=${p.colorbalance}`);
 

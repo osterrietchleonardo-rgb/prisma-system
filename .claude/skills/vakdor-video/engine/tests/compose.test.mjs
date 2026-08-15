@@ -38,10 +38,27 @@ test("la limpieza entra al grafo, entre el formato y el color", () => {
     `orden esperado formato < limpieza < color, dio ${posFormato},${posLimpieza},${posColor}`);
 });
 
-test("sin --limpiar, el grafo no agrega nada de limpieza (receta sin el campo)", () => {
+test("por defecto la limpieza es suave: un video sale con calidad sin pedir nada", () => {
   const { receta } = cargarReceta({}, { durationSec: 6, palabras: [] });
+  assert.equal(receta.limpieza, "suave");
+  const { filtroVideo } = construirGrafo({ receta, info });
+  assert.ok(filtroVideo.includes("hqdn3d"));
+});
+
+test('con limpieza "no" el grafo no agrega nada de limpieza', () => {
+  const { receta } = cargarReceta({ limpieza: "no" }, { durationSec: 6, palabras: [] });
   const { filtroVideo } = construirGrafo({ receta, info });
   assert.ok(!filtroVideo.includes("hqdn3d"));
+});
+
+test("el grade por defecto no baja el brillo ni pone viñeta", () => {
+  // `cinematic` cerraba a la mitad el lado en sombra de la cara (medido). El default
+  // tiene que dejar la imagen como salio de la camara, no maquillarla.
+  const { receta } = cargarReceta({}, { durationSec: 6, palabras: [] });
+  assert.equal(receta.grade.preset, "natural");
+  const { filtroVideo } = construirGrafo({ receta, info });
+  assert.ok(!filtroVideo.includes("brightness=-"), "el default no puede bajar el brillo");
+  assert.ok(!filtroVideo.includes("vignette"), "el default no puede poner viñeta");
 });
 
 test("el color entra al grafo", () => {
@@ -49,6 +66,46 @@ test("el color entra al grafo", () => {
   const { filtroVideo } = construirGrafo({ receta, info });
   assert.ok(filtroVideo.includes("eq="));
   assert.ok(filtroVideo.includes("vignette"));
+});
+
+// --- HDR: un .mov de celular moderno llega en HLG/bt2020. Si el grafo no lo baja a
+// SDR ANTES de gradear, el video sale oscuro y amarillento (medido; ver lib/hdr.mjs).
+const infoHDR = () => ({
+  ...info,
+  color: { space: "bt2020nc", transfer: "arib-std-b67", primaries: "bt2020", range: "tv" },
+  pixFmt: "yuv420p10le",
+  esHDR: true,
+});
+
+test("un video HDR se convierte a SDR, y el tonemap va PRIMERO de todo", () => {
+  const { receta } = cargarReceta({ grade: { preset: "cinematic" }, limpieza: "normal" }, { durationSec: 6, palabras: [] });
+  const { filtroVideo, huboTonemap } = construirGrafo({ receta, info: infoHDR() });
+
+  assert.equal(huboTonemap, true);
+  const posTonemap = filtroVideo.indexOf("tonemap=");
+  const posFormato = filtroVideo.indexOf("scale=");
+  const posLimpieza = filtroVideo.indexOf("hqdn3d");
+  const posColor = filtroVideo.indexOf("eq=");
+  assert.ok(posTonemap >= 0, "el HDR tiene que tonemapearse");
+  // El grade esta pensado sobre la curva bt709: gradear HLG crudo es gradear otra cosa.
+  assert.ok(posTonemap < posLimpieza && posTonemap < posColor,
+    `el tonemap tiene que ir antes que limpieza y color, dio ${posTonemap},${posLimpieza},${posColor}`);
+  assert.ok(posTonemap < posFormato || filtroVideo.startsWith("zscale"),
+    "el tonemap tiene que abrir la cadena");
+});
+
+test("un video SDR no paga ningun filtro de HDR", () => {
+  const { receta } = cargarReceta({ grade: { preset: "cinematic" } }, { durationSec: 6, palabras: [] });
+  const { filtroVideo, huboTonemap } = construirGrafo({ receta, info });
+  assert.equal(huboTonemap, false);
+  assert.ok(!filtroVideo.includes("tonemap="));
+});
+
+test('con hdr:"no" el HDR no se convierte, aunque el video lo sea', () => {
+  const { receta } = cargarReceta({ hdr: "no" }, { durationSec: 6, palabras: [] });
+  const { filtroVideo, huboTonemap } = construirGrafo({ receta, info: infoHDR() });
+  assert.equal(huboTonemap, false);
+  assert.ok(!filtroVideo.includes("tonemap="));
 });
 
 test("el zoom solo se aplica al tramo pedido, no a todo el video", () => {

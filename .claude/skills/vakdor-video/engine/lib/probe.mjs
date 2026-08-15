@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import { esHDR } from "./hdr.mjs";
 
 const correr = (cmd, args) =>
   new Promise((resolve, reject) => {
@@ -38,6 +39,17 @@ export async function probe(ruta) {
   ) % 180;
   const rotado = rot === 90;
 
+  // COLOR: sin esto no hay forma de saber si el video es HDR, y un video HDR
+  // procesado como si fuera SDR sale oscuro y amarillento (ver lib/hdr.mjs, que
+  // consume estos campos). `pixFmt` va aparte porque decide si los pasos
+  // intermedios (corte, estabilizacion) tienen que conservar 10 bits.
+  const color = {
+    space: video.color_space ?? null,
+    transfer: video.color_transfer ?? null,
+    primaries: video.color_primaries ?? null,
+    range: video.color_range ?? null,
+  };
+
   return {
     durationSec: Number(datos.format?.duration ?? video.duration ?? 0),
     fps: Number.isInteger(fps) ? fps : Math.round(fps * 1000) / 1000,
@@ -45,5 +57,8 @@ export async function probe(ruta) {
     height: Number(rotado ? video.width : video.height),
     rotacion: rot,
     hasAudio: datos.streams.some((s) => s.codec_type === "audio"),
+    color,
+    pixFmt: video.pix_fmt ?? null,
+    esHDR: esHDR(color),
   };
 }

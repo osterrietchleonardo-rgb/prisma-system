@@ -24,6 +24,30 @@ function duracionDe(entrada) {
   return parseFloat(r.stdout.trim());
 }
 
+/**
+ * Formato de pixel para el archivo INTERMEDIO del corte.
+ *
+ * Un celular moderno graba HDR en 10 bits. Este archivo no es el final: lo consume
+ * `compose`, que recien ahi baja el HDR a SDR (lib/hdr.mjs). Si aca se lo aplasta a 8
+ * bits, el tonemap posterior tiene que estirar un degrade de 8 bits y la pared del
+ * fondo sale con bandas. Por eso: si la fuente es de 10 bits, el intermedio queda en
+ * 10 bits. Para un video comun (8 bits) no cambia nada.
+ */
+export function pixFmtIntermedioDe(pixFmtOrigen) {
+  return /10|12/.test(String(pixFmtOrigen ?? "")) ? "yuv420p10le" : "yuv420p";
+}
+
+/** Igual que `pixFmtIntermedioDe`, pero leyendo el pix_fmt del archivo.
+ *  Solo para quien NO tenga ya el dato: cada llamada cuesta un proceso ffprobe. */
+export function pixFmtIntermedio(entrada) {
+  const r = spawnSync(
+    "ffprobe",
+    ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=pix_fmt", "-of", "csv=p=0", entrada],
+    { encoding: "utf8" }
+  );
+  return pixFmtIntermedioDe((r.stdout || "").trim());
+}
+
 /** Corre silencedetect sobre `entrada` y devuelve los pares [inicio, fin] de cada silencio. */
 export async function detectarSilencios({ entrada, db = -30, min = 0.6 }) {
   const dur = duracionDe(entrada);
@@ -177,7 +201,7 @@ export async function cortarSilencios({ entrada, salida, db = -30, min = 0.6, pa
     await correrFfmpeg([
       "-f", "concat", "-safe", "0", "-i", concatList,
       "-c:v", "libx264", "-preset", "medium", "-crf", "16",
-      "-pix_fmt", "yuv420p", "-r", "30",
+      "-pix_fmt", pixFmtIntermedio(entrada), "-r", "30",
       "-af", loudnormFilter,
       "-c:a", "aac", "-b:a", "256k", "-ar", "48000",
       "-movflags", "+faststart",
