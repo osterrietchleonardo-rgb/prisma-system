@@ -101,6 +101,7 @@
 | v1.0.5 | 2026-05-29 | Documentación completa del módulo Marketing IA. Skill `vakdor-video` creado. |
 | v1.0.6 | 2026-06-01 | Reescritura Landing Page (Framework Vakdor) con foco High-Ticket y Multi-Audiencia. Análisis exhaustivo de 36 herramientas. |
 | v1.0.7 | 2026-07-17 | Fix Marketing IA: Superposición determinista de logo con Sharp en imágenes publicitarías (100% completo, 1 vez, posición/tamaño exactos sin alucinaciones de IA). |
+| v1.0.8 | 2026-08-14 | Marketing IA: pestaña **Mi Forma de Trabajar** (formulario de operación real + 2 ofertas irresistibles de Hormozi, por usuario, tabla `advisor_operations`). La oferta y los datos duros se inyectan en todos los anuncios con regla anti-invento. **6 estructuras de guion** elegibles (+ "Sugerida" por nivel de consciencia) y el copy de video pasa a ser un **guion para cámara sin imágenes**, con segundos, tono y el porqué de cada bloque. Retrocompatible: los anuncios viejos y el flujo de Post quedan igual. |
 
 ---
 
@@ -118,8 +119,9 @@ IPC Manager → IPC Form (5 pasos) → Copy Generator Flow → API generate-batc
 
 | Tab | Componente | Función |
 |-----|-----------|---------|
-| Crear Anuncio | `CopyGeneratorFlow` | Multi-generador IA: 3 variantes (copy + imagen) con un clic |
+| Crear Anuncio | `CopyGeneratorFlow` | Multi-generador IA: 3 variantes con un clic. **Video → 3 guiones para cámara (sin imagen), con estructura elegible; Post → copy + imagen** |
 | Clientes Ideales (IPC) | `IpcManager` | CRUD de perfiles de cliente ideal |
+| Mi Forma de Trabajar | `FormaTrabajoForm` + `OfertasIrresistibles` | Formulario de operación real (Hormozi) por usuario + sus 2 ofertas irresistibles guardadas y editables |
 | Historial / Galería | `MarketingHistory` | Galería de todo el contenido generado |
 | Guía Mágica | `AdGuide` | Guía de Meta Ads 2026 integrada |
 | Configuración IA | `MarketingAiSettings` | Identidad visual de la agencia para las imágenes |

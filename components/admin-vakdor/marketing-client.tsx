@@ -1,7 +1,8 @@
 "use client"
-import { useState } from "react"
+import { useState, createContext, useContext } from "react"
 import { useRouter } from "next/navigation"
 import { ESTADOS, type MarketingIdea, type EstadoIdea, type FunnelStage } from "@/lib/admin-vakdor/marketing/types"
+import type { Ejes } from "@/lib/admin-vakdor/marketing/store"
 import { MarketingMetricsSection } from "@/components/admin-vakdor/marketing-metrics-section"
 
 const ACCENT = "#c2783c"
@@ -19,6 +20,39 @@ function FunnelBadge({ funnel }: { funnel: FunnelStage | null }) {
     <span title={funnel === "tofu" ? "Descubrimiento" : funnel === "mofu" ? "Nutrición" : "Empujón a la reunión"}
       style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.06em", padding: "2px 7px", borderRadius: 5, background: f.bg, border: `1px solid ${f.border}`, color: f.color }}>
       {f.label}
+    </span>
+  )
+}
+
+/**
+ * Los ejes (territorios y propósitos) los usa medio árbol: tarjeta, visor, calendario y
+ * el alta. Van por contexto para no arrastrarlos como prop por cinco niveles.
+ */
+const EjesCtx = createContext<Ejes>({ clusters: [], propositos: [] })
+
+/** Pasa "leads_inmobiliarios" a "Leads inmobiliarios" cuando no hay título cargado. */
+function legible(clave: string): string {
+  const t = clave.replace(/_/g, " ")
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+
+/**
+ * Badge de cluster o propósito. Devuelve null si el eje no está: las ideas creadas
+ * antes de esta versión no lo tienen, y el tablero tiene que seguir funcionando igual.
+ * No se muestra "sin cluster" — un hueco es más limpio que una etiqueta vacía.
+ */
+function EjeBadge({ valor, tono }: { valor: string | null; tono: "cluster" | "proposito" }) {
+  const ejes = useContext(EjesCtx)
+  if (!valor) return null
+  const lista = tono === "cluster" ? ejes.clusters : ejes.propositos
+  const titulo = lista.find((e) => e.clave === valor)?.titulo ?? legible(valor)
+  const c = tono === "cluster"
+    ? { bg: "rgba(194,120,60,0.14)", border: "rgba(194,120,60,0.4)", color: "#e0a877" }
+    : { bg: "rgba(148,163,184,0.14)", border: "rgba(148,163,184,0.35)", color: "#cbd5e1" }
+  return (
+    <span title={tono === "cluster" ? `Territorio: ${titulo}` : `Propósito: ${titulo}`}
+      style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.03em", padding: "2px 7px", borderRadius: 5, background: c.bg, border: `1px solid ${c.border}`, color: c.color, whiteSpace: "nowrap" }}>
+      {titulo}
     </span>
   )
 }
@@ -197,6 +231,8 @@ function Card({ idea, onMover, onVer, onProgramar, onPublicar, publicando, onRef
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginBottom: 8 }}>
         <FunnelBadge funnel={idea.funnel} />
+        <EjeBadge valor={idea.cluster} tono="cluster" />
+        <EjeBadge valor={idea.proposito} tono="proposito" />
         <Chip>{idea.fuente}</Chip>
         <Chip>{idea.formato}</Chip>
         {idea.angulo ? <Chip>{idea.angulo}</Chip> : null}
@@ -479,12 +515,15 @@ function Calendario({ items, onVer }: { items: MarketingIdea[]; onVer: (i: Marke
   const [fFuente, setFFuente] = useState("")
   const [fFormato, setFFormato] = useState("")
   const [fFunnel, setFFunnel] = useState("")
+  const [fCluster, setFCluster] = useState("")
   const [fAngulo, setFAngulo] = useState("")
+  const ejes = useContext(EjesCtx)
 
   const filtradas = items.filter((i) => {
     if (fFuente && i.fuente !== fFuente) return false
     if (fFormato && i.formato !== fFormato) return false
     if (fFunnel && i.funnel !== fFunnel) return false
+    if (fCluster && i.cluster !== fCluster) return false
     if (fAngulo && !(i.angulo ?? "").toLowerCase().includes(fAngulo.toLowerCase())) return false
     return true
   })
@@ -520,6 +559,14 @@ function Calendario({ items, onVer }: { items: MarketingIdea[]; onVer: (i: Marke
           <option value="mofu" style={optionStyle}>MOFU · Nutrición</option>
           <option value="bofu" style={optionStyle}>BOFU · Reunión</option>
         </select>
+        {ejes.clusters.length > 0 ? (
+          <select value={fCluster} onChange={(e) => setFCluster(e.target.value)} style={inputStyle}>
+            <option value="" style={optionStyle}>Todos los territorios</option>
+            {ejes.clusters.map((c) => (
+              <option key={c.clave} value={c.clave} style={optionStyle}>{c.titulo}</option>
+            ))}
+          </select>
+        ) : null}
         <input value={fAngulo} onChange={(e) => setFAngulo(e.target.value)} placeholder="Ángulo contiene…" style={inputStyle} />
       </div>
 
@@ -650,9 +697,12 @@ function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post", onDupli
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <FunnelBadge funnel={idea.funnel} />
+              <EjeBadge valor={idea.cluster} tono="cluster" />
+              <EjeBadge valor={idea.proposito} tono="proposito" />
               <Chip>{idea.fuente.toUpperCase()}</Chip>
               <Chip>{idea.formato}</Chip>
               {idea.angulo ? <Chip>{idea.angulo}</Chip> : null}
+              {idea.keyword_objetivo ? <Chip>🔍 {idea.keyword_objetivo}</Chip> : null}
             </div>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: "#fff", margin: 0, lineHeight: 1.3 }}>{idea.titulo}</h2>
           </div>
@@ -1037,7 +1087,7 @@ function ModalVisor({ idea, onClose, onIdeaUpdated, initialTab = "post", onDupli
   )
 }
 
-export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
+export default function MarketingClient({ ideas, ejes }: { ideas: MarketingIdea[]; ejes: Ejes }) {
   const router = useRouter()
   const [items, setItems] = useState<MarketingIdea[]>(ideas)
   const [nueva, setNueva] = useState(false)
@@ -1169,6 +1219,7 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
   const [tabPrincipal, setTabPrincipal] = useState<"tablero" | "metricas">("tablero")
 
   return (
+    <EjesCtx.Provider value={ejes}>
     <div style={{ padding: "28px 32px", minHeight: "100vh" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
         <div>
@@ -1313,6 +1364,11 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
                 body: JSON.stringify({
                   titulo: fd.get("titulo"), fuente: fd.get("fuente"),
                   formato: fd.get("formato"), funnel: fd.get("funnel"),
+                  // Vacío = sin eje. El worker sortea el propósito y escribe sin
+                  // pilar ni enlaces si no hay territorio.
+                  cluster: fd.get("cluster") || null,
+                  proposito: fd.get("proposito") || null,
+                  keyword_objetivo: fd.get("keyword_objetivo") || null,
                   angulo: fd.get("angulo"), motivo: fd.get("motivo"),
                 }),
               })
@@ -1341,6 +1397,23 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
               <option value="mofu" style={optionStyle}>MOFU · Nutrición (mecanismo/método)</option>
               <option value="bofu" style={optionStyle}>BOFU · Empujón a la reunión</option>
             </select>
+            {ejes.clusters.length > 0 ? (
+              <select name="cluster" defaultValue="" style={inputStyle}>
+                <option value="" style={optionStyle}>Territorio (opcional)</option>
+                {ejes.clusters.map((c) => (
+                  <option key={c.clave} value={c.clave} style={optionStyle}>{c.titulo}</option>
+                ))}
+              </select>
+            ) : null}
+            {ejes.propositos.length > 0 ? (
+              <select name="proposito" defaultValue="" style={inputStyle}>
+                <option value="" style={optionStyle}>Propósito (opcional · si no, se sortea)</option>
+                {ejes.propositos.map((p) => (
+                  <option key={p.clave} value={p.clave} style={optionStyle}>{p.titulo}</option>
+                ))}
+              </select>
+            ) : null}
+            <input name="keyword_objetivo" placeholder="Búsqueda objetivo (solo blog, opcional)" style={inputStyle} />
             <input name="angulo" placeholder="Ángulo (opcional)" style={inputStyle} />
             <input name="motivo" placeholder="Motivo / por qué (opcional)" style={inputStyle} />
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -1389,5 +1462,6 @@ export default function MarketingClient({ ideas }: { ideas: MarketingIdea[] }) {
         </div>
       ) : null}
     </div>
+    </EjesCtx.Provider>
   )
 }

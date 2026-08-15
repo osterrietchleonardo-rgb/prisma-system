@@ -3,8 +3,11 @@ import { prismaIA } from "@/lib/gemini";
 import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
 import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
-import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
+import { AdvisorOperation, EstructuraId, IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
 import { buildPropertyDirective } from "@/lib/marketing-ia/property-context";
+import { buildOperacionDirective } from "@/lib/marketing-ia/operacion-context";
+import { nivelDesdeIpc, NIVEL_DESCRIPCION } from "@/lib/marketing-ia/niveles";
+import { ESTRUCTURAS, resolverEstructura, esquemaJsonGuion, guiaBloquesParaPrompt } from "@/lib/marketing-ia/estructuras";
 
 export const dynamic = "force-dynamic";
 
@@ -14,16 +17,18 @@ interface GenerateBatchPayload {
   consciousness_level?: ConsciousnessLevel;
   extra_context?: string;
   propiedad_tokko_id?: number | null;
+  estructura?: EstructuraId | "sugerida";
 }
 
-const buildBatchCopyPrompt = (ipc: IpcProfile, config: GenerateBatchPayload, property?: TokkoProperty | null, directive?: string): string => {
-  const nivelDesc = {
-    0: "El público no sabe que tiene el problema. Creá el problema en su mente antes de hablar de la solución.",
-    1: "Siente que algo no funciona pero no identifica la causa. Ayudalo a ponerle nombre al dolor.",
-    2: "Sabe que hay soluciones pero no nos conoce. Posicioná nuestra solución como la correcta.",
-    3: "Nos conoce pero tiene dudas. Trabajá objeciones y usá prueba social.",
-    4: "Está casi listo. Sé directo. Oferta clara. CTA fuerte."
-  }[config.consciousness_level ?? 1];
+const buildBatchCopyPrompt = (
+  ipc: IpcProfile,
+  config: GenerateBatchPayload,
+  property?: TokkoProperty | null,
+  directive?: string,
+  operacion?: string,
+  estructuraId: EstructuraId = "pas"
+): string => {
+  const nivelDesc = NIVEL_DESCRIPCION[config.consciousness_level ?? 1];
 
   let ipcCtx = "";
 
@@ -72,6 +77,7 @@ PERFIL: VENDER PROPIEDAD
   const base = `Sos un experto en copywriting para el sector inmobiliario argentino. Tu misión es persuadir al IPC detallado abajo creando 3 VARIACIONES ÚNICAS del copy basándote en 3 ángulos diferentes.
 
 ${ipcCtx}
+${operacion ?? ""}
 
 NIVEL DE CONSCIENCIA PARA LAS 3 VARIANTES: Nivel ${config.consciousness_level ?? 1}/4 — ${nivelDesc}
 ${config.extra_context ? `- CONTEXTO EXTRA DEL USUARIO: ${config.extra_context}` : ''}
@@ -92,20 +98,27 @@ Debes generar exactamente 3 variaciones estructurando la narrativa sobre los sig
 Respondé ÚNICAMENTE en JSON válido. El JSON debe ser estrictamente un ARRAY de 3 objetos.`;
 
   if (config.copy_type === 'video') {
-    return `${base}\n\nEstructura exacta del ARRAY JSON:\n[
+    const estructura = ESTRUCTURAS[estructuraId];
+    return `${base}
+
+ESTRUCTURA OBLIGATORIA DEL GUION — "${estructura.label}".
+Las 3 variantes usan ESTA estructura, en este orden exacto de bloques:
+${guiaBloquesParaPrompt(estructura)}
+
+ESTO ES UN GUION PARA HABLAR A CÁMARA, no un texto para leer en pantalla:
+- "texto" es lo que el asesor dice en voz alta, en criollo, listo para leer de corrido. Sin acotaciones adentro del texto.
+- "segundos" es cuánto dura ese bloque dicho a ritmo normal (el guion completo tiene que dar entre 30 y 60 segundos).
+- "indicacion" es cómo decirlo (tono, ritmo, gesto), en menos de 12 palabras.
+- "por_que" explica al asesor por qué ese bloque va en ese lugar de la fórmula, en una frase.
+
+Estructura exacta del ARRAY JSON: 3 objetos, con "angle" distinto cada uno ("pas", "transformacion", "datos"), y cada "content" con esta forma exacta:
+[
   {
     "angle": "pas",
-    "content": {"hook":"texto para captar atención","problema":"...","agitacion":"...","solucion":"...","cta":"..."}
-  },
-  {
-    "angle": "transformacion",
-    "content": {"hook":"texto para captar atención","problema":"...","agitacion":"...","solucion":"...","cta":"..."}
-  },
-  {
-    "angle": "datos",
-    "content": {"hook":"texto para captar atención","problema":"...","agitacion":"...","solucion":"...","cta":"..."}
+    "content": ${esquemaJsonGuion(estructura)}
   }
-]`;
+]
+Devolvé los 3 objetos completos, no solo el del ejemplo.`;
   } else {
     return `${base}\n\nEstructura exacta del ARRAY JSON:\n[
   {
@@ -157,6 +170,13 @@ export async function POST(req: Request) {
       creativeDirective = agency?.marketing_ai_config?.creative_directive ?? "";
     }
 
+    // Forma real de trabajar del asesor (oferta irresistible + datos duros). Si no cargó nada, queda vacío.
+    const { data: operacion } = await supabase
+      .from("advisor_operations")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
+
     let propertyData: TokkoProperty | null = null;
     const propertyId = payload.propiedad_tokko_id || ipc.propiedad_tokko_id || (ipc.flow_data as any).propiedad_tokko_id;
 
@@ -192,8 +212,23 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log('[DEBUG] Generating copy batch');
-    const prompt = buildBatchCopyPrompt(ipc as any as IpcProfile, payload, propertyData, creativeDirective);
+    // El nivel sale del perfil de IPC (antes se asumía siempre 1) y de ahí se sugiere la estructura.
+    const nivel = payload.consciousness_level ?? nivelDesdeIpc(ipc.flow_data);
+    const estructuraId = resolverEstructura(payload.estructura, nivel);
+    const operacionDirective = buildOperacionDirective(
+      operacion as AdvisorOperation | null,
+      ipc.tipo_ipc === "vender" ? "vender" : "captar"
+    );
+
+    console.log('[DEBUG] Generating copy batch', { nivel, estructuraId, conOperacion: Boolean(operacionDirective) });
+    const prompt = buildBatchCopyPrompt(
+      ipc as any as IpcProfile,
+      { ...payload, consciousness_level: nivel },
+      propertyData,
+      creativeDirective,
+      operacionDirective,
+      estructuraId
+    );
     
     // We can use pro model for better complex JSON adherence
     const result = await prismaIA.generateContent(prompt);
@@ -221,6 +256,19 @@ export async function POST(req: Request) {
       if (!Array.isArray(generatedBatch)) {
         throw new Error("El resultado no es un array");
       }
+
+      // La estructura y la duración las sella el servidor: el modelo no suma bien y no tiene por qué elegirlas.
+      if (payload.copy_type === "video") {
+        for (const item of generatedBatch) {
+          if (!item?.content) continue;
+          item.content.estructura = estructuraId;
+          const bloques = Array.isArray(item.content.bloques) ? item.content.bloques : [];
+          item.content.duracion_estimada = bloques.reduce(
+            (total: number, b: any) => total + (Number(b?.segundos) || 0), 0
+          );
+        }
+      }
+
       return NextResponse.json(generatedBatch);
     } catch (parseError) {
       console.error('[DEBUG] Failed to parse batch JSON:', cleanResponse);

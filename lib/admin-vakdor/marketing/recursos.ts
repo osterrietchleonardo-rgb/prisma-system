@@ -1,7 +1,7 @@
 import { getAdminDb } from "@/lib/admin-vakdor/logger"
 import { CANON_FALLBACK } from "./voz"
 
-export type TipoRecurso = "canon" | "estructura" | "escena" | "comentario"
+export type TipoRecurso = "canon" | "estructura" | "escena" | "comentario" | "proposito"
 
 export interface Recurso {
   id: string
@@ -11,6 +11,11 @@ export interface Recurso {
   detalle: string
   usos: number
   ultimo_uso: string | null
+  /** Solo en escenas: a qué parte de la operación pertenece y de qué momento habla. */
+  area?: string | null
+  momento?: string | null
+  /** Solo en estructuras: qué propósitos habilitan esta forma narrativa. */
+  propositos?: string[]
 }
 
 /** Orden determinista: menos usados primero; a igual uso, el que hace más tiempo no se usa. */
@@ -37,7 +42,7 @@ export function elegirRecursos(candidatos: Recurso[], cantidad: number, excluirI
 export async function traerRecursos(tipo: TipoRecurso): Promise<Recurso[]> {
   const { data, error } = await getAdminDb()
     .from("marketing_recursos")
-    .select("id, tipo, clave, titulo, detalle, usos, ultimo_uso")
+    .select("id, tipo, clave, titulo, detalle, usos, ultimo_uso, area, momento, propositos")
     .eq("tipo", tipo)
     .eq("activo", true)
   if (error) throw new Error(`traerRecursos(${tipo}): ${error.message}`)

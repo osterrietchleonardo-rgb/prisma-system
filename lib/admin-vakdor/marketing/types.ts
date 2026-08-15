@@ -46,6 +46,12 @@ export interface MarketingIdea {
   fuente: FuenteIdea
   formato: FormatoIdea
   funnel: FunnelStage | null
+  /** Territorio temático. Sirve a blog (SEO) y a LinkedIn (de qué venís hablando). */
+  cluster: string | null
+  /** El para qué de la pieza. Restringe qué estructuras puede sortear el worker. */
+  proposito: string | null
+  /** Búsqueda real (Search Console) que este artículo tiene que responder. Solo blog. */
+  keyword_objetivo: string | null
   titulo: string
   angulo: string | null
   estructura: string | null
@@ -71,6 +77,9 @@ export interface NuevaIdeaInput {
   fuente: FuenteIdea
   formato: FormatoIdea
   funnel?: FunnelStage | null
+  cluster?: string | null
+  proposito?: string | null
+  keyword_objetivo?: string | null
   angulo?: string | null
   estructura?: string | null
   gancho?: string | null
@@ -87,6 +96,10 @@ import type { ClaveEstructura, ClaveComentario } from "./voz"
 /** Qué receta produjo una pieza: sirve para rotar, para no repetir y para auditar después. */
 export interface Receta {
   estructura: ClaveEstructura | null
+  /** El propósito que se usó. La rotación lo lee de acá para no repetirlo. */
+  proposito: string | null
+  /** El territorio de la pieza, copiado de la idea para poder auditar el cruce completo. */
+  cluster: string | null
   escenas: string[]
   comentario_tipo: ClaveComentario | null
   modelo: string
