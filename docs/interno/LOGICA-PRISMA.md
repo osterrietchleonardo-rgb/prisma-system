@@ -2396,6 +2396,20 @@ filtra, no se puede clickear, y se saca desde su cartelito rojo o eligiendo otro
 Un barrio o una zona NO la ponen: su centro geométrico no significa nada y un pin en el
 medio de Palermo se leería como una propiedad más.
 
+### Ambientes
+
+Se eligen con botones **1 · 2 · 3 · 4 · 5+**, como en los portales, y **se suman**: tocar
+2 y 3 trae los de dos y los de tres, y nada más. Antes había una sola casilla de "mínimo",
+con la que pedir 2 y 3 obligaba a tragarse también los de 6. Sin ningún botón tocado no
+filtra nada. El 5 significa "5 o más": arriba de ahí queda el 8,1% de la red repartido en
+una cola larga de 6, 7, 8…, y un botón por número llenaría la barra de opciones vacías.
+
+Lo que se filtra son **ambientes, no dormitorios**. No es una distinción de nombres: en la
+cartera de Central el 84% de las propiedades tiene los dos números distintos, porque el
+ambiente de más es el living. Hasta el 2026-08-14 el mapa decía "ambientes" y medía
+dormitorios, así que pedir "3 ambientes o más" traía cosas de 4. Una propiedad sin
+ambientes cargados no entra en ningún botón: no se le inventa el número.
+
 ### Precio por m² (mapa de calor)
 
 Se pinta el precio mediano por metro sobre cada **manzana real**, de verde (barato) a rojo

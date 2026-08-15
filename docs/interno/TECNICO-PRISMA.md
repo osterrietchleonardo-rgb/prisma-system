@@ -1117,9 +1117,12 @@ Componentes en `components/mapa/`, lógica pura en `lib/mapa/` (81 tests con `no
 
 Cada uno de estos nació de un `statement timeout` real, no de una optimización preventiva:
 
-- `idx_roomix_geo_filtros` — GiST compuesto (`btree_gist`) que mezcla `point(lng,lat)` con
-  operación, tipo, moneda y precio. Sin él, un filtro que no coincide con nada obliga a
-  recorrer el rectángulo entero: 16.439 ms medidos para devolver cero.
+- `idx_roomix_geo_filtros_amb` — GiST compuesto (`btree_gist`) que mezcla `point(lng,lat)`
+  con operación, tipo, moneda, precio y **ambientes** (`rooms`). Sin él, un filtro que no
+  coincide con nada obliga a recorrer el rectángulo entero: 16.439 ms medidos para devolver
+  cero. Reemplazó a `idx_roomix_geo_filtros`, que era el mismo sin `rooms`: el planner elige
+  el nuevo también para las consultas que no filtran ambientes, así que dejar los dos
+  costaba el doble en cada sync nocturno. 29 MB.
 - `idx_roomix_barrio_normalizado` — índice de expresión sobre `barrio_normalizado()`. Sin
   él, filtrar por barrio tardaba 8.337 ms y se cancelaba solo. `unaccent()` no se puede
   indexar directamente (depende de un diccionario configurable): va envuelta con el
@@ -1141,6 +1144,20 @@ Cada uno de estos nació de un `statement timeout` real, no de una optimización
   geocoder se llama desde el navegador, no desde el backend. Los orígenes permitidos deben
   incluir `*.vakdor.com` (`vakdor.com` a secas NO cubre subdominios) y `localhost`.
 - **`100vh` no descuenta la barra de direcciones en el celular**: va `dvh`.
+- **Ambientes y dormitorios NO son lo mismo, y el mapa los confundía.** El filtro decía
+  "Amb. mín." pero en la cartera medía `properties.bedrooms`, que son dormitorios: en el
+  84% de las activas de Central los dos números difieren (377 de 451, el ambiente de más es
+  el living). Los ambientes de la cartera **no están en una columna**, viven en
+  `tokko_data->>'room_amount'`; en la red sí (`rooms` = ambientes, `bedrooms` = dormitorios).
+  Las dos funciones devuelven ahora las dos cosas: `ambientes` lo muestra la lista del mapa
+  y `bedrooms` la ficha compartida con el chat, que dice "Dorm.".
+- **El filtro de ambientes NECESITA estar en el índice, no es una optimización.** Sin
+  `rooms` dentro de `idx_roomix_geo_filtros_amb`, la base arma el bitmap con las 25.223 del
+  rectángulo y descarta a mano 3.902 filas por cada 1.000 útiles: **4.033 ms en la prueba y
+  `statement timeout` (8,6 s) en la app**. Con `rooms` en el índice el filtro entra en el
+  `Index Cond`: **72 ms**, y el endpoint pasó de 500 a 200 en 548 ms. Regla general para
+  esta tabla: **un filtro nuevo del mapa que no esté en el índice GiST hace timeout**, no
+  se pone lento — no hay término medio con 178.351 avisos.
 - **La ficha de una propiedad va por un portal a `<body>`** (`mapa-ficha.tsx`). El modal
   compartido con el chat (`UnifiedPropertyDetail`) es `fixed inset-0 z-50`, y dentro del
   contenedor del mapa —que es `isolate`— las capas de Leaflet valen de 400 a 700: z-50

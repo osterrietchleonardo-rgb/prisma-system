@@ -140,6 +140,29 @@ describe("leerFiltros", () => {
     assert.equal(leer("tipo=Local Comercial").tipo, null)
     assert.equal(leer("tipo=").tipo, null)
   })
+
+  test("sin ambientes en la URL, no hay filtro de ambientes", () => {
+    assert.deepEqual(leer("").ambientes, [])
+    assert.deepEqual(leer("ambientes=").ambientes, [])
+  })
+
+  test("lee los ambientes elegidos, ordenados y sin repetidos", () => {
+    assert.deepEqual(leer("ambientes=3,2").ambientes, [2, 3])
+    assert.deepEqual(leer("ambientes=2,2,3").ambientes, [2, 3])
+    assert.deepEqual(leer("ambientes= 4 , 1 ").ambientes, [1, 4])
+  })
+
+  test("descarta lo que no es un boton de la pantalla", () => {
+    // Un 0, un negativo, un decimal o algo mas grande que el tope no significan nada:
+    // colados a mano en la URL dejarian el mapa vacio sin explicacion.
+    assert.deepEqual(leer("ambientes=0").ambientes, [])
+    assert.deepEqual(leer("ambientes=-2").ambientes, [])
+    assert.deepEqual(leer("ambientes=2.5").ambientes, [])
+    assert.deepEqual(leer("ambientes=99").ambientes, [])
+    assert.deepEqual(leer("ambientes=hola").ambientes, [])
+    // Los validos de una lista mezclada sobreviven; el resto se cae.
+    assert.deepEqual(leer("ambientes=2,99,hola,3").ambientes, [2, 3])
+  })
 })
 
 // ─────────────── tipos de propiedad (etiqueta -> valores reales) ───────────────
@@ -274,6 +297,7 @@ const aviso = (o: Partial<PropiedadMapa> & { id: string }): PropiedadMapa => ({
   currency: "USD",
   status: "Venta",
   bedrooms: 2,
+  ambientes: 3,
   bathrooms: 1,
   address: "Alguna calle 100",
   images: [],
@@ -386,7 +410,7 @@ const PARAMS_BASE = {
   bbox: { sur: -34.7, oeste: -58.5, norte: -34.5, este: -58.3 },
   filtros: {
     operacion: "Venta", tipo: null, precio_min: null, precio_max: null,
-    moneda: "USD", ambientes_min: null, fuentes: ["own", "agency", "roomix"],
+    moneda: "USD", ambientes: [], fuentes: ["own", "agency", "roomix"],
   } as any,
   agencyId: "a", userId: "u",
 }
@@ -548,7 +572,7 @@ describe("buscarEnPropiedades", () => {
     id: "1", title: "Depto luminoso", description: null, price: 185000, currency: "USD",
     property_type: "Apartment", status: "Venta", bedrooms: 3, bathrooms: 1, total_area: 75,
     address: "Juncal 1300", city: "Recoleta", images: [], similarity: 0, source: "roomix",
-    agent_name: "", agent_email: "", lat: -34.6, lng: -58.4, ...extra,
+    agent_name: "", agent_email: "", lat: -34.6, lng: -58.4, ambientes: 4, ...extra,
   })
 
   test("sin consulta devuelve la MISMA lista, no una copia", () => {
@@ -583,6 +607,28 @@ describe("buscarEnPropiedades", () => {
 
   test("lo que no coincide se va", () => {
     assert.equal(buscarEnPropiedades([prop()], "chacarita").length, 0)
+  })
+
+  test("los ambientes y los dormitorios entran los dos, cada uno con su palabra", () => {
+    // La de la prueba es un 4 ambientes con 3 dormitorios, que es el caso normal (el
+    // ambiente de mas es el living). Antes se indexaba `bedrooms` como si fueran
+    // ambientes: "4 ambientes" no la encontraba y "3 ambientes" si, o sea al reves.
+    // Los precios y las superficies van elegidos para que no aporten los digitos que se
+    // buscan: la busqueda es por texto y un "2" pegaria tambien en "m2" o en "200".
+    const lista = [
+      prop({ id: "4a", price: 100, total_area: 80, address: "Guise", ambientes: 4, bedrooms: 3 }),
+      prop({ id: "6a", price: 900, total_area: 90, address: "Guise", ambientes: 6, bedrooms: 5 }),
+    ]
+
+    assert.deepEqual(buscarEnPropiedades(lista, "4 ambientes").map((p: any) => p.id), ["4a"])
+    assert.deepEqual(buscarEnPropiedades(lista, "6 ambientes").map((p: any) => p.id), ["6a"])
+    assert.deepEqual(buscarEnPropiedades(lista, "3 dormitorios").map((p: any) => p.id), ["4a"])
+  })
+
+  test("sin ambientes cargados no se inventa un numero", () => {
+    // 22.938 avisos ubicados de la red no traen ambientes: no tienen que aparecer al
+    // buscar un numero cualquiera solo porque el campo diga "0".
+    assert.equal(buscarEnPropiedades([prop({ ambientes: null })], "4 ambientes").length, 0)
   })
 })
 

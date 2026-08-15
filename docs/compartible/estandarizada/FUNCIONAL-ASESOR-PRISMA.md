@@ -632,6 +632,18 @@ Los colores te dicen de quién es cada una:
 - **Gris** — de la agencia
 - **Azul** — de la red de colaboración
 
+### Filtrar por ambientes
+
+En **Filtros** tenés los botones **1 · 2 · 3 · 4 · 5+**. Tocá los que te sirvan y **se
+suman**: si el cliente busca dos o tres ambientes, tocá el 2 y el 3 y vas a ver solo esos.
+El **5+** junta los de cinco para arriba. Sin tocar ninguno, se ven todas.
+
+> **Ojo con los números.** Son **ambientes**, no dormitorios. Un tres ambientes tiene dos
+> dormitorios y un living. En la lista del mapa vas a leer los ambientes; adentro de la
+> ficha, donde dice "Dorm.", son los dormitorios. Hasta agosto de 2026 el mapa mezclaba las
+> dos cosas y te mostraba un ambiente de menos: si te acordás de un número de antes, ya no
+> es el mismo.
+
 ### Buscar un lugar
 
 Arriba de todo hay un buscador. Escribí un barrio, una dirección, o el nombre de una zona

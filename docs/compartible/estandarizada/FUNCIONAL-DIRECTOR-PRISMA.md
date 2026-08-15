@@ -779,6 +779,14 @@ Tus asesores tienen, dentro del Buscador IA, una solapa **Mapa** con todas las p
   chinche roja de siempre y deja alrededor todo lo publicado cerca. Es la vista con la que
   un asesor defiende un precio frente al dueño: esta es la puerta, esto es lo que se está
   pidiendo a la vuelta.
+- **Acotar a lo que el cliente pide.** Los filtros incluyen botones de ambientes (1 al 5+)
+  que se suman, así que un asesor puede dejar en pantalla solo dos y tres ambientes sin
+  arrastrar los de seis.
+
+> **Un número que cambió.** Hasta agosto de 2026 el mapa decía "ambientes" pero mostraba y
+> filtraba **dormitorios**, que es un ambiente menos. Ya está corregido: donde tus asesores
+> leían "3 amb." ahora pueden leer "4 amb." para la misma propiedad. No se agregó ni se
+> perdió nada; lo que cambió es que el número ahora dice lo que dice que dice.
 
 ### El precio por metro cuadrado
 

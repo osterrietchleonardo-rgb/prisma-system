@@ -41,7 +41,7 @@ const FILTROS_INICIALES: FiltrosMapa = {
   precio_min: null,
   precio_max: null,
   moneda: "USD",
-  ambientes_min: null,
+  ambientes: [],
   fuentes: ["own", "agency", "roomix"],
   barrio: null,
 }
@@ -135,7 +135,7 @@ export function MapaTab() {
     if (filtros.tipo) qs.set("tipo", filtros.tipo)
     if (filtros.precio_min !== null) qs.set("precio_min", String(filtros.precio_min))
     if (filtros.precio_max !== null) qs.set("precio_max", String(filtros.precio_max))
-    if (filtros.ambientes_min !== null) qs.set("ambientes_min", String(filtros.ambientes_min))
+    if (filtros.ambientes.length > 0) qs.set("ambientes", filtros.ambientes.join(","))
     if (filtros.barrio) qs.set("barrio", filtros.barrio)
 
     fetch(`/api/mapa/propiedades?${qs}`, { signal: ctrl.signal })
@@ -295,7 +295,9 @@ export function MapaTab() {
     if (filtros.tipo) n++
     if (filtros.precio_min !== null) n++
     if (filtros.precio_max !== null) n++
-    if (filtros.ambientes_min !== null) n++
+    // Los ambientes cuentan como UN filtro aunque haya tres botones apretados: el numerito
+    // dice cuantas cosas estan filtrando, no cuantos clicks se hicieron.
+    if (filtros.ambientes.length > 0) n++
     if (filtros.barrio) n++
     if (filtros.fuentes.length < 3) n++
     return n || undefined
@@ -422,7 +424,15 @@ export function MapaTab() {
         </div>
 
         {verFiltros && (
-          <div className="pointer-events-auto max-h-[55dvh] w-full max-w-4xl overflow-y-auto overscroll-contain rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95">
+          /* Con la lista abierta la barra se angosta para no meterse abajo del panel de
+             resultados, que flota mas arriba (z-650). Antes se le montaba encima y tapaba
+             lo ultimo de la fila: los filtros seguian ahi pero no se podian ni ver ni
+             tocar. En el celular no hace falta, el panel sube desde abajo. */
+          <div
+            className={`pointer-events-auto max-h-[55dvh] w-full overflow-y-auto overscroll-contain rounded-xl border border-zinc-200 bg-white/95 shadow-xl backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/95 ${
+              verLista ? "sm:max-w-[calc(100%-21rem)]" : "max-w-4xl"
+            }`}
+          >
             <MapaFiltros filtros={filtros} onCambio={setFiltros} />
           </div>
         )}
