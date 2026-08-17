@@ -43,3 +43,6 @@ docs/compartible/particular/*
 # Scratch / secretos locales (contienen API keys de Tokko)
 _tokko_explore/
 .mcp.json
+
+# Backups de workflows de n8n (los exports incluyen credenciales en texto plano)
+scratch/n8n-backups/
