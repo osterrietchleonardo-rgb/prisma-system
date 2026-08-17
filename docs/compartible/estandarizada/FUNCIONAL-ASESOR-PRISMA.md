@@ -164,7 +164,30 @@ Dentro de la ficha, debajo de la descripción original (la que baja de Tokko), t
 
 > ⚠️ Cada generación **consume 1 crédito de IA**. El tope es **2 versiones por propiedad** (V1 y V2); no se puede volver a generar.
 
-> 💡 **Tip:** las propiedades y los leads se actualizan desde Tokko **automáticamente dos veces por día (7:00 AM y 6:00 PM)**. Si falta algo puntual, avisale a tu director para que sincronice al instante.
+### 6.2 Notas para el Asesor IA (lo que el bot debería saber)
+
+Más abajo en la misma ficha vas a ver el bloque **"Notas para [el nombre de tu asesor IA]"** (si tu inmobiliaria le puso "Valentina", dice *Notas para Valentina*).
+
+**Para qué sirve:** para escribirle al bot de WhatsApp todo lo que vos sabés de esa propiedad y **no figura en Tokko**. Por ejemplo:
+
+- *"El propietario acepta mascotas chicas, pero no perros grandes."*
+- *"Solo se puede visitar de lunes a viernes; el fin de semana no hay acceso al complejo."*
+- *"Es un tercer piso por escalera, el edificio no tiene ascensor."*
+- *"Aceptan tomar parte del pago en pesos."*
+
+**Lo importante:** el bot **no las anda contando**. Cuando le presenta la propiedad a un cliente, no menciona nada de esto. Solo lo usa **si el cliente pregunta justo por ese tema**: si pregunta si puede llevar a su perro, ahí sí le responde con lo que vos anotaste. Son notas internas, el cliente nunca ve esta pantalla.
+
+**Cómo se usa:**
+- Escribís la nota y tocás **Agregar nota**. Podés cargar varias (hasta 20 por propiedad, de 800 caracteres cada una).
+- Cada nota queda con **tu nombre y la fecha**, así el equipo sabe quién anotó qué. Si la editás, queda marcado *"editada"*.
+- Podés **editar** y **borrar** tus propias notas cuando quieras. Tu director puede editar o borrar cualquiera.
+- Solo podés escribir notas en **las propiedades que tenés asignadas**. En las demás las ves, pero en modo lectura.
+
+> 💡 **Tip:** mientras más concreta la nota, mejor contesta el bot. "No tiene ascensor" le sirve mucho más que "el edificio es antiguo".
+
+> ⚠️ Escribí solo cosas **ciertas y confirmadas**: el bot las trata como información real de la propiedad y se las va a decir al cliente si pregunta.
+
+> 💡 **Tip:** las propiedades y los leads se actualizan desde Tokko **automáticamente dos veces por día (7:00 AM y 6:00 PM)**. Si falta algo puntual, avisale a tu director para que sincronice al instante. Tus notas **no se borran** con la sincronización.
 
 ---
 

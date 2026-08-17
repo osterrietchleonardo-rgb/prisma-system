@@ -463,6 +463,27 @@ GET https://tokkobroker.com/api/v1/property/?key={KEY}&format=json&limit=100&off
 
 **Por qué columna nueva y no `description`:** la descripción de Tokko se pisa en cada sincronización; guardar la versión IA en `ai_description` evita perderla y permite copiarla/verla siempre y pegarla manualmente en Tokko si se quiere publicar.
 
+### 7.1.ter Notas internas para el Asesor IA (por propiedad)
+
+**Endpoint:** `GET/POST/PATCH/DELETE /api/propiedades/[id]/notas-ia`
+**Archivo:** `app/api/propiedades/[id]/notas-ia/route.ts`
+**UI:** `components/propiedades/NotasIA.tsx` (ficha de asesor y de director, debajo de la descripción IA).
+**Columna:** `properties.notas_ia` (jsonb, array, la más reciente primero; el sync de Tokko **nunca** la toca, igual que `ai_description`).
+
+**Objetivo:** que el equipo cargue lo que el agente de WhatsApp debería saber de una propiedad y que **no está en Tokko** (condiciones del dueño, restricciones de visita, detalles del edificio). El bot las usa **solo si el cliente pregunta por ese tema**; nunca las menciona por su cuenta.
+
+**Forma de cada nota:** `{ id, texto, autor_id, autor_nombre, autor_rol, creado_at, editado_at?, editado_por? }`. Topes que controla la API: **800 caracteres** por nota y **20 notas** por propiedad.
+
+**Permisos (se validan en el servidor, no en la pantalla):**
+- Leer: cualquiera de la agencia (RLS de `properties` es solo `SELECT` por agencia).
+- Escribir: **director** en cualquier propiedad de su agencia; **asesor** solo en las que tiene asignadas (`assigned_agent_id = su id`).
+- Editar/borrar una nota: su **autor**, o el **director**. El `GET` devuelve `puedo_tocarla` por nota, así la UI no replica la regla.
+- Otra agencia → `404` (ni lee ni escribe). Propiedad no asignada → lectura, `POST` da `403`.
+
+**Escritura con `createAdminClient()`** después de validar agencia y permiso: `properties` no tiene políticas RLS de escritura (mismo caso que `ai_description`). El `guardar()` **relee** el array con el cliente admin justo antes de aplicar el cambio, para no pisar lo que otro haya agregado con la pantalla abierta.
+
+**Cómo llega al bot** (ver §Agentes de WhatsApp): `Cartera_Propiedades` trae `p.notas_ia` en el `SELECT` y su prompt solo dice *copiala tal cual* → viaja en `notas_internas[]` del JSON de salida. La **regla de uso** (solo si preguntan, nunca de motu propio) vive en el prompt del workflow `PRISMA`, sección `RESPONDER DUDAS`.
+
 ### 7.2 Sincronización de Leads
 
 **Endpoint:** `POST /api/tokko/sync-leads`  

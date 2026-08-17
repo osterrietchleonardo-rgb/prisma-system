@@ -202,6 +202,23 @@ En la ficha de cada propiedad, debajo de la descripción de Tokko, está el bloq
 
 > ⚠️ **Costo:** cada generación **consume 1 crédito de IA**. El tope es **estricto: 2 versiones por propiedad** (V1 + V2), para mantener el gasto bajo control. El consumo queda registrado en el panel de Créditos IA.
 
+### 7.2 Notas para el Asesor IA (lo que el bot debería saber de cada propiedad)
+
+En la misma ficha, debajo de la descripción IA, está el bloque **"Notas para [el nombre de tu asesor IA]"**. El nombre sale de lo que configuraste en *Asesor IA WhatsApp*: si tu bot se llama Valentina, el bloque dice **"Notas para Valentina"**.
+
+**Para qué sirve:** es el lugar donde tu equipo le pasa al bot lo que sabe de una propiedad y **no está cargado en Tokko**: condiciones del dueño, restricciones para visitar, detalles del edificio, formas de pago que aceptan.
+
+**La regla clave:** el bot **nunca cuenta estas notas por su cuenta**. No las menciona al presentar la propiedad ni las usa como argumento de venta. Las usa **solo si el cliente pregunta justo por ese tema**. Son internas: el cliente jamás ve esta pantalla.
+
+**Quién puede escribir:**
+- **Vos (director):** en cualquier propiedad de la inmobiliaria.
+- **Cada asesor:** solo en las propiedades que tiene asignadas. En el resto las ve, pero no las puede tocar.
+- Cada nota queda firmada con **nombre y fecha**. Cada asesor edita y borra las suyas; **vos podés editar o borrar cualquiera**.
+
+**Control de calidad — lo que conviene mirar:** como el bot trata estas notas como información real y se las dice al cliente cuando pregunta, vale la pena que revises de vez en cuando lo que cargó el equipo, sobre todo en las propiedades más consultadas. Una nota desactualizada (un precio que cambió, una condición que ya no corre) le llega al cliente como si fuera la ficha.
+
+> 💡 **Tip:** no consume créditos de IA, y las notas **no se pierden** cuando se sincroniza con Tokko.
+
 ---
 
 ## 8. Tracking Performance
