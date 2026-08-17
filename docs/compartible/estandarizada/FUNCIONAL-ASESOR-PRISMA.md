@@ -472,7 +472,7 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 > 🔁 **Sin repetidos y sin tu propia propiedad.** Si el mismo aviso está cargado varias veces en la red, ahora ves **uno solo**. Y si la propiedad que estás analizando también está publicada, **ya no aparece como comparable de sí misma**.
 > 💡 El **checklist compara todo lo que tiene dato real**: además de zona/superficie/ambientes/baños/amenities, ahora suma **dormitorios** y **antigüedad**. Si de un comparable falta un dato, ese renglón dice "sin dato" y no baja el puntaje.
-> 💡 Trae **hasta 50 comparables por bloque** (cartera y red), ordenados por comparabilidad (los mejores arriba). Para **venta**, la mayoría suele salir de tu propia cartera.
+> 💡 Trae **hasta 100 comparables por bloque** (cartera y red), ordenados por comparabilidad (los mejores arriba). Para **venta**, la mayoría suele salir de tu propia cartera. Cada bloque vive en **su propio recuadro con scroll**: deslizás adentro del recuadro para recorrer la lista, y la página no se estira por más resultados que haya, así los dos bloques quedan siempre a la vista. El tope de 100 existe porque en un barrio grande la búsqueda puede dar más de dos mil coincidencias; como la lista viene ordenada, lo que queda afuera es siempre lo que menos se parece.
 > 🏠 **¿Considerar PH? (solo en Casas):** cuando la propiedad que analizás es una **Casa**, aparece la casilla **"Considerar PH"**. Viene **tildada**, así que por defecto no cambia nada. Como en los portales los **PH** figuran muchas veces como "casa", si querés comparar **solo casas puras**, **destildala** antes de buscar y los PH quedan afuera. En cualquier otro tipo de propiedad la casilla no aparece.
 > 🏗️ **¿A estrenar o en pozo?** Al lado de "Antigüedad" tenés dos casillas: **"A estrenar"** y **"En pozo"**. Tildá la que corresponda (podés tildar las dos) y el campo de años se apaga solo, porque ya no hace falta. **¿Para qué sirve?** Una propiedad sin uso vale bastante más el m² que una usada del mismo barrio —**entre 18 % y 36 % más**, medido con datos reales—, así que mezclarlas te desvía la tasación. Con la casilla tildada, PRISMA compara **solo contra propiedades del mismo estado**; sin tildar, compara solo contra usadas y deja afuera las a estrenar y las de pozo. **Si elegís la propiedad desde tu cartera, la casilla se tilda sola** cuando en Tokko figura como a estrenar o en pozo. En **terrenos** no se aplica (la antigüedad no les corresponde).
 > 💰 Buscar comparables **no consume créditos**.
@@ -714,10 +714,13 @@ Cuando armás una ficha para tu cliente, ahora se suma **una hoja nueva justo de
 
 De un lado están la descripción de la propiedad y un texto que cuenta cómo es el barrio. Del otro, un mapa con la propiedad marcada y una lista de lo que tiene alrededor: la estación de subte más cercana, la plaza, cuántas escuelas y farmacias hay a la vuelta, el hospital, las líneas de colectivo que paran cerca, la comisaría, las estaciones de bici y la ciclovía. Cada cosa con la distancia real.
 
+**Los puntos del mapa tienen referencia.** El punto azul oscuro y más grande es la propiedad. Los otros son de colores, y **cada renglón de la lista lleva un punto del mismo color que su marcador**: así tu cliente sabe cuál es cuál sin preguntarte. Los renglones que son una cuenta ("20 farmacias a menos de 500 m" no es un lugar puntual) y los que quedaron fuera del pedazo de mapa que se muestra (por ejemplo un hospital a más de un kilómetro) van **sin punto** a propósito — la referencia nunca nombra algo que no se pueda encontrar mirando el mapa.
+
 **Antes de crear la ficha lo revisás vos.** En la misma pantalla donde ya revisás las conclusiones, aparece el texto del barrio para que lo leas y lo cambies si querés. Abajo vas a ver los datos con los que se escribió: esos no se editan, y están ahí justamente para que puedas controlar que el texto diga la verdad. **Leelos.** Si el texto menciona algo que no está en esa lista, corregilo antes de mandarlo.
 
 Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 
-**Dos cosas para tener en cuenta:**
-- La descripción de la propiedad **ya no aparece en la portada**: se mudó a esta hoja. La portada quedó más limpia.
+**Tres cosas para tener en cuenta:**
+- La descripción de la propiedad **ya no aparece en la portada**: se mudó a esta hoja. La portada quedó más limpia, con el título arriba y los datos del análisis al pie.
 - Si la dirección que cargaste no se puede ubicar en el mapa, la hoja no se genera y la ficha se crea igual, sin ella. No es un error: es que sin ubicación no hay nada honesto que contar.
+- **La ficha se ve completa desde el celular.** Antes, si tu cliente abría el link desde el teléfono, veía la mitad izquierda de cada hoja y el título cortado a mitad de palabra. Ahora se ve la hoja entera, más chica, igualita a como se ve en la computadora. El PDF no cambió en nada: sigue saliendo en A4.

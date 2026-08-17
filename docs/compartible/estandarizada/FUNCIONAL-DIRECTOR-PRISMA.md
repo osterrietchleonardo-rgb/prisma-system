@@ -832,3 +832,7 @@ Las fichas que genera tu equipo ahora incluyen **una hoja dedicada al barrio**, 
 **Quién controla qué.** El asesor lee y edita el texto **antes** de que la ficha exista, con los datos a la vista, y puede sacar la hoja entera si no le sirve. Una vez creada, la ficha no cambia: el link que recibió el cliente muestra siempre lo mismo.
 
 La hoja no menciona de dónde salieron los datos. Es el documento de tu inmobiliaria, no un informe con bibliografía.
+
+**El mapa se explica solo.** Cada punto de color del mapa tiene su renglón del mismo color en la lista de al lado, y la propiedad es el punto azul oscuro. Nadie tiene que preguntarle al asesor qué es cada cosa. Los renglones que son una cuenta ("20 farmacias a menos de 500 m") o que caen fuera del pedazo de mapa que se muestra van sin punto: la referencia no nombra nada que el cliente no pueda encontrar mirando.
+
+**La ficha se abre bien desde el celular.** La mayoría de tus clientes abre el link desde el teléfono, y hasta ahora veían la mitad izquierda de cada hoja con el título cortado a mitad de palabra. Ahora ven el documento entero. El PDF no cambió: sigue saliendo en A4 exacto.
