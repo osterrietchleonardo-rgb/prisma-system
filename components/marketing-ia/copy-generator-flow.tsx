@@ -8,7 +8,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Sparkles, Video, FileText, Loader2, ArrowRight, Smartphone, Camera } from "lucide-react"
-import { CopyType, ImageFormat, ImageStyle, IpcProfile, TokkoProperty } from "@/types/marketing-ia"
+import { CopyType, EstructuraId, ImageFormat, ImageStyle, IpcProfile, TokkoProperty } from "@/types/marketing-ia"
+import { ESTRUCTURAS_LISTA } from "@/lib/marketing-ia/estructuras"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -20,9 +21,11 @@ export function CopyGeneratorFlow() {
   const [selectedIpc, setSelectedIpc] = useState<IpcProfile | null>(null)
   
   const [copyType, setCopyType] = useState<CopyType>('video')
+  const [estructura, setEstructura] = useState<EstructuraId | 'sugerida'>('sugerida')
   const [format, setFormat] = useState<ImageFormat>('reels')
   const [style, setStyle] = useState<ImageStyle>('moderno')
   const [extraContext, setExtraContext] = useState("")
+  const [tieneOferta, setTieneOferta] = useState(true)
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressText, setProgressText] = useState("")
@@ -35,6 +38,10 @@ export function CopyGeneratorFlow() {
       setIpcs(data || [])
     }
     fetchIpcs()
+
+    // ¿Ya armó su oferta irresistible? Si no, avisamos que los anuncios van a salir genéricos.
+    supabase.from('advisor_operations').select('oferta_captacion, oferta_venta').maybeSingle()
+      .then(({ data }) => setTieneOferta(Boolean(data?.oferta_captacion || data?.oferta_venta)))
   }, [])
 
   useEffect(() => {
@@ -46,8 +53,9 @@ export function CopyGeneratorFlow() {
 
   const handleGenerateBatch = async () => {
     if (!selectedIpcId || !selectedIpc) return toast.error("Seleccione un IPC")
+    const esGuion = copyType === 'video'
     setIsGenerating(true)
-    setProgressText("Generando copys...")
+    setProgressText(esGuion ? "Escribiendo tus 3 guiones..." : "Generando copys...")
 
     const sessionId = crypto.randomUUID()
     const { data: { user } } = await supabase.auth.getUser()
@@ -59,15 +67,16 @@ export function CopyGeneratorFlow() {
         body: JSON.stringify({
           ipc_id: selectedIpcId,
           copy_type: copyType,
-          extra_context: extraContext
+          extra_context: extraContext,
+          estructura
         })
       })
 
       if (!res.ok) throw new Error("Error en la generación de textos")
       const batchContent = await res.json()
-      
-      setProgressText("Se está generando la imagen...")
-      
+
+      if (!esGuion) setProgressText("Se está generando la imagen...")
+
       const tokkoProperty = selectedIpc.tipo_ipc === 'vender' ? (selectedIpc.flow_data as any).tokko_property_details : null;
       
       // Save 3 drafts
@@ -91,31 +100,31 @@ export function CopyGeneratorFlow() {
         throw new Error("Error guardando los borradores en la base de datos")
       }
 
-      // Generate 3 images
-      let completedImages = 0;
-      for (const draft of insertedDrafts) {
-        setProgressText("Se está generando la imagen...")
-        try {
-          await fetch('/api/marketing-ia/generate-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              draft_id: draft.id,
-              copy_content: draft.content,
-              tokko_property: tokkoProperty,
-              format,
-              style,
-              extra_prompt: ""
+      // Los guiones de video son para hablar a cámara: no llevan imagen.
+      if (!esGuion) {
+        for (const draft of insertedDrafts) {
+          setProgressText("Se está generando la imagen...")
+          try {
+            await fetch('/api/marketing-ia/generate-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                draft_id: draft.id,
+                copy_content: draft.content,
+                tokko_property: tokkoProperty,
+                format,
+                style,
+                extra_prompt: ""
+              })
             })
-          })
-        } catch (imgError) {
-          console.error("Failed to generate image for draft", draft.id, imgError)
-          // Tolerancia a fallos: continuamos con las demás
+          } catch (imgError) {
+            console.error("Failed to generate image for draft", draft.id, imgError)
+            // Tolerancia a fallos: continuamos con las demás
+          }
         }
-        completedImages++;
       }
 
-      toast.success("¡3 variantes generadas exitosamente!")
+      toast.success(esGuion ? "¡3 guiones listos!" : "¡3 variantes generadas exitosamente!")
       
       // Attempt to switch tabs automatically or alert user
       const evt = new CustomEvent("generation-complete", { detail: { sessionId, origin: 'copy-flow' } });
@@ -174,10 +183,22 @@ export function CopyGeneratorFlow() {
           <Sparkles className="w-6 h-6 text-accent" />
           Multi-Generador IA
         </CardTitle>
-        <CardDescription>Generaremos automáticamente 3 variaciones completas (Copy + Imagen) utilizando ángulos de venta distintos para que elijas la que mejor convierta.</CardDescription>
+        <CardDescription>
+          {copyType === 'video'
+            ? "Generamos 3 guiones listos para hablar a cámara, con la estructura que elijas y tu oferta irresistible adentro. Sin imágenes."
+            : "Generaremos automáticamente 3 variaciones completas (Copy + Imagen) utilizando ángulos de venta distintos para que elijas la que mejor convierta."}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {!tieneOferta && (
+          <div className="flex gap-3 p-4 rounded-xl bg-accent/5 border border-accent/20">
+            <Sparkles className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+            <p className="text-sm text-muted-foreground">
+              Tus anuncios van a salir genéricos hasta que completes <strong className="text-foreground">Mi Forma de Trabajar</strong>. Ahí cargás tus números reales y armás tu oferta irresistible.
+            </p>
+          </div>
+        )}
+        <div className={cn("grid grid-cols-1 gap-8", copyType === 'post' && "md:grid-cols-2")}>
           <div className="space-y-6">
             <div className="space-y-3">
               <Label className="text-sm font-bold">1. Perfil IPC Real Estate</Label>
@@ -226,6 +247,28 @@ export function CopyGeneratorFlow() {
               </RadioGroup>
             </div>
 
+            {copyType === 'video' && (
+              <div className="space-y-3">
+                <Label className="text-sm font-bold">3. Estructura del guión</Label>
+                <Select value={estructura} onValueChange={(v: string) => setEstructura(v as EstructuraId | 'sugerida')}>
+                  <SelectTrigger className="bg-accent/5 h-12">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sugerida">Sugerida (la elegimos por vos)</SelectItem>
+                    {ESTRUCTURAS_LISTA.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>{e.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  {estructura === 'sugerida'
+                    ? "Elegimos la estructura que mejor le calza al nivel de consciencia de tu cliente ideal."
+                    : ESTRUCTURAS_LISTA.find((e) => e.id === estructura)?.cuando_usarla}
+                </p>
+              </div>
+            )}
+
             <div className="space-y-3">
               <Label className="text-sm font-bold">Contexto extra (ofertas, rebajas...)</Label>
               <Textarea 
@@ -237,6 +280,7 @@ export function CopyGeneratorFlow() {
             </div>
           </div>
 
+          {copyType === 'post' && (
           <div className="space-y-6">
             <div className="space-y-4">
               <Label className="text-sm font-bold">3. Formato de Imagen</Label>
@@ -277,6 +321,7 @@ export function CopyGeneratorFlow() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </CardContent>
       <CardFooter className="bg-accent/5 pt-6 pb-4 flex flex-col gap-2">
@@ -285,8 +330,8 @@ export function CopyGeneratorFlow() {
           onClick={handleGenerateBatch}
           disabled={!selectedIpcId || isGenerating}
         >
-          <Sparkles className="mr-2 h-6 w-6" /> 
-          Generar 3 Variantes Automáticamente
+          <Sparkles className="mr-2 h-6 w-6" />
+          {copyType === 'video' ? 'Generar 3 guiones para cámara' : 'Generar 3 Variantes Automáticamente'}
         </Button>
         <p className="text-[10px] text-muted-foreground/50 text-center flex items-center justify-center gap-1">
           <Sparkles className="w-3 h-3" />

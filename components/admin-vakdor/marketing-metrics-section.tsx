@@ -694,6 +694,65 @@ export function MarketingMetricsSection() {
                 )}
               </div>
             </div>
+
+            {/* Oportunidades SEO: lo que ya aparece pero todavía no arriba. */}
+            <div style={{
+              background: "rgba(0,0,0,0.25)",
+              border: "1px solid rgba(194,120,60,0.25)",
+              borderRadius: 12,
+              padding: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "#e0a877", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  ⬆ Oportunidades SEO · posición 4-20
+                </span>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>{data?.periodo ?? ""}</span>
+              </div>
+
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", lineHeight: 1.45 }}>
+                Búsquedas por las que ya aparecés sin estar arriba. Conviene mejorar estas páginas
+                antes de escribir una nueva que compita con ellas.
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto" }}>
+                {(data?.gscOportunidades ?? []).length > 0 ? (
+                  (data?.gscOportunidades ?? []).map((o, idx) => (
+                    <div key={idx} style={{
+                      padding: "8px 10px",
+                      background: "rgba(194,120,60,0.05)",
+                      border: "1px solid rgba(194,120,60,0.15)",
+                      borderRadius: 6,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", fontWeight: 500 }}>
+                          "{o.query}"
+                        </span>
+                        <div style={{ display: "flex", gap: 10, fontSize: 10, color: "rgba(255,255,255,0.45)", whiteSpace: "nowrap" }}>
+                          <span><b>{o.impressions}</b> imp</span>
+                          <span style={{ color: "#e0a877" }}>Pos. <b>{o.position}</b></span>
+                        </div>
+                      </div>
+                      {o.url ? (
+                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", wordBreak: "break-all" }}>{o.url}</span>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  // Nunca una tabla vacía sin explicación: si la fuente falló, se dice.
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", textAlign: "center", padding: "16px 0" }}>
+                    {data?.sources?.gsc === "error"
+                      ? "Search Console no respondió en este período"
+                      : "Todavía no hay búsquedas en posición 4-20 con impresiones suficientes"}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Sección de Análisis IA con Gemini 3.5 Flash */}

@@ -293,23 +293,53 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 **Qué es:** un generador de contenido publicitario con inteligencia artificial (la pantalla se titula "Marketing IA Asesor").
 
-**Tiene 4 pestañas:** Crear Anuncio · Clientes Ideales (IPC) · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
+**Tiene 5 pestañas:** Crear Anuncio · Clientes Ideales (IPC) · Mi Forma de Trabajar · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
 
 **Cómo usarlo paso a paso:**
 1. En **Clientes Ideales (IPC)** creás un **perfil IPC** (Cliente Ideal). Elegís el objetivo:
    - **Captar** (conseguir propietarios que quieran vender), o
    - **Vender** (atraer compradores para una propiedad).
    Después completás los datos del perfil paso a paso (motivo, urgencia, ángulo, tono, llamada a la acción, nivel de conciencia, etc.).
-2. En **Crear Anuncio** elegís: el **IPC**, el **tipo de copy** (Video/Reel o Post), el **formato de imagen** (Reels, Post o Historia) y el **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante).
-3. Apretás **"Generar 3 Variantes Automáticamente"**: la IA te crea de una **3 anuncios completos (texto + imagen)** con ángulos distintos (PAS, Transformación, Autoridad/Datos) para que elijas el mejor.
-4. Los anuncios quedan guardados en **Mis Generaciones**, donde los ves, editás el texto, descargás la imagen o los borrás.
+2. En **Mi Forma de Trabajar** cargás **cómo trabajás vos** (ver más abajo). Se hace **una sola vez** y es lo que hace que tus anuncios dejen de sonar genéricos.
+3. En **Crear Anuncio** elegís el **IPC** y el **tipo de copy**:
+   - **Video/Reel** → te salen **3 guiones para hablar a cámara** (sin imágenes). Elegís además la **estructura del guión** o dejás "Sugerida" y la elegimos por vos.
+   - **Post/Texto** → como siempre: elegís **formato de imagen** (Reels, Post o Historia) y **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante), y te salen 3 anuncios completos (texto + imagen).
+4. Apretás el botón de generar: la IA te crea **3 variantes** con ángulos distintos (PAS, Transformación, Autoridad/Datos) para que elijas la mejor.
+5. Todo queda guardado en **Mis Generaciones**, donde lo ves, editás el texto, descargás la imagen o lo borrás.
+
+### Mi Forma de Trabajar (tu oferta irresistible)
+
+**Para qué sirve:** el IPC dice *a quién* le hablás. Esta pestaña dice *quién sos vos y por qué te tienen que elegir a vos y no a la inmobiliaria de la otra cuadra*. Con tus datos, la IA te arma **dos ofertas irresistibles**: una para **captar** (dueños que quieren vender) y otra para **vender** (gente que quiere comprar). Después esas ofertas se meten solas en todos tus anuncios.
+
+**Son 4 pasos:**
+1. **Mi perfil** (opcional, pero es el que más suma): años en el rubro, matrícula, la zona que conocés de memoria, en qué te especializás, cuántas operaciones cerraste, **2 o 3 casos reales** tuyos y qué incluye tu servicio. También hay un campo para decir **qué NO se puede prometer nunca** en tus anuncios: la IA lo respeta a rajatabla.
+2. **Captación:** cuántas propiedades vendiste en los últimos 6 meses, a qué porcentaje de tu tasación se cerraron, cuántos compradores tenés en tu base, en cuánto entregás la tasación, cuánto tardás en conseguir la primera oferta y qué te bancás vos para que el dueño no mueva un dedo.
+3. **Venta:** qué hacés para que el comprador esté seguro de que no paga de más, cuánta rebaja conseguís, cuántas exclusivas tenés, en cuánto le mandás la primera selección, en cuántas semanas reserva y qué trámites le sacás de encima.
+4. **Mis 2 ofertas:** apretás **"Generar mis 2 ofertas"** y la IA te las escribe con tus números. Las podés **corregir a mano** y guardar. Si más adelante cambian tus números, las regenerás.
+
+> ⚠️ **Importante:** los números que cargues **salen publicados** en tus anuncios. Cargá los reales.
+> ✅ La IA **no puede inventar**: solo usa los números, los casos y los tiempos que vos cargaste. Si algo no está, no lo menciona.
+> 💡 Podés dejar el formulario a medias y seguir después: se guarda con el botón **Guardar**.
+
+### Los guiones de video (para hablar a cámara)
+
+Cuando elegís **Video/Reel**, PRISMA ya no te arma una imagen: te arma un **guión para que lo aprendas y lo digas vos frente a la cámara**. Cada guión viene partido en bloques y, en cada bloque, tenés:
+
+- **El texto exacto** que decís, escrito como se habla.
+- **Cuántos segundos** debería durar ese bloque.
+- **Cómo decirlo** (el tono, el gesto).
+- **Por qué va ahí** — para que aprendas la fórmula y no repitas de memoria.
+
+En **Mis Generaciones** tenés dos botones: **"Copiar para teleprompter"** (solo lo que decís, limpio para leer de corrido) y **"Copiar completo"** (con los segundos y las explicaciones, para estudiarlo).
+
+**Las estructuras que podés elegir:** *La oferta primero*, *Oferta y prueba social*, *AIDA*, *PAS*, *Antes–Después–Puente* y *Caso real / Storytelling*. Si no sabés cuál, dejá **"Sugerida"**: la elegimos según qué tan consciente del problema está tu cliente ideal.
 
 **Guía Mágica:** una guía de lectura (5 fases) con buenas prácticas para hacer campañas de captación en Meta Ads (Facebook/Instagram). No genera nada, es material para aprender.
 
 > 💡 **Tip:** el copy y las imágenes respetan la **directiva creativa** y el **aviso legal** que cargó tu director. No hace falta que los pongas vos.
 > 🏠 **IPC "Vender" con propiedad asociada:** cuando creás un IPC de tipo **Vender**, podés **buscar y asociar una propiedad de tu cartera** (el buscador te muestra **toda tu cartera**, no solo unas pocas). Si lo hacés, los anuncios **usan los datos reales** de esa propiedad (ubicación, ambientes, superficie, lo más atractivo) integrados con criterio en el mensaje persuasivo —ni ficha técnica fría, ni texto genérico— y **nunca inventan** datos.
 > ⚠️ Si **no** asociás ninguna propiedad, el generador **no inventa** direcciones, metros, ambientes ni precios: habla del perfil de cliente, en términos generales.
-> 💰 **Costo:** cada "Generar 3 Variantes" consume **~7 créditos** (1 por los 3 textos + 2 por cada una de las 3 imágenes). El cartel de "1 crédito" en pantalla es solo por los textos, no el total.
+> 💰 **Costo:** un **Post** ("Generar 3 Variantes") consume **~7 créditos** (1 por los 3 textos + 2 por cada una de las 3 imágenes). Los **guiones de video** consumen **1 crédito** (no llevan imagen). Generar tus **2 ofertas** también cuesta 1 crédito.
 
 ---
 
@@ -442,7 +472,7 @@ Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tar
 
 > 🔁 **Sin repetidos y sin tu propia propiedad.** Si el mismo aviso está cargado varias veces en la red, ahora ves **uno solo**. Y si la propiedad que estás analizando también está publicada, **ya no aparece como comparable de sí misma**.
 > 💡 El **checklist compara todo lo que tiene dato real**: además de zona/superficie/ambientes/baños/amenities, ahora suma **dormitorios** y **antigüedad**. Si de un comparable falta un dato, ese renglón dice "sin dato" y no baja el puntaje.
-> 💡 Trae **hasta 50 comparables por bloque** (cartera y red), ordenados por comparabilidad (los mejores arriba). Para **venta**, la mayoría suele salir de tu propia cartera.
+> 💡 Trae **hasta 100 comparables por bloque** (cartera y red), ordenados por comparabilidad (los mejores arriba). Para **venta**, la mayoría suele salir de tu propia cartera. Cada bloque vive en **su propio recuadro con scroll**: deslizás adentro del recuadro para recorrer la lista, y la página no se estira por más resultados que haya, así los dos bloques quedan siempre a la vista. El tope de 100 existe porque en un barrio grande la búsqueda puede dar más de dos mil coincidencias; como la lista viene ordenada, lo que queda afuera es siempre lo que menos se parece.
 > 🏠 **¿Considerar PH? (solo en Casas):** cuando la propiedad que analizás es una **Casa**, aparece la casilla **"Considerar PH"**. Viene **tildada**, así que por defecto no cambia nada. Como en los portales los **PH** figuran muchas veces como "casa", si querés comparar **solo casas puras**, **destildala** antes de buscar y los PH quedan afuera. En cualquier otro tipo de propiedad la casilla no aparece.
 > 🏗️ **¿A estrenar o en pozo?** Al lado de "Antigüedad" tenés dos casillas: **"A estrenar"** y **"En pozo"**. Tildá la que corresponda (podés tildar las dos) y el campo de años se apaga solo, porque ya no hace falta. **¿Para qué sirve?** Una propiedad sin uso vale bastante más el m² que una usada del mismo barrio —**entre 18 % y 36 % más**, medido con datos reales—, así que mezclarlas te desvía la tasación. Con la casilla tildada, PRISMA compara **solo contra propiedades del mismo estado**; sin tildar, compara solo contra usadas y deja afuera las a estrenar y las de pozo. **Si elegís la propiedad desde tu cartera, la casilla se tilda sola** cuando en Tokko figura como a estrenar o en pozo. En **terrenos** no se aplica (la antigüedad no les corresponde).
 > 💰 Buscar comparables **no consume créditos**.
@@ -709,3 +739,20 @@ y se suman. Después la guardás con nombre y la volvés a usar cuando quieras.
 ## FIN DE LA GUÍA
 
 Esta guía refleja el sistema PRISMA tal como funciona hoy. Si tu pantalla se ve distinta a lo descripto, puede que tu agencia tenga una función deshabilitada o que haya una actualización: consultá con tu director.
+
+### La hoja del entorno en la ficha del cliente
+
+Cuando armás una ficha para tu cliente, ahora se suma **una hoja nueva justo después de la portada**: "La propiedad y su entorno".
+
+De un lado están la descripción de la propiedad y un texto que cuenta cómo es el barrio. Del otro, un mapa con la propiedad marcada y una lista de lo que tiene alrededor: la estación de subte más cercana, la plaza, cuántas escuelas y farmacias hay a la vuelta, el hospital, las líneas de colectivo que paran cerca, la comisaría, las estaciones de bici y la ciclovía. Cada cosa con la distancia real.
+
+**Los puntos del mapa tienen referencia.** El punto azul oscuro y más grande es la propiedad. Los otros son de colores, y **cada renglón de la lista lleva un punto del mismo color que su marcador**: así tu cliente sabe cuál es cuál sin preguntarte. Los renglones que son una cuenta ("20 farmacias a menos de 500 m" no es un lugar puntual) y los que quedaron fuera del pedazo de mapa que se muestra (por ejemplo un hospital a más de un kilómetro) van **sin punto** a propósito — la referencia nunca nombra algo que no se pueda encontrar mirando el mapa.
+
+**Antes de crear la ficha lo revisás vos.** En la misma pantalla donde ya revisás las conclusiones, aparece el texto del barrio para que lo leas y lo cambies si querés. Abajo vas a ver los datos con los que se escribió: esos no se editan, y están ahí justamente para que puedas controlar que el texto diga la verdad. **Leelos.** Si el texto menciona algo que no está en esa lista, corregilo antes de mandarlo.
+
+Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
+
+**Tres cosas para tener en cuenta:**
+- La descripción de la propiedad **ya no aparece en la portada**: se mudó a esta hoja. La portada quedó más limpia, con el título arriba y los datos del análisis al pie.
+- Si la dirección que cargaste no se puede ubicar en el mapa, la hoja no se genera y la ficha se crea igual, sin ella. No es un error: es que sin ubicación no hay nada honesto que contar.
+- **La ficha se ve completa desde el celular.** Antes, si tu cliente abría el link desde el teléfono, veía la mitad izquierda de cada hoja y el título cortado a mitad de palabra. Ahora se ve la hoja entera, más chica, igualita a como se ve en la computadora. El PDF no cambió en nada: sigue saliendo en A4.

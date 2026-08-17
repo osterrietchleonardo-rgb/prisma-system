@@ -381,18 +381,30 @@ Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **
 
 **Qué es:** el generador de contenido publicitario con IA, alineado a tu marca (la pantalla se titula "Marketing IA Pro").
 
-**Tiene 5 pestañas:**
+**Tiene 6 pestañas:**
 1. **Crear Anuncio:** el generador principal (ver abajo).
 2. **Clientes Ideales (IPC):** donde creás y administrás tus perfiles de cliente ideal.
-3. **Historial / Galería:** todos los anuncios generados, agrupados por tanda. Podés verlos, editar el texto, descargar la imagen y borrarlos.
-4. **Guía Mágica:** una guía práctica de 5 fases para hacer campañas de captación de leads de calidad en Meta (Facebook/Instagram) Ads: segmentación, el anuncio, el formulario "filtro de oro", retargeting y medición. Es material de lectura, no genera nada.
-5. **Configuración IA:** los ajustes de marca de la agencia (solo director, ver abajo).
+3. **Mi Forma de Trabajar:** tu operación real y tus 2 ofertas irresistibles (ver abajo).
+4. **Historial / Galería:** todos los anuncios generados, agrupados por tanda. Podés verlos, editar el texto, descargar la imagen y borrarlos.
+5. **Guía Mágica:** una guía práctica de 5 fases para hacer campañas de captación de leads de calidad en Meta (Facebook/Instagram) Ads: segmentación, el anuncio, el formulario "filtro de oro", retargeting y medición. Es material de lectura, no genera nada.
+6. **Configuración IA:** los ajustes de marca de la agencia (solo director, ver abajo).
 
 **Cómo usarlo (pestaña "Crear Anuncio"):**
 1. Primero creás un **perfil IPC** (Cliente Ideal) en la pestaña de IPC: objetivo **Captar** (propietarios) o **Vender** (compradores). Completás el perfil paso a paso (motivo, urgencia, ángulo, tono, CTA, nivel de conciencia, etc.).
-2. En "Crear Anuncio" elegís: el **IPC**, el **tipo de copy** (Video/Reel o Post), el **formato de imagen** (Reels, Post o Historia) y el **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante).
-3. Apretás **"Generar 3 Variantes Automáticamente"**: en una sola acción la IA crea **3 copies + 3 imágenes** (3 anuncios completos) usando 3 ángulos distintos (PAS, Transformación y Autoridad/Datos), para que elijas el que mejor convierta.
+2. En "Crear Anuncio" elegís el **IPC** y el **tipo de copy**:
+   - **Video/Reel** → salen **3 guiones para hablar a cámara**, sin imágenes. Elegís también la **estructura del guión** (o dejás "Sugerida").
+   - **Post/Texto** → como siempre: **formato de imagen** (Reels, Post o Historia) y **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante), con sus 3 imágenes.
+3. Apretás el botón de generar: en una sola acción la IA crea **3 variantes** usando 3 ángulos distintos (PAS, Transformación y Autoridad/Datos), para que elijas la que mejor convierta.
 4. El resultado queda en la pestaña **Historial / Galería**.
+
+**Mi Forma de Trabajar (tu oferta irresistible):**
+Es un formulario que se completa **una sola vez** y es **de cada persona**: la tuya es tuya y la de cada asesor es suya (los números tienen que ser de quien habla en el anuncio). Cargás cómo trabajás —a qué porcentaje de tu tasación cerrás, cuántos compradores tenés en base, en cuánto entregás la tasación, qué te bancás vos para que el dueño no mueva un dedo, tus casos reales— y la IA te arma **2 ofertas irresistibles**: una para captar propietarios y otra para vender. Esas ofertas después entran solas en todos tus anuncios y guiones.
+
+> ⚠️ Los números que se cargan **salen publicados**. Vale la pena que le pidas a tu equipo que cargue los reales.
+> ✅ La IA **no inventa**: solo usa los datos cargados. Además hay un campo de **"qué NO prometer nunca"** que se respeta a rajatabla.
+> 💡 Si un asesor todavía no lo completó, sus anuncios siguen saliendo como antes (genéricos) y la pantalla se lo avisa.
+
+**Los guiones de video:** cada guión viene partido en bloques y, en cada uno, el texto exacto a decir, los segundos que dura, cómo decirlo (tono y gesto) y **por qué va ahí**. Es material de formación para el equipo, no solo un texto para copiar. Desde el historial se copia "para teleprompter" (limpio) o "completo" (con las explicaciones).
 
 **Ajustes de Marca (pestaña "Configuración IA", solo director):**
 - **Colores de marca:** hasta 3 colores.
@@ -824,3 +836,19 @@ Casi nada, pero conviene que lo sepas:
 ## FIN DE LA GUÍA
 
 Esta guía refleja el sistema PRISMA tal como funciona hoy. Para la guía operativa de tu equipo, compartiles el documento **«PRISMA - Guía del Asesor»**.
+
+### La hoja del entorno en la ficha del cliente
+
+Las fichas que genera tu equipo ahora incluyen **una hoja dedicada al barrio**, apenas después de la portada: un mapa con la propiedad marcada, lo que tiene alrededor con distancias reales (subte, plazas, escuelas, farmacias, hospital, colectivos, comisaría) y un texto que lo cuenta de forma leíble.
+
+**Por qué le sirve a tu operación.** Es el argumento de zona que hasta ahora cada asesor improvisaba de memoria y contaba distinto: uno se acordaba del subte, otro de las escuelas, otro no decía nada. Ahora sale igual de completo en todas las fichas, sin depender de cuánto conozca el barrio quien la arma.
+
+**De dónde salen los números.** De registros públicos oficiales, no de la impresión de nadie. Las distancias están medidas, no estimadas. El texto lo redacta la IA, pero **solo puede usar esos datos**: tiene prohibido nombrar un lugar que no esté en la lista, opinar sobre el valor de la propiedad o afirmar que la zona es segura o tranquila.
+
+**Quién controla qué.** El asesor lee y edita el texto **antes** de que la ficha exista, con los datos a la vista, y puede sacar la hoja entera si no le sirve. Una vez creada, la ficha no cambia: el link que recibió el cliente muestra siempre lo mismo.
+
+La hoja no menciona de dónde salieron los datos. Es el documento de tu inmobiliaria, no un informe con bibliografía.
+
+**El mapa se explica solo.** Cada punto de color del mapa tiene su renglón del mismo color en la lista de al lado, y la propiedad es el punto azul oscuro. Nadie tiene que preguntarle al asesor qué es cada cosa. Los renglones que son una cuenta ("20 farmacias a menos de 500 m") o que caen fuera del pedazo de mapa que se muestra van sin punto: la referencia no nombra nada que el cliente no pueda encontrar mirando.
+
+**La ficha se abre bien desde el celular.** La mayoría de tus clientes abre el link desde el teléfono, y hasta ahora veían la mitad izquierda de cada hoja con el título cortado a mitad de palabra. Ahora ven el documento entero. El PDF no cambió: sigue saliendo en A4 exacto.

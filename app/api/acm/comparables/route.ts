@@ -21,6 +21,7 @@ import {
   amenityLabels,
 } from "@/lib/acm/subject";
 import { buildChecklist, type SubScores } from "@/lib/acm/checklist";
+import { TOPE_COMPARABLES } from "@/lib/tasacion/types";
 import type { AcmComparable, Operacion, Sujeto } from "@/lib/tasacion/types";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
     const zonaMin = sujeto.incluir_linderos === true ? 50 : 70;
     // Sin límites artificiales: el gate de barrio ya acota el universo; traemos todos los
     // comparables del barrio (tope alto por performance del render, configurable por request).
-    const limit = Math.min(Number(body.limit) || 50, 100);
+    const limit = Math.min(Number(body.limit) || 50, TOPE_COMPARABLES);
     // Con una descripción real de la propiedad, la similitud descriptiva deja de ser
     // redundante con las dimensiones duras (tipo/m²/ambientes ya se puntúan aparte) y
     // pasa a aportar señal propia: de 10 a 20 puntos sobre ~130.

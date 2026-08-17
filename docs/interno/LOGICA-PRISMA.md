@@ -1104,7 +1104,39 @@ Los IPC son perfiles estratégicos de marketing que definen:
   - **Captar:** tipo_propietario, motivo_venta, urgencia, preocupaciones, objeción_principal, angulo_marketing, tono, promesa_central, CTA
   - **Vender:** tipo_comprador_ideal, necesidad_concreta, atractivos_propiedad, angulo_copy, mensaje_central, CTA, propiedad_tokko_id (opcional)
 
-> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Clientes Ideales (IPC) · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (4 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) lista los anuncios generados agrupados por tanda, con ver/editar/descargar/borrar.
+> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Clientes Ideales (IPC) · Mi Forma de Trabajar · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (5 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) lista los anuncios generados agrupados por tanda, con ver/editar/descargar/borrar.
+
+### 13.1.b Mi Forma de Trabajar y la oferta irresistible (fórmula de Hormozi)
+
+El IPC dice **a quién** le hablamos; esta pestaña dice **quién habla y con qué respaldo**. Es lo que diferencia al asesor de cualquier otra inmobiliaria, y es **por usuario** (cada asesor la suya; el director carga la propia como uno más).
+
+Formulario en 4 pasos (`components/marketing-ia/forma-trabajo-form.tsx`), guardado por `upsert` con RLS en `advisor_operations`:
+
+1. **Mi perfil** (opcional): años en el rubro, matrícula, zona que domina, especialidad, operaciones cerradas, **casos reales** (la materia prima de la "prueba social"), qué incluye el servicio y **qué NO se puede prometer nunca**.
+2. **Captación** (obligatorio): las 6 preguntas de Hormozi para dueños — propiedades vendidas en 6 meses, % del ACM al que cierra, diferencial de confianza, compradores activos en base, tiempo de entrega del ACM, días hasta la primera oferta, y qué se banca el asesor para que el dueño no mueva un dedo.
+3. **Venta** (obligatorio): las 5 preguntas para compradores — diferencial de confianza, % de rebaja negociada, exclusivas/off-market, tiempo hasta la primera selección curada, semanas hasta la reserva y trámites que le saca de encima.
+4. **Mis 2 ofertas** (`ofertas-irresistibles.tsx`): botón que genera las dos (1 crédito, `POST /api/marketing-ia/generar-oferta`). Quedan **guardadas y editables a mano**; regenerar una que fue editada pide confirmación explícita.
+
+**Cómo entra en los anuncios:** al generar, el backend elige la oferta según `ipc.tipo_ipc` (captar → oferta de captación; vender → oferta de venta) y suma los datos duros del bloque que corresponda + el perfil. Regla dura en el prompt: **solo se pueden usar esos números**; prohibido inventar cifras, plazos, testimonios o garantías, y prohibido contradecir el campo "no prometer". Si el asesor no cargó nada, el prompt queda igual que siempre y en "Crear Anuncio" aparece un aviso de que sus anuncios van a salir genéricos.
+
+### 13.1.c Estructuras de guion (video)
+
+Con tipo de copy **Video**, el asesor elige la estructura narrativa (o deja "Sugerida"). Las 3 variantes usan esa misma estructura y se siguen diferenciando por ángulo.
+
+| Estructura | Bloques |
+|---|---|
+| Variante 1 — La oferta primero | Oferta · Problema · Solución · Prueba social · CTA |
+| Variante 2 — Oferta y prueba social | Oferta · Prueba social · Problema · Solución · CTA |
+| AIDA | Atención · Interés · Deseo · Acción (CTA) |
+| PAS | Problema · Agitación · Solución · CTA |
+| Antes – Después – Puente | Antes · Después · Puente · CTA |
+| Caso real / Storytelling | Situación · Conflicto · Qué hicimos · Resultado · CTA |
+
+A PAS, BAB y Storytelling se les agrega un **CTA** final aunque la fórmula clásica no lo traiga: un anuncio sin llamada a la acción no convierte.
+
+"Sugerida" es determinista según el nivel de consciencia del IPC: **0 → PAS · 1 → Antes-Después-Puente · 2 → AIDA · 3 → Variante 2 · 4 → Variante 1**. Storytelling nunca se sugiere solo (depende de que haya un caso real cargado).
+
+**El video pasó a ser un guion, no un anuncio con imagen:** con Video no se generan imágenes ni se piden formato/estilo. Cada guion trae, bloque por bloque, el texto exacto a decir, los segundos, una indicación de tono/gesto y el porqué de ese bloque en la fórmula (para que el asesor aprenda, no repita). El historial lo muestra así y ofrece **Copiar para teleprompter** (solo lo hablado) y **Copiar completo**. Con Post todo sigue igual que antes: copy + imagen.
 
 ### 13.2 Generación de Copy individual (legacy — sin uso en la UI)
 
@@ -1274,7 +1306,7 @@ Columnas: (Asesor — solo director), Contrato, **Código** (badge mono), Client
 > - Rutas nuevas: `/asesor/acm` y `/director/acm` (las viejas `/…/tasaciones` redirigen 308 a las nuevas, ver `next.config.mjs`).
 > - **Nueva lógica:** se elige UNA propiedad sujeto por **(a) formulario manual**, **(b) link de cualquier portal** (botón "Analizar", extracción server-side) o **(c) desplegable de la cartera** de la agencia. El backend busca **comparables reales** en `properties` (cartera) + `roomix_properties` (red de colaboración) con **filtros duros + embedding (Gemini 768d)**, devolviendo cada comparable con **% de comparabilidad** y un **checklist** (qué coincide y qué no). El **precio queda FUERA del %**.
 > - **Funciones SQL:** `acm_match_properties` y `acm_match_roomix` (base `20260625130000_acm_match_functions.sql`; **reescritas en `20260702120000_acm_barrio_gate_and_dims.sql`**, jul-2026). Filtros duros (gate): misma operación + mismo tipo + m² ±40% + ambientes ±1 **+ mismo barrio**. % ponderado (jul-2026): Superficie 22 · Ambientes 16 · **Dormitorios 14** · Baños 12 · **Antigüedad 14** · Amenities 12 (Jaccard ES+EN) · Semántica 10; los pesos se redistribuyen si falta dato. Tipo, operación **y zona** son gates (salen del % y se muestran como "filtro").
-> - **Barrio como filtro duro + más variables (jul-2026):** el comparable ahora se **limita al barrio del sujeto** (antes la zona era un puntaje y podía traer otro barrio con menos puntos). Si el sujeto es de Belgrano, **todos** los comparables (cartera + red) son de Belgrano; Palermo→Palermo; La Plata→La Plata. Insensible a acentos (Nuñez=Núñez) y respeta la jerarquía real de barrios (Belgrano R/C∈Belgrano, Las Cañitas∈Palermo). El **checklist suma Dormitorios y Antigüedad** con dato real (nada inventado): antigüedad de Tokko en la cartera y de la red; solo comparan cuando hay dato en ambos lados. **Piso no se agrega** (la cartera no tiene el piso real de la unidad). **Sin límite artificial:** hasta 50 comparables por fuente (antes 20), ordenados por comparabilidad.
+> - **Barrio como filtro duro + más variables (jul-2026):** el comparable ahora se **limita al barrio del sujeto** (antes la zona era un puntaje y podía traer otro barrio con menos puntos). Si el sujeto es de Belgrano, **todos** los comparables (cartera + red) son de Belgrano; Palermo→Palermo; La Plata→La Plata. Insensible a acentos (Nuñez=Núñez) y respeta la jerarquía real de barrios (Belgrano R/C∈Belgrano, Las Cañitas∈Palermo). El **checklist suma Dormitorios y Antigüedad** con dato real (nada inventado): antigüedad de Tokko en la cartera y de la red; solo comparan cuando hay dato en ambos lados. **Piso no se agrega** (la cartera no tiene el piso real de la unidad). **Sin límite artificial:** hasta 50 comparables por fuente (antes 20), ordenados por comparabilidad. *(Ago-2026: el tope pasó a 100 por fuente y cada bloque muestra la lista dentro de un recuadro con scroll propio — ver más abajo.)*
 > - **Excluir PH en comparables de Casa (jul-2026, rama `feat/acm-excluir-ph-casas`):** al analizar una **Casa** aparece una casilla **"Considerar PH"** (tildada por defecto = incluye PH, como siempre). Los PH suelen figurar como "casa"/"House" en los portales, pero no siempre son comparables con casas; si el asesor la **destilda**, se excluyen. La detección es por la **sigla "PH" como palabra suelta** (regex `\mph\M`, insensible a mayúsculas) en **tipo + título + descripción** del aviso — no confunde palabras que llevan "ph" adentro ni matchea "propiedad horizontal". El filtro corre **dentro de las funciones SQL** (parámetro `p_exclude_ph`), **antes del ranking y del límite**, así el conteo queda correcto y no se caen casas puras. Solo aplica a Casa; en cualquier otro tipo la casilla no se muestra y no afecta. Por defecto no cambia nada (casilla tildada).
 > - **Endpoints nuevos:** `app/api/acm/comparables`, `app/api/acm/extract`, `app/api/acm/cartera`. Librerías en `lib/acm/` (`extract.ts`, `subject.ts`, `checklist.ts`, `tokko.ts`).
 > - **A estrenar solo con a estrenar (ago-2026, rama `feat/acm-filtro-a-estrenar`):** una propiedad **sin uso vale bastante más por m²** que una usada del mismo barrio, así que mezclarlas distorsionaba el ACM. Medido sobre la red (venta, USD, mediana US$/m²): Palermo 3.448 vs 2.642 (**+31 %**), Belgrano 3.495 vs 2.692 (+30 %), Caballito 2.758 vs 2.033 (+36 %), Villa Urquiza 2.657 vs 2.258 (+18 %), Almagro 2.461 vs 1.885 (+31 %). En el paso 1 hay dos casillas nuevas al lado de Antigüedad: **"A estrenar"** y **"En pozo"** (se pueden tildar las dos, una o ninguna; al tildar alguna, el campo de años se deshabilita). **Sin tildar = usada** → se excluyen los comparables a estrenar y en pozo. **Tildada = sin uso** → solo entran comparables del/los estado(s) tildado(s). Antes esto era **imposible de expresar**: el formulario arranca en 0 y `sujetoAntiguedad()` trataba el 0 como "sin dato", así que un depto a estrenar elegido de la cartera perdía esa información antes de llegar al SQL. Los avisos **sin antigüedad declarada** entran siempre para un sujeto usado (su mediana US$/m² se comporta como la de usadas), y para un sujeto sin uso entran **solo en alquiler** (en venta se descartan; en alquiler el 99,8 % de la red no carga el dato y descartarlos dejaría 0 comparables). **Terreno/lote queda afuera del filtro**: la antigüedad no le aplica y Tokko igual le pone `age=0` (47 de los 49 lotes de la cartera), así que filtrarlos los dejaría casi sin comparables.
@@ -2453,3 +2485,38 @@ El lápiz recorta en el navegador, sin consultas nuevas. Las zonas guardadas son
 ## FIN DEL DOCUMENTO
 
 Este documento cubre la lógica completa del sistema PRISMA al nivel de código fuente. Cada endpoint, cada flujo de datos, cada integración y cada mecanismo de seguridad han sido documentados basándose en el análisis directo del código, sin alteración ni ejecución del mismo.
+
+### 15.x El listado de comparables: lista larga en un recuadro fijo (ago-2026)
+
+**El problema no era cuántos traía sino dónde los ponía.** Con 50 por fuente apilados en la página, el alto de la pantalla dependía de la cantidad de resultados y los dos bloques (cartera y red) dejaban de verse juntos. Ahora **cada bloque tiene su propio recuadro con scroll** (540 px en escritorio, 60vh en celular): 8 o 100 comparables ocupan el mismo lugar. Como el alto dejó de ser un costo, el pedido subió a **100 por fuente**.
+
+**No es "todos", y el número tiene una razón medida.** Un depto de 2 dormitorios en Belgrano devuelve **más de 2.000 coincidencias** en la red (628 por encima del 80%). Ni el navegador ni el asesor procesan eso. Como la lista viene ordenada de mayor a menor coincidencia, lo que queda afuera es siempre lo que menos se parece. **Subir el tope no encarece la consulta**: medido, 50 y 100 tardan lo mismo (131 vs 134 ms en caliente) porque el ranking recorre los mismos candidatos y el límite solo corta al final.
+
+**El tope vive en una sola constante** (`TOPE_COMPARABLES`) que usan los tres lados —lo que pide la pantalla, el techo del endpoint y el aviso que lee el asesor—: con tres números sueltos, cambiar uno dejaba a la interfaz mintiendo sobre lo que el backend hace.
+
+**Las fotos de las tarjetas se cargan diferido.** Con la lista completa hay hasta 200 tarjetas montadas; sin eso el navegador arranca bajando 200 fotos de golpe para mostrar tres.
+
+### 15.x Hoja "La propiedad y su entorno" — qué decide qué
+
+**Cuándo sale la hoja.** Solo si se cumplen las cuatro:
+1. Se pudo ubicar la dirección (Georef la encuentra).
+2. Hay al menos **3 categorías** de datos del entorno.
+3. La IA (o el asesor a mano) dejó un texto: **sin relato no hay hoja**, porque los datos duros solos serían una tabla suelta sin nada que la explique.
+4. El asesor dejó tildada la casilla en el paso de revisión.
+
+Si falla cualquiera, **la ficha se crea igual, sin esa hoja**. La zona nunca puede impedir que un asesor arme su ficha: todo el bloque está dentro de un `try` y cualquier caída (Georef, la base, Overpass, Gemini, el mapa) termina en "no hay hoja", nunca en error.
+
+**De dónde salen los datos, en este orden.** Dentro de CABA, de las tablas propias (instantáneo, más completo, y es el 90% de los casos medidos: 48 de los 53 ACM hechos). Fuera de CABA, de OpenStreetMap en vivo. **El cliente no ve la diferencia**: la hoja se imprime con el mismo código y no dice de dónde vino nada. La fuente queda guardada en el snapshot solo para poder auditarla.
+
+**Qué escribe la IA y qué no.** La IA **no produce ni un número**. Nombres, distancias y conteos salen calculados de la base o de OpenStreetMap; la IA solo los narra, y tiene prohibido nombrar cualquier cosa que no esté en la lista que se le pasó. El asesor **revisa y edita ese texto antes** de que la ficha exista, con los datos duros a la vista de solo lectura — sin verlos no tendría cómo darse cuenta de que la IA se inventó una estación.
+
+**Qué NO entra, y por qué.**
+- **Nada en tiempo real** (llegada del subte, bicis disponibles). La ficha es un PDF que el cliente abre tres días después: un dato en vivo queda viejo y hace quedar mal al documento.
+- **Nada de delitos ni seguridad estadística.** El dataset existe, pero poner tasas de delito en un documento firmado por la inmobiliaria es un riesgo comercial y legal que nadie pidió. Al relato también se le prohíbe afirmar que una zona es "segura" o "tranquila".
+- **La hoja no se edita después de creada.** El snapshot es inmutable a propósito: el link que tiene el cliente no puede cambiar bajo sus pies.
+
+**Un cambio que afecta a TODA ficha nueva:** la descripción de la propiedad ya **no va en la portada**, va en esta hoja. La portada queda solo con el título, la propiedad de referencia y la fecha, y esos datos se corrieron **al pie de la hoja**: sin la descripción quedaba un hueco blanco en el medio. Las fichas viejas siguen abriendo como siempre.
+
+**Las referencias del mapa las decide el mapa, no la lista.** Cada renglón lleva un punto del color de su marcador **solo si ese marcador está efectivamente dibujado**. Quedan sin punto los renglones que son un conteo (una "farmacia a menos de 500 m" es un radio, no un lugar) y los que caen fuera del recorte que se muestra. La condición se calcula con el **mismo código** que usa el generador de la imagen (`lib/acm/zona-mapa.ts`), no con una copia: si fueran dos copias, la primera edición que tocara una sola dejaría la ficha diciéndole al cliente que busque un punto que no está.
+
+**La ficha en pantalla chica.** La hoja mide 210 mm fijos porque tiene que ser un A4 exacto al imprimir; eso no se negocia. En una pantalla más angosta se **achica la hoja entera**, no se reacomoda: es el mismo documento más chico, así que no existe una segunda maqueta que pueda quedar desactualizada ni un caso "celular" que probar aparte. Tres candados hacen que no toque nada de lo que ya andaba: solo aplica en pantalla (la impresión no lo ve), solo por debajo de 840 px (el escritorio no lo ve) y el factor vale 1 si no corre JavaScript (queda como estaba).

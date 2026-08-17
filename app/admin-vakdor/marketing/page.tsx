@@ -1,4 +1,4 @@
-import { listarIdeas } from "@/lib/admin-vakdor/marketing/store"
+import { listarIdeas, listarEjes } from "@/lib/admin-vakdor/marketing/store"
 import MarketingClient from "@/components/admin-vakdor/marketing-client"
 
 export const metadata = {
@@ -9,6 +9,8 @@ export const metadata = {
 export const dynamic = "force-dynamic"
 
 export default async function AdminMarketingPage() {
-  const ideas = await listarIdeas()
-  return <MarketingClient ideas={ideas} />
+  // Los ejes se leen acá (server) en vez de por un endpoint: no hace falta estado de carga
+  // y un cluster agregado por SQL aparece en los selectores sin desplegar.
+  const [ideas, ejes] = await Promise.all([listarIdeas(), listarEjes()])
+  return <MarketingClient ideas={ideas} ejes={ejes} />
 }

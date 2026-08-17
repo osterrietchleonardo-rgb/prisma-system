@@ -9,13 +9,27 @@ export type EtapaEmbudo = "tofu" | "mofu" | "bofu"
 export type ClaveEstructura =
   | "confesion" | "concesion_vuelta" | "escena_campo" | "contraste"
   | "autopsia" | "mito_realidad" | "carta_director" | "numero_duele"
+  | "framework_pasos"
 
 export type ClaveComentario =
   | "dato_crudo" | "opinion_filosa" | "matiz" | "micro_caso" | "pregunta_binaria"
 
+/** El PARA QUÉ de la pieza. No dicta la forma: restringe qué estructuras se sortean. */
+export type ClaveProposito =
+  | "convencer" | "ensenar" | "mostrar_detras" | "probar_con_dato" | "reflexionar"
+
+/** El momento del que habla una escena. Se ata a la etapa del embudo. */
+export type Momento = "dolor" | "intento_fallido" | "resuelto"
+
+/**
+ * Set conocido para tipar. NO es un validador: si lo fuera, una estructura insertada
+ * en la base se descartaría en silencio y la idea quedaría con `estructura: null`.
+ * La validación real la hace `claveValida` contra las claves activas de la base.
+ */
 export const CLAVES_ESTRUCTURA: readonly ClaveEstructura[] = [
   "confesion", "concesion_vuelta", "escena_campo", "contraste",
   "autopsia", "mito_realidad", "carta_director", "numero_duele",
+  "framework_pasos",
 ] as const
 
 export const CLAVES_COMENTARIO: readonly ClaveComentario[] = [
@@ -73,7 +87,52 @@ Urgencia sin ruego: no supliques la visita.`
   }
 }
 
-export function instruccionComentario(clave: ClaveComentario, etapa: EtapaEmbudo): string {
+/**
+ * Cada etapa del embudo tira de un momento distinto de la escena. Antes las tres
+ * sorteaban de la misma bolsa de dolor y BOFU tenía que improvisar el "así se ve resuelto".
+ */
+export function momentoDeEtapa(etapa: EtapaEmbudo): Momento {
+  switch (etapa) {
+    case "tofu": return "dolor"
+    case "mofu": return "intento_fallido"
+    case "bofu": return "resuelto"
+  }
+}
+
+/**
+ * El propósito NO dicta la forma: restringe qué estructuras pueden sortearse.
+ * Si el filtro deja el pool vacío devuelve todas — una estructura menos afín es
+ * mejor que ninguna, y bloquear la generación no es una opción.
+ */
+export function estructurasCompatibles<T extends { propositos?: string[] }>(
+  estructuras: T[],
+  proposito: string | null,
+): T[] {
+  if (!proposito) return estructuras
+  const afines = estructuras.filter((e) => (e.propositos ?? []).includes(proposito))
+  return afines.length ? afines : estructuras
+}
+
+/**
+ * Valida una clave contra las que existen HOY en la base, no contra una lista cerrada
+ * en código. Es lo que permite agregar estructuras, comentarios o propósitos con un
+ * INSERT y que el motor los acepte sin desplegar.
+ */
+export function claveValida(claves: string[], candidata: unknown): string | null {
+  if (typeof candidata !== "string") return null
+  const limpia = candidata.trim().toLowerCase()
+  return claves.includes(limpia) ? limpia : null
+}
+
+/**
+ * `detalle` es el texto que vive en la fila de `marketing_recursos`. Si no viene (o
+ * viene vacío) se cae al texto de acá, con el mismo criterio de falla suave que canonDeVoz.
+ */
+export function instruccionComentario(
+  clave: ClaveComentario,
+  etapa: EtapaEmbudo,
+  detalle?: string | null,
+): string {
   const cuerpos: Record<ClaveComentario, string> = {
     dato_crudo: "Un número real del negocio con el contexto que lo hace doler. No pidas nada. Dos o tres líneas.",
     opinion_filosa: "Una postura más dura que la del post, que el post no se animó a decir. Controversia sobre el negocio, nunca agravio a personas.",
@@ -81,10 +140,11 @@ export function instruccionComentario(clave: ClaveComentario, etapa: EtapaEmbudo
     micro_caso: "La escena contada en tres líneas, sin moraleja ni cierre. Que el lector saque la conclusión.",
     pregunta_binaria: 'Una pregunta de dos opciones concretas del negocio. PROHIBIDO "¿y vos qué opinás?" y cualquier variante genérica.',
   }
+  const cuerpo = (detalle ?? "").trim() || cuerpos[clave]
   const link = etapa === "bofu"
     ? "Al final, en una línea aparte, el link: https://vakdor.com/demostracion"
     : "Sin links."
-  return `PRIMER COMENTARIO (tipo: ${clave}). ${cuerpos[clave]} ${link}`
+  return `PRIMER COMENTARIO (tipo: ${clave}). ${cuerpo} ${link}`
 }
 
 export const RUBRICA: readonly string[] = [
@@ -97,10 +157,26 @@ export const RUBRICA: readonly string[] = [
   "No usa muletillas de IA.",
 ] as const
 
-export function promptRevision(texto: string, etapa: EtapaEmbudo, hooksPrevios: string[]): string {
+/**
+ * `keyword` suma un criterio extra a la rúbrica. Se pasa SOLO para artículos de blog:
+ * en LinkedIn cada criterio de más sube los reintentos, y un reintento es una llamada
+ * paga en el formato que más se publica.
+ */
+export function promptRevision(
+  texto: string,
+  etapa: EtapaEmbudo,
+  hooksPrevios: string[],
+  { keyword }: { keyword?: string | null } = {},
+): string {
+  const criterios = [...RUBRICA]
+  if (keyword?.trim()) {
+    criterios.push(
+      `La búsqueda objetivo «${keyword.trim()}» aparece en el primer párrafo, y la pregunta que implica queda respondida dentro de las primeras 100 palabras.`,
+    )
+  }
   return [
     `Sos el editor. Evaluá esta pieza (etapa del embudo: ${etapa.toUpperCase()}) contra la rúbrica.`,
-    `RÚBRICA:\n${RUBRICA.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
+    `RÚBRICA:\n${criterios.map((r, i) => `${i + 1}. ${r}`).join("\n")}`,
     // Sin esto, el criterio 6 le pedía al juez que evaluara una regla que nunca le dijimos: la
     // instrucción de CTA por etapa iba solo al prompt de escritura. Acá va la hoja de respuestas.
     `REGLA DE CIERRE DE ESTA ETAPA (es la respuesta del criterio 6):\n${instruccionCta(etapa)}`,

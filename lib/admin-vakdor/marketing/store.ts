@@ -4,7 +4,8 @@ import type {
 } from "./types"
 
 const COLS =
-  "id, estado, fuente, formato, funnel, titulo, angulo, estructura, gancho, contenido, " +
+  "id, estado, fuente, formato, funnel, cluster, proposito, keyword_objetivo, " +
+  "titulo, angulo, estructura, gancho, contenido, " +
   "primer_comentario, hashtags, motivo, comentario, brief, blog, assets, " +
   "programada_para, publicado_en, origen, historial, created_at, updated_at"
 
@@ -19,6 +20,37 @@ export async function listarIdeas(): Promise<MarketingIdea[]> {
   return (data ?? []) as unknown as MarketingIdea[]
 }
 
+export interface Eje {
+  clave: string
+  titulo: string
+}
+
+export interface Ejes {
+  clusters: Eje[]
+  propositos: Eje[]
+}
+
+/**
+ * Los ejes que existen HOY en la base, para los selectores y los badges del panel.
+ * Se leen en cada carga (no se hardcodean) para que agregar un cluster o un propósito
+ * por SQL aparezca en la pantalla sin desplegar.
+ *
+ * Falla suave a listas vacías: sin ejes el tablero se usa igual, solo que sin selectores.
+ */
+export async function listarEjes(): Promise<Ejes> {
+  const db = getAdminDb()
+  const [cl, pr] = await Promise.all([
+    db.from("marketing_clusters").select("clave, titulo").eq("activo", true).order("clave"),
+    db.from("marketing_recursos").select("clave, titulo").eq("tipo", "proposito").eq("activo", true).order("clave"),
+  ])
+  if (cl.error) console.error(`listarEjes(clusters): ${cl.error.message}`)
+  if (pr.error) console.error(`listarEjes(propositos): ${pr.error.message}`)
+  return {
+    clusters: (cl.data ?? []) as Eje[],
+    propositos: ((pr.data ?? []) as Eje[]).filter((p) => typeof p.clave === "string"),
+  }
+}
+
 export async function crearIdeaManual(input: NuevaIdeaInput): Promise<MarketingIdea> {
   const db = getAdminDb()
   const { data, error } = await db
@@ -28,6 +60,9 @@ export async function crearIdeaManual(input: NuevaIdeaInput): Promise<MarketingI
       fuente: input.fuente,
       formato: input.formato,
       funnel: input.funnel ?? null,
+      cluster: input.cluster ?? null,
+      proposito: input.proposito ?? null,
+      keyword_objetivo: input.keyword_objetivo ?? null,
       angulo: input.angulo ?? null,
       estructura: input.estructura ?? null,
       gancho: input.gancho ?? null,
@@ -54,6 +89,9 @@ export async function insertarIdeasMotor(ideas: NuevaIdeaInput[]): Promise<numbe
     fuente: i.fuente,
     formato: i.formato,
     funnel: i.funnel ?? null,
+    cluster: i.cluster ?? null,
+    proposito: i.proposito ?? null,
+    keyword_objetivo: i.keyword_objetivo ?? null,
     angulo: i.angulo ?? null,
     estructura: i.estructura ?? null,
     gancho: i.gancho ?? null,
@@ -225,6 +263,9 @@ export async function duplicarIdea(id: string): Promise<MarketingIdea> {
       fuente: original.fuente,
       formato: original.formato,
       funnel: original.funnel ?? null,
+      cluster: original.cluster ?? null,
+      proposito: original.proposito ?? null,
+      keyword_objetivo: original.keyword_objetivo ?? null,
       angulo: original.angulo ?? null,
       estructura: original.estructura ?? null,
       gancho: original.gancho ?? null,

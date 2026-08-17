@@ -91,6 +91,19 @@ export interface Comparable extends Omit<Sujeto, 'ocupacion'> {
 export type Operacion = 'venta' | 'alquiler';
 export type AcmSource = 'cartera' | 'roomix';
 
+/**
+ * Tope de comparables que devuelve cada fuente (cartera y red) en una búsqueda.
+ *
+ * No es un recorte de calidad, es el techo de lo que tiene sentido mostrar: en un barrio grande
+ * la función SQL llega a 2.000 coincidencias y ni el navegador ni el asesor procesan eso. La
+ * lista viene ordenada de mayor a menor coincidencia, así que lo que queda afuera es siempre lo
+ * que menos se parece.
+ *
+ * Lo usan los tres lados a la vez —el pedido del front, el tope duro del endpoint y el aviso que
+ * lee el asesor— para que no puedan quedar diciendo números distintos.
+ */
+export const TOPE_COMPARABLES = 100;
+
 // Cada renglón del checklist de comparabilidad (qué coincide y qué no).
 export interface ChecklistItem {
   dimension: 'tipo' | 'operacion' | 'zona' | 'superficie' | 'ambientes' | 'dormitorios' | 'banos' | 'antiguedad' | 'amenities' | 'semantica';
