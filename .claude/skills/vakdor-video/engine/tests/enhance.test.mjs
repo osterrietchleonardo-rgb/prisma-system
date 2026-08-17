@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { NIVELES_LIMPIEZA, filtroDeLimpieza, estabilizar } from "../lib/enhance.mjs";
+import { NIVELES_LIMPIEZA, filtroDeLimpieza, estabilizar, filtroDeTransform } from "../lib/enhance.mjs";
 import { pixFmtIntermedioDe } from "../lib/cut.mjs";
 import { crearClipDePrueba, dirTemporal, borrarDirDePrueba } from "./helpers.mjs";
 
@@ -65,6 +65,22 @@ test("un origen de 10 bits conserva los 10 bits en el paso intermedio", () => {
   assert.equal(pixFmtIntermedioDe(null), "yuv420p");
 });
 
+test("la 2da pasada de vidstab NO encadena unsharp: esa cadena tumba a ffmpeg", () => {
+  // Esta es la prueba que evita que alguien "mejore" la estabilizacion volviendo a
+  // pegarle un unsharp atras. Se hizo una vez y hacia que ffmpeg muriera con SIGSEGV
+  // sin mensaje: MEDIDO, clip de 3s a 640x360, 20 corridas de cada variante, sin
+  // concurrencia -> con unsharp 18 de 20; sin unsharp 20 de 20. En un clip de 1s la
+  // diferencia es brutal: 4 de 10 contra 19 de 20. El detalle completo esta en el
+  // comentario de `filtroDeTransform` en lib/enhance.mjs.
+  const f = filtroDeTransform({ trfEnFiltro: "'x.trf'", suavizado: 30 });
+  assert.ok(f.includes("vidstabtransform"), "tiene que seguir siendo la pasada de transform");
+  assert.ok(f.includes("smoothing=30"), "el suavizado tiene que llegar al filtro");
+  assert.ok(!f.includes("unsharp"), "unsharp encadenado a vidstabtransform hace segfaultear a ffmpeg");
+  // Cualquier filtro de convolucion atras de vidstabtransform es el mismo riesgo, no
+  // solo unsharp: la 2da pasada tiene que ser vidstabtransform y nada mas.
+  assert.equal(f.split(",").length, 1, `la 2da pasada tiene que ser UN solo filtro, es: ${f}`);
+});
+
 test("estabilizar hace las 2 pasadas y no cambia las dimensiones", async () => {
   const salida = path.join(dir, "estab.mp4");
   await estabilizar({ entrada: clip, salida, suavizado: 30 });
@@ -95,20 +111,36 @@ test("estabilizar limpia el .trf incluso si la segunda pasada (transform) revien
 });
 
 test("dos estabilizaciones concurrentes en la misma carpeta no chocan de nombre de .trf", async () => {
-  // Clip CHICO y corto a proposito. Lo que esta prueba verifica es que dos corridas no
-  // se pisen el nombre del .trf: la resolucion y la duracion no cambian nada de eso.
-  // Con el clip de 1920x1080 de `before`, dos vidstab en paralelo (4 pasadas de ffmpeg
-  // a la vez) se caian de a ratos cuando la suite completa ya tenia la maquina cargada
-  // -- una prueba que falla sin motivo real es una prueba que nadie vuelve a creer.
+  // Clip CHICO a proposito: lo que se verifica es el nombre del .trf, y la resolucion no
+  // cambia nada de eso. Los 3 segundos SI importan y estan medidos: en clips de 1 segundo
+  // vidstabtransform se cae solo cada tanto (19 de 20), en 3 segundos no (20 de 20).
   const chico = crearClipDePrueba({
-    segundos: 1, ancho: 640, alto: 360, conAudio: false, salida: path.join(dir, "conc.mp4"),
+    segundos: 3, ancho: 640, alto: 360, conAudio: false, salida: path.join(dir, "conc.mp4"),
   });
+
+  // Se espia la carpeta MIENTRAS las dos corren. Antes esta prueba solo miraba que no
+  // quedaran temporales al final, y con eso no probaba lo que dice el titulo: si las dos
+  // corridas hubieran usado EL MISMO nombre, tambien terminaba sin sobrantes y pasaba
+  // igual. Ver DOS nombres distintos es la unica forma de afirmar que no se pisan.
+  // El .trf existe desde que arranca la 1ra pasada hasta el finally de la 2da, o sea
+  // casi toda la llamada: mirar cada 15 ms lo agarra de sobra.
+  const vistos = new Set();
+  const reloj = setInterval(() => {
+    for (const f of fs.readdirSync(dir)) if (f.endsWith(".trf")) vistos.add(f);
+  }, 15);
+
   const salidaA = path.join(dir, "estab-conc-a.mp4");
   const salidaB = path.join(dir, "estab-conc-b.mp4");
-  await Promise.all([
-    estabilizar({ entrada: chico, salida: salidaA, suavizado: 10 }),
-    estabilizar({ entrada: chico, salida: salidaB, suavizado: 10 }),
-  ]);
+  try {
+    await Promise.all([
+      estabilizar({ entrada: chico, salida: salidaA, suavizado: 10 }),
+      estabilizar({ entrada: chico, salida: salidaB, suavizado: 10 }),
+    ]);
+  } finally {
+    clearInterval(reloj);
+  }
+
+  assert.equal(vistos.size, 2, `esperaba dos .trf con nombres distintos, vi: ${[...vistos].join(", ") || "ninguno"}`);
   assert.ok(fs.existsSync(salidaA));
   assert.ok(fs.existsSync(salidaB));
   const sobrantes = fs.readdirSync(dir).filter((f) => f.endsWith(".trf"));

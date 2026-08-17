@@ -49,6 +49,34 @@ const correr = (args) =>
 const escaparRutaDeFiltro = (p) => `'${p.replace(/\\/g, "/").replace(/:/g, "\\:")}'`;
 
 /**
+ * Filtro de la 2da pasada de vidstab. Va aparte y es puro para poder AFIRMARLO en una
+ * prueba, porque tiene una regla que cuesta cara si alguien la rompe sin saber:
+ *
+ * NO se le puede encadenar `unsharp` (ni ningun filtro de convolucion) atras de
+ * `vidstabtransform` en el mismo comando. Antes lo tenia (`...,unsharp=5:5:0.5`) y hacia
+ * que ffmpeg se cayera con SIGSEGV / 3221225477 = 0xC0000005 cada tanto, sin mensaje de
+ * error: el proceso simplemente moria. Es un bug de ffmpeg, no del motor — pero el que
+ * se queda sin video es el usuario.
+ *
+ * MEDIDO el 17-ago-2026 (ffmpeg 8.1.1, clips de 640x360, 20 corridas por variante,
+ * SIN concurrencia: una sola estabilizacion a la vez):
+ *   clip de 1s, con unsharp -> 4 de 10 OK   | sin unsharp -> 19 de 20 OK
+ *   clip de 3s, con unsharp -> 18 de 20 OK  | sin unsharp -> 20 de 20 OK
+ * Cada filtro POR SEPARADO anda perfecto (8 de 8 cada uno): lo que rompe es la cadena.
+ * Tambien se probaron dos atajos para poder dejar el unsharp, y NINGUNO sirve (clip de
+ * 1s, 10 corridas cada uno): meter `format=yuv420p` en el medio -> 4 de 10; bajar
+ * `-filter_threads` a 1 -> 6 de 10. La referencia sin tocar nada daba 4 de 10.
+ *
+ * Sacarlo no le quita nitidez al resultado final: la nitidez la pone despues el paso de
+ * limpieza en `compose` (`hqdn3d + cas + unsharp`), que viene en "suave" por defecto.
+ * Aca era una segunda pasada de nitidez sobre un archivo INTERMEDIO, o sea que ademas
+ * se estaba afilando ruido para volver a afilarlo mas tarde.
+ */
+export function filtroDeTransform({ trfEnFiltro, suavizado }) {
+  return `vidstabtransform=input=${trfEnFiltro}:smoothing=${suavizado}:zoom=1`;
+}
+
+/**
  * Estabilizacion vidstab en 2 pasadas (deteccion + transformacion). Es la EXCEPCION del
  * modulo: a diferencia de `filtroDeLimpieza`, si ejecuta ffmpeg, porque vidstab necesita
  * su propio archivo de analisis (.trf) entre pasada y pasada — no se puede expresar como
@@ -74,7 +102,7 @@ export async function estabilizar({ entrada, salida, suavizado = 30, pixFmtOrige
     // todo el pipeline. Sin el parametro, el comportamiento es identico al de siempre
     // (yuv420p) — asi un caller viejo no cambia de conducta sin darse cuenta.
     await correr(["-y", "-v", "error", "-i", entrada,
-      "-vf", `vidstabtransform=input=${trfEnFiltro}:smoothing=${suavizado}:zoom=1,unsharp=5:5:0.5`,
+      "-vf", filtroDeTransform({ trfEnFiltro, suavizado }),
       "-c:v", "libx264", "-crf", "16", "-pix_fmt", pixFmtIntermedioDe(pixFmtOrigen),
       "-c:a", "copy", salida]);
     return { salida };
