@@ -293,23 +293,53 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 **Qué es:** un generador de contenido publicitario con inteligencia artificial (la pantalla se titula "Marketing IA Asesor").
 
-**Tiene 4 pestañas:** Crear Anuncio · Clientes Ideales (IPC) · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
+**Tiene 5 pestañas:** Crear Anuncio · Clientes Ideales (IPC) · Mi Forma de Trabajar · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
 
 **Cómo usarlo paso a paso:**
 1. En **Clientes Ideales (IPC)** creás un **perfil IPC** (Cliente Ideal). Elegís el objetivo:
    - **Captar** (conseguir propietarios que quieran vender), o
    - **Vender** (atraer compradores para una propiedad).
    Después completás los datos del perfil paso a paso (motivo, urgencia, ángulo, tono, llamada a la acción, nivel de conciencia, etc.).
-2. En **Crear Anuncio** elegís: el **IPC**, el **tipo de copy** (Video/Reel o Post), el **formato de imagen** (Reels, Post o Historia) y el **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante).
-3. Apretás **"Generar 3 Variantes Automáticamente"**: la IA te crea de una **3 anuncios completos (texto + imagen)** con ángulos distintos (PAS, Transformación, Autoridad/Datos) para que elijas el mejor.
-4. Los anuncios quedan guardados en **Mis Generaciones**, donde los ves, editás el texto, descargás la imagen o los borrás.
+2. En **Mi Forma de Trabajar** cargás **cómo trabajás vos** (ver más abajo). Se hace **una sola vez** y es lo que hace que tus anuncios dejen de sonar genéricos.
+3. En **Crear Anuncio** elegís el **IPC** y el **tipo de copy**:
+   - **Video/Reel** → te salen **3 guiones para hablar a cámara** (sin imágenes). Elegís además la **estructura del guión** o dejás "Sugerida" y la elegimos por vos.
+   - **Post/Texto** → como siempre: elegís **formato de imagen** (Reels, Post o Historia) y **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante), y te salen 3 anuncios completos (texto + imagen).
+4. Apretás el botón de generar: la IA te crea **3 variantes** con ángulos distintos (PAS, Transformación, Autoridad/Datos) para que elijas la mejor.
+5. Todo queda guardado en **Mis Generaciones**, donde lo ves, editás el texto, descargás la imagen o lo borrás.
+
+### Mi Forma de Trabajar (tu oferta irresistible)
+
+**Para qué sirve:** el IPC dice *a quién* le hablás. Esta pestaña dice *quién sos vos y por qué te tienen que elegir a vos y no a la inmobiliaria de la otra cuadra*. Con tus datos, la IA te arma **dos ofertas irresistibles**: una para **captar** (dueños que quieren vender) y otra para **vender** (gente que quiere comprar). Después esas ofertas se meten solas en todos tus anuncios.
+
+**Son 4 pasos:**
+1. **Mi perfil** (opcional, pero es el que más suma): años en el rubro, matrícula, la zona que conocés de memoria, en qué te especializás, cuántas operaciones cerraste, **2 o 3 casos reales** tuyos y qué incluye tu servicio. También hay un campo para decir **qué NO se puede prometer nunca** en tus anuncios: la IA lo respeta a rajatabla.
+2. **Captación:** cuántas propiedades vendiste en los últimos 6 meses, a qué porcentaje de tu tasación se cerraron, cuántos compradores tenés en tu base, en cuánto entregás la tasación, cuánto tardás en conseguir la primera oferta y qué te bancás vos para que el dueño no mueva un dedo.
+3. **Venta:** qué hacés para que el comprador esté seguro de que no paga de más, cuánta rebaja conseguís, cuántas exclusivas tenés, en cuánto le mandás la primera selección, en cuántas semanas reserva y qué trámites le sacás de encima.
+4. **Mis 2 ofertas:** apretás **"Generar mis 2 ofertas"** y la IA te las escribe con tus números. Las podés **corregir a mano** y guardar. Si más adelante cambian tus números, las regenerás.
+
+> ⚠️ **Importante:** los números que cargues **salen publicados** en tus anuncios. Cargá los reales.
+> ✅ La IA **no puede inventar**: solo usa los números, los casos y los tiempos que vos cargaste. Si algo no está, no lo menciona.
+> 💡 Podés dejar el formulario a medias y seguir después: se guarda con el botón **Guardar**.
+
+### Los guiones de video (para hablar a cámara)
+
+Cuando elegís **Video/Reel**, PRISMA ya no te arma una imagen: te arma un **guión para que lo aprendas y lo digas vos frente a la cámara**. Cada guión viene partido en bloques y, en cada bloque, tenés:
+
+- **El texto exacto** que decís, escrito como se habla.
+- **Cuántos segundos** debería durar ese bloque.
+- **Cómo decirlo** (el tono, el gesto).
+- **Por qué va ahí** — para que aprendas la fórmula y no repitas de memoria.
+
+En **Mis Generaciones** tenés dos botones: **"Copiar para teleprompter"** (solo lo que decís, limpio para leer de corrido) y **"Copiar completo"** (con los segundos y las explicaciones, para estudiarlo).
+
+**Las estructuras que podés elegir:** *La oferta primero*, *Oferta y prueba social*, *AIDA*, *PAS*, *Antes–Después–Puente* y *Caso real / Storytelling*. Si no sabés cuál, dejá **"Sugerida"**: la elegimos según qué tan consciente del problema está tu cliente ideal.
 
 **Guía Mágica:** una guía de lectura (5 fases) con buenas prácticas para hacer campañas de captación en Meta Ads (Facebook/Instagram). No genera nada, es material para aprender.
 
 > 💡 **Tip:** el copy y las imágenes respetan la **directiva creativa** y el **aviso legal** que cargó tu director. No hace falta que los pongas vos.
 > 🏠 **IPC "Vender" con propiedad asociada:** cuando creás un IPC de tipo **Vender**, podés **buscar y asociar una propiedad de tu cartera** (el buscador te muestra **toda tu cartera**, no solo unas pocas). Si lo hacés, los anuncios **usan los datos reales** de esa propiedad (ubicación, ambientes, superficie, lo más atractivo) integrados con criterio en el mensaje persuasivo —ni ficha técnica fría, ni texto genérico— y **nunca inventan** datos.
 > ⚠️ Si **no** asociás ninguna propiedad, el generador **no inventa** direcciones, metros, ambientes ni precios: habla del perfil de cliente, en términos generales.
-> 💰 **Costo:** cada "Generar 3 Variantes" consume **~7 créditos** (1 por los 3 textos + 2 por cada una de las 3 imágenes). El cartel de "1 crédito" en pantalla es solo por los textos, no el total.
+> 💰 **Costo:** un **Post** ("Generar 3 Variantes") consume **~7 créditos** (1 por los 3 textos + 2 por cada una de las 3 imágenes). Los **guiones de video** consumen **1 crédito** (no llevan imagen). Generar tus **2 ofertas** también cuesta 1 crédito.
 
 ---
 

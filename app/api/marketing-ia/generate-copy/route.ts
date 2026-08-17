@@ -3,8 +3,11 @@ import { prismaIA } from "@/lib/gemini";
 import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
 import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
-import { IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
+import { AdvisorOperation, EstructuraId, IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
 import { buildPropertyDirective } from "@/lib/marketing-ia/property-context";
+import { buildOperacionDirective } from "@/lib/marketing-ia/operacion-context";
+import { nivelDesdeIpc, NIVEL_DESCRIPCION } from "@/lib/marketing-ia/niveles";
+import { ESTRUCTURAS, resolverEstructura, esquemaJsonGuion, guiaBloquesParaPrompt } from "@/lib/marketing-ia/estructuras";
 
 export const dynamic = "force-dynamic";
 
@@ -15,14 +18,15 @@ interface CopyConfig {
   extra_context?: string;
 }
 
-const buildCopyPrompt = (ipc: IpcProfile, config: CopyConfig, property?: TokkoProperty | null, directive?: string): string => {
-  const nivelDesc = {
-    0: "El público no sabe que tiene el problema. Creá el problema en su mente antes de hablar de la solución.",
-    1: "Siente que algo no funciona pero no identifica la causa. Ayudalo a ponerle nombre al dolor.",
-    2: "Sabe que hay soluciones pero no nos conoce. Posicioná nuestra solución como la correcta.",
-    3: "Nos conoce pero tiene dudas. Trabajá objeciones y usá prueba social.",
-    4: "Está casi listo. Sé directo. Oferta clara. CTA fuerte."
-  }[config.consciousness_level];
+const buildCopyPrompt = (
+  ipc: IpcProfile,
+  config: CopyConfig,
+  property?: TokkoProperty | null,
+  directive?: string,
+  operacion?: string,
+  estructuraId: EstructuraId = "pas"
+): string => {
+  const nivelDesc = NIVEL_DESCRIPCION[config.consciousness_level];
 
   const angleDesc = {
     pas:          "PAS: Problema → Agitación → Solución. Empezá por el dolor, amplifícalo, presentá la salida.",
@@ -88,6 +92,7 @@ PERFIL: VENDER PROPIEDAD
   const base = `Sos un experto en copywriting para el sector inmobiliario argentino. Tu misión es persuadir al IPC detallado abajo.
 
 ${ipcCtx}
+${operacion ?? ""}
 
 REGLAS ESTRATÉGICAS:
 - ÁNGULO: ${angleDesc}
@@ -102,7 +107,20 @@ ${buildPropertyDirective(property)}
 Respondé ÚNICAMENTE en JSON válido.`;
 
   if (config.copy_type === 'video') {
-    return `${base}\n\nEstructura exacta:\n{"hook":"texto para captar atención en 3 segundos","problema":"conectar con el dolor/situación (2-3 frases)","agitacion":"intensificar el sentimiento/consecuencia (2-3 frases)","solucion":"presentar la solución/beneficio (2-4 frases)","cta":"llamada a la acción clara"}`;
+    const estructura = ESTRUCTURAS[estructuraId];
+    return `${base}
+
+ESTRUCTURA OBLIGATORIA DEL GUION — "${estructura.label}", en este orden exacto de bloques:
+${guiaBloquesParaPrompt(estructura)}
+
+ESTO ES UN GUION PARA HABLAR A CÁMARA, no un texto para leer en pantalla:
+- "texto" es lo que el asesor dice en voz alta, en criollo, listo para leer de corrido. Sin acotaciones adentro del texto.
+- "segundos" es cuánto dura ese bloque dicho a ritmo normal (el guion completo tiene que dar entre 30 y 60 segundos).
+- "indicacion" es cómo decirlo (tono, ritmo, gesto), en menos de 12 palabras.
+- "por_que" explica al asesor por qué ese bloque va en ese lugar de la fórmula, en una frase.
+
+Estructura exacta del JSON:
+${esquemaJsonGuion(estructura)}`;
   } else {
     return `${base}\n\nEstructura exacta:\n{"hook":"una frase de apertura demoledora","desarrollo":"3-5 párrafos cortos que construyan el deseo usando el ángulo ${config.angle}","cta":"llamada a la acción estratégica"}`;
   }
@@ -110,7 +128,8 @@ Respondé ÚNICAMENTE en JSON válido.`;
 
 export async function POST(req: Request) {
   try {
-    const { ipc_id, copy_type, angle: reqAngle, consciousness_level: reqLevel, extra_context, propiedad_tokko_id: reqPropertyId } = await req.json();
+    const { ipc_id, copy_type, angle: reqAngle, consciousness_level: reqLevel, extra_context,
+            propiedad_tokko_id: reqPropertyId, estructura: reqEstructura } = await req.json();
     const { userId, agencyId } = await requireTenant();
     const supabase = await createClient();
 
@@ -140,6 +159,13 @@ export async function POST(req: Request) {
       agencyTokkoKey = agency?.tokko_api_key ?? null;
       creativeDirective = agency?.marketing_ai_config?.creative_directive ?? "";
     }
+
+    // Forma real de trabajar del asesor (oferta irresistible + datos duros). Si no cargó nada, queda vacío.
+    const { data: operacion } = await supabase
+      .from("advisor_operations")
+      .select("*")
+      .eq("user_id", userId)
+      .maybeSingle();
 
     let propertyData: TokkoProperty | null = null;
     const propertyId = reqPropertyId || ipc.propiedad_tokko_id || (ipc.flow_data as any).propiedad_tokko_id;
@@ -181,15 +207,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Helper mappings
-    const levelMap: Record<string, number> = {
-      "Inconsciente": 0,
-      "Consciente del Problema": 1,
-      "Consciente de la Solución": 2,
-      "Consciente del Producto": 3,
-      "Muy Consciente": 4
-    };
-
+    // El nivel de consciencia lo resuelve lib/marketing-ia/niveles.ts (antes estaba duplicado acá).
     const angleMap: Record<string, string> = {
       "Necesidad/Problema": "pas",
       "Emoción/Deseo": "transformacion",
@@ -204,16 +222,21 @@ export async function POST(req: Request) {
     const fd = ipc.flow_data as any;
     const rawAngle = reqAngle || fd.angulo_marketing || fd.angulo_copy || 'pas';
     const finalAngle = (angleMap[rawAngle] || rawAngle) as CopyAngle;
-    const finalLevel = (reqLevel !== undefined ? reqLevel : (levelMap[fd.nivel_conciencia] ?? 1)) as ConsciousnessLevel;
+    const finalLevel = (reqLevel !== undefined ? reqLevel : nivelDesdeIpc(fd)) as ConsciousnessLevel;
+    const estructuraId = resolverEstructura(reqEstructura, finalLevel);
+    const operacionDirective = buildOperacionDirective(
+      operacion as AdvisorOperation | null,
+      ipc.tipo_ipc === "vender" ? "vender" : "captar"
+    );
 
-    console.log('[DEBUG] Generating copy with:', { finalAngle, finalLevel, copy_type });
+    console.log('[DEBUG] Generating copy with:', { finalAngle, finalLevel, copy_type, estructuraId });
 
     const prompt = buildCopyPrompt(ipc as any as IpcProfile, {
       copy_type,
       angle: finalAngle,
       consciousness_level: finalLevel,
       extra_context
-    }, propertyData, creativeDirective);
+    }, propertyData, creativeDirective, operacionDirective, estructuraId);
 
     const result = await prismaIA.generateContent(prompt);
     const rawResponse = result.response.text();
@@ -239,6 +262,16 @@ export async function POST(req: Request) {
 
     try {
       const copyContent = JSON.parse(cleanResponse);
+
+      // La estructura y la duración las sella el servidor: el modelo no suma bien y no tiene por qué elegirlas.
+      if (copy_type === "video") {
+        copyContent.estructura = estructuraId;
+        const bloques = Array.isArray(copyContent.bloques) ? copyContent.bloques : [];
+        copyContent.duracion_estimada = bloques.reduce(
+          (total: number, b: any) => total + (Number(b?.segundos) || 0), 0
+        );
+      }
+
       return NextResponse.json(copyContent);
     } catch (parseError) {
       console.error('[DEBUG] JSON Parse Error:', parseError);

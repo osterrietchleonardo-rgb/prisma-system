@@ -231,17 +231,33 @@ export function MarketingHistory() {
     }
   }
 
-  const handleCopyText = (content: any) => {
+  /** Solo lo que se dice en voz alta: listo para el teleprompter. */
+  const copiarTeleprompter = (content: any) => {
     if (!content) { toast.error("Nada que copiar"); return; }
     let txt = ""
-    if (content.hook) txt += renderText(content.hook) + "\n\n"
-    if (content.problema) txt += renderText(content.problema) + "\n"
-    if (content.agitacion) txt += renderText(content.agitacion) + "\n"
-    if (content.solucion) txt += renderText(content.solucion) + "\n\n"
-    if (content.desarrollo) txt += renderText(content.desarrollo) + "\n\n"
-    if (content.cta) txt += renderText(content.cta)
-    
+    if (Array.isArray(content.bloques) && content.bloques.length > 0) {
+      txt = content.bloques.map((b: any) => renderText(b.texto)).join("\n\n")
+    } else {
+      if (content.hook) txt += renderText(content.hook) + "\n\n"
+      if (content.problema) txt += renderText(content.problema) + "\n"
+      if (content.agitacion) txt += renderText(content.agitacion) + "\n"
+      if (content.solucion) txt += renderText(content.solucion) + "\n\n"
+      if (content.desarrollo) txt += renderText(content.desarrollo) + "\n\n"
+      if (content.cta) txt += renderText(content.cta)
+    }
     navigator.clipboard.writeText(txt).then(() => toast.success("Texto copiado al portapapeles"))
+  }
+
+  /** El guión entero, con segundos, indicaciones y el porqué de cada bloque: para estudiarlo. */
+  const copiarCompleto = (content: any) => {
+    if (!Array.isArray(content?.bloques)) return copiarTeleprompter(content)
+    const txt = content.bloques
+      .map((b: any, i: number) =>
+        `${i + 1}. ${renderText(b.titulo)} (${b.segundos ?? "?"}s)\n${renderText(b.texto)}\n` +
+        `→ Cómo decirlo: ${renderText(b.indicacion)}\n→ Por qué va acá: ${renderText(b.por_que)}`
+      )
+      .join("\n\n")
+    navigator.clipboard.writeText(txt).then(() => toast.success("Guión completo copiado"))
   }
 
   const filteredGroups = adGroups.filter(grp => {
@@ -317,6 +333,12 @@ export function MarketingHistory() {
                       </div>
                     ))}
                   </div>
+                ) : primaryAd.copy_type === 'video' ? (
+                   <div className="w-full h-full flex flex-col items-center justify-center gap-2 p-4 text-center bg-gradient-to-br from-accent/5 to-accent/15">
+                      <FileText className="w-8 h-8 text-accent opacity-60" />
+                      <span className="text-[10px] font-bold text-accent uppercase tracking-wide">Guión para cámara</span>
+                      <span className="text-xs text-muted-foreground line-clamp-2">{renderText(primaryAd.content?.hook)}</span>
+                   </div>
                 ) : (
                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
                       <ImageIcon className="w-10 h-10 opacity-20 mb-2" />
@@ -397,7 +419,12 @@ export function MarketingHistory() {
               </div>
 
               {selectedGroup.variants[activeVariantIndex] && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 animate-in fade-in zoom-in-95 duration-300 w-full">
+                <div className={cn(
+                  "grid grid-cols-1 gap-6 md:gap-8 animate-in fade-in zoom-in-95 duration-300 w-full",
+                  (selectedGroup.variants[activeVariantIndex].public_url || selectedGroup.variants[activeVariantIndex].copy_type !== 'video') && "md:grid-cols-2"
+                )}>
+                  {/* Los guiones para cámara no llevan imagen: el texto ocupa todo el ancho. */}
+                  {(selectedGroup.variants[activeVariantIndex].public_url || selectedGroup.variants[activeVariantIndex].copy_type !== 'video') && (
                   <div className="space-y-4 min-w-0 w-full">
                     <div className="aspect-auto h-[250px] md:h-[500px] w-full bg-muted rounded-xl md:rounded-3xl overflow-hidden shadow-lg md:shadow-2xl relative border border-accent/10 shrink-0">
                       {selectedGroup.variants[activeVariantIndex].public_url ? (
@@ -421,6 +448,7 @@ export function MarketingHistory() {
                       )}
                     </div>
                   </div>
+                  )}
 
                   <div className="space-y-6 flex flex-col min-w-0 w-full">
                     <div className="flex justify-between items-center bg-accent/5 p-3 rounded-xl border border-accent/10">
@@ -428,17 +456,67 @@ export function MarketingHistory() {
                           <p className="text-[10px] font-bold text-accent uppercase">Formato</p>
                           <p className="text-xs font-bold capitalize">{selectedGroup.variants[activeVariantIndex].copy_type}</p>
                        </div>
-                       <div>
-                          <Button variant="ghost" size="sm" className="h-8 group hover:bg-accent/10" onClick={() => handleCopyText(selectedGroup.variants[activeVariantIndex].content)}>
-                            <Copy className="w-3.5 h-3.5 mr-2 text-accent group-hover:text-accent" /> 
-                            Copiar Todo
+                       <div className="flex flex-wrap gap-1 justify-end">
+                          <Button variant="ghost" size="sm" className="h-8 group hover:bg-accent/10" onClick={() => copiarTeleprompter(selectedGroup.variants[activeVariantIndex].content)}>
+                            <Copy className="w-3.5 h-3.5 mr-2 text-accent group-hover:text-accent" />
+                            {Array.isArray(selectedGroup.variants[activeVariantIndex].content?.bloques) ? "Copiar para teleprompter" : "Copiar Todo"}
                           </Button>
+                          {Array.isArray(selectedGroup.variants[activeVariantIndex].content?.bloques) && (
+                            <Button variant="ghost" size="sm" className="h-8 group hover:bg-accent/10" onClick={() => copiarCompleto(selectedGroup.variants[activeVariantIndex].content)}>
+                              <Copy className="w-3.5 h-3.5 mr-2 text-accent group-hover:text-accent" />
+                              Copiar completo
+                            </Button>
+                          )}
                        </div>
                     </div>
 
                     <div className="flex-1 min-w-0 w-full">
                         <div className="bg-muted/30 p-4 md:p-6 rounded-xl md:rounded-2xl border border-muted space-y-4 w-full overflow-hidden">
-                          {selectedGroup.variants[activeVariantIndex].copy_type === 'video' ? (
+                          {Array.isArray(selectedGroup.variants[activeVariantIndex].content?.bloques) ? (
+                            <>
+                              <div className="flex flex-wrap gap-2 pb-3 border-b border-accent/10">
+                                <Badge variant="outline" className="text-[10px] capitalize border-accent/30">
+                                  {renderText(selectedGroup.variants[activeVariantIndex].content.estructura).split('_').join(' ')}
+                                </Badge>
+                                <Badge variant="outline" className="text-[10px] capitalize">
+                                  ángulo: {renderText(selectedGroup.variants[activeVariantIndex].angle)}
+                                </Badge>
+                                <Badge variant="outline" className="text-[10px]">
+                                  ~{selectedGroup.variants[activeVariantIndex].content.duracion_estimada ?? "?"} seg
+                                </Badge>
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase">Primeros 3 segundos:</label>
+                                <p className="text-sm font-bold leading-relaxed whitespace-pre-wrap break-words">
+                                  {renderText(selectedGroup.variants[activeVariantIndex].content?.hook)}
+                                </p>
+                              </div>
+
+                              {selectedGroup.variants[activeVariantIndex].content.bloques.map((b: any, i: number) => (
+                                <div key={b?.id ?? i} className="space-y-1 pb-3 border-b border-muted/50 last:border-0">
+                                  <label className="text-[10px] font-bold text-accent uppercase">
+                                    {renderText(b?.titulo)} · {b?.segundos ?? "?"}s
+                                  </label>
+                                  {isEditingMode ? (
+                                    <textarea
+                                      value={renderText(editContent?.bloques?.[i]?.texto)}
+                                      onChange={(e) => {
+                                        const bloques = [...(editContent?.bloques ?? [])]
+                                        bloques[i] = { ...bloques[i], texto: e.target.value }
+                                        setEditContent({ ...editContent, bloques })
+                                      }}
+                                      className="w-full bg-background border rounded-lg p-2 text-sm min-h-[70px]"
+                                    />
+                                  ) : (
+                                    <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap break-words w-full overflow-hidden">{renderText(b?.texto)}</p>
+                                  )}
+                                  {b?.indicacion && <p className="text-[11px] text-muted-foreground italic">Cómo decirlo: {renderText(b.indicacion)}</p>}
+                                  {b?.por_que && <p className="text-[11px] text-muted-foreground">Por qué va acá: {renderText(b.por_que)}</p>}
+                                </div>
+                              ))}
+                            </>
+                          ) : selectedGroup.variants[activeVariantIndex].copy_type === 'video' ? (
                             ['hook', 'problema', 'agitacion', 'solucion', 'cta'].map(field => (
                               <div key={field} className="space-y-1">
                                   <label className="text-[10px] font-bold text-muted-foreground uppercase">{field}:</label>

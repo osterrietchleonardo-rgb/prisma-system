@@ -1104,7 +1104,39 @@ Los IPC son perfiles estratégicos de marketing que definen:
   - **Captar:** tipo_propietario, motivo_venta, urgencia, preocupaciones, objeción_principal, angulo_marketing, tono, promesa_central, CTA
   - **Vender:** tipo_comprador_ideal, necesidad_concreta, atractivos_propiedad, angulo_copy, mensaje_central, CTA, propiedad_tokko_id (opcional)
 
-> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Clientes Ideales (IPC) · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (4 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) lista los anuncios generados agrupados por tanda, con ver/editar/descargar/borrar.
+> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Clientes Ideales (IPC) · Mi Forma de Trabajar · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (5 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) lista los anuncios generados agrupados por tanda, con ver/editar/descargar/borrar.
+
+### 13.1.b Mi Forma de Trabajar y la oferta irresistible (fórmula de Hormozi)
+
+El IPC dice **a quién** le hablamos; esta pestaña dice **quién habla y con qué respaldo**. Es lo que diferencia al asesor de cualquier otra inmobiliaria, y es **por usuario** (cada asesor la suya; el director carga la propia como uno más).
+
+Formulario en 4 pasos (`components/marketing-ia/forma-trabajo-form.tsx`), guardado por `upsert` con RLS en `advisor_operations`:
+
+1. **Mi perfil** (opcional): años en el rubro, matrícula, zona que domina, especialidad, operaciones cerradas, **casos reales** (la materia prima de la "prueba social"), qué incluye el servicio y **qué NO se puede prometer nunca**.
+2. **Captación** (obligatorio): las 6 preguntas de Hormozi para dueños — propiedades vendidas en 6 meses, % del ACM al que cierra, diferencial de confianza, compradores activos en base, tiempo de entrega del ACM, días hasta la primera oferta, y qué se banca el asesor para que el dueño no mueva un dedo.
+3. **Venta** (obligatorio): las 5 preguntas para compradores — diferencial de confianza, % de rebaja negociada, exclusivas/off-market, tiempo hasta la primera selección curada, semanas hasta la reserva y trámites que le saca de encima.
+4. **Mis 2 ofertas** (`ofertas-irresistibles.tsx`): botón que genera las dos (1 crédito, `POST /api/marketing-ia/generar-oferta`). Quedan **guardadas y editables a mano**; regenerar una que fue editada pide confirmación explícita.
+
+**Cómo entra en los anuncios:** al generar, el backend elige la oferta según `ipc.tipo_ipc` (captar → oferta de captación; vender → oferta de venta) y suma los datos duros del bloque que corresponda + el perfil. Regla dura en el prompt: **solo se pueden usar esos números**; prohibido inventar cifras, plazos, testimonios o garantías, y prohibido contradecir el campo "no prometer". Si el asesor no cargó nada, el prompt queda igual que siempre y en "Crear Anuncio" aparece un aviso de que sus anuncios van a salir genéricos.
+
+### 13.1.c Estructuras de guion (video)
+
+Con tipo de copy **Video**, el asesor elige la estructura narrativa (o deja "Sugerida"). Las 3 variantes usan esa misma estructura y se siguen diferenciando por ángulo.
+
+| Estructura | Bloques |
+|---|---|
+| Variante 1 — La oferta primero | Oferta · Problema · Solución · Prueba social · CTA |
+| Variante 2 — Oferta y prueba social | Oferta · Prueba social · Problema · Solución · CTA |
+| AIDA | Atención · Interés · Deseo · Acción (CTA) |
+| PAS | Problema · Agitación · Solución · CTA |
+| Antes – Después – Puente | Antes · Después · Puente · CTA |
+| Caso real / Storytelling | Situación · Conflicto · Qué hicimos · Resultado · CTA |
+
+A PAS, BAB y Storytelling se les agrega un **CTA** final aunque la fórmula clásica no lo traiga: un anuncio sin llamada a la acción no convierte.
+
+"Sugerida" es determinista según el nivel de consciencia del IPC: **0 → PAS · 1 → Antes-Después-Puente · 2 → AIDA · 3 → Variante 2 · 4 → Variante 1**. Storytelling nunca se sugiere solo (depende de que haya un caso real cargado).
+
+**El video pasó a ser un guion, no un anuncio con imagen:** con Video no se generan imágenes ni se piden formato/estilo. Cada guion trae, bloque por bloque, el texto exacto a decir, los segundos, una indicación de tono/gesto y el porqué de ese bloque en la fórmula (para que el asesor aprenda, no repita). El historial lo muestra así y ofrece **Copiar para teleprompter** (solo lo hablado) y **Copiar completo**. Con Post todo sigue igual que antes: copy + imagen.
 
 ### 13.2 Generación de Copy individual (legacy — sin uso en la UI)
 

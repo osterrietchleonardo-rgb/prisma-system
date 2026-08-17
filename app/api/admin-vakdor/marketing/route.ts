@@ -25,6 +25,11 @@ export async function POST(request: NextRequest) {
     const idea = await crearIdeaManual({
       titulo, fuente, formato,
       funnel: funnel && FUNNELS.includes(funnel) ? funnel : null,
+      // Los ejes vienen de selectores armados con lo que hay en la base, así que no se
+      // revalidan acá contra una lista: vacío significa "sin eje", no un error.
+      cluster: (body?.cluster as string | undefined)?.trim() || null,
+      proposito: (body?.proposito as string | undefined)?.trim() || null,
+      keyword_objetivo: (body?.keyword_objetivo as string | undefined)?.trim() || null,
       angulo: (body?.angulo as string | undefined)?.trim() || null,
       motivo: (body?.motivo as string | undefined)?.trim() || null,
       origen: "manual",

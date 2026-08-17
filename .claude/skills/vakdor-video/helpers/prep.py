@@ -33,6 +33,24 @@ NOISE_DB = -30.0
 FAST_WPM = 230.0
 MIN_GAPS_TO_CUT = 3
 
+# HDR -> SDR. Un celular moderno graba en HLG (arib-std-b67) o PQ (smpte2084) con
+# primarios bt2020. Si esa señal se etiqueta como bt709 SIN convertirla —que es lo
+# que hacía `make_master` antes de esto— el video sale oscuro y amarillento: los
+# píxeles siguen siendo HLG pero el archivo jura que son bt709, así que todo lo que
+# venga después (y el reproductor) lee la curva equivocada.
+# Medido sobre "Video reel 2.mov" (frame 00:08, frente): sin convertir R175 G162 B146
+# (el rojo y el verde se juntan = piel gris amarillenta); convertido R179 G138 B118.
+# Es la misma cadena que usa el motor JS en engine/lib/hdr.mjs — si cambia una, cambia la otra.
+HDR_TRANSFERS = {"arib-std-b67", "smpte2084"}
+HDR_PRIMARIES = {"bt2020"}
+TONEMAP_VF = ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,"
+              "tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p")
+
+
+def is_hdr(color_transfer: str | None, color_primaries: str | None) -> bool:
+    """¿El material es HDR? Se decide por los metadatos del archivo, no por la resolución."""
+    return color_transfer in HDR_TRANSFERS or color_primaries in HDR_PRIMARIES
+
 _MEAN = re.compile(r"mean_volume:\s+(-?\d+\.?\d*) dB")
 
 
@@ -87,6 +105,9 @@ def probe(video: str) -> dict:
         "pix_fmt": v.get("pix_fmt", "?"),
         "color_space": v.get("color_space", "sin etiquetar"),
         "color_range": v.get("color_range", "sin etiquetar"),
+        "color_transfer": v.get("color_transfer", "sin etiquetar"),
+        "color_primaries": v.get("color_primaries", "sin etiquetar"),
+        "is_hdr": is_hdr(v.get("color_transfer"), v.get("color_primaries")),
         "n_audio": len(audios),
         "acodec": audios[0].get("codec_name", "?") if audios else None,
     }
@@ -125,14 +146,23 @@ def make_master(video: str, out: str, fps: int = 30, audio_from: str | None = No
     Keyframe por segundo: el compositor busca por frame y sin keyframes densos el
     seek se va de lugar. El color se etiqueta explícito para que el reproductor no
     tenga que adivinar (y no te aplaste los negros).
+
+    Si el material viene en HDR, acá se lo CONVIERTE a SDR antes de etiquetarlo. El
+    máster es la puerta de entrada de todo el modo helpers: si el HDR pasa de largo,
+    `COLOR_TAGS` le estampa "esto es bt709" a píxeles que no lo son y el amarillo se
+    arrastra hasta el archivo final (ver el comentario de TONEMAP_VF arriba).
     """
     os.makedirs(os.path.dirname(os.path.abspath(out)) or ".", exist_ok=True)
+    info = probe(video)
+    # El tonemap va PRIMERO: `fps` solo tira/duplica frames, pero cualquier cosa que
+    # toque color después tiene que trabajar sobre imagen ya en bt709.
+    vf = f"{TONEMAP_VF},fps={fps}" if info["is_hdr"] else f"fps={fps}"
     cmd = ["ffmpeg", "-hide_banner", "-v", "error", "-i", video]
     if audio_from:
         cmd += ["-i", audio_from, "-map", "0:v:0", "-map", "1:a:0", "-shortest"]
     else:
         cmd += ["-map", "0:v:0", "-map", "0:a:0"]
-    cmd += ["-vf", f"fps={fps}", "-c:v", "libx264", "-crf", "18", "-preset", "slow",
+    cmd += ["-vf", vf, "-c:v", "libx264", "-crf", "18", "-preset", "slow",
             "-g", str(fps), "-keyint_min", str(fps), "-pix_fmt", "yuv420p", *COLOR_TAGS,
             "-c:a", "aac", "-b:a", "256k", "-ar", "48000", "-ac", "2",
             "-movflags", "+faststart", "-y", out]
@@ -183,7 +213,12 @@ def main():
     print(f"== {os.path.basename(a.video)} ==")
     print(f"   {r['width']}x{r['height']} · {r['fps']} fps · {r['duration']:.1f}s · "
           f"{r['size_mb']} MB · {r['bitrate_mbps']} Mbps · {r['vcodec']}/{r['pix_fmt']}")
-    if r["color_space"] == "sin etiquetar" or r["color_range"] == "sin etiquetar":
+    if r["is_hdr"]:
+        print(f"   [!] material HDR ({r['color_transfer']}/{r['color_primaries']}): "
+              f"HAY que pasarlo a máster (--master) antes de editar.")
+        print(f"       Editar el HDR directo lo deja oscuro y amarillento — el máster "
+              f"lo convierte a SDR bt709 de verdad.")
+    elif r["color_space"] == "sin etiquetar" or r["color_range"] == "sin etiquetar":
         print(f"   [!] color {r['color_space']}/{r['color_range']}: conviene un máster "
               f"con bt709 explícito (--master)")
 
@@ -219,6 +254,7 @@ def main():
         out = make_master(a.video, a.master, a.fps, sib)
         print(f"\n== máster -> {out} ==")
         print(f"   {a.fps} fps · keyframe por segundo · bt709 explícito"
+              + (" · HDR convertido a SDR" if r["is_hdr"] else "")
               + (f" · audio del hermano" if sib else ""))
 
     if a.json:
