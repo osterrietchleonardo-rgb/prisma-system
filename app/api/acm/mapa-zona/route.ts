@@ -24,58 +24,18 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { AcmFichaSnapshot } from "@/lib/acm/ficha";
+// Zoom, recorte, colores y el cálculo de qué punto entra en cuadro viven en lib/acm/zona-mapa.ts
+// porque la hoja los necesita para escribir las referencias del mapa con los mismos colores y sin
+// nombrar ningún punto que no se llegue a ver. Ver el comentario de ese archivo.
+import {
+  TILE, ZOOM, ANCHO_TILES, ALTO_TILES, ANCHO, ALTO, R_POI, R_CASA,
+  COLOR_ZONA, COLOR_PROPIEDAD, aTile, origenDelRecorte, marcadoresDibujados,
+} from "@/lib/acm/zona-mapa";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-const TILE = 256;
-// Zoom 16 ≈ 2 m por píxel en la latitud de Buenos Aires: la imagen cubre unos 2 km de ancho por
-// 1,5 km de alto, que es donde caen casi todos los puntos que muestra la hoja. En zoom 15
-// entraba el doble de ciudad y los marcadores quedaban todos apelotonados en el centro.
-const ZOOM = 16;
-// VERTICAL, no apaisado: en la hoja el mapa vive en una columna de 82 mm de ancho por 110 mm de
-// alto (proporción 0,75). Con una imagen apaisada, el `object-fit: cover` del CSS recortaba los
-// costados y se comía justo los marcadores que están a los lados de la propiedad.
-// 3 × 4 tiles = 768 × 1024 px, proporción 0,75: entra sin recortar casi nada.
-const ANCHO_TILES = 3;  //  768 px
-const ALTO_TILES = 4;   // 1024 px
-// A 82 mm de ancho impreso, 768 px son ~238 dpi: nítido en el PDF.
-const ANCHO = ANCHO_TILES * TILE;
-const ALTO = ALTO_TILES * TILE;
-
 const UA = "PRISMA-acm/1.0 (inmobiliaria; contacto: osterrietchleonardo@vakdor.com)";
-const MAX_MARCADORES = 12;
-
-// TAMAÑO DE LOS MARCADORES: se dibujan sobre una imagen de 768 px de ancho que en la hoja se
-// muestra a ~310 px, o sea que TODO se ve al 40%. Con radio 9 (que en la imagen suelta parece
-// correcto) el marcador terminaba midiendo 3,6 px en el papel: prácticamente invisible. Los
-// radios de acá están calculados para verse bien YA REDUCIDOS, no en la imagen original.
-const R_POI = 22;   // ~9 px en la hoja
-const R_CASA = 34;  // ~14 px en la hoja
-
-/** lon/lat → coordenadas de tile fraccionarias (Web Mercator). */
-function aTile(lat: number, lon: number, z: number): { x: number; y: number } {
-  const n = 2 ** z;
-  const latRad = (lat * Math.PI) / 180;
-  return {
-    x: ((lon + 180) / 360) * n,
-    y: ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * n,
-  };
-}
-
-// Un círculo de color con borde blanco. NO se usan emoji: no se renderizan igual en todos los
-// sistemas y en el servidor directamente no hay fuente que los tenga.
-const COLOR: Record<string, string> = {
-  subte: "#1d4ed8",
-  espacio_verde: "#15803d",
-  escuela: "#b45309",
-  hospital: "#be123c",
-  comisaria: "#4338ca",
-  ciclovia: "#0891b2",
-  farmacia: "#7c3aed",
-  ecobici: "#0d9488",
-  parada_colectivo: "#525252",
-};
 
 export async function GET(req: Request) {
   try {
@@ -94,15 +54,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Coordenadas inválidas." }, { status: 400 });
     }
 
-    // Solo los que tienen punto propio: los conteos (farmacias, escuelas) no se dibujan.
-    const pois = zona.pois
-      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lon))
-      .slice(0, MAX_MARCADORES)
-      .map((p) => ({ categoria: p.categoria as string, lat: p.lat as number, lon: p.lon as number }));
-
-    const centro = aTile(lat, lon, ZOOM);
-    const x0 = Math.floor(centro.x) - Math.floor(ANCHO_TILES / 2);
-    const y0 = Math.floor(centro.y) - Math.floor(ALTO_TILES / 2);
+    // Qué marcadores entran: fuera los conteos (una "farmacia a 300 m" es un radio, no un lugar)
+    // y fuera los que caen afuera del recorte. Lo decide el helper compartido, así la hoja puede
+    // escribir las referencias sabiendo exactamente qué se dibujó.
+    const marcadores = marcadoresDibujados(zona.centro, zona.pois);
+    const { x0, y0 } = origenDelRecorte(zona.centro);
 
     // Bajar las tiles. Una que falle deja un hueco del color de fondo, no rompe el mapa entero.
     const tiles: Array<{ input: Buffer; top: number; left: number }> = [];
@@ -128,28 +84,18 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "No se pudo armar el mapa." }, { status: 502 });
     }
 
-    /** Píxel dentro de la imagen para una coordenada. */
-    const aPixel = (la: number, lo: number) => {
-      const t = aTile(la, lo, ZOOM);
-      return { x: (t.x - x0) * TILE, y: (t.y - y0) * TILE };
-    };
-
-    const marcas: string[] = [];
-    for (const p of pois) {
-      const { x, y } = aPixel(p.lat, p.lon);
-      // Fuera de cuadro (un hospital puede estar a 3 km): no se dibuja, no se recorta contra el
-      // borde. Un marcador mordido por el margen parece un error de impresión.
-      if (x < 10 || y < 10 || x > ANCHO - 10 || y > ALTO - 10) continue;
-      marcas.push(
-        `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${R_POI}" fill="${COLOR[p.categoria] || "#525252"}" stroke="#ffffff" stroke-width="${R_POI / 3}"/>`
-      );
-    }
+    const marcas = marcadores.map(
+      (m) =>
+        `<circle cx="${m.x.toFixed(1)}" cy="${m.y.toFixed(1)}" r="${R_POI}" fill="${COLOR_ZONA[m.categoria] || "#525252"}" stroke="#ffffff" stroke-width="${R_POI / 3}"/>`
+    );
 
     // La propiedad va ÚLTIMA para quedar arriba de todo, más grande y con un halo que la separa
     // del resto: es el punto que el cliente busca primero.
-    const c = aPixel(lat, lon);
-    marcas.push(`<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${R_CASA * 1.8}" fill="#0a1f33" fill-opacity="0.15"/>`);
-    marcas.push(`<circle cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${R_CASA}" fill="#0a1f33" stroke="#ffffff" stroke-width="${R_CASA / 3}"/>`);
+    const t = aTile(lat, lon, ZOOM);
+    const cx = ((t.x - x0) * TILE).toFixed(1);
+    const cy = ((t.y - y0) * TILE).toFixed(1);
+    marcas.push(`<circle cx="${cx}" cy="${cy}" r="${R_CASA * 1.8}" fill="${COLOR_PROPIEDAD}" fill-opacity="0.15"/>`);
+    marcas.push(`<circle cx="${cx}" cy="${cy}" r="${R_CASA}" fill="${COLOR_PROPIEDAD}" stroke="#ffffff" stroke-width="${R_CASA / 3}"/>`);
 
     // El crédito es CONDICION DE LA LICENCIA para poder usar estas tiles, no una cita de fuente:
     // la ficha no nombra ninguna otra. Van los dos porque son dos licencias distintas — los
