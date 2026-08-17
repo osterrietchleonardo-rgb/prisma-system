@@ -29,6 +29,7 @@ import { createClient } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { AiDescription } from "@/components/propiedades/AiDescription"
+import { NotasIA } from "@/components/propiedades/NotasIA"
 
 export default function AsesorPropertyDetailPage() {
   const { id } = useParams()
@@ -278,6 +279,7 @@ export default function AsesorPropertyDetailPage() {
                 {property.description}
               </p>
               <AiDescription propertyId={property.id} initial={property.ai_description} />
+              <NotasIA propertyId={property.id} />
             </Card>
 
             {/* Tokko Extras (Tags) */}

@@ -31,6 +31,8 @@ interface FilaMapa {
   agent_email: string | null
   agencia_nombre: string | null
   canonical_url: string | null
+  /** Ambientes de verdad: `tokko_data.room_amount` en la cartera, `rooms` en la red. */
+  ambientes: number | null
 }
 
 const num = (v: number | string | null): number => {
@@ -68,6 +70,9 @@ function aPropiedadMapa(f: FilaMapa, esColaboracion: boolean, userId: string): P
     agent_email: f.agent_email || "",
     lat: f.lat,
     lng: f.lng,
+    // `bedrooms` arriba son los DORMITORIOS, que es lo que muestra la ficha del chat.
+    // Los ambientes viajan aparte porque no son lo mismo: ver tipos.ts.
+    ambientes: f.ambientes ?? null,
     ...(esColaboracion
       ? {
           roomix_agency_name: f.agencia_nombre || "Inmobiliaria colaboradora",
@@ -97,7 +102,9 @@ export async function consultarMapa(
     p_precio_min: filtros.precio_min,
     p_precio_max: filtros.precio_max,
     p_moneda: filtros.moneda,
-    p_ambientes_min: filtros.ambientes_min,
+    // Lista vacia = sin filtro. Va como null y no como `{}`: un array vacio en SQL no
+    // matchearia con nada y dejaria el mapa en cero.
+    p_ambientes: filtros.ambientes.length > 0 ? filtros.ambientes : null,
     p_barrio: barrio,
   }
 

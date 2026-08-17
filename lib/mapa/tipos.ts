@@ -23,7 +23,18 @@ export interface FiltrosMapa {
   precio_min: number | null
   precio_max: number | null
   moneda: "USD" | "ARS"
-  ambientes_min: number | null
+  /**
+   * Cantidad de ambientes elegida con los botones 1·2·3·4·5+. Se suman: `[2, 3]` trae los
+   * de 2 y los de 3, y nada mas. Lista vacia = sin filtro.
+   *
+   * El 5 significa "5 o mas": arriba de ahi la muestra se vuelve tan chica que un boton
+   * por numero no le sirve a nadie. Ver AMBIENTES_TOPE.
+   *
+   * OJO: son AMBIENTES, no dormitorios. En la cartera salen de `tokko_data.room_amount` y
+   * en la red de `rooms`; la columna `bedrooms` de las dos son los dormitorios y es la que
+   * muestra la ficha compartida con el chat.
+   */
+  ambientes: number[]
   fuentes: FuenteMapa[]
   /**
    * Barrio elegido en el buscador, tal como se escribe ("Núñez"). null = sin filtro.
@@ -39,6 +50,13 @@ export interface FiltrosMapa {
 export type PropiedadMapa = UnifiedProperty & {
   lat: number | null
   lng: number | null
+  /**
+   * Ambientes. Va aparte de `bedrooms` —que son los DORMITORIOS— porque no son lo mismo:
+   * en la cartera de Central los dos numeros difieren en el 84% de las propiedades. La
+   * lista del mapa muestra este; la ficha compartida con el chat muestra los dormitorios.
+   * `null` cuando nadie lo cargo: ahi la lista no inventa un numero, no muestra nada.
+   */
+  ambientes: number | null
 }
 
 export interface RespuestaMapa {

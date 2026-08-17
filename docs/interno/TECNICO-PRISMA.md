@@ -130,7 +130,7 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 - `equipo_acciones` — trazabilidad de acciones del director sobre asesores: `agency_id`, `asesor_id` (a quién), `ejecutado_por` (qué director), `tipo_accion` (`pausa`/`reanudacion`/`desvinculacion`, CHECK), `motivo`, `created_at`. RLS deny-all (`FOR ALL USING(false)`): se escribe/lee **solo desde el servidor** con `service_role`, igual que `director_invites`. Índice `(asesor_id, created_at DESC)` para leer la última acción. (Migración `20260709120000_equipo_acciones.sql`.)
 
 **Propiedades y leads**
-- `properties` — tokko_id, agency_id, assigned_agent_id, título, precio, moneda, tipo, estado, ubicación, ambientes/baños, superficies, images[], `tokko_data` (jsonb), `embedding vector(768)`, `ai_description` (jsonb: `{v1, v2, suggestion, model, v1_at, v2_at}` — descripción mejorada con IA; aislada del sync de Tokko, ver §Propiedades en la capa de API).
+- `properties` — tokko_id, agency_id, assigned_agent_id, título, precio, moneda, tipo, estado, ubicación, ambientes/baños, superficies, images[], `tokko_data` (jsonb), `embedding vector(768)`, `ai_description` (jsonb: `{v1, v2, suggestion, model, v1_at, v2_at}` — descripción mejorada con IA; aislada del sync de Tokko, ver §Propiedades en la capa de API), `notas_ia` (jsonb array: notas internas que el equipo carga para el Asesor IA de WhatsApp; también aislada del sync).
 - `leads` — agency_id, assigned_agent_id, datos de contacto, source, status, pipeline_stage, tokko_contact_id, first_response_time, `chat_analysis` (jsonb).
 - `lead_activities` — historial de actividades.
 - `scheduled_visits` — agendamiento de visitas (lead, propiedad/zona, fecha/hora, calificación, score_bant, intereses, objeciones, decisores, resumen, origen, `estado_visita`: agendada/cancelada/completada, motivo_cambio).
@@ -327,6 +327,7 @@ Patrón estándar de un endpoint protegido:
 
 **Propiedades**
 - `POST /api/propiedades/[id]/ai-description` — genera la **descripción mejorada con IA** de una propiedad. Body `{ version: 1|2, suggestion?: string }`. Valida agencia (`requireTenant` + chequeo `property.agency_id`), consume 1 crédito (`consumeAiCredits("propiedades_descripcion")`), llama a `prismaIA` (`gemini-3.5-flash`), registra costo real por tokens (`updateAiTransactionCost`) y guarda en `properties.ai_description` (jsonb) con `createAdminClient()` (el asesor no tiene UPDATE por RLS). **Tope estricto:** rechaza (409) si la versión pedida ya existe o si se pide V2 sin V1. La V2 reescribe la V1 aplicando `suggestion`. No toca `properties.description` (la de Tokko). Componente UI: `components/propiedades/AiDescription.tsx`, embebido en las fichas de asesor y director.
+- `GET/POST/PATCH/DELETE /api/propiedades/[id]/notas-ia` — **notas internas para el Asesor IA de WhatsApp**. Guarda en `properties.notas_ia` (jsonb array) con `createAdminClient()` tras validar agencia (`requireTenant` + chequeo `property.agency_id`) y permiso: director en cualquier propiedad de su agencia, asesor solo en las que tiene asignadas (`assigned_agent_id`). Editar/borrar una nota: su autor o el director; el `GET` devuelve `puedo_tocarla` por nota y `bot_name` (de `whatsapp_ai_settings`, fallback "tu Asesor IA"). Topes: 800 caracteres por nota, 20 notas por propiedad. No consume créditos. Componente UI: `components/propiedades/NotasIA.tsx`. El bot las recibe vía `Cartera_Propiedades` (columna en el `SELECT` → `notas_internas[]`) y la regla de uso vive en el prompt de `PRISMA`.
 
 **Tokko**
 - `POST /api/tokko/sync` (propiedades), `POST /api/tokko/sync-leads`, `GET /api/tokko-proxy/[...path]`.
@@ -731,7 +732,7 @@ Rate limit 30 req/h por usuario; validación Zod (10–50000 chars); `parseWhats
 - **SQL:** `acm_match_properties`, `acm_match_roomix` (base `20260625130000_acm_match_functions.sql`; **reescritas en `20260702120000_acm_barrio_gate_and_dims.sql`**, ver bullet "Barrio gate" abajo).
 - **API:** `app/api/acm/{comparables,extract,cartera}/route.ts`. **Libs:** `lib/acm/{extract,subject,checklist,tokko}.ts`.
 - **Excluir PH en Casa (jul-2026, `20260724120000_acm_exclude_ph.sql`, rama `feat/acm-excluir-ph-casas`):** `acm_match_properties`/`acm_match_roomix` aceptan `p_exclude_ph boolean DEFAULT false` (la migración recrea ambas funciones — misma firma + el nuevo param **antes de `p_limit`**; `RETURNS TABLE` sin cambios). Cuando `true`, descartan en el `WHERE` del CTE `cand` las filas cuyo `property_type || title || description` matchea `\mph\M` (PH como palabra suelta), **antes del ranking y del límite**. El endpoint `/api/acm/comparables` calcula `excludePh = sujeto.tipo_propiedad === "casa" && considerar_ph === false` y lo pasa a ambas RPC; el body trae `considerar_ph` (default `true`). UI: casilla en `subject-input.tsx` visible solo si `tipo === "casa"` (estado `considerarPh` en `AcmModule`, default `true`). Defaults (`false`/`true`) = comportamiento idéntico al actual. Verificado en Palermo: pool 200→107 al excluir, 31 avisos excluidos, los 31 mencionan "PH", 0 falsos positivos.
-- **Barrio como filtro duro + más variables (jul-2026, rama `feat/acm-barrio-gate-y-checklist-completo`):** el comparable ahora se **limita al barrio del sujeto** (gate, no puntaje): Belgrano→Belgrano, Palermo→Palermo, La Plata→La Plata. El gate matchea contra campos **estructurados** (properties: `city` + `tokko_data.location.name`/`full_location`; roomix: `neighborhood` + `city`), **insensible a acentos** vía helper SQL `acm_norm()` (translate lower + sin tildes → Nuñez=Núñez) y **consciente de la jerarquía** de Tokko (Belgrano R/C entran como Belgrano; Las Cañitas entra como Palermo por `full_location`). Solo gatea si el sujeto trae barrio (el form lo exige, siempre lo trae). Al ser gate, **la zona sale del %** y se muestra como "filtro" en el checklist (la UI marca "filtro" para toda dim con `peso===0`: tipo, operación, zona). El **checklist suma DORMITORIOS** (`bedrooms` en ambas tablas) **y ANTIGÜEDAD** (`tokko_data->>'age'` en cartera —0=a estrenar, -1→null, 92% cargado— y `property_age_years` en roomix) — corrige la nota vieja de "antigüedad no se puntúa"; ambas solo puntúan si hay dato en sujeto **y** comparable (si falta → "sin dato", no penaliza). **Piso NO se agregó**: cartera no tiene piso de unidad confiable (`floors_amount`=plantas del edificio ≠ piso). **Pesos nuevos** (deben coincidir SQL↔`lib/acm/checklist.ts`): Superficie 22 · Ambientes 16 · Dormitorios 14 · Baños 12 · Antigüedad 14 · Amenities 12 · Semántica 10. **Sin límite artificial:** `p_limit` default 50/máx 100 por fuente (antes 20/30); roomix **no** filtra `is_active` (76% NULL → lo borraría). `lib/acm/subject.ts` suma `sujetoDormitorios`/`sujetoAntiguedad`. Verificado con datos reales (sujeto monoambiente Belgrano): cartera 3 y roomix 420 comparables disponibles, **100% del barrio**, sub-scores de antigüedad/dormitorios OK, control negativo (Palermo no trae Belgrano) y acento (Núñez) OK; `tsc --noEmit` 0 errores.
+- **Barrio como filtro duro + más variables (jul-2026, rama `feat/acm-barrio-gate-y-checklist-completo`):** el comparable ahora se **limita al barrio del sujeto** (gate, no puntaje): Belgrano→Belgrano, Palermo→Palermo, La Plata→La Plata. El gate matchea contra campos **estructurados** (properties: `city` + `tokko_data.location.name`/`full_location`; roomix: `neighborhood` + `city`), **insensible a acentos** vía helper SQL `acm_norm()` (translate lower + sin tildes → Nuñez=Núñez) y **consciente de la jerarquía** de Tokko (Belgrano R/C entran como Belgrano; Las Cañitas entra como Palermo por `full_location`). Solo gatea si el sujeto trae barrio (el form lo exige, siempre lo trae). Al ser gate, **la zona sale del %** y se muestra como "filtro" en el checklist (la UI marca "filtro" para toda dim con `peso===0`: tipo, operación, zona). El **checklist suma DORMITORIOS** (`bedrooms` en ambas tablas) **y ANTIGÜEDAD** (`tokko_data->>'age'` en cartera —0=a estrenar, -1→null, 92% cargado— y `property_age_years` en roomix) — corrige la nota vieja de "antigüedad no se puntúa"; ambas solo puntúan si hay dato en sujeto **y** comparable (si falta → "sin dato", no penaliza). **Piso NO se agregó**: cartera no tiene piso de unidad confiable (`floors_amount`=plantas del edificio ≠ piso). **Pesos nuevos** (deben coincidir SQL↔`lib/acm/checklist.ts`): Superficie 22 · Ambientes 16 · Dormitorios 14 · Baños 12 · Antigüedad 14 · Amenities 12 · Semántica 10. **Sin límite artificial:** `p_limit` default 50/máx 100 por fuente (antes 20/30); roomix **no** filtra `is_active` (76% NULL → lo borraría). *(**Revertido en ago-2026**: ver «La red de colaboración solo muestra publicaciones activas», más abajo — el backfill bajó los NULL y el filtro se puso.)* `lib/acm/subject.ts` suma `sujetoDormitorios`/`sujetoAntiguedad`. Verificado con datos reales (sujeto monoambiente Belgrano): cartera 3 y roomix 420 comparables disponibles, **100% del barrio**, sub-scores de antigüedad/dormitorios OK, control negativo (Palermo no trae Belgrano) y acento (Núñez) OK; `tsc --noEmit` 0 errores.
 - **Estado de obra — a estrenar / en pozo (ago-2026, `20260803120000_acm_estado_obra.sql`, rama `feat/acm-filtro-a-estrenar`):** gate duro para no mezclar propiedades sin uso con usadas (mediana US$/m² de la red, venta: Palermo 3.448 vs 2.642 = **+31 %**; Belgrano +30 %, Caballito +36 %, V. Urquiza +18 %, Almagro +31 %). **Cómo viene el dato (verificado):** `properties.tokko_data.age` → `0` = a estrenar (221 de 466 activas), `-1` = en pozo (30), `>0` = años; `roomix_properties.property_age_years` → `0` = a estrenar (16.299 en venta), `NULL` = sin dato (32.730 = 41 % en venta, **99,8 % en alquiler**), `>0` = usada. **La red NO distingue pozo** (0 negativos en 134.561 filas: el extractor mapea "a estrenar"/"nuevo" → 0), por eso ahí el pozo se trata igual que a estrenar. **Función nueva `acm_pasa_obra(p_anios, p_obra, p_sin_dato, p_pozo_es_estrenar)`** (`sql IMMUTABLE`) concentra toda la regla, así el `WHERE` del CTE `cand` queda en una línea en ambas funciones. `acm_match_properties`/`acm_match_roomix` se recrean con `p_obra text DEFAULT 'off'` (`off|usada|estrenar|pozo|estrenar_pozo`) y `p_obra_sin_dato boolean DEFAULT true`, ambos **antes de `p_limit`**; `RETURNS TABLE` sin cambios y los defaults = comportamiento idéntico al anterior. Además el `ant` de `properties` pasó de `^[0-9]+$` a `^-?[0-9]+$` para **no perder el `-1`** (antes el pozo caía en "sin dato"). Lado TS: `sujetoEstadoObra(sujeto)` (terreno → `'off'`) y `obraAdmiteSinDato(operacion)` (`true` solo en alquiler) en `lib/acm/subject.ts`; `sujetoAntiguedad()` devuelve `null` si hay casilla tildada; `Sujeto` gana `a_estrenar`/`en_pozo`; `/api/acm/cartera` devuelve esos dos flags (pre-tildan al elegir de cartera) y ya no manda `antiguedad: 0`; `fmtAnios()` del checklist muestra "A estrenar"/"En pozo" en vez de "0 años". UI: dos casillas en `step1-sujeto.tsx` que deshabilitan el campo de años. **Verificado contra la base real:** partición exacta en cartera (`off`=113 = 52 estrenar + 13 pozo + 48 usada, sin fugas ni pérdidas); roomix venta Palermo mediana US$/m² 3.041 (estrenar) vs 2.564 (usada) vs 2.622 (mezclado = comportamiento viejo); alquiler con `p_obra_sin_dato=false` daba **0** comparables y con `true` da 50 (de ahí la asimetría); tabla de verdad completa de `acm_pasa_obra` (4 candidatos × 5 estados × 4 contextos) y de los helpers TS, todas OK; `tsc --noEmit` y `next build` limpios.
 - **Zona por niveles + superficie comparable + dedup (ago-2026, `20260803180000_acm_zona_niveles_y_superficie.sql`, rama `feat/acm-zona-y-superficie`):** tres arreglos salidos de auditar por qué faltaban comparables reales en una casa de Belgrano.
   - **`p_m2_cubierta`** — el filtro de superficie comparaba **cubiertos del sujeto** (`sujetoM2` = cubiertos+semicubiertos) contra **superficie total del candidato** (`roomix.area_m2` = `total_area_m2`, ver `crawler.mjs:631`; en cartera `coalesce(total_area, covered_area)`). Ahora ambos lados usan cubierta con fallback al total: `coalesce(nullif(covered_area_m2,0), area_m2)` y `coalesce(nullif(covered_area,0), total_area)`. Impacto medido (Belgrano, casas venta): 156 candidatas → **19 recuperadas** que la banda ±40% descartaba por el lote (405/246, 507/298, 490/350…); en la red, **3.248 de 4.859** casas con dato de cubierta tienen total > cubierta×1,15. Cobertura de `covered_area_m2`: 31% del total, 20% de las casas → el resto cae al total (sin regresión).
@@ -772,7 +773,8 @@ Rate limit 30 req/h por usuario; validación Zod (10–50000 chars); `parseWhats
     - **Resultados idénticos, probado, no supuesto:** 8 casos reales comparados por `json_agg(*)` completo, **antes vs después** — Palermo/Belgrano/Agronomía (chico), con/sin embedding, `zona_min` 70/50, venta/alquiler, más un control negativo del camino de fallback (no tocado en el código) — **cero diferencias en los 8**. (Gotcha propio del proceso de comparación, no del fix: los primeros scripts elegían el embedding del "sujeto" de prueba con `LIMIT 1` sin `ORDER BY` — no determinístico en Postgres, generó una alarma falsa de regresión hasta agregar `ORDER BY id`; la función en sí no tiene este problema, `p_query_embedding` lo arma la app a partir de un solo texto.)
     - **`app/api/acm/comparables/route.ts` deja de tragarse el error.** Antes: `if (roomixRes.error) console.error(...)` y seguía de largo con `roomixRes.data || []` — un timeout de Postgres (`57014`) se convertía en **HTTP 200 con `roomix: []`**, indistinguible de "esta zona no tiene comparables en la red" (mismo patrón exacto encontrado y corregido en `acm_match_properties`/cartera). Ahora `route.ts` calcula `carteraFallo`/`roomixFallo` (`Boolean(x.error)`) y los manda en `meta.cartera_fallo`/`meta.roomix_fallo` (sigue devolviendo 200 con los resultados parciales que sí llegaron, no tiene sentido tirar todo si solo una fuente falló); `acm-module.tsx` lee esos flags y dispara un `toast.error` inmediato; `comparables-result.tsx` muestra un **banner rojo fijo** mientras el fallo siga en el resultado activo, y los mensajes de "vacío" de cada sección cambian para no contradecirlo ("la búsqueda no se completó — probá de nuevo", no "no se encontraron comparables con estos criterios"). **Léase junto con el punto anterior:** de acá en más, un array `roomix: []` (o `cartera: []`) en la respuesta significa que la zona de verdad no tiene comparables — ya no puede significar "la búsqueda se cayó y nadie se enteró". No toca la base de datos: es información que Postgres ya entregaba, solo se dejó de descartar.
     - Ambas migraciones (`20260813120000_acm_roomix_zona_index.sql`, `20260813120100_acm_roomix_indexado_zona_primero.sql`) están **aplicadas en producción** vía `node scratch/apply-sql.mjs` (Management API, no el flujo normal de migraciones de Supabase — ver `docs/interno/*supabase-migraciones-management-api*`); el código de `route.ts`/componentes está commiteado en la rama, lo despliega Vercel al mergear.
-    - **Concern abierto, no bloqueante:** dos índices HNSW idénticos en `roomix_properties` (`idx_roomix_embedding_hnsw` + `idx_roomix_properties_embedding`, ~972MB cada uno, ~1,9GB redundantes) — no causan este timeout (el plan problemático ni siquiera usa HNSW), pero duplican el costo de mantenimiento en cada insert/update del crawler; fuera de alcance de este fix, queda para dropear uno de los dos en algún momento.
+    - **~~Concern abierto~~ → CERRADO (ago-2026, migración `20260817130000_roomix_borrar_hnsw_duplicado.sql`).** Eran dos índices HNSW **idénticos** en `roomix_properties` (`idx_roomix_embedding_hnsw` + `idx_roomix_properties_embedding`), **1309 MB cada uno** al momento de borrarlos (la cifra vieja de ~972 MB quedó corta: la tabla siguió creciendo). Idénticos de verdad y no solo de nombre: misma columna, mismo método, **misma clase de operador** (`vector_cosine_ops` — lo que había que mirar: con `vector_l2_ops` medirían otra distancia y no serían intercambiables) y ninguno con cláusula `WITH`, o sea mismos `m`/`ef_construction`. **Cuál sobraba, medido:** los contadores de `pg_stat` venían del 2026-02-12 sin resetearse (6 meses) y en ese lapso `idx_roomix_embedding_hnsw` acumuló 24 usos contra **cero** del otro (`last_idx_scan` en null); corriendo una búsqueda semántica real con el vector como literal, el plan elige `Index Scan using idx_roomix_embedding_hnsw` y sube su contador mientras el otro sigue en cero. **Qué se ganó:** 1309 MB — la tabla pasó de 4718 a 3410 MB y sus índices de 2691 a 1382 MB —, y sobre todo cada escritura dejó de mantener dos HNSW en vez de uno (550.010 escrituras desde febrero, 12.937 filas tocadas en 7 días: la tabla se escribe seguido). **Qué NO tocó:** el mapa no usa embeddings (sus índices son los GiST geográficos y el btree de barrio) y el crawler actualiza/borra por `id` (`.eq('id')`, `.in('id')`, `upsert onConflict:'id'`), o sea por `roomix_properties_pkey`, que además no se puede dropear suelto por pertenecer a la PK. **Verificado antes/después con huella:** 3 vectores de consulta × `acm_match_roomix` y `match_roomix_ia`, comparando el contenido completo de cada fila **y el orden del ranking** (en una búsqueda vectorial el orden *es* el resultado) — 6 de 6 idénticos; más ACM y Buscador IA por la UI, ambos 200 OK con resultados reales.
+      - *Gotcha para la próxima vez que se mida esto:* si el vector de consulta viene de un `JOIN`, pgvector **no puede usar el índice** y se va a barrido completo (43 s medidos) — el `EXPLAIN` parece decir que el índice no sirve cuando en realidad la prueba está mal armada. Las funciones reales lo reciben como parámetro, que para el planificador es una constante; para reproducirlo hay que inyectar el vector como literal.
 
 **Legacy:** `/api/valuation/generate` + tabla `valuations` (Gemini) — sin uso confirmado en frontend (ver §20).
 
@@ -1120,13 +1122,18 @@ Componentes en `components/mapa/`, lógica pura en `lib/mapa/` (81 tests con `no
 
 Cada uno de estos nació de un `statement timeout` real, no de una optimización preventiva:
 
-- `idx_roomix_geo_filtros` — GiST compuesto (`btree_gist`) que mezcla `point(lng,lat)` con
-  operación, tipo, moneda y precio. Sin él, un filtro que no coincide con nada obliga a
-  recorrer el rectángulo entero: 16.439 ms medidos para devolver cero.
-- `idx_roomix_barrio_normalizado` — índice de expresión sobre `barrio_normalizado()`. Sin
-  él, filtrar por barrio tardaba 8.337 ms y se cancelaba solo. `unaccent()` no se puede
-  indexar directamente (depende de un diccionario configurable): va envuelta con el
-  diccionario explícito para volverla inmutable, y calificada con su esquema.
+- `idx_roomix_geo_filtros_amb` — GiST compuesto (`btree_gist`) que mezcla `point(lng,lat)`
+  con operación, tipo, moneda, precio y **ambientes** (`rooms`). Sin él, un filtro que no
+  coincide con nada obliga a recorrer el rectángulo entero: 16.439 ms medidos para devolver
+  cero. Reemplazó a `idx_roomix_geo_filtros`, que era el mismo sin `rooms`: el planner elige
+  el nuevo también para las consultas que no filtran ambientes, así que dejar los dos
+  costaba el doble en cada sync nocturno. 29 MB.
+- `idx_roomix_barrio_filtros` — btree sobre `(barrio_normalizado(neighborhood), operation,
+  rooms)`, que es como se lo consulta siempre. `unaccent()` no se puede indexar
+  directamente (depende de un diccionario configurable): va envuelta con el diccionario
+  explícito para volverla inmutable, y calificada con su esquema. Reemplazó a
+  `idx_roomix_barrio_normalizado`, que era solo la primera columna **y que ninguna consulta
+  del mapa llegó a usar nunca** (ver la trampa de la normalización escrita a mano). 2 MB.
 - `idx_mapa_manzanas_geom`, `idx_precio_m2_celdas_geo`, `idx_mapa_barrios_trgm`.
 
 ### Trampas verificadas
@@ -1144,6 +1151,71 @@ Cada uno de estos nació de un `statement timeout` real, no de una optimización
   geocoder se llama desde el navegador, no desde el backend. Los orígenes permitidos deben
   incluir `*.vakdor.com` (`vakdor.com` a secas NO cubre subdominios) y `localhost`.
 - **`100vh` no descuenta la barra de direcciones en el celular**: va `dvh`.
+- **`is_active` en `roomix_properties` tiene TRES estados, no dos.** De 325.903 filas:
+  204.085 en `true`, 8.732 en `false` y **113.086 en `NULL`** (2026-08-15). El `WHERE
+  r.is_active` de las funciones del mapa deja afuera las dos últimas, que es lo correcto —
+  NULL no es publicado — pero conviene saberlo antes de comparar cualquier conteo contra la
+  tabla cruda. Verificado sobre un rectángulo de Belgrano: 22.847 activas + 117 inactivas +
+  4.880 nulas, y `mapa_colaboracion` devuelve 5.510 filas, las 5.510 activas.
+  **`/api/mapa/propiedad` no filtraba nada**: los pines ya salen filtrados, así que por
+  pantalla no se llegaba a una baja, pero el endpoint acepta cualquier slug y de ahí sale la
+  ficha que el asesor le COMPARTE al cliente. Ahora lleva `.eq("is_active", true)` en las
+  dos fuentes.
+- **El mismo barrio existe en muchas ciudades, y el catálogo agrupa por NOMBRE.** El
+  recuadro de "Belgrano" salía de 181 × 207 km porque juntaba el de CABA (6.612) con los de
+  Rosario (64), Bariloche (19), Carlos Paz (9) y Mendoza (2). Los percentiles 1/99 no
+  alcanzan: los de afuera son el 2,9%, así que el p99 cae dentro de Rosario. Estaba
+  calibrado para ruido, no para homónimos. **No era un caso raro: 446 de 2.647 barrios
+  (17%) tenían el recuadro reventado y 268 pasaban los 100 km** — "Centro" medía
+  1.089 × 1.388 km. Ahora se elige primero el **núcleo** (celda de ~5 km con más
+  propiedades) y se descarta lo que esté a más de 10 km, y recién ahí se aplican los
+  percentiles. Quedó en 13 recuadros grandes, todos legítimos (Pilar, Mar del Plata,
+  Córdoba: partidos de verdad, 12-20 km). **Se elige la celda más poblada y NO la mediana**:
+  la mediana de dos ciudades con la misma cantidad de avisos cae en el campo entre las dos.
+- **Una normalización escrita a mano NO usa el índice de la normalización.**
+  `idx_roomix_barrio_normalizado` estaba sobre `barrio_normalizado(neighborhood)`, que por
+  dentro llama a `unaccent(<diccionario>, …)` — con el argumento explícito, que es lo que la
+  vuelve inmutable e indexable. Las funciones del mapa comparaban con
+  `lower(unaccent(btrim(coalesce(…))))`, el `unaccent` de UN argumento: **otra expresión**,
+  así que el índice nunca aplicó y el barrio se evaluaba fila por fila. Regla: el WHERE
+  tiene que llamar a la MISMA función que indexa, no reescribirla.
+- **Frío contra tibio: la misma consulta son 2.511 ms o 36 ms.** Las filas de
+  `roomix_properties` pesan ~10 KB (fotos, descripción, embedding), así que el costo está en
+  traer páginas de disco, no en pensar. Por eso los timeouts del mapa aparecen justo cuando
+  un asesor entra a una zona que nadie miró hace rato — y desaparecen al reintentar, que es
+  lo que los vuelve difíciles de creer. **Al medir el mapa hay que correr la consulta dos
+  veces y mirar las dos.**
+- **Con barrio, la consulta resuelve el BARRIO primero** (`mapa_colaboracion` es plpgsql con
+  dos caminos, igual que `acm_match_roomix`). Con el barrio como filtro, la base traía del
+  disco las 3.585 filas del rectángulo para quedarse con 808: 2.505 ms y timeout al sumarle
+  ambientes. Resolviendo el barrio con su índice salen 824 filas: **531 ms**.
+- **`5 = ANY(p_ambientes)` dentro del WHERE mata el índice.** Escrito así, la base no puede
+  resolverlo al planificar y toda la condición de ambientes deja de ser indexable. Va
+  hoisteado a una variable plpgsql (`v_hay_cinco`) para que el plan de cada llamada lo vea
+  como constante. Se descartó expandir el array a `{5,6,7,…}`: hay avisos de hasta 527
+  ambientes y cualquier tope elegido a dedo se come en silencio los de arriba.
+- **Ambientes y dormitorios NO son lo mismo, y el mapa los confundía.** El filtro decía
+  "Amb. mín." pero en la cartera medía `properties.bedrooms`, que son dormitorios: en el
+  84% de las activas de Central los dos números difieren (377 de 451, el ambiente de más es
+  el living). Los ambientes de la cartera **no están en una columna**, viven en
+  `tokko_data->>'room_amount'`; en la red sí (`rooms` = ambientes, `bedrooms` = dormitorios).
+  Las dos funciones devuelven ahora las dos cosas: `ambientes` lo muestra la lista del mapa
+  y `bedrooms` la ficha compartida con el chat, que dice "Dorm.".
+- **El filtro de ambientes NECESITA estar en el índice, no es una optimización.** Sin
+  `rooms` dentro de `idx_roomix_geo_filtros_amb`, la base arma el bitmap con las 25.223 del
+  rectángulo y descarta a mano 3.902 filas por cada 1.000 útiles: **4.033 ms en la prueba y
+  `statement timeout` (8,6 s) en la app**. Con `rooms` en el índice el filtro entra en el
+  `Index Cond`: **72 ms**, y el endpoint pasó de 500 a 200 en 548 ms. Regla general para
+  esta tabla: **un filtro nuevo del mapa que no esté en el índice GiST hace timeout**, no
+  se pone lento — no hay término medio con 178.351 avisos.
+- **La ficha de una propiedad va por un portal a `<body>`** (`mapa-ficha.tsx`). El modal
+  compartido con el chat (`UnifiedPropertyDetail`) es `fixed inset-0 z-50`, y dentro del
+  contenedor del mapa —que es `isolate`— las capas de Leaflet valen de 400 a 700: z-50
+  pierde y **la ficha se dibujaba detrás del mapa**. Las dos salidas fáciles no sirven:
+  subirle el z-index al modal compartido lo cambia también para el chat, y envolverlo en
+  un div con z-index alto le rompe el `backdrop-blur` (ese div pasa a ser el fondo a
+  difuminar, o sea nada). Fuera del contenedor no hay con qué competir. Mismo patrón que
+  la barra flotante del ACM.
 
 ### Tareas automáticas
 
@@ -1156,9 +1228,70 @@ Secretos necesarios: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_API_KEY_MANAGEMENT`,
 `SITE_DOMAIN`, `CRON_SECRET`. En Vercel: `NEXT_PUBLIC_MAPTILER_KEY` (sin ella el mapa usa
 OpenStreetMap, que funciona igual).
 
+**El `CRON_SECRET` va en la cabecera, nunca en la URL.** `assertCron()`
+(`lib/admin-vakdor/cron-auth.ts`) solo lee `Authorization: Bearer <secreto>` y falla
+cerrado; un `?secret=` da **401**. `mapa-refrescar.yml` lo mandaba por la URL y cobraba 401
+en cada corrida programada — 8 segundos y a otra cosa. La falla era invisible desde la
+app: los **pines** se leen de la base en vivo y seguían apareciendo, así que lo único que
+quedaba viejo eran los **colores del precio por m², el ranking de barrios y el catálogo de
+barrios del buscador**, que son los precalculados. Ojo al comparar con otros crons:
+`market-sync.yml` sí usa `?secret=` **porque `/api/mercado/sync` no usa `assertCron()`**,
+lee el parámetro a mano.
+
 La cola de trazado la arma la base sola: busca las propiedades que no caen dentro de
 ninguna manzana. Si la red publica en una zona nueva, se traza esa misma noche.
 
 ## FIN DEL DOCUMENTO
 
 Documento técnico de PRISMA basado en análisis directo del código fuente, sin ejecución ni modificación del sistema. Para la lógica detallada endpoint por endpoint, ver `LOGICA-PRISMA.md`.
+
+### 10.6.x Hoja "La propiedad y su entorno" (ago-2026, rama `feat/acm-hoja-entorno`)
+
+Hoja A4 nueva **entre la portada y los comparables** de `/ficha-acm/[token]`: dos columnas, a la izquierda la descripción de la propiedad (que **se mudó de la portada**, ahora limpia) y un relato del barrio escrito por IA, a la derecha un mapa con marcadores y los puntos de interés con sus distancias. **La hoja NO nombra ninguna fuente de datos** (decisión de Leonardo); la única excepción es el crédito `© OpenStreetMap © CARTO` dibujado dentro del PNG del mapa, que es condición de licencia.
+
+**Datos precargados, no consultados en vivo.** Dos tablas PostGIS (`20260814100000_zona_pois.sql`): `zona_barrios` (48 barrios con polígono, `nombre_norm` para el respaldo por nombre) y `zona_pois` (16.503 puntos en 9 categorías: subte, escuela, hospital, farmacia, comisaria, espacio_verde, parada_colectivo, ecobici, ciclovia). Las carga `scripts/cargar-zona-pois.mjs`, **a mano** (`node scripts/cargar-zona-pois.mjs [categoria]`), resolviendo las URLs por el **catálogo CKAN** (`data.buenosaires.gob.ar/api/3/action/package_show`) y no fijas: el gobierno mueve los archivos de carpeta — al escribir esto 4 de 7 URLs anotadas daban 404. RLS: lectura para `authenticated`, escritura solo service-role; son datos públicos, sin `agency_id`.
+
+**Tres trampas de la carga, todas medidas:**
+1. **EPSG:9498** ("POSGAR 2007 / CABA 2019", el sistema local en el que vienen **escuelas y hospitales**) **no existe en PostGIS 3.3.7**: `ST_Transform(...,9498,4326)` fallaba con *Cannot find SRID*. Se registra en `spatial_ref_sys` con la definición oficial de EPSG (`20260814100060_srid_9498_caba.sql`). Errarle al falso este (20.000) / falso norte (70.000) corre **todas** las escuelas varios kilómetros en silencio.
+2. **El dataset de hospitales ya cambió de columnas una vez** (antes `WKT/ID/NOMBRE` en lat/lon; ahora `nam/gna/dir/bar` en 9498) y el parser viejo devolvía **0 filas sin error**. Por eso una categoría que carga cero **aborta la carga**: es la falla más peligrosa del script (no rompe nada y esa categoría no vuelve a aparecer nunca).
+3. **Las paradas de colectivo traen coma decimal** (`"-58,3709946"`). Parseadas sin corregir, todas las paradas aterrizan en el Golfo de Guinea. Las líneas vienen en 6 columnas `L1..L6`.
+
+**Control de calidad obligatorio:** cada POI declara su barrio; se cruza contra el polígono real y se reporta el % que **no cae donde dice estar**. Más de 10% en una categoría → carga inválida. Valores sanos actuales: 2–6%.
+
+**`zona_resumen(lat, lon)`** (`20260814100100_zona_resumen.sql`) devuelve todo en una llamada: barrio por point-in-polygon + contexto + el más cercano de cada categoría y los conteos por radio (subte 1500 m, verde 1200, escuelas 1000, hospital 3000, farmacias 500, colectivos 300, comisaría 1500, ecobici 600, ciclovía 400). **Los radios viven adentro de la función** para que nadie los cambie desde el llamador y produzca dos fichas con criterios distintos. La distancia se mide contra `geom_forma` (el polígono del parque, el trazado de la ciclovía) cuando existe: el centro de las Barrancas está al doble de distancia que su borde. Devuelve `null` fuera de CABA.
+
+**Qué cuenta como espacio verde (`zona_verde_cercano`).** El dataset mezcla las Barrancas (21.000 m²) con canteros de 19 m². Sin filtrar, una propiedad en Cabildo y Juramento mostraba *"espacio verde a 11 metros: Plaza Joaquín Sánchez"* — 152 m², el tamaño de un living: literalmente cierto y completamente engañoso. Regla: fuera los `CANTERO CENTRAL` por tipo; **con nombre** valen desde 1.000 m²; **sin nombre**, solo desde una hectárea (hay 7 sin nombre que la pasan, el mayor de 5,4 ha). Con eso Belgrano da Plaza Gral. Manuel Belgrano (68 m) y Palermo el Parque Ferroviario.
+
+**Fuera de CABA** (`lib/acm/zona-overpass.ts`): Overpass/OpenStreetMap en vivo, timeout 20 s **sin reintentos** (hay un asesor esperando; los reintentos son del script de carga, que corre solo). Menos de 3 categorías con dato → no hay hoja. Arma el **mismo objeto** que `zona_resumen` para reusar `resumenACategorias` y que la hoja se vea idéntica. **Ojo:** fuera de CABA no hay subte — la categoría `subte` trae la estación de **tren** y se aclara en el subtipo.
+
+**El relato** (`lib/acm/zona-relato.ts`, `gemini-3.5-flash`, ~US$0,003 por ficha): recibe los datos **ya convertidos a cuadras** (nunca metros: si el modelo divide por cien, tenemos aritmética de un LLM en un documento firmado). **`thinkingConfig: { thinkingBudget: 0 }` es obligatorio** — medido: con thinking encendido y 2.000 tokens de tope, 1.917 se los llevó el razonamiento y quedaron 79 para el texto, que salía cortado con `finishReason: MAX_TOKENS`. Las reglas duras del prompt salieron de inventos reales del modelo: nombraba destinos ("el tren te conecta con Retiro") y regiones ("del norte del conurbano"), inventaba relaciones ("la ciclovía te conecta con la red de Ecobici"), le inventaba carácter al barrio cuando no había datos ("de veredas arboladas y perfil familiar"), enumeraba las 13 líneas de colectivo y cerraba con relleno afirmando que la zona era "segura".
+
+**El mapa** (`GET /api/acm/mapa-zona?token=…`): PNG armado con `sharp` pegando tiles de CARTO *voyager* + marcadores en SVG. **Se pide con el TOKEN de la ficha, no con coordenadas**: la primera versión exigía sesión y el mapa salía **vacío para el cliente**, que es justamente quien abre la ficha — el error apareció recién al renderizar la hoja sin cookies. Las coordenadas salen del propio snapshot (`FichaZona.centro`), así que el que llama no elige qué se dibuja y el endpoint no es un proxy abierto de tiles. Imagen **vertical 768×1024** (apaisada, `object-fit: cover` recortaba los costados y se comía los marcadores) y radios de marcador calculados para verse **ya reducidos al 40%** en la hoja. Cache `immutable`: la misma coordenada da la misma imagen.
+
+**Maqueta:** clamps calculados contra el peor caso (descripción 700 + relato 900 caracteres = 867 px sobre 981 disponibles), no elegidos a ojo — con 9 renglones parejos, una descripción real de 607 caracteres ya salía cortada. Verificado **en modo impresión** (donde el desborde se corta en silencio): 6 hojas = 6 páginas, altura forzada a 297 mm, sin desborde, sin texto recortado, pie dentro de la hoja.
+
+**`AcmFichaSnapshot.zona` es opcional**: las fichas anteriores a ago-2026 no lo tienen y tienen que seguir abriendo. `fuente: "gcba" | "osm"` queda solo para auditar, no se muestra.
+
+**Referencias del mapa (`lib/acm/zona-mapa.ts`).** El mapa mostraba nueve puntos de colores sin decir qué era cada uno. La lista de POIs pasó a ser la referencia: cada renglón lleva un punto del **mismo color** que su marcador, y solo lo lleva si el marcador **está dibujado** — quedan sin punto los conteos (una "farmacia a menos de 500 m" es un radio, no un lugar) y los que caen fuera del recorte. Zoom, tamaño de la imagen, colores y el test de "entra en cuadro" viven en **un solo archivo** que importan los dos lados (`app/api/acm/mapa-zona/route.ts` dibuja, `app/ficha-acm/[token]/page.tsx` escribe la referencia): eran dos copias en potencia, y la copia que no se edita es la que termina mandando al cliente a buscar un punto inexistente. Cubierto por `lib/acm/zona-mapa.test.ts`.
+
+**La ficha en pantalla chica (`app/ficha-acm/[token]/AjusteAncho.tsx`).** `.sheet` mide 210 mm = 794 px **fijos** porque es un A4 exacto al imprimir. En 390 px el cliente veía la mitad izquierda de cada hoja, cortada a mitad de palabra ("Análisis Comparat…"). Se **escala la hoja entera** (`transform: scale`) en vez de reacomodarla: mismo documento más chico, sin una segunda maqueta que mantener. Hace falta JavaScript porque **CSS no puede dividir dos longitudes** (`calc(100vw / 794px)` no es válido) y con breakpoints fijos habría que adivinar cada modelo de teléfono. **Tres candados:** `@media screen` (la impresión no lo ve), `max-width: 840px` (el escritorio no lo ve) y `var(--acm-k, 1)` (sin JS queda como estaba). El margen negativo (`calc(-297mm * (1 - k) + 14px)`) existe porque **un elemento escalado sigue ocupando su alto original** en el layout. Medido: iPhone SE 320 px → k 0,383; iPhone 13 390 → 0,471; Pixel 7 412 → 0,499; **1440 px → k 1 y `transform: none`**. En emulación de impresión: 6 hojas de 793,7 × 1122,5 px, sin transformación.
+
+**⚠️ El CSS de la ficha es una plantilla de JavaScript (`const CSS = \`…\``): una comilla invertida suelta adentro de un comentario CSS corta la cadena y la página entera devuelve 500.** Pasó **dos veces**. `lib/acm/ficha-css.test.ts` lo detecta sin abrir el navegador, y de paso verifica los tres candados del celular y que la hoja de impresión siga en `297mm`.
+
+### 10.6.x La red de colaboración solo muestra publicaciones activas (ago-2026)
+
+`acm_match_roomix` filtraba **nada**: traía avisos dados de baja como comparables. Se le agregó `and r.is_active` **en los dos caminos de código** de la función (con y sin embedding) — en SQL eso descarta `false` **y** `NULL`, que es lo que se quería. La migración `20260815100000_acm_roomix_solo_activas.sql` se generó desde el `pg_get_functiondef` de la función **viva** con `scratch/_gen-migracion.mjs`, y el generador **aborta si no encuentra exactamente 2 coincidencias**: la función tiene dos ramas y parchear una sola deja el bug vivo en la mitad de los casos, en silencio.
+
+**Por qué ahora sí y en jul-2026 no.** La nota vieja (§ arriba) decía que filtrar borraría el 76% de la red por `NULL`. El backfill de detalle cambió el reparto: medido al 17-ago-2026, **226.735 activas, 16.318 en `false`, 100.848 en `NULL`**. O sea 117.166 filas que el filtro tiene que dejar afuera, y quedan más de 226 mil disponibles. Verificado sobre una búsqueda real (Belgrano, venta, 78 m²): **30 comparables, 30 activos, 0 colados**.
+
+**Los `NULL` no son "inactivos confirmados"**: son avisos que el crawler todavía no volvió a visitar. Dejarlos afuera es la decisión conservadora (mejor perder un comparable que mostrarle al cliente una propiedad que ya no está), y se recuperan solos a medida que el backfill los completa.
+
+### 10.6.x Lista larga de comparables en un recuadro con scroll (ago-2026)
+
+El front pedía 50 por fuente y apilaba las tarjetas en la página: el alto dependía de la cantidad de resultados y los dos bloques dejaban de verse juntos. Ahora cada `Section` monta la lista en un contenedor `max-h-[min(60vh,560px)] overflow-y-auto overscroll-contain` y el pedido subió a `TOPE_COMPARABLES = 100` (`lib/tasacion/types.ts`), la **misma constante** que usan el techo del endpoint (`Math.min(body.limit || 50, TOPE_COMPARABLES)`) y el aviso que lee el asesor — con tres números sueltos, mover uno deja la interfaz mintiendo.
+
+**El tope no es arbitrario.** Medido: `acm_match_roomix` para un depto de 2 dormitorios en Belgrano devuelve **más de 2.000** filas (la propia función corta ahí), 628 por encima del 80%. Y **subirlo no cuesta nada**: `EXPLAIN ANALYZE` da 131 ms con `p_limit 100` contra 134 ms con 50 — el ranking recorre los mismos candidatos, el `LIMIT` solo trunca. Lo que sí cuesta es la **primera** llamada tras un reinicio: 6,6 s en frío, con `statement timeout` ocasional. Eso ya existía y está manejado (`roomix_fallo` → banner rojo, nunca "0 comparables" en silencio); no lo introdujo el tope nuevo.
+
+`loading="lazy"` en la foto de la tarjeta: con la lista completa hay hasta 200 tarjetas montadas y sin eso el navegador arranca bajando 200 fotos para mostrar tres.
+
+**Tarjeta en celular:** `p-3/gap-3` y foto 80 px por debajo de `sm:`, el precio con `whitespace-nowrap` dentro de una fila `flex-wrap` (se partía en dos líneas: "US$" arriba, el número abajo) y `fecha_publicacion` formateada (la red la manda cruda: `2026-06-19T04:00:00+00:00`). De 640 px para arriba, idéntico a como estaba.

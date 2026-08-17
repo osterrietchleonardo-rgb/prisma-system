@@ -135,6 +135,30 @@ function pin(fuente: FuenteMapa, cuantas: number) {
 }
 
 /**
+ * El marcador rojo clasico de "estas acá": la direccion que se busco en la cajita.
+ *
+ * Es a proposito la gota roja de toda la vida y no un circulito mas: los pines de las
+ * propiedades son circulos dorados, grises y azules, y el punto de referencia tiene que
+ * distinguirse de un vistazo de las propiedades que uno esta comparando alrededor.
+ *
+ * `iconAnchor` va en la PUNTA de la gota (abajo al medio), no en el centro: la punta es
+ * la que señala la coordenada. Anclado al medio, el pin marcaria media cuadra mas al sur.
+ */
+const ICONO_UBICACION = L.divIcon({
+  className: "",
+  iconSize: [28, 40],
+  iconAnchor: [14, 40],
+  // El cartelito con la direccion, arriba de la cabeza de la gota y no de la punta.
+  tooltipAnchor: [0, -38],
+  html: `<svg width="28" height="40" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg"
+      style="filter:drop-shadow(0 2px 3px rgba(0,0,0,.45))">
+      <path d="M14 0C6.8 0 1 5.8 1 13c0 9.6 13 27 13 27s13-17.4 13-27C27 5.8 21.2 0 14 0z"
+        fill="#dc2626" stroke="#fff" stroke-width="2"/>
+      <circle cx="14" cy="13" r="4.6" fill="#fff"/>
+    </svg>`,
+})
+
+/**
  * Globito de un grupo de puntos cercanos.
  *
  * Se dibuja a mano por dos razones. La primera, que el de la libreria pinta verde /
@@ -392,6 +416,8 @@ export interface MapaLienzoProps {
   monedaPrecio?: string
   /** Cuando llega un rectangulo nuevo, el mapa se acomoda a el. */
   encuadrarA?: BBox | null
+  /** La direccion buscada, para clavarle el marcador rojo de referencia. */
+  ubicacion?: { lat: number; lng: number; nombre: string } | null
   lapizActivo?: boolean
   trazos?: Trazo[]
   onTrazo?: (t: Trazo) => void
@@ -411,6 +437,7 @@ export default function MapaLienzo({
   cortesPrecio = [],
   monedaPrecio = "USD",
   encuadrarA = null,
+  ubicacion = null,
   lapizActivo = false,
   trazos = [],
   onTrazo,
@@ -510,6 +537,24 @@ export default function MapaLienzo({
       >
         {marcadores}
       </MarkerClusterGroup>
+
+      {/* La direccion buscada. Va DESPUES de los pines y con `zIndexOffset` bien alto
+          para que no quede tapada: es el punto de referencia con el que se leen todas las
+          demas, y escondido abajo de un globito no sirve de nada.
+          `interactive: false` deja pasar el click al mapa y a los pines de atras: el
+          marcador es una referencia, no un boton. */}
+      {ubicacion && (
+        <Marker
+          position={[ubicacion.lat, ubicacion.lng]}
+          icon={ICONO_UBICACION}
+          zIndexOffset={2000}
+          interactive={false}
+        >
+          <Tooltip direction="top" opacity={1} permanent>
+            <span className="font-semibold">{ubicacion.nombre}</span>
+          </Tooltip>
+        </Marker>
+      )}
 
       <TrazosDibujados trazos={trazos} />
       {onTrazo && <MapaLapiz activo={lapizActivo} onTrazo={onTrazo} />}

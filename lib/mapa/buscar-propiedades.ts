@@ -26,7 +26,8 @@ function textoDe(p: PropiedadMapa): string {
     p.agent_name,
     p.price ? String(p.price) : null,
     p.price ? p.price.toLocaleString("es-AR") : null,
-    p.bedrooms ? `${p.bedrooms} amb ambientes` : null,
+    p.ambientes ? `${p.ambientes} amb ambientes` : null,
+    p.bedrooms ? `${p.bedrooms} dorm dormitorios` : null,
     p.total_area ? `${p.total_area} m2 m²` : null,
   ]
   return normalizarTexto(partes.filter(Boolean).join(" "))

@@ -1,0 +1,49 @@
+-- ⚠️ APLICAR SOLO / APLICAR ESTE ARCHIVO SOLO ⚠️
+-- Contiene DROP INDEX CONCURRENTLY, que NO puede correr dentro de una transaccion.
+-- La Management API envuelve en una transaccion todo lo que le mandes junto, asi que
+-- si esta sentencia viaja con otras falla con "25001: cannot run inside a transaction
+-- block". Va sola, igual que 20260813120000_acm_roomix_zona_index.sql.
+
+-- Borra el segundo indice HNSW de roomix_properties, que estaba DUPLICADO.
+--
+-- Habia dos indices con la definicion EXACTAMENTE igual sobre la misma columna:
+--
+--   idx_roomix_properties_embedding  hnsw (embedding vector_cosine_ops)   1309 MB
+--   idx_roomix_embedding_hnsw        hnsw (embedding vector_cosine_ops)   1309 MB
+--
+-- Iguales de verdad, no solo parecidos: misma columna, mismo metodo, misma clase de
+-- operador y ninguno con clausula WITH (o sea, mismos m / ef_construction). La clase
+-- de operador era lo importante de mirar: si uno hubiera sido vector_l2_ops mediria
+-- otra distancia y NO serian intercambiables.
+--
+-- Cual sobra, medido y no supuesto: los contadores de pg_stat vienen del 2026-02-12
+-- sin resetearse (seis meses). En ese lapso idx_roomix_embedding_hnsw acumulo 24
+-- usos y idx_roomix_properties_embedding CERO, con last_idx_scan en null. Ademas,
+-- corriendo una busqueda semantica real el plan elige "Index Scan using
+-- idx_roomix_embedding_hnsw" y su contador sube, mientras el otro sigue en cero.
+-- Ninguna funcion de la base nombra al que se borra.
+--
+-- Que se lleva por delante: nada. Como las definiciones son identicas, el que queda
+-- cubre exactamente las mismas consultas. Los usan dos cosas — acm_match_roomix (los
+-- comparables del ACM) y match_roomix_ia (el chat del Buscador IA). El MAPA no usa
+-- embeddings: sus indices son los geograficos GiST y el btree de barrio, intactos.
+-- El crawler tampoco se entera: actualiza y borra por `id`
+-- (.eq('id'), .in('id'), upsert onConflict:'id'), o sea por roomix_properties_pkey,
+-- que es otro indice y ni siquiera se puede borrar suelto porque pertenece a la
+-- clave primaria.
+--
+-- Que se gana: 1309 MB, el 49% de todo el espacio de indices de esa tabla (2691 MB)
+-- y el 28% de los 4718 MB que ocupa entera. Y sobre todo, cada escritura deja de
+-- mantener dos indices HNSW en vez de uno, que es la parte cara de un insert: van
+-- 550.010 escrituras desde febrero y 12.937 filas tocadas en los ultimos 7 dias, asi
+-- que la tabla se escribe seguido.
+--
+-- CONCURRENTLY para no tomar el candado exclusivo sobre la tabla: el crawler escribe
+-- todo el tiempo y el ACM lee, no hay ventana tranquila.
+--
+-- Si hubiera que volver atras (no deberia): recrearlo cuesta caro, es reconstruir un
+-- HNSW de 343.901 vectores.
+--   CREATE INDEX CONCURRENTLY idx_roomix_properties_embedding
+--     ON public.roomix_properties USING hnsw (embedding vector_cosine_ops);
+
+DROP INDEX CONCURRENTLY IF EXISTS public.idx_roomix_properties_embedding;

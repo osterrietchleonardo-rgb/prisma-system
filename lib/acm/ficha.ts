@@ -104,10 +104,62 @@ export interface AcmFichaSnapshot {
   operacion: string;
   comparables: FichaComparable[];
   comparison: FichaComparison;
+  /**
+   * Ausente en toda ficha anterior a ago-2026, y ausente también cuando el asesor destildó la
+   * hoja o cuando no hubo datos de zona. Nunca acceder sin verificar.
+   */
+  zona?: FichaZona | null;
   agent: FichaAgent;
   agency: { id: string; name: string };
   brand: FichaBrand;
   created_at: string;
+}
+
+// ── Hoja "La propiedad y su entorno" ─────────────────────────────────────────
+// Los datos duros los calcula la base (o Overpass fuera de CABA); el relato lo escribe la IA a
+// partir de ESOS datos y lo revisa el asesor. Ver lib/acm/zona.ts.
+
+/** Categorías que muestra la hoja, en el orden en que salen impresas. */
+export const CATEGORIAS_ZONA = [
+  "subte", "espacio_verde", "escuela", "hospital",
+  "farmacia", "parada_colectivo", "comisaria", "ecobici", "ciclovia",
+] as const;
+export type CategoriaZona = (typeof CATEGORIAS_ZONA)[number];
+
+export interface FichaZonaPoi {
+  categoria: CategoriaZona;
+  /** "Juramento" · "12 escuelas". Ya resuelto para imprimir. */
+  titulo: string;
+  /** "Línea D" · "8 estatales". Vacío si la categoría no tiene detalle. */
+  detalle: string;
+  /** Metros al más cercano. null en las categorías que solo cuentan (farmacias). */
+  metros: number | null;
+  /** Cuántos hay en el radio. null en las que muestran solo el más cercano. */
+  cantidad: number | null;
+  /** Para el mapa. null si la categoría no se dibuja (conteos sin punto único). */
+  lat: number | null;
+  lon: number | null;
+}
+
+export interface FichaZona {
+  barrio: string;
+  comuna: number | null;
+  area_km2: number | null;
+  /** Espacios verdes públicos del barrio ENTERO (contexto del banner), no los del radio. */
+  espacios_verdes_barrio: number | null;
+  /** Interno, para auditar de dónde salieron los datos. NO se muestra en la hoja. */
+  fuente: "gcba" | "osm";
+  /**
+   * Coordenadas de la propiedad. Se guardan porque las necesita /api/acm/mapa-zona para dibujar
+   * el mapa, y ese endpoint las lee del snapshot: la ficha pública la abre un CLIENTE sin
+   * sesión, así que el mapa no puede depender de nada que esté en el navegador del asesor.
+   */
+  centro: { lat: number; lon: number } | null;
+  /** El texto de la IA, ya revisado y editado por el asesor. */
+  relato: string;
+  pois: FichaZonaPoi[];
+  /** URL del PNG del mapa. null si no se pudo generar: la hoja sale sin mapa. */
+  mapa_url: string | null;
 }
 
 export interface MercadoBarrioLite {

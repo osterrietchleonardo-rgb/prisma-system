@@ -1,0 +1,721 @@
+{
+ "updatedAt": "2026-08-07T19:38:20.390Z",
+ "createdAt": "2026-04-25T12:54:02.136Z",
+ "id": "NQtasQlz0N86Oxa6",
+ "name": "Cartera_Propiedades",
+ "description": null,
+ "active": true,
+ "isArchived": false,
+ "nodes": [
+  {
+   "parameters": {
+    "inputSource": "passthrough"
+   },
+   "id": "0afede6e-6268-4e8f-a54c-40e2b8914028",
+   "typeVersion": 1.1,
+   "name": "When Executed by Another Workflow",
+   "type": "n8n-nodes-base.executeWorkflowTrigger",
+   "position": [
+    -128,
+    1632
+   ]
+  },
+  {
+   "parameters": {
+    "jsCode": "for (const item of $input.all()) {\n  const text = item.json.query || \"\";\n\n  const agencyMatch = text.match(/agency_id:([a-f0-9-]{36})/i);\n  item.json.extracted_agency_id = agencyMatch ? agencyMatch[1] : \"default_session\";\n\n  const conversationMatch = text.match(/conversation_id:([a-f0-9-]{36})/i);\n  item.json.extracted_conversation_id = conversationMatch ? conversationMatch[1] : \"default_conversation\";\n\n  const urlMatch = text.match(/https?:\\/\\/[^\\s]+/i);\n  item.json.extracted_url = urlMatch ? urlMatch[0].replace(/[.,;:]+$/, \"\") : \"\";\n\n  let clean = text\n    .replace(/agency_id:[a-f0-9-]{36}/ig, \"\")\n    .replace(/conversation_id:[a-f0-9-]{36}/ig, \"\")\n    .replace(/https?:\\/\\/[^\\s]+/ig, \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n  if (clean.length < 3) clean = (text.trim() || \"propiedad\");\n  item.json.clean_query = clean;\n}\n\nreturn $input.all();"
+   },
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    96,
+    1632
+   ],
+   "id": "1dcb5ac1-32d7-4e2c-a433-5859cd255e5a",
+   "name": "extraer_agency_id",
+   "retryOnFail": true,
+   "maxTries": 3,
+   "waitBetweenTries": 2000
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpQueryAuth",
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ content: { parts: [{ text: $json.clean_query }] }, taskType: 'RETRIEVAL_QUERY', outputDimensionality: 768 }) }}",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    992,
+    1632
+   ],
+   "id": "8d43131b-5a27-41a8-87c5-5c233a4f85c7",
+   "name": "Generar_Embedding",
+   "credentials": {
+    "httpQueryAuth": {
+     "id": "9sWQDmKFONtGTVQ7",
+     "name": "Query Auth account"
+    }
+   },
+   "onError": "continueRegularOutput"
+  },
+  {
+   "parameters": {
+    "promptType": "define",
+    "text": "={{ $('Preparar_Busqueda').first().json.query }}{{ $('Preparar_Busqueda').first().json.agent_extra }}",
+    "options": {
+     "systemMessage": "=### ROL\nSos un Especialista en Analisis Tecnico de Cartera Inmobiliaria. Procesas los datos de CARTERA_PROPIEDADES para el Agente Principal, con precision tecnica.\n\n### FLUJO DE TRABAJO\nIdentifica primero el tipo de input.\n\n#### CASO A - Input con URL de propiedad publicada\n1. Los datos de la propiedad del link YA vienen en tu input, en el bloque [DATOS DE LA PROPIEDAD DEL LINK] (tipo, direccion/zona, ambientes, m2, amenities, precio de referencia). Usalos directamente; NO llames ninguna herramienta para leer el link.\n2. Con esos datos llama a CARTERA_PROPIEDADES pasando zona, ambientes (rooms), tipo y caracteristicas. NUNCA pases max_price (el precio del aviso NO es el presupuesto del cliente; es solo referencia). Usa el precio de la publicación del link SOLO como parte de tu comparación final en el análisis experto, NUNCA para filtrar ni para el cálculo del % de coincidencia. Objetivo: traer la propiedad publicada si esta en el stock Y ADEMAS las similares, todas en propiedades[] ordenadas por coincidencia. DOBLE VERIFICACION (ni el Postgres ni vos deciden solos). La herramienta marca es_del_link=true cuando reconoce la propiedad del aviso en el stock y la devuelve primera: si viene, confirmala. Pero el Postgres puede fallar por un dato mal leido del aviso (por ejemplo el barrio), asi que CADA fila trae ademas datos duros de comparacion contra el link: coincide_precio, coincide_calle, coincide_ambientes, coincide_zona, y los valores del aviso (precio_link, moneda_link, calle_link, zona_link, ambientes_link). Usalos para razonar. Regla: si NINGUNA fila trae es_del_link=true pero hay una con coincide_precio=true y ademas (coincide_calle=true o (coincide_ambientes=true y coincide_zona=true)), esa ES la propiedad del link aunque el Postgres no la haya marcado: reconocela vos, ponela primera y marcala, explicando por que la reconociste (mismo precio exacto y misma calle/zona que el aviso). Si es_del_link=true y ademas los datos duros coinciden, ambos coinciden y listo. Lo que NUNCA podes hacer es marcar como la del link una fila sin respaldo de hechos duros (sin precio igual y sin calle igual): esas son solo comparables. El resto son comparables.\n3. Toma TODOS los datos del registro interno (fotos, public_url, asesor, etc.), nunca del scraping. No respondas hasta cerrar los 3 pasos. Si NINGUNA fila trae es_del_link=true y TAMPOCO hay una que cumpla la regla de datos duros de la DOBLE VERIFICACION, entonces la propiedad del aviso NO esta en el stock: no marques ninguna como la del link, mostra igual las comparables (busqueda_exitosa:true) y aclara en el analisis que la propiedad del link no figura en el stock y estas son similares. Solo si la herramienta no devuelve NADA, devolve busqueda_exitosa:false y propiedades:[].\n\n#### CASO B - Input sin URL (busqueda por criterios)\nLlama directamente a CARTERA_PROPIEDADES pasando los criterios. La herramienta YA filtra, calcula el porcentaje de coincidencia (match_pct), ordena y devuelve el TOP 10 listo. Tu unico trabajo es FORMATEAR esas propiedades tal cual.\n\n### REGLAS DE INTERPRETACION (MERCADO LOCAL)\n- \"Espacios aéreos\": Cuando el cliente o la búsqueda menciona esto, se refiere a lugares descubiertos como balcón, terraza o patio.\n- \"En altura\": Referido a departamentos, significa buscar un piso alto (del 5to piso en adelante).\n- \"Ambientes vs Dormitorios\": La cantidad de dormitorios es siempre uno menos que la cantidad de ambientes (ejemplo: 4 ambientes = 3 dormitorios).\n\n### COMO LLENAR LOS PARAMETROS DE CARTERA_PROPIEDADES\n- prop_type: tipo exacto solo si el cliente lo dice (Departamento, Casa, Lote, etc.), sino vacio. OJO: un PH (propiedad horizontal) se llama 'Condo' en el stock.\n- status_val: Venta, Alquiler o Temporary rent.\n- max_price y currency: presupuesto y moneda (USD por defecto). SOLO si el CLIENTE lo pide. Si el origen es un LINK, PROHIBIDO usar el precio del aviso como max_price (es solo referencia): dejalo VACIO.\n- rooms: cantidad de ambientes.\n- zona: barrio, zona o calle.\n- caracteristicas: amenities o condiciones (pileta, cochera, estrenar, balcon, etc.).\nSi un dato NO fue mencionado por el cliente, dejalo vacio. Nunca inventes filtros que no pidio.\n\n### REGLAS (CRITICAS)\n1. Devolve TODAS las propiedades que entrega la herramienta (hasta 10). NO inventes, agregues ni quites propiedades. Respeta el orden que trae la herramienta, con UNA sola excepcion: si por la DOBLE VERIFICACION identificaste la propiedad del link en una fila que no vino primera, movela al primer lugar. Ninguna otra reordenacion esta permitida. CANTIDAD EXACTA: propiedades[] tiene que tener EXACTAMENTE la misma cantidad de objetos que filas devolvio la herramienta, ni una mas ni una menos. Nunca repitas una fila, ni la partas en dos, ni la dupliques cambiandole el precio. Antes de responder conta las filas que te dio la herramienta y conta los objetos de propiedades[]: si no dan igual, corregilo.\n2. coincidencia_pct = el match_pct EXACTO de CADA propiedad. Cada una tiene el suyo: NO pongas el mismo valor a todas, NO lo redondees a 100,\nNO lo estimes. Copialo literal del registro.\n3. NO descartes ni priorices por precio: la lista ya trae todo el rango; el cliente decide.\n4. cantidad_retornada = la cantidad REAL de objetos en propiedades[].\n5. Honestidad total: si la herramienta no trajo nada, busqueda_exitosa:false y propiedades:[]. Prohibido inventar o alucinar datos.\n\n### EXTRACCION DE DATOS (solo de CARTERA_PROPIEDADES, nunca de la URL ni de suposiciones)\n- Coincidencia: coincidencia_pct = match_pct (numero 0-100).\n- Propiedad del link (CASO A): una fila es la del aviso si (a) trae es_del_link=true, O (b) por la DOBLE VERIFICACION cumple los datos duros (coincide_precio=true y ademas calle o ambientes+zona). Marca UNA sola. En su analisis_experto.justificacion arranca EXACTAMENTE con \"🔗 ESTA ES LA PROPIEDAD DEL LINK — las siguientes son comparables.\" y ponela primera. NUNCA llames \"la del link\" ni \"coincidencia exacta\" a una fila que no cumpla (a) ni (b), aunque sea la primera o la de mayor porcentaje de coincidencia. CHEQUEO DE COHERENCIA (con cabeza) antes de marcar la del link: confirma que la fila con es_del_link=true tenga sentido como la del aviso: misma tipologia, misma zona y ambientes iguales (o mas/menos 1). Sobre el precio: si el aviso y el registro son de la MISMA operacion (ambos Venta o ambos Alquiler), el precio de referencia del link debe ser IGUAL o variar muy poco respecto al del registro; si difiere muchisimo, NO la trates como la del link (probable error) y pasala a comparable. EXCEPCION: si el aviso es de una operacion y el registro de otra (aviso \"venta o alquiler\" que en el stock figura como Venta, o al reves), es la MISMA propiedad y el precio VA a ser muy distinto (alquiler mensual vs precio de venta): ahi el precio distinto es NORMAL y NO invalida la marca; lo que confirma es la coincidencia de direccion + ambientes + zona.\n- Identificacion: direccion (usa SIEMPRE la direccion publica 'fake_address', ej: 'Los Chañares al 800'; NUNCA 'real_address' que expone numeración exacta) y disposicion.\n- Costos: precio, moneda y expensas (expenses).\n- Filtros Excluyentes Críticos: \n  * apto_mascotas = mapear directamente de 'pets_allowed' (true/false).\n  * apto_profesional = mapear directamente de 'is_professional' (true/false). El campo 'is_professional_origen' dice de donde salio el dato: \"ficha\" (cargado como tal en el sistema) o \"descripcion\" (lo dice el texto del aviso). En los dos casos va true; si el origen es \"descripcion\", al mencionarlo aclara que figura en la descripcion de la publicacion.\n  * antiguedad = valor numérico de 'age'. Si es 0, interpretar como \"A estrenar\".\n- Espacios y Superficies: \n  * ambientes = room_amount, dormitorios = suite_amount, baños = bathroom_amount.\n  * toilettes = toilet_amount, livings = living_amount, plantas = floors_amount (util sobre todo en PH, casas y duplex).\n  * sup_cubierta = roofed_surface, sup_descubierta = unroofed_surface, sup_total = total_surface.\n  * cocheras_totales = parking_lot_amount, cocheras_cubiertas = covered_parking, cocheras_descubiertas = uncovered_parking.\n- Apto credito: sale de 'credit_eligible'. Si es \"Si\" o \"Eligible\" = true; si es \"Not eligible\" o \"No\" = false; si es \"Not specified\" o ausente = null.\n- Ubicacion en el edificio: piso = valor de 'floor' tal cual (ej \"3\"); si esta vacio o ausente, cadena vacia. orientacion = traducir 'orientation' al espanol (North=Norte, South=Sur, East=Este, West=Oeste; combinaciones ej South-East=Sudeste, North-West=Noroeste); si esta vacio, cadena vacia. estado = traducir 'property_condition' al espanol (Excellent=Excelente, Very good=Muy bueno, Good=Bueno, Regular=Regular, To renovate/To recycle=A reciclar, Under construction=En construccion); si esta vacio o ausente, cadena vacia.\n- Destacados de la descripcion: leyendo UNICAMENTE el texto de 'description', extrae de 3 a 6 puntos de venta reales y concretos para destacados_descripcion (ej: \"Muy luminoso\", \"Living con salida a balcon y vista abierta\", \"Cocina independiente con ventilacion\", \"Placard de piso a techo\", \"Solo 3 unidades por piso\", \"Edificio con encargado\"). Reglas: en espanol, frases cortas, SOLO lo que dice el aviso, PROHIBIDO inventar, suponer o exagerar. Si 'description' esta vacia, devolve lista vacia [].\n- Valor agregado: extrae la lista plana de 'amenities_and_services' para nutrir los detalles técnicos de la propiedad de forma limpia.\n- Multimedia: primer link de 'images'; si está vacío, usa 'cover_photo' dentro de tokko_data.\n- Acceso: public_url dentro de tokko_data.\n- Disponibilidad (campo 'situation'): traducir asi -> Empty = \"Desocupada, disponible para entrar\"; In use = \"Habitada\"; Owner = \"Habitada por el propietario\"; Tenant = \"Alquilada, con inquilino\"; Construction company = \"En obra\". Si viene \"---\", vacio o ausente, cadena vacia. NUNCA lo deduzcas de otra cosa.\n- Video (campo 'video_url'): copialo tal cual en enlaces.video. Si viene vacio o null, cadena vacia.\n- Codigo de referencia (campo 'reference_code'): copialo tal cual en codigo_referencia. Si viene vacio, cadena vacia.\n- Condiciones y requisitos de la operacion (condiciones_y_requisitos): lista de frases cortas en espanol, SOLO con lo que este explicito en los datos:\n  1. Si 'transaction_requirements' trae texto, incluilo resumido (ej: \"Seguro de caucion\", \"Contrato temporal de 6 meses minimo\", \"Hipoteca existente a cancelar antes de la escritura\", \"Primera escritura\", \"Servicios e impuestos a cargo del inquilino\").\n  2. Si el texto de 'description' menciona condiciones concretas de la operacion, sumalas (ej: \"Apto profesional\", \"Apto credito\", \"Se entrega amoblado\", \"Acepta permuta\", \"Entrega inmediata\", requisitos de garantia o caucion, restricciones de uso).\n  PROHIBIDO inventar, suponer o completar con conocimiento general del mercado. Si no hay nada explicito, devolve lista vacia [].\n- Asesor (campo assigned_agent): nombre_asesor = name, email_asesor = email, celular_asesor = cellphone. Si falta alguno, cadena vacía.\n\n### ANALISIS CRITICO (por cada opcion)\n- Por que la sugeris para este cliente.\n- En que varia respecto a lo pedido (ej: balcon mas chico pero mejor zona).\n- Si el origen de la búsqueda es un LINK (CASO A), utiliza el precio de referencia de la publicación original únicamente aquí, para comparar y argumentar por qué esta opción es competitiva.\n- Tu recomendacion experta.\n\n### FORMATO DE SALIDA\nResponde EXCLUSIVAMENTE en este formato JSON, sin texto introductorio ni explicaciones fuera del bloque de código:\n\n{\n  \"busqueda_exitosa\": true,\n  \"cantidad_retornada\": 0,\n  \"origen_busqueda\": \"url | criterios\",\n  \"propiedades\": [\n    {\n      \"coincidencia_pct\": 0,\n      \"info_general\": {\n        \"direccion\": \"\",\n        \"precio\": 0,\n        \"moneda\": \"USD | ARS\",\n        \"expensas\": 0,\n        \"ambientes\": 0,\n        \"dormitorios\": 0,\n        \"baños\": 0,\n        \"disposicion\": \"\",\n        \"piso\": \"\",\n        \"orientacion\": \"\",\n        \"estado\": \"\",\n        \"antiguedad\": 0,\n        \"apto_credito\": null,\n        \"apto_mascotas\": false,\n        \"apto_profesional\": false,\n        \"disponibilidad\": \"\",\n        \"codigo_referencia\": \"\"\n      },\n      \"espacios_y_superficies\": {\n        \"superficie_cubierta_m2\": 0,\n        \"superficie_descubierta_m2\": 0,\n        \"superficie_total_m2\": 0,\n        \"cocheras_totales\": 0,\n        \"cocheras_cubiertas\": 0,\n        \"cocheras_descubiertas\": 0,\n        \"toilettes\": 0,\n        \"livings\": 0,\n        \"plantas\": 0\n      },\n      \"detalles_tecnicos\": {\n        \"amenities_y_servicios\": [],\n        \"destacados_descripcion\": [],\n        \"condiciones_y_requisitos\": []\n      },\n      \"analisis_experto\": {\n        \"justificacion\": \"\",\n        \"diferencias_con_pedido\": \"\",\n        \"valor_destacado\": \"\"\n      },\n      \"enlaces\": {\n        \"foto_principal\": \"\",\n        \"ficha_completa\": \"\",\n        \"video\": \"\"\n      },\n      \"asesor\": {\n        \"nombre_asesor\": \"\",\n        \"email_asesor\": \"\",\n        \"celular_asesor\": \"\"\n      }\n    }\n  ]\n}"
+    }
+   },
+   "type": "@n8n/n8n-nodes-langchain.agent",
+   "typeVersion": 3.1,
+   "position": [
+    1280,
+    1632
+   ],
+   "id": "b9dd4a69-0649-49e9-a20e-1df1110f8f36",
+   "name": "AI Agent"
+  },
+  {
+   "parameters": {
+    "model": {
+     "__rl": true,
+     "value": "gpt-5.4-mini-2026-03-17",
+     "mode": "list",
+     "cachedResultName": "gpt-5.4-mini-2026-03-17"
+    },
+    "builtInTools": {},
+    "options": {}
+   },
+   "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+   "typeVersion": 1.3,
+   "position": [
+    1216,
+    1856
+   ],
+   "id": "2efd660d-4d0f-4899-a8a0-9c9e835a41de",
+   "name": "OpenAI Chat Model",
+   "credentials": {
+    "openAiApi": {
+     "id": "sELIerYlyCiF7cB2",
+     "name": "OPENAI_PRISMA"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "sessionIdType": "customKey",
+    "sessionKey": "={{ $('extraer_agency_id').item.json.extracted_conversation_id }}_buffer",
+    "contextWindowLength": 25
+   },
+   "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+   "typeVersion": 1.3,
+   "position": [
+    1424,
+    1856
+   ],
+   "id": "63abbc66-a768-4250-a6e0-809686d5a3fb",
+   "name": "Simple Memory"
+  },
+  {
+   "parameters": {
+    "operation": "executeQuery",
+    "query": "WITH q AS (\n  SELECT\n    '{{ ($fromAI('prop_type', 'Tipo EXACTO de propiedad solo si el cliente lo especifica. Valores validos: Departamento, Casa, Lote, Condo, Bussiness Premises, Oficina, Garage, Weekend House, Hotel, Warehouse. (Local/comercial = Bussiness Premises u Oficina; un PH del aviso = Condo). Vacio si no lo menciona.', 'string') || '').replace(/[^a-zA-Z ]/g, '').trim() }}' AS p_type,\n    '{{ ($fromAI('status_val', 'Tipo de operacion: Venta, Alquiler o Temporary rent. Vacio si no se menciona.', 'string') || '').replace(/[^a-zA-Z ]/g, '').trim() }}' AS p_status,\n    NULLIF('{{ ($fromAI('max_price', 'Presupuesto maximo del cliente, solo el numero entero sin puntos ni comas. Vacio si no hay presupuesto.', 'string') || '').replace(/[^0-9]/g, '') }}', '')::numeric AS p_maxprice,\n    '{{ (($fromAI('currency', 'Moneda del presupuesto: USD o ARS. Si no se aclara, USD.', 'string') || 'USD').toUpperCase().replace(/[^A-Z]/g, '')) || 'USD' }}' AS p_currency,\n    NULLIF('{{ ($fromAI('rooms', 'Cantidad de ambientes que pide el cliente, solo el numero. Vacio si no lo menciona.', 'string') || '').replace(/[^0-9]/g, '') }}', '')::int AS p_rooms,\n    '{{ ($fromAI('zona', 'Barrio, zona o calle que pide el cliente, sin articulos ni preposiciones. Ej: belgrano, palermo, arcos. Vacio si no especifica.', 'string') || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9 ]/g, '').trim() }}' AS p_zona,\n    '{{ ($fromAI('caracteristicas', 'Palabras clave de caracteristicas o amenities en espanol separadas por espacio, sin articulos. Ej: pileta cochera estrenar luminoso balcon. Vacio si no menciona ninguna.', 'string') || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9 ]/g, '').trim().replace(/\\s+/g, ' | ') }}' AS p_kw,\n    NULLIF('{{ $('Generar_Embedding').item.json && $('Generar_Embedding').item.json.embedding && $('Generar_Embedding').item.json.embedding.values ? JSON.stringify($('Generar_Embedding').item.json.embedding.values) : '' }}', '')::vector(768) AS p_vec,\n    NULLIF('{{ $('Preparar_Busqueda').item.json.ref_price }}', '')::numeric AS ref_price,\n    '{{ $('Preparar_Busqueda').item.json.ref_currency }}' AS ref_currency,\n    NULLIF('{{ $('Preparar_Busqueda').item.json.ref_rooms }}', '')::int AS ref_rooms,\n    '{{ $('Preparar_Busqueda').item.json.ref_zona }}' AS ref_zona,\n    '{{ $('Preparar_Busqueda').item.json.ref_addr }}' AS ref_addr,\n    ('{{ $('Preparar_Busqueda').item.json.ref_from_link }}' = 'true') AS from_link\n)\nSELECT\n  p.id, p.tokko_id, p.agency_id, p.title, p.description, p.price, p.currency,\n  p.property_type, p.status, p.address, p.city, p.bedrooms, p.bathrooms,\n  p.covered_area, p.total_area, p.images,\n  (p.tokko_data->>'room_amount')::int AS ambientes,\n  (p.tokko_data->>'suite_amount')::int AS dormitorios,\n  (p.tokko_data->>'bathroom_amount')::int AS banos,\n  CASE\n    WHEN ( (CASE WHEN q.p_zona <> '' THEN 35 ELSE 0 END)\n         + (CASE WHEN q.p_rooms IS NOT NULL THEN 30 ELSE 0 END)\n         + (CASE WHEN q.p_vec IS NOT NULL THEN 25 ELSE 0 END)\n         + (CASE WHEN q.p_kw <> '' THEN 10 ELSE 0 END) ) = 0 THEN 100\n    ELSE round(\n      ( (CASE WHEN q.p_zona <> '' AND (\n              btrim(regexp_replace(translate(lower(COALESCE(p.city,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || q.p_zona || '%'\n           OR btrim(regexp_replace(translate(lower(COALESCE(p.address,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || q.p_zona || '%'\n         ) THEN 35 ELSE 0 END)\n      + (CASE WHEN q.p_rooms IS NOT NULL THEN\n           (CASE WHEN (p.tokko_data->>'room_amount')::int = q.p_rooms THEN 30\n                 WHEN abs((p.tokko_data->>'room_amount')::int - q.p_rooms) = 1 THEN 15 ELSE 0 END)\n           ELSE 0 END)\n      + (CASE WHEN q.p_vec IS NOT NULL\n              THEN 25 * GREATEST(0, LEAST(1, 1 - (p.embedding <=> q.p_vec))) ELSE 0 END)\n      + (CASE WHEN q.p_kw <> '' AND\n              to_tsvector('simple', translate(lower(COALESCE(p.description,'') || ' ' || COALESCE(p.title,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'))\n              @@ to_tsquery('simple', q.p_kw)\n           THEN 10 ELSE 0 END)\n      )::numeric\n      / ( (CASE WHEN q.p_zona <> '' THEN 35 ELSE 0 END)\n        + (CASE WHEN q.p_rooms IS NOT NULL THEN 30 ELSE 0 END)\n        + (CASE WHEN q.p_vec IS NOT NULL THEN 25 ELSE 0 END)\n        + (CASE WHEN q.p_kw <> '' THEN 10 ELSE 0 END) ) * 100 )\n  END AS match_pct,\n  ( q.from_link\n    AND q.ref_rooms IS NOT NULL AND (p.tokko_data->>'room_amount')::int = q.ref_rooms\n    AND ( q.ref_zona = '' OR btrim(regexp_replace(translate(lower(COALESCE(p.city,'') || ' ' || COALESCE(p.address,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || btrim(regexp_replace(translate(q.ref_zona,'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) || '%' )\n    AND (\n         ( q.ref_price IS NOT NULL AND p.price = q.ref_price AND p.currency = q.ref_currency )\n      OR ( q.ref_addr <> '' AND btrim(regexp_replace(translate(q.ref_addr,'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || btrim(regexp_replace(translate(lower(COALESCE(p.address,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) || '%' )\n    )\n  ) AS es_del_link,\n  ( q.from_link AND q.ref_price IS NOT NULL AND p.price = q.ref_price AND p.currency = q.ref_currency ) AS coincide_precio,\n  ( q.from_link AND q.ref_addr <> '' AND btrim(regexp_replace(translate(q.ref_addr,'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || btrim(regexp_replace(translate(lower(COALESCE(p.address,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) || '%' ) AS coincide_calle,\n  ( q.from_link AND q.ref_rooms IS NOT NULL AND (p.tokko_data->>'room_amount')::int = q.ref_rooms ) AS coincide_ambientes,\n  ( q.from_link AND q.ref_zona <> '' AND btrim(regexp_replace(translate(lower(COALESCE(p.city,'') || ' ' || COALESCE(p.address,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || btrim(regexp_replace(translate(q.ref_zona,'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) || '%' ) AS coincide_zona,\n  q.ref_price AS precio_link, q.ref_currency AS moneda_link, q.ref_addr AS calle_link, q.ref_zona AS zona_link, q.ref_rooms AS ambientes_link,\njsonb_build_object(\n    'operations',         p.tokko_data -> 'operations',\n    'type',               p.tokko_data -> 'type',\n    'room_amount',        p.tokko_data -> 'room_amount',\n    'suite_amount',       p.tokko_data -> 'suite_amount',\n    'bathroom_amount',    p.tokko_data -> 'bathroom_amount',\n    'roofed_surface',     p.tokko_data -> 'roofed_surface',\n    'total_surface',      p.tokko_data -> 'total_surface',\n    'semiroofed_surface', p.tokko_data -> 'semiroofed_surface',\n    \n    -- [NUEVO] Superficie descubierta real (parque, patio, terraza libre)\n    'unroofed_surface',   p.tokko_data -> 'unroofed_surface', \n    \n    -- [NUEVO] Antigüedad de la edificación\n    'age',                p.tokko_data -> 'age', \n    \n    'fake_address',       p.tokko_data -> 'fake_address',\n    'location',           p.tokko_data -> 'location',\n    'floor',              p.tokko_data -> 'floor',\n    'publication_title',  p.tokko_data -> 'publication_title',\n    'description',        p.tokko_data -> 'description',\n    'expenses',           p.tokko_data -> 'expenses',\n    \n    -- [NUEVO] Apertura de cocheras para evitar ambigüedades\n    'parking_lot_amount', p.tokko_data -> 'parking_lot_amount',\n    'covered_parking',    p.tokko_data -> 'covered_parking_lot',\n    'uncovered_parking',  p.tokko_data -> 'uncovered_parking_lot',\n    \n    'disposition',        p.tokko_data -> 'disposition',\n    'orientation',        p.tokko_data -> 'orientation',\n    'property_condition', p.tokko_data -> 'property_condition',\n    'credit_eligible',    p.tokko_data -> 'credit_eligible',\n    'geo_lat',            p.tokko_data -> 'geo_lat',\n    'geo_long',           p.tokko_data -> 'geo_long',\n    'public_url',         p.tokko_data -> 'public_url',\n    'real_address',       p.tokko_data -> 'real_address',\n    'development_tags',   p.tokko_data -> 'development' -> 'tags',\n    \n    -- [NUEVO] Extracción directa de todos los tags como lista plana de strings\n    -- Esto simplifica drásticamente la lectura del LLM o del motor de búsqueda\n    'amenities_and_services', (\n         SELECT jsonb_agg(tag->>'name') \n         FROM jsonb_array_elements(COALESCE(p.tokko_data -> 'tags', '[]'::jsonb)) tag\n    ),\n    \n    -- [NUEVO] Flags booleanos rápidos para tus filtros más preguntados\n    'pets_allowed', EXISTS (\n         SELECT 1 FROM jsonb_to_recordset(COALESCE(p.tokko_data -> 'tags', '[]'::jsonb)) AS x(name text) \n         WHERE x.name = 'Pets allowed'\n    ),\n    'is_professional', (\n         EXISTS (\n           SELECT 1 FROM jsonb_to_recordset(COALESCE(p.tokko_data -> 'tags', '[]'::jsonb)) AS x(name text)\n           WHERE x.name = 'Work able'\n         )\n         OR p.description ILIKE '%apto profesional%'\n         OR p.description ILIKE '%apto profesionales%'\n         OR p.description ILIKE '%uso profesional%'\n    ),\n    'is_professional_origen', CASE\n         WHEN EXISTS (\n           SELECT 1 FROM jsonb_to_recordset(COALESCE(p.tokko_data -> 'tags', '[]'::jsonb)) AS x(name text)\n           WHERE x.name = 'Work able'\n         ) THEN 'ficha'\n         WHEN p.description ILIKE '%apto profesional%'\n           OR p.description ILIKE '%apto profesionales%'\n           OR p.description ILIKE '%uso profesional%' THEN 'descripcion'\n         ELSE ''\n    END,\n\n    -- [NUEVO] Estado de ocupacion, requisitos de la operacion y ambientes extra\n    'situation',                p.tokko_data -> 'situation',\n    'transaction_requirements', p.tokko_data -> 'transaction_requirements',\n    'toilet_amount',            p.tokko_data -> 'toilet_amount',\n    'living_amount',            p.tokko_data -> 'living_amount',\n    'floors_amount',            p.tokko_data -> 'floors_amount',\n    'reference_code',           p.tokko_data -> 'reference_code',\n\n    -- [NUEVO] Primer video publicado de la propiedad (si tiene)\n    'video_url', (\n      SELECT v ->> 'url'\n      FROM jsonb_array_elements(COALESCE(p.tokko_data -> 'videos', '[]'::jsonb)) AS v\n      WHERE COALESCE(v ->> 'url', '') <> ''\n      ORDER BY v ->> 'order'\n      LIMIT 1\n    ),\n\n    'cover_photo', (\n      SELECT photo FROM jsonb_array_elements(COALESCE(p.tokko_data -> 'photos', '[]'::jsonb)) AS photo\n      WHERE (photo ->> 'is_front_cover')::boolean = true LIMIT 1\n    )\n) AS tokko_data,\n  p.assigned_agent, p.assigned_agent_id\nFROM properties p CROSS JOIN q\nWHERE\n  p.agency_id = '{{ $('extraer_agency_id').item.json.extracted_agency_id }}'::uuid\n  AND p.is_active = TRUE\n  AND ( q.p_type = '' OR replace(lower(p.property_type), 'ss', 's') = replace(lower(q.p_type), 'ss', 's') )\n  AND ( q.p_status = '' OR q.from_link OR p.status = q.p_status )\n  AND ( q.p_maxprice IS NULL OR ( p.price > 0 AND p.price <= q.p_maxprice * 1.20 AND p.currency = q.p_currency ) )\n  AND ( q.p_rooms IS NULL OR (p.tokko_data->>'room_amount')::int BETWEEN q.p_rooms - 1 AND q.p_rooms + 1 )\nORDER BY es_del_link DESC, coincide_precio DESC, coincide_calle DESC, match_pct DESC, (p.embedding <=> q.p_vec) ASC NULLS LAST, p.created_at DESC NULLS LAST\nLIMIT 10;",
+    "options": {}
+   },
+   "type": "n8n-nodes-base.postgresTool",
+   "typeVersion": 2.6,
+   "position": [
+    1600,
+    1856
+   ],
+   "id": "c3ccbb85-fa7a-4c03-b067-0ddb43acf547",
+   "name": "CARTERA_PROPIEDADES",
+   "credentials": {
+    "postgres": {
+     "id": "Vje6BCZn5QY9nNWy",
+     "name": "MEMORIA_PRISMA"
+    }
+   }
+  },
+  {
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose",
+      "version": 2
+     },
+     "conditions": [
+      {
+       "id": "cond1",
+       "leftValue": "={{ $json.extracted_url }}",
+       "rightValue": "",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty",
+        "singleValue": true
+       }
+      }
+     ],
+     "combinator": "and"
+    },
+    "options": {}
+   },
+   "id": "6977a4da-e0ae-4ab8-aa88-6c542bff7ee1",
+   "name": "Tiene_Link",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.2,
+   "position": [
+    320,
+    1632
+   ]
+  },
+  {
+   "parameters": {
+    "method": "POST",
+    "url": "http://agencia_vakdor_acm-extractor:80/extract",
+    "sendHeaders": true,
+    "headerParameters": {
+     "parameters": [
+      {
+       "name": "x-extractor-secret",
+       "value": "Leito3983356213."
+      }
+     ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ JSON.stringify({ url: $('extraer_agency_id').first().json.extracted_url }) }}",
+    "options": {
+     "timeout": 120000
+    }
+   },
+   "id": "a3cef09a-8701-49e0-b454-4a830313aa67",
+   "name": "Extraer_Web",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.2,
+   "position": [
+    544,
+    1552
+   ],
+   "retryOnFail": true,
+   "onError": "continueRegularOutput"
+  },
+  {
+   "parameters": {
+    "jsCode": "const base = $('extraer_agency_id').first().json;\nconst j = $json || {};\nconst scraped = (j && j.sujeto) ? j : null;\nlet cq = base.clean_query || 'propiedad';\nlet extra = '';\nconst clean = (t) => (t == null ? '' : String(t)).toLowerCase().split(\"'\").join('').split('\"').join('').split(';').join('').split(' ').filter(Boolean).join(' ');\nlet ref = { ref_from_link: false, ref_price: '', ref_currency: '', ref_rooms: '', ref_zona: '', ref_addr: '' };\nif (base.extracted_url && scraped) {\n  const s = scraped.sujeto || {};\n  const amen = s.amenidades ? Object.keys(s.amenidades).join(', ') : '';\n  const parts = [s.tipo_propiedad, s.barrio, s.direccion, (s.dormitorios != null ? s.dormitorios + ' dormitorios' : ''), (s.m2_cubiertos ? s.m2_cubiertos + ' m2' : ''), amen];\n  cq = parts.filter(Boolean).join(' ').trim() || cq;\n  extra = '\\n\\n[DATOS DE LA PROPIEDAD DEL LINK - para identificarla en el stock; el precio es SOLO referencia, NO presupuesto]: ' + JSON.stringify(scraped);\n  ref.ref_from_link = true;\n  ref.ref_price = (scraped.precio != null && !isNaN(Number(scraped.precio))) ? String(Math.round(Number(scraped.precio))) : '';\n  ref.ref_currency = (clean(scraped.moneda).toUpperCase()) || 'USD';\n  ref.ref_rooms = (s.dormitorios != null && !isNaN(Number(s.dormitorios))) ? String(Number(s.dormitorios) + 1) : '';\n  ref.ref_zona = clean(s.barrio);\n  ref.ref_addr = clean(s.direccion);\n}\nreturn [{ json: Object.assign({}, base, { clean_query: cq, agent_extra: extra, scraped: scraped || null }, ref), pairedItem: { item: 0 } }];"
+   },
+   "id": "3218a256-9460-478c-b31b-3fec6eef76dc",
+   "name": "Preparar_Busqueda",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    768,
+    1632
+   ]
+  }
+ ],
+ "connections": {
+  "When Executed by Another Workflow": {
+   "main": [
+    [
+     {
+      "node": "extraer_agency_id",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Generar_Embedding": {
+   "main": [
+    [
+     {
+      "node": "AI Agent",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "OpenAI Chat Model": {
+   "ai_languageModel": [
+    [
+     {
+      "node": "AI Agent",
+      "type": "ai_languageModel",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Simple Memory": {
+   "ai_memory": [
+    [
+     {
+      "node": "AI Agent",
+      "type": "ai_memory",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "CARTERA_PROPIEDADES": {
+   "ai_tool": [
+    [
+     {
+      "node": "AI Agent",
+      "type": "ai_tool",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "extraer_agency_id": {
+   "main": [
+    [
+     {
+      "node": "Tiene_Link",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Tiene_Link": {
+   "main": [
+    [
+     {
+      "node": "Extraer_Web",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Preparar_Busqueda",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Extraer_Web": {
+   "main": [
+    [
+     {
+      "node": "Preparar_Busqueda",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Preparar_Busqueda": {
+   "main": [
+    [
+     {
+      "node": "Generar_Embedding",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1",
+  "availableInMCP": true,
+  "binaryMode": "separate"
+ },
+ "staticData": null,
+ "meta": {
+  "templateCredsSetupCompleted": true
+ },
+ "nodeGroups": [],
+ "pinData": {},
+ "versionId": "fa009bc9-02a1-4b23-b553-32d871d3c114",
+ "activeVersionId": "fa009bc9-02a1-4b23-b553-32d871d3c114",
+ "versionCounter": 534,
+ "triggerCount": 0,
+ "sourceWorkflowId": null,
+ "shared": [
+  {
+   "updatedAt": "2026-04-25T12:54:02.155Z",
+   "createdAt": "2026-04-25T12:54:02.155Z",
+   "role": "workflow:owner",
+   "workflowId": "NQtasQlz0N86Oxa6",
+   "projectId": "kHDUN61HinE2WNyr",
+   "project": {
+    "updatedAt": "2026-01-10T15:03:38.251Z",
+    "createdAt": "2026-01-10T15:02:52.885Z",
+    "id": "kHDUN61HinE2WNyr",
+    "name": "Leo Osterrietch <osterrietchleonardo@vakdor.com>",
+    "type": "personal",
+    "icon": null,
+    "description": null,
+    "customTelemetryTags": [],
+    "creatorId": "9b194ba8-440e-4a8a-b5ba-e6a5ba26f7b6"
+   }
+  }
+ ],
+ "tags": [],
+ "activeVersion": {
+  "updatedAt": "2026-08-07T19:38:20.413Z",
+  "createdAt": "2026-08-07T19:38:20.413Z",
+  "versionId": "fa009bc9-02a1-4b23-b553-32d871d3c114",
+  "workflowId": "NQtasQlz0N86Oxa6",
+  "nodes": [
+   {
+    "parameters": {
+     "inputSource": "passthrough"
+    },
+    "id": "0afede6e-6268-4e8f-a54c-40e2b8914028",
+    "typeVersion": 1.1,
+    "name": "When Executed by Another Workflow",
+    "type": "n8n-nodes-base.executeWorkflowTrigger",
+    "position": [
+     -128,
+     1632
+    ]
+   },
+   {
+    "parameters": {
+     "jsCode": "for (const item of $input.all()) {\n  const text = item.json.query || \"\";\n\n  const agencyMatch = text.match(/agency_id:([a-f0-9-]{36})/i);\n  item.json.extracted_agency_id = agencyMatch ? agencyMatch[1] : \"default_session\";\n\n  const conversationMatch = text.match(/conversation_id:([a-f0-9-]{36})/i);\n  item.json.extracted_conversation_id = conversationMatch ? conversationMatch[1] : \"default_conversation\";\n\n  const urlMatch = text.match(/https?:\\/\\/[^\\s]+/i);\n  item.json.extracted_url = urlMatch ? urlMatch[0].replace(/[.,;:]+$/, \"\") : \"\";\n\n  let clean = text\n    .replace(/agency_id:[a-f0-9-]{36}/ig, \"\")\n    .replace(/conversation_id:[a-f0-9-]{36}/ig, \"\")\n    .replace(/https?:\\/\\/[^\\s]+/ig, \"\")\n    .replace(/\\s+/g, \" \")\n    .trim();\n  if (clean.length < 3) clean = (text.trim() || \"propiedad\");\n  item.json.clean_query = clean;\n}\n\nreturn $input.all();"
+    },
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     96,
+     1632
+    ],
+    "id": "1dcb5ac1-32d7-4e2c-a433-5859cd255e5a",
+    "name": "extraer_agency_id",
+    "retryOnFail": true,
+    "maxTries": 3,
+    "waitBetweenTries": 2000
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+     "authentication": "genericCredentialType",
+     "genericAuthType": "httpQueryAuth",
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={{ JSON.stringify({ content: { parts: [{ text: $json.clean_query }] }, taskType: 'RETRIEVAL_QUERY', outputDimensionality: 768 }) }}",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.2,
+    "position": [
+     992,
+     1632
+    ],
+    "id": "8d43131b-5a27-41a8-87c5-5c233a4f85c7",
+    "name": "Generar_Embedding",
+    "credentials": {
+     "httpQueryAuth": {
+      "id": "9sWQDmKFONtGTVQ7",
+      "name": "Query Auth account"
+     }
+    },
+    "onError": "continueRegularOutput"
+   },
+   {
+    "parameters": {
+     "promptType": "define",
+     "text": "={{ $('Preparar_Busqueda').first().json.query }}{{ $('Preparar_Busqueda').first().json.agent_extra }}",
+     "options": {
+      "systemMessage": "=### ROL\nSos un Especialista en Analisis Tecnico de Cartera Inmobiliaria. Procesas los datos de CARTERA_PROPIEDADES para el Agente Principal, con precision tecnica.\n\n### FLUJO DE TRABAJO\nIdentifica primero el tipo de input.\n\n#### CASO A - Input con URL de propiedad publicada\n1. Los datos de la propiedad del link YA vienen en tu input, en el bloque [DATOS DE LA PROPIEDAD DEL LINK] (tipo, direccion/zona, ambientes, m2, amenities, precio de referencia). Usalos directamente; NO llames ninguna herramienta para leer el link.\n2. Con esos datos llama a CARTERA_PROPIEDADES pasando zona, ambientes (rooms), tipo y caracteristicas. NUNCA pases max_price (el precio del aviso NO es el presupuesto del cliente; es solo referencia). Usa el precio de la publicación del link SOLO como parte de tu comparación final en el análisis experto, NUNCA para filtrar ni para el cálculo del % de coincidencia. Objetivo: traer la propiedad publicada si esta en el stock Y ADEMAS las similares, todas en propiedades[] ordenadas por coincidencia. DOBLE VERIFICACION (ni el Postgres ni vos deciden solos). La herramienta marca es_del_link=true cuando reconoce la propiedad del aviso en el stock y la devuelve primera: si viene, confirmala. Pero el Postgres puede fallar por un dato mal leido del aviso (por ejemplo el barrio), asi que CADA fila trae ademas datos duros de comparacion contra el link: coincide_precio, coincide_calle, coincide_ambientes, coincide_zona, y los valores del aviso (precio_link, moneda_link, calle_link, zona_link, ambientes_link). Usalos para razonar. Regla: si NINGUNA fila trae es_del_link=true pero hay una con coincide_precio=true y ademas (coincide_calle=true o (coincide_ambientes=true y coincide_zona=true)), esa ES la propiedad del link aunque el Postgres no la haya marcado: reconocela vos, ponela primera y marcala, explicando por que la reconociste (mismo precio exacto y misma calle/zona que el aviso). Si es_del_link=true y ademas los datos duros coinciden, ambos coinciden y listo. Lo que NUNCA podes hacer es marcar como la del link una fila sin respaldo de hechos duros (sin precio igual y sin calle igual): esas son solo comparables. El resto son comparables.\n3. Toma TODOS los datos del registro interno (fotos, public_url, asesor, etc.), nunca del scraping. No respondas hasta cerrar los 3 pasos. Si NINGUNA fila trae es_del_link=true y TAMPOCO hay una que cumpla la regla de datos duros de la DOBLE VERIFICACION, entonces la propiedad del aviso NO esta en el stock: no marques ninguna como la del link, mostra igual las comparables (busqueda_exitosa:true) y aclara en el analisis que la propiedad del link no figura en el stock y estas son similares. Solo si la herramienta no devuelve NADA, devolve busqueda_exitosa:false y propiedades:[].\n\n#### CASO B - Input sin URL (busqueda por criterios)\nLlama directamente a CARTERA_PROPIEDADES pasando los criterios. La herramienta YA filtra, calcula el porcentaje de coincidencia (match_pct), ordena y devuelve el TOP 10 listo. Tu unico trabajo es FORMATEAR esas propiedades tal cual.\n\n### REGLAS DE INTERPRETACION (MERCADO LOCAL)\n- \"Espacios aéreos\": Cuando el cliente o la búsqueda menciona esto, se refiere a lugares descubiertos como balcón, terraza o patio.\n- \"En altura\": Referido a departamentos, significa buscar un piso alto (del 5to piso en adelante).\n- \"Ambientes vs Dormitorios\": La cantidad de dormitorios es siempre uno menos que la cantidad de ambientes (ejemplo: 4 ambientes = 3 dormitorios).\n\n### COMO LLENAR LOS PARAMETROS DE CARTERA_PROPIEDADES\n- prop_type: tipo exacto solo si el cliente lo dice (Departamento, Casa, Lote, etc.), sino vacio. OJO: un PH (propiedad horizontal) se llama 'Condo' en el stock.\n- status_val: Venta, Alquiler o Temporary rent.\n- max_price y currency: presupuesto y moneda (USD por defecto). SOLO si el CLIENTE lo pide. Si el origen es un LINK, PROHIBIDO usar el precio del aviso como max_price (es solo referencia): dejalo VACIO.\n- rooms: cantidad de ambientes.\n- zona: barrio, zona o calle.\n- caracteristicas: amenities o condiciones (pileta, cochera, estrenar, balcon, etc.).\nSi un dato NO fue mencionado por el cliente, dejalo vacio. Nunca inventes filtros que no pidio.\n\n### REGLAS (CRITICAS)\n1. Devolve TODAS las propiedades que entrega la herramienta (hasta 10). NO inventes, agregues ni quites propiedades. Respeta el orden que trae la herramienta, con UNA sola excepcion: si por la DOBLE VERIFICACION identificaste la propiedad del link en una fila que no vino primera, movela al primer lugar. Ninguna otra reordenacion esta permitida. CANTIDAD EXACTA: propiedades[] tiene que tener EXACTAMENTE la misma cantidad de objetos que filas devolvio la herramienta, ni una mas ni una menos. Nunca repitas una fila, ni la partas en dos, ni la dupliques cambiandole el precio. Antes de responder conta las filas que te dio la herramienta y conta los objetos de propiedades[]: si no dan igual, corregilo.\n2. coincidencia_pct = el match_pct EXACTO de CADA propiedad. Cada una tiene el suyo: NO pongas el mismo valor a todas, NO lo redondees a 100,\nNO lo estimes. Copialo literal del registro.\n3. NO descartes ni priorices por precio: la lista ya trae todo el rango; el cliente decide.\n4. cantidad_retornada = la cantidad REAL de objetos en propiedades[].\n5. Honestidad total: si la herramienta no trajo nada, busqueda_exitosa:false y propiedades:[]. Prohibido inventar o alucinar datos.\n\n### EXTRACCION DE DATOS (solo de CARTERA_PROPIEDADES, nunca de la URL ni de suposiciones)\n- Coincidencia: coincidencia_pct = match_pct (numero 0-100).\n- Propiedad del link (CASO A): una fila es la del aviso si (a) trae es_del_link=true, O (b) por la DOBLE VERIFICACION cumple los datos duros (coincide_precio=true y ademas calle o ambientes+zona). Marca UNA sola. En su analisis_experto.justificacion arranca EXACTAMENTE con \"🔗 ESTA ES LA PROPIEDAD DEL LINK — las siguientes son comparables.\" y ponela primera. NUNCA llames \"la del link\" ni \"coincidencia exacta\" a una fila que no cumpla (a) ni (b), aunque sea la primera o la de mayor porcentaje de coincidencia. CHEQUEO DE COHERENCIA (con cabeza) antes de marcar la del link: confirma que la fila con es_del_link=true tenga sentido como la del aviso: misma tipologia, misma zona y ambientes iguales (o mas/menos 1). Sobre el precio: si el aviso y el registro son de la MISMA operacion (ambos Venta o ambos Alquiler), el precio de referencia del link debe ser IGUAL o variar muy poco respecto al del registro; si difiere muchisimo, NO la trates como la del link (probable error) y pasala a comparable. EXCEPCION: si el aviso es de una operacion y el registro de otra (aviso \"venta o alquiler\" que en el stock figura como Venta, o al reves), es la MISMA propiedad y el precio VA a ser muy distinto (alquiler mensual vs precio de venta): ahi el precio distinto es NORMAL y NO invalida la marca; lo que confirma es la coincidencia de direccion + ambientes + zona.\n- Identificacion: direccion (usa SIEMPRE la direccion publica 'fake_address', ej: 'Los Chañares al 800'; NUNCA 'real_address' que expone numeración exacta) y disposicion.\n- Costos: precio, moneda y expensas (expenses).\n- Filtros Excluyentes Críticos: \n  * apto_mascotas = mapear directamente de 'pets_allowed' (true/false).\n  * apto_profesional = mapear directamente de 'is_professional' (true/false). El campo 'is_professional_origen' dice de donde salio el dato: \"ficha\" (cargado como tal en el sistema) o \"descripcion\" (lo dice el texto del aviso). En los dos casos va true; si el origen es \"descripcion\", al mencionarlo aclara que figura en la descripcion de la publicacion.\n  * antiguedad = valor numérico de 'age'. Si es 0, interpretar como \"A estrenar\".\n- Espacios y Superficies: \n  * ambientes = room_amount, dormitorios = suite_amount, baños = bathroom_amount.\n  * toilettes = toilet_amount, livings = living_amount, plantas = floors_amount (util sobre todo en PH, casas y duplex).\n  * sup_cubierta = roofed_surface, sup_descubierta = unroofed_surface, sup_total = total_surface.\n  * cocheras_totales = parking_lot_amount, cocheras_cubiertas = covered_parking, cocheras_descubiertas = uncovered_parking.\n- Apto credito: sale de 'credit_eligible'. Si es \"Si\" o \"Eligible\" = true; si es \"Not eligible\" o \"No\" = false; si es \"Not specified\" o ausente = null.\n- Ubicacion en el edificio: piso = valor de 'floor' tal cual (ej \"3\"); si esta vacio o ausente, cadena vacia. orientacion = traducir 'orientation' al espanol (North=Norte, South=Sur, East=Este, West=Oeste; combinaciones ej South-East=Sudeste, North-West=Noroeste); si esta vacio, cadena vacia. estado = traducir 'property_condition' al espanol (Excellent=Excelente, Very good=Muy bueno, Good=Bueno, Regular=Regular, To renovate/To recycle=A reciclar, Under construction=En construccion); si esta vacio o ausente, cadena vacia.\n- Destacados de la descripcion: leyendo UNICAMENTE el texto de 'description', extrae de 3 a 6 puntos de venta reales y concretos para destacados_descripcion (ej: \"Muy luminoso\", \"Living con salida a balcon y vista abierta\", \"Cocina independiente con ventilacion\", \"Placard de piso a techo\", \"Solo 3 unidades por piso\", \"Edificio con encargado\"). Reglas: en espanol, frases cortas, SOLO lo que dice el aviso, PROHIBIDO inventar, suponer o exagerar. Si 'description' esta vacia, devolve lista vacia [].\n- Valor agregado: extrae la lista plana de 'amenities_and_services' para nutrir los detalles técnicos de la propiedad de forma limpia.\n- Multimedia: primer link de 'images'; si está vacío, usa 'cover_photo' dentro de tokko_data.\n- Acceso: public_url dentro de tokko_data.\n- Disponibilidad (campo 'situation'): traducir asi -> Empty = \"Desocupada, disponible para entrar\"; In use = \"Habitada\"; Owner = \"Habitada por el propietario\"; Tenant = \"Alquilada, con inquilino\"; Construction company = \"En obra\". Si viene \"---\", vacio o ausente, cadena vacia. NUNCA lo deduzcas de otra cosa.\n- Video (campo 'video_url'): copialo tal cual en enlaces.video. Si viene vacio o null, cadena vacia.\n- Codigo de referencia (campo 'reference_code'): copialo tal cual en codigo_referencia. Si viene vacio, cadena vacia.\n- Condiciones y requisitos de la operacion (condiciones_y_requisitos): lista de frases cortas en espanol, SOLO con lo que este explicito en los datos:\n  1. Si 'transaction_requirements' trae texto, incluilo resumido (ej: \"Seguro de caucion\", \"Contrato temporal de 6 meses minimo\", \"Hipoteca existente a cancelar antes de la escritura\", \"Primera escritura\", \"Servicios e impuestos a cargo del inquilino\").\n  2. Si el texto de 'description' menciona condiciones concretas de la operacion, sumalas (ej: \"Apto profesional\", \"Apto credito\", \"Se entrega amoblado\", \"Acepta permuta\", \"Entrega inmediata\", requisitos de garantia o caucion, restricciones de uso).\n  PROHIBIDO inventar, suponer o completar con conocimiento general del mercado. Si no hay nada explicito, devolve lista vacia [].\n- Asesor (campo assigned_agent): nombre_asesor = name, email_asesor = email, celular_asesor = cellphone. Si falta alguno, cadena vacía.\n\n### ANALISIS CRITICO (por cada opcion)\n- Por que la sugeris para este cliente.\n- En que varia respecto a lo pedido (ej: balcon mas chico pero mejor zona).\n- Si el origen de la búsqueda es un LINK (CASO A), utiliza el precio de referencia de la publicación original únicamente aquí, para comparar y argumentar por qué esta opción es competitiva.\n- Tu recomendacion experta.\n\n### FORMATO DE SALIDA\nResponde EXCLUSIVAMENTE en este formato JSON, sin texto introductorio ni explicaciones fuera del bloque de código:\n\n{\n  \"busqueda_exitosa\": true,\n  \"cantidad_retornada\": 0,\n  \"origen_busqueda\": \"url | criterios\",\n  \"propiedades\": [\n    {\n      \"coincidencia_pct\": 0,\n      \"info_general\": {\n        \"direccion\": \"\",\n        \"precio\": 0,\n        \"moneda\": \"USD | ARS\",\n        \"expensas\": 0,\n        \"ambientes\": 0,\n        \"dormitorios\": 0,\n        \"baños\": 0,\n        \"disposicion\": \"\",\n        \"piso\": \"\",\n        \"orientacion\": \"\",\n        \"estado\": \"\",\n        \"antiguedad\": 0,\n        \"apto_credito\": null,\n        \"apto_mascotas\": false,\n        \"apto_profesional\": false,\n        \"disponibilidad\": \"\",\n        \"codigo_referencia\": \"\"\n      },\n      \"espacios_y_superficies\": {\n        \"superficie_cubierta_m2\": 0,\n        \"superficie_descubierta_m2\": 0,\n        \"superficie_total_m2\": 0,\n        \"cocheras_totales\": 0,\n        \"cocheras_cubiertas\": 0,\n        \"cocheras_descubiertas\": 0,\n        \"toilettes\": 0,\n        \"livings\": 0,\n        \"plantas\": 0\n      },\n      \"detalles_tecnicos\": {\n        \"amenities_y_servicios\": [],\n        \"destacados_descripcion\": [],\n        \"condiciones_y_requisitos\": []\n      },\n      \"analisis_experto\": {\n        \"justificacion\": \"\",\n        \"diferencias_con_pedido\": \"\",\n        \"valor_destacado\": \"\"\n      },\n      \"enlaces\": {\n        \"foto_principal\": \"\",\n        \"ficha_completa\": \"\",\n        \"video\": \"\"\n      },\n      \"asesor\": {\n        \"nombre_asesor\": \"\",\n        \"email_asesor\": \"\",\n        \"celular_asesor\": \"\"\n      }\n    }\n  ]\n}"
+     }
+    },
+    "type": "@n8n/n8n-nodes-langchain.agent",
+    "typeVersion": 3.1,
+    "position": [
+     1280,
+     1632
+    ],
+    "id": "b9dd4a69-0649-49e9-a20e-1df1110f8f36",
+    "name": "AI Agent"
+   },
+   {
+    "parameters": {
+     "model": {
+      "__rl": true,
+      "value": "gpt-5.4-mini-2026-03-17",
+      "mode": "list",
+      "cachedResultName": "gpt-5.4-mini-2026-03-17"
+     },
+     "builtInTools": {},
+     "options": {}
+    },
+    "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+    "typeVersion": 1.3,
+    "position": [
+     1216,
+     1856
+    ],
+    "id": "2efd660d-4d0f-4899-a8a0-9c9e835a41de",
+    "name": "OpenAI Chat Model",
+    "credentials": {
+     "openAiApi": {
+      "id": "sELIerYlyCiF7cB2",
+      "name": "OPENAI_PRISMA"
+     }
+    }
+   },
+   {
+    "parameters": {
+     "sessionIdType": "customKey",
+     "sessionKey": "={{ $('extraer_agency_id').item.json.extracted_conversation_id }}_buffer",
+     "contextWindowLength": 25
+    },
+    "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+    "typeVersion": 1.3,
+    "position": [
+     1424,
+     1856
+    ],
+    "id": "63abbc66-a768-4250-a6e0-809686d5a3fb",
+    "name": "Simple Memory"
+   },
+   {
+    "parameters": {
+     "operation": "executeQuery",
+     "query": "WITH q AS (\n  SELECT\n    '{{ ($fromAI('prop_type', 'Tipo EXACTO de propiedad solo si el cliente lo especifica. Valores validos: Departamento, Casa, Lote, Condo, Bussiness Premises, Oficina, Garage, Weekend House, Hotel, Warehouse. (Local/comercial = Bussiness Premises u Oficina; un PH del aviso = Condo). Vacio si no lo menciona.', 'string') || '').replace(/[^a-zA-Z ]/g, '').trim() }}' AS p_type,\n    '{{ ($fromAI('status_val', 'Tipo de operacion: Venta, Alquiler o Temporary rent. Vacio si no se menciona.', 'string') || '').replace(/[^a-zA-Z ]/g, '').trim() }}' AS p_status,\n    NULLIF('{{ ($fromAI('max_price', 'Presupuesto maximo del cliente, solo el numero entero sin puntos ni comas. Vacio si no hay presupuesto.', 'string') || '').replace(/[^0-9]/g, '') }}', '')::numeric AS p_maxprice,\n    '{{ (($fromAI('currency', 'Moneda del presupuesto: USD o ARS. Si no se aclara, USD.', 'string') || 'USD').toUpperCase().replace(/[^A-Z]/g, '')) || 'USD' }}' AS p_currency,\n    NULLIF('{{ ($fromAI('rooms', 'Cantidad de ambientes que pide el cliente, solo el numero. Vacio si no lo menciona.', 'string') || '').replace(/[^0-9]/g, '') }}', '')::int AS p_rooms,\n    '{{ ($fromAI('zona', 'Barrio, zona o calle que pide el cliente, sin articulos ni preposiciones. Ej: belgrano, palermo, arcos. Vacio si no especifica.', 'string') || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9 ]/g, '').trim() }}' AS p_zona,\n    '{{ ($fromAI('caracteristicas', 'Palabras clave de caracteristicas o amenities en espanol separadas por espacio, sin articulos. Ej: pileta cochera estrenar luminoso balcon. Vacio si no menciona ninguna.', 'string') || '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[^a-z0-9 ]/g, '').trim().replace(/\\s+/g, ' | ') }}' AS p_kw,\n    NULLIF('{{ $('Generar_Embedding').item.json && $('Generar_Embedding').item.json.embedding && $('Generar_Embedding').item.json.embedding.values ? JSON.stringify($('Generar_Embedding').item.json.embedding.values) : '' }}', '')::vector(768) AS p_vec,\n    NULLIF('{{ $('Preparar_Busqueda').item.json.ref_price }}', '')::numeric AS ref_price,\n    '{{ $('Preparar_Busqueda').item.json.ref_currency }}' AS ref_currency,\n    NULLIF('{{ $('Preparar_Busqueda').item.json.ref_rooms }}', '')::int AS ref_rooms,\n    '{{ $('Preparar_Busqueda').item.json.ref_zona }}' AS ref_zona,\n    '{{ $('Preparar_Busqueda').item.json.ref_addr }}' AS ref_addr,\n    ('{{ $('Preparar_Busqueda').item.json.ref_from_link }}' = 'true') AS from_link\n)\nSELECT\n  p.id, p.tokko_id, p.agency_id, p.title, p.description, p.price, p.currency,\n  p.property_type, p.status, p.address, p.city, p.bedrooms, p.bathrooms,\n  p.covered_area, p.total_area, p.images,\n  (p.tokko_data->>'room_amount')::int AS ambientes,\n  (p.tokko_data->>'suite_amount')::int AS dormitorios,\n  (p.tokko_data->>'bathroom_amount')::int AS banos,\n  CASE\n    WHEN ( (CASE WHEN q.p_zona <> '' THEN 35 ELSE 0 END)\n         + (CASE WHEN q.p_rooms IS NOT NULL THEN 30 ELSE 0 END)\n         + (CASE WHEN q.p_vec IS NOT NULL THEN 25 ELSE 0 END)\n         + (CASE WHEN q.p_kw <> '' THEN 10 ELSE 0 END) ) = 0 THEN 100\n    ELSE round(\n      ( (CASE WHEN q.p_zona <> '' AND (\n              btrim(regexp_replace(translate(lower(COALESCE(p.city,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || q.p_zona || '%'\n           OR btrim(regexp_replace(translate(lower(COALESCE(p.address,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || q.p_zona || '%'\n         ) THEN 35 ELSE 0 END)\n      + (CASE WHEN q.p_rooms IS NOT NULL THEN\n           (CASE WHEN (p.tokko_data->>'room_amount')::int = q.p_rooms THEN 30\n                 WHEN abs((p.tokko_data->>'room_amount')::int - q.p_rooms) = 1 THEN 15 ELSE 0 END)\n           ELSE 0 END)\n      + (CASE WHEN q.p_vec IS NOT NULL\n              THEN 25 * GREATEST(0, LEAST(1, 1 - (p.embedding <=> q.p_vec))) ELSE 0 END)\n      + (CASE WHEN q.p_kw <> '' AND\n              to_tsvector('simple', translate(lower(COALESCE(p.description,'') || ' ' || COALESCE(p.title,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'))\n              @@ to_tsquery('simple', q.p_kw)\n           THEN 10 ELSE 0 END)\n      )::numeric\n      / ( (CASE WHEN q.p_zona <> '' THEN 35 ELSE 0 END)\n        + (CASE WHEN q.p_rooms IS NOT NULL THEN 30 ELSE 0 END)\n        + (CASE WHEN q.p_vec IS NOT NULL THEN 25 ELSE 0 END)\n        + (CASE WHEN q.p_kw <> '' THEN 10 ELSE 0 END) ) * 100 )\n  END AS match_pct,\n  ( q.from_link\n    AND q.ref_rooms IS NOT NULL AND (p.tokko_data->>'room_amount')::int = q.ref_rooms\n    AND ( q.ref_zona = '' OR btrim(regexp_replace(translate(lower(COALESCE(p.city,'') || ' ' || COALESCE(p.address,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || btrim(regexp_replace(translate(q.ref_zona,'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) || '%' )\n    AND (\n         ( q.ref_price IS NOT NULL AND p.price = q.ref_price AND p.currency = q.ref_currency )\n      OR ( q.ref_addr <> '' AND btrim(regexp_replace(translate(q.ref_addr,'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || btrim(regexp_replace(translate(lower(COALESCE(p.address,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) || '%' )\n    )\n  ) AS es_del_link,\n  ( q.from_link AND q.ref_price IS NOT NULL AND p.price = q.ref_price AND p.currency = q.ref_currency ) AS coincide_precio,\n  ( q.from_link AND q.ref_addr <> '' AND btrim(regexp_replace(translate(q.ref_addr,'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || btrim(regexp_replace(translate(lower(COALESCE(p.address,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) || '%' ) AS coincide_calle,\n  ( q.from_link AND q.ref_rooms IS NOT NULL AND (p.tokko_data->>'room_amount')::int = q.ref_rooms ) AS coincide_ambientes,\n  ( q.from_link AND q.ref_zona <> '' AND btrim(regexp_replace(translate(lower(COALESCE(p.city,'') || ' ' || COALESCE(p.address,'')),'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) ILIKE '%' || btrim(regexp_replace(translate(q.ref_zona,'áàäâéèëêíìïîóòöôúùüûñ','aaaaeeeeiiiioooouuuun'),'[[:space:]]+',' ','g')) || '%' ) AS coincide_zona,\n  q.ref_price AS precio_link, q.ref_currency AS moneda_link, q.ref_addr AS calle_link, q.ref_zona AS zona_link, q.ref_rooms AS ambientes_link,\njsonb_build_object(\n    'operations',         p.tokko_data -> 'operations',\n    'type',               p.tokko_data -> 'type',\n    'room_amount',        p.tokko_data -> 'room_amount',\n    'suite_amount',       p.tokko_data -> 'suite_amount',\n    'bathroom_amount',    p.tokko_data -> 'bathroom_amount',\n    'roofed_surface',     p.tokko_data -> 'roofed_surface',\n    'total_surface',      p.tokko_data -> 'total_surface',\n    'semiroofed_surface', p.tokko_data -> 'semiroofed_surface',\n    \n    -- [NUEVO] Superficie descubierta real (parque, patio, terraza libre)\n    'unroofed_surface',   p.tokko_data -> 'unroofed_surface', \n    \n    -- [NUEVO] Antigüedad de la edificación\n    'age',                p.tokko_data -> 'age', \n    \n    'fake_address',       p.tokko_data -> 'fake_address',\n    'location',           p.tokko_data -> 'location',\n    'floor',              p.tokko_data -> 'floor',\n    'publication_title',  p.tokko_data -> 'publication_title',\n    'description',        p.tokko_data -> 'description',\n    'expenses',           p.tokko_data -> 'expenses',\n    \n    -- [NUEVO] Apertura de cocheras para evitar ambigüedades\n    'parking_lot_amount', p.tokko_data -> 'parking_lot_amount',\n    'covered_parking',    p.tokko_data -> 'covered_parking_lot',\n    'uncovered_parking',  p.tokko_data -> 'uncovered_parking_lot',\n    \n    'disposition',        p.tokko_data -> 'disposition',\n    'orientation',        p.tokko_data -> 'orientation',\n    'property_condition', p.tokko_data -> 'property_condition',\n    'credit_eligible',    p.tokko_data -> 'credit_eligible',\n    'geo_lat',            p.tokko_data -> 'geo_lat',\n    'geo_long',           p.tokko_data -> 'geo_long',\n    'public_url',         p.tokko_data -> 'public_url',\n    'real_address',       p.tokko_data -> 'real_address',\n    'development_tags',   p.tokko_data -> 'development' -> 'tags',\n    \n    -- [NUEVO] Extracción directa de todos los tags como lista plana de strings\n    -- Esto simplifica drásticamente la lectura del LLM o del motor de búsqueda\n    'amenities_and_services', (\n         SELECT jsonb_agg(tag->>'name') \n         FROM jsonb_array_elements(COALESCE(p.tokko_data -> 'tags', '[]'::jsonb)) tag\n    ),\n    \n    -- [NUEVO] Flags booleanos rápidos para tus filtros más preguntados\n    'pets_allowed', EXISTS (\n         SELECT 1 FROM jsonb_to_recordset(COALESCE(p.tokko_data -> 'tags', '[]'::jsonb)) AS x(name text) \n         WHERE x.name = 'Pets allowed'\n    ),\n    'is_professional', (\n         EXISTS (\n           SELECT 1 FROM jsonb_to_recordset(COALESCE(p.tokko_data -> 'tags', '[]'::jsonb)) AS x(name text)\n           WHERE x.name = 'Work able'\n         )\n         OR p.description ILIKE '%apto profesional%'\n         OR p.description ILIKE '%apto profesionales%'\n         OR p.description ILIKE '%uso profesional%'\n    ),\n    'is_professional_origen', CASE\n         WHEN EXISTS (\n           SELECT 1 FROM jsonb_to_recordset(COALESCE(p.tokko_data -> 'tags', '[]'::jsonb)) AS x(name text)\n           WHERE x.name = 'Work able'\n         ) THEN 'ficha'\n         WHEN p.description ILIKE '%apto profesional%'\n           OR p.description ILIKE '%apto profesionales%'\n           OR p.description ILIKE '%uso profesional%' THEN 'descripcion'\n         ELSE ''\n    END,\n\n    -- [NUEVO] Estado de ocupacion, requisitos de la operacion y ambientes extra\n    'situation',                p.tokko_data -> 'situation',\n    'transaction_requirements', p.tokko_data -> 'transaction_requirements',\n    'toilet_amount',            p.tokko_data -> 'toilet_amount',\n    'living_amount',            p.tokko_data -> 'living_amount',\n    'floors_amount',            p.tokko_data -> 'floors_amount',\n    'reference_code',           p.tokko_data -> 'reference_code',\n\n    -- [NUEVO] Primer video publicado de la propiedad (si tiene)\n    'video_url', (\n      SELECT v ->> 'url'\n      FROM jsonb_array_elements(COALESCE(p.tokko_data -> 'videos', '[]'::jsonb)) AS v\n      WHERE COALESCE(v ->> 'url', '') <> ''\n      ORDER BY v ->> 'order'\n      LIMIT 1\n    ),\n\n    'cover_photo', (\n      SELECT photo FROM jsonb_array_elements(COALESCE(p.tokko_data -> 'photos', '[]'::jsonb)) AS photo\n      WHERE (photo ->> 'is_front_cover')::boolean = true LIMIT 1\n    )\n) AS tokko_data,\n  p.assigned_agent, p.assigned_agent_id\nFROM properties p CROSS JOIN q\nWHERE\n  p.agency_id = '{{ $('extraer_agency_id').item.json.extracted_agency_id }}'::uuid\n  AND p.is_active = TRUE\n  AND ( q.p_type = '' OR replace(lower(p.property_type), 'ss', 's') = replace(lower(q.p_type), 'ss', 's') )\n  AND ( q.p_status = '' OR q.from_link OR p.status = q.p_status )\n  AND ( q.p_maxprice IS NULL OR ( p.price > 0 AND p.price <= q.p_maxprice * 1.20 AND p.currency = q.p_currency ) )\n  AND ( q.p_rooms IS NULL OR (p.tokko_data->>'room_amount')::int BETWEEN q.p_rooms - 1 AND q.p_rooms + 1 )\nORDER BY es_del_link DESC, coincide_precio DESC, coincide_calle DESC, match_pct DESC, (p.embedding <=> q.p_vec) ASC NULLS LAST, p.created_at DESC NULLS LAST\nLIMIT 10;",
+     "options": {}
+    },
+    "type": "n8n-nodes-base.postgresTool",
+    "typeVersion": 2.6,
+    "position": [
+     1600,
+     1856
+    ],
+    "id": "c3ccbb85-fa7a-4c03-b067-0ddb43acf547",
+    "name": "CARTERA_PROPIEDADES",
+    "credentials": {
+     "postgres": {
+      "id": "Vje6BCZn5QY9nNWy",
+      "name": "MEMORIA_PRISMA"
+     }
+    }
+   },
+   {
+    "parameters": {
+     "conditions": {
+      "options": {
+       "caseSensitive": true,
+       "leftValue": "",
+       "typeValidation": "loose",
+       "version": 2
+      },
+      "conditions": [
+       {
+        "id": "cond1",
+        "leftValue": "={{ $json.extracted_url }}",
+        "rightValue": "",
+        "operator": {
+         "type": "string",
+         "operation": "notEmpty",
+         "singleValue": true
+        }
+       }
+      ],
+      "combinator": "and"
+     },
+     "options": {}
+    },
+    "id": "6977a4da-e0ae-4ab8-aa88-6c542bff7ee1",
+    "name": "Tiene_Link",
+    "type": "n8n-nodes-base.if",
+    "typeVersion": 2.2,
+    "position": [
+     320,
+     1632
+    ]
+   },
+   {
+    "parameters": {
+     "method": "POST",
+     "url": "http://agencia_vakdor_acm-extractor:80/extract",
+     "sendHeaders": true,
+     "headerParameters": {
+      "parameters": [
+       {
+        "name": "x-extractor-secret",
+        "value": "Leito3983356213."
+       }
+      ]
+     },
+     "sendBody": true,
+     "specifyBody": "json",
+     "jsonBody": "={{ JSON.stringify({ url: $('extraer_agency_id').first().json.extracted_url }) }}",
+     "options": {
+      "timeout": 120000
+     }
+    },
+    "id": "a3cef09a-8701-49e0-b454-4a830313aa67",
+    "name": "Extraer_Web",
+    "type": "n8n-nodes-base.httpRequest",
+    "typeVersion": 4.2,
+    "position": [
+     544,
+     1552
+    ],
+    "retryOnFail": true,
+    "onError": "continueRegularOutput"
+   },
+   {
+    "parameters": {
+     "jsCode": "const base = $('extraer_agency_id').first().json;\nconst j = $json || {};\nconst scraped = (j && j.sujeto) ? j : null;\nlet cq = base.clean_query || 'propiedad';\nlet extra = '';\nconst clean = (t) => (t == null ? '' : String(t)).toLowerCase().split(\"'\").join('').split('\"').join('').split(';').join('').split(' ').filter(Boolean).join(' ');\nlet ref = { ref_from_link: false, ref_price: '', ref_currency: '', ref_rooms: '', ref_zona: '', ref_addr: '' };\nif (base.extracted_url && scraped) {\n  const s = scraped.sujeto || {};\n  const amen = s.amenidades ? Object.keys(s.amenidades).join(', ') : '';\n  const parts = [s.tipo_propiedad, s.barrio, s.direccion, (s.dormitorios != null ? s.dormitorios + ' dormitorios' : ''), (s.m2_cubiertos ? s.m2_cubiertos + ' m2' : ''), amen];\n  cq = parts.filter(Boolean).join(' ').trim() || cq;\n  extra = '\\n\\n[DATOS DE LA PROPIEDAD DEL LINK - para identificarla en el stock; el precio es SOLO referencia, NO presupuesto]: ' + JSON.stringify(scraped);\n  ref.ref_from_link = true;\n  ref.ref_price = (scraped.precio != null && !isNaN(Number(scraped.precio))) ? String(Math.round(Number(scraped.precio))) : '';\n  ref.ref_currency = (clean(scraped.moneda).toUpperCase()) || 'USD';\n  ref.ref_rooms = (s.dormitorios != null && !isNaN(Number(s.dormitorios))) ? String(Number(s.dormitorios) + 1) : '';\n  ref.ref_zona = clean(s.barrio);\n  ref.ref_addr = clean(s.direccion);\n}\nreturn [{ json: Object.assign({}, base, { clean_query: cq, agent_extra: extra, scraped: scraped || null }, ref), pairedItem: { item: 0 } }];"
+    },
+    "id": "3218a256-9460-478c-b31b-3fec6eef76dc",
+    "name": "Preparar_Busqueda",
+    "type": "n8n-nodes-base.code",
+    "typeVersion": 2,
+    "position": [
+     768,
+     1632
+    ]
+   }
+  ],
+  "connections": {
+   "When Executed by Another Workflow": {
+    "main": [
+     [
+      {
+       "node": "extraer_agency_id",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Generar_Embedding": {
+    "main": [
+     [
+      {
+       "node": "AI Agent",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "OpenAI Chat Model": {
+    "ai_languageModel": [
+     [
+      {
+       "node": "AI Agent",
+       "type": "ai_languageModel",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Simple Memory": {
+    "ai_memory": [
+     [
+      {
+       "node": "AI Agent",
+       "type": "ai_memory",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "CARTERA_PROPIEDADES": {
+    "ai_tool": [
+     [
+      {
+       "node": "AI Agent",
+       "type": "ai_tool",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "extraer_agency_id": {
+    "main": [
+     [
+      {
+       "node": "Tiene_Link",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Tiene_Link": {
+    "main": [
+     [
+      {
+       "node": "Extraer_Web",
+       "type": "main",
+       "index": 0
+      }
+     ],
+     [
+      {
+       "node": "Preparar_Busqueda",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Extraer_Web": {
+    "main": [
+     [
+      {
+       "node": "Preparar_Busqueda",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   },
+   "Preparar_Busqueda": {
+    "main": [
+     [
+      {
+       "node": "Generar_Embedding",
+       "type": "main",
+       "index": 0
+      }
+     ]
+    ]
+   }
+  },
+  "nodeGroups": [],
+  "authors": "Leo Osterrietch",
+  "name": null,
+  "description": null,
+  "autosaved": false,
+  "workflowPublishHistory": [
+   {
+    "createdAt": "2026-08-07T19:38:20.769Z",
+    "id": 574,
+    "workflowId": "NQtasQlz0N86Oxa6",
+    "versionId": "fa009bc9-02a1-4b23-b553-32d871d3c114",
+    "event": "activated",
+    "userId": "9b194ba8-440e-4a8a-b5ba-e6a5ba26f7b6"
+   },
+   {
+    "createdAt": "2026-08-07T19:38:20.698Z",
+    "id": 573,
+    "workflowId": "NQtasQlz0N86Oxa6",
+    "versionId": "fa009bc9-02a1-4b23-b553-32d871d3c114",
+    "event": "deactivated",
+    "userId": "9b194ba8-440e-4a8a-b5ba-e6a5ba26f7b6"
+   }
+  ]
+ }
+}

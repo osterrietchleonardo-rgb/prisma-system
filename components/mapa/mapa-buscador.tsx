@@ -62,6 +62,8 @@ async function buscarDirecciones(q: string, senal: AbortSignal): Promise<Lugar[]
         bbox: b
           ? { oeste: b[0], sur: b[1], este: b[2], norte: b[3] }
           : recuadroDePunto(lat, lng),
+        // La coordenada exacta, para clavar el marcador rojo en la puerta.
+        punto: { lat, lng },
       }]
     })
   } catch {
