@@ -3,8 +3,11 @@ import { notFound } from "next/navigation";
 import { Playfair_Display, Inter } from "next/font/google";
 import type { Metadata } from "next";
 import PrintButton from "./PrintButton";
-import type { AcmFichaSnapshot, FichaBrand, FichaComparable } from "@/lib/acm/ficha";
+import AjusteAncho from "./AjusteAncho";
+import type { AcmFichaSnapshot, FichaBrand, FichaComparable, FichaZona } from "@/lib/acm/ficha";
 import { condensarDescripcion } from "@/lib/acm/descripcion";
+import { metrosLegible } from "@/lib/acm/zona-formato";
+import { COLOR_ZONA, COLOR_PROPIEDAD, categoriasEnElMapa } from "@/lib/acm/zona-mapa";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +130,7 @@ export default async function FichaAcmPage({ params }: { params: { token: string
           rompía la hidratación de la hoja ("Text content does not match server-rendered HTML").
           Seguro: `CSS` es una constante de este mismo archivo, no entra nada del usuario. */}
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <AjusteAncho />
       <PrintButton accent={accent} onAccent={onAccent} fileName={nombreArchivo} />
 
       {/* ══════════ PORTADA ══════════ */}
@@ -164,13 +168,22 @@ export default async function FichaAcmPage({ params }: { params: { token: string
             </div>
           </div>
 
-          {subject.descripcion && (
-            <p className="cover-desc">{subject.descripcion}</p>
-          )}
+          {/* La descripción de la propiedad ya NO va acá: se mudó a la hoja del entorno, para
+              que la portada quede limpia. En una ficha vieja (sin `zona`) tampoco se muestra;
+              es el precio de tener una sola portada y no dos. */}
         </div>
 
         <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
       </section>
+
+      {/* ══════════ LA PROPIEDAD Y SU ENTORNO ══════════ */}
+      {/* Ausente en las fichas anteriores a ago-2026 y cuando el asesor destildó la hoja. */}
+      {snap.zona && (
+        <EntornoSheet
+          zona={snap.zona} descripcion={subject.descripcion || ""} primary={primary} accent={accent}
+          onPrimary={onPrimary} brand={brand} agencyName={agencyName}
+        />
+      )}
 
       {/* ══════════ UNA HOJA POR COMPARABLE ══════════ */}
       {comparables.map((c, i) => (
@@ -351,6 +364,111 @@ function PiramidePrecios({ primary, accent, desvio }: { primary: string; accent:
   );
 }
 
+// ── Hoja "La propiedad y su entorno" ─────────────────────────────────────────
+// Dos columnas: a la izquierda lo que se LEE (la descripción de la propiedad y el relato del
+// barrio), a la derecha lo que se CONSULTA (el mapa y los datos con sus distancias).
+// La hoja NO nombra ninguna fuente de datos. El único crédito está dibujado adentro del PNG del
+// mapa, y está ahí por licencia, no como cita.
+const ICONO_ZONA: Record<string, string> = {
+  subte: "🚇", espacio_verde: "🌳", escuela: "🎓", hospital: "🏥",
+  farmacia: "💊", parada_colectivo: "🚌", comisaria: "🚓", ecobici: "🚲", ciclovia: "🚴",
+};
+
+function EntornoSheet({
+  zona, descripcion, primary, accent, onPrimary, brand, agencyName,
+}: {
+  zona: FichaZona; descripcion: string; primary: string; accent: string; onPrimary: string;
+  brand: FichaBrand; agencyName: string;
+}) {
+  // Contexto del banner. Fuera de CABA no hay comuna ni superficie: la línea sale vacía y el
+  // banner queda solo con el nombre del barrio, sin ningún hueco que delate que falta algo.
+  const contexto = [
+    zona.comuna != null ? `Comuna ${zona.comuna}` : null,
+    zona.area_km2 != null ? `${zona.area_km2.toLocaleString("es-AR")} km²` : null,
+    zona.espacios_verdes_barrio ? `${zona.espacios_verdes_barrio} espacios verdes` : null,
+  ].filter(Boolean).join("  ·  ");
+
+  // Qué categorías quedaron efectivamente pintadas en el mapa. Se calcula con el MISMO helper que
+  // usa /api/acm/mapa-zona para dibujarlas, así la referencia nunca nombra un punto que no está.
+  const enElMapa = categoriasEnElMapa(zona);
+
+  return (
+    <section className="sheet">
+      <div className="pulso" style={{ backgroundColor: primary, color: onPrimary }}>
+        <div className="pulso-left">
+          <span className="pulso-eyebrow" style={{ color: accent }}>LA PROPIEDAD Y SU ENTORNO</span>
+          <div className="entorno-barrio">{zona.barrio}</div>
+        </div>
+        {contexto && (
+          <div className="pulso-right">
+            <span className="pulso-sub">{contexto}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="sheet-body entorno-body">
+        <div className="entorno-col">
+          {descripcion && (
+            <>
+              <h3 className="entorno-h" style={{ color: accent }}>La propiedad</h3>
+              <p className="entorno-texto entorno-texto-prop">{descripcion}</p>
+            </>
+          )}
+          {zona.relato && (
+            <>
+              <h3 className="entorno-h" style={{ color: accent }}>El barrio</h3>
+              {/* El relato viene en párrafos separados por línea en blanco. */}
+              {zona.relato.split(/\n{2,}/).map((p, i) => (
+                <p key={i} className="entorno-texto">{p.trim()}</p>
+              ))}
+            </>
+          )}
+        </div>
+
+        <div className="entorno-col">
+          {zona.mapa_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={zona.mapa_url} alt={`Mapa de ${zona.barrio}`} className="entorno-mapa" loading="eager" />
+          )}
+          {/* Referencias del mapa. Sin esto el cliente ve nueve puntos de colores y no sabe cuál
+              es cuál — ni siquiera cuál es la propiedad. El punto de cada renglón usa EXACTAMENTE
+              el color de su marcador, y solo se dibuja en los renglones que de verdad están en el
+              mapa: los conteos ("8 farmacias a menos de cinco cuadras") no son un lugar y no
+              tienen punto, y un hospital que quedó fuera del recorte tampoco. */}
+          {zona.mapa_url && enElMapa.size > 0 && (
+            <div className="entorno-ref">
+              <span className="entorno-ref-punto" style={{ backgroundColor: COLOR_PROPIEDAD }} />
+              <span>Esta propiedad. Cada punto de color señala el lugar de su renglón.</span>
+            </div>
+          )}
+          <div className="entorno-pois">
+            {zona.pois.map((p) => (
+              <div key={p.categoria} className="entorno-poi">
+                <span className="entorno-poi-ico">{ICONO_ZONA[p.categoria] || "📍"}</span>
+                <div className="entorno-poi-txt">
+                  <div className="entorno-poi-tit" style={{ color: primary }}>
+                    {enElMapa.has(p.categoria) && (
+                      <span className="entorno-poi-punto" style={{ backgroundColor: COLOR_ZONA[p.categoria] }} />
+                    )}
+                    {p.titulo}
+                  </div>
+                  {(p.detalle || p.metros != null) && (
+                    <div className="entorno-poi-sub">
+                      {[p.detalle, p.metros != null ? metrosLegible(p.metros) : null].filter(Boolean).join(" · ")}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
+    </section>
+  );
+}
+
 // ── Hoja de un comparable ────────────────────────────────────────────────────
 function ComparableSheet({
   c, index, primary, accent, onPrimary, onAccent, brand, agencyName,
@@ -487,28 +605,72 @@ const CSS = `
 .cover-title { font-size: 40px; line-height: 1.08; font-weight: 700; margin: 14px 0 10px; }
 .cover-sub { font-size: 16px; color: #5c5c5c; max-width: 78%; }
 .cover-rule { width: 90px; height: 3px; margin: 30px 0; }
-.cover-meta { display: grid; gap: 26px; margin-top: 6px; }
+/* Los datos de la ficha van abajo de todo, no pegados al título: al mudar la descripción a la
+   hoja del entorno quedaba un hueco blanco enorme en el medio de la portada. El margin-top auto
+   dentro del flex de .sheet-body empuja el bloque al pie y convierte ese hueco en aire
+   deliberado — la portada de un informe serio se lee así: título arriba, datos abajo.
+   No se toca el alto de la hoja, así que la impresión sale igual. */
+.cover-meta { display: grid; gap: 26px; margin-top: auto; padding-bottom: 8mm; }
 .cover-meta-block { display: flex; flex-direction: column; gap: 3px; }
 .cover-meta-block .label { font-size: 11px; text-transform: uppercase; letter-spacing: .2em; color: #8a8a8a; }
 .cover-meta-block strong { font-size: 18px; }
-/* Descripción del sujeto en la portada. Mismo criterio que .comp-desc: la hoja es un A4
-   EXACTO, así que además del tope de 700 caracteres al guardar va un clamp duro. Aunque
-   alguien pegue a mano un texto larguísimo, la portada no puede desbordar.
-   A diferencia de ComparableSheet, la portada NO tiene una "esponja" visual (ahí es la
-   foto de .gallery quien absorbe el sobrante); acá el único colchón es el propio
-   flex:1 1 auto de .cover-body dentro de .sheet. Por eso el clamp quedó en 7 líneas
-   (no 8): medido con la altura de impresión FORZADA (.sheet con height:297mm fijo +
-   overflow:hidden, no el min-height de pantalla que puede crecer sin que se note el
-   desborde) y el peor caso real —descripción de 689 caracteres en palabras largas que
-   llena el clamp entero + dirección/barrio/tipo larguísimos que ocupan 2 líneas cada
-   uno— el margen hasta el pie de página dio 318px sobre un clamp de 165px: de sobra,
-   pero 7 líneas en vez de 8 suma otro colchón por las dudas sin perder casi nada de
-   texto real. */
-.cover-desc {
-  margin-top: 26px; font-size: 12.5px; line-height: 1.65; color: #5c5c5c; max-width: 88%;
-  max-height: 145px; overflow: hidden;
-  display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical;
+
+/* Hoja del entorno — dos columnas: la izquierda se lee, la derecha se consulta.
+   Los textos tienen clamp SI O SI: la hoja es un A4 exacto y acá no hay ninguna foto que
+   absorba el sobrante (a diferencia de la hoja del comparable, donde .gallery hace de esponja).
+   Sin clamp, una descripción de 700 caracteres más un relato de 900 empujan el pie fuera de la
+   página impresa. Los dos bloques juntos entran en la columna con margen. */
+/* La hoja es un A4 exacto y el texto no llega a llenarla: medido con un caso real, el contenido
+   terminaba a 662 px de los 1.081 disponibles y quedaban 420 px de blanco al pie. El mapa es el
+   elemento flexible que absorbe ese sobrante — el mismo papel que cumple .gallery en la hoja del
+   comparable. Por eso el cuerpo ocupa todo el alto y la columna derecha es un flex. */
+.entorno-body { display: grid; grid-template-columns: 1fr 82mm; gap: 9mm; align-items: stretch; padding-top: 10px; }
+.entorno-col { min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.entorno-barrio { font-size: 19px; font-weight: 700; line-height: 1.15; margin-top: 2px; }
+.entorno-h { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .2em; margin: 0 0 7px; }
+.entorno-texto + .entorno-h { margin-top: 16px; }
+/* LOS CLAMPS ESTAN CALCULADOS, NO ELEGIDOS A OJO.
+   Renglón = 12,5px × 1,68 ≈ 21px. La columna tiene 981px libres hasta el pie.
+   Peor caso posible: descripción en su tope de 700 caracteres (13 renglones = 273px) + relato
+   en su tope de 900 repartido en 3 párrafos (3 × 8 renglones = 504px) + los dos títulos y sus
+   márgenes (~90px) = 867px. Entra con 114px de sobra.
+   Con 9 renglones para todo —lo primero que puse— una descripción real de 607 caracteres ya
+   salía cortada a mitad de frase. */
+.entorno-texto {
+  flex: 0 0 auto;
+  font-size: 12.5px; line-height: 1.68; color: #4a4a4a; margin: 0 0 9px;
+  max-height: 168px; overflow: hidden;
+  display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical;
 }
+/* La descripción es UN solo párrafo y es el texto que habla de lo que se está vendiendo:
+   se lleva la parte grande del presupuesto de renglones. */
+.entorno-texto-prop { max-height: 273px; -webkit-line-clamp: 13; }
+/* Alto FIJO y proporción atada a la imagen que genera /api/acm/mapa-zona (768 × 1024 = 0,75).
+   82 mm / 130 mm = 0,63 contra 0,75 de la imagen: object-fit cover recorta un poco arriba y
+   abajo, que es donde no hay marcadores (todos caen alrededor del centro). Si se cambia uno de
+   los dos, hay que revisar el otro.
+   OJO: esto es una plantilla de texto de JavaScript — nada de comillas invertidas acá adentro,
+   cortan la cadena y la pagina entera tira 500. */
+.entorno-mapa {
+  flex: 0 0 auto; width: 100%; height: 130mm; object-fit: cover; border-radius: 12px;
+  background: #e8e6e1; display: block; margin-bottom: 13px;
+}
+/* Gap fijo y NO space-between: repartiendo el sobrante, los nueve renglones quedaban a 60 px
+   uno del otro y el bloque se leia como poco contenido estirado para llenar la hoja. Juntos y
+   con el mapa mas grande queda un bloque de datos denso, que es como se lee un informe. */
+/* Referencias del mapa: una sola línea arriba de la lista. El punto de la propiedad se dibuja
+   más grande que los de los renglones porque en el mapa también es más grande. */
+.entorno-ref { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; font-size: 9px; color: #7b7b7b; line-height: 1.35; margin: 0 0 9px; }
+.entorno-ref-punto { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; border: 2px solid #ffffff; box-shadow: 0 0 0 1px rgba(0,0,0,.18); }
+.entorno-pois { flex: 0 0 auto; display: flex; flex-direction: column; gap: 9px; }
+.entorno-poi { display: flex; align-items: flex-start; gap: 8px; }
+.entorno-poi-ico { font-size: 14px; line-height: 1.25; flex-shrink: 0; width: 19px; }
+.entorno-poi-txt { min-width: 0; }
+.entorno-poi-tit { font-size: 11.5px; font-weight: 700; line-height: 1.3; }
+/* El punto que ata el renglón con su marcador en el mapa. Va dentro del título para que arranque
+   sobre el mismo renglón aunque el nombre del lugar ocupe dos líneas. */
+.entorno-poi-punto { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; position: relative; top: -1px; box-shadow: 0 0 0 1px rgba(0,0,0,.14); }
+.entorno-poi-sub { font-size: 9.5px; color: #8a8a8a; line-height: 1.3; margin-top: 1px; }
 
 /* Banner de pulso / consolidado (informativo, no llamativo) */
 .pulso { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 10px var(--pad); gap: 16px; }
@@ -604,6 +766,32 @@ const CSS = `
 .contact-line { font-size: 12.5px; color: #444; }
 .contact-btns { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
 .contact-btn { padding: 9px 18px; border-radius: 10px; font-weight: 600; font-size: 13px; text-decoration: none; }
+
+/* ── CELULAR ──────────────────────────────────────────────────────────────────
+   La hoja mide 794px fijos porque tiene que ser un A4 exacto al imprimir. En una pantalla más
+   angosta que eso, se achica la hoja ENTERA con un scale: es el mismo documento, más chico.
+   No se reordena ni se apila nada, así que no hay una segunda maqueta que mantener y el riesgo
+   de romper algo es cero.
+
+   TRES CANDADOS para no tocar lo que ya funciona:
+   1. media screen  → la impresión y el PDF ni se enteran de que esto existe.
+   2. max-width 840 → arriba de eso (escritorio, notebook, tablet apaisada) no aplica.
+   3. el default 1  → si el JavaScript no corre, el factor es 1 y queda como estaba.
+
+   El factor lo calcula AjusteAncho.tsx: CSS no puede dividir dos longitudes.
+   transform-origin top left + el padding de 8px del contenedor la dejan centrada.
+   El margen negativo existe porque un elemento escalado SIGUE ocupando su alto original en el
+   layout: sin eso quedaría medio metro de vacío entre hoja y hoja.
+   (Recordatorio: esto es una plantilla de JavaScript, nada de comillas invertidas acá.) */
+@media screen and (max-width: 840px) {
+  .acm-root { padding: 10px 8px 80px; }
+  .sheet {
+    transform: scale(var(--acm-k, 1));
+    transform-origin: top left;
+    margin: 0 0 calc(-297mm * (1 - var(--acm-k, 1)) + 14px);
+    box-shadow: 0 4px 18px rgba(0,0,0,.14);
+  }
+}
 
 @media print {
   /* Sin márgenes de página → la hoja va edge-to-edge y NO se ve el fondo del tema de la app. */

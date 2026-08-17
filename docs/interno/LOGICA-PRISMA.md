@@ -1306,7 +1306,7 @@ Columnas: (Asesor — solo director), Contrato, **Código** (badge mono), Client
 > - Rutas nuevas: `/asesor/acm` y `/director/acm` (las viejas `/…/tasaciones` redirigen 308 a las nuevas, ver `next.config.mjs`).
 > - **Nueva lógica:** se elige UNA propiedad sujeto por **(a) formulario manual**, **(b) link de cualquier portal** (botón "Analizar", extracción server-side) o **(c) desplegable de la cartera** de la agencia. El backend busca **comparables reales** en `properties` (cartera) + `roomix_properties` (red de colaboración) con **filtros duros + embedding (Gemini 768d)**, devolviendo cada comparable con **% de comparabilidad** y un **checklist** (qué coincide y qué no). El **precio queda FUERA del %**.
 > - **Funciones SQL:** `acm_match_properties` y `acm_match_roomix` (base `20260625130000_acm_match_functions.sql`; **reescritas en `20260702120000_acm_barrio_gate_and_dims.sql`**, jul-2026). Filtros duros (gate): misma operación + mismo tipo + m² ±40% + ambientes ±1 **+ mismo barrio**. % ponderado (jul-2026): Superficie 22 · Ambientes 16 · **Dormitorios 14** · Baños 12 · **Antigüedad 14** · Amenities 12 (Jaccard ES+EN) · Semántica 10; los pesos se redistribuyen si falta dato. Tipo, operación **y zona** son gates (salen del % y se muestran como "filtro").
-> - **Barrio como filtro duro + más variables (jul-2026):** el comparable ahora se **limita al barrio del sujeto** (antes la zona era un puntaje y podía traer otro barrio con menos puntos). Si el sujeto es de Belgrano, **todos** los comparables (cartera + red) son de Belgrano; Palermo→Palermo; La Plata→La Plata. Insensible a acentos (Nuñez=Núñez) y respeta la jerarquía real de barrios (Belgrano R/C∈Belgrano, Las Cañitas∈Palermo). El **checklist suma Dormitorios y Antigüedad** con dato real (nada inventado): antigüedad de Tokko en la cartera y de la red; solo comparan cuando hay dato en ambos lados. **Piso no se agrega** (la cartera no tiene el piso real de la unidad). **Sin límite artificial:** hasta 50 comparables por fuente (antes 20), ordenados por comparabilidad.
+> - **Barrio como filtro duro + más variables (jul-2026):** el comparable ahora se **limita al barrio del sujeto** (antes la zona era un puntaje y podía traer otro barrio con menos puntos). Si el sujeto es de Belgrano, **todos** los comparables (cartera + red) son de Belgrano; Palermo→Palermo; La Plata→La Plata. Insensible a acentos (Nuñez=Núñez) y respeta la jerarquía real de barrios (Belgrano R/C∈Belgrano, Las Cañitas∈Palermo). El **checklist suma Dormitorios y Antigüedad** con dato real (nada inventado): antigüedad de Tokko en la cartera y de la red; solo comparan cuando hay dato en ambos lados. **Piso no se agrega** (la cartera no tiene el piso real de la unidad). **Sin límite artificial:** hasta 50 comparables por fuente (antes 20), ordenados por comparabilidad. *(Ago-2026: el tope pasó a 100 por fuente y cada bloque muestra la lista dentro de un recuadro con scroll propio — ver más abajo.)*
 > - **Excluir PH en comparables de Casa (jul-2026, rama `feat/acm-excluir-ph-casas`):** al analizar una **Casa** aparece una casilla **"Considerar PH"** (tildada por defecto = incluye PH, como siempre). Los PH suelen figurar como "casa"/"House" en los portales, pero no siempre son comparables con casas; si el asesor la **destilda**, se excluyen. La detección es por la **sigla "PH" como palabra suelta** (regex `\mph\M`, insensible a mayúsculas) en **tipo + título + descripción** del aviso — no confunde palabras que llevan "ph" adentro ni matchea "propiedad horizontal". El filtro corre **dentro de las funciones SQL** (parámetro `p_exclude_ph`), **antes del ranking y del límite**, así el conteo queda correcto y no se caen casas puras. Solo aplica a Casa; en cualquier otro tipo la casilla no se muestra y no afecta. Por defecto no cambia nada (casilla tildada).
 > - **Endpoints nuevos:** `app/api/acm/comparables`, `app/api/acm/extract`, `app/api/acm/cartera`. Librerías en `lib/acm/` (`extract.ts`, `subject.ts`, `checklist.ts`, `tokko.ts`).
 > - **A estrenar solo con a estrenar (ago-2026, rama `feat/acm-filtro-a-estrenar`):** una propiedad **sin uso vale bastante más por m²** que una usada del mismo barrio, así que mezclarlas distorsionaba el ACM. Medido sobre la red (venta, USD, mediana US$/m²): Palermo 3.448 vs 2.642 (**+31 %**), Belgrano 3.495 vs 2.692 (+30 %), Caballito 2.758 vs 2.033 (+36 %), Villa Urquiza 2.657 vs 2.258 (+18 %), Almagro 2.461 vs 1.885 (+31 %). En el paso 1 hay dos casillas nuevas al lado de Antigüedad: **"A estrenar"** y **"En pozo"** (se pueden tildar las dos, una o ninguna; al tildar alguna, el campo de años se deshabilita). **Sin tildar = usada** → se excluyen los comparables a estrenar y en pozo. **Tildada = sin uso** → solo entran comparables del/los estado(s) tildado(s). Antes esto era **imposible de expresar**: el formulario arranca en 0 y `sujetoAntiguedad()` trataba el 0 como "sin dato", así que un depto a estrenar elegido de la cartera perdía esa información antes de llegar al SQL. Los avisos **sin antigüedad declarada** entran siempre para un sujeto usado (su mediana US$/m² se comporta como la de usadas), y para un sujeto sin uso entran **solo en alquiler** (en venta se descartan; en alquiler el 99,8 % de la red no carga el dato y descartarlos dejaría 0 comparables). **Terreno/lote queda afuera del filtro**: la antigüedad no le aplica y Tokko igual le pone `age=0` (47 de los 49 lotes de la cartera), así que filtrarlos los dejaría casi sin comparables.
@@ -2416,9 +2416,44 @@ puede haber 40.000.
 Una cajita arriba del mapa sugiere mientras se tipea, tolerante a acentos y a errores de
 tipeo ("cavallito" encuentra Caballito, "nunez" encuentra Núñez). Cuatro fuentes, en orden
 de prioridad: zonas guardadas propias, barrios de la cartera, barrios de la red, y
-direcciones. Elegir un **barrio** vuela al barrio Y filtra por él; elegir una **dirección**
+direcciones.
+
+**De qué Belgrano estamos hablando.** El mismo nombre de barrio existe en muchas ciudades:
+hay "Belgrano" en CABA, Rosario, Bariloche, Carlos Paz y Mendoza, y "Centro" en casi todas.
+El catálogo se queda con el **núcleo**: la zona donde está la masa de propiedades con ese
+nombre. Sin eso, el recuadro de Belgrano abarcaba 181 × 207 km y buscarlo no acercaba a
+ningún lado. Como elegir el núcleo resuelve la ambigüedad en silencio —quien busca "Centro"
+aterriza en Rosario sin enterarse—, la sugerencia **dice dónde queda**: "6.615 propiedades ·
+Capital Federal".
+
+**El buscador y los filtros se suman, no se pisan.** Elegir un barrio no borra los filtros
+puestos ni al revés: se puede pedir 1 ambiente y después Belgrano, o al revés, y quedan los
+dos. El chip azul "Solo Belgrano" y el numerito del botón Filtros muestran, juntos, todo lo
+que está recortando la pantalla en ese momento. Elegir un **barrio** vuela al barrio Y filtra por él; elegir una **dirección**
 solo vuela, porque un domicilio es un punto y filtrar dejaría la pantalla vacía si ahí no
 hay nada publicado.
+
+Una dirección además queda **marcada con la chinche roja** de siempre, con la punta
+clavada en la puerta y el domicilio escrito al lado. Sin ella el mapa se acercaba a la
+zona pero no decía dónde estaba parado uno, que es justo lo que hace falta para leer el
+entorno y comparar contra lo que hay alrededor. La chinche es solo una referencia: no
+filtra, no se puede clickear, y se saca desde su cartelito rojo o eligiendo otro lugar.
+Un barrio o una zona NO la ponen: su centro geométrico no significa nada y un pin en el
+medio de Palermo se leería como una propiedad más.
+
+### Ambientes
+
+Se eligen con botones **1 · 2 · 3 · 4 · 5+**, como en los portales, y **se suman**: tocar
+2 y 3 trae los de dos y los de tres, y nada más. Antes había una sola casilla de "mínimo",
+con la que pedir 2 y 3 obligaba a tragarse también los de 6. Sin ningún botón tocado no
+filtra nada. El 5 significa "5 o más": arriba de ahí queda el 8,1% de la red repartido en
+una cola larga de 6, 7, 8…, y un botón por número llenaría la barra de opciones vacías.
+
+Lo que se filtra son **ambientes, no dormitorios**. No es una distinción de nombres: en la
+cartera de Central el 84% de las propiedades tiene los dos números distintos, porque el
+ambiente de más es el living. Hasta el 2026-08-14 el mapa decía "ambientes" y medía
+dormitorios, así que pedir "3 ambientes o más" traía cosas de 4. Una propiedad sin
+ambientes cargados no entra en ningún botón: no se le inventa el número.
 
 ### Precio por m² (mapa de calor)
 
@@ -2450,3 +2485,38 @@ El lápiz recorta en el navegador, sin consultas nuevas. Las zonas guardadas son
 ## FIN DEL DOCUMENTO
 
 Este documento cubre la lógica completa del sistema PRISMA al nivel de código fuente. Cada endpoint, cada flujo de datos, cada integración y cada mecanismo de seguridad han sido documentados basándose en el análisis directo del código, sin alteración ni ejecución del mismo.
+
+### 15.x El listado de comparables: lista larga en un recuadro fijo (ago-2026)
+
+**El problema no era cuántos traía sino dónde los ponía.** Con 50 por fuente apilados en la página, el alto de la pantalla dependía de la cantidad de resultados y los dos bloques (cartera y red) dejaban de verse juntos. Ahora **cada bloque tiene su propio recuadro con scroll** (540 px en escritorio, 60vh en celular): 8 o 100 comparables ocupan el mismo lugar. Como el alto dejó de ser un costo, el pedido subió a **100 por fuente**.
+
+**No es "todos", y el número tiene una razón medida.** Un depto de 2 dormitorios en Belgrano devuelve **más de 2.000 coincidencias** en la red (628 por encima del 80%). Ni el navegador ni el asesor procesan eso. Como la lista viene ordenada de mayor a menor coincidencia, lo que queda afuera es siempre lo que menos se parece. **Subir el tope no encarece la consulta**: medido, 50 y 100 tardan lo mismo (131 vs 134 ms en caliente) porque el ranking recorre los mismos candidatos y el límite solo corta al final.
+
+**El tope vive en una sola constante** (`TOPE_COMPARABLES`) que usan los tres lados —lo que pide la pantalla, el techo del endpoint y el aviso que lee el asesor—: con tres números sueltos, cambiar uno dejaba a la interfaz mintiendo sobre lo que el backend hace.
+
+**Las fotos de las tarjetas se cargan diferido.** Con la lista completa hay hasta 200 tarjetas montadas; sin eso el navegador arranca bajando 200 fotos de golpe para mostrar tres.
+
+### 15.x Hoja "La propiedad y su entorno" — qué decide qué
+
+**Cuándo sale la hoja.** Solo si se cumplen las cuatro:
+1. Se pudo ubicar la dirección (Georef la encuentra).
+2. Hay al menos **3 categorías** de datos del entorno.
+3. La IA (o el asesor a mano) dejó un texto: **sin relato no hay hoja**, porque los datos duros solos serían una tabla suelta sin nada que la explique.
+4. El asesor dejó tildada la casilla en el paso de revisión.
+
+Si falla cualquiera, **la ficha se crea igual, sin esa hoja**. La zona nunca puede impedir que un asesor arme su ficha: todo el bloque está dentro de un `try` y cualquier caída (Georef, la base, Overpass, Gemini, el mapa) termina en "no hay hoja", nunca en error.
+
+**De dónde salen los datos, en este orden.** Dentro de CABA, de las tablas propias (instantáneo, más completo, y es el 90% de los casos medidos: 48 de los 53 ACM hechos). Fuera de CABA, de OpenStreetMap en vivo. **El cliente no ve la diferencia**: la hoja se imprime con el mismo código y no dice de dónde vino nada. La fuente queda guardada en el snapshot solo para poder auditarla.
+
+**Qué escribe la IA y qué no.** La IA **no produce ni un número**. Nombres, distancias y conteos salen calculados de la base o de OpenStreetMap; la IA solo los narra, y tiene prohibido nombrar cualquier cosa que no esté en la lista que se le pasó. El asesor **revisa y edita ese texto antes** de que la ficha exista, con los datos duros a la vista de solo lectura — sin verlos no tendría cómo darse cuenta de que la IA se inventó una estación.
+
+**Qué NO entra, y por qué.**
+- **Nada en tiempo real** (llegada del subte, bicis disponibles). La ficha es un PDF que el cliente abre tres días después: un dato en vivo queda viejo y hace quedar mal al documento.
+- **Nada de delitos ni seguridad estadística.** El dataset existe, pero poner tasas de delito en un documento firmado por la inmobiliaria es un riesgo comercial y legal que nadie pidió. Al relato también se le prohíbe afirmar que una zona es "segura" o "tranquila".
+- **La hoja no se edita después de creada.** El snapshot es inmutable a propósito: el link que tiene el cliente no puede cambiar bajo sus pies.
+
+**Un cambio que afecta a TODA ficha nueva:** la descripción de la propiedad ya **no va en la portada**, va en esta hoja. La portada queda solo con el título, la propiedad de referencia y la fecha, y esos datos se corrieron **al pie de la hoja**: sin la descripción quedaba un hueco blanco en el medio. Las fichas viejas siguen abriendo como siempre.
+
+**Las referencias del mapa las decide el mapa, no la lista.** Cada renglón lleva un punto del color de su marcador **solo si ese marcador está efectivamente dibujado**. Quedan sin punto los renglones que son un conteo (una "farmacia a menos de 500 m" es un radio, no un lugar) y los que caen fuera del recorte que se muestra. La condición se calcula con el **mismo código** que usa el generador de la imagen (`lib/acm/zona-mapa.ts`), no con una copia: si fueran dos copias, la primera edición que tocara una sola dejaría la ficha diciéndole al cliente que busque un punto que no está.
+
+**La ficha en pantalla chica.** La hoja mide 210 mm fijos porque tiene que ser un A4 exacto al imprimir; eso no se negocia. En una pantalla más angosta se **achica la hoja entera**, no se reacomoda: es el mismo documento más chico, así que no existe una segunda maqueta que pueda quedar desactualizada ni un caso "celular" que probar aparte. Tres candados hacen que no toque nada de lo que ya andaba: solo aplica en pantalla (la impresión no lo ve), solo por debajo de 840 px (el escritorio no lo ve) y el factor vale 1 si no corre JavaScript (queda como estaba).

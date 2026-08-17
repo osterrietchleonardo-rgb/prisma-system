@@ -3,7 +3,8 @@ import { resumirPieza, formatearMemoria } from "./store"
 import type { Receta } from "./types"
 
 const receta: Receta = {
-  estructura: "contraste", escenas: ["id-1"], comentario_tipo: "matiz",
+  estructura: "contraste", proposito: "ensenar", cluster: "operacion",
+  escenas: ["id-1"], comentario_tipo: "matiz",
   modelo: "claude-sonnet-5", revision: { aprobado: true, reintentos: 0 },
 }
 

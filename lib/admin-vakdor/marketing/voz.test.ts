@@ -47,7 +47,10 @@ describe("estructurasCompatibles", () => {
   })
 
   it("tolera estructuras sin la columna propositos", () => {
-    expect(estructurasCompatibles([{ clave: "vieja" }], "ensenar")).toHaveLength(1)
+    // El tipo va en la variable y no en el literal a propósito: pasado suelto, TypeScript
+    // infiere el genérico desde su restricción y trata a `clave` como una propiedad de más.
+    const sinLaColumna: Array<{ clave: string; propositos?: string[] }> = [{ clave: "vieja" }]
+    expect(estructurasCompatibles(sinLaColumna, "ensenar")).toHaveLength(1)
   })
 })
 

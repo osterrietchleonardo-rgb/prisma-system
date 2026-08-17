@@ -787,6 +787,22 @@ Tus asesores tienen, dentro del Buscador IA, una solapa **Mapa** con todas las p
 - **Saber cuánto vale el metro en cada manzana**, con el ranking de barrios del más caro al
   más barato. Es el dato que sostiene una tasación cuando el cliente discute el precio.
 - **Ver dónde tenés cartera y dónde no**, de un vistazo.
+- **Pararse en una dirección concreta.** Al buscar un domicilio, el mapa lo marca con la
+  chinche roja de siempre y deja alrededor todo lo publicado cerca. Es la vista con la que
+  un asesor defiende un precio frente al dueño: esta es la puerta, esto es lo que se está
+  pidiendo a la vuelta.
+- **Acotar a lo que el cliente pide.** Los filtros incluyen botones de ambientes (1 al 5+)
+  que se suman, así que un asesor puede dejar en pantalla solo dos y tres ambientes sin
+  arrastrar los de seis. El buscador de barrio y los filtros se combinan: "1 ambiente en
+  Belgrano" es una sola pantalla, no dos búsquedas.
+- **Saber en qué provincia está el barrio.** Cada sugerencia lo aclara ("Belgrano · Capital
+  Federal"): hay un Belgrano en Rosario, otro en Bariloche y un "Centro" en casi todas las
+  ciudades del país.
+
+> **Un número que cambió.** Hasta agosto de 2026 el mapa decía "ambientes" pero mostraba y
+> filtraba **dormitorios**, que es un ambiente menos. Ya está corregido: donde tus asesores
+> leían "3 amb." ahora pueden leer "4 amb." para la misma propiedad. No se agregó ni se
+> perdió nada; lo que cambió es que el número ahora dice lo que dice que dice.
 
 ### El precio por metro cuadrado
 
@@ -820,3 +836,19 @@ Casi nada, pero conviene que lo sepas:
 ## FIN DE LA GUÍA
 
 Esta guía refleja el sistema PRISMA tal como funciona hoy. Para la guía operativa de tu equipo, compartiles el documento **«PRISMA - Guía del Asesor»**.
+
+### La hoja del entorno en la ficha del cliente
+
+Las fichas que genera tu equipo ahora incluyen **una hoja dedicada al barrio**, apenas después de la portada: un mapa con la propiedad marcada, lo que tiene alrededor con distancias reales (subte, plazas, escuelas, farmacias, hospital, colectivos, comisaría) y un texto que lo cuenta de forma leíble.
+
+**Por qué le sirve a tu operación.** Es el argumento de zona que hasta ahora cada asesor improvisaba de memoria y contaba distinto: uno se acordaba del subte, otro de las escuelas, otro no decía nada. Ahora sale igual de completo en todas las fichas, sin depender de cuánto conozca el barrio quien la arma.
+
+**De dónde salen los números.** De registros públicos oficiales, no de la impresión de nadie. Las distancias están medidas, no estimadas. El texto lo redacta la IA, pero **solo puede usar esos datos**: tiene prohibido nombrar un lugar que no esté en la lista, opinar sobre el valor de la propiedad o afirmar que la zona es segura o tranquila.
+
+**Quién controla qué.** El asesor lee y edita el texto **antes** de que la ficha exista, con los datos a la vista, y puede sacar la hoja entera si no le sirve. Una vez creada, la ficha no cambia: el link que recibió el cliente muestra siempre lo mismo.
+
+La hoja no menciona de dónde salieron los datos. Es el documento de tu inmobiliaria, no un informe con bibliografía.
+
+**El mapa se explica solo.** Cada punto de color del mapa tiene su renglón del mismo color en la lista de al lado, y la propiedad es el punto azul oscuro. Nadie tiene que preguntarle al asesor qué es cada cosa. Los renglones que son una cuenta ("20 farmacias a menos de 500 m") o que caen fuera del pedazo de mapa que se muestra van sin punto: la referencia no nombra nada que el cliente no pueda encontrar mirando.
+
+**La ficha se abre bien desde el celular.** La mayoría de tus clientes abre el link desde el teléfono, y hasta ahora veían la mitad izquierda de cada hoja con el título cortado a mitad de palabra. Ahora ven el documento entero. El PDF no cambió: sigue saliendo en A4 exacto.

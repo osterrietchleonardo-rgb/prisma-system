@@ -120,7 +120,10 @@ export function MapaResultados({
                 <p className="truncate text-sm font-semibold">{precio(p)}</p>
                 <p className="truncate text-xs text-zinc-500">{p.address || p.city || "Sin dirección"}</p>
                 <p className="truncate text-[11px] text-zinc-400">
-                  {[tipoEnCastellano(p.property_type), p.bedrooms ? `${p.bedrooms} amb.` : null, p.total_area ? `${p.total_area} m²` : null]
+                  {/* `ambientes`, no `bedrooms`: hasta el 2026-08-14 esta linea decia
+                      "3 amb." mostrando los DORMITORIOS, y en la cartera de Central los
+                      dos numeros difieren en el 84% de las propiedades. */}
+                  {[tipoEnCastellano(p.property_type), p.ambientes ? `${p.ambientes} amb.` : null, p.total_area ? `${p.total_area} m²` : null]
                     .filter(Boolean)
                     .join(" · ")}
                 </p>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { AcmComparable, ChecklistItem, Sujeto, Operacion } from "@/lib/tasacion/types";
+import { AcmComparable, ChecklistItem, Sujeto, Operacion, TOPE_COMPARABLES } from "@/lib/tasacion/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
@@ -20,6 +20,8 @@ import {
   aplicarAjuste,
   type AtributosFotoIA,
 } from "@/lib/acm/analisis-fotos";
+import type { FichaZona } from "@/lib/acm/ficha";
+import { RevisionZona } from "./revision-zona";
 
 interface Props {
   sujeto: Sujeto;
@@ -104,6 +106,15 @@ const pctColor = (p: number) =>
 const fmtPrecio = (c: AcmComparable) =>
   c.precio ? `${c.moneda === "ARS" ? "$" : "US$"} ${c.precio.toLocaleString("es-AR")}` : "Consultar";
 
+/** La red devuelve la fecha en crudo ("2026-06-19T04:00:00+00:00"): ilegible y encima ocupa dos
+ *  líneas en un celular. Si no se puede interpretar, se muestra tal cual antes que perder el dato. */
+const fmtFecha = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" });
+};
+
 function ComparableCard({
   c, selectable, selected, onToggle, sujeto, fotos,
 }: {
@@ -129,7 +140,9 @@ function ComparableCard({
         selectable && selected ? "border-accent bg-accent/5 ring-1 ring-accent/40" : "border-accent/10 bg-card/40"
       }`}
     >
-      <div className="flex gap-4 p-4">
+      {/* En celular la tarjeta se aprieta: menos padding, foto más chica y el % un punto más
+          chico. De 640px para arriba (sm:) queda exactamente como estaba en escritorio. */}
+      <div className="flex gap-3 p-3 sm:gap-4 sm:p-4">
         {selectable && (
           <button
             onClick={() => onToggle?.(c.id)}
@@ -140,10 +153,13 @@ function ComparableCard({
           </button>
         )}
         {c.imagen ? (
+          // Carga diferida: con la lista completa hay hasta 200 tarjetas y sin esto el navegador
+          // se pondría a bajar 200 fotos de golpe. Solo baja las que el asesor tiene a la vista
+          // dentro del recuadro.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={c.imagen} alt={c.titulo} className="w-24 h-24 rounded-xl object-cover shrink-0 bg-muted" />
+          <img src={c.imagen} alt={c.titulo} loading="lazy" className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover shrink-0 bg-muted" />
         ) : (
-          <div className="w-24 h-24 rounded-xl bg-muted/40 shrink-0 flex items-center justify-center">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-muted/40 shrink-0 flex items-center justify-center">
             <Building2 className="w-7 h-7 text-muted-foreground/40" />
           </div>
         )}
@@ -168,7 +184,7 @@ function ComparableCard({
                   <span className={pctColor(pctAjustado)}>{pctAjustado}%</span>
                 </p>
               ) : (
-                <p className={`text-2xl font-black leading-none ${pctColor(c.match_pct)}`}>{c.match_pct}%</p>
+                <p className={`text-xl sm:text-2xl font-black leading-none ${pctColor(c.match_pct)}`}>{c.match_pct}%</p>
               )}
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">comparable</p>
             </div>
@@ -180,14 +196,16 @@ function ComparableCard({
             <span>{c.banos ? `${c.banos} baño${c.banos > 1 ? "s" : ""}` : ""}</span>
           </div>
 
-          <div className="flex items-end justify-between mt-2">
+          {/* `flex-wrap`: en celular el precio y el dato de la inmobiliaria no entran en una
+              línea y sin esto el precio se partía en dos ("US$" arriba, el número abajo). */}
+          <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1 mt-2">
             <div>
-              <p className="text-lg font-black text-foreground">{fmtPrecio(c)}</p>
+              <p className="text-base sm:text-lg font-black text-foreground whitespace-nowrap">{fmtPrecio(c)}</p>
               {c.precio_m2 ? <p className="text-[11px] text-muted-foreground">{c.moneda === "ARS" ? "$" : "US$"} {c.precio_m2.toLocaleString("es-AR")}/m²</p> : null}
             </div>
-            <div className="text-right text-[11px] text-muted-foreground">
+            <div className="text-right text-[11px] text-muted-foreground ml-auto">
               <p className="truncate max-w-[160px]">{c.responsable}</p>
-              {c.fecha_publicacion && <p>{c.fecha_publicacion}</p>}
+              {c.fecha_publicacion && <p>{fmtFecha(c.fecha_publicacion)}</p>}
             </div>
           </div>
         </div>
@@ -297,15 +315,30 @@ function Section({
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Icon className="w-5 h-5 text-accent" />
         <h3 className="text-lg font-black">{title}</h3>
         <Badge variant="outline" className="border-accent/20">{items.length}</Badge>
+        {/* El recuadro corta la lista a la vista: sin este aviso, ver tres tarjetas y una cuarta
+            cortada se lee como "hay cuatro" y el asesor se pierde el resto. La cantidad ya la
+            dice el contador de al lado; acá va el tope, que es el dato que no se ve en ningún
+            lado — cuando la lista llega a 100 hay más comparables que no entraron. */}
+        {items.length > 3 && (
+          <span className="text-xs text-muted-foreground">
+            Deslizá dentro del recuadro. Van ordenados de mayor a menor coincidencia y se muestran hasta {TOPE_COMPARABLES}.
+          </span>
+        )}
       </div>
       {items.length === 0 ? (
         <p className="text-sm text-muted-foreground p-4 rounded-xl bg-card/20 border border-accent/5">{empty}</p>
       ) : (
-        <div className="space-y-3">
+        // Recuadro con scroll propio: la lista viene completa, pero la página deja de crecer
+        // con la cantidad de propiedades — 8 o 100 comparables ocupan el mismo lugar en pantalla
+        // y las dos secciones quedan siempre a la vista sin scrollear medio kilómetro.
+        // `max-height` y no `height`: con tres resultados no queremos un recuadro medio vacío.
+        // El tope es relativo a la pantalla (60vh) con un techo en 560px, así también entra
+        // en un celular sin comerse toda la vista.
+        <div className="max-h-[min(60vh,560px)] overflow-y-auto overscroll-contain space-y-3 p-3 pr-2 rounded-2xl border border-accent/20 bg-background/40">
           {items.map((c) => (
             <ComparableCard
               key={c.id}
@@ -339,6 +372,10 @@ export function ComparablesResult({
   const [cargandoPrev, setCargandoPrev] = useState(false); // pidiendo el cálculo
   const [conclusiones, setConclusiones] = useState<string[]>([]);
   const [incluirConclusiones, setIncluirConclusiones] = useState(true);
+  // Hoja del entorno: el texto lo escribe la IA y el asesor lo edita acá adentro. Las
+  // coordenadas viajan dentro de `zona` (zona.centro), no aparte.
+  const [zona, setZona] = useState<FichaZona | null>(null);
+  const [incluirZona, setIncluirZona] = useState(true);
 
   const byId = useMemo(() => {
     const m = new Map<string, AcmComparable>();
@@ -557,6 +594,9 @@ export function ComparablesResult({
       if (!res.ok || data.error) throw new Error(data.error || "No se pudieron calcular las conclusiones.");
       setConclusiones(Array.isArray(data.conclusiones) ? data.conclusiones : []);
       setIncluirConclusiones(true);
+      // Si no hubo datos de zona, la casilla arranca destildada: no tiene nada que incluir.
+      setZona(data.zona ?? null);
+      setIncluirZona(Boolean(data.zona));
       setEntendidoAdvertencia(false); // cada revisión arranca sin el "ya lo sé" tildado
       setRevisando(true);
     } catch (e: any) {
@@ -581,6 +621,10 @@ export function ComparablesResult({
           operacion, sujeto, comparables, search_id: searchId ?? null,
           // [] = el asesor decidió que la sección de conclusiones no aparezca en la ficha.
           conclusiones: incluirConclusiones ? conclusiones.filter((t) => t.trim()) : [],
+          // La URL del mapa la arma el servidor con el token de la ficha: el mapa lo tiene que
+          // poder ver un cliente sin sesión.
+          incluir_zona: incluirZona && Boolean(zona),
+          zona: incluirZona && zona ? zona : null,
         }),
       });
       const data = await res.json();
@@ -744,11 +788,12 @@ export function ComparablesResult({
             <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl bg-card border border-accent/20 shadow-2xl">
               <div className="p-5 border-b border-accent/10">
                 <h3 className="text-lg font-black flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-accent" /> Conclusiones del estudio
+                  <Sparkles className="w-5 h-5 text-accent" /> Revisá antes de crear la ficha
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Se calcularon con los comparables que elegiste. Podés editarlas, agregar las tuyas o sacar la sección
-                  para que no aparezca en la ficha del cliente.
+                  El análisis del entorno lo escribió la IA con datos reales del barrio, y las conclusiones se
+                  calcularon con los comparables que elegiste. Podés editar todo, o sacar cualquiera de las dos
+                  secciones para que no aparezca en la ficha del cliente.
                 </p>
               </div>
 
@@ -795,6 +840,15 @@ export function ComparablesResult({
                     </label>
                   </div>
                 )}
+
+                <RevisionZona
+                  zona={zona}
+                  incluir={incluirZona}
+                  onIncluir={setIncluirZona}
+                  onRelato={(v) => setZona((z) => (z ? { ...z, relato: v } : z))}
+                />
+
+                <div className="h-px bg-accent/10" />
 
                 <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
                   <button

@@ -7,7 +7,7 @@ import { Scale } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-import { Sujeto, Operacion, AcmComparable } from "@/lib/tasacion/types";
+import { Sujeto, Operacion, AcmComparable, TOPE_COMPARABLES } from "@/lib/tasacion/types";
 import { SubjectInput } from "./subject-input";
 import { ComparablesResult } from "./comparables-result";
 import { MisAcm } from "./mis-acm";
@@ -98,6 +98,10 @@ export function AcmModule() {
           operacion,
           exclude_id: excludeId,
           considerar_ph: considerarPh,
+          // Traer la lista larga, no una muestra de 50. El tope y el porqué están en
+          // TOPE_COMPARABLES. Como cada sección ahora scrollea en su propio recuadro, una lista
+          // larga ya no estira la página.
+          limit: TOPE_COMPARABLES,
         }),
       });
       const data = await res.json();
