@@ -165,6 +165,42 @@ dice.
   concreto detrás del pedido "que me haga preguntas para mejorarse cada día" — semanal, porque un
   día suelto no da señal.
 
+## 6b. Reglas incorporadas el 18/08/2026
+
+Salieron de la primera pasada real sobre las fuentes de Leonardo.
+
+1. **Verificar antes de crear.** Ninguna tarea se carga en ClickUp sin comprobar
+   primero, contra el código y contra la base de producción, que no esté ya
+   implementada. Un grep positivo no es prueba: hace falta el archivo, la columna o
+   las filas reales. Crear una tarea ya hecha destruye la confianza en el sistema.
+   Ver `docs/interno/verificacion-compromisos-2026-08-18.md`.
+2. **Las notas de reunión son una fuente de primera.** `gemini-notes@google.com` deja
+   en Zoho los compromisos de cada Meet. El recolector las lee, extrae las líneas
+   asignadas a Leonardo y las pasa por la regla 1.
+3. **Aviso el día ANTES de cada reunión.** El Socio mira el calendario y, la víspera,
+   ofrece preparar lo que haya que llevar. El mismo día ya no sirve.
+4. **La bandeja de enviados cuenta.** Antes de decir que algo no tuvo seguimiento hay
+   que mirar enviados, no solo recibidos. Y antes de escribir a alguien, verificar la
+   dirección exacta en el hilo: el dominio se parece pero no siempre es el mismo.
+5. **El cierre del día (fase ⑦).** A las 17, `/socio cerrar` repasa lo hecho, mueve lo
+   que no se hizo sumando el contador de postergaciones, confirma que todo quedó
+   anotado y cierra el día explícitamente. El objetivo del Socio no es que Leonardo
+   trabaje más: es que pueda dejar de trabajar sin culpa.
+6. **"Suficiente" se define antes de empezar.** El plan del día son 3 tareas. Si están
+   hechas, el día fue un éxito, aunque queden decenas pendientes.
+7. **La franja 8-17 es un contenedor, no una meta.** Se cargan 5 a 6 horas reales de
+   trabajo dentro de esa ventana. Fuera de ella no se agenda nada del negocio.
+
+### Estructura de ClickUp (creada el 18/08/2026)
+
+Carpetas `🎯 METAS` (lista Metas, vista Gantt) y `📅 TAREAS` (lista Tareas, vistas
+Semana, Por prioridad y Tablero). Nueve campos personalizados: Área, Tipo, A quién
+afecta, **Origen**, Meta, Bloque, Energía, Veces postergada y Postergada desde.
+
+**Origen es el campo que da el control**: cada tarea declara de dónde salió (reunión,
+sugerencia de un asesor, mail, métrica o idea propia). Lo que aparece en varios lugares
+es una tarea con varios orígenes, no varias tareas huérfanas.
+
 ## 7. Autonomía
 
 **Regla universal, para toda conexión presente y futura:**
