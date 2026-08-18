@@ -1,0 +1,9 @@
+{
+  "name": "vakdor-socio",
+  "private": true,
+  "type": "module",
+  "description": "Dependencias del recolector del Socio. Aparte del package.json de PRISMA a proposito.",
+  "dependencies": {
+    "@composio/core": "^0.16.0"
+  }
+}
