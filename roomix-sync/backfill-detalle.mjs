@@ -110,6 +110,43 @@ async function loadPending() {
   return rows;
 }
 
+// ─── Filas con fotos vacías (images = '{}') ────────────────────────────────────
+// Bug distinto (ago-2026): el JSON-LD trae "image" undefined en fichas reales aunque
+// SÍ tienen galería — el fix vive en parseInternal (blob "images":[...]). Es un universo
+// aparte del de covered_area_m2/property_age_years (verificado: solo 449 de 1.765 se
+// solapan), así que se barre por separado. OJO: NO se filtra por checkpoint acá — una
+// fila puede estar "hecha" en el checkpoint viejo (visitada antes de que este fix
+// existiera) y seguir con la foto vacía.
+async function loadPendingImages() {
+  const rows = [];
+  let ultimoId = '';
+  let leidas = 0;
+  const step = 1000;
+  while (true) {
+    let data, error;
+    for (let intento = 1; intento <= 3; intento++) {
+      const q = supabase
+        .from('roomix_properties')
+        .select('id, slug, canonical_url')
+        .eq('images', '{}')
+        .order('id', { ascending: true })
+        .limit(step);
+      ({ data, error } = ultimoId ? await q.gt('id', ultimoId) : await q);
+      if (!error) break;
+      log('⏳', `Lectura fallida imágenes (${intento}/3): ${error.message}`);
+      await sleep(2000 * intento);
+    }
+    if (error) { log('❌', 'No se pudo leer las filas sin fotos:', error.message); process.exit(1); }
+
+    for (const r of (data || [])) rows.push(r);
+    leidas += (data || []).length;
+    if (!data || data.length < step) break;
+    ultimoId = data[data.length - 1].id;
+  }
+  log('🔎', `Barrido de fotos completo: ${leidas} filas sin imágenes encontradas`);
+  return rows;
+}
+
 // ─── Procesa una ficha: visita, re-parsea el detalle, UPDATE solo lo que vino ──
 async function processOne(page, dbRow) {
   const url = dbRow.canonical_url || `https://roomix.ai/propiedad/${dbRow.slug}`;
@@ -138,6 +175,7 @@ async function processOne(page, dbRow) {
     if (internal.whatsapp) patch.whatsapp = internal.whatsapp;
     if (internal.h3_res6) patch.h3_res6 = internal.h3_res6;
     if (internal.h3_res8) patch.h3_res8 = internal.h3_res8;
+    if (internal.images && internal.images.length > 0) patch.images = internal.images;
     if (internal.source_listing_url) patch.source_listing_url = internal.source_listing_url;
 
     if (Object.keys(patch).length === 0) { log('ℹ️', `${dbRow.id} fuente sin dato real (confirmado), salteo`); return 'sindato'; }
@@ -165,7 +203,14 @@ async function main() {
 
   const checkpoint = DRY_RUN ? new Set() : loadCheckpoint();
   log('🔍', 'Buscando filas con covered_area_m2 y property_age_years en null...');
-  let pending = (await loadPending()).filter((r) => !checkpoint.has(r.id));
+  const core = (await loadPending()).filter((r) => !checkpoint.has(r.id));
+  log('🔍', 'Buscando filas con fotos vacías...');
+  const imagenes = await loadPendingImages();
+  const vistos = new Set(core.map((r) => r.id));
+  let extras = 0;
+  for (const r of imagenes) { if (!vistos.has(r.id)) { core.push(r); vistos.add(r.id); extras++; } }
+  if (extras > 0) log('🖼️', `+${extras} filas sumadas solo por fotos vacías (ya estaban "hechas" para m²/antigüedad)`);
+  let pending = core;
   if (LIMIT > 0) pending = pending.slice(0, LIMIT);
   log('📦', `A procesar: ${pending.length} (ya hechas en checkpoint: ${checkpoint.size})`);
   if (pending.length === 0) { log('✅', 'Nada pendiente. Listo.'); return; }
