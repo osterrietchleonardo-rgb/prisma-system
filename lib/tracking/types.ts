@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProcesoNegocio } from "./proceso";
 
 export interface DashboardFilters {
   period: "week" | "month" | "3months" | "custom";
@@ -35,6 +36,7 @@ export interface WAAnalysis {
 }
 
 export type ActivityType = 'prospeccion' | 'prelisting' | 'prebuying' | 'captacion' | 'reserva' | 'cierre';
+export type { ProcesoNegocio } from "./proceso";
 
 export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
   id: string;
@@ -44,6 +46,8 @@ export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
   agency_id: string;
   
   type: ActivityType;
+  /** De qué lado del negocio es esta actividad. null = histórica sin definir. */
+  proceso: ProcesoNegocio | null;
   propiedad_ref: string | null;
   property_id?: string | null;
   lead_id?: string | null;
@@ -84,6 +88,10 @@ export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
 
 export const performanceLogSchema = z.object({
   type: z.enum(['prospeccion', 'prelisting', 'prebuying', 'captacion', 'reserva', 'cierre']),
+  proceso: z.enum(['compra', 'venta'], {
+    required_error: "Elegí si la actividad es de Compra o de Venta",
+    invalid_type_error: "Elegí si la actividad es de Compra o de Venta",
+  }),
   propiedad_ref: z.string().optional().nullable(),
   property_id: z.string().uuid().optional().nullable(),
   lead_id: z.string().uuid().optional().nullable(),
@@ -126,6 +134,7 @@ export interface PipelineMove {
   wa_contact_id: string | null;
   from_stage: ActivityType | null;
   to_stage: ActivityType;
+  proceso: ProcesoNegocio | null;
   created_at: string;
 }
 
