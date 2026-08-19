@@ -123,7 +123,7 @@ export function PerformanceLogForm({
   const procesoFijoPorEtapa = PROCESO_FIJO[activityType];
   const procesoBloqueado = !!procesoFijoPorEtapa || !!forcedProceso;
   const motivoBloqueo = procesoFijoPorEtapa
-    ? `Un ${PIPELINE_STAGES.find((s) => s.id === activityType)?.title} es siempre del lado de la ${labelDeProceso(procesoFijoPorEtapa).toLowerCase()}`
+    ? `${PIPELINE_STAGES.find((s) => s.id === activityType)?.title} es siempre del lado de la ${labelDeProceso(procesoFijoPorEtapa).toLowerCase()}`
     : "Lo define la tarjeta del tablero";
 
   useEffect(() => {
@@ -258,6 +258,13 @@ export function PerformanceLogForm({
                 setValue("metadata", {}); // Reset metadata on type change
                 setValue("monto_operacion", 0);
                 setValue("comision_generada", 0);
+                // El proceso depende de la etapa igual que estos tres campos:
+                // se limpia acá y el useEffect de abajo lo vuelve a fijar solo
+                // si la nueva etapa es de las que lo imponen (prelisting,
+                // captación, prebuying). Si no, queda vacío a propósito: en
+                // Prospección/Reserva/Cierre se elige a conciencia, nunca por
+                // inercia de la etapa anterior.
+                setValue("proceso", undefined as any);
               }} value={watch("type")}>
                 <SelectTrigger className="h-12 text-base">
                   <SelectValue placeholder="Seleccionar actividad..." />
