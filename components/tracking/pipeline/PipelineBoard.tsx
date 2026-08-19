@@ -23,6 +23,7 @@ import { PipelineColumnView } from "./PipelineColumn";
 import { PipelineCardItem } from "./PipelineCard";
 import { PipelineStageDialog } from "./PipelineStageDialog";
 import { PipelineClientSheet } from "./PipelineClientSheet";
+import { etapasPermitidas, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
 
 interface Props {
   /** Actividades ya filtradas por asesor, SIN filtrar por fecha/tipo/estado. */
@@ -38,7 +39,12 @@ interface Props {
 export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, onEditLog }: Props) {
   const [activeCard, setActiveCard] = useState<PipelineCard | null>(null);
   const [openCard, setOpenCard] = useState<PipelineCard | null>(null);
-  const [pending, setPending] = useState<{ card: PipelineCard; stage: ActivityType } | null>(null);
+  const [pending, setPending] = useState<{
+    card: PipelineCard;
+    stage: ActivityType;
+    proceso: ProcesoNegocio | null;
+    esProcesoNuevo: boolean;
+  } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -57,13 +63,26 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
   const resolverMovimiento = async (card: PipelineCard, destino: ActivityType) => {
     if (destino === card.stage) return;
 
+    // Una tarjeta de compra no tiene nada que hacer en Prelisting ni Captación,
+    // y una de venta no lo tiene en Prebuying: son columnas del otro lado del
+    // negocio. La tarjeta vuelve sola porque su posición se recalcula desde los
+    // datos, así que alcanza con explicar por qué y no refrescar.
+    if (!etapasPermitidas(card.proceso).includes(destino)) {
+      toast.error(
+        `${PIPELINE_STAGES.find((s) => s.id === destino)?.title} es del otro lado del negocio: ` +
+          `esta tarjeta es de ${labelDeProceso(card.proceso)}.`
+      );
+      return;
+    }
+
     if (!card.stagesConActividad.includes(destino)) {
-      setPending({ card, stage: destino });
+      setPending({ card, stage: destino, proceso: card.proceso, esProcesoNuevo: false });
       return;
     }
 
     const res = await movePipelineCard({
       clientKey: card.clientKey,
+      proceso: card.proceso,
       leadId: card.leadId,
       waContactId: card.waContactId,
       fromStage: card.stage,
@@ -81,6 +100,19 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
     onRefresh();
   };
 
+  /**
+   * Abrir el segundo proceso de un cliente = cargarle la primera actividad del
+   * otro lado. La etapa de arranque de cada lado es su etapa exclusiva.
+   */
+  const abrirProceso = (card: PipelineCard, proceso: ProcesoNegocio) => {
+    setPending({
+      card,
+      stage: proceso === "venta" ? "prelisting" : "prebuying",
+      proceso,
+      esProcesoNuevo: true,
+    });
+  };
+
   const onDragStart = (e: DragStartEvent) => {
     if (e.active.data.current?.type === "PipelineCard") {
       setActiveCard(e.active.data.current.card as PipelineCard);
@@ -95,7 +127,7 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
     const overId = String(e.over.id);
     const destino = PIPELINE_STAGES.some((s) => s.id === overId)
       ? (overId as ActivityType)
-      : cards.find((c) => c.clientKey === overId)?.stage;
+      : cards.find((c) => c.cardKey === overId)?.stage;
 
     if (destino) await resolverMovimiento(card, destino);
   };
@@ -160,6 +192,8 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
         onOpenChange={(open) => { if (!open) setPending(null); }}
         card={pending?.card ?? null}
         targetStage={pending?.stage ?? null}
+        proceso={pending?.proceso ?? null}
+        esProcesoNuevo={pending?.esProcesoNuevo ?? false}
         isDirector={isDirector}
         onSaved={() => { setPending(null); onRefresh(); }}
       />

@@ -6,17 +6,30 @@ import { Separator } from "@/components/ui/separator";
 import { PerformanceLogForm } from "@/components/tracking/PerformanceLogForm";
 import { PIPELINE_STAGES, type PipelineCard } from "@/lib/tracking/pipeline";
 import type { ActivityType } from "@/lib/tracking/types";
+import { labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   card: PipelineCard | null;
   targetStage: ActivityType | null;
+  proceso: ProcesoNegocio | null;
+  /** true cuando se está abriendo el segundo proceso del cliente, no moviendo la tarjeta. */
+  esProcesoNuevo: boolean;
   isDirector?: boolean;
   onSaved: () => void;
 }
 
-export function PipelineStageDialog({ open, onOpenChange, card, targetStage, isDirector, onSaved }: Props) {
+export function PipelineStageDialog({
+  open,
+  onOpenChange,
+  card,
+  targetStage,
+  proceso,
+  esProcesoNuevo,
+  isDirector,
+  onSaved,
+}: Props) {
   if (!card || !targetStage) return null;
 
   const stage = PIPELINE_STAGES.find((s) => s.id === targetStage);
@@ -27,11 +40,12 @@ export function PipelineStageDialog({ open, onOpenChange, card, targetStage, isD
         <div className="h-full flex flex-col">
           <SheetHeader className="p-6 pb-2">
             <SheetTitle className="text-2xl font-bold tracking-tight">
-              Pasar a {stage?.title}
+              {esProcesoNuevo ? `Abrir proceso de ${labelDeProceso(proceso)}` : `Pasar a ${stage?.title}`}
             </SheetTitle>
             <SheetDescription className="text-sm text-muted-foreground mt-1">
-              {card.clientName} todavía no tiene actividad en esta etapa. Completá los datos
-              y queda registrada como cualquier otra actividad.
+              {esProcesoNuevo
+                ? `${card.clientName} pasa a tener dos procesos en paralelo. La tarjeta que ya tenías no se mueve de donde está.`
+                : `${card.clientName} todavía no tiene actividad en esta etapa. Completá los datos y queda registrada como cualquier otra actividad.`}
             </SheetDescription>
           </SheetHeader>
 
@@ -41,6 +55,7 @@ export function PipelineStageDialog({ open, onOpenChange, card, targetStage, isD
             <PerformanceLogForm
               isDirector={isDirector}
               forcedType={targetStage}
+              forcedProceso={proceso}
               lockedClient={{
                 label: card.clientName,
                 leadId: card.leadId,

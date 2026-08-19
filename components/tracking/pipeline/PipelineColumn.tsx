@@ -40,10 +40,10 @@ export function PipelineColumnView({ stage, cards, onOpenCard, onMoveCard, showA
           isOver && "bg-accent/10"
         )}
       >
-        <SortableContext items={cards.map((c) => c.clientKey)} strategy={verticalListSortingStrategy}>
+        <SortableContext items={cards.map((c) => c.cardKey)} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
             <PipelineCardItem
-              key={card.clientKey}
+              key={card.cardKey}
               card={card}
               onOpen={onOpenCard}
               onMoveTo={onMoveCard}

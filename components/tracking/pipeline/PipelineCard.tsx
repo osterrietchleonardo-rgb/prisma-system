@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { PIPELINE_STAGES, type PipelineCard } from "@/lib/tracking/pipeline";
 import type { ActivityType } from "@/lib/tracking/types";
 import { formatPhoneInternational } from "@/lib/whatsapp/phone";
+import { badgeDeProceso, etapasPermitidas } from "@/lib/tracking/proceso";
 
 interface Props {
   card: PipelineCard;
@@ -24,9 +25,12 @@ interface Props {
 
 export function PipelineCardItem({ card, onOpen, onMoveTo, showAgent }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: card.clientKey, data: { type: "PipelineCard", card } });
+    useSortable({ id: card.cardKey, data: { type: "PipelineCard", card } });
 
   const style = { transform: CSS.Transform.toString(transform), transition };
+
+  const badge = badgeDeProceso(card.proceso);
+  const permitidas = etapasPermitidas(card.proceso);
 
   return (
     <div
@@ -37,6 +41,15 @@ export function PipelineCardItem({ card, onOpen, onMoveTo, showAgent }: Props) {
         isDragging && "opacity-40"
       )}
     >
+      <span
+        className={cn(
+          "inline-block rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider border",
+          badge.className
+        )}
+      >
+        {badge.label}
+      </span>
+
       <div className="flex items-start justify-between gap-2">
         {/* El área de arrastre es el cuerpo, no el menú. */}
         <button
@@ -64,7 +77,7 @@ export function PipelineCardItem({ card, onOpen, onMoveTo, showAgent }: Props) {
             {PIPELINE_STAGES.map((stage) => (
               <DropdownMenuItem
                 key={stage.id}
-                disabled={stage.id === card.stage}
+                disabled={stage.id === card.stage || !permitidas.includes(stage.id)}
                 onClick={() => onMoveTo(card, stage.id)}
               >
                 {stage.title}
