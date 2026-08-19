@@ -124,6 +124,27 @@ Es larga e incómoda a propósito. Salís con el `Norte.md` lleno. Preguntá de 
 
 Si maquilla los números, decíselo: con datos de fantasía el plan es de fantasía.
 
+## El outbound diario (la tarea de las 11:00)
+
+```bash
+node .claude/skills/vakdor-socio/scripts/outbound-diario.mjs [paginas]
+```
+
+Abre Sales Navigator con la sesión real de Leonardo, en **navegador visible y a ritmo
+humano**. Lee la búsqueda guardada con paginación, descarta a quien ya está contactado
+(marca "Guardado"), a quien ya está en el pipeline de ClickUp y a Víctor y Kevin Arlandi
+(Central), filtra por encaje con el IPC2, y deja **los 10 candidatos del día** ordenados
+por puntaje. También lee la bandeja y lista los hilos.
+
+> [!important] Nunca manda un mensaje
+> Ni mensajes, ni invitaciones, ni nada masivo. Los manda Leonardo a mano desde el
+> navegador que queda abierto. Si LinkedIn muestra un captcha o pide verificación, se
+> frena todo y se le avisa: su perfil personal es el 100% de su motor de marketing y una
+> restricción de cuenta sería carísima.
+
+El filtro sale del método en `20 Frentes/outbound.md` del vault. Cuando un candidato es
+dudoso, se le muestra igual y se le dice por qué dudás — el criterio final es de él.
+
 ## El consejero: NotebookLM
 
 Leonardo tiene **28 notebooks** en NotebookLM con su biblioteca de formación:
