@@ -219,6 +219,7 @@ Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos boto
 - Arriba de cada columna hay un **número**: cuántos clientes tenés en esa etapa. De un vistazo ves dónde se te está juntando el trabajo.
 - Las tarjetas están ordenadas **de la más reciente a la más antigua**, así lo último que tocaste queda siempre arriba. Si tenés muchas, **scrolleás dentro de la columna** y el tablero no se te va de la pantalla.
 - Si un cliente entró por Tokko y también te escribió por WhatsApp, **es una sola tarjeta**: el sistema los une por el celular.
+- Cada tarjeta tiene un **cartelito de color** que te dice de qué lado del negocio es: **COMPRA** (violeta) si le estás buscando una propiedad, **VENTA** (índigo) si le estás gestionando la venta de la suya, y **SIN DEFINIR** (ámbar) en tarjetas viejas que todavía no tienen ese dato cargado.
 
 **Cómo mover un cliente de etapa:** arrastrá la tarjeta a la columna que quieras, o tocá los **tres puntitos** de la tarjeta y elegí **"Mover a…"** (esto último es lo más cómodo desde el celular). Ahí pasa una de dos cosas:
 
@@ -230,6 +231,15 @@ Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos boto
 **Ver todo lo que pasó con un cliente:** tocá la tarjeta (en el nombre) y se abre un panel lateral con **toda su historia** en orden: cada actividad que cargaste y cada vez que lo moviste de etapa, con la fecha. Desde ahí también podés editar cualquier actividad.
 
 > ⚠️ **Ahora el cliente es obligatorio.** Para guardar cualquier actividad tenés que vincular un cliente (un lead de Tokko, un contacto de WhatsApp, o cargarlo a mano). Es lo que permite armar la tarjeta. Si tenés actividades viejas sin cliente, el tablero te lo avisa con un cartel amarillo: entrá a la vista Lista, editalas y vinculales el cliente para que aparezcan.
+
+#### Un cliente que te compra y te vende al mismo tiempo
+
+Pasa más seguido de lo que parece: le estás buscando una propiedad a alguien y, en el medio, esa misma persona te pide que le gestiones la venta de la suya. Antes, el tablero solo podía mostrarlo en un lugar — apenas le cargabas la actividad de venta, la tarjeta de compra desaparecía de donde estaba (y al revés). Ahora no: cada lado del negocio tiene su propia tarjeta y avanza solo.
+
+- **Cómo se abre el segundo proceso:** desde **"Nueva Actividad"**, elegís el mismo cliente y cargás la actividad del lado que te falta (por ejemplo, un Prelisting si ya lo tenías como comprador en Prebuying). O más directo: abrís la tarjeta que ya tiene, y en el panel apretás **"Abrir proceso de Venta"** (o de Compra, según corresponda). Se abre el formulario con el cliente ya cargado y arranca directo en la etapa que le corresponde a ese lado (Prelisting si es venta, Prebuying si es compra). **La tarjeta que ya tenías no se mueve** al hacer esto.
+- **El "Proceso" en el formulario:** en Prelisting, Captación y Prebuying no lo elegís vos — viene marcado solo, porque esas etapas ya son de un solo lado (un Prelisting siempre es de venta, un Prebuying siempre es de compra). En Prospección, Reserva y Cierre sí lo elegís vos y es obligatorio, sin ninguno marcado de entrada: como esas etapas sirven para los dos lados, tenés que decir cuál es a propósito.
+- **Al arrastrar:** una tarjeta de COMPRA no se puede soltar en Prelisting ni en Captación (son del lado de la venta); una de VENTA no entra en Prebuying. Si lo intentás, la tarjeta vuelve sola a su lugar y te avisa por qué. En el menú de los tres puntitos, esas etapas ya aparecen apagadas para que ni lo intentes. Las tarjetas SIN DEFINIR no tienen esta restricción: se mueven a cualquier columna, como siempre.
+- **En la ficha del cliente:** si tiene los dos procesos abiertos, arriba te avisa ("También tiene un proceso de Venta abierto"). El historial que ves ahí es el de esa tarjeta puntual — para ver el del otro lado, abrís su propia tarjeta.
 
 > 💡 **Tip:** cargá tu actividad **todos los días**. Es la diferencia entre un dashboard que refleja tu esfuerzo real y uno que te subvalora.
 > 💡 La pestaña de "Configuración IA" de las escalas de puntaje la define el director; vos solo cargás actividad.

@@ -250,6 +250,7 @@ Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos bo
 - Con el **filtro por asesor** (el desplegable de la fila de abajo) ves el tablero de una sola persona: útil para una reunión de seguimiento uno a uno.
 - Las tarjetas van **de la más reciente a la más antigua**. Las que quedan abajo de todo en una columna son, literalmente, **los clientes que nadie tocó hace más tiempo**.
 - Si un cliente entró por Tokko y también por WhatsApp, es **una sola tarjeta** (se unen por el celular): no se te duplica el embudo.
+- Cada tarjeta tiene un **cartelito de color** que dice de qué lado del negocio es: **COMPRA** (violeta), **VENTA** (índigo) o **SIN DEFINIR** (ámbar) en las tarjetas viejas que todavía no tienen ese dato.
 
 **Mover un cliente de etapa:** se arrastra la tarjeta, o se usa el menú de **tres puntitos → "Mover a…"**. Si la etapa destino es nueva para ese cliente, se abre el formulario y pide los datos de esa etapa (queda registrada como una actividad normal). Si es una etapa por la que ya pasó, se mueve sin pedir nada.
 
@@ -258,6 +259,15 @@ Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos bo
 **Trazabilidad por cliente:** al tocar una tarjeta se abre un panel con **toda la historia de ese cliente** en orden: cada actividad cargada y cada movimiento de etapa, con fecha y con acceso a editar. Es la auditoría completa del caso.
 
 > ⚠️ **Ahora el cliente es obligatorio** al cargar cualquier actividad (para el equipo y para vos). Sin cliente vinculado no se puede armar la tarjeta. Las actividades viejas sin cliente se siguen viendo en la vista Lista y el tablero avisa cuántas son con un cartel amarillo; hay que editarlas y vincularles el cliente.
+
+#### Un cliente que le compra y le vende a la agencia al mismo tiempo
+
+Es un caso frecuente: una persona le encarga a un asesor la búsqueda de una propiedad para comprar y, en paralelo, le pide que le gestione la venta de la suya. Antes esto era invisible en el tablero — cargar la actividad del segundo lado hacía desaparecer la tarjeta del primero, porque el sistema solo sabía ubicar una tarjeta por cliente. Ahora cada lado del negocio tiene **su propia tarjeta**, y avanzan de forma independiente: mover una no toca la otra.
+
+- El asesor abre el segundo proceso desde **"Nueva Actividad"** (eligiendo el mismo cliente) o desde el botón **"Abrir proceso de Compra/Venta"** dentro de la ficha del cliente. La tarjeta que ya existía **no se mueve** cuando se abre la segunda.
+- En Prelisting, Captación y Prebuying el sistema **ya sabe** de qué lado es la actividad (esas etapas son de un solo lado del negocio) y lo marca solo, sin dejar tocarlo. En Prospección, Reserva y Cierre el asesor tiene que elegirlo a mano, sin ninguno marcado de entrada, porque esas etapas sirven para los dos lados.
+- El sistema **no deja arrastrar** una tarjeta de Compra a una etapa de venta (Prelisting, Captación) ni una de Venta a Prebuying: la tarjeta vuelve sola con un aviso, y en el menú de tres puntitos esas etapas aparecen apagadas. Es una protección contra cargas erróneas, no una limitación operativa — las tarjetas "Sin definir" (las de antes de este cambio) se siguen moviendo libremente.
+- En la ficha de una tarjeta que tiene el otro proceso abierto, arriba te lo avisa ("También tiene un proceso de Venta abierto"), aunque el historial que se ve ahí es el de esa tarjeta puntual, no el de las dos mezcladas.
 
 > 💡 **Tip de gestión:** abrí el Pipeline filtrado por un asesor antes de cada reunión. En 5 segundos ves cuántos clientes tiene en cada etapa y cuáles están frenados hace semanas — mucho más rápido que leer el historial fila por fila.
 
