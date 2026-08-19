@@ -221,7 +221,7 @@ Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos boto
 - Si un cliente entró por Tokko y también te escribió por WhatsApp, **es una sola tarjeta**: el sistema los une por el celular.
 - Cada tarjeta tiene un **cartelito de color** que te dice de qué lado del negocio es: **COMPRA** (violeta) si le estás buscando una propiedad, **VENTA** (índigo) si le estás gestionando la venta de la suya, y **SIN DEFINIR** (ámbar) en tarjetas viejas que todavía no tienen ese dato cargado.
 
-> ⚠️ **¿Qué es una tarjeta SIN DEFINIR?** Es una actividad vieja, cargada antes de que el sistema empezara a preguntar de qué lado del negocio era (compra o venta). Hoy quedan muy pocas. Se mueve por el tablero sin ningún problema, igual que las demás. Si querés dejarla prolija: entrá a la vista **Lista**, editá esa actividad y elegí **Compra** o **Venta**.
+> ⚠️ **¿Qué es una tarjeta SIN DEFINIR?** Es una actividad vieja, cargada antes de que el sistema empezara a preguntar de qué lado del negocio era (compra o venta). Hoy quedan muy pocas. Se mueve por el tablero sin ningún problema, igual que las demás. Para dejarla prolija: abrí la tarjeta y en el cartel de arriba tocá **Compra** o **Venta** — con un solo toque le pone ese lado a todas las actividades viejas de esa tarjeta, sin marcarlas como modificadas ni tocarles nada más.
 
 **Cómo mover un cliente de etapa:** arrastrá la tarjeta a la columna que quieras, o tocá los **tres puntitos** de la tarjeta y elegí **"Mover a…"** (esto último es lo más cómodo desde el celular). Ahí pasa una de dos cosas:
 
@@ -230,7 +230,7 @@ Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos boto
 
 > ⚠️ **Importante:** mover una tarjeta **para atrás no borra ni inventa nada**. Tus números del Dashboard quedan exactamente igual. El tablero es para que ordenes tu cabeza, no para inflar ni bajar tus métricas.
 
-**Ver todo lo que pasó con un cliente:** tocá la tarjeta (en el nombre) y se abre un panel lateral con **toda su historia** en orden: cada actividad que cargaste y cada vez que lo moviste de etapa, con la fecha. Desde ahí también podés editar cualquier actividad.
+**Ver todo lo que pasó con un cliente:** tocá la tarjeta (en el nombre) y se abre un panel lateral con **toda la historia de esa tarjeta** en orden: cada actividad que cargaste y cada vez que la moviste de etapa, con la fecha. Desde ahí también podés editar cualquier actividad. Si el cliente tiene los dos procesos abiertos, esto es la historia completa de ese lado — para ver el otro lado abrís su propia tarjeta.
 
 > ⚠️ **Ahora el cliente es obligatorio.** Para guardar cualquier actividad tenés que vincular un cliente (un lead de Tokko, un contacto de WhatsApp, o cargarlo a mano). Es lo que permite armar la tarjeta. Si tenés actividades viejas sin cliente, el tablero te lo avisa con un cartel amarillo: entrá a la vista Lista, editalas y vinculales el cliente para que aparezcan.
 

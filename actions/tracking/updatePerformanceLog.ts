@@ -15,10 +15,12 @@ export async function updatePerformanceLog(id: string, payload: any, reason: str
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("No autenticado");
 
-  // Verify the log exists and the user has access to it
+  // Verify the log exists and the user has access to it. Se trae también
+  // `type`: hace falta más abajo para el caso de un payload que manda
+  // `proceso` sin mandar `type` (ver comentario ahí).
   const { data: existingLog } = await supabase
     .from("performance_logs")
-    .select("id")
+    .select("id, type")
     .eq("id", id)
     .single();
 
@@ -34,13 +36,24 @@ export async function updatePerformanceLog(id: string, payload: any, reason: str
   // (por ejemplo, corregir solo el monto o la fecha) — este formulario SIEMPRE
   // manda `type`, así que este bloque corre en todo uso real de la UI; queda
   // condicionado para que un caller externo que sólo actualice otro campo
-  // (sin `type` ni `proceso`) no se rompa: ahí el valor derivado da
-  // `undefined` y lo dejamos pasar tal cual, para que Supabase lo descarte del
-  // UPDATE y el proceso ya guardado sobreviva sin tocarse (decisión deliberada,
-  // no un caso sin cubrir). Lo que sí se rechaza siempre es un valor
-  // explícito que no sea ni 'compra' ni 'venta'.
-  const procesoDerivado =
-    PROCESO_FIJO[baseData.type as keyof typeof PROCESO_FIJO] ?? baseData.proceso;
+  // (sin `type` ni `proceso`) no se rompa: ahí no hay nada que derivar y lo
+  // dejamos pasar tal cual, para que Supabase lo descarte del UPDATE y el
+  // proceso ya guardado sobreviva sin tocarse (decisión deliberada, no un
+  // caso sin cubrir).
+  //
+  // Caso aparte: un payload que manda `proceso` pero no `type`. Ahí no hay
+  // `type` del que derivar el lado fijo, así que sin esto un `proceso`
+  // inventado (p.ej. 'compra' sobre una fila que en realidad es prelisting)
+  // pasaba el chequeo literal de abajo y llegaba a la base, donde el CHECK
+  // la rechazaba con un error crudo de Postgres en vez de este mensaje. Se
+  // usa el `type` ya guardado (el mismo registro que el select de arriba ya
+  // confirmó que existe) para derivar igual que si el payload lo hubiera
+  // mandado.
+  const seTocaAlgo = baseData.type !== undefined || baseData.proceso !== undefined;
+  const tipoParaDerivar = baseData.type !== undefined ? baseData.type : existingLog.type;
+  const procesoDerivado = seTocaAlgo
+    ? PROCESO_FIJO[tipoParaDerivar as keyof typeof PROCESO_FIJO] ?? baseData.proceso
+    : undefined;
   if (procesoDerivado !== undefined) {
     if (procesoDerivado !== "compra" && procesoDerivado !== "venta") {
       throw new Error("El proceso debe ser Compra o Venta");
