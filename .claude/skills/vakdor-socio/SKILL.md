@@ -124,6 +124,26 @@ Es larga e incómoda a propósito. Salís con el `Norte.md` lleno. Preguntá de 
 
 Si maquilla los números, decíselo: con datos de fantasía el plan es de fantasía.
 
+## El consejero: NotebookLM
+
+Leonardo tiene **28 notebooks** en NotebookLM con su biblioteca de formación:
+Hormozi, Russell Brunson, Brian Tracy, Alex Dey, *Strategies for Prospecting and
+Closing*, *High-Performance Sales and Conversion*, *FUNNELS DE VENTA*, *Mastering
+the 2026 B2B Sales Funnel*, *IPC - vakdor*, *PROCESOS*, y más.
+
+Cuando pida consejo, quiera capacitarse, o estés por aconsejarlo en algo de ventas,
+oferta, embudos o proceso comercial, **consultá su biblioteca antes de opinar de
+memoria**. La respuesta que sale de ahí viene con citas a sus propias fuentes y
+pesa mucho más que una opinión tuya.
+
+```bash
+notebooklm list --json                       # ver los 28 notebooks
+notebooklm ask -n <id> "<pregunta concreta>" # preguntarle a uno
+```
+
+Pedile respuestas breves y accionables, no ensayos. Y decile a Leonardo de qué
+notebook salió: aprender de su propio material lo motiva más que un consejo genérico.
+
 ## Los asesores
 
 Invocá la skill del frente cuando el tema aparezca. Marketing tiene además una
