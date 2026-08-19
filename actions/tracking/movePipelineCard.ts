@@ -3,9 +3,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import type { ActivityType } from "@/lib/tracking/types";
+import type { ProcesoNegocio } from "@/lib/tracking/proceso";
 
 export interface MovePipelineCardInput {
   clientKey: string;
+  /** Qué tarjeta del cliente se movió. Sin esto, mover la de compra movería también la de venta. */
+  proceso: ProcesoNegocio | null;
   leadId: string | null;
   waContactId: string | null;
   fromStage: ActivityType | null;
@@ -41,6 +44,7 @@ export async function movePipelineCard(
     agency_id: profile.agency_id,
     agent_id: user.id,
     client_key: input.clientKey,
+    proceso: input.proceso,
     lead_id: input.leadId,
     wa_contact_id: input.waContactId,
     from_stage: input.fromStage,
