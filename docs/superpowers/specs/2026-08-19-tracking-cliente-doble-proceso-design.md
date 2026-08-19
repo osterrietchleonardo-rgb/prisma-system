@@ -247,10 +247,15 @@ correspondientes en `PIPELINE_STAGES`:
 
 ### 7.3 Ficha del cliente (`PipelineClientSheet`)
 
-- Encabezado: qué procesos tiene abiertos ese cliente y en qué etapa está cada uno.
-- El historial de actividades se muestra completo (los dos procesos), con su cartelito,
-  para que el asesor vea la relación con el cliente entera y no a media luz.
-- Botón "Abrir proceso de Compra / Venta" para el lado que le falta.
+- Encabezado: el cartelito del proceso de esa tarjeta, y una línea que avisa si el
+  cliente además tiene el otro proceso abierto.
+- El historial muestra **las actividades y los movimientos de esa tarjeta**, no los de
+  los dos procesos mezclados: cada proceso tiene su propia historia y su propio botón
+  de editar, y mezclarlos volvería ambiguo a qué registro pertenece cada acción. Para
+  ver el otro proceso se abre la otra tarjeta.
+- Botón "Abrir proceso de Compra / Venta" para el lado que le falta. Abre el formulario
+  con el cliente fijado y la etapa de arranque de ese lado (Prelisting para venta,
+  Prebuying para compra).
 
 ### 7.4 Vista Lista (`PerformanceHistoryList`)
 
@@ -315,12 +320,15 @@ Con la cuenta **PRISMAIA - VAKDOR** — nunca Central Real Estate, que es del cl
 
 **Nuevos**
 - `supabase/migrations/20260819140000_add_proceso_a_tracking.sql`
+- `lib/tracking/proceso.ts` — el vocabulario del proceso, puro y sin dependencias de UI
+  (lo necesitan también los server actions, que no tienen por qué arrastrar los iconos
+  que importa `pipeline.ts`)
+- `lib/tracking/proceso.test.ts`
 - `lib/tracking/pipeline.test.ts`
 
 **Modificados**
 - `lib/tracking/types.ts` — `ProcesoNegocio`, campo en `PerformanceLog`, en el schema zod y en `PipelineMove`
-- `lib/tracking/pipeline.ts` — `PROCESO_FIJO`, `ETAPAS_POR_PROCESO`, `cardKey`, agrupación y movimientos por proceso
-- `lib/tracking/queries.ts` — traer la columna nueva
+- `lib/tracking/pipeline.ts` — `cardKey` y `proceso` en `PipelineCard`, agrupación y movimientos por tarjeta
 - `actions/tracking/savePerformanceLog.ts` — validar/derivar `proceso`
 - `actions/tracking/movePipelineCard.ts` — guardar `proceso`
 - `components/tracking/PerformanceLogForm.tsx` — campo Proceso
@@ -330,3 +338,6 @@ Con la cuenta **PRISMAIA - VAKDOR** — nunca Central Real Estate, que es del cl
 - `components/tracking/pipeline/PipelineColumn.tsx` — id de tarjeta = `cardKey`
 - `components/tracking/pipeline/PipelineStageDialog.tsx` — pasar el proceso al formulario
 - `components/tracking/pipeline/PipelineClientSheet.tsx` — procesos abiertos y botón de alta
+
+`lib/tracking/queries.ts` **no se toca**: usa `select("*")`, así que la columna nueva
+llega sola.
