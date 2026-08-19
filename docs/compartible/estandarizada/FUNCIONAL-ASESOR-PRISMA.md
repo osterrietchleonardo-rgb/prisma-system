@@ -216,7 +216,7 @@ Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos boto
 
 **Cómo leerlo:**
 - Cada tarjeta te muestra el nombre del cliente, su celular, la propiedad y cuántas actividades le cargaste.
-- Arriba de cada columna hay un **número**: cuántos clientes tenés en esa etapa. De un vistazo ves dónde se te está juntando el trabajo.
+- Arriba de cada columna hay un **número**: cuántas tarjetas tenés en esa etapa. Para casi todos tus clientes es lo mismo que "cuántos clientes", pero si alguno te compra y te vende a la vez, cuenta dos veces — una tarjeta por cada lado. De un vistazo ves dónde se te está juntando el trabajo.
 - Las tarjetas están ordenadas **de la más reciente a la más antigua**, así lo último que tocaste queda siempre arriba. Si tenés muchas, **scrolleás dentro de la columna** y el tablero no se te va de la pantalla.
 - Si un cliente entró por Tokko y también te escribió por WhatsApp, **es una sola tarjeta**: el sistema los une por el celular.
 - Cada tarjeta tiene un **cartelito de color** que te dice de qué lado del negocio es: **COMPRA** (violeta) si le estás buscando una propiedad, **VENTA** (índigo) si le estás gestionando la venta de la suya, y **SIN DEFINIR** (ámbar) en tarjetas viejas que todavía no tienen ese dato cargado.

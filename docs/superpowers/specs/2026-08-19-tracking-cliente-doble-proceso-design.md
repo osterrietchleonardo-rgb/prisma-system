@@ -279,6 +279,19 @@ Por lo tanto quedan idénticos:
 **El cambio es puramente aditivo sobre las métricas.** Eso es lo que lo vuelve de bajo
 riesgo pese a tocar el corazón del tablero.
 
+**Con una salvedad: "idéntico" no es lo mismo que "consistente con el tablero nuevo".**
+`fetchEtapasPipeline` (`lib/reports/weekly/sources.ts`) sigue quedándose con **una sola
+etapa por cliente** — es exactamente la regla que tenía antes de este feature, y por eso
+está en la lista de arriba: su código no se tocó. Pero el tablero dejó de tener esa
+misma regla: ahora arma **una tarjeta por (cliente, proceso)**. Un cliente con compra y
+venta abiertas va a aparecer en **dos columnas** del Pipeline y en **una sola etapa**
+del informe semanal (la de su evento más reciente, sin distinguir de qué lado es). No es
+un bug: es una divergencia real entre dos piezas que antes de este cambio siempre
+coincidían, y que ahora dejan de hacerlo justo para el caso que motiva todo el feature.
+Documentado también en el funcional del director (`FUNCIONAL-DIRECTOR-PRISMA.md`).
+Hacer que el informe semanal distinga por proceso es una decisión de producto aparte,
+fuera de esta rama.
+
 ## 9. Testing
 
 ### 9.1 Automático (vitest, `lib/tracking/pipeline.test.ts` — archivo nuevo)

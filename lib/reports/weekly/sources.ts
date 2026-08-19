@@ -213,9 +213,17 @@ export async function fetchVisitasDesde(
 /**
  * Etapa de cada cliente en el pipeline de Tracking Performance.
  *
- * Misma regla que lib/tracking/pipeline.ts: manda el evento más reciente por created_at
- * entre las actividades vivas y los movimientos manuales del tablero. Las tablas son
- * chicas (28 actividades, 4 movimientos), así que se traen enteras y se cruza en JS.
+ * Manda el evento más reciente por created_at entre las actividades vivas y los
+ * movimientos manuales del tablero. Las tablas son chicas (28 actividades, 4
+ * movimientos), así que se traen enteras y se cruza en JS.
+ *
+ * OJO — esto ya NO es "la misma regla que lib/tracking/pipeline.ts" (lo era hasta que
+ * el tablero sumó `proceso`, ago-2026). Esta función sigue quedándose con **una sola
+ * etapa por cliente** a propósito; el tablero ahora arma **una tarjeta por (cliente,
+ * proceso)**, así que un cliente con compra y venta abiertas puede aparecer en dos
+ * columnas del tablero y en una sola etapa acá. Es una divergencia conocida, no un bug:
+ * hacer que este informe también distinga por proceso es una decisión de producto que
+ * le corresponde al dueño, no algo para resolver de paso en esta rama.
  */
 export async function fetchEtapasPipeline(agencyId: string): Promise<Map<string, string>> {
   const db = getAdminDb()

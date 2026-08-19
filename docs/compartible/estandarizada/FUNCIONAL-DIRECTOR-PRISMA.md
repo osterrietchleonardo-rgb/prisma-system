@@ -245,7 +245,7 @@ Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos bo
 - **Pipeline** es un **tablero**: cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy. Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
 
 **Cómo leerlo como director — es la foto del equipo:**
-- El número arriba de cada columna te dice **cuántos clientes hay en cada etapa**. Ahí ves el embudo real: si tenés 40 en Prospección y 2 en Reserva, sabés exactamente dónde se está trabando el equipo.
+- El número arriba de cada columna te dice **cuántas tarjetas hay en esa etapa**. Para casi todos tus clientes es lo mismo que "cuántos clientes", pero no siempre: uno que compra y vende a la vez tiene dos tarjetas, así que pesa dos veces en el conteo (una en cada lado). Igual te sirve para ver el embudo real: si tenés 40 en Prospección y 2 en Reserva, sabés exactamente dónde se está trabando el equipo.
 - Cada tarjeta muestra, además del cliente y la propiedad, **el nombre del asesor** que la trabaja.
 - Con el **filtro por asesor** (el desplegable de la fila de abajo) ves el tablero de una sola persona: útil para una reunión de seguimiento uno a uno.
 - Las tarjetas van **de la más reciente a la más antigua**. Las que quedan abajo de todo en una columna son, literalmente, **los clientes que nadie tocó hace más tiempo**.
@@ -264,7 +264,9 @@ Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos bo
 
 En el tablero te vas a encontrar clientes con **dos tarjetas**, una COMPRA y una VENTA — es un cliente al que un asesor le está buscando propiedad para comprar y, al mismo tiempo, le está gestionando la venta de la suya. No es un duplicado ni un error de carga: es el mismo caso de siempre (bastante común) que antes el tablero no podía mostrar, porque solo alcanzaba para una tarjeta por cliente. Cada una avanza por su cuenta, así que vas a ver, por ejemplo, la de VENTA todavía en Prelisting mientras la de COMPRA ya llegó a Reserva.
 
-Tampoco te infla ningún número: el Dashboard, los objetivos mensuales y el informe semanal cuentan **por tipo de actividad**, no por cliente ni por tarjeta. Dos tarjetas del mismo cliente no duplican nada en el ranking de un asesor ni en la facturación del equipo — son el mismo conteo de siempre, solo que ahora el tablero te deja *ver* que hay dos procesos, en vez de esconder uno.
+Tampoco te infla los números que ya tenías: el Dashboard y los objetivos mensuales siguen contando **por tipo de actividad**, no por cliente ni por tarjeta, así que dos tarjetas del mismo cliente no duplican nada en el ranking de un asesor ni en la facturación del equipo.
+
+El **informe de los lunes es distinto y conviene que lo sepas**: ahí cada cliente sigue contando **una sola vez**, en la etapa de su actividad más reciente — ese informe todavía no separa Compra de Venta como hace el tablero. Entonces un cliente con los dos procesos abiertos te va a aparecer con **dos tarjetas en el Pipeline** pero **una sola vez** en el informe del lunes. Ninguno de los dos está mal — son dos fotos distintas del mismo cliente —, pero si algún lunes un número no te cierra contra lo que ves en el tablero, es por esto y no por un error de carga.
 
 Como dato de gestión, es una buena señal para mirar en las reuniones: un cliente con los dos lados abiertos es un cliente con **dos oportunidades de cierre** en danza, no una. Vale la pena fijarse qué asesores están detectando esos casos y haciéndoles seguimiento a los dos lados, en vez de quedarse solo con el que entró primero.
 
