@@ -20,6 +20,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { createManualContact } from "@/actions/whatsapp/createManualContact";
 import { ManualContactFields, ManualContactData } from "@/components/shared/ManualContactFields";
+import { cn } from "@/lib/utils";
+import { PROCESO_FIJO, etapasPermitidas, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
+import { PIPELINE_STAGES } from "@/lib/tracking/pipeline";
 
 interface Props {
   onSuccess: () => void;
@@ -27,6 +30,8 @@ interface Props {
   isDirector?: boolean;
   /** Fija la etapa y oculta el selector. Lo usa el popup del tablero. */
   forcedType?: ActivityType;
+  /** Fija el proceso y lo muestra bloqueado. Lo usa el popup del tablero. */
+  forcedProceso?: ProcesoNegocio | null;
   /** Fija el cliente y oculta el selector. Lo usa el popup del tablero. */
   lockedClient?: {
     label: string;
@@ -42,6 +47,7 @@ export function PerformanceLogForm({
   logToEdit,
   isDirector = false,
   forcedType,
+  forcedProceso,
   lockedClient,
   defaults,
 }: Props) {
@@ -52,6 +58,7 @@ export function PerformanceLogForm({
     resolver: zodResolver(performanceLogSchema) as any,
     defaultValues: logToEdit ? {
       type: logToEdit.type,
+      proceso: logToEdit.proceso ?? undefined,
       propiedad_ref: logToEdit.propiedad_ref || "",
       monto_operacion: logToEdit.monto_operacion || 0,
       comision_generada: logToEdit.comision_generada || 0,
@@ -59,6 +66,7 @@ export function PerformanceLogForm({
       metadata: logToEdit.metadata || {},
     } : {
       type: forcedType ?? "prospeccion",
+      proceso: forcedProceso ?? PROCESO_FIJO[forcedType ?? "prospeccion"] ?? undefined,
       propiedad_ref: defaults?.propiedadRef ?? "",
       property_id: defaults?.propertyId ?? null,
       lead_id: lockedClient?.leadId ?? null,
@@ -107,6 +115,25 @@ export function PerformanceLogForm({
 
   const { watch, setValue, register, formState: { errors } } = form;
   const activityType = watch("type");
+  const proceso = watch("proceso");
+
+  // En prelisting, captación y prebuying el proceso no se elige: lo dice la
+  // etapa. Se muestra igual, pero bloqueado, para que quede explícito qué se
+  // está guardando y no parezca que el sistema lo decidió a escondidas.
+  const procesoFijoPorEtapa = PROCESO_FIJO[activityType];
+  const procesoBloqueado = !!procesoFijoPorEtapa || !!forcedProceso;
+  const motivoBloqueo = procesoFijoPorEtapa
+    ? `Un ${PIPELINE_STAGES.find((s) => s.id === activityType)?.title} es siempre del lado de la ${labelDeProceso(procesoFijoPorEtapa).toLowerCase()}`
+    : "Lo define la tarjeta del tablero";
+
+  useEffect(() => {
+    const fijo = procesoFijoPorEtapa ?? forcedProceso ?? null;
+    if (fijo) setValue("proceso", fijo);
+  }, [procesoFijoPorEtapa, forcedProceso, setValue]);
+
+  // Cuando el proceso viene impuesto (por ejemplo desde "Abrir proceso de
+  // Venta"), el desplegable de etapas no puede ofrecer las del otro lado.
+  const etapasElegibles = etapasPermitidas(forcedProceso ?? null);
 
   // En prospección el asesor recién está conociendo al cliente: muchas veces
   // sólo tiene el celular. De la segunda etapa en adelante el email vuelve a
@@ -236,14 +263,47 @@ export function PerformanceLogForm({
                   <SelectValue placeholder="Seleccionar actividad..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="prospeccion">Prospección</SelectItem>
-                  <SelectItem value="prelisting">Prelisting</SelectItem>
-                  <SelectItem value="prebuying">Prebuying</SelectItem>
-                  <SelectItem value="captacion">Captación</SelectItem>
-                  <SelectItem value="reserva">Reserva</SelectItem>
-                  <SelectItem value="cierre">Cierre</SelectItem>
+                  {PIPELINE_STAGES.filter((s) => etapasElegibles.includes(s.id)).map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+            )}
+          </div>
+
+          {/* Proceso: de qué lado del negocio está el cliente en esta actividad. */}
+          <div className="space-y-2">
+            <Label htmlFor="proceso">Proceso *</Label>
+            {procesoBloqueado ? (
+              <div className="h-12 px-3 flex items-center gap-2 rounded-md border border-accent/20 bg-accent/5">
+                <span className="text-base font-semibold">{labelDeProceso(proceso ?? null)}</span>
+                <span className="text-[11px] text-muted-foreground">{motivoBloqueo}</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {(["compra", "venta"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setValue("proceso", p, { shouldValidate: true })}
+                    className={cn(
+                      "h-12 rounded-md border text-base font-semibold transition-all active:scale-95",
+                      proceso === p
+                        ? "border-accent bg-accent/15 text-foreground"
+                        : "border-white/10 bg-background/30 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {labelDeProceso(p)}
+                  </button>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground">
+              Una misma persona puede comprarte y venderte a la vez: cada proceso lleva su propia
+              tarjeta en el tablero.
+            </p>
+            {errors.proceso && (
+              <p className="text-xs text-red-400">{errors.proceso.message as string}</p>
             )}
           </div>
         </div>
