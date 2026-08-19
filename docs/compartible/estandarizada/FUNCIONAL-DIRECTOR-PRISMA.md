@@ -241,7 +241,7 @@ Tenés **3 solapas**:
 
 Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos botones: **Lista** y **Pipeline**.
 
-- **Lista** es lo de siempre: el historial de actividades del equipo, una fila por registro.
+- **Lista** es lo de siempre: el historial de actividades del equipo, una fila por registro. Ahí también se ve el cartelito COMPRA/VENTA/SIN DEFINIR junto al tipo de actividad, así identificás de qué lado del negocio era cada fila sin tener que entrar al Pipeline.
 - **Pipeline** es un **tablero**: cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy. Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
 
 **Cómo leerlo como director — es la foto del equipo:**
@@ -260,14 +260,13 @@ Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos bo
 
 > ⚠️ **Ahora el cliente es obligatorio** al cargar cualquier actividad (para el equipo y para vos). Sin cliente vinculado no se puede armar la tarjeta. Las actividades viejas sin cliente se siguen viendo en la vista Lista y el tablero avisa cuántas son con un cartel amarillo; hay que editarlas y vincularles el cliente.
 
-#### Un cliente que le compra y le vende a la agencia al mismo tiempo
+#### Un mismo cliente en dos columnas a la vez
 
-Es un caso frecuente: una persona le encarga a un asesor la búsqueda de una propiedad para comprar y, en paralelo, le pide que le gestione la venta de la suya. Antes esto era invisible en el tablero — cargar la actividad del segundo lado hacía desaparecer la tarjeta del primero, porque el sistema solo sabía ubicar una tarjeta por cliente. Ahora cada lado del negocio tiene **su propia tarjeta**, y avanzan de forma independiente: mover una no toca la otra.
+En el tablero te vas a encontrar clientes con **dos tarjetas**, una COMPRA y una VENTA — es un cliente al que un asesor le está buscando propiedad para comprar y, al mismo tiempo, le está gestionando la venta de la suya. No es un duplicado ni un error de carga: es el mismo caso de siempre (bastante común) que antes el tablero no podía mostrar, porque solo alcanzaba para una tarjeta por cliente. Cada una avanza por su cuenta, así que vas a ver, por ejemplo, la de VENTA todavía en Prelisting mientras la de COMPRA ya llegó a Reserva.
 
-- El asesor abre el segundo proceso desde **"Nueva Actividad"** (eligiendo el mismo cliente) o desde el botón **"Abrir proceso de Compra/Venta"** dentro de la ficha del cliente. La tarjeta que ya existía **no se mueve** cuando se abre la segunda.
-- En Prelisting, Captación y Prebuying el sistema **ya sabe** de qué lado es la actividad (esas etapas son de un solo lado del negocio) y lo marca solo, sin dejar tocarlo. En Prospección, Reserva y Cierre el asesor tiene que elegirlo a mano, sin ninguno marcado de entrada, porque esas etapas sirven para los dos lados.
-- El sistema **no deja arrastrar** una tarjeta de Compra a una etapa de venta (Prelisting, Captación) ni una de Venta a Prebuying: la tarjeta vuelve sola con un aviso, y en el menú de tres puntitos esas etapas aparecen apagadas. Es una protección contra cargas erróneas, no una limitación operativa — las tarjetas "Sin definir" (las de antes de este cambio) se siguen moviendo libremente.
-- En la ficha de una tarjeta que tiene el otro proceso abierto, arriba te lo avisa ("También tiene un proceso de Venta abierto"), aunque el historial que se ve ahí es el de esa tarjeta puntual, no el de las dos mezcladas.
+Tampoco te infla ningún número: el Dashboard, los objetivos mensuales y el informe semanal cuentan **por tipo de actividad**, no por cliente ni por tarjeta. Dos tarjetas del mismo cliente no duplican nada en el ranking de un asesor ni en la facturación del equipo — son el mismo conteo de siempre, solo que ahora el tablero te deja *ver* que hay dos procesos, en vez de esconder uno.
+
+Como dato de gestión, es una buena señal para mirar en las reuniones: un cliente con los dos lados abiertos es un cliente con **dos oportunidades de cierre** en danza, no una. Vale la pena fijarse qué asesores están detectando esos casos y haciéndoles seguimiento a los dos lados, en vez de quedarse solo con el que entró primero.
 
 > 💡 **Tip de gestión:** abrí el Pipeline filtrado por un asesor antes de cada reunión. En 5 segundos ves cuántos clientes tiene en cada etapa y cuáles están frenados hace semanas — mucho más rápido que leer el historial fila por fila.
 

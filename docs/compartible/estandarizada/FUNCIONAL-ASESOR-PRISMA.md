@@ -211,7 +211,7 @@ Más abajo en la misma ficha vas a ver el bloque **"Notas para [el nombre de tu 
 
 Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos botones: **Lista** y **Pipeline**.
 
-- **Lista** es lo de siempre: el historial de actividades, una fila por cada cosa que cargaste.
+- **Lista** es lo de siempre: el historial de actividades, una fila por cada cosa que cargaste. Ahí también aparece el cartelito COMPRA/VENTA/SIN DEFINIR, al lado del tipo de actividad, para que sepas de qué lado del negocio era esa fila sin tener que abrirla.
 - **Pipeline** es un **tablero**: cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy. Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
 
 **Cómo leerlo:**
