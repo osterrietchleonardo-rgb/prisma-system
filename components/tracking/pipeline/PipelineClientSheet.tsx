@@ -8,25 +8,40 @@ import { Badge } from "@/components/ui/badge";
 import { Edit2, MapPin, ArrowRight } from "lucide-react";
 import { PIPELINE_STAGES, type PipelineCard } from "@/lib/tracking/pipeline";
 import type { PerformanceLog, PipelineMove } from "@/lib/tracking/types";
+import { badgeDeProceso, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
+import { cn } from "@/lib/utils";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   card: PipelineCard | null;
+  /** Todos los procesos que ese cliente tiene abiertos, para ofrecer el que falta. */
+  procesosDelCliente: ProcesoNegocio[];
+  onAbrirProceso: (card: PipelineCard, proceso: ProcesoNegocio) => void;
   moves: PipelineMove[];
   onEditLog: (log: PerformanceLog) => void;
 }
 
 const tituloEtapa = (id: string) => PIPELINE_STAGES.find((s) => s.id === id)?.title ?? id;
 
-export function PipelineClientSheet({ open, onOpenChange, card, moves, onEditLog }: Props) {
+export function PipelineClientSheet({
+  open,
+  onOpenChange,
+  card,
+  procesosDelCliente,
+  onAbrirProceso,
+  moves,
+  onEditLog,
+}: Props) {
   if (!card) return null;
 
   // Actividades y movimientos manuales, intercalados por cuándo se registraron.
   const eventos = [
     ...card.logs.map((log) => ({ kind: "log" as const, at: log.created_at, log })),
     ...moves
-      .filter((m) => m.client_key === card.clientKey)
+      // Sólo los movimientos de ESTA tarjeta: los del otro proceso del mismo
+      // cliente son otra historia y se ven abriendo la otra tarjeta.
+      .filter((m) => m.client_key === card.clientKey && (m.proceso ?? null) === card.proceso)
       .map((move) => ({ kind: "move" as const, at: move.created_at, move })),
   ].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 
@@ -40,6 +55,39 @@ export function PipelineClientSheet({ open, onOpenChange, card, moves, onEditLog
               Está en <strong>{tituloEtapa(card.stage)}</strong> · {card.activityCount}{" "}
               {card.activityCount === 1 ? "actividad" : "actividades"}
             </SheetDescription>
+
+            <div className="flex flex-wrap items-center gap-2 pt-3">
+              <span
+                className={cn(
+                  "inline-block rounded px-2 py-0.5 text-[10px] font-bold tracking-wider border",
+                  badgeDeProceso(card.proceso).className
+                )}
+              >
+                {badgeDeProceso(card.proceso).label}
+              </span>
+
+              {(["compra", "venta"] as const)
+                .filter((p) => p !== card.proceso && !procesosDelCliente.includes(p))
+                .map((p) => (
+                  <Button
+                    key={p}
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[11px]"
+                    onClick={() => onAbrirProceso(card, p)}
+                  >
+                    Abrir proceso de {labelDeProceso(p)}
+                  </Button>
+                ))}
+
+              {(["compra", "venta"] as const)
+                .filter((p) => p !== card.proceso && procesosDelCliente.includes(p))
+                .map((p) => (
+                  <span key={p} className="text-[11px] text-muted-foreground">
+                    También tiene un proceso de {labelDeProceso(p)} abierto.
+                  </span>
+                ))}
+            </div>
           </SheetHeader>
 
           <Separator className="opacity-50" />

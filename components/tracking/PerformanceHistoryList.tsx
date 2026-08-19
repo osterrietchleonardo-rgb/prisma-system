@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { badgeDeProceso } from "@/lib/tracking/proceso";
 
 interface Props {
   logs: PerformanceLog[];
@@ -133,7 +134,16 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete, isDi
                   <TableCell className="text-xs font-medium">
                     {format(new Date(log.fecha_actividad), "dd MMM yyyy", { locale: es })}
                   </TableCell>
-                  <TableCell>{getTypeBadge(log.type)}</TableCell>
+                  <TableCell>
+                    <div className="flex flex-col items-start gap-1">
+                      {getTypeBadge(log.type)}
+                      <span
+                        className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-bold tracking-wider border ${badgeDeProceso(log.proceso).className}`}
+                      >
+                        {badgeDeProceso(log.proceso).label}
+                      </span>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex flex-col gap-1">
                       {log.properties ? (

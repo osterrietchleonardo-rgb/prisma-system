@@ -202,6 +202,17 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
         open={!!openCard}
         onOpenChange={(open) => { if (!open) setOpenCard(null); }}
         card={openCard}
+        procesosDelCliente={
+          openCard
+            ? (cards
+                .filter((c) => c.clientKey === openCard.clientKey && c.proceso)
+                .map((c) => c.proceso) as ProcesoNegocio[])
+            : []
+        }
+        onAbrirProceso={(card, proceso) => {
+          setOpenCard(null);
+          abrirProceso(card, proceso);
+        }}
         moves={moves}
         onEditLog={(log) => { setOpenCard(null); onEditLog(log); }}
       />
