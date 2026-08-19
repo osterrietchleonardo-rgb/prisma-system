@@ -79,7 +79,14 @@ export function BarrioCombobox({
   const sugerencias = useMemo(() => filtrarBarrios(value, opciones), [value, opciones]);
   // Mientras el catálogo no llegó, no hay con qué juzgar: no le mostramos un aviso de
   // "barrio desconocido" a alguien que escribió bien.
-  const desconocido = !cargando && opciones.length > 0 && !barrioReconocido(value, opciones);
+  //
+  // Y tampoco mientras la lista está abierta mostrando coincidencias: ahí el asesor está a
+  // mitad de tipear ("villa del par" todavía no es ningún barrio) y gritarle que no lo
+  // reconocemos es ruido. Además la lista flota por encima del aviso y solo se le ve el
+  // último renglón asomando, que queda como texto suelto sin sentido.
+  const escribiendo = abierto && sugerencias.length > 0;
+  const desconocido =
+    !cargando && opciones.length > 0 && !escribiendo && !barrioReconocido(value, opciones);
 
   const elegir = (o: BarrioOpcion) => {
     onChange(o.nombre);
@@ -158,7 +165,7 @@ export function BarrioCombobox({
             dejarlo igual, aunque quizá no aparezcan comparables.
           </span>
         </p>
-      ) : value.trim() && !cargando ? (
+      ) : value.trim() && !cargando && !escribiendo ? (
         <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-500">
           <Check className="w-3.5 h-3.5 shrink-0" /> Barrio reconocido.
         </p>
