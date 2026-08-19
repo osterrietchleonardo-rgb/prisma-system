@@ -215,6 +215,7 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
         }}
         moves={moves}
         onEditLog={(log) => { setOpenCard(null); onEditLog(log); }}
+        onResuelto={() => { setOpenCard(null); onRefresh(); }}
       />
     </div>
   );

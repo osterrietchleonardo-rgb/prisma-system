@@ -1,5 +1,7 @@
 "use client";
 
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -9,6 +11,7 @@ import { Edit2, MapPin, ArrowRight } from "lucide-react";
 import { PIPELINE_STAGES, type PipelineCard } from "@/lib/tracking/pipeline";
 import type { PerformanceLog, PipelineMove } from "@/lib/tracking/types";
 import { badgeDeProceso, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
+import { asignarProcesoATarjeta } from "@/actions/tracking/asignarProcesoATarjeta";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -20,6 +23,8 @@ interface Props {
   onAbrirProceso: (card: PipelineCard, proceso: ProcesoNegocio) => void;
   moves: PipelineMove[];
   onEditLog: (log: PerformanceLog) => void;
+  /** Se llama después de clasificar con éxito una tarjeta "Sin definir". */
+  onResuelto: () => void;
 }
 
 const tituloEtapa = (id: string) => PIPELINE_STAGES.find((s) => s.id === id)?.title ?? id;
@@ -32,8 +37,29 @@ export function PipelineClientSheet({
   onAbrirProceso,
   moves,
   onEditLog,
+  onResuelto,
 }: Props) {
+  const [isPending, startTransition] = useTransition();
+  const [eligiendo, setEligiendo] = useState<ProcesoNegocio | null>(null);
+
   if (!card) return null;
+
+  const resolverTarjeta = (proceso: ProcesoNegocio) => {
+    setEligiendo(proceso);
+    startTransition(async () => {
+      const res = await asignarProcesoATarjeta(
+        card.logs.map((log) => log.id),
+        proceso
+      );
+      setEligiendo(null);
+      if (!res.success) {
+        toast.error(res.error || "No se pudo clasificar la tarjeta");
+        return;
+      }
+      toast.success(`Tarjeta clasificada como ${labelDeProceso(proceso)}`);
+      onResuelto();
+    });
+  };
 
   // Actividades y movimientos manuales, intercalados por cuándo se registraron.
   const eventos = [
@@ -88,6 +114,36 @@ export function PipelineClientSheet({
                   </span>
                 ))}
             </div>
+
+            {card.proceso === null && (
+              <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
+                <p className="text-xs font-medium text-foreground">Esta tarjeta es de:</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px]"
+                    disabled={isPending}
+                    onClick={() => resolverTarjeta("compra")}
+                  >
+                    {isPending && eligiendo === "compra" ? "Clasificando…" : "Compra"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px]"
+                    disabled={isPending}
+                    onClick={() => resolverTarjeta("venta")}
+                  >
+                    {isPending && eligiendo === "venta" ? "Clasificando…" : "Venta"}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Sólo clasifica las actividades viejas de esta tarjeta; no las marca como
+                  modificadas ni les toca la calificación de IA.
+                </p>
+              </div>
+            )}
           </SheetHeader>
 
           <Separator className="opacity-50" />

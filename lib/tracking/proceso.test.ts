@@ -4,6 +4,7 @@ import {
   etapasPermitidas,
   cardKeyDe,
   badgeDeProceso,
+  procesoParaResolucion,
 } from "./proceso";
 
 describe("PROCESO_FIJO", () => {
@@ -58,6 +59,28 @@ describe("cardKeyDe", () => {
 
   it("agrupa lo que no tiene proceso en una clave propia y estable", () => {
     expect(cardKeyDe("5491155555555", null)).toBe("5491155555555::sin-definir");
+  });
+});
+
+describe("procesoParaResolucion", () => {
+  it("una fila de etapa libre toma el valor elegido por el asesor", () => {
+    expect(procesoParaResolucion("prospeccion", "compra")).toBe("compra");
+    expect(procesoParaResolucion("prospeccion", "venta")).toBe("venta");
+    expect(procesoParaResolucion("reserva", "compra")).toBe("compra");
+    expect(procesoParaResolucion("cierre", "venta")).toBe("venta");
+  });
+
+  it("una fila de etapa fija ignora lo elegido y toma siempre su lado forzado", () => {
+    // Aunque el asesor apriete "Compra", un prelisting/captación es de venta.
+    expect(procesoParaResolucion("prelisting", "compra")).toBe("venta");
+    expect(procesoParaResolucion("captacion", "compra")).toBe("venta");
+    // Y aunque apriete "Venta", un prebuying es de compra.
+    expect(procesoParaResolucion("prebuying", "venta")).toBe("compra");
+  });
+
+  it("una fila de etapa fija con el valor elegido coincidente también se fuerza (mismo resultado)", () => {
+    expect(procesoParaResolucion("prelisting", "venta")).toBe("venta");
+    expect(procesoParaResolucion("prebuying", "compra")).toBe("compra");
   });
 });
 

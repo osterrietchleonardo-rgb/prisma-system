@@ -56,6 +56,23 @@ export function cardKeyDe(clientKey: string, proceso: ProcesoNegocio | null): st
   return `${clientKey}::${proceso ?? "sin-definir"}`;
 }
 
+/**
+ * El valor que se escribe al resolver en un clic una tarjeta "Sin definir"
+ * (botón en `PipelineClientSheet`, action `asignarProcesoATarjeta`).
+ *
+ * Si la etapa de la fila tiene un lado fijo (Prelisting/Captación = venta,
+ * Prebuying = compra) ese lado gana siempre, sin importar qué botón haya
+ * tocado el asesor. Es lo que hace que la escritura sea segura por
+ * construcción: nunca puede producir un valor que el CHECK de la base
+ * (`performance_logs_proceso_coherente`) vaya a rechazar.
+ */
+export function procesoParaResolucion(
+  type: ActivityType,
+  elegido: ProcesoNegocio
+): ProcesoNegocio {
+  return PROCESO_FIJO[type] ?? elegido;
+}
+
 export function labelDeProceso(proceso: ProcesoNegocio | null): string {
   if (proceso === "compra") return "Compra";
   if (proceso === "venta") return "Venta";
