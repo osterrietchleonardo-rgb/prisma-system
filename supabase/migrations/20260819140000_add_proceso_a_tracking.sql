@@ -39,9 +39,19 @@ UPDATE public.performance_logs
 --    Si tiene los dos, o no tiene ninguno, queda NULL y lo define una persona.
 --
 --    Ojo: acá el cliente se agrupa por uuid (wa_contact_id / lead_id), mientras
---    que el tablero lo agrupa por teléfono normalizado. Son criterios distintos,
---    y el de acá es más fino: a lo sumo resuelve de menos y deja algo en NULL,
---    nunca de más. Ese es el lado seguro para equivocarse.
+--    que el tablero lo agrupa por teléfono normalizado. Son criterios distintos
+--    y pueden discrepar en LOS DOS SENTIDOS, no solo resolviendo de menos:
+--    agrupar por uuid separa lo que el teléfono uniría, así que en el caso
+--    puntual de una persona que llega como lead de Tokko Y como contacto de
+--    WhatsApp con lados opuestos (por ejemplo wa_contact A con un prelisting
+--    → venta y lead B con un prebuying → compra, mismo teléfono, más una
+--    prospección suelta en A), este criterio SÍ resuelve de más: por uuid, A
+--    tiene un solo lado y la prospección se estampa 'venta'; por teléfono, el
+--    cliente tiene los dos lados y el tablero la hubiera dejado en NULL.
+--    Ese caso no existe hoy en los datos (verificado: cero clientes con ambos
+--    lados a la vez entre lead y contacto de WhatsApp), pero si en el futuro
+--    aparece uno, el backfill de esta migración y el criterio del tablero
+--    pueden no coincidir para esa fila puntual.
 WITH lado_unico AS (
   SELECT coalesce(wa_contact_id::text, lead_id::text) AS ck,
          min(proceso)                                 AS proceso

@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
+import { PROCESO_FIJO } from "@/lib/tracking/proceso";
 
 export async function updatePerformanceLog(id: string, payload: any, reason: string) {
   if (!reason || reason.trim() === '') {
@@ -26,6 +27,26 @@ export async function updatePerformanceLog(id: string, payload: any, reason: str
   }
 
   const { waMetrics, waAnalysis, ...baseData } = payload;
+
+  // Igual que savePerformanceLog: el action es la última puerta antes de la
+  // base y no puede confiar en que el llamador haya hecho los deberes. A
+  // diferencia del alta, una edición puede legítimamente no tocar el proceso
+  // (por ejemplo, corregir solo el monto o la fecha) — este formulario SIEMPRE
+  // manda `type`, así que este bloque corre en todo uso real de la UI; queda
+  // condicionado para que un caller externo que sólo actualice otro campo
+  // (sin `type` ni `proceso`) no se rompa: ahí el valor derivado da
+  // `undefined` y lo dejamos pasar tal cual, para que Supabase lo descarte del
+  // UPDATE y el proceso ya guardado sobreviva sin tocarse (decisión deliberada,
+  // no un caso sin cubrir). Lo que sí se rechaza siempre es un valor
+  // explícito que no sea ni 'compra' ni 'venta'.
+  const procesoDerivado =
+    PROCESO_FIJO[baseData.type as keyof typeof PROCESO_FIJO] ?? baseData.proceso;
+  if (procesoDerivado !== undefined) {
+    if (procesoDerivado !== "compra" && procesoDerivado !== "venta") {
+      throw new Error("El proceso debe ser Compra o Venta");
+    }
+    baseData.proceso = procesoDerivado;
+  }
 
   const supabaseAdmin = createAdminClient();
   const { data: log, error } = await supabaseAdmin

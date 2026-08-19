@@ -208,10 +208,27 @@ filtra por Eliminadas las siga viendo consistentes.
 **Nada se borra, ningún `type` cambia, ningún monto se mueve, ningún `status` se toca.**
 El backfill escribe únicamente la columna nueva.
 
-Las 4 tarjetas que quedan "Sin definir" muestran un cartelito ámbar y un botón que
-abre un diálogo de un clic para asignarles proceso. Esa asignación escribe `proceso` en
-todas las actividades de esa tarjeta; no marca las actividades como `modificada`
-porque no cambia contenido comercial, sólo las clasifica.
+Las 4 tarjetas que quedan "Sin definir" muestran un cartelito ámbar. **Eso es lo único
+que se implementó de este punto.** No existe ningún diálogo de un clic para asignarles
+proceso — esa parte quedó pendiente, es un follow-up conocido, no un olvido a
+redescubrir.
+
+Comportamiento real de una tarjeta "Sin definir" hoy:
+
+- No tiene ninguna restricción de movimiento: se arrastra a cualquier columna, igual
+  que en el tablero viejo (a diferencia de las tarjetas COMPRA/VENTA, que sí tienen
+  columnas bloqueadas — ver 5.4).
+- Si se la arrastra a una etapa donde ese cliente todavía no tiene actividad, se abre
+  el formulario normal de actividad, que pide (o autocompleta) un `proceso` real de
+  verdad (`compra` o `venta`). Guardar ese formulario **crea una tarjeta nueva**; la
+  tarjeta "Sin definir" original no se toca y se queda donde estaba, con sus
+  actividades viejas intactas. Un mismo cliente puede terminar así con **tres**
+  tarjetas: sin-definir, compra y venta.
+- La única forma de reclasificar las actividades viejas en sí (para que la tarjeta
+  "Sin definir" deje de existir) es hoy editarlas una por una desde la vista Lista.
+  Esa edición pide un *motivo*, marca la fila como "Modificada" y le borra la
+  calificación de IA — exactamente el costo que este punto decía evitar con el
+  diálogo de un clic. Mientras el diálogo no se construya, ese es el único camino.
 
 ## 7. Interfaz
 

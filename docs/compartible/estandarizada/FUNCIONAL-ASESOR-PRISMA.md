@@ -212,7 +212,7 @@ Más abajo en la misma ficha vas a ver el bloque **"Notas para [el nombre de tu 
 Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos botones: **Lista** y **Pipeline**.
 
 - **Lista** es lo de siempre: el historial de actividades, una fila por cada cosa que cargaste. Ahí también aparece el cartelito COMPRA/VENTA/SIN DEFINIR, al lado del tipo de actividad, para que sepas de qué lado del negocio era esa fila sin tener que abrirla.
-- **Pipeline** es un **tablero**: cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy. Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
+- **Pipeline** es un **tablero**: casi siempre cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy — salvo cuando te compra y te vende a la vez, que ahí tiene dos (más abajo, en *"Un cliente que te compra y te vende al mismo tiempo"*). Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
 
 **Cómo leerlo:**
 - Cada tarjeta te muestra el nombre del cliente, su celular, la propiedad y cuántas actividades le cargaste.
@@ -220,6 +220,8 @@ Arriba a la derecha, al lado del filtro de fechas, tenés un switch con dos boto
 - Las tarjetas están ordenadas **de la más reciente a la más antigua**, así lo último que tocaste queda siempre arriba. Si tenés muchas, **scrolleás dentro de la columna** y el tablero no se te va de la pantalla.
 - Si un cliente entró por Tokko y también te escribió por WhatsApp, **es una sola tarjeta**: el sistema los une por el celular.
 - Cada tarjeta tiene un **cartelito de color** que te dice de qué lado del negocio es: **COMPRA** (violeta) si le estás buscando una propiedad, **VENTA** (índigo) si le estás gestionando la venta de la suya, y **SIN DEFINIR** (ámbar) en tarjetas viejas que todavía no tienen ese dato cargado.
+
+> ⚠️ **¿Qué es una tarjeta SIN DEFINIR?** Es una actividad vieja, cargada antes de que el sistema empezara a preguntar de qué lado del negocio era (compra o venta). Hoy quedan muy pocas. Se mueve por el tablero sin ningún problema, igual que las demás. Si querés dejarla prolija: entrá a la vista **Lista**, editá esa actividad y elegí **Compra** o **Venta**.
 
 **Cómo mover un cliente de etapa:** arrastrá la tarjeta a la columna que quieras, o tocá los **tres puntitos** de la tarjeta y elegí **"Mover a…"** (esto último es lo más cómodo desde el celular). Ahí pasa una de dos cosas:
 

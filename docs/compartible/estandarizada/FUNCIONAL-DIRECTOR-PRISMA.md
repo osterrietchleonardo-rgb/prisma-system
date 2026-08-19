@@ -242,7 +242,7 @@ Tenés **3 solapas**:
 Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos botones: **Lista** y **Pipeline**.
 
 - **Lista** es lo de siempre: el historial de actividades del equipo, una fila por registro. Ahí también se ve el cartelito COMPRA/VENTA/SIN DEFINIR junto al tipo de actividad, así identificás de qué lado del negocio era cada fila sin tener que entrar al Pipeline.
-- **Pipeline** es un **tablero**: cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy. Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
+- **Pipeline** es un **tablero**: casi siempre cada cliente aparece **una sola vez**, como una tarjeta parada en la etapa en la que está hoy — salvo cuando compra y vende al mismo tiempo, que ahí tiene dos tarjetas (más abajo, en *"Un mismo cliente en dos columnas a la vez"*). Las columnas son las 6 etapas: Prospección, Prelisting, Prebuying, Captación, Reserva y Cierre.
 
 **Cómo leerlo como director — es la foto del equipo:**
 - El número arriba de cada columna te dice **cuántas tarjetas hay en esa etapa**. Para casi todos tus clientes es lo mismo que "cuántos clientes", pero no siempre: uno que compra y vende a la vez tiene dos tarjetas, así que pesa dos veces en el conteo (una en cada lado). Igual te sirve para ver el embudo real: si tenés 40 en Prospección y 2 en Reserva, sabés exactamente dónde se está trabando el equipo.
@@ -256,7 +256,7 @@ Dentro de la solapa **Actividad**, arriba a la derecha, hay un switch con dos bo
 
 > ⚠️ **Mover tarjetas no toca tus números.** Volver un cliente para atrás **no borra actividades ni cambia ningún KPI** del Dashboard. Queda registrado quién lo movió y cuándo, pero las métricas y el ranking se siguen calculando solo con la actividad realmente cargada. Es una herramienta de orden, no una forma de maquillar resultados.
 
-**Trazabilidad por cliente:** al tocar una tarjeta se abre un panel con **toda la historia de ese cliente** en orden: cada actividad cargada y cada movimiento de etapa, con fecha y con acceso a editar. Es la auditoría completa del caso.
+**Trazabilidad por cliente:** al tocar una tarjeta se abre un panel con **toda la historia de esa tarjeta** en orden: cada actividad cargada y cada movimiento de etapa, con fecha y con acceso a editar. Si el cliente tiene los dos procesos abiertos (compra y venta), esto es la auditoría completa de ese lado — para ver el del otro lado hay que abrir su propia tarjeta.
 
 > ⚠️ **Ahora el cliente es obligatorio** al cargar cualquier actividad (para el equipo y para vos). Sin cliente vinculado no se puede armar la tarjeta. Las actividades viejas sin cliente se siguen viendo en la vista Lista y el tablero avisa cuántas son con un cartel amarillo; hay que editarlas y vincularles el cliente.
 
