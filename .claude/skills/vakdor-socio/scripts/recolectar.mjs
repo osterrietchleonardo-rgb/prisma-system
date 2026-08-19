@@ -161,17 +161,34 @@ async function github() {
 
 async function buffer() {
   if (!env.BUFFER_API_KEY) throw new Error('sin BUFFER_API_KEY');
-  // La REST vieja (api.bufferapp.com) ya no acepta estos tokens: hay que ir por GraphQL,
-  // igual que lib/admin-vakdor/marketing/buffer-client.ts.
-  const r = await fetch('https://api.buffer.com/graphql', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.BUFFER_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: '{ account { channels { id service name } } }' }),
-  });
-  const b = await r.json();
-  if (b.errors) throw new Error(`GraphQL: ${JSON.stringify(b.errors).slice(0, 140)}`);
-  const canales = b?.data?.account?.channels ?? [];
-  return { canales: canales.map((c) => ({ servicio: c.service, nombre: c.name })) };
+  // Via el CLI oficial (@bufferapp/cli), que se genera del schema GraphQL.
+  // Escribir la query a mano es lo que fallaba antes: el token siempre estuvo bien.
+  const { execFileSync } = await import('node:child_process');
+  // Se invoca el .mjs con node: en Windows, Node bloquea ejecutar el .cmd del bin
+  // global (EINVAL), y usar shell:true para saltearlo abriria inyeccion.
+  const CLI = path.join(process.env.APPDATA || '', 'npm/node_modules/@bufferapp/cli/built/index.mjs');
+  if (!fs.existsSync(CLI)) throw new Error('falta @bufferapp/cli (npm i -g @bufferapp/cli)');
+  const correr = (args) => {
+    const out = execFileSync(process.execPath, [CLI, ...args, '--output', 'json', '--quiet'],
+      { encoding: 'utf8', env: { ...process.env, BUFFER_API_KEY: env.BUFFER_API_KEY }, stdio: ['ignore', 'pipe', 'pipe'] });
+    return JSON.parse(out);
+  };
+  const cuenta = correr(['account']);
+  const org = cuenta.organizations?.[0]?.id;
+  const canales = correr(['channels', 'list']);
+  const desde = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10) + 'T00:00:00Z';
+  const hasta = new Date().toISOString().slice(0, 10) + 'T00:00:00Z';
+  const met = correr(['aggregatedPostMetrics', '--organization-id', org,
+    '--start-date-time', desde, '--end-date-time', hasta]);
+  const m = Object.fromEntries((met.metrics || []).map((x) => [x.type, x.value]));
+  return {
+    canales: canales.map((c) => ({ servicio: c.service, nombre: c.name, id: c.id })),
+    ultimos_30_dias: {
+      posts: m.postCount, impresiones: m.impressions, alcance: m.reach,
+      reacciones: m.reactions, comentarios: m.comments,
+      compartidos: m.shares, tasa_engagement: m.engagementRate,
+    },
+  };
 }
 
 // ---------------------------------------------------------------------- main
@@ -183,10 +200,7 @@ const FUENTES = [
   ['mailerlite', mailerlite],
   ['n8n', n8n],
   ['github', github],
-  // buffer: DESACTIVADO. El BUFFER_API_KEY actual permite publicar (lo usa
-  // lib/admin-vakdor/marketing/buffer-client.ts) pero no leer: account.channels
-  // devuelve "Not authorized to access this resource". Para que el asesor de
-  // Marketing lea métricas hace falta un token con alcance de lectura.
+  ['buffer', buffer],
 ];
 
 const resultados = await Promise.all(FUENTES.map(([n, f]) => fuente(n, f)));
@@ -216,6 +230,6 @@ for (const r of resultados.filter((r) => r.ok)) {
   if (r.nombre === 'n8n') console.log(`  n8n       -> ${d.fallidas.length} ejecuciones con error`);
   if (r.nombre === 'github') console.log(`  github    -> ${d.fallidos.length} workflows fallidos`);
   if (r.nombre === 'mailerlite') console.log(`  mailerlite-> ${d.grupos.length} grupos`);
-  if (r.nombre === "buffer") console.log(`  buffer    -> ${d.canales.length} canales`);
+  if (r.nombre === "buffer") console.log(`  buffer    -> ${d.canales.length} canales | 30d: ${d.ultimos_30_dias.posts} posts, ${d.ultimos_30_dias.impresiones} impresiones, ${d.ultimos_30_dias.tasa_engagement}% engagement`);
 }
 console.log(`\nparte guardado en estado/${parte.fecha}.json`);
