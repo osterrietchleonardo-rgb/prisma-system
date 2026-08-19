@@ -571,7 +571,7 @@ function parseInternal(html, slug) {
     const str = (re) => { const m = win.match(re); return m && m[1] != null ? m[1] : null; };
     const num = (re) => { const m = win.match(re); return m && m[1] != null ? parseFloat(m[1]) : null; };
     const int = (re) => { const m = win.match(re); return m && m[1] != null ? parseInt(m[1], 10) : null; };
-    return {
+    const result = {
       operation_type: str(/"operation_type":"(venta|alquiler|temporal)"/),
       property_type_es: str(/"property_type":"([^"]*)"/),
       expenses: num(/"expenses":(\d+(?:\.\d+)?)/),
@@ -594,6 +594,47 @@ function parseInternal(html, slug) {
       // El primer "url" no-roomix dentro de la ventana = ficha original del portal.
       source_listing_url: str(/"url":"(https?:\/\/(?!roomix\.ai)[^"]+)"/),
     };
+    // Respaldo (detectado ago-2026): Roomix repite covered_area_m2/property_age_years en un
+    // segundo bloque "property":{...} — el que alimenta el panel de análisis/comparables —,
+    // en otro punto del payload y con el mismo nombre de campo. Cuando la ventana principal
+    // no lo trae (probado: pasa en fichas reales, no es que falten esos m²/antigüedad), se
+    // busca ahí antes de darlas por perdidas. OJO: la página trae MÁS DE UN "property":{...}
+    // (hay uno previo, solo de coordenadas, para el mapa) — hay que recorrer todas las
+    // ocurrencias, no quedarse con la primera.
+    if (result.covered_area_m2 == null || result.property_age_years == null) {
+      let pIdx = -1;
+      while (
+        (result.covered_area_m2 == null || result.property_age_years == null) &&
+        (pIdx = blob.indexOf('"property":{', pIdx + 1)) !== -1
+      ) {
+        const pWin = blob.slice(pIdx, pIdx + 500);
+        if (result.covered_area_m2 == null) {
+          const m = pWin.match(/"covered_area_m2":(\d+(?:\.\d+)?)/);
+          if (m) result.covered_area_m2 = parseFloat(m[1]);
+        }
+        if (result.property_age_years == null) {
+          const m = pWin.match(/"property_age_years":(\d+)/);
+          if (m) result.property_age_years = parseInt(m[1], 10);
+        }
+      }
+    }
+    // Fotos: el JSON-LD trae "image" undefined en ~1.765 fichas reales (verificado ago-2026:
+    // 15/15 en muestra recuperable) aunque la ficha SÍ tiene galería — está en este mismo
+    // objeto interno, como "images":[url, url, ...] (URLs de cdn.roomix.ai, la misma galería
+    // que se ve en la página). Una sola ocurrencia en el payload, sin ambigüedad de bloques.
+    {
+      const imgIdx = blob.indexOf('"images":[');
+      if (imgIdx !== -1) {
+        const imgEnd = blob.indexOf(']', imgIdx);
+        if (imgEnd !== -1) {
+          try {
+            const arr = JSON.parse(blob.slice(imgIdx + '"images":'.length, imgEnd + 1));
+            if (Array.isArray(arr) && arr.length > 0) result.images = arr.filter(Boolean);
+          } catch {}
+        }
+      }
+    }
+    return result;
   } catch { return null; }
 }
 
@@ -692,7 +733,10 @@ function mapToRow(jsonLd, agent, entry, internal, descripcionCompleta) {
     phone: internal?.phone || null, whatsapp: internal?.whatsapp || null,
     h3_res6: internal?.h3_res6 || null, h3_res8: internal?.h3_res8 || null,
     amenities: (Array.isArray(me.amenityFeature || jsonLd.amenityFeature) ? (me.amenityFeature || jsonLd.amenityFeature) : []).map(a => typeof a === 'string' ? a : a.name || '').filter(Boolean),
-    images: (Array.isArray(jsonLd.image) ? jsonLd.image : [jsonLd.image]).filter(Boolean),
+    images: (() => {
+      const fromJsonLd = (Array.isArray(jsonLd.image) ? jsonLd.image : [jsonLd.image]).filter(Boolean);
+      return fromJsonLd.length > 0 ? fromJsonLd : (internal?.images || []);
+    })(),
     roomix_agency_name: agent?.name || null, roomix_agency_logo: agent?.image || null,
     roomix_agency_source_url: agent?.seller_url || null,
     source_listing_url: internal?.source_listing_url || null,   // ficha ORIGINAL del portal (ZonaProp/ML/Argenprop)
