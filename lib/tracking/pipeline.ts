@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { normalizePhoneE164 } from "@/lib/whatsapp/phone";
 import type { ActivityType, PerformanceLog, PipelineMove } from "./types";
+import { cardKeyDe, type ProcesoNegocio } from "./proceso";
 
 export interface PipelineStageDef {
   id: ActivityType;
@@ -37,6 +38,14 @@ export const PIPELINE_STAGES: readonly PipelineStageDef[] = [
 ] as const;
 
 export interface PipelineCard {
+  /**
+   * Identidad de la tarjeta en el tablero: cliente + proceso. Un mismo cliente
+   * que nos compra y además nos vende tiene dos tarjetas, y esta es la clave
+   * que las distingue (la de dnd-kit, la del map de movimientos, la de React).
+   */
+  cardKey: string;
+  /** De qué lado del negocio es esta tarjeta. null = histórica sin definir. */
+  proceso: ProcesoNegocio | null;
   /** Celular normalizado, o "lead:<id>" / "wa:<id>" como respaldo. */
   clientKey: string;
   clientName: string;
@@ -121,38 +130,48 @@ export function buildPipeline(
   const vivos = logs.filter((l) => l.status !== "eliminada");
 
   let sinCliente = 0;
-  const porCliente = new Map<string, PerformanceLog[]>();
+
+  // La unidad del tablero es (cliente, proceso), no el cliente: por eso la
+  // clave del map es la cardKey y no la clientKey.
+  const porTarjeta = new Map<
+    string,
+    { clientKey: string; proceso: ProcesoNegocio | null; logs: PerformanceLog[] }
+  >();
 
   for (const log of vivos) {
-    const key = clientKeyFromLog(log);
-    if (!key) {
+    const clientKey = clientKeyFromLog(log);
+    if (!clientKey) {
       sinCliente++;
       continue;
     }
-    const actual = porCliente.get(key);
-    if (actual) actual.push(log);
-    else porCliente.set(key, [log]);
+    const proceso = log.proceso ?? null;
+    const key = cardKeyDe(clientKey, proceso);
+    const actual = porTarjeta.get(key);
+    if (actual) actual.logs.push(log);
+    else porTarjeta.set(key, { clientKey, proceso, logs: [log] });
   }
 
-  // Último movimiento manual por cliente.
+  // Último movimiento manual POR TARJETA. Si se indexara sólo por cliente,
+  // arrastrar la tarjeta de compra movería también la de venta.
   const ultimoMovimiento = new Map<string, PipelineMove>();
   for (const move of moves) {
-    const previo = ultimoMovimiento.get(move.client_key);
+    const key = cardKeyDe(move.client_key, move.proceso ?? null);
+    const previo = ultimoMovimiento.get(key);
     if (!previo || move.created_at > previo.created_at) {
-      ultimoMovimiento.set(move.client_key, move);
+      ultimoMovimiento.set(key, move);
     }
   }
 
   const cards: PipelineCard[] = [];
 
-  for (const [clientKey, delCliente] of porCliente) {
+  for (const [cardKey, { clientKey, proceso, logs: delCliente }] of porTarjeta) {
     // De más nueva a más vieja por created_at.
     const ordenados = [...delCliente].sort((a, b) =>
       a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0
     );
     const ultima = ordenados[0];
 
-    const move = ultimoMovimiento.get(clientKey);
+    const move = ultimoMovimiento.get(cardKey);
     const movioDespues = !!move && move.created_at > ultima.created_at;
     const stage: ActivityType = movioDespues ? move!.to_stage : ultima.type;
     const lastEventAt = movioDespues ? move!.created_at : ultima.created_at;
@@ -167,6 +186,8 @@ export function buildPipeline(
       null;
 
     cards.push({
+      cardKey,
+      proceso,
       clientKey,
       clientName: conNombre ? nombreDeCliente(conNombre, clientKey) : clientKey,
       clientPhone: phone,
