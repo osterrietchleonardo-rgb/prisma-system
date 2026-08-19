@@ -139,14 +139,22 @@ async function mailerlite() {
 async function n8n() {
   const base = String(env.N8N_WEBHOOK_URL || '').replace(/\/webhook.*$/, '');
   if (!base) throw new Error('sin N8N_WEBHOOK_URL');
-  const j = await json(`${base}/api/v1/executions?status=error&limit=10`, {
+  const j = await json(`${base}/api/v1/executions?status=error&limit=100`, {
     headers: { 'X-N8N-API-KEY': env.N8N_API_KEY },
   });
+  // Solo lo de las ultimas 48 h. Sin este filtro se reportan errores de hace
+  // semanas como si fueran de hoy, y el Socio da falsas alarmas sobre cosas
+  // que Leonardo ya resolvio. Paso el 19/08/2026.
+  const corte = Date.now() - 48 * 3600 * 1000;
+  const recientes = (j.data || []).filter((e) => new Date(e.startedAt).getTime() >= corte);
   return {
-    fallidas: (j.data || []).map((e) => ({
+    ventana: '48 h',
+    fallidas: recientes.map((e) => ({
       flujo: e.workflowData?.name ?? e.workflowId,
       cuando: e.startedAt,
+      id: e.id,
     })),
+    historico_total: (j.data || []).length,
   };
 }
 
@@ -227,7 +235,7 @@ for (const r of resultados.filter((r) => r.ok)) {
     console.log(`  clickup   -> ${d.total_abiertas} abiertas | hoy: ${d.hoy.length} | vencidas: ${d.vencidas.length} | postergadas 3+: ${d.postergadas_3_o_mas.length}`);
   if (r.nombre === 'zoho') console.log(`  zoho      -> ${d.no_leidos.length} sin leer`);
   if (r.nombre === 'supabase') console.log(`  supabase  -> ${d.sugerencias_abiertas} sugerencias abiertas`);
-  if (r.nombre === 'n8n') console.log(`  n8n       -> ${d.fallidas.length} ejecuciones con error`);
+  if (r.nombre === 'n8n') console.log(`  n8n       -> ${d.fallidas.length} errores en las ultimas 48h (historico: ${d.historico_total})`);
   if (r.nombre === 'github') console.log(`  github    -> ${d.fallidos.length} workflows fallidos`);
   if (r.nombre === 'mailerlite') console.log(`  mailerlite-> ${d.grupos.length} grupos`);
   if (r.nombre === "buffer") console.log(`  buffer    -> ${d.canales.length} canales | 30d: ${d.ultimos_30_dias.posts} posts, ${d.ultimos_30_dias.impresiones} impresiones, ${d.ultimos_30_dias.tasa_engagement}% engagement`);
