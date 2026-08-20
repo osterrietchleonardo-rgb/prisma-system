@@ -6,6 +6,10 @@ const config: Config = {
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    // lib/tracking/proceso.ts builds Tailwind class strings (badgeDeProceso)
+    // outside pages/components/app — without this glob those classes are
+    // purged from the generated CSS and the badges render colorless.
+    "./lib/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
   	extend: {
