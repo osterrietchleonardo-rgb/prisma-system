@@ -13,6 +13,14 @@
 -- 'compra'/'venta'. Por eso las dos restricciones bajan ANTES de tocar un
 -- solo valor, y suben de nuevo recién al final, ya validando contra la lista
 -- de cada etapa.
+--
+-- Idempotente y segura de re-correr: cada UPDATE de los pasos 3 y 4 filtra
+-- por `type`/`to_stage` además de por `proceso IS NULL` (o ya resuelto), así
+-- que sólo toca filas que su propio CHECK final puede aceptar. Una fila de
+-- etapa fija (prelisting/captacion/prebuying) nunca hereda un valor del otro
+-- lado, así que el `ADD CONSTRAINT` de más abajo no puede abortar por algo
+-- que esta misma migración escribió. Correrla dos veces, contra una réplica,
+-- o contra un `supabase db reset` da el mismo resultado.
 -- ============================================================================
 
 -- ── 1. Bajar los CHECK existentes ───────────────────────────────────────────
@@ -47,24 +55,32 @@ UPDATE public.tracking_pipeline_moves
 -- El "Tipo de Lead" de Prospección tenía el dato que el backfill anterior no
 -- miró. Resuelve, entre otras, las 5 filas "Vendedor" que habían quedado en
 -- SIN DEFINIR por esa razón.
+-- `tipo_lead` sólo existió en Prospección (ver PerformanceLogForm.tsx antes
+-- de este cambio): el filtro `type = 'prospeccion'` es tanto el honesto como
+-- el más ajustado, y es lo que evita que una fila de etapa fija (que sólo
+-- admite dos de los cuatro valores) se stampee con el que no le toca.
 UPDATE public.performance_logs
    SET proceso = 'vendedor'
  WHERE proceso IS NULL
+   AND type = 'prospeccion'
    AND metadata->>'tipo_lead' = 'Vendedor';
 
 UPDATE public.performance_logs
    SET proceso = 'comprador'
  WHERE proceso IS NULL
+   AND type = 'prospeccion'
    AND metadata->>'tipo_lead' = 'Comprador';
 
 UPDATE public.performance_logs
    SET proceso = 'locador'
  WHERE proceso IS NULL
+   AND type = 'prospeccion'
    AND metadata->>'tipo_lead' = 'Locador';
 
 UPDATE public.performance_logs
    SET proceso = 'locatario'
  WHERE proceso IS NULL
+   AND type = 'prospeccion'
    AND metadata->>'tipo_lead' = 'Locatario';
 
 -- ── 4. Herencia por cliente para lo que sigue ambiguo ───────────────────────
@@ -86,6 +102,7 @@ UPDATE public.performance_logs pl
    SET proceso = lado_unico.proceso
   FROM lado_unico
  WHERE pl.proceso IS NULL
+   AND pl.type IN ('prospeccion', 'reserva', 'cierre')
    AND coalesce(pl.wa_contact_id::text, pl.lead_id::text) = lado_unico.ck;
 
 -- Mismo criterio para los movimientos manuales del tablero.
