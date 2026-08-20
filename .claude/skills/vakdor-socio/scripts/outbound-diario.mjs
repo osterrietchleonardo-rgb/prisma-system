@@ -205,6 +205,51 @@ const porMotivo = {};
 for (const d of descartados) porMotivo[d.motivo] = (porMotivo[d.motivo] || 0) + 1;
 for (const [m, c] of Object.entries(porMotivo)) console.log(`   ${c}x  ${m}`);
 
+// ------------------------------------- cargar los 10 al pipeline en "sin contactar"
+
+async function cargarAlPipeline(lista) {
+  const H = { Authorization: env.CLICKUP_API_KEY, 'Content-Type': 'application/json' };
+  const ids = JSON.parse(fs.readFileSync(path.join(RAIZ, 'scratch/clickup-ids.json'), 'utf8'));
+  const B2 = 'https://api.clickup.com/api/v2';
+  const f = await (await fetch(`${B2}/list/${ids.lPipeline}/field`, { headers: H })).json();
+  const campo = {}, opcion = {};
+  for (const x of f.fields) {
+    campo[x.name] = x.id;
+    for (const o of (x.type_config?.options ?? [])) opcion[x.name + '|' + o.name] = o.id;
+  }
+  let n = 0;
+  for (const c of lista) {
+    const perfil = 'https://www.linkedin.com' + c.url;
+    const bloque = bloqueCargo(c.resto, c.nombre);
+    const desc = [
+      `POR QUE LO ELEGI (puntaje ${c.puntaje}): ${c.porque}.`,
+      '',
+      `Cargo y empresa: ${bloque}`,
+      '',
+      `Perfil y chat: ${perfil}`,
+      '(desde ahi, boton "Mensaje" para escribirle)',
+      '',
+      `Seleccionado el ${new Date().toISOString().slice(0,10)} por el outbound diario, de la busqueda guardada 2001387130.`,
+      'Toque 1: apertura con observacion de SU operacion + pregunta de si o no. El guion esta en el vault, 20 Frentes/outbound.md.',
+    ].join(String.fromCharCode(10));
+    const cf = [
+      { id: campo['Origen'], value: opcion['Origen|Frío calificado'] },
+      { id: campo['Perfil'], value: perfil },
+    ].filter(x => x.id && x.value !== undefined);
+    const r = await fetch(`${B2}/list/${ids.lPipeline}/task`, {
+      method: 'POST', headers: H,
+      body: JSON.stringify({ name: c.nombre, description: desc, status: 'sin contactar',
+        priority: c.puntaje >= 7 ? 2 : 3, custom_fields: cf }),
+    });
+    if (r.status === 200) n++;
+    await dormir(220);
+  }
+  return n;
+}
+
+const cargados = await cargarAlPipeline(diez);
+console.log(`cargados al pipeline en "sin contactar": ${cargados}`);
+
 // ------------------------------------------------------- seguimientos pendientes
 
 console.log('Leyendo la bandeja...');
