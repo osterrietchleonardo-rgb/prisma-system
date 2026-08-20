@@ -137,7 +137,11 @@ export async function saveObjectives(input: SaveObjectivesInput) {
 
   if (error) {
     console.error("Error saving objectives", error);
-    throw new Error(error.message);
+    // No relanzar error.message: PerformanceObjectivesEditor.tsx muestra
+    // `e?.message` directo en el toast, y ese texto puede ser crudo de
+    // Postgres (DETAIL con la fila entera). El log de arriba ya tiene el
+    // detalle real.
+    throw new Error("No se pudieron guardar los objetivos.");
   }
 
   revalidatePath("/director/tracking-performance");
@@ -226,7 +230,9 @@ export async function saveObjectiveWeights(input: {
 
   if (error) {
     console.error("Error saving objective weights", error);
-    throw new Error(error.message);
+    // Mismo motivo que en saveObjectives: el llamador muestra `e?.message`
+    // directo y no hay que dejarle pasar texto crudo de Postgres.
+    throw new Error("No se pudieron guardar los porcentajes.");
   }
 
   revalidatePath("/director/tracking-performance");

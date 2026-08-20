@@ -27,7 +27,10 @@ export async function savePerformanceConfig(config: AgencyPerformanceConfig) {
 
   if (error) {
     console.error("Error saving performance config:", error);
-    return { success: false, error: error.message };
+    // No devolver error.message: es texto crudo de Postgres y el `error` de
+    // este resultado SÍ se renderiza tal cual en un toast (ver
+    // PerformanceScaleEditor.tsx).
+    return { success: false, error: "No se pudo guardar la configuración." };
   }
 
   revalidatePath("/director/tracking-performance");

@@ -39,7 +39,10 @@ export async function saveLead(payload: any) {
 
   if (error) {
     console.error("Error saving lead:", error);
-    throw new Error(error.message);
+    // Sin caller hoy (verificado por búsqueda en el repo), pero no hay que
+    // dejar el patrón de relanzar texto crudo de Postgres para quien la use
+    // después.
+    throw new Error("No se pudo guardar el lead.");
   }
 
   revalidatePath("/tracking-performance");

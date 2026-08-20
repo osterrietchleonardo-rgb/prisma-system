@@ -66,7 +66,9 @@ export async function movePipelineCard(
 
   if (error) {
     console.error("Error moving pipeline card:", error);
-    return { success: false, error: error.message };
+    // No devolver error.message: es texto crudo de Postgres y el `error` de
+    // este resultado SÍ se renderiza tal cual en un toast.
+    return { success: false, error: "No se pudo mover la tarjeta." };
   }
 
   revalidatePath("/director/tracking-performance");

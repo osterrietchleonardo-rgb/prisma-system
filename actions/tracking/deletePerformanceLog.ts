@@ -38,7 +38,11 @@ export async function deletePerformanceLog(id: string, reason: string) {
 
   if (error) {
     console.error("Error deleting performance log:", error);
-    throw new Error(error.message);
+    // El caller hoy siempre muestra un texto fijo y descarta este mensaje,
+    // pero igual no hay que relanzar texto crudo de Postgres: sigue viajando
+    // en la respuesta del Server Action (visible en devtools) y un cambio en
+    // el catch del caller no debería depender de que este action sea seguro.
+    throw new Error("No se pudo eliminar el registro.");
   }
 
   revalidatePath("/director/tracking-performance");

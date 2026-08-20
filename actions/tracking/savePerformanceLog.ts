@@ -68,7 +68,10 @@ export async function savePerformanceLog(payload: any) {
 
   if (error) {
     console.error("Error saving performance log:", error);
-    throw new Error(error.message);
+    // No relanzar error.message: un error de Postgres (p. ej. una violación
+    // de CHECK) trae en DETAIL la fila entera. El texto real ya quedó en el
+    // log de arriba; al cliente le llega un mensaje propio, sin datos.
+    throw new Error("No se pudo guardar el registro.");
   }
 
   revalidatePath("/director/tracking-performance");

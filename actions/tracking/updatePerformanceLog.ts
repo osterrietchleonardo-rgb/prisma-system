@@ -93,7 +93,10 @@ export async function updatePerformanceLog(id: string, payload: any, reason: str
 
   if (error) {
     console.error("Error updating performance log:", error);
-    throw new Error(error.message);
+    // No relanzar error.message: un error de Postgres (p. ej. una violación
+    // de CHECK) trae en DETAIL la fila entera. El texto real ya quedó en el
+    // log de arriba; al cliente le llega un mensaje propio, sin datos.
+    throw new Error("No se pudo actualizar el registro.");
   }
 
   revalidatePath("/director/tracking-performance");

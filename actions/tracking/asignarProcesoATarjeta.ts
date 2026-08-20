@@ -66,7 +66,9 @@ export async function asignarProcesoATarjeta(
 
   if (fetchError) {
     console.error("Error reading performance logs to assign proceso:", fetchError);
-    return { success: false, error: fetchError.message };
+    // No devolver fetchError.message: es texto crudo de Postgres y el
+    // `error` de este resultado SÍ se renderiza tal cual en un toast.
+    return { success: false, error: "No se pudieron leer las actividades de esta tarjeta." };
   }
   if (!logs || logs.length === 0) {
     return { success: false, error: "No quedan actividades sin proceso en esta tarjeta" };
@@ -117,7 +119,10 @@ export async function asignarProcesoATarjeta(
 
   if (error) {
     console.error("Error assigning proceso:", error);
-    return { success: false, error: error.message };
+    // No devolver error.message: es texto crudo de Postgres (puede traer la
+    // fila entera en DETAIL) y el `error` de este resultado SÍ se renderiza
+    // tal cual en un toast.
+    return { success: false, error: "No se pudo clasificar la tarjeta." };
   }
 
   revalidatePath("/director/tracking-performance");
