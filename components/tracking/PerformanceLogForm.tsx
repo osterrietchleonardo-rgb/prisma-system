@@ -21,7 +21,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { createManualContact } from "@/actions/whatsapp/createManualContact";
 import { ManualContactFields, ManualContactData } from "@/components/shared/ManualContactFields";
 import { cn } from "@/lib/utils";
-import { PROCESO_FIJO, etapasPermitidas, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
+import { PROCESOS_POR_ETAPA, ladoDelNegocio, etapasPermitidas, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
 import { PIPELINE_STAGES } from "@/lib/tracking/pipeline";
 
 interface Props {
@@ -66,7 +66,7 @@ export function PerformanceLogForm({
       metadata: logToEdit.metadata || {},
     } : {
       type: forcedType ?? "prospeccion",
-      proceso: forcedProceso ?? PROCESO_FIJO[forcedType ?? "prospeccion"] ?? undefined,
+      proceso: forcedProceso ?? undefined,
       propiedad_ref: defaults?.propiedadRef ?? "",
       property_id: defaults?.propertyId ?? null,
       lead_id: lockedClient?.leadId ?? null,
@@ -117,19 +117,20 @@ export function PerformanceLogForm({
   const activityType = watch("type");
   const proceso = watch("proceso");
 
-  // En prelisting, captación y prebuying el proceso no se elige: lo dice la
-  // etapa. Se muestra igual, pero bloqueado, para que quede explícito qué se
-  // está guardando y no parezca que el sistema lo decidió a escondidas.
-  const procesoFijoPorEtapa = PROCESO_FIJO[activityType];
-  const procesoBloqueado = !!procesoFijoPorEtapa || !!forcedProceso;
-  const motivoBloqueo = procesoFijoPorEtapa
-    ? `${PIPELINE_STAGES.find((s) => s.id === activityType)?.title} es siempre del lado de la ${labelDeProceso(procesoFijoPorEtapa).toLowerCase()}`
-    : "Lo define la tarjeta del tablero";
+  // Qué valores de proceso admite la etapa elegida: dos en prelisting,
+  // captación y prebuying (las dos opciones del mismo lado del negocio),
+  // cuatro en prospección, reserva y cierre (ahí no hay etapa que lo
+  // restrinja, se elige a conciencia). Ya no hay un único valor "fijo" que
+  // forzar: cuando la etapa admite dos, hay que preguntar cuál de las dos es.
+  const opcionesProceso = PROCESOS_POR_ETAPA[activityType] ?? [];
+  // El campo sólo viene bloqueado cuando el proceso lo impone la tarjeta del
+  // tablero (mover una tarjeta existente, o abrirle el segundo proceso).
+  const procesoBloqueado = !!forcedProceso;
+  const ladoDeEstaEtapa = opcionesProceso.length === 2 ? ladoDelNegocio(opcionesProceso[0]) : null;
 
   useEffect(() => {
-    const fijo = procesoFijoPorEtapa ?? forcedProceso ?? null;
-    if (fijo) setValue("proceso", fijo);
-  }, [procesoFijoPorEtapa, forcedProceso, setValue]);
+    if (forcedProceso) setValue("proceso", forcedProceso);
+  }, [forcedProceso, setValue]);
 
   // Cuando el proceso viene impuesto (por ejemplo desde "Abrir proceso de
   // Venta"), el desplegable de etapas no puede ofrecer las del otro lado.
@@ -284,11 +285,11 @@ export function PerformanceLogForm({
             {procesoBloqueado ? (
               <div className="h-12 px-3 flex items-center gap-2 rounded-md border border-accent/20 bg-accent/5">
                 <span className="text-base font-semibold">{labelDeProceso(proceso ?? null)}</span>
-                <span className="text-[11px] text-muted-foreground">{motivoBloqueo}</span>
+                <span className="text-[11px] text-muted-foreground">Lo define la tarjeta del tablero</span>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
-                {(["compra", "venta"] as const).map((p) => (
+                {opcionesProceso.map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -306,9 +307,18 @@ export function PerformanceLogForm({
               </div>
             )}
             <p className="text-[11px] text-muted-foreground">
-              Una misma persona puede comprarte y venderte a la vez: cada proceso lleva su propia
-              tarjeta en el tablero.
+              Una misma persona puede comprarte y venderte (o alquilarte y alquilarse) a la vez:
+              cada proceso lleva su propia tarjeta en el tablero.
             </p>
+            {ladoDeEstaEtapa && !procesoBloqueado && (
+              <p className="text-[11px] text-muted-foreground">
+                {PIPELINE_STAGES.find((s) => s.id === activityType)?.title} es siempre de quien{" "}
+                {ladoDeEstaEtapa === "ofrece"
+                  ? "tiene una propiedad (para vender o para alquilar)"
+                  : "busca una propiedad (para comprar o para alquilarse)"}
+                : por eso sólo aparecen estas dos opciones.
+              </p>
+            )}
             {errors.proceso && (
               <p className="text-xs text-red-400">{errors.proceso.message as string}</p>
             )}
@@ -323,7 +333,7 @@ export function PerformanceLogForm({
         
         {/* Prospección */}
         {activityType === "prospeccion" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-left-2">
+          <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-left-2">
             <div className="space-y-2">
               <Label>Origen</Label>
               <Select onValueChange={(v) => handleMetadataChange("origen", v)} value={watch("metadata")?.origen || ""}>
@@ -366,20 +376,6 @@ export function PerformanceLogForm({
                   <SelectItem value="TikTok / YouTube">TikTok / YouTube</SelectItem>
                   <SelectItem value="WhatsApp Business">WhatsApp Business</SelectItem>
                   <SelectItem value="Zonaprop">Zonaprop</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo de Lead</Label>
-              <Select onValueChange={(v) => handleMetadataChange("tipo_lead", v)} value={watch("metadata")?.tipo_lead || ""}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Seleccionar tipo..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Vendedor">Vendedor</SelectItem>
-                  <SelectItem value="Comprador">Comprador</SelectItem>
-                  <SelectItem value="Locador">Locador</SelectItem>
-                  <SelectItem value="Locatario">Locatario</SelectItem>
                 </SelectContent>
               </Select>
             </div>
