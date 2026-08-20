@@ -30,6 +30,7 @@ export async function savePerformanceLog(payload: any) {
   // que lo que mandaron esté entre los que esa etapa permite.
   const tipo = baseData.type as ActivityType;
   const permitidos = PROCESOS_POR_ETAPA[tipo];
+  if (!permitidos) throw new Error("Tipo de actividad inválido");
   const proceso = baseData.proceso;
   if (!proceso || !permitidos.includes(proceso)) {
     throw new Error(

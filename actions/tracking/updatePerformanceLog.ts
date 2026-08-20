@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { PROCESOS_POR_ETAPA, labelDeProceso } from "@/lib/tracking/proceso";
+import { PROCESOS_POR_ETAPA, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
 import type { ActivityType } from "@/lib/tracking/types";
 
 export async function updatePerformanceLog(id: string, payload: any, reason: string) {
@@ -17,11 +17,13 @@ export async function updatePerformanceLog(id: string, payload: any, reason: str
   if (!user) throw new Error("No autenticado");
 
   // Verify the log exists and the user has access to it. Se trae también
-  // `type`: hace falta más abajo para el caso de un payload que manda
-  // `proceso` sin mandar `type` (ver comentario ahí).
+  // `type` y `proceso`: hacen falta más abajo, `type` para el caso de un
+  // payload que manda `proceso` sin mandar `type` (ver comentario ahí), y
+  // `proceso` para el caso inverso: un payload que cambia `type` sin mandar
+  // `proceso` (ver comentario más abajo).
   const { data: existingLog } = await supabase
     .from("performance_logs")
-    .select("id, type")
+    .select("id, type, proceso")
     .eq("id", id)
     .single();
 
@@ -48,9 +50,26 @@ export async function updatePerformanceLog(id: string, payload: any, reason: str
   if (baseData.proceso !== undefined) {
     const tipoParaValidar = (baseData.type !== undefined ? baseData.type : existingLog.type) as ActivityType;
     const permitidos = PROCESOS_POR_ETAPA[tipoParaValidar];
+    if (!permitidos) throw new Error("Tipo de actividad inválido");
     if (!permitidos.includes(baseData.proceso)) {
       throw new Error(
         `El proceso debe ser uno de estos para esta etapa: ${permitidos.map(labelDeProceso).join(", ")}`
+      );
+    }
+  } else if (baseData.type !== undefined) {
+    // El caso inverso: cambian la etapa pero no mandan `proceso`. No es
+    // alcanzable desde el formulario (zod exige `proceso`), pero antes lo
+    // cubría `PROCESO_FIJO` corrigiendo en silencio el valor guardado; ahora
+    // que no hay un único valor por etapa, no hay nada que "corregir" solo,
+    // así que se valida el que ya está guardado contra la etapa nueva y se
+    // rechaza si quedaría incoherente. `null` (Sin definir) siempre es válido
+    // para cualquier etapa, no hace falta chequearlo.
+    const tipoNuevo = baseData.type as ActivityType;
+    const permitidos = PROCESOS_POR_ETAPA[tipoNuevo];
+    if (!permitidos) throw new Error("Tipo de actividad inválido");
+    if (existingLog.proceso !== null && !permitidos.includes(existingLog.proceso as ProcesoNegocio)) {
+      throw new Error(
+        `El proceso guardado ("${labelDeProceso(existingLog.proceso as ProcesoNegocio)}") no es válido para la nueva etapa. Elegí uno de estos: ${permitidos.map(labelDeProceso).join(", ")}`
       );
     }
   }
