@@ -3,7 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
-import { PROCESO_FIJO } from "@/lib/tracking/proceso";
+import { PROCESOS_POR_ETAPA, labelDeProceso } from "@/lib/tracking/proceso";
+import type { ActivityType } from "@/lib/tracking/types";
 
 export async function updatePerformanceLog(id: string, payload: any, reason: string) {
   if (!reason || reason.trim() === '') {
@@ -31,34 +32,27 @@ export async function updatePerformanceLog(id: string, payload: any, reason: str
   const { waMetrics, waAnalysis, ...baseData } = payload;
 
   // Igual que savePerformanceLog: el action es la última puerta antes de la
-  // base y no puede confiar en que el llamador haya hecho los deberes. A
-  // diferencia del alta, una edición puede legítimamente no tocar el proceso
-  // (por ejemplo, corregir solo el monto o la fecha) — este formulario SIEMPRE
-  // manda `type`, así que este bloque corre en todo uso real de la UI; queda
-  // condicionado para que un caller externo que sólo actualice otro campo
-  // (sin `type` ni `proceso`) no se rompa: ahí no hay nada que derivar y lo
-  // dejamos pasar tal cual, para que Supabase lo descarte del UPDATE y el
-  // proceso ya guardado sobreviva sin tocarse (decisión deliberada, no un
-  // caso sin cubrir).
+  // base y no puede confiar en que el llamador haya hecho los deberes. Ya no
+  // hay un único valor que "derivar" por etapa (prelisting y captación
+  // admiten vendedor o locador; prebuying, comprador o locatario), así que
+  // esto pasó de derivación a validación: si el payload manda `proceso`, se
+  // valida contra lo que permite la etapa (la nueva si mandaron `type`, la
+  // ya guardada si no la mandaron — el mismo registro que el select de
+  // arriba ya confirmó que existe).
   //
-  // Caso aparte: un payload que manda `proceso` pero no `type`. Ahí no hay
-  // `type` del que derivar el lado fijo, así que sin esto un `proceso`
-  // inventado (p.ej. 'compra' sobre una fila que en realidad es prelisting)
-  // pasaba el chequeo literal de abajo y llegaba a la base, donde el CHECK
-  // la rechazaba con un error crudo de Postgres en vez de este mensaje. Se
-  // usa el `type` ya guardado (el mismo registro que el select de arriba ya
-  // confirmó que existe) para derivar igual que si el payload lo hubiera
-  // mandado.
-  const seTocaAlgo = baseData.type !== undefined || baseData.proceso !== undefined;
-  const tipoParaDerivar = baseData.type !== undefined ? baseData.type : existingLog.type;
-  const procesoDerivado = seTocaAlgo
-    ? PROCESO_FIJO[tipoParaDerivar as keyof typeof PROCESO_FIJO] ?? baseData.proceso
-    : undefined;
-  if (procesoDerivado !== undefined) {
-    if (procesoDerivado !== "compra" && procesoDerivado !== "venta") {
-      throw new Error("El proceso debe ser Compra o Venta");
+  // Una edición puede legítimamente no tocar el proceso (por ejemplo,
+  // corregir solo el monto o la fecha): si el payload no manda `proceso`, no
+  // hay nada que validar y `baseData.proceso` queda `undefined`, así que
+  // Supabase lo descarta del UPDATE y el proceso ya guardado sobrevive sin
+  // tocarse (decisión deliberada, no un caso sin cubrir).
+  if (baseData.proceso !== undefined) {
+    const tipoParaValidar = (baseData.type !== undefined ? baseData.type : existingLog.type) as ActivityType;
+    const permitidos = PROCESOS_POR_ETAPA[tipoParaValidar];
+    if (!permitidos.includes(baseData.proceso)) {
+      throw new Error(
+        `El proceso debe ser uno de estos para esta etapa: ${permitidos.map(labelDeProceso).join(", ")}`
+      );
     }
-    baseData.proceso = procesoDerivado;
   }
 
   const supabaseAdmin = createAdminClient();

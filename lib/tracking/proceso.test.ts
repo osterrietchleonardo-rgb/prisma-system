@@ -7,6 +7,7 @@ import {
   cardKeyDe,
   labelDeProceso,
   badgeDeProceso,
+  procesosPosiblesParaTarjeta,
 } from "./proceso";
 import type { ActivityType } from "./types";
 
@@ -160,5 +161,31 @@ describe("badgeDeProceso", () => {
       badgeDeProceso(null).className,
     ]);
     expect(colores.size).toBe(3);
+  });
+});
+
+describe("procesosPosiblesParaTarjeta", () => {
+  it("una tarjeta sólo con etapas libres ofrece los cuatro valores", () => {
+    const posibles = procesosPosiblesParaTarjeta(["prospeccion", "reserva", "cierre"]);
+    expect(posibles.sort()).toEqual([...CUATRO_VALORES].sort());
+  });
+
+  it("mezclar una etapa libre con una del lado de quien ofrece deja sólo esas dos", () => {
+    const posibles = procesosPosiblesParaTarjeta(["prospeccion", "prelisting"]);
+    expect(posibles.sort()).toEqual(["locador", "vendedor"]);
+  });
+
+  it("mezclar una etapa libre con una del lado de quien busca deja sólo esas dos", () => {
+    const posibles = procesosPosiblesParaTarjeta(["reserva", "prebuying"]);
+    expect(posibles.sort()).toEqual(["comprador", "locatario"]);
+  });
+
+  it("mezclar los dos lados del negocio no deja ningún proceso posible", () => {
+    const posibles = procesosPosiblesParaTarjeta(["prelisting", "prebuying"]);
+    expect(posibles).toEqual([]);
+  });
+
+  it("sin actividades no hay nada que ofrecer", () => {
+    expect(procesosPosiblesParaTarjeta([])).toEqual([]);
   });
 });

@@ -126,3 +126,24 @@ export function badgeDeProceso(
 ): { label: string; className: string } {
   return BADGES[proceso ?? "sin-definir"];
 }
+
+/**
+ * Los procesos que se le pueden asignar a una tarjeta entera: los que sirven
+ * para TODAS sus etapas (la intersección de `PROCESOS_POR_ETAPA` a lo largo
+ * de las actividades de la tarjeta). Reemplaza a `procesoParaResolucion`: ya
+ * no hay un único valor por fila que "forzar" cuando una etapa fija admite
+ * dos opciones, así que el resolutor de "Sin definir" ofrece un solo valor
+ * para toda la tarjeta, y solo entre los que le sirven a cada una de sus
+ * actividades.
+ *
+ * Vacío cuando la tarjeta mezcla los dos lados del negocio (por ejemplo una
+ * prelisting y una prebuying juntas, en una tarjeta que nunca tuvo proceso
+ * definido) — un estado real y alcanzable, no un caso de error.
+ */
+export function procesosPosiblesParaTarjeta(tipos: ActivityType[]): ProcesoNegocio[] {
+  if (tipos.length === 0) return [];
+  const [primero, ...resto] = tipos;
+  return PROCESOS_POR_ETAPA[primero].filter((p) =>
+    resto.every((tipo) => PROCESOS_POR_ETAPA[tipo].includes(p))
+  );
+}

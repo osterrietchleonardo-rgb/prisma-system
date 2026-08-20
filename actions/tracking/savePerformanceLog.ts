@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
-import { PROCESO_FIJO } from "@/lib/tracking/proceso";
+import { PROCESOS_POR_ETAPA, labelDeProceso } from "@/lib/tracking/proceso";
+import type { ActivityType } from "@/lib/tracking/types";
 
 export async function savePerformanceLog(payload: any) {
   const supabase = createClient();
@@ -21,13 +22,19 @@ export async function savePerformanceLog(payload: any) {
 
   const { waMetrics, waAnalysis, ...baseData } = payload;
 
-  // El proceso es obligatorio para toda alta nueva. En las tres etapas que ya
-  // lo definen se deriva acá también, y no sólo en el formulario: el action es
-  // la última puerta antes de la base, y no puede confiar en que quien llama
-  // haya hecho los deberes.
-  const proceso = PROCESO_FIJO[baseData.type as keyof typeof PROCESO_FIJO] ?? baseData.proceso ?? null;
-  if (proceso !== "compra" && proceso !== "venta") {
-    throw new Error("Falta indicar si la actividad es de Compra o de Venta");
+  // El proceso es obligatorio para toda alta nueva. Se valida acá también, y
+  // no sólo en el formulario: el action es la última puerta antes de la base,
+  // y no puede confiar en que quien llama haya hecho los deberes. Ya no hay un
+  // único valor que "derivar" por etapa (prelisting y captación admiten
+  // vendedor o locador; prebuying, comprador o locatario) — hay que validar
+  // que lo que mandaron esté entre los que esa etapa permite.
+  const tipo = baseData.type as ActivityType;
+  const permitidos = PROCESOS_POR_ETAPA[tipo];
+  const proceso = baseData.proceso;
+  if (!proceso || !permitidos.includes(proceso)) {
+    throw new Error(
+      `Elegí de qué proceso es esta actividad: ${permitidos.map(labelDeProceso).join(", ")}`
+    );
   }
   baseData.proceso = proceso;
 
