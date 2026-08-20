@@ -179,9 +179,10 @@ los botones: lo que quede ahí, no se lee.
 **`references/piezas-de-apoyo.md`** — **leer antes de meter cualquier cosa en pantalla que no sea
 la persona hablando**: mockups (chat, panel, notificación, mail), clips de stick figure,
 animaciones 2D y b-roll generativo. La pieza **sale del guion, nunca al revés**, y la regla que
-decide con qué se hace es una sola: **si el espectador tiene que leer algo, va en Remotion; si no,
-puede ir generado con IA**. Incluye lo que cuesta cada cosa en Google Flow, cómo dirigirlo con
-tramos de tiempo, y por qué las prohibiciones en el prompt hacen aparecer justo lo que se prohíbe.
+decide con qué se hace es una sola: **un rótulo de 1 o 2 palabras sale bien generado; una interfaz
+con varios textos va en Remotion**. Trae **el template de 10 segundos**, que es el formato con el
+que se piden los clips a Flow (no se escribe un prompt de cero: se completa ese), lo que cuesta
+cada cosa, y por qué las prohibiciones en el prompt hacen aparecer justo lo que se prohíbe.
 
 **`references/estilo-reel-vakdor.md`** — la receta destilada de editar videos reales de Leonardo:
 estructura (portada → cuerpo → cierre), cuándo va cada pieza gráfica, los valores de cámara que
