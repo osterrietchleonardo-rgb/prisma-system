@@ -1,5 +1,11 @@
 # Tracking Performance: un cliente, dos procesos (Compra y Venta)
 
+> ⚠️ **Superado por el Addendum — 20-ago-2026** (al final de este documento): el título
+> y el cuerpo de abajo describen el diseño original, de dos valores (Compra/Venta). Al
+> día siguiente `proceso` pasó a cuatro valores (vendedor/comprador/locador/locatario) y
+> un cliente puede llegar a tener hasta cuatro tarjetas, no dos. El cuerpo queda como
+> registro histórico de esa primera decisión; el addendum es la versión vigente.
+
 **Fecha:** 19-ago-2026
 **Rama:** `feat/tracking-cliente-doble-proceso`
 **Origen:** sugerencia de Matías Gomez (asesor, Central Real Estate Argentina), 18-ago-2026 06:06.
@@ -59,6 +65,10 @@ cliente en conflicto.
    tienen dos procesos.
 3. En las tres etapas donde la respuesta ya está determinada por la etapa
    (Prelisting, Captación, Prebuying) el campo **se muestra pero viene fijo**.
+   (⚠️ **Superado por el Addendum — 20-ago-2026**: con cuatro valores esas etapas dejaron
+   de tener una única respuesta posible — Prelisting/Captación admiten vendedor **o**
+   locador, Prebuying admite comprador **o** locatario — así que el campo ya no viene
+   fijo, se pregunta. Ver "Qué valores admite cada etapa" en el addendum.)
 4. Al arrastrar, **se bloquean las columnas del otro lado del negocio**.
 
 ## 4. Modelo de datos
@@ -392,7 +402,7 @@ Con la cuenta **PRISMAIA - VAKDOR** — nunca Central Real Estate, que es del cl
 |---|---|
 | El backfill clasifica mal una actividad ambigua | Sólo hereda cuando el cliente tiene **un único** lado; ante duda deja `NULL` y lo resuelve el asesor. Son 4 filas. |
 | El bloqueo al arrastrar molesta a un asesor con un flujo propio | Es una constante en un solo lugar (`ETAPAS_POR_PROCESO`); sacarlo es borrar la validación, no rehacer nada. |
-| Un cliente que alquila (ni compra ni vende) no encaja | Fuera de alcance: las 6 etapas actuales tampoco lo modelan. Puede cargarse del lado que corresponda o quedar Sin definir. |
+| Un cliente que alquila (ni compra ni vende) no encaja | Fuera de alcance: las 6 etapas actuales tampoco lo modelan. Puede cargarse del lado que corresponda o quedar Sin definir. (⚠️ **Superado por el Addendum — 20-ago-2026**: dejó de estar fuera de alcance — es el tema entero del addendum. `proceso` ganó `locador` y `locatario`, así que un cliente que alquila ya encaja sin mentirle al sistema. Ver "Por qué" en el addendum.) |
 | El código se despliega antes que la migración | Rompería: `savePerformanceLog` escribiría una columna que no existe. El orden es al revés que en el índice único de chats: acá va **primero la migración**, que es aditiva y no molesta al código viejo (simplemente no escribe la columna), y después el código. |
 
 ## 11. Archivos que se tocan
@@ -534,10 +544,19 @@ Orden obligatorio — el CHECK viejo rechaza los valores nuevos, así que se baj
 3. **Backfill desde `metadata->>'tipo_lead'`** para las filas que siguen en `NULL`:
    `'Vendedor'→vendedor`, `'Comprador'→comprador`, `'Locador'→locador`,
    `'Locatario'→locatario`. Esto resuelve las 5 filas que el backfill anterior dejó sin
-   definir teniendo el dato a mano.
+   definir teniendo el dato a mano. Filtra además por `type = 'prospeccion'` (donde vivía
+   "Tipo de Lead"), para que una fila de etapa fija (prelisting/captacion/prebuying) no
+   pueda heredar un valor del lado que no le toca — eso es lo que evita que el
+   `ADD CONSTRAINT` del paso 5 aborte por algo que este mismo backfill escribió.
 4. Volver a aplicar la herencia por cliente para las ambiguas que sigan en `NULL`, con el
    mismo criterio conservador de la migración anterior (sólo si el cliente quedó con un
-   único valor).
+   único valor). El `UPDATE` sobre `performance_logs` filtra por
+   `type IN ('prospeccion','reserva','cierre')`, mismo motivo que el paso 3. El `UPDATE`
+   sobre `tracking_pipeline_moves` **no tiene ese filtro** — esa tabla no distingue etapa
+   por fila y su CHECK final sólo limita el dominio de valores, no la combinación con la
+   etapa, así que no hay riesgo de abortar. Puede, sí, dejar un movimiento con una pareja
+   proceso/etapa que `etapasPermitidas` no dejaría crear hoy (ver el comentario de cabecera
+   de la migración); es preexistente y sólo afecta esa tabla de historial.
 5. `ADD CONSTRAINT` nuevo, que ahora valida contra la lista de la etapa:
 
 ```sql
@@ -576,7 +595,25 @@ que la pantalla de hoy no cambie mientras la agencia no cargue ninguno:
 
 ## Qué NO cambia
 
-`buildPipeline`, `cardKey`, el bloqueo al arrastrar, la ficha del cliente, el botón de
-resolver "Sin definir" y la vista Lista: todos consumen `etapasPermitidas`,
-`badgeDeProceso` y `labelDeProceso`, que conservan su firma. El código de esos archivos no
-se toca.
+**Sin tocar en esta vuelta:** `buildPipeline` y `cardKey` (`lib/tracking/pipeline.ts`) y
+la vista Lista (`PerformanceHistoryList.tsx`). Los tres consumen `etapasPermitidas`,
+`badgeDeProceso` y `labelDeProceso`, que conservan su firma — devuelven cuatro valores en
+vez de dos, pero el código que los llama no se editó. El bloqueo al arrastrar tampoco
+cambió como mecanismo: sigue siendo `ETAPAS_POR_PROCESO` derivado del lado
+(`ladoDelNegocio`), sólo que con cuatro claves en vez de dos.
+
+**Lo que sí se tocó — `PipelineClientSheet.tsx` (commit `eb5fd3f`):** este archivo es a
+la vez "la ficha del cliente" y "el botón de resolver Sin definir" de más arriba en este
+documento, y se reescribió para los cuatro valores (67 líneas). Antes ofrecía un único
+botón "Abrir proceso de Compra/Venta"; ahora recorre los cuatro valores y muestra hasta
+tres botones "Abrir proceso de…" — uno por cada proceso que ese cliente todavía no tenga.
+El resolutor de "Sin definir" pasó de dos opciones a un botón por cada valor de
+`procesosPosiblesParaTarjeta` (la intersección de lo que admite cada actividad de la
+tarjeta); cuando esa intersección queda vacía —una tarjeta que mezcla los dos lados del
+negocio— muestra el mensaje explicándolo en vez de botones, igual que describe la sección
+6 de más arriba.
+
+`PipelineBoard.tsx` tuvo un cambio puntual en el mismo commit (4 líneas): `abrirProceso`
+deriva la etapa de arranque con `ladoDelNegocio(proceso)` en vez de comparar contra el
+literal `'venta'`. El resultado es el mismo de siempre (Prelisting para quien ofrece,
+Prebuying para quien busca) — cambió cómo se calcula, no lo que muestra.

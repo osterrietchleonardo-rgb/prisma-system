@@ -44,7 +44,7 @@ export function PipelineStageDialog({
             </SheetTitle>
             <SheetDescription className="text-sm text-muted-foreground mt-1">
               {esProcesoNuevo
-                ? `${card.clientName} pasa a tener dos procesos en paralelo. La tarjeta que ya tenías no se mueve de donde está.`
+                ? `${card.clientName} pasa a tener otro proceso corriendo en paralelo. La tarjeta que ya tenías no se mueve de donde está.`
                 : `${card.clientName} todavía no tiene actividad en esta etapa. Completá los datos y queda registrada como cualquier otra actividad.`}
             </SheetDescription>
           </SheetHeader>

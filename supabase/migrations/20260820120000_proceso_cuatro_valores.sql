@@ -14,13 +14,27 @@
 -- solo valor, y suben de nuevo recién al final, ya validando contra la lista
 -- de cada etapa.
 --
--- Idempotente y segura de re-correr: cada UPDATE de los pasos 3 y 4 filtra
--- por `type`/`to_stage` además de por `proceso IS NULL` (o ya resuelto), así
--- que sólo toca filas que su propio CHECK final puede aceptar. Una fila de
--- etapa fija (prelisting/captacion/prebuying) nunca hereda un valor del otro
--- lado, así que el `ADD CONSTRAINT` de más abajo no puede abortar por algo
--- que esta misma migración escribió. Correrla dos veces, contra una réplica,
--- o contra un `supabase db reset` da el mismo resultado.
+-- Idempotente y segura de re-correr: los UPDATE del paso 3 y el primer UPDATE
+-- del paso 4 (sobre `performance_logs`) filtran por `type` además de por
+-- `proceso IS NULL` (o ya resuelto), así que sólo tocan filas que su propio
+-- CHECK final puede aceptar — una fila de etapa fija (prelisting/captacion/
+-- prebuying) nunca hereda un valor del otro lado, así que el primer
+-- `ADD CONSTRAINT` de más abajo no puede abortar por algo que esta misma
+-- migración escribió.
+--
+-- El segundo UPDATE del paso 4 (sobre `tracking_pipeline_moves`, línea ~118)
+-- NO tiene ese filtro: esa tabla no distingue `type`/`to_stage` por fila, y su
+-- CHECK final sólo limita el dominio de valores, no la combinación con la
+-- etapa. Por eso no hay riesgo de que el `ADD CONSTRAINT` aborte — pero sí
+-- puede quedar un movimiento con una pareja proceso/etapa que `etapasPermitidas`
+-- (en el código) no dejaría crear hoy: por ejemplo un cliente arrastrado a
+-- Prebuying antes de tener ningún proceso, que después se resuelve como
+-- 'vendedor' por este backfill, termina con un movimiento 'vendedor' hacia
+-- Prebuying. Es una condición preexistente (ya podía pasar antes de esta
+-- migración) y sólo afecta esa tabla de historial/trazabilidad, de solo
+-- lectura para la UI — no bloquea nada ni corrompe el tablero. Correrla dos
+-- veces, contra una réplica, o contra un `supabase db reset` da el mismo
+-- resultado.
 -- ============================================================================
 
 -- ── 1. Bajar los CHECK existentes ───────────────────────────────────────────

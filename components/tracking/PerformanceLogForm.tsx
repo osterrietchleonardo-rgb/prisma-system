@@ -228,14 +228,12 @@ export function PerformanceLogForm({
       onSuccess();
     } catch (err) {
       console.error(err);
-      // Deliberadamente genérico: un error de Supabase/Postgres (por ejemplo
-      // una violación de CHECK) trae en `DETAIL` la fila entera (uuids,
-      // agencia, asesor, montos, fechas), y esos server actions relanzan ese
-      // texto crudo. Mostrarlo acá lo expondría en la pantalla del asesor. Y
-      // en producción ni siquiera serviría: Next.js enmascara el mensaje de
-      // los Server Actions antes de que llegue al cliente, así que mostrar
-      // el mensaje puntual no suma nada y sí arriesga la fuga. El detalle
-      // real queda en el log del servidor, no en pantalla.
+      // Deliberadamente genérico: en producción Next.js enmascara igual
+      // el mensaje real de los Server Actions antes de que llegue acá, así
+      // que mostrar el texto puntual de `err` no suma nada. El detalle
+      // real (savePerformanceLog.ts / updatePerformanceLog.ts ya lo acotan
+      // a un mensaje propio antes de tirarlo) queda en el log del servidor,
+      // no en pantalla.
       toast.error("Ocurrió un error al guardar el registro");
     } finally {
       setIsSubmitting(false);
