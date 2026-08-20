@@ -121,7 +121,7 @@ export async function getDashboardData(
     prospeccion: {
       waChats: waChatsCount || 0,
       active: perfLogs?.filter(l => l.type === 'prospeccion').length || 0,
-      leads: { vendedor: 0, comprador: 0 },
+      leads: { vendedor: 0, comprador: 0, locador: 0, locatario: 0 },
       channels: {} as Record<string, number>
     },
     prelisting: {
@@ -173,12 +173,16 @@ export async function getDashboardData(
     }
   };
 
-  // Process Prospeccion Metadata
+  // Process Prospeccion: antes leía metadata.tipo_lead (un campo que vivía
+  // sólo en el formulario de Prospección); ahora ese dato lo absorbió
+  // `proceso`, que existe en las seis etapas y es la fuente real.
   perfLogs?.filter(l => l.type === 'prospeccion').forEach(l => {
-    const tipo = l.metadata?.tipo_lead;
-    if (tipo === 'Vendedor') metrics.prospeccion.leads.vendedor++;
-    if (tipo === 'Comprador') metrics.prospeccion.leads.comprador++;
-    
+    const proceso = l.proceso;
+    if (proceso === 'vendedor') metrics.prospeccion.leads.vendedor++;
+    if (proceso === 'comprador') metrics.prospeccion.leads.comprador++;
+    if (proceso === 'locador') metrics.prospeccion.leads.locador++;
+    if (proceso === 'locatario') metrics.prospeccion.leads.locatario++;
+
     const origen = l.metadata?.origen || "Otro";
     metrics.prospeccion.channels[origen] = (metrics.prospeccion.channels[origen] || 0) + 1;
   });
@@ -229,6 +233,8 @@ export async function getDashboardData(
     prospeccionActiva: metrics.prospeccion.active,
     leadsVendedores: metrics.prospeccion.leads.vendedor,
     leadsCompradores: metrics.prospeccion.leads.comprador,
+    leadsLocadores: metrics.prospeccion.leads.locador,
+    leadsLocatarios: metrics.prospeccion.leads.locatario,
     channelDistribution: Object.entries(metrics.prospeccion.channels).map(([label, count]) => ({ label, count })),
     // Inicializado aqui para tipar la clave; se sobreescribe mas abajo con los valores reales
     responseTime: { botFirst: '', botBetween: '', humanFirst: '', humanBetween: '' },

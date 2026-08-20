@@ -78,7 +78,16 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
         metrics={[
           { label: "Consultas WhatsApp", value: kpis.waChats },
           { label: "Prospección Activa", value: kpis.prospeccionActiva },
-          { label: "Composición Demanda", value: `${kpis.leadsVendedores}V / ${kpis.leadsCompradores}C` },
+          {
+            label: "Composición Demanda",
+            // Los de alquiler sólo se agregan cuando existen, para que la
+            // pantalla de hoy (sin alquileres cargados) no cambie ni un
+            // carácter: "3V / 2C" sigue siendo "3V / 2C".
+            value:
+              kpis.leadsLocadores > 0 || kpis.leadsLocatarios > 0
+                ? `${kpis.leadsVendedores}V / ${kpis.leadsCompradores}C / ${kpis.leadsLocadores}L / ${kpis.leadsLocatarios}Lt`
+                : `${kpis.leadsVendedores}V / ${kpis.leadsCompradores}C`,
+          },
         ]}
       />
 
