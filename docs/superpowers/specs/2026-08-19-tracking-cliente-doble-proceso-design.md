@@ -371,3 +371,156 @@ Con la cuenta **PRISMAIA - VAKDOR** — nunca Central Real Estate, que es del cl
 
 `lib/tracking/queries.ts` **no se toca**: usa `select("*")`, así que la columna nueva
 llega sola.
+
+---
+
+# Addendum — 20-ago-2026: el proceso pasa a tener cuatro valores
+
+## Por qué
+
+Leonardo señaló que el formulario **ya tenía** un campo "Tipo de Lead", con cuatro
+valores: Vendedor, Comprador, Locador y Locatario — los dos últimos porque la agencia
+también maneja alquileres. Y preguntó si había que sacar `proceso` o redefinirlo.
+
+Lo verificado antes de decidir:
+
+1. **"Tipo de Lead" sólo existe en Prospección** (`PerformanceLogForm.tsx`, dentro del
+   bloque `activityType === "prospeccion"`). Confirmado en la base: ninguna Prelisting,
+   Prebuying, Captación, Reserva o Cierre tiene ese dato. Por eso **sacar `proceso` no es
+   posible**: sin el dato en las seis etapas no se puede partir la tarjeta en dos, que es
+   toda la función.
+2. **Los alquileres no entran en compra/venta.** Un Locador no vende y un Locatario no
+   compra. Hoy habría que mentirle al sistema.
+3. **Hay pregunta duplicada.** En Prospección el asesor contesta lo mismo dos veces.
+4. **Bug preexistente:** `lib/queries/dashboard.ts` sólo cuenta `'Vendedor'` y
+   `'Comprador'`; un Locador o un Locatario no se cuentan en ninguna parte.
+5. **Hay 5 actividades con "Tipo de Lead: Vendedor" que quedaron en SIN DEFINIR.** El
+   backfill original podía haberlas resuelto y no lo hizo, porque no miró ese campo.
+6. **Cero actividades con Locador o Locatario** cargadas hoy: el problema es a futuro,
+   no hay nada roto en producción.
+
+Decisión de Leonardo: **`proceso` absorbe a "Tipo de Lead"**. Un solo campo, en las seis
+etapas, con los cuatro valores que la agencia ya usa.
+
+## Modelo nuevo
+
+```ts
+export type ProcesoNegocio = 'vendedor' | 'comprador' | 'locador' | 'locatario';
+```
+
+El "lado del negocio" deja de ser el valor y pasa a ser algo que se **deriva**:
+
+| Proceso | Lado | Qué significa |
+|---|---|---|
+| `vendedor` | ofrece | tiene una propiedad y la quiere vender |
+| `locador` | ofrece | tiene una propiedad y la quiere alquilar |
+| `comprador` | busca | quiere comprar una propiedad |
+| `locatario` | busca | quiere alquilar una propiedad |
+
+```ts
+export function ladoDelNegocio(p: ProcesoNegocio | null): 'ofrece' | 'busca' | null
+```
+
+## Qué valores admite cada etapa
+
+`PROCESO_FIJO` (un valor por etapa) deja de existir: una Prelisting puede ser de un
+vendedor **o** de un locador. Lo reemplaza una lista:
+
+```ts
+export const PROCESOS_POR_ETAPA: Record<ActivityType, ProcesoNegocio[]> = {
+  prospeccion: ['vendedor', 'comprador', 'locador', 'locatario'],
+  prelisting:  ['vendedor', 'locador'],
+  captacion:   ['vendedor', 'locador'],
+  prebuying:   ['comprador', 'locatario'],
+  reserva:     ['vendedor', 'comprador', 'locador', 'locatario'],
+  cierre:      ['vendedor', 'comprador', 'locador', 'locatario'],
+};
+```
+
+**Consecuencia en el formulario:** el campo ya no viene "relleno y bloqueado" en
+Prelisting, Captación y Prebuying, porque en esas etapas hay **dos** opciones válidas, no
+una. Lo que hace ahora es **ofrecer sólo las que corresponden**. Es una pregunta más que
+antes, y es información que el sistema hoy no tiene: si esa captación es para vender o
+para alquilar.
+
+`ETAPAS_POR_PROCESO` se deriva del lado y no cambia de forma:
+
+```ts
+ofrece  (vendedor, locador)  → prospeccion, prelisting, captacion, reserva, cierre
+busca   (comprador, locatario) → prospeccion, prebuying, reserva, cierre
+```
+
+El bloqueo al arrastrar, las dos tarjetas y `cardKey` siguen exactamente igual: la clave
+sigue siendo `clientKey::proceso`, sólo que ahora el proceso puede tomar cuatro valores.
+
+## Cartelitos
+
+El color comunica el **lado**, el texto comunica el **valor**. Así se sigue viendo de un
+golpe de qué lado está la tarjeta, y se lee sin ambigüedad cuál de los dos es:
+
+| Proceso | Cartelito | Color |
+|---|---|---|
+| `vendedor` | VENDEDOR | índigo (el de Prelisting) |
+| `locador` | LOCADOR | índigo |
+| `comprador` | COMPRADOR | violeta (el de Prebuying) |
+| `locatario` | LOCATARIO | violeta |
+| `null` | SIN DEFINIR | ámbar |
+
+## Migración
+
+Archivo `supabase/migrations/20260820120000_proceso_cuatro_valores.sql`.
+
+Orden obligatorio — el CHECK viejo rechaza los valores nuevos, así que se baja primero:
+
+1. `DROP CONSTRAINT` de los dos CHECK existentes.
+2. Renombrar los valores ya cargados: `'venta' → 'vendedor'`, `'compra' → 'comprador'`,
+   en `performance_logs` y en `tracking_pipeline_moves`.
+3. **Backfill desde `metadata->>'tipo_lead'`** para las filas que siguen en `NULL`:
+   `'Vendedor'→vendedor`, `'Comprador'→comprador`, `'Locador'→locador`,
+   `'Locatario'→locatario`. Esto resuelve las 5 filas que el backfill anterior dejó sin
+   definir teniendo el dato a mano.
+4. Volver a aplicar la herencia por cliente para las ambiguas que sigan en `NULL`, con el
+   mismo criterio conservador de la migración anterior (sólo si el cliente quedó con un
+   único valor).
+5. `ADD CONSTRAINT` nuevo, que ahora valida contra la lista de la etapa:
+
+```sql
+CHECK (
+  proceso IS NULL
+  OR (type IN ('prelisting','captacion') AND proceso IN ('vendedor','locador'))
+  OR (type = 'prebuying'                 AND proceso IN ('comprador','locatario'))
+  OR (type IN ('prospeccion','reserva','cierre')
+      AND proceso IN ('vendedor','comprador','locador','locatario'))
+);
+```
+
+Y en `tracking_pipeline_moves`: `proceso IS NULL OR proceso IN (los cuatro)`.
+
+## El campo duplicado se va
+
+Se elimina el select "Tipo de Lead" del bloque de Prospección. **No se borra
+`metadata.tipo_lead` de las filas históricas** — queda como estaba, no molesta a nadie y
+borrarlo sería tocar datos sin necesidad. Simplemente deja de escribirse.
+
+## Dashboard
+
+`lib/queries/dashboard.ts` deja de leer `metadata.tipo_lead` y pasa a leer `proceso`,
+sumando los dos contadores que faltaban:
+
+```ts
+leads: { vendedor: 0, comprador: 0, locador: 0, locatario: 0 }
+```
+
+El recuadro "Composición Demanda" (`components/dashboard/PerformanceMetricsGrid.tsx`)
+muestra hoy `${V}V / ${C}C`. Pasa a mostrar los de alquiler **sólo cuando existen**, para
+que la pantalla de hoy no cambie mientras la agencia no cargue ninguno:
+
+- sin alquileres: `3V / 2C` (idéntico a hoy)
+- con alquileres: `3V / 2C / 1L / 2Lt`
+
+## Qué NO cambia
+
+`buildPipeline`, `cardKey`, el bloqueo al arrastrar, la ficha del cliente, el botón de
+resolver "Sin definir" y la vista Lista: todos consumen `etapasPermitidas`,
+`badgeDeProceso` y `labelDeProceso`, que conservan su firma. El código de esos archivos no
+se toca.
