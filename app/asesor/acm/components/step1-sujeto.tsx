@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { BarrioCombobox } from "./barrio-combobox";
 
 interface Step1SujetoProps {
   sujeto: Sujeto;
@@ -57,11 +58,9 @@ export function Step1Sujeto({ sujeto, onChange, onNext, hideNextButton }: Step1S
           </div>
           <div className="space-y-2">
             <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Barrio / Zona</Label>
-            <Input 
-              placeholder="Ej: Recoleta" 
-              className="bg-card/50 border-accent/10 focus-visible:ring-accent"
+            <BarrioCombobox
               value={sujeto.barrio}
-              onChange={(e) => onChange({...sujeto, barrio: e.target.value})}
+              onChange={(v) => onChange({...sujeto, barrio: v})}
             />
           </div>
           <div className="space-y-2">
