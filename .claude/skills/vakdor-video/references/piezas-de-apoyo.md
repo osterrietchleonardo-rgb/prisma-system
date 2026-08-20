@@ -33,13 +33,33 @@ Si no se puede nombrar la frase que la pieza acompaña, la pieza no va.
 
 ## 2. La regla que decide con qué se hace
 
-> **¿El espectador tiene que LEER algo en la pieza?**
-> **Sí → Remotion. No → puede ir generativo.**
+> **¿Cuánto texto y de qué tipo?**
+> **Un rótulo de 1 o 2 palabras, aislado → sale bien generado.**
+> **Una interfaz con varios textos (mensajes, horas, nombres, encabezados) → Remotion.**
 
-Está medida, no es opinión. Un modelo de video puede escribir bien una frase corta y a la vez
-inventar basura alrededor: en la prueba salió *"Yuessages de 212021"*, *"Tur2 PM"*, *"Messager"*,
-*"algueien"*, y horarios sin ningún orden (12:43 p.m., 8:12 p.m., 10:13 p.m. mezclados). En un
-b-roll de una oficina, la pantalla del celular decía *"Heal a Letain Fool Eatme foe tofan"*.
+Está medido en las dos direcciones, no es opinión.
+
+**Sale bien:** un rótulo corto y solo. En los clips de Leonardo del 20-ago, "ACM Manual" y
+"ACM Automático" salieron perfectos, con tilde. Un texto breve, dentro de un marco, sin nada
+alrededor que competir.
+
+**Sale mal:** la interfaz densa. En el mockup de chat el mismo modelo escribió bien las frases
+principales y a la vez inventó *"Yuessages de 212021"*, *"Tur2 PM"*, *"Messager"*, *"algueien"*, y
+horarios sin ningún orden (12:43 p.m., 8:12 p.m., 10:13 p.m. mezclados). En un b-roll de oficina,
+la pantalla del celular decía *"Heal a Letain Fool Eatme foe tofan"*.
+
+La diferencia no es el idioma ni la longitud de la frase: es **cuántos textos hay en el cuadro**.
+Uno lo clava. Seis, y empieza a rellenar los huecos con lo que le parece.
+
+El ejemplo más claro está en un solo cuadro, el clip "Flujos Dispersos" al segundo 6,5: el rótulo
+grande dice **"Control Total"** perfecto, el título **"Dashboard"** perfecto, y al mismo tiempo el
+menú lateral de ese dashboard dice *"Aemual"*, *"Apratar"*, *"Arcarutlización"*, *"Detrchos"*,
+*"Compirutes"*. Mismo cuadro, mismo modelo, mismo segundo.
+
+**Y está bien que sea así**, si se lo usa a conciencia: en un reel de 10 segundos nadie lee el menú
+lateral, funciona como textura. La regla práctica es que **lo que el espectador tiene que leer sea
+lo único legible del cuadro** — el resto puede ser garabato y nadie lo nota. Lo que no se puede es
+pedirle que escriba seis cosas y esperar que las seis estén bien.
 
 Corolario útil: **un clip generado sirve de fondo y Remotion pone el texto encima.** El celular
 sobre el escritorio queda mejor con una conversación de verdad superpuesta que cualquiera de las
@@ -55,7 +75,84 @@ dos cosas por separado.
 
 ---
 
-## 3. Dirigir a Flow: los tramos de tiempo
+## 3. El template de 10 segundos (el estándar para pedir clips a Flow)
+
+**Este es el formato que se usa.** No se escribe un prompt de cero: se completa este. Lo trajo
+Leonardo el 20-ago-2026 y produjo los dos mejores clips que se generaron hasta hoy.
+
+Lo que lo hace funcionar son **los tres primeros bloques, que NUNCA se tocan**. Son los que
+garantizan que dos clips pedidos con una semana de diferencia parezcan del mismo video: mismo
+personaje, mismo fondo, misma estética. Si se les agrega ropa, pelo o se cambia el fondo, se
+rompe el universo visual y cada clip parece de otra campaña.
+
+```
+[System/Style & Character Consistency]: Minimalist 2D animation, fluid (60fps) and modern. The
+main character is ALWAYS a consistent stick figure with pure white, sharp, and slightly glowing
+strokes. The character design must remain identical: no facial features, just clean, simple lines.
+
+[Background/Environment Consistency]: Pitch black background. In the center, a very slight white
+radial gradient to give depth. In the background, a subtle white wireframe grid with 10% opacity,
+giving a clean, trendy, and technological aesthetic.
+
+[Text & Typography Constraints]: Any text appearing on screen must be perfectly spelled in a
+modern, clean, sans-serif font.
+
+[Action Timeline & Camera Flow - 10 Seconds Total]:
+
+[0:00 - 0:04] The Problem (Wide or Medium Shot): The stick figure character is experiencing
+[EL PROBLEMA O CAOS]. A text overlay appears smoothly containing EXACTLY the Spanish text:
+"[1 O 2 PALABRAS]".
+
+[0:04 - 0:05] The Transition (Camera Move): A rapid [Whip Pan / Zoom In / Digital Wipe] instantly
+changes the scene, clearing the chaos.
+
+[0:05 - 0:08] The Solution (Medium Shot): The stick figure is now [LA SOLUCIÓN]. A new text overlay
+appears smoothly containing EXACTLY the Spanish text: "[1 O 2 PALABRAS]".
+
+[0:08 - 0:10] The Outcome (Macro Close-up): Fast zoom into [EL DETALLE FINAL], drawn in the same
+minimalist white line style on pitch black, flat 2D, no photorealism, no real device, no operating
+system interface. Below it, the Spanish text EXACTLY spells: "[1 O 2 PALABRAS]".
+
+[Motion/Fluidity]: The first 4 seconds must show [erratic / slow / chaotic] movement. The last 5
+seconds must have smooth, satisfying easing (acceleration and deceleration) and perfect alignment.
+
+[Audio/SFX]: Synchronized soundscape. [SONIDOS DEL PROBLEMA]. A sharp transition sound [whoosh /
+scanner sweep]. [SONIDOS DE SOLUCIÓN].
+
+Clean video, no subtitles, no watermark, no floating text, no extra letters or symbols anywhere.
+```
+
+### Las tres reglas de uso
+
+1. **Los bloques de consistencia no se tocan.** Son la identidad visual.
+2. **Textos de 1 o 2 palabras, entre comillas y con `containing EXACTLY the Spanish text`.** Frases
+   largas confunden al modelo (ver la regla del punto 2).
+3. **El arco es problema → transición → solución → resultado.** Gancho en los primeros 3 segundos,
+   giro en el medio, cierre satisfactorio. Es lo que sostiene la retención en redes.
+
+### Los tres arreglos que le hicimos al template original, y por qué
+
+- **En el macro final, nunca nombrar un aparato.** Es el arreglo importante, y el motivo es más
+  fino de lo que parecía. Dos clips del mismo día, mismo estilo, mismo bloque de cabecera:
+
+  | El prompt del tramo `[0:08-0:10]` dice | Qué devolvió |
+  |---|---|
+  | `Fast zoom into **the laptop**` | una laptop **fotorrealista**, con Windows y la barra de tareas |
+  | `Fast zoom into **the clean dashboard interface**` | siguió en línea blanca, perfecto |
+
+  No es que el close-up rompa el estilo: es que **nombrar un objeto físico** (laptop, cell phone,
+  monitor) arrastra al modelo al fotorrealismo, porque de esos objetos vio millones de fotos. Una
+  interfaz descrita en abstracto no tiene ese ancla. Entonces: se nombra **lo que se ve en la
+  pantalla**, nunca el aparato que la contiene, y se repite la restricción de estilo dentro del
+  tramo por las dudas.
+- **Se agregó la cola de limpieza al final.** El template original confiaba en la frase
+  "No misspelled words or AI gibberish", y aun así en el clip de ACM aparecieron caracteres
+  inventados al lado del marco de "ACM Manual". La cola al cierre del prompt sí funcionó en todas
+  las pruebas.
+- **`fluid (60fps)` es una indicación estética, no un parámetro.** La salida real de Flow es
+  **24 fps** siempre. Sirve para pedir movimiento suave; no cambia la cadencia del archivo.
+
+## 4. Dirigir a Flow: los tramos de tiempo
 
 Lo que hace que una pieza **explique** algo es que las cosas pasen en orden. Eso se consigue
 partiendo los 8 segundos en tramos:
@@ -82,7 +179,7 @@ Donde se usó, no apareció una sola letra parásita. Donde se omitió, aparecie
 
 ---
 
-## 4. Lo que cuesta y lo que entrega Flow (cuenta de Leonardo, PRO)
+## 5. Lo que cuesta y lo que entrega Flow (cuenta de Leonardo, PRO)
 
 | | |
 |---|---|
@@ -105,7 +202,7 @@ está generando cuando en realidad está esperando. Detalle del MCP en la memori
 
 ---
 
-## 5. Cómo se construye una pieza en Remotion
+## 6. Cómo se construye una pieza en Remotion
 
 `ChatMockup.tsx` (composición **`ChatMockup`**) es la **primera de la familia**, no la única que
 va a haber. Cuando el guion pida un panel, un mail o una notificación, se escribe otra al lado
@@ -138,7 +235,7 @@ VAKDOR va como texto en Inter con `letterSpacing: 6`.
 
 ---
 
-## 6. Ojo con las dos copias del motor
+## 7. Ojo con las dos copias del motor
 
 `engine/` (acá, versionado en git) y `Prisma - MK\_motor-video` (el que renderiza) **están
 desincronizados desde antes**: `engine/` tiene `Thumbnail`, `format.ts` y los efectos
