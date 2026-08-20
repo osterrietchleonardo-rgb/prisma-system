@@ -1,33 +1,66 @@
 import type { ActivityType } from "./types";
 
 /**
- * De qué lado del negocio está el cliente en una actividad determinada.
+ * Qué es esta persona en esta actividad puntual.
  *
- * Existe porque una misma persona puede estar comprándonos y vendiéndonos a la
- * vez, y el tablero necesita poder seguirle los dos procesos por separado sin
- * que uno le tape al otro.
+ * Absorbe al viejo "Tipo de Lead" (que sólo se preguntaba en Prospección):
+ * un cliente puede vendernos una propiedad y a la vez buscar otra para
+ * comprar, o alquilar la que tiene y buscar otra para alquilarse — el
+ * tablero necesita poder seguirle cada proceso por separado sin que uno le
+ * tape al otro.
  */
-export type ProcesoNegocio = "compra" | "venta";
+export type ProcesoNegocio = "vendedor" | "comprador" | "locador" | "locatario";
 
 /**
- * Las tres etapas donde el proceso NO se elige: ya lo dice la etapa.
- * Un prelisting o una captación son del lado del vendedor por definición, y un
- * prebuying del comprador. Dejarlas elegibles sólo habilitaría cargar un
- * registro que se contradice a sí mismo.
+ * El lado del negocio ya no es un valor que se guarda: se deriva del
+ * proceso. "Ofrece" es quien tiene una propiedad (para vender o alquilar);
+ * "busca" es quien quiere una (para comprar o alquilarse).
  */
-export const PROCESO_FIJO: Partial<Record<ActivityType, ProcesoNegocio>> = {
-  prelisting: "venta",
-  captacion: "venta",
-  prebuying: "compra",
+export type LadoDelNegocio = "ofrece" | "busca";
+
+export function ladoDelNegocio(proceso: ProcesoNegocio | null): LadoDelNegocio | null {
+  if (proceso === "vendedor" || proceso === "locador") return "ofrece";
+  if (proceso === "comprador" || proceso === "locatario") return "busca";
+  return null;
+}
+
+/**
+ * Qué valores de proceso admite cada etapa. Reemplaza al viejo `PROCESO_FIJO`:
+ * antes cada etapa fija tenía UN solo valor posible (una captación sólo podía
+ * ser "venta"), pero ahora una captación puede ser de un vendedor o de un
+ * locador — dos opciones válidas, no una. Por eso el campo dejó de venir
+ * relleno y bloqueado en esas etapas: hay que preguntar cuál de las dos es.
+ *
+ * Prospección, Reserva y Cierre siguen siendo de los cuatro valores: ahí el
+ * asesor elige a conciencia, sin default.
+ */
+export const PROCESOS_POR_ETAPA: Record<ActivityType, ProcesoNegocio[]> = {
+  prospeccion: ["vendedor", "comprador", "locador", "locatario"],
+  prelisting: ["vendedor", "locador"],
+  captacion: ["vendedor", "locador"],
+  prebuying: ["comprador", "locatario"],
+  reserva: ["vendedor", "comprador", "locador", "locatario"],
+  cierre: ["vendedor", "comprador", "locador", "locatario"],
+};
+
+/** Las columnas del tablero que corresponden a cada lado del negocio. */
+const ETAPAS_POR_LADO: Record<LadoDelNegocio, ActivityType[]> = {
+  ofrece: ["prospeccion", "prelisting", "captacion", "reserva", "cierre"],
+  busca: ["prospeccion", "prebuying", "reserva", "cierre"],
 };
 
 /**
- * Las columnas del tablero que admite cada proceso. Prospección, reserva y
- * cierre son de los dos lados; el resto es de uno solo.
+ * Las columnas del tablero que admite cada proceso. Se deriva del lado:
+ * vendedor y locador comparten las mismas etapas (las de quien ofrece);
+ * comprador y locatario comparten las suyas (las de quien busca). El
+ * bloqueo al arrastrar sigue siendo el mismo de antes, sólo que ahora hay
+ * cuatro procesos repartidos en dos lados en vez de dos procesos sueltos.
  */
 export const ETAPAS_POR_PROCESO: Record<ProcesoNegocio, ActivityType[]> = {
-  venta: ["prospeccion", "prelisting", "captacion", "reserva", "cierre"],
-  compra: ["prospeccion", "prebuying", "reserva", "cierre"],
+  vendedor: ETAPAS_POR_LADO.ofrece,
+  locador: ETAPAS_POR_LADO.ofrece,
+  comprador: ETAPAS_POR_LADO.busca,
+  locatario: ETAPAS_POR_LADO.busca,
 };
 
 const TODAS_LAS_ETAPAS: ActivityType[] = [
@@ -56,45 +89,37 @@ export function cardKeyDe(clientKey: string, proceso: ProcesoNegocio | null): st
   return `${clientKey}::${proceso ?? "sin-definir"}`;
 }
 
-/**
- * El valor que se escribe al resolver en un clic una tarjeta "Sin definir"
- * (botón en `PipelineClientSheet`, action `asignarProcesoATarjeta`).
- *
- * Si la etapa de la fila tiene un lado fijo (Prelisting/Captación = venta,
- * Prebuying = compra) ese lado gana siempre, sin importar qué botón haya
- * tocado el asesor. Es lo que hace que la escritura sea segura por
- * construcción: nunca puede producir un valor que el CHECK de la base
- * (`performance_logs_proceso_coherente`) vaya a rechazar.
- */
-export function procesoParaResolucion(
-  type: ActivityType,
-  elegido: ProcesoNegocio
-): ProcesoNegocio {
-  return PROCESO_FIJO[type] ?? elegido;
-}
-
 export function labelDeProceso(proceso: ProcesoNegocio | null): string {
-  if (proceso === "compra") return "Compra";
-  if (proceso === "venta") return "Venta";
-  return "Sin definir";
+  switch (proceso) {
+    case "vendedor":
+      return "Vendedor";
+    case "comprador":
+      return "Comprador";
+    case "locador":
+      return "Locador";
+    case "locatario":
+      return "Locatario";
+    default:
+      return "Sin definir";
+  }
 }
 
-const BADGES = {
-  compra: {
-    label: "COMPRA",
-    // Violeta: el mismo color con el que la columna Prebuying se identifica.
-    className: "bg-violet-500/15 text-violet-400 border-violet-500/30",
-  },
-  venta: {
-    label: "VENTA",
-    // Índigo: el color de la columna Prelisting.
-    className: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
-  },
+// El color comunica el lado (índigo = ofrece, violeta = busca); el texto
+// comunica el valor exacto. Así se ve de un golpe de qué lado está la
+// tarjeta, y se lee sin ambigüedad cuál de los dos procesos de ese lado es.
+const COLOR_OFRECE = "bg-indigo-500/15 text-indigo-400 border-indigo-500/30";
+const COLOR_BUSCA = "bg-violet-500/15 text-violet-400 border-violet-500/30";
+
+const BADGES: Record<ProcesoNegocio | "sin-definir", { label: string; className: string }> = {
+  vendedor: { label: "VENDEDOR", className: COLOR_OFRECE },
+  locador: { label: "LOCADOR", className: COLOR_OFRECE },
+  comprador: { label: "COMPRADOR", className: COLOR_BUSCA },
+  locatario: { label: "LOCATARIO", className: COLOR_BUSCA },
   "sin-definir": {
     label: "SIN DEFINIR",
     className: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   },
-} as const;
+};
 
 export function badgeDeProceso(
   proceso: ProcesoNegocio | null

@@ -88,9 +88,9 @@ export interface PerformanceLog extends WAMetrics, Partial<WAAnalysis> {
 
 export const performanceLogSchema = z.object({
   type: z.enum(['prospeccion', 'prelisting', 'prebuying', 'captacion', 'reserva', 'cierre']),
-  proceso: z.enum(['compra', 'venta'], {
-    required_error: "Elegí si la actividad es de Compra o de Venta",
-    invalid_type_error: "Elegí si la actividad es de Compra o de Venta",
+  proceso: z.enum(['vendedor', 'comprador', 'locador', 'locatario'], {
+    required_error: "Elegí de qué proceso es esta actividad",
+    invalid_type_error: "Elegí de qué proceso es esta actividad",
   }),
   propiedad_ref: z.string().optional().nullable(),
   property_id: z.string().uuid().optional().nullable(),

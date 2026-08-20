@@ -44,28 +44,28 @@ describe("buildPipeline: el cliente que compra y además vende", () => {
   it("le arma DOS tarjetas, una por proceso", () => {
     const { cards } = buildPipeline(
       [
-        unLog({ id: "1", type: "prebuying", proceso: "compra", created_at: "2026-08-01T10:00:00.000Z" }),
-        unLog({ id: "2", type: "prelisting", proceso: "venta", created_at: "2026-08-05T10:00:00.000Z" }),
+        unLog({ id: "1", type: "prebuying", proceso: "comprador", created_at: "2026-08-01T10:00:00.000Z" }),
+        unLog({ id: "2", type: "prelisting", proceso: "vendedor", created_at: "2026-08-05T10:00:00.000Z" }),
       ],
       []
     );
 
     expect(cards).toHaveLength(2);
-    expect(cards.map((c) => c.proceso).sort()).toEqual(["compra", "venta"]);
+    expect(cards.map((c) => c.proceso).sort()).toEqual(["comprador", "vendedor"]);
     expect(new Set(cards.map((c) => c.clientKey)).size).toBe(1);
   });
 
   it("cargar el prelisting NO le saca la tarjeta de compra de Prebuying", () => {
     const { cards } = buildPipeline(
       [
-        unLog({ id: "1", type: "prebuying", proceso: "compra", created_at: "2026-08-01T10:00:00.000Z" }),
-        unLog({ id: "2", type: "prelisting", proceso: "venta", created_at: "2026-08-05T10:00:00.000Z" }),
+        unLog({ id: "1", type: "prebuying", proceso: "comprador", created_at: "2026-08-01T10:00:00.000Z" }),
+        unLog({ id: "2", type: "prelisting", proceso: "vendedor", created_at: "2026-08-05T10:00:00.000Z" }),
       ],
       []
     );
 
-    const compra = cards.find((c) => c.proceso === "compra");
-    const venta = cards.find((c) => c.proceso === "venta");
+    const compra = cards.find((c) => c.proceso === "comprador");
+    const venta = cards.find((c) => c.proceso === "vendedor");
     expect(compra?.stage).toBe("prebuying");
     expect(venta?.stage).toBe("prelisting");
   });
@@ -73,15 +73,15 @@ describe("buildPipeline: el cliente que compra y además vende", () => {
   it("cada tarjeta cuenta sólo sus propias actividades", () => {
     const { cards } = buildPipeline(
       [
-        unLog({ id: "1", type: "prebuying", proceso: "compra" }),
-        unLog({ id: "2", type: "prebuying", proceso: "compra", created_at: "2026-08-03T10:00:00.000Z" }),
-        unLog({ id: "3", type: "prelisting", proceso: "venta" }),
+        unLog({ id: "1", type: "prebuying", proceso: "comprador" }),
+        unLog({ id: "2", type: "prebuying", proceso: "comprador", created_at: "2026-08-03T10:00:00.000Z" }),
+        unLog({ id: "3", type: "prelisting", proceso: "vendedor" }),
       ],
       []
     );
 
-    expect(cards.find((c) => c.proceso === "compra")?.activityCount).toBe(2);
-    expect(cards.find((c) => c.proceso === "venta")?.activityCount).toBe(1);
+    expect(cards.find((c) => c.proceso === "comprador")?.activityCount).toBe(2);
+    expect(cards.find((c) => c.proceso === "vendedor")?.activityCount).toBe(1);
   });
 });
 
@@ -89,13 +89,13 @@ describe("buildPipeline: movimientos manuales", () => {
   it("mover la tarjeta de compra no mueve la de venta", () => {
     const { cards } = buildPipeline(
       [
-        unLog({ id: "1", type: "prebuying", proceso: "compra", created_at: "2026-08-01T10:00:00.000Z" }),
-        unLog({ id: "2", type: "prelisting", proceso: "venta", created_at: "2026-08-01T11:00:00.000Z" }),
+        unLog({ id: "1", type: "prebuying", proceso: "comprador", created_at: "2026-08-01T10:00:00.000Z" }),
+        unLog({ id: "2", type: "prelisting", proceso: "vendedor", created_at: "2026-08-01T11:00:00.000Z" }),
       ],
       [
         unMovimiento({
           id: "m1",
-          proceso: "compra",
+          proceso: "comprador",
           from_stage: "prebuying",
           to_stage: "reserva",
           created_at: "2026-08-10T10:00:00.000Z",
@@ -103,8 +103,8 @@ describe("buildPipeline: movimientos manuales", () => {
       ]
     );
 
-    expect(cards.find((c) => c.proceso === "compra")?.stage).toBe("reserva");
-    expect(cards.find((c) => c.proceso === "venta")?.stage).toBe("prelisting");
+    expect(cards.find((c) => c.proceso === "comprador")?.stage).toBe("reserva");
+    expect(cards.find((c) => c.proceso === "vendedor")?.stage).toBe("prelisting");
   });
 });
 
@@ -112,8 +112,8 @@ describe("buildPipeline: lo de siempre no se rompe", () => {
   it("un cliente con un solo proceso sigue siendo UNA tarjeta", () => {
     const { cards } = buildPipeline(
       [
-        unLog({ id: "1", type: "prospeccion", proceso: "compra" }),
-        unLog({ id: "2", type: "prebuying", proceso: "compra", created_at: "2026-08-04T10:00:00.000Z" }),
+        unLog({ id: "1", type: "prospeccion", proceso: "comprador" }),
+        unLog({ id: "2", type: "prebuying", proceso: "comprador", created_at: "2026-08-04T10:00:00.000Z" }),
       ],
       []
     );
@@ -127,19 +127,19 @@ describe("buildPipeline: lo de siempre no se rompe", () => {
     const { cards } = buildPipeline(
       [
         unLog({ id: "1", type: "prospeccion", proceso: null }),
-        unLog({ id: "2", type: "prebuying", proceso: "compra", created_at: "2026-08-04T10:00:00.000Z" }),
+        unLog({ id: "2", type: "prebuying", proceso: "comprador", created_at: "2026-08-04T10:00:00.000Z" }),
       ],
       []
     );
 
     expect(cards).toHaveLength(2);
     expect(cards.filter((c) => c.proceso === null)).toHaveLength(1);
-    expect(cards.filter((c) => c.proceso === "compra")).toHaveLength(1);
+    expect(cards.filter((c) => c.proceso === "comprador")).toHaveLength(1);
   });
 
   it("las eliminadas no cuentan para nadie", () => {
     const { cards } = buildPipeline(
-      [unLog({ id: "1", type: "prebuying", proceso: "compra", status: "eliminada" })],
+      [unLog({ id: "1", type: "prebuying", proceso: "comprador", status: "eliminada" })],
       []
     );
     expect(cards).toHaveLength(0);
@@ -147,7 +147,7 @@ describe("buildPipeline: lo de siempre no se rompe", () => {
 
   it("las actividades sin cliente vinculado no arman tarjeta y se cuentan aparte", () => {
     const { cards, sinCliente } = buildPipeline(
-      [unLog({ id: "1", proceso: "compra", wa_contact_id: null, wa_contacts: null, lead_id: null })],
+      [unLog({ id: "1", proceso: "comprador", wa_contact_id: null, wa_contacts: null, lead_id: null })],
       []
     );
     expect(cards).toHaveLength(0);
@@ -156,9 +156,9 @@ describe("buildPipeline: lo de siempre no se rompe", () => {
 
   it("la tarjeta lleva su propia cardKey, distinta de la clave del cliente", () => {
     const { cards } = buildPipeline(
-      [unLog({ id: "1", type: "prebuying", proceso: "compra" })],
+      [unLog({ id: "1", type: "prebuying", proceso: "comprador" })],
       []
     );
-    expect(cards[0].cardKey).toBe(`${cards[0].clientKey}::compra`);
+    expect(cards[0].cardKey).toBe(`${cards[0].clientKey}::comprador`);
   });
 });
