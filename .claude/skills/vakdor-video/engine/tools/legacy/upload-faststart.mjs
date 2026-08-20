@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 
-const SUPABASE_URL = "https://upggigryxdvcmnuwafyl.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVwZ2dpZ3J5eGR2Y21udXdhZnlsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTA0ODQzMywiZXhwIjoyMDg0NjI0NDMzfQ.rnD0gMaunTz6j3CPvyzhgyBxHZuCj1gDQAt7s3IJPVo";
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+if (!SUPABASE_KEY) throw new Error("Falta SUPABASE_SERVICE_ROLE_KEY en el entorno.");
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
