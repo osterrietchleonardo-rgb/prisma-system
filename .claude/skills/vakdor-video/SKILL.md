@@ -176,6 +176,13 @@ los botones: lo que quede ahí, no se lee.
 
 ### 📐 Antes de editar un reel, leer esto
 
+**`references/piezas-de-apoyo.md`** — **leer antes de meter cualquier cosa en pantalla que no sea
+la persona hablando**: mockups (chat, panel, notificación, mail), clips de stick figure,
+animaciones 2D y b-roll generativo. La pieza **sale del guion, nunca al revés**, y la regla que
+decide con qué se hace es una sola: **si el espectador tiene que leer algo, va en Remotion; si no,
+puede ir generado con IA**. Incluye lo que cuesta cada cosa en Google Flow, cómo dirigirlo con
+tramos de tiempo, y por qué las prohibiciones en el prompt hacen aparecer justo lo que se prohíbe.
+
 **`references/estilo-reel-vakdor.md`** — la receta destilada de editar videos reales de Leonardo:
 estructura (portada → cuerpo → cierre), cuándo va cada pieza gráfica, los valores de cámara que
 quedaron después de dos rondas de "está muy movido", dónde va cada cosa en el cuadro, cómo se
@@ -272,6 +279,10 @@ Verificar la privacidad SIEMPRE sobre el archivo final:
 HyperFrames, Manim (ver `references/animations.md` y `references/manim.md`). Cada una = un slot en
 `edit/animations/slot_<id>/`; múltiples animaciones = sub-agentes en paralelo.
 
+**Mockups, stick figures y b-roll generado:** la decisión de qué pieza va en cada momento sale del
+diálogo, y con qué se hace lo decide `references/piezas-de-apoyo.md`. Leerlo antes de generar nada
+en Google Flow — hay piezas que cuestan créditos y salen peor que renderizarlas en casa.
+
 ---
 
 ## Copy y marca
@@ -285,6 +296,7 @@ HyperFrames, Manim (ver `references/animations.md` y `references/manim.md`). Cad
 ```
 SKILL.md · install.md · requirements.txt
 references/  video-use.md (correctitud) · produccion.md (criterio) ·
+             piezas-de-apoyo.md (mockups, stick figures y generativo) ·
              animations.md · formats.md · manim.md
 helpers/     ── material ──   prep · frame_map
              ── voz ──        whisper_parse · transcribe · transcribe_batch · pack_transcripts ·
@@ -301,4 +313,7 @@ engine/      motor Remotion de A/B (multi-formato: format.ts + PropertyReel/Edit
 
 - **`PropertyReel`** — Modo A. Prop `format`; dimensiones vía `calculateMetadata`; layout escalado por `unit()`.
 - **`EditedReel`** — Modo B. Ídem `format`; subtítulos con posición relativa al alto.
+- **`ChatMockup`** — pieza de apoyo: conversación animada con la marca. **La primera de una
+  familia**, no la única: cuando el guion pida un panel, un mail o una notificación, se escribe
+  otra al lado con el mismo patrón. Ver `references/piezas-de-apoyo.md`.
 - `render.mjs` / `edit.mjs` reciben `--format`. `format.ts` centraliza dimensiones y el factor de escala.

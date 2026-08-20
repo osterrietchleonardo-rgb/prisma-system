@@ -18,6 +18,18 @@ import {
   calcThumbnailMetadata,
   THUMB_FPS,
 } from "./Thumbnail";
+import {
+  PropertyTour,
+  propertyTourDefaults,
+  calcTourMetadata,
+  FPS as TOUR_FPS,
+} from "./PropertyTour";
+import {
+  ChatMockup,
+  chatMockupDefaults,
+  calcChatMetadata,
+  CHAT_FPS,
+} from "./ChatMockup";
 
 // Registro de composiciones del motor de video Vakdor.
 // Formato vertical 1080x1920 (reel IG/TikTok). La duracion se calcula sola
@@ -46,6 +58,16 @@ export const RemotionRoot: React.FC = () => {
         calculateMetadata={calcEditedMetadata}
       />
       <Composition
+        id="PropertyTour"
+        component={PropertyTour}
+        durationInFrames={1050}
+        fps={TOUR_FPS}
+        width={1080}
+        height={1920}
+        defaultProps={propertyTourDefaults}
+        calculateMetadata={calcTourMetadata}
+      />
+      <Composition
         id="Thumbnail"
         component={Thumbnail}
         durationInFrames={1}
@@ -54,6 +76,16 @@ export const RemotionRoot: React.FC = () => {
         height={1920}
         defaultProps={thumbnailDefaults}
         calculateMetadata={calcThumbnailMetadata}
+      />
+      <Composition
+        id="ChatMockup"
+        component={ChatMockup}
+        durationInFrames={300}
+        fps={CHAT_FPS}
+        width={1080}
+        height={1920}
+        defaultProps={chatMockupDefaults}
+        calculateMetadata={calcChatMetadata}
       />
     </>
   );
