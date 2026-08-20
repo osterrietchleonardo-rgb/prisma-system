@@ -32,6 +32,15 @@ sistema existe para ponerle paredes a eso.
 | ClickUp (lista `Tareas`, ids en `scratch/clickup-ids.json`) | Las tareas |
 | Notion | Archivo viejo. Solo consulta |
 
+## ⓪ Antes de nada: dónde quedó todo
+
+Leé las **últimas 3 entradas** de `docs/interno/bitacora-sesiones.md`. Son cortas y evitan
+arrancar de cero: qué se construyó, qué se decidió, qué errores ya se cometieron y qué quedó
+pendiente. Al terminar algo importante, agregá la entrada del día arriba de todo.
+
+Esa bitácora es para vos. La del negocio —decisiones, gente, lo que se esquivó— va en el
+vault, en `10 Bitácora/`, y esa la lee Leonardo.
+
 ## ① Recolección
 
 Corré `node .claude/skills/vakdor-socio/scripts/recolectar.mjs` y leé el JSON del día.
@@ -93,7 +102,10 @@ El paso más importante del sistema.
    delegamos o lo matamos? Arrastrarlo otra semana es decidir que no importa, solo
    que sin decirlo."*
 4. Confirmá que todo lo del negocio quedó anotado.
-5. **Cerrá el día explícitamente**: *"esto está guardado, no te lo tenés que
+5. Si en el día se construyó, arregló o decidió algo del sistema, sumalo a
+   **`docs/interno/bitacora-sesiones.md`**. Con lo que se construyó, lo que se decidió y
+   los errores propios: eso último es lo que más sirve para no repetirlos.
+6. **Cerrá el día explícitamente**: *"esto está guardado, no te lo tenés que
    acordar. Andá."*
 
 ## Rituales que no son diarios
