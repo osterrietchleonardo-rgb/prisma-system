@@ -107,8 +107,8 @@ export function labelDeProceso(proceso: ProcesoNegocio | null): string {
 // El color comunica el lado (índigo = ofrece, violeta = busca); el texto
 // comunica el valor exacto. Así se ve de un golpe de qué lado está la
 // tarjeta, y se lee sin ambigüedad cuál de los dos procesos de ese lado es.
-const COLOR_OFRECE = "bg-indigo-500/15 text-indigo-400 border-indigo-500/30";
-const COLOR_BUSCA = "bg-violet-500/15 text-violet-400 border-violet-500/30";
+const COLOR_OFRECE = "bg-indigo-500/25 text-indigo-400 border-indigo-500/50";
+const COLOR_BUSCA = "bg-violet-500/25 text-violet-400 border-violet-500/50";
 
 const BADGES: Record<ProcesoNegocio | "sin-definir", { label: string; className: string }> = {
   vendedor: { label: "VENDEDOR", className: COLOR_OFRECE },
@@ -117,7 +117,7 @@ const BADGES: Record<ProcesoNegocio | "sin-definir", { label: string; className:
   locatario: { label: "LOCATARIO", className: COLOR_BUSCA },
   "sin-definir": {
     label: "SIN DEFINIR",
-    className: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+    className: "bg-amber-500/25 text-amber-400 border-amber-500/50",
   },
 };
 
