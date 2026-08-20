@@ -228,7 +228,10 @@ export function PerformanceLogForm({
       onSuccess();
     } catch (err) {
       console.error(err);
-      toast.error("Ocurrió un error al guardar el registro");
+      // Los dos server actions tiran mensajes puntuales (qué procesos admite
+      // la etapa) que son la última puerta antes del CHECK de la base: si se
+      // pisan acá con el genérico, ese texto nunca le llega a nadie.
+      toast.error(err instanceof Error ? err.message : "Ocurrió un error al guardar el registro");
     } finally {
       setIsSubmitting(false);
     }
@@ -260,11 +263,14 @@ export function PerformanceLogForm({
                 setValue("monto_operacion", 0);
                 setValue("comision_generada", 0);
                 // El proceso depende de la etapa igual que estos tres campos:
-                // se limpia acá y el useEffect de abajo lo vuelve a fijar solo
-                // si la nueva etapa es de las que lo imponen (prelisting,
-                // captación, prebuying). Si no, queda vacío a propósito: en
-                // Prospección/Reserva/Cierre se elige a conciencia, nunca por
-                // inercia de la etapa anterior.
+                // se limpia acá SIEMPRE, sin condición, para que un valor de
+                // la etapa anterior (por ejemplo "vendedor") no sobreviva al
+                // cambiar a una etapa donde no es válido (Prebuying). El
+                // useEffect de abajo sólo lo vuelve a rellenar cuando el
+                // proceso viene impuesto por la tarjeta del tablero
+                // (`forcedProceso`); ninguna de las seis etapas lo impone por
+                // sí sola: las tres de lado fijo ahora ofrecen dos opciones,
+                // no una, así que siempre hay que elegir.
                 setValue("proceso", undefined as any);
               }} value={watch("type")}>
                 <SelectTrigger className="h-12 text-base">
@@ -307,15 +313,15 @@ export function PerformanceLogForm({
               </div>
             )}
             <p className="text-[11px] text-muted-foreground">
-              Una misma persona puede comprarte y venderte (o alquilarte y alquilarse) a la vez:
-              cada proceso lleva su propia tarjeta en el tablero.
+              Una misma persona puede estar en más de un proceso a la vez: cada uno lleva su
+              propia tarjeta en el tablero.
             </p>
             {ladoDeEstaEtapa && !procesoBloqueado && (
               <p className="text-[11px] text-muted-foreground">
                 {PIPELINE_STAGES.find((s) => s.id === activityType)?.title} es siempre de quien{" "}
                 {ladoDeEstaEtapa === "ofrece"
                   ? "tiene una propiedad (para vender o para alquilar)"
-                  : "busca una propiedad (para comprar o para alquilarse)"}
+                  : "busca una propiedad (para comprar o para alquilar)"}
                 : por eso sólo aparecen estas dos opciones.
               </p>
             )}
