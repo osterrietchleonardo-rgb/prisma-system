@@ -23,7 +23,7 @@ import { PipelineColumnView } from "./PipelineColumn";
 import { PipelineCardItem } from "./PipelineCard";
 import { PipelineStageDialog } from "./PipelineStageDialog";
 import { PipelineClientSheet } from "./PipelineClientSheet";
-import { etapasPermitidas, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
+import { etapasPermitidas, labelDeProceso, ladoDelNegocio, type ProcesoNegocio } from "@/lib/tracking/proceso";
 
 interface Props {
   /** Actividades ya filtradas por asesor, SIN filtrar por fecha/tipo/estado. */
@@ -107,7 +107,7 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
   const abrirProceso = (card: PipelineCard, proceso: ProcesoNegocio) => {
     setPending({
       card,
-      stage: proceso === "venta" ? "prelisting" : "prebuying",
+      stage: ladoDelNegocio(proceso) === "ofrece" ? "prelisting" : "prebuying",
       proceso,
       esProcesoNuevo: true,
     });

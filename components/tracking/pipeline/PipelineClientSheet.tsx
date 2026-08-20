@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Edit2, MapPin, ArrowRight } from "lucide-react";
 import { PIPELINE_STAGES, type PipelineCard } from "@/lib/tracking/pipeline";
 import type { PerformanceLog, PipelineMove } from "@/lib/tracking/types";
-import { badgeDeProceso, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
+import { badgeDeProceso, labelDeProceso, procesosPosiblesParaTarjeta, type ProcesoNegocio } from "@/lib/tracking/proceso";
 import { asignarProcesoATarjeta } from "@/actions/tracking/asignarProcesoATarjeta";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +29,8 @@ interface Props {
 
 const tituloEtapa = (id: string) => PIPELINE_STAGES.find((s) => s.id === id)?.title ?? id;
 
+const TODOS_LOS_PROCESOS: ProcesoNegocio[] = ["vendedor", "comprador", "locador", "locatario"];
+
 export function PipelineClientSheet({
   open,
   onOpenChange,
@@ -43,6 +45,13 @@ export function PipelineClientSheet({
   const [eligiendo, setEligiendo] = useState<ProcesoNegocio | null>(null);
 
   if (!card) return null;
+
+  // Los procesos que sirven para TODAS las actividades de esta tarjeta: la
+  // intersección, no una lista por fila. Vacía cuando la tarjeta mezcla los
+  // dos lados del negocio (p. ej. una prelisting y una prebuying juntas,
+  // nunca clasificadas) — un estado real que hay que resolver a mano desde
+  // la vista Lista, no acá.
+  const posiblesParaResolver = procesosPosiblesParaTarjeta(card.logs.map((log) => log.type));
 
   const resolverTarjeta = (proceso: ProcesoNegocio) => {
     setEligiendo(proceso);
@@ -92,7 +101,7 @@ export function PipelineClientSheet({
                 {badgeDeProceso(card.proceso).label}
               </span>
 
-              {(["compra", "venta"] as const)
+              {TODOS_LOS_PROCESOS
                 .filter((p) => p !== card.proceso && !procesosDelCliente.includes(p))
                 .map((p) => (
                   <Button
@@ -106,7 +115,7 @@ export function PipelineClientSheet({
                   </Button>
                 ))}
 
-              {(["compra", "venta"] as const)
+              {TODOS_LOS_PROCESOS
                 .filter((p) => p !== card.proceso && procesosDelCliente.includes(p))
                 .map((p) => (
                   <span key={p} className="text-[11px] text-muted-foreground">
@@ -118,30 +127,34 @@ export function PipelineClientSheet({
             {card.proceso === null && (
               <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-2">
                 <p className="text-xs font-medium text-foreground">Esta tarjeta es de:</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-[11px]"
-                    disabled={isPending}
-                    onClick={() => resolverTarjeta("compra")}
-                  >
-                    {isPending && eligiendo === "compra" ? "Clasificando…" : "Compra"}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-[11px]"
-                    disabled={isPending}
-                    onClick={() => resolverTarjeta("venta")}
-                  >
-                    {isPending && eligiendo === "venta" ? "Clasificando…" : "Venta"}
-                  </Button>
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  Sólo clasifica las actividades viejas de esta tarjeta; no las marca como
-                  modificadas ni les toca la calificación de IA.
-                </p>
+                {posiblesParaResolver.length > 0 ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {posiblesParaResolver.map((p) => (
+                        <Button
+                          key={p}
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-[11px]"
+                          disabled={isPending}
+                          onClick={() => resolverTarjeta(p)}
+                        >
+                          {isPending && eligiendo === p ? "Clasificando…" : labelDeProceso(p)}
+                        </Button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Sólo clasifica las actividades viejas de esta tarjeta; no las marca como
+                      modificadas ni les toca la calificación de IA.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">
+                    Esta tarjeta mezcla actividades de los dos lados del negocio (por ejemplo, una
+                    de Prelisting y una de Prebuying juntas): no hay un único proceso que sirva
+                    para todas. Resolvela actividad por actividad desde la vista Lista.
+                  </p>
+                )}
               </div>
             )}
           </SheetHeader>
