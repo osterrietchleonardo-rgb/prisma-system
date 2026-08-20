@@ -51,6 +51,16 @@ la pantalla del celular decía *"Heal a Letain Fool Eatme foe tofan"*.
 La diferencia no es el idioma ni la longitud de la frase: es **cuántos textos hay en el cuadro**.
 Uno lo clava. Seis, y empieza a rellenar los huecos con lo que le parece.
 
+El ejemplo más claro está en un solo cuadro, el clip "Flujos Dispersos" al segundo 6,5: el rótulo
+grande dice **"Control Total"** perfecto, el título **"Dashboard"** perfecto, y al mismo tiempo el
+menú lateral de ese dashboard dice *"Aemual"*, *"Apratar"*, *"Arcarutlización"*, *"Detrchos"*,
+*"Compirutes"*. Mismo cuadro, mismo modelo, mismo segundo.
+
+**Y está bien que sea así**, si se lo usa a conciencia: en un reel de 10 segundos nadie lee el menú
+lateral, funciona como textura. La regla práctica es que **lo que el espectador tiene que leer sea
+lo único legible del cuadro** — el resto puede ser garabato y nadie lo nota. Lo que no se puede es
+pedirle que escriba seis cosas y esperar que las seis estén bien.
+
 Corolario útil: **un clip generado sirve de fondo y Remotion pone el texto encima.** El celular
 sobre el escritorio queda mejor con una conversación de verdad superpuesta que cualquiera de las
 dos cosas por separado.
@@ -122,12 +132,19 @@ Clean video, no subtitles, no watermark, no floating text, no extra letters or s
 
 ### Los tres arreglos que le hicimos al template original, y por qué
 
-- **El bloque del macro final repite la restricción de estilo.** Es el arreglo importante. En el
-  clip de ACM, Leonardo pidió stick figure 2D para todo y el `Macro Close-up` le devolvió **un
-  laptop fotorrealista con Windows y la barra de tareas a la vista**: los primeros 8 segundos son
-  línea blanca y los últimos 2 son otra cosa. Pasa porque el bloque de estilo está al principio y
-  el modelo lo pierde al pedirle un primer plano de una interfaz, que es donde más material
-  fotográfico vio entrenando. Por eso ahora la restricción se repite **dentro** de ese tramo.
+- **En el macro final, nunca nombrar un aparato.** Es el arreglo importante, y el motivo es más
+  fino de lo que parecía. Dos clips del mismo día, mismo estilo, mismo bloque de cabecera:
+
+  | El prompt del tramo `[0:08-0:10]` dice | Qué devolvió |
+  |---|---|
+  | `Fast zoom into **the laptop**` | una laptop **fotorrealista**, con Windows y la barra de tareas |
+  | `Fast zoom into **the clean dashboard interface**` | siguió en línea blanca, perfecto |
+
+  No es que el close-up rompa el estilo: es que **nombrar un objeto físico** (laptop, cell phone,
+  monitor) arrastra al modelo al fotorrealismo, porque de esos objetos vio millones de fotos. Una
+  interfaz descrita en abstracto no tiene ese ancla. Entonces: se nombra **lo que se ve en la
+  pantalla**, nunca el aparato que la contiene, y se repite la restricción de estilo dentro del
+  tramo por las dudas.
 - **Se agregó la cola de limpieza al final.** El template original confiaba en la frase
   "No misspelled words or AI gibberish", y aun así en el clip de ACM aparecieron caracteres
   inventados al lado del marco de "ACM Manual". La cola al cierre del prompt sí funcionó en todas
