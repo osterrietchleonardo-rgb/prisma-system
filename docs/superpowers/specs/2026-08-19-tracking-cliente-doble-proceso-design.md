@@ -65,6 +65,9 @@ cliente en conflicto.
 
 ### 4.1 Columna nueva `proceso`
 
+> ⚠️ **Superado por el Addendum — 20-ago-2026** (al final de este documento): `proceso`
+> pasó de dos a cuatro valores. Ver "Modelo nuevo" en el addendum.
+
 ```ts
 export type ProcesoNegocio = 'compra' | 'venta';
 ```
@@ -84,6 +87,10 @@ valida el server action).
 ambiguas y forzaría a inventarles un lado.
 
 ### 4.2 Coherencia garantizada en base
+
+> ⚠️ **Superado por el Addendum — 20-ago-2026**: este `CHECK` se reemplazó por uno que
+> valida contra la lista de valores de cada etapa (cuatro procesos, no dos). Ver
+> "Migración" en el addendum.
 
 `CHECK` a nivel tabla en `performance_logs`, para que un registro que se contradice a
 sí mismo no pueda existir ni por API ni por SQL directo:
@@ -117,6 +124,10 @@ específicas; agregar una columna no las afecta.
 
 ### 5.1 Proceso fijo por etapa
 
+> ⚠️ **Superado por el Addendum — 20-ago-2026**: `PROCESO_FIJO` se eliminó. Ninguna
+> etapa fija ya un único valor — la reemplaza `PROCESOS_POR_ETAPA`, una lista por
+> etapa. Ver "Qué valores admite cada etapa" en el addendum.
+
 ```ts
 export const PROCESO_FIJO: Partial<Record<ActivityType, ProcesoNegocio>> = {
   prelisting: 'venta',
@@ -143,7 +154,11 @@ cardKey = `${clientKey}::${proceso ?? 'sin-definir'}`
 
 - `clientKey` se sigue calculando igual que hoy (`clientKeyFromLog`: teléfono E.164, o
   `lead:<uuid>` / `wa:<uuid>` de respaldo). No se toca.
-- Un cliente con actividades de compra **y** de venta genera **dos tarjetas**.
+- Un cliente con actividades de compra **y** de venta genera **dos tarjetas**. (⚠️
+  **Superado en parte por el Addendum — 20-ago-2026:** `proceso` pasó a tener cuatro
+  valores, no dos; un mismo cliente puede llegar a tener hasta cuatro tarjetas. El
+  mecanismo de `cardKey` en sí no cambió — ver "Qué valores admite cada etapa" en el
+  addendum.)
 - Un cliente con un solo proceso genera **una** tarjeta, igual que hoy.
 - Las filas `proceso = NULL` se agrupan en su propia tarjeta **"Sin definir"**, que se
   comporta exactamente como el tablero de hoy (sin restricciones de arrastre).
@@ -160,6 +175,10 @@ Compra movería también la de Venta.
 `movePipelineCard` recibe y guarda el `proceso` de la tarjeta movida.
 
 ### 5.4 Columnas permitidas al arrastrar
+
+> ⚠️ **Superado por el Addendum — 20-ago-2026**: `ETAPAS_POR_PROCESO` sigue existiendo
+> con ese nombre, pero ahora tiene cuatro claves derivadas del lado del negocio
+> (`ladoDelNegocio`), no dos. Ver "Qué valores admite cada etapa" en el addendum.
 
 ```ts
 export const ETAPAS_POR_PROCESO: Record<ProcesoNegocio, ActivityType[]> = {
@@ -178,6 +197,10 @@ motivo, no un error genérico. El mismo bloqueo se aplica al menú "Mover a…" 
 tarjeta: las etapas del otro lado aparecen deshabilitadas.
 
 ### 5.5 Cómo se abre el segundo proceso
+
+> ⚠️ **Superado por el Addendum — 20-ago-2026**: con cuatro valores el botón de la
+> ficha del cliente ofrece hasta tres opciones, no una sola "Compra/Venta". Ver "Qué NO
+> cambia" en el addendum.
 
 No hace falta ningún mecanismo nuevo: alcanza con cargar una actividad del otro lado
 para ese cliente. Dos caminos, los dos terminan en el mismo formulario:
@@ -208,6 +231,11 @@ filtra por Eliminadas las siga viendo consistentes.
 **Nada se borra, ningún `type` cambia, ningún monto se mueve, ningún `status` se toca.**
 El backfill escribe únicamente la columna nueva.
 
+> ⚠️ **Superado por el Addendum — 20-ago-2026**: el diálogo de un clic que este párrafo
+> da por pendiente **ya se construyó** (`PipelineClientSheet` + server action
+> `asignarProcesoATarjeta`). Ver "Qué NO cambia" en el addendum y el resolutor descrito
+> en TECNICO / FUNCIONAL.
+
 Las 4 tarjetas que quedan "Sin definir" muestran un cartelito ámbar. **Eso es lo único
 que se implementó de este punto.** No existe ningún diálogo de un clic para asignarles
 proceso — esa parte quedó pendiente, es un follow-up conocido, no un olvido a
@@ -229,10 +257,19 @@ Comportamiento real de una tarjeta "Sin definir" hoy:
   Esa edición pide un *motivo*, marca la fila como "Modificada" y le borra la
   calificación de IA — exactamente el costo que este punto decía evitar con el
   diálogo de un clic. Mientras el diálogo no se construya, ese es el único camino.
+  (⚠️ **Superado por el Addendum — 20-ago-2026**: el diálogo de un clic ya existe y
+  cubre el caso normal sin ese costo; el camino por la Lista solo queda como único
+  camino cuando la tarjeta mezcla actividades de los dos lados del negocio. Ver "Qué
+  NO cambia" en el addendum.)
 
 ## 7. Interfaz
 
 ### 7.1 Formulario de actividad (`PerformanceLogForm`)
+
+> ⚠️ **Superado por el Addendum — 20-ago-2026**: el campo ya no viene "relleno,
+> deshabilitado" en Prelisting/Captación/Prebuying — en esas etapas hay dos opciones
+> válidas y el asesor elige. Solo viene bloqueado cuando el proceso lo impone el
+> popup del tablero. Ver "Qué valores admite cada etapa" en el addendum.
 
 Campo nuevo **"Proceso"** en la sección "Actividad a registrar", inmediatamente debajo
 de "Tipo de Actividad":
@@ -253,6 +290,10 @@ Proceso *             ( ) Compra   ( ) Venta
 
 ### 7.2 Tarjeta del tablero (`PipelineCard`)
 
+> ⚠️ **Superado por el Addendum — 20-ago-2026**: la tabla de abajo quedó en dos valores;
+> son cuatro (VENDEDOR, COMPRADOR, LOCADOR, LOCATARIO), con el color marcando el lado
+> y el texto el valor exacto. Ver "Cartelitos" en el addendum.
+
 Cartelito de proceso arriba a la izquierda, con los colores que ya usan las etapas
 correspondientes en `PIPELINE_STAGES`:
 
@@ -263,6 +304,11 @@ correspondientes en `PIPELINE_STAGES`:
 | Sin definir | ámbar (`amber-500`) | SIN DEFINIR |
 
 ### 7.3 Ficha del cliente (`PipelineClientSheet`)
+
+> ⚠️ **Superado por el Addendum — 20-ago-2026**: el botón "Abrir proceso de Compra /
+> Venta" pasó a ofrecer hasta tres botones — uno por cada valor que ese cliente todavía
+> no tenga — y la etapa de arranque se deriva del lado, no de "compra o venta". Ver
+> "Qué NO cambia" en el addendum.
 
 - Encabezado: el cartelito del proceso de esa tarjeta, y una línea que avisa si el
   cliente además tiene el otro proceso abierto.
@@ -321,7 +367,10 @@ Sobre `buildPipeline`, que es donde vive toda la lógica:
 3. Un movimiento manual sobre la tarjeta de Compra **no mueve** la de Venta.
 4. Filas con `proceso = NULL` → tarjeta "Sin definir", sin mezclarse con las demás.
 5. Un cliente sin cliente vinculado sigue contando en `sinCliente` y no arma tarjeta.
-6. `etapasPermitidas()` devuelve el set correcto para compra, venta y sin definir.
+6. `etapasPermitidas()` devuelve el set correcto para compra, venta y sin definir. (⚠️
+   **Superado por el Addendum — 20-ago-2026:** son cuatro valores, no dos —
+   `etapasPermitidas()` recibe cualquiera de los cuatro y los deriva por lado. Ver
+   `lib/tracking/proceso.test.ts` para la cobertura real.)
 
 ### 9.2 En el navegador (obligatorio antes de entregar)
 
@@ -347,6 +396,13 @@ Con la cuenta **PRISMAIA - VAKDOR** — nunca Central Real Estate, que es del cl
 | El código se despliega antes que la migración | Rompería: `savePerformanceLog` escribiría una columna que no existe. El orden es al revés que en el índice único de chats: acá va **primero la migración**, que es aditiva y no molesta al código viejo (simplemente no escribe la columna), y después el código. |
 
 ## 11. Archivos que se tocan
+
+> ⚠️ **Superado por el Addendum — 20-ago-2026**: la lista de abajo es la de la primera
+> versión (dos valores). El addendum agregó, sobre esta lista: la migración
+> `supabase/migrations/20260820120000_proceso_cuatro_valores.sql` (ver "Migración" en
+> el addendum), el server action nuevo `actions/tracking/asignarProcesoATarjeta.ts`
+> (el resolutor de "Sin definir"), y volvió a tocar `PerformanceLogForm.tsx` (sacar
+> "Tipo de Lead" de Prospección) y `lib/queries/dashboard.ts` (contar por `proceso`).
 
 **Nuevos**
 - `supabase/migrations/20260819140000_add_proceso_a_tracking.sql`
