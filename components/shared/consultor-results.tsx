@@ -33,8 +33,11 @@ export interface UnifiedProperty {
   amenities?: string[]
   roomix_agency_name?: string
   roomix_agency_logo?: string | null
-  roomix_agency_source_url?: string | null
-  canonical_url?: string
+  roomix_agency_source_url?: string | null   // listado de la inmobiliaria en el portal
+  canonical_url?: string                     // ficha en roomix.ai (la tienen todas)
+  source_listing_url?: string | null         // el aviso puntual en el portal de origen
+  roomix_agency_phone?: string | null
+  roomix_agency_whatsapp?: string | null
 
   // Tokko-specific
   public_url?: string | null
@@ -90,6 +93,11 @@ export function UnifiedPropertyCard({ property }: { property: UnifiedProperty })
       ? `${property.agent_name} — ${property.agent_email}`
       : property.agent_name || 'Sin asignar'
   const badgeLabel = `${badge.icon} ${badge.labelPrefix} | ${agentInfo}`
+
+  // Contacto de la inmobiliaria que publica, accesible desde la tarjeta misma.
+  const cardWhatsapp = property.roomix_agency_whatsapp?.trim() || null
+  const cardTelefono = property.roomix_agency_phone?.trim() || null
+  const cardWaLink = cardWhatsapp ? `https://wa.me/${cardWhatsapp.replace(/[^\d]/g, '')}` : null
 
   return (
     <>
@@ -198,6 +206,33 @@ export function UnifiedPropertyCard({ property }: { property: UnifiedProperty })
             )}
           </div>
         )}
+
+        {/* Contacto del colega, a mano desde la tarjeta: para coordinar la visita sin abrir el detalle.
+            stopPropagation porque toda la tarjeta abre el detalle al tocarla. */}
+        {property.source === 'roomix' && (cardWaLink || cardTelefono) && (
+          <div className="px-4 pb-3 flex flex-wrap items-center gap-1.5 shrink-0">
+            {cardWaLink && (
+              <a
+                href={cardWaLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-green-600 text-white hover:bg-green-700 transition-colors"
+              >
+                WhatsApp
+              </a>
+            )}
+            {cardTelefono && (
+              <a
+                href={`tel:${cardTelefono.replace(/[^\d+]/g, '')}`}
+                onClick={(e) => e.stopPropagation()}
+                className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
+              >
+                {cardTelefono}
+              </a>
+            )}
+          </div>
+        )}
       </div>
 
       {showDetail && (
@@ -254,6 +289,21 @@ export function UnifiedPropertyDetail({
     : property.agent_email
       ? `${property.agent_name} — ${property.agent_email}`
       : property.agent_name || 'Sin asignar'
+
+  // Link al aviso del colega, del más útil al menos: el aviso puntual en el portal,
+  // después la ficha en roomix (la tienen todas), y último el listado de la inmobiliaria.
+  // Antes el botón sólo salía si había listado, así que 50.187 propiedades quedaban
+  // sin ningún link visible aunque su ficha de roomix existiera.
+  const roomixLink = property.source === 'roomix'
+    ? property.source_listing_url || property.canonical_url || property.roomix_agency_source_url || null
+    : null
+
+  // Contacto de la inmobiliaria que publica, para poder coordinar la visita.
+  const colegaWhatsapp = property.roomix_agency_whatsapp?.trim() || null
+  const colegaTelefono = property.roomix_agency_phone?.trim() || null
+  const colegaWaLink = colegaWhatsapp
+    ? `https://wa.me/${colegaWhatsapp.replace(/[^\d]/g, '')}`
+    : null
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -351,6 +401,36 @@ export function UnifiedPropertyDetail({
             </div>
           )}
 
+          {/* Contacto de la inmobiliaria que publica: para coordinar la visita sin salir de PRISMA */}
+          {property.source === 'roomix' && (colegaWaLink || colegaTelefono) && (
+            <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
+              <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-1">
+                Para coordinar la visita
+              </h3>
+              <p className="text-sm font-semibold mb-3">{property.roomix_agency_name}</p>
+              <div className="flex flex-wrap gap-2">
+                {colegaWaLink && (
+                  <a
+                    href={colegaWaLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    WhatsApp {colegaWhatsapp}
+                  </a>
+                )}
+                {colegaTelefono && (
+                  <a
+                    href={`tel:${colegaTelefono.replace(/[^\d+]/g, '')}`}
+                    className="px-4 py-2 border border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    Llamar {colegaTelefono}
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Botón Compartir ficha (página pública de lujo con la marca + datos del asesor) */}
           <div className="pt-4 border-t flex justify-end">
             <button
@@ -367,13 +447,13 @@ export function UnifiedPropertyDetail({
 
           {/* Acciones Footer */}
           <div className="pt-4 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            {property.source === 'roomix' && property.roomix_agency_source_url ? (
+            {property.source === 'roomix' && roomixLink ? (
               <>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
                   Fuente: {property.roomix_agency_name}
                 </p>
                 <a
-                  href={property.canonical_url || property.roomix_agency_source_url}
+                  href={roomixLink}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors"

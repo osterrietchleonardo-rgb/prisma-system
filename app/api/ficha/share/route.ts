@@ -49,7 +49,22 @@ export async function POST(req: Request) {
     let property: any = null;
     if (source === "roomix") {
       const slug = String(id).replace(/^roomix_/, "");
-      const { data: rp } = await supabase.from("roomix_properties").select("*").eq("slug", slug).single();
+      // Sólo las columnas que se usan: traer "*" arrastraba el embedding de 768 dimensiones
+      // de cada fila escaneada y hacía mucho más pesada la consulta.
+      const { data: rp, error: rpErr } = await supabase
+        .from("roomix_properties")
+        .select("title, description, price, currency, property_type, operation, bedrooms, rooms, bathrooms, area_m2, address, neighborhood, city, images, amenities")
+        .eq("slug", slug)
+        .maybeSingle();
+      // Si la consulta falló (timeout, permisos, red) NO es que la propiedad no exista:
+      // decirlo como "no se encontró" mandaba al asesor a buscar un problema que no era.
+      if (rpErr) {
+        console.error("Share ficha — falló la consulta a roomix_properties:", { slug, error: rpErr });
+        return NextResponse.json(
+          { error: "No pudimos traer la propiedad en este momento. Probá de nuevo en unos segundos." },
+          { status: 503 },
+        );
+      }
       if (rp) {
         property = {
           title: rp.title,
@@ -66,18 +81,27 @@ export async function POST(req: Request) {
           images: Array.isArray(rp.images) ? rp.images : [],
           amenities: Array.isArray(rp.amenities) ? rp.amenities : [],
           source: "roomix",
-          roomix_agency_name: rp.roomix_agency_name || "Inmobiliaria colaboradora",
-          canonical_url: rp.canonical_url || null,
-          source_listing_url: rp.source_listing_url || null,
+          // Esta ficha es la que el asesor le manda a SU cliente, así que no lleva NINGÚN
+          // rastro de la inmobiliaria que publica: ni nombre, ni logo, ni teléfono, ni los
+          // links al aviso original. Cualquiera de esos datos manda al cliente directo al
+          // colega. Todo eso vive en la tarjeta del Buscador IA, que es de uso interno.
         };
       }
     } else {
-      const { data: p } = await supabase
+      const { data: p, error: pErr } = await supabase
         .from("properties")
         .select("id, title, description, price, currency, property_type, status, bedrooms, bathrooms, total_area, covered_area, address, city, images, tokko_data, agency_id")
         .eq("id", id)
         .eq("agency_id", agencyId)
-        .single();
+        .maybeSingle();
+      // Mismo criterio que en roomix: un error de consulta no es una propiedad inexistente.
+      if (pErr) {
+        console.error("Share ficha — falló la consulta a properties:", { id, error: pErr });
+        return NextResponse.json(
+          { error: "No pudimos traer la propiedad en este momento. Probá de nuevo en unos segundos." },
+          { status: 503 },
+        );
+      }
       if (p) {
         const tags = (p.tokko_data as any)?.tags;
         const amenities = Array.isArray(tags) ? tags.map((t: any) => t?.name).filter(Boolean) : [];
@@ -102,7 +126,12 @@ export async function POST(req: Request) {
     }
 
     if (!property) {
-      return NextResponse.json({ error: "No se encontró la propiedad o no pertenece a tu agencia." }, { status: 404 });
+      // El aviso de un colega puede haberse dado de baja; el de la agencia, no pertenecerle.
+      // Son dos cosas distintas y antes se contaban como una sola.
+      const motivo = source === "roomix"
+        ? "Esta propiedad ya no está publicada por la inmobiliaria que la ofrecía."
+        : "No se encontró la propiedad o no pertenece a tu agencia.";
+      return NextResponse.json({ error: motivo }, { status: 404 });
     }
 
     const snapshot = {
