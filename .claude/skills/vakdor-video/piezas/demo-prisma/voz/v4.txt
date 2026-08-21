@@ -1,0 +1,1 @@
+Y cuando llega el momento de tasar, carga la propiedad una sola vez. Sube cuatro fotos, y la inteligencia artificial las mira: describe el departamento, califica su estado, y con eso afina la búsqueda. En segundos aparecen cien comparables reales de la red, ordenados por cuánto se parecen. Y compara las fotos de cada uno contra las suyas, ajusta el porcentaje, y explica por qué.
