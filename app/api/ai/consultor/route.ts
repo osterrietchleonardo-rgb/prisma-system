@@ -498,11 +498,17 @@ export async function POST(req: Request) {
           source: 'roomix',
           match_pct: r.match_pct ?? null,
           similarity: r.match_pct ?? 0,
-          roomix_agency_name: rp.roomix_agency_name || 'Inmobiliaria colaboradora',
+          roomix_agency_name: rp.roomix_agency_name?.trim() || 'Inmobiliaria colaboradora',
           roomix_agency_logo: rp.roomix_agency_logo,
           roomix_agency_source_url: rp.roomix_agency_source_url,
           canonical_url: rp.canonical_url,
-          agent_name: rp.roomix_agency_name || 'Inmobiliaria colaboradora',
+          // Link al aviso puntual (no al listado de la inmobiliaria) y contacto del colega:
+          // estaban en la tabla y nunca llegaban a la pantalla, así que el asesor veía la
+          // propiedad pero no tenía cómo coordinar la visita.
+          source_listing_url: rp.source_listing_url,
+          roomix_agency_phone: rp.phone,
+          roomix_agency_whatsapp: rp.whatsapp,
+          agent_name: rp.roomix_agency_name?.trim() || 'Inmobiliaria colaboradora',
           agent_email: '',
         };
       }).filter(Boolean);
