@@ -24,6 +24,8 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ = path.resolve(AQUI, '../../../..');
 const SALIDA = path.join(AQUI, '..', 'estado');
 const PAGINAS = Number(process.argv[2] || 5);
+/** Perfil del navegador, FUERA del repo: guarda las cookies de la sesion de LinkedIn. */
+const PERFIL = path.join(process.env.USERPROFILE || process.env.HOME || '', '.playwright-perfiles', 'linkedin');
 const BUSQUEDA = 'https://www.linkedin.com/sales/search/people?savedSearchId=2001387130';
 
 // Nunca contactar. Victor Arlandi es el presidente de Central (padre de Kevin).
@@ -209,6 +211,41 @@ function puntuar(p) {
   return { puntaje: n, porque: por.join(' · ') };
 }
 
+// ------------------------------------------------------- el link directo al chat
+
+/*
+ * Sales Navigator NO tiene URL al chat: su boton "Mensaje" es un overlay de JS y la barra
+ * de direcciones no cambia. Comprobado el 21/08/2026 abriendolo y mirando location.href.
+ *
+ * El link que SI funciona es el de la mensajeria normal de LinkedIn, y necesita el
+ * identificador publico (el /in/xxx). Ese dato lo devuelve la API interna de Sales
+ * Navigator en el campo flagshipProfileUrl.
+ *
+ * Verificado a mano: el link abre la mensajeria con el destinatario ya cargado y el cursor
+ * en el compositor. Un solo clic para empezar a escribir. No manda nada.
+ */
+const DEC_PERFIL = '%28entityUrn%2CobjectUrn%2CfirstName%2ClastName%2CfullName%2Cheadline%2CflagshipProfileUrl%29';
+
+/** De /sales/lead/<id>,<authType>,<authToken> saca el identificador publico, o null. */
+async function identificadorPublico(urlLead) {
+  const m = String(urlLead).match(/\/sales\/lead\/([^,]+),([^,]+),([^/?#\s]+)/);
+  if (!m) return null;
+  const js = `async page => { const r = await page.evaluate(async () => {
+    const csrf = (document.cookie.match(/JSESSIONID="?([^";]+)/)||[])[1];
+    const u = 'https://www.linkedin.com/sales-api/salesApiProfiles/(profileId:${m[1]},authType:${m[2]},authToken:${m[3]})?decoration=${DEC_PERFIL}';
+    const res = await fetch(u, {headers:{'csrf-token':csrf,'accept':'application/json','x-restli-protocol-version':'2.0.0'}});
+    if (!res.ok) return null;
+    const j = await res.json();
+    return j.flagshipProfileUrl || null;
+  }); return JSON.stringify(r); }`;
+  try {
+    const flagship = json(pw(['run-code', js]));
+    return flagship ? (String(flagship).match(/\/in\/([^/?#]+)/) || [])[1] || null : null;
+  } catch { return null; }
+}
+
+const linkChat = (ident) => 'https://www.linkedin.com/messaging/thread/new/?recipient=' + ident;
+
 // -------------------------------------------------------------------- ClickUp
 
 async function yaEnPipeline() {
@@ -233,19 +270,25 @@ async function cargarAlPipeline(lista, soloSaludo) {
   for (const c of lista) {
     const perfil = 'https://www.linkedin.com' + c.url;
     const tibio = soloSaludo.has(normalizar(c.nombre));
-    const lineas = [
-      `POR QUE LO ELEGI (puntaje ${c.puntaje}): ${c.porque}.`, '',
-      `Cargo y empresa: ${bloqueCargo(c.resto, c.nombre)}`, '',
-      `Perfil y chat: ${perfil}`,
-      '(desde ahi, boton "Mensaje" para escribirle)', '',
-    ];
+    // el link al chat va PRIMERO: es el unico que se clickea, el resto es contexto
+    const ident = await identificadorPublico(c.url);
+    await dormir(1500 + Math.random() * 1200);
+    const lineas = ident
+      ? ['ESCRIBIRLE (abre el chat directo, ya con el destinatario cargado):', linkChat(ident), '',
+         `POR QUE LO ELEGI (puntaje ${c.puntaje}): ${c.porque}.`, '',
+         `Cargo y empresa: ${bloqueCargo(c.resto, c.nombre)}`, '',
+         `Perfil en Sales Navigator: ${perfil}`, '']
+      : [`POR QUE LO ELEGI (puntaje ${c.puntaje}): ${c.porque}.`, '',
+         `Cargo y empresa: ${bloqueCargo(c.resto, c.nombre)}`, '',
+         `Perfil en Sales Navigator: ${perfil}`,
+         'NO SE PUDO SACAR EL LINK AL CHAT: abri el perfil y usa el boton "Mensaje".', ''];
     if (tibio) lineas.push('YA SON CONTACTO: solo recibio un saludo, nunca la propuesta. Arranca mas tibio.', '');
     if (c.guardado) lineas.push('Figura "Guardado" en Sales Navigator pero NO hay ningun mensaje en las bandejas.', '');
     lineas.push(`Seleccionado el ${new Date().toISOString().slice(0, 10)} por el outbound diario.`,
       'El guion del toque 1 esta en el vault: 20 Frentes/outbound.md');
     const cf = [
       { id: campo['Origen'], value: opcion[tibio ? 'Origen|Tibio (comentó o reaccionó)' : 'Origen|Frío calificado'] },
-      { id: campo['Perfil'], value: perfil },
+      { id: campo['Perfil'], value: ident ? linkChat(ident) : perfil },
     ].filter(x => x.id && x.value !== undefined);
     const r = await fetch(`${B2}/list/${ids.lPipeline}/task`, {
       method: 'POST', headers: H,
@@ -261,7 +304,16 @@ async function cargarAlPipeline(lista, soloSaludo) {
 // ----------------------------------------------------------------------- main
 
 console.log('Abriendo LinkedIn con tu sesion (navegador visible)...');
-pw(['open', 'https://www.linkedin.com/sales/inbox/', '--persistent', '--headed', '--browser=chrome']);
+/*
+ * --profile es obligatorio. Sin el, --persistent NO alcanza: el CLI abre el navegador con
+ * user-data-dir <in-memory> y el login de Leonardo se pierde apenas se cierra la ventana.
+ * Paso el 21/08/2026: la sesion estaba deslogueada, el outbound no pudo correr y 7 contactos
+ * del pipeline quedaron sin link. Se comprueba con `playwright-cli list`, que tiene que
+ * devolver la ruta del perfil y headed: true.
+ * El perfil vive FUERA del repo: guarda las cookies de sesion y no puede entrar en un commit.
+ */
+pw(['open', 'https://www.linkedin.com/sales/inbox/', '--persistent', '--headed',
+    '--browser=chrome', '--profile', PERFIL]);
 await dormir(9000);
 
 const excluir = await yaEnPipeline();
