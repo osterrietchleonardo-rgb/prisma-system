@@ -54,13 +54,20 @@ problema es la Management API, que corre como `postgres`.
 EXCEPTION` y la transacción revierte el borrado. Antes, un recálculo vacío dejaba el mapa
 en blanco y devolvía `ok`. Se comprobó sin querer en producción: las tres borraron, murieron
 por timeout a mitad, y las cuatro tablas quedaron **idénticas**. Antes de tocar nada se
-copiaron a `respaldos.*_20260821` (155.848 filas) — **se pueden borrar cuando Leonardo
-confirme que el mapa se ve bien**.
+copiaron a `respaldos.*_20260821` (155.848 filas); **ya se borraron** con el OK de Leonardo,
+una vez verificado el mapa — los datos del respaldo eran del 15/8, o sea peores que los de
+ahora: restaurarlos habría sido un retroceso, no un rescate.
 
-Verificado: Action disparado a mano sobre la rama → **verde en 34,2 s**, los tres pasos OK
-(2.814 barrios, 89.956 celdas, 4.891 barrios con precio, 78.780 manzanas). Equivalencia de
-la reescritura comprobada corriendo la lógica vieja y la nueva sobre los mismos datos.
-**Pendiente: la mirada en el navegador y el OK para mergear.**
+Verificado antes de mergear: Action sobre la rama → **verde en 34,2 s**, los tres pasos OK.
+Equivalencia de la reescritura comprobada corriendo la lógica vieja y la nueva sobre los
+mismos datos. Y el mapa en el navegador con la sesión real de PRISMAIA - VAKDOR, escritorio
+y celular emulado (390×844, iOS UA): colores por manzana, ranking con valores creíbles
+(Puerto Madero US$ 5.590 con 1.178 avisos, Barrio Parque US$ 4.564, Palermo Chico
+US$ 4.217), Recoleta en rojo y Almagro en verde, **cero errores de consola**.
+
+**Mergeado a main** (`f7bb702`). Después del merge se disparó otra vez desde `main`:
+**verde en 50,5 s** con los mismos números que la corrida anterior — 2.814 barrios, 89.956
+celdas, 4.891 con precio, 78.780 manzanas—, o sea que el recálculo es determinista.
 
 **Se cerró el bug de Central que llevaba 17 días**
 
