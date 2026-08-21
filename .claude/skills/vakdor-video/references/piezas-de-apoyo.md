@@ -34,8 +34,9 @@ Si no se puede nombrar la frase que la pieza acompaña, la pieza no va.
 ## 2. La regla que decide con qué se hace
 
 > **¿Cuánto texto y de qué tipo?**
-> **Un rótulo de 1 o 2 palabras, aislado → sale bien generado.**
-> **Una interfaz con varios textos (mensajes, horas, nombres, encabezados) → Remotion.**
+> **Un rótulo de 1 o 2 palabras, aislado → sale bien generado (Flow).**
+> **Una interfaz con varios textos (mensajes, horas, nombres, encabezados) → se renderiza en
+> casa (HyperFrames o Remotion), donde el texto es texto y sale como se escribió.**
 
 Está medido en las dos direcciones, no es opinión.
 
@@ -61,13 +62,14 @@ lateral, funciona como textura. La regla práctica es que **lo que el espectador
 lo único legible del cuadro** — el resto puede ser garabato y nadie lo nota. Lo que no se puede es
 pedirle que escriba seis cosas y esperar que las seis estén bien.
 
-Corolario útil: **un clip generado sirve de fondo y Remotion pone el texto encima.** El celular
-sobre el escritorio queda mejor con una conversación de verdad superpuesta que cualquiera de las
-dos cosas por separado.
+Corolario útil: **un clip generado sirve de fondo y el texto se pone encima renderizado.** El
+celular sobre el escritorio queda mejor con una conversación de verdad superpuesta que cualquiera
+de las dos cosas por separado. Para eso conviene el **WebM con alpha** de HyperFrames: se apoya
+sobre el clip de Flow sin recortar nada a mano.
 
 | La pieza | Con qué se hace | Por qué |
 |---|---|---|
-| Chat, notificación, mail, panel, listado, calendario, factura | **Remotion** | lleva texto que se lee |
+| Chat, notificación, mail, panel, listado, calendario, factura | **HyperFrames** si es nueva · **Remotion** si ya existe (`ChatMockup`) | lleva texto que se lee. Ver §6 |
 | Stick figure, muñecos de línea | **Flow** | no lleva texto y sale muy bien |
 | Animación 2D abstracta (formas, líneas, grillas) | **Flow** | ídem, y respeta la paleta de marca |
 | B-roll de ambiente (oficina, escritorio, ciudad) | **Flow** | fotorrealismo creíble; el texto que aparezca queda fuera de foco |
@@ -202,11 +204,28 @@ está generando cuando en realidad está esperando. Detalle del MCP en la memori
 
 ---
 
-## 6. Cómo se construye una pieza en Remotion
+## 6. Cómo se construye una pieza
 
-`ChatMockup.tsx` (composición **`ChatMockup`**) es la **primera de la familia**, no la única que
-va a haber. Cuando el guion pida un panel, un mail o una notificación, se escribe otra al lado
-siguiendo el mismo patrón — no se fuerza el chat a ser lo que no es.
+**La regla de desempate, para una pieza NUEVA: mirar primero el catálogo de HyperFrames.** Son
+154 bloques y 219 componentes ya escritos (`chat-thread`, `notification-stack`, `number-wheel`,
+`panel-reveal`, placas inferiores, transiciones). Salen a **WebM con alpha**, que se apoya
+directo sobre el corte del Modo C. Escribir un `.tsx` de cero es el camino largo si la pieza ya
+existe hecha. La receta y el catálogo, en **`hyperframes.md`**.
+
+**El chat de WhatsApp ya está hecho y probado.** Vive en `piezas/chat-whatsapp/`: es
+`chat-thread` re-tematizado a WhatsApp con la marca (burbujas verdes `#005C4B`, fondo `#0A0F1A`,
+avatar cobre, ✓✓ de leído, "en línea", y la marca en el chip de sistema del cifrado). Se copia
+la carpeta a un slot, se cambia la conversación en `data-variable-values` y se renderiza. Ver
+`hyperframes.md` §4 — incluye por qué la firma **no puede ir abajo** (danger zone abajo, hilo
+que crece desde abajo en el medio).
+
+**Lo que ya está en Remotion no se reescribe.** `ChatMockup` funciona, está calibrado y se usa.
+Lo de abajo sigue vigente tal cual.
+
+### `ChatMockup` (Remotion) — la que ya existe
+
+`ChatMockup.tsx` (composición **`ChatMockup`**) fue la **primera de la familia**. Sigue siendo la
+opción cuando la pieza es un chat de marca y no se quiere tocar nada.
 
 ```bash
 # parado en Prisma - MK\_motor-video

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1920" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: transparent; }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-no-timeline
+      data-start="0"
+      data-duration="14"
+      data-width="1080"
+      data-height="1920"
+    >
+      <div
+        id="chat"
+        class="clip"
+        data-composition-id="chat-thread"
+        data-composition-src="compositions/components/chat-thread.html"
+        data-start="0"
+        data-duration="14"
+        data-track-index="0"
+        data-width="1080"
+        data-height="1920"
+        data-variable-values='{
+          "contact": "PRISMA IA",
+          "unread": 0,
+          "beat": 1.9,
+          "dots": "on",
+          "receipt": "on",
+          "messages": "recv:Hola, vi el 3 ambientes de Belgrano. ¿Sigue disponible?|sent:¡Hola! Sí, sigue disponible. Son 78 m² con balcón aterrazado y cochera.|recv:¿Cuánto piden?|sent:USD 189.000. Expensas: lo que figura hoy son $95.000.|recv:¿Se puede ver el sábado?|sent:Te paso con Carolina, que coordina las visitas 👇"
+        }'
+      ></div>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = null;
+    </script>
+  </body>
+</html>

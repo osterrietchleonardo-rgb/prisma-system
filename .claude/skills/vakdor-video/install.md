@@ -25,7 +25,15 @@ Las 4 vías están listas; se elige por slot. Ninguna es obligatoria.
   de moderngl/glcontext). Instalar: `py -3.12 -m pip install --user manim`.
   Invocar los slots Manim con: `py -3.12 -m manim -qh scene.py <Clase>`.
   (Ecuaciones con LaTeX es opcional; los diagramas básicos andan sin LaTeX.)
-- **HyperFrames** (motion HTML/CSS/GSAP, WebM alpha): `npx --yes hyperframes --help` (Node 22+, tenemos 24).
+- **HyperFrames** (overlays HTML/CSS/GSAP, WebM alpha): **instalado global el 21-ago-2026** con
+  `npm install -g hyperframes` (v0.8.6, Node 22+, tenemos 24). Se invoca `hyperframes ...` a
+  secas. Verificar con `hyperframes doctor`. La instalación global es **necesaria para
+  `hyperframes add`**, que es lo que baja los bloques del catálogo.
+  Se baja su propio Chrome y usa el ffmpeg del sistema. **Probado el 21-ago-2026 en esta máquina.**
+  Dos cosas de la instalación: la telemetría **viene prendida** (se apagó con `telemetry disable`,
+  repetirlo si se instala en otra máquina), y `init` deja 9 skills en `C:\Users\LENOVO\.claude\skills\`
+  (5,8 MB) **aunque se le pase `--skip-skills`** — están puestas a propósito, dan `/hyperframes`.
+  Recetas y gotchas: `references/hyperframes.md`.
 
 ## 4. Descargas de YouTube (opcional, Modo C)
 - `python -m pip install yt-dlp`

@@ -280,6 +280,13 @@ Verificar la privacidad SIEMPRE sobre el archivo final:
 HyperFrames, Manim (ver `references/animations.md` y `references/manim.md`). Cada una = un slot en
 `edit/animations/slot_<id>/`; múltiples animaciones = sub-agentes en paralelo.
 
+> **Para overlays nuevos, empezar por `references/hyperframes.md`.** Es la vía más barata: HTML
+> plano (sin build), un catálogo de 154 bloques + 219 componentes ya hechos (con el chat de WhatsApp de marca ya armado en `piezas/chat-whatsapp/`), y salida a **WebM
+> con alpha** que entra directo al EDL. Trae el gotcha que hace fallar el trabajo **en silencio**:
+> sin `-c:v libvpx-vp9` antes del `-i` del webm, ffmpeg descarta la transparencia y el overlay
+> sale como un cuadrado negro, **sin un solo warning en el log**. Se detecta antes de renderizar
+> mirando el `pix_fmt` de la entrada: `yuva420p` bien, `yuv420p` ya perdido.
+
 **Mockups, stick figures y b-roll generado:** la decisión de qué pieza va en cada momento sale del
 diálogo, y con qué se hace lo decide `references/piezas-de-apoyo.md`. Leerlo antes de generar nada
 en Google Flow — hay piezas que cuestan créditos y salen peor que renderizarlas en casa.
@@ -298,7 +305,8 @@ en Google Flow — hay piezas que cuestan créditos y salen peor que renderizarl
 SKILL.md · install.md · requirements.txt
 references/  video-use.md (correctitud) · produccion.md (criterio) ·
              piezas-de-apoyo.md (mockups, stick figures y generativo) ·
-             animations.md · formats.md · manim.md
+             animations.md · hyperframes.md (overlays HTML + WebM alpha) ·
+             formats.md · manim.md
 helpers/     ── material ──   prep · frame_map
              ── voz ──        whisper_parse · transcribe · transcribe_batch · pack_transcripts ·
                               silences · subtitles

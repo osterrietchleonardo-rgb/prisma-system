@@ -8,11 +8,17 @@ Cada animación = un slot en `edit/animations/slot_<id>/`, un archivo de salida 
 |---|---|---|---|
 | **PIL + PNG + ffmpeg** | tarjetas simples: contadores, typewriter, barras, reveals | script Python con Pillow → PNGs → `ffmpeg` los arma | listo (pillow) |
 | **Remotion** | overlays con estado React / sistema de marca existente | motor en `Prisma - MK\_motor-video\node_modules` | listo |
-| **HyperFrames** | motion HTML/CSS/GSAP, UI de producto, kinetic typography, WebM con alpha | `npx --yes hyperframes ...` | listo (v0.7.59) |
+| **HyperFrames** ⭐ | overlays en HTML/CSS/GSAP con **WebM alpha**, UI de producto, kinetic typography, y **un catálogo de 154 bloques + 219 componentes** ya hechos (incluido el **chat de WhatsApp de marca**, ya armado en `piezas/chat-whatsapp/`) | `hyperframes ...` (instalado global) — receta y gotchas en **`hyperframes.md`** | listo (v0.8.6, probado 21-ago-2026) |
 | **Manim** | diagramas formales, máquinas de estado, ecuaciones, morphs de grafo | `py -3.12 -m manim -qh scene.py <Clase>` (ver `manim.md`) | listo (v0.20.1) |
 
 El overlay del EDL apunta al mp4/webm renderizado del slot:
 `{"file": "edit/animations/slot_1/render.mp4", "start_in_output": <s>, "duration": <s>}`.
+
+> ⚠️ **Si el overlay es un WebM con alpha, el ffmpeg que lo compone necesita `-c:v libvpx-vp9`
+> ANTES del `-i` del webm.** Sin ese flag ffmpeg descarta la transparencia, **no imprime ni un
+> warning**, y el overlay sale como un cuadrado negro.
+> **Se comprueba en la línea de entrada de ffmpeg: `yuva420p` = tiene alpha; `yuv420p` = ya se
+> perdió.** Una letra. Detalle en `hyperframes.md` §1.
 
 ## Reglas universales (aplican a las 4 vías)
 
@@ -60,9 +66,11 @@ Un sub-agente = un archivo (nombres únicos; los agentes paralelos no se pisan).
 
 ## Setup por vía (comandos reales)
 
-- **HyperFrames:** scaffold `npx --yes hyperframes init . --example blank --non-interactive --skip-skills`
-  dentro del slot; construir el HTML; `npx --yes hyperframes render . -o render.mp4`
-  (o `--format webm -o render.webm` si necesitás alpha).
+- **HyperFrames:** `init` en el slot → escribir el HTML → **`check`** (gratis, valida hasta el
+  contraste del texto) → `render --format webm` para alpha. **Los 5 pasos exactos, los tiempos
+  medidos, el catálogo de bloques y todos los gotchas están en `hyperframes.md`.** Leerlo antes de
+  abrir el primer slot: uno hace fallar el trabajo en silencio y otro cuesta **45 segundos en
+  cada render** (`data-no-timeline` en la raíz).
 - **Remotion:** proyecto Remotion aislado en el slot (`npx create-video@latest` o dep local);
   `remotion render <Comp> render.mp4`; verificar con `ffprobe`.
 - **Manim:** ver `manim.md`.
