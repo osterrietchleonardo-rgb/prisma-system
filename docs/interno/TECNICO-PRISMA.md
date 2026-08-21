@@ -1249,11 +1249,12 @@ Cada uno de estos nació de un `statement timeout` real, no de una optimización
 | Workflow | Cuándo | Qué hace |
 |---|---|---|
 | `mapa-manzanas.yml` | 03:30 UTC | traza manzanas nuevas donde hay propiedades sin cubrir, de a 80 baldosas |
-| `mapa-refrescar.yml` | 08:00 UTC | recalcula barrios, cuadrícula, ranking y precio por manzana |
+| `mapa-refrescar.yml` | 08:00 UTC | recalcula barrios, cuadrícula, ranking y precio por manzana (`scripts/refrescar-mapa.mjs`) |
 
-Secretos necesarios: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_API_KEY_MANAGEMENT`,
-`SITE_DOMAIN`, `CRON_SECRET`. En Vercel: `NEXT_PUBLIC_MAPTILER_KEY` (sin ella el mapa usa
-OpenStreetMap, que funciona igual).
+Secretos necesarios: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_API_KEY_MANAGEMENT`. En Vercel:
+`NEXT_PUBLIC_MAPTILER_KEY` (sin ella el mapa usa OpenStreetMap, que funciona igual).
+`SITE_DOMAIN` y `CRON_SECRET` ya **no** los usa ningún workflow del mapa: desde el
+21/8/2026 ninguno de los dos pasa por un endpoint de la app.
 
 **El `CRON_SECRET` va en la cabecera, nunca en la URL.** `assertCron()`
 (`lib/admin-vakdor/cron-auth.ts`) solo lee `Authorization: Bearer <secreto>` y falla
@@ -1264,6 +1265,54 @@ quedaba viejo eran los **colores del precio por m², el ranking de barrios y el 
 barrios del buscador**, que son los precalculados. Ojo al comparar con otros crons:
 `market-sync.yml` sí usa `?secret=` **porque `/api/mercado/sync` no usa `assertCron()`**,
 lee el parámetro a mano.
+
+#### Por qué el recálculo ya no pasa por un endpoint (21/8/2026)
+
+Arreglado el 401 de arriba, el workflow siguió fallando **las 10 veces que corrió**: nunca
+funcionó ni un día desde que se creó. Ahora daba 500 en vez de 401. Eran dos problemas
+encadenados, y el primero tapaba al segundo.
+
+**1. `DELETE requires a WHERE clause` (código 21000).** El rol `authenticator` —el que usa
+PostgREST, o sea toda llamada que sale de la app— tiene
+`session_preload_libraries=safeupdate` (verificable en `pg_roles`). Esa extensión rechaza
+cualquier `DELETE` o `UPDATE` sin `WHERE`, y las tres funciones abren vaciando su tabla.
+El arreglo es `DELETE FROM x WHERE true`, que es la forma de declarar que el vaciado es a
+propósito. No se usa `TRUNCATE`: toma un lock exclusivo y dejaría el mapa bloqueado
+mientras se recalculan las 78.540 manzanas.
+
+**La trampa que lo escondió 10 días:** cada migración que define estas funciones termina
+con un `SELECT refrescar_...()`. Aplicada desde el editor de SQL, esa llamada corre como
+rol `postgres`, que **no** tiene el seguro puesto, y andaba perfecto. Se probaba por el
+camino que no es el de producción. Quedó registrado en los datos: `mapa_barrios` tenía
+fecha 15/8 11:15, que es cuando se aplicó a mano la última migración, no cuando corrió el
+cron. **Una función que se llama por RPC hay que probarla por PostgREST, no por el editor.**
+
+**2. El techo de 8 segundos.** Destrabado el `DELETE`, apareció lo que estaba abajo: ese
+mismo rol tiene `statement_timeout=8s`. Medido el 21/8/2026, el recálculo tarda 7,8 + 11,4
++ 20,4 s. Ninguna de las tres entra. Ocho segundos es un límite pensado para que una
+pantalla no se cuelgue, no para recalcular 90.000 celdas. Por eso el cron pasó a ser
+`scripts/refrescar-mapa.mjs` hablando directo con la base por la Management API, igual que
+`mapa-manzanas.yml`, que es el workflow del mapa que sí venía funcionando.
+
+**Y de paso, un tercer problema que nadie había visto:** `refrescar_precio_m2` no terminaba
+**ni en 2 minutos**. El nombre de cada barrio salía de una subconsulta correlacionada que
+recorría las 356.314 filas de `_base` una vez por cada uno de los 4.621 barrios: unos 1.600
+millones de filas leídas. Precalculado una sola vez en una temp table (la misma técnica que
+ya usaba `refrescar_mapa_barrios`), pasó a **11,4 s**. Verificado que da el mismo resultado
+sobre los mismos datos: 2.581 de 2.582 nombres idénticos y ninguno perdido; el único
+distinto —`Lácar` → `Lacar`, un empate 1 a 1 que se desempata alfabéticamente— cambia igual
+con la lógica vieja, o sea que lo movieron los datos nuevos, no la reescritura.
+
+**Candado nuevo en las tres funciones:** si el recálculo devuelve 0 filas, `RAISE
+EXCEPTION`. Como todo corre en una transacción, el error revierte el `DELETE` y la tabla
+vieja queda intacta. Antes, un recálculo que diera vacío borraba el mapa y devolvía `ok`.
+Se comprobó en producción sin querer: las tres funciones borraron, murieron por timeout a
+mitad de camino, y las cuatro tablas quedaron **idénticas** (2.713 / 69.974 / 4.621 /
+78.540). Preferimos precios de ayer antes que un mapa en blanco.
+
+`/api/cron/mapa-refrescar` quedó en el repo para disparo manual, pero **hoy no puede
+terminar** por el techo de 8 s: devuelve 500 con un statement timeout. No rompe nada
+—revierte— pero tampoco sirve. Está avisado en el comentario del archivo.
 
 La cola de trazado la arma la base sola: busca las propiedades que no caen dentro de
 ninguna manzana. Si la red publica en una zona nueva, se traza esa misma noche.

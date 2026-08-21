@@ -6,6 +6,15 @@ name: PRISMA Mapa · recalcular precio por m2
 #     quedan con los numeros del dia que se cargaron.
 #
 # Corre despues del sync de la red, no antes: recalcular sobre datos viejos no sirve.
+#
+# POR QUE UN SCRIPT CONTRA LA BASE Y NO UN curl AL ENDPOINT DE LA APP
+# Hasta el 21/8/2026 este workflow le pegaba a /api/cron/mapa-refrescar y fallaba TODAS
+# las noches (10 de 10 corridas desde que se creo: nunca funciono ni un dia). El motivo
+# de fondo es que ese camino tiene dos topes que este trabajo no puede respetar: el rol
+# de PostgREST rechaza los DELETE sin WHERE y ademas corta a los 8 segundos. El recalculo
+# medido tarda unos 40 segundos. Ocho segundos es un limite pensado para que una pantalla
+# no se cuelgue, no para recalcular 90.000 celdas.
+# El detalle completo esta arriba de scripts/refrescar-mapa.mjs.
 
 on:
   schedule:
@@ -17,18 +26,23 @@ on:
 jobs:
   refrescar:
     runs-on: ubuntu-latest
+    # El recalculo completo ronda los 40 segundos. 10 minutos es margen de sobra para un
+    # dia en que la base este cargada.
+    timeout-minutes: 10
     steps:
-      - name: Recalcular barrios, cuadricula y manzanas
-        # El secreto va en la cabecera `Authorization`, NO en la URL: `assertCron()`
-        # (lib/admin-vakdor/cron-auth.ts) solo mira la cabecera y falla cerrado. Mandado
-        # como `?secret=` el endpoint devolvia 401 todos los dias, y con el los colores y
-        # el ranking del mapa se quedaron con numeros viejos sin que nadie se enterara.
-        # Es ademas la forma que usan los otros seis workflows de cron del repo.
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Armar el .env que lee el script
         run: |
-          respuesta=$(curl -sS --fail-with-body -m 300 \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://${{ secrets.SITE_DOMAIN }}/api/cron/mapa-refrescar")
-          echo "$respuesta"
-          # Si el endpoint contesta ok:false, el paso tiene que fallar: un cron que
-          # "termina bien" habiendo fallado deja los precios viejos sin que nadie se entere.
-          echo "$respuesta" | grep -q '"ok":true'
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" > .env
+          echo "SUPABASE_API_KEY_MANAGEMENT=${{ secrets.SUPABASE_API_KEY_MANAGEMENT }}" >> .env
+
+      - name: Recalcular barrios, cuadricula y manzanas
+        # El script termina en error si falla cualquiera de los tres pasos, e imprime cual
+        # y por que. Un cron que "termina bien" habiendo fallado deja los precios viejos
+        # sin que nadie se entere.
+        run: node scripts/refrescar-mapa.mjs

@@ -18,6 +18,50 @@
 
 ## 2026-08-21
 
+**El recálculo de precios del mapa nunca había funcionado — 10 de 10 corridas fallidas**
+
+Rama `fix/mapa-refrescar-delete-where`. Leonardo avisó que "el git action de mapa da
+error". El que fallaba era `mapa-refrescar.yml`, no `mapa-manzanas.yml` (ese va 10 de 10 en
+verde). Y no fallaba a veces: **falló las 10 veces que corrió desde el 12/8**. Los colores
+y el ranking del mapa quedaron congelados con los números del 15/8; los pines no, porque se
+leen en vivo.
+
+Eran **tres** problemas, encadenados de modo que cada uno tapaba al siguiente:
+
+1. **`DELETE requires a WHERE clause` (21000).** El rol `authenticator` tiene
+   `session_preload_libraries=safeupdate`, que rechaza el `DELETE` pelado. Las tres
+   funciones abren vaciando su tabla. → `DELETE FROM x WHERE true`.
+2. **Techo de 8 s.** Ese mismo rol tiene `statement_timeout=8s` y el recálculo tarda ~40 s.
+   → el cron dejó de pegarle al endpoint: ahora corre `scripts/refrescar-mapa.mjs` contra
+   la base por Management API, igual que `mapa-manzanas.yml`.
+3. **`refrescar_precio_m2` no terminaba ni en 2 minutos.** Una subconsulta correlacionada
+   recorría las 356.314 filas de `_base` una vez por cada uno de los 4.621 barrios: ~1.600
+   millones de filas. Precalculado una vez → **11,4 s**.
+
+**El error de método que hay que no repetir.** Cada migración termina con un
+`SELECT refrescar_...()`. Aplicada desde el editor de SQL corre como `postgres`, que no
+tiene el seguro, y andaba perfecto. **Se probó por el camino que no es el de producción.**
+Quedó la huella en los datos: `mapa_barrios` con fecha 15/8 11:15, que es cuando se aplicó
+la migración a mano, no cuando corrió el cron. Una función que se llama por RPC hay que
+probarla **por PostgREST**, no por el editor.
+
+**Corrige la memoria de más abajo en este mismo día:** `service_role` **no** está "sin
+límite". Su `rolconfig` es `null`, así que por PostgREST hereda los **8 s** del
+`authenticator`. Medido: las tres RPC cortaron a los 8,2 s exactos. Lo que no reproduce el
+problema es la Management API, que corre como `postgres`.
+
+**Candado nuevo:** si un recálculo devuelve 0 filas, las funciones cortan con `RAISE
+EXCEPTION` y la transacción revierte el borrado. Antes, un recálculo vacío dejaba el mapa
+en blanco y devolvía `ok`. Se comprobó sin querer en producción: las tres borraron, murieron
+por timeout a mitad, y las cuatro tablas quedaron **idénticas**. Antes de tocar nada se
+copiaron a `respaldos.*_20260821` (155.848 filas) — **se pueden borrar cuando Leonardo
+confirme que el mapa se ve bien**.
+
+Verificado: Action disparado a mano sobre la rama → **verde en 34,2 s**, los tres pasos OK
+(2.814 barrios, 89.956 celdas, 4.891 barrios con precio, 78.780 manzanas). Equivalencia de
+la reescritura comprobada corriendo la lógica vieja y la nueva sobre los mismos datos.
+**Pendiente: la mirada en el navegador y el OK para mergear.**
+
 **Se cerró el bug de Central que llevaba 17 días**
 
 La sugerencia de Carolina Etcheverry del 4/8 ("no puedo ver el link de la propiedad del
