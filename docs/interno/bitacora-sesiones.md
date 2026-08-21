@@ -18,6 +18,41 @@
 
 ## 2026-08-21
 
+**El link del pipeline lleva al chat, y el Socio aprendió a sacar el contacto de LinkedIn**
+
+Mergeado en `97392dc`. Dos scripts en `.claude/skills/vakdor-socio/scripts/`.
+
+*Lo que se descubrió del CLI de Playwright, que es lo que más va a servir después:*
+`playwright-cli open` abre **headless y con `user-data-dir: <in-memory>`**, así que **el login
+se pierde entero al cerrar la ventana**. `--persistent` NO alcanza: hace falta `--profile`
+apuntando a una carpeta real. Por eso la sesión de LinkedIn apareció caída, el outbound no
+pudo correr y Leonardo no veía ninguna ventana (el proceso era `chrome-headless-shell`). Se
+comprueba con `playwright-cli list`. El perfil vive en `~/.playwright-perfiles/`, fuera del
+repo, porque guarda cookies de sesión.
+
+*Sales Navigator no tiene URL de chat.* Su botón "Mensaje" es un overlay de JS y
+`location.href` no cambia — comprobado. El link que sí funciona es
+`linkedin.com/messaging/thread/new/?recipient=<publicId>`, y ese `publicId` sale del campo
+`flagshipProfileUrl` de la API interna (`/sales-api/salesApiProfiles/(profileId:...)`), que
+necesita el header `csrf-token` tomado de la cookie `JSESSIONID`.
+
+*El modal de "Información de contacto" no se abre por URL:* `/overlay/contact-info/` redirige
+al perfil. Hay que hacer **click** en el enlace. Y el contenido **no** se lee del `innerText`
+del modal, que vuelve vacío: se busca el patrón de email en el HTML completo, filtrando los
+dominios de LinkedIn. Rinde ~30% (4 de 14), pero trae mails personales que Apollo no tiene.
+
+*Dos errores de método propios, para no repetir:*
+1. **El `date` de Bash miente casi tres horas en esta máquina** (dio 13:08 cuando eran las
+   15:44). Va `Get-Date` de PowerShell, siempre.
+2. **Se midió el mercado solo sobre Argentina y se dio un consejo estratégico con eso.**
+   Argentina: 50 prospectos. LATAM: 427. Un número correcto sobre un recorte equivocado suena
+   a dato y es una opinión disfrazada.
+
+*Y un límite del actor de Zonaprop:* en modo `entityType: agencies` el parámetro `location`
+**no segmenta** — cinco corridas de cinco zonas distintas devolvieron la misma lista nacional.
+Hay que pasar `startUrls`. A favor: ese modo devuelve `listings_count`, o sea la cartera de
+cada inmobiliaria, a US$0,002 cada una.
+
 **El recálculo de precios del mapa nunca había funcionado — 10 de 10 corridas fallidas**
 
 Rama `fix/mapa-refrescar-delete-where`. Leonardo avisó que "el git action de mapa da
