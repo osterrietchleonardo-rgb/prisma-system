@@ -8,6 +8,16 @@ export const maxDuration = 300
 /**
  * GET /api/cron/mapa-refrescar
  *
+ * OJO: ESTE YA NO ES EL CAMINO DEL CRON DIARIO. Desde el 21/8/2026 el recalculo lo hace
+ * `scripts/refrescar-mapa.mjs` desde mapa-refrescar.yml, hablando directo con la base.
+ *
+ * Este endpoint quedo porque sirve para disparar el recalculo a mano, pero HOY NO PUEDE
+ * TERMINAR: el rol de PostgREST corta a los 8 segundos y el recalculo tarda unos 40
+ * (medido 7,8 + 11,4 + 20,4 el 21/8/2026). Va a devolver 500 con un statement timeout.
+ * No rompe nada cuando pasa —las tres funciones revierten y las tablas quedan como
+ * estaban—, pero tampoco sirve. Antes de volver a apoyarse en el, hay que resolver ese
+ * techo de 8 s; el detalle esta arriba de scripts/refrescar-mapa.mjs.
+ *
  * Recalcula todo lo que el mapa tiene PRECALCULADO. Sin esto, los precios por m² y el
  * ranking de barrios se quedan con los numeros del dia que se cargaron: las propiedades
  * nuevas entran a la base, se ven como pines, pero no mueven ningun promedio.
