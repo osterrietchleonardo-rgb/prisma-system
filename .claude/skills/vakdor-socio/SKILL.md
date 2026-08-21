@@ -49,6 +49,25 @@ El calendario va aparte: `list_events` de Google Calendar, hoy y mañana.
 Si una fuente aparece en `fuentes_caidas`, **decilo**. Nunca asumas que está vacío
 lo que no pudiste ver.
 
+### Y todos los días, los candidatos nuevos
+
+En la misma fase, corré también el buscador de Sales Navigator:
+
+```bash
+node .claude/skills/vakdor-socio/scripts/outbound-diario.mjs [paginas]
+```
+
+Deja **los 10 candidatos del día** que encajan con el IPC2 y que todavía están *sin
+contactar*: descarta a los ya contactados, a los que ya están en el pipeline y a Víctor y
+Kevin Arlandi. Los mensajes los manda Leonardo a mano — el script **nunca envía nada**.
+El detalle del filtro está más abajo, en *El outbound diario*.
+
+Va acá y no en la tarea de las 11:00 porque el bloque comercial no puede arrancar con la
+lista vacía: para las 11:00 los candidatos ya tienen que estar sobre la mesa.
+
+Abre un navegador visible y tarda unos minutos. Si Leonardo tiene apuro, decíselo y
+salteálo — pero **decilo**, para que sepa que ese día no hay candidatos nuevos.
+
 ## ② Vaciar el Inbox
 
 Leé `Inbox.md` del vault. Clasificá cada línea:
@@ -110,8 +129,20 @@ El paso más importante del sistema.
 
 ## Rituales que no son diarios
 
-- **Martes 16:00** → preparar el resumen para Kevin. La reunión con Central es el
-  miércoles 18:00: el aviso va **la víspera**, nunca el mismo día.
+- **Lunes 15:00** → preparar el resumen para Kevin. **No es la víspera de la reunión del
+  miércoles: es que Kevin lo usa en SU reunión con los asesores, el martes temprano.** Si
+  llega el martes a la tarde, llega tarde para lo único que le sirve.
+
+  > ⚠️ **Esto es una excepción deliberada a la regla de la víspera** (regla 3 del diseño:
+  > *"aviso el día ANTES de cada reunión"*). No la corrijas de vuelta a martes.
+  >
+  > **El principio, que vale para todos y no solo para Kevin: la fecha de entrega la
+  > pone el momento en que el otro lo USA, no el momento en que es la reunión.** Antes de
+  > agendar cualquier entrega a un tercero, la pregunta no es *"¿cuándo nos juntamos?"*
+  > sino ***"¿cuándo lo necesita en la mano para hacer algo con eso?"***. Si el material
+  > alimenta una reunión de la otra persona, la víspera de la nuestra ya es tarde.
+  >
+  > Se aplica igual a Víctor, a un asesor de Central o a cualquier cliente que venga.
 - **Lunes** → `/socio-mercado`: investigación de real estate y proptech.
 - **Viernes 16:00** → retro. Mostrale la semana contra el norte y **hacele preguntas
   para mejorarte a vos**: qué sirvió, qué fue ruido, dónde te equivocaste. Escribí lo
