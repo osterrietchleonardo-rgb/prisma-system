@@ -706,7 +706,27 @@ Asistente de búsqueda con **memoria por chat**. Flujo vigente (rediseño jun-20
 - **roomix `ef_search` 400→1000** (migración `20260630120000_roomix_ia_ef_search_1000.sql`, `CREATE OR REPLACE`): el filtro duro corre sobre TODA la base (verificado: un filtro amplio matchea 13.423/69k); el 1000 es el pool de "mejores por significado" que se rankea para el top 10. No es "buscar solo en 1000".
 
 ### 10.1.b Ficha compartible (`/api/ficha/share`, `/ficha/[token]`)
-Genera un link público de lujo de una propiedad con la tarjeta del asesor logueado + marca de la agencia. `POST /api/ficha/share` (`requireTenant`) snapshotea perfil (`profiles`), marca (`agencies.marketing_ai_config`) y propiedad (Roomix por slug / `properties` por id validando `agency_id`), guarda en `shared_properties` (token base62, RLS sin políticas → solo service-role). Página `/ficha/[token]` = **server component público** (fuera de `/asesor`·`/director`) que lee el snapshot con admin client, suma vista (`increment_shared_view`) y renderiza ficha premium (colores de marca o default navy+dorado+Playfair; `generateMetadata` para preview WhatsApp). No expone "Ver publicación original" (solo asesores). Migración `20260629140000_shared_properties.sql`.
+Genera un link público de lujo de una propiedad con la tarjeta del asesor logueado + marca de la agencia. `POST /api/ficha/share` (`requireTenant`) snapshotea perfil (`profiles`), marca (`agencies.marketing_ai_config`) y propiedad (Roomix por slug — índice `idx_roomix_slug`, ver §10.1.c / `properties` por id validando `agency_id`), guarda en `shared_properties` (token base62, RLS sin políticas → solo service-role). **El snapshot de una propiedad de la red NO lleva ningún dato de la inmobiliaria que publica** — ni nombre, ni logo, ni teléfono, ni `canonical_url`/`source_listing_url`: esta ficha es la que el asesor le manda a *su* cliente y cualquiera de esos datos lo derivaría al colega (decisión de Leonardo, 21/08/2026). Ese contacto vive solo en la tarjeta del Buscador IA, que es interna. Las dos consultas usan `maybeSingle()` y **chequean `error`**: si la consulta falla devuelven **503** ("probá de nuevo"), distinto del **404** de "no está" (ver §10.1.c). Página `/ficha/[token]` = **server component público** (fuera de `/asesor`·`/director`) que lee el snapshot con admin client, suma vista (`increment_shared_view`) y renderiza ficha premium (colores de marca o default navy+dorado+Playfair; `generateMetadata` para preview WhatsApp). No expone "Ver publicación original" (solo asesores). Migración `20260629140000_shared_properties.sql`.
+
+### 10.1.c El link y el contacto de la propiedad del colega (ago-2026, rama `fix/buscador-ia-link-y-contacto-colega`)
+
+**Síntoma (sugerencia de una asesora de Central, 4/8/2026 23:31):** *"No puedo ver el link de la propiedad del colega y no tengo cómo contactarlo para coordinar visita"*. La captura adjunta mostraba el toast rojo **"No se encontró la propiedad o no pertenece a tu agencia"** sobre un depto de Recoleta de la red.
+
+**La hipótesis inicial era falsa.** Se sospechaba que la propiedad ya no estaba en Roomix. Está: `slug` `departamento-3-ambientes-recoleta-3c996bda`, `is_active = true`, con `canonical_url`, `source_listing_url` y `phone`, sin tocar desde el 30/06. Eran **tres problemas distintos**.
+
+**Cómo se reconstruyó el caso (método reusable):** `consultor_chat_messages` guarda en `metadata.matchedProperties` **las propiedades que se le mostraron al usuario en cada turno**. Con eso se recuperó el `id` exacto de la tarjeta que tocó (`roomix_departamento-3-ambientes-recoleta-3c996bda`) y se descartó cualquier duda sobre qué había visto. El mensaje literal de la captura, grepeado en el repo, cayó en la única línea que lo emite.
+
+**(1) `select` por `slug` sin índice.** Ninguno de los 8 índices de `roomix_properties` cubría `slug`. `EXPLAIN ANALYZE`: **Seq Scan** sobre 356.314 filas, 89.102 bloques leídos, **4.674 ms** (estable en 4 corridas, frío y caliente), y con `select("*")` arrastrando el `embedding` de 768 dims de cada fila escaneada. Contra el `statement_timeout` de **8 s** del rol `authenticated` era una moneda al aire: reproducido con `set local role authenticated` daba **6,1-7,0 s**, y con la anon key (tope 3 s) fallaba siempre con `57014`. **La prueba de la intermitencia:** `shared_properties` registra que la misma asesora compartió **esa misma propiedad con éxito a las 22:54** y falló a las 23:28. Fix: `idx_roomix_slug` UNIQUE CONCURRENTLY (22 MB, `20260821120000_roomix_indice_slug.sql`) → Index Scan, **1,4 ms**. Es el mismo patrón de timeout ya anotado en §11.3/§11.5: en esta tabla, cualquier acceso que no sea por la PK necesita su índice.
+
+**(2) El error de la consulta se ignoraba.** `const { data: rp } = await ...` sin mirar `error`: el cliente de Supabase devuelve el timeout en `error` y no tira excepción, así que `rp` quedaba `undefined` y el endpoint concluía "no existe" → 404 con un texto que además insinuaba un problema de permisos. Ahora ambas ramas usan `maybeSingle()`, chequean `error` y devuelven **503** ("no pudimos traerla, probá de nuevo") separado del **404**, que para Roomix dice *"ya no está publicada por la inmobiliaria que la ofrecía"*.
+
+**(3) El botón del link exigía el campo equivocado.** `consultor-results.tsx` sólo renderizaba "Ver en portal original" si existía `roomix_agency_source_url` — **le falta a 50.187 filas (14%)**, aunque el **100%** tiene `canonical_url`. Para esas, el botón no aparecía y el fallback armaba `/asesor/propiedades/roomix_<slug>`, una ruta inexistente. Ahora el orden es `source_listing_url` (el aviso puntual, 82% de cobertura y el link que realmente sirve) → `canonical_url` → `roomix_agency_source_url`.
+
+**Contacto del colega:** `roomix_properties.phone`/`whatsapp` estaban cargados en **290.040 filas (81%)** y el route del Buscador IA nunca los mapeaba (mandaba `agent_email: ''`). Ahora viajan a la UI y se muestran **en la tarjeta** (botones WhatsApp/teléfono, con `stopPropagation` porque la tarjeta entera abre el detalle) y **en el detalle** (bloque "Para coordinar la visita"). **En la ficha pública no van** — ver §10.1.b.
+
+**Verificación:** en el navegador con la sesión real de PRISMAIA - VAKDOR, con la propiedad exacta del reporte, en escritorio y en celular emulado (390×844, iOS UA): "Compartir ficha" devuelve el toast verde donde ella vio el rojo; el link abre el aviso de ZonaProp; el HTML crudo de `/ficha/[token]` no contiene "CER GROUP", "zonaprop" ni el teléfono. Casos de borde por `fetch` desde la página: propia existente → 200; uuid inexistente → 404 de agencia; slug inexistente → 404 de despublicada, en 434 ms. `tsc --noEmit` y `npm run build` limpios.
+
+**Pendiente menor:** las fotos se sirven desde `cdn.roomix.ai`, así que ese dominio aparece en el código fuente de la ficha pública. No identifica a la inmobiliaria; sacarlo obliga a re-hostear las imágenes.
 
 ### 10.2 Tutor IA (`/api/ai/tutor`, GPT-5.4-mini)
 Mentor con **RAG** sobre `agency_documents`. Intent RETRIEVAL/GENERAL; si RETRIEVAL → `generateEmbedding()` + `match_agency_documents(threshold 0.15, count 5, p_user_role)`. Resume el tópico de la sesión cada 4 mensajes.
@@ -1134,6 +1154,13 @@ Cada uno de estos nació de un `statement timeout` real, no de una optimización
   explícito para volverla inmutable, y calificada con su esquema. Reemplazó a
   `idx_roomix_barrio_normalizado`, que era solo la primera columna **y que ninguna consulta
   del mapa llegó a usar nunca** (ver la trampa de la normalización escrita a mano). 2 MB.
+- `idx_roomix_slug` — btree **UNIQUE** sobre `slug` (ago-2026). Lo usa un solo camino,
+  "Compartir ficha" (`/api/ficha/share`), y sin él ese `select` recorría las 356.314 filas:
+  **4.674 ms**, contra el tope de 8 s del rol `authenticated` → fallaba a veces, y el 404
+  resultante decía "no se encontró o no pertenece a tu agencia" (falso). Con el índice,
+  **1,4 ms**. UNIQUE porque el slug ya lo era (356.314 filas = 356.314 slugs distintos).
+  22 MB. Detalle completo del caso en §10.1.c. **Ojo:** `id` es solo el sufijo del `slug`
+  (`3c996bda` ↔ `departamento-3-ambientes-recoleta-3c996bda`), no son intercambiables.
 - `idx_mapa_manzanas_geom`, `idx_precio_m2_celdas_geo`, `idx_mapa_barrios_trgm`.
 
 ### Trampas verificadas

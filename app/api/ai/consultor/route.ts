@@ -367,7 +367,7 @@ export async function POST(req: Request) {
 
       // ── Embedding de la consulta (RETRIEVAL_QUERY). Si falla, las funciones caen a ranking estructural. ──
       // CLAVE: NO embebemos el último mensaje suelto (en turnos de refinamiento puede ser "Comprar", "sí",
-      // "dale" → vector sin sentido que hace colapsar el escaneo vectorial sobre las 69k filas de roomix).
+      // "dale" → vector sin sentido que hace colapsar el escaneo vectorial sobre las 356k filas de roomix).
       // Embebemos una consulta ACUMULADA: criterios estructurados + el resumen en lenguaje natural (que
       // captura también los matices subjetivos tipo "luminoso"). Fallback al mensaje crudo solo si no hay nada.
       const canonicalQuery = [

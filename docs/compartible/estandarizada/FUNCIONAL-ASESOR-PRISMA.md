@@ -473,6 +473,16 @@ En **Mis Generaciones** tenés dos botones: **"Copiar para teleprompter"** (solo
 > 🔎 La **red de colaboración** son propiedades de **otras inmobiliarias** (en venta y alquiler), para que tengas más opciones para ofrecerle a tu cliente además de tu propia cartera.
 > 💰 Cada búsqueda consume 1 crédito.
 
+#### Coordinar una visita a una propiedad de otra inmobiliaria
+
+En las tarjetas de la **red de colaboración** tenés, abajo de todo, el **WhatsApp** y el **teléfono** de la inmobiliaria que la publica. Los tocás y se abre el chat o la llamada directo, sin salir de PRISMA ni buscar el aviso a mano.
+
+Si abrís el detalle de la propiedad, lo mismo aparece en el recuadro **"Para coordinar la visita"**, con el nombre de la inmobiliaria arriba.
+
+Y si querés ver el aviso original como lo publicaron ellos, abajo de todo está el botón **"Ver en portal original"**, que te lleva directo a esa propiedad en el portal.
+
+> 💡 Algunas propiedades traen solo teléfono y no WhatsApp: se muestra lo que la inmobiliaria haya publicado.
+
 ### Compartir ficha con tu cliente
 
 Cuando hacés una búsqueda en el **Buscador IA** y abrís el detalle de una propiedad (en los resultados), tenés el botón **"Compartir ficha"**. Al tocarlo se genera una **página web de presentación, elegante y profesional**, y el link se **copia solo** para que se lo mandes al cliente por WhatsApp.
@@ -480,6 +490,8 @@ Cuando hacés una búsqueda en el **Buscador IA** y abrís el detalle de una pro
 Esa página muestra: las fotos, el precio, los datos de la propiedad, y **tu tarjeta de contacto** (tu nombre, tu WhatsApp y tu email) con los **colores y el logo de tu inmobiliaria**. El cliente la abre sin tener que registrarse en nada.
 
 **Sobre la descripción:** en las propiedades de la **red de colaboración** (las que no son de tu cartera), la descripción de la ficha se muestra **resumida y ordenada** por secciones (Superficie · Interior · Ubicación · Edificio), con lo importante del aviso y **sin la letra chica** (matrículas, textos legales ni los datos de contacto de la inmobiliaria que publicó). Antes se cortaba a la mitad de una frase; ahora siempre termina completa.
+
+> 🔒 **La ficha que le mandás al cliente no menciona a la otra inmobiliaria.** No lleva su nombre, ni su logo, ni su teléfono, ni el link al aviso original: sale con **tu** tarjeta y la marca de **tu** agencia. Los datos del colega los ves solo vos, en la tarjeta del Buscador.
 
 > 💡 **Tip:** es ideal para mandar por WhatsApp — al pegar el link aparece una vista previa con la foto y el título.
 > 🔒 El cliente **no** ve de qué portal salió la propiedad (eso es info interna tuya). Tampoco puede entrar al sistema desde ahí: es solo una vitrina de presentación.
