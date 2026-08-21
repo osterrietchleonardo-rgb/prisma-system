@@ -22,7 +22,8 @@ import {
   extraerAnalisisFotos,
   SCHEMA_ANALISIS_FOTOS,
 } from "@/lib/acm/analisis-fotos";
-import { normalizarImagenes, descargarFotoValidada, HOSTS_CARTERA } from "@/lib/acm/fotos-descarga";
+import { descargarFotoValidada } from "@/lib/acm/fotos-descarga";
+import { normalizarImagenes, HOSTS_CARTERA } from "@/lib/acm/fotos-url";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

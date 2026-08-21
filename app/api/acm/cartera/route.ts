@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { tokkoTagsToAmenidades } from "@/lib/acm/tokko";
-import { normalizarImagenes } from "@/lib/acm/fotos-descarga";
+import { normalizarImagenes } from "@/lib/acm/fotos-url";
 
 export const dynamic = "force-dynamic";
 

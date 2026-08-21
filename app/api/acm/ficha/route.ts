@@ -21,7 +21,7 @@ import {
 import { obtenerZona } from "@/lib/acm/zona";
 import { generarRelato } from "@/lib/acm/zona-relato";
 import { recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
-import { normalizarImagenes } from "@/lib/acm/fotos-descarga";
+import { normalizarImagenes } from "@/lib/acm/fotos-url";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

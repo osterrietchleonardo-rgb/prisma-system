@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
+import { normalizarImagenes } from "@/lib/acm/fotos-url"
 
 export const dynamic = "force-dynamic"
 
@@ -60,7 +61,9 @@ export async function GET(req: Request) {
           total_area: r.area_m2 ? Number(r.area_m2) : 0,
           address: r.address || r.neighborhood || "",
           city: r.neighborhood,
-          images: r.images || [],
+          // El `.webp` que publica roomix da 404 en su propio CDN el 12% de las veces
+          // y la foto queda rota (ver `normalizarFotoRoomix`).
+          images: normalizarImagenes(r.images),
           amenities: r.amenities || [],
           similarity: 0,
           source: "roomix",

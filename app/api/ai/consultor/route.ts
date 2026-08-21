@@ -4,6 +4,7 @@ import { generateEmbedding } from "@/lib/gemini";
 import { openaiIA } from "@/lib/openai";
 import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
+import { normalizarImagenes } from "@/lib/acm/fotos-url";
 import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
 
 export const dynamic = "force-dynamic";
@@ -492,7 +493,9 @@ export async function POST(req: Request) {
           bathrooms: rp.bathrooms || 0,
           total_area: rp.area_m2 ? Number(rp.area_m2) : 0,
           status: rp.operation === 'rent' ? 'Alquiler' : 'Venta',
-          images: rp.images || [],
+          // El `.webp` que publica roomix da 404 en su propio CDN el 12% de las veces
+          // y la foto queda rota (ver `normalizarFotoRoomix`).
+          images: normalizarImagenes(rp.images),
           description: rp.description || '',
           amenities: rp.amenities || [],
           source: 'roomix',
