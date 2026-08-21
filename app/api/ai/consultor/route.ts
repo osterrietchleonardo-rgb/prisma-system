@@ -274,14 +274,29 @@ export async function POST(req: Request) {
     // ─── COMPUERTA DE DATOS MÍNIMOS ───────────────────────────────────────────
     // Pedimos los 5 datos clave (operación, tipo, zona, ambientes, presupuesto) para que la búsqueda
     // salga con la mayor info posible. Mientras falte alguno, NO se busca: el asistente pregunta
-    // (acumulando el contexto entre turnos). EXCEPCIÓN: si el usuario dice "no tengo más datos" /
-    // "buscá con eso" → buscamos YA con lo que haya. No se busca al tener solo el primer dato.
-    const missingRequired: string[] = [];
-    if (operation === "ambas") missingRequired.push("la operación (compra o alquiler)");
-    if (typeKeywords.length === 0) missingRequired.push("el tipo de propiedad (depto, casa, PH, etc.)");
-    if (locationKeywords.length === 0) missingRequired.push("la zona o barrio");
-    if (!roomsFilter && !bedroomsFilter) missingRequired.push("la cantidad de ambientes o dormitorios");
-    if (!priceMax && !priceMin) missingRequired.push("el presupuesto y la moneda (USD o ARS)");
+    // (acumulando el contexto entre turnos). Si el usuario dice "no tengo más datos" / "buscá con
+    // eso", se busca YA con lo que haya — pero solo de los DESEABLES, ver abajo.
+    //
+    // Los datos van en dos grupos, y la diferencia no es de gusto: es lo que evita que la consulta
+    // se caiga. Sin zona, `match_roomix_ia` no tiene ningún índice que enganchar y termina leyendo
+    // las 356.314 filas de roomix_properties: 25 s medidos contra el statement_timeout de 8 s del
+    // rol authenticated. La búsqueda se corta y el asesor recibe "no encontré resultados", que es
+    // falso. Por eso operación, zona y ambientes NO se saltean ni cuando el usuario pide ver igual:
+    // sin ellos la búsqueda no falla "un poco", falla entera. La migración
+    // 20260821191200_buscador_ia_timeout_roomix.sql tiene los números.
+    //
+    // El tipo y el presupuesto sí se saltean: acotan el resultado, pero su ausencia no rompe nada.
+
+    /** Sin estos la consulta escanea la tabla entera y se cae por timeout. No son negociables. */
+    const missingCritical: string[] = [];
+    if (operation === "ambas") missingCritical.push("la operación (compra o alquiler)");
+    if (locationKeywords.length === 0) missingCritical.push("la zona o barrio");
+    if (!roomsFilter && !bedroomsFilter) missingCritical.push("la cantidad de ambientes o dormitorios");
+
+    /** Estos mejoran el resultado, pero si el usuario dice "mostrame lo que haya", se busca igual. */
+    const missingNiceToHave: string[] = [];
+    if (typeKeywords.length === 0) missingNiceToHave.push("el tipo de propiedad (depto, casa, PH, etc.)");
+    if (!priceMax && !priceMin) missingNiceToHave.push("el presupuesto y la moneda (USD o ARS)");
 
     // Señal principal: el MODELO interpreta (force_search) si el usuario quiere ver YA con lo que haya,
     // dicho de cualquier forma (no hay frase detonadora fija). El regex queda SOLO de respaldo por si el
@@ -289,12 +304,22 @@ export async function POST(req: Request) {
     const wantsAnywayRegex = /\b(mostr[aá]|busc[aá]|dame|d[ae]le|quiero ver|a ver|ver opcione|opcione|resultado)\b|\b(lo que (tengas|haya|hay|sea)|sin (m[aá]s|importar)|no tengo (m[aá]s|nada)|es lo que hay|con eso|igual mostr|mostr[aá]\s+igual|d[ae]le igual)\b/.test(msgLower);
     const wantsAnyway = forceSearch || wantsAnywayRegex;
 
-    // Mientras falte algún dato clave y el usuario NO haya pedido ver igual → preguntamos sin buscar.
-    const needsMoreInfo = isRetrieval && missingRequired.length > 0 && !wantsAnyway;
+    // Falta algo crítico → se pregunta, diga lo que diga el usuario. Falta solo algo deseable →
+    // se pregunta salvo que haya pedido ver igual.
+    const needsMoreInfo =
+      isRetrieval && (missingCritical.length > 0 || (missingNiceToHave.length > 0 && !wantsAnyway));
+
+    // Qué se le pide. Si ya dijo "mostrame lo que haya", no tiene sentido insistirle con el
+    // presupuesto: se le piden SOLO los críticos, que son los que impiden buscar.
+    const missingRequired = wantsAnyway ? missingCritical : [...missingCritical, ...missingNiceToHave];
 
     let newMatchedProperties: any[] = [];
     let propertyContext = "";
     let pisoFallback = false;
+
+    // Queda en el log qué faltó y de qué grupo: sin esto, un "no encontré resultados" en
+    // producción no se distingue de una búsqueda que ni siquiera llegó a correr.
+    console.log("Compuerta:", { needsMoreInfo, wantsAnyway, missingCritical, missingNiceToHave });
 
     if (isRetrieval && !needsMoreInfo) {
       const FULL_SELECT = 'id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, description, tokko_data, assigned_agent_id, assigned_agent, agent_profile:profiles(full_name, email)';
@@ -599,7 +624,12 @@ INSTRUCCIÓN SOBRE NOTAS: Interpretá las notas y directivas de arriba. Si algun
     CONTEXTO DE BÚSQUEDA ACTUAL:
     ${needsMoreInfo
       ? `TODAVÍA NO BUSQUÉS NI MUESTRES PROPIEDADES. El usuario quiere buscar pero faltan datos clave para traerle lo mejor. Faltan: ${missingRequired.join("; ")}.
-Tu tarea AHORA: pedile esos datos de forma natural, cálida y profesional (como un asesor experto que quiere entender bien la necesidad antes de mostrar). Reconocé lo que YA te dijo para no repreguntarlo. Podés agrupar 2-3 preguntas en una sola intervención fluida (no como formulario). Explicale en una frase por qué te sirve (para acotar y no hacerle perder tiempo). NO inventes ni menciones propiedades, y NO digas "mirá las tarjetas", "te muestro las opciones" ni nada que sugiera que hay resultados en pantalla: TODAVÍA NO HAY.`
+Tu tarea AHORA: pedile esos datos de forma natural, cálida y profesional (como un asesor experto que quiere entender bien la necesidad antes de mostrar). Reconocé lo que YA te dijo para no repreguntarlo. Podés agrupar 2-3 preguntas en una sola intervención fluida (no como formulario). Explicale en una frase por qué te sirve (para acotar y no hacerle perder tiempo). NO inventes ni menciones propiedades, y NO digas "mirá las tarjetas", "te muestro las opciones" ni nada que sugiera que hay resultados en pantalla: TODAVÍA NO HAY.${
+          wantsAnyway
+            ? `
+OJO: el usuario YA te pidió ver resultados igual, y aun así le estás preguntando. Reconocé ese pedido antes que nada ("dale, vamos") y pedile SOLO lo que falta de arriba, que es lo mínimo indispensable para poder buscar — sin eso no hay búsqueda posible, no es que quede peor. Una sola pregunta corta y al hueso. No le pidas nada que no esté en esa lista, y no suene a que lo estás frenando.`
+            : ""
+        }`
       : isRetrieval
         ? propertyContext
         : 'El usuario no está buscando propiedades. Respondé normalmente y, si corresponde, retomá lo conversado.'}
