@@ -65,12 +65,25 @@ nunca llegaban a la pantalla. Ahora están en la tarjeta y en el detalle.
 - `statement_timeout`: `anon` = 3 s, `authenticated` = 8 s, `service_role` sin límite. Medir
   con la Management API (service_role) **no reproduce** lo que le pasa al usuario.
 
+**Cerrado el mismo día — NO crear tareas de esto**
+
+- **Leonardo le respondió a Carolina y cerró la sugerencia él mismo** (11:23 AR del 21/08;
+  `system_feedback.estado = 'resuelta'`, verificado en la base). Nada que hacer acá.
+- **Las 3 fichas de prueba de `shared_properties` se dejan.** Decisión suya, no es deuda.
+
 **Quedó pendiente**
 
-- Responderle la sugerencia a Carolina y pasar la sugerencia a resuelta (está `en_revision`).
+- **El crawler tiene el mismo bug de paginación que acabamos de arreglar.**
+  `loadExistingMap()` (`roomix-sync/crawler.mjs`, la que usa `main()` para el diff
+  incremental) pagina con `.range(offset, offset+999)` sobre `roomix_properties`. Es el
+  patrón que ya causó `canceling statement due to statement timeout` (documentado en
+  TECNICO §11.3/§11.5) y ahora sabemos que el riesgo sobre esta tabla es real, no teórico:
+  son 356.314 filas, muy por encima de las ~100k donde el patrón empezó a romperse. Está
+  anotado como "candidato a revisar" desde ago-2026 y sigue sin confirmar en vivo. **La
+  forma correcta es paginar por clave** (`id > último`), como ya hace
+  `backfill-faltantes.mjs`.
 - Las fotos de roomix se sirven desde `cdn.roomix.ai`, así que ese dominio se ve en el código
   fuente de la ficha pública. No identifica a la inmobiliaria; sacarlo obliga a re-hostear.
-- Quedaron 3 fichas de prueba en `shared_properties` a nombre de Leonardo.
 - Sigue pendiente lo de los audios/imágenes/videos del cliente que no se ven en el chat
   (Meta manda `media_id`, no URL) y los trámites de DNDA e INPI.
 
