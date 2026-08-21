@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizarFotoRoomix, normalizarImagenes } from "./fotos-descarga";
+import { normalizarFotoRoomix, normalizarImagenes } from "./fotos-url";
 
 // El caso real que motivó el arreglo: la propiedad 2a998e59 ("Excelente departamento 3
 // ambientes EN DUPLEX", La Cle Estudio Inmobiliario) tenía sus 6 fotos en `.webp` y las 6

@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // La ficha es un snapshot congelado: las que ya se le mandaron a un cliente tienen adentro
 // la URL `.webp` que el CDN de roomix no sirve. Se arregla al pintar, así los links que ya
 // están dando vueltas dejan de mostrar la foto rota (ver `normalizarFotoRoomix`).
-import { normalizarFotoRoomix } from "@/lib/acm/fotos-descarga";
+import { normalizarFotoRoomix } from "@/lib/acm/fotos-url";
 import { notFound } from "next/navigation";
 import { Playfair_Display, Inter } from "next/font/google";
 import type { Metadata } from "next";

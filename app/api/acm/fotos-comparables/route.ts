@@ -35,13 +35,8 @@ import {
   coercionarLuminosidad,
   type AtributosFotoIA,
 } from "@/lib/acm/analisis-fotos";
-import {
-  normalizarImagenes,
-  primerasFotosPermitidas,
-  descargarFotoValidada,
-  HOSTS_CARTERA,
-  HOSTS_ROOMIX,
-} from "@/lib/acm/fotos-descarga";
+import { descargarFotoValidada } from "@/lib/acm/fotos-descarga";
+import { normalizarImagenes, primerasFotosPermitidas, HOSTS_CARTERA, HOSTS_ROOMIX } from "@/lib/acm/fotos-url";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;

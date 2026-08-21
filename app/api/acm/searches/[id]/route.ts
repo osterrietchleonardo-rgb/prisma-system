@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
-import { normalizarFotoRoomix } from "@/lib/acm/fotos-descarga";
+import { normalizarFotoRoomix } from "@/lib/acm/fotos-url";
 
 export const dynamic = "force-dynamic";
 

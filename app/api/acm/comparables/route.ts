@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { generateEmbedding } from "@/lib/gemini";
-import { normalizarFotoRoomix } from "@/lib/acm/fotos-descarga";
+import { normalizarFotoRoomix } from "@/lib/acm/fotos-url";
 import {
   sujetoAmbientes,
   sujetoDormitorios,
