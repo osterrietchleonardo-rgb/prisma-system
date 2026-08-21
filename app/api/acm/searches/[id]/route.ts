@@ -3,6 +3,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
+import { normalizarFotoRoomix } from "@/lib/acm/fotos-descarga";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,14 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       sujeto: row.sujeto,
       exclude_id: row.exclude_id,
       cartera: Array.isArray(r.cartera) ? r.cartera : [],
-      roomix: Array.isArray(r.roomix) ? r.roomix : [],
+      // La foto se arregla AL LEER, no solo al guardar: el snapshot de las búsquedas hechas
+      // antes de este fix tiene congelada la URL `.webp` que el CDN de roomix no sirve (ver
+      // `normalizarFotoRoomix`). Sin esto, reabrir un ACM viejo desde "Mis ACM" seguiría
+      // mostrando la tarjeta sin foto para siempre. No se reescribe la fila: la búsqueda
+      // guardada es un registro de lo que se buscó, y arreglar la URL al vuelo alcanza.
+      roomix: Array.isArray(r.roomix)
+        ? r.roomix.map((c: any) => (c?.imagen ? { ...c, imagen: normalizarFotoRoomix(c.imagen) } : c))
+        : [],
       con_semantica: Boolean(r.con_semantica),
       // Ausente en búsquedas guardadas ANTES de este fix (viejo `resultados` sin estos campos):
       // `Boolean(undefined)` da `false`, el mismo default seguro que ya tenía el front

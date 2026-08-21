@@ -125,6 +125,11 @@ function ComparableCard({
   fotos?: "cargando" | FotoResultadoComparable;
 }) {
   const [open, setOpen] = useState(false);
+  // Red de seguridad de la foto: `c.imagen` puede existir y aun así no bajar (una URL del CDN
+  // de roomix que quedó vieja, un archivo borrado). Sin esto el navegador pinta el TEXTO del
+  // título dentro del recuadro de 80px — que es exactamente lo que se veía. Con esto cae al
+  // mismo ícono gris que ya se usa cuando la propiedad no tiene foto: siempre algo prolijo.
+  const [fotoRota, setFotoRota] = useState(false);
   // El ítem "zona" del checklist trae el nivel: 100 mismo barrio · 70 sub-barrio · 50 limítrofe.
   const esLindero = c.checklist.some((i) => i.dimension === "zona" && i.score === 50);
 
@@ -152,12 +157,18 @@ function ComparableCard({
             {selected ? <CheckSquare className="w-6 h-6" /> : <Square className="w-6 h-6 text-muted-foreground/50" />}
           </button>
         )}
-        {c.imagen ? (
+        {c.imagen && !fotoRota ? (
           // Carga diferida: con la lista completa hay hasta 200 tarjetas y sin esto el navegador
           // se pondría a bajar 200 fotos de golpe. Solo baja las que el asesor tiene a la vista
           // dentro del recuadro.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={c.imagen} alt={c.titulo} loading="lazy" className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover shrink-0 bg-muted" />
+          <img
+            src={c.imagen}
+            alt={c.titulo}
+            loading="lazy"
+            onError={() => setFotoRota(true)}
+            className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover shrink-0 bg-muted"
+          />
         ) : (
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-muted/40 shrink-0 flex items-center justify-center">
             <Building2 className="w-7 h-7 text-muted-foreground/40" />

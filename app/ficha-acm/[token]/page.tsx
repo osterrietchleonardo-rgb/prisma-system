@@ -1,4 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+// La ficha es un snapshot congelado: las que ya se le mandaron a un cliente tienen adentro
+// la URL `.webp` que el CDN de roomix no sirve. Se arregla al pintar, así los links que ya
+// están dando vueltas dejan de mostrar la foto rota (ver `normalizarFotoRoomix`).
+import { normalizarFotoRoomix } from "@/lib/acm/fotos-descarga";
 import { notFound } from "next/navigation";
 import { Playfair_Display, Inter } from "next/font/google";
 import type { Metadata } from "next";
@@ -35,7 +39,9 @@ function readableOn(hex: string): string {
 // en next.config: tokkobroker/roomix/supabase). Baja el peso del PDF de decenas de MB a pocos MB.
 // w debe ser un tamaño permitido por Next (deviceSizes/imageSizes): usamos 1080 (hero) y 384 (thumb).
 const opt = (url: string | null | undefined, w: number, q = 65): string =>
-  url && /^https?:\/\//.test(url) ? `/_next/image?url=${encodeURIComponent(url)}&w=${w}&q=${q}` : url || "";
+  url && /^https?:\/\//.test(url)
+    ? `/_next/image?url=${encodeURIComponent(normalizarFotoRoomix(url))}&w=${w}&q=${q}`
+    : url || "";
 
 // Logo de marca recortado (sin el aire transparente/blanco alrededor) para que llene su caja
 // sea cual sea la estructura del archivo que subió la agencia. Ver app/api/brand-logo/route.ts.
