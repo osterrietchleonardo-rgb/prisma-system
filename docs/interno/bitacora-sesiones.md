@@ -16,6 +16,64 @@
 
 ---
 
+## 2026-08-24
+
+**La solapa "Fotos": las fotos de una propiedad se arreglan solas**
+
+Rama `feat/marketing-fotos-ia`, mergeada. Motor en `lib/marketing-ia/fotos-ia.ts` y
+`fotos-marcado.ts`; tabla nueva `property_photos` (migración `20260824160000`).
+
+Se analizaron 5 repos de GitHub que Leonardo pasó. **Tres no tenían código** (solo README de
+SEO) y el cuarto es un paper académico que pide fotografía HDR panorámica y render 3D. Los
+dos de SamurAIGPT son el mismo boilerplate y su "IA" son 50 líneas llamando a MuAPI, que
+revende Nano Banana — o sea, `gemini-3-pro-image`, el mismo modelo que PRISMA ya usaba. Lo
+único que valía la pena eran los prompts.
+
+*Lo que costó descubrir, cada cosa con su prueba fallida:*
+
+**Hay dos familias de edición.** Local (sacar un objeto) permite pegar solo la zona editada
+sobre la original: el resto queda intacto, medido 0,71 contra 8,37. Global (cielo, luz,
+staging) NO: pegar solo el cielo deja una línea horizontal con los árboles partidos al medio.
+
+**Para marcar una zona va UNA sola imagen, la marcada.** Mandarle la original junto con la
+marcada, explicando cuál es cuál, es lo que uno haría — y falla: no edita nada y encima mueve
+el resto.
+
+**Las marcas van por color, nunca numeradas.** El modelo copia a la imagen cualquier texto
+que ve dibujado: al pasarle el inventario numerado, **pintó los números sobre la foto**. Y el
+control la aprobó igual, porque solo miraba el inventario. De ahí salió la regla de salida
+limpia, que además bajó los reintentos de 3 a 1.
+
+**Sin `imageConfig: { imageSize: "2K" }` devuelve 1365x768**, más chica que la original.
+
+**Los tres modos van en secuencia.** Pedir las tres cosas juntas hace que el modelo
+reinterprete el ambiente: inventó un arco, cambió el granito por otro piso y movió las
+paredes. De a uno, edita. Y **mejorar va primero**: el inventario se lee de la foto, y sobre
+una oscura da 6 elementos en vez de 8 y confunde granito con madera. Mejorar es el único modo
+que no mueve nada, así que puede ir antes de relevar.
+
+*Cómo se sostiene la fidelidad:* antes de tocar nada se releva geometría, piso (material,
+tamaño de pieza, dirección de juntas, veteado), inventario de lo que es del inmueble, y los
+defectos. Todo eso entra como regla dura — **nada hardcodeado, sale de cada foto**. Un
+control automático compara antes y después y rechaza si falta algo grave, si se inventó un
+artefacto, si cambió el piso o si se tapó un defecto; entonces se corrige y se regenera solo.
+El asesor nunca ve un rechazo.
+
+*Los límites que quedan:* el control verifica que los elementos estén, **no que las
+proporciones se respeten** — aprobó el ambiente reconstruido del "todo junto", y esa decisión
+la resolvió el ojo. Y sobre ambientes ya amoblados, lo que los muebles del dueño tapaban la
+IA lo inventa: apareció un radiador donde estaba apoyada una funda de guitarra.
+
+*Decisiones de Leonardo:* la solapa va también para asesores, que son los que más la usan
+(cuesta 3 créditos por paso, de su propia bolsa, y ahora se avisa antes de apretar). La
+galería agrupa por `sesion_id`: una tarjeta por foto, que se abre en carrusel con la original
+de la ficha primero.
+
+Costo de todo el trabajo: unos US$5 en 42 generaciones. Cada foto sale US$0,134 y tarda entre
+45 y 90 segundos.
+
+---
+
 ## 2026-08-21
 
 **El link del pipeline lleva al chat, y el Socio aprendió a sacar el contacto de LinkedIn**
