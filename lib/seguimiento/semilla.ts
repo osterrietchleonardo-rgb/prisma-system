@@ -1,0 +1,28 @@
+import type { Candidato } from "./tipos"
+
+/** El user-message inicial del loop. Mínimo: el agente investiga el resto con herramientas. */
+export function renderizarSemilla(
+  c: Candidato,
+  score: number,
+  compromisosActivos: number,
+  ahoraISO: string,
+  clasificacion: string | null = null
+): string {
+  const metricas =
+    Object.entries(c.metricas ?? {})
+      .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "")
+      .map(([k, v]) => `  - ${k}: ${String(v)}`)
+      .join("\n") || "  (sin datos capturados)"
+
+  return [
+    `Fecha y hora actual (Argentina): ${ahoraISO}`,
+    // El nombre válido es SOLO el de metricas (jamás el del perfil de WhatsApp)
+    `Lead: ${String(c.metricas?.nombre ?? "").trim() || "sin nombre capturado"} · etapa: ${c.funnel_status} · score interno: ${score}`,
+    `Origen del contacto: ${clasificacion ?? "desconocido"} (Whatsapp-Consulta = consultó él; Reclutamiento* = entró por un envío masivo de reclutamiento, NO es lead de propiedades)`,
+    `Último mensaje (de cualquiera): ${c.last_message_at ?? "nunca"}`,
+    `Intentos de seguimiento ya enviados: ${c.follow_ups_sent}`,
+    `Compromisos activos: ${compromisosActivos} (el detalle con leer_compromisos)`,
+    `Datos capturados del lead:\n${metricas}`,
+    `Investigá con tus herramientas lo que necesites y emití tu decisión con emitir_decision.`,
+  ].join("\n\n")
+}
