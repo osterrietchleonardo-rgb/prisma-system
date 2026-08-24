@@ -1,0 +1,108 @@
+{
+  "updatedAt": "2026-08-24T19:10:40.878Z",
+  "createdAt": "2026-08-24T19:10:40.878Z",
+  "id": "qSMsyCv2rgaClTOl",
+  "name": "SuperAgente_Reloj",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "a1a1a1a1-0000-0000-0000-000000000001",
+      "name": "Cada 30 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/30 * * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "a1a1a1a1-0000-0000-0000-000000000002",
+      "name": "Correr seguimiento (sombra)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "https://prisma-system-git-feat-super-agen-e1c49f-leos-projects-a294f9ee.vercel.app/api/seguimiento/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"tarea\":\"seguimiento\"}",
+        "options": {
+          "timeout": 290000
+        }
+      },
+      "credentials": {
+        "httpCustomAuth": {
+          "id": "HcvGXnuZnwH4AHbB",
+          "name": "PRISMA Super Agente (preview)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cada 30 minutos": {
+      "main": [
+        [
+          {
+            "node": "Correr seguimiento (sombra)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": null,
+  "versionId": "3a165617-933b-4446-9423-c62bede60c54",
+  "activeVersionId": null,
+  "versionCounter": 1,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "shared": [
+    {
+      "updatedAt": "2026-08-24T19:10:40.882Z",
+      "createdAt": "2026-08-24T19:10:40.882Z",
+      "role": "workflow:owner",
+      "workflowId": "qSMsyCv2rgaClTOl",
+      "projectId": "kHDUN61HinE2WNyr",
+      "project": {
+        "updatedAt": "2026-01-10T15:03:38.251Z",
+        "createdAt": "2026-01-10T15:02:52.885Z",
+        "id": "kHDUN61HinE2WNyr",
+        "name": "Leo Osterrietch <osterrietchleonardo@vakdor.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "9b194ba8-440e-4a8a-b5ba-e6a5ba26f7b6"
+      }
+    }
+  ],
+  "tags": [],
+  "parentFolder": null,
+  "activeVersion": null
+}
