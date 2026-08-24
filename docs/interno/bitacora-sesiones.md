@@ -18,6 +18,21 @@
 
 ## 2026-08-24
 
+**El radar de mercado existe: `/socio-mercado`** (rama `feat/socio-radar-mercado`).
+`/socio-mercado` estaba nombrado en el SKILL.md del Socio como ritual del lunes y **no
+existía**. Ahora es `.claude/commands/socio-mercado.md`: sin scripts — el Socio investiga
+con búsqueda web en vivo, filtra contra el código (regla 2) y escribe con OK. Dos salidas:
+candidatos de funciones → frente producto; informe extenso → `30 Mercado/` del vault, con
+tabla de datos citables y 3-5 ángulos de contenido para marketing (pedido de Leonardo en la
+primera corrida: el informe es materia prima de posts, no solo contexto). Cadencia día por
+medio; la apertura de `/socio` avisa si pasaron 2+ días mirando la fecha del último informe.
+La primera corrida real quedó en `30 Mercado/2026-08-24 informe.md`.
+
+*Error entre worktrees que costó una entrada:* la sesión de fotos commiteó esta bitácora
+desde otro worktree y **pisó la entrada del 22/08**, que se reinsertó acá. Antes de
+commitear la bitácora: `git show main:docs/interno/bitacora-sesiones.md` y verificar que
+no falte ningún día.
+
 **La solapa "Fotos": las fotos de una propiedad se arreglan solas**
 
 Rama `feat/marketing-fotos-ia`, mergeada. Motor en `lib/marketing-ia/fotos-ia.ts` y
@@ -71,6 +86,39 @@ de la ficha primero.
 
 Costo de todo el trabajo: unos US$5 en 42 generaciones. Cada foto sale US$0,134 y tarda entre
 45 y 90 segundos.
+
+---
+
+## 2026-08-22
+
+**Sábado corto: V4 del super agente, la receta del mejorador de fotos, y un error propio
+del Socio con ClickUp**
+
+Leonardo (en otras terminales): el plan del super agente llegó a
+`docs/superpowers/plans/2026-08-22-super-agente-v4.md` (12:59, con V3 intermedio), y el
+mejorador de imágenes (home staging + quitar elementos, compromiso con Kevin que vence la
+semana del 24-28) tiene su receta técnica en 6 scripts de `scratch/` (`_receta-editar-foto`,
+`_pipeline-fotos`, `_detectar-textos`, `_probar-optimo`, `_correr-casos`, `_reversion`).
+UI en la página de marketing: todavía no. *(La sesión del 24 de fotos convirtió esto en la
+solapa "Fotos" — ver la entrada de arriba.)*
+
+*El error de método propio, para no repetir:* **las tareas de ritual semanal existen como
+varias instancias pre-creadas con el mismo nombre** (22/08, 29/08, 5/09). Un
+`find(t => /nombre/.test(...))` sobre la lista agarró las del 5/09 y el Socio "movió" esas
+creyendo mover las de hoy; el recolector después mostró las de hoy sin tocar y pareció un
+bug del recolector — **el recolector estaba bien**. Regla: una tarea se mueve por **id**, y
+la instancia se elige mirando el `due_date`, nunca solo el nombre.
+
+Dos gotchas más de la API de ClickUp confirmados hoy: (1) `FIELD_033` también pega en la
+lista Tareas vía el endpoint `/task/:id/field/:fid` — *Veces postergada* y *Postergada
+desde* no se pueden escribir con el plan actual; el registro va en la descripción. (2) Si la
+tarea tiene `start_date` posterior al nuevo `due_date`, el PUT falla con `ITEM_238`: hay que
+setear los dos juntos.
+
+*Y un aviso para el que trabaje con varios worktrees:* esta entrada se perdió una vez porque
+la sesión de fotos commiteó la bitácora desde otro worktree sin tener esta versión. Antes de
+commitear la bitácora, mirar `git show main:docs/interno/bitacora-sesiones.md` y verificar
+que no falte la entrada de otro día.
 
 ---
 

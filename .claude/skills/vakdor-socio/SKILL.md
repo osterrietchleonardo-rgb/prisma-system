@@ -143,7 +143,11 @@ El paso más importante del sistema.
   > alimenta una reunión de la otra persona, la víspera de la nuestra ya es tarde.
   >
   > Se aplica igual a Víctor, a un asesor de Central o a cualquier cliente que venga.
-- **Lunes** → `/socio-mercado`: investigación de real estate y proptech.
+- **Día por medio** → `/socio-mercado`: el radar de novedades (candidatos de funciones
+  para PRISMA) + el informe de mercado. El método completo está en
+  `.claude/commands/socio-mercado.md`. En cada apertura, mirá la fecha del informe más
+  nuevo de `30 Mercado/` del vault: si pasaron **2 o más días**, decilo en el parte y
+  ofrecé correrlo. De esto depende tener qué mostrarle a Víctor.
 - **Viernes 16:00** → retro. Mostrale la semana contra el norte y **hacele preguntas
   para mejorarte a vos**: qué sirvió, qué fue ruido, dónde te equivocaste. Escribí lo
   aprendido en `50 Aprendizajes/preferencias.md` y leelo al empezar cada sesión.
