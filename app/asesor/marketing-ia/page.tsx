@@ -7,7 +7,8 @@ import { CopyGeneratorFlow } from "@/components/marketing-ia/copy-generator-flow
 import { MarketingHistory } from "@/components/marketing-ia/marketing-history"
 import { AdGuide } from "@/components/marketing-ia/ad-guide"
 import { FormaTrabajoForm } from "@/components/marketing-ia/forma-trabajo-form"
-import { Bot, UserSearch, History, Sparkles, BookOpen, Briefcase } from "lucide-react"
+import { FotosIA } from "@/components/marketing-ia/fotos-ia"
+import { Bot, UserSearch, History, Sparkles, BookOpen, Briefcase, Camera } from "lucide-react"
 import { AiCreditBadge } from "@/components/ai-credit-badge"
 
 export default function MarketingIAPage() {
@@ -19,8 +20,16 @@ export default function MarketingIAPage() {
         setActiveTab("history")
       }
     }
+    // Desde la galería del Historial se puede seguir editando una foto:
+    // el evento trae la foto y acá solo hay que traer la solapa al frente.
+    const handleRetomarFoto = () => setActiveTab("fotos")
+
     window.addEventListener('generation-complete', handleGenComplete)
-    return () => window.removeEventListener('generation-complete', handleGenComplete)
+    window.addEventListener('retomar-foto-ia', handleRetomarFoto)
+    return () => {
+      window.removeEventListener('generation-complete', handleGenComplete)
+      window.removeEventListener('retomar-foto-ia', handleRetomarFoto)
+    }
   }, [])
 
   return (
@@ -39,9 +48,12 @@ export default function MarketingIAPage() {
         </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-5 h-14 bg-muted/50 p-1 rounded-xl overflow-x-auto scrollbar-none">
+        <TabsList className="grid w-full grid-cols-6 h-14 bg-muted/50 p-1 rounded-xl overflow-x-auto scrollbar-none">
           <TabsTrigger value="copys" className="text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <Sparkles className="w-4 h-4 mr-2" /> Crear Anuncio
+          </TabsTrigger>
+          <TabsTrigger value="fotos" className="text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
+            <Camera className="w-4 h-4 mr-2" /> Fotos
           </TabsTrigger>
           <TabsTrigger value="ipcs" className="text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <UserSearch className="w-4 h-4 mr-2" /> Clientes Ideales (IPC)
@@ -59,6 +71,10 @@ export default function MarketingIAPage() {
 
         <TabsContent value="copys" className="mt-8">
            <CopyGeneratorFlow />
+        </TabsContent>
+
+        <TabsContent value="fotos" className="mt-8">
+           <FotosIA />
         </TabsContent>
 
         <TabsContent value="ipcs" className="mt-8">
