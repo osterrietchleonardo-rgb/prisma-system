@@ -411,13 +411,14 @@ Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **
 
 **Qué es:** el generador de contenido publicitario con IA, alineado a tu marca (la pantalla se titula "Marketing IA Pro").
 
-**Tiene 6 pestañas:**
+**Tiene 7 pestañas:**
 1. **Crear Anuncio:** el generador principal (ver abajo).
-2. **Clientes Ideales (IPC):** donde creás y administrás tus perfiles de cliente ideal.
-3. **Mi Forma de Trabajar:** tu operación real y tus 2 ofertas irresistibles (ver abajo).
-4. **Historial / Galería:** todos los anuncios generados, agrupados por tanda. Podés verlos, editar el texto, descargar la imagen y borrarlos.
-5. **Guía Mágica:** una guía práctica de 5 fases para hacer campañas de captación de leads de calidad en Meta (Facebook/Instagram) Ads: segmentación, el anuncio, el formulario "filtro de oro", retargeting y medición. Es material de lectura, no genera nada.
-6. **Configuración IA:** los ajustes de marca de la agencia (solo director, ver abajo).
+2. **Fotos:** arregla las fotos de una propiedad (ver abajo).
+3. **Clientes Ideales (IPC):** donde creás y administrás tus perfiles de cliente ideal.
+4. **Mi Forma de Trabajar:** tu operación real y tus 2 ofertas irresistibles (ver abajo).
+5. **Historial / Galería:** con dos vistas — **Anuncios y copys** (todo lo generado, agrupado por tanda: lo ves, editás el texto, descargás la imagen y lo borrás) y **Fotos retocadas** (las fotos de propiedades que trabajaste).
+6. **Guía Mágica:** una guía práctica de 5 fases para hacer campañas de captación de leads de calidad en Meta (Facebook/Instagram) Ads: segmentación, el anuncio, el formulario "filtro de oro", retargeting y medición. Es material de lectura, no genera nada.
+7. **Configuración IA:** los ajustes de marca de la agencia (solo director, ver abajo).
 
 **Cómo usarlo (pestaña "Crear Anuncio"):**
 1. Primero creás un **perfil IPC** (Cliente Ideal) en la pestaña de IPC: objetivo **Captar** (propietarios) o **Vender** (compradores). Completás el perfil paso a paso (motivo, urgencia, ángulo, tono, CTA, nivel de conciencia, etc.).
@@ -447,6 +448,37 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 > 🏠 **IPC "Vender" con propiedad asociada:** al crear un IPC de tipo **Vender** podés **asociar una propiedad de tu cartera**. El buscador muestra **toda tu cartera completa** (no un tope de pocas). Si asociás una propiedad, los anuncios **toman sus datos reales** (ubicación, ambientes, superficie, lo más atractivo) integrados con criterio en el copy persuasivo —ni ficha técnica, ni texto genérico— y **sin inventar** nada.
 > ⚠️ Si **no** se asocia ninguna propiedad, el generador **no inventa** datos concretos (direcciones, m², precios): los copies hablan del perfil de cliente, en términos generales.
 > 💰 **Costo real:** cada "Generar 3 Variantes" consume **~7 créditos** (1 por los 3 textos + 2 por cada una de las 3 imágenes). Nota: el cartelito de la pantalla que dice "1 crédito" se refiere solo a la generación de textos, no al total.
+
+---
+
+### Fotos (arreglar las fotos de una propiedad)
+
+**Qué es:** agarra una foto de la ficha de una propiedad y la deja publicable. No hay que subir nada ni saber editar. **Tus asesores también la tienen.**
+
+**Cómo se usa:**
+1. Se elige la **propiedad** de la cartera y después **cuál de sus fotos** trabajar.
+2. Se marca qué hacerle. Se puede elegir más de una y se aplican en este orden:
+   - **Mejorar la foto** — levanta una foto oscura o de día nublado. Si el cielo salió blanco, la pasa a día de sol. No mueve nada de lugar.
+   - **Despejar el ambiente** — saca adornos, cuadros, objetos personales y los muebles que hay hoy.
+   - **Amoblar** — amuebla un ambiente vacío, con el estilo que elijas: moderno, cálido, nórdico o clásico.
+3. Cada paso tarda entre 45 y 90 segundos, y la pantalla va mostrando en cuál va.
+4. Al final se ve el **antes y el después**.
+
+**Si algo no cierra, se corrige ahí mismo:** se arrastra sobre la foto para encerrar lo que se quiere tocar y se dice qué hacer. **Con nombrarlo alcanza** — "el perchero" — y si no se escribe nada, saca lo que quedó marcado. Se pueden marcar **varias cosas a la vez** y se hacen todas juntas.
+
+> 💡 Para **sacar** algo la marca es exacta. Para **agregar** algo es una indicación de por dónde, no un lugar clavado.
+
+**Lo que el sistema cuida solo, sin que nadie se lo aclare:**
+- El **piso** queda igual: mismo material, mismo dibujo, mismo color.
+- Las **paredes, ventanas, puertas y aberturas** quedan donde están y del tamaño que son.
+- Los **carteles, teléfonos y números de casa** vuelven tal cual: no se los inventa.
+- **Las manchas, humedades y roturas se quedan.** La propiedad se muestra como es. Si se quiere arreglar alguna, hay que marcarla y pedirlo.
+
+> ⚠️ **Lo que conviene que sepan tus asesores:** sobre ambientes que ya tienen muebles, lo que los muebles tapaban el sistema lo tiene que imaginar. Alguien que conozca la propiedad tiene que mirar el resultado antes de publicar.
+
+**Dónde quedan:** en **Historial / Galería → Fotos retocadas**. Cada foto es **una tarjeta**: se abre y se recorren los pasos como un álbum, empezando por la original de la ficha. En cualquiera se puede **seguir editando**, **descargar** o **borrar**. Cada uno ve las suyas.
+
+> 💰 Cada paso consume **3 créditos**. Los tres modos juntos son 9, y cada retoque posterior 3 más. Salen de la bolsa de quien la use: si la usa un asesor, de la suya.
 
 ---
 

@@ -332,7 +332,7 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 **Qué es:** un generador de contenido publicitario con inteligencia artificial (la pantalla se titula "Marketing IA Asesor").
 
-**Tiene 5 pestañas:** Crear Anuncio · Clientes Ideales (IPC) · Mi Forma de Trabajar · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
+**Tiene 6 pestañas:** Crear Anuncio · **Fotos** · Clientes Ideales (IPC) · Mi Forma de Trabajar · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
 
 **Cómo usarlo paso a paso:**
 1. En **Clientes Ideales (IPC)** creás un **perfil IPC** (Cliente Ideal). Elegís el objetivo:
@@ -345,6 +345,36 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
    - **Post/Texto** → como siempre: elegís **formato de imagen** (Reels, Post o Historia) y **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante), y te salen 3 anuncios completos (texto + imagen).
 4. Apretás el botón de generar: la IA te crea **3 variantes** con ángulos distintos (PAS, Transformación, Autoridad/Datos) para que elijas la mejor.
 5. Todo queda guardado en **Mis Generaciones**, donde lo ves, editás el texto, descargás la imagen o lo borrás.
+
+### Fotos (arreglar las fotos de una propiedad)
+
+**Qué es:** agarra una foto de la ficha de tu propiedad y te la deja publicable. No hace falta que subas nada ni que sepas editar.
+
+**Cómo se usa:**
+1. Elegís la **propiedad** de tu cartera y después **cuál de sus fotos** querés trabajar.
+2. Marcás qué querés que le haga. Podés elegir más de una cosa y se aplican en este orden:
+   - **Mejorar la foto** — levanta una foto oscura o de día nublado. Si la sacaste con el cielo blanco, te la pasa a día de sol. No mueve nada de lugar.
+   - **Despejar el ambiente** — saca adornos, cuadros, objetos personales y los muebles que hay hoy.
+   - **Amoblar** — amuebla un ambiente vacío. Elegís el estilo: moderno, cálido, nórdico o clásico.
+3. Apretás y esperás. Cada paso tarda entre 45 y 90 segundos y te va mostrando en cuál va.
+4. Te muestra el **antes y el después** para que compares.
+
+**Si algo no te cierra, lo cambiás vos:** abajo del resultado arrastrás sobre la foto para encerrar lo que querés tocar y decís qué hacer. **Con nombrarlo alcanza** — "el perchero" — y si no escribís nada, saca lo que marcaste. Podés marcar **varias cosas a la vez** y se hacen todas juntas. También podés pedir algo para toda la foto ("poné cortinas claras en la ventana").
+
+> 💡 Para **sacar** algo la marca es exacta. Para **agregar** algo es una indicación de por dónde, no un lugar clavado.
+
+**Lo que el sistema cuida solo, sin que le digas nada:**
+- El **piso** queda igual: mismo material, mismo dibujo, mismo color.
+- Las **paredes, ventanas, puertas y aberturas** quedan donde están y del tamaño que son.
+- Los **carteles, teléfonos y números de casa** vuelven tal cual: no se los inventa.
+- **Las manchas, humedades y roturas se quedan.** La propiedad se muestra como es. Si querés arreglar alguna, la marcás y lo pedís.
+
+> ⚠️ **Sobre ambientes que ya tienen muebles:** lo que los muebles tapaban, el sistema lo tiene que imaginar. Miralo bien antes de publicar, sobre todo si conocés la propiedad.
+
+**Dónde quedan:** en **Historial / Galería**, en la solapa **Fotos retocadas**. Cada foto es **una tarjeta**: la abrís y vas viendo cada paso como un álbum, empezando por la original de la ficha. En cualquiera de ellos podés **seguir editando**, **descargar** o **borrar**.
+
+> 💰 Cada paso consume **3 créditos**. Los tres modos juntos son 9.
+
 
 ### Mi Forma de Trabajar (tu oferta irresistible)
 
@@ -636,6 +666,7 @@ Tiene 4 pestañas:
 | Buscador IA | 1 crédito |
 | Tutor IA | 1 crédito |
 | Marketing IA — "Generar 3 Variantes" | ~7 créditos (3 textos + 3 imágenes) |
+| Marketing IA — Fotos (cada paso) | 3 créditos |
 | ACM (comparables) | **0 — sin costo por uso** |
 | Contratos (finalizar) | 5 créditos |
 
