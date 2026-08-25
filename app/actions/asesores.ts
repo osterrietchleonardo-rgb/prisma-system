@@ -159,9 +159,14 @@ export async function actualizarDatosAsesor(
   }
 
   if (datos.phone !== undefined) {
-    // Llega ya normalizado desde el formulario, pero esta función es pública:
-    // se vuelve a normalizar acá antes de guardar nada.
-    const phone = normalizePhoneE164(datos.phone, "AR")
+    // El valor ya viene en E.164 sin "+", normalizado por la pantalla. Esta
+    // función es pública y no puede confiar en que la llamen bien, así que
+    // se vuelve a normalizar acá antes de guardar nada — pero SIN asumir un
+    // país fijo: anteponer "+" hace que libphonenumber deduzca el país del
+    // propio código de país del número (ej: +525512345678 es México), en
+    // vez de forzar "AR". Sin esto, los asesores de Colombia, México, Brasil
+    // y cualquier país que no sea Argentina quedarían rechazados.
+    const phone = normalizePhoneE164("+" + datos.phone.trim())
     if (!phone) throw new Error("El celular no parece válido")
     if (phone !== asesor.phone) {
       cambios.phone = phone
