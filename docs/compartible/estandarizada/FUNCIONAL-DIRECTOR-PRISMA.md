@@ -525,7 +525,7 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
   - Solo te deja avanzar cuando el perfil **no tiene nada** — que es justo lo que pasa con un duplicado.
 
 **Invitaciones (Configuración → Inmobiliaria):** hay dos cajitas, **Invitación de Asesores** e **Invitación de Directores**.
-- En cualquiera, para generar un código ahora se piden **tres datos: nombre y apellido, celular y email**. El celular y el email se escriben **dos veces** (hay una cajita de confirmación al lado de cada uno), para no invitar a alguien con un dato mal tipeado. Apretá **Generar Código** cuando los cuatro campos coincidan.
+- En cualquiera, para generar un código ahora se piden **tres datos: nombre y apellido, celular y email**. El celular y el email se escriben **dos veces** (hay una cajita de confirmación al lado de cada uno), para no invitar a alguien con un dato mal tipeado. Apretá **Generar Código** cuando esté todo completo y las repeticiones coincidan.
 - **El código solo le sirve a esa persona.** Queda atado al email que cargaste: si se lo pasás a otra persona, o alguien lo consigue, no le va a andar. Solo se puede usar registrándose con ese email exacto.
 - **El nombre lo ponés vos, no lo elige quien se registra.** Es el nombre con el que esa persona va a figurar en tu equipo desde el primer día.
 - **Si el email ya tiene cuenta en tu inmobiliaria, el sistema no te deja generar el código** y te avisa quién ya lo está usando (por ejemplo: *"Ese email ya tiene cuenta en tu inmobiliaria: Juan Pérez"*). Así no se duplica gente por error.
