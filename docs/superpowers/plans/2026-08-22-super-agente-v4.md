@@ -2070,14 +2070,19 @@ Juan, Mauro): `scratch/_sa-plantillas-v2-ejemplos.md`. Las 3 viejas y `reactivac
 quedan (no se borran).
 
 - [x] **Step 1: OK de Leonardo sobre los textos** (25/8, tras dos rondas de ejemplos).
-- [ ] **Step 2:** sumar las 5 al catálogo de `injectCoreTemplates` (nombre de agencia en el texto
-  fijo; `seg_pendiente` como UTILITY, el resto MARKETING) y crearlas **en PRISMAIA - VAKDOR**
-  (escribe en Meta; OK dado el 25/8) con un script one-off que use el mismo camino.
-- [ ] **Step 3:** esperar la aprobación de Meta (`sync-templates`); si rechaza, regla de §I.6.
-- [ ] **Step 4:** cambiar el prompt (cuándo elegir cada una + el estilo de los ejemplos), habilitar
-  las v2 en el decisor, y el ejecutor: `variables: [nombre, frase + BAJA si follow_ups_sent ≥ 1]`.
-  Tests. (El catálogo y el schema ya las conocen desde el 25/8: `PLANTILLAS_SEGUIMIENTO`.)
-- [ ] **Step 5:** sombra 24h con las nuevas en PRISMAIA → OK → crearlas en Central (⚠️ OK).
+- [x] **Step 2 (25/8):** las 5 en el catálogo de `injectCoreTemplates` (`lib/whatsapp/plantillas-v2.ts`,
+  módulo puro, con el nombre de la agencia en el texto fijo; `seg_pendiente` UTILITY) y creadas en
+  **PRISMAIA - VAKDOR** con el one-off `manual-crear-plantillas-v2.test.ts` (5/5 con id de Meta).
+- [x] **Step 3 (25/8):** **Meta aprobó las 5 en ~5 minutos** (18:30); `wa_templates` reflejado
+  (el cron `sync-templates` corre a las 00:00 UTC, se adelantó a mano).
+- [x] **Step 4 (25/8, commit a64ac3f):** el runner trae las plantillas APROBADAS de cada agencia y
+  la semilla las lista con su texto fijo; el agente elige SOLO entre esas (Central sigue con
+  f1/f2/f3 hasta que se creen las v2 ahí); prompt con el estilo aprobado; `armarVariables` en
+  `plantillas.ts` (f3 solo nombre; v2 nombre + frase + BAJA solo con `follow_ups_sent ≥ 1`, nunca
+  en `seg_pendiente`); una decisión con plantilla no disponible queda
+  `bloqueada_plantilla_no_disponible`.
+- [ ] **Step 5:** sombra con las nuevas en PRISMAIA (hoy sin candidatos: probar con
+  `SEGUIMIENTO_SIMULAR_V2=1` sobre leads de Central, solo lectura) → OK → crearlas en Central (⚠️ OK).
 
 ### Task 12c: `leer_propiedad_por_link` (diseño verificado el 25/8 contra n8n y la base)
 
