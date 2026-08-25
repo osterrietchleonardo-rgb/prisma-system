@@ -316,7 +316,12 @@ export async function generateAgencyInvite(
   // Normalizar y validar el celular usando la misma regla del proyecto:
   // E.164 sin "+", siempre. Si el llamador no pasó por validarNuevoCodigo(),
   // esta función es la última barrera.
-  const phone = normalizePhoneE164(inviteePhone, "AR")
+  //
+  // IMPORTANTE: el valor ya viene en E.164 sin "+", normalizado por validarNuevoCodigo().
+  // Anteponer "+" hace que libphonenumber deduzca el país del código de país en el
+  // número mismo (ej: +525512345678 es México), en lugar de asumir un país fijo.
+  // Sin esto, números de Colombia, México, Brasil y otros países serían rechazados.
+  const phone = normalizePhoneE164("+" + inviteePhone.trim())
 
   // Última barrera. La validación de verdad la hace el diálogo con
   // validarNuevoCodigo(), pero esta función es pública y no puede confiar en
