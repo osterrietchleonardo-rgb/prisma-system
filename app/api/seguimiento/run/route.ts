@@ -5,6 +5,7 @@ import { decidirConAgente, estimarCostoUSD } from "@/lib/seguimiento/agente"
 import { crearHerramientas } from "@/lib/seguimiento/herramientas"
 import { renderizarSemilla } from "@/lib/seguimiento/semilla"
 import { registrarEvento } from "@/lib/seguimiento/eventos"
+import { plantillaDesdeFila, type PlantillaDisponible } from "@/lib/seguimiento/plantillas"
 import type { Candidato, CompromisoActivo, ConfigAgencia } from "@/lib/seguimiento/tipos"
 
 export const maxDuration = 300
@@ -70,6 +71,19 @@ export async function POST(req: Request) {
   const yaDecididos = new Set((recientes ?? []).map((r) => r.conversation_id))
   const cola = puntuados.filter((x) => !yaDecididos.has(x.c.id)).slice(0, MAX_LLM)
 
+  // ── Plantillas de seguimiento APROBADAS por agencia (el agente solo elige entre estas) ──
+  const { data: filasPlantillas } = await db
+    .from("wa_templates")
+    .select("agency_id, template_name, components")
+    .eq("status", "APPROVED")
+    .like("template_name", "%\\_seg\\_%")
+  const plantillasPorAgencia = new Map<string, PlantillaDisponible[]>()
+  for (const f of filasPlantillas ?? []) {
+    const p = plantillaDesdeFila(f)
+    if (!p) continue
+    plantillasPorAgencia.set(f.agency_id, [...(plantillasPorAgencia.get(f.agency_id) ?? []), p])
+  }
+
   // ── Capa 3: el agente decide, uno por uno (secuencial: previsible) ──
   const inicio = Date.now()
   const resultados: Array<{ conversation_id: string; accion: string; razon: string }> = []
@@ -87,17 +101,21 @@ export async function POST(req: Request) {
       .eq("agency_id", c.agency_id)
       .eq("phone", c.contact_phone)
       .maybeSingle()
+    const disponibles = plantillasPorAgencia.get(c.agency_id) ?? []
     const semilla = renderizarSemilla(
       c,
       score,
       compromisos.length,
       ahoraISO,
-      contacto?.clasificacion ?? null
+      contacto?.clasificacion ?? null,
+      disponibles
     )
     const herramientas = crearHerramientas(db, c)
 
     try {
       const { decision, pasos, tokens } = await decidirConAgente(semilla, herramientas)
+      // la plantilla elegida tiene que existir aprobada en ESTA agencia; si no, queda bloqueada
+      const plantillaValida = !decision.plantilla || disponibles.some((p) => p.nombre === decision.plantilla)
       const { data: fila } = await db
         .from("seguimiento_decisiones")
         .insert({
@@ -115,6 +133,7 @@ export async function POST(req: Request) {
           contexto_snapshot: { pasos, tokens, metricas: c.metricas }, // el trace: qué miró
           decision_cruda: decision, // incluye la evidencia
           ejecutada: false,
+          resultado: plantillaValida ? null : "bloqueada_plantilla_no_disponible",
           costo_usd: estimarCostoUSD(tokens),
         })
         .select("id")

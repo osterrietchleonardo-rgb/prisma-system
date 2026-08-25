@@ -1,4 +1,5 @@
 import type { Candidato } from "./tipos"
+import type { PlantillaDisponible } from "./plantillas"
 
 /** El nombre válido es SOLO el de metricas (jamás el del perfil de WhatsApp) y con 3+ letras
  *  (decisión 25/8: "K" o "" = sin nombre; se sigue igual, sin nombrarlo). */
@@ -13,8 +14,12 @@ export function renderizarSemilla(
   score: number,
   compromisosActivos: number,
   ahoraISO: string,
-  clasificacion: string | null = null
+  clasificacion: string | null = null,
+  plantillasDisponibles: PlantillaDisponible[] = []
 ): string {
+  const plantillas = plantillasDisponibles.length
+    ? plantillasDisponibles.map((p) => `  - ${p.nombre}: «${p.texto}»`).join("\n")
+    : "  (ninguna aprobada todavía: no se puede contactar, solo posponer/abandonar/escalar)"
   const metricas =
     Object.entries(c.metricas ?? {})
       .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "")
@@ -33,6 +38,7 @@ export function renderizarSemilla(
       ? [`ATENCIÓN: este lead fue DERIVADO a un asesor humano. Verificá en los mensajes si algún [human] le escribió. Si nadie lo atendió, la acción correcta es "escalar" (no "contactar": el sistema bloquea seguimientos automáticos a leads en handoff).`]
       : []),
     `Datos capturados del lead:\n${metricas}`,
+    `Plantillas DISPONIBLES para esta agencia (texto fijo; {{1}} = nombre, {{2}} = tu frase_cierre). Elegí SOLO entre estas:\n${plantillas}`,
     `Investigá con tus herramientas lo que necesites y emití tu decisión con emitir_decision.`,
   ].join("\n\n")
 }

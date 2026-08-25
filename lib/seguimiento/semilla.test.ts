@@ -46,6 +46,15 @@ describe("renderizarSemilla", () => {
     expect(t).not.toMatch(/Lead: K ·/)
     expect(t).toContain("sin nombre")
   })
+  it("lista las plantillas disponibles de la agencia con su texto fijo", () => {
+    const t = renderizarSemilla(base, 0, 0, "2026-08-25T15:00:00-03:00", null, [
+      { nombre: "seg_valor", texto: "Hola {{1}}, te escribo de X. {{2}} Si te sirve, decime." },
+    ])
+    expect(t).toContain("seg_valor: «Hola {{1}}")
+  })
+  it("sin plantillas aprobadas lo dice (no se puede contactar)", () => {
+    expect(renderizarSemilla(base, 0, 0, "2026-08-25T15:00:00-03:00")).toContain("ninguna aprobada")
+  })
   it("no incluye los mensajes de la conversación (eso es de leer_mensajes)", () => {
     const t = renderizarSemilla(base, 55, 0, "2026-08-24T15:00:00-03:00")
     expect(t).not.toContain("cochera")
