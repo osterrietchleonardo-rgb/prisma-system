@@ -23,8 +23,9 @@ import {
   RotateCcw
 } from "lucide-react"
 import { getAgentPerformanceAction, getAgencyAdvisorsPerformanceAction } from "@/app/actions/performance"
-import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa, setClasificacionAsesor, getHuellaDatosAsesor, eliminarAsesorDefinitivamente, type ClasificacionAsesor } from "@/app/actions/asesores"
+import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa, setClasificacionAsesor, getHuellaDatosAsesor, eliminarAsesorDefinitivamente, actualizarDatosAsesor, type ClasificacionAsesor } from "@/app/actions/asesores"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -69,6 +70,9 @@ import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
 import { QRCodeSVG } from "qrcode.react"
 import { NuevoCodigoDialog } from "@/components/director/NuevoCodigoDialog"
+import { VerifiedPhoneField, type VerifiedPhoneValue } from "@/components/shared/VerifiedPhoneField"
+import { normalizePhoneE164, formatPhoneInternational } from "@/lib/whatsapp/phone"
+import type { CountryCode } from "libphonenumber-js"
 // import { cn } from "@/lib/utils" // Unused
 
 // Clasificaciones que el director puede asignar a cada asesor.
@@ -115,6 +119,12 @@ export default function AsesoresPage() {
   const [unlinkReason, setUnlinkReason] = useState("")
   // Info de la pausa vigente del asesor abierto en el panel (motivo/fecha/quién)
   const [pauseInfo, setPauseInfo] = useState<{ motivo: string | null; created_at: string; ejecutado_por_nombre: string | null } | null>(null)
+
+  // Edición de nombre/celular del asesor (el email no se toca)
+  const [editandoDatos, setEditandoDatos] = useState<Record<string, any> | null>(null)
+  const [nombreEdit, setNombreEdit] = useState("")
+  const [phoneEdit, setPhoneEdit] = useState<VerifiedPhoneValue>({ phone: "", phoneConfirm: "", country: "AR" as CountryCode })
+  const [guardandoDatos, setGuardandoDatos] = useState(false)
 
   const supabase = createClient()
   const [agencyId, setAgencyId] = useState<string | null>(null)
@@ -295,6 +305,42 @@ export default function AsesoresPage() {
       toast.error(e.message || "Error al clasificar al asesor")
     } finally {
       setClasificando(null)
+    }
+  }
+
+  // Abre el diálogo de edición de datos con el nombre precargado y el celular
+  // en blanco (blanco = "no lo toques", nunca se precarga para no tentar a
+  // "reescribirlo mal" sin darse cuenta).
+  const abrirEdicionDatos = (agent: Record<string, any>) => {
+    setNombreEdit(agent.full_name ?? "")
+    setPhoneEdit({ phone: "", phoneConfirm: "", country: "AR" as CountryCode })
+    setEditandoDatos(agent)
+  }
+
+  const guardarDatos = async () => {
+    if (!editandoDatos) return
+    const e164 = normalizePhoneE164(phoneEdit.phone, phoneEdit.country)
+    const confirm164 = normalizePhoneE164(phoneEdit.phoneConfirm, phoneEdit.country)
+    const tocaCelular = phoneEdit.phone.trim() !== ""
+
+    if (tocaCelular && (!e164 || e164 !== confirm164)) {
+      toast.error("Revisá el celular: tiene que ser válido y estar escrito igual las dos veces")
+      return
+    }
+    try {
+      setGuardandoDatos(true)
+      await actualizarDatosAsesor(editandoDatos.id, {
+        full_name: nombreEdit,
+        ...(tocaCelular && e164 ? { phone: e164 } : {}),
+      })
+      toast.success("Datos actualizados")
+      setEditandoDatos(null)
+      setSelectedAgent(null)
+      fetchAgents()
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "No se pudieron guardar los datos")
+    } finally {
+      setGuardandoDatos(false)
     }
   }
 
@@ -767,6 +813,27 @@ export default function AsesoresPage() {
           </SheetHeader>
           
           <div className="space-y-6 mt-8 overflow-y-auto max-h-[calc(100vh-250px)] pr-2">
+            {selectedAgent && (
+              <div className="rounded-xl border border-border/60 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Datos de contacto</p>
+                  <Button variant="ghost" size="sm" onClick={() => selectedAgent && abrirEdicionDatos(selectedAgent)}>
+                    Editar
+                  </Button>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-muted-foreground">Email:</span> {selectedAgent.email}</p>
+                  <p>
+                    <span className="text-muted-foreground">Celular:</span>{" "}
+                    {selectedAgent.phone
+                      ? formatPhoneInternational(selectedAgent.phone, "AR") ?? selectedAgent.phone
+                      : <span className="text-amber-600">Sin cargar</span>}
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">El email no se puede cambiar: es su cuenta.</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <Card className="bg-accent/5 border-accent/10 shadow-none">
                 <CardHeader className="p-4 pb-0">
@@ -1042,6 +1109,41 @@ export default function AsesoresPage() {
             >
               <Trash2 className="h-4 w-4" />
               {borrando === agentToDelete?.id ? "Eliminando…" : "Eliminar definitivamente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de edición de nombre/celular. El email queda de solo lectura. */}
+      <Dialog open={!!editandoDatos} onOpenChange={(v) => !v && setEditandoDatos(null)}>
+        <DialogContent className="bg-card border-accent/20 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Datos de {editandoDatos?.full_name || "el asesor"}</DialogTitle>
+            <DialogDescription>
+              El email queda como está: es la cuenta con la que se registró.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="ed-nombre">Nombre y apellido</Label>
+              <Input
+                id="ed-nombre"
+                value={nombreEdit}
+                disabled={guardandoDatos}
+                onChange={(e) => setNombreEdit(e.target.value)}
+              />
+            </div>
+            <VerifiedPhoneField value={phoneEdit} onChange={setPhoneEdit} disabled={guardandoDatos} />
+            <p className="text-xs text-muted-foreground">
+              Dejá el celular en blanco si no querés cambiarlo.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditandoDatos(null)} disabled={guardandoDatos}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarDatos} disabled={guardandoDatos} className="bg-accent">
+              Guardar
             </Button>
           </DialogFooter>
         </DialogContent>

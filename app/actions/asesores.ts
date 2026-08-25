@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
+import { normalizePhoneE164 } from "@/lib/whatsapp/phone"
 
 /**
  * Valida que quien ejecuta sea un director y que el asesor objetivo pertenezca a
@@ -25,7 +26,7 @@ async function requireDirectorSobreAsesor(agentId: string) {
 
   const { data: asesor } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, agency_id")
+    .select("id, email, full_name, phone, role, agency_id")
     .eq("id", agentId)
     .single()
 
@@ -54,7 +55,7 @@ async function registrarAccion(
     // existir y la FK impediria guardar la constancia.
     asesorId: string | null
     ejecutadoPor: string
-    tipoAccion: "pausa" | "reanudacion" | "desvinculacion" | "eliminacion_definitiva"
+    tipoAccion: "pausa" | "reanudacion" | "desvinculacion" | "eliminacion_definitiva" | "edicion_datos"
     motivo?: string | null
   }
 ) {
@@ -131,6 +132,61 @@ export async function reanudarAsesor(agentId: string) {
 
   revalidatePath("/director/asesores")
   return { success: true }
+}
+
+/**
+ * El director corrige el nombre o el celular de un asesor de su inmobiliaria.
+ *
+ * El email NO se toca: es la cuenta con la que la persona se registró y cambiarlo
+ * sería cambiarle el usuario.
+ */
+export async function actualizarDatosAsesor(
+  agentId: string,
+  datos: { full_name?: string; phone?: string }
+) {
+  const { directorId, agencyId, asesor, admin } = await requireDirectorSobreAsesor(agentId)
+
+  const cambios: Record<string, string> = {}
+  const detalle: string[] = []
+
+  if (datos.full_name !== undefined) {
+    const nombre = datos.full_name.trim()
+    if (nombre.length < 3) throw new Error("El nombre es demasiado corto")
+    if (nombre !== asesor.full_name) {
+      cambios.full_name = nombre
+      detalle.push(`nombre: "${asesor.full_name ?? "—"}" → "${nombre}"`)
+    }
+  }
+
+  if (datos.phone !== undefined) {
+    // Llega ya normalizado desde el formulario, pero esta función es pública:
+    // se vuelve a normalizar acá antes de guardar nada.
+    const phone = normalizePhoneE164(datos.phone, "AR")
+    if (!phone) throw new Error("El celular no parece válido")
+    if (phone !== asesor.phone) {
+      cambios.phone = phone
+      detalle.push(`celular: "${asesor.phone ?? "—"}" → "${phone}"`)
+    }
+  }
+
+  if (Object.keys(cambios).length === 0) return { success: true as const }
+
+  const { error } = await admin.from("profiles").update(cambios).eq("id", agentId)
+  if (error) {
+    console.error("Error actualizando datos del asesor:", error)
+    throw new Error(error.message)
+  }
+
+  await registrarAccion(admin, {
+    agencyId,
+    asesorId: asesor.id,
+    ejecutadoPor: directorId,
+    tipoAccion: "edicion_datos",
+    motivo: detalle.join(" · "),
+  })
+
+  revalidatePath("/director/asesores")
+  return { success: true as const }
 }
 
 /**
