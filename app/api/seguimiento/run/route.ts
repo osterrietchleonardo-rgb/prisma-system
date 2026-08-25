@@ -13,7 +13,9 @@ export const maxDuration = 300
 // nunca entraba (la noche del 24/8: 15 corridas con 0 leads y 50 candidatos sin decidir).
 const MAX_CANDIDATOS = 200
 const MAX_LLM = 8 // solo los mejores llegan al agente; el resto, próxima corrida
-const DEADLINE_MS = 240_000 // deja 60s de colchón antes del timeout
+// 200 s y no 240: el freno solo evita EMPEZAR leads nuevos; un lead arrancado a los 239 s
+// terminaba a los 271 s (corrida de las 15:30 del 25/8), a 29 s del timeout de Vercel.
+const DEADLINE_MS = 200_000
 const DEDUPE_HORAS = 20 // no re-decidir un lead ya decidido hace poco
 const TOPE_COSTO_USD = 0.1 // acordado con Leonardo el 25/8: por encima se registra alerta
 
