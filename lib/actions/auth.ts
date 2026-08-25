@@ -6,17 +6,30 @@ import { z } from "zod"
 import { redirect } from "next/navigation"
 import { headers } from "next/headers"
 import { loginRateLimit } from "@/lib/rate-limit"
+import { emailCoincideConInvite } from "@/lib/invites/reglas"
 
-const registerSchema = z.object({
-  fullName: z.string().min(3, "Mínimo 3 caracteres"),
-  email: z.string().email("Email inválido"),
-  password: z.string().min(6, "Mínimo 6 caracteres"),
-  // "crear" = funda una inmobiliaria nueva (requiere código de Vakdor/admin).
-  // "unirme" = entra a una inmobiliaria existente; el rol lo define el código.
-  mode: z.enum(["crear", "unirme"]),
-  agencyName: z.string().optional(),
-  inviteCode: z.string().optional(),
-})
+const registerSchema = z
+  .object({
+    // Opcional a nivel de tipo, obligatorio solo en modo "crear": quien se une
+    // con un código ya no tipea su nombre, se lo define su inmobiliaria.
+    fullName: z.string().optional(),
+    email: z.string().email("Email inválido"),
+    password: z.string().min(6, "Mínimo 6 caracteres"),
+    // "crear" = funda una inmobiliaria nueva (requiere código de Vakdor/admin).
+    // "unirme" = entra a una inmobiliaria existente; el rol lo define el código.
+    mode: z.enum(["crear", "unirme"]),
+    agencyName: z.string().optional(),
+    inviteCode: z.string().optional(),
+  })
+  .superRefine((d, ctx) => {
+    if (d.mode === "crear" && (d.fullName ?? "").trim().length < 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["fullName"],
+        message: "Mínimo 3 caracteres",
+      })
+    }
+  })
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -64,7 +77,12 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
     //    Cruzar códigos (uno de agencia en "crear", o uno de admin en "unirme") cae en
     //    "Código incorrecto" porque cada uno vive en su propia tabla.
     let validAdminInvite: { id: string } | null = null
-    let validAgencyInvite: { agency_id: string; role: 'director' | 'asesor' } | null = null
+    let validAgencyInvite: {
+      agency_id: string
+      role: 'director' | 'asesor'
+      invitee_name: string | null
+      invitee_phone: string | null
+    } | null = null
     let finalRole: 'director' | 'asesor' = 'director'
 
     if (data.mode === 'crear') {
@@ -85,18 +103,36 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
 
       const { data: invite, error: findError } = await adminClient
         .from('agency_invites')
-        .select('agency_id, is_used, role')
+        .select('agency_id, is_used, role, invitee_name, invitee_phone, invitee_email')
         .eq('code', data.inviteCode)
         .single()
 
       if (findError || !invite) return { error: "Código incorrecto" }
       if (invite.is_used) return { error: "Este código ya fue utilizado" }
+
+      // La llave. Si el código trae email, solo sirve para esa dirección.
+      // Se corta ANTES de crear el usuario, así el código no se consume.
+      if (!emailCoincideConInvite(invite.invitee_email, data.email)) {
+        return { error: "Este código no corresponde a este email." }
+      }
+
       validAgencyInvite = {
         agency_id: invite.agency_id,
         role: invite.role === 'director' ? 'director' : 'asesor',
+        invitee_name: invite.invitee_name,
+        invitee_phone: invite.invitee_phone,
       }
       finalRole = validAgencyInvite.role
     }
+
+    // El nombre del código manda. Si es un código viejo que no lo trae, cae en lo
+    // que haya tipeado la persona; y si tampoco hay, en la parte del email antes
+    // del arroba, para no dejar el perfil sin nombre. El director lo corrige
+    // después desde la tarjeta del asesor.
+    const nombreFinal =
+      validAgencyInvite?.invitee_name?.trim() ||
+      data.fullName?.trim() ||
+      data.email.split("@")[0]
 
     // 1. Crear usuario con signUp para que Supabase maneje el envío del email de confirmación
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -104,7 +140,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
       password: data.password,
       options: {
         data: {
-          full_name: data.fullName,
+          full_name: nombreFinal,
           role: finalRole,
           invite_code: data.inviteCode,
         },
@@ -124,7 +160,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
         id: userId,
         email: data.email,
         role: finalRole,
-        full_name: data.fullName,
+        full_name: nombreFinal,
       }, { onConflict: 'id' })
 
     if (profileError) {
@@ -135,7 +171,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
             id: userId,
             email: data.email,
             role: finalRole,
-            full_name: data.fullName,
+            full_name: nombreFinal,
           }, { onConflict: 'id' })
     }
 
@@ -180,7 +216,16 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
     } else if (data.mode === 'unirme' && validAgencyInvite) {
       const { error: asesorLinkError } = await adminClient
         .from('profiles')
-        .update({ agency_id: validAgencyInvite.agency_id, role: finalRole, full_name: data.fullName })
+        .update({
+          agency_id: validAgencyInvite.agency_id,
+          role: finalRole,
+          full_name: nombreFinal,
+          // Solo se pisa si el código lo trae: un código viejo no tiene que
+          // borrarle el teléfono a nadie.
+          ...(validAgencyInvite.invitee_phone
+            ? { phone: validAgencyInvite.invitee_phone }
+            : {}),
+        })
         .eq('id', userId)
 
       if (asesorLinkError) return { error: "Error al vincular el usuario a la inmobiliaria." }
@@ -198,7 +243,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
     await adminClient.auth.admin.updateUserById(userId, {
       user_metadata: {
           role: finalRole,
-          full_name: data.fullName,
+          full_name: nombreFinal,
       }
     })
 
