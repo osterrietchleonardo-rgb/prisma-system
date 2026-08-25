@@ -68,6 +68,12 @@ describe("puedeEjecutar", () => {
     const r = puedeEjecutar(decision, { ...base, follow_ups_sent: 3 }, config, 0)
     expect(r).toEqual({ ok: false, motivo: "max_intentos" })
   })
+  it("bloquea contactar a un lead derivado a humano (handoff): eso se escala, no se persigue", () => {
+    const c = { ...base, metricas: { nombre: "Test", fue_derivado_a_humano: "true" } }
+    expect(puedeEjecutar(decision, c, config, 0)).toEqual({ ok: false, motivo: "en_handoff" })
+    const c2 = { ...base, metricas: { nombre: "Test", etapa: "handoff" } }
+    expect(puedeEjecutar(decision, c2, config, 0)).toEqual({ ok: false, motivo: "en_handoff" })
+  })
   it("deja pasar el caso sano", () => {
     expect(puedeEjecutar(decision, base, config, 5).ok).toBe(true)
   })

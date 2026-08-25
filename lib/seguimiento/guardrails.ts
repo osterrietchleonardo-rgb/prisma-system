@@ -30,7 +30,16 @@ export function puedeEjecutar(
   if (c.follow_ups_sent >= config.max_intentos) return { ok: false, motivo: "max_intentos" }
   if (c.opt_out) return { ok: false, motivo: "opt_out" }
   if (!c.bot_active) return { ok: false, motivo: "humano_al_mando" }
+  if (enHandoff(c)) return { ok: false, motivo: "en_handoff" }
   return { ok: true }
+}
+
+/** Handoff REAL (verificado 25/8 en Central): la marca es metricas.fue_derivado_a_humano /
+ *  etapa='handoff' — NO bot_active (1.521 conversaciones lo tienen en false sin handoff).
+ *  Un lead derivado no recibe seguimiento automático: si nadie lo atendió, se ESCALA. */
+export function enHandoff(c: Candidato): boolean {
+  const m = c.metricas ?? {}
+  return String(m.fue_derivado_a_humano) === "true" || String(m.etapa) === "handoff"
 }
 
 /** Releer la conversación justo antes de despachar: si algo cambió, no se envía. */

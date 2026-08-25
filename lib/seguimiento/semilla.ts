@@ -29,6 +29,9 @@ export function renderizarSemilla(
     `Último mensaje (de cualquiera): ${c.last_message_at ?? "nunca"}`,
     `Intentos de seguimiento ya enviados: ${c.follow_ups_sent}`,
     `Compromisos activos: ${compromisosActivos} (el detalle con leer_compromisos)`,
+    ...(String(c.metricas?.fue_derivado_a_humano) === "true" || String(c.metricas?.etapa) === "handoff"
+      ? [`ATENCIÓN: este lead fue DERIVADO a un asesor humano. Verificá en los mensajes si algún [human] le escribió. Si nadie lo atendió, la acción correcta es "escalar" (no "contactar": el sistema bloquea seguimientos automáticos a leads en handoff).`]
+      : []),
     `Datos capturados del lead:\n${metricas}`,
     `Investigá con tus herramientas lo que necesites y emití tu decisión con emitir_decision.`,
   ].join("\n\n")

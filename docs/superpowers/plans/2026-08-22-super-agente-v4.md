@@ -2032,6 +2032,114 @@ WHERE sd.modo = 'sombra' ORDER BY sd.creado_en DESC LIMIT 20;
 - [ ] **Step 4: Ajustar el prompt con lo que salga** y repetir la sombra si el cambio fue
   grande. Commit: `git add lib/seguimiento/agente.ts && git commit -m "fix(seguimiento): ajuste de prompt tras revision de sombra"`
 
+### Task 12b: Plantillas de seguimiento v2 (⚠️ crear en Meta REQUIERE OK; propuesta del 25/8)
+
+**Por qué cambiarlas (hechos de la sombra):** las 3 plantillas actuales nacieron para una
+escalera fija F1→F2→F3. Con un agente que decide caso por caso, tienen 4 problemas medidos:
+(1) todas saludan "Hola {{1}}" → el nombre es obligatorio: los leads sin nombre en metricas
+(mayoría del envío de reclutamiento) no pueden recibir seguimiento, y el agente lo repetía en
+la frase; (2) la F3 dice "vamos a pausar los recordatorios" — suena a sistema, no aporta valor
+y NO tiene variable: el agente no puede poner nada ahí (19 de 35 contactar del día 1 cayeron
+en F3 con la frase descartada); (3) la F1 presupone "tu consulta sobre la propiedad" aunque
+la consulta haya sido genérica; (4) los cierres "Aguardamos tus comentarios" / "Quedamos a tu
+disposición" son rígidos y no invitan a responder.
+
+**Diseño:** plantillas SIN variable de nombre, con **una sola variable {{1}} = el mensaje del
+agente** (el nombre va adentro solo si es válido, una vez), texto fijo al inicio (identifica a
+la agencia — el provisionador tiene el `agency_id` y puede leer `agencies.name`) y al final
+(cierre + baja). Categoría: MARKETING salvo la de pendiente (UTILITY, a validar con Meta).
+
+| Nombre | Cuándo la elige el agente | Cuerpo propuesto |
+|---|---|---|
+| `seg_retomar` | Primer toque: retoma algo puntual del historial | "Hola, te escribimos de {AGENCIA} por tu consulta. {{1}} Cualquier cosa, respondé por acá." |
+| `seg_valor` | Aporta un dato o destraba un requisito (presupuesto, apto crédito, zona) | "Hola, desde {AGENCIA} seguimos atentos a tu búsqueda. {{1}} Si te sirve, decinos y lo vemos." |
+| `seg_pendiente` | El bot/asesor prometió algo y no se cumplió (aviso de tranquilidad) | "Hola, te escribimos de {AGENCIA} por un tema que quedó pendiente: {{1}} Gracias por la paciencia." |
+| `seg_novedad` | Hay un hecho nuevo verificado: baja de precio, propiedad nueva que encaja (base de las vigías) | "Hola, desde {AGENCIA} tenemos una novedad sobre lo que buscabas: {{1}} ¿Querés que te pasemos más detalles?" |
+| `seg_puerta_abierta` | Último toque: sin presión, con valor, la puerta queda abierta | "Hola, desde {AGENCIA} queremos dejarte esto antes de darte un respiro: {{1}} Cuando quieras retomar, escribinos por acá y seguimos desde donde quedaste." |
+
+Todas terminan con: "Si preferís no recibir más mensajes, respondé BAJA." (protege la
+calificación de calidad de la WABA). `reactivacion_snoozed` y las 3 viejas quedan (no se
+borran) hasta que las nuevas estén aprobadas y el agente las use.
+
+- [ ] **Step 1 (OK de Leonardo sobre los textos).** Ajustar redacción si hace falta.
+- [ ] **Step 2:** agregar las 5 al catálogo de `injectCoreTemplates` (con el nombre de la agencia
+  en el texto fijo) y crearlas **primero en PRISMAIA - VAKDOR** (⚠️ OK: escribe en Meta).
+- [ ] **Step 3:** esperar la aprobación de Meta (`sync-templates`); si rechaza, aplicar la regla
+  de reformulación de §I.6.
+- [ ] **Step 4:** cambiar `PLANTILLAS`, el enum de `emitir_decision`, el prompt (cuándo elegir
+  cada una; nombre una sola vez adentro de la frase) y el ejecutor (`variables: [frase]`);
+  **sacar el filtro de nombre de la Capa 1** (los sin nombre entran, sin nombrarlos). Tests.
+- [ ] **Step 5:** sombra 24h con las nuevas en PRISMAIA → OK → crearlas en Central (⚠️ OK).
+
+### Task 12c: `leer_propiedad_por_link` (diseño verificado el 25/8 contra n8n y la base)
+
+**Hecho:** las consultas llegan con links de portales — dominios reales de
+`metricas.link_compartido` en Central: mercadolibre (482), argenprop (131), centralre.com.ar
+(35), ficha.info (6), buscainmueble (4), zonaprop (2). **No existe un mapa directo
+link→propiedad**: `tokko_data.public_url` es siempre `ficha.info/p/...` y coincide con 0 de
+los links que mandan los leads.
+
+**Cómo lo resuelve hoy `Cartera_Propiedades` (n8n, solo lectura):** `extraer_agency_id` saca
+la URL del texto → `Tiene_Link` → `Extraer_Web` (POST al `acm-extractor` de EasyPanel con
+`x-extractor-secret`, timeout 120 s) devuelve `sujeto` {tipo, barrio, dirección, dormitorios,
+m2, amenidades} + precio/moneda → `Preparar_Busqueda` arma la consulta y los `ref_*` →
+embedding Gemini 768 → la tool SQL `CARTERA_PROPIEDADES` busca en `properties` por zona,
+dirección, precio y vector.
+
+**Diseño de la herramienta del agente:** reutilizar **el extractor que ya usa la app**
+(`lib/acm/extract.ts` → `extractFromUrl(url)`: tier 1 server-side + tier 2 vía
+`ACM_EXTRACTOR_URL` público, alcanzable desde Vercel) y con `sujeto.direccion` /
+`sujeto.barrio` / precio buscar en `properties` de la agencia (mismo `.or` de
+`leer_propiedad` + tolerancia de precio ±15%). Input: `{ url }`. Salida: la misma ficha de
+`leer_propiedad` (con `is_active`) o "no está en la cartera: era de otra inmobiliaria o se
+retiró". El agente la usa cuando `link_compartido` o `propiedades_mostradas` traen URL.
+Caché por URL 24h (los 86 leads que mandaron el mismo link de ML no deben disparar 86
+extracciones). **Hallazgo de seguridad al pasar:** el nodo `Extraer_Web` tiene el secreto
+del extractor pegado en el nodo (mismo patrón que el hallazgo del 17/8) — anotar para
+mover a credencial, con OK.
+
+- [ ] **Step 1:** test con `extractFromUrl` mockeado (3 casos: match activo, match inactivo,
+  sin match) — patrón de `herramientas.test.ts`.
+- [ ] **Step 2:** implementar en `herramientas.ts` + registrar en `HERRAMIENTAS_API` + línea en
+  el prompt ("si el lead mandó un link, leelo por link antes de hablar de esa propiedad").
+- [ ] **Step 3:** prueba real con `manual-real.test.ts` sobre un lead con `link_compartido`.
+
+### Task 12d: Alineación con los analizadores de n8n (leído el 25/8, solo lectura)
+
+**Qué hace cada nodo (verificado en el workflow PRISMA):**
+- `Analizar conversación` (gpt-4.1): clasificador de 14 etiquetas de seguridad/relevancia.
+- `Analizar_Conversacion` (gpt-5.4-nano): `etiquetas` + `score_bant` → `Actualizar_Etiquetas_Score`.
+- `Analizar_Conversacion1` (nano): las ~42 métricas (`nombre`, `urgencia`, `etapa`,
+  `fue_derivado_a_humano`, `link_compartido`, `propiedades_mostradas`, `calificado`…).
+- `Analizar_Conversacion2` (nano): `opt_out`, `visit_status`, `visit_scheduled_at`,
+  `requires_follow_up` (+ justificación). **Solo `opt_out` y `requires_follow_up` llegan a
+  `wa_conversations`** (`Actualizar_Metricas2`); `visit_status` de la conversación lo escribe
+  el sync de visitas de la app (`scheduled_visits`, agendadas por el asesor).
+- **`next_follow_up_at` NO lo decide ningún analizador**: lo fija el webhook de entrada
+  (`app/api/webhooks/{evolution,meta}/route.ts`) = ahora + 24 h en cada mensaje entrante,
+  reseteando `follow_ups_sent = 0` y `requires_follow_up = true`; el flujo viejo lo movía
+  +3 días por F1/F2 y a null en F3.
+
+**Cómo decide hoy "¿necesita seguimiento?":** `requires_follow_up` = true por defecto; false
+solo si hay visita pactada o handoff explícito en el texto. Pero el webhook lo vuelve a poner
+en true con cada mensaje del lead. Evidencia en Central: 324 conversaciones con
+`fue_derivado_a_humano = true`, de las cuales **94 tienen `requires_follow_up = true`**; y
+`bot_active = false` en 1.521 conversaciones — no es marca de handoff.
+
+**Los 8 escalar del día 1 comparten la firma:** `fue_derivado_a_humano = true` (6/8) o
+`etapa = handoff`, asesor asignado (7/8), **0 mensajes `internal` y 0 mensajes `human`**,
+`requires_follow_up = true`. Es decir: el bot dijo "te paso con un asesor", se asignó un
+asesor, y nadie escribió nunca.
+
+**Alineación aplicada (25/8):** (1) guardrail `en_handoff` en código — un lead derivado no
+recibe seguimiento automático: si nadie lo atendió, se escala; (2) la semilla avisa al
+agente cuando el lead está derivado. **Pendiente (Task 19 y fase 2):** la función
+`seguimiento_esperando_humano` usa `bot_active = false` como marca de handoff — hay que
+reescribirla con la firma real (`metricas.fue_derivado_a_humano` / `etapa = handoff` y
+ausencia de `role = 'human'` posterior) — migración chica con OK. Los analizadores de n8n
+**no se tocan**: el criterio "¿necesita seguimiento?" pasa a vivir en el Super Agente, que
+lee lo que ellos capturan y decide con el hilo completo.
+
 ---
 
 # DÍA 5 — Compromisos: lo que el sistema persigue
