@@ -826,7 +826,12 @@ export default function AsesoresPage() {
                   <p>
                     <span className="text-muted-foreground">Celular:</span>{" "}
                     {selectedAgent.phone
-                      ? formatPhoneInternational(selectedAgent.phone, "AR") ?? selectedAgent.phone
+                      ? (
+                          // El valor ya viene en E.164 sin "+". Sin asumir país,
+                          // formatPhoneInternational deducirá el país del código
+                          // del propio número. Si está vacío, cae al fallback crudo.
+                          formatPhoneInternational("+" + selectedAgent.phone) ?? selectedAgent.phone
+                        )
                       : <span className="text-amber-600">Sin cargar</span>}
                   </p>
                 </div>

@@ -404,7 +404,12 @@ export default function AsesorConfiguracionPage() {
                   <p className="text-sm font-medium">Mi celular</p>
                   <p className="text-sm text-muted-foreground">
                     {profile.phone
-                      ? formatPhoneInternational(profile.phone, "AR") ?? profile.phone
+                      ? (
+                          // El valor ya viene en E.164 sin "+". Sin asumir país,
+                          // formatPhoneInternational deducirá el país del código
+                          // del propio número. Si está vacío, cae al fallback crudo.
+                          formatPhoneInternational("+" + profile.phone) ?? profile.phone
+                        )
                       : "Todavía no está cargado"}
                   </p>
                 </div>
