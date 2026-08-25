@@ -102,7 +102,7 @@ export async function injectCoreTemplates(agency_id: string, business_id: string
       buttons: [
         { type: "QUICK_REPLY", text: "Me interesa verlas" }
       ]
-    }
+    },
     // 9-13. Seguimiento v2 (Super Agente, Task 12b): {{1}} nombre, {{2}} mensaje del agente
     ...plantillasV2(prefix, nombreAgencia),
   ]
