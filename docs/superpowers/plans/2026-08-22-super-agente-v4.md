@@ -2153,6 +2153,72 @@ ausencia de `role = 'human'` posterior) — migración chica con OK. Los analiza
 **no se tocan**: el criterio "¿necesita seguimiento?" pasa a vivir en el Super Agente, que
 lee lo que ellos capturan y decide con el hilo completo.
 
+### Task 12e: Avisos por WhatsApp a asesores y director (análisis del 25/8 — antes de crear las v2 en Central)
+
+**Para qué:** los avisos de la escalera (Task 14 Step 1b, §III.2.3) y las aprobaciones salen
+**por email Y por WhatsApp a la vez**. El WhatsApp al asesor sale del MISMO número de la
+agencia que atiende a los leads, así que (a) la regla de 24 h de Meta obliga a plantilla, y
+(b) su respuesta entra por el mismo webhook que los leads.
+
+**Tres hechos que condicionan el orden (verificados 25/8):**
+1. **Ningún asesor ni director tiene teléfono cargado:** Central 0/29 asesores y 0/4
+   directores; PRISMAIA 0/3. Todos tienen email. No existe campo de teléfono en la config
+   del asesor ni del director ni en Equipo; `agency_invites.invitee_phone` existe pero está
+   vacío en las 39 invitaciones y ningún código lo lee.
+2. **Colisiones teléfono-asesor vs. conversaciones: 0** — solo porque no hay teléfonos. En
+   cuanto un asesor conteste un aviso, sin el gate de internos (§III.2.6) el conversacional lo
+   trata como lead. **El gate va ANTES del primer aviso por WhatsApp.**
+3. Los avisos necesitan un **link directo al chat en PRISMA** (verificar la URL real de la
+   conversación en la ficha al construirlo).
+
+**Prerrequisitos, en orden:**
+- [ ] **P1 — Teléfono del equipo:** campo `phone` en el perfil del asesor y del director
+  (misma normalización E.164 y doble verificación del alta de contactos) + edición por el
+  director en Equipo. Cargarlo es el opt-in del asesor a recibir avisos. (UI chica; OK de
+  Leonardo por tocar la app.)
+- [ ] **P2 — Gate de internos** en el flujo PRISMA de n8n (§III.2.6): allowlist de
+  `profiles.phone` de la agencia; la respuesta del asesor se guarda en `interacciones_canal`
+  y se anota en el caso de la escalera; nunca llega al conversacional. (OK: escribe en n8n.)
+- [ ] **P3 — Plantillas de asesor/director aprobadas** en la WABA de la agencia (abajo).
+
+**El catálogo propuesto (todas UTILITY — avisan de una gestión pendiente, no venden —, es_AR,
+{{1}} siempre el nombre del destinatario, último parámetro siempre el link a PRISMA):**
+
+| Plantilla | Cuándo sale (y con qué email) | Cuerpo |
+|---|---|---|
+| `asesor_cliente_esperando` | Nivel 1: al `escalar` (junto con el email al asesor, Task 14 Step 1b) | "Hola {{1}}, tenés un cliente esperando tu respuesta en PRISMA: {{2}}. Entrá y respondele desde acá: {{3}}" |
+| `asesor_sigue_esperando` | Niveles 2-3: recordatorio si no le escribió al cliente (junto con el email del nivel 2) | "Hola {{1}}, {{2}} sigue esperando desde hace {{3}}. Si no lo podés tomar, avisá por acá y lo reasignamos: {{4}}" |
+| `director_asesor_sin_respuesta` | Nivel 4 (24 h): al director, con la decisión en el panel (junto con su email) | "Hola {{1}}, {{2}} pese a los avisos. Decidilo en PRISMA: reasignar, tomarlo vos o dar más tiempo: {{3}}" |
+| `director_aprobacion_pendiente` | Cualquier aprobación consume-once (plantilla nueva, acción sensible) | "Hola {{1}}, el agente necesita tu OK para {{2}}. Revisalo y decidí en PRISMA: {{3}}" |
+| `asesor_visitas_manana` (opcional) | La noche anterior, si tiene visitas agendadas | "Hola {{1}}, mañana tenés {{2}} en agenda: {{3}}. Confirmá o reprogramá desde PRISMA: {{4}}" |
+| `operador_alerta` (opcional, §III.2.8.2) | `system_events` críticos, al WhatsApp de Leonardo | "Hola {{1}}, PRISMA reporta un problema: {{2}}. Detalle: {{3}}" |
+
+Ejemplos con datos reales de la sombra (Belen, Delfina):
+- Nivel 1 → "Hola Martín, tenés un cliente esperando tu respuesta en PRISMA: Belen pidió
+  coordinar una visita el 1/8 y hace 3 semanas que nadie le escribe. Entrá y respondele
+  desde acá: prisma.vakdor.com/…"
+- Nivel 4 → "Hola Víctor, Fernanda lleva 24 horas sin atender a Delfina, que quedó
+  esperando la confirmación de la visita del 3/8, pese a los avisos. Decidilo en PRISMA:
+  reasignar, tomarlo vos o dar más tiempo: prisma.vakdor.com/…"
+
+Reglas: mismo tono humano y corto de las v2 de clientes; **nunca datos del lead más allá
+del nombre y qué espera** (el detalle está en PRISMA); tope de avisos por asesor por día y
+solo en horario laboral (§III.2.3); el "atendido" se mide por un mensaje `human` al cliente,
+no por la respuesta al aviso. Las de asesor NO llevan BAJA (son operativas; el opt-out es
+sacar el teléfono del perfil).
+
+**Orden recomendado (decisión 25/8):** P1 (teléfono) → P2 (gate) → crear en PRISMAIA las de
+asesor/director y probarlas con el teléfono de Leonardo como director → **crear en Central las
+v2 de clientes y las de asesor juntas** (un solo OK, una sola espera de Meta) → encender la
+escalera en sombra.
+
+- [ ] **Step 1:** OK de Leonardo sobre el catálogo y el orden.
+- [ ] **Step 2:** P1 en la app (perfil + Equipo) con su verificación en navegador.
+- [ ] **Step 3:** P2 en n8n con backup del workflow (OK).
+- [ ] **Step 4:** sumar las de asesor/director a `plantillas-v2.ts` (catálogo del provisionador) y
+  crearlas en PRISMAIA con el one-off; esperar Meta; probar un aviso real a Leonardo.
+- [ ] **Step 5:** Central: clientes + asesores juntas (OK).
+
 ---
 
 # DÍA 5 — Compromisos: lo que el sistema persigue
