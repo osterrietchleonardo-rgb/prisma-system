@@ -150,7 +150,16 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
 
     if (authError) return { error: getFriendlyErrorMessage(authError.message) }
     if (!authData.user) return { error: "No se pudo crear el usuario" }
-    
+
+    // signUp con un email YA registrado no falla cuando la confirmación por email
+    // está activa: Supabase devuelve un usuario ofuscado con identities vacío, para
+    // no revelar quién está registrado. Sin este chequeo el flujo seguiría de largo
+    // y quemaría el código de invitación: la persona vería "revisá tu email", nunca
+    // recibiría nada, y su código quedaría usado para siempre.
+    if (authData.user.identities?.length === 0) {
+      return { error: "Este email ya se encuentra registrado." }
+    }
+
     const userId = authData.user.id
 
     // Crear Perfil
