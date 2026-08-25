@@ -6,6 +6,7 @@ import {
   emailCoincideConInvite,
   type DatosNuevoCodigo,
 } from "./reglas";
+import { normalizePhoneE164 } from "@/lib/whatsapp/phone";
 
 const BASE: DatosNuevoCodigo = {
   nombre: "Juan Pérez",
@@ -95,6 +96,73 @@ describe("validarNuevoCodigo", () => {
   it("rechaza si los dos celulares son números distintos", () => {
     const r = validarNuevoCodigo({ ...BASE, phoneConfirm: "11 2345-6780" });
     expect(r).toEqual({ ok: false, error: "Los dos celulares no coinciden" });
+  });
+});
+
+describe("validarNuevoCodigo — otros países de LATAM (el defecto del país fijo)", () => {
+  // El defecto del país fijo apareció cuatro veces y las cuatro se verificaron a
+  // mano, solo con Argentina. Estos tests cubren México y Colombia, para que
+  // validarNuevoCodigo no vuelva a asumir un país que no es el que eligió el director.
+  it("acepta un celular de México (MX) y devuelve el E.164 correcto sin +", () => {
+    const r = validarNuevoCodigo({
+      ...BASE,
+      phone: "55 1234 5678",
+      phoneConfirm: "55 1234 5678",
+      country: "MX",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.datos.phone).toBe("525512345678");
+    }
+  });
+
+  it("acepta un celular de Colombia (CO) y devuelve el E.164 correcto sin +", () => {
+    const r = validarNuevoCodigo({
+      ...BASE,
+      phone: "300 1234567",
+      phoneConfirm: "300 1234567",
+      country: "CO",
+    });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.datos.phone).toBe("573001234567");
+    }
+  });
+});
+
+describe("normalizePhoneE164 — el viaje de ida y vuelta (raíz del defecto del país fijo)", () => {
+  // generateAgencyInvite recibe un celular YA normalizado a E.164 sin "+" y le
+  // antepone "+" para volver a pasarlo por normalizePhoneE164 (sin fijar país,
+  // dejando que libphonenumber lo deduzca del propio número). Este es el test
+  // que impide que el defecto reaparezca por quinta vez: si alguien reintroduce
+  // un país fijo ahí, este test se rompe antes de llegar a producción.
+  it("Argentina: normalizePhoneE164('+' + E.164) devuelve el mismo valor", () => {
+    const original = normalizePhoneE164("11 2345-6789", "AR");
+    expect(original).toBe("5491123456789");
+    expect(normalizePhoneE164("+" + original)).toBe(original);
+  });
+
+  it("México: normalizePhoneE164('+' + E.164) devuelve el mismo valor", () => {
+    const original = normalizePhoneE164("55 1234 5678", "MX");
+    expect(original).toBe("525512345678");
+    expect(normalizePhoneE164("+" + original)).toBe(original);
+  });
+
+  it("Colombia: normalizePhoneE164('+' + E.164) devuelve el mismo valor", () => {
+    const original = normalizePhoneE164("300 1234567", "CO");
+    expect(original).toBe("573001234567");
+    expect(normalizePhoneE164("+" + original)).toBe(original);
+  });
+
+  it("Brasil: normalizePhoneE164('+' + E.164) devuelve el mismo valor", () => {
+    const original = normalizePhoneE164("11 91234-5678", "BR");
+    expect(original).toBe("5511912345678");
+    expect(normalizePhoneE164("+" + original)).toBe(original);
+  });
+
+  it("basura antepuesta de + (doble +) sigue dando null", () => {
+    const original = normalizePhoneE164("11 2345-6789", "AR");
+    expect(normalizePhoneE164("+" + "+" + original)).toBeNull();
   });
 });
 
