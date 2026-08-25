@@ -62,6 +62,23 @@ export function validarNuevoCodigo(d: DatosNuevoCodigo): ResultadoValidacion {
 }
 
 /**
+ * Última barrera para un celular que YA viene en E.164 sin "+" — el formato en el
+ * que se guarda `profiles.phone`. La usan generateAgencyInvite (lib/queries/director.ts)
+ * y actualizarDatosAsesor (app/actions/asesores.ts) antes de escribir en la base,
+ * porque las dos son funciones públicas que no pueden confiar en que las llamen bien.
+ *
+ * Antepone "+" y vuelve a pasarlo por normalizePhoneE164 SIN fijar país, para que
+ * libphonenumber-js lo deduzca del propio número (ej: +525512345678 es México) en
+ * vez de asumir uno fijo. Ese "país fijo" es el defecto que apareció cuatro veces
+ * en esta rama: funcionaba para Argentina y devolvía null para México, Colombia,
+ * Brasil y Uruguay. Estar en un solo lugar, testeado, es lo que evita que los dos
+ * consumidores diverjan si alguien toca uno y se olvida del otro.
+ */
+export function validarCelularGuardado(e164: string): string | null {
+  return normalizePhoneE164("+" + e164.trim())
+}
+
+/**
  * ¿El que se está registrando es la persona a la que se le mandó el código?
  *
  * Si el código no trae email es uno viejo, anterior a esta función: no hay contra

@@ -3,10 +3,11 @@ import {
   normalizarEmail,
   emailValido,
   validarNuevoCodigo,
+  validarCelularGuardado,
   emailCoincideConInvite,
   type DatosNuevoCodigo,
 } from "./reglas";
-import { normalizePhoneE164 } from "@/lib/whatsapp/phone";
+import { normalizePhoneE164, formatPhoneInternational } from "@/lib/whatsapp/phone";
 
 const BASE: DatosNuevoCodigo = {
   nombre: "Juan Pérez",
@@ -130,39 +131,41 @@ describe("validarNuevoCodigo — otros países de LATAM (el defecto del país fi
   });
 });
 
-describe("normalizePhoneE164 — el viaje de ida y vuelta (raíz del defecto del país fijo)", () => {
-  // generateAgencyInvite recibe un celular YA normalizado a E.164 sin "+" y le
-  // antepone "+" para volver a pasarlo por normalizePhoneE164 (sin fijar país,
-  // dejando que libphonenumber lo deduzca del propio número). Este es el test
-  // que impide que el defecto reaparezca por quinta vez: si alguien reintroduce
-  // un país fijo ahí, este test se rompe antes de llegar a producción.
-  it("Argentina: normalizePhoneE164('+' + E.164) devuelve el mismo valor", () => {
+describe("validarCelularGuardado — la función real que usan generateAgencyInvite y actualizarDatosAsesor", () => {
+  // Esta es la red que protege el arreglo, no una imitación. Antes, el test acá
+  // le anteponía el "+" él mismo y llamaba a normalizePhoneE164 directo — eso NO
+  // ejercita el código del producto: si alguien revertía el arreglo real (volver
+  // a fijar un país en generateAgencyInvite o en actualizarDatosAsesor), el test
+  // seguía en verde. validarCelularGuardado() es la función que esos dos lugares
+  // llaman de verdad, así que probarla a ELLA es lo que impide que el defecto
+  // del país fijo reaparezca por quinta vez sin que ningún test se entere.
+  it("Argentina: devuelve el mismo E.164 de entrada", () => {
     const original = normalizePhoneE164("11 2345-6789", "AR");
     expect(original).toBe("5491123456789");
-    expect(normalizePhoneE164("+" + original)).toBe(original);
+    expect(validarCelularGuardado(original!)).toBe(original);
   });
 
-  it("México: normalizePhoneE164('+' + E.164) devuelve el mismo valor", () => {
+  it("México: devuelve el mismo E.164 de entrada", () => {
     const original = normalizePhoneE164("55 1234 5678", "MX");
     expect(original).toBe("525512345678");
-    expect(normalizePhoneE164("+" + original)).toBe(original);
+    expect(validarCelularGuardado(original!)).toBe(original);
   });
 
-  it("Colombia: normalizePhoneE164('+' + E.164) devuelve el mismo valor", () => {
+  it("Colombia: devuelve el mismo E.164 de entrada", () => {
     const original = normalizePhoneE164("300 1234567", "CO");
     expect(original).toBe("573001234567");
-    expect(normalizePhoneE164("+" + original)).toBe(original);
+    expect(validarCelularGuardado(original!)).toBe(original);
   });
 
-  it("Brasil: normalizePhoneE164('+' + E.164) devuelve el mismo valor", () => {
+  it("Brasil: devuelve el mismo E.164 de entrada", () => {
     const original = normalizePhoneE164("11 91234-5678", "BR");
     expect(original).toBe("5511912345678");
-    expect(normalizePhoneE164("+" + original)).toBe(original);
+    expect(validarCelularGuardado(original!)).toBe(original);
   });
 
-  it("basura antepuesta de + (doble +) sigue dando null", () => {
-    const original = normalizePhoneE164("11 2345-6789", "AR");
-    expect(normalizePhoneE164("+" + "+" + original)).toBeNull();
+  it("basura da null", () => {
+    expect(validarCelularGuardado("123")).toBeNull();
+    expect(validarCelularGuardado("")).toBeNull();
   });
 });
 

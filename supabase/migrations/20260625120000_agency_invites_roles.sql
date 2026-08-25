@@ -61,3 +61,11 @@ CREATE POLICY "Directores crean invites de su agencia"
 
 -- La política "Public can view unused invites by code for validation"
 -- (is_used = false) se mantiene tal cual: la usa el registro para validar códigos.
+--
+-- ACLARACIÓN (2026-08-25): esta política ya NO existe — se sacó el mismo día,
+-- ver 20260825120000_agency_invites_sacar_politica_publica.sql. Además, la
+-- afirmación de arriba era incorrecta: el registro nunca la usó, siempre validó
+-- el código con credenciales de servidor (admin client, sin pasar por RLS). La
+-- política exponía a cualquiera con la clave anónima la lista completa de
+-- códigos libres de TODAS las agencias. Se deja el texto original sin borrar,
+-- como historia; la corrección queda acá al lado.

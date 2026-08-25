@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase"
-import { emailValido, normalizarEmail } from "@/lib/invites/reglas"
-import { normalizePhoneE164 } from "@/lib/whatsapp/phone"
+import { emailValido, normalizarEmail, validarCelularGuardado } from "@/lib/invites/reglas"
 
 export interface AgencyLeadsOptions {
   agencyId: string;
@@ -315,13 +314,10 @@ export async function generateAgencyInvite(
 
   // Normalizar y validar el celular usando la misma regla del proyecto:
   // E.164 sin "+", siempre. Si el llamador no pasó por validarNuevoCodigo(),
-  // esta función es la última barrera.
-  //
-  // IMPORTANTE: el valor ya viene en E.164 sin "+", normalizado por validarNuevoCodigo().
-  // Anteponer "+" hace que libphonenumber deduzca el país del código de país en el
-  // número mismo (ej: +525512345678 es México), en lugar de asumir un país fijo.
-  // Sin esto, números de Colombia, México, Brasil y otros países serían rechazados.
-  const phone = normalizePhoneE164("+" + inviteePhone.trim())
+  // esta función es la última barrera. validarCelularGuardado() vive en
+  // lib/invites/reglas.ts, junto con su test: no repetir esta línea acá evita
+  // que este consumidor y actualizarDatosAsesor() diverjan.
+  const phone = validarCelularGuardado(inviteePhone)
 
   // Última barrera. La validación de verdad la hace el diálogo con
   // validarNuevoCodigo(), pero esta función es pública y no puede confiar en
