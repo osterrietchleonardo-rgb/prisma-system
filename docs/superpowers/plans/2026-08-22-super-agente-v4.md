@@ -2033,43 +2033,50 @@ WHERE sd.modo = 'sombra' ORDER BY sd.creado_en DESC LIMIT 20;
 - [ ] **Step 4: Ajustar el prompt con lo que salga** y repetir la sombra si el cambio fue
   grande. Commit: `git add lib/seguimiento/agente.ts && git commit -m "fix(seguimiento): ajuste de prompt tras revision de sombra"`
 
-### Task 12b: Plantillas de seguimiento v2 (⚠️ crear en Meta REQUIERE OK; propuesta del 25/8)
+### Task 12b: Plantillas de seguimiento v2 (✅ textos aprobados por Leonardo el 25/8; crear en Meta con OK dado para PRISMAIA)
 
 **Por qué cambiarlas (hechos de la sombra):** las 3 plantillas actuales nacieron para una
-escalera fija F1→F2→F3. Con un agente que decide caso por caso, tienen 4 problemas medidos:
-(1) todas saludan "Hola {{1}}" → el nombre es obligatorio: los leads sin nombre en metricas
-(mayoría del envío de reclutamiento) no pueden recibir seguimiento, y el agente lo repetía en
-la frase; (2) la F3 dice "vamos a pausar los recordatorios" — suena a sistema, no aporta valor
-y NO tiene variable: el agente no puede poner nada ahí (19 de 35 contactar del día 1 cayeron
-en F3 con la frase descartada); (3) la F1 presupone "tu consulta sobre la propiedad" aunque
-la consulta haya sido genérica; (4) los cierres "Aguardamos tus comentarios" / "Quedamos a tu
-disposición" son rígidos y no invitan a responder.
+escalera fija F1→F2→F3: la F3 dice "vamos a pausar los recordatorios" y no tiene variable
+(19 de 35 contactar del día 1 cayeron ahí con la frase descartada), la F1 presupone "tu
+consulta sobre la propiedad", y los cierres son rígidos.
 
-**Diseño:** plantillas SIN variable de nombre, con **una sola variable {{1}} = el mensaje del
-agente** (el nombre va adentro solo si es válido, una vez), texto fijo al inicio (identifica a
-la agencia — el provisionador tiene el `agency_id` y puede leer `agencies.name`) y al final
-(cierre + baja). Categoría: MARKETING salvo la de pendiente (UTILITY, a validar con Meta).
+**Reglas de Leonardo (25/8), después de ver ejemplos reales:**
+1. **Todas empiezan con el nombre** (`Hola {{1}}`): más personalización. **Sin nombre válido
+   (3+ letras en `metricas.nombre`) no hay seguimiento** — el filtro de la Capa 1 se queda.
+2. **Tono natural y humano**, como una persona que se acuerda del lead y quiere ayudarlo:
+   nada de "quedamos a disposición", "aguardamos", "recordamos que"; sin "che"; 1-2 frases;
+   sin repetir palabras del texto fijo.
+3. **La línea de BAJA solo desde el 2º seguimiento sin respuesta**: no está en la
+   plantilla; el ejecutor la agrega al final de `{{2}}` cuando `follow_ups_sent ≥ 1`
+   (" Si preferís que no te escriba más, decime BAJA."). Determinístico.
+4. **Lead esperando a un humano** (coordinación de visita o handoff sin respuesta): el
+   seguimiento es EMPÁTICO — `seg_pendiente` le dice que estamos hablando con el asesor
+   responsable para que se comunique con él a la brevedad — y **en el mismo acto se avisa al
+   asesor** (ver Task 14/19). Es la única plantilla que va con la acción `escalar`.
 
-| Nombre | Cuándo la elige el agente | Cuerpo propuesto |
+**Diseño:** dos variables — `{{1}}` nombre, `{{2}}` el mensaje del agente — texto fijo con el
+nombre de la agencia (`agencies.name`, lo tiene el provisionador) y cierre corto.
+
+| Plantilla | Cuándo | Cuerpo (con {AGENCIA} = agencies.name) |
 |---|---|---|
-| `seg_retomar` | Primer toque: retoma algo puntual del historial | "Hola, te escribimos de {AGENCIA} por tu consulta. {{1}} Cualquier cosa, respondé por acá." |
-| `seg_valor` | Aporta un dato o destraba un requisito (presupuesto, apto crédito, zona) | "Hola, desde {AGENCIA} seguimos atentos a tu búsqueda. {{1}} Si te sirve, decinos y lo vemos." |
-| `seg_pendiente` | El bot/asesor prometió algo y no se cumplió (aviso de tranquilidad) | "Hola, te escribimos de {AGENCIA} por un tema que quedó pendiente: {{1}} Gracias por la paciencia." |
-| `seg_novedad` | Hay un hecho nuevo verificado: baja de precio, propiedad nueva que encaja (base de las vigías) | "Hola, desde {AGENCIA} tenemos una novedad sobre lo que buscabas: {{1}} ¿Querés que te pasemos más detalles?" |
-| `seg_puerta_abierta` | Último toque: sin presión, con valor, la puerta queda abierta | "Hola, desde {AGENCIA} queremos dejarte esto antes de darte un respiro: {{1}} Cuando quieras retomar, escribinos por acá y seguimos desde donde quedaste." |
+| `seg_retomar` | Primer toque: retoma lo puntual que quedó colgado | "Hola {{1}}, ¿cómo va? Te escribo de {AGENCIA} porque me quedé pensando en tu búsqueda. {{2}} Contame y lo vemos." |
+| `seg_valor` | Aporta un dato concreto o destraba el requisito | "Hola {{1}}, te escribo de {AGENCIA}. {{2}} Si te sirve, decime y te paso más." |
+| `seg_pendiente` | Con `escalar`: se le prometió algo / esperaba a un humano | "Hola {{1}}, te escribo de {AGENCIA} por algo que te quedamos debiendo. {{2}} Perdón por la demora." |
+| `seg_novedad` | SOLO con una novedad positiva verificada (vigías, fase 4) | "Hola {{1}}, te escribo de {AGENCIA} porque apareció algo que puede interesarte. {{2}} ¿Querés que te cuente más?" |
+| `seg_puerta_abierta` | Último toque, con valor, sin presión ni pedidos | "Hola {{1}}, te escribo de {AGENCIA}. {{2}} Cuando quieras retomar, escribime por acá y seguimos." |
 
-Todas terminan con: "Si preferís no recibir más mensajes, respondé BAJA." (protege la
-calificación de calidad de la WABA). `reactivacion_snoozed` y las 3 viejas quedan (no se
-borran) hasta que las nuevas estén aprobadas y el agente las use.
+Ejemplos reales generados por el agente sobre leads de Central (Natalia, Fernando, Maia,
+Juan, Mauro): `scratch/_sa-plantillas-v2-ejemplos.md`. Las 3 viejas y `reactivacion_snoozed`
+quedan (no se borran).
 
-- [ ] **Step 1 (OK de Leonardo sobre los textos).** Ajustar redacción si hace falta.
-- [ ] **Step 2:** agregar las 5 al catálogo de `injectCoreTemplates` (con el nombre de la agencia
-  en el texto fijo) y crearlas **primero en PRISMAIA - VAKDOR** (⚠️ OK: escribe en Meta).
-- [ ] **Step 3:** esperar la aprobación de Meta (`sync-templates`); si rechaza, aplicar la regla
-  de reformulación de §I.6.
-- [ ] **Step 4:** cambiar `PLANTILLAS`, el enum de `emitir_decision`, el prompt (cuándo elegir
-  cada una; nombre una sola vez adentro de la frase) y el ejecutor (`variables: [frase]`);
-  **sacar el filtro de nombre de la Capa 1** (los sin nombre entran, sin nombrarlos). Tests.
+- [x] **Step 1: OK de Leonardo sobre los textos** (25/8, tras dos rondas de ejemplos).
+- [ ] **Step 2:** sumar las 5 al catálogo de `injectCoreTemplates` (nombre de agencia en el texto
+  fijo; `seg_pendiente` como UTILITY, el resto MARKETING) y crearlas **en PRISMAIA - VAKDOR**
+  (escribe en Meta; OK dado el 25/8) con un script one-off que use el mismo camino.
+- [ ] **Step 3:** esperar la aprobación de Meta (`sync-templates`); si rechaza, regla de §I.6.
+- [ ] **Step 4:** cambiar el prompt (cuándo elegir cada una + el estilo de los ejemplos), habilitar
+  las v2 en el decisor, y el ejecutor: `variables: [nombre, frase + BAJA si follow_ups_sent ≥ 1]`.
+  Tests. (El catálogo y el schema ya las conocen desde el 25/8: `PLANTILLAS_SEGUIMIENTO`.)
 - [ ] **Step 5:** sombra 24h con las nuevas en PRISMAIA → OK → crearlas en Central (⚠️ OK).
 
 ### Task 12c: `leer_propiedad_por_link` (diseño verificado el 25/8 contra n8n y la base)
@@ -2264,6 +2271,14 @@ if (decision.accion === "escalar") {
 }
 ```
 (En sombra también se crea: es información para el asesor, no un envío.)
+- [ ] **Step 1b (regla 25/8 — el aviso al asesor va en el mismo acto):** en modo activo, cuando
+  la decisión es `escalar`, además del compromiso se manda un **email al asesor asignado**
+  (`wa_conversations.agent_id` → `profiles.email`; si no hay asesor asignado, al director) con
+  el caso, la razón y la evidencia, por Resend (misma técnica que Task 19). Y si la decisión trae
+  `seg_pendiente` + frase, el ejecutor le manda al lead el mensaje empático por el dispatch (con
+  todos los guardrails de envío; hasta que Meta apruebe la plantilla queda `bloqueada_*`). Así
+  "estoy hablando con tu asesor para que te contacte" es verdad en el momento en que se dice.
+  Task 19 queda como red de seguridad: si el asesor no atiende en `escalamiento_horas`, director.
 - [ ] **Step 2: Corrida local + verificación SQL.**
 - [ ] **Step 3: Commit** — `git add app/api/seguimiento/run/route.ts && git commit -m "feat(seguimiento): escalar crea compromiso respuesta_pendiente para el asesor"`
 
