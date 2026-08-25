@@ -12,7 +12,6 @@ import {
   Target, 
   Home,
   QrCode,
-  RefreshCcw,
   Zap,
   Briefcase,
   PauseCircle,
@@ -69,6 +68,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
 import { QRCodeSVG } from "qrcode.react"
+import { NuevoCodigoDialog } from "@/components/director/NuevoCodigoDialog"
 // import { cn } from "@/lib/utils" // Unused
 
 // Clasificaciones que el director puede asignar a cada asesor.
@@ -88,6 +88,7 @@ export default function AsesoresPage() {
   const [selectedAdvisorFilter, setSelectedAdvisorFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [dialogoCodigoAbierto, setDialogoCodigoAbierto] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
   const [copied, setCopied] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState<Record<string, any> | null>(null)
@@ -337,26 +338,6 @@ export default function AsesoresPage() {
     fetchAgentPerformance()
   }, [selectedAgent])
 
-  const generateInviteCode = async () => {
-    if (!agencyId) return
-    try {
-      const code = Math.random().toString(36).substring(2, 10).toUpperCase()
-      const { error } = await supabase
-        .from("agency_invites")
-        .insert({ 
-          agency_id: agencyId,
-          code: code,
-          is_used: false
-        })
-
-      if (error) throw error
-      setInviteCode(code)
-      toast.success("Nuevo código de invitación generado")
-    } catch (_error) {
-      toast.error("Error al generar código")
-    }
-  }
-
   const copyToClipboard = () => {
     navigator.clipboard.writeText(inviteCode)
     setCopied(true)
@@ -432,13 +413,14 @@ export default function AsesoresPage() {
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold">Invitar al equipo</DialogTitle>
                 <DialogDescription>
-                  Comparte este código con los nuevos asesores para que se vinculen a tu inmobiliaria.
+                  Cada código se genera para una persona concreta y solo le sirve a ella.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-6 py-4">
                 {inviteCode ? (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Último código libre</p>
                     <div className="flex items-center gap-2">
                       <div className="flex-1 bg-accent/5 p-3 rounded-xl border border-accent/20 font-mono text-center text-lg font-bold tracking-widest text-accent">
                         {inviteCode}
@@ -447,23 +429,30 @@ export default function AsesoresPage() {
                         {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
-                    
-                    <Button variant="ghost" className="w-full gap-2 text-muted-foreground" onClick={generateInviteCode}>
-                      <RefreshCcw className="h-3 w-3" />
-                      Regenerar código
-                    </Button>
                   </div>
                 ) : (
-                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
                     <QrCode className="h-12 w-12 text-muted-foreground/30" />
-                    <p className="text-sm text-muted-foreground">Aún no has generado un código de invitación.</p>
-                    <Button onClick={generateInviteCode} className="bg-accent">Generar primer código</Button>
+                    <p className="text-sm text-muted-foreground">No hay ningún código libre.</p>
                   </div>
                 )}
+
+                <Button
+                  className="w-full bg-accent gap-2"
+                  onClick={() => {
+                    setIsInviteModalOpen(false)
+                    setDialogoCodigoAbierto(true)
+                  }}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Generar código para un asesor
+                </Button>
               </div>
-              
+
               <DialogFooter>
-                <Button variant="secondary" className="w-full" onClick={() => setIsInviteModalOpen(false)}>Listo</Button>
+                <Button variant="secondary" className="w-full" onClick={() => setIsInviteModalOpen(false)}>
+                  Listo
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -1057,6 +1046,16 @@ export default function AsesoresPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {agencyId && (
+        <NuevoCodigoDialog
+          open={dialogoCodigoAbierto}
+          onOpenChange={setDialogoCodigoAbierto}
+          agencyId={agencyId}
+          role="asesor"
+          onCreated={(code) => setInviteCode(code)}
+        />
+      )}
     </div>
   )
 }
