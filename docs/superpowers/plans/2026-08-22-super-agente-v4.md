@@ -2004,11 +2004,31 @@ WHERE sd.modo = 'sombra' ORDER BY sd.creado_en DESC LIMIT 20;
   - **0 alucinaciones** en frases y evidencias (una sola = se ajusta el prompt y se
     repite la sombra).
   - **≥80% de razones que Leonardo firmaría.**
-  - **Costo medio por decisión ≤ el tope que Leonardo acuerde** viendo el
+  - **Costo medio por decisión ≤ US$0,10** (tope acordado por Leonardo el 25/8; el
+    runner registra un evento `costo_alto` por cada decisión que lo supere) viendo el
     `costo_medio_usd` real. Además, cotejar la estimación contra la Console de Anthropic
     — una tarifa de tabla interna ya nos mintió una vez (Google: la real era el doble).
   - `cache_read_input_tokens > 0` en las corridas (si el caché no pega, el costo real es
     ~10× el esperado).
+**Resultado de la primera lectura (25/8/2026, análisis en `scratch/_sa-sombra-analisis-2026-08-25.md`):**
+- 45 corridas del reloj, 45 success. 40 leads únicos decididos (todos Central; PRISMAIA sin
+  elegibles): 30 contactar · 8 escalar · 1 posponer · 1 abandonar.
+- Evidencia: 77/77 fechas citadas tienen mensajes reales (0 inventadas). Propiedades: 0
+  frases ofrecen una NO DISPONIBLE. Guardrail de investigación: 0 violaciones. 1 fallo del
+  modelo en 81 (respondió con texto): sin envío, registrado.
+- Costo: estimado US$0,054/decisión vs **real US$0,037** (cost report de Anthropic del
+  24/8: US$1,49 por 40 decisiones) — la estimación es ~44% conservadora (precio intro).
+  Caché: 627k tokens leídos, 0 decisiones sin caché.
+- **Tres defectos encontrados y corregidos el 25/8 (commit 654a082):** (A) la Capa 1 con
+  40 candidatos + dedupe vaciaba la cola y 50 leads nunca entraban → 200 candidatos;
+  (B) `leer_intentos_previos` mostraba decisiones de SOMBRA como intentos enviados → 30/40
+  decisiones del 25/8 creían que el breakup ya había salido → solo cuenta lo ejecutado,
+  la sombra se muestra aparte como NO enviada; las 40 filas contaminadas se borraron con
+  OK; (C) horas en UTC en `leer_mensajes` → hora argentina.
+- Pendiente: la firma de Leonardo sobre las 40 (archivo
+  `scratch/_sa-sombra-LECTURA-dia1-2026-08-25.md`), y validar el criterio de elegir F3 como
+  primer mensaje del agente cuando el flujo viejo ya mandó 2 seguimientos (19/35 casos).
+
 - [ ] **Step 4: Ajustar el prompt con lo que salga** y repetir la sombra si el cambio fue
   grande. Commit: `git add lib/seguimiento/agente.ts && git commit -m "fix(seguimiento): ajuste de prompt tras revision de sombra"`
 
