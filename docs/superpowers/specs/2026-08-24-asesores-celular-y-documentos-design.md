@@ -52,9 +52,32 @@ Comprobado el 2026-08-24 contra el código de `main` @ 2ff67b2 y contra la base 
 
 Es la verificación correcta: ya está probado que la Cloud API de WhatsApp no permite verificar la titularidad de un número.
 
-### 3.3 Qué pasa hoy cuando alguien se registra con un código
+### 3.3 Qué pasa hoy cuando alguien se registra con un código — y el agujero que tiene
 
-`lib/actions/auth.ts:180`, rama `mode === 'unirme'`: valida el código contra `agency_invites`, crea el usuario, y actualiza `profiles` con `agency_id`, `role` y `full_name`. **El celular no participa** porque hoy no existe.
+`lib/actions/auth.ts:180`, rama `mode === 'unirme'`: valida el código contra `agency_invites`, crea el usuario, y actualiza `profiles` con `agency_id`, `role` y `full_name`.
+
+**Hoy no hay ninguna validación de que quien usa el código sea la persona invitada.** Y no es algo que introduzca esta rama: ya está roto, sin celular de por medio.
+
+- Al validar el código, el sistema lee **solo** `agency_id, is_used, role` (`auth.ts:86-89`). **Ni siquiera trae `invitee_name`.**
+- Al crear el perfil, le pone el nombre que tipeó quien se registra: `full_name: data.fullName` (`auth.ts:183`).
+
+Es decir: se puede generar un código que dice "Juan Pérez" y terminar con un perfil que dice "Pedro Gómez". El nombre del invitado es hoy **decorativo** — se muestra en la lista de códigos y nada más.
+
+Lo único que sí funciona es que el código es **de un solo uso**: `is_used` se chequea al validar (`auth.ts:93`) y se marca al consumirlo (`auth.ts:190`).
+
+Con el celular, ese agujero pasa de cosmético a peligroso: si el código se reenvía, se le asigna a una persona **el número de teléfono de otra persona real** — y es el número que después usa el director para llamarlo.
+
+### 3.3.1 Cuánto arrastre hay de códigos viejos
+
+Medido en producción el 2026-08-24:
+
+| Estado | Sin nombre | Cantidad |
+|---|---|---|
+| Sin usar | No | **2** |
+| Usados | No | 23 |
+| Usados | Sí | 14 |
+
+**Los únicos 2 códigos sin usar ya tienen nombre.** Los 14 sin nombre están todos consumidos. No hay gap de nombres que resolver; sí les falta email y celular (§5.5).
 
 ### 3.4 El motor de plantillas que ya existe (Contratos IA)
 
@@ -104,6 +127,9 @@ Cada una es una decisión de Leonardo del 2026-08-24, no un default mío.
 | Salida | **.docx el día uno; el PDF queda para la segunda vuelta** | El PDF idéntico al Word exige LibreOffice en un servidor |
 | Los dos formularios de código | Se unifican en un componente compartido | Cierra la puerta trasera |
 | El rol | **El formulario nunca lo pregunta**: lo fija la pantalla que lo abre | En Asesores es siempre `asesor` y no hay forma de crear un director |
+| Qué pide el formulario | **Nombre + celular + email** | El email es la llave: sin él, el código no valida contra nadie |
+| Cómo se valida quién se registra | **El email tiene que coincidir con el del código** | Convierte el código en intransferible sin pedirle nada nuevo al que se registra |
+| El nombre | **Manda el del código**, no el que tipea quien se registra | Cierra la inconsistencia de §3.3 de raíz |
 | Quién edita el celular después | **Solo el director** | El asesor lo ve, no lo toca |
 | Bucket | **Público**, reusando `documents` | Decisión de Leonardo tras plantearle el riesgo (§9.1) |
 
@@ -119,24 +145,60 @@ Se crea `components/shared/VerifiedPhoneField.tsx`: selector de país + número 
 
 Se crea `components/director/NuevoCodigoDialog.tsx`, con una prop `role: "asesor" | "director"` que **no se muestra ni se elige**.
 
-Pide: nombre del invitado (obligatorio) + celular verificado (obligatorio). El botón de confirmar queda deshabilitado hasta que los dos estén completos y el celular verificado.
+Pide **tres cosas, las tres obligatorias**:
+
+| Campo | Verificación | Para qué sirve |
+|---|---|---|
+| Nombre del invitado | — | Pasa a `profiles.full_name` al registrarse. Manda esto, no lo que tipee la persona |
+| Celular | Doble tipeo, sin pegar, comparado en E.164 | Pasa a `profiles.phone` |
+| Email | **Doble tipeo**, normalizado a minúsculas | **Es la llave**: solo se puede registrar quien use ese email |
+
+El botón de confirmar queda deshabilitado hasta que los tres estén completos y verificados.
+
+**Por qué el email también va con doble tipeo:** deja de ser un dato de contacto y pasa a ser una credencial. Un error de tipeo ahí no es una molestia — **es una persona que directamente no puede registrarse**, con un código quemado y un director que no entiende por qué. Es el mismo criterio que ya aplica `ManualContactFields` (§3.2).
+
+**Chequeo al generar:** si ese email ya tiene cuenta en la agencia, no se genera el código y se dice cuál es el asesor que ya lo usa. Evita el duplicado antes de que exista, en vez de tener que borrarlo después.
 
 Se usa en los dos lados:
 
 - **`/director/configuracion`**: el botón "Generar" de cada solapa abre el diálogo con el rol de esa solapa. El input de nombre suelto que hoy está en línea (`page.tsx:388`) se saca: pasa a vivir adentro del diálogo.
 - **`/director/asesores`**: el modal "Invitar al equipo" pasa a abrir el mismo diálogo con `role="asesor"` fijo. Se elimina `generateInviteCode` (`page.tsx:340`) y su generación de código al azar: pasa a usar `generateAgencyInvite` de `lib/queries/director.ts:299`, así todos los códigos quedan con el mismo formato y las mismas reglas.
 
-### 5.3 Del código al perfil
+### 5.3 Del código al perfil, y la validación
 
-- `agency_invites` suma **`invitee_phone text`** (E.164 sin `+`).
-- `generateAgencyInvite` suma el parámetro y lo escribe. Rechaza crear el código si viene vacío o no normaliza.
-- `lib/actions/auth.ts:180` (`mode === 'unirme'`): al vincular el perfil, copia `invitee_phone` a `profiles.phone`. Si el invite no lo trae (códigos viejos, previos a esta rama), no falla: sigue como hoy.
+`agency_invites` suma dos columnas: **`invitee_phone text`** (E.164 sin `+`) e **`invitee_email text`** (minúsculas, sin espacios).
 
-### 5.4 Editar el celular de los que ya están
+`generateAgencyInvite` suma los dos parámetros y los escribe. Rechaza crear el código si alguno viene vacío, si el celular no normaliza, o si el email ya tiene cuenta en la agencia.
 
-En el panel lateral del asesor en `/director/asesores`, junto al nombre: el celular con un botón de editar que abre el mismo `VerifiedPhoneField`. Solo director. Queda registro en `equipo_acciones`, igual que pausar y desvincular.
+En `lib/actions/auth.ts`, rama `mode === 'unirme'`:
 
-El asesor lo ve en su Configuración, en solo lectura, con la leyenda de a quién pedirle el cambio.
+1. La consulta del invite (`auth.ts:86-89`) pasa a traer también `invitee_name, invitee_phone, invitee_email`.
+2. **Si el invite tiene email y no coincide con el del registro** → se corta ahí: *"Este código no corresponde a este email."* No se crea el usuario ni se consume el código.
+3. Si coincide, el perfil se arma con `full_name` e `invitee_phone` **del invite**, no de lo que tipeó la persona.
+
+La comparación es sobre el email normalizado —minúsculas, sin espacios—, reusando el `emailNormalizado` que ya existe unas líneas más arriba en el mismo archivo.
+
+En `components/auth-register-form.tsx`, el campo "Nombre Completo" (`:112`) hoy está **fuera** del bloque condicional por modo, así que lo usan los dos. Pasa a mostrarse **solo en modo "crear"**: quien se une con un código ya no lo tipea, porque lo define su inmobiliaria. El modo "crear" —el director que levanta la agencia— no se toca.
+
+### 5.4 Editar los datos de los que ya están
+
+En el panel lateral del asesor en `/director/asesores`:
+
+| Dato | Quién lo edita |
+|---|---|
+| Email | **Nadie.** Es la cuenta con la que se registró; se muestra en solo lectura |
+| Nombre | El director |
+| Celular | El director |
+
+Es donde el director carga el celular de los que hoy no lo tienen. Usa el mismo `VerifiedPhoneField`. Queda registro en `equipo_acciones`, igual que pausar y desvincular.
+
+El asesor los ve en su Configuración, en solo lectura, con la leyenda de a quién pedirle el cambio.
+
+### 5.5 Los códigos viejos
+
+Los 2 códigos sin usar que existen hoy (§3.3.1) no tienen email ni celular. **Siguen funcionando exactamente como hoy**: sin email en el invite no hay contra qué validar, así que se comportan como antes de esta rama. El director puede borrarlos y regenerarlos si quiere la validación — son dos.
+
+La regla general: **la validación por email aplica cuando el invite trae email.** Nada de lo viejo se rompe.
 
 ## 6. Diseño — Parte B: los documentos del asesor
 
@@ -205,7 +267,10 @@ Todo aditivo. Nada de lo existente cambia de forma, salvo una columna nueva en `
 
 ```
 + invitee_phone text   -- E.164 sin "+"
++ invitee_email text   -- minúsculas, sin espacios; la llave de validación
 ```
+
+Las dos nullables, porque los códigos viejos no las tienen (§5.5).
 
 ### 8.2 `advisor_doc_templates`
 
@@ -309,11 +374,20 @@ Son tres pedazos y **cada uno se puede probar y mergear solo**. El plan de imple
 
 Con la cuenta propia (**PRISMAIA - VAKDOR**). **Central no se toca.** En navegador de escritorio y en celular emulado.
 
-1. Generar un código desde Configuración (las dos solapas) y otro desde Asesores. Confirmar que ninguno sale sin celular, y que desde Asesores no hay forma de crear un código de director.
-2. Registrar una cuenta descartable con ese código y verificar que el celular quedó en su `profiles.phone`.
-3. Cargarle el celular desde la tarjeta a un asesor que hoy no lo tiene. Verificar el registro en `equipo_acciones`.
-4. Armar 3 `.docx` del mismo contrato con datos distintos, subirlos, detectar la plantilla, y revisar hueco por hueco que la detección sea correcta.
-5. Subir una versión nueva con un párrafo agregado y un campo nuevo. Confirmar: los datos viejos se conservan, el campo nuevo queda pendiente, la versión anterior se puede restaurar.
-6. Entrar como el asesor descartable: ve lo suyo y nada más. Probar a mano que no puede llegar al documento de otro asesor desde la app.
-7. Romperlo a propósito: subir un `.doc`, subir un `.pdf` en la sección de plantillas, subir un documento de otro tipo, y detectar con solo 2 documentos.
-8. Confirmar que un asesor pausado y uno desvinculado quedan fuera del versionado.
+### Etapa A — el código y el celular
+
+1. Generar un código desde Configuración (las dos solapas) y otro desde Asesores. Confirmar que ninguno sale sin nombre, celular y email, y que desde Asesores no hay forma de crear un código de director.
+2. Intentar generar un código con el email de un asesor que ya existe → tiene que negarse y decir quién lo usa.
+3. **Registrarse con el código pero con OTRO email** → tiene que rechazarlo, no crear el usuario, y dejar el código sin consumir (verificar `is_used = false` después del intento).
+4. Registrar una cuenta descartable con el email correcto y verificar que en `profiles` quedaron el celular **y el nombre que cargó el director**, aunque en el registro se haya tipeado otra cosa.
+5. Registrarse con uno de los 2 códigos viejos sin email → tiene que seguir funcionando como hoy, sin validar.
+6. Confirmar que el modo "crear una inmobiliaria" sigue pidiendo el nombre y funciona igual que antes.
+7. Cargarle el celular desde la tarjeta a un asesor que hoy no lo tiene. Verificar el registro en `equipo_acciones`, y que el email se muestre en solo lectura.
+
+### Etapas B y C — los documentos y las plantillas
+
+8. Armar 3 `.docx` del mismo contrato con datos distintos, subirlos, detectar la plantilla, y revisar hueco por hueco que la detección sea correcta.
+9. Subir una versión nueva con un párrafo agregado y un campo nuevo. Confirmar: los datos viejos se conservan, el campo nuevo queda pendiente, la versión anterior se puede restaurar.
+10. Entrar como el asesor descartable: ve lo suyo y nada más. Probar a mano que no puede llegar al documento de otro asesor desde la app.
+11. Romperlo a propósito: subir un `.doc`, subir un `.pdf` en la sección de plantillas, subir un documento de otro tipo, y detectar con solo 2 documentos.
+12. Confirmar que un asesor pausado y uno desvinculado quedan fuera del versionado.
