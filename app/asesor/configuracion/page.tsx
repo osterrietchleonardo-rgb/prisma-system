@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
+import { formatPhoneInternational } from "@/lib/whatsapp/phone"
 
 import { useSearchParams } from "next/navigation"
 
@@ -62,9 +63,10 @@ export default function AsesorConfiguracionPage() {
 
   const [loading, setLoading] = useState(false)
   const [passwordLoading, setPasswordLoading] = useState(false)
-  const [profile, setProfile] = useState<{ full_name: string; email: string; avatar_url: string; agency_name: string }>({
+  const [profile, setProfile] = useState<{ full_name: string; email: string; phone: string; avatar_url: string; agency_name: string }>({
     full_name: "",
     email: "",
+    phone: "",
     avatar_url: "",
     agency_name: "Cargando..."
   })
@@ -146,7 +148,7 @@ export default function AsesorConfiguracionPage() {
       
       const { data: profileData } = await supabase
         .from('profiles')
-        .select(`full_name, email, avatar_url, agency_id, notification_prefs`)
+        .select(`full_name, email, phone, avatar_url, agency_id, notification_prefs`)
         .eq('id', session.user.id)
         .single()
         
@@ -155,6 +157,7 @@ export default function AsesorConfiguracionPage() {
           ...p,
           full_name: profileData.full_name || "",
           email: profileData.email || session.user.email || "",
+          phone: profileData.phone || "",
           avatar_url: profileData.avatar_url || "",
           agency_name: "Inmobiliaria Vinculada"
         }))
@@ -380,21 +383,37 @@ export default function AsesorConfiguracionPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label>Nombre Completo</Label>
-                  <Input 
-                    value={profile.full_name} 
+                  <Input
+                    value={profile.full_name}
                     onChange={e => setProfile({...profile, full_name: e.target.value})}
                     className="bg-background/50 border-accent/20"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Email (Solo lectura)</Label>
-                  <Input 
-                    value={profile.email} 
+                  <Input
+                    value={profile.email}
                     readOnly
                     className="bg-muted/50 border-accent/10 text-muted-foreground"
                   />
                 </div>
               </div>
+
+              <div className="flex items-center justify-between py-2 p-4 rounded-xl border border-accent/10 bg-background/40">
+                <div>
+                  <p className="text-sm font-medium">Mi celular</p>
+                  <p className="text-sm text-muted-foreground">
+                    {profile.phone
+                      ? formatPhoneInternational(profile.phone, "AR") ?? profile.phone
+                      : "Todavía no está cargado"}
+                  </p>
+                </div>
+                <Smartphone className="h-5 w-5 text-accent/60" />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Si cambiaste de número, pedíselo a la dirección de tu inmobiliaria: son los
+                únicos que pueden actualizarlo.
+              </p>
 
               <div className="pt-4 flex justify-end">
                 <Button onClick={handleSaveProfile} disabled={loading} className="bg-accent hover:bg-accent/90 gap-2">
