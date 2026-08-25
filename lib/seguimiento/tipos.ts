@@ -10,7 +10,20 @@ export const PLANTILLAS = {
   visita1: "visita_recordatorio_1h",
   noShow: "visita_post_noshow", // nombre real verificado 24/8 (Task 0)
   reactivacion: "reactivacion_snoozed", // la 8ª del catálogo; candidata futura del decisor
+  // ── v2 (Task 12b, aprobadas por Leonardo el 25/8): {{1}} nombre, {{2}} mensaje del agente ──
+  retomar: "seg_retomar",
+  valor: "seg_valor",
+  pendiente: "seg_pendiente", // SOLO junto con "escalar": el lead esperaba a un humano
+  novedad: "seg_novedad",
+  puertaAbierta: "seg_puerta_abierta",
 } as const
+
+/** Plantillas que el decisor puede elegir. Hasta que las v2 estén aprobadas en Meta, el
+ *  dispatch rechaza las que no existan (queda `bloqueada_*`, nunca un envío a ciegas). */
+export const PLANTILLAS_SEGUIMIENTO = [
+  PLANTILLAS.f1, PLANTILLAS.f2, PLANTILLAS.f3,
+  PLANTILLAS.retomar, PLANTILLAS.valor, PLANTILLAS.novedad, PLANTILLAS.puertaAbierta,
+] as const
 
 /*
  * Variables por plantilla (cuerpos reales verificados 24/8 en whatsapp-templates.ts):
@@ -21,7 +34,7 @@ export const PLANTILLAS = {
 
 const camposDecision = {
   accion: z.enum(["contactar", "posponer", "abandonar", "escalar"]),
-  plantilla: z.enum([PLANTILLAS.f1, PLANTILLAS.f2, PLANTILLAS.f3]).nullable(),
+  plantilla: z.enum([...PLANTILLAS_SEGUIMIENTO, PLANTILLAS.pendiente]).nullable(),
   /** La frase que completa la variable {{2}} de la plantilla. */
   frase_cierre: z.string().min(5).max(300).nullable(),
   proximo_intento_horas: z.number().int().min(4).max(720).nullable(),
@@ -40,8 +53,13 @@ type CamposDecision = {
 function validarCoherencia(d: CamposDecision, ctx: z.RefinementCtx) {
   if (d.accion === "contactar" && (!d.plantilla || !d.frase_cierre))
     ctx.addIssue({ code: "custom", message: "contactar exige plantilla y frase_cierre" })
+  if (d.accion === "contactar" && d.plantilla === PLANTILLAS.pendiente)
+    ctx.addIssue({ code: "custom", message: "seg_pendiente solo va con escalar (el lead esperaba a un humano)" })
   if (d.accion === "posponer" && d.proximo_intento_horas == null)
     ctx.addIssue({ code: "custom", message: "posponer exige proximo_intento_horas" })
+  // escalar: plantilla opcional, pero si la lleva es seg_pendiente con su frase
+  if (d.accion === "escalar" && d.plantilla && (d.plantilla !== PLANTILLAS.pendiente || !d.frase_cierre))
+    ctx.addIssue({ code: "custom", message: "escalar solo admite seg_pendiente, y con frase_cierre" })
 }
 
 export const DecisionSchema = z.object(camposDecision).superRefine(validarCoherencia)

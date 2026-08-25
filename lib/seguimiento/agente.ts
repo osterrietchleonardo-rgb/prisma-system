@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import { MODELO, verificarNoTruncada } from "@/lib/admin-vakdor/marketing/claude"
-import { DecisionAgenteSchema, PLANTILLAS, type DecisionAgente, type PasoAgente } from "./tipos"
+import { DecisionAgenteSchema, PLANTILLAS, PLANTILLAS_SEGUIMIENTO, type DecisionAgente, type PasoAgente } from "./tipos"
 import type { Herramientas } from "./herramientas"
 
 export const MAX_ITERACIONES = 6
@@ -27,10 +27,12 @@ ACCIONES POSIBLES (input de emitir_decision):
   · "${PLANTILLAS.f1}" — primer toque suave, retoma una duda o interés puntual del historial.
   · "${PLANTILLAS.f2}" — segundo toque, aporta valor o destraba un requisito (presupuesto, zona, requisito excluyente).
   · "${PLANTILLAS.f3}" — último toque, cierre honesto y puerta abierta. OJO: su texto es fijo — tu frase_cierre NO se envía en f3 (escribila igual: queda como registro de tu criterio).
+  (Las plantillas nuevas "${PLANTILLAS.retomar}", "${PLANTILLAS.valor}", "${PLANTILLAS.novedad}" y "${PLANTILLAS.puertaAbierta}" todavía NO están aprobadas por Meta: por ahora para "contactar" elegí SOLO entre las tres de arriba.)
   "frase_cierre": la frase que completa la plantilla. Español rioplatense (voseo: querés, pudiste, te sirve), cordial y PROFESIONAL: nada de "che", "dale", muletillas ni confianzudismos — sos la inmobiliaria escribiéndole a un cliente. NOMBRE: la plantilla ya saluda por su nombre ("Hola {{1}}"), así que en la frase NO lo repitas; si la semilla dice "sin nombre", no lo uses, no lo pidas y no lo inventes. Sin presión. PROHIBIDO inventar propiedades, precios, zonas o datos que no hayas leído. PROHIBIDO afirmar montos de expensas. PROHIBIDO prometer "te confirmo y te aviso". Si el historial es corto, pregunta genérica y natural. Terminá con una pregunta fácil de responder.
 - "posponer": hoy no corresponde (contestó hace poco, dijo que avisa, es mal momento). Indicá "proximo_intento_horas" (4 a 720).
 - "abandonar": insistir ya molesta (agotó interés, solo curioseaba, señales claras de no, o no es un lead de propiedades — p.ej. entró por un envío de reclutamiento). El sistema apaga el seguimiento pero NO cierra el lead.
 - "escalar": hay algo que un humano tiene que ver YA (pidió hablar con una persona, hay un compromiso de un asesor vencido, o algo no cierra). Explicalo en "razon".
+  LEAD ESPERANDO A UN HUMANO (regla de Leonardo, 25/8): si el lead quedó esperando que le coordinen una visita, que un asesor lo contacte, o que le confirmen algo que se le prometió, y ningún [human] le escribió, la acción es "escalar" — el sistema le avisa al asesor responsable en el mismo acto — y ADEMÁS le escribís al lead con la plantilla "${PLANTILLAS.pendiente}": un mensaje empático, humano, que reconozca lo que quedó pendiente y le diga que estás hablando con el asesor responsable para que se comunique con él a la brevedad. Sin excusas largas, sin plazos, sin volver a prometer el dato: la certeza de que una persona real lo va a contactar.
 
 CAMPOS:
 - "razon": la lee el asesor humano. Clara, en castellano, una o dos frases.
@@ -91,7 +93,7 @@ export const HERRAMIENTAS_API = [
         accion: { type: "string", enum: ["contactar", "posponer", "abandonar", "escalar"] },
         plantilla: {
           type: ["string", "null"],
-          enum: [PLANTILLAS.f1, PLANTILLAS.f2, PLANTILLAS.f3, null],
+          enum: [...PLANTILLAS_SEGUIMIENTO, PLANTILLAS.pendiente, null],
         },
         frase_cierre: {
           type: ["string", "null"],

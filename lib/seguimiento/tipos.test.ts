@@ -43,6 +43,23 @@ describe("DecisionSchema", () => {
   })
 })
 
+describe("escalar con mensaje empático (regla 25/8)", () => {
+  const base = { proximo_intento_horas: null, razon: "Pidió visita el 30/7 y nadie lo atendió.", confianza: 0.8 }
+  it("escalar puede llevar seg_pendiente con su frase", () => {
+    const d = DecisionSchema.parse({ ...base, accion: "escalar", plantilla: "seg_pendiente", frase_cierre: "Estoy hablando con tu asesor para que te contacte a la brevedad." })
+    expect(d.plantilla).toBe("seg_pendiente")
+  })
+  it("escalar sin mensaje sigue siendo válido", () => {
+    expect(DecisionSchema.parse({ ...base, accion: "escalar", plantilla: null, frase_cierre: null }).accion).toBe("escalar")
+  })
+  it("seg_pendiente NO va con contactar", () => {
+    expect(() => DecisionSchema.parse({ ...base, accion: "contactar", plantilla: "seg_pendiente", frase_cierre: "x".repeat(20) })).toThrow()
+  })
+  it("escalar no admite otra plantilla que seg_pendiente", () => {
+    expect(() => DecisionSchema.parse({ ...base, accion: "escalar", plantilla: "seg_valor", frase_cierre: "x".repeat(20) })).toThrow()
+  })
+})
+
 describe("DecisionAgenteSchema", () => {
   it("exige evidencia además de los campos de la decisión", () => {
     const d = DecisionAgenteSchema.parse({
