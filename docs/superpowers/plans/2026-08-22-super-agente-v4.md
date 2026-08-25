@@ -2172,7 +2172,7 @@ agencia que atiende a los leads, así que (a) la regla de 24 h de Meta obliga a 
    conversación en la ficha al construirlo).
 
 **Prerrequisitos, en orden:**
-- [ ] **P1 — Teléfono del equipo:** campo `phone` en el perfil del asesor y del director
+- [ ] **P1 — Teléfono del equipo** (🔧 **lo está haciendo Leonardo, 25/8**, en su terminal — contrato: `profiles.phone` en E.164, asesores Y directores): campo `phone` en el perfil del asesor y del director
   (misma normalización E.164 y doble verificación del alta de contactos) + edición por el
   director en Equipo. Cargarlo es el opt-in del asesor a recibir avisos. (UI chica; OK de
   Leonardo por tocar la app.)
@@ -2215,8 +2215,8 @@ escalera en sombra.
 - [ ] **Step 1:** OK de Leonardo sobre el catálogo y el orden.
 - [ ] **Step 2:** P1 en la app (perfil + Equipo) con su verificación en navegador.
 - [ ] **Step 3:** P2 en n8n con backup del workflow (OK).
-- [ ] **Step 4:** sumar las de asesor/director a `plantillas-v2.ts` (catálogo del provisionador) y
-  crearlas en PRISMAIA con el one-off; esperar Meta; probar un aviso real a Leonardo.
+- [ ] **Step 4:** ~~sumar las de asesor/director a `plantillas-v2.ts`~~ (hecho 25/8: `plantillasEquipo()`,
+  con tests) → crearlas en PRISMAIA con el one-off (OK); esperar Meta; probar un aviso real a Leonardo.
 - [ ] **Step 5:** Central: clientes + asesores juntas (OK).
 
 ---

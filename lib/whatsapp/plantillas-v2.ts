@@ -64,3 +64,55 @@ export function plantillasV2(prefix: string, agencia: string): PlantillaV2[] {
 
 /** Nombres SIN prefijo, para el catálogo del agente (`PLANTILLAS` en lib/seguimiento/tipos.ts). */
 export const NOMBRES_V2 = ["seg_retomar", "seg_valor", "seg_pendiente", "seg_novedad", "seg_puerta_abierta"] as const
+
+/**
+ * Plantillas para el EQUIPO (asesores y director) — Task 12e, análisis del 25/8. Salen del
+ * mismo número de la agencia que atiende a los leads, junto con el email correspondiente.
+ * Todas UTILITY (avisan de una gestión pendiente). {{1}} = nombre del destinatario; el último
+ * parámetro es siempre el link al chat o a la decisión en PRISMA. NO llevan BAJA: el opt-out
+ * es sacar el teléfono del perfil. Prerrequisitos: teléfono en `profiles.phone` (E.164) y el
+ * gate de internos en n8n ANTES del primer envío.
+ */
+export function plantillasEquipo(prefix: string): PlantillaV2[] {
+  return [
+    {
+      template_name: `${prefix}_asesor_cliente_esperando`,
+      category: "UTILITY",
+      language: "es_AR",
+      body: "Hola {{1}}, tenés un cliente esperando tu respuesta en PRISMA: {{2}}. Entrá y respondele desde acá: {{3}}",
+      body_examples: ["Martín", "Belen pidió coordinar una visita el 1/8 y hace 3 semanas que nadie le escribe", "https://prisma.vakdor.com/asesor/leads-whatsapp"],
+      buttons: [],
+    },
+    {
+      template_name: `${prefix}_asesor_sigue_esperando`,
+      category: "UTILITY",
+      language: "es_AR",
+      body: "Hola {{1}}, {{2}} sigue esperando desde hace {{3}}. Si no lo podés tomar, avisá por acá y lo reasignamos: {{4}}",
+      body_examples: ["Martín", "Belen", "2 días", "https://prisma.vakdor.com/asesor/leads-whatsapp"],
+      buttons: [],
+    },
+    {
+      template_name: `${prefix}_director_asesor_sin_respuesta`,
+      category: "UTILITY",
+      language: "es_AR",
+      body: "Hola {{1}}, {{2}} pese a los avisos. Decidilo en PRISMA: reasignar, tomarlo vos o dar más tiempo: {{3}}",
+      body_examples: ["Víctor", "Fernanda lleva 24 horas sin atender a Delfina, que quedó esperando la confirmación de la visita del 3/8", "https://prisma.vakdor.com/director/leads"],
+      buttons: [],
+    },
+    {
+      template_name: `${prefix}_director_aprobacion_pendiente`,
+      category: "UTILITY",
+      language: "es_AR",
+      body: "Hola {{1}}, el agente necesita tu OK para {{2}}. Revisalo y decidí en PRISMA: {{3}}",
+      body_examples: ["Víctor", "crear una plantilla nueva de seguimiento para leads que piden tasación", "https://prisma.vakdor.com/director/configuracion"],
+      buttons: [],
+    },
+  ]
+}
+
+export const NOMBRES_EQUIPO = [
+  "asesor_cliente_esperando",
+  "asesor_sigue_esperando",
+  "director_asesor_sin_respuesta",
+  "director_aprobacion_pendiente",
+] as const
