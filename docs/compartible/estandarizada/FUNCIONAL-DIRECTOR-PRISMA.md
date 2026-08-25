@@ -714,7 +714,7 @@ La pantalla se titula "Ajustes Generales". Tiene 5 pestañas:
 - **Nombre** legal/fantasía de la agencia.
 - **Tokko Broker API Key:** al guardarla con una key válida, PRISMA **sincroniza propiedades y leads automáticamente** en segundo plano.
 - **Logo de la agencia** (PNG/JPG/SVG hasta 2MB).
-- **Invitación de Asesores:** generá códigos únicos y copialos para compartir.
+- **Invitación de Asesores:** cargá el nombre, el celular y el email de la persona que querés sumar y generá su código. Es un código a medida de esa persona: solo le va a andar a ella, con ese email (ver sección 14).
 
 **3. Créditos IA**
 - El **dashboard de créditos** de toda la agencia: cuánto se consumió por cada módulo (los 7 módulos de IA con su ícono).
