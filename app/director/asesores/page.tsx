@@ -94,6 +94,9 @@ export default function AsesoresPage() {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [dialogoCodigoAbierto, setDialogoCodigoAbierto] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
+  // De quién es el "Último código libre": se muestra al lado del código para
+  // que el director sepa a quién se lo está por mandar antes de copiarlo.
+  const [inviteName, setInviteName] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState<Record<string, any> | null>(null)
   const [agentKpis, setAgentKpis] = useState<any>(null)
@@ -164,17 +167,25 @@ export default function AsesoresPage() {
 
       if (error) throw error
       
-      // Get LATEST unused invite code from agency_invites
+      // Último código de ASESOR sin usar, y que además tenga email: eso es lo
+      // que garantiza que esté atado a una persona concreta y sea intransferible.
+      // Sin el filtro por email entraban también los códigos que el sistema crea
+      // solos al fundar una agencia (esos SÍ son transferibles a cualquiera) y,
+      // sin el filtro por role, los códigos de director generados desde
+      // Configuración —que esta pantalla ni siquiera debería poder ofrecer—.
       const { data: invite } = await supabase
         .from("agency_invites")
-        .select("code")
+        .select("code, invitee_name")
         .eq("agency_id", agencyId)
+        .eq("role", "asesor")
         .eq("is_used", false)
+        .not("invitee_email", "is", null)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
-      
+
       setInviteCode(invite?.code || "")
+      setInviteName(invite?.invitee_name || null)
       setAgents(data || [])
 
       // Performance real (de performance_logs) para las tarjetas
@@ -467,6 +478,11 @@ export default function AsesoresPage() {
                 {inviteCode ? (
                   <div className="space-y-2">
                     <p className="text-xs text-muted-foreground">Último código libre</p>
+                    {inviteName && (
+                      <p className="text-sm font-medium">
+                        Para: <span className="text-accent">{inviteName}</span>
+                      </p>
+                    )}
                     <div className="flex items-center gap-2">
                       <div className="flex-1 bg-accent/5 p-3 rounded-xl border border-accent/20 font-mono text-center text-lg font-bold tracking-widest text-accent">
                         {inviteCode}
@@ -1160,7 +1176,17 @@ export default function AsesoresPage() {
           onOpenChange={setDialogoCodigoAbierto}
           agencyId={agencyId}
           role="asesor"
-          onCreated={(code) => setInviteCode(code)}
+          onCreated={(code, invite) => {
+            // El botón "Generar código para un asesor" cierra este modal antes de
+            // abrir el diálogo (ver más arriba). Si acá solo actualizáramos el
+            // código, quedaría guardado sobre un modal que ya no está en pantalla:
+            // el director vería el toast "Código generado para Juan" sin el
+            // código, y tendría que volver a abrir "Invitar al equipo" para verlo.
+            // Por eso lo reabrimos acá, ya con el código y el nombre listos.
+            setInviteCode(code)
+            setInviteName(invite.nombre)
+            setIsInviteModalOpen(true)
+          }}
         />
       )}
     </div>

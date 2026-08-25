@@ -25,8 +25,12 @@ interface Props {
   agencyId: string;
   /** Lo fija la pantalla que abre el diálogo. Acá NO se elige ni se muestra. */
   role: "asesor" | "director";
-  /** Se llama después de generar, para que la pantalla recargue su lista. */
-  onCreated: (code: string) => void;
+  /**
+   * Se llama después de generar. Lleva también el nombre del invitado para que
+   * la pantalla pueda mostrar "de quién es" el código recién generado sin
+   * tener que volver a consultarlo.
+   */
+  onCreated: (code: string, invite: { nombre: string }) => void;
 }
 
 const blockPaste = (e: React.ClipboardEvent | React.DragEvent) => e.preventDefault();
@@ -75,9 +79,10 @@ export function NuevoCodigoDialog({ open, onOpenChange, agencyId, role, onCreate
         validacion.datos.email
       );
       toast.success(`Código generado para ${validacion.datos.nombre}`);
+      const nombreGenerado = validacion.datos.nombre;
       limpiar();
       onOpenChange(false);
-      onCreated(invite.code);
+      onCreated(invite.code, { nombre: nombreGenerado });
     } catch (e: unknown) {
       // El mensaje real importa: puede ser "ese email ya tiene cuenta".
       toast.error(e instanceof Error ? e.message : "No se pudo generar el código");
@@ -167,7 +172,20 @@ export function NuevoCodigoDialog({ open, onOpenChange, agencyId, role, onCreate
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={guardando}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              // No alcanza con onOpenChange(false): ese wrapper de Dialog (más abajo)
+              // solo corre en los cierres que dispara Radix (Escape, click afuera).
+              // Este botón llama directo a la prop del padre, así que si no limpiamos
+              // acá también, en una pantalla donde el diálogo NO se desmonta al
+              // cerrarse (agencyId siempre truthy) los datos del invitado anterior
+              // sobreviven y quedan precargados en la próxima invitación.
+              limpiar();
+              onOpenChange(false);
+            }}
+            disabled={guardando}
+          >
             Cancelar
           </Button>
           <Button onClick={confirmar} disabled={!validacion.ok || guardando} className="bg-accent gap-2">
