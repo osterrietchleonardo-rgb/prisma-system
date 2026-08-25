@@ -174,7 +174,7 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
 
     if (profileError) {
         // Reintentar si hubo un delay en la replicación
-        await adminClient
+        const { error: profileRetryError } = await adminClient
           .from('profiles')
           .upsert({
             id: userId,
@@ -182,6 +182,18 @@ export async function register(rawData: z.infer<typeof registerSchema>) {
             role: finalRole,
             full_name: nombreFinal,
           }, { onConflict: 'id' })
+
+        // Si el reintento también falla, cortamos ACÁ, antes de tocar el código de
+        // invitación. Si seguimos de largo: el usuario queda creado en Auth sin
+        // perfil, y el UPDATE de vinculación de más abajo no encuentra la fila del
+        // perfil para actualizar —un UPDATE sobre cero filas no devuelve error—,
+        // así que el código de invitación se marca como usado igual, quemado para
+        // siempre. La regla de esta rama es que un intento fallido nunca puede
+        // consumir un código.
+        if (profileRetryError) {
+          console.error("Error creando perfil (tras reintento):", profileRetryError)
+          return { error: "No se pudo crear tu perfil. Volvé a intentar en unos minutos; si persiste, contactá al equipo de PRISMA." }
+        }
     }
 
     if (data.mode === 'crear' && validAdminInvite) {
