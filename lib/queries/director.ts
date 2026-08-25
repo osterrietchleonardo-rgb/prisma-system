@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase"
 import { emailValido, normalizarEmail } from "@/lib/invites/reglas"
+import { normalizePhoneE164 } from "@/lib/whatsapp/phone"
 
 export interface AgencyLeadsOptions {
   agencyId: string;
@@ -310,24 +311,37 @@ export async function generateAgencyInvite(
   const safeRole = role === "director" ? "director" : "asesor"
 
   const nombre = inviteeName.trim()
-  const phone = inviteePhone.trim()
   const email = normalizarEmail(inviteeEmail)
+
+  // Normalizar y validar el celular usando la misma regla del proyecto:
+  // E.164 sin "+", siempre. Si el llamador no pasó por validarNuevoCodigo(),
+  // esta función es la última barrera.
+  const phone = normalizePhoneE164(inviteePhone, "AR")
 
   // Última barrera. La validación de verdad la hace el diálogo con
   // validarNuevoCodigo(), pero esta función es pública y no puede confiar en
   // que la llamen bien.
   if (!nombre) throw new Error("Falta el nombre del invitado")
-  if (!phone) throw new Error("Falta el celular del invitado")
+  if (!phone) throw new Error("Falta un celular válido del invitado")
   if (!emailValido(email)) throw new Error("Falta un email válido del invitado")
 
   // Que no se genere un código para alguien que ya tiene cuenta acá. Es más
   // barato negarlo ahora que borrar un perfil duplicado después.
-  const { data: yaExiste } = await supabase
+  //
+  // IMPORTANTE: escapamos _ y % (comodines de LIKE en PostgreSQL) para que la
+  // búsqueda sea exacta, no aproximada. Un email como "juan_perez@acme.com"
+  // no debe matchear "juanXperez@acme.com". El carácter de escape es \ en Postgres.
+  const emailSafe = email.replace(/\\/g, "\\\\").replace(/_/g, "\\_").replace(/%/g, "\\%")
+  const { data: yaExiste, error: errorDuplicado } = await supabase
     .from("profiles")
     .select("full_name")
     .eq("agency_id", agencyId)
-    .ilike("email", email)
+    .ilike("email", emailSafe)
     .maybeSingle()
+
+  if (errorDuplicado) {
+    throw new Error(`No se pudo verificar si ese email ya tiene cuenta. Reintentá.`)
+  }
 
   if (yaExiste) {
     throw new Error(
