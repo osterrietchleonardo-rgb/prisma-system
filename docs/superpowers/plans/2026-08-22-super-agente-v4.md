@@ -2003,7 +2003,8 @@ WHERE sd.modo = 'sombra' ORDER BY sd.creado_en DESC LIMIT 20;
 - [ ] **Step 3: Criterio de salida (todos, no alguno):**
   - **0 alucinaciones** en frases y evidencias (una sola = se ajusta el prompt y se
     repite la sombra).
-  - **≥80% de razones que Leonardo firmaría.**
+  - **≥80% de razones que Leonardo firmaría.** ✅ **Firmadas por Leonardo el 25/8/2026** (las 40
+    del día 1, `scratch/_sa-sombra-LECTURA-dia1-2026-08-25.md`).
   - **Costo medio por decisión ≤ US$0,10** (tope acordado por Leonardo el 25/8; el
     runner registra un evento `costo_alto` por cada decisión que lo supere) viendo el
     `costo_medio_usd` real. Además, cotejar la estimación contra la Console de Anthropic
