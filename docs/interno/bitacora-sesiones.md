@@ -16,6 +16,77 @@
 
 ---
 
+## 2026-08-25
+
+**Etapa A cerrada: el código de invitación ahora valida quién lo usa** (rama
+`feat/asesores-celular-y-documentos`, worktree propio `PRISMA-SYSTEM-asesores-docs`; spec en
+`docs/superpowers/specs/2026-08-24-asesores-celular-y-documentos-design.md`, plan en
+`docs/superpowers/plans/2026-08-24-asesores-etapa-a-celular-y-email.md`). Falta el OK de
+Leonardo probándolo él mismo en el navegador (Task 9 paso 3, deliberadamente no hecho acá) y
+el merge a `main`.
+
+**El agujero que había:** nadie validaba que quien usaba un código de invitación fuera la
+persona invitada. El registro ni siquiera leía el nombre del invitado: le ponía al perfil el
+nombre que tipeaba quien se registraba. Ahora el email del código es la llave — si no
+coincide, se corta **antes de crear el usuario** y **el código no se consume**. Al generar un
+código ahora se piden los tres datos (nombre, celular, email), cada uno de los dos últimos se
+escribe dos veces para evitar tipeos, y a los asesores que ya estaban adentro se les puede
+cargar el celular desde su tarjeta en la página Asesores.
+
+Commits en orden: `79a7862` (reglas puras, 18 tests), `ba6321b` (migración
+`20260824120000_invites_celular_y_email.sql`), `7c01429`+`798d39b`+`ccd34ca` (generar
+códigos con los tres datos), `789ebcf` (diálogo único + celular verificado), `9d22664`
+(tapar la puerta trasera de la página Asesores — generaba código sin pasar por las reglas),
+`69a03f7`+`28e4241` (validar el email al registrarse), `ce1189b`+`eec283d` (editar
+nombre/celular del asesor desde la tarjeta), `26aa1de`+`1722c21` (el asesor ve su celular en
+Configuración, de solo lectura).
+
+**Los tres errores que vale la pena no repetir:**
+
+1. **El mismo defecto en tres archivos distintos.** Al guardar el celular del código, al
+   guardar el del asesor, y al mostrarlo: las tres veces se normalizaba un teléfono que YA
+   estaba en formato internacional asumiendo Argentina como país. No rompe nada acá porque
+   todos los casos de prueba son de Argentina — recién se habría notado con un asesor de otro
+   país, y tarde. La corrección es anteponer `+` para que `libphonenumber-js` deduzca el país
+   del propio número en vez de forzarlo. Se dejó **un comentario explicando el porqué en cada
+   uno de los tres lugares** (`lib/queries/director.ts`, `app/director/asesores/page.tsx`,
+   `app/asesor/configuracion/page.tsx`), porque las dos primeras veces el defecto se coló
+   justamente por no tener ese comentario al lado.
+2. **El chequeo de email duplicado fallaba abierto.** `generateAgencyInvite` descartaba el
+   error de la consulta que busca si el email ya tiene perfil en la agencia; si esa consulta
+   fallaba, el alta seguía de largo en silencio — exactamente lo contrario de lo que el
+   chequeo existe para evitar. Corregido para cortar con error explícito si la verificación
+   no se pudo hacer.
+3. **Un email ya registrado quemaba el código sin avisar.** Supabase no devuelve error al
+   pedir el registro de un email que ya existe cuando la confirmación por email está activa
+   (por diseño, para no filtrar qué emails existen). El flujo anterior no distinguía ese caso:
+   consumía el código igual, la persona veía "revisá tu email" y no llegaba nada, y el código
+   quedaba gastado sin que nadie se enterara. Ahora se verifica el estado antes de consumir.
+
+**Verificación (Task 9, pasos 1-2, 4-6 — el 3 queda para Leonardo):** `npm test` → 310 tests
+en 29 archivos de vitest + 88 de node, todos verdes. `npx tsc --noEmit` → limpio. `npm run
+build` → compila. `npm run lint` → 43 errores preexistentes en archivos que esta rama no
+tocó (comillas sin escapar en JSX y `prefer-const`, repartidos por `app/`, `components/` y
+`lib/`); ninguno cae en los 14 archivos que sí modificó la rama. Detalle completo en
+`.superpowers/sdd/2026-08-24-asesores-etapa-a-celular-y-email/task-9-report.md`.
+
+**Queda pendiente:**
+- **Etapas B (documentos por asesor) y C (plantillas y versionado)**, con plan propio —
+  todavía no arrancadas.
+- El bucket `contratos` de Supabase Storage **sigue público** (spec §9.3, no tocado en esta
+  etapa).
+- `components/tracking/pipeline/PipelineCard.tsx:93` tiene el **mismo defecto de país fijo**
+  que el error 1 de arriba, en otro subsistema. Se detectó al auditar pero no se tocó: no es
+  parte del alcance de Etapa A.
+- `components/shared/ManualContactFields.tsx` (spec §9.2) tampoco se tocó.
+- El auto-renombre del asesor (`app/asesor/configuracion/page.tsx:207` — hoy puede cambiarse
+  el nombre a sí mismo) queda **como está**: es conducta preexistente, no es un problema de
+  seguridad, y Leonardo la va a decidir aparte.
+- Los 2 códigos de invitación viejos sin email siguen funcionando como antes, a propósito: no
+  se migraron.
+
+---
+
 ## 2026-08-24
 
 **El radar de mercado existe: `/socio-mercado`** (rama `feat/socio-radar-mercado`).
