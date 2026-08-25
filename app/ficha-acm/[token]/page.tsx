@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // la URL `.webp` que el CDN de roomix no sirve. Se arregla al pintar, así los links que ya
 // están dando vueltas dejan de mostrar la foto rota (ver `normalizarFotoRoomix`).
 import { normalizarFotoRoomix } from "@/lib/acm/fotos-url";
+import { formatPhoneInternational } from "@/lib/whatsapp/phone";
 import { notFound } from "next/navigation";
 import { Playfair_Display, Inter } from "next/font/google";
 import type { Metadata } from "next";
@@ -280,7 +281,17 @@ export default async function FichaAcmPage({ params }: { params: { token: string
                 </div>
               </div>
               <div className="contact-links">
-                {agent?.phone && <span className="contact-line">📱 {agent.phone}</span>}
+                {agent?.phone && (
+                  <span className="contact-line">
+                    📱{" "}
+                    {
+                      // El valor ya viene en E.164 sin "+". Sin asumir país,
+                      // formatPhoneInternational deducirá el país del código
+                      // del propio número. Si está vacío, cae al fallback crudo.
+                      formatPhoneInternational("+" + agent.phone) ?? agent.phone
+                    }
+                  </span>
+                )}
                 {agent?.email && <span className="contact-line">✉️ {agent.email}</span>}
                 <div className="contact-btns no-print">
                   {waLink && <a href={waLink} target="_blank" rel="noopener noreferrer" className="contact-btn" style={{ backgroundColor: "#25D366", color: "#fff" }}>WhatsApp</a>}
