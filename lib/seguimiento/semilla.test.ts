@@ -39,7 +39,12 @@ describe("renderizarSemilla", () => {
       "2026-08-24T15:00:00-03:00"
     )
     expect(t).not.toContain("🔥")
-    expect(t).toContain("sin nombre capturado")
+    expect(t).toContain("sin nombre")
+  })
+  it("un nombre de menos de 3 letras cuenta como sin nombre (decisión 25/8)", () => {
+    const t = renderizarSemilla({ ...base, metricas: { nombre: "K" } }, 0, 0, "2026-08-25T15:00:00-03:00")
+    expect(t).not.toMatch(/Lead: K ·/)
+    expect(t).toContain("sin nombre")
   })
   it("no incluye los mensajes de la conversación (eso es de leer_mensajes)", () => {
     const t = renderizarSemilla(base, 55, 0, "2026-08-24T15:00:00-03:00")
