@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase"
+import { emailValido, normalizarEmail } from "@/lib/invites/reglas"
 
 export interface AgencyLeadsOptions {
   agencyId: string;
@@ -298,13 +299,41 @@ export async function getAgencyInvites(agencyId: string) {
 
 export async function generateAgencyInvite(
   agencyId: string,
-  role: "director" | "asesor" = "asesor",
-  inviteeName?: string
+  role: "director" | "asesor",
+  inviteeName: string,
+  inviteePhone: string,
+  inviteeEmail: string
 ) {
   const supabase = createClient()
 
   // El rol del código define qué será la persona al registrarse.
   const safeRole = role === "director" ? "director" : "asesor"
+
+  const nombre = inviteeName.trim()
+  const phone = inviteePhone.trim()
+  const email = normalizarEmail(inviteeEmail)
+
+  // Última barrera. La validación de verdad la hace el diálogo con
+  // validarNuevoCodigo(), pero esta función es pública y no puede confiar en
+  // que la llamen bien.
+  if (!nombre) throw new Error("Falta el nombre del invitado")
+  if (!phone) throw new Error("Falta el celular del invitado")
+  if (!emailValido(email)) throw new Error("Falta un email válido del invitado")
+
+  // Que no se genere un código para alguien que ya tiene cuenta acá. Es más
+  // barato negarlo ahora que borrar un perfil duplicado después.
+  const { data: yaExiste } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("agency_id", agencyId)
+    .ilike("email", email)
+    .maybeSingle()
+
+  if (yaExiste) {
+    throw new Error(
+      `Ese email ya tiene cuenta en tu inmobiliaria${yaExiste.full_name ? `: ${yaExiste.full_name}` : ""}`
+    )
+  }
 
   // Get agency name prefix for the code
   const { data: agency } = await supabase
@@ -325,7 +354,9 @@ export async function generateAgencyInvite(
       agency_id: agencyId,
       code,
       role: safeRole,
-      invitee_name: inviteeName?.trim() || null,
+      invitee_name: nombre,
+      invitee_phone: phone,
+      invitee_email: email,
     })
     .select()
 
