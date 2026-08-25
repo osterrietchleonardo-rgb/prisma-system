@@ -64,6 +64,46 @@ export async function GET(request: Request) {
             })
           }
         } else if (inviteCode) {
+           // ============================================================
+           // ADVERTENCIA — AGUJERO DE SEGURIDAD DORMIDO, NO CORREGIDO ACÁ.
+           // ============================================================
+           // Este bloque consume códigos de agency_invites con EXACTAMENTE el
+           // mismo agujero que la rama feat/asesores-celular-y-documentos vino
+           // a cerrar en lib/actions/auth.ts (register()): acá solo se lee
+           // `agency_id, is_used, role` — NO se compara invite.invitee_email
+           // contra el email real de la sesión de Google (emailCoincideConInvite),
+           // NO se copia invitee_name al perfil, y NO se copia invitee_phone.
+           // Es decir: cualquiera que consiga un código de invitación (por
+           // ejemplo, viéndolo de reojo en la pantalla de otra persona) podría
+           // usarlo para entrar con SU PROPIA cuenta de Google, sin que el
+           // código esté atado a su email. Eso es exactamente lo que
+           // emailCoincideConInvite() existe para impedir.
+           //
+           // Por qué hoy esto NO se dispara: el formulario de registro
+           // (app/auth/registro, vía lib/actions/auth.ts) no ofrece "Registrate
+           // con Google" — solo entra por acá el LOGIN con Google de alguien
+           // que ya tiene perfil, y ese camino no pasa por este bloque porque
+           // `if (!profile)` ya es falso. El único disparador real hoy es
+           // signInWithGoogle() en lib/actions/auth.ts, y nada en la UI actual
+           // le pasa un inviteCode. Está dormido por accidente, no por diseño.
+           //
+           // Qué hay que hacer ANTES de agregar "Registrate con Google" al
+           // formulario de registro (o cualquier otro camino que llegue acá
+           // con un inviteCode real):
+           //   1. Traer también invitee_email, invitee_name e invitee_phone
+           //      en el select de abajo.
+           //   2. Cortar con un error/redirect si
+           //      !emailCoincideConInvite(invite.invitee_email, user.email)
+           //      ANTES de marcar el código como usado (igual que hace
+           //      register() en lib/actions/auth.ts).
+           //   3. Copiar invitee_name y invitee_phone al perfil, igual que
+           //      hace register() (así el código no solo autoriza: también
+           //      arma el perfil con los datos que cargó el director).
+           //
+           // NO se cambia el comportamiento de este archivo en esta rama: no se
+           // puede probar el flujo de Google desde acá con seguridad, y romper
+           // el ingreso con Google sería peor que dejar dormido un agujero que
+           // hoy no es alcanzable.
            // Unirse a una inmobiliaria existente: el rol lo define el código.
            const { data: invite } = await adminClient
             .from('agency_invites')
