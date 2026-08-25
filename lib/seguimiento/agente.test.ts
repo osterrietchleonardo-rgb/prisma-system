@@ -73,7 +73,7 @@ describe("decidirConAgente", () => {
     const r = await decidirConAgente("semilla", h, llamar)
     expect(r.decision.accion).toBe("contactar")
     // la primera emisión volvió como tool_result con error explicando qué falta
-    const conversacion = llamar.mock.calls[0][0] as Array<{ role: string; content: unknown }>
+    const conversacion = (llamar.mock.calls as unknown as unknown[][])[0][0] as Array<{ role: string; content: unknown }>
     const erroresDevueltos = conversacion
       .filter((m) => m.role === "user" && Array.isArray(m.content))
       .flatMap((m) => m.content as Array<Record<string, unknown>>)

@@ -56,6 +56,50 @@ describe("leer_mensajes", () => {
   })
 })
 
+describe("leer_intentos_previos", () => {
+  it("las decisiones en sombra NO cuentan como intentos enviados", async () => {
+    const h = crearHerramientas(
+      dbMock({
+        data: [
+          { plantilla: "seg_f3_breakup", razon: "ya van dos sin respuesta", creado_en: "2026-08-24T17:00:00Z", resultado: null, ejecutada: false },
+        ],
+        error: null,
+      }),
+      base
+    )
+    const t = await h.leer_intentos_previos({})
+    expect(t).toContain("INTENTOS ENVIADOS por el agente: ninguno")
+    expect(t).toContain("NO se enviaron")
+    expect(t).toContain("seg_f3_breakup")
+  })
+  it("un intento ejecutado sí figura como enviado", async () => {
+    const h = crearHerramientas(
+      dbMock({
+        data: [
+          { plantilla: "seg_f1_seguimiento", razon: "retomo la cochera", creado_en: "2026-08-24T17:00:00Z", resultado: "enviada", ejecutada: true },
+        ],
+        error: null,
+      }),
+      base
+    )
+    const t = await h.leer_intentos_previos({})
+    expect(t).toMatch(/INTENTOS ENVIADOS por el agente:\n- 2026-08-24: seg_f1_seguimiento/)
+    expect(t).not.toContain("NO se enviaron")
+  })
+})
+
+describe("leer_mensajes muestra hora argentina", () => {
+  it("convierte el timestamp UTC a hora AR", async () => {
+    const h = crearHerramientas(
+      dbMock({ data: [{ role: "lead", content: "hola", created_at: "2026-07-31T01:34:00Z" }], error: null }),
+      base
+    )
+    const t = await h.leer_mensajes({})
+    expect(t).toContain("[2026-07-30 22:34]") // 01:34 UTC = 22:34 del día anterior en AR
+    expect(t).toContain("horas en Argentina")
+  })
+})
+
 describe("leer_propiedad", () => {
   it("cuando no hay coincidencias lo dice explícitamente y prohíbe nombrarla", async () => {
     const h = crearHerramientas(dbMock({ data: [], error: null }), base)

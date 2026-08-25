@@ -8,10 +8,14 @@ import { registrarEvento } from "@/lib/seguimiento/eventos"
 import type { Candidato, CompromisoActivo, ConfigAgencia } from "@/lib/seguimiento/tipos"
 
 export const maxDuration = 300
-const MAX_CANDIDATOS = 40 // los trae la Capa 1
+// 200 y no 40: la Capa 1 ordena por next_follow_up_at y el dedupe saca los ya decididos.
+// Con 40, una vez decididos los primeros 40 la cola quedaba vacía y el resto del backlog
+// nunca entraba (la noche del 24/8: 15 corridas con 0 leads y 50 candidatos sin decidir).
+const MAX_CANDIDATOS = 200
 const MAX_LLM = 8 // solo los mejores llegan al agente; el resto, próxima corrida
 const DEADLINE_MS = 240_000 // deja 60s de colchón antes del timeout
 const DEDUPE_HORAS = 20 // no re-decidir un lead ya decidido hace poco
+const TOPE_COSTO_USD = 0.1 // acordado con Leonardo el 25/8: por encima se registra alerta
 
 export async function POST(req: Request) {
   if (req.headers.get("x-api-key") !== process.env.SEGUIMIENTO_SECRET)
@@ -122,6 +126,10 @@ export async function POST(req: Request) {
         { score, confianza: decision.confianza, herramientas: pasos.map((p) => p.herramienta) }
       )
       resultados.push({ conversation_id: c.id, accion: decision.accion, razon: decision.razon })
+      const costo = estimarCostoUSD(tokens)
+      if (costo > TOPE_COSTO_USD)
+        await registrarEvento(db, c.agency_id, c.id, "costo_alto",
+          `Decisión por encima del tope: US$${costo.toFixed(4)} (tope ${TOPE_COSTO_USD})`, { tokens })
       void fila // Task 15 usa fila.id para enchufar el ejecutor cuando config.modo === "activo"
     } catch (e) {
       // Degradación elegante: si el agente falla, NO se manda nada y se registra

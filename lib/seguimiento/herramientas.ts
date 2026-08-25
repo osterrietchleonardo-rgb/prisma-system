@@ -13,6 +13,11 @@ export interface Herramientas {
  *  (Venta/Alquiler); la disponibilidad es `is_active`. `notas_ia` es jsonb. */
 const COLUMNAS_PROPIEDAD = "id, title, address, city, status, is_active, price, currency, notas_ia"
 
+/** Fecha y hora en Argentina, "2026-08-16 13:58". El agente razona en hora local: mostrarle
+ *  UTC lo hacía decir "respondió tarde el 31/07 01:34" cuando fue el 30/7 a las 22:34 AR. */
+const FECHA_HORA_AR = (d: string) =>
+  new Date(d).toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).slice(0, 16)
+
 export function crearHerramientas(db: SupabaseClient, c: Candidato): Herramientas {
   return {
     async leer_mensajes({ cantidad = 10 }) {
@@ -25,29 +30,41 @@ export function crearHerramientas(db: SupabaseClient, c: Candidato): Herramienta
         .limit(n)
       if (error) return `error leyendo mensajes: ${error.message}`
       if (!data?.length) return "(no hay mensajes en esta conversación)"
-      return [...data]
-        .reverse()
-        .map((m) => `[${String(m.created_at).slice(0, 16)}] [${m.role}] ${String(m.content).slice(0, 400)}`)
-        .join("\n")
+      return (
+        "(horas en Argentina)\n" +
+        [...data]
+          .reverse()
+          .map((m) => `[${FECHA_HORA_AR(String(m.created_at))}] [${m.role}] ${String(m.content).slice(0, 400)}`)
+          .join("\n")
+      )
     },
 
     async leer_intentos_previos() {
       const { data, error } = await db
         .from("seguimiento_decisiones")
-        .select("plantilla, razon, creado_en, resultado")
+        .select("plantilla, razon, creado_en, resultado, ejecutada")
         .eq("conversation_id", c.id)
         .eq("accion", "contactar")
         .order("creado_en", { ascending: false })
-        .limit(5)
+        .limit(8)
       if (error) return `error leyendo intentos: ${error.message}`
-      if (!data?.length) return "(ningún intento de seguimiento previo)"
-      return data
-        .map(
-          (i) =>
-            `- ${String(i.creado_en).slice(0, 10)}: ${i.plantilla ?? "sin plantilla"} — ${i.razon}` +
-            (i.resultado ? ` [${i.resultado}]` : "")
+      // Solo lo EJECUTADO cuenta como intento: en sombra el agente decide sin enviar, y si
+      // viera esas decisiones como intentos creería que ya mandó el breakup (pasó el 25/8).
+      const fmt = (i: { creado_en: string; plantilla: string | null; razon: string; resultado: string | null }) =>
+        `- ${FECHA_HORA_AR(String(i.creado_en)).slice(0, 10)}: ${i.plantilla ?? "sin plantilla"} — ${i.razon}` +
+        (i.resultado ? ` [${i.resultado}]` : "")
+      const enviados = (data ?? []).filter((i) => i.ejecutada)
+      const sombra = (data ?? []).filter((i) => !i.ejecutada)
+      const partes = [
+        enviados.length
+          ? `INTENTOS ENVIADOS por el agente:\n${enviados.map(fmt).join("\n")}`
+          : "INTENTOS ENVIADOS por el agente: ninguno (los seguimientos viejos, si los hubo, están en los mensajes como [bot])",
+      ]
+      if (sombra.length)
+        partes.push(
+          `Decisiones previas en SOMBRA (NO se enviaron, el lead NO las recibió — no las cuentes como intentos; solo evitá repetir el ángulo):\n${sombra.slice(0, 3).map(fmt).join("\n")}`
         )
-        .join("\n")
+      return partes.join("\n")
     },
 
     async leer_compromisos() {
