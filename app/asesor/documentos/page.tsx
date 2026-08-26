@@ -580,7 +580,7 @@ export default function AsesorDocumentosPage() {
           <OfficialDocsSection readOnly />
         </TabsContent>
 
-        <TabsContent value="mis-documentos" className="flex-1 overflow-hidden mt-0 data-[state=inactive]:hidden">
+        <TabsContent value="mis-documentos" className="flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar mt-0 data-[state=inactive]:hidden">
           {userId && agencyId ? (
             <DocumentosDelAsesor advisorId={userId} agencyId={agencyId} readOnly />
           ) : (
