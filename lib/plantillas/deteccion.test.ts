@@ -195,3 +195,107 @@ describe("detectarHuecos: que no parta ni pegue de más", () => {
     expect(r.advertencias.length).toBeGreaterThan(0);
   });
 });
+
+// Un texto largo y otro completamente distinto: el diff no llega a terminar
+// con el tope en 0 y esa comparación se cae. Medido: 200 de 200 veces aborta,
+// y 200 de 200 el par idéntico pasa por el camino rápido y NO aborta.
+const LARGO = Array.from({ length: 400 }, (_, i) => `alfa${i} bravo${i}`).join(" ");
+const OTRO_LARGO = Array.from({ length: 400 }, (_, i) => `zulu${i * 7} yanqui${i * 3}`).join(" ");
+
+describe("detectarHuecos: abreviaturas, cuentas y quién entró de verdad", () => {
+  it("una razón social de largo distinto no deja a nadie afuera", () => {
+    // El diff emite `+ "L. "` con el espacio adentro del agregado, y el tramo
+    // igual que sigue arranca con letra. Antes eso descartaba a los dos
+    // asesores y la plantilla salía sin un solo hueco, con luz verde.
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Firma Gomez S.A. hoy." },
+      { advisorId: "b", texto: "Firma Martinez S.R.L. hoy." },
+      { advisorId: "c", texto: "Firma Lopez S.A.S. hoy." },
+    ]);
+    expect(r.advertencias).toEqual([]);
+    expect(r.documentosUsados).toEqual(["a", "b", "c"]);
+    expect(r.huecos).toHaveLength(2);
+    expect(r.huecos[0].valores).toEqual({ a: "Gomez", b: "Martinez", c: "Lopez" });
+    expect(r.huecos[1].valores).toEqual({ a: "A.", b: "R.L.", c: "A.S." });
+  });
+
+  it("iniciales de largo distinto tampoco", () => {
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Asesor J.P. presente." },
+      { advisorId: "b", texto: "Asesor M.G.R. presente." },
+      { advisorId: "c", texto: "Asesor L.T.V. presente." },
+    ]);
+    expect(r.advertencias).toEqual([]);
+    expect(r.huecos).toHaveLength(1);
+    expect(r.huecos[0].valores).toEqual({ a: "J.P.", b: "M.G.R.", c: "L.T.V." });
+  });
+
+  it("el asesor cuya comparación se cayó NO figura en documentosUsados", () => {
+    // Sin esta lista, esto es indistinguible de "los tres son idénticos":
+    // las dos cosas devuelven huecos vacío y las mismas llaves.
+    const r = detectarHuecos(
+      [
+        { advisorId: "a", texto: LARGO },
+        { advisorId: "b", texto: LARGO },
+        { advisorId: "c", texto: OTRO_LARGO },
+      ],
+      { topeDiffMs: 0 },
+    );
+    expect(r.huecos).toEqual([]);
+    expect(r.documentosUsados).toEqual(["a", "b"]);
+  });
+
+  it("y se avisa por su nombre cuando la comparación se cae", () => {
+    const r = detectarHuecos(
+      [
+        { advisorId: "a", texto: LARGO },
+        { advisorId: "b", texto: LARGO },
+        { advisorId: "c", texto: OTRO_LARGO },
+      ],
+      { topeDiffMs: 0 },
+    );
+    expect(r.advertencias.some((x) => x.includes("No se pudo comparar") && x.includes("c"))).toBe(true);
+  });
+
+  it("documentosUsados deja afuera al vacío y al repetido", () => {
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Hola Juan." },
+      { advisorId: "vacio", texto: "   " },
+      { advisorId: "a", texto: "Hola Otro." },
+      { advisorId: "b", texto: "Hola Pedro." },
+      { advisorId: "c", texto: "Hola Ana." },
+    ]);
+    expect(r.documentosUsados).toEqual(["a", "b", "c"]);
+  });
+
+  it("el valor del otro asesor tampoco se lleva el espacio de cola", () => {
+    // El diff emite `+ "Otra mas. "`. Ese espacio terminaba guardado en la
+    // base de datos y escrito en el contrato de esa persona.
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Uno. Fin." },
+      { advisorId: "b", texto: "Uno. Otra mas. Fin." },
+      { advisorId: "c", texto: "Uno. Distinta cosa. Fin." },
+    ]);
+    expect(r.huecos).toHaveLength(1);
+    expect(r.huecos[0].valores).toEqual({ a: "", b: "Otra mas.", c: "Distinta cosa." });
+  });
+
+  it("un separador de cuatro caracteres ya no pega dos datos", () => {
+    // El largo del pegamento decide de verdad: con el tope más grande,
+    // "Juan--.-30" pasaría a ser un dato solo.
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Ref Juan--.-30 ok." },
+      { advisorId: "b", texto: "Ref Maria--.-35 ok." },
+      { advisorId: "c", texto: "Ref Pedro--.-40 ok." },
+    ]);
+    expect(r.huecos.map((h) => h.valores.a)).toEqual(["Juan", "30"]);
+    expect(r.huecos.map((h) => h.valores.b)).toEqual(["Maria", "35"]);
+  });
+
+  it("el indice numera los huecos de corrido, no es siempre el mismo", () => {
+    // El test de orden del brief ordena la lista que él mismo devuelve: con
+    // los índices en [0,0,0] tampoco se cae. Este los mide.
+    const r = detectarHuecos(TRES);
+    expect(r.huecos.map((h) => h.indice)).toEqual([0, 1, 2]);
+  });
+});

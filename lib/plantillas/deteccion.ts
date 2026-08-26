@@ -24,7 +24,27 @@ export type Documento = { advisorId: string; texto: string }
 export type Deteccion = {
   huecos: Hueco[]
   textoBase: string
+  /**
+   * Los asesores que de verdad entraron en la comparación: el del documento
+   * base más los que se pudieron comparar contra él.
+   *
+   * Sin esto, "los tres contratos son idénticos" y "se cayeron todos los
+   * documentos" devuelven exactamente las mismas llaves, y lo único que los
+   * separa es prosa en castellano adentro de `advertencias`. Por `valores`
+   * tampoco se puede deducir: si no hay huecos, no hay ningún `valores` que
+   * mirar. Quien consuma esto tiene que poder contar.
+   */
+  documentosUsados: string[]
   advertencias: string[]
+}
+
+export type Opciones = {
+  /**
+   * Cuánto puede tardar la comparación contra UN asesor antes de darla por
+   * perdida. Se puede bajar desde afuera para poder probar qué pasa cuando
+   * una comparación se cae, sin tener que armar dos contratos gigantes.
+   */
+  topeDiffMs?: number
 }
 
 /**
@@ -59,6 +79,14 @@ const LARGO_MAXIMO_PEGAMENTO = 3
  * El espacio es justamente lo que distingue "20-11111111-1" (un dato) de
  * "Juan, 35%" (dos datos separados por ", "): lo que se escribe pegado es un
  * dato solo; en cuanto hay un espacio de por medio, son dos.
+ *
+ * El largo también decide, y no es decorativo: con un tope más grande
+ * "Juan--.-30" pasaría a ser un dato solo.
+ *
+ * Lo de las letras y los números es la DEFINICIÓN de la regla, no una
+ * defensa: hoy `diffWords` nunca los deja afuera del tramo cambiado, así que
+ * ninguna prueba lo pone en rojo. Está escrito igual para que la regla se
+ * lea completa, y para que el que venga no lo tome por cobertura faltante.
  */
 function esPegamento(entre: string): boolean {
   if (entre.length === 0 || entre.length > LARGO_MAXIMO_PEGAMENTO) return false
@@ -112,6 +140,18 @@ function avanzarPorLoIgual(
       while (i < base.length && esEspacio(base[i])) i++
       continue
     }
+    /**
+     * Los espacios de la base se saltean SIEMPRE, no solo cuando el tramo
+     * igual arranca con espacio. Si no, alcanza con que el diff meta el
+     * espacio adentro del agregado -- "S.A." contra "S.R.L." emite
+     * `+ "L. "` y el tramo igual que sigue arranca con letra -- para que la
+     * base llegue con un espacio sin consumir, no coincida, y el asesor
+     * entero quede afuera de la comparación. Con razones sociales o
+     * iniciales de largo distinto (J.P. contra M.G.R.) se caían los dos
+     * asesores y la plantilla salía SIN NINGÚN HUECO y sin nada en rojo:
+     * igualita a tres contratos idénticos.
+     */
+    while (i < base.length && esEspacio(base[i])) i++
     if (i >= base.length || base[i] !== valor[j]) return null
     i++
     j++
@@ -121,8 +161,8 @@ function avanzarPorLoIgual(
 }
 
 /** Parte la base en tramos iguales y distintos contra `textoOtro`. */
-function segmentar(textoBase: string, textoOtro: string): Segmento[] | null {
-  const cambios = diffWords(textoBase, textoOtro, { timeout: TOPE_DIFF_MS })
+function segmentar(textoBase: string, textoOtro: string, topeMs: number): Segmento[] | null {
+  const cambios = diffWords(textoBase, textoOtro, { timeout: topeMs })
   if (!cambios) return null
 
   const segmentos: Segmento[] = []
@@ -204,7 +244,8 @@ function recorte(segmentos: Segmento[], textoBase: string, ini: number, fin: num
   return salida
 }
 
-export function detectarHuecos(docs: Documento[]): Deteccion {
+export function detectarHuecos(docs: Documento[], opciones: Opciones = {}): Deteccion {
+  const topeMs = opciones.topeDiffMs ?? TOPE_DIFF_MS
   const advertencias: string[] = []
 
   /**
@@ -242,7 +283,7 @@ export function detectarHuecos(docs: Documento[]): Deteccion {
     )
   }
 
-  if (usables.length === 0) return { huecos: [], textoBase: "", advertencias }
+  if (usables.length === 0) return { huecos: [], textoBase: "", documentosUsados: [], advertencias }
 
   const base = usables[0]
   const textoBase = base.texto
@@ -254,7 +295,7 @@ export function detectarHuecos(docs: Documento[]): Deteccion {
    */
   const porAsesor = new Map<string, Segmento[]>()
   for (const otro of usables.slice(1)) {
-    const segmentos = segmentar(textoBase, otro.texto)
+    const segmentos = segmentar(textoBase, otro.texto, topeMs)
     if (segmentos === null) {
       advertencias.push(
         `No se pudo comparar el documento del asesor ${otro.advisorId} con el de ${base.advisorId}: ` +
@@ -316,7 +357,14 @@ export function detectarHuecos(docs: Documento[]): Deteccion {
   for (const r of finales) {
     const valores: Record<string, string> = { [base.advisorId]: textoBase.slice(r.ini, r.fin) }
     for (const [advisorId, segmentos] of porAsesor) {
-      valores[advisorId] = recorte(segmentos, textoBase, r.ini, r.fin)
+      /**
+       * El mismo recorte de espacios que se le hace al rango de la base hay
+       * que hacérselo al valor del otro asesor, porque el diff le mete el
+       * espacio adentro del agregado ("Otra mas. "). Sin esto, ese espacio de
+       * cola se guarda en la base de datos y después se escribe en el
+       * contrato de esa persona.
+       */
+      valores[advisorId] = recorte(segmentos, textoBase, r.ini, r.fin).trim()
     }
     huecos.push({
       indice: huecos.length,
@@ -333,5 +381,10 @@ export function detectarHuecos(docs: Documento[]): Deteccion {
     })
   }
 
-  return { huecos, textoBase, advertencias }
+  return {
+    huecos,
+    textoBase,
+    documentosUsados: [base.advisorId, ...porAsesor.keys()],
+    advertencias,
+  }
 }
