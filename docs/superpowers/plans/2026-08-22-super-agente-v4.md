@@ -2262,7 +2262,30 @@ escalera en sombra.
 
 - [ ] **Step 1:** OK de Leonardo sobre el catálogo y el orden.
 - [ ] **Step 2:** P1 en la app (perfil + Equipo) con su verificación en navegador.
-- [x] **Step 3 (26/8):** P2 en el webhook de la app (evolution + meta), con tests y prueba real. Falta el OK para mergear (llega con el merge de la rama, Task 20).
+- [x] **Step 3 (26/8):** P2 en el webhook de la app (evolution + meta), con tests. **Mergeado a `main`
+  (`b39e455`, fast-forward de 28 commits, 393 tests + build OK) y probado en PRODUCCIÓN con un
+  mensaje real de Leonardo desde su celular (perfil de asesor de PRISMAIA): log
+  `[Meta Webhook] Mensaje interno … registrado, confirmación enviada`, fila en
+  `interacciones_canal`, cero `wa_messages`, el bot NO contestó.** Hechos que salieron del camino:
+  - En producción los mensajes entran por **`/api/webhooks/meta`** (Meta directo a la app);
+    Evolution solo ENVÍA. Su webhook de instancia (`byEvents: true`) manda sufijos
+    `/send-message` que dan 404 (ruido). El webhook global de Evolution está deshabilitado.
+    Un desvío temporal del webhook de instancia de PRISMAIA al preview no sirvió (canal
+    equivocado) y se restauró.
+  - La confirmación es texto libre: Meta solo la entrega si el asesor escribió en las últimas
+    24 h (probada: llegó desde +54 9 221 202-4714). En el flujo real la ventana siempre está
+    abierta. Meta escribe los celulares AR sin el 9 → el gate compara en forma canónica.
+  - **Caída de Supabase** (~02:20 a 03:29 AR, instancia Micro 1 GB, reinicio manual desde el
+    dashboard): durante la caída el webhook de Meta **devolvió 200 sin poder procesar** (la
+    búsqueda de instancia falla → "no encontrada" → 200) y Meta NO reintenta con 200 → **los
+    mensajes de leads que llegaron en esa ventana se perdieron en silencio**. Pendiente
+    prioritario (fuera de este plan): devolver 5xx cuando la base no responde, para que Meta
+    reintente; y `system_events` (§III.2.8.2) tiene que avisar a Leonardo de esto.
+  - Bug visto en logs: links a `/director/leads-whatsapp/Mensaje%20de%20voz%20recibido`
+    (texto del mensaje en vez del id).
+  - Regla de Leonardo: el link del aviso se adapta al rol del destinatario y apunta al chat
+    concreto (`/director/leads-whatsapp/[id]` para el director, que ve todo y reasigna desde
+    la configuración de ese chat).
 - [ ] **Step 4:** ~~sumar las de asesor/director a `plantillas-v2.ts`~~ (hecho 25/8: `plantillasEquipo()`,
   con tests) → crearlas en PRISMAIA con el one-off (OK); esperar Meta; probar un aviso real a Leonardo.
 - [ ] **Step 5:** Central: clientes + asesores juntas (OK).
