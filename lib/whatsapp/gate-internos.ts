@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { normalizeArgPhone } from "@/lib/whatsapp/phone-ar"
 
 /**
  * GATE DE INTERNOS (Super Agente, Task 12e / §III.2.6).
@@ -41,14 +42,26 @@ export function digitos(tel: string | null | undefined): string {
   return String(tel ?? "").replace(/\D/g, "")
 }
 
+/**
+ * Forma canónica para comparar: Meta escribe los celulares argentinos SIN el 9 en el jid
+ * (`542213089334`) mientras el perfil y wa_conversations los guardan CON el 9
+ * (`5492213089334`, verificado 26/8). `normalizeArgPhone` inserta el 9 cuando falta; si no
+ * puede interpretar el número, caemos a los dígitos crudos.
+ */
+export function canonico(tel: string | null | undefined): string {
+  const d = digitos(tel)
+  if (d.length < 8) return ""
+  return normalizeArgPhone(d) ?? d
+}
+
 /** ¿El teléfono es de un asesor/director (no eliminado) de ESTA agencia? Falla abierto. */
 export async function buscarInterno(
   db: SupabaseClient,
   agencyId: string,
   contactPhone: string
 ): Promise<PerfilInterno | null> {
-  const objetivo = digitos(contactPhone)
-  if (objetivo.length < 8) return null
+  const objetivo = canonico(contactPhone)
+  if (!objetivo) return null
   try {
     const { data, error } = await db
       .from("profiles")
@@ -58,8 +71,8 @@ export async function buscarInterno(
       .not("phone", "is", null)
     if (error || !data) return null
     const hit = data.find((p) => {
-      const d = digitos(p.phone)
-      return d.length >= 8 && d === objetivo
+      const d = canonico(p.phone)
+      return d !== "" && d === objetivo
     })
     return hit ? { id: hit.id, role: hit.role, full_name: hit.full_name, phone: hit.phone } : null
   } catch {

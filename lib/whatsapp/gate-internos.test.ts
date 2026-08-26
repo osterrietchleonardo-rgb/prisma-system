@@ -32,6 +32,11 @@ describe("buscarInterno", () => {
     const r = await buscarInterno(db as never, "a1", "5491161328586@s.whatsapp.net".split("@")[0])
     expect(r?.id).toBe("p1")
   })
+  it("matchea aunque Meta mande el número argentino SIN el 9 (542213089334 vs 5492213089334)", async () => {
+    const db = dbMock({ profiles: { data: [{ ...perfil, phone: "5492213089334" }], error: null } })
+    const r = await buscarInterno(db as never, "a1", "542213089334")
+    expect(r?.id).toBe("p1")
+  })
   it("no matchea otro número ni teléfonos cortos/vacíos", async () => {
     const db = dbMock({ profiles: { data: [perfil, { ...perfil, id: "p2", phone: "" }], error: null } })
     expect(await buscarInterno(db as never, "a1", "5491100000000")).toBeNull()
