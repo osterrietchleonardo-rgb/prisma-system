@@ -66,6 +66,9 @@ function formatBytes(bytes?: number | null) {
 // El resto se deja crudo a propósito: son casos de borde que no vale la
 // pena adivinar en español.
 function traducirErrorBase(mensaje: string): string {
+  // El mensaje crudo de Postgres se pierde en cuanto se traduce: si algo no
+  // cuadra, esto es lo único que le queda a quien tenga que investigar.
+  console.error("[traducirErrorBase] mensaje original de la base:", mensaje);
   if (mensaje.includes("duplicate key")) {
     return "Este asesor ya tiene un documento de ese tipo. Recargá la página e intentá de nuevo.";
   }
@@ -231,7 +234,19 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
             .select("id, nombre")
             .single();
           if (errTipo || !nuevoTipo) {
-            toast.error("No se pudo crear el tipo de documento" + (errTipo ? `: ${traducirErrorBase(errTipo.message)}` : ""));
+            // OJO: acá NO se usa traducirErrorBase. En el resto del archivo
+            // "duplicate key" significa "este asesor ya tiene un documento de
+            // ese tipo" — pero acá el índice único es (agency_id, lower(nombre))
+            // en advisor_doc_templates, así que significa otra cosa: ya existe
+            // el TIPO en esta inmobiliaria (dos directores creándolo a la vez,
+            // por ejemplo). Usar el mensaje genérico sería decirle al usuario
+            // algo que no pasó. Si esto se "unifica" con traducirErrorBase en
+            // el futuro, vuelve la mentira.
+            if (errTipo) console.error("[subirPlantilla] error al crear el tipo:", errTipo.message);
+            const mensaje = errTipo?.message.includes("duplicate key")
+              ? "Ya existe un tipo de documento con ese nombre. Recargá la página y elegilo de la lista."
+              : "No se pudo crear el tipo de documento" + (errTipo ? `: ${errTipo.message}` : "");
+            toast.error(mensaje);
             return;
           }
           templateId = nuevoTipo.id;
