@@ -620,14 +620,51 @@ describe("huecosDe — sin huecos fantasma entre párrafos", () => {
     expect(huecosDe(zip)).toEqual(["NOMBRE"])
   })
 
-  it("un hueco con espacios adentro ({{ NOMBRE }}) NO se lista: no es un hueco válido", () => {
-    // huecosDe aceptaba espacios y la validación no. El director escribía
-    // "{{ NOMBRE }}" a mano en Word, la app le pedía el nombre, y el
-    // contrato salía con ese lugar en blanco -- diciendo que estuvo todo
-    // bien. Ahora la forma de un hueco está definida en un solo lugar y las
-    // dos funciones no pueden discrepar.
+  it("un hueco con espacios adentro ({{ NOMBRE }}) se lista con el nombre limpio", () => {
     const zip = armarDocx(`<w:p>${run("Hola {{ NOMBRE }}, firmá.")}</w:p>`)
-    expect(huecosDe(zip)).toEqual([])
+    expect(huecosDe(zip)).toEqual(["NOMBRE"])
+  })
+})
+
+describe("el hueco escrito a mano, con un espacio de más", () => {
+  // El director escribe los huecos en Word, y "{{ NOMBRE }}" con un
+  // espacio de más sale solo. Antes el documento se rellenaba con ese lugar
+  // EN BLANCO y sin un aviso: docxtemplater buscaba el dato bajo el nombre
+  // " NOMBRE ", con los espacios adentro, y no lo encontraba. Un contrato
+  // firmado sin el nombre del asesor.
+
+  it("se rellena con el valor correcto, aunque Word lo haya partido en pedazos", () => {
+    // Partido en tres <w:r> --"{{ NOM", "BRE ", "}}"-- que es como lo
+    // guarda Word de verdad. Es EL caso que importa: si el nombre del hueco
+    // se juntara después de buscar el dato, el trim no alcanzaría.
+    const zip = armarDocx(`<w:p>${run("Hola {{ NOM")}${run("BRE ")}${run("}}, firmá.")}</w:p>`)
+    const salida = rellenarDocx(zip, { NOMBRE: "María González" })
+    expect(textoDe(salida)).toBe("Hola María González, firmá.")
+  })
+
+  it("y también entero, en el encabezado y todo", () => {
+    const zip = armarDocx(`<w:p>${run("Cuerpo: {{  CUIT  }}.")}</w:p>`, {
+      header: `<w:p>${run("Membrete: {{ NOMBRE }}")}</w:p>`,
+    })
+    const salida = rellenarDocx(zip, { NOMBRE: "María González", CUIT: "27-98765432-1" })
+    expect(textoDe(salida)).toBe("Cuerpo: 27-98765432-1.")
+    expect(textoDeParte(salida, "word/header1.xml")).toContain("María González")
+  })
+
+  it("un hueco con espacios que NO tiene dato sigue quedando vacío, nunca 'undefined'", () => {
+    const zip = armarDocx(`<w:p>${run("Hola {{ NOMBRE }}, tu CUIT es {{ CUIT }}.")}</w:p>`)
+    const salida = rellenarDocx(zip, { NOMBRE: "Juan" })
+    expect(textoDe(salida)).toBe("Hola Juan, tu CUIT es .")
+  })
+
+  it("el circuito entero: se pone el hueco, se lista y se rellena", () => {
+    const zip = armarDocx(`<w:p>${run("El asesor Juan Pérez acuerda.")}</w:p>`)
+    const r = ponerHuecosEnDocx(zip, [{ buscado: "Juan Pérez", hueco: "{{ NOMBRE }}" }])
+    expect(r.puestos).toEqual([{ buscado: "Juan Pérez", hueco: "{{ NOMBRE }}", veces: 1 }])
+    expect(huecosDe(r.zip)).toEqual(["NOMBRE"])
+    expect(textoDe(rellenarDocx(r.zip, { NOMBRE: "María González" }))).toBe(
+      "El asesor María González acuerda."
+    )
   })
 })
 

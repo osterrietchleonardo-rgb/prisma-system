@@ -19,6 +19,25 @@ const OPCIONES = {
    * "tu CUIT es undefined" es peor que uno que no sale.
    */
   nullGetter: () => "",
+  /**
+   * El director escribe los huecos a mano en Word, y ahí sale
+   * "{{ NOMBRE }}" con un espacio de más muy fácil. Sin esto, docxtemplater
+   * busca el dato bajo el nombre " NOMBRE " --con los espacios adentro--,
+   * no lo encuentra, y el nullGetter deja el lugar en blanco: el contrato
+   * sale a la firma sin el nombre del asesor y sin un solo aviso.
+   *
+   * El trim lo arregla de verdad, en vez de avisar que no anda. Comprobado
+   * contra la librería real: para cuando llama al parser ya juntó el
+   * nombre entero, aunque Word haya partido "{{ NOM" / "BRE " / "}}" en
+   * tres <w:r> distintos -- que es el caso que importa, porque es el que
+   * Word escribe siempre.
+   *
+   * El caso "." es el que documenta docxtemplater para su parser mínimo:
+   * significa "el dato entero", y se deja pasar tal cual.
+   */
+  parser: (tag: string) => ({
+    get: (scope: Record<string, string>) => (tag === "." ? scope : scope[tag.trim()]),
+  }),
 }
 
 /**
@@ -96,21 +115,35 @@ function escapeRegExp(s: string): string {
  * huecosDe permitía espacios adentro ("{{ NOMBRE }}") y la de validación
  * no. Resultado medido: huecosDe listaba NOMBRE, la app le pedía ese dato
  * al director, y el contrato salía con el nombre en blanco sin un solo
- * aviso. Con la forma en un único lugar, las dos no pueden volver a
- * separarse.
+ * aviso.
+ *
+ * Las dos coinciden ahora del lado PERMISIVO, no del estricto: los
+ * espacios se aceptan en los dos lados porque el rellenado los resuelve de
+ * verdad (ver el `parser` de OPCIONES). Ponerse estricto acá habría
+ * cerrado la discrepancia dejando el mismo contrato en blanco, solo que
+ * sin mencionarlo. El NOMBRE del hueco, en cambio, sigue siendo estricto:
+ * solo letras, números y guión bajo.
  */
-const CUERPO_DE_HUECO = "[A-Za-z0-9_]+"
+const NOMBRE_DE_HUECO = "[A-Za-z0-9_]+"
+const ESPACIOS = "\\s*"
 const APERTURA_DE_HUECO = escapeRegExp(DELIMITADORES.start)
 const CIERRE_DE_HUECO = escapeRegExp(DELIMITADORES.end)
 
 /**
- * Un hueco tiene que ser exactamente {{NOMBRE}}: solo letras, números y
- * guión bajo adentro de los delimitadores configurados. Si se inyectara
- * crudo un hueco con &, < o mal formado, el .docx queda inválido -- se
- * valida ACÁ, en la puerta, antes de tocar el XML.
+ * Un hueco tiene que ser {{NOMBRE}}: solo letras, números y guión bajo
+ * adentro de los delimitadores configurados, con o sin espacios pegados a
+ * las llaves. Si se inyectara crudo un hueco con &, < o mal formado, el
+ * .docx queda inválido -- se valida ACÁ, en la puerta, antes de tocar el
+ * XML. Las dos formas se arman con las MISMAS piezas: no pueden
+ * discrepar.
  */
-const RE_HUECO_VALIDO = new RegExp(`^${APERTURA_DE_HUECO}${CUERPO_DE_HUECO}${CIERRE_DE_HUECO}$`)
-const RE_HUECO_EN_TEXTO = new RegExp(`${APERTURA_DE_HUECO}(${CUERPO_DE_HUECO})${CIERRE_DE_HUECO}`, "g")
+const RE_HUECO_VALIDO = new RegExp(
+  `^${APERTURA_DE_HUECO}${ESPACIOS}${NOMBRE_DE_HUECO}${ESPACIOS}${CIERRE_DE_HUECO}$`
+)
+const RE_HUECO_EN_TEXTO = new RegExp(
+  `${APERTURA_DE_HUECO}${ESPACIOS}(${NOMBRE_DE_HUECO})${ESPACIOS}${CIERRE_DE_HUECO}`,
+  "g"
+)
 
 function huecoValido(hueco: string): boolean {
   return RE_HUECO_VALIDO.test(hueco)
