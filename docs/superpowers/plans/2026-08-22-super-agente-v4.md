@@ -2176,9 +2176,20 @@ agencia que atiende a los leads, así que (a) la regla de 24 h de Meta obliga a 
   (misma normalización E.164 y doble verificación del alta de contactos) + edición por el
   director en Equipo. Cargarlo es el opt-in del asesor a recibir avisos. (UI chica; OK de
   Leonardo por tocar la app.)
-- [ ] **P2 — Gate de internos** en el flujo PRISMA de n8n (§III.2.6): allowlist de
-  `profiles.phone` de la agencia; la respuesta del asesor se guarda en `interacciones_canal`
-  y se anota en el caso de la escalera; nunca llega al conversacional. (OK: escribe en n8n.)
+- [ ] **P2 — Gate de internos: va en la APP, no en n8n** (corregido el 26/8 al verificar el
+  recorrido real). El mensaje entrante NO lo recibe n8n primero: lo recibe el webhook de la app
+  (`app/api/webhooks/evolution/route.ts` — y su espejo `meta/route.ts`), que (1) saca el
+  teléfono del `remoteJid` (línea ~60), (2) descarta duplicados, (3) busca o CREA la
+  `wa_conversation` para la agencia de la instancia, (4) guarda en `wa_messages`/`wa_contacts`,
+  y recién (5) dispara n8n si `bot_active` (línea ~264/324). **El gate se inserta entre (1) y
+  (3):** si el teléfono (dígitos, misma convención `549…`) está en `profiles.phone` de esa
+  agencia → guardar en `interacciones_canal` (canal whatsapp, direccion entrada,
+  destinatario asesor/director), anotar en el caso abierto de `escalamientos_asesor` si lo hay,
+  mandar la confirmación fija ("Recibido, quedó anotado. Para responderle al cliente entrá a
+  PRISMA: [link]") y **return** — sin conversación, sin `wa_messages`, sin n8n. Si no hay
+  teléfono cargado, no hay gate que aplicar: la escalera manda solo email. Es código TypeScript
+  testeable en la rama; **toca el webhook de producción**, así que va con tests, prueba real con
+  el celular de Leonardo como director de PRISMAIA, y OK antes de mergear.
 - [ ] **P3 — Plantillas de asesor/director aprobadas** en la WABA de la agencia (abajo).
 
 **El catálogo propuesto (todas UTILITY — avisan de una gestión pendiente, no venden —, es_AR,
@@ -2229,6 +2240,21 @@ sacar el teléfono del perfil).
   [link]") — texto libre desde n8n dentro de la ventana de 24 h, sin IA; (d) lectura de
   `profiles.phone` en la escalera y en el gate.
 
+**Regla de canal para el equipo (Leonardo, 26/8):** el aviso sale **por email siempre** y
+**por WhatsApp además, solo si el asesor/director tiene celular cargado**. Los celulares se
+van completando; la lógica es la misma con o sin celular. Aviso con link al chat = solo al
+asesor **asignado**; sin asesor asignado → al director.
+
+**Email personalizado por agencia (§I.5.1, precisado el 26/8):** hoy todo sale de
+`RESEND_FROM = "PRISMA <no-reply@…>"`. Tres niveles, del más barato al más propio:
+(1) **ya, sin que el cliente haga nada:** `from` con el NOMBRE de la agencia
+("Central Real Estate Argentina <no-reply@…>") y `reply_to` = email del director o del
+asesor asignado, así las respuestas caen en SU casilla; (2) casilla administrada por agencia
+en dominio PRISMA (`seguimiento-ag…@agentes.vakdor.com`) — automática, habilita recibir;
+(3) **dominio propio del cliente** verificado en Resend (el cliente carga 3 registros DNS
+—SPF/DKIM— en su dominio, p.ej. `seguimiento@centralre.com.ar`) o Gmail por OAuth — opt-in
+para quien quiera que salga desde su propio dominio. Fase 2 arranca con (1) + (2).
+
 **Orden recomendado (decisión 25/8):** P1 (teléfono) → P2 (gate) → crear en PRISMAIA las de
 asesor/director y probarlas con el teléfono de Leonardo como director → **crear en Central las
 v2 de clientes y las de asesor juntas** (un solo OK, una sola espera de Meta) → encender la
@@ -2236,7 +2262,7 @@ escalera en sombra.
 
 - [ ] **Step 1:** OK de Leonardo sobre el catálogo y el orden.
 - [ ] **Step 2:** P1 en la app (perfil + Equipo) con su verificación en navegador.
-- [ ] **Step 3:** P2 en n8n con backup del workflow (OK).
+- [ ] **Step 3:** P2 en el webhook de la app (evolution + meta), con tests y prueba real (OK para mergear).
 - [ ] **Step 4:** ~~sumar las de asesor/director a `plantillas-v2.ts`~~ (hecho 25/8: `plantillasEquipo()`,
   con tests) → crearlas en PRISMAIA con el one-off (OK); esperar Meta; probar un aviso real a Leonardo.
 - [ ] **Step 5:** Central: clientes + asesores juntas (OK).
