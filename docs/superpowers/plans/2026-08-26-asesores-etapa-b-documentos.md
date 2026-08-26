@@ -530,7 +530,7 @@ const q=(sql)=>fetch('https://api.supabase.com/v1/projects/'+env.SUPABASE_PROJEC
 "
 ```
 
-Esperado: las **tres** tablas, `relrowsecurity` en `true` en las tres, y **seis** políticas.
+Esperado: las **tres** tablas, `relrowsecurity` en `true` en las tres, y **cinco** políticas: dos por cada tabla de documentos (director y asesor) y una sola sobre los tipos, que son solo del director.
 
 - [ ] **Step 5: Commit**
 
