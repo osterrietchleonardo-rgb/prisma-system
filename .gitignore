@@ -29,6 +29,17 @@ yarn-error.log*
 .env
 .env*.local
 
+# Copias de seguridad del .env. Aparecen solas cuando una herramienta toca la
+# configuración (ej. .env.bak-composio) y traen la SUPABASE_SERVICE_ROLE_KEY,
+# que saltea todos los permisos de la base. Ojo: NO usar `.env.*` acá, porque
+# .env.example sí va versionado.
+.env.bak*
+.env.backup*
+
+# Sesiones guardadas de navegador: cookies vivas de una cuenta real
+# (ej. linkedin-auth.json, que lo escribe la automatización de LinkedIn).
+*auth.json
+
 # vercel
 .vercel
 
