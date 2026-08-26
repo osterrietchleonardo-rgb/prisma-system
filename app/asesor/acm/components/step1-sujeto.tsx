@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { BarrioCombobox } from "./barrio-combobox";
+import { verNumero, leerNumero } from "@/lib/tasacion/campo-numerico";
 
 interface Step1SujetoProps {
   sujeto: Sujeto;
@@ -220,15 +221,15 @@ export function Step1Sujeto({ sujeto, onChange, onNext, hideNextButton }: Step1S
           </div>
           <div className="space-y-2">
             <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Dormitorios</Label>
-            <Input type="number" min="0" value={sujeto.dormitorios || ''} onChange={(e) => onChange({...sujeto, dormitorios: Number(e.target.value)})} className="bg-card/50 border-accent/10" />
+            <Input type="number" min="0" value={verNumero(sujeto.dormitorios)} onChange={(e) => onChange({...sujeto, dormitorios: leerNumero(e.target.value)})} className="bg-card/50 border-accent/10" />
           </div>
           <div className="space-y-2">
             <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Baños</Label>
-            <Input type="number" min="0" value={sujeto.banos || ''} onChange={(e) => onChange({...sujeto, banos: Number(e.target.value)})} className="bg-card/50 border-accent/10" />
+            <Input type="number" min="0" value={verNumero(sujeto.banos)} onChange={(e) => onChange({...sujeto, banos: leerNumero(e.target.value)})} className="bg-card/50 border-accent/10" />
           </div>
           <div className="space-y-2">
             <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Piso (0 = PB)</Label>
-            <Input type="number" min="0" value={sujeto.piso || ''} onChange={(e) => onChange({...sujeto, piso: Number(e.target.value)})} className="bg-card/50 border-accent/10" />
+            <Input type="number" min="0" value={verNumero(sujeto.piso)} onChange={(e) => onChange({...sujeto, piso: leerNumero(e.target.value)})} className="bg-card/50 border-accent/10" />
           </div>
           <div className="space-y-2">
             <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Vista</Label>

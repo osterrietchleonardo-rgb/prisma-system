@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { TextareaAuto } from "./textarea-auto"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -12,18 +12,21 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { Loader2, Sparkles, Save, RefreshCw, Home, Tag } from "lucide-react"
 import type { AdvisorOperation } from "@/types/marketing-ia"
+import type { CampoFaltante } from "@/lib/marketing-ia/campos-operacion"
 
 type Objetivo = "ambas" | "captacion" | "venta"
 
 interface Props {
   operacion: AdvisorOperation | null;
-  completo: boolean;
+  /** Las preguntas de Captación y Venta que quedan sin responder. Vacío = se puede generar. */
+  faltantes: CampoFaltante[];
   /** Guarda el formulario antes de generar, para que la fila exista sí o sí. */
   guardarAntes: () => Promise<void>;
   onActualizar: (parcial: Partial<AdvisorOperation>) => void;
 }
 
-export function OfertasIrresistibles({ operacion, completo, guardarAntes, onActualizar }: Props) {
+export function OfertasIrresistibles({ operacion, faltantes, guardarAntes, onActualizar }: Props) {
+  const completo = faltantes.length === 0
   const [captacion, setCaptacion] = useState(operacion?.oferta_captacion ?? "")
   const [venta, setVenta] = useState(operacion?.oferta_venta ?? "")
   const [generando, setGenerando] = useState<Objetivo | null>(null)
@@ -94,11 +97,21 @@ export function OfertasIrresistibles({ operacion, completo, guardarAntes, onActu
 
   if (!completo) {
     return (
-      <div className="p-8 text-center bg-muted/20 rounded-2xl border border-dashed">
-        <p className="font-bold">Todavía faltan datos</p>
-        <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-          Completá todos los campos de <strong>Captación</strong> y <strong>Venta</strong> para poder armar tus dos ofertas.
+      <div className="p-8 bg-muted/20 rounded-2xl border border-dashed">
+        <p className="font-bold text-center">
+          {faltantes.length === 1 ? "Falta una respuesta" : `Faltan ${faltantes.length} respuestas`}
         </p>
+        <p className="text-sm text-muted-foreground mt-2 mb-5 text-center max-w-md mx-auto">
+          Volvé con <strong>Anterior</strong> y completá esto para poder armar tus dos ofertas:
+        </p>
+        <ul className="space-y-2 max-w-lg mx-auto text-left">
+          {faltantes.map((f) => (
+            <li key={`${f.bloque}-${f.label}`} className="flex gap-3 text-sm">
+              <Badge variant="outline" className="shrink-0 h-fit">{f.bloque}</Badge>
+              <span className="text-muted-foreground">{f.label}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     )
   }
@@ -129,11 +142,12 @@ export function OfertasIrresistibles({ operacion, completo, guardarAntes, onActu
         </div>
       </CardHeader>
       <CardContent>
-        <Textarea
+        <TextareaAuto
           value={valor}
           onChange={(e) => setValor(e.target.value)}
           placeholder="Todavía no la generaste."
-          className="min-h-[170px] resize-none leading-relaxed"
+          minAlto={170}
+          className="leading-relaxed"
         />
       </CardContent>
     </Card>

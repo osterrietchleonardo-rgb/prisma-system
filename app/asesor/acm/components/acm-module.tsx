@@ -22,10 +22,7 @@ export const SUJETO_INICIAL: Sujeto = {
   antiguedad_anios: 0,
   estado_conservacion: "bueno",
   calidad_construccion: "estandar",
-  dormitorios: 0,
-  banos: 0,
   orientacion: "norte",
-  piso: 0,
   vista: "frente",
   amenidades: {
     cochera_cubierta: false,

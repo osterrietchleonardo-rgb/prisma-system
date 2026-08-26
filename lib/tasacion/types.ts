@@ -62,10 +62,12 @@ export interface Sujeto {
   incluir_linderos?: boolean;
   estado_conservacion: EstadoConservacion;
   calidad_construccion: CalidadConstruccion;
-  dormitorios: number;
-  banos: number;
+  // Opcionales a proposito: 0 es una respuesta real (monoambiente, PB) y hay que poder
+  // distinguirla de "todavia no lo cargue". Ver lib/tasacion/campo-numerico.ts.
+  dormitorios?: number;
+  banos?: number;
   orientacion: Orientacion;
-  piso: number; // 0 para PB, o null/undefined si no aplica (casa)
+  piso?: number; // 0 para PB, o undefined si no se cargo / no aplica (casa)
   vista: Vista;
   amenidades: Amenidades;
   
