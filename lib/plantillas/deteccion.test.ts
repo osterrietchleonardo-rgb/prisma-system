@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectarHuecos, MINIMO_DOCUMENTOS } from "./deteccion";
+import { detectarHuecos, MINIMO_DOCUMENTOS, TOPE_DIFF_MS } from "./deteccion";
 
 const doc = (advisorId: string, texto: string) => ({ advisorId, texto });
 
@@ -297,5 +297,66 @@ describe("detectarHuecos: abreviaturas, cuentas y quién entró de verdad", () =
     // los índices en [0,0,0] tampoco se cae. Este los mide.
     const r = detectarHuecos(TRES);
     expect(r.huecos.map((h) => h.indice)).toEqual([0, 1, 2]);
+  });
+});
+
+describe("detectarHuecos: que el hueco quede parejo entre los asesores", () => {
+  it("un dato pegado al final del documento no se lleva el salto de línea", () => {
+    // Se junta todo: el hueco pasa por el pegamento (la fecha) Y es lo último
+    // del documento. La rama que pega dos rangos se salteaba el recorte, así
+    // que la base quedaba con el "\n" y los otros asesores con su fecha
+    // limpia. Desparejo entre asesores es peor que parejo mal.
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "VIG: 12/03/2024\n" },
+      { advisorId: "b", texto: "VIG: 05/11/2025\n" },
+      { advisorId: "c", texto: "VIG: 28/02/2026\n" },
+    ]);
+    expect(r.huecos).toHaveLength(1);
+    expect(r.huecos[0].valores).toEqual({ a: "12/03/2024", b: "05/11/2025", c: "28/02/2026" });
+  });
+
+  it("lo mismo con un CUIT y con un importe al final", () => {
+    const cuit = detectarHuecos([
+      { advisorId: "a", texto: "CUIT 20-11111111-1\n" },
+      { advisorId: "b", texto: "CUIT 27-22222222-2\n" },
+      { advisorId: "c", texto: "CUIT 20-33333333-3\n" },
+    ]);
+    expect(cuit.huecos[0].valores).toEqual({ a: "20-11111111-1", b: "27-22222222-2", c: "20-33333333-3" });
+
+    const importe = detectarHuecos([
+      { advisorId: "a", texto: "Total 1.500,50 " },
+      { advisorId: "b", texto: "Total 2.300,75" },
+      { advisorId: "c", texto: "Total 9.100,25" },
+    ]);
+    expect(importe.huecos[0].valores).toEqual({ a: "1.500,50", b: "2.300,75", c: "9.100,25" });
+  });
+
+  it("el valor del otro asesor tampoco se lleva el espacio de CABEZA", () => {
+    // El diff emite `+ "  Maria Gonzalez Lopez"` cuando ese documento trae
+    // espacios de sobra antes del campo. Recortar solo la cola no alcanza.
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Asesor: Juan, ok." },
+      { advisorId: "b", texto: "Asesor:   Maria Gonzalez Lopez, ok." },
+      { advisorId: "c", texto: "Asesor: Pedro Gomez, ok." },
+    ]);
+    expect(r.huecos).toHaveLength(1);
+    expect(r.huecos[0].valores).toEqual({ a: "Juan", b: "Maria Gonzalez Lopez", c: "Pedro Gomez" });
+  });
+
+  it("ni el salto de línea de cabeza, que en un .docx es lo mismo", () => {
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Zona: Norte." },
+      { advisorId: "b", texto: "Zona:\n  Sur profundo." },
+      { advisorId: "c", texto: "Zona: Oeste." },
+    ]);
+    expect(r.huecos[0].valores).toEqual({ a: "Norte", b: "Sur profundo", c: "Oeste" });
+  });
+
+  it("el tope del diff tiene que seguir siendo finito: es la baranda", () => {
+    // Sin tope, dos contratos largos y muy distintos cuelgan la pantalla del
+    // director y nada se pone en rojo. El valor puede cambiar; que sea finito
+    // y positivo, no.
+    expect(Number.isFinite(TOPE_DIFF_MS)).toBe(true);
+    expect(TOPE_DIFF_MS).toBeGreaterThan(0);
   });
 });

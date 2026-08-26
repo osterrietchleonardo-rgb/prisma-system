@@ -64,7 +64,7 @@ const CONTEXTO = 60
  * Un director subiendo documentos no puede quedarse con la pantalla colgada:
  * se corta, se avisa, y ese asesor queda fuera de la comparación.
  */
-const TOPE_DIFF_MS = 10_000
+export const TOPE_DIFF_MS = 10_000
 
 const LARGO_MAXIMO_PEGAMENTO = 3
 
@@ -87,6 +87,8 @@ const LARGO_MAXIMO_PEGAMENTO = 3
  * defensa: hoy `diffWords` nunca los deja afuera del tramo cambiado, así que
  * ninguna prueba lo pone en rojo. Está escrito igual para que la regla se
  * lea completa, y para que el que venga no lo tome por cobertura faltante.
+ * El día que se cambie el tokenizer del diff eso deja de ser cierto: ahí sí
+ * pasa a ser cobertura que falta, y hay que escribirle una prueba.
  */
 function esPegamento(entre: string): boolean {
   if (entre.length === 0 || entre.length > LARGO_MAXIMO_PEGAMENTO) return false
@@ -333,24 +335,36 @@ export function detectarHuecos(docs: Documento[], opciones: Opciones = {}): Dete
     unidos.push({ ...r })
   }
 
+  /**
+   * Los espacios de los bordes no son parte del dato. Si la base trae un
+   * espacio de más antes del nombre, el rango arranca ahí, y el valor saldría
+   * como " Juan Pérez" -- que después se guarda así en la base de datos y se
+   * escribe así en el contrato de todos.
+   */
+  const recortarRango = (ini: number, fin: number) => {
+    while (ini < fin && esEspacio(textoBase[ini])) ini++
+    while (fin > ini && esEspacio(textoBase[fin - 1])) fin--
+    return { ini, fin }
+  }
+
   // Segunda vuelta: volver a pegar lo que solo separa un guión, una barra o un punto.
   const finales: Array<{ ini: number; fin: number }> = []
   for (const r of unidos) {
     const ultimo = finales[finales.length - 1]
     if (ultimo && esPegamento(textoBase.slice(ultimo.fin, r.ini))) {
-      ultimo.fin = r.fin
+      /**
+       * Recortar también acá, y no solo al empujar un rango nuevo. Un hueco
+       * que pasa por el pegamento (una fecha, un CUIT, un importe) y que es lo
+       * último del documento se llevaba el salto de línea final: la base
+       * quedaba con "12/03/2024
+" y los otros asesores con su fecha limpia.
+       * Desparejo entre asesores es peor que parejo mal, porque el salto se
+       * escribe en el contrato de una persona sola.
+       */
+      ultimo.fin = recortarRango(ultimo.ini, r.fin).fin
       continue
     }
-    /**
-     * Los espacios de los bordes no son parte del dato. Si la base trae un
-     * espacio de más antes del nombre, el rango arranca ahí, y el valor
-     * saldría como " Juan Pérez" -- que después se guarda así en la base de
-     * datos y se escribe así en el contrato de todos.
-     */
-    let { ini, fin } = r
-    while (ini < fin && esEspacio(textoBase[ini])) ini++
-    while (fin > ini && esEspacio(textoBase[fin - 1])) fin--
-    finales.push({ ini, fin })
+    finales.push(recortarRango(r.ini, r.fin))
   }
 
   const huecos: Hueco[] = []
