@@ -85,6 +85,19 @@ Inbox marcada. **Nunca inventes la clasificación.** Al terminar, el Inbox queda
 Filtrá, no vuelques. De 40 mails, los 3 que importan. Lo vencido, lo roto, y los
 números contra el norte. Máximo 30 segundos de lectura.
 
+> [!warning] Un ritual vencido en el tablero NO es un ritual incumplido
+> **Regla del 25/08/2026, después de equivocarse dos veces con la misma tarea.**
+> Cuando lo que figura vencido es un **ritual con otra persona esperando del otro lado**
+> —el resumen para Kevin, un toque del pipeline, un aviso a un asesor—, **preguntale antes
+> de afirmar que no lo hizo.** Leonardo ejecuta muchos de estos por WhatsApp o LinkedIn y el
+> tablero no se entera: el resumen para Kevin salió el 21/08 y el 24/08, y las dos veces
+> ClickUp decía `to do` (tareas `wdvf3a8b1u` y `wdvf3a861w`).
+>
+> Decilo así: *"figura sin cerrar desde el lunes, ¿salió?"* Un tablero que acusa en falso es
+> peor que no tener tablero — le hace discutir con su socio en vez de trabajar.
+> Esto **no aplica** a lo que sí podés verificar en una fuente (código, producción, un
+> commit): ahí vale la regla 2 y se verifica, no se pregunta.
+
 ## ④ El plan: tres cosas
 
 **Tres, no quince.** Cada una con el porqué atado al norte. Y decí explícitamente
@@ -115,16 +128,20 @@ la gente que aparecieron.
 El paso más importante del sistema.
 
 1. Repasá lo que hizo y **nombralo**. Que quede dicho.
-2. Mové lo que no hizo a mañana. Por cada tarea que movés, **sumá 1 a "Veces
+2. **Los rituales que vencían hoy, uno por uno, preguntados en voz alta.** No des por cerrado
+   ni por incumplido nada que dependa de otra persona: leé la lista corta y pedile sí o no. Lo
+   que salió se cierra en ClickUp **en ese momento**, con la nota de por dónde salió si fue por
+   fuera del tablero. Treinta segundos acá evitan el falso vencido de mañana a la mañana.
+3. Mové lo que no hizo a mañana. Por cada tarea que movés, **sumá 1 a "Veces
    postergada"** y completá "Postergada desde" si está vacío.
-3. Si alguna llegó a 3 postergaciones, frená y preguntá: *"¿lo hacemos mañana, lo
+4. Si alguna llegó a 3 postergaciones, frená y preguntá: *"¿lo hacemos mañana, lo
    delegamos o lo matamos? Arrastrarlo otra semana es decidir que no importa, solo
    que sin decirlo."*
-4. Confirmá que todo lo del negocio quedó anotado.
-5. Si en el día se construyó, arregló o decidió algo del sistema, sumalo a
+5. Confirmá que todo lo del negocio quedó anotado.
+6. Si en el día se construyó, arregló o decidió algo del sistema, sumalo a
    **`docs/interno/bitacora-sesiones.md`**. Con lo que se construyó, lo que se decidió y
    los errores propios: eso último es lo que más sirve para no repetirlos.
-6. **Cerrá el día explícitamente**: *"esto está guardado, no te lo tenés que
+7. **Cerrá el día explícitamente**: *"esto está guardado, no te lo tenés que
    acordar. Andá."*
 
 ## Rituales que no son diarios

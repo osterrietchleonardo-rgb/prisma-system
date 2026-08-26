@@ -85,6 +85,61 @@ tocó (comillas sin escapar en JSX y `prefer-const`, repartidos por `app/`, `com
 - Los 2 códigos de invitación viejos sin email siguen funcionando como antes, a propósito: no
   se migraron.
 
+**El Socio acusó en falso, y el arreglo es la parte que importa** (misma jornada, sesión de
+`/socio`)
+
+Se le marcó a Leonardo como deuda el resumen para Kevin, que **ya estaba mandado**. Era la
+**segunda vez** con el mismo ritual: la primera quedó anotada en la descripción de la tarea
+anterior (`wdvf3a8b1u`, 21/08: *"YA ESTABA HECHO. Leonardo lo había preparado por su
+cuenta"*), y nadie leyó esa nota antes de repetir el error.
+
+*La causa:* Leonardo ejecuta los rituales que tienen a otra persona del otro lado por WhatsApp
+o LinkedIn, y ClickUp no se entera. El estado del tablero **no es evidencia** de que algo no se
+hizo — solo de que nadie lo cerró.
+
+*El arreglo, en `.claude/skills/vakdor-socio/SKILL.md`:* en la fase ③ se pregunta antes de
+afirmar que un ritual con un tercero está incumplido; en la fase ⑦ se repasan uno por uno y se
+cierran en el momento, anotando por dónde salieron. Con el límite escrito al lado para que no
+se vuelva excusa: **solo vale para lo que depende de otra persona**; lo verificable contra el
+código o producción se sigue verificando. También quedó como memoria del proyecto
+(`ritual-vencido-no-es-incumplido.md`).
+
+**El guion de outbound dejó de ser una corazonada** (`20 Frentes/outbound.md` del vault, fuera
+del repo). El mensaje que trajo el sí de Sergio Bermúdez es el mismo que trajo el de Damián
+Ostrovsky, casi palabra por palabra; el guion que estaba escrito tiene cero respuestas. Se
+reemplazó el Toque 1, el viejo quedó abajo marcado como descartado con su porqué, y se corrigió
+una contradicción que el frente arrastraba: decía *"prohibido hablar de tu producto"* y lo que
+funciona **sí habla del producto**. La regla real es **no pedir la reunión en el primer
+mensaje**.
+
+*Errores propios de esta sesión, que es lo que más sirve:*
+
+**Una edición se perdió por trabajar en el worktree equivocado.** Las dos reglas del
+`SKILL.md` se escribieron en `PRISMA-SYSTEM` (el principal) sin commitear, y **otra terminal
+cambió de rama en ese mismo worktree** (de `feat/outbound-canal-por-grado` a
+`chore/sanear-backup-n8n`): el cambio desapareció. Se detectó porque `git status` dejó de
+mostrarlo como modificado. Regla que faltaba explicitar: **la sesión de `/socio` trabaja en
+`PRISMA-SYSTEM-socio`**, que existe justamente para eso. Lo que vive fuera de git —el vault,
+ClickUp, la memoria— sobrevivió sin un rasguño; lo único que se perdió fue lo del repo.
+
+**No volví a mirar el reloj en cinco horas.** Se leyó la hora al abrir (14:35) y después se
+razonó todo el día sobre esa hora, planificando "las dos horas que quedan" cuando ya eran las
+19:37 y la jornada había terminado. Lo delató el timestamp de un log, no una verificación. La
+memoria `mirar-la-hora-antes-de-decirla` ya advertía esto y **igual volvió a pasar**: leerla
+una vez no alcanza, hay que releerla cada vez que se habla de tiempo o se arma un plan.
+
+**Se escribió un bloque entero al vault sin acentos**, por miedo a los escapes del heredoc —
+incluido el texto de un mensaje que Leonardo iba a copiarle a un CEO. El heredoc con
+delimitador citado (`<<'EOF'`) no expande nada: los acentos pasan bien.
+
+*Dos gotchas más de este entorno:*
+
+1. Los scripts que usan `@composio/core` **solo corren con el cwd en
+   `.claude/skills/vakdor-socio/`**: el `node_modules` vive ahí, no en la raíz del repo.
+2. **`/tmp` de Git Bash no es el `/tmp` de node**: un archivo escrito en `/tmp` desde Bash,
+   node lo busca en `C:	mp` y falla con ENOENT. Los temporales van al scratchpad de la
+   sesión, con ruta absoluta.
+
 ---
 
 ## 2026-08-24
