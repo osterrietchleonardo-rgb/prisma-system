@@ -2176,7 +2176,7 @@ agencia que atiende a los leads, así que (a) la regla de 24 h de Meta obliga a 
   (misma normalización E.164 y doble verificación del alta de contactos) + edición por el
   director en Equipo. Cargarlo es el opt-in del asesor a recibir avisos. (UI chica; OK de
   Leonardo por tocar la app.)
-- [ ] **P2 — Gate de internos: va en la APP, no en n8n** (corregido el 26/8 al verificar el
+- [x] **P2 — Gate de internos: va en la APP, no en n8n** (✅ implementado el 26/8, commit `7bc8d29`, pendiente el OK de merge: `lib/whatsapp/gate-internos.ts` + inserción en `evolution/route.ts` y `meta/route.ts`; 10 tests; migración `interacciones_canal` aplicada; **prueba real contra el preview con el celular cargado en PRISMAIA: 200 handled by gate, fila registrada, 0 conversaciones nuevas, 0 wa_messages, confirmación enviada; el reenvío del mismo wamid no duplica**) (corregido el 26/8 al verificar el
   recorrido real). El mensaje entrante NO lo recibe n8n primero: lo recibe el webhook de la app
   (`app/api/webhooks/evolution/route.ts` — y su espejo `meta/route.ts`), que (1) saca el
   teléfono del `remoteJid` (línea ~60), (2) descarta duplicados, (3) busca o CREA la
@@ -2262,7 +2262,7 @@ escalera en sombra.
 
 - [ ] **Step 1:** OK de Leonardo sobre el catálogo y el orden.
 - [ ] **Step 2:** P1 en la app (perfil + Equipo) con su verificación en navegador.
-- [ ] **Step 3:** P2 en el webhook de la app (evolution + meta), con tests y prueba real (OK para mergear).
+- [x] **Step 3 (26/8):** P2 en el webhook de la app (evolution + meta), con tests y prueba real. Falta el OK para mergear (llega con el merge de la rama, Task 20).
 - [ ] **Step 4:** ~~sumar las de asesor/director a `plantillas-v2.ts`~~ (hecho 25/8: `plantillasEquipo()`,
   con tests) → crearlas en PRISMAIA con el one-off (OK); esperar Meta; probar un aviso real a Leonardo.
 - [ ] **Step 5:** Central: clientes + asesores juntas (OK).
