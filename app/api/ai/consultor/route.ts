@@ -23,6 +23,19 @@ export const dynamic = "force-dynamic";
  */
 const TOPE_POR_SECCION = 100;
 
+/**
+ * Cuántas candidatas junta la red antes de frenar, sin ordenarlas.
+ *
+ * Para "3 ambientes en Belgrano" hay 6.739 avisos que coinciden. La función vieja los leía
+ * TODOS para poder ordenarlos por parecido: 140 MB de disco y 15 s la primera vez. Frenando en
+ * 8.000 el resultado es idéntico —se verificó propiedad por propiedad en cinco zonas— y pone un
+ * techo: ningún barrio puede costar más, por grande que sea.
+ */
+const CANDIDATAS_ANTES_DE_FRENAR = 8000;
+
+/** Debajo de esto, un filtro de amenities se afloja solo y se le avisa al asesor. */
+const MINIMO_ANTES_DE_AFLOJAR = 20;
+
 export async function POST(req: Request) {
   try {
     const { message, sessionId, history } = await req.json();
@@ -494,6 +507,12 @@ export async function POST(req: Request) {
         p_floor_min: floorMin,
         p_floor_max: floorMax,
         p_free_text_patterns: freeTextPatterns,
+        // Cuántas candidatas junta antes de frenar. Con 8.000 devuelve exactamente las mismas
+        // 100 que la función vieja (verificado en Belgrano, Palermo, Retiro, Villa Ortúzar y
+        // Puerto Madero) y en los barrios grandes tarda menos de la mitad. Ver la migración
+        // 20260826030000_buscador_red_frena_y_rankea.sql.
+        p_candidatas: CANDIDATAS_ANTES_DE_FRENAR,
+        p_excluir_ids: [],
         p_limit: TOPE_POR_SECCION,
       };
 
@@ -509,7 +528,24 @@ export async function POST(req: Request) {
       // único que cambia es el tiempo que se le permite tardar. La cartera propia y la de la
       // agencia SIGUEN yendo por la sesión del usuario, que es donde el aislamiento importa.
       const redDb = createAdminClient();
-      let { data: rmxRanked, error: rmxErr } = await redDb.rpc('match_roomix_ia', rmxArgs);
+      let { data: rmxRanked, error: rmxErr } = await redDb.rpc('buscar_roomix', rmxArgs);
+
+      // ─── Si los amenities dejaron muy poco, se afloja el filtro y se avisa ───
+      // Los amenities ahora DESCARTAN (antes solo sumaban puntos: pedías cochera y te mostraba
+      // igual las que no tienen). El riesgo es quedarse en cero: "3 ambientes en Coghlan con
+      // pileta y parrilla" puede no existir. Entonces, si con el filtro estricto quedan menos de
+      // 20, se busca de nuevo sin los amenities y se le dice al asesor cuántas los cumplen de
+      // verdad. Es la misma idea que ya se usa cuando se pide un "piso" y no hay ninguno.
+      let redAflojada: { pedidos: string[]; estrictas: number } | null = null;
+      if (!rmxErr && amenityPatterns.length > 0 && (rmxRanked || []).length < MINIMO_ANTES_DE_AFLOJAR) {
+        const estrictas = (rmxRanked || []).length;
+        const sinAmenities = await redDb.rpc('buscar_roomix', { ...rmxArgs, p_amenity_patterns: [] });
+        if (!sinAmenities.error && (sinAmenities.data || []).length > estrictas) {
+          rmxRanked = sinAmenities.data;
+          redAflojada = { pedidos: amenityKeywords, estrictas };
+          console.log(`Red: con ${amenityKeywords.join(' + ')} solo ${estrictas}; se aflojó a ${(rmxRanked || []).length}`);
+        }
+      }
 
       // ─── Un solo reintento cuando la red se corta por tiempo ───
       // La consulta de la red vive contra el techo de 8 s del rol `authenticated`: medido el
@@ -521,8 +557,8 @@ export async function POST(req: Request) {
       // fondo —ese es que la consulta no tarde 9 s— pero le devuelve al asesor las propiedades
       // de la red en vez de un "no encontré nada" que es falso.
       if (rmxErr && (rmxErr as any).code === '57014') {
-        console.warn('match_roomix_ia se cortó por tiempo; reintentando una vez');
-        const reintento = await redDb.rpc('match_roomix_ia', rmxArgs);
+        console.warn('buscar_roomix se cortó por tiempo; reintentando una vez');
+        const reintento = await redDb.rpc('buscar_roomix', rmxArgs);
         rmxRanked = reintento.data;
         rmxErr = reintento.error;
         console.log('Reintento de la red →', rmxErr ? 'falló de nuevo' : `${(rmxRanked || []).length} propiedades`);
@@ -535,7 +571,7 @@ export async function POST(req: Request) {
       // red teniendo la red propiedades (Belgrano: 14.593 avisos). El asistente terminó diciéndole a una
       // asesora "no tengo acceso a propiedades fuera de la cartera de PRISMA" y se fue a Zonaprop.
       const redFallo = !!rmxErr;
-      if (rmxErr) console.error('match_roomix_ia error:', rmxErr);
+      if (rmxErr) console.error('buscar_roomix error:', rmxErr);
       console.log('RPC counts → propias:', propiasRanked.length, 'agencia:', agenciaRanked.length, 'roomix:', (rmxRanked || []).length, redFallo ? '(LA RED FALLÓ)' : '');
 
       marcar("5-sql-red-de-colaboracion");
@@ -641,6 +677,12 @@ Respondé con un resumen MUY BREVE (2-4 oraciones): cuántas encontraste y ofrec
 
       // La red no contestó: hay que DECIRLO. Si no, el resumen sale como "encontré 10" (las de la
       // agencia) y el asesor se queda pensando que afuera no hay nada.
+      // El asesor pidió amenities y no alcanzaban: se le muestra más, pero se le dice la verdad.
+      if (redAflojada) {
+        propertyContext += `
+SOBRE LO QUE PEDISTE DE MÁS (${redAflojada.pedidos.join(", ")}): en la red solo ${redAflojada.estrictas === 0 ? "no hay ninguna" : `hay ${redAflojada.estrictas}`} que lo cumpla en esta zona con el resto de los criterios. Para que el asesor tenga con qué comparar se agregaron propiedades que NO lo tienen. Decíselo en una frase, sin vueltas, al principio de tu respuesta.`;
+      }
+
       if (redFallo) {
         propertyContext += `\nAVISO OBLIGATORIO — LA RED DE COLABORACIÓN NO RESPONDIÓ: la búsqueda en la red de colaboración (los avisos publicados por otras inmobiliarias) se cortó por un problema técnico, así que lo que ves arriba NO la incluye. NO digas ni des a entender que afuera de la agencia no hay propiedades: no lo sabemos. Decíselo en una frase corta y ofrecele reintentar en un momento.`;
       }
