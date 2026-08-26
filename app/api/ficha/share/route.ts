@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
-import { normalizarImagenes } from "@/lib/acm/fotos-url";
+import { normalizarImagenes, urlsFotoRed } from "@/lib/acm/fotos-url";
 import { NextResponse } from "next/server";
 import crypto from "crypto";
 
@@ -81,7 +81,7 @@ export async function POST(req: Request) {
           city: rp.neighborhood || rp.city || "",
           // El `.webp` que publica roomix da 404 en su propio CDN el 12% de las veces
           // y la foto queda rota (ver `normalizarFotoRoomix`).
-          images: normalizarImagenes(rp.images),
+          images: urlsFotoRed(normalizarImagenes(rp.images)),
           amenities: Array.isArray(rp.amenities) ? rp.amenities : [],
           source: "roomix",
           // Esta ficha es la que el asesor le manda a SU cliente, así que no lleva NINGÚN

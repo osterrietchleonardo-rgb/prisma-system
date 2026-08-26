@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { generateEmbedding } from "@/lib/gemini";
-import { normalizarFotoRoomix } from "@/lib/acm/fotos-url";
+import { urlFotoRed } from "@/lib/acm/fotos-url";
 import {
   sujetoAmbientes,
   sujetoDormitorios,
@@ -291,9 +291,9 @@ export async function POST(req: Request) {
           precio: r.price ? Number(r.price) : null,
           moneda: r.currency || "USD",
           precio_m2: r.price && candM2 ? Math.round(Number(r.price) / candM2) : null,
-          // El `.webp` que publica roomix da 404 en su propio CDN el 12% de las veces y la
-          // tarjeta queda con la foto rota (ver `normalizarFotoRoomix`).
-          imagen: Array.isArray(r.images) && r.images[0] ? normalizarFotoRoomix(r.images[0]) : null,
+          // Sale por nuestro proxy, no por el CDN de roomix (ver `urlFotoRed`). De paso pide el
+          // `.jpg`, porque el `.webp` que publica roomix da 404 en su CDN el 12% de las veces.
+          imagen: Array.isArray(r.images) && r.images[0] ? urlFotoRed(r.images[0]) : null,
           url: r.canonical_url || null,
           responsable: r.roomix_agency_name || "Inmobiliaria colaboradora",
           fecha_publicacion: r.date_posted || null,

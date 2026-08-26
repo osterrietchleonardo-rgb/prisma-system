@@ -70,3 +70,36 @@ export function normalizarFotoRoomix(url: string): string {
     return url;
   }
 }
+
+/** Ruta del proxy propio que sirve las fotos de la red de colaboración. Existe para que el
+ *  navegador del asesor deje de pedirle cada foto al CDN de roomix: desde el 26-ago-2026 la
+ *  foto se baja UNA sola vez, server-side, se guarda en nuestro Storage y de ahí en más sale
+ *  de nuestro lado. Lo que esto corta, además del tráfico, es el `Referer` — cada foto pedida
+ *  desde el navegador dejaba escrito `https://prisma.vakdor.com/` en los registros de ellos.
+ *
+ *  Ver `app/api/foto-red/route.ts` (la descarga y el cacheo) y la entrada del 26-ago-2026 en
+ *  `docs/interno/bitacora-sesiones.md` (por qué existe). */
+export const RUTA_FOTO_RED = "/api/foto-red";
+
+/** Convierte una foto de la red de colaboración en la URL de nuestro proxy. Cualquier otra
+ *  foto (Tokko, Storage) sale igual: la cartera propia no pasa por acá.
+ *
+ *  PURA a propósito, igual que el resto del archivo: arma un string, no baja nada. Y aplica
+ *  `normalizarFotoRoomix` primero para que al proxy le llegue siempre el `.jpg`, que es el
+ *  único que el CDN de origen sirve — así el caché no se llena de 404. */
+export function urlFotoRed(url: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return url;
+  }
+  if (parsed.protocol !== "https:" || !HOSTS_ROOMIX.some((re) => re.test(parsed.hostname))) return url;
+  return `${RUTA_FOTO_RED}?u=${encodeURIComponent(normalizarFotoRoomix(url))}`;
+}
+
+/** `urlFotoRed` sobre una lista ya normalizada. Azúcar para los endpoints que devuelven
+ *  `images` completas (ficha, buscador IA, mapa, ficha compartible). */
+export function urlsFotoRed(urls: string[]): string[] {
+  return urls.map(urlFotoRed);
+}
