@@ -2286,8 +2286,10 @@ escalera en sombra.
   - Regla de Leonardo: el link del aviso se adapta al rol del destinatario y apunta al chat
     concreto (`/director/leads-whatsapp/[id]` para el director, que ve todo y reasigna desde
     la configuración de ese chat).
-- [ ] **Step 4:** ~~sumar las de asesor/director a `plantillas-v2.ts`~~ (hecho 25/8: `plantillasEquipo()`,
-  con tests) → crearlas en PRISMAIA con el one-off (OK); esperar Meta; probar un aviso real a Leonardo.
+- [x] **Step 4 (26/8):** `plantillasEquipo()` en el provisionador y **creadas y APROBADAS por Meta en PRISMAIA**
+  (primer intento rechazado: "las variables no pueden estar al principio ni al final" → cierre fijo
+  tras el link, regla fijada en test). Meta reclasificó `asesor_sigue_esperando` como MARKETING
+  (el resto UTILITY). Falta: probar un aviso real de escalera al celular de Leonardo (con la Task 14).
 - [ ] **Step 5:** Central: clientes + asesores juntas (OK).
 
 ---
