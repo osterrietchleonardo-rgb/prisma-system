@@ -1,0 +1,197 @@
+import { describe, it, expect } from "vitest";
+import { detectarHuecos, MINIMO_DOCUMENTOS } from "./deteccion";
+
+const doc = (advisorId: string, texto: string) => ({ advisorId, texto });
+
+// Tres contratos iguales salvo el nombre, el CUIT y el porcentaje.
+const TRES = [
+  doc("a", "Contrato con Juan Pérez, CUIT 20-11111111-1, comisión del 30%. Fin."),
+  doc("b", "Contrato con María González, CUIT 27-22222222-2, comisión del 35%. Fin."),
+  doc("c", "Contrato con Pedro Gómez, CUIT 20-33333333-3, comisión del 40%. Fin."),
+];
+
+describe("detectarHuecos", () => {
+  it("encuentra los tramos que cambian entre asesores", () => {
+    const r = detectarHuecos(TRES);
+    const textos = r.huecos.map((h) => h.valores.a);
+    expect(textos).toContain("Juan Pérez");
+    expect(textos.some((t) => t.includes("20-11111111-1"))).toBe(true);
+    expect(textos.some((t) => t.includes("30"))).toBe(true);
+  });
+
+  it("guarda el valor de CADA asesor en cada hueco", () => {
+    const r = detectarHuecos(TRES);
+    const nombre = r.huecos.find((h) => h.valores.a === "Juan Pérez");
+    expect(nombre).toBeDefined();
+    expect(nombre!.valores.b).toBe("María González");
+    expect(nombre!.valores.c).toBe("Pedro Gómez");
+  });
+
+  it("NO marca como hueco lo que es igual en todos", () => {
+    const r = detectarHuecos(TRES);
+    for (const h of r.huecos) {
+      expect(h.valores.a).not.toContain("Contrato con");
+      expect(h.valores.a).not.toBe("Fin.");
+    }
+  });
+
+  it("guarda contexto de alrededor, que es lo que después lee la IA", () => {
+    const r = detectarHuecos(TRES);
+    expect(r.huecos.every((h) => h.contexto.length > 0)).toBe(true);
+  });
+
+  it("avisa si hay menos de tres documentos, en vez de inventar", () => {
+    // Con dos no se puede medir: cualquier diferencia parece un hueco.
+    const r = detectarHuecos(TRES.slice(0, 2));
+    expect(r.advertencias.some((a) => a.includes(String(MINIMO_DOCUMENTOS)))).toBe(true);
+  });
+
+  it("con documentos idénticos no encuentra ningún hueco", () => {
+    const iguales = [doc("a", "Texto fijo."), doc("b", "Texto fijo."), doc("c", "Texto fijo.")];
+    expect(detectarHuecos(iguales).huecos).toEqual([]);
+  });
+
+  it("no revienta si un documento está vacío: lo avisa", () => {
+    const r = detectarHuecos([doc("a", "Hola Juan."), doc("b", ""), doc("c", "Hola Pedro.")]);
+    expect(r.advertencias.length).toBeGreaterThan(0);
+  });
+
+  it("los huecos salen en el orden en que aparecen en el documento", () => {
+    const r = detectarHuecos(TRES);
+    expect(r.huecos.map((h) => h.indice)).toEqual([...r.huecos.map((h) => h.indice)].sort((x, y) => x - y));
+  });
+});
+
+// Lo de abajo es lo que se rompe de verdad cuando la detección falla: no que
+// no encuentre nada, sino que encuentre de más o parta un dato en pedazos.
+describe("detectarHuecos: que no parta ni pegue de más", () => {
+  it("son tres datos y salen tres huecos, ni uno más", () => {
+    // El CUIT le llega al diff partido en 20 / - / 11111111 / - / 1: si no se
+    // vuelve a pegar, un solo dato sale como tres huecos.
+    const r = detectarHuecos(TRES);
+    expect(r.huecos.map((h) => h.valores.a)).toEqual(["Juan Pérez", "20-11111111-1", "30"]);
+    expect(r.huecos.map((h) => h.valores.b)).toEqual(["María González", "27-22222222-2", "35"]);
+    expect(r.huecos.map((h) => h.valores.c)).toEqual(["Pedro Gómez", "20-33333333-3", "40"]);
+  });
+
+  it("dos datos separados por una coma NO se fusionan en uno", () => {
+    // El pegamento junta "20-11" pero no puede juntar "Juan, 30": en cuanto
+    // hay un espacio de por medio son dos datos distintos.
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Asesor Juan, comisión 30%, zona Norte." },
+      { advisorId: "b", texto: "Asesor María, comisión 35%, zona Sur." },
+      { advisorId: "c", texto: "Asesor Pedro, comisión 40%, zona Oeste." },
+    ]);
+    expect(r.huecos.map((h) => h.valores.a)).toEqual(["Juan", "30", "Norte"]);
+    expect(r.huecos.map((h) => h.valores.c)).toEqual(["Pedro", "40", "Oeste"]);
+  });
+
+  it("una coma y un espacio NO pegan dos datos, aunque sean pocos caracteres", () => {
+    // El caso justo: entre "Juan" y "30" hay solo ", ". Es corto y no tiene ni
+    // letras ni números, así que lo único que los separa es el espacio.
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Ref Juan, 30% ok." },
+      { advisorId: "b", texto: "Ref María, 35% ok." },
+      { advisorId: "c", texto: "Ref Pedro, 40% ok." },
+    ]);
+    expect(r.huecos.map((h) => h.valores.a)).toEqual(["Juan", "30"]);
+    expect(r.huecos.map((h) => h.valores.b)).toEqual(["María", "35"]);
+  });
+
+  it("un número con punto y coma de miles es un solo dato", () => {
+    // Al diff le llega partido en 1 / . / 500 / , / 50.
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Total 1.500,50 hoy" },
+      { advisorId: "b", texto: "Total 2.300,75 hoy" },
+      { advisorId: "c", texto: "Total 9.100,25 hoy" },
+    ]);
+    expect(r.huecos.map((h) => h.valores.a)).toEqual(["1.500,50"]);
+    expect(r.huecos.map((h) => h.valores.c)).toEqual(["9.100,25"]);
+  });
+
+  it("una fecha con barras es un solo dato", () => {
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Vigente desde 12/03/2024 hasta nuevo aviso." },
+      { advisorId: "b", texto: "Vigente desde 05/11/2025 hasta nuevo aviso." },
+      { advisorId: "c", texto: "Vigente desde 01/03/2026 hasta nuevo aviso." },
+    ]);
+    expect(r.huecos.map((h) => h.valores.a)).toEqual(["12/03/2024"]);
+    expect(r.huecos.map((h) => h.valores.b)).toEqual(["05/11/2025"]);
+  });
+
+  it("un espacio de más en el documento base no corre los valores", () => {
+    // Word mete espacios dobles sin que nadie se dé cuenta. Antes esto
+    // dejaba el valor como " Juan Pérez" o directamente descartaba el asesor.
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Contrato  con   Juan Pérez, comisión del 30%." },
+      { advisorId: "b", texto: "Contrato con María González, comisión del 35%." },
+      { advisorId: "c", texto: "Contrato con  Pedro Gómez,  comisión del 40%." },
+    ]);
+    expect(r.advertencias).toEqual([]);
+    expect(r.huecos.map((h) => h.valores.a)).toEqual(["Juan Pérez", "30"]);
+    expect(r.huecos.map((h) => h.valores.b)).toEqual(["María González", "35"]);
+    expect(r.huecos.map((h) => h.valores.c)).toEqual(["Pedro Gómez", "40"]);
+  });
+
+  it("una diferencia de solo espacios no es un hueco", () => {
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Hola  Juan  Pérez." },
+      { advisorId: "b", texto: "Hola Juan Pérez." },
+      { advisorId: "c", texto: "Hola   Juan Pérez." },
+    ]);
+    expect(r.huecos).toEqual([]);
+  });
+
+  it("si la base no dice nada ahí, el hueco queda vacío para ella y con texto para el resto", () => {
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Hola, firma el titular." },
+      { advisorId: "b", texto: "Hola, firma el titular Juan Pérez." },
+      { advisorId: "c", texto: "Hola, firma el titular Pedro Gómez." },
+    ]);
+    expect(r.huecos).toHaveLength(1);
+    expect(r.huecos[0].valores).toEqual({ a: "", b: "Juan Pérez", c: "Pedro Gómez" });
+  });
+
+  it("el contexto trae la frase de alrededor, no solo el dato", () => {
+    const r = detectarHuecos(TRES);
+    const nombre = r.huecos[0];
+    expect(nombre.contexto).toContain("Contrato con");
+    expect(nombre.contexto).toContain("Juan Pérez");
+    expect(nombre.contexto).toContain("CUIT");
+  });
+
+  it("el textoBase es el del primer documento que sirve, no el del primero a secas", () => {
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "   " },
+      { advisorId: "b", texto: "Hola Juan." },
+      { advisorId: "c", texto: "Hola Pedro." },
+      { advisorId: "d", texto: "Hola Ana." },
+    ]);
+    expect(r.textoBase).toBe("Hola Juan.");
+    expect(r.huecos.map((h) => h.valores)).toEqual([{ b: "Juan", c: "Pedro", d: "Ana" }]);
+  });
+
+  it("dos documentos con el mismo asesor: usa uno y avisa, en vez de pisar el valor", () => {
+    const r = detectarHuecos([
+      { advisorId: "a", texto: "Hola Juan." },
+      { advisorId: "a", texto: "Hola Otro." },
+      { advisorId: "b", texto: "Hola Pedro." },
+      { advisorId: "c", texto: "Hola Ana." },
+    ]);
+    expect(r.advertencias.some((x) => x.includes("más de un documento"))).toBe(true);
+    expect(r.huecos[0].valores).toEqual({ a: "Juan", b: "Pedro", c: "Ana" });
+  });
+
+  it("con un solo documento no inventa huecos", () => {
+    const r = detectarHuecos([{ advisorId: "a", texto: "Hola Juan." }]);
+    expect(r.huecos).toEqual([]);
+    expect(r.textoBase).toBe("Hola Juan.");
+  });
+
+  it("sin documentos devuelve vacío y avisa, en vez de reventar", () => {
+    const r = detectarHuecos([]);
+    expect(r.huecos).toEqual([]);
+    expect(r.textoBase).toBe("");
+    expect(r.advertencias.length).toBeGreaterThan(0);
+  });
+});
