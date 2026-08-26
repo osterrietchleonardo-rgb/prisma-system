@@ -2278,9 +2278,13 @@ escalera en sombra.
   - **Caída de Supabase** (~02:20 a 03:29 AR, instancia Micro 1 GB, reinicio manual desde el
     dashboard): durante la caída el webhook de Meta **devolvió 200 sin poder procesar** (la
     búsqueda de instancia falla → "no encontrada" → 200) y Meta NO reintenta con 200 → **los
-    mensajes de leads que llegaron en esa ventana se perdieron en silencio**. Pendiente
-    prioritario (fuera de este plan): devolver 5xx cuando la base no responde, para que Meta
-    reintente; y `system_events` (§III.2.8.2) tiene que avisar a Leonardo de esto.
+    mensajes de leads que llegaron en esa ventana se perdieron en silencio**. **Resuelto el
+    26/8** (rama `fix/webhook-503-base-caida`, en `main` como `3137a13`): los dos webhooks
+    (`meta` y `evolution`) responden **503** cuando la base no contesta (al buscar la
+    instancia, chequear duplicados o crear la conversación) y Meta reintenta; un
+    `phone_number_id` desconocido sigue dando 200. Probado en local: base inalcanzable → 503;
+    base sana + instancia desconocida → 200 sin escribir nada. Sigue pendiente:
+    `system_events` (§III.2.8.2) avisándole a Leonardo de la caída.
   - Bug visto en logs: links a `/director/leads-whatsapp/Mensaje%20de%20voz%20recibido`
     (texto del mensaje en vez del id).
   - Regla de Leonardo: el link del aviso se adapta al rol del destinatario y apunta al chat
