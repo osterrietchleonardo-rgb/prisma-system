@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 export type PropertySource = 'own' | 'agency' | 'roomix'
 
@@ -529,6 +530,9 @@ const SECTION_ICONS: Record<PropertySource, React.ReactNode> = {
   roomix: <span className="text-lg">⚡</span>,
 }
 
+/** A partir de cuántas tarjetas la sección pasa a tener scroll propio en vez de estirar el chat. */
+const SCROLL_DESDE = 6
+
 function PropertySection({
   source,
   properties,
@@ -558,12 +562,27 @@ function PropertySection({
         </span>
       </div>
 
-      {/* Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* Grilla de tarjetas.
+          Con muchos resultados la grilla va dentro de su propio contenedor con scroll: si no,
+          una búsqueda de 100 propiedades empuja el resto de la conversación cientos de pantallas
+          hacia abajo y el chat deja de leerse. El tope alcanza para ver ~6 tarjetas de una;
+          el resto se recorre acá adentro sin mover el chat. */}
+      <div
+        className={cn(
+          "grid grid-cols-1 md:grid-cols-2 gap-4",
+          properties.length > SCROLL_DESDE &&
+            "max-h-[560px] overflow-y-auto overscroll-contain pr-2 rounded-lg"
+        )}
+      >
         {properties.map((prop) => (
           <UnifiedPropertyCard key={prop.id} property={prop} />
         ))}
       </div>
+      {properties.length > SCROLL_DESDE && (
+        <p className="text-center text-[10px] text-muted-foreground/60">
+          Deslizá dentro del recuadro para ver las {properties.length}
+        </p>
+      )}
     </div>
   )
 }
