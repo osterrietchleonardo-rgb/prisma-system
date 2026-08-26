@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
 import { normalizarImagenes } from "@/lib/acm/fotos-url";
 import { poligonoParaSql } from "@/lib/mapa/poligono-sql";
+import { fusionarFiltrosDeZona } from "@/lib/mapa/filtros-de-zona";
 import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
 
 export const dynamic = "force-dynamic";
@@ -132,11 +133,11 @@ export async function POST(req: Request) {
     // PRIVADAS: se filtra por user_id y no por agencia. Ni el director ve las de un asesor —
     // asi esta escrito en /api/mapa/zonas y asi tiene que seguir. Se consulta con el cliente
     // de servicio (que saltea RLS), por eso el filtro explicito no es opcional.
-    let zonasDelUsuario: { id: string; nombre: string; geojson: any }[] = [];
+    let zonasDelUsuario: { id: string; nombre: string; geojson: any; filtros: any }[] = [];
     try {
       const { data: zonas } = await createAdminClient()
         .from("mapa_zonas")
-        .select("id, nombre, geojson")
+        .select("id, nombre, geojson, filtros")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(200);
@@ -392,20 +393,43 @@ export async function POST(req: Request) {
     // ─── La zona dibujada que nombró, convertida a algo que Postgres entienda ───
     // El modelo devuelve el nombre tal cual figura en la lista del usuario; acá se busca por
     // nombre normalizado (sin acentos ni mayúsculas) para tolerar cómo lo escribió.
-    let zonaElegida: { nombre: string; poligono: string } | null = null;
+    let zonaElegida: { nombre: string; poligono: string; filtros: any } | null = null;
     if (zonaPedida) {
       const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
       const z = zonasDelUsuario.find((x) => norm(x.nombre) === norm(zonaPedida!))
         || zonasDelUsuario.find((x) => norm(x.nombre).includes(norm(zonaPedida!)));
       const poligono = z ? poligonoParaSql(z.geojson) : null;
       if (z && poligono) {
-        zonaElegida = { nombre: z.nombre, poligono };
+        zonaElegida = { nombre: z.nombre, poligono, filtros: z.filtros || null };
       } else {
         // Se nombró una zona que no existe o cuyo dibujo está roto. NO se busca en todos lados
         // como si nada: el asesor acotó a propósito y merece saber que no se pudo.
         console.warn("Zona pedida sin resolver:", zonaPedida, z ? "(dibujo inválido)" : "(no está en su lista)");
       }
     }
+    // ─── Los filtros con los que guardó la zona rellenan lo que no dijo hoy ───
+    // Cuando dibujó el área tenía puestos operación, tipo, ambientes y presupuesto, y la zona
+    // los guardó junto con el trazo. Volvérselos a preguntar es hacerle repetir lo que ya
+    // definió. Gana siempre lo que dice en la conversación: la zona solo completa los huecos.
+    let deLaZona: string[] = [];
+    if (zonaElegida?.filtros) {
+      const fusion = fusionarFiltrosDeZona(
+        { operation, typeKeywords, roomsFilter, bedroomsFilter, priceMax, priceMin, priceCurrency },
+        zonaElegida.filtros,
+      );
+      operation = fusion.criterios.operation;
+      // El tipo guardado por el mapa pasa por el mismo traductor de jerga que usa el chat: sin
+      // esto, una zona guardada como "PH" no encontraría los que Tokko guarda como "Condo".
+      typeKeywords = fusion.criterios.typeKeywords.flatMap((t: string) => SLANG_MAP[t.toLowerCase().trim()] || [t]);
+      roomsFilter = fusion.criterios.roomsFilter;
+      bedroomsFilter = fusion.criterios.bedroomsFilter;
+      priceMax = fusion.criterios.priceMax;
+      priceMin = fusion.criterios.priceMin;
+      priceCurrency = fusion.criterios.priceCurrency;
+      deLaZona = fusion.tomadoDeLaZona;
+      if (deLaZona.length) console.log("De los filtros guardados con la zona se tomó:", deLaZona.join(" · "));
+    }
+
     console.log("Zona:", { zonaPedida, resuelta: zonaElegida?.nombre || null, tiene: zonasDelUsuario.length });
 
     // ─── COMPUERTA DE DATOS MÍNIMOS ───────────────────────────────────────────
@@ -605,16 +629,6 @@ export async function POST(req: Request) {
         // `match_properties_ia` no sabe excluir, así que las ya vistas se sacan acá. Son 100
         // filas como mucho: filtrarlas en memoria no cuesta nada y evita tocar esa función,
         // que también usa el ACM.
-      // Se buscó adentro de un dibujo: decirlo, para que el asesor sepa que se respetó el
-      // límite que él marcó y no se le colaron propiedades de la vuelta de la esquina.
-      if (zonaElegida) {
-        propertyContext += `\nBUSQUEDA ACOTADA A UNA ZONA DIBUJADA: todo lo de arriba está DENTRO de la zona que el asesor dibujó y guardó con el nombre "${zonaElegida.nombre}". Nombrásela en tu respuesta para que sepa que se respetó, y no menciones barrios como si hubieras buscado por barrio.`;
-      } else if (zonaPedida) {
-        // Nombró una zona que no se pudo resolver. Lo peor sería buscar en todos lados y
-        // mostrarle 100 propiedades como si nada: acotó a propósito.
-        propertyContext += `\nOJO — NOMBRÓ UNA ZONA QUE NO ENCONTRÉ: dijo "${zonaPedida}" y no coincide con ninguna de las zonas que tiene dibujadas${zonasDelUsuario.length ? ` (las suyas son: ${zonasDelUsuario.map((z) => z.nombre).join(", ")})` : " (no tiene ninguna guardada todavía)"}. Lo de arriba se buscó SIN esa zona. Decíselo antes que nada y preguntale cuál quiso decir.`;
-      }
-
         if (pedirMas) {
           propiasRanked = propiasRanked.filter((r: any) => !yaMostradas.has(String(r.id)));
           agenciaRanked = agenciaRanked.filter((r: any) => !yaMostradas.has(String(r.id)));
@@ -814,8 +828,23 @@ ${pisoFallback ? `AVISO IMPORTANTE: El usuario buscó un "piso" (depto planta co
 Respondé con un resumen MUY BREVE (2-4 oraciones): cuántas encontraste y ofrecé refinar la búsqueda.`
         : `No se encontraron propiedades con esos criterios.${pisoFallback ? ' Tampoco se encontraron departamentos.' : ''} Explicá cordialmente y sugerí alternativas concretas (ampliar zona, cambiar precio, quitar algún filtro).`;
 
-      // La red no contestó: hay que DECIRLO. Si no, el resumen sale como "encontré 10" (las de la
-      // agencia) y el asesor se queda pensando que afuera no hay nada.
+      // ─── Se buscó adentro de un dibujo: decirlo, y decir con qué criterios ───
+      // Va PEGADO ADELANTE del contexto y no agregado al final, por dos razones. La primera es
+      // que acá `propertyContext` recién se asignó con `=`: cualquier cosa escrita antes de esta
+      // línea se pierde (me pasó, y el aviso nunca llegó al modelo). La segunda es que puesto al
+      // final, entre las demás notas, el modelo lo pasaba por arriba y contestaba "encontré 100
+      // propiedades en la zona" sin nombrarla. Las dos cosas, verificadas en el navegador.
+      if (zonaElegida) {
+        const conQue = deLaZona.length > 0
+          ? ` Y NO le preguntaste nada porque esos criterios (${deLaZona.join(", ")}) salieron de los filtros con los que ÉL MISMO guardó esa zona: decile cuáles usaste, en la misma frase, y ofrecele cambiarlos si hoy busca otra cosa.`
+          : "";
+        propertyContext = `ARRANCÁ TU RESPUESTA POR ESTO, es lo primero que tiene que leer: todo lo que sigue está DENTRO de la zona que el asesor dibujó y guardó como "${zonaElegida.nombre}". Nombrala con esas palabras exactas para que sepa que se respetó su dibujo.${conQue}\n\n` + propertyContext;
+      } else if (zonaPedida) {
+        // Nombró una zona que no se pudo resolver. Lo peor sería buscar en todos lados y
+        // mostrarle 100 propiedades como si nada: acotó a propósito.
+        propertyContext = `OJO — NOMBRÓ UNA ZONA QUE NO ENCONTRÉ: dijo "${zonaPedida}" y no coincide con ninguna de las zonas que tiene dibujadas${zonasDelUsuario.length ? ` (las suyas son: ${zonasDelUsuario.map((z) => z.nombre).join(", ")})` : " (no tiene ninguna guardada todavía)"}. Lo de abajo se buscó SIN esa zona. Decíselo antes que nada y preguntale cuál quiso decir.\n\n` + propertyContext;
+      }
+
       // Pidió más: que el modelo lo diga como lo que es, una tanda nueva, y no como si
       // hubiera vuelto a buscar de cero.
       if (pedirMas) {
@@ -829,6 +858,8 @@ SON PROPIEDADES NUEVAS: el asesor pidió ver más y estas NO se le mostraron ant
 SOBRE LO QUE PEDISTE DE MÁS (${redAflojada.pedidos.join(", ")}): en la red solo ${redAflojada.estrictas === 0 ? "no hay ninguna" : `hay ${redAflojada.estrictas}`} que lo cumpla en esta zona con el resto de los criterios. Para que el asesor tenga con qué comparar se agregaron propiedades que NO lo tienen. Decíselo en una frase, sin vueltas, al principio de tu respuesta.`;
       }
 
+      // La red no contestó: hay que DECIRLO. Si no, el resumen sale como "encontré 10" (las de
+      // la agencia) y el asesor se queda pensando que afuera no hay nada.
       if (redFallo) {
         propertyContext += `\nAVISO OBLIGATORIO — LA RED DE COLABORACIÓN NO RESPONDIÓ: la búsqueda en la red de colaboración (los avisos publicados por otras inmobiliarias) se cortó por un problema técnico, así que lo que ves arriba NO la incluye. NO digas ni des a entender que afuera de la agencia no hay propiedades: no lo sabemos. Decíselo en una frase corta y ofrecele reintentar en un momento.`;
       }
