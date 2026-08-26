@@ -39,17 +39,25 @@ export async function textoDeDocx(buffer: Buffer): Promise<string> {
  * El nombre de una etiqueta XML siempre termina en '>' (sin atributos) o en
  * un espacio (antes de sus atributos) -- nunca en cualquier otro caracter.
  * Por eso `(?:\s[^>]*)?` y no un `[^>]*` pelado: `<w:t[^>]*>` (sin el \s)
- * también matchea `<w:tbl>` y `<w:tc>`, porque `[^>]*` se come el resto del
- * nombre de la etiqueta ("bl", "c"). Medido contra un .docx real con
- * tablas: sin el \s, "extraía" 130.793 caracteres de "texto" cuando el
- * texto real eran 29.901 -- 100.892 de basura XML, toda de las tablas.
+ * también matchea `<w:tbl>`, `<w:tc>` y `<w:tab/>`, porque `[^>]*` se come
+ * el resto del nombre de la etiqueta ("bl", "c", "ab/"). Medido contra un
+ * .docx real con tablas: sin el \s, "extraía" 130.793 caracteres de "texto"
+ * cuando el texto real eran 29.901 -- 100.892 de basura XML, toda de las
+ * tablas.
  */
 const abre = (tag: string) => `<w:${tag}(?:\\s[^>]*)?>`
 const cierra = (tag: string) => `<\\/w:${tag}>`
 const autocierra = (tag: string) => `<w:${tag}(?:\\s[^>]*)?\\/>`
 
 const RE_TEXTO = new RegExp(`${abre("t")}([\\s\\S]*?)${cierra("t")}`, "g")
-const RE_RPR = new RegExp(`${abre("rPr")}[\\s\\S]*?${cierra("rPr")}`)
+/**
+ * El formato del run. Contempla también el `<w:rPr/>` vacío, que Word
+ * escribe: si solo se buscara la forma con cierre, ese caso caería como
+ * contenido cualquiera y el run terminaría partido de más.
+ */
+const RE_RPR = new RegExp(`${autocierra("rPr")}|${abre("rPr")}[\\s\\S]*?${cierra("rPr")}`)
+const RE_ABRE_RUN = new RegExp(`^${abre("r")}`)
+const CIERRE_RUN = "</w:r>"
 
 const escapar = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 
@@ -80,16 +88,97 @@ function escapeRegExp(s: string): string {
 }
 
 /**
+ * QUÉ FORMA TIENE UN HUECO -- definido una sola vez, para dos usos:
+ * validar el que nos mandan (huecoValido) y encontrar los que ya están
+ * escritos en el documento (huecosDe).
+ *
+ * Estaba escrito dos veces y las dos versiones no coincidían: la de
+ * huecosDe permitía espacios adentro ("{{ NOMBRE }}") y la de validación
+ * no. Resultado medido: huecosDe listaba NOMBRE, la app le pedía ese dato
+ * al director, y el contrato salía con el nombre en blanco sin un solo
+ * aviso. Con la forma en un único lugar, las dos no pueden volver a
+ * separarse.
+ */
+const CUERPO_DE_HUECO = "[A-Za-z0-9_]+"
+const APERTURA_DE_HUECO = escapeRegExp(DELIMITADORES.start)
+const CIERRE_DE_HUECO = escapeRegExp(DELIMITADORES.end)
+
+/**
  * Un hueco tiene que ser exactamente {{NOMBRE}}: solo letras, números y
  * guión bajo adentro de los delimitadores configurados. Si se inyectara
  * crudo un hueco con &, < o mal formado, el .docx queda inválido -- se
  * valida ACÁ, en la puerta, antes de tocar el XML.
  */
-const RE_HUECO_VALIDO = new RegExp(
-  `^${escapeRegExp(DELIMITADORES.start)}[A-Za-z0-9_]+${escapeRegExp(DELIMITADORES.end)}$`
-)
+const RE_HUECO_VALIDO = new RegExp(`^${APERTURA_DE_HUECO}${CUERPO_DE_HUECO}${CIERRE_DE_HUECO}$`)
+const RE_HUECO_EN_TEXTO = new RegExp(`${APERTURA_DE_HUECO}(${CUERPO_DE_HUECO})${CIERRE_DE_HUECO}`, "g")
+
 function huecoValido(hueco: string): boolean {
   return RE_HUECO_VALIDO.test(hueco)
+}
+
+/**
+ * ¿Este XML abre y cierra todas sus etiquetas, y en el orden correcto?
+ *
+ * Es la red de seguridad del módulo, no un detalle de prolijidad. Word abre
+ * un .docx con una etiqueta de cierre sin apertura pidiendo REPARAR el
+ * archivo; mammoth, en cambio, lo lee igual porque es tolerante, así que
+ * leer el texto de la salida NO alcanza para saber que quedó sano. Y el
+ * daño no se descubre en la app: se descubre el día de la firma.
+ *
+ * Se recorre a mano en vez de con un regex porque hay que saltear lo que
+ * PARECE una etiqueta y no lo es: los comentarios, la declaración <?xml?>,
+ * el CDATA, y sobre todo los ">" que viven adentro del valor de un
+ * atributo.
+ */
+function xmlBalanceado(xml: string): boolean {
+  const pila: string[] = []
+  let i = 0
+  while (i < xml.length) {
+    const at = xml.indexOf("<", i)
+    if (at === -1) break
+
+    // -1 = no era esto; -2 = empezó y nunca terminó; >0 = dónde sigue.
+    const saltar = (marca: string, hasta: string) => {
+      if (!xml.startsWith(marca, at)) return -1
+      const fin = xml.indexOf(hasta, at + marca.length)
+      return fin === -1 ? -2 : fin + hasta.length
+    }
+    let salto = saltar("<!--", "-->")
+    if (salto === -1) salto = saltar("<![CDATA[", "]]>")
+    if (salto === -1) salto = saltar("<?", "?>")
+    if (salto === -1) salto = saltar("<!", ">")
+    if (salto === -2) return false
+    if (salto > 0) {
+      i = salto
+      continue
+    }
+
+    // Etiqueta normal: termina en el primer ">" que NO esté adentro de las
+    // comillas de un atributo.
+    let j = at + 1
+    let comilla = ""
+    while (j < xml.length) {
+      const c = xml[j]
+      if (comilla) {
+        if (c === comilla) comilla = ""
+      } else if (c === '"' || c === "'") {
+        comilla = c
+      } else if (c === ">") {
+        break
+      }
+      j++
+    }
+    if (j >= xml.length) return false
+    const cuerpo = xml.slice(at + 1, j)
+    i = j + 1
+    if (cuerpo.endsWith("/")) continue // autocerrada: ni abre ni cierra nada
+    if (cuerpo.startsWith("/")) {
+      if (pila.pop() !== cuerpo.slice(1).trim()) return false
+      continue
+    }
+    pila.push(cuerpo.split(/[\s/]/)[0])
+  }
+  return pila.length === 0
 }
 
 /**
@@ -126,7 +215,13 @@ function todasLasApariciones(completo: string, buscado: string): Array<{ inicio:
       continue
     }
     apariciones.push({ inicio: at, fin })
-    desde = fin
+    // El Math.max es lo que hace que este bucle NO PUEDA quedarse quieto.
+    // Con un buscado vacío `fin` es igual a `at`, y un `desde = fin` pelado
+    // deja el cursor donde estaba: el proceso se cuelga para siempre. Que
+    // la única defensa contra eso fuera la guarda de ponerHueco era frágil
+    // -- si alguien la sacaba, el pedido no fallaba: se congelaba. Y un
+    // test que solo puede colgarse o pasar no protege nada.
+    desde = Math.max(fin, at + 1)
   }
   return apariciones
 }
@@ -190,24 +285,73 @@ function segmentosDeNivelSuperior(
   return segmentos
 }
 
-type Run = { inicio: number; fin: number; xml: string; formato: string; texto: string }
+/**
+ * Un run NO es "un formato y un texto": es una secuencia ORDENADA de
+ * pedazos. Word mete adentro del mismo <w:r>, conviviendo con el texto,
+ * cosas que no son texto -- un <w:tab/>, un <w:br/>, un <w:drawing>, un
+ * <w:noBreakHyphen/>. Modelarlo como "un texto" y reescribirlo como
+ * <w:r>{rPr}<w:t>…</w:t></w:r> borra todo lo demás sin decir nada: la
+ * tabulación del renglón de la firma, el salto de línea del domicilio.
+ *
+ * Por eso cada pedazo es una de dos cosas: `texto` (el contenido de un
+ * <w:t>, ya desescapado) u `opaco` (cualquier otro hijo del run, guardado
+ * como XML crudo y copiado tal cual). El <w:rPr> no es un pedazo: es el
+ * formato del run, y se vuelve a emitir con cada pedazo que se reescriba.
+ */
+type Pedazo = { tipo: "texto"; texto: string } | { tipo: "opaco"; xml: string }
+
+type Run = {
+  inicio: number
+  fin: number
+  xml: string
+  /** La etiqueta de apertura tal cual vino, con sus atributos (w:rsidRPr y
+   * compañía). Se reusa al reescribir el run para no perderlos. */
+  abridor: string
+  formato: string
+  pedazos: Pedazo[]
+  texto: string
+}
+
+function pedazosDeRun(cuerpo: string): Pedazo[] {
+  const pedazos: Pedazo[] = []
+  let cursor = 0
+  for (const m of cuerpo.matchAll(RE_TEXTO)) {
+    const at = m.index ?? 0
+    if (at > cursor) pedazos.push({ tipo: "opaco", xml: cuerpo.slice(cursor, at) })
+    pedazos.push({ tipo: "texto", texto: desescapar(m[1]) })
+    cursor = at + m[0].length
+  }
+  if (cursor < cuerpo.length) pedazos.push({ tipo: "opaco", xml: cuerpo.slice(cursor) })
+  return pedazos
+}
 
 /**
  * Los <w:r> de nivel superior de un párrafo, con su texto ya desescapado.
  *
  * Un run con OTRO <w:r> anidado adentro es un cuadro de texto o una forma
  * (ver segmentosDeNivelSuperior): no se lee su texto -- podría ni
- * pertenecer a este párrafo -- y se preserva como un bloque opaco, igual
- * que una imagen o un salto de línea. Un run así queda con `texto: ""`, y
- * por eso nunca se parte ni se pierde: en ponerHueco, un run sin texto se
- * copia siempre tal cual, esté donde esté.
+ * pertenecer a este párrafo -- y se preserva como UN SOLO bloque opaco, sin
+ * mirar adentro. Un run así queda con `texto: ""`, y por eso nunca se parte
+ * ni se pierde: en ponerHueco, un run sin texto se copia siempre tal cual,
+ * esté donde esté.
  */
 function extraerRuns(xmlParrafo: string): Run[] {
   return segmentosDeNivelSuperior(xmlParrafo, "r").map((seg) => {
     const xml = xmlParrafo.slice(seg.inicio, seg.fin)
-    const texto = seg.anidado ? "" : desescapar([...xml.matchAll(RE_TEXTO)].map((t) => t[1]).join(""))
-    const formato = (xml.match(RE_RPR) || [""])[0]
-    return { inicio: seg.inicio, fin: seg.fin, xml, formato, texto }
+    const abridor = (xml.match(RE_ABRE_RUN) || [""])[0]
+    const base = { inicio: seg.inicio, fin: seg.fin, xml, abridor }
+    // Sin apertura reconocible o sin cierre propio (un <w:r/> vacío) no hay
+    // interior que leer; anidado, no se quiere leer.
+    if (seg.anidado || !abridor || !xml.endsWith(CIERRE_RUN)) {
+      return { ...base, formato: "", pedazos: [], texto: "" }
+    }
+    const interior = xml.slice(abridor.length, xml.length - CIERRE_RUN.length)
+    const rpr = RE_RPR.exec(interior)
+    const formato = rpr ? rpr[0] : ""
+    const cuerpo = rpr ? interior.slice(0, rpr.index) + interior.slice(rpr.index + rpr[0].length) : interior
+    const pedazos = pedazosDeRun(cuerpo)
+    const texto = pedazos.map((p) => (p.tipo === "texto" ? p.texto : "")).join("")
+    return { ...base, formato, pedazos, texto }
   })
 }
 
@@ -248,67 +392,131 @@ export function ponerHueco(
   const apariciones = todasLasApariciones(completo, buscado)
   if (!apariciones.length) return { xml: xmlParrafo, ok: false, veces: 0 }
 
-  const runDeTexto = (texto: string, formato: string) =>
-    `<w:r>${formato}<w:t xml:space="preserve">${escapar(texto)}</w:t></w:r>`
-  const runDeHueco = (formato: string) => `<w:r>${formato}<w:t xml:space="preserve">${escapar(hueco)}</w:t></w:r>`
+  const runDeTexto = (texto: string, r: Run) =>
+    `${r.abridor}${r.formato}<w:t xml:space="preserve">${escapar(texto)}</w:t></w:r>`
+  const runDeHueco = (r: Run) =>
+    `${r.abridor}${r.formato}<w:t xml:space="preserve">${escapar(hueco)}</w:t></w:r>`
+  /**
+   * Un pedazo opaco sale en SU PROPIO run, con el mismo formato: un <w:r>
+   * que contiene solo un <w:tab/> es OOXML válido, y así la tabulación
+   * queda exactamente donde estaba aunque el reemplazo le pase por encima.
+   * Si el pedazo son solo espacios entre etiquetas va suelto: envolverlo en
+   * un run inventaría contenido que el documento no tenía.
+   */
+  const runOpaco = (crudo: string, r: Run) =>
+    crudo.trim() === "" ? crudo : `${r.abridor}${r.formato}${crudo}</w:r>`
 
   const piezas: string[] = []
-  let cursor = 0
+  let cursorXml = 0 // por dónde va la copia textual del XML del párrafo
+  let pos = 0 // por dónde va la lectura del texto del párrafo
   let mi = 0 // índice de la próxima aparición a procesar
 
   for (const r of runs) {
-    if (r.texto.length === 0) {
-      // Sin texto (imagen, salto, cuadro de texto anidado...): no hay nada
-      // que buscar adentro, y JAMÁS se descarta -- se copia tal cual, quede
-      // donde quede respecto de un reemplazo en curso.
+    // Todo lo que hay ENTRE dos runs, y todo lo que los ENVUELVE, se copia
+    // textual: un <w:hyperlink>, un <w:sdt> (control de contenido), un
+    // <w:ins> (control de cambios), un <w:fldSimple>, un <w:bookmarkStart>
+    // -- construcciones que Word escribe solo, sin que nadie las pida.
+    // Recortar de un saque desde el primer run hasta el último parece lo
+    // mismo y no lo es: se lleva puestas esas etiquetas y deja los cierres
+    // sin apertura. Medido: el .docx sale roto y Word pide repararlo.
+    piezas.push(xmlParrafo.slice(cursorXml, r.inicio))
+    cursorXml = r.fin
+
+    const finDelRun = pos + r.texto.length
+    // Un run que ningún reemplazo toca se copia entero, byte por byte: es
+    // más barato y, sobre todo, no hay forma de perderle nada adentro.
+    if (r.texto.length === 0 || mi >= apariciones.length || apariciones[mi].inicio >= finDelRun) {
       piezas.push(r.xml)
+      pos = finDelRun
       continue
     }
-    let local = 0
-    const len = r.texto.length
-    while (local < len) {
-      const abs = cursor + local
-      const enCurso = mi < apariciones.length && abs >= apariciones[mi].inicio && abs < apariciones[mi].fin
-      if (enCurso) {
-        const ap = apariciones[mi]
-        if (abs === ap.inicio) piezas.push(runDeHueco(r.formato))
-        const hasta = Math.min(ap.fin, cursor + len)
-        local = hasta - cursor
-        if (hasta === ap.fin) mi++
+
+    for (const p of r.pedazos) {
+      if (p.tipo === "opaco") {
+        piezas.push(runOpaco(p.xml, r))
         continue
       }
-      // Literal hasta la próxima aparición (o el fin del run): con el
-      // formato de ESTE run, no el del primero que tocó el match -- así el
-      // sufijo de un reemplazo que cruza dos runs con formato distinto no
-      // hereda la negrita del que empezó el match.
-      const limite = mi < apariciones.length ? Math.min(apariciones[mi].inicio, cursor + len) : cursor + len
-      const texto = r.texto.slice(local, limite - cursor)
-      if (texto) piezas.push(runDeTexto(texto, r.formato))
-      local = limite - cursor
+      const finDelPedazo = pos + p.texto.length
+      let off = 0
+      while (off < p.texto.length) {
+        const abs = pos + off
+        const ap = mi < apariciones.length ? apariciones[mi] : null
+        if (ap && abs >= ap.inicio && abs < ap.fin) {
+          if (abs === ap.inicio) piezas.push(runDeHueco(r))
+          const hasta = Math.min(ap.fin, finDelPedazo)
+          off = hasta - pos
+          if (hasta === ap.fin) mi++
+          continue
+        }
+        // Literal hasta la próxima aparición (o el fin del pedazo): con el
+        // formato de ESTE run, no el del primero que tocó el match -- así el
+        // sufijo de un reemplazo que cruza dos runs con formato distinto no
+        // hereda la negrita del que empezó el match.
+        const limite = ap ? Math.min(ap.inicio, finDelPedazo) : finDelPedazo
+        const texto = p.texto.slice(off, limite - pos)
+        if (texto) piezas.push(runDeTexto(texto, r))
+        off = limite - pos
+      }
+      pos = finDelPedazo
     }
-    cursor += len
   }
+  piezas.push(xmlParrafo.slice(cursorXml)) // la cola del párrafo, tal cual
 
-  const xml = xmlParrafo.slice(0, runs[0].inicio) + piezas.join("") + xmlParrafo.slice(runs[runs.length - 1].fin)
+  const xml = piezas.join("")
+
+  // La cura estructural, y la regla que ordena el módulo: NUNCA devolver
+  // éxito habiendo hecho el trabajo mal. Si el párrafo reconstruido quedó
+  // desbalanceado -- por una construcción de Word que no previmos, hoy o
+  // dentro de un año -- se devuelve el original intacto y el valor cae en
+  // `faltantes`, donde el director lo ve. Un documento roto con luz verde
+  // no se descubre hasta el día de la firma.
+  if (!xmlBalanceado(xml)) return { xml: xmlParrafo, ok: false, veces: 0 }
+
   return { xml, ok: true, veces: apariciones.length }
 }
 
 /**
- * Los archivos de texto del paquete .docx a revisar: el cuerpo siempre, y
- * el encabezado/pie si el documento los tiene.
+ * Los archivos de texto del paquete .docx a revisar.
  *
- * Word los nombra headerN.xml / footerN.xml siempre que los crea, así que
- * alcanza con buscar por ese patrón sin tener que leer
- * [Content_Types].xml. docxtemplater, al RELLENAR (ver rellenarDocx), ya
- * los procesa solo con que el .docx los declare ahí -- eso lo hace
- * cualquier Word real. Lo que esta función resuelve es la mitad que
- * depende de nosotros: poner el hueco ahí adentro en primer lugar, porque
- * ponerHuecosEnDocx no es docxtemplater.
+ * La lista sale de [Content_Types].xml y es EXACTAMENTE la misma que
+ * rellena docxtemplater (está en su propio código, en filetypes.js:
+ * encabezado, cuerpo, pie, notas al pie y comentarios). Que las dos
+ * mitades miren lo mismo es lo que evita el peor final: poner un hueco en
+ * una parte que después nadie rellena, y que el contrato salga a la firma
+ * con un "{{NOMBRE}}" impreso.
+ *
+ * Por eso word/endnotes.xml queda AFUERA a propósito, aunque también sea
+ * texto del documento: docxtemplater no lo rellena. Un valor que viva solo
+ * en una nota final se informa como faltante -- que es la verdad -- en vez
+ * de quedar a medio hacer.
  */
+const TIPOS_DE_PARTE_CON_TEXTO = [
+  "wordprocessingml.header+xml",
+  "wordprocessingml.footer+xml",
+  "wordprocessingml.footnotes+xml",
+  "wordprocessingml.comments+xml",
+]
+
 function partesDeTextoDeDocx(zip: PizZip): string[] {
-  const principal = zip.file("word/document.xml") ? ["word/document.xml"] : []
-  const encabezadosYPies = zip.file(/^word\/(header|footer)\d*\.xml$/).map((f) => f.name)
-  return [...principal, ...encabezadosYPies]
+  const rutas = new Set<string>()
+  if (zip.file("word/document.xml")) rutas.add("word/document.xml")
+
+  const tipos = zip.file("[Content_Types].xml")
+  if (tipos) {
+    for (const m of tipos.asText().matchAll(/<Override\b([^>]*)\/>/g)) {
+      const parte = /PartName\s*=\s*"([^"]*)"/.exec(m[1])?.[1]
+      const tipo = /ContentType\s*=\s*"([^"]*)"/.exec(m[1])?.[1]
+      if (!parte || !tipo) continue
+      if (!TIPOS_DE_PARTE_CON_TEXTO.some((t) => tipo.endsWith(t))) continue
+      rutas.add(parte.replace(/^\//, ""))
+    }
+  }
+
+  // Por si el paquete no declarara sus encabezados: Word los nombra siempre
+  // headerN.xml / footerN.xml, así que se buscan igual por nombre.
+  for (const f of zip.file(/^word\/(header|footer)\d*\.xml$/)) rutas.add(f.name)
+
+  return [...rutas].filter((r) => zip.file(r))
 }
 
 function exigirDocxValido(zip: PizZip, accion: string) {
@@ -346,7 +554,14 @@ export function ponerHuecosEnDocx(
   const salida = new PizZip(zip.generate({ type: "nodebuffer" }))
   const partes = partesDeTextoDeDocx(salida)
 
-  const vecesPorHueco = new Map<string, number>()
+  // Una cuenta POR PEDIDO, no por hueco. Dos valores distintos que apuntan
+  // al mismo hueco ("Juan Pérez" y "JUAN PÉREZ" -> {{NOMBRE}}) son dos
+  // pedidos distintos: si el documento dice solo uno, el otro tiene que
+  // aparecer en faltantes. Contándolo por hueco los dos se llevaban el
+  // mismo número y el director veía dos valores colocados donde se colocó
+  // uno. Va por posición en `orden` para que ni un buscado repetido los
+  // confunda.
+  const vecesPorPedido = new Array<number>(orden.length).fill(0)
   const archivosConAnidado = new Set<string>()
 
   for (const ruta of partes) {
@@ -354,24 +569,28 @@ export function ponerHuecosEnDocx(
     if (!archivo) continue
     let xml = archivo.asText()
 
-    for (const { buscado, hueco } of orden) {
+    // Los cuadros de texto se buscan sobre el DOCUMENTO, no adentro del
+    // bucle de reemplazos: estando adentro, un pedido sin reemplazos (o con
+    // todos inválidos) devolvía `advertencias: []` sobre un documento lleno
+    // de cuadros de texto. Callado justo donde había algo que decir.
+    if (segmentosDeNivelSuperior(xml, "p").some((seg) => seg.anidado)) archivosConAnidado.add(ruta)
+
+    for (let i = 0; i < orden.length; i++) {
+      const { buscado, hueco } = orden[i]
       if (!buscado || !huecoValido(hueco)) continue
 
       const segmentos = segmentosDeNivelSuperior(xml, "p")
       let xmlNuevo = ""
       let cursorXml = 0
-      let vecesAqui = 0
       for (const seg of segmentos) {
         xmlNuevo += xml.slice(cursorXml, seg.inicio)
-        if (seg.anidado) archivosConAnidado.add(ruta)
         const r = ponerHueco(xml.slice(seg.inicio, seg.fin), buscado, hueco)
         xmlNuevo += r.xml
-        vecesAqui += r.veces
+        vecesPorPedido[i] += r.veces
         cursorXml = seg.fin
       }
       xmlNuevo += xml.slice(cursorXml)
       xml = xmlNuevo
-      if (vecesAqui > 0) vecesPorHueco.set(hueco, (vecesPorHueco.get(hueco) || 0) + vecesAqui)
     }
 
     salida.file(ruta, xml)
@@ -379,7 +598,8 @@ export function ponerHuecosEnDocx(
 
   const puestos: Array<{ buscado: string; hueco: string; veces: number }> = []
   const faltantes: string[] = []
-  for (const { buscado, hueco } of orden) {
+  for (let i = 0; i < orden.length; i++) {
+    const { buscado, hueco } = orden[i]
     if (!buscado) {
       faltantes.push("(vacío -- se ignoró)")
       continue
@@ -388,8 +608,7 @@ export function ponerHuecosEnDocx(
       faltantes.push(`${buscado} (el hueco "${hueco}" no tiene una forma válida)`)
       continue
     }
-    const veces = vecesPorHueco.get(hueco) || 0
-    if (veces > 0) puestos.push({ buscado, hueco, veces })
+    if (vecesPorPedido[i] > 0) puestos.push({ buscado, hueco, veces: vecesPorPedido[i] })
     else faltantes.push(buscado)
   }
 
@@ -410,10 +629,10 @@ export function ponerHuecosEnDocx(
 /**
  * Rellena la plantilla con los datos de un asesor.
  *
- * docxtemplater procesa también encabezado y pie solo, sin que haga falta
- * nada especial acá: lo hace en cuanto [Content_Types].xml los declara con
- * el content-type de header/footer, que es lo que trae cualquier .docx
- * real armado por Word.
+ * docxtemplater procesa también encabezado, pie, notas al pie y
+ * comentarios solo, sin que haga falta nada especial acá: lo hace en
+ * cuanto [Content_Types].xml los declara, que es lo que trae cualquier
+ * .docx real armado por Word.
  */
 export function rellenarDocx(zip: PizZip, datos: Record<string, string>): PizZip {
   exigirDocxValido(zip, "rellenarDocx")
@@ -425,7 +644,7 @@ export function rellenarDocx(zip: PizZip, datos: Record<string, string>): PizZip
 
 /**
  * Los nombres de los huecos que tiene la plantilla, sin repetir --
- * revisando cuerpo, encabezado y pie.
+ * revisando las mismas partes del paquete que después se rellenan.
  */
 export function huecosDe(zip: PizZip): string[] {
   exigirDocxValido(zip, "huecosDe")
@@ -437,13 +656,13 @@ export function huecosDe(zip: PizZip): string[] {
     const segmentos = segmentosDeNivelSuperior(xml, "p")
     // Separador ||| entre párrafos: sin él, un {{ al final de un
     // párrafo y un }} al principio del siguiente arman un hueco fantasma
-    // que no existe. ||| no es letra, número ni el espacio que \s*
-    // permite adentro del patrón, así que corta la lectura ahí en vez de
-    // unir dos párrafos en un solo hueco inventado.
+    // que no existe. ||| no es letra, número ni guión bajo, así que corta
+    // la lectura ahí en vez de unir dos párrafos en un solo hueco
+    // inventado.
     const texto = segmentos
       .map((seg) => desescapar([...xml.slice(seg.inicio, seg.fin).matchAll(RE_TEXTO)].map((t) => t[1]).join("")))
       .join("|||")
-    for (const m of texto.matchAll(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g)) nombres.add(m[1])
+    for (const m of texto.matchAll(RE_HUECO_EN_TEXTO)) nombres.add(m[1])
   }
   return [...nombres]
 }
