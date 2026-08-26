@@ -34,6 +34,20 @@ const TOPE_POR_SECCION = 100;
  */
 const CANDIDATAS_ANTES_DE_FRENAR = 8000;
 
+/**
+ * Lo mismo, pero cuando el asesor acotó a una zona que dibujó a mano.
+ *
+ * Se frena mucho antes y es a propósito. Un dibujo del tamaño de un barrio puede tener miles
+ * adentro ("zona prueba": 8.856), y leerlas todas para ordenarlas cuesta lo mismo que una
+ * búsqueda por barrio: 17,8 s la primera vez, medido. Con 1.500 son 134 ms.
+ *
+ * Se resigna algo: entre las 8.856 de adentro, las 100 que se muestran salen de las primeras
+ * 1.500 que encuentra, no de todas. Vale la pena porque acá el filtro fuerte YA es la zona —
+ * el asesor marcó el área justamente para no tener que elegir entre miles— y porque Leonardo
+ * lo pidió así: "que muestre las 100, lo más fácil".
+ */
+const CANDIDATAS_CON_ZONA = 1500;
+
 /** Debajo de esto, un filtro de amenities se afloja solo y se le avisa al asesor. */
 const MINIMO_ANTES_DE_AFLOJAR = 20;
 
@@ -418,7 +432,11 @@ export async function POST(req: Request) {
     // motivo por el que la zona era obligatoria (sin ella la consulta escaneaba la tabla entera
     // y moría por timeout) acá no aplica.
     if (locationKeywords.length === 0 && !zonaElegida) missingCritical.push("la zona o barrio");
-    if (!roomsFilter && !bedroomsFilter) missingCritical.push("la cantidad de ambientes o dormitorios");
+    // Los ambientes tampoco se exigen cuando hay una zona dibujada, y por el mismo motivo que la
+    // zona: eran obligatorios para que la consulta no escanease la tabla entera. Un dibujo la
+    // acota a un puñado de manzanas por índice geográfico. Pedirle los ambientes a quien dijo
+    // "mostrame lo que hay en mi zona" es ponerle un trámite sin razón.
+    if (!roomsFilter && !bedroomsFilter && !zonaElegida) missingCritical.push("la cantidad de ambientes o dormitorios");
 
     /** Estos mejoran el resultado, pero si el usuario dice "mostrame lo que haya", se busca igual. */
     const missingNiceToHave: string[] = [];
@@ -433,8 +451,11 @@ export async function POST(req: Request) {
 
     // Falta algo crítico → se pregunta, diga lo que diga el usuario. Falta solo algo deseable →
     // se pregunta salvo que haya pedido ver igual.
+    // Con una zona dibujada tampoco se le pide el presupuesto ni el tipo antes de mostrar. El
+    // asesor marcó un área en el mapa y preguntó qué hay adentro: eso es un pedido completo, no
+    // uno a medias. Se le muestra y después se le ofrece afinar, que es el orden natural.
     const needsMoreInfo =
-      isRetrieval && (missingCritical.length > 0 || (missingNiceToHave.length > 0 && !wantsAnyway));
+      isRetrieval && (missingCritical.length > 0 || (missingNiceToHave.length > 0 && !wantsAnyway && !zonaElegida));
 
     // Qué se le pide. Si ya dijo "mostrame lo que haya", no tiene sentido insistirle con el
     // presupuesto: se le piden SOLO los críticos, que son los que impiden buscar.
@@ -623,7 +644,7 @@ export async function POST(req: Request) {
         // Puerto Madero) y en los barrios grandes tarda menos de la mitad. Ver la migración
         // 20260826030000_buscador_red_frena_y_rankea.sql.
         p_poligono: zonaElegida?.poligono ?? null,
-        p_candidatas: CANDIDATAS_ANTES_DE_FRENAR,
+        p_candidatas: zonaElegida ? CANDIDATAS_CON_ZONA : CANDIDATAS_ANTES_DE_FRENAR,
         // Cuando pide "mostrame otras", las que ya vio quedan afuera de la búsqueda. Los ids
         // de la red vienen con el prefijo `roomix_` en la pantalla; en la tabla no lo llevan.
         p_excluir_ids: pedirMas ? [...yaMostradasRed] : [],
