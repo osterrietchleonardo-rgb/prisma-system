@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
-import { normalizarFotoRoomix } from "@/lib/acm/fotos-url";
+import { urlFotoRed } from "@/lib/acm/fotos-url";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       // mostrando la tarjeta sin foto para siempre. No se reescribe la fila: la búsqueda
       // guardada es un registro de lo que se buscó, y arreglar la URL al vuelo alcanza.
       roomix: Array.isArray(r.roomix)
-        ? r.roomix.map((c: any) => (c?.imagen ? { ...c, imagen: normalizarFotoRoomix(c.imagen) } : c))
+        ? r.roomix.map((c: any) => (c?.imagen ? { ...c, imagen: urlFotoRed(c.imagen) } : c))
         : [],
       con_semantica: Boolean(r.con_semantica),
       // Ausente en búsquedas guardadas ANTES de este fix (viejo `resultados` sin estos campos):

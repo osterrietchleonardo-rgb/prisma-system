@@ -20,10 +20,6 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
-      {
-        protocol: 'https',
-        hostname: 'cdn.roomix.ai',
-      },
     ],
   },
   async redirects() {
@@ -63,7 +59,7 @@ const nextConfig = {
               // Los dos ultimos son los proveedores de baldosas del mapa del Buscador IA.
               // Sin ellos el navegador bloquea CADA imagen del fondo y el mapa se ve gris,
               // aunque la capa este bien montada y las peticiones sean validas.
-              "img-src 'self' blob: data: https://*.supabase.co https://*.tokkobroker.com https://*.googleusercontent.com https://*.mailerlite.com https://cdn.roomix.ai https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://api.maptiler.com; " +
+              "img-src 'self' blob: data: https://*.supabase.co https://*.tokkobroker.com https://*.googleusercontent.com https://*.mailerlite.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://api.maptiler.com; " +
               "font-src 'self' data: https://fonts.gstatic.com https://assets.mailerlite.com; " +
               // api.maptiler.com esta aca ademas de en img-src porque el mapa le pregunta
               // por el estado HTTP con fetch (a fetch lo gobierna connect-src): con clave
