@@ -2207,6 +2207,28 @@ solo en horario laboral (§III.2.3); el "atendido" se mide por un mensaje `human
 no por la respuesta al aviso. Las de asesor NO llevan BAJA (son operativas; el opt-out es
 sacar el teléfono del perfil).
 
+**Verificado el 26/8 (links, ids y formato de teléfonos):**
+- **P1 hecho por Leonardo:** el celular se guarda en `profiles.phone` como dígitos sin "+"
+  (`549…`, 13 dígitos) — **la misma convención que `wa_conversations.contact_phone`**
+  (1.871 leads `5491…` de 13 dígitos), así que la allowlist del gate compara dígito a dígito
+  sin conversiones. Normalizador existente: `normalizeArgPhone()` en `lib/whatsapp/phone-ar.ts`.
+  Cargados al 26/8: 1 (PRISMAIA); Central 0/33 → los asesores tienen que cargarlo.
+- **Link al chat: YA EXISTE.** `/director/leads-whatsapp/[id]` y `/asesor/leads-whatsapp/[id]`
+  con `[id] = wa_conversations.id`. Ojo: la ruta del asesor exige `agent_id = usuario`: el link
+  del aviso solo abre si la conversación está **asignada** a ese asesor — la escalera avisa al
+  asesor asignado (`wa_conversations.agent_id`) y, si no hay, al director. El panel de la
+  Task 18 (`SeguimientoPanel` en `LeadTraceability`) vive en esa misma ficha: el link aterriza
+  donde están la razón, la evidencia y los compromisos.
+- **Lo que NO existe y hay que desarrollar (fase 2):**
+  (a) **botones de acción en la ficha** para la escalera: "Lo tomo" / "Reasignar a…" /
+  "Dar más tiempo" (director) — la respuesta del asesor por WhatsApp no ejecuta nada, solo se
+  anota; (b) **pantalla de aprobaciones del director** (`aprobaciones` consume-once, §III.2.8.3:
+  ver el pedido con justificación y Aprobar/Rechazar con un clic) — el link de
+  `director_aprobacion_pendiente` apunta ahí; (c) la **confirmación automática fija** al asesor
+  que contesta un aviso ("Recibido, quedó anotado. Para responderle al cliente entrá a PRISMA:
+  [link]") — texto libre desde n8n dentro de la ventana de 24 h, sin IA; (d) lectura de
+  `profiles.phone` en la escalera y en el gate.
+
 **Orden recomendado (decisión 25/8):** P1 (teléfono) → P2 (gate) → crear en PRISMAIA las de
 asesor/director y probarlas con el teléfono de Leonardo como director → **crear en Central las
 v2 de clientes y las de asesor juntas** (un solo OK, una sola espera de Meta) → encender la
