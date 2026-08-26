@@ -28,14 +28,21 @@ export interface PerfilEquipo {
   phone: string | null
 }
 
+/** Plantillas UTILITY del equipo (`plantillasEquipo()` en lib/whatsapp/plantillas-v2.ts). */
+export type PlantillaEquipo =
+  | "asesor_cliente_esperando"
+  | "asesor_sigue_esperando"
+  | "director_asesor_sin_respuesta"
+  | "director_aprobacion_pendiente"
+
 export interface Aviso {
   destinatario: PerfilEquipo
   esAsignado: boolean
   link: string
   asunto: string
   html: string
-  plantilla: "asesor_cliente_esperando"
-  variables: [string, string, string]
+  plantilla: PlantillaEquipo
+  variables: string[]
 }
 
 export type ResultadoCanal =

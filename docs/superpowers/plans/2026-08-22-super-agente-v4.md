@@ -3216,6 +3216,33 @@ create table aprobaciones (
 create index on aprobaciones (agency_id, estado, creado_en desc);
 ```
 
+### III.2.2b HECHO 26/8 — Reasignación, "Lo tomo" / "No lo puedo tomar" y Aprobaciones
+
+Primera pieza de la fase 2, construida antes que el ejecutor por decisión de Leonardo (26/8):
+sin esto, reabrir leads o escalar es mandar avisos a nadie. Reglas suyas:
+- **El asesor no reasigna.** Tiene «Lo tomo», «No lo puedo tomar» (justificación obligatoria,
+  se le saca la asignación —deja de ver el chat por la RLS— y el pedido llega al director) y
+  «Marcar como perdido» (justificación).
+- **El director** tiene «Reasignar a…» (con motivo opcional), «Lo tomo yo», «Dar más tiempo»
+  (+24 h al compromiso) y «Marcar como perdido». Al reasignar, el asesor nuevo recibe email +
+  WhatsApp (`asesor_cliente_esperando`) con el detalle y el link a SU chat, donde están los
+  botones. Si la ventana de 24 h del cliente está cerrada, el director puede tildar «Avisarle al
+  cliente»: sale `seg_pendiente` por el `dispatch` (arreglado) con "Tu consulta ahora la sigue X";
+  solo si la plantilla está aprobada en esa agencia y el cliente tiene nombre registrado.
+- **Aprobaciones consume-once** (`aprobaciones`, migración `2026-08-27-aprobaciones.sql`,
+  aplicada): pantalla propia `/director/aprobaciones` con contador en el menú; cada pedido se
+  decide UNA vez (Lo tomo yo / Reasignar a… / Dejar sin asesor con motivo); a las 48 h sin
+  respuesta vence y no se ejecuta nada. Todo queda en `lead_eventos` y en `interacciones_canal`.
+
+Dónde vive: `lib/seguimiento/equipo.ts` (+13 tests), `app/actions/equipo.ts` (las escrituras,
+con el cliente de servidor porque la RLS no deja al asesor soltar su chat),
+`components/seguimiento/EquipoPanel.tsx` (bloque "Equipo y seguimiento" en la ficha),
+`app/director/aprobaciones/`, ítem en `director-sidebar.tsx`.
+**Probado el 26/8 en local con la agencia de prueba, escritorio y celular:** reasignar desde la
+ficha (aviso real recibido), pedido pendiente → «Lo tomo yo» (consumido una vez), «Dar más
+tiempo» (48 h), «Dejar sin asesor» con motivo. Sin probar en vivo: el lado del asesor (se prueba
+con la cuenta de asesor de Leonardo) y la reapertura por plantilla con ventana cerrada.
+
 ### III.2.3 La escalera del asesor (frente 2)
 
 ```
