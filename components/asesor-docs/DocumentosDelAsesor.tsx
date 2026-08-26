@@ -14,7 +14,7 @@ import {
 import { FileText, Upload, Download, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
-import { validarArchivo, rutaDeArchivo, nombreVisible, type Seccion } from "@/lib/asesor-docs/reglas";
+import { validarArchivo, rutaDeArchivo, nombreVisible, escaparComodinesIlike, type Seccion } from "@/lib/asesor-docs/reglas";
 import { urlDeDescarga } from "@/lib/asesor-docs/url";
 
 interface Props {
@@ -56,6 +56,23 @@ function formatBytes(bytes?: number | null) {
   const mb = bytes / 1024 / 1024;
   if (mb >= 1) return `${mb.toFixed(2)} MB`;
   return `${(bytes / 1024).toFixed(0)} KB`;
+}
+
+// Los mensajes de error de Postgres/Supabase vienen en inglés y son
+// ilegibles para gente no técnica. De todos los que puede tirar esta
+// pantalla, solo estos dos son alcanzables desde acá: el índice único de
+// advisor_documents (un tipo duplicado, ver el flujo de subirPlantilla) y
+// una violación de RLS (agencyId desalineado con el perfil del director).
+// El resto se deja crudo a propósito: son casos de borde que no vale la
+// pena adivinar en español.
+function traducirErrorBase(mensaje: string): string {
+  if (mensaje.includes("duplicate key")) {
+    return "Este asesor ya tiene un documento de ese tipo. Recargá la página e intentá de nuevo.";
+  }
+  if (mensaje.includes("row-level security policy")) {
+    return "No tenés permiso para hacer esta acción. Recargá la página e intentá de nuevo.";
+  }
+  return mensaje;
 }
 
 // Distinto del estado vacío a propósito: acá algo salió mal, no es que no
@@ -198,10 +215,10 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
           .from("advisor_doc_templates")
           .select("id, nombre")
           .eq("agency_id", agencyId)
-          .ilike("nombre", nombreNuevo)
+          .ilike("nombre", escaparComodinesIlike(nombreNuevo))
           .maybeSingle();
         if (errBuscar) {
-          toast.error("No se pudo verificar el tipo de documento: " + errBuscar.message);
+          toast.error("No se pudo verificar el tipo de documento: " + traducirErrorBase(errBuscar.message));
           return;
         }
         if (tipoExistente) {
@@ -214,7 +231,7 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
             .select("id, nombre")
             .single();
           if (errTipo || !nuevoTipo) {
-            toast.error("No se pudo crear el tipo de documento" + (errTipo ? `: ${errTipo.message}` : ""));
+            toast.error("No se pudo crear el tipo de documento" + (errTipo ? `: ${traducirErrorBase(errTipo.message)}` : ""));
             return;
           }
           templateId = nuevoTipo.id;
@@ -264,7 +281,7 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
           .eq("id", existente.id);
         if (errUpdate) {
           await supabase.storage.from(STORAGE_BUCKET).remove([path]);
-          toast.error("No se pudo guardar el reemplazo: " + errUpdate.message);
+          toast.error("No se pudo guardar el reemplazo: " + traducirErrorBase(errUpdate.message));
           return;
         }
         // El nuevo archivo ya está arriba: recién ahora se borra el viejo.
@@ -287,7 +304,7 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
         if (errInsert) {
           // Rollback: no pueden quedar archivos huérfanos en Storage.
           await supabase.storage.from(STORAGE_BUCKET).remove([path]);
-          toast.error("No se pudo guardar el documento: " + errInsert.message);
+          toast.error("No se pudo guardar el documento: " + traducirErrorBase(errInsert.message));
           return;
         }
         toast.success("Documento subido");
@@ -305,10 +322,19 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
     if (!confirm("¿Eliminar este documento? No se puede deshacer.")) return;
     setBorrandoPlantillaId(doc.id);
     try {
-      const okStorage = await borrarDeStorage(doc.archivo_original_path);
+      // Primero la fila, recién después el archivo: si se borrara el archivo
+      // primero y esto fallara (red, o el tope de 8s del rol authenticated),
+      // quedaría una fila apuntando a un archivo que ya no existe — y para el
+      // asesor eso se ve como que Descargar lo saca de PRISMA sin aviso,
+      // porque urlDeDescarga arma la dirección igual, sin consultar nada.
       const { error } = await supabase.from("advisor_documents").delete().eq("id", doc.id);
-      if (error) { toast.error("No se pudo eliminar: " + error.message); return; }
+      if (error) { toast.error("No se pudo eliminar: " + traducirErrorBase(error.message)); return; }
+      const okStorage = await borrarDeStorage(doc.archivo_original_path);
       if (!okStorage) {
+        // El borrado es por autor: con dos directores, el segundo no puede
+        // borrar lo que subió el primero. Se tolera y queda huérfano en
+        // Storage; se deja registrado acá para poder limpiarlo después.
+        console.error("Archivo huérfano en Storage (advisor_documents):", doc.archivo_original_path);
         toast.warning("Se eliminó el documento, pero el archivo no se pudo quitar del almacenamiento.");
       } else {
         toast.success("Documento eliminado");
@@ -416,10 +442,13 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
     if (!confirm("¿Eliminar este archivo? No se puede deshacer.")) return;
     setBorrandoInfoId(doc.id);
     try {
-      const okStorage = await borrarDeStorage(doc.file_path);
+      // Mismo orden que en borrarPlantilla: primero la fila, después el
+      // archivo. Ver el comentario de ahí.
       const { error } = await supabase.from("advisor_info_documents").delete().eq("id", doc.id);
-      if (error) { toast.error("No se pudo eliminar: " + error.message); return; }
+      if (error) { toast.error("No se pudo eliminar: " + traducirErrorBase(error.message)); return; }
+      const okStorage = await borrarDeStorage(doc.file_path);
       if (!okStorage) {
+        console.error("Archivo huérfano en Storage (advisor_info_documents):", doc.file_path);
         toast.warning("Se eliminó el archivo, pero no se pudo quitar del almacenamiento.");
       } else {
         toast.success("Archivo eliminado");
@@ -448,7 +477,11 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
           {!readOnly && (
             <Dialog open={dialogPlantillaAbierto} onOpenChange={(o) => { if (!o) cerrarDialogPlantilla(); else setDialogPlantillaAbierto(true); }}>
               <DialogTrigger asChild>
-                <Button className="gap-2">
+                {/* Deshabilitado con error de carga: si no, el diálogo se abre con
+                    la lista vacía por el error (no porque no haya nada), y el
+                    chequeo de "ya existe" busca en esa lista vacía y deja
+                    pasar un duplicado que el índice único rechaza después. */}
+                <Button className="gap-2" disabled={!!errorCarga} title={errorCarga ? "No se pudo cargar la lista de documentos" : undefined}>
                   <Upload className="h-4 w-4" />
                   Subir documento
                 </Button>
@@ -531,7 +564,16 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
                   <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{nombrePlantilla(doc)}</p>
-                    <p className="text-xs text-muted-foreground">{formatBytes(doc.size_bytes)}</p>
+                    {/* El director ve acá el nombre del tipo, arriba. Sin esto no
+                        tiene forma de saber cuál archivo cargó: el asesor ve el
+                        nombre del ARCHIVO, no el del tipo, así que pueden ser
+                        dos cosas distintas y el director quedarse tranquilo con
+                        el archivo equivocado. Solo para el director: para el
+                        asesor arriba YA es el nombre del archivo. */}
+                    <p className="text-xs text-muted-foreground truncate">
+                      {!readOnly && `${nombreVisible(doc.nombre_archivo)} · `}
+                      {formatBytes(doc.size_bytes)}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -573,7 +615,7 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
           {!readOnly && (
             <Dialog open={dialogInfoAbierto} onOpenChange={(o) => { if (!o) cerrarDialogInfo(); else setDialogInfoAbierto(true); }}>
               <DialogTrigger asChild>
-                <Button className="gap-2">
+                <Button className="gap-2" disabled={!!errorCarga} title={errorCarga ? "No se pudo cargar la lista de documentos" : undefined}>
                   <Upload className="h-4 w-4" />
                   Subir archivos
                 </Button>
