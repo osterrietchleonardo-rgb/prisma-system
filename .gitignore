@@ -53,3 +53,10 @@ scratch/n8n-backups/
 
 # Capturas de Playwright: guardan el contenido de la pantalla, contraseñas incluidas
 .playwright-cli/
+
+# Carpeta de trabajo sucio: respaldos de n8n, volcados de datos y pruebas sueltas.
+# Ahi adentro aparecen secretos -- un export de n8n trae los headers escritos ADENTRO del
+# flujo -- asi que nada nuevo de aca se versiona. Los 6 archivos que YA estaban versionados
+# siguen igual: se revisaron uno por uno y no tienen claves, y uno de ellos,
+# scratch/clickup-ids.json, lo usa el CLAUDE.md.
+scratch/
