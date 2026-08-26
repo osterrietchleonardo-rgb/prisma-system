@@ -31,6 +31,16 @@
 -- el recorte exacto en SQL sale 17 ms y usa el indice igual, asi que no hay razon para traer
 -- 300 propiedades y tirar 200.
 --
+-- ── COMO SE APLICA (esto costo un intento fallido) ──
+--
+-- NO se puede mandar este archivo entero de una: la Management API lo envia como UNA sola
+-- consulta, y Postgres envuelve toda consulta de varias sentencias en una transaccion
+-- implicita. Ahi adentro `create index concurrently` falla con 25001. Van en dos envios:
+--   1) solo el create index
+--   2) el resto, del begin al commit
+-- El generador (scratch/_generar-migracion-zonas.mjs) deja las dos partes cortadas por el
+-- `begin;`. El intento fallido no dejo nada aplicado: la transaccion revirtio todo.
+--
 -- Aplicado en produccion por Management API el 26-ago-2026. Esta migracion es el registro
 -- versionado: las del repo NO se aplican solas.
 
