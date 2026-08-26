@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { CLASIFICACION_CONSULTA } from '@/lib/whatsapp/clasificacion'
 import { triggerN8nWithSafetyNet } from '@/lib/whatsapp/n8nTrigger'
+import { buscarInterno, procesarMensajeInterno, crearEnviadorTexto } from '@/lib/whatsapp/gate-internos'
 import { actualizarEstadoEntrega } from '@/lib/whatsapp/delivery-status'
 import { buscarOCrearConversacion } from '@/lib/whatsapp/conversations'
 
@@ -104,6 +105,21 @@ export async function POST(req: Request) {
                 else if (message.type === 'interactive') {
                     content = message.interactive.button_reply?.title || message.interactive.list_reply?.title || 'Respuesta interactiva'
                 } else continue // Ignorar otros tipos por ahora
+
+                // GATE DE INTERNOS (ver evolution/route.ts): un asesor/director de la agencia
+                // que contesta un aviso no es un lead. Registrar, confirmar y seguir con el
+                // próximo mensaje. Falla abierto.
+                const interno = await buscarInterno(supabase, instance.agency_id, contactPhone)
+                if (interno) {
+                    const r = await procesarMensajeInterno(
+                        supabase,
+                        { agencyId: instance.agency_id, perfil: interno, contactPhone, contenido: content, wamid: wamid ?? null },
+                        crearEnviadorTexto(supabase, instance.id),
+                        process.env.APP_URL || 'https://prisma.vakdor.com'
+                    )
+                    console.log(`[Meta Webhook] Mensaje interno de ${interno.role} ${interno.id} (gate): ${JSON.stringify(r)}`)
+                    continue
+                }
 
                 // Dedup por wamid: Meta puede reentregar el mismo mensaje. Si ya lo
                 // tenemos, saltamos para no duplicar ni re-disparar n8n.

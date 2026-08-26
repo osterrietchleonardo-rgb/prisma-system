@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { CLASIFICACION_CONSULTA } from '@/lib/whatsapp/clasificacion'
 import { triggerN8nWithSafetyNet } from '@/lib/whatsapp/n8nTrigger'
+import { buscarInterno, procesarMensajeInterno, crearEnviadorTexto } from '@/lib/whatsapp/gate-internos'
 import { actualizarEstadoEntrega } from '@/lib/whatsapp/delivery-status'
 import { buscarOCrearConversacion } from '@/lib/whatsapp/conversations'
 
@@ -109,6 +110,22 @@ export async function POST(req: Request) {
     if (!instance) {
       console.warn(`[Evolution Webhook] Instancia no encontrada: ${resolvedName}`)
       return NextResponse.json({ error: 'Instance not found' }, { status: 404 })
+    }
+
+    // 1b. GATE DE INTERNOS: si escribe un asesor/director de la agencia (contestando un
+    // aviso del sistema), el mensaje NO es un lead: se registra en interacciones_canal, se
+    // le confirma con el link a PRISMA y se termina acá — sin conversación, sin wa_messages,
+    // sin n8n. Falla abierto: si la consulta falla, sigue el camino normal.
+    const interno = await buscarInterno(supabase, instance.agency_id, contactPhone)
+    if (interno) {
+      const r = await procesarMensajeInterno(
+        supabase,
+        { agencyId: instance.agency_id, perfil: interno, contactPhone, contenido: content, wamid: wamid ?? null },
+        crearEnviadorTexto(supabase, instance.id),
+        process.env.APP_URL || 'https://prisma.vakdor.com'
+      )
+      console.log(`[Evolution Webhook] Mensaje interno de ${interno.role} ${interno.id} (gate): ${JSON.stringify(r)}`)
+      return NextResponse.json({ success: true, message: 'Internal team message handled by gate', ...r })
     }
 
     // 2. Buscar o crear la conversación.
