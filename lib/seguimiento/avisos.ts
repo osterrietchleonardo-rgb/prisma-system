@@ -256,15 +256,20 @@ async function enviarPlantillaEquipo(
     const res = await fetchFn(`${url}/message/sendTemplate/${inst.evo_instance_name}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: key },
+      // `components`, NO `variables` (verificado 26/8 contra el código de Evolution 2.3.7 y con
+      // envíos reales): con `variables` Evolution manda la plantilla sin parámetros, Meta la
+      // rechaza (#132000) y Evolution igual responde 201 con el error adentro.
       body: JSON.stringify({
         number: telefono,
         name: nombrePlantilla,
         language: "es_AR",
-        variables: [{ type: "body", parameters: parametros }],
+        components: [{ type: "body", parameters: parametros }],
       }),
     })
     const data = await res.json().catch(() => ({}))
-    if (!res.ok) return { resultado: `error_evolution_${res.status}`, wamid: null, plantilla: nombrePlantilla }
+    if (!res.ok) return { resultado: `error_evolution_${res.status}`, wamid: null, plantilla: nombrePlantilla, respuesta: data }
+    if (data?.error_data || data?.code)
+      return { resultado: `error_meta_${data.code ?? "?"}`, wamid: null, plantilla: nombrePlantilla, respuesta: data }
     const wamid = data?.key?.id ?? data?.messageId ?? data?.messages?.[0]?.id ?? null
     return { resultado: "enviado", wamid, plantilla: nombrePlantilla, respuesta: wamid ? undefined : data }
   }
