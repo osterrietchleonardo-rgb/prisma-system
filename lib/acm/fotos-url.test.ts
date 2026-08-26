@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizarFotoRoomix, normalizarImagenes, urlFotoRed, urlsFotoRed } from "./fotos-url";
+import { normalizarFotoRoomix, normalizarImagenes, urlFotoRed, urlsFotoRed, esTipoFotoPermitido } from "./fotos-url";
 
 // El caso real que motivó el arreglo: la propiedad 2a998e59 ("Excelente departamento 3
 // ambientes EN DUPLEX", La Cle Estudio Inmobiliario) tenía sus 6 fotos en `.webp` y las 6
@@ -100,5 +100,46 @@ describe("urlFotoRed", () => {
       `/api/foto-red?u=${encodeURIComponent(SANA)}`,
       "https://static.tokkobroker.com/pics/c.jpg",
     ]);
+  });
+});
+
+// El agujero que encontro una revision el 26/08/2026: el proxy validaba el archivo con
+// `tipo.startsWith("image/")`, y `image/svg+xml` pasa ese filtro. Un SVG no es una foto: es
+// texto que puede traer un <script>, y servido desde prisma.vakdor.com correria con los
+// permisos de la app. El endpoint es publico, asi que no hacia falta ni estar logueado.
+describe("esTipoFotoPermitido", () => {
+  it("RECHAZA image/svg+xml aunque empiece con image/", () => {
+    expect(esTipoFotoPermitido("image/svg+xml")).toBe(false);
+  });
+
+  it("rechaza cualquier otro image/* que no sea una foto real", () => {
+    expect(esTipoFotoPermitido("image/svg")).toBe(false);
+    expect(esTipoFotoPermitido("image/svg+xml; charset=utf-8")).toBe(false);
+    expect(esTipoFotoPermitido("image/x-icon")).toBe(false);
+  });
+
+  it("acepta los formatos de foto reales", () => {
+    for (const t of ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]) {
+      expect(esTipoFotoPermitido(t)).toBe(true);
+    }
+  });
+
+  it("tolera el charset y las mayusculas que manda un CDN", () => {
+    expect(esTipoFotoPermitido("image/jpeg; charset=binary")).toBe(true);
+    expect(esTipoFotoPermitido("IMAGE/JPEG")).toBe(true);
+    expect(esTipoFotoPermitido("  image/png  ")).toBe(true);
+  });
+
+  it("rechaza lo que no es imagen, y el vacio", () => {
+    expect(esTipoFotoPermitido("text/html")).toBe(false);
+    expect(esTipoFotoPermitido("application/javascript")).toBe(false);
+    expect(esTipoFotoPermitido("")).toBe(false);
+    expect(esTipoFotoPermitido(null)).toBe(false);
+    expect(esTipoFotoPermitido(undefined)).toBe(false);
+  });
+
+  it("no se deja enganar por un tipo que CONTIENE uno permitido", () => {
+    expect(esTipoFotoPermitido("text/html+image/jpeg")).toBe(false);
+    expect(esTipoFotoPermitido("image/jpeg-evil")).toBe(false);
   });
 });

@@ -21,7 +21,7 @@
 // navegable con el material de un tercero.
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
-import { HOSTS_ROOMIX } from "@/lib/acm/fotos-url";
+import { HOSTS_ROOMIX, esTipoFotoPermitido } from "@/lib/acm/fotos-url";
 
 export const runtime = "nodejs";
 
@@ -32,6 +32,16 @@ const MAX_BYTES = 8 * 1024 * 1024;
 /** El archivo del CDN de origen no cambia de contenido, así que la respuesta se puede cachear
  *  todo lo que el navegador quiera. */
 const CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+/** Cabeceras que además le sacan al navegador cualquier margen de interpretación: que no adivine
+ *  el tipo por el contenido (`nosniff`), que no ejecute nada aunque el archivo lo traiga (CSP),
+ *  y que no lo trate como una página navegable. Defensa en profundidad: si algún día se cuela
+ *  un tipo indebido, igual no corre. */
+const CABECERAS_SEGURAS = {
+  "X-Content-Type-Options": "nosniff",
+  "Content-Security-Policy": "default-src 'none'; sandbox",
+  "Content-Disposition": "inline",
+} as const;
 
 function admin() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -63,8 +73,20 @@ export async function GET(req: Request) {
   // 1) Si ya la tenemos guardada, no se toca el origen.
   const cacheada = await sb.storage.from(BUCKET).download(nombre);
   if (cacheada.data) {
+    // El tipo sale del archivo guardado, no fijo en jpeg: si lo que se cacheó fue un png o un
+    // webp, servirlo como jpeg es mentirle al navegador. Igual pasa por la lista blanca, porque
+    // en el bucket puede haber quedado algo subido antes de este chequeo.
+    const guardado = (cacheada.data.type || "").split(";")[0].trim().toLowerCase();
+    if (guardado && !esTipoFotoPermitido(guardado)) {
+      return new Response("tipo de archivo no permitido", { status: 415 });
+    }
     return new Response(await cacheada.data.arrayBuffer(), {
-      headers: { "Content-Type": "image/jpeg", "Cache-Control": CACHE_CONTROL, "X-Foto-Red": "cache" },
+      headers: {
+        "Content-Type": guardado || "image/jpeg",
+        "Cache-Control": CACHE_CONTROL,
+        "X-Foto-Red": "cache",
+        ...CABECERAS_SEGURAS,
+      },
     });
   }
 
@@ -82,8 +104,14 @@ export async function GET(req: Request) {
   const bytes = Buffer.from(await origen.arrayBuffer());
   if (bytes.byteLength > MAX_BYTES) return new Response("foto demasiado pesada", { status: 413 });
 
-  const tipo = origen.headers.get("content-type") || "image/jpeg";
-  if (!tipo.startsWith("image/")) return new Response("el origen no devolvio una imagen", { status: 502 });
+  // Lista blanca de formatos, NO `startsWith("image/")`. `image/svg+xml` también empieza con
+  // "image/" y un SVG no es una foto: es texto que puede traer un <script> adentro. Servido
+  // desde nuestro dominio, ese script correría con los permisos de la app y podría leer la
+  // sesión del asesor que tenga la pestaña abierta. Y como este endpoint es público y basta
+  // cambiarle un carácter a la URL para volver a caer en el camino de "primera vez", el
+  // atacante no necesita ni estar logueado ni pasar una sola vez.
+  const tipo = (origen.headers.get("content-type") || "image/jpeg").split(";")[0].trim().toLowerCase();
+  if (!esTipoFotoPermitido(tipo)) return new Response("tipo de archivo no permitido", { status: 415 });
 
   // 3) Se guarda para no volver a pedirla nunca mas. Si el guardado falla, igual se sirve:
   //    perder el cache es molesto, no devolver la foto seria peor.
@@ -95,6 +123,7 @@ export async function GET(req: Request) {
       "Content-Type": tipo,
       "Cache-Control": CACHE_CONTROL,
       "X-Foto-Red": subida.error ? "origen-sin-cache" : "origen",
+      ...CABECERAS_SEGURAS,
     },
   });
 }

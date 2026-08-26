@@ -103,3 +103,21 @@ export function urlFotoRed(url: string): string {
 export function urlsFotoRed(urls: string[]): string[] {
   return urls.map(urlFotoRed);
 }
+
+/** Formatos de foto reales que el proxy acepta servir. */
+const TIPOS_FOTO = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
+
+/** ¿Este `Content-Type` es una foto que se puede servir desde nuestro dominio?
+ *
+ *  NO alcanza con que empiece con `image/`: **`image/svg+xml` también empieza con `image/`** y
+ *  un SVG no es una foto — es texto que puede traer un `<script>` adentro. Servido desde
+ *  `prisma.vakdor.com`, ese script correría con los permisos de nuestra propia app y podría
+ *  leer la sesión del asesor que tenga la pestaña abierta.
+ *
+ *  Vive acá, junto al resto de la allowlist, por el mismo motivo que los hosts: **tenerlo en un
+ *  solo lugar es lo que evita que una copia quede desactualizada.** Lo usa
+ *  `app/api/foto-red/route.ts`. */
+export function esTipoFotoPermitido(contentType: string | null | undefined): boolean {
+  if (!contentType) return false;
+  return TIPOS_FOTO.has(contentType.split(";")[0].trim().toLowerCase());
+}
