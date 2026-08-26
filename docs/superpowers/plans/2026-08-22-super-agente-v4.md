@@ -2302,6 +2302,9 @@ escalera en sombra.
 
 ### Task 13: Módulo de compromisos (`compromisos.ts`)
 
+> **HECHA 26/8.** `lib/seguimiento/compromisos.ts` (+ 5 tests): `derivarCompromisosDeVisita`,
+> `sincronizarCompromisos` (corre al inicio de cada corrida) y `crearCompromisoEscalar` (Task 14).
+
 **Files:**
 - Create: `lib/seguimiento/compromisos.ts`
 - Test: `lib/seguimiento/compromisos.test.ts`
@@ -2394,6 +2397,19 @@ export async function sincronizarCompromisos(db: SupabaseClient) {
 - [ ] **Step 5: Commit** — `git add lib/seguimiento/compromisos.ts lib/seguimiento/compromisos.test.ts app/api/seguimiento/run/route.ts && git commit -m "feat(seguimiento): compromisos activos (la senal mas fuerte del agente)"`
 
 ### Task 14: Compromisos creados por el agente (escalar ⇒ respuesta_pendiente)
+
+> **HECHA 26/8, incluido el Step 1b.** En el runner, `escalar` ⇒ compromiso `respuesta_pendiente`
+> (24 h, máx. 1 activo por chat, en sombra también) + `avisarPorEscalar` (`lib/seguimiento/avisos.ts`,
+> 13 tests): destinatario = asesor asignado activo, si no el director; email por Resend siempre
+> (remitente "Agencia vía PRISMA") y WhatsApp además si tiene celular, con la plantilla UTILITY
+> `asesor_cliente_esperando` **solo si Meta la aprobó en esa agencia**; link al chat concreto con la
+> URL del rol (`/{director|asesor}/leads-whatsapp/[id]`); una vez por chat cada 24 h; TODO queda en
+> `interacciones_canal` (canal, resultado, motivo si se omitió, wamid) y en `lead_eventos`. En sombra
+> no manda: registra `aviso_simulado` con a quién habría ido. **Probado de verdad el 26/8 12:45**
+> desde el número de PRISMAIA al celular y al Gmail del perfil "Leonardo Asesor": email y WhatsApp
+> `enviado`, 0 `wa_messages` en el chat del lead (el aviso no ensucia la conversación).
+> Pendiente chico: Evolution devuelve otra forma para plantillas y el `wamid` quedó null; se guarda
+> la respuesta cruda para aprenderla.
 
 **Files:**
 - Modify: `app/api/seguimiento/run/route.ts`
