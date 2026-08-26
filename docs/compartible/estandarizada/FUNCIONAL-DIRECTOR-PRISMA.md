@@ -537,6 +537,18 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 > 💡 **El asesor ve su celular en su Configuración pero no lo puede cambiar él mismo.** Si necesita corregirlo, te lo va a pedir a vos: lo hacés desde su tarjeta, como se explica arriba.
 > ⚠️ **Pausar vs. Desvincular:** la **pausa** es temporal y la revertís vos con "Reactivar". La **desvinculación** bloquea el email y es más definitiva; si después necesitás reactivar a esa persona, contactá al equipo de PRISMA (Vakdor).
 
+### Solapa "Documentos" (dentro de la tarjeta del asesor)
+
+**Qué es:** ahora podés cargarle documentos propios a cada asesor. Abrí su tarjeta (tocando su nombre) y vas a ver dos solapas arriba: **"Resumen"** (lo de siempre) y **"Documentos"**. Ahí adentro hay dos secciones, cada una para una necesidad distinta.
+
+**Plantillas personalizadas.** Para cuando querés darle a cada asesor **el mismo documento, pero con sus propios datos** — por ejemplo, una autorización o un contrato tipo que lleva su nombre. Se sube **un documento por tipo**: si más adelante subís otro archivo del mismo tipo para ese asesor (por ejemplo, actualizaste el modelo de la autorización), el sistema **te avisa antes** y, si confirmás, **el nuevo reemplaza al anterior**. Solo se aceptan archivos **Word (.docx)** — a propósito: es el formato que, más adelante, el sistema va a poder abrir solo y completar con los datos de cada asesor, así que conviene ir cargando ya los modelos en ese formato.
+
+**Documentos de información.** Para archivos sueltos que no necesitan ser "por tipo": manuales, formularios, cualquier cosa que quieras que ese asesor en particular tenga a mano. Acá entran tanto **Word como PDF**, y podés subir **varios archivos de una vez**.
+
+**Cómo lo ve el asesor:** le aparece una solapa nueva, "Mis Documentos" (ver guía del asesor), donde ve **solo lo suyo** — nunca lo de otro asesor — y solo puede **mirarlo y descargarlo**. No puede subir, cambiar ni borrar nada desde ahí: eso queda en tus manos.
+
+> 💡 **Tip:** si un asesor te dice que le falta un documento o que el que tiene quedó viejo, es él avisándote a vos — desde su lado no lo puede arreglar solo.
+
 ---
 
 ## 15. Documentos (base de conocimiento)
