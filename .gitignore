@@ -50,3 +50,6 @@ scratch/n8n-backups/
 # Estado diario del Socio (se regenera solo)
 .claude/skills/vakdor-socio/estado/
 .claude/skills/vakdor-socio/node_modules/
+
+# Capturas de Playwright: guardan el contenido de la pantalla, contraseñas incluidas
+.playwright-cli/
