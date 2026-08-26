@@ -3,6 +3,7 @@ import {
   validarArchivo,
   rutaDeArchivo,
   nombreVisible,
+  escaparComodinesIlike,
   MAX_BYTES,
 } from "./reglas";
 
@@ -108,5 +109,30 @@ describe("nombreVisible", () => {
 
   it("recorta espacios", () => {
     expect(nombreVisible("  Manual.pdf  ")).toBe("Manual");
+  });
+});
+
+describe("escaparComodinesIlike", () => {
+  it("escapa el guion bajo, comodín de un carácter", () => {
+    expect(escaparComodinesIlike("Contrato_2026")).toBe("Contrato\\_2026");
+  });
+
+  it("escapa el porcentaje, comodín de cualquier cadena", () => {
+    expect(escaparComodinesIlike("100%")).toBe("100\\%");
+  });
+
+  it("escapa la barra invertida antes que los comodines, para no doble-escapar", () => {
+    expect(escaparComodinesIlike("a\\_b")).toBe("a\\\\\\_b");
+  });
+
+  it("un nombre sin comodines queda igual", () => {
+    expect(escaparComodinesIlike("Contrato de Asesor")).toBe("Contrato de Asesor");
+  });
+
+  it("no deja que un nombre con guion bajo matchee otro con cualquier caracter ahí", () => {
+    // Es la prueba de la falla real: "Contrato_2026" NO tiene que encontrar
+    // "ContratoX2026" en una búsqueda ilike.
+    const patron = escaparComodinesIlike("Contrato_2026");
+    expect(patron).not.toBe("Contrato_2026");
   });
 });

@@ -103,3 +103,23 @@ export function nombreVisible(nombreArchivo: string): string {
   const i = limpio.lastIndexOf(".")
   return i > 0 ? limpio.slice(0, i) : limpio
 }
+
+/**
+ * Escapa un texto para usarlo dentro de un patrón `ilike` de Postgres.
+ *
+ * `%` y `_` son comodines de LIKE/ILIKE (cualquier cadena, y un carácter
+ * cualquiera). Si el nombre de un tipo de documento los trae tal cual —
+ * "Contrato_2026" es un nombre perfectamente normal—, la búsqueda deja de
+ * ser "busco ese texto" y pasa a ser "busco ese patrón": "Contrato_2026"
+ * podría matchear "ContratoX2026" y devolver el id de un tipo distinto, con
+ * el documento archivándose bajo el tipo equivocado.
+ *
+ * Postgres usa `\` como carácter de escape por defecto en LIKE/ILIKE (no
+ * hace falta pasar `ESCAPE`), así que anteponer `\` a `\`, `%` y `_` alcanza
+ * para que el texto se busque literal. Es reemplazo de caracteres, igual
+ * que el saneo de `urlDeDescarga` en `url.ts` — mismo motivo: se está
+ * escapando para un lenguaje de patrones, no codificando para una URL.
+ */
+export function escaparComodinesIlike(texto: string): string {
+  return texto.replace(/[\\%_]/g, (c) => `\\${c}`)
+}
