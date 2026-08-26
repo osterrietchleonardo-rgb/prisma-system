@@ -765,8 +765,14 @@ export default function AsesoresPage() {
 
       {/* Performance Side Panel */}
       <Sheet open={!!selectedAgent} onOpenChange={() => setSelectedAgent(null)}>
-        <SheetContent className="bg-card border-accent/20 sm:max-w-md">
-          <SheetHeader>
+        {/* En columna: el encabezado ocupa lo suyo y el cuerpo se queda con lo que sobre.
+            Antes el cuerpo tenía un alto máximo escrito a mano (100vh - 250px) que sólo
+            cerraba con el encabezado de aquel momento: al crecer el encabezado, la zona
+            con scroll terminaba por debajo del borde de la pantalla y esos píxeles no se
+            podían alcanzar de ninguna forma. Medido: 42px cortados en escritorio y 102px
+            en pantalla angosta, donde el encabezado se acomoda en más líneas. */}
+        <SheetContent className="bg-card border-accent/20 sm:max-w-md flex flex-col">
+          <SheetHeader className="shrink-0">
             <div className="flex flex-col items-center text-center space-y-4 mb-4">
               <Avatar className="h-24 w-24 border-4 border-accent/20">
                 <AvatarImage src={selectedAgent?.avatar_url} />
@@ -828,7 +834,7 @@ export default function AsesoresPage() {
             </div>
           </SheetHeader>
           
-          <div className="space-y-6 mt-8 overflow-y-auto max-h-[calc(100vh-250px)] pr-2">
+          <div className="space-y-6 mt-8 flex-1 min-h-0 overflow-y-auto pr-2">
             {selectedAgent && (
               <div className="rounded-xl border border-border/60 p-4 space-y-3">
                 <div className="flex items-center justify-between">
