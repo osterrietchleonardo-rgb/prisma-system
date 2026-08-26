@@ -30,6 +30,26 @@ export async function urlDeDescarga(
   if (!path) return null
   const { data } = supabase.storage
     .from(BUCKET)
-    .getPublicUrl(path, nombre ? { download: nombre } : undefined)
+    .getPublicUrl(path, nombre ? { download: sanearNombreDescarga(nombre) } : undefined)
   return data?.publicUrl ?? null
+}
+
+/**
+ * Saca del nombre los caracteres que rompen el `download` de `getPublicUrl`.
+ *
+ * getPublicUrl mete `nombre` CRUDO en la URL y recién después corre
+ * `encodeURI()` sobre el total. `encodeURI` deja pasar sin tocar
+ * `& # ? = + / : ; , @ $` — comprobado: `encodeURI('...?download=Ventas & Alquileres.docx')`
+ * da `'...?download=Ventas%20&%20Alquileres.docx'`, con el `&` intacto. Ese
+ * `&` arranca un parámetro nuevo en la URL y el asesor termina descargando un
+ * archivo llamado "Ventas ", sin extensión.
+ *
+ * NO uses encodeURIComponent acá: no sirve, porque getPublicUrl corre
+ * encodeURI() sobre el resultado final, y encodeURI escapa el `%` que
+ * encodeURIComponent introduce — comprobado: `encodeURI('a%20b')` da
+ * `'a%2520b'`. Por eso esto es un REEMPLAZO de caracteres, no una
+ * codificación: no lo cambies a encodeURIComponent.
+ */
+function sanearNombreDescarga(nombre: string): string {
+  return nombre.replace(/[&#?=+/:;,@$]/g, "-")
 }
