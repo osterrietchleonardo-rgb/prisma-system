@@ -11,7 +11,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { FileText, Upload, Download, Trash2, Loader2 } from "lucide-react";
+import { FileText, Upload, Download, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { validarArchivo, rutaDeArchivo, nombreVisible, type Seccion } from "@/lib/asesor-docs/reglas";
@@ -58,16 +58,36 @@ function formatBytes(bytes?: number | null) {
   return `${(bytes / 1024).toFixed(0)} KB`;
 }
 
+// Distinto del estado vacío a propósito: acá algo salió mal, no es que no
+// haya documentos. Con botón para reintentar la carga.
+function BloqueError({ mensaje, onReintentar }: { mensaje: string; onReintentar: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+      <div className="flex items-center gap-2 text-sm text-destructive">
+        <AlertTriangle className="h-4 w-4 shrink-0" />
+        <span>{mensaje}</span>
+      </div>
+      <Button variant="outline" size="sm" onClick={onReintentar}>Reintentar</Button>
+    </div>
+  );
+}
+
 export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: Props) {
   const supabase = createClient();
 
   const [cargando, setCargando] = useState(true);
+  // Distinto de "sin documentos": una consulta que falla (red, permisos, el tope
+  // de 8s del rol authenticated) NO es lo mismo que una lista vacía. Si se
+  // confunden, el usuario cree que no hay nada cuando en realidad no se pudo
+  // saber — el peor tipo de fallo, porque se disfraza de dato.
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [plantillas, setPlantillas] = useState<Plantilla[]>([]);
   const [tipos, setTipos] = useState<Tipo[]>([]);
   const [infos, setInfos] = useState<Info[]>([]);
 
   const cargar = useCallback(async () => {
     setCargando(true);
+    setErrorCarga(null);
     try {
       const columnasPlantillas = readOnly
         ? "id, nombre_archivo, archivo_original_path, template_id, size_bytes, created_at"
@@ -84,15 +104,26 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
           .eq("advisor_id", advisorId)
           .order("created_at", { ascending: false }),
       ]);
+      if (p.error || i.error) {
+        setErrorCarga("No se pudieron cargar los documentos. Puede ser un problema de conexión — probá de nuevo.");
+        setPlantillas([]);
+        setInfos([]);
+        return;
+      }
       setPlantillas((p.data as unknown as Plantilla[]) ?? []);
       setInfos((i.data as Info[]) ?? []);
       // La lista de tipos es solo del director: el asesor no tiene política para leerla.
       if (!readOnly) {
-        const { data: t } = await supabase
+        const { data: t, error: errTipos } = await supabase
           .from("advisor_doc_templates")
           .select("id, nombre")
           .eq("agency_id", agencyId)
           .order("nombre");
+        if (errTipos) {
+          setErrorCarga("No se pudieron cargar los tipos de documento. Probá de nuevo.");
+          setTipos([]);
+          return;
+        }
         setTipos(t ?? []);
       }
     } finally {
@@ -103,7 +134,10 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
   useEffect(() => { cargar(); }, [cargar]);
 
   const descargar = async (path: string, nombre: string) => {
-    const url = await urlDeDescarga(supabase, path);
+    // El nombre se le pasa a urlDeDescarga para que Supabase lo fuerce por
+    // header (download=nombre): a.download NO alcanza, el navegador lo
+    // ignora en un link cross-origin como el de Storage.
+    const url = await urlDeDescarga(supabase, path, nombre);
     if (!url) { toast.error("No se pudo armar el link de descarga"); return; }
     const a = document.createElement("a");
     a.href = url;
@@ -155,17 +189,37 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
       // 1) Resolver el tipo: el que se eligió, o crear uno nuevo.
       let templateId = tipoSeleccionado;
       if (esNuevo) {
-        const { data: nuevoTipo, error: errTipo } = await supabase
+        // El nombre tiene un índice único case-insensitive (agency_id, lower(nombre)).
+        // Buscarlo ANTES de insertar evita dos cosas: un mensaje de "duplicate key"
+        // ilegible si ya existe con otra capitalización, y la trampa de quedar
+        // trabado si esta misma pantalla ya lo creó en un intento anterior que
+        // falló después (el tipo quedó creado, pero el archivo no se subió).
+        const { data: tipoExistente, error: errBuscar } = await supabase
           .from("advisor_doc_templates")
-          .insert({ agency_id: agencyId, nombre: nombreNuevo, created_by: user?.id })
           .select("id, nombre")
-          .single();
-        if (errTipo || !nuevoTipo) {
-          toast.error("No se pudo crear el tipo de documento" + (errTipo ? `: ${errTipo.message}` : ""));
+          .eq("agency_id", agencyId)
+          .ilike("nombre", nombreNuevo)
+          .maybeSingle();
+        if (errBuscar) {
+          toast.error("No se pudo verificar el tipo de documento: " + errBuscar.message);
           return;
         }
-        templateId = nuevoTipo.id;
-        setTipos((prev) => [...prev, nuevoTipo].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        if (tipoExistente) {
+          templateId = tipoExistente.id;
+          setTipos((prev) => (prev.some((t) => t.id === tipoExistente.id) ? prev : [...prev, tipoExistente].sort((a, b) => a.nombre.localeCompare(b.nombre))));
+        } else {
+          const { data: nuevoTipo, error: errTipo } = await supabase
+            .from("advisor_doc_templates")
+            .insert({ agency_id: agencyId, nombre: nombreNuevo, created_by: user?.id })
+            .select("id, nombre")
+            .single();
+          if (errTipo || !nuevoTipo) {
+            toast.error("No se pudo crear el tipo de documento" + (errTipo ? `: ${errTipo.message}` : ""));
+            return;
+          }
+          templateId = nuevoTipo.id;
+          setTipos((prev) => [...prev, nuevoTipo].sort((a, b) => a.nombre.localeCompare(b.nombre)));
+        }
       }
 
       // 2) ¿Ya tiene un documento de este tipo? Si sí, es un reemplazo: confirmar.
@@ -187,6 +241,17 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
       if (errStorage) { toast.error("No se pudo subir el archivo: " + errStorage.message); return; }
 
       // 4) La fila: update si reemplaza, insert si es la primera vez.
+      //
+      // El UPDATE (en vez de borrar la fila y crear otra) es a propósito: con
+      // DELETE+INSERT hay una ventana sin fila, y si el INSERT fallara el
+      // asesor se queda sin documento. Con UPDATE además se preservan `id` y
+      // `created_at`.
+      //
+      // OJO Etapa C: este UPDATE no toca version_id/form_data/estado/observacion.
+      // Hoy son siempre null y no pasa nada, pero apenas la C empiece a llenarlos
+      // con datos extraídos del archivo, reemplazar acá va a dejar esos datos
+      // del archivo VIEJO pegados al archivo nuevo. Cuando eso exista, este
+      // UPDATE tiene que limpiarlos también.
       if (existente) {
         const { error: errUpdate } = await supabase
           .from("advisor_documents")
@@ -278,13 +343,17 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
     try {
       const { data: { user } } = await supabase.auth.getUser();
       let okCount = 0;
-      const fallidos: string[] = [];
+      const fallidos: { nombre: string; motivo: string }[] = [];
+      // Solo los que fallaron quedan seleccionados: si se aprieta Subir de
+      // nuevo, los que ya entraron no se vuelven a subir (no hay índice único
+      // en esta tabla que lo frene, así que duplicarían sin avisar).
+      const pendientes: File[] = [];
 
       for (const file of archivosInfo) {
         const validacion = validarArchivo(file.name, file.size, "info" as Seccion);
         if (!validacion.ok) {
-          toast.error(`${file.name}: ${validacion.error}`);
-          fallidos.push(file.name);
+          fallidos.push({ nombre: file.name, motivo: validacion.error });
+          pendientes.push(file);
           setProgresoInfo((p) => (p ? { ...p, done: p.done + 1 } : p));
           continue;
         }
@@ -310,8 +379,10 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
             throw errInsert;
           }
           okCount++;
-        } catch (_err) {
-          fallidos.push(file.name);
+        } catch (err) {
+          const motivo = err instanceof Error ? err.message : "No se pudo subir";
+          fallidos.push({ nombre: file.name, motivo });
+          pendientes.push(file);
         } finally {
           setProgresoInfo((p) => (p ? { ...p, done: p.done + 1 } : p));
         }
@@ -320,10 +391,19 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
       if (okCount > 0) {
         toast.success(okCount === 1 ? "Archivo subido" : `${okCount} archivos subidos`);
       }
-      if (fallidos.length > 0 && okCount > 0) {
-        toast.error(`No se pudieron subir ${fallidos.length}: ${fallidos.join(", ")}`);
+      // Sin el "&& okCount > 0": si TODOS fallan (ej. se cae la subida a
+      // Storage), antes no se avisaba nada — ni éxito (no hubo) ni error
+      // (el guard lo tapaba). El spinner terminaba y no pasaba nada.
+      if (fallidos.length > 0) {
+        toast.error(
+          fallidos.length === 1
+            ? `No se pudo subir "${fallidos[0].nombre}": ${fallidos[0].motivo}`
+            : `No se pudieron subir ${fallidos.length} de ${archivosInfo.length}: ${fallidos.map((f) => f.nombre).join(", ")}`
+        );
       }
-      if (fallidos.length === 0) cerrarDialogInfo();
+
+      setArchivosInfo(pendientes);
+      if (pendientes.length === 0) cerrarDialogInfo();
       cargar();
     } finally {
       setSubiendoInfo(false);
@@ -435,6 +515,8 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
             <Skeleton className="h-14 w-full rounded-xl" />
             <Skeleton className="h-14 w-full rounded-xl" />
           </div>
+        ) : errorCarga ? (
+          <BloqueError mensaje={errorCarga} onReintentar={cargar} />
         ) : plantillas.length === 0 ? (
           <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
             {readOnly
@@ -537,6 +619,8 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
             <Skeleton className="h-14 w-full rounded-xl" />
             <Skeleton className="h-14 w-full rounded-xl" />
           </div>
+        ) : errorCarga ? (
+          <BloqueError mensaje={errorCarga} onReintentar={cargar} />
         ) : infos.length === 0 ? (
           <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
             {readOnly
