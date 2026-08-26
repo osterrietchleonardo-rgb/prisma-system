@@ -89,11 +89,29 @@ export async function POST(req: Request) {
     // ─── Memoria del chat: historial completo de la sesión (para mantener el hilo y no repetir) ───
     const { data: convoRows } = await supabase
       .from('consultor_chat_messages')
-      .select('role, content')
+      .select('role, content, metadata')
       .eq('session_id', currentSessionId)
       .order('created_at', { ascending: true });
     // Turnos previos = todo menos el mensaje actual (último insertado). Limitamos a los últimos 12.
     const priorTurns = (convoRows || []).slice(0, -1).slice(-12);
+
+    // ─── Qué propiedades ya vio el asesor en esta búsqueda ───
+    // No hace falta guardarlas en ningún lado nuevo: cada respuesta del asistente ya deja las
+    // que mostró en su `metadata`. Se juntan todas las de la sesión para que, cuando pida
+    // "mostrame otras", no le vuelvan las mismas.
+    // El `metadata` viejo (chats anteriores a las tres secciones) es un array suelto: se
+    // contempla para que el historial no se rompa.
+    const yaMostradas = new Set<string>();      // cartera propia y de la agencia
+    const yaMostradasRed = new Set<string>();   // red de colaboración, con el id de la tabla
+    for (const fila of (convoRows || [])) {
+      const mp: any = (fila as any).metadata?.matchedProperties;
+      if (!mp) continue;
+      const grupos = Array.isArray(mp) ? [mp] : [mp.propias, mp.agencia, mp.roomix];
+      for (const g of grupos) for (const prop of (g || [])) {
+        if (prop?.id) yaMostradas.add(String(prop.id));
+        if (prop?.roomix_id) yaMostradasRed.add(String(prop.roomix_id));
+      }
+    }
 
     // 4. Intent Analysis + Keyword Extraction
 
@@ -190,7 +208,8 @@ export async function POST(req: Request) {
           "floor_preference": "alto" | "bajo" | "medio" | null,
           "free_text_keywords": ["características concretas que NO entran en los filtros de arriba: ej 'frente', 'contrafrente', 'a estrenar', 'apto crédito', 'pozo/en construcción', 'reciclado', 'luminoso', 'al río', 'esquina', nombre de barrio cerrado/edificio, etc. Si no hay: []"],
           "search_summary": "frase corta en lenguaje natural que describe la búsqueda ACUMULADA del usuario (tipo, zona, ambientes, operación, presupuesto y matices subjetivos como 'luminoso', 'para una familia', 'a estrenar'). Ej: 'departamento 2 ambientes luminoso a estrenar en venta en Almagro hasta 120000 usd'. Si todavía no hay criterios concretos: ''",
-          "force_search": false
+          "force_search": false,
+          "pedir_mas": false
         }
 
         REGLAS CRÍTICAS:
@@ -211,6 +230,7 @@ export async function POST(req: Request) {
         - ESPACIO EXTERIOR (importante): si piden espacio al aire libre de forma genérica o con "o" (ej "patio o balcón", "balcón o terraza", "espacio aéreo", "aire libre", "con expansión", "algo afuera/al exterior", "espacio verde propio") → poné UN SOLO amenity: "espacio aereo" (NO listes patio y balcón por separado: así matchea si tiene CUALQUIERA y no se penaliza por tener solo uno). Listá el específico (ej solo "balcón", solo "patio") únicamente cuando pidan ESE puntual y excluyente.
         - JERGA INMOBILIARIA AR (traducí a los campos): "espacio aéreo/expansión/aire libre" → amenity "espacio aereo". "a estrenar/sin estrenar/nuevo/recién terminado" → free_text "a estrenar". "pozo/en pozo/del pozo/en construcción/preventa/desde pozo" → free_text "pozo". "apto crédito/apto banco/apto hipotecario" → free_text "apto credito". "apto profesional/uso profesional/apto oficina" → amenity "apto profesional". "semipiso" → type "departamento" + free_text "semipiso". "monoambiente/mono" → type "monoambiente". "dúplex/tríplex" → type "duplex". "PH" → type "ph". "frente/contrafrente/lateral" → free_text con ese término. "reciclado/a reciclar/a refaccionar/a remodelar" → free_text con ese término. "categoría/premium/de lujo/alta gama/super luxe" → free_text "categoria". "fondo/parque/jardín propio" → amenity "jardin". "cochera fija/cubierta/descubierta" → amenity "cochera". Términos subjetivos puros ("luminoso", "amplio", "moderno", "para la familia") NO van a filtros: van SOLO en search_summary (los captura el significado).
         - search_summary: SIEMPRE redactalo acumulando todo lo dicho (incluí los matices subjetivos). Es la base de la búsqueda por significado; nunca lo dejes vacío si ya hay aunque sea un criterio.
+        - "pedir_mas": true SOLO cuando el usuario pide MÁS OPCIONES DE LO MISMO, sin cambiar ningún criterio: "mostrame más", "otras", "hay más?", "no me gustan, mostrame otras", "seguí", "más opciones", "y qué más tenés". Es false si CAMBIA o AGREGA algo (ahí es una búsqueda nueva, aunque diga "mostrame"): "ahora con cochera" → false, "mostrame en Núñez" → false, "más barato" → false. La diferencia importa: con true no se le repiten las propiedades que ya vio; con false se busca de nuevo desde cero.
         - "force_search": tu JUICIO sobre si el usuario quiere ver resultados YA con lo que haya, AUNQUE falten datos. Poné true si de CUALQUIER forma (no hay frase fija) da a entender que no tiene/no quiere dar más datos o que avancés: "mostrame igual", "dale mostrame", "quiero ver lo que hay", "no tengo más", "no importa", "lo que sea", "buscá ya", "avanzá", "así está bien", "no me preguntes más", "ya está", etc. Poné false si todavía está respondiendo/dando datos o pregunta otra cosa. Interpretá la intención humana, no busques palabras exactas.
         - Mensaje general ("qué tenés?", "mostrá propiedades") → intent: RETRIEVAL con todo []/null/ambas.
         - Saludo/charla → intent: GENERAL.
@@ -237,6 +257,8 @@ export async function POST(req: Request) {
     let freeTextKeywords: string[] = [];
     let searchSummary = "";
     let forceSearch = false;
+    /** El usuario pide MÁS de lo mismo: no se le repiten las que ya vio. */
+    let pedirMas = false;
 
     try {
       const parsed = JSON.parse(intentResText);
@@ -263,6 +285,7 @@ export async function POST(req: Request) {
         .map((k: string) => k.toLowerCase().trim());
       searchSummary = typeof parsed.search_summary === "string" ? parsed.search_summary.trim() : "";
       forceSearch = parsed.force_search === true || parsed.force_search === "true";
+      pedirMas = parsed.pedir_mas === true || parsed.pedir_mas === "true";
     } catch(e) {
       isRetrieval = intentResText.toUpperCase().includes("RETRIEVAL");
     }
@@ -283,6 +306,21 @@ export async function POST(req: Request) {
     const saysAlquiler = /\b(alquiler|alquilar|alquilando|renta|rentar|locaci[oó]n|locar)\b/.test(msgLower);
     if (saysVenta && !saysAlquiler) operation = "venta";
     else if (saysAlquiler && !saysVenta) operation = "alquiler";
+
+    // Red de seguridad de "MOSTRAME OTRAS": si el modelo no lo marco pero el mensaje es
+    // claramente un pedido de mas de lo mismo, se toma igual.
+    //
+    // Solo se aplica a mensajes CORTOS, y es a proposito: "mostrame otras" es pedir mas;
+    // "mostrame otras en Nunez con cochera" es una busqueda nueva. Donde hay criterios nuevos
+    // manda el modelo, que sabe distinguirlos; este regex solo cubre el caso en que el JSON
+    // del extractor falle.
+    if (!pedirMas) {
+      const palabras = msgLower.trim().split(/\s+/).length;
+      const pideMasSuelto =
+        /\b(m[aá]s|otras?|otros?)\b/.test(msgLower) &&
+        /\b(mostr\w*|ten[eé]s|hay|dame|ver|segu[ií]\w*)\b/.test(msgLower);
+      if (palabras <= 6 && pideMasSuelto) pedirMas = true;
+    }
 
     // Red de seguridad de PISO/NIVEL: si nombran nivel del depto en este mensaje, fijamos la preferencia
     // por código (sin pisar el tipo "piso planta completa"). Solo aplica si el modelo no la detectó.
@@ -355,7 +393,7 @@ export async function POST(req: Request) {
 
     // Queda en el log qué faltó y de qué grupo: sin esto, un "no encontré resultados" en
     // producción no se distingue de una búsqueda que ni siquiera llegó a correr.
-    console.log("Compuerta:", { needsMoreInfo, wantsAnyway, missingCritical, missingNiceToHave });
+    console.log("Compuerta:", { needsMoreInfo, wantsAnyway, missingCritical, missingNiceToHave, pedirMas, yaVistas: yaMostradas.size });
 
     if (isRetrieval && !needsMoreInfo) {
       const FULL_SELECT = 'id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, description, tokko_data, assigned_agent_id, assigned_agent, agent_profile:profiles(full_name, email)';
@@ -487,6 +525,13 @@ export async function POST(req: Request) {
         if (agRes.error) console.error('match_properties_ia (agencia) error:', agRes.error);
         propiasRanked = ownRes.data || [];
         agenciaRanked = agRes.data || [];
+        // `match_properties_ia` no sabe excluir, así que las ya vistas se sacan acá. Son 100
+        // filas como mucho: filtrarlas en memoria no cuesta nada y evita tocar esa función,
+        // que también usa el ACM.
+        if (pedirMas) {
+          propiasRanked = propiasRanked.filter((r: any) => !yaMostradas.has(String(r.id)));
+          agenciaRanked = agenciaRanked.filter((r: any) => !yaMostradas.has(String(r.id)));
+        }
       }
 
       marcar("4-sql-cartera-propia-y-agencia");
@@ -512,7 +557,9 @@ export async function POST(req: Request) {
         // Puerto Madero) y en los barrios grandes tarda menos de la mitad. Ver la migración
         // 20260826030000_buscador_red_frena_y_rankea.sql.
         p_candidatas: CANDIDATAS_ANTES_DE_FRENAR,
-        p_excluir_ids: [],
+        // Cuando pide "mostrame otras", las que ya vio quedan afuera de la búsqueda. Los ids
+        // de la red vienen con el prefijo `roomix_` en la pantalla; en la tabla no lo llevan.
+        p_excluir_ids: pedirMas ? [...yaMostradasRed] : [],
         p_limit: TOPE_POR_SECCION,
       };
 
@@ -610,6 +657,10 @@ export async function POST(req: Request) {
         if (!rp) return null;
         return {
           id: `roomix_${rp.slug}`,
+          // El id de la pantalla lleva el prefijo y el slug, no el de la tabla. Se guarda el
+          // real aparte para poder excluir con exactitud las que el asesor ya vio cuando pide
+          // "mostrame otras".
+          roomix_id: rp.id,
           title: rp.title,
           address: rp.address || rp.neighborhood || '',
           city: rp.neighborhood,
@@ -677,6 +728,13 @@ Respondé con un resumen MUY BREVE (2-4 oraciones): cuántas encontraste y ofrec
 
       // La red no contestó: hay que DECIRLO. Si no, el resumen sale como "encontré 10" (las de la
       // agencia) y el asesor se queda pensando que afuera no hay nada.
+      // Pidió más: que el modelo lo diga como lo que es, una tanda nueva, y no como si
+      // hubiera vuelto a buscar de cero.
+      if (pedirMas) {
+        propertyContext += `
+SON PROPIEDADES NUEVAS: el asesor pidió ver más y estas NO se le mostraron antes en este chat (se excluyeron las ${yaMostradas.size} que ya vio). Decíselo en una frase para que sepa que no son las mismas.`;
+      }
+
       // El asesor pidió amenities y no alcanzaban: se le muestra más, pero se le dice la verdad.
       if (redAflojada) {
         propertyContext += `

@@ -37,6 +37,7 @@ export interface UnifiedProperty {
   roomix_agency_source_url?: string | null   // listado de la inmobiliaria en el portal
   canonical_url?: string                     // ficha en roomix.ai (la tienen todas)
   source_listing_url?: string | null         // el aviso puntual en el portal de origen
+  roomix_id?: string                         // el id de la tabla, para no repetir al pedir más
   roomix_agency_phone?: string | null
   roomix_agency_whatsapp?: string | null
 
