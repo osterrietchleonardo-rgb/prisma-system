@@ -281,7 +281,13 @@ describe("ponerHueco — lo que NO es texto y vive DENTRO del mismo run que el t
     const r = ponerHueco(parrafo, "Juan Pérez", "{{NOMBRE}}")
     expect(r.ok).toBe(true)
     expect(r.xml).toContain("<w:tab/>")
+    // Encerrado por los DOS lados. Con un solo `menor que` el pedazo opaco
+    // se puede ir al final del run y el test sigue verde: la tabulación del
+    // renglón de la firma se corre de lugar y nadie se entera. Probado
+    // mutando el código para que lo mande al final -- este par de asserts
+    // es lo que lo agarra.
     expect(r.xml.indexOf("{{NOMBRE}}")).toBeLessThan(r.xml.indexOf("<w:tab/>"))
+    expect(r.xml.indexOf("<w:tab/>")).toBeLessThan(r.xml.indexOf(", asesor."))
     expect(textoDeXml(r.xml)).toBe("{{NOMBRE}}, asesor.")
     expect(balanceado(r.xml)).toBe(true)
   })
@@ -292,6 +298,43 @@ describe("ponerHueco — lo que NO es texto y vive DENTRO del mismo run que el t
     expect(r.ok).toBe(true)
     expect(r.xml).toContain("<w:br/>")
     expect(balanceado(r.xml)).toBe(true)
+  })
+
+  it("el pedazo opaco sale con el formato del run, no pelado", () => {
+    // Si se emitiera sin el <w:rPr>, la tabulación (o el salto, o la
+    // imagen) perdería el formato del run que la contenía y el renglón se
+    // desalinearía sin que nadie lo pida.
+    const parrafo = `<w:p><w:r>${NEGRITA}<w:t xml:space="preserve">Juan</w:t><w:tab/><w:t xml:space="preserve"> Pérez, asesor.</w:t></w:r></w:p>`
+    const r = ponerHueco(parrafo, "Juan Pérez", "{{NOMBRE}}")
+    expect(r.ok).toBe(true)
+    const corridas = [...r.xml.matchAll(/<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g)].map((m) => m[0])
+    const conTab = corridas.find((c) => c.includes("<w:tab/>"))
+    expect(conTab).toBeDefined()
+    expect(conTab).toContain("<w:b/>")
+  })
+
+  it("un <w:rPr> que NO es el primer hijo no es el formato del run: no se lo roba", () => {
+    // El run tiene colgado un cuadro de texto con un párrafo en negrita
+    // adentro, y además su propio texto. Como ahí adentro no hay ningún
+    // <w:r>, el run no se marca como anidado y se procesa. Buscando el
+    // <w:rPr> en cualquier parte, el run se apropiaba de la negrita del
+    // cuadro y se la aplicaba al {{NOMBRE}} -- balanceado y con ok: true,
+    // así que la red de seguridad no lo veía: mide balance, no si el
+    // formato es el que corresponde.
+    const conNegritaAdentro =
+      `<w:pict><v:shape><v:textbox><w:txbxContent>` +
+      `<w:p><w:pPr><w:rPr><w:b/></w:rPr></w:pPr></w:p>` +
+      `</w:txbxContent></v:textbox></v:shape></w:pict>`
+    const parrafo = `<w:p><w:r>${conNegritaAdentro}<w:t xml:space="preserve">Juan Pérez firma.</w:t></w:r></w:p>`
+    const r = ponerHueco(parrafo, "Juan Pérez", "{{NOMBRE}}")
+    expect(r.ok).toBe(true)
+    // la negrita sigue donde estaba, adentro del cuadro
+    expect(r.xml).toContain("<w:pPr><w:rPr><w:b/></w:rPr></w:pPr>")
+    // y el hueco NO salió en negrita
+    const corridas = [...r.xml.matchAll(/<w:r(?:\s[^>]*)?>[\s\S]*?<\/w:r>/g)].map((m) => m[0])
+    const conHueco = corridas.find((c) => c.includes("{{NOMBRE}}"))
+    expect(conHueco).toBeDefined()
+    expect(conHueco).not.toContain("<w:b/>")
   })
 
   it("un <w:rPr/> vacío no se confunde con contenido y el formato se sigue emitiendo", () => {
@@ -569,6 +612,32 @@ describe("ponerHuecosEnDocx / huecosDe / rellenarDocx — encabezado y pie", () 
   })
 })
 
+describe("ponerHuecosEnDocx — una parte que el paquete no declara", () => {
+  it("no se le pone el hueco, porque el rellenado tampoco la tocaría", () => {
+    // word/header1.xml existe adentro del .docx pero [Content_Types].xml no
+    // lo declara. Medido contra docxtemplater: una parte así NO se rellena.
+    // Ponerle el hueco igual --buscándola por el nombre del archivo-- sería
+    // dejar un "{{NOMBRE}}" impreso en el membrete del contrato. Mismo
+    // motivo por el que endnotes queda afuera.
+    const zip = armarDocx(`<w:p>${run("Cuerpo: Juan Pérez.")}</w:p>`)
+    zip
+      .folder("word")!
+      .file(
+        "header1.xml",
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:p>${run("Membrete: Juan Pérez")}</w:p></w:hdr>`
+      )
+
+    const r = ponerHuecosEnDocx(zip, [{ buscado: "Juan Pérez", hueco: "{{NOMBRE}}" }])
+    expect(r.puestos).toEqual([{ buscado: "Juan Pérez", hueco: "{{NOMBRE}}", veces: 1 }]) // solo el cuerpo
+    expect(textoDeParte(r.zip, "word/header1.xml")).toBe("Membrete: Juan Pérez")
+
+    // Y la razón, medida acá mismo: docxtemplater tampoco la rellena.
+    const salida = rellenarDocx(r.zip, { NOMBRE: "María González" })
+    expect(textoDe(salida)).toBe("Cuerpo: María González.")
+    expect(textoDeParte(salida, "word/header1.xml")).toBe("Membrete: Juan Pérez")
+  })
+})
+
 describe("ponerHuecosEnDocx / huecosDe — notas al pie y comentarios", () => {
   // Las dos mitades tienen que mirar las mismas partes del paquete: si
   // rellenarDocx rellena una nota al pie y nosotros no le ponemos el hueco,
@@ -655,6 +724,22 @@ describe("el hueco escrito a mano, con un espacio de más", () => {
     const zip = armarDocx(`<w:p>${run("Hola {{ NOMBRE }}, tu CUIT es {{ CUIT }}.")}</w:p>`)
     const salida = rellenarDocx(zip, { NOMBRE: "Juan" })
     expect(textoDe(salida)).toBe("Hola Juan, tu CUIT es .")
+  })
+
+  it("un hueco con el nombre de una propiedad de Object no saca datos de la nada", () => {
+    // El parser propio reemplaza al de docxtemplater, que mira solo las
+    // llaves PROPIAS del dato. Sin ese chequeo, {{constructor}} y
+    // {{__proto__}} escribían "[object Object]" en el contrato con la app
+    // informando éxito, y {{valueOf}} hacía explotar el rellenado.
+    for (const clave of ["constructor", "__proto__", "toString", "valueOf", "hasOwnProperty"]) {
+      const zip = armarDocx(`<w:p>${run(`Dato: {{${clave}}}.`)}</w:p>`)
+      expect(textoDe(rellenarDocx(zip, { NOMBRE: "María" }))).toBe("Dato: .")
+    }
+  })
+
+  it("pero si el dato SÍ trae esa llave, se usa -- no se bloquea por el nombre", () => {
+    const zip = armarDocx(`<w:p>${run("Dato: {{constructor}}.")}</w:p>`)
+    expect(textoDe(rellenarDocx(zip, { constructor: "María González" }))).toBe("Dato: María González.")
   })
 
   it("el circuito entero: se pone el hueco, se lista y se rellena", () => {

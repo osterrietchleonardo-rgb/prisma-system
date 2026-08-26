@@ -36,7 +36,22 @@ const OPCIONES = {
    * significa "el dato entero", y se deja pasar tal cual.
    */
   parser: (tag: string) => ({
-    get: (scope: Record<string, string>) => (tag === "." ? scope : scope[tag.trim()]),
+    get: (scope: Record<string, string>) => {
+      const nombre = tag.trim()
+      if (nombre === ".") return scope
+      /**
+       * `hasOwnProperty` y no un `scope[nombre]` pelado. Un hueco llamado
+       * {{constructor}} o {{__proto__}} saca de la cadena de prototipos
+       * algo que no es el dato de nadie: el contrato salía diciendo
+       * "[object Object]" y la app informaba ÉXITO. Con {{valueOf}} o
+       * {{hasOwnProperty}} el rellenado directamente explotaba. Medido.
+       *
+       * El parser que trae docxtemplater ya hacía este chequeo; al
+       * reemplazarlo por uno propio para poder hacerle trim al nombre,
+       * había que traerlo con él.
+       */
+      return scope && Object.prototype.hasOwnProperty.call(scope, nombre) ? scope[nombre] : undefined
+    },
   }),
 }
 
@@ -379,9 +394,21 @@ function extraerRuns(xmlParrafo: string): Run[] {
       return { ...base, formato: "", pedazos: [], texto: "" }
     }
     const interior = xml.slice(abridor.length, xml.length - CIERRE_RUN.length)
+    /**
+     * El formato solo cuenta si el <w:rPr> es el PRIMER hijo del run, que
+     * es donde OOXML lo exige. Buscándolo en cualquier parte, un run que
+     * tenga colgado un <w:pict> con un párrafo formateado adentro le ROBA
+     * ese <w:rPr> y se lo aplica a todo lo que reescribimos. Medido: salía
+     * el {{NOMBRE}} en negrita y un <w:pPr></w:pPr> vacío, balanceado y con
+     * ok: true -- la red de seguridad no lo agarra porque mide balance, no
+     * si el formato es el que corresponde.
+     *
+     * Si aparece más adentro no se toca: queda dentro de su pedazo opaco y
+     * se copia tal cual, que es su lugar.
+     */
     const rpr = RE_RPR.exec(interior)
-    const formato = rpr ? rpr[0] : ""
-    const cuerpo = rpr ? interior.slice(0, rpr.index) + interior.slice(rpr.index + rpr[0].length) : interior
+    const formato = rpr && rpr.index === 0 ? rpr[0] : ""
+    const cuerpo = interior.slice(formato.length)
     const pedazos = pedazosDeRun(cuerpo)
     const texto = pedazos.map((p) => (p.tipo === "texto" ? p.texto : "")).join("")
     return { ...base, formato, pedazos, texto }
@@ -545,9 +572,11 @@ function partesDeTextoDeDocx(zip: PizZip): string[] {
     }
   }
 
-  // Por si el paquete no declarara sus encabezados: Word los nombra siempre
-  // headerN.xml / footerN.xml, así que se buscan igual por nombre.
-  for (const f of zip.file(/^word\/(header|footer)\d*\.xml$/)) rutas.add(f.name)
+  // No hay red por nombre de archivo, a propósito. Un word/headerN.xml que
+  // el paquete NO declara es una parte que docxtemplater tampoco rellena
+  // (medido): ponerle el hueco ahí sería dejar un "{{NOMBRE}}" impreso en
+  // el membrete del contrato. Es el mismo motivo por el que endnotes queda
+  // afuera -- se informa como faltante, que es la verdad.
 
   return [...rutas].filter((r) => zip.file(r))
 }
