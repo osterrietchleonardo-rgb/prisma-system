@@ -225,6 +225,30 @@ async function enviarPlantillaEquipo(
   if (!inst) return { resultado: "error_sin_instancia", wamid: null, plantilla: nombrePlantilla }
 
   const parametros = aviso.variables.map((v) => ({ type: "text", text: v }))
+  // Meta directo PRIMERO: es el camino de las campañas, el único con entrega verificada (26/8).
+  // Evolution `sendTemplate` respondió 200 sin id y el mensaje nunca llegó (prueba de las 12:45).
+  if (inst.phone_number_id && inst.token) {
+    const res = await fetchFn(`https://graph.facebook.com/v20.0/${inst.phone_number_id}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${inst.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: telefono,
+        type: "template",
+        template: {
+          name: nombrePlantilla,
+          language: { code: "es_AR" },
+          components: [{ type: "body", parameters: parametros }],
+        },
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok)
+      return { resultado: `error_meta_${res.status}`, wamid: null, plantilla: nombrePlantilla, respuesta: data }
+    const wamid = data?.messages?.[0]?.id ?? null
+    return { resultado: "enviado", wamid, plantilla: nombrePlantilla, respuesta: wamid ? undefined : data }
+  }
   if (inst.integration_type === "evolution" && inst.evo_instance_name) {
     const url = process.env.EVOLUTION_API_URL
     const key = process.env.EVOLUTION_API_KEY
@@ -242,27 +266,7 @@ async function enviarPlantillaEquipo(
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { resultado: `error_evolution_${res.status}`, wamid: null, plantilla: nombrePlantilla }
     const wamid = data?.key?.id ?? data?.messageId ?? data?.messages?.[0]?.id ?? null
-    // si no reconocemos el id, guardamos la respuesta para aprender la forma (26/8: vino null)
     return { resultado: "enviado", wamid, plantilla: nombrePlantilla, respuesta: wamid ? undefined : data }
-  }
-  if (inst.phone_number_id && inst.token) {
-    const res = await fetchFn(`https://graph.facebook.com/v20.0/${inst.phone_number_id}/messages`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${inst.token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messaging_product: "whatsapp",
-        to: telefono,
-        type: "template",
-        template: {
-          name: nombrePlantilla,
-          language: { code: "es_AR" },
-          components: [{ type: "body", parameters: parametros }],
-        },
-      }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) return { resultado: `error_meta_${res.status}`, wamid: null, plantilla: nombrePlantilla }
-    return { resultado: "enviado", wamid: data?.messages?.[0]?.id ?? null, plantilla: nombrePlantilla }
   }
   return { resultado: "error_sin_canal", wamid: null, plantilla: nombrePlantilla }
 }

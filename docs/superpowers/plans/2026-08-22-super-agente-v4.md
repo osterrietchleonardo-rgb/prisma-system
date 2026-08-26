@@ -2408,8 +2408,12 @@ export async function sincronizarCompromisos(db: SupabaseClient) {
 > no manda: registra `aviso_simulado` con a quién habría ido. **Probado de verdad el 26/8 12:45**
 > desde el número de PRISMAIA al celular y al Gmail del perfil "Leonardo Asesor": email y WhatsApp
 > `enviado`, 0 `wa_messages` en el chat del lead (el aviso no ensucia la conversación).
-> Pendiente chico: Evolution devuelve otra forma para plantillas y el `wamid` quedó null; se guarda
-> la respuesta cruda para aprenderla.
+> **Hallazgo 26/8 (importa para Task 15):** Evolution `sendTemplate` respondió 200 sin id y el
+> WhatsApp de las 12:45 **nunca llegó**; Evolution tampoco lo registró. Las campañas (entrega
+> verificada) mandan plantillas por **Meta Graph directo** (`phone_number_id` + `token`). El aviso
+> ahora va por Meta directo primero (13:42: `wamid.HBgN…` real) y Evolution solo si no hay token.
+> **El ejecutor (Task 15) NO debe usar `/api/whatsapp/dispatch` tal cual**: ese endpoint manda por
+> Evolution `sendTemplate` cuando la instancia es `evolution`, el camino que falló.
 
 **Files:**
 - Modify: `app/api/seguimiento/run/route.ts`
