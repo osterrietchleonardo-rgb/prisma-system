@@ -16,6 +16,66 @@
 
 ---
 
+## 2026-08-26
+
+**Etapa B cerrada: los documentos de cada asesor ya viven adentro del sistema** (rama
+`feat/asesores-documentos`, mismo worktree `PRISMA-SYSTEM-asesores-docs`; spec en
+`docs/superpowers/specs/2026-08-24-asesores-celular-y-documentos-design.md`, plan en
+`docs/superpowers/plans/2026-08-26-asesores-etapa-b-documentos.md`). Falta el recorrido en
+el navegador de Leonardo (Task 7 paso 3, deliberadamente no hecho acá) y el merge a `main`.
+
+**Qué se construyó:** dos secciones nuevas en la tarjeta del asesor, en el panel del
+director — plantillas personalizadas (mismo documento para todos, con los datos de cada uno,
+solo `.docx`) y documentos de información (archivos sueltos, Word o PDF) — y una solapa "Mis
+Documentos" para el asesor, de solo lectura. Commits en orden: `05cd8c2` (reglas de qué
+archivo entra y dónde se guarda, 18 tests), `a9af2bb` (las tres tablas y sus permisos),
+`b5672a2` (la URL de descarga en un solo lugar), `dae1377`+`b3d7e7e` (el componente de las
+dos secciones y sus cinco arreglos de revisión), `fb24d00` (las solapas en el panel del
+director), `70f08f7` (la solapa del asesor).
+
+**Los hallazgos que vale la pena dejar anotados:**
+
+1. **El plan le pedía al asesor un dato que sus permisos no le dejan leer.** El componente
+   iba a pedir el nombre del tipo de documento con una consulta anidada, y por diseño el
+   asesor no ve esa lista — le habría llegado vacío. Se detectó **antes de escribir una
+   línea**, en el escaneo previo al plan. Se resolvió mostrándole al asesor el nombre del
+   archivo en vez del tipo.
+2. **Dos fallos silenciosos en el componente**, encontrados en revisión (ronda de los cinco
+   arreglos, `b3d7e7e`): si fallaban *todos* los archivos de una subida no salía ningún
+   mensaje de error, y si fallaba la consulta contra la base la pantalla decía "todavía no
+   tenés documentos" — informaba ausencia cuando en realidad había un fallo.
+3. **El nombre del archivo al descargar no se respetaba y los PDF no se descargaban** (se
+   abrían en pestaña nueva en vez de bajar): el atributo `download` del navegador se ignora
+   cuando el archivo viene de otro dominio. El arreglo entró en `lib/asesor-docs/url.ts`
+   (`b5672a2`), la función chiquita creada justamente para centralizar esa URL — era
+   exactamente su razón de ser.
+4. **Se verificó el aislamiento simulando el rol del asesor contra la base**, no confiando en
+   que la pantalla esconda botones: que no puede escribir y que no ve lo de otro asesor.
+   Todo dentro de transacciones revertidas (`BEGIN`/`ROLLBACK`), sin dejar nada escrito.
+
+**Verificación (Task 7, pasos 1-2 y 4-6 — el 3 queda para Leonardo):** `npm test` → 341
+tests en 31 archivos de vitest + 88 de node, todos verdes. `npx tsc --noEmit` → limpio.
+`npm run build` → compila. `npm run lint` → 61 errores preexistentes repartidos por `app/`,
+`components/` y `lib/`; uno de esos archivos (`app/api/ai/consultor/route.ts`) aparece
+también en `git diff --name-only main..HEAD`, pero es un falso positivo — `main` avanzó de
+forma independiente después de que esta rama divergiera (commit `26fe01d`, ajeno a esta
+etapa) y los commits propios de esta rama nunca tocaron ese archivo
+(`git diff 47e6230..HEAD -- app/api/ai/consultor/route.ts` da vacío). Ninguno de los 8
+archivos que esta rama sí modificó cae en la lista del lint. Detalle completo en
+`.superpowers/sdd/2026-08-26-asesores-etapa-b-documentos/task-7-report.md`.
+
+**Queda pendiente:**
+- **Etapa C (detección de plantillas y versionado)**, con plan propio — todavía no
+  arrancada.
+- El borrado de archivos es **por autor, no por inmobiliaria**: con dos directores en la
+  misma agencia, el segundo no puede borrar los que subió el primero. Hoy no es un problema
+  (una sola agencia real, un solo director) pero queda anotado para cuando deje de serlo.
+- La búsqueda del tipo de documento **no escapa los comodines** (`%`, `_`) — es la **cuarta
+  aparición** de ese mismo patrón en el proyecto. No se tocó porque no era parte del alcance
+  de esta etapa, pero ya son cuatro lugares con el mismo defecto suelto.
+
+---
+
 ## 2026-08-25
 
 **Etapa A cerrada: el código de invitación ahora valida quién lo usa** (rama

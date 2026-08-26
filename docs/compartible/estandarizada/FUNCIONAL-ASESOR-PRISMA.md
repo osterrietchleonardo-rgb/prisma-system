@@ -617,6 +617,21 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca Digital"** (lo de arriba
 - Es **solo lectura**: no podés subir ni modificar (eso lo gestiona el director).
 - Esta sección **no se consulta con la IA**: es solo para descargar el archivo oficial.
 
+### Solapa "Mis Documentos" (los que te cargó la dirección)
+
+Al lado de "Biblioteca Digital" y "Documentos Oficiales" tenés una tercera solapa: **"Mis Documentos"**. Acá están, todos juntos, los archivos que la dirección te cargó a vos, personalmente — nadie más los ve.
+
+**Qué vas a encontrar, en dos grupos:**
+- **Plantillas personalizadas:** documentos que la dirección preparó con tus datos (por ejemplo, un contrato o una autorización con tu nombre ya puesto).
+- **Documentos de información:** cualquier otro archivo suelto que la dirección quiera que tengas a mano.
+
+**Cómo usarla:**
+- Tocá el ícono de descarga en cualquier archivo para bajarlo a tu computadora o a tu celular.
+- Es **solo lectura**: podés mirar y descargar, pero no podés subir, cambiar ni borrar nada desde acá. Eso lo maneja la dirección.
+- Si te falta un documento, o el que tenés quedó viejo y hay que cambiarlo, **pedíselo a la dirección**: son quienes lo suben y lo actualizan.
+
+> 💡 **Tip:** si una plantilla se actualiza (por ejemplo, cambia un modelo de contrato), la dirección sube la versión nueva y esa **reemplaza automáticamente** a la anterior — vos siempre vas a ver la última versión, sin tener que fijarte cuál es la vieja.
+
 ---
 
 ## 18. Configuración
