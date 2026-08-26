@@ -11,7 +11,6 @@ import {
   Key,
   Users,
   Copy,
-  Plus,
   Sparkles,
   BarChart3,
   CalendarCheck,
@@ -49,8 +48,7 @@ import { Badge } from "@/components/ui/badge"
 
 import {
   getAgencySettings,
-  getAgencyInvites,
-  generateAgencyInvite
+  getAgencyInvites
 } from "@/lib/queries/director"
 import { createAgencyAction, updateAgencyAction } from "@/app/actions/agency"
 import { eliminarCodigoInvitacion } from "@/app/actions/invites"
@@ -59,6 +57,7 @@ import { useSearchParams } from "next/navigation"
 import { AiCreditsDashboard } from "@/components/ai-credits-dashboard"
 import { WhatsAppCostsDashboard } from "@/components/whatsapp-costs-dashboard"
 import { MetaTokenManager } from "@/components/whatsapp/MetaTokenManager"
+import { NuevoCodigoDialog } from "@/components/director/NuevoCodigoDialog"
 
 export default function DirectorConfiguracionPage() {
   const searchParams = useSearchParams()
@@ -84,8 +83,8 @@ export default function DirectorConfiguracionPage() {
 
   // Real Invite codes (lista compartida por todos los directores de la agencia)
   const [inviteCodes, setInviteCodes] = useState<any[]>([])
-  // Nombre del invitado al generar (uno por cada tipo de código)
-  const [inviteeName, setInviteeName] = useState<{ asesor: string; director: string }>({ asesor: "", director: "" })
+  // Qué rol se está invitando en el diálogo abierto. null = cerrado.
+  const [dialogoRol, setDialogoRol] = useState<"asesor" | "director" | null>(null)
   // Código que el director quiere borrar (abre el popup de confirmación)
   const [codeToDelete, setCodeToDelete] = useState<any | null>(null)
   const [deletingCode, setDeletingCode] = useState(false)
@@ -331,26 +330,10 @@ export default function DirectorConfiguracionPage() {
     }
   }
 
-  const generateCode = async (role: "asesor" | "director") => {
+  const recargarInvites = async () => {
     if (!profile.agency_id) return
-    const name = inviteeName[role].trim()
-    if (!name) {
-      toast.error("Escribí el nombre de la persona que vas a invitar")
-      return
-    }
-    try {
-      setLoading(true)
-      await generateAgencyInvite(profile.agency_id, role, name)
-      // Recargar invitaciones (lista compartida por todos los directores)
-      const codes = await getAgencyInvites(profile.agency_id)
-      setInviteCodes(codes)
-      setInviteeName((prev) => ({ ...prev, [role]: "" }))
-      toast.success(`Código de ${role === "director" ? "director" : "asesor"} generado para ${name}`)
-    } catch (_error) {
-      toast.error("Error al generar código")
-    } finally {
-      setLoading(false)
-    }
+    const codes = await getAgencyInvites(profile.agency_id)
+    setInviteCodes(codes)
   }
 
   const copyToClipboard = (text: string) => {
@@ -383,17 +366,14 @@ export default function DirectorConfiguracionPage() {
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">{descripcion}</p>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Input
-            value={inviteeName[role]}
-            onChange={(e) => setInviteeName((prev) => ({ ...prev, [role]: e.target.value }))}
-            placeholder="Nombre de la persona a invitar"
-            className="bg-background/50 border-accent/20 focus-visible:ring-accent"
-          />
-          <Button onClick={() => generateCode(role)} disabled={loading} variant="outline" className="gap-2 border-accent/20 text-accent hover:bg-accent/10 shrink-0">
-            <Plus className="h-4 w-4" /> Generar Código
-          </Button>
-        </div>
+        <Button
+          onClick={() => setDialogoRol(role)}
+          disabled={loading}
+          variant="outline"
+          className="gap-2 border-accent/20 text-accent hover:bg-accent/10 shrink-0"
+        >
+          Generar código de {role === "director" ? "director" : "asesor"}
+        </Button>
         <div className="space-y-3">
           {list.length > 0 ? (
             list.map((invite, i) => (
@@ -433,7 +413,7 @@ export default function DirectorConfiguracionPage() {
             ))
           ) : (
             <div className="text-center py-6 text-muted-foreground border-2 border-dashed border-accent/10 rounded-xl">
-              No hay códigos de {role === "director" ? "director" : "asesor"} todavía. Escribí un nombre y generá uno.
+              No hay códigos de {role === "director" ? "director" : "asesor"} todavía.
             </div>
           )}
         </div>
@@ -814,6 +794,16 @@ export default function DirectorConfiguracionPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {profile.agency_id && dialogoRol && (
+        <NuevoCodigoDialog
+          open={!!dialogoRol}
+          onOpenChange={(v) => setDialogoRol(v ? dialogoRol : null)}
+          agencyId={profile.agency_id}
+          role={dialogoRol}
+          onCreated={recargarInvites}
+        />
+      )}
     </div>
   )
 }

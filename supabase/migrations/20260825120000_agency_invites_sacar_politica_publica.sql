@@ -1,0 +1,62 @@
+-- ─────────────────────────────────────────────────────────────
+-- Sacar la política pública de agency_invites: filtraba TODOS los
+-- códigos libres del sistema a cualquiera con la clave anónima.
+--
+-- Qué hacía y por qué era un problema:
+--  La política "Public can view unused invites by code for validation"
+--  daba SELECT sobre agency_invites al rol público, con la condición
+--  USING (is_used = false). El problema es que una condición USING de
+--  RLS filtra FILAS, no "el código puntual que el cliente pidió": no
+--  existe forma de expresar ahí "solo si coincide con el código que
+--  me pasaron". Con is_used = false como única condición, cualquiera
+--  con la clave anónima podía hacer
+--    select * from agency_invites where is_used = eq.false
+--  y recibir la lista COMPLETA de códigos libres de TODAS las agencias,
+--  con su `role` — director incluido. Verificado desde afuera con la
+--  clave anónima antes de sacarla.
+--
+--  Esta rama (feat/asesores-celular-y-documentos) agrega invitee_phone
+--  e invitee_email a esa misma tabla. Con la política pública viva,
+--  esa fuga habría empezado a exponer también el celular y el email de
+--  cada invitado — que es justo el par de datos que esta rama convierte
+--  en credencial (el código solo le sirve a esa dirección de email).
+--  Sacarla ahora es parte de cerrar el mismo agujero, no un tema aparte.
+--
+-- Por qué es seguro sacarla:
+--  Se auditaron los seis lugares del sistema que leen agency_invites y
+--  ninguno depende de esta política:
+--   - El registro (lib/actions/auth.ts, función register()) valida el
+--     código con el admin client (service_role), que no pasa por RLS.
+--   - El callback de ingreso con Google (app/auth/callback/route.ts)
+--     también usa el admin client.
+--   - Las acciones del director (generateAgencyInvite, getAgencyInvites
+--     en lib/queries/director.ts, y la consulta de
+--     app/director/asesores/page.tsx) corren con la sesión del director
+--     logueado, cubiertas por la política "Directores ven invites de su
+--     agencia" (creada en 20260625120000_agency_invites_roles.sql), que
+--     esta migración NO toca.
+--  No queda ningún camino legítimo que necesitara leer agency_invites
+--  sin sesión de director y sin credenciales de servidor.
+--
+-- Ya aplicada en producción:
+--  Ejecutada contra producción el 2026-08-25 con OK explícito del dueño
+--  del proyecto, fuera de este repo (por Management API, sin pasar por
+--  esta migración). Verificado después: la consulta pública a
+--  agency_invites ahora devuelve vacío, las dos políticas de director
+--  siguen intactas, y las 39 filas de la tabla no se tocaron. Este
+--  archivo es la constancia en el repo de un cambio que hasta ahora
+--  solo existía en la base — para que nadie la recree sin saber por qué
+--  se sacó, y para que `main` refleje el estado real de producción.
+--
+-- Cómo revertir (si hiciera falta reponerla — NO se recomienda, ver
+-- arriba por qué era un problema; queda comentado para no ejecutarse
+-- solo, y es la reconstrucción semántica de la política original, no
+-- necesariamente el DDL byte a byte con el que se creó en su momento):
+--
+--   CREATE POLICY "Public can view unused invites by code for validation"
+--     ON public.agency_invites FOR SELECT
+--     TO public
+--     USING (is_used = false);
+-- ─────────────────────────────────────────────────────────────
+
+DROP POLICY IF EXISTS "Public can view unused invites by code for validation" ON public.agency_invites;

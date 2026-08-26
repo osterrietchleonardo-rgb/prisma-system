@@ -28,7 +28,10 @@ export default function RegisterForm() {
     setError(null)
 
     const formData = new FormData(e.currentTarget)
-    const fullName = formData.get("fullName") as string
+    // En modo "unirme" el campo ya no existe en el formulario: FormData.get
+    // devuelve null, y el schema del servidor espera string | undefined (nunca
+    // null), así que se normaliza acá.
+    const fullName = (formData.get("fullName") as string | null) ?? undefined
     const email = formData.get("email") as string
     const password = formData.get("password") as string
     const agencyName = formData.get("agencyName") as string
@@ -108,11 +111,13 @@ export default function RegisterForm() {
         </Tabs>
 
         <form onSubmit={handleSubmit} className="grid gap-4 mt-2">
-          <div className="grid gap-2">
-            <Label htmlFor="fullName">Nombre Completo</Label>
-            <Input id="fullName" name="fullName" placeholder="Juan Pérez" required disabled={loading} className="bg-background/50" />
-          </div>
-          
+          {mode === 'crear' && (
+            <div className="grid gap-2">
+              <Label htmlFor="fullName">Nombre Completo</Label>
+              <Input id="fullName" name="fullName" placeholder="Juan Pérez" required disabled={loading} className="bg-background/50" />
+            </div>
+          )}
+
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" name="email" type="email" placeholder="nombre@ejemplo.com" required disabled={loading} className="bg-background/50" />

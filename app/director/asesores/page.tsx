@@ -12,7 +12,6 @@ import {
   Target, 
   Home,
   QrCode,
-  RefreshCcw,
   Zap,
   Briefcase,
   PauseCircle,
@@ -24,8 +23,9 @@ import {
   RotateCcw
 } from "lucide-react"
 import { getAgentPerformanceAction, getAgencyAdvisorsPerformanceAction } from "@/app/actions/performance"
-import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa, setClasificacionAsesor, getHuellaDatosAsesor, eliminarAsesorDefinitivamente, type ClasificacionAsesor } from "@/app/actions/asesores"
+import { desvincularAsesor, pausarAsesor, reanudarAsesor, getUltimaAccionPausa, setClasificacionAsesor, getHuellaDatosAsesor, eliminarAsesorDefinitivamente, actualizarDatosAsesor, type ClasificacionAsesor } from "@/app/actions/asesores"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -69,6 +69,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
 import { QRCodeSVG } from "qrcode.react"
+import { NuevoCodigoDialog } from "@/components/director/NuevoCodigoDialog"
+import { VerifiedPhoneField, type VerifiedPhoneValue } from "@/components/shared/VerifiedPhoneField"
+import { normalizePhoneE164, formatPhoneInternational } from "@/lib/whatsapp/phone"
+import type { CountryCode } from "libphonenumber-js"
 // import { cn } from "@/lib/utils" // Unused
 
 // Clasificaciones que el director puede asignar a cada asesor.
@@ -88,7 +92,11 @@ export default function AsesoresPage() {
   const [selectedAdvisorFilter, setSelectedAdvisorFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [dialogoCodigoAbierto, setDialogoCodigoAbierto] = useState(false)
   const [inviteCode, setInviteCode] = useState("")
+  // De quién es el "Último código libre": se muestra al lado del código para
+  // que el director sepa a quién se lo está por mandar antes de copiarlo.
+  const [inviteName, setInviteName] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState<Record<string, any> | null>(null)
   const [agentKpis, setAgentKpis] = useState<any>(null)
@@ -114,6 +122,12 @@ export default function AsesoresPage() {
   const [unlinkReason, setUnlinkReason] = useState("")
   // Info de la pausa vigente del asesor abierto en el panel (motivo/fecha/quién)
   const [pauseInfo, setPauseInfo] = useState<{ motivo: string | null; created_at: string; ejecutado_por_nombre: string | null } | null>(null)
+
+  // Edición de nombre/celular del asesor (el email no se toca)
+  const [editandoDatos, setEditandoDatos] = useState<Record<string, any> | null>(null)
+  const [nombreEdit, setNombreEdit] = useState("")
+  const [phoneEdit, setPhoneEdit] = useState<VerifiedPhoneValue>({ phone: "", phoneConfirm: "", country: "AR" as CountryCode })
+  const [guardandoDatos, setGuardandoDatos] = useState(false)
 
   const supabase = createClient()
   const [agencyId, setAgencyId] = useState<string | null>(null)
@@ -153,17 +167,25 @@ export default function AsesoresPage() {
 
       if (error) throw error
       
-      // Get LATEST unused invite code from agency_invites
+      // Último código de ASESOR sin usar, y que además tenga email: eso es lo
+      // que garantiza que esté atado a una persona concreta y sea intransferible.
+      // Sin el filtro por email entraban también los códigos que el sistema crea
+      // solos al fundar una agencia (esos SÍ son transferibles a cualquiera) y,
+      // sin el filtro por role, los códigos de director generados desde
+      // Configuración —que esta pantalla ni siquiera debería poder ofrecer—.
       const { data: invite } = await supabase
         .from("agency_invites")
-        .select("code")
+        .select("code, invitee_name")
         .eq("agency_id", agencyId)
+        .eq("role", "asesor")
         .eq("is_used", false)
+        .not("invitee_email", "is", null)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
-      
+
       setInviteCode(invite?.code || "")
+      setInviteName(invite?.invitee_name || null)
       setAgents(data || [])
 
       // Performance real (de performance_logs) para las tarjetas
@@ -297,6 +319,42 @@ export default function AsesoresPage() {
     }
   }
 
+  // Abre el diálogo de edición de datos con el nombre precargado y el celular
+  // en blanco (blanco = "no lo toques", nunca se precarga para no tentar a
+  // "reescribirlo mal" sin darse cuenta).
+  const abrirEdicionDatos = (agent: Record<string, any>) => {
+    setNombreEdit(agent.full_name ?? "")
+    setPhoneEdit({ phone: "", phoneConfirm: "", country: "AR" as CountryCode })
+    setEditandoDatos(agent)
+  }
+
+  const guardarDatos = async () => {
+    if (!editandoDatos) return
+    const e164 = normalizePhoneE164(phoneEdit.phone, phoneEdit.country)
+    const confirm164 = normalizePhoneE164(phoneEdit.phoneConfirm, phoneEdit.country)
+    const tocaCelular = phoneEdit.phone.trim() !== ""
+
+    if (tocaCelular && (!e164 || e164 !== confirm164)) {
+      toast.error("Revisá el celular: tiene que ser válido y estar escrito igual las dos veces")
+      return
+    }
+    try {
+      setGuardandoDatos(true)
+      await actualizarDatosAsesor(editandoDatos.id, {
+        full_name: nombreEdit,
+        ...(tocaCelular && e164 ? { phone: e164 } : {}),
+      })
+      toast.success("Datos actualizados")
+      setEditandoDatos(null)
+      setSelectedAgent(null)
+      fetchAgents()
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "No se pudieron guardar los datos")
+    } finally {
+      setGuardandoDatos(false)
+    }
+  }
+
   useEffect(() => {
     fetchAgents()
   }, [fetchAgents])
@@ -336,26 +394,6 @@ export default function AsesoresPage() {
     }
     fetchAgentPerformance()
   }, [selectedAgent])
-
-  const generateInviteCode = async () => {
-    if (!agencyId) return
-    try {
-      const code = Math.random().toString(36).substring(2, 10).toUpperCase()
-      const { error } = await supabase
-        .from("agency_invites")
-        .insert({ 
-          agency_id: agencyId,
-          code: code,
-          is_used: false
-        })
-
-      if (error) throw error
-      setInviteCode(code)
-      toast.success("Nuevo código de invitación generado")
-    } catch (_error) {
-      toast.error("Error al generar código")
-    }
-  }
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(inviteCode)
@@ -432,13 +470,19 @@ export default function AsesoresPage() {
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold">Invitar al equipo</DialogTitle>
                 <DialogDescription>
-                  Comparte este código con los nuevos asesores para que se vinculen a tu inmobiliaria.
+                  Cada código se genera para una persona concreta y solo le sirve a ella.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-6 py-4">
                 {inviteCode ? (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Último código libre</p>
+                    {inviteName && (
+                      <p className="text-sm font-medium">
+                        Para: <span className="text-accent">{inviteName}</span>
+                      </p>
+                    )}
                     <div className="flex items-center gap-2">
                       <div className="flex-1 bg-accent/5 p-3 rounded-xl border border-accent/20 font-mono text-center text-lg font-bold tracking-widest text-accent">
                         {inviteCode}
@@ -447,23 +491,30 @@ export default function AsesoresPage() {
                         {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
-                    
-                    <Button variant="ghost" className="w-full gap-2 text-muted-foreground" onClick={generateInviteCode}>
-                      <RefreshCcw className="h-3 w-3" />
-                      Regenerar código
-                    </Button>
                   </div>
                 ) : (
-                  <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="py-8 flex flex-col items-center justify-center text-center space-y-3">
                     <QrCode className="h-12 w-12 text-muted-foreground/30" />
-                    <p className="text-sm text-muted-foreground">Aún no has generado un código de invitación.</p>
-                    <Button onClick={generateInviteCode} className="bg-accent">Generar primer código</Button>
+                    <p className="text-sm text-muted-foreground">No hay ningún código libre.</p>
                   </div>
                 )}
+
+                <Button
+                  className="w-full bg-accent gap-2"
+                  onClick={() => {
+                    setIsInviteModalOpen(false)
+                    setDialogoCodigoAbierto(true)
+                  }}
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Generar código para un asesor
+                </Button>
               </div>
-              
+
               <DialogFooter>
-                <Button variant="secondary" className="w-full" onClick={() => setIsInviteModalOpen(false)}>Listo</Button>
+                <Button variant="secondary" className="w-full" onClick={() => setIsInviteModalOpen(false)}>
+                  Listo
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -714,8 +765,14 @@ export default function AsesoresPage() {
 
       {/* Performance Side Panel */}
       <Sheet open={!!selectedAgent} onOpenChange={() => setSelectedAgent(null)}>
-        <SheetContent className="bg-card border-accent/20 sm:max-w-md">
-          <SheetHeader>
+        {/* En columna: el encabezado ocupa lo suyo y el cuerpo se queda con lo que sobre.
+            Antes el cuerpo tenía un alto máximo escrito a mano (100vh - 250px) que sólo
+            cerraba con el encabezado de aquel momento: al crecer el encabezado, la zona
+            con scroll terminaba por debajo del borde de la pantalla y esos píxeles no se
+            podían alcanzar de ninguna forma. Medido: 42px cortados en escritorio y 102px
+            en pantalla angosta, donde el encabezado se acomoda en más líneas. */}
+        <SheetContent className="bg-card border-accent/20 sm:max-w-md flex flex-col">
+          <SheetHeader className="shrink-0">
             <div className="flex flex-col items-center text-center space-y-4 mb-4">
               <Avatar className="h-24 w-24 border-4 border-accent/20">
                 <AvatarImage src={selectedAgent?.avatar_url} />
@@ -777,7 +834,33 @@ export default function AsesoresPage() {
             </div>
           </SheetHeader>
           
-          <div className="space-y-6 mt-8 overflow-y-auto max-h-[calc(100vh-250px)] pr-2">
+          <div className="space-y-6 mt-8 flex-1 min-h-0 overflow-y-auto pr-2">
+            {selectedAgent && (
+              <div className="rounded-xl border border-border/60 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Datos de contacto</p>
+                  <Button variant="ghost" size="sm" onClick={() => selectedAgent && abrirEdicionDatos(selectedAgent)}>
+                    Editar
+                  </Button>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-muted-foreground">Email:</span> {selectedAgent.email}</p>
+                  <p>
+                    <span className="text-muted-foreground">Celular:</span>{" "}
+                    {selectedAgent.phone
+                      ? (
+                          // El valor ya viene en E.164 sin "+". Sin asumir país,
+                          // formatPhoneInternational deducirá el país del código
+                          // del propio número. Si está vacío, cae al fallback crudo.
+                          formatPhoneInternational("+" + selectedAgent.phone) ?? selectedAgent.phone
+                        )
+                      : <span className="text-amber-600">Sin cargar</span>}
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">El email no se puede cambiar: es su cuenta.</p>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <Card className="bg-accent/5 border-accent/10 shadow-none">
                 <CardHeader className="p-4 pb-0">
@@ -1057,6 +1140,61 @@ export default function AsesoresPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Diálogo de edición de nombre/celular. El email queda de solo lectura. */}
+      <Dialog open={!!editandoDatos} onOpenChange={(v) => !v && setEditandoDatos(null)}>
+        <DialogContent className="bg-card border-accent/20 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Datos de {editandoDatos?.full_name || "el asesor"}</DialogTitle>
+            <DialogDescription>
+              El email queda como está: es la cuenta con la que se registró.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="ed-nombre">Nombre y apellido</Label>
+              <Input
+                id="ed-nombre"
+                value={nombreEdit}
+                disabled={guardandoDatos}
+                onChange={(e) => setNombreEdit(e.target.value)}
+              />
+            </div>
+            <VerifiedPhoneField value={phoneEdit} onChange={setPhoneEdit} disabled={guardandoDatos} />
+            <p className="text-xs text-muted-foreground">
+              Dejá el celular en blanco si no querés cambiarlo.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditandoDatos(null)} disabled={guardandoDatos}>
+              Cancelar
+            </Button>
+            <Button onClick={guardarDatos} disabled={guardandoDatos} className="bg-accent">
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {agencyId && (
+        <NuevoCodigoDialog
+          open={dialogoCodigoAbierto}
+          onOpenChange={setDialogoCodigoAbierto}
+          agencyId={agencyId}
+          role="asesor"
+          onCreated={(code, invite) => {
+            // El botón "Generar código para un asesor" cierra este modal antes de
+            // abrir el diálogo (ver más arriba). Si acá solo actualizáramos el
+            // código, quedaría guardado sobre un modal que ya no está en pantalla:
+            // el director vería el toast "Código generado para Juan" sin el
+            // código, y tendría que volver a abrir "Invitar al equipo" para verlo.
+            // Por eso lo reabrimos acá, ya con el código y el nombre listos.
+            setInviteCode(code)
+            setInviteName(invite.nombre)
+            setIsInviteModalOpen(true)
+          }}
+        />
+      )}
     </div>
   )
 }
