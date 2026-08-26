@@ -74,6 +74,69 @@ archivos que esta rama sí modificó cae en la lista del lint. Detalle completo 
   aparición** de ese mismo patrón en el proyecto. No se tocó porque no era parte del alcance
   de esta etapa, pero ya son cuatro lugares con el mismo defecto suelto.
 
+**El reclamo de roomix, y el proxy de fotos que salió de ahí** (rama `feat/fotos-red-proxy`,
+worktree propio `PRISMA-SYSTEM-fotos-red`; mergeada y desplegada el mismo día, `b6fd474`).
+El contexto completo del asunto está en `20 Frentes/roomix.md` del vault.
+
+**Lo que llegó:** a las 09:22 un aviso de abuse de DigitalOcean con 24 h para responder o
+suspender el droplet (n8n, chatwoot, evolution-api — o sea el bot de Central), y a las 12:54
+el reclamo de roomix por scraping: 20,2 M de requests y US$1.500 de daño estimado. Los dos
+respondidos dentro del día. El `roomix-worker` de EasyPanel quedó apagado.
+
+**Los números del relevamiento, que son el dato que faltaba:** `roomix_properties` tiene
+369.478 filas (267.547 activas, 178.340 sin `lastmod`) contra 353 activas de cartera propia
+de Central. En los 112 ACM generados hay **6.370 comparables de la red contra 303 propios**, y
+**72 de esos 112 no tuvieron ningún comparable propio**. El ACM, como funciona hoy, es la base
+de roomix con nuestra interfaz.
+
+**El proxy** (`app/api/foto-red/route.ts`): hasta hoy cada foto se la pedía el NAVEGADOR del
+asesor a `cdn.roomix.ai`, lo que además dejaba `Referer: https://prisma.vakdor.com/` en los
+registros de ellos — una de las cosas que reclamaron. Ahora se baja una vez server-side, se
+guarda en el bucket privado `red-fotos` y sale de nuestro lado.
+
+*Las decisiones que valen, con su porqué:*
+
+**Bajo demanda, no copiando todo.** El catálogo son 1.480.427 fotos (~212 GB) y solo hay 112
+ACM. Copiarlo entero habría significado pegarle a roomix el pico de tráfico más grande de toda
+la historia del asunto, el mismo día que les dijimos que parábamos.
+
+**`cdn.roomix.ai` sale de `next.config` y del CSP, a propósito.** Es *fail closed*: si quedó
+algún punto sin migrar, la foto se ve rota en vez de seguir pegándoles sin que nos enteremos.
+
+**El endpoint recibe una URL del cliente**, así que lo único que lo separa de un SSRF abierto
+es la allowlist de hosts, igual que en `fotos-descarga.ts`, más `redirect: "error"`. Probado
+con un impostor `cdn.roomix.ai.evil.com`, con `http` y sin parámetro: los tres dan 400.
+
+**Se tocó `opt()` en la ficha pública** para que `next/image` optimice también nuestras rutas
+internas. Sin eso el PDF de la ficha volvía a pesar decenas de MB.
+
+**Queda afuera:** `fotos-comparables` (el análisis con IA) sigue bajando del CDN server-side.
+No deja Referer y solo corre a pedido, pero no es cero.
+
+*Errores propios de la sesión:*
+
+**Verifiqué con un regex equivocado y casi reporto un falso negativo.** Al chequear que los
+endpoints ya no devolvieran URLs de roomix busqué `https://cdn.roomix.ai` en la respuesta y
+dio 0 por el proxy y 0 directo — o sea, ninguna foto. La URL viaja **URL-encodeada** dentro
+del parámetro (`%3A%2F%2F`). Un "0" en los dos lados no era éxito: era la señal de que la
+verificación no estaba mirando nada. Regla: cuando una comprobación da cero en todas sus
+categorías, lo primero que se duda es la comprobación.
+
+**Y probé primero con un ACM de Central estando logueado como PRISMAIA - VAKDOR**: el 404 no
+era un bug, era el scope por agencia funcionando. Para probar hace falta un ACM de la agencia
+con la que uno entra.
+
+*Gotchas del entorno:*
+
+1. **Un worktree nuevo no tiene `node_modules` ni `.env`.** Hay que correr `npm install` y
+   copiar `.env` y `.env.local` antes de poder compilar o levantar nada.
+2. **`npx tsc` agarra otro binario** ("This is not the tsc command you are looking for"): va
+   `./node_modules/.bin/tsc`.
+3. **El clasificador de permisos bloqueó cinco acciones** en esta sesión (apagar el servicio de
+   EasyPanel dos veces, un heredoc largo, y dos ediciones). Tres salieron al reintentar; el
+   apagado lo terminó haciendo Leonardo. Cuando un bloqueo se repite dos veces, conviene frenar
+   y pedirlo en vez de buscarle la vuelta.
+
 ---
 
 ## 2026-08-25
