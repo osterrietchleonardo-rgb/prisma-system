@@ -99,11 +99,18 @@ export async function POST(req: Request) {
 
     // 1. Buscar la instancia por evo_instance_name (prioridad) o instance_name
     const resolvedName = instanceName || data.external_instance_id
-    const { data: instance } = await supabase
+    const { data: instance, error: errInstance } = await supabase
       .from('whatsapp_instances')
       .select('id, agency_id, evo_instance_name')
       .or(`evo_instance_name.eq.${resolvedName},instance_name.eq.${resolvedName}`)
       .maybeSingle()
+
+    // FALLO DE BASE (26/8/2026): con Supabase caído esto respondía 404 "Instance not found"
+    // y el mensaje se perdía. 503 = que el emisor reintente cuando la base vuelva.
+    if (errInstance) {
+      console.error('[Evolution Webhook] Base no disponible al buscar la instancia (se pedirá reintento):', errInstance.message)
+      return NextResponse.json({ error: 'database unavailable, retry later' }, { status: 503 })
+    }
     
     console.log(`[Evolution Webhook] Instancia encontrada: ${instance?.id || 'NO ENCONTRADA'} para nombre: ${resolvedName}`)
 
@@ -164,8 +171,8 @@ export async function POST(req: Request) {
     })
 
     if (!convRow) {
-      console.error('[Evolution Webhook] Error creando conversación:', errConv)
-      return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 })
+      console.error('[Evolution Webhook] Error creando conversación (se pedirá reintento):', errConv)
+      return NextResponse.json({ error: 'database unavailable, retry later' }, { status: 503 })
     }
 
     // `conv` = la conversación que YA existía (null si la acabamos de crear). El
