@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { GaleriaFotos } from "@/components/marketing-ia/galeria-fotos"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Trash2, Loader2, Image as ImageIcon, FileText, Calendar, Download, Edit2, History as HistoryIcon, Search, Eye, Save, Copy, Sparkles } from "lucide-react"
@@ -42,6 +43,8 @@ export function MarketingHistory() {
   const [adGroups, setAdGroups] = useState<AdGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  // El Historial junta dos cosas distintas: los anuncios y las fotos retocadas.
+  const [vista, setVista] = useState<"anuncios" | "fotos">("anuncios")
 
   // Delete states
   const [variantToDelete, setVariantToDelete] = useState<string | null>(null)
@@ -269,8 +272,40 @@ export function MarketingHistory() {
     })
   })
 
+  const Separador = () => (
+    <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-muted/50 mb-6">
+      {([
+        { id: "anuncios", texto: "Anuncios y copys" },
+        { id: "fotos", texto: "Fotos retocadas" },
+      ] as const).map((v) => (
+        <button
+          key={v.id}
+          onClick={() => setVista(v.id)}
+          className={cn(
+            "px-4 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap",
+            vista === v.id
+              ? "bg-background shadow-sm text-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {v.texto}
+        </button>
+      ))}
+    </div>
+  )
+
+  if (vista === "fotos") {
+    return (
+      <div className="space-y-6">
+        <Separador />
+        <GaleriaFotos />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
+      <Separador />
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

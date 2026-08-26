@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase"
+import { emailValido, normalizarEmail, validarCelularGuardado } from "@/lib/invites/reglas"
 
 export interface AgencyLeadsOptions {
   agencyId: string;
@@ -298,13 +299,56 @@ export async function getAgencyInvites(agencyId: string) {
 
 export async function generateAgencyInvite(
   agencyId: string,
-  role: "director" | "asesor" = "asesor",
-  inviteeName?: string
+  role: "director" | "asesor",
+  inviteeName: string,
+  inviteePhone: string,
+  inviteeEmail: string
 ) {
   const supabase = createClient()
 
   // El rol del código define qué será la persona al registrarse.
   const safeRole = role === "director" ? "director" : "asesor"
+
+  const nombre = inviteeName.trim()
+  const email = normalizarEmail(inviteeEmail)
+
+  // Normalizar y validar el celular usando la misma regla del proyecto:
+  // E.164 sin "+", siempre. Si el llamador no pasó por validarNuevoCodigo(),
+  // esta función es la última barrera. validarCelularGuardado() vive en
+  // lib/invites/reglas.ts, junto con su test: no repetir esta línea acá evita
+  // que este consumidor y actualizarDatosAsesor() diverjan.
+  const phone = validarCelularGuardado(inviteePhone)
+
+  // Última barrera. La validación de verdad la hace el diálogo con
+  // validarNuevoCodigo(), pero esta función es pública y no puede confiar en
+  // que la llamen bien.
+  if (!nombre) throw new Error("Falta el nombre del invitado")
+  if (!phone) throw new Error("Falta un celular válido del invitado")
+  if (!emailValido(email)) throw new Error("Falta un email válido del invitado")
+
+  // Que no se genere un código para alguien que ya tiene cuenta acá. Es más
+  // barato negarlo ahora que borrar un perfil duplicado después.
+  //
+  // IMPORTANTE: escapamos _ y % (comodines de LIKE en PostgreSQL) para que la
+  // búsqueda sea exacta, no aproximada. Un email como "juan_perez@acme.com"
+  // no debe matchear "juanXperez@acme.com". El carácter de escape es \ en Postgres.
+  const emailSafe = email.replace(/\\/g, "\\\\").replace(/_/g, "\\_").replace(/%/g, "\\%")
+  const { data: yaExiste, error: errorDuplicado } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("agency_id", agencyId)
+    .ilike("email", emailSafe)
+    .maybeSingle()
+
+  if (errorDuplicado) {
+    throw new Error(`No se pudo verificar si ese email ya tiene cuenta. Reintentá.`)
+  }
+
+  if (yaExiste) {
+    throw new Error(
+      `Ese email ya tiene cuenta en tu inmobiliaria${yaExiste.full_name ? `: ${yaExiste.full_name}` : ""}`
+    )
+  }
 
   // Get agency name prefix for the code
   const { data: agency } = await supabase
@@ -325,7 +369,9 @@ export async function generateAgencyInvite(
       agency_id: agencyId,
       code,
       role: safeRole,
-      invitee_name: inviteeName?.trim() || null,
+      invitee_name: nombre,
+      invitee_phone: phone,
+      invitee_email: email,
     })
     .select()
 

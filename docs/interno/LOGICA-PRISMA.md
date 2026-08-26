@@ -365,7 +365,8 @@ El borrado definitivo **no puede destruir el historial de alguien real**: antes 
 - **`official_documents`** — Documentos Oficiales descargables (NO consultados por IA)
 - **`official_document_folders`** — Carpetas de los Documentos Oficiales (jerárquicas vía `parent_id`: admiten subcarpetas)
 - **`ipc_profiles`** — Perfiles de IPC para Marketing IA (Ideal Prospect Client)
-- **`generated_images`** — Imágenes generadas por Marketing IA
+- **`generated_images`** — Imágenes generadas por Marketing IA (siempre cuelgan de un `copy_drafts`)
+- **`property_photos`** — Fotos de propiedades retocadas con IA; `sesion_id` agrupa los pasos de una misma foto (ver 13.7)
 - **`valuations`** — Tasaciones generadas
 
 #### Contratos
@@ -1128,7 +1129,7 @@ Los IPC son perfiles estratégicos de marketing que definen:
   - **Captar:** tipo_propietario, motivo_venta, urgencia, preocupaciones, objeción_principal, angulo_marketing, tono, promesa_central, CTA
   - **Vender:** tipo_comprador_ideal, necesidad_concreta, atractivos_propiedad, angulo_copy, mensaje_central, CTA, propiedad_tokko_id (opcional)
 
-> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Clientes Ideales (IPC) · Mi Forma de Trabajar · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (5 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) lista los anuncios generados agrupados por tanda, con ver/editar/descargar/borrar.
+> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Fotos · Clientes Ideales (IPC) · Mi Forma de Trabajar · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (6 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) tiene dos vistas: **Anuncios y copys** (los anuncios agrupados por tanda, con ver/editar/descargar/borrar) y **Fotos retocadas** (`galeria-fotos.tsx`, ver 13.7).
 
 ### 13.1.b Mi Forma de Trabajar y la oferta irresistible (fórmula de Hormozi)
 
@@ -1222,6 +1223,40 @@ Gestiona la configuración de branding de la agencia (`marketing_ai_config`):
 **Endpoint:** `GET /api/marketing-ia/tokko-search`
 
 Busca propiedades para vincular a un IPC de tipo "vender". Lee la **cartera completa de la agencia** desde la tabla local `properties` (la misma fuente sincronizada que usa el ACM), no la API de Tokko en vivo. Por eso el **director (y el asesor) ven toda su cartera** —no un tope de 10—: filtra por `agency_id` + `is_active` (RLS por agencia), operación y tipo, con buscador de texto libre (título/dirección/zona/descripción). Devuelve el `id` de Tokko de cada propiedad para que, al asociarla y generar el anuncio, se traiga su ficha real desde Tokko.
+
+### 13.7 Fotos de propiedades retocadas con IA
+
+**Qué resuelve:** el asesor elige una foto de la ficha de Tokko y la deja publicable sin salir de PRISMA. Tres modos que se aplican **en secuencia**: `mejorar` (luz, color y cielo), `limpiar` (saca los objetos y muebles del dueño) y `ambientar` (home staging).
+
+**Piezas:** `lib/marketing-ia/fotos-ia.ts` (relevar, reglas, generar, controlar, reintento), `lib/marketing-ia/fotos-marcado.ts` (marcado por zonas, traductor de pedidos, detección y protección de textos), `POST /api/marketing-ia/editar-foto`, `GET /api/marketing-ia/fotos-propiedad`, `components/marketing-ia/fotos-ia.tsx` y `galeria-fotos.tsx`. Modelo: `gemini-3-pro-image-preview` para las imágenes, `gemini-3.5-flash` para relevar, controlar e interpretar.
+
+**El circuito de cada paso:**
+1. **Relevar** (flash) — se lee de la foto la geometría, el piso (material, tamaño de pieza, dirección de juntas, veteado), el inventario de lo que es del inmueble con su peso `grave`/`menor`, y los defectos visibles. **Nada de esto está hardcodeado**: sale de cada foto.
+2. **Generar** (imagen) — el relevamiento entra como regla dura junto con las reglas de piso, superficies, defectos y salida limpia.
+3. **Controlar** (flash) — compara antes y después. Rechaza si falta algo `grave`, si se inventó un elemento del inmueble, si cambió el piso, si se tapó un defecto o si quedó texto dibujado sobre la imagen.
+4. **Corregir y regenerar** — el defecto vuelve al modelo como corrección, hasta 3 intentos. Si ninguno pasa se entrega el de menos defectos: **el asesor nunca ve un rechazo**.
+
+**Lo que se descubrió probando (22 y 24-ago-2026, 42 generaciones sobre fotos reales de la cartera):**
+
+- **Dos familias de edición.** *Local* (sacar un objeto) permite recomponer: se pega solo la zona editada sobre la original y el resto queda intacto (diferencia medida 0,71 contra 8,37). *Global* (cielo, luz, staging) no lo permite — pegar solo el cielo deja una línea horizontal con los árboles partidos al medio.
+- **Para marcar una zona va UNA sola imagen, la marcada.** Mandar la original junto con la marcada, explicando cuál es cuál, **falla**: no edita nada y además mueve el resto.
+- **Las marcas van por color, nunca numeradas.** El modelo **copia a la imagen cualquier texto que ve dibujado**: al pasarle el inventario numerado pintó los números sobre la foto, y el control la aprobó porque solo miraba el inventario. De ahí salieron la regla de salida limpia y el chequeo de `marcas_dibujadas` (que además bajó los reintentos de 3 a 1).
+- **Sin `imageConfig: { imageSize: "2K" }` devuelve 1365x768**, más chica que la original.
+- **Los modos van en secuencia, nunca juntos.** Pedir las tres cosas de una vez hace que el modelo reinterprete el ambiente en lugar de editarlo: inventó un arco, cambió el piso de granito y movió las paredes.
+- **`mejorar` va primero.** El inventario se lee de la foto: sobre una oscura dio 6 elementos en vez de 8 y confundió granito con madera. Es el único modo que no mueve nada, así que puede correr antes de relevar; después el relevamiento definitivo se toma de la foto ya corregida, que pasa a ser la referencia del control.
+
+**Retoque por zonas (`reversionar`):** el asesor encierra zonas sobre el resultado y dice qué quiere. Con nombrar el objeto alcanza, y si no escribe nada se saca lo marcado: un traductor (flash) mira la imagen marcada y arma la instrucción completa, incluida la reconstrucción de lo que queda detrás. Varias zonas se resuelven en una sola pasada, más un pedido suelto para toda la foto.
+
+**Textos:** antes de editar se detectan solos los carteles, teléfonos, números de casa y chapas de calle, y al final se pegan de vuelta desde la original. **La zona protegida va ajustada al objeto**: con fondo adentro se nota el recuadro.
+
+**Persistencia:** cada paso es una fila de `property_photos`, con `sesion_id` agrupando todo lo que se le hizo a una misma foto. La galería muestra **una tarjeta por sesión** que se abre en carrusel: primero la original de la ficha, después cada paso, con seguir editando / descargar / borrar en cada uno. RLS por usuario; se guarda `agency_id` para poder abrirla a toda la agencia sin migrar datos.
+
+**Costo:** 3 créditos por paso (cubre hasta 3 generaciones si el control rechaza). US$ 0,134 por generación, 45 a 90 segundos por paso.
+
+**Límites conocidos:**
+- El control verifica que los **elementos** estén, **no que las proporciones se respeten**: aprobó el ambiente reconstruido del "todo junto". Esa clase de falla todavía pide ojo humano.
+- Sobre ambientes **ya amoblados**, lo que los muebles del dueño tapaban la IA lo inventa (apareció un radiador donde estaba apoyada una funda de guitarra), y el control no puede detectarlo porque el inventario tampoco lo vio.
+- El control **no es determinista**: la misma foto puede dar rechazada y aprobada en corridas distintas.
 
 ---
 

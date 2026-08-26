@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { generateEmbedding } from "@/lib/gemini";
 import { openaiIA } from "@/lib/openai";
@@ -9,11 +10,32 @@ import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Cuántas propiedades vuelven por sección (propias, agencia, red de colaboración).
+ *
+ * Eran 10 y quedaba corto: en un barrio grande hay cientos que cumplen, y el asesor
+ * necesita la lista para elegir, no una muestra. Las tarjetas van dentro de un contenedor
+ * con scroll propio, así el chat no se vuelve infinito (ver consultor-results.tsx).
+ *
+ * El costo no está en rankear —la función SQL puntúa TODAS las filas igual, el tope solo
+ * recorta el final— sino en traer las fichas completas y guardarlas en el historial del
+ * chat. Por eso 100 y no 500.
+ */
+const TOPE_POR_SECCION = 100;
+
 export async function POST(req: Request) {
   try {
     const { message, sessionId, history } = await req.json();
     const { userId, agencyId } = await requireTenant();
     console.log("Buscador IA Request:", { message, sessionId, agencyId });
+
+    // ─── Cronómetro por etapa ───
+    // Sin esto, un pedido de 13 s es una caja negra: no se distingue el SQL de la espera al
+    // modelo. Cada etapa deja su medición en el log, en milisegundos.
+    const t0 = Date.now();
+    const tramos: Record<string, number> = {};
+    let ultimo = t0;
+    const marcar = (etapa: string) => { const ahora = Date.now(); tramos[etapa] = ahora - ultimo; ultimo = ahora; };
     const supabase = await createClient();
 
     // ─── Notas/directivas del Buscador IA cargadas por el director (texto libre, la IA las interpreta) ───
@@ -184,6 +206,7 @@ export async function POST(req: Request) {
       }]
     });
 
+    marcar("1-modelo-extrae-filtros");
     const intentResText = intentCheck.response.text().replace(/```json|```/g, "").trim();
     let isRetrieval = false;
     let operation = "ambas";
@@ -413,6 +436,7 @@ export async function POST(req: Request) {
         .trim() || message;
       console.log("Embedding query text:", embeddingText);
 
+      marcar("2-preparar-busqueda");
       let queryEmbeddingStr: string | null = null;
       try {
         const emb = await generateEmbedding(embeddingText, 'RETRIEVAL_QUERY');
@@ -421,6 +445,7 @@ export async function POST(req: Request) {
         console.error('Query embedding fallo (se usa ranking estructural):', embErr);
       }
 
+      marcar("3-embedding-de-la-consulta");
       // ── 1+2) PROPERTIES: dos llamadas (propias / agencia) ──
       const propArgs = {
         p_query_embedding: queryEmbeddingStr,
@@ -442,8 +467,8 @@ export async function POST(req: Request) {
       let agenciaRanked: any[] = [];
       if (!askingExternalAgency) {
         const [ownRes, agRes] = await Promise.all([
-          supabase.rpc('match_properties_ia', { ...propArgs, p_agency_id: agencyId, p_include_agent: userId, p_limit: 10 }),
-          supabase.rpc('match_properties_ia', { ...propArgs, p_agency_id: agencyId, p_exclude_agent: userId, p_limit: 10 }),
+          supabase.rpc('match_properties_ia', { ...propArgs, p_agency_id: agencyId, p_include_agent: userId, p_limit: TOPE_POR_SECCION }),
+          supabase.rpc('match_properties_ia', { ...propArgs, p_agency_id: agencyId, p_exclude_agent: userId, p_limit: TOPE_POR_SECCION }),
         ]);
         if (ownRes.error) console.error('match_properties_ia (propias) error:', ownRes.error);
         if (agRes.error) console.error('match_properties_ia (agencia) error:', agRes.error);
@@ -451,8 +476,9 @@ export async function POST(req: Request) {
         agenciaRanked = agRes.data || [];
       }
 
+      marcar("4-sql-cartera-propia-y-agencia");
       // ── 3) ROOMIX: una llamada (sobre las 54k, sin límite de 400) ──
-      const { data: rmxRanked, error: rmxErr } = await supabase.rpc('match_roomix_ia', {
+      const rmxArgs = {
         p_query_embedding: queryEmbeddingStr,
         p_operation: operation,
         p_type_patterns: rmxTypePatterns,
@@ -468,11 +494,51 @@ export async function POST(req: Request) {
         p_floor_min: floorMin,
         p_floor_max: floorMax,
         p_free_text_patterns: freeTextPatterns,
-        p_limit: 10,
-      });
-      if (rmxErr) console.error('match_roomix_ia error:', rmxErr);
-      console.log('RPC counts → propias:', propiasRanked.length, 'agencia:', agenciaRanked.length, 'roomix:', (rmxRanked || []).length);
+        p_limit: TOPE_POR_SECCION,
+      };
 
+      // ─── La red se consulta con el cliente de servicio, no con la sesión del usuario ───
+      // El tope de 8 s que cortaba la búsqueda NO es de la base: lo pone el rol `authenticator`
+      // con el que entra PostgREST, y del que heredan `anon` y `authenticated`. `service_role`
+      // no tiene tope propio, así que por este camino la consulta puede terminar (Belgrano tarda
+      // 4,9 s en frío; Rosario y Córdoba pasan de 8 s y hasta ahora morían siempre).
+      //
+      // Que esto NO abre ninguna puerta: `roomix_properties` es de lectura pública — su única
+      // política de seguridad es SELECT para `public` con condición `true` (verificado en
+      // pg_policies el 25-ago-2026). Es la misma tabla que ya podía leer cualquier sesión; lo
+      // único que cambia es el tiempo que se le permite tardar. La cartera propia y la de la
+      // agencia SIGUEN yendo por la sesión del usuario, que es donde el aislamiento importa.
+      const redDb = createAdminClient();
+      let { data: rmxRanked, error: rmxErr } = await redDb.rpc('match_roomix_ia', rmxArgs);
+
+      // ─── Un solo reintento cuando la red se corta por tiempo ───
+      // La consulta de la red vive contra el techo de 8 s del rol `authenticated`: medido el
+      // 25-ago-2026 contra producción, la MISMA búsqueda tarda entre 2,3 s y 9,6 s según si los
+      // datos ya están en memoria. Cuando se pasa, el intento fallido igual dejó calientes las
+      // páginas que alcanzó a leer, y el segundo pasa cómodo: 297 ms, 373 ms y 246 ms medidos
+      // en las tres corridas siguientes a un timeout.
+      // Por eso se reintenta UNA vez y solo ante 57014 (statement timeout). No es el arreglo de
+      // fondo —ese es que la consulta no tarde 9 s— pero le devuelve al asesor las propiedades
+      // de la red en vez de un "no encontré nada" que es falso.
+      if (rmxErr && (rmxErr as any).code === '57014') {
+        console.warn('match_roomix_ia se cortó por tiempo; reintentando una vez');
+        const reintento = await redDb.rpc('match_roomix_ia', rmxArgs);
+        rmxRanked = reintento.data;
+        rmxErr = reintento.error;
+        console.log('Reintento de la red →', rmxErr ? 'falló de nuevo' : `${(rmxRanked || []).length} propiedades`);
+      }
+
+      // Si la red de colaboración FALLA (típicamente 57014: se cortó por el statement_timeout de 8 s
+      // del rol authenticated), la RPC devuelve null y hasta ahora eso se contaba como "0 propiedades".
+      // No es lo mismo: "no hay nada publicado" y "no pudimos preguntar" son dos respuestas distintas,
+      // y la primera es falsa. Medido el 25-ago-2026: de 16 búsquedas del día, 8 volvieron con 0 de la
+      // red teniendo la red propiedades (Belgrano: 14.593 avisos). El asistente terminó diciéndole a una
+      // asesora "no tengo acceso a propiedades fuera de la cartera de PRISMA" y se fue a Zonaprop.
+      const redFallo = !!rmxErr;
+      if (rmxErr) console.error('match_roomix_ia error:', rmxErr);
+      console.log('RPC counts → propias:', propiasRanked.length, 'agencia:', agenciaRanked.length, 'roomix:', (rmxRanked || []).length, redFallo ? '(LA RED FALLÓ)' : '');
+
+      marcar("5-sql-red-de-colaboracion");
       // ── Re-traer filas completas de properties por id (preserva join de perfil) y adjuntar match_pct ──
       const propIds = [...propiasRanked, ...agenciaRanked].map((r: any) => r.id);
       const propRowsById: Record<string, any> = {};
@@ -500,7 +566,7 @@ export async function POST(req: Request) {
       const rmxIds = (rmxRanked || []).map((r: any) => r.id);
       const rmxRowsById: Record<string, any> = {};
       if (rmxIds.length > 0) {
-        const { data: fullRmx } = await supabase.from('roomix_properties').select('*').in('id', rmxIds);
+        const { data: fullRmx } = await redDb.from('roomix_properties').select('*').in('id', rmxIds);
         for (const row of (fullRmx || [])) rmxRowsById[(row as any).id] = row;
       }
       const roomix = (rmxRanked || []).map((r: any) => {
@@ -541,17 +607,22 @@ export async function POST(req: Request) {
         };
       }).filter(Boolean);
 
+      marcar("6-traer-fichas-completas");
       newMatchedProperties = { propias, agencia, roomix } as any;
       const allNewProps = [...propias, ...agencia, ...roomix];
 
       // ─── Notas del director: lista de recomendadas (con su inmobiliaria) para que la IA pueda cruzarlas ───
+      // Solo las mejores de cada sección: la pantalla muestra hasta 100 por sección, pero
+      // mandarle las 300 al modelo serían miles de tokens en cada mensaje y las notas se cruzan
+      // igual de bien contra las que encabezan el ranking, que son las que el asesor va a mirar.
+      const TOPE_PARA_LA_IA = 12;
       let recommendedListStr = "";
       if (buscadorNotes) {
         const fmt = (p: any, tag: string) => `- [${tag}] "${p.title}"${p.address ? `, ${p.address}` : ""}`;
         recommendedListStr = [
-          ...propias.map((p: any) => fmt(p, "propia")),
-          ...agencia.map((p: any) => fmt(p, "agencia")),
-          ...roomix.map((p: any) => fmt(p, `inmobiliaria: ${p.roomix_agency_name || "externa"}`)),
+          ...propias.slice(0, TOPE_PARA_LA_IA).map((p: any) => fmt(p, "propia")),
+          ...agencia.slice(0, TOPE_PARA_LA_IA).map((p: any) => fmt(p, "agencia")),
+          ...roomix.slice(0, TOPE_PARA_LA_IA).map((p: any) => fmt(p, `inmobiliaria: ${p.roomix_agency_name || "externa"}`)),
         ].join("\n");
       }
 
@@ -567,6 +638,12 @@ export async function POST(req: Request) {
 ${pisoFallback ? `AVISO IMPORTANTE: El usuario buscó un "piso" (depto planta completa) pero no se encontró ninguno. Se muestran departamentos como alternativa. Comunicale esto claramente al INICIO de tu respuesta.` : ''}
 Respondé con un resumen MUY BREVE (2-4 oraciones): cuántas encontraste y ofrecé refinar la búsqueda.`
         : `No se encontraron propiedades con esos criterios.${pisoFallback ? ' Tampoco se encontraron departamentos.' : ''} Explicá cordialmente y sugerí alternativas concretas (ampliar zona, cambiar precio, quitar algún filtro).`;
+
+      // La red no contestó: hay que DECIRLO. Si no, el resumen sale como "encontré 10" (las de la
+      // agencia) y el asesor se queda pensando que afuera no hay nada.
+      if (redFallo) {
+        propertyContext += `\nAVISO OBLIGATORIO — LA RED DE COLABORACIÓN NO RESPONDIÓ: la búsqueda en la red de colaboración (los avisos publicados por otras inmobiliarias) se cortó por un problema técnico, así que lo que ves arriba NO la incluye. NO digas ni des a entender que afuera de la agencia no hay propiedades: no lo sabemos. Decíselo en una frase corta y ofrecele reintentar en un momento.`;
+      }
 
       // ─── Aviso sobre el piso/nivel: el dato está poco cargado, así que es un filtro SUAVE (no descarta) ───
       if (floorPreference) {
@@ -599,7 +676,17 @@ INSTRUCCIÓN SOBRE NOTAS: Interpretá las notas y directivas de arriba. Si algun
     }
 
     // 5. Generate Assistant Response
-    const systemPrompt = `Eres el "Buscador IA" de la inmobiliaria PRISMA. Sos el asistente experto para buscar propiedades en la cartera de la agencia.
+    const systemPrompt = `Eres el "Buscador IA" de la inmobiliaria PRISMA. Sos el asistente experto para buscar propiedades.
+
+    DÓNDE BUSCÁS (importante, es lo que más se malinterpreta):
+    Cada búsqueda tuya mira TRES lugares a la vez, y los resultados se muestran en tres secciones separadas:
+    1. PROPIAS: las propiedades cargadas por el propio asesor.
+    2. DE LA AGENCIA: las del resto de la inmobiliaria.
+    3. RED DE COLABORACIÓN: avisos publicados por OTRAS inmobiliarias, tomados de los portales. Son cientos de miles y cubren todo el país. NO son de la agencia: son de afuera.
+    - Por eso, cuando el usuario pide "buscá fuera de la oficina", "afuera", "en otras inmobiliarias", "algo que no sea nuestro" o similar, la respuesta NO es que no podés: la red de colaboración es exactamente eso, y ya la buscaste. Contale qué apareció en esa sección.
+    - REGLA ANTI-ERROR (no negociable): NUNCA digas "no tengo acceso a propiedades fuera de la cartera de PRISMA", "solo puedo ver la cartera de la agencia" ni nada parecido. Es FALSO y hace que el asesor se vaya a buscar a un portal.
+    - Lo único que NO podés hacer es consultar un portal EN VIVO (Zonaprop, Argenprop, MercadoLibre) en este momento. Si te lo piden por nombre, aclará esa diferencia sin negar la red: los avisos de esos portales que ya están relevados sí los ves, en la sección Red de colaboración.
+    - Si el contexto dice que la red de colaboración NO respondió, decilo tal cual: se cortó, no es que afuera no haya nada.
 
     FORMATO DE RESPUESTA CRÍTICO:
     - Las propiedades encontradas se muestran automáticamente como tarjetas visuales con fotos, precio y detalles. NO las listes en texto.
@@ -648,6 +735,8 @@ OJO: el usuario YA te pidió ver resultados igual, y aun así le estás pregunta
       ]
     });
 
+    marcar("7-modelo-escribe-la-respuesta");
+    console.log("Tiempos (ms):", { ...tramos, TOTAL: Date.now() - t0 });
     const assistantContent = chatResult.response.text();
 
     // ─── Record real token usage (input + output) ─────────────────────────

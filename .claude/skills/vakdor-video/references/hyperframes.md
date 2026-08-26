@@ -190,6 +190,14 @@ piezas/chat-whatsapp/          ← copiarla entera a un slot y renderizar
   ejemplo.png                  ← cómo queda
 ```
 
+### Y el demo del sistema, en `piezas/demo-prisma/`
+
+El video de 1:50 que recorre Dashboard, Tracking y el ACM completo hasta la ficha del
+cliente, con voz y música. **Se regenera con cuatro comandos** — está pensado para que
+cuando cambie una pantalla se re-capture esa sola y el video se rearme, en vez de volver
+a filmar todo a mano. La receta, el guion de la narración y los diez gotchas de captura
+están en `piezas/demo-prisma/LEEME.md`.
+
 La conversación se escribe en `data-variable-values` del host, con prefijos:
 
 ```

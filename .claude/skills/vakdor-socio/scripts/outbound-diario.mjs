@@ -211,6 +211,20 @@ function puntuar(p) {
   return { puntaje: n, porque: por.join(' · ') };
 }
 
+/*
+ * El canal segun el grado (regla del 24/08/2026, el detalle en 20 Frentes/outbound.md):
+ * el InMail es escaso y se agota. 1er grado va por mensaje directo (gratis); 2º y 3er
+ * grado por invitacion a conectar con nota; el email de Apollo/Apify queda como segundo
+ * canal, nunca el mismo dia. El InMail se reserva para los puntaje 8 que no aceptaron.
+ */
+const gradoDe = (c) => {
+  const t = c.resto.toLowerCase();
+  return /contacto de 1er/.test(t) ? 1 : /contacto de 2º/.test(t) ? 2 : /contacto de 3er/.test(t) ? 3 : 9;
+};
+const canalSugerido = (c, tibio) => (tibio || gradoDe(c) === 1)
+  ? 'mensaje directo — 1er grado o ya es contacto, gratis, sin InMail'
+  : 'invitacion a conectar con nota (300 caracteres), NO gastar InMail; si hay email de Apollo/Apify, va como segundo canal otro dia';
+
 // ------------------------------------------------------- el link directo al chat
 
 /*
@@ -275,10 +289,12 @@ async function cargarAlPipeline(lista, soloSaludo) {
     await dormir(1500 + Math.random() * 1200);
     const lineas = ident
       ? ['ESCRIBIRLE (abre el chat directo, ya con el destinatario cargado):', linkChat(ident), '',
+         `CANAL: ${canalSugerido(c, tibio)}.`, '',
          `POR QUE LO ELEGI (puntaje ${c.puntaje}): ${c.porque}.`, '',
          `Cargo y empresa: ${bloqueCargo(c.resto, c.nombre)}`, '',
          `Perfil en Sales Navigator: ${perfil}`, '']
-      : [`POR QUE LO ELEGI (puntaje ${c.puntaje}): ${c.porque}.`, '',
+      : [`CANAL: ${canalSugerido(c, tibio)}.`, '',
+         `POR QUE LO ELEGI (puntaje ${c.puntaje}): ${c.porque}.`, '',
          `Cargo y empresa: ${bloqueCargo(c.resto, c.nombre)}`, '',
          `Perfil en Sales Navigator: ${perfil}`,
          'NO SE PUDO SACAR EL LINK AL CHAT: abri el perfil y usa el boton "Mensaje".', ''];
@@ -359,9 +375,10 @@ for (const p of todos) {
   if (motivo) { descartados.push({ nombre: p.nombre, motivo }); continue; }
   candidatos.push({ ...p, ...puntuar(p) });
 }
-// los tibios primero: ya son contacto y solo les falta la propuesta
+// los tibios primero (ya son contacto y solo les falta la propuesta), despues los de
+// 1er grado (mensaje directo, sin InMail), y recien ahi el puntaje
 const esTibio = (c) => soloSaludo.has(normalizar(c.nombre)) ? 1 : 0;
-candidatos.sort((a, b) => (esTibio(b) - esTibio(a)) || (b.puntaje - a.puntaje));
+candidatos.sort((a, b) => (esTibio(b) - esTibio(a)) || (gradoDe(a) - gradoDe(b)) || (b.puntaje - a.puntaje));
 const diez = candidatos.slice(0, 10);
 
 console.log(`descartados: ${yaEscritos} ya recibieron la propuesta · ${yaPipeline} en el pipeline · ${descartados.length} no encajan`);
@@ -386,6 +403,7 @@ for (const c of diez) {
   const tibio = esTibio(c) ? ' [YA ES CONTACTO]' : '';
   console.log(`  [${c.puntaje}] ${c.nombre}${tibio} — ${bloqueCargo(c.resto, c.nombre).slice(0, 70)}`);
   console.log(`       ${c.porque}`);
+  console.log(`       canal: ${canalSugerido(c, esTibio(c))}`);
 }
 console.log(`\nparte guardado en estado/outbound-${fecha}.json`);
 console.log('El navegador queda abierto para que mandes los mensajes vos.');

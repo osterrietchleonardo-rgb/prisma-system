@@ -16,7 +16,219 @@
 
 ---
 
+## 2026-08-25
+
+**Etapa A cerrada: el código de invitación ahora valida quién lo usa** (rama
+`feat/asesores-celular-y-documentos`, worktree propio `PRISMA-SYSTEM-asesores-docs`; spec en
+`docs/superpowers/specs/2026-08-24-asesores-celular-y-documentos-design.md`, plan en
+`docs/superpowers/plans/2026-08-24-asesores-etapa-a-celular-y-email.md`). Falta el OK de
+Leonardo probándolo él mismo en el navegador (Task 9 paso 3, deliberadamente no hecho acá) y
+el merge a `main`.
+
+**El agujero que había:** nadie validaba que quien usaba un código de invitación fuera la
+persona invitada. El registro ni siquiera leía el nombre del invitado: le ponía al perfil el
+nombre que tipeaba quien se registraba. Ahora el email del código es la llave — si no
+coincide, se corta **antes de crear el usuario** y **el código no se consume**. Al generar un
+código ahora se piden los tres datos (nombre, celular, email), cada uno de los dos últimos se
+escribe dos veces para evitar tipeos, y a los asesores que ya estaban adentro se les puede
+cargar el celular desde su tarjeta en la página Asesores.
+
+Commits en orden: `79a7862` (reglas puras, 18 tests), `ba6321b` (migración
+`20260824120000_invites_celular_y_email.sql`), `7c01429`+`798d39b`+`ccd34ca` (generar
+códigos con los tres datos), `789ebcf` (diálogo único + celular verificado), `9d22664`
+(tapar la puerta trasera de la página Asesores — generaba código sin pasar por las reglas),
+`69a03f7`+`28e4241` (validar el email al registrarse), `ce1189b`+`eec283d` (editar
+nombre/celular del asesor desde la tarjeta), `26aa1de`+`1722c21` (el asesor ve su celular en
+Configuración, de solo lectura).
+
+**Los tres errores que vale la pena no repetir:**
+
+1. **El mismo defecto en tres archivos distintos.** Al guardar el celular del código, al
+   guardar el del asesor, y al mostrarlo: las tres veces se normalizaba un teléfono que YA
+   estaba en formato internacional asumiendo Argentina como país. No rompe nada acá porque
+   todos los casos de prueba son de Argentina — recién se habría notado con un asesor de otro
+   país, y tarde. La corrección es anteponer `+` para que `libphonenumber-js` deduzca el país
+   del propio número en vez de forzarlo. Se dejó **un comentario explicando el porqué en cada
+   uno de los tres lugares** (`lib/queries/director.ts`, `app/director/asesores/page.tsx`,
+   `app/asesor/configuracion/page.tsx`), porque las dos primeras veces el defecto se coló
+   justamente por no tener ese comentario al lado.
+2. **El chequeo de email duplicado fallaba abierto.** `generateAgencyInvite` descartaba el
+   error de la consulta que busca si el email ya tiene perfil en la agencia; si esa consulta
+   fallaba, el alta seguía de largo en silencio — exactamente lo contrario de lo que el
+   chequeo existe para evitar. Corregido para cortar con error explícito si la verificación
+   no se pudo hacer.
+3. **Un email ya registrado quemaba el código sin avisar.** Supabase no devuelve error al
+   pedir el registro de un email que ya existe cuando la confirmación por email está activa
+   (por diseño, para no filtrar qué emails existen). El flujo anterior no distinguía ese caso:
+   consumía el código igual, la persona veía "revisá tu email" y no llegaba nada, y el código
+   quedaba gastado sin que nadie se enterara. Ahora se verifica el estado antes de consumir.
+
+**Verificación (Task 9, pasos 1-2, 4-6 — el 3 queda para Leonardo):** `npm test` → 310 tests
+en 29 archivos de vitest + 88 de node, todos verdes. `npx tsc --noEmit` → limpio. `npm run
+build` → compila. `npm run lint` → 43 errores preexistentes en archivos que esta rama no
+tocó (comillas sin escapar en JSX y `prefer-const`, repartidos por `app/`, `components/` y
+`lib/`); ninguno cae en los 14 archivos que sí modificó la rama. Detalle completo en
+`.superpowers/sdd/2026-08-24-asesores-etapa-a-celular-y-email/task-9-report.md`.
+
+**Queda pendiente:**
+- **Etapas B (documentos por asesor) y C (plantillas y versionado)**, con plan propio —
+  todavía no arrancadas.
+- El bucket `contratos` de Supabase Storage **sigue público** (spec §9.3, no tocado en esta
+  etapa).
+- `components/tracking/pipeline/PipelineCard.tsx:93` tiene el **mismo defecto de país fijo**
+  que el error 1 de arriba, en otro subsistema. Se detectó al auditar pero no se tocó: no es
+  parte del alcance de Etapa A.
+- `components/shared/ManualContactFields.tsx` (spec §9.2) tampoco se tocó.
+- El auto-renombre del asesor (`app/asesor/configuracion/page.tsx:207` — hoy puede cambiarse
+  el nombre a sí mismo) queda **como está**: es conducta preexistente, no es un problema de
+  seguridad, y Leonardo la va a decidir aparte.
+- Los 2 códigos de invitación viejos sin email siguen funcionando como antes, a propósito: no
+  se migraron.
+
+---
+
+## 2026-08-24
+
+**El radar de mercado existe: `/socio-mercado`** (rama `feat/socio-radar-mercado`).
+`/socio-mercado` estaba nombrado en el SKILL.md del Socio como ritual del lunes y **no
+existía**. Ahora es `.claude/commands/socio-mercado.md`: sin scripts — el Socio investiga
+con búsqueda web en vivo, filtra contra el código (regla 2) y escribe con OK. Dos salidas:
+candidatos de funciones → frente producto; informe extenso → `30 Mercado/` del vault, con
+tabla de datos citables y 3-5 ángulos de contenido para marketing (pedido de Leonardo en la
+primera corrida: el informe es materia prima de posts, no solo contexto). Cadencia día por
+medio; la apertura de `/socio` avisa si pasaron 2+ días mirando la fecha del último informe.
+La primera corrida real quedó en `30 Mercado/2026-08-24 informe.md`.
+
+*Error entre worktrees que costó una entrada:* la sesión de fotos commiteó esta bitácora
+desde otro worktree y **pisó la entrada del 22/08**, que se reinsertó acá. Antes de
+commitear la bitácora: `git show main:docs/interno/bitacora-sesiones.md` y verificar que
+no falte ningún día.
+
+**La solapa "Fotos": las fotos de una propiedad se arreglan solas**
+
+Rama `feat/marketing-fotos-ia`, mergeada. Motor en `lib/marketing-ia/fotos-ia.ts` y
+`fotos-marcado.ts`; tabla nueva `property_photos` (migración `20260824160000`).
+
+Se analizaron 5 repos de GitHub que Leonardo pasó. **Tres no tenían código** (solo README de
+SEO) y el cuarto es un paper académico que pide fotografía HDR panorámica y render 3D. Los
+dos de SamurAIGPT son el mismo boilerplate y su "IA" son 50 líneas llamando a MuAPI, que
+revende Nano Banana — o sea, `gemini-3-pro-image`, el mismo modelo que PRISMA ya usaba. Lo
+único que valía la pena eran los prompts.
+
+*Lo que costó descubrir, cada cosa con su prueba fallida:*
+
+**Hay dos familias de edición.** Local (sacar un objeto) permite pegar solo la zona editada
+sobre la original: el resto queda intacto, medido 0,71 contra 8,37. Global (cielo, luz,
+staging) NO: pegar solo el cielo deja una línea horizontal con los árboles partidos al medio.
+
+**Para marcar una zona va UNA sola imagen, la marcada.** Mandarle la original junto con la
+marcada, explicando cuál es cuál, es lo que uno haría — y falla: no edita nada y encima mueve
+el resto.
+
+**Las marcas van por color, nunca numeradas.** El modelo copia a la imagen cualquier texto
+que ve dibujado: al pasarle el inventario numerado, **pintó los números sobre la foto**. Y el
+control la aprobó igual, porque solo miraba el inventario. De ahí salió la regla de salida
+limpia, que además bajó los reintentos de 3 a 1.
+
+**Sin `imageConfig: { imageSize: "2K" }` devuelve 1365x768**, más chica que la original.
+
+**Los tres modos van en secuencia.** Pedir las tres cosas juntas hace que el modelo
+reinterprete el ambiente: inventó un arco, cambió el granito por otro piso y movió las
+paredes. De a uno, edita. Y **mejorar va primero**: el inventario se lee de la foto, y sobre
+una oscura da 6 elementos en vez de 8 y confunde granito con madera. Mejorar es el único modo
+que no mueve nada, así que puede ir antes de relevar.
+
+*Cómo se sostiene la fidelidad:* antes de tocar nada se releva geometría, piso (material,
+tamaño de pieza, dirección de juntas, veteado), inventario de lo que es del inmueble, y los
+defectos. Todo eso entra como regla dura — **nada hardcodeado, sale de cada foto**. Un
+control automático compara antes y después y rechaza si falta algo grave, si se inventó un
+artefacto, si cambió el piso o si se tapó un defecto; entonces se corrige y se regenera solo.
+El asesor nunca ve un rechazo.
+
+*Los límites que quedan:* el control verifica que los elementos estén, **no que las
+proporciones se respeten** — aprobó el ambiente reconstruido del "todo junto", y esa decisión
+la resolvió el ojo. Y sobre ambientes ya amoblados, lo que los muebles del dueño tapaban la
+IA lo inventa: apareció un radiador donde estaba apoyada una funda de guitarra.
+
+*Decisiones de Leonardo:* la solapa va también para asesores, que son los que más la usan
+(cuesta 3 créditos por paso, de su propia bolsa, y ahora se avisa antes de apretar). La
+galería agrupa por `sesion_id`: una tarjeta por foto, que se abre en carrusel con la original
+de la ficha primero.
+
+Costo de todo el trabajo: unos US$5 en 42 generaciones. Cada foto sale US$0,134 y tarda entre
+45 y 90 segundos.
+
+---
+
+## 2026-08-22
+
+**Sábado corto: V4 del super agente, la receta del mejorador de fotos, y un error propio
+del Socio con ClickUp**
+
+Leonardo (en otras terminales): el plan del super agente llegó a
+`docs/superpowers/plans/2026-08-22-super-agente-v4.md` (12:59, con V3 intermedio), y el
+mejorador de imágenes (home staging + quitar elementos, compromiso con Kevin que vence la
+semana del 24-28) tiene su receta técnica en 6 scripts de `scratch/` (`_receta-editar-foto`,
+`_pipeline-fotos`, `_detectar-textos`, `_probar-optimo`, `_correr-casos`, `_reversion`).
+UI en la página de marketing: todavía no. *(La sesión del 24 de fotos convirtió esto en la
+solapa "Fotos" — ver la entrada de arriba.)*
+
+*El error de método propio, para no repetir:* **las tareas de ritual semanal existen como
+varias instancias pre-creadas con el mismo nombre** (22/08, 29/08, 5/09). Un
+`find(t => /nombre/.test(...))` sobre la lista agarró las del 5/09 y el Socio "movió" esas
+creyendo mover las de hoy; el recolector después mostró las de hoy sin tocar y pareció un
+bug del recolector — **el recolector estaba bien**. Regla: una tarea se mueve por **id**, y
+la instancia se elige mirando el `due_date`, nunca solo el nombre.
+
+Dos gotchas más de la API de ClickUp confirmados hoy: (1) `FIELD_033` también pega en la
+lista Tareas vía el endpoint `/task/:id/field/:fid` — *Veces postergada* y *Postergada
+desde* no se pueden escribir con el plan actual; el registro va en la descripción. (2) Si la
+tarea tiene `start_date` posterior al nuevo `due_date`, el PUT falla con `ITEM_238`: hay que
+setear los dos juntos.
+
+*Y un aviso para el que trabaje con varios worktrees:* esta entrada se perdió una vez porque
+la sesión de fotos commiteó la bitácora desde otro worktree sin tener esta versión. Antes de
+commitear la bitácora, mirar `git show main:docs/interno/bitacora-sesiones.md` y verificar
+que no falte la entrada de otro día.
+
+---
+
 ## 2026-08-21
+
+**El link del pipeline lleva al chat, y el Socio aprendió a sacar el contacto de LinkedIn**
+
+Mergeado en `97392dc`. Dos scripts en `.claude/skills/vakdor-socio/scripts/`.
+
+*Lo que se descubrió del CLI de Playwright, que es lo que más va a servir después:*
+`playwright-cli open` abre **headless y con `user-data-dir: <in-memory>`**, así que **el login
+se pierde entero al cerrar la ventana**. `--persistent` NO alcanza: hace falta `--profile`
+apuntando a una carpeta real. Por eso la sesión de LinkedIn apareció caída, el outbound no
+pudo correr y Leonardo no veía ninguna ventana (el proceso era `chrome-headless-shell`). Se
+comprueba con `playwright-cli list`. El perfil vive en `~/.playwright-perfiles/`, fuera del
+repo, porque guarda cookies de sesión.
+
+*Sales Navigator no tiene URL de chat.* Su botón "Mensaje" es un overlay de JS y
+`location.href` no cambia — comprobado. El link que sí funciona es
+`linkedin.com/messaging/thread/new/?recipient=<publicId>`, y ese `publicId` sale del campo
+`flagshipProfileUrl` de la API interna (`/sales-api/salesApiProfiles/(profileId:...)`), que
+necesita el header `csrf-token` tomado de la cookie `JSESSIONID`.
+
+*El modal de "Información de contacto" no se abre por URL:* `/overlay/contact-info/` redirige
+al perfil. Hay que hacer **click** en el enlace. Y el contenido **no** se lee del `innerText`
+del modal, que vuelve vacío: se busca el patrón de email en el HTML completo, filtrando los
+dominios de LinkedIn. Rinde ~30% (4 de 14), pero trae mails personales que Apollo no tiene.
+
+*Dos errores de método propios, para no repetir:*
+1. **El `date` de Bash miente casi tres horas en esta máquina** (dio 13:08 cuando eran las
+   15:44). Va `Get-Date` de PowerShell, siempre.
+2. **Se midió el mercado solo sobre Argentina y se dio un consejo estratégico con eso.**
+   Argentina: 50 prospectos. LATAM: 427. Un número correcto sobre un recorte equivocado suena
+   a dato y es una opinión disfrazada.
+
+*Y un límite del actor de Zonaprop:* en modo `entityType: agencies` el parámetro `location`
+**no segmenta** — cinco corridas de cinco zonas distintas devolvieron la misma lista nacional.
+Hay que pasar `startUrls`. A favor: ese modo devuelve `listings_count`, o sea la cartera de
+cada inmobiliaria, a US$0,002 cada una.
 
 **El recálculo de precios del mapa nunca había funcionado — 10 de 10 corridas fallidas**
 

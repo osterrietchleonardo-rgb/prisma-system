@@ -60,7 +60,7 @@ Antes de operar, dejá lista la base. Andá a **Configuración** (último ítem 
 3. **Conectá WhatsApp** (sección *Asesor IA en WhatsApp*): seguí el asistente de configuración (ver sección 10).
 4. **Cargá tu directiva de marketing y aviso legal** (Marketing IA → ajustes): así todos los contenidos salen con tu estilo y tu legal.
 5. **Subí documentos a la Biblioteca:** manuales y guiones para que el Tutor IA capacite a tu equipo.
-6. **Invitá a tu equipo** (Configuración → Inmobiliaria): dos cajitas, **Invitación de Asesores** e **Invitación de Directores**. Escribí el nombre de la persona y generá su código.
+6. **Invitá a tu equipo** (Configuración → Inmobiliaria): dos cajitas, **Invitación de Asesores** e **Invitación de Directores**. Cargá nombre, celular y email de la persona (celular y email se confirman dos veces) y generá su código: solo le va a andar a ella.
 
 > 💡 **Tip:** completar estos 6 pasos hace que PRISMA funcione "lleno" desde el día uno.
 
@@ -411,13 +411,14 @@ Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **
 
 **Qué es:** el generador de contenido publicitario con IA, alineado a tu marca (la pantalla se titula "Marketing IA Pro").
 
-**Tiene 6 pestañas:**
+**Tiene 7 pestañas:**
 1. **Crear Anuncio:** el generador principal (ver abajo).
-2. **Clientes Ideales (IPC):** donde creás y administrás tus perfiles de cliente ideal.
-3. **Mi Forma de Trabajar:** tu operación real y tus 2 ofertas irresistibles (ver abajo).
-4. **Historial / Galería:** todos los anuncios generados, agrupados por tanda. Podés verlos, editar el texto, descargar la imagen y borrarlos.
-5. **Guía Mágica:** una guía práctica de 5 fases para hacer campañas de captación de leads de calidad en Meta (Facebook/Instagram) Ads: segmentación, el anuncio, el formulario "filtro de oro", retargeting y medición. Es material de lectura, no genera nada.
-6. **Configuración IA:** los ajustes de marca de la agencia (solo director, ver abajo).
+2. **Fotos:** arregla las fotos de una propiedad (ver abajo).
+3. **Clientes Ideales (IPC):** donde creás y administrás tus perfiles de cliente ideal.
+4. **Mi Forma de Trabajar:** tu operación real y tus 2 ofertas irresistibles (ver abajo).
+5. **Historial / Galería:** con dos vistas — **Anuncios y copys** (todo lo generado, agrupado por tanda: lo ves, editás el texto, descargás la imagen y lo borrás) y **Fotos retocadas** (las fotos de propiedades que trabajaste).
+6. **Guía Mágica:** una guía práctica de 5 fases para hacer campañas de captación de leads de calidad en Meta (Facebook/Instagram) Ads: segmentación, el anuncio, el formulario "filtro de oro", retargeting y medición. Es material de lectura, no genera nada.
+7. **Configuración IA:** los ajustes de marca de la agencia (solo director, ver abajo).
 
 **Cómo usarlo (pestaña "Crear Anuncio"):**
 1. Primero creás un **perfil IPC** (Cliente Ideal) en la pestaña de IPC: objetivo **Captar** (propietarios) o **Vender** (compradores). Completás el perfil paso a paso (motivo, urgencia, ángulo, tono, CTA, nivel de conciencia, etc.).
@@ -450,6 +451,37 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 
 ---
 
+### Fotos (arreglar las fotos de una propiedad)
+
+**Qué es:** agarra una foto de la ficha de una propiedad y la deja publicable. No hay que subir nada ni saber editar. **Tus asesores también la tienen.**
+
+**Cómo se usa:**
+1. Se elige la **propiedad** de la cartera y después **cuál de sus fotos** trabajar.
+2. Se marca qué hacerle. Se puede elegir más de una y se aplican en este orden:
+   - **Mejorar la foto** — levanta una foto oscura o de día nublado. Si el cielo salió blanco, la pasa a día de sol. No mueve nada de lugar.
+   - **Despejar el ambiente** — saca adornos, cuadros, objetos personales y los muebles que hay hoy.
+   - **Amoblar** — amuebla un ambiente vacío, con el estilo que elijas: moderno, cálido, nórdico o clásico.
+3. Cada paso tarda entre 45 y 90 segundos, y la pantalla va mostrando en cuál va.
+4. Al final se ve el **antes y el después**.
+
+**Si algo no cierra, se corrige ahí mismo:** se arrastra sobre la foto para encerrar lo que se quiere tocar y se dice qué hacer. **Con nombrarlo alcanza** — "el perchero" — y si no se escribe nada, saca lo que quedó marcado. Se pueden marcar **varias cosas a la vez** y se hacen todas juntas.
+
+> 💡 Para **sacar** algo la marca es exacta. Para **agregar** algo es una indicación de por dónde, no un lugar clavado.
+
+**Lo que el sistema cuida solo, sin que nadie se lo aclare:**
+- El **piso** queda igual: mismo material, mismo dibujo, mismo color.
+- Las **paredes, ventanas, puertas y aberturas** quedan donde están y del tamaño que son.
+- Los **carteles, teléfonos y números de casa** vuelven tal cual: no se los inventa.
+- **Las manchas, humedades y roturas se quedan.** La propiedad se muestra como es. Si se quiere arreglar alguna, hay que marcarla y pedirlo.
+
+> ⚠️ **Lo que conviene que sepan tus asesores:** sobre ambientes que ya tienen muebles, lo que los muebles tapaban el sistema lo tiene que imaginar. Alguien que conozca la propiedad tiene que mirar el resultado antes de publicar.
+
+**Dónde quedan:** en **Historial / Galería → Fotos retocadas**. Cada foto es **una tarjeta**: se abre y se recorren los pasos como un álbum, empezando por la original de la ficha. En cualquiera se puede **seguir editando**, **descargar** o **borrar**. Cada uno ve las suyas.
+
+> 💰 Cada paso consume **3 créditos**. Los tres modos juntos son 9, y cada retoque posterior 3 más. Salen de la bolsa de quien la use: si la usa un asesor, de la suya.
+
+---
+
 ## 13. Contratos IA
 
 **Qué es:** generación y gestión de contratos a partir de plantillas, con trazabilidad completa.
@@ -479,6 +511,7 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 
 **Qué podés hacer:**
 - **Invitar asesores:** generá un **código de invitación**. El asesor se registra con ese código y queda vinculado a tu agencia.
+- **Cargarle el celular a un asesor que ya está en el sistema:** abrí su tarjeta y tocá **Editar**, junto a "Datos de contacto". Ahí podés corregir el nombre y cargar o cambiar el celular. El email no se toca desde acá: es su cuenta, y no se puede cambiar.
 - **Ver el rendimiento real de cada asesor:** cada tarjeta muestra datos reales tomados de la actividad cargada (Captaciones, Cierres, Cartera activa y % de Rotación), más una etiqueta de estado (Activo / Pausado / Desvinculado). Al hacer clic se abre un panel con su embudo de conversión.
 - **Clasificar a un asesor (Client Director / Client Support):** en cada tarjeta tenés dos botones. Tocá uno y el asesor queda marcado con esa clasificación (la ves arriba, en "Rol:"). Tocá **el mismo botón otra vez** y se deselecciona. Si no elegís ninguno, queda simplemente como **Asesor**. Es una **etiqueta interna tuya, para ordenar al equipo: no cambia los permisos ni lo que la persona ve en el sistema** (sigue entrando como asesor, exactamente igual que antes).
 - **Pausar un asesor (temporal):** para cuando necesitás dejarlo fuera un tiempo (licencia, motivos internos) sin darlo de baja. Al pausar te pide un **motivo obligatorio**. El asesor pausado **queda deslogueado y no puede volver a entrar** hasta que lo reactivés; si intenta ingresar ve "Tu cuenta ha sido suspendida" (nunca ve el motivo). El mismo botón cambia a **Reactivar** para devolverle el acceso al instante. Su **email no se bloquea**, así que reactivarlo es inmediato.
@@ -492,12 +525,16 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
   - Solo te deja avanzar cuando el perfil **no tiene nada** — que es justo lo que pasa con un duplicado.
 
 **Invitaciones (Configuración → Inmobiliaria):** hay dos cajitas, **Invitación de Asesores** e **Invitación de Directores**.
-- En cualquiera: escribí el **nombre de la persona** a invitar y apretá **Generar Código**. El nombre queda pegado al código (lo ves aunque todavía no se haya registrado).
+- En cualquiera, para generar un código ahora se piden **tres datos: nombre y apellido, celular y email**. El celular y el email se escriben **dos veces** (hay una cajita de confirmación al lado de cada uno), para no invitar a alguien con un dato mal tipeado. Apretá **Generar Código** cuando esté todo completo y las repeticiones coincidan.
+- **El código solo le sirve a esa persona.** Queda atado al email que cargaste: si se lo pasás a otra persona, o alguien lo consigue, no le va a andar. Solo se puede usar registrándose con ese email exacto.
+- **El nombre lo ponés vos, no lo elige quien se registra.** Es el nombre con el que esa persona va a figurar en tu equipo desde el primer día.
+- **Si el email ya tiene cuenta en tu inmobiliaria, el sistema no te deja generar el código** y te avisa quién ya lo está usando (por ejemplo: *"Ese email ya tiene cuenta en tu inmobiliaria: Juan Pérez"*). Así no se duplica gente por error.
 - El **código define el rol**: un código de la cajita "Directores" hace entrar a la persona **como director** (mismo poder que vos, sin jerarquía); uno de "Asesores", como asesor. La persona entra directo, sin que tengas que aprobar nada más.
 - **Lista compartida:** si la inmobiliaria tiene varios directores, **todos ven la misma lista** de códigos (Activos y Usados, con el nombre de cada invitado). Así nadie invita dos veces a la misma persona.
 - **Borrar un código:** cada código de la lista tiene un botón de **papelera 🗑️** para limpiarla (por ejemplo cuando generaste dos códigos para la misma persona, o uno sin querer). Al tocarlo aparece un **cartel de advertencia y confirmación**. Si el código **ya fue usado**, el cartel aclara fuerte que borrarlo **NO desvincula a la persona** (para eso está "Desvincular asesor"): solo saca la fila de la lista.
 
 > 💡 **Tip:** cada código sirve una vez. El código de invitación **no** funciona para "Crear inmobiliaria nueva" (eso necesita el código de Vakdor); si alguien lo intenta, le aparece "Código incorrecto".
+> 💡 **El asesor ve su celular en su Configuración pero no lo puede cambiar él mismo.** Si necesita corregirlo, te lo va a pedir a vos: lo hacés desde su tarjeta, como se explica arriba.
 > ⚠️ **Pausar vs. Desvincular:** la **pausa** es temporal y la revertís vos con "Reactivar". La **desvinculación** bloquea el email y es más definitiva; si después necesitás reactivar a esa persona, contactá al equipo de PRISMA (Vakdor).
 
 ---
@@ -677,7 +714,7 @@ La pantalla se titula "Ajustes Generales". Tiene 5 pestañas:
 - **Nombre** legal/fantasía de la agencia.
 - **Tokko Broker API Key:** al guardarla con una key válida, PRISMA **sincroniza propiedades y leads automáticamente** en segundo plano.
 - **Logo de la agencia** (PNG/JPG/SVG hasta 2MB).
-- **Invitación de Asesores:** generá códigos únicos y copialos para compartir.
+- **Invitación de Asesores:** cargá el nombre, el celular y el email de la persona que querés sumar y generá su código. Es un código a medida de esa persona: solo le va a andar a ella, con ese email (ver sección 14).
 
 **3. Créditos IA**
 - El **dashboard de créditos** de toda la agencia: cuánto se consumió por cada módulo (los 7 módulos de IA con su ícono).
