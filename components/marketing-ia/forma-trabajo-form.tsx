@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+import { TextareaAuto } from "./textarea-auto"
 import { Label } from "@/components/ui/label"
 import { MarketingIAStepper } from "./marketing-ia-stepper"
 import { OfertasIrresistibles } from "./ofertas-irresistibles"
@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { Loader2, Save, ArrowLeft, ArrowRight, Briefcase, AlertTriangle } from "lucide-react"
 import {
-  CAMPOS_PERFIL, CAMPOS_CAPTACION, CAMPOS_VENTA, operacionCompleta, type CampoOperacion,
+  CAMPOS_PERFIL, CAMPOS_CAPTACION, CAMPOS_VENTA, camposFaltantes, type CampoOperacion,
 } from "@/lib/marketing-ia/campos-operacion"
 import type { AdvisorOperation } from "@/types/marketing-ia"
 
@@ -79,11 +79,12 @@ export function FormaTrabajoForm() {
     <div key={c.name} className="space-y-2">
       <Label className="text-sm font-bold leading-snug">{c.label}</Label>
       {c.multilinea ? (
-        <Textarea
+        <TextareaAuto
           value={valores[c.name] ?? ""}
           onChange={(e) => setValores({ ...valores, [c.name]: e.target.value })}
           placeholder={c.placeholder}
-          className="min-h-[110px] resize-none bg-accent/5"
+          minAlto={110}
+          className="bg-accent/5"
         />
       ) : (
         <Input
@@ -135,7 +136,7 @@ export function FormaTrabajoForm() {
           {paso === 3 && (
             <OfertasIrresistibles
               operacion={operacion}
-              completo={operacionCompleta({ perfil, captacion, venta })}
+              faltantes={camposFaltantes({ perfil, captacion, venta })}
               guardarAntes={guardar}
               onActualizar={(parcial) => setOperacion((prev) => (prev ? { ...prev, ...parcial } : (parcial as AdvisorOperation)))}
             />

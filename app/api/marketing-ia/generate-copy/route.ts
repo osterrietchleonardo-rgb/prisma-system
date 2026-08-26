@@ -6,6 +6,7 @@ import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
 import { AdvisorOperation, EstructuraId, IpcProfile, CopyType, CopyAngle, ConsciousnessLevel, TokkoProperty } from "@/types/marketing-ia";
 import { buildPropertyDirective } from "@/lib/marketing-ia/property-context";
 import { buildOperacionDirective } from "@/lib/marketing-ia/operacion-context";
+import { REGLA_VOZ } from "@/lib/marketing-ia/voz";
 import { nivelDesdeIpc, NIVEL_DESCRIPCION } from "@/lib/marketing-ia/niveles";
 import { ESTRUCTURAS, resolverEstructura, esquemaJsonGuion, guiaBloquesParaPrompt } from "@/lib/marketing-ia/estructuras";
 
@@ -98,7 +99,8 @@ REGLAS ESTRATÉGICAS:
 - ÁNGULO: ${angleDesc}
 - NIVEL DE CONSCIENCIA: Nivel ${config.consciousness_level}/4 — ${nivelDesc}
 ${config.extra_context ? `- CONTEXTO EXTRA DEL USUARIO: ${config.extra_context}` : ''}
-${directive?.trim() ? `- DIRECTIVA CREATIVA DE LA AGENCIA (OBLIGATORIO RESPETAR): ${directive.trim()}` : ''}
+${REGLA_VOZ}
+${directive?.trim() ? `- DIRECTIVA CREATIVA DE LA AGENCIA (OBLIGATORIO RESPETAR, manda por encima de la regla de voz): ${directive.trim()}` : ''}
 
 TONO: Usá un lenguaje 100% rioplatense (voseo), auténtico, empático y profesional. Nada de "un hogar para vos", hablá de "tu próxima casa" o "la venta de tu depto".
 
