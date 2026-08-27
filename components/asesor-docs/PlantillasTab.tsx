@@ -45,6 +45,24 @@ const ETIQUETA_DEL_ESTADO: Record<FilaPlantilla["estado"], string> = {
   borrador: "Borrador",
 };
 
+/**
+ * Para qué sirve esta pantalla, en dos renglones.
+ *
+ * Dice la maquinaria (comparar, detectar) **y el premio** (que después PRISMA
+ * genere solo el documento de cada asesor). Sin el premio, el director lee un
+ * procedimiento y no entiende para qué apretaría el botón: el pago aparecía
+ * una sola vez, adentro de la explicación del estado `activa`, o sea en filas
+ * que una inmobiliaria que recién empieza todavía no tiene.
+ *
+ * Es una constante y no dos textos sueltos porque se muestra en dos lugares
+ * —fijo en el escritorio, adentro del scroll en el celular— y dos copias que
+ * se editan por separado terminan diciendo cosas distintas.
+ */
+const PARA_QUE_SIRVE =
+  "Un tipo de documento por fila. Cuando varios asesores tienen el mismo contrato cargado, PRISMA los compara " +
+  "entre sí y detecta qué parte es texto fijo y qué parte es el dato de cada persona. Con eso arma la plantilla, " +
+  "y de ahí en adelante le genera el documento a cada asesor solo, con los datos de cada uno.";
+
 export function PlantillasTab() {
   const supabase = createClient();
 
@@ -119,7 +137,7 @@ export function PlantillasTab() {
 
       if (!res.ok) {
         // Los mensajes del endpoint ya están escritos para el director.
-        toast.error(cuerpo?.error ?? "No se pudo deducir la plantilla. Probá de nuevo en un rato.");
+        toast.error(cuerpo?.error ?? "No se pudo detectar la plantilla. Probá de nuevo en un rato.");
         return;
       }
 
@@ -150,13 +168,18 @@ export function PlantillasTab() {
      * cortada y no hay forma de llegar a ella.
      */
     <div className="flex h-full min-h-0 flex-col">
-      <div className="shrink-0 flex flex-col md:flex-row md:items-start justify-between gap-3">
-        <div>
+      {/* En una sola fila también en el celular. Apilado, el título y el botón
+          se comían 84 px de los 667 de un iPhone SE; al lado, 44. Medido: el
+          botón entra sin desborde horizontal y sin pisar el título. */}
+      <div className="shrink-0 flex flex-row items-start justify-between gap-3">
+        <div className="min-w-0">
           <h3 className="text-lg font-semibold text-foreground">Plantillas de documentos</h3>
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            Un tipo de documento por fila. Cuando varios asesores tienen el mismo contrato cargado, PRISMA los
-            compara entre sí y deduce qué parte es texto fijo y qué parte es el dato de cada persona.
-          </p>
+          {/* En el celular este párrafo NO va acá: ocupa media pantalla y, como
+              el encabezado es fijo, le come el alto a la lista hasta dejarla en
+              una ranura. Abajo se repite adentro del scroll, donde se lee una
+              vez y después se va. En el escritorio sobra lugar y queda fijo,
+              que es donde mejor funciona. */}
+          <p className="hidden md:block text-sm text-muted-foreground max-w-2xl">{PARA_QUE_SIRVE}</p>
         </div>
         <Button
           variant="outline"
@@ -171,6 +194,10 @@ export function PlantillasTab() {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-1 mt-4 space-y-3">
+        {/* La copia de celular del párrafo de arriba: acá adentro scrollea con
+            la lista en vez de robarle alto para siempre. */}
+        <p className="md:hidden text-sm text-muted-foreground">{PARA_QUE_SIRVE}</p>
+
         {cargando ? (
           <div className="space-y-3">
             <Skeleton className="h-28 w-full rounded-xl" />
@@ -209,11 +236,15 @@ export function PlantillasTab() {
                   <Button
                     className="shrink-0 gap-2 self-start"
                     // Deshabilitado por el mínimo de documentos, o mientras
-                    // corre. El PORQUÉ se escribe abajo, siempre visible: en
-                    // el celular no hay dónde pasar el mouse, así que un
-                    // `title` solo sería un botón mudo.
+                    // corre. El PORQUÉ se escribe abajo, siempre visible.
+                    //
+                    // Y SOLO abajo: acá había además un `title={motivo}` que no
+                    // se mostraba nunca. Un botón deshabilitado de shadcn lleva
+                    // `pointer-events: none`, así que el navegador no registra
+                    // el mouse encima y jamás dibuja el tooltip — verificado.
+                    // En el celular tampoco hay dónde pasar el mouse. Dejarlo
+                    // hacía creer que el motivo estaba cubierto por ahí.
                     disabled={motivo !== null || detectando}
-                    title={motivo ?? undefined}
                     onClick={() => detectar(fila)}
                   >
                     {detectando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
@@ -224,7 +255,14 @@ export function PlantillasTab() {
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1.5">
                     <Users className="h-3.5 w-3.5" />
-                    {fila.documentos === 1 ? "1 asesor la usa" : `${fila.documentos} asesores la usan`}
+                    {/* "N asesores la usan" era literalmente falso al lado de
+                        "Versión vigente: todavía ninguna" —y esa es la fila por
+                        defecto de toda inmobiliaria que arranca—: sin versión
+                        no hay plantilla que usar. Lo que este número cuenta es
+                        cuántos tienen el documento CARGADO. */}
+                    {fila.documentos === 1
+                      ? "1 asesor tiene este documento cargado"
+                      : `${fila.documentos} asesores tienen este documento cargado`}
                   </span>
                   <span>
                     Versión vigente:{" "}
@@ -235,7 +273,9 @@ export function PlantillasTab() {
                   {fila.enRojo > 0 && (
                     <span className="flex items-center gap-1.5 text-destructive font-medium">
                       <AlertTriangle className="h-3.5 w-3.5" />
-                      {fila.enRojo === 1 ? "1 asesor para revisar" : `${fila.enRojo} asesores para revisar`}
+                      {fila.enRojo === 1
+                        ? "1 asesor con su documento para revisar"
+                        : `${fila.enRojo} asesores con su documento para revisar`}
                     </span>
                   )}
                 </div>
@@ -276,8 +316,12 @@ function Resumen({ datos }: { datos: Propuesta }) {
               ? "Se encontró 1 dato que cambia de asesor a asesor"
               : `Se encontraron ${datos.huecos.length} datos que cambian de asesor a asesor`}
         </p>
+        {/* En pasado: la comparación YA terminó. "Comparando…" se leía como que
+            todavía estaba corriendo y el número iba a seguir subiendo. */}
         <p className="text-xs text-muted-foreground">
-          Comparando {datos.documentosUsados.length === 1 ? "1 documento" : `${datos.documentosUsados.length} documentos`}.
+          {datos.documentosUsados.length === 1
+            ? "Se comparó 1 documento."
+            : `Se compararon ${datos.documentosUsados.length} documentos.`}{" "}
           Todavía no se guardó nada: revisarlos y confirmar la plantilla es el paso siguiente.
         </p>
       </div>

@@ -143,7 +143,7 @@ export function motivoParaNoDetectar(documentos: number): string | null {
   const cuantosFaltan = faltan === 1 ? "1 asesor más" : `${faltan} asesores más`
 
   return (
-    `Para deducir la plantilla hacen falta al menos ${MINIMO_PARA_DETECTAR} documentos de este tipo y ` +
+    `Para detectar la plantilla hacen falta al menos ${MINIMO_PARA_DETECTAR} documentos de este tipo y ` +
     `${cuantosHay}. Comparando menos no se puede distinguir qué parte del contrato es texto fijo y qué parte es ` +
     `el dato de cada persona. Subí este mismo documento a ${cuantosFaltan}.`
   )
@@ -152,6 +152,11 @@ export function motivoParaNoDetectar(documentos: number): string | null {
 // ---------------------------------------------------------------------------
 // Qué significa cada estado
 // ---------------------------------------------------------------------------
+
+/** "1 asesor quedó" / "N asesores quedaron", para no repetirlo en cada rama. */
+function quienesQuedaron(enRojo: number): string {
+  return enRojo === 1 ? "1 asesor quedó" : `${enRojo} asesores quedaron`
+}
 
 /**
  * Qué quiere decir el estado de esta fila, dicho entero.
@@ -162,23 +167,34 @@ export function motivoParaNoDetectar(documentos: number): string | null {
  */
 export function explicacionDelEstado(fila: Pick<FilaPlantilla, "estado" | "version" | "enRojo">): string {
   if (fila.estado === "activa") {
+    const enUso = "Está en uso: los documentos de los asesores se generan con esta versión."
+    if (fila.enRojo === 0) return enUso
+    /**
+     * Una plantilla en uso NO debería tener documentos para revisar. Cuando los
+     * tiene, se dice acá con todas las letras.
+     *
+     * Callarlo dejaría al director leyendo "está en uso" justo al lado de un
+     * contador en rojo, sin nada que explique la contradicción — y esa
+     * contradicción es el síntoma visible de un problema de verdad. Nombrarla
+     * la hace MÁS visible, que es exactamente lo que se busca: taparla sería
+     * esconder el aviso, no arreglar la causa.
+     */
     return (
-      "Está en uso: los documentos de los asesores se generan con esta versión, y al subir una nueva se " +
-      "regeneran todos conservando los datos de cada uno."
+      `${enUso} Pero ${quienesQuedaron(fila.enRojo)} para revisar, y eso no debería pasar con una plantilla en ` +
+      `uso: revisá esos documentos antes de darlos por buenos.`
     )
   }
   if (fila.enRojo > 0) {
-    const quienes = fila.enRojo === 1 ? "1 asesor quedó" : `${fila.enRojo} asesores quedaron`
     return (
-      `Es un borrador y todavía no se usa: ${quienes} para revisar. Hasta que estén todos bien, la plantilla no ` +
-      `se aplica a nadie.`
+      `Es un borrador y todavía no se usa: ${quienesQuedaron(fila.enRojo)} para revisar. Hasta que estén todos ` +
+      `bien, la plantilla no se aplica a nadie.`
     )
   }
   if (fila.version === null) {
     return (
-      "Es un borrador y todavía no se usa: falta deducir la plantilla a partir de los documentos cargados y " +
+      "Es un borrador y todavía no se usa: falta detectar la plantilla a partir de los documentos cargados y " +
       "revisarla."
     )
   }
-  return "Es un borrador y todavía no se usa: la plantilla está deducida pero falta confirmarla."
+  return "Es un borrador y todavía no se usa: la plantilla ya está detectada pero falta confirmarla."
 }

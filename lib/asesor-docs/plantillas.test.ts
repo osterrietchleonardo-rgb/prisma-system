@@ -155,6 +155,16 @@ describe("motivoParaNoDetectar", () => {
     expect(motivoParaNoDetectar(MINIMO_PARA_DETECTAR - 1)).not.toBeNull()
     expect(motivoParaNoDetectar(MINIMO_PARA_DETECTAR)).toBeNull()
   })
+
+  /**
+   * El botón dice "Detectar plantilla". Si el motivo de al lado dice
+   * "deducir", el director tiene que adivinar que son la misma cosa.
+   */
+  it("habla de detectar, la misma palabra del botón", () => {
+    const motivo = motivoParaNoDetectar(1)
+    expect(motivo).toContain("detectar")
+    expect(motivo).not.toContain("deducir")
+  })
 })
 
 describe("explicacionDelEstado", () => {
@@ -162,11 +172,47 @@ describe("explicacionDelEstado", () => {
     expect(explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0 })).toContain("en uso")
   })
 
-  it("borrador sin versión dice que falta deducirla", () => {
+  /**
+   * Una plantilla "Activa" con asesores en rojo es una contradicción, y la
+   * pantalla la muestra igual: "Activa" de un lado y el contador rojo del
+   * otro. Si la explicación del estado no la nombra, el director lee las dos
+   * cosas juntas y no tiene nada que le diga cuál vale.
+   *
+   * Se nombra a propósito: la contradicción es el síntoma de un problema real,
+   * y taparla sería apagar el aviso en vez de arreglar la causa.
+   */
+  it("activa con asesores en rojo nombra la contradicción", () => {
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 2 })
+    expect(texto).toContain("en uso")
+    expect(texto).toContain("2 asesores quedaron")
+    expect(texto).toContain("no debería")
+  })
+
+  it("activa con uno solo en rojo habla en singular", () => {
+    expect(explicacionDelEstado({ estado: "activa", version: 2, enRojo: 1 })).toContain("1 asesor quedó")
+  })
+
+  /**
+   * La regeneración automática al subir una versión nueva TODAVÍA NO EXISTE
+   * (es una tarea posterior). Describirla en presente le promete al director
+   * algo que la pantalla no hace.
+   */
+  it("activa no promete que los documentos se regeneren solos", () => {
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0 })
+    expect(texto).not.toContain("regeneran")
+  })
+
+  /**
+   * El botón dice "Detectar plantilla". Si la prosa dice "deducir", el
+   * director tiene que adivinar que son la misma cosa.
+   */
+  it("borrador sin versión dice que falta detectarla, con la misma palabra del botón", () => {
     const texto = explicacionDelEstado({ estado: "borrador", version: null, enRojo: 0 })
     expect(texto).toContain("todavía no se usa")
-    expect(texto).toContain("deducir")
+    expect(texto).toContain("detectar")
+    expect(texto).not.toContain("deducir")
   })
+
 
   it("borrador con asesores en rojo dice cuántos son y que no se aplica a nadie", () => {
     const texto = explicacionDelEstado({ estado: "borrador", version: 1, enRojo: 2 })
