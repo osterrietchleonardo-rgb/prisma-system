@@ -2767,6 +2767,27 @@ Variables ya verificadas (24/8, Task 0): 24h/3h = [nombre, hora, dirección];
 
 ### Task 17: Encender de verdad (⚠️ REQUIERE OK DE LEONARDO)
 
+> **Decisiones de Leonardo del 27/8 (repaso de flujos y topes), ya implementadas:**
+> - **PRISMAIA apagada** (cero decisiones, cero sombra): `seguimiento_config.modo = 'apagado'`.
+> - **Solo plantillas nuevas**: el agente elige entre las v2 aprobadas (f1/f2/f3 no se usan más); los
+>   avisos al equipo van por email siempre y por WhatsApp solo con plantilla nueva aprobada — nunca se saltea.
+> - **La escalera del lead que espera a un humano** (reemplaza al escalamiento mínimo de la Task 19):
+>   esperando = derivado / etapa handoff / pidió humano / bot apagado, sin ningún mensaje HUMANO después del
+>   último del lead (cubre bot apagado con promesa y bot activo "el asesor se va a comunicar"). Niveles
+>   desde el último mensaje del lead: **2 h asesor · 5 h asesor + director · 10 h asesor · 20 h asesor +
+>   director** para decidir; cada nivel una vez por caso; sin tope por agencia (30 asesores → 30 avisos);
+>   "atendido" lo mide el chat, no la promesa. Sombra real en Central: 105 esperando, 7 atendidos, 99 > 20 h.
+> - **El reloj arranca el día del encendido**: `seguimiento_config.activo_desde` (migración
+>   `2026-08-27-activo-desde.sql`, aplicada); el agente y la escalera solo miran conversaciones con
+>   movimiento posterior. El backlog queda intacto para reactivarlo después ("por el momento no").
+> - **Silencio mínimo: 20 h.** 3 intentos por lead: OK.
+> - **Agencias nuevas arrancan ACTIVAS** al conectar WhatsApp (`injectCoreTemplates` crea la config con
+>   `modo='activo'` y `activo_desde=now()`): email desde el día uno, WhatsApp a medida que Meta aprueba.
+>
+> **Encender Central = `update seguimiento_config set modo='activo', activo_desde=now()`** (con OK explícito).
+> Kill-switch: volver a `sombra`, o `SEGUIMIENTO_MODO=apagado` en Vercel para todas.
+
+
 - [ ] **Step 1: Checklist previo:** sombra revisada (Task 12, criterio de salida
   cumplido) · suite verde · deploy en Vercel con `SEGUIMIENTO_SECRET` y
   `SEGUIMIENTO_MODO=activo` · reloj corriendo · plantillas de fase 1 todas `approved`
