@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { registrarEvento } from "./eventos"
+import { bloqueContextoHtml, contextoDelLead, lineaContextoWhatsApp, type ContextoLead } from "./contexto"
 import { nombreValido } from "./semilla"
 import type { Candidato, ConfigAgencia, DecisionAgente } from "./tipos"
 
@@ -97,11 +98,16 @@ export function armarAvisoEscalar(
   c: Pick<Candidato, "id" | "contact_phone" | "metricas">,
   d: Pick<DecisionAgente, "razon" | "evidencia" | "frase_cierre" | "plantilla">,
   appUrl: string,
-  nombreAgencia: string
+  nombreAgencia: string,
+  contexto?: ContextoLead
 ): Aviso {
   const cliente = nombreCliente(c)
   const link = linkAlChat(perfil, c.id, appUrl)
-  const resumen = unaLinea(`${cliente} (+${c.contact_phone.replace(/\D/g, "")}): ${d.razon}`)
+  // Regla 27/8: todos los avisos con contexto (qué busca + último mensaje) y cada parte etiquetada
+  const resumen = unaLinea(
+    `${cliente} (+${c.contact_phone.replace(/\D/g, "")}).${lineaContextoWhatsApp(contexto)} Qué pasa: ${d.razon}.`,
+    700
+  )
   const porQueVos = esAsignado
     ? "Este chat está asignado a vos."
     : "Este chat no tiene asesor asignado, por eso te llega a vos."
@@ -112,6 +118,7 @@ export function armarAvisoEscalar(
     `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;color:#1a1a1a">`,
     `<p>Hola ${escaparHtml(primerNombre(perfil))},</p>`,
     `<p><strong>${escaparHtml(cliente)}</strong> (+${escaparHtml(c.contact_phone.replace(/\D/g, ""))}) está esperando tu respuesta.</p>`,
+    ...bloqueContextoHtml(contexto),
     `<p><strong>Qué pasa:</strong> ${escaparHtml(d.razon)}</p>`,
     `<p style="color:#555"><strong>El dato:</strong> ${escaparHtml(d.evidencia)}</p>`,
     leDijimos,
@@ -378,7 +385,8 @@ export async function avisarPorEscalar(
       "Escalada sin nadie a quien avisar: la agencia no tiene asesor asignado ni director activo")
     return "sin_destinatario"
   }
-  const aviso = armarAvisoEscalar(destino.perfil, destino.esAsignado, c, d, appUrl, nombreAgencia)
+  const contexto = await contextoDelLead(db, c)
+  const aviso = armarAvisoEscalar(destino.perfil, destino.esAsignado, c, d, appUrl, nombreAgencia, contexto)
   const quien = `${destino.perfil.role} ${destino.perfil.full_name ?? destino.perfil.id}${destino.esAsignado ? " (asignado)" : " (sin asesor asignado)"}`
   if (config.modo !== "activo") {
     await registrarEvento(db, c.agency_id, c.id, "aviso_simulado",

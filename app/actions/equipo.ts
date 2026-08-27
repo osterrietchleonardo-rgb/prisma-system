@@ -6,9 +6,10 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { enviarAviso, type PerfilEquipo } from "@/lib/seguimiento/avisos"
 import {
-  HORAS_VENCE_APROBACION, armarAvisoAsignacion, armarAvisoPedidoAlDirector, contextoDesdeMetricas,
-  fechaCortaAR, fraseReapertura, validarJustificacion, venceEn, ventanaCerrada, type ContextoLead,
+  HORAS_VENCE_APROBACION, armarAvisoAsignacion, armarAvisoPedidoAlDirector, fraseReapertura,
+  validarJustificacion, venceEn, ventanaCerrada,
 } from "@/lib/seguimiento/equipo"
+import { contextoDelLead as contextoDelLeadDb } from "@/lib/seguimiento/contexto"
 import { registrarEvento } from "@/lib/seguimiento/eventos"
 import { nombreValido } from "@/lib/seguimiento/semilla"
 import type { Candidato } from "@/lib/seguimiento/tipos"
@@ -81,17 +82,9 @@ function baseUrlDeEstePedido(): string {
   return `${proto}://${host}`
 }
 
-/** Qué busca el lead (de `metricas`) y su último mensaje, para que el aviso tenga contexto (27/8). */
-async function contextoDelLead(c: Conv): Promise<ContextoLead> {
-  const { data: ultimo } = await createAdminClient()
-    .from("wa_messages").select("content, created_at").eq("conversation_id", c.id).eq("role", "lead")
-    .order("created_at", { ascending: false }).limit(1).maybeSingle()
-  return {
-    busca: contextoDesdeMetricas(c.metricas),
-    ultimoMensaje: ultimo?.content && ultimo?.created_at
-      ? { texto: String(ultimo.content), fechaAR: fechaCortaAR(ultimo.created_at) }
-      : null,
-  }
+/** Qué busca el lead y su último mensaje: va en todos los avisos (regla 27/8). */
+function contextoDelLead(c: Conv) {
+  return contextoDelLeadDb(createAdminClient(), c)
 }
 
 async function cancelarCompromisosDelAsesor(conversationId: string, motivo: string) {

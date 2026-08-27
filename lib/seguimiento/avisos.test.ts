@@ -54,7 +54,7 @@ describe("armarAvisoEscalar", () => {
     const a = armarAvisoEscalar(asesor, true, conv, decision, APP, "Central Real Estate")
     expect(a.variables[0]).toBe("Martín")
     expect(a.variables[1]).toContain("Belen (+5491155550000)")
-    expect(a.variables[1]).toContain("Pidió coordinar una visita")
+    expect(a.variables[1]).toContain("Qué pasa: Pidió coordinar una visita")
     expect(a.variables[1]).not.toMatch(/\n/)
     expect(a.variables[2]).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-1")
     expect(a.plantilla).toBe("asesor_cliente_esperando")
@@ -79,5 +79,24 @@ describe("armarAvisoEscalar", () => {
     const a = armarAvisoEscalar(asesor, true, conv, { ...decision, razon: "<script>x</script>" }, APP, "C")
     expect(a.html).not.toContain("<script>")
     expect(a.html).toContain("&lt;script&gt;")
+  })
+})
+
+describe("armarAvisoEscalar con contexto (regla 27/8: todos los avisos con valor)", () => {
+  const contexto = { busca: "venta, casa en La Plata", ultimoMensaje: { texto: "¿Se puede visitar el sábado?", fechaAR: "26/8 12:37" } }
+  it("WhatsApp: cliente, qué busca, último mensaje con fecha y 'Qué pasa' etiquetado", () => {
+    const a = armarAvisoEscalar(asesor, true, conv, decision, APP, "Central", contexto)
+    expect(a.variables[1]).toBe(
+      "Belen (+5491155550000). Busca: venta, casa en La Plata. Último mensaje del cliente (26/8 12:37): «¿Se puede visitar el sábado?». Qué pasa: Pidió coordinar una visita el 1/8 y hace 3 semanas que nadie le escribe."
+    )
+  })
+  it("email: las secciones de contexto antes de 'Qué pasa'", () => {
+    const a = armarAvisoEscalar(asesor, true, conv, decision, APP, "Central", contexto)
+    expect(a.html.indexOf("Qué busca:")).toBeLessThan(a.html.indexOf("Qué pasa:"))
+    expect(a.html).toContain("Último mensaje del cliente</strong> (26/8 12:37)")
+  })
+  it("sin contexto sigue funcionando (compatibilidad)", () => {
+    const a = armarAvisoEscalar(asesor, true, conv, decision, APP, "Central")
+    expect(a.variables[1]).toBe("Belen (+5491155550000). Qué pasa: Pidió coordinar una visita el 1/8 y hace 3 semanas que nadie le escribe.")
   })
 })

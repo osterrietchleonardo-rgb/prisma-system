@@ -1,5 +1,8 @@
 import { linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
 import type { Candidato } from "./tipos"
+import { bloqueContextoHtml, lineaContextoWhatsApp, type ContextoLead } from "./contexto"
+
+export { contextoDesdeMetricas, fechaCortaAR, type ContextoLead } from "./contexto"
 
 /**
  * Reasignación y aprobaciones (fase 2, primera pieza). Reglas de Leonardo (26/8):
@@ -58,67 +61,6 @@ function boton(href: string, texto: string): string {
 }
 
 type Conv = Pick<Candidato, "id" | "contact_phone" | "metricas">
-
-/** Lo que el asesor necesita saber del lead antes de abrir el chat (regla de Leonardo 27/8). */
-export interface ContextoLead {
-  /** Qué busca, armado desde `metricas` (null si no hay datos). */
-  busca: string | null
-  /** Último mensaje del cliente, ya con fecha en hora argentina. */
-  ultimoMensaje: { texto: string; fechaAR: string } | null
-}
-
-function val(m: Record<string, unknown>, k: string): string | null {
-  const v = m[k]
-  if (v === null || v === undefined) return null
-  const s = String(v).trim()
-  return s && s.toLowerCase() !== "null" && s.toLowerCase() !== "undefined" ? s : null
-}
-
-/** "alquiler, departamento 2 amb en Caballito, hasta USD 120000, urgencia alta" */
-export function contextoDesdeMetricas(metricas: Record<string, unknown> | null | undefined): string | null {
-  const m = metricas ?? {}
-  const partes: string[] = []
-  const operacion = val(m, "tipo_operacion")
-  const tipo = val(m, "tipo_propiedad")
-  const amb = val(m, "ambientes_buscados")
-  const zona = val(m, "zona") ?? val(m, "barrio_consultado")
-  const tipoAmb = [tipo, amb ? `${amb} amb` : null].filter(Boolean).join(" ")
-  const que = [operacion, tipoAmb || null].filter(Boolean).join(", ")
-  if (que || zona) partes.push([que || null, zona ? `en ${zona}` : null].filter(Boolean).join(" "))
-  const moneda = val(m, "moneda_presupuesto") ?? ""
-  const min = val(m, "presupuesto_min")
-  const max = val(m, "presupuesto_max")
-  const plata = (t: string) => t.replace(/\s+/g, " ").trim()
-  if (min && max) partes.push(plata(`presupuesto ${moneda} ${min} a ${max}`))
-  else if (max) partes.push(plata(`hasta ${moneda} ${max}`))
-  else if (min) partes.push(plata(`desde ${moneda} ${min}`))
-  const prop = val(m, "propiedad_interes") ?? val(m, "propiedad_consultada")
-  if (prop) partes.push(`propiedad de interés: ${prop}`)
-  const urgencia = val(m, "urgencia")
-  if (urgencia) partes.push(`urgencia ${urgencia}`)
-  const nec = val(m, "necesidades")
-  if (nec) partes.push(nec)
-  if (!partes.length) return null
-  return unaLinea(partes.join(", "), 300)
-}
-
-function lineaContextoWhatsApp(ctx: ContextoLead | undefined): string {
-  if (!ctx) return ""
-  const p: string[] = []
-  if (ctx.busca) p.push(`Busca: ${ctx.busca}.`)
-  if (ctx.ultimoMensaje) p.push(`Último mensaje del cliente (${ctx.ultimoMensaje.fechaAR}): «${unaLinea(ctx.ultimoMensaje.texto, 140)}».`)
-  return p.length ? ` ${p.join(" ")}` : ""
-}
-
-function bloqueContextoHtml(ctx: ContextoLead | undefined): string[] {
-  if (!ctx) return []
-  const out: string[] = []
-  if (ctx.busca) out.push(`<p><strong>Qué busca:</strong> ${esc(ctx.busca)}</p>`)
-  if (ctx.ultimoMensaje)
-    out.push(`<p><strong>Último mensaje del cliente</strong> (${esc(ctx.ultimoMensaje.fechaAR)}):<br><em>“${esc(unaLinea(ctx.ultimoMensaje.texto, 400))}”</em></p>`)
-  if (!out.length) out.push(`<p style="color:#555">Todavía no hay datos capturados de este cliente: leé el chat.</p>`)
-  return out
-}
 
 /** Aviso al asesor al que le asignaron (o reasignaron) un chat. */
 export function armarAvisoAsignacion(
@@ -203,12 +145,4 @@ export function fraseReapertura(nombreAsesor: string): string {
 /** Vencimiento de un compromiso "responder en 24 h", o 24 h más si ya existe. */
 export function venceEn(desde: Date, horas = HORAS_RESPUESTA_ASESOR): string {
   return new Date(desde.getTime() + horas * 3600e3).toISOString()
-}
-
-/** "26/8 12:37" en hora argentina, para citar el último mensaje del cliente. */
-export function fechaCortaAR(iso: string): string {
-  const d = new Date(iso)
-  const dia = d.toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "numeric", month: "numeric" })
-  const hora = d.toLocaleTimeString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", hour: "2-digit", minute: "2-digit", hour12: false })
-  return `${dia} ${hora}`
 }
