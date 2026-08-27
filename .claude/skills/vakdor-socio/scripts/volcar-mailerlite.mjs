@@ -11,10 +11,13 @@
  * Se corre DESPUES de outbound-diario.mjs. Es idempotente: MailerLite actualiza al que ya
  * existe en vez de duplicarlo, asi que correrlo dos veces no rompe nada.
  *
- * SEGURIDAD DEL ENVIO. Va al grupo IMPORTADOS-NO-ENVIAR, que es cuarentena, y siempre con
- * `autoresponders: false` y `resubscribe: false`. Son contactos en frio: un envio automatico
- * a decenas de CEOs que nunca pidieron nada seria un desastre y ademas quemaria el dominio.
- * Si algun dia se cambia eso, que sea una decision de Leonardo, no un default de este script.
+ * SEGURIDAD DEL ENVIO. Va al grupo "Pipeline Outbound" y nunca dispara un mail: el endpoint
+ * que se usa no manda nada por si mismo. Son contactos en frio que nunca pidieron nada, asi
+ * que un envio automatico seria un desastre y ademas quemaria la reputacion del dominio.
+ *
+ * Lo unico que podria mandarles algo solo es una automatizacion con disparador "se sumo al
+ * grupo". Al 27/08/2026 la cuenta no tiene ninguna automatizacion activa. Si algun dia se
+ * crea una, revisar esto antes: que salga un mail tiene que ser una decision de Leonardo.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,8 +28,16 @@ const RAIZ = path.resolve(AQUI, '../../../..');
 const DRY = process.argv.includes('--dry');
 const NL = String.fromCharCode(10);
 
-/** Cuarentena. El nombre es la regla: las campanas no le apuntan. */
-const GRUPO = '196157836228560104';
+/**
+ * Grupo propio de los leads del pipeline. Antes iban a IMPORTADOS-NO-ENVIAR, pero ahi ya
+ * habia 136 suscriptores de otra cosa y quedaba todo mezclado; Leonardo pidio separarlos el
+ * 27/08/2026. Este grupo tiene SOLO gente del pipeline de outbound.
+ *
+ * Que esten aparte no los vuelve enviables: siguen siendo contactos en frio que nunca
+ * pidieron nada. Antes de apuntarle una campana a este grupo, mirar uno por uno — hay
+ * fichas marcadas con "[!]" en el resumen que son casillas de oficina o mails equivocados.
+ */
+const GRUPO = '196986392716248714';   // Pipeline Outbound
 
 const env = (() => {
   const t = fs.readFileSync(path.join(RAIZ, '.env'), 'utf8');
@@ -203,7 +214,7 @@ if (sinMail.length) {
   console.log(`     ${sinMail.slice(0, 5).join(', ')}${sinMail.length > 5 ? `, y ${sinMail.length - 5} mas` : ''}`);
 }
 
-if (DRY) { console.log(`\n[dry] hubiera subido ${unicos.length} a IMPORTADOS-NO-ENVIAR`); process.exit(0); }
+if (DRY) { console.log(`\n[dry] hubiera subido ${unicos.length} a Pipeline Outbound`); process.exit(0); }
 
 // De a uno, con pausa: MailerLite corta a las 120 llamadas por minuto.
 let subidos = 0; const fallados = [];
@@ -213,5 +224,5 @@ for (const s of unicos) {
   else { fallados.push(`${s.email}: HTTP ${r.status} ${r.cuerpo}`); process.stdout.write('x'); }
   await dormir(520);
 }
-console.log(`\nsubidos a IMPORTADOS-NO-ENVIAR: ${subidos} de ${unicos.length}`);
+console.log(`\nsubidos a Pipeline Outbound: ${subidos} de ${unicos.length}`);
 if (fallados.length) { console.log('FALLARON:'); for (const f of fallados) console.log('  ' + f); }
