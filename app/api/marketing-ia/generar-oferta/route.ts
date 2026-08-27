@@ -4,8 +4,9 @@ import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
 import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
 import {
-  CAMPOS_PERFIL, CAMPOS_CAPTACION, CAMPOS_VENTA, operacionCompleta, type CampoOperacion,
+  CAMPOS_PERFIL, CAMPOS_CAPTACION, CAMPOS_VENTA, camposFaltantes, type CampoOperacion,
 } from "@/lib/marketing-ia/campos-operacion";
+import { REGLA_VOZ } from "@/lib/marketing-ia/voz";
 
 export const dynamic = "force-dynamic";
 
@@ -35,12 +36,13 @@ ${bloqueDatos(op.captacion, CAMPOS_CAPTACION)}
 
 DATOS DE VENTA:
 ${bloqueDatos(op.venta, CAMPOS_VENTA)}
-${directive ? `\nDIRECTIVA CREATIVA DE LA AGENCIA (obligatorio respetarla): ${directive}` : ""}
+
+${REGLA_VOZ}${directive ? `\nDIRECTIVA CREATIVA DE LA AGENCIA (obligatorio respetarla, manda por encima de la regla de voz): ${directive}` : ""}
 
 REGLAS:
 1. Cada oferta es un párrafo conciso, directo y de alto impacto (4 a 6 frases).
 2. Incluí explícitamente los números y diferenciales de arriba: son los que elevan la Probabilidad de Éxito.
-3. Redactá de forma que quede claro que el Esfuerzo y el Sacrificio los carga el ASESOR, no el cliente.
+3. Redactá de forma que quede claro que el Esfuerzo y el Sacrificio los carga el ASESOR y su equipo, no el cliente, y decilo en plural ("nos encargamos", "coordinamos").
 4. Bajá el Retraso Temporal: nombrá los tiempos concretos que el asesor declaró.
 5. PROHIBIDO inventar cifras, plazos, testimonios, premios o garantías que no estén en los datos de arriba.${noPrometer ? `\n6. PROHIBIDO prometer, insinuar o dar a entender lo siguiente: ${noPrometer}` : ""}
 7. Español rioplatense (voseo), profesional y sin marketinerías vacías. Nada de "tu hogar soñado".
@@ -70,9 +72,11 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!operacionCompleta({ perfil: op.perfil ?? {}, captacion: op.captacion ?? {}, venta: op.venta ?? {} })) {
+    const faltantes = camposFaltantes({ perfil: op.perfil ?? {}, captacion: op.captacion ?? {}, venta: op.venta ?? {} });
+    if (faltantes.length > 0) {
+      // Nombrar las preguntas: "completá todo" no le dice al asesor cuál es la que le falta.
       return NextResponse.json(
-        { error: "Completá los pasos de Captación y Venta antes de generar tus ofertas." },
+        { error: `Falta responder: ${faltantes.map((f) => `${f.bloque} — ${f.label}`).join(" · ")}` },
         { status: 400 }
       );
     }

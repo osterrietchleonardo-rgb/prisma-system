@@ -45,6 +45,13 @@ export async function POST(req: Request) {
     // Recorrer el batch de cambios
     const n8nTriggers: Promise<any>[] = []
 
+    // FALLO DE BASE (26/8/2026): si Supabase no responde, este webhook devolvía 200 igual
+    // (la instancia "no se encontraba") y Meta daba el mensaje por entregado: se perdía en
+    // silencio. Ahora cualquier error de base marca esta bandera y al final se responde 503,
+    // que es lo que hace que Meta REINTENTE cuando la base vuelve. Un "no encontrado" real
+    // (phone_number_id desconocido) sigue siendo 200: reintentar eso no serviría de nada.
+    let falloBase = false
+
     for (const entry of payload.entry) {
        for (const change of entry.changes) {
           const val = change.value
@@ -84,12 +91,17 @@ export async function POST(req: Request) {
              const phoneNumberId = metadata.phone_number_id
              
              // Buscar la instancia por phone_number_id
-             const { data: instance } = await supabase
+             const { data: instance, error: errInstance } = await supabase
                  .from('whatsapp_instances')
                  .select('id, agency_id')
                  .eq('phone_number_id', phoneNumberId)
-                 .single()
+                 .maybeSingle()
 
+             if (errInstance) {
+                 console.error('[Meta Webhook] Base no disponible al buscar la instancia (se pedirá reintento):', errInstance.message)
+                 falloBase = true
+                 continue
+             }
              if (!instance) continue
 
              for (const message of val.messages) {
@@ -123,11 +135,16 @@ export async function POST(req: Request) {
 
                 // Dedup por wamid: Meta puede reentregar el mismo mensaje. Si ya lo
                 // tenemos, saltamos para no duplicar ni re-disparar n8n.
-                const { data: dupMsg } = await supabase
+                const { data: dupMsg, error: errDup } = await supabase
                     .from('wa_messages')
                     .select('id')
                     .eq('wamid', wamid)
                     .maybeSingle()
+                if (errDup) {
+                    console.error('[Meta Webhook] Base no disponible al chequear duplicados (se pedirá reintento):', errDup.message)
+                    falloBase = true
+                    continue
+                }
                 if (dupMsg) {
                     console.log(`[Meta Webhook] Mensaje duplicado (wamid ya procesado), se ignora: ${wamid}`)
                     continue
@@ -161,7 +178,8 @@ export async function POST(req: Request) {
                 })
 
                 if (!conv) {
-                    console.error('[Meta Webhook] No se pudo obtener la conversacion:', errConv)
+                    console.error('[Meta Webhook] No se pudo obtener la conversacion (se pedirá reintento):', errConv)
+                    falloBase = true
                     continue
                 }
 
@@ -342,6 +360,11 @@ export async function POST(req: Request) {
         await Promise.all(n8nTriggers)
     }
 
+    if (falloBase) {
+        // 503 = "reintentá más tarde". Lo ya procesado en este batch no se duplica: el
+        // reintento cae en el dedupe por wamid.
+        return NextResponse.json({ error: 'database unavailable, retry later' }, { status: 503 })
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Meta webhook error:', error)

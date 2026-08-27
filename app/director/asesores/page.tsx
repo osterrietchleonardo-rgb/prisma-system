@@ -66,6 +66,8 @@ import {
   SheetDescription 
 } from "@/components/ui/sheet"
 import { Textarea } from "@/components/ui/textarea"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { DocumentosDelAsesor } from "@/components/asesor-docs/DocumentosDelAsesor"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
 import { QRCodeSVG } from "qrcode.react"
@@ -834,7 +836,17 @@ export default function AsesoresPage() {
             </div>
           </SheetHeader>
           
-          <div className="space-y-6 mt-8 flex-1 min-h-0 overflow-y-auto pr-2">
+          {/* Solapas: la barra (TabsList) queda shrink-0 y es cada TabsContent el
+              que scrollea. Si en cambio scrolleara el <Tabs> entero, la barra se
+              iría con el scroll y volveríamos al mismo corte de 11b4238. Patrón
+              copiado de app/asesor/documentos/page.tsx:273-283, ya probado. */}
+          <Tabs defaultValue="resumen" className="flex-1 min-h-0 flex flex-col mt-8">
+            <TabsList className="shrink-0 self-start">
+              <TabsTrigger value="resumen">Resumen</TabsTrigger>
+              <TabsTrigger value="documentos">Documentos</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="resumen" className="flex-1 min-h-0 overflow-y-auto pr-2 space-y-6 mt-4 data-[state=inactive]:hidden">
             {selectedAgent && (
               <div className="rounded-xl border border-border/60 p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -972,7 +984,14 @@ export default function AsesoresPage() {
                 </div>
               </div>
             </div>
-          </div>
+            </TabsContent>
+
+            <TabsContent value="documentos" className="flex-1 min-h-0 overflow-y-auto pr-2 mt-4 data-[state=inactive]:hidden">
+              {selectedAgent && agencyId && (
+                <DocumentosDelAsesor advisorId={selectedAgent.id} agencyId={agencyId} />
+              )}
+            </TabsContent>
+          </Tabs>
         </SheetContent>
       </Sheet>
 

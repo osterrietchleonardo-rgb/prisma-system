@@ -16,6 +16,129 @@
 
 ---
 
+## 2026-08-26
+
+**Etapa B cerrada: los documentos de cada asesor ya viven adentro del sistema** (rama
+`feat/asesores-documentos`, mismo worktree `PRISMA-SYSTEM-asesores-docs`; spec en
+`docs/superpowers/specs/2026-08-24-asesores-celular-y-documentos-design.md`, plan en
+`docs/superpowers/plans/2026-08-26-asesores-etapa-b-documentos.md`). Falta el recorrido en
+el navegador de Leonardo (Task 7 paso 3, deliberadamente no hecho acá) y el merge a `main`.
+
+**Qué se construyó:** dos secciones nuevas en la tarjeta del asesor, en el panel del
+director — plantillas personalizadas (mismo documento para todos, con los datos de cada uno,
+solo `.docx`) y documentos de información (archivos sueltos, Word o PDF) — y una solapa "Mis
+Documentos" para el asesor, de solo lectura. Commits en orden: `05cd8c2` (reglas de qué
+archivo entra y dónde se guarda, 18 tests), `a9af2bb` (las tres tablas y sus permisos),
+`b5672a2` (la URL de descarga en un solo lugar), `dae1377`+`b3d7e7e` (el componente de las
+dos secciones y sus cinco arreglos de revisión), `fb24d00` (las solapas en el panel del
+director), `70f08f7` (la solapa del asesor).
+
+**Los hallazgos que vale la pena dejar anotados:**
+
+1. **El plan le pedía al asesor un dato que sus permisos no le dejan leer.** El componente
+   iba a pedir el nombre del tipo de documento con una consulta anidada, y por diseño el
+   asesor no ve esa lista — le habría llegado vacío. Se detectó **antes de escribir una
+   línea**, en el escaneo previo al plan. Se resolvió mostrándole al asesor el nombre del
+   archivo en vez del tipo.
+2. **Dos fallos silenciosos en el componente**, encontrados en revisión (ronda de los cinco
+   arreglos, `b3d7e7e`): si fallaban *todos* los archivos de una subida no salía ningún
+   mensaje de error, y si fallaba la consulta contra la base la pantalla decía "todavía no
+   tenés documentos" — informaba ausencia cuando en realidad había un fallo.
+3. **El nombre del archivo al descargar no se respetaba y los PDF no se descargaban** (se
+   abrían en pestaña nueva en vez de bajar): el atributo `download` del navegador se ignora
+   cuando el archivo viene de otro dominio. El arreglo entró en `lib/asesor-docs/url.ts`
+   (`b5672a2`), la función chiquita creada justamente para centralizar esa URL — era
+   exactamente su razón de ser.
+4. **Se verificó el aislamiento simulando el rol del asesor contra la base**, no confiando en
+   que la pantalla esconda botones: que no puede escribir y que no ve lo de otro asesor.
+   Todo dentro de transacciones revertidas (`BEGIN`/`ROLLBACK`), sin dejar nada escrito.
+
+**Verificación (Task 7, pasos 1-2 y 4-6 — el 3 queda para Leonardo):** `npm test` → 341
+tests en 31 archivos de vitest + 88 de node, todos verdes. `npx tsc --noEmit` → limpio.
+`npm run build` → compila. `npm run lint` → 61 errores preexistentes repartidos por `app/`,
+`components/` y `lib/`; uno de esos archivos (`app/api/ai/consultor/route.ts`) aparece
+también en `git diff --name-only main..HEAD`, pero es un falso positivo — `main` avanzó de
+forma independiente después de que esta rama divergiera (commit `26fe01d`, ajeno a esta
+etapa) y los commits propios de esta rama nunca tocaron ese archivo
+(`git diff 47e6230..HEAD -- app/api/ai/consultor/route.ts` da vacío). Ninguno de los 8
+archivos que esta rama sí modificó cae en la lista del lint. Detalle completo en
+`.superpowers/sdd/2026-08-26-asesores-etapa-b-documentos/task-7-report.md`.
+
+**Queda pendiente:**
+- **Etapa C (detección de plantillas y versionado)**, con plan propio — todavía no
+  arrancada.
+- El borrado de archivos es **por autor, no por inmobiliaria**: con dos directores en la
+  misma agencia, el segundo no puede borrar los que subió el primero. Hoy no es un problema
+  (una sola agencia real, un solo director) pero queda anotado para cuando deje de serlo.
+- La búsqueda del tipo de documento **no escapa los comodines** (`%`, `_`) — es la **cuarta
+  aparición** de ese mismo patrón en el proyecto. No se tocó porque no era parte del alcance
+  de esta etapa, pero ya son cuatro lugares con el mismo defecto suelto.
+
+**El reclamo de roomix, y el proxy de fotos que salió de ahí** (rama `feat/fotos-red-proxy`,
+worktree propio `PRISMA-SYSTEM-fotos-red`; mergeada y desplegada el mismo día, `b6fd474`).
+El contexto completo del asunto está en `20 Frentes/roomix.md` del vault.
+
+**Lo que llegó:** a las 09:22 un aviso de abuse de DigitalOcean con 24 h para responder o
+suspender el droplet (n8n, chatwoot, evolution-api — o sea el bot de Central), y a las 12:54
+el reclamo de roomix por scraping: 20,2 M de requests y US$1.500 de daño estimado. Los dos
+respondidos dentro del día. El `roomix-worker` de EasyPanel quedó apagado.
+
+**Los números del relevamiento, que son el dato que faltaba:** `roomix_properties` tiene
+369.478 filas (267.547 activas, 178.340 sin `lastmod`) contra 353 activas de cartera propia
+de Central. En los 112 ACM generados hay **6.370 comparables de la red contra 303 propios**, y
+**72 de esos 112 no tuvieron ningún comparable propio**. El ACM, como funciona hoy, es la base
+de roomix con nuestra interfaz.
+
+**El proxy** (`app/api/foto-red/route.ts`): hasta hoy cada foto se la pedía el NAVEGADOR del
+asesor a `cdn.roomix.ai`, lo que además dejaba `Referer: https://prisma.vakdor.com/` en los
+registros de ellos — una de las cosas que reclamaron. Ahora se baja una vez server-side, se
+guarda en el bucket privado `red-fotos` y sale de nuestro lado.
+
+*Las decisiones que valen, con su porqué:*
+
+**Bajo demanda, no copiando todo.** El catálogo son 1.480.427 fotos (~212 GB) y solo hay 112
+ACM. Copiarlo entero habría significado pegarle a roomix el pico de tráfico más grande de toda
+la historia del asunto, el mismo día que les dijimos que parábamos.
+
+**`cdn.roomix.ai` sale de `next.config` y del CSP, a propósito.** Es *fail closed*: si quedó
+algún punto sin migrar, la foto se ve rota en vez de seguir pegándoles sin que nos enteremos.
+
+**El endpoint recibe una URL del cliente**, así que lo único que lo separa de un SSRF abierto
+es la allowlist de hosts, igual que en `fotos-descarga.ts`, más `redirect: "error"`. Probado
+con un impostor `cdn.roomix.ai.evil.com`, con `http` y sin parámetro: los tres dan 400.
+
+**Se tocó `opt()` en la ficha pública** para que `next/image` optimice también nuestras rutas
+internas. Sin eso el PDF de la ficha volvía a pesar decenas de MB.
+
+**Queda afuera:** `fotos-comparables` (el análisis con IA) sigue bajando del CDN server-side.
+No deja Referer y solo corre a pedido, pero no es cero.
+
+*Errores propios de la sesión:*
+
+**Verifiqué con un regex equivocado y casi reporto un falso negativo.** Al chequear que los
+endpoints ya no devolvieran URLs de roomix busqué `https://cdn.roomix.ai` en la respuesta y
+dio 0 por el proxy y 0 directo — o sea, ninguna foto. La URL viaja **URL-encodeada** dentro
+del parámetro (`%3A%2F%2F`). Un "0" en los dos lados no era éxito: era la señal de que la
+verificación no estaba mirando nada. Regla: cuando una comprobación da cero en todas sus
+categorías, lo primero que se duda es la comprobación.
+
+**Y probé primero con un ACM de Central estando logueado como PRISMAIA - VAKDOR**: el 404 no
+era un bug, era el scope por agencia funcionando. Para probar hace falta un ACM de la agencia
+con la que uno entra.
+
+*Gotchas del entorno:*
+
+1. **Un worktree nuevo no tiene `node_modules` ni `.env`.** Hay que correr `npm install` y
+   copiar `.env` y `.env.local` antes de poder compilar o levantar nada.
+2. **`npx tsc` agarra otro binario** ("This is not the tsc command you are looking for"): va
+   `./node_modules/.bin/tsc`.
+3. **El clasificador de permisos bloqueó cinco acciones** en esta sesión (apagar el servicio de
+   EasyPanel dos veces, un heredoc largo, y dos ediciones). Tres salieron al reintentar; el
+   apagado lo terminó haciendo Leonardo. Cuando un bloqueo se repite dos veces, conviene frenar
+   y pedirlo en vez de buscarle la vuelta.
+
+---
+
 ## 2026-08-25
 
 **Etapa A cerrada: el código de invitación ahora valida quién lo usa** (rama
@@ -84,6 +207,61 @@ tocó (comillas sin escapar en JSX y `prefer-const`, repartidos por `app/`, `com
   seguridad, y Leonardo la va a decidir aparte.
 - Los 2 códigos de invitación viejos sin email siguen funcionando como antes, a propósito: no
   se migraron.
+
+**El Socio acusó en falso, y el arreglo es la parte que importa** (misma jornada, sesión de
+`/socio`)
+
+Se le marcó a Leonardo como deuda el resumen para Kevin, que **ya estaba mandado**. Era la
+**segunda vez** con el mismo ritual: la primera quedó anotada en la descripción de la tarea
+anterior (`wdvf3a8b1u`, 21/08: *"YA ESTABA HECHO. Leonardo lo había preparado por su
+cuenta"*), y nadie leyó esa nota antes de repetir el error.
+
+*La causa:* Leonardo ejecuta los rituales que tienen a otra persona del otro lado por WhatsApp
+o LinkedIn, y ClickUp no se entera. El estado del tablero **no es evidencia** de que algo no se
+hizo — solo de que nadie lo cerró.
+
+*El arreglo, en `.claude/skills/vakdor-socio/SKILL.md`:* en la fase ③ se pregunta antes de
+afirmar que un ritual con un tercero está incumplido; en la fase ⑦ se repasan uno por uno y se
+cierran en el momento, anotando por dónde salieron. Con el límite escrito al lado para que no
+se vuelva excusa: **solo vale para lo que depende de otra persona**; lo verificable contra el
+código o producción se sigue verificando. También quedó como memoria del proyecto
+(`ritual-vencido-no-es-incumplido.md`).
+
+**El guion de outbound dejó de ser una corazonada** (`20 Frentes/outbound.md` del vault, fuera
+del repo). El mensaje que trajo el sí de Sergio Bermúdez es el mismo que trajo el de Damián
+Ostrovsky, casi palabra por palabra; el guion que estaba escrito tiene cero respuestas. Se
+reemplazó el Toque 1, el viejo quedó abajo marcado como descartado con su porqué, y se corrigió
+una contradicción que el frente arrastraba: decía *"prohibido hablar de tu producto"* y lo que
+funciona **sí habla del producto**. La regla real es **no pedir la reunión en el primer
+mensaje**.
+
+*Errores propios de esta sesión, que es lo que más sirve:*
+
+**Una edición se perdió por trabajar en el worktree equivocado.** Las dos reglas del
+`SKILL.md` se escribieron en `PRISMA-SYSTEM` (el principal) sin commitear, y **otra terminal
+cambió de rama en ese mismo worktree** (de `feat/outbound-canal-por-grado` a
+`chore/sanear-backup-n8n`): el cambio desapareció. Se detectó porque `git status` dejó de
+mostrarlo como modificado. Regla que faltaba explicitar: **la sesión de `/socio` trabaja en
+`PRISMA-SYSTEM-socio`**, que existe justamente para eso. Lo que vive fuera de git —el vault,
+ClickUp, la memoria— sobrevivió sin un rasguño; lo único que se perdió fue lo del repo.
+
+**No volví a mirar el reloj en cinco horas.** Se leyó la hora al abrir (14:35) y después se
+razonó todo el día sobre esa hora, planificando "las dos horas que quedan" cuando ya eran las
+19:37 y la jornada había terminado. Lo delató el timestamp de un log, no una verificación. La
+memoria `mirar-la-hora-antes-de-decirla` ya advertía esto y **igual volvió a pasar**: leerla
+una vez no alcanza, hay que releerla cada vez que se habla de tiempo o se arma un plan.
+
+**Se escribió un bloque entero al vault sin acentos**, por miedo a los escapes del heredoc —
+incluido el texto de un mensaje que Leonardo iba a copiarle a un CEO. El heredoc con
+delimitador citado (`<<'EOF'`) no expande nada: los acentos pasan bien.
+
+*Dos gotchas más de este entorno:*
+
+1. Los scripts que usan `@composio/core` **solo corren con el cwd en
+   `.claude/skills/vakdor-socio/`**: el `node_modules` vive ahí, no en la raíz del repo.
+2. **`/tmp` de Git Bash no es el `/tmp` de node**: un archivo escrito en `/tmp` desde Bash,
+   node lo busca en `C:	mp` y falla con ENOENT. Los temporales van al scratchpad de la
+   sesión, con ruta absoluta.
 
 ---
 

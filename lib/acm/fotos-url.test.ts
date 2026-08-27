@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizarFotoRoomix, normalizarImagenes } from "./fotos-url";
+import { normalizarFotoRoomix, normalizarImagenes, urlFotoRed, urlsFotoRed, esTipoFotoPermitido } from "./fotos-url";
 
 // El caso real que motivó el arreglo: la propiedad 2a998e59 ("Excelente departamento 3
 // ambientes EN DUPLEX", La Cle Estudio Inmobiliario) tenía sus 6 fotos en `.webp` y las 6
@@ -55,5 +55,91 @@ describe("normalizarImagenes", () => {
     expect(normalizarImagenes([null, "", { url: null }, 42, "https://cdn.roomix.ai/1/1/1/d.webp"])).toEqual([
       "https://cdn.roomix.ai/1/1/1/d.jpg",
     ]);
+  });
+});
+
+// El proxy propio (26-ago-2026): el navegador no le pide más ninguna foto al CDN de roomix.
+// Lo que se prueba acá es la parte pura — armar la URL. La descarga y el cacheo viven en
+// `app/api/foto-red/route.ts`.
+describe("urlFotoRed", () => {
+  it("manda la foto de la red por nuestro proxy", () => {
+    expect(urlFotoRed(SANA)).toBe(`/api/foto-red?u=${encodeURIComponent(SANA)}`);
+  });
+
+  it("pide el .jpg, no el .webp roto, para no llenar el caché de 404", () => {
+    expect(urlFotoRed(ROTA)).toBe(`/api/foto-red?u=${encodeURIComponent(SANA)}`);
+  });
+
+  it("no toca la cartera propia: Tokko y Storage siguen saliendo directo", () => {
+    const tokko = "https://static.tokkobroker.com/pics/123_frente.webp";
+    const storage = "https://abc.supabase.co/storage/v1/object/public/props/frente.webp";
+    expect(urlFotoRed(tokko)).toBe(tokko);
+    expect(urlFotoRed(storage)).toBe(storage);
+  });
+
+  it("no cae con un host que solo TERMINA parecido a roomix", () => {
+    const impostor = "https://cdn.roomix.ai.evil.com/1/2/3/foto.webp";
+    expect(urlFotoRed(impostor)).toBe(impostor);
+  });
+
+  it("no toca http: solo se proxean URLs https", () => {
+    const inseguro = "http://cdn.roomix.ai/1/2/3/foto.jpg";
+    expect(urlFotoRed(inseguro)).toBe(inseguro);
+  });
+
+  it("una URL basura sale igual, sin romper", () => {
+    expect(urlFotoRed("no soy una url")).toBe("no soy una url");
+  });
+
+  it("es idempotente: aplicarla dos veces no anida proxies", () => {
+    expect(urlFotoRed(urlFotoRed(SANA))).toBe(`/api/foto-red?u=${encodeURIComponent(SANA)}`);
+  });
+
+  it("urlsFotoRed convierte solo las de la red y deja el resto", () => {
+    expect(urlsFotoRed([SANA, "https://static.tokkobroker.com/pics/c.jpg"])).toEqual([
+      `/api/foto-red?u=${encodeURIComponent(SANA)}`,
+      "https://static.tokkobroker.com/pics/c.jpg",
+    ]);
+  });
+});
+
+// El agujero que encontro una revision el 26/08/2026: el proxy validaba el archivo con
+// `tipo.startsWith("image/")`, y `image/svg+xml` pasa ese filtro. Un SVG no es una foto: es
+// texto que puede traer un <script>, y servido desde prisma.vakdor.com correria con los
+// permisos de la app. El endpoint es publico, asi que no hacia falta ni estar logueado.
+describe("esTipoFotoPermitido", () => {
+  it("RECHAZA image/svg+xml aunque empiece con image/", () => {
+    expect(esTipoFotoPermitido("image/svg+xml")).toBe(false);
+  });
+
+  it("rechaza cualquier otro image/* que no sea una foto real", () => {
+    expect(esTipoFotoPermitido("image/svg")).toBe(false);
+    expect(esTipoFotoPermitido("image/svg+xml; charset=utf-8")).toBe(false);
+    expect(esTipoFotoPermitido("image/x-icon")).toBe(false);
+  });
+
+  it("acepta los formatos de foto reales", () => {
+    for (const t of ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]) {
+      expect(esTipoFotoPermitido(t)).toBe(true);
+    }
+  });
+
+  it("tolera el charset y las mayusculas que manda un CDN", () => {
+    expect(esTipoFotoPermitido("image/jpeg; charset=binary")).toBe(true);
+    expect(esTipoFotoPermitido("IMAGE/JPEG")).toBe(true);
+    expect(esTipoFotoPermitido("  image/png  ")).toBe(true);
+  });
+
+  it("rechaza lo que no es imagen, y el vacio", () => {
+    expect(esTipoFotoPermitido("text/html")).toBe(false);
+    expect(esTipoFotoPermitido("application/javascript")).toBe(false);
+    expect(esTipoFotoPermitido("")).toBe(false);
+    expect(esTipoFotoPermitido(null)).toBe(false);
+    expect(esTipoFotoPermitido(undefined)).toBe(false);
+  });
+
+  it("no se deja enganar por un tipo que CONTIENE uno permitido", () => {
+    expect(esTipoFotoPermitido("text/html+image/jpeg")).toBe(false);
+    expect(esTipoFotoPermitido("image/jpeg-evil")).toBe(false);
   });
 });

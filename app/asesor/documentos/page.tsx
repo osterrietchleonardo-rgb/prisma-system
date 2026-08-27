@@ -51,14 +51,17 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { useRouter } from "next/navigation"
 import OfficialDocsSection from "@/components/documentos/OfficialDocsSection"
+import DocumentosDelAsesor from "@/components/asesor-docs/DocumentosDelAsesor"
 
 export default function AsesorDocumentosPage() {
-  // Solapa de nivel superior: biblioteca compartida (IA) vs documentos oficiales (solo lectura)
-  const [section, setSection] = useState<"biblioteca" | "oficiales">("biblioteca")
+  // Solapa de nivel superior: biblioteca compartida (IA), documentos oficiales
+  // (solo lectura) y los propios del asesor (solo lectura)
+  const [section, setSection] = useState<"biblioteca" | "oficiales" | "mis-documentos">("biblioteca")
   const [documents, setDocuments] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [agencyId, setAgencyId] = useState<string | null>(null)
+  const [userId, setUserId] = useState<string | null>(null)
   
   // Folders State
   const [folders, setFolders] = useState<Record<string, any>[]>([])
@@ -81,6 +84,8 @@ export default function AsesorDocumentosPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
+      setUserId(user.id)
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -270,13 +275,16 @@ export default function AsesorDocumentosPage() {
 
   return (
     <div className="flex flex-col h-full p-4 md:p-8 pt-6 overflow-hidden">
-      <Tabs value={section} onValueChange={(v) => setSection(v as "biblioteca" | "oficiales")} className="flex flex-col h-full">
+      <Tabs value={section} onValueChange={(v) => setSection(v as "biblioteca" | "oficiales" | "mis-documentos")} className="flex flex-col h-full">
         <TabsList className="bg-muted/50 p-1 rounded-xl border border-accent/10 self-start mb-4">
           <TabsTrigger value="biblioteca" className="rounded-lg px-4 h-9 text-sm data-[state=active]:bg-card data-[state=active]:text-accent gap-2">
             <Sparkles className="h-4 w-4" /> Biblioteca Digital
           </TabsTrigger>
           <TabsTrigger value="oficiales" className="rounded-lg px-4 h-9 text-sm data-[state=active]:bg-card data-[state=active]:text-accent gap-2">
             <FileBadge className="h-4 w-4" /> Documentos Oficiales
+          </TabsTrigger>
+          <TabsTrigger value="mis-documentos" className="rounded-lg px-4 h-9 text-sm data-[state=active]:bg-card data-[state=active]:text-accent gap-2">
+            <FileText className="h-4 w-4" /> Mis Documentos
           </TabsTrigger>
         </TabsList>
 
@@ -570,6 +578,16 @@ export default function AsesorDocumentosPage() {
 
         <TabsContent value="oficiales" className="flex-1 overflow-hidden mt-0 data-[state=inactive]:hidden">
           <OfficialDocsSection readOnly />
+        </TabsContent>
+
+        <TabsContent value="mis-documentos" className="flex-1 min-h-0 overflow-y-auto pr-2 custom-scrollbar mt-0 data-[state=inactive]:hidden">
+          {userId && agencyId ? (
+            <DocumentosDelAsesor advisorId={userId} agencyId={agencyId} readOnly />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {[1, 2, 3].map(i => <Skeleton key={i} className="h-44 rounded-2xl w-full" />)}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -185,7 +185,7 @@
      "parameters": [
       {
        "name": "x-extractor-secret",
-       "value": "Leito3983356213."
+       "value": "__ACM_EXTRACTOR_SECRET__"
       }
      ]
     },
@@ -550,7 +550,7 @@
       "parameters": [
        {
         "name": "x-extractor-secret",
-        "value": "Leito3983356213."
+        "value": "__ACM_EXTRACTOR_SECRET__"
        }
       ]
      },
