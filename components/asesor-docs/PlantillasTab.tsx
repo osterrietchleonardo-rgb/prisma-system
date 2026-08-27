@@ -12,6 +12,7 @@ import {
   armarFilas,
   explicacionDelEstado,
   motivoParaNoDetectar,
+  PARA_QUE_SIRVE,
   type DocumentoCrudo,
   type FilaPlantilla,
   type TipoCrudo,
@@ -46,22 +47,12 @@ const ETIQUETA_DEL_ESTADO: Record<FilaPlantilla["estado"], string> = {
 };
 
 /**
- * Para qué sirve esta pantalla, en dos renglones.
- *
- * Dice la maquinaria (comparar, detectar) **y el premio** (que después PRISMA
- * genere solo el documento de cada asesor). Sin el premio, el director lee un
- * procedimiento y no entiende para qué apretaría el botón: el pago aparecía
- * una sola vez, adentro de la explicación del estado `activa`, o sea en filas
- * que una inmobiliaria que recién empieza todavía no tiene.
- *
- * Es una constante y no dos textos sueltos porque se muestra en dos lugares
- * —fijo en el escritorio, adentro del scroll en el celular— y dos copias que
- * se editan por separado terminan diciendo cosas distintas.
+ * El texto de "para qué sirve esta pantalla" NO se escribe acá: vive en
+ * `lib/asesor-docs/plantillas.ts` junto con el resto de la prosa, que es donde
+ * los tests lo alcanzan. Se muestra en dos lugares —fijo en el escritorio,
+ * adentro del scroll en el celular— y una sola constante evita que las dos
+ * copias se editen por separado y terminen diciendo cosas distintas.
  */
-const PARA_QUE_SIRVE =
-  "Un tipo de documento por fila. Cuando varios asesores tienen el mismo contrato cargado, PRISMA los compara " +
-  "entre sí y detecta qué parte es texto fijo y qué parte es el dato de cada persona. Con eso arma la plantilla, " +
-  "y de ahí en adelante le genera el documento a cada asesor solo, con los datos de cada uno.";
 
 export function PlantillasTab() {
   const supabase = createClient();
@@ -112,6 +103,17 @@ export function PlantillasTab() {
           documentos: (d.data ?? []) as DocumentoCrudo[],
         }),
       );
+    } catch (e) {
+      /**
+       * supabase-js devuelve los fallos de red en `error` y casi nunca tira,
+       * pero "casi nunca" no alcanza acá: sin este `catch` una excepción se
+       * comería el `setFilas`, la lista quedaría vacía y el director leería
+       * "todavía no hay ningún tipo de documento" — que es exactamente la
+       * confusión que esta pantalla tiene prohibida (ver `errorCarga`).
+       */
+      console.error("[PlantillasTab] excepción al cargar:", e);
+      setErrorCarga("No se pudo cargar la lista de plantillas. Puede ser un problema de conexión — probá de nuevo.");
+      setFilas([]);
     } finally {
       setCargando(false);
     }

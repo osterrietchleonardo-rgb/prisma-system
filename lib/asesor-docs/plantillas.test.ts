@@ -5,8 +5,39 @@ import {
   explicacionDelEstado,
   MINIMO_PARA_DETECTAR,
   motivoParaNoDetectar,
+  PARA_QUE_SIRVE,
 } from "./plantillas"
 import { MINIMO_DOCUMENTOS } from "@/lib/plantillas/deteccion"
+
+/**
+ * La familia de formas en PRESENTE del verbo generar: "genera", "generan",
+ * "se generan", "generamos", "regenera", "regeneran", "generás".
+ *
+ * POR QUÉ EXISTE ESTO, para quien lo lea dentro de seis meses:
+ *
+ * Que PRISMA le arme solo el documento a cada asesor **todavía no está
+ * escrito**. La única ruta de esta etapa es `detectar-plantilla`, que compara
+ * los documentos y devuelve una propuesta SIN guardar nada; no hay
+ * `confirmar-plantilla`, y `rellenarDocx` existe como primitiva de librería
+ * que no llama ninguna pantalla ni ningún endpoint.
+ *
+ * Contarlo en presente ya pasó dos veces. La segunda es la que explica por qué
+ * el test mira una familia entera y no una palabra: se sacó la promesa de
+ * `explicacionDelEstado` —con un `not.toContain("regeneran")` cuidándola— y la
+ * misma promesa reapareció con OTRO VERBO ("le genera") treinta líneas más
+ * arriba, en la primera oración de la pantalla, que es la que ve todo el
+ * mundo. `not.toContain("regeneran")` la dejó pasar entera.
+ *
+ * El futuro está permitido a propósito: "le va a generar", "generará",
+ * "falta generarle". La pantalla PUEDE decir qué va a poder hacer; lo que no
+ * puede es describir en presente algo que hoy no pasa. Ante la duda entre
+ * prometer y quedarse corto, corto.
+ *
+ * Cuando la generación exista de verdad —un endpoint que la corra y una
+ * pantalla que la muestre— este test se borra en el MISMO commit que la hace
+ * andar, no antes.
+ */
+const PROMESA_EN_PRESENTE = /\b(?:re)?gener(?:a|an|amos|as|ás)\b/i
 
 /**
  * `MINIMO_PARA_DETECTAR` está escrito a mano en `plantillas.ts` para no
@@ -193,13 +224,14 @@ describe("explicacionDelEstado", () => {
   })
 
   /**
-   * La regeneración automática al subir una versión nueva TODAVÍA NO EXISTE
-   * (es una tarea posterior). Describirla en presente le promete al director
-   * algo que la pantalla no hace.
+   * Que los documentos se armen o se rehagan solos TODAVÍA NO EXISTE (es una
+   * tarea posterior). Describirlo en presente le promete al director algo que
+   * la pantalla no hace. La familia completa, y el porqué, en
+   * `PROMESA_EN_PRESENTE`, arriba.
    */
-  it("activa no promete que los documentos se regeneren solos", () => {
+  it("activa no promete que los documentos se generen ni se regeneren solos", () => {
     const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0 })
-    expect(texto).not.toContain("regeneran")
+    expect(texto).not.toMatch(PROMESA_EN_PRESENTE)
   })
 
   /**
@@ -212,7 +244,6 @@ describe("explicacionDelEstado", () => {
     expect(texto).toContain("detectar")
     expect(texto).not.toContain("deducir")
   })
-
 
   it("borrador con asesores en rojo dice cuántos son y que no se aplica a nadie", () => {
     const texto = explicacionDelEstado({ estado: "borrador", version: 1, enRojo: 2 })
@@ -235,6 +266,64 @@ describe("explicacionDelEstado", () => {
           expect(explicacionDelEstado({ estado, version, enRojo }).length).toBeGreaterThan(20)
         }
       }
+    }
+  })
+})
+
+/**
+ * La red que faltaba: todo lo que la pantalla dice, revisado contra
+ * `PROMESA_EN_PRESENTE`. El texto de arriba de la pantalla se mudó de
+ * `PlantillasTab.tsx` a `plantillas.ts` justamente para que estos tests lo
+ * alcancen — ningún test del repo mira los `.tsx`.
+ */
+describe("nada de lo que se muestra promete en presente algo que todavía no pasa", () => {
+  it("el párrafo de para qué sirve no lo promete", () => {
+    expect(PARA_QUE_SIRVE).not.toMatch(PROMESA_EN_PRESENTE)
+  })
+
+  /**
+   * Y el otro lado de la moneda: sacar la promesa no puede significar borrar
+   * el premio. Si el director no lee para qué le sirve apretar el botón, no lo
+   * aprieta. Se dice, en futuro.
+   */
+  it("pero sí cuenta lo que PRISMA va a poder hacer", () => {
+    expect(PARA_QUE_SIRVE).toContain("va a generar")
+  })
+
+  it("ninguna explicación de estado lo promete, en ninguna combinación", () => {
+    for (const estado of ["activa", "borrador"] as const) {
+      for (const version of [null, 1, 2]) {
+        for (const enRojo of [0, 1, 5]) {
+          expect(explicacionDelEstado({ estado, version, enRojo })).not.toMatch(PROMESA_EN_PRESENTE)
+        }
+      }
+    }
+  })
+
+  /**
+   * Un patrón que no agarra nada pasa todos los tests de arriba y no protege
+   * de nada. Acá se comprueba contra frases escritas a mano que el patrón
+   * distingue el presente del futuro.
+   */
+  it("el patrón agarra la familia entera y deja pasar el futuro", () => {
+    for (const promesa of [
+      "de ahí en adelante le genera el documento a cada asesor",
+      "los documentos de los asesores se generan con esta versión",
+      "al subir una versión nueva se regenera todo",
+      "los documentos se regeneran solos",
+      "generamos el documento de cada asesor",
+      "vos generás el documento",
+    ]) {
+      expect(promesa).toMatch(PROMESA_EN_PRESENTE)
+    }
+
+    for (const permitido of [
+      "más adelante le va a generar el documento a cada asesor",
+      "lo generará con los datos de cada uno",
+      "falta generarle el documento a cada asesor",
+      "la generación del documento viene después",
+    ]) {
+      expect(permitido).not.toMatch(PROMESA_EN_PRESENTE)
     }
   })
 })

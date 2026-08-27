@@ -14,6 +14,39 @@
  */
 
 // ---------------------------------------------------------------------------
+// Para qué sirve la pantalla
+// ---------------------------------------------------------------------------
+
+/**
+ * Para qué sirve esta pantalla, en dos renglones.
+ *
+ * Dice la maquinaria (comparar, detectar) **y el premio** (que PRISMA le arme
+ * después el documento a cada asesor). Sin el premio, el director lee un
+ * procedimiento y no entiende para qué apretaría el botón.
+ *
+ * El premio va **en futuro, y a propósito**: generar el documento de cada
+ * asesor TODAVÍA NO EXISTE. Hoy la única ruta de esta etapa es
+ * `detectar-plantilla`, que compara y devuelve una propuesta sin guardar nada;
+ * ni `confirmar-plantilla` ni ninguna pantalla llaman a `rellenarDocx`. Decirlo
+ * en presente ("le genera el documento a cada asesor") le promete al director
+ * algo que va a buscar y no va a encontrar, y esa es la única forma segura de
+ * que deje de creerle a la pantalla. La regla, entonces: **se puede decir qué
+ * va a poder hacer; no se puede describir en presente algo que hoy no pasa.**
+ * Ante la duda, quedarse corto.
+ *
+ * Vive acá y no adentro del `.tsx` por el mismo motivo que el resto de este
+ * archivo: los tests del repo solo miran `lib/**`. La versión anterior de esta
+ * frase vivía en el componente, y por eso la promesa en presente pasó una
+ * ronda entera sin que ningún test la viera. Ahora la vigila
+ * `PROMESA_EN_PRESENTE` en `plantillas.test.ts`, junto con todo lo que
+ * devuelve `explicacionDelEstado`.
+ */
+export const PARA_QUE_SIRVE =
+  "Un tipo de documento por fila. Cuando varios asesores tienen el mismo contrato cargado, PRISMA los compara y " +
+  "detecta qué parte es texto fijo y qué parte es el dato de cada persona. Con eso arma la plantilla; más " +
+  "adelante le va a generar el documento a cada asesor con sus datos."
+
+// ---------------------------------------------------------------------------
 // La forma de cada fila
 // ---------------------------------------------------------------------------
 
@@ -167,7 +200,13 @@ function quienesQuedaron(enRojo: number): string {
  */
 export function explicacionDelEstado(fila: Pick<FilaPlantilla, "estado" | "version" | "enRojo">): string {
   if (fila.estado === "activa") {
-    const enUso = "Está en uso: los documentos de los asesores se generan con esta versión."
+    /**
+     * "…se generan con esta versión" decía en presente lo mismo que el párrafo
+     * de arriba: que PRISMA ya le arma el documento a cada asesor. No lo hace
+     * (ver `PARA_QUE_SIRVE`). Lo que SÍ es cierto de una fila `activa` es que
+     * esta versión quedó confirmada; generar con ella viene después.
+     */
+    const enUso = "Está en uso: es la versión confirmada. Con ella se le va a generar el documento a cada asesor."
     if (fila.enRojo === 0) return enUso
     /**
      * Una plantilla en uso NO debería tener documentos para revisar. Cuando los
