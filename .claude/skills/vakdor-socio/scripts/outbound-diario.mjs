@@ -260,6 +260,44 @@ async function identificadorPublico(urlLead) {
 
 const linkChat = (ident) => 'https://www.linkedin.com/messaging/thread/new/?recipient=' + ident;
 
+/**
+ * El mail de trabajo, buscado en Apollo por el perfil de LinkedIn.
+ *
+ * POR QUE EXISTE. Hasta el 27/08/2026 este buscador cargaba al pipeline SOLO el link de
+ * LinkedIn. Resultado: de 165 tareas del pipeline, 81 no tenian mail y no podian entrar a
+ * MailerLite ni recibir un segundo canal si LinkedIn no contestaba. La mitad del trabajo
+ * quedaba en un solo canal.
+ *
+ * Cuesta un credito de Apollo por lead que encuentra (10 por dia, con el tope de 10
+ * candidatos del script). Solo se acepta el mail si Apollo lo da como `verified`: un
+ * `guessed` que rebota ensucia la reputacion del dominio, y para eso es mejor no tenerlo.
+ *
+ * SIN `APOLLO_API_KEY` en .env el script sigue funcionando igual que antes, solo que sin
+ * mail. Se saca en Apollo: Settings > Integrations > API.
+ */
+async function mailDeApollo(identPublico) {
+  if (!env.APOLLO_API_KEY || !identPublico) return null;
+  try {
+    const r = await fetch('https://api.apollo.io/api/v1/people/match', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json', 'x-api-key': env.APOLLO_API_KEY },
+      body: JSON.stringify({ linkedin_url: `https://www.linkedin.com/in/${identPublico}` }),
+    });
+    if (!r.ok) { console.log(`  apollo: HTTP ${r.status} para ${identPublico}`); return null; }
+    const j = await r.json();
+    const p = j.person;
+    if (!p || !p.email) return null;
+    if (p.email_status && p.email_status !== 'verified') {
+      console.log(`  apollo: ${identPublico} tiene mail pero es "${p.email_status}", se descarta`);
+      return null;
+    }
+    return { email: p.email, empresa: p.organization?.name || '', empleados: p.organization?.estimated_num_employees || '' };
+  } catch (e) {
+    console.log(`  apollo: fallo la busqueda de ${identPublico} (${e.message})`);
+    return null;
+  }
+}
+
 // -------------------------------------------------------------------- ClickUp
 
 /**
@@ -314,6 +352,26 @@ async function cargarAlPipeline(lista, soloSaludo) {
          `Cargo y empresa: ${bloqueCargo(c.resto, c.nombre)}`, '',
          `Perfil en Sales Navigator: ${perfil}`,
          'NO SE PUDO SACAR EL LINK AL CHAT: abri el perfil y usa el boton "Mensaje".', ''];
+    /*
+     * El mail va con la etiqueta "Mail:" a proposito. `volcar-mailerlite.mjs` solo acepta un
+     * mail que este declarado con esa etiqueta, y no el primero que aparezca en el texto: en
+     * la ficha de Ruben Frattini el primer mail era el de otra persona que el habia sumado a
+     * la conversacion. Si se cambia el formato de esta linea, hay que cambiarlo alla tambien.
+     */
+    const apollo = await mailDeApollo(ident);
+    if (apollo) {
+      lineas.push('SEGUNDO CANAL (el mail, verificado por Apollo):', `Mail: ${apollo.email}`,
+        'No mandar LinkedIn y mail el mismo dia.', '');
+      if (apollo.empleados) {
+        lineas.push(`Apollo le cuenta ${apollo.empleados} empleados en LinkedIn a ${apollo.empresa || 'la empresa'}.`,
+          'Ojo: empleados NO es lo mismo que asesores ni que propiedades publicadas.', '');
+      }
+    } else if (env.APOLLO_API_KEY) {
+      lineas.push('SIN MAIL: Apollo no tiene un mail verificado para esta persona. Solo LinkedIn.', '');
+    } else {
+      lineas.push('SIN MAIL: falta APOLLO_API_KEY en .env, asi que no se busco. Solo LinkedIn.', '');
+    }
+
     if (tibio) lineas.push('YA SON CONTACTO: solo recibio un saludo, nunca la propuesta. Arranca mas tibio.', '');
     if (c.guardado) lineas.push('Figura "Guardado" en Sales Navigator pero NO hay ningun mensaje en las bandejas.', '');
     lineas.push(`Seleccionado el ${new Date().toISOString().slice(0, 10)} por el outbound diario.`,
