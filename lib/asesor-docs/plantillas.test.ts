@@ -6,8 +6,15 @@ import {
   MINIMO_PARA_DETECTAR,
   motivoParaNoDetectar,
   PARA_QUE_SIRVE,
+  PARA_QUE_SIRVE_LA_REVISION,
+  NADA_SE_GUARDA_TODAVIA,
+  LIMITE_ENCABEZADO_Y_PIE,
+  SI_ALGUNO_QUEDA_EN_ROJO,
+  LARGO_DE_DATO_CORTO,
+  avisoDeDatoCorto,
 } from "./plantillas"
 import { MINIMO_DOCUMENTOS } from "@/lib/plantillas/deteccion"
+import { LARGO_DE_DATO_SOSPECHOSO } from "./confirmacion"
 
 /**
  * La familia de formas en PRESENTE del verbo generar: "genera", "generan",
@@ -325,5 +332,93 @@ describe("nada de lo que se muestra promete en presente algo que todavía no pas
     ]) {
       expect(permitido).not.toMatch(PROMESA_EN_PRESENTE)
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// La prosa de la pantalla de revisión (spec §7.2)
+// ---------------------------------------------------------------------------
+
+describe("la prosa de la pantalla de revisión", () => {
+  const textos = {
+    PARA_QUE_SIRVE_LA_REVISION,
+    NADA_SE_GUARDA_TODAVIA,
+    LIMITE_ENCABEZADO_Y_PIE,
+    SI_ALGUNO_QUEDA_EN_ROJO,
+  }
+
+  for (const [nombre, texto] of Object.entries(textos)) {
+    it(`${nombre} no promete en presente algo que todavía no pasa`, () => {
+      expect(texto).not.toMatch(PROMESA_EN_PRESENTE)
+    })
+  }
+
+  it("dice con todas las letras que todavía no se guardó nada", () => {
+    // Sin esta frase, ver la lista de campos armada se lee como que la
+    // plantilla ya quedó hecha, y el director cierra la pantalla creyendo que
+    // terminó.
+    expect(NADA_SE_GUARDA_TODAVIA.toLowerCase()).toContain("todavía no se guardó nada")
+  })
+
+  it("avisa que el encabezado y el pie quedan fuera de la comprobación", () => {
+    // mammoth lee el cuerpo. Callarlo dejaría al director creyendo que se
+    // revisó el archivo entero.
+    expect(LIMITE_ENCABEZADO_Y_PIE).toContain("encabezado")
+    expect(LIMITE_ENCABEZADO_Y_PIE).toContain("pie")
+  })
+
+  it("cuenta de antemano qué pasa si alguno queda en rojo", () => {
+    expect(SI_ALGUNO_QUEDA_EN_ROJO).toContain("borrador")
+  })
+
+  it("dice qué se puede hacer en esa pantalla", () => {
+    expect(PARA_QUE_SIRVE_LA_REVISION).toContain("nombre")
+    expect(PARA_QUE_SIRVE_LA_REVISION).toContain("sacar")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El aviso de un dato demasiado corto
+// ---------------------------------------------------------------------------
+
+describe("el largo del dato corto está escrito dos veces y tiene que ser el mismo", () => {
+  it("no se separaron", () => {
+    /**
+     * `plantillas.ts` lo carga el navegador y no puede importar
+     * `confirmacion.ts` (arrastra la librería de comparación de textos), así
+     * que el número está escrito a mano en los dos. Este test es lo único que
+     * impide que la pantalla avise por un largo y el servidor mida por otro.
+     */
+    expect(LARGO_DE_DATO_CORTO).toBe(LARGO_DE_DATO_SOSPECHOSO)
+  })
+})
+
+describe("avisoDeDatoCorto", () => {
+  it("avisa por un dato de un solo carácter, y lo muestra", () => {
+    /**
+     * El caso medido con tres contratos reales: el "1" de "1 de marzo" se
+     * reemplaza también en "una (1) instancia mensual".
+     */
+    const aviso = avisoDeDatoCorto("1")
+    expect(aviso).toContain('"1"')
+    expect(aviso).toContain("TODOS los lugares")
+    expect(aviso).toContain("sacalo")
+  })
+
+  it("no avisa por un nombre y apellido", () => {
+    expect(avisoDeDatoCorto("Ana Ruiz")).toBeNull()
+  })
+
+  it("no avisa por un dato vacío: ese es otro problema", () => {
+    expect(avisoDeDatoCorto("   ")).toBeNull()
+  })
+
+  it("el límite: avisa justo en el largo y no uno más", () => {
+    expect(avisoDeDatoCorto("x".repeat(LARGO_DE_DATO_CORTO))).not.toBeNull()
+    expect(avisoDeDatoCorto("x".repeat(LARGO_DE_DATO_CORTO + 1))).toBeNull()
+  })
+
+  it("no promete en presente algo que todavía no pasa", () => {
+    expect(avisoDeDatoCorto("1")).not.toMatch(PROMESA_EN_PRESENTE)
   })
 })

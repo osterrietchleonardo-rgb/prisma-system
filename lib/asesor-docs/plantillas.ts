@@ -237,3 +237,94 @@ export function explicacionDelEstado(fila: Pick<FilaPlantilla, "estado" | "versi
   }
   return "Es un borrador y todavía no se usa: la plantilla ya está detectada pero falta confirmarla."
 }
+
+// ---------------------------------------------------------------------------
+// La pantalla de revisión (spec §7.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Los textos de la pantalla donde el director revisa la plantilla antes de
+ * confirmarla viven acá, con el resto de la prosa de la solapa, por DOS
+ * motivos que se suman:
+ *
+ *  · los tests solo miran `lib/**`, y la regla del presente (ver
+ *    `PARA_QUE_SIRVE`) ya se escapó una vez por vivir adentro de un `.tsx`;
+ *  · este archivo lo carga el NAVEGADOR y no importa nada pesado. Ponerlos en
+ *    `confirmacion.ts` los ataría a `propuesta.ts`, que importa
+ *    `deteccion.ts`, que arrastra la librería de comparación de textos
+ *    (900 KB) a cada visita del director. Es el mismo motivo por el que
+ *    `MINIMO_PARA_DETECTAR` está escrito a mano acá arriba.
+ */
+
+/**
+ * Para qué sirve la revisión, en dos renglones y sin tecnicismos.
+ *
+ * Rige la misma regla que `PARA_QUE_SIRVE`: se puede decir qué va a poder
+ * hacer, no se puede describir en presente algo que todavía no pasa. Hasta que
+ * exista la pantalla que le arma el documento a cada asesor (Tarea 7 en
+ * adelante), acá no se promete en presente; lo vigila `PROMESA_EN_PRESENTE`
+ * en `plantillas.test.ts`, la misma que cuida el resto de la solapa.
+ */
+export const PARA_QUE_SIRVE_LA_REVISION =
+  "Estos son los datos que cambian de asesor a asesor. Revisá que cada uno sea de verdad un dato de la persona y " +
+  "no una parte fija del contrato: podés cambiarle el nombre o sacar el que esté de más."
+
+/**
+ * Que todavía no se guardó nada. Va en la barra de abajo, siempre visible.
+ *
+ * No es una cortesía: sin esta frase, ver la lista de campos armada se lee
+ * como que la plantilla ya quedó hecha, y el director cierra la pantalla
+ * creyendo que terminó.
+ */
+export const NADA_SE_GUARDA_TODAVIA =
+  "Todavía no se guardó nada. Recién al confirmar se crea la plantilla y se revisa contra el documento de cada asesor."
+
+/**
+ * El límite de la verificación, dicho de frente.
+ *
+ * `textoDeDocx` lee el CUERPO del documento (mammoth no trae encabezado ni
+ * pie). Los huecos sí se marcan y se rellenan ahí, pero la comprobación
+ * contra el archivo original no los mira. Callarlo dejaría al director creyendo
+ * que se revisó el archivo entero.
+ */
+export const LIMITE_ENCABEZADO_Y_PIE =
+  "La comprobación mira el cuerpo del documento. Si el contrato tiene datos en el encabezado o en el pie de " +
+  "página, esos se marcan y se rellenan igual, pero hay que revisarlos a ojo."
+
+/**
+ * Hasta cuántas letras un dato se considera demasiado corto.
+ *
+ * Es el mismo número que `LARGO_DE_DATO_SOSPECHOSO` en `confirmacion.ts`,
+ * escrito de nuevo acá a propósito y NO importado de allá: este archivo lo
+ * carga el navegador y `confirmacion.ts` arrastra la librería de comparación
+ * de textos (900 KB). Es el mismo motivo, y la misma solución, que
+ * `MINIMO_PARA_DETECTAR`: un test compara los dos números.
+ */
+export const LARGO_DE_DATO_CORTO = 3
+
+/**
+ * El aviso de un dato demasiado corto, para la pantalla de revisión.
+ *
+ * Por qué existe: el reemplazo cambia TODAS las apariciones de ese texto en el
+ * contrato. Con un dato de una o dos letras eso no es lo que nadie quiere — el
+ * "A." que queda de "S.A." se lleva puesto el "S.A." de la inmobiliaria, y el
+ * "1" de "1 de marzo" se lleva el "(1)" de "una (1) instancia mensual". Medido
+ * con tres contratos reales.
+ *
+ * El director es el único que puede decidir: se le muestra y él saca el campo
+ * si no corresponde, que es para lo que está esta pantalla. `null` cuando el
+ * dato tiene largo suficiente.
+ */
+export function avisoDeDatoCorto(valor: string): string | null {
+  const limpio = valor.trim()
+  if (limpio === "" || limpio.length > LARGO_DE_DATO_CORTO) return null
+  return (
+    `Este dato es muy corto ("${limpio}"): se va a reemplazar en TODOS los lugares del contrato donde aparezca ese ` +
+    `texto, no solo en este. Si no es un dato de cada persona, sacalo.`
+  )
+}
+
+/** Qué pasa si algún asesor queda en rojo. Se dice ANTES de confirmar. */
+export const SI_ALGUNO_QUEDA_EN_ROJO =
+  "Si aunque sea un asesor no coincide, la plantilla se guarda igual pero queda como borrador y no se usa para " +
+  "nadie, y vas a ver quién falló y por qué."

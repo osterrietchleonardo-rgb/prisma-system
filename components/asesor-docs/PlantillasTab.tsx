@@ -8,6 +8,7 @@ import { FileStack, Loader2, RotateCcw, Sparkles, Users, AlertTriangle, Info } f
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { BloqueError } from "@/components/asesor-docs/DocumentosDelAsesor";
+import { RevisionPlantilla } from "@/components/asesor-docs/RevisionPlantilla";
 import {
   armarFilas,
   explicacionDelEstado,
@@ -289,71 +290,22 @@ export function PlantillasTab() {
                   </p>
                 )}
 
-                {propuesta?.fila.templateId === fila.templateId && <Resumen datos={propuesta.datos} />}
+                {propuesta?.fila.templateId === fila.templateId && (
+                  /* La revisión es OBLIGATORIA antes de guardar (spec §7.2):
+                     apenas la detección devuelve algo, se abre. Nada se guarda
+                     hasta que el director confirma ahí adentro. */
+                  <RevisionPlantilla
+                    nombreDelTipo={fila.nombre}
+                    propuesta={propuesta.datos}
+                    onCerrar={() => setPropuesta(null)}
+                    onConfirmado={cargar}
+                  />
+                )}
               </div>
             );
           })
         )}
       </div>
-    </div>
-  );
-}
-
-/**
- * Lo que la comparación encontró, para mirar y nada más.
- *
- * La pantalla donde el director renombra, borra y confirma es el paso
- * siguiente. Hasta que confirme, **no se guardó absolutamente nada**, y eso se
- * dice acá con todas las letras: si no, ver la lista de campos se lee como que
- * la plantilla ya quedó hecha.
- */
-function Resumen({ datos }: { datos: Propuesta }) {
-  return (
-    <div className="rounded-lg border border-accent/20 bg-accent/5 p-3 space-y-3">
-      <div className="space-y-1">
-        <p className="text-sm font-semibold text-foreground">
-          {datos.huecos.length === 0
-            ? "No se encontró ningún dato que cambie de asesor a asesor"
-            : datos.huecos.length === 1
-              ? "Se encontró 1 dato que cambia de asesor a asesor"
-              : `Se encontraron ${datos.huecos.length} datos que cambian de asesor a asesor`}
-        </p>
-        {/* En pasado: la comparación YA terminó. "Comparando…" se leía como que
-            todavía estaba corriendo y el número iba a seguir subiendo. */}
-        <p className="text-xs text-muted-foreground">
-          {datos.documentosUsados.length === 1
-            ? "Se comparó 1 documento."
-            : `Se compararon ${datos.documentosUsados.length} documentos.`}{" "}
-          Todavía no se guardó nada: revisarlos y confirmar la plantilla es el paso siguiente.
-        </p>
-      </div>
-
-      {datos.huecos.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {datos.huecos.map((h) => (
-            <Badge key={h.id} variant="secondary" className="font-mono text-[10px]">
-              {h.nombre}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {!datos.laIaRespondio && datos.huecos.length > 0 && (
-        <p className="text-xs text-amber-600">
-          Los nombres que salen como CAMPO_1, CAMPO_2… hay que ponérselos a mano al revisar.
-        </p>
-      )}
-
-      {datos.advertencias.length > 0 && (
-        <ul className="space-y-1.5 text-xs text-muted-foreground">
-          {datos.advertencias.map((a, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
-              <span>{a}</span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
