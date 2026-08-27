@@ -2456,6 +2456,16 @@ if (decision.accion === "escalar") {
 
 ### Task 15: El ejecutor (`ejecutor.ts`) — de la decisión al dispatch
 
+> **HECHA 27/8.** `lib/seguimiento/ejecutor.ts` (+12 tests): `ejecutarDecision` (presupuesto diario
+> por día AR, `puedeEjecutar`, relectura anti-colisión, nombre SOLO de `metricas`, `armarVariables`,
+> POST al `dispatch` propio del mismo origen —con bypass de Vercel en preview—, y **sin wamid no es
+> éxito**) y `aplicarSinEnvio` (posponer/abandonar; abandonar NUNCA cierra como perdido). El mensaje
+> empático de una escalada (`seg_pendiente`) también pasa por el ejecutor, con los mismos frenos salvo
+> el de handoff (existe para eso) y sin sumar intento. Enchufado en el runner **solo en modo
+> `activo`**: las dos agencias siguen en sombra, así que nada sale hasta la Task 17 (con OK).
+> Central: las 9 plantillas nuevas creadas en su WABA el 27/8 (PENDING → Meta).
+
+
 **Files:**
 - Create: `lib/seguimiento/ejecutor.ts`
 - Test: `lib/seguimiento/ejecutor.test.ts`
