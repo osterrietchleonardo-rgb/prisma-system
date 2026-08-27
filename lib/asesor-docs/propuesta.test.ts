@@ -574,3 +574,82 @@ describe("armarPropuesta: ninguna advertencia sale con un uuid crudo", () => {
     expect(p.moldeAdvisorId).toBe(UUID_ANA)
   })
 })
+
+// ── El renglón resumen: "N de M" ───────────────────────────────────────────
+
+/**
+ * El caso que estos tests fijan es el que se escapaba: el reparto de tiempo
+ * deja entrar TODOS los documentos, y aun así algunas comparaciones se cortan
+ * adentro de `detectarHuecos`. Se intentaron M y se compararon menos.
+ *
+ * Decidiendo el resumen contra cuántos se INTENTARON, no sale ningún renglón:
+ * entraron todos, no hay resta. La información queda solo en las advertencias
+ * por persona y en `documentosUsados`, y el total nunca se dice. Decidiéndolo
+ * contra `documentosUsados` salen las dos formas de quedarse afuera.
+ */
+describe("armarPropuesta: el renglón resumen de cuántos documentos se compararon", () => {
+  it("lo dice cuando entraron todos pero alguna comparación se cortó adentro", () => {
+    const p = armarPropuesta({
+      templateId: "t1",
+      // Se intentaron los 3 (nada quedó fuera por el reparto de tiempo) y solo
+      // 2 llegaron a compararse: el tercero se cortó por el tope del diff.
+      cantidadDeDocumentos: 3,
+      deteccion: deteccion({
+        documentosUsados: ["a", "b"],
+        advertencias: ["No se pudo comparar el documento del asesor c con el de a: queda fuera de la detección."],
+        huecos: [hueco(0, { a: "Ana", b: "Bruno" })],
+      }),
+      nombres: ["NOMBRE"],
+      laIaRespondio: true,
+    })
+    expect(p.advertencias.some((a) => a.includes("2 de 3"))).toBe(true)
+  })
+
+  it("lo dice también cuando el documento no llegó a entrar", () => {
+    const p = armarPropuesta({
+      templateId: "t1",
+      cantidadDeDocumentos: 26,
+      deteccion: deteccion({ documentosUsados: ["a", "b", "c"] }),
+      nombres: [],
+      laIaRespondio: false,
+    })
+    expect(p.advertencias.some((a) => a.includes("3 de 26"))).toBe(true)
+  })
+
+  it("no mete ruido cuando se compararon todos", () => {
+    const p = armarPropuesta({
+      templateId: "t1",
+      cantidadDeDocumentos: 3,
+      deteccion: deteccion({ documentosUsados: ["a", "b", "c"] }),
+      nombres: [],
+      laIaRespondio: false,
+    })
+    expect(p.advertencias.some((a) => a.includes("de 3"))).toBe(false)
+  })
+
+  /**
+   * Arriba de todo: es el total, y sin el total arriba las advertencias
+   * sueltas de cada persona no se leen como una resta.
+   */
+  it("va primero, antes de las advertencias de cada persona", () => {
+    const p = armarPropuesta({
+      templateId: "t1",
+      cantidadDeDocumentos: 3,
+      deteccion: deteccion({ documentosUsados: ["a"], advertencias: ["algo de la detección"] }),
+      advertenciasPrevias: ["algo previo"],
+      nombres: [],
+      laIaRespondio: false,
+    })
+    expect(p.advertencias[0]).toContain("1 de 3")
+  })
+
+  it("sin el número de documentos no inventa ningún resumen", () => {
+    const p = armarPropuesta({
+      templateId: "t1",
+      deteccion: deteccion({ documentosUsados: ["a"] }),
+      nombres: [],
+      laIaRespondio: false,
+    })
+    expect(p.advertencias.some((a) => /\d+ de \d+ documentos/.test(a))).toBe(false)
+  })
+})

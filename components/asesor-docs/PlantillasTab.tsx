@@ -1,0 +1,315 @@
+"use client";
+
+import React, { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { FileStack, Loader2, RotateCcw, Sparkles, Users, AlertTriangle, Info } from "lucide-react";
+import { toast } from "sonner";
+import { createClient } from "@/lib/supabase";
+import { BloqueError } from "@/components/asesor-docs/DocumentosDelAsesor";
+import {
+  armarFilas,
+  explicacionDelEstado,
+  motivoParaNoDetectar,
+  type DocumentoCrudo,
+  type FilaPlantilla,
+  type TipoCrudo,
+  type VersionCruda,
+} from "@/lib/asesor-docs/plantillas";
+// Solo el tipo: `import type` desaparece al compilar, así que traerlo NO
+// arrastra al navegador la librería de comparación de textos que hay del otro
+// lado de ese archivo.
+import type { Propuesta } from "@/lib/asesor-docs/propuesta";
+
+/**
+ * La solapa "Plantillas": una fila por tipo de documento de la inmobiliaria.
+ *
+ * **Acá NO se recibe ni se manda el `agency_id`.** Ni como prop ni en el
+ * cuerpo del pedido. Las tres consultas van sin filtro de inmobiliaria a
+ * propósito: las políticas de la base ya devuelven únicamente las filas de la
+ * agencia del director que está mirando, y el endpoint de detectar saca la
+ * agencia de la sesión del servidor. Un id de agencia que viaja desde el
+ * navegador es un id que el navegador puede cambiar; el 26-ago-2026 se cerró
+ * en producción un agujero exactamente así.
+ */
+
+/** Cómo se ve cada estado. El texto largo lo pone `explicacionDelEstado`. */
+const PINTA_DEL_ESTADO: Record<FilaPlantilla["estado"], string> = {
+  activa: "bg-green-500/10 text-green-600 border-green-500/20",
+  borrador: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+};
+
+const ETIQUETA_DEL_ESTADO: Record<FilaPlantilla["estado"], string> = {
+  activa: "Activa",
+  borrador: "Borrador",
+};
+
+export function PlantillasTab() {
+  const supabase = createClient();
+
+  const [cargando, setCargando] = useState(true);
+  /**
+   * Distinto de "no hay plantillas": una consulta que falla (la conexión, los
+   * permisos, el tope de 8 s del rol) NO es una lista vacía. Confundirlos hace
+   * que el director crea que no tiene nada cargado cuando en realidad no se
+   * pudo averiguar — el peor tipo de fallo, porque se disfraza de dato.
+   */
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const [filas, setFilas] = useState<FilaPlantilla[]>([]);
+
+  const [detectandoId, setDetectandoId] = useState<string | null>(null);
+  const [propuesta, setPropuesta] = useState<{ fila: FilaPlantilla; datos: Propuesta } | null>(null);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    setErrorCarga(null);
+    try {
+      /**
+       * Tres consultas sueltas y no un join. Entre `advisor_doc_templates` y
+       * `advisor_doc_template_versions` hay DOS caminos (la versión apunta al
+       * tipo, y el tipo apunta a su versión vigente), así que un join anidado
+       * hay que desambiguarlo a mano y se rompe en silencio si mañana cambia
+       * una clave. Las tres tablas son chicas: son de una inmobiliaria.
+       */
+      const [t, v, d] = await Promise.all([
+        supabase.from("advisor_doc_templates").select("id, nombre, estado, version_actual"),
+        supabase.from("advisor_doc_template_versions").select("id, version"),
+        supabase.from("advisor_documents").select("template_id, estado"),
+      ]);
+
+      if (t.error || v.error || d.error) {
+        // El mensaje crudo se pierde apenas se traduce: si algo no cuadra,
+        // esto es lo único que le queda a quien tenga que investigar.
+        console.error("[PlantillasTab] error al cargar:", t.error?.message, v.error?.message, d.error?.message);
+        setErrorCarga("No se pudo cargar la lista de plantillas. Puede ser un problema de conexión — probá de nuevo.");
+        setFilas([]);
+        return;
+      }
+
+      setFilas(
+        armarFilas({
+          tipos: (t.data ?? []) as TipoCrudo[],
+          versiones: (v.data ?? []) as VersionCruda[],
+          documentos: (d.data ?? []) as DocumentoCrudo[],
+        }),
+      );
+    } finally {
+      setCargando(false);
+    }
+  }, [supabase]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  const detectar = async (fila: FilaPlantilla) => {
+    setDetectandoId(fila.templateId);
+    setPropuesta(null);
+    try {
+      const res = await fetch("/api/asesor-docs/detectar-plantilla", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Un solo dato: qué tipo de documento. Quién soy lo sabe el servidor
+        // por la sesión.
+        body: JSON.stringify({ templateId: fila.templateId }),
+      });
+
+      const cuerpo = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        // Los mensajes del endpoint ya están escritos para el director.
+        toast.error(cuerpo?.error ?? "No se pudo deducir la plantilla. Probá de nuevo en un rato.");
+        return;
+      }
+
+      setPropuesta({ fila, datos: cuerpo as Propuesta });
+      const cuantos = (cuerpo as Propuesta).huecos.length;
+      toast.success(
+        cuantos === 0
+          ? "La comparación terminó, pero no encontró ningún dato que cambie de asesor a asesor."
+          : cuantos === 1
+            ? "Se encontró 1 dato que cambia de asesor a asesor."
+            : `Se encontraron ${cuantos} datos que cambian de asesor a asesor.`,
+      );
+    } catch (e) {
+      console.error("[PlantillasTab] falló el pedido de detección:", e);
+      toast.error("No se pudo hablar con el servidor. Revisá la conexión y probá de nuevo.");
+    } finally {
+      setDetectandoId(null);
+    }
+  };
+
+  return (
+    /**
+     * El alto, que en la Etapa A costó una ronda entera: contenedor en
+     * columna, el encabezado fijo (`shrink-0`) y la lista con SU PROPIO scroll
+     * (`flex-1 min-h-0 overflow-y-auto`). Ninguna altura escrita en píxeles:
+     * un `max-height` a mano solo cierra con el encabezado del día que se
+     * escribió, y en cuanto el encabezado crece la parte de abajo queda
+     * cortada y no hay forma de llegar a ella.
+     */
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="shrink-0 flex flex-col md:flex-row md:items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-foreground">Plantillas de documentos</h3>
+          <p className="text-sm text-muted-foreground max-w-2xl">
+            Un tipo de documento por fila. Cuando varios asesores tienen el mismo contrato cargado, PRISMA los
+            compara entre sí y deduce qué parte es texto fijo y qué parte es el dato de cada persona.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="shrink-0 gap-2 self-start"
+          onClick={cargar}
+          disabled={cargando}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+          Actualizar
+        </Button>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1 mt-4 space-y-3">
+        {cargando ? (
+          <div className="space-y-3">
+            <Skeleton className="h-28 w-full rounded-xl" />
+            <Skeleton className="h-28 w-full rounded-xl" />
+          </div>
+        ) : errorCarga ? (
+          <BloqueError mensaje={errorCarga} onReintentar={cargar} />
+        ) : filas.length === 0 ? (
+          // El estado vacío es DISTINTO del error de arriba, a propósito: acá
+          // no falló nada, simplemente todavía no hay ningún tipo cargado.
+          <div className="rounded-xl border border-dashed p-8 text-center space-y-2">
+            <FileStack className="h-10 w-10 text-muted-foreground/30 mx-auto" />
+            <p className="text-sm font-semibold text-foreground">Todavía no hay ningún tipo de documento</p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Los tipos se crean al subir el primer documento de un asesor: abrí la ficha de cualquiera, entrá en
+              Documentos y subí su contrato.
+            </p>
+          </div>
+        ) : (
+          filas.map((fila) => {
+            const motivo = motivoParaNoDetectar(fila.documentos);
+            const detectando = detectandoId === fila.templateId;
+            return (
+              <div key={fila.templateId} className="rounded-xl border p-4 space-y-3">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-foreground break-words">{fila.nombre}</p>
+                      <Badge variant="outline" className={PINTA_DEL_ESTADO[fila.estado]}>
+                        {ETIQUETA_DEL_ESTADO[fila.estado]}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground max-w-2xl">{explicacionDelEstado(fila)}</p>
+                  </div>
+
+                  <Button
+                    className="shrink-0 gap-2 self-start"
+                    // Deshabilitado por el mínimo de documentos, o mientras
+                    // corre. El PORQUÉ se escribe abajo, siempre visible: en
+                    // el celular no hay dónde pasar el mouse, así que un
+                    // `title` solo sería un botón mudo.
+                    disabled={motivo !== null || detectando}
+                    title={motivo ?? undefined}
+                    onClick={() => detectar(fila)}
+                  >
+                    {detectando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                    {detectando ? "Comparando…" : "Detectar plantilla"}
+                  </Button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    {fila.documentos === 1 ? "1 asesor la usa" : `${fila.documentos} asesores la usan`}
+                  </span>
+                  <span>
+                    Versión vigente:{" "}
+                    <span className="text-foreground font-medium">
+                      {fila.version === null ? "todavía ninguna" : `v${fila.version}`}
+                    </span>
+                  </span>
+                  {fila.enRojo > 0 && (
+                    <span className="flex items-center gap-1.5 text-destructive font-medium">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      {fila.enRojo === 1 ? "1 asesor para revisar" : `${fila.enRojo} asesores para revisar`}
+                    </span>
+                  )}
+                </div>
+
+                {motivo && (
+                  <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    <span>{motivo}</span>
+                  </p>
+                )}
+
+                {propuesta?.fila.templateId === fila.templateId && <Resumen datos={propuesta.datos} />}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Lo que la comparación encontró, para mirar y nada más.
+ *
+ * La pantalla donde el director renombra, borra y confirma es el paso
+ * siguiente. Hasta que confirme, **no se guardó absolutamente nada**, y eso se
+ * dice acá con todas las letras: si no, ver la lista de campos se lee como que
+ * la plantilla ya quedó hecha.
+ */
+function Resumen({ datos }: { datos: Propuesta }) {
+  return (
+    <div className="rounded-lg border border-accent/20 bg-accent/5 p-3 space-y-3">
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-foreground">
+          {datos.huecos.length === 0
+            ? "No se encontró ningún dato que cambie de asesor a asesor"
+            : datos.huecos.length === 1
+              ? "Se encontró 1 dato que cambia de asesor a asesor"
+              : `Se encontraron ${datos.huecos.length} datos que cambian de asesor a asesor`}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Comparando {datos.documentosUsados.length === 1 ? "1 documento" : `${datos.documentosUsados.length} documentos`}.
+          Todavía no se guardó nada: revisarlos y confirmar la plantilla es el paso siguiente.
+        </p>
+      </div>
+
+      {datos.huecos.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {datos.huecos.map((h) => (
+            <Badge key={h.id} variant="secondary" className="font-mono text-[10px]">
+              {h.nombre}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      {!datos.laIaRespondio && datos.huecos.length > 0 && (
+        <p className="text-xs text-amber-600">
+          Los nombres que salen como CAMPO_1, CAMPO_2… hay que ponérselos a mano al revisar.
+        </p>
+      )}
+
+      {datos.advertencias.length > 0 && (
+        <ul className="space-y-1.5 text-xs text-muted-foreground">
+          {datos.advertencias.map((a, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
+              <span>{a}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export default PlantillasTab;

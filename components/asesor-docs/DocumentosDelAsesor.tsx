@@ -80,7 +80,7 @@ function traducirErrorBase(mensaje: string): string {
 
 // Distinto del estado vacío a propósito: acá algo salió mal, no es que no
 // haya documentos. Con botón para reintentar la carga.
-function BloqueError({ mensaje, onReintentar }: { mensaje: string; onReintentar: () => void }) {
+export function BloqueError({ mensaje, onReintentar }: { mensaje: string; onReintentar: () => void }) {
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4">
       <div className="flex items-center gap-2 text-sm text-destructive">

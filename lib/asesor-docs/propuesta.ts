@@ -411,18 +411,31 @@ export function repartirPresupuesto(args: {
 }
 
 /**
- * El aviso de que quedaron documentos afuera por tiempo.
+ * El renglón resumen: cuántos documentos se compararon de verdad, de los que
+ * había.
  *
  * Se dice el número completo -- "N de M" -- y no solo cuántos entraron: el
  * director subió M archivos y tiene que poder ver la resta él mismo. `null`
- * cuando entraron todos, para no meter ruido.
+ * cuando se compararon todos, para no meter ruido.
+ *
+ * **El segundo número es cuántos se compararon, NO cuántos se intentaron.**
+ * Son dos cosas distintas y confundirlas deja al director sin el resumen justo
+ * cuando más lo necesita: hay un caso medido donde el reparto de tiempo deja
+ * entrar los M documentos y aun así algunas comparaciones se cortan adentro,
+ * así que se intentaron M y se lograron menos. Decidiéndolo contra los que se
+ * intentaron, el aviso no sale: la información queda solo desparramada en las
+ * advertencias por persona, y el renglón que hace la resta no aparece. Las dos
+ * formas de quedarse afuera -- "no entró" y "entró y se cortó" -- terminan en
+ * `documentosUsados`, que es por eso el único número honesto para comparar.
  */
-export function avisoPorRecorteDeTiempo(cantidadOriginal: number, cuantosEntran: number): string | null {
-  if (cuantosEntran >= cantidadOriginal) return null
+export function avisoPorRecorteDeTiempo(cantidadOriginal: number, cuantosSeCompararon: number): string | null {
+  if (cuantosSeCompararon >= cantidadOriginal) return null
   return (
-    `Solo se pudieron comparar ${cuantosEntran} de ${cantidadOriginal} documentos: comparar todos no entraba en el ` +
-    `tiempo que tiene la operación. La plantilla sale con esos ${cuantosEntran}; los demás no se tocaron. Si los ` +
-    `contratos son muy distintos entre sí, conviene revisar que todos sean del mismo tipo de documento.`
+    `Se compararon ${cuantosSeCompararon} de ${cantidadOriginal} documentos. Los que faltan quedaron afuera ` +
+    `-- casi siempre porque comparar todos no entraba en el tiempo que tiene la operación --, y cada uno tiene su ` +
+    `propio aviso en esta misma lista. La plantilla sale con esos ${cuantosSeCompararon}; los demás no se ` +
+    `tocaron. Si los contratos son muy distintos entre sí, conviene revisar que todos sean del mismo tipo de ` +
+    `documento.`
   )
 }
 
@@ -476,9 +489,34 @@ export function armarPropuesta(args: {
    * uuid crudo. Opcional: sin el mapa, los textos quedan como vinieron.
    */
   nombresDeAsesores?: ReadonlyMap<string, string>
+  /**
+   * Cuántos documentos había para comparar antes de que empezara la
+   * comparación. Con esto se arma el renglón resumen "N de M". Opcional: sin
+   * el número no hay resta que hacer y no se dice nada.
+   */
+  cantidadDeDocumentos?: number
 }): Propuesta {
   const { templateId, deteccion, nombres, laIaRespondio } = args
-  const advertencias = [...(args.advertenciasPrevias ?? []), ...deteccion.advertencias]
+
+  /**
+   * El resumen va PRIMERO, antes que las advertencias de cada persona: es el
+   * renglón que le dice al director cuántos documentos entraron de verdad, y
+   * leer diez avisos sueltos sin ese total arriba es lo que hace que no se
+   * entienda cuántos quedaron afuera.
+   *
+   * Se decide contra `documentosUsados`, los que se compararon de verdad, y
+   * NO contra cuántos se intentaron: ver `avisoPorRecorteDeTiempo`.
+   */
+  const resumen =
+    args.cantidadDeDocumentos === undefined
+      ? null
+      : avisoPorRecorteDeTiempo(args.cantidadDeDocumentos, deteccion.documentosUsados.length)
+
+  const advertencias = [
+    ...(resumen ? [resumen] : []),
+    ...(args.advertenciasPrevias ?? []),
+    ...deteccion.advertencias,
+  ]
 
   const huecos: PropuestaHueco[] = deteccion.huecos.map((h, i) => ({
     id: `hueco-${h.indice}`,

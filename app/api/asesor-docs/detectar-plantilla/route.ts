@@ -8,7 +8,6 @@ import { textoDeDocx } from "@/lib/plantillas/docx"
 import { detectarHuecos, TOPE_DIFF_MS, type Documento, type Hueco } from "@/lib/plantillas/deteccion"
 import {
   armarPropuesta,
-  avisoPorRecorteDeTiempo,
   nombresParaHuecos,
   promptDeNombres,
   repartirPresupuesto,
@@ -292,9 +291,6 @@ export async function POST(req: Request) {
     msPorComparacionMedido: msSonda,
   })
 
-  const avisoTiempo = avisoPorRecorteDeTiempo(docs.length, reparto.cuantosEntran)
-  if (avisoTiempo) advertencias.push(avisoTiempo)
-
   /**
    * `detectarHuecos` ya avisa cuando llegan menos de 3 documentos y cuando uno
    * queda vacío o no se pudo comparar. No se falla por eso: se devuelve la
@@ -318,6 +314,15 @@ export async function POST(req: Request) {
     laIaRespondio: nombres.laIaRespondio,
     advertenciasPrevias: advertencias,
     nombresDeAsesores,
+    /**
+     * Cuántos documentos había para comparar. El renglón resumen ("N de M") lo
+     * arma `armarPropuesta`, y a propósito DESPUÉS de comparar: el que se
+     * quedó afuera puede haberse quedado afuera por el reparto de tiempo (no
+     * entró) o por haberse cortado adentro de la comparación (entró y se
+     * cortó). El único número que ve las dos formas es
+     * `deteccion.documentosUsados`, que acá todavía no existe.
+     */
+    cantidadDeDocumentos: docs.length,
   })
 
   return NextResponse.json(propuesta)
