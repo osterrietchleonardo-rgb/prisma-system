@@ -262,11 +262,27 @@ const linkChat = (ident) => 'https://www.linkedin.com/messaging/thread/new/?reci
 
 // -------------------------------------------------------------------- ClickUp
 
+/**
+ * Todos los nombres que ya estan en el pipeline, PAGINANDO.
+ *
+ * ClickUp devuelve 100 tareas por pagina y no avisa: manda 100 y listo. Mientras el
+ * pipeline tuvo menos de 100 esto no se noto. El 27/08/2026 se cargaron 59 candidatos de
+ * Apollo, el pipeline paso a 145, y desde ahi leer solo la primera pagina dejaba 45
+ * personas afuera del filtro: el outbound las hubiera vuelto a cargar como si fueran
+ * nuevas. Se corta con `last_page`, no contando cuantas vinieron.
+ */
 async function yaEnPipeline() {
   const H = { Authorization: env.CLICKUP_API_KEY };
   const ids = JSON.parse(fs.readFileSync(path.join(RAIZ, 'scratch/clickup-ids.json'), 'utf8'));
-  const j = await (await fetch(`https://api.clickup.com/api/v2/list/${ids.lPipeline}/task?include_closed=true`, { headers: H })).json();
-  return new Set((j.tasks || []).map(t => normalizar(t.name)));
+  const nombres = new Set();
+  for (let pag = 0; pag < 50; pag++) {
+    const u = `https://api.clickup.com/api/v2/list/${ids.lPipeline}/task?include_closed=true&page=${pag}`;
+    const j = await (await fetch(u, { headers: H })).json();
+    for (const t of (j.tasks || [])) nombres.add(normalizar(t.name));
+    if (j.last_page || !(j.tasks || []).length) break;
+    await dormir(200);
+  }
+  return nombres;
 }
 
 async function cargarAlPipeline(lista, soloSaludo) {

@@ -94,21 +94,42 @@ async function clickup() {
   };
 }
 
+// Correo. Trae TODO lo de las ultimas 24 h, leido y sin leer.
+//
+// Antes pedia solo `status: 'unread'` y eso dejaba ciego al Socio: el 27/08/2026 no vio que
+// habian contestado Ruben Frattini y DigitalOcean (el caso de abuse), porque Leonardo ya los
+// habia abierto desde el telefono. Un mail leido no es un mail atendido.
+//
+// Se separa el ruido conocido (notificaciones, newsletters, plataformas) de lo que es una
+// persona escribiendo: eso ultimo es lo que hay que mirar si o si.
+const RUIDO_CORREO = /linkedin|newsletter|noreply@ucema|buffermail|canva|clickup|acquire|motivante|composio|openai|vercel|noreply-accounts@google|supabase|anthropic|agencygotomarket|cuandoelriosuena|lightdash|skool|meetings-noreply/i;
+
 async function zoho() {
   const { Composio } = await import('@composio/core');
   process.env.COMPOSIO_API_KEY = env.COMPOSIO_API_KEY;
   const s = await new Composio().create('leonardo');
   const ACC = env.ZOHO_ACCOUNT_ID || '5457602000000008002';
-  const r = await s.execute('ZOHO_MAIL_MESSAGES_LIST_EMAILS', { account_id: ACC, limit: 25, status: 'unread' });
-  const arr = r.data?.data ?? [];
+  const r = await s.execute('ZOHO_MAIL_MESSAGES_LIST_EMAILS', { account_id: ACC, limit: 60 });
+  const arr = Array.isArray(r.data?.data) ? r.data.data : [];
+  const corte = Date.now() - 24 * 3600 * 1000;
+  const mapear = (m) => ({
+    de: m.fromAddress,
+    asunto: String(m.subject || '').replace(/&#39;/g, "'"),
+    fecha: new Date(Number(m.receivedTime)).toISOString(),
+    leido: m.status === '1' || m.status === 1 || m.isRead === true,
+    message_id: m.messageId,
+    folder_id: m.folderId,
+  });
+  const ultimas24h = arr.filter((m) => Number(m.receivedTime) >= corte).map(mapear);
   return {
-    no_leidos: (Array.isArray(arr) ? arr : []).map((m) => ({
-      de: m.fromAddress,
-      asunto: String(m.subject || '').replace(/&#39;/g, "'"),
-      fecha: new Date(Number(m.receivedTime)).toISOString(),
-    })),
+    // Lo que hay que leer si o si: una persona escribiendo en las ultimas 24 h.
+    para_mirar: ultimas24h.filter((m) => !RUIDO_CORREO.test(String(m.de))),
+    ruido: ultimas24h.filter((m) => RUIDO_CORREO.test(String(m.de))).length,
+    total_24h: ultimas24h.length,
+    no_leidos: ultimas24h.filter((m) => !m.leido),
   };
 }
+
 
 async function supabase() {
   const url = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -233,7 +254,7 @@ for (const r of resultados.filter((r) => r.ok)) {
   const d = r.datos;
   if (r.nombre === 'clickup')
     console.log(`  clickup   -> ${d.total_abiertas} abiertas | hoy: ${d.hoy.length} | vencidas: ${d.vencidas.length} | postergadas 3+: ${d.postergadas_3_o_mas.length}`);
-  if (r.nombre === 'zoho') console.log(`  zoho      -> ${d.no_leidos.length} sin leer`);
+  if (r.nombre === 'zoho') console.log(`  zoho      -> ${d.total_24h} en 24 h | ${d.para_mirar.length} PARA MIRAR | ${d.no_leidos.length} sin leer`);
   if (r.nombre === 'supabase') console.log(`  supabase  -> ${d.sugerencias_abiertas} sugerencias abiertas`);
   if (r.nombre === 'n8n') console.log(`  n8n       -> ${d.fallidas.length} errores en las ultimas 48h (historico: ${d.historico_total})`);
   if (r.nombre === 'github') console.log(`  github    -> ${d.fallidos.length} workflows fallidos`);
