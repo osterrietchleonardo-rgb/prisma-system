@@ -533,7 +533,7 @@ export default function DirectorConfiguracionPage() {
               </div>
               </div>
 
-              <div className="pt-4 flex justify-end">
+              <div className="pt-4 pb-16 md:pb-0 flex justify-end">
                 <Button onClick={handleSaveProfile} disabled={loading} className="bg-accent hover:bg-accent/90 gap-2">
                   <Save className="h-4 w-4" /> Guardar Perfil
                 </Button>
