@@ -2,11 +2,14 @@ import { describe, it, expect } from "vitest"
 import type { Deteccion, Hueco } from "@/lib/plantillas/deteccion"
 import {
   armarPropuesta,
+  avisoPorRecorteDeTiempo,
+  conNombres,
   limitesConocidos,
   MAX_HUECOS_A_LA_IA,
   nombreGenerico,
   nombresParaHuecos,
   promptDeNombres,
+  repartirPresupuesto,
   sanearNombre,
   separarPorEstado,
 } from "./propuesta"
@@ -358,5 +361,216 @@ describe("armarPropuesta", () => {
   it("un nombre que falta cae a CAMPO_N en vez de quedar undefined en la pantalla", () => {
     const p = armarPropuesta({ templateId: "t1", deteccion: base(), nombres: ["NOMBRE"], laIaRespondio: false })
     expect(p.huecos[1].nombre).toBe("CAMPO_2")
+  })
+})
+
+// ── El presupuesto de tiempo ─────────────────────────────────────────
+
+const TOPE_NORMAL = 10_000
+
+/** Lo que sale de la sonda contra documentos reales, en ms por comparación. */
+const PARECIDOS = 6   // 26 contratos parecidos: 150 ms / 25 comparaciones
+const DISPARES = 1900 // 26 contratos distintos: 46,8 s / 25 comparaciones
+
+const repartir = (cantidad: number, presupuesto: number, medido: number) =>
+  repartirPresupuesto({
+    cantidadDeDocumentos: cantidad,
+    presupuestoMs: presupuesto,
+    topeNormalMs: TOPE_NORMAL,
+    msPorComparacionMedido: medido,
+  })
+
+describe("repartirPresupuesto", () => {
+  it("con documentos parecidos entran TODOS: es el caso normal y no se recorta nada", () => {
+    const r = repartir(26, 40_000, PARECIDOS)
+    expect(r.cuantosEntran).toBe(26)
+  })
+
+  /**
+   * El caso que la sonda desmintió: repartir parejo daba 1,6 s por comparación,
+   * las 25 se cortaban y volvía UN documento usado tras gastar los 40 s. Con la
+   * medición entran menos, pero con tiempo suficiente para TERMINAR.
+   */
+  it("con documentos dispares entran menos, pero con tiempo de sobra para cada comparación", () => {
+    const r = repartir(26, 40_000, DISPARES)
+    expect(r.cuantosEntran).toBeLessThan(26)
+    expect(r.cuantosEntran).toBeGreaterThanOrEqual(4) // sigue por encima del mínimo de 3
+    expect(r.topeDiffMs).toBeGreaterThan(DISPARES) // cada comparación llega a terminar
+  })
+
+  it("con 10 dispares entran los 10: ahí el problema todavía no existe", () => {
+    const r = repartir(10, 40_000, 1_700) // medido: 16,8 s / 9 comparaciones
+    expect(r.cuantosEntran).toBe(10)
+    expect(r.topeDiffMs).toBeGreaterThan(1_700)
+  })
+
+  it("nunca pasa del tope de siempre, aunque sobre presupuesto", () => {
+    expect(repartir(3, 600_000, PARECIDOS).topeDiffMs).toBe(TOPE_NORMAL)
+  })
+
+  it("con un solo documento no hay nada que acotar", () => {
+    expect(repartir(1, 0, DISPARES)).toEqual({ cuantosEntran: 1, topeDiffMs: TOPE_NORMAL })
+  })
+
+  it("sin presupuesto igual intenta una comparación, en vez de devolver una propuesta vacía", () => {
+    const r = repartir(10, -5_000, DISPARES)
+    expect(r.cuantosEntran).toBe(2)
+    expect(r.topeDiffMs).toBeGreaterThanOrEqual(1)
+  })
+
+  /**
+   * Una sonda de 0 ms -- documentos cortos, o el reloj sin resolución -- no puede
+   * volverse una división por cero que deje entrar a todos sin límite: eso es
+   * justo el bug que esta función arregla.
+   */
+  it("una sonda en 0 no desactiva el límite", () => {
+    const r = repartir(1_000, 40_000, 0)
+    expect(Number.isFinite(r.cuantosEntran)).toBe(true)
+    expect((r.cuantosEntran - 1) * r.topeDiffMs).toBeLessThanOrEqual(40_000)
+  })
+
+  /**
+   * La propiedad que importa, y la razón de que esta función exista: el TOTAL
+   * tiene que caber. Un tope por comparación no puede acotar el total —por
+   * diseño— y por eso 26 contratos dispares tardan 46,8 s medidos sin que el
+   * tope de 10 s se dispare una sola vez.
+   */
+  it("el total siempre cabe en el presupuesto, para cualquier cantidad y cualquier medición", () => {
+    for (const cantidad of [2, 3, 5, 10, 26, 50, 200, 1000]) {
+      for (const presupuesto of [1_000, 5_000, 40_000, 120_000]) {
+        for (const medido of [0, 1, PARECIDOS, DISPARES, 60_000]) {
+          const r = repartir(cantidad, presupuesto, medido)
+          const total = (r.cuantosEntran - 1) * r.topeDiffMs
+          expect(total, `${cantidad} docs, ${presupuesto} ms, sonda ${medido} ms`).toBeLessThanOrEqual(presupuesto)
+          expect(r.cuantosEntran).toBeLessThanOrEqual(cantidad)
+          expect(r.cuantosEntran).toBeGreaterThanOrEqual(2)
+        }
+      }
+    }
+  })
+
+  it("el caso medido de Central: 26 asesores dispares no puede pedir 250 s de diff", () => {
+    const r = repartir(26, 40_000, DISPARES)
+    // Con el tope de siempre serían 25 × 10 s = 250 s. Medido real sin tope: 46,8 s.
+    expect((r.cuantosEntran - 1) * r.topeDiffMs).toBeLessThanOrEqual(40_000)
+  })
+})
+
+describe("avisoPorRecorteDeTiempo", () => {
+  it("dice N de M, para que el director pueda hacer la resta", () => {
+    const aviso = avisoPorRecorteDeTiempo(26, 11)
+    expect(aviso).toContain("11 de 26")
+  })
+
+  it("no mete ruido cuando entraron todos", () => {
+    expect(avisoPorRecorteDeTiempo(26, 26)).toBeNull()
+    expect(avisoPorRecorteDeTiempo(3, 3)).toBeNull()
+  })
+})
+
+// ── Nombres en vez de ids ───────────────────────────────────────────
+
+const UUID_ANA = "aaaaaaaa-1111-2222-3333-444444444444"
+const UUID_BRUNO = "bbbbbbbb-1111-2222-3333-444444444444"
+
+describe("conNombres", () => {
+  it("cambia el uuid crudo por el nombre de la persona", () => {
+    const salida = conNombres(
+      [`El documento del asesor ${UUID_ANA} está vacío o no se pudo leer.`],
+      new Map([[UUID_ANA, "Ana García"]]),
+    )
+    expect(salida[0]).toBe("El documento del asesor Ana García está vacío o no se pudo leer.")
+    expect(salida[0]).not.toContain(UUID_ANA)
+  })
+
+  it("traduce los dos ids de una advertencia de comparación", () => {
+    const salida = conNombres(
+      [`No se pudo comparar el documento del asesor ${UUID_BRUNO} con el de ${UUID_ANA}.`],
+      new Map([
+        [UUID_ANA, "Ana"],
+        [UUID_BRUNO, "Bruno"],
+      ]),
+    )
+    expect(salida[0]).toBe("No se pudo comparar el documento del asesor Bruno con el de Ana.")
+  })
+
+  it("sin mapa, o con un nombre en blanco, deja el texto como vino", () => {
+    const texto = [`El documento del asesor ${UUID_ANA} está vacío.`]
+    expect(conNombres(texto)).toEqual(texto)
+    expect(conNombres(texto, new Map())).toEqual(texto)
+    expect(conNombres(texto, new Map([[UUID_ANA, "   "]]))).toEqual(texto)
+  })
+})
+
+// ── Lo que la revisión encontró ──────────────────────────────────────
+
+describe("armarPropuesta: el aviso de documentos idénticos", () => {
+  /**
+   * Con UN solo documento legible no se comparó nada: no hay con qué ser
+   * idéntico. Mandar al director a buscar archivos duplicados que no existen
+   * lo desvía del problema real, que es que los otros no se pudieron leer.
+   */
+  it("con un solo documento usado NO dice que son idénticos", () => {
+    const p = armarPropuesta({
+      templateId: "t1",
+      deteccion: deteccion({
+        documentosUsados: ["ana"],
+        advertencias: ["Hacen falta al menos 3 documentos…; llegaron 1."],
+      }),
+      nombres: [],
+      laIaRespondio: false,
+    })
+    expect(p.advertencias.some((a) => a.includes("idénticos"))).toBe(false)
+    expect(p.advertencias.some((a) => a.includes("Hacen falta al menos 3"))).toBe(true)
+  })
+
+  it("con dos o más documentos usados y ningún hueco, sí lo dice", () => {
+    const p = armarPropuesta({
+      templateId: "t1",
+      deteccion: deteccion({ documentosUsados: ["ana", "bruno"] }),
+      nombres: [],
+      laIaRespondio: false,
+    })
+    expect(p.advertencias.some((a) => a.includes("idénticos"))).toBe(true)
+  })
+})
+
+describe("armarPropuesta: ninguna advertencia sale con un uuid crudo", () => {
+  it("traduce las advertencias que escribió deteccion.ts, que nombra por id", () => {
+    const p = armarPropuesta({
+      templateId: "t1",
+      deteccion: deteccion({
+        documentosUsados: ["ana", "bruno"],
+        huecos: [hueco(0, { ana: "Ana", bruno: "Bruno" })],
+        advertencias: [`El documento del asesor ${UUID_ANA} está vacío o no se pudo leer.`],
+      }),
+      nombres: ["NOMBRE"],
+      laIaRespondio: true,
+      advertenciasPrevias: [`No se pudo abrir el documento de ${UUID_BRUNO}.`],
+      nombresDeAsesores: new Map([
+        [UUID_ANA, "Ana García"],
+        [UUID_BRUNO, "Bruno López"],
+      ]),
+    })
+    expect(p.advertencias.some((a) => a.includes(UUID_ANA))).toBe(false)
+    expect(p.advertencias.some((a) => a.includes(UUID_BRUNO))).toBe(false)
+    expect(p.advertencias.some((a) => a.includes("Ana García"))).toBe(true)
+    expect(p.advertencias.some((a) => a.includes("Bruno López"))).toBe(true)
+  })
+
+  it("los ids de valores y de documentosUsados NO se tocan: la pantalla escribe con esos", () => {
+    const p = armarPropuesta({
+      templateId: "t1",
+      deteccion: deteccion({
+        documentosUsados: [UUID_ANA],
+        huecos: [hueco(0, { [UUID_ANA]: "Ana" })],
+      }),
+      nombres: ["NOMBRE"],
+      laIaRespondio: true,
+      nombresDeAsesores: new Map([[UUID_ANA, "Ana García"]]),
+    })
+    expect(p.documentosUsados).toEqual([UUID_ANA])
+    expect(Object.keys(p.huecos[0].valores)).toEqual([UUID_ANA])
+    expect(p.moldeAdvisorId).toBe(UUID_ANA)
   })
 })

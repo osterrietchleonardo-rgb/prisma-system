@@ -5,11 +5,13 @@ import { createClient } from "@/lib/supabase/server"
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation"
 import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator"
 import { textoDeDocx } from "@/lib/plantillas/docx"
-import { detectarHuecos, type Documento, type Hueco } from "@/lib/plantillas/deteccion"
+import { detectarHuecos, TOPE_DIFF_MS, type Documento, type Hueco } from "@/lib/plantillas/deteccion"
 import {
   armarPropuesta,
+  avisoPorRecorteDeTiempo,
   nombresParaHuecos,
   promptDeNombres,
+  repartirPresupuesto,
   separarPorEstado,
   SYSTEM_PROMPT_NOMBRES,
   type FilaAsesor,
@@ -42,6 +44,25 @@ export const dynamic = "force-dynamic"
 /** Bajar y leer N documentos de Word tarda; el default de 10 s no alcanza. */
 export const maxDuration = 60
 
+/**
+ * El presupuesto de tiempo, sacado del único número que importa de verdad:
+ * `maxDuration`. Si alguien lo sube o lo baja, esto lo sigue solo -- que es
+ * justamente lo que no pasa cuando el límite se escribe dos veces.
+ */
+const TOPE_TOTAL_MS = maxDuration * 1000
+
+/**
+ * Lo que se le guarda a la llamada a la IA. No es un número de adorno: el
+ * prompt puede llevar 150 huecos con el contexto y los valores de cada asesor,
+ * y esa llamada se hace DESPUÉS de comparar. Si la comparación se come el
+ * tiempo entero, la función muere justo antes de nombrar los campos y el
+ * director no recibe nada -- ni siquiera los CAMPO_N.
+ */
+const RESERVA_IA_MS = 15_000
+
+/** Colchón para armar la respuesta y para lo que el reloj del lambda no cuenta. */
+const MARGEN_MS = 5_000
+
 /** El mismo bucket que usa el resto de los documentos del asesor. */
 const BUCKET = "documents"
 
@@ -57,6 +78,13 @@ type FilaDocumento = {
 }
 
 export async function POST(req: Request) {
+  /**
+   * El reloj arranca acá, no antes de comparar: bajar N documentos de Word de
+   * Storage también gasta del mismo presupuesto, y medir solo el diff dejaría
+   * afuera la mitad del gasto real.
+   */
+  const arranque = Date.now()
+
   let agencyId: string
   let role: string | null
   try {
@@ -159,6 +187,7 @@ export async function POST(req: Request) {
   const advertencias: string[] = []
   const candidatas: FilaAsesor[] = []
   const rutas = new Map<string, FilaDocumento>()
+  const nombresDeAsesores = new Map<string, string>()
 
   for (const fila of filas) {
     const perfil = porId.get(fila.advisor_id)
@@ -177,6 +206,12 @@ export async function POST(req: Request) {
     }
     candidatas.push({ advisorId: fila.advisor_id, estado: perfil.estado, nombre: perfil.full_name })
     rutas.set(fila.advisor_id, fila)
+    /**
+     * `deteccion.ts` no conoce a nadie: sus advertencias nombran al asesor por
+     * uuid. Este mapa es lo que después las traduce a nombres de personas.
+     */
+    const nombre = perfil.full_name?.trim()
+    if (nombre) nombresDeAsesores.set(fila.advisor_id, nombre)
   }
 
   const { dentro, advertencias: avisosEstado } = separarPorEstado(candidatas)
@@ -221,11 +256,53 @@ export async function POST(req: Request) {
   }
 
   /**
+   * Cuánto tiempo queda para comparar, ya descontado lo que se fue en bajar y
+   * leer los .docx. El reparto decide cuántos documentos entran y con cuánto
+   * tiempo cada uno, de forma que el TOTAL quepa: el tope de `detectarHuecos`
+   * es por comparación y hay N−1 comparaciones, así que por sí solo no acota
+   * nada. Con 26 asesores y contratos distintos entre sí eso son 89,6 s
+   * medidos, sin que el tope de 10 s llegue a dispararse una sola vez.
+   */
+  const presupuestoMs = TOPE_TOTAL_MS - RESERVA_IA_MS - MARGEN_MS - (Date.now() - arranque)
+
+  /**
+   * La sonda: se compara UN par de verdad y se cronometra. Con eso se sabe si
+   * estos documentos son de los que se comparan en milisegundos o de los que
+   * tardan segundos, y recién ahí se decide cuántos entran.
+   *
+   * Se mide en vez de predecir porque predecir ya falló una vez acá: repartir
+   * el presupuesto en partes iguales le daba 1,6 s a cada una de las 25
+   * comparaciones de 26 contratos dispares, **las 25 se cortaban**, y la
+   * propuesta volvía con UN documento usado después de gastar los 40 s enteros.
+   * Medía bien el techo y producía basura.
+   *
+   * Cuesta una comparación de más: 6 ms con documentos parecidos, que es el
+   * caso normal, y ~1,9 s con documentos dispares. El tope de la sonda es un
+   * cuarto del presupuesto para que un par patológico no se coma el resto.
+   */
+  const topeSonda = Math.max(1, Math.min(TOPE_DIFF_MS, Math.floor(presupuestoMs / 4)))
+  const antesDeLaSonda = Date.now()
+  if (docs.length > 1) detectarHuecos(docs.slice(0, 2), { topeDiffMs: topeSonda })
+  const msSonda = Date.now() - antesDeLaSonda
+
+  const reparto = repartirPresupuesto({
+    cantidadDeDocumentos: docs.length,
+    presupuestoMs: presupuestoMs - msSonda,
+    topeNormalMs: TOPE_DIFF_MS,
+    msPorComparacionMedido: msSonda,
+  })
+
+  const avisoTiempo = avisoPorRecorteDeTiempo(docs.length, reparto.cuantosEntran)
+  if (avisoTiempo) advertencias.push(avisoTiempo)
+
+  /**
    * `detectarHuecos` ya avisa cuando llegan menos de 3 documentos y cuando uno
    * queda vacío o no se pudo comparar. No se falla por eso: se devuelve la
    * propuesta con las advertencias y decide el director (brief de la tarea).
    */
-  const deteccion = detectarHuecos(docs)
+  const deteccion = detectarHuecos(docs.slice(0, reparto.cuantosEntran), {
+    topeDiffMs: reparto.topeDiffMs,
+  })
 
   // ── La IA le pone nombre a cada hueco ────────────────────────────────────
   const { respuesta, avisos } = await nombrarConIa(deteccion.huecos)
@@ -240,6 +317,7 @@ export async function POST(req: Request) {
     nombres: nombres.nombres,
     laIaRespondio: nombres.laIaRespondio,
     advertenciasPrevias: advertencias,
+    nombresDeAsesores,
   })
 
   return NextResponse.json(propuesta)

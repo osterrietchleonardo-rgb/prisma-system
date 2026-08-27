@@ -341,6 +341,126 @@ export function limitesConocidos(deteccion: Deteccion): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// El presupuesto de tiempo
+// ---------------------------------------------------------------------------
+
+/**
+ * Cuánto se le suma a lo medido antes de creerle.
+ *
+ * La sonda mide UNA comparación y con eso se decide por todas, y no todas
+ * cuestan igual. Un 50% de holgura es lo que separa "entraron 14 y las 13
+ * comparaciones terminaron" de "entraron 14 y las últimas se cortaron".
+ */
+const HOLGURA = 1.5
+
+/**
+ * Cuántos documentos entran en la comparación y con cuánto tiempo cada uno,
+ * para que el TOTAL quepa en el presupuesto.
+ *
+ * El problema que resuelve: el tope de `detectarHuecos` es **por comparación**,
+ * y hay N−1 comparaciones. Un tope por comparación no puede acotar el total, por
+ * diseño. Medido con 26 contratos distintos entre sí: **46,8 s** de comparación,
+ * con cada comparación individual en ~1,9 s, o sea que el tope de 10 s **nunca
+ * se dispara** y la función muere de timeout. Lo que ve el director es un
+ * FUNCTION_INVOCATION_TIMEOUT pelado: sin aviso, sin propuesta y sin explicación.
+ *
+ * **No predice: mide.** El que llama corre UNA comparación de prueba sobre estos
+ * mismos documentos y pasa cuánto tardó. El primer intento repartía el
+ * presupuesto en partes iguales sin medir nada, y la sonda lo desmintió: con 26
+ * contratos dispares el reparto parejo da 1,6 s por comparación, **las 25 se
+ * cortan**, y la propuesta vuelve con UN documento usado después de gastar los
+ * 40 s enteros. Cumplía el techo y no servía para nada. Con la medición entran
+ * menos documentos pero las comparaciones **terminan**, que es lo único que
+ * produce una plantilla.
+ *
+ * Garantiza que `(cuantosEntran − 1) × topeDiffMs ≤ presupuestoMs`: el tope
+ * sigue siendo la pared dura por si la sonda midió de menos.
+ */
+export function repartirPresupuesto(args: {
+  cantidadDeDocumentos: number
+  presupuestoMs: number
+  /** El tope por comparación de siempre (`TOPE_DIFF_MS` de `deteccion.ts`). */
+  topeNormalMs: number
+  /** Lo que tardó UNA comparación de prueba sobre estos mismos documentos. */
+  msPorComparacionMedido: number
+}): { cuantosEntran: number; topeDiffMs: number } {
+  const { cantidadDeDocumentos: cantidad, topeNormalMs } = args
+  const presupuesto = Math.max(0, args.presupuestoMs)
+
+  // Con uno solo no hay ninguna comparación que acotar.
+  if (cantidad <= 1) return { cuantosEntran: cantidad, topeDiffMs: topeNormalMs }
+
+  /**
+   * Nunca menos de 1 ms: si la sonda dio 0 -- documentos cortos, o el reloj sin
+   * resolución suficiente -- dividir por cero da Infinity y `cabidas` deja de
+   * significar nada. El total lo sigue acotando el tope de abajo igual, así que
+   * esto no es la red de seguridad: es no dejar un Infinity dando vueltas
+   * adentro de una cuenta que el que venga va a querer tocar.
+   */
+  const estimado = Math.max(1, Math.ceil(Math.max(0, args.msPorComparacionMedido) * HOLGURA))
+
+  /**
+   * Al menos una comparación siempre se intenta. Devolver una propuesta sin
+   * ningún hueco por no haber intentado nada sería peor que pasarse un poco.
+   */
+  const cabidas = Math.max(1, Math.floor(presupuesto / estimado))
+  const cuantosEntran = Math.min(cantidad, cabidas + 1)
+
+  const topeDiffMs = Math.max(1, Math.min(topeNormalMs, Math.floor(presupuesto / (cuantosEntran - 1))))
+  return { cuantosEntran, topeDiffMs }
+}
+
+/**
+ * El aviso de que quedaron documentos afuera por tiempo.
+ *
+ * Se dice el número completo -- "N de M" -- y no solo cuántos entraron: el
+ * director subió M archivos y tiene que poder ver la resta él mismo. `null`
+ * cuando entraron todos, para no meter ruido.
+ */
+export function avisoPorRecorteDeTiempo(cantidadOriginal: number, cuantosEntran: number): string | null {
+  if (cuantosEntran >= cantidadOriginal) return null
+  return (
+    `Solo se pudieron comparar ${cuantosEntran} de ${cantidadOriginal} documentos: comparar todos no entraba en el ` +
+    `tiempo que tiene la operación. La plantilla sale con esos ${cuantosEntran}; los demás no se tocaron. Si los ` +
+    `contratos son muy distintos entre sí, conviene revisar que todos sean del mismo tipo de documento.`
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Nombres en vez de ids
+// ---------------------------------------------------------------------------
+
+/**
+ * Cambia los ids de asesor por el nombre de la persona adentro de las
+ * advertencias.
+ *
+ * `deteccion.ts` no conoce a nadie: nombra por id, y le sale "El documento del
+ * asesor aaaaaaaa-1111-... está vacío". El director no tiene cómo saber de quién
+ * habla, y encima queda desparejo contra las advertencias de acá, que sí usan el
+ * nombre. Traducirlo es de las cosas más baratas que se pueden hacer por que un
+ * aviso sirva.
+ *
+ * Toca SOLO el texto de las advertencias. Los ids de `valores` y de
+ * `documentosUsados` quedan intactos: la pantalla los necesita para poder
+ * escribir después.
+ */
+export function conNombres(
+  advertencias: string[],
+  nombresDeAsesores?: ReadonlyMap<string, string>,
+): string[] {
+  if (!nombresDeAsesores || nombresDeAsesores.size === 0) return advertencias
+  return advertencias.map((texto) => {
+    let salida = texto
+    for (const [id, nombre] of nombresDeAsesores) {
+      const limpio = nombre.trim()
+      if (limpio === "" || !salida.includes(id)) continue
+      salida = salida.split(id).join(limpio)
+    }
+    return salida
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Armar la propuesta
 // ---------------------------------------------------------------------------
 
@@ -351,6 +471,11 @@ export function armarPropuesta(args: {
   laIaRespondio: boolean
   /** Lo que ya se sabía antes de comparar: exclusiones, descargas fallidas… */
   advertenciasPrevias?: string[]
+  /**
+   * Del id del asesor a su nombre, para que ninguna advertencia salga con un
+   * uuid crudo. Opcional: sin el mapa, los textos quedan como vinieron.
+   */
+  nombresDeAsesores?: ReadonlyMap<string, string>
 }): Propuesta {
   const { templateId, deteccion, nombres, laIaRespondio } = args
   const advertencias = [...(args.advertenciasPrevias ?? []), ...deteccion.advertencias]
@@ -380,7 +505,15 @@ export function armarPropuesta(args: {
     }
   }
 
-  if (deteccion.documentosUsados.length > 0 && deteccion.huecos.length === 0) {
+  /**
+   * `> 1` y no `> 0`. Con UN solo documento legible no se comparó nada: no hay
+   * con qué ser idéntico. Decirle al director que revise si subió el mismo
+   * archivo para todos lo manda a buscar duplicados que no existen, cuando el
+   * problema real es que solo uno de sus documentos se pudo leer -- y eso ya se
+   * lo dice la advertencia de MINIMO_DOCUMENTOS. Un aviso que desvía es peor
+   * que ninguno.
+   */
+  if (deteccion.documentosUsados.length > 1 && deteccion.huecos.length === 0) {
     advertencias.push(
       "Los documentos comparados son idénticos entre sí: no se encontró ningún dato que cambie de asesor a asesor. " +
         "Revisá que no hayas subido el mismo archivo para todos.",
@@ -393,7 +526,12 @@ export function armarPropuesta(args: {
     templateId,
     moldeAdvisorId: deteccion.documentosUsados[0] ?? "",
     huecos,
-    advertencias,
+    /**
+     * La traducción de ids a nombres va al final y de una sola pasada, para que
+     * alcance también a las advertencias que escribió `deteccion.ts`, que no
+     * conoce a nadie y nombra por uuid.
+     */
+    advertencias: conNombres(advertencias, args.nombresDeAsesores),
     documentosUsados: deteccion.documentosUsados,
     laIaRespondio,
   }
