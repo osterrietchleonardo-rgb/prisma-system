@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Users, Clock, AlertTriangle, Loader2 } from "lucide-react"
 import {
-  darMasTiempo, estadoEquipo, marcarPerdido, noPuedoTomar, reasignarChat, tomarChat, type EstadoEquipo,
+  darMasTiempo, estadoEquipo, marcarPerdido, noPuedoTomar, reactivarLead, reasignarChat, tomarChat, type EstadoEquipo,
 } from "@/app/actions/equipo"
 
 /**
@@ -122,7 +122,7 @@ export default function EquipoPanel({ conversationId }: { conversationId: string
           {perdido && <Badge variant="destructive">Marcado como perdido</Badge>}
 
           <div className="flex flex-wrap gap-2 pt-1">
-            {!esDirector && estado.esMio && !perdido && (
+            {!esDirector && estado.esMio && (
               <>
                 <Button size="sm" disabled={ocupado} onClick={() => correr(() => tomarChat(conversationId))}>Lo tomo</Button>
                 <Button size="sm" variant="outline" disabled={ocupado} onClick={() => { setTexto(""); setDialogo("no_puedo") }}>No lo puedo tomar</Button>
@@ -146,6 +146,11 @@ export default function EquipoPanel({ conversationId }: { conversationId: string
             {!perdido && (esDirector || estado.esMio) && (
               <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" disabled={ocupado} onClick={() => { setTexto(""); setDialogo("perdido") }}>
                 Marcar como perdido
+              </Button>
+            )}
+            {perdido && (esDirector || estado.esMio) && (
+              <Button size="sm" variant="outline" disabled={ocupado} onClick={() => correr(() => reactivarLead(conversationId))}>
+                Reactivar
               </Button>
             )}
           </div>

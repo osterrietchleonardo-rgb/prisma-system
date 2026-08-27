@@ -3238,6 +3238,13 @@ Dónde vive: `lib/seguimiento/equipo.ts` (+13 tests), `app/actions/equipo.ts` (l
 con el cliente de servidor porque la RLS no deja al asesor soltar su chat),
 `components/seguimiento/EquipoPanel.tsx` (bloque "Equipo y seguimiento" en la ficha),
 `app/director/aprobaciones/`, ítem en `director-sidebar.tsx`.
+**Feedback de Leonardo del 27/8, aplicado:** (1) el aviso al asesor lleva CONTEXTO (qué busca el
+lead desde `metricas` + su último mensaje con fecha) y el comentario del director va etiquetado
+("Comentario de Víctor: «…»"); (2) un lead "perdido" se puede **Reactivar** desde la ficha, y los
+botones del asesor no desaparecen por estar perdido; (3) el link de OTRO rol
+(`/asesor/leads-whatsapp/[id]` abierto por el director, o al revés) va al mismo chat en la ruta
+propia, en el middleware — el `?next=` del login ya existía; (4) Aprobaciones: buscador (cliente,
+teléfono, asesor, motivo), filtro por asesor y por estado, y pendientes agrupadas por quién las pidió.
 **Probado el 26/8 en local con la agencia de prueba, escritorio y celular:** reasignar desde la
 ficha (aviso real recibido), pedido pendiente → «Lo tomo yo» (consumido una vez), «Dar más
 tiempo» (48 h), «Dejar sin asesor» con motivo. Sin probar en vivo: el lado del asesor (se prueba

@@ -6,8 +6,8 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { enviarAviso, type PerfilEquipo } from "@/lib/seguimiento/avisos"
 import {
-  HORAS_VENCE_APROBACION, armarAvisoAsignacion, armarAvisoPedidoAlDirector, fraseReapertura,
-  validarJustificacion, venceEn, ventanaCerrada,
+  HORAS_VENCE_APROBACION, armarAvisoAsignacion, armarAvisoPedidoAlDirector, contextoDesdeMetricas,
+  fechaCortaAR, fraseReapertura, validarJustificacion, venceEn, ventanaCerrada, type ContextoLead,
 } from "@/lib/seguimiento/equipo"
 import { registrarEvento } from "@/lib/seguimiento/eventos"
 import { nombreValido } from "@/lib/seguimiento/semilla"
@@ -81,6 +81,19 @@ function baseUrlDeEstePedido(): string {
   return `${proto}://${host}`
 }
 
+/** Qué busca el lead (de `metricas`) y su último mensaje, para que el aviso tenga contexto (27/8). */
+async function contextoDelLead(c: Conv): Promise<ContextoLead> {
+  const { data: ultimo } = await createAdminClient()
+    .from("wa_messages").select("content, created_at").eq("conversation_id", c.id).eq("role", "lead")
+    .order("created_at", { ascending: false }).limit(1).maybeSingle()
+  return {
+    busca: contextoDesdeMetricas(c.metricas),
+    ultimoMensaje: ultimo?.content && ultimo?.created_at
+      ? { texto: String(ultimo.content), fechaAR: fechaCortaAR(ultimo.created_at) }
+      : null,
+  }
+}
+
 async function cancelarCompromisosDelAsesor(conversationId: string, motivo: string) {
   await createAdminClient()
     .from("compromisos")
@@ -136,7 +149,7 @@ export async function estadoEquipo(conversationId: string): Promise<EstadoEquipo
     admin.from("wa_templates").select("status").eq("agency_id", c.agency_id)
       .eq("template_name", `ag${c.agency_id.replace(/-/g, "").substring(0, 6)}_seg_pendiente`).maybeSingle(),
     admin.from("lead_eventos").select("tipo, descripcion, ts").eq("conversation_id", c.id)
-      .in("tipo", ["reasignacion", "asesor_tomo", "asesor_no_puede", "director_dio_tiempo", "lead_perdido_por_asesor", "aviso_equipo", "reapertura_cliente", "aprobacion_decidida"])
+      .in("tipo", ["reasignacion", "asesor_tomo", "asesor_no_puede", "director_dio_tiempo", "lead_perdido_por_asesor", "lead_reactivado", "aviso_equipo", "reapertura_cliente", "aprobacion_decidida"])
       .order("ts", { ascending: false }).limit(6),
   ])
 
@@ -235,8 +248,9 @@ export async function noPuedoTomar(conversationId: string, justificacion: string
     // aviso al director (email siempre, WhatsApp si tiene celular)
     const directores = await directoresActivos(c.agency_id)
     const agencia = await nombreAgencia(c.agency_id)
+    const contexto = await contextoDelLead(c)
     for (const d of directores.slice(0, 1)) {
-      const aviso = armarAvisoPedidoAlDirector(d, c, { asesorNombre: yo.full_name || "Un asesor", justificacion: motivo }, appUrl(), agencia)
+      const aviso = armarAvisoPedidoAlDirector(d, c, { asesorNombre: yo.full_name || "Un asesor", justificacion: motivo, contexto }, appUrl(), agencia)
       await enviarAviso(admin, c, aviso, agencia, { decisionId: apro?.id ?? null })
     }
     refrescar(c.id)
@@ -291,7 +305,8 @@ export async function reasignarChat(conversationId: string, nuevoId: string, opt
     const agencia = await nombreAgencia(c.agency_id)
     let detalle = `Chat reasignado a ${nuevo.full_name}.`
     if (nuevoId !== yo.id) {
-      const aviso = armarAvisoAsignacion(nuevo, c, { porQuien: yo.full_name || "El director", motivo }, appUrl(), agencia)
+      const contexto = await contextoDelLead(c)
+      const aviso = armarAvisoAsignacion(nuevo, c, { porQuien: yo.full_name || "El director", motivo, contexto }, appUrl(), agencia)
       const r = await enviarAviso(admin, c, aviso, agencia, { decisionId: opts.aprobacionId ?? null })
       detalle += ` Aviso: email ${r.email === "enviado" ? "enviado" : r.email}, WhatsApp ${r.whatsapp === "enviado" ? "enviado" : r.whatsapp.replace(/_/g, " ")}.`
     }
@@ -368,6 +383,25 @@ export async function marcarPerdido(conversationId: string, justificacion: strin
     await registrarEvento(admin, c.agency_id, c.id, "lead_perdido_por_asesor", `${yo.full_name} marcó el lead como perdido: «${motivo}»`, { perfil_id: yo.id }, `${yo.role}:${yo.id}`)
     refrescar(c.id)
     return { ok: true, detalle: "Marcado como perdido. El seguimiento automático no lo va a tocar más." }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+/** Lo contrario de "perdido": vuelve a abierto y el seguimiento lo mira de nuevo. */
+export async function reactivarLead(conversationId: string): Promise<Resultado> {
+  try {
+    const yo = await quienSoy()
+    const c = await leerChat(yo, conversationId)
+    if (yo.role === "asesor" && c.agent_id !== yo.id) return { ok: false, error: "Este chat no está asignado a vos." }
+    if (c.funnel_status !== "closed_lost") return { ok: false, error: "Este lead no está marcado como perdido." }
+    const admin = createAdminClient()
+    await admin.from("wa_conversations")
+      .update({ funnel_status: "open", requires_follow_up: true, next_follow_up_at: new Date().toISOString(), dropoff_reason: null })
+      .eq("id", c.id)
+    await registrarEvento(admin, c.agency_id, c.id, "lead_reactivado", `${yo.full_name} reactivó el lead (estaba como perdido)`, { perfil_id: yo.id }, `${yo.role}:${yo.id}`)
+    refrescar(c.id)
+    return { ok: true, detalle: "Reactivado: vuelve a estar abierto y el seguimiento lo mira de nuevo." }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
