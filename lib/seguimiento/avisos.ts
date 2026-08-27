@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import { registrarEvento } from "./eventos"
 import { bloqueContextoHtml, contextoDelLead, lineaContextoWhatsApp, type ContextoLead } from "./contexto"
 import { nombreValido } from "./semilla"
+import { esperandoHumano } from "./escalamiento"
 import type { Candidato, ConfigAgencia, DecisionAgente } from "./tipos"
 
 /**
@@ -379,6 +380,13 @@ export async function avisarPorEscalar(
   appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://prisma.vakdor.com",
   fetchFn: FetchFn = fetch
 ): Promise<string> {
+  // Regla 27/8: si el lead está esperando a un humano, avisa la ESCALERA (2 h, 5 h, 10 h, 20 h,
+  // verificada contra el chat), no este aviso suelto: así el asesor no recibe dos por lo mismo.
+  if (esperandoHumano(c)) {
+    await registrarEvento(db, c.agency_id, c.id, "aviso_delegado_escalera",
+      "Lead esperando a un humano: el aviso al equipo lo lleva la escalera (2 h / 5 h / 10 h / 20 h)")
+    return "escalera"
+  }
   const destino = await resolverDestinatario(db, c)
   if (!destino) {
     await registrarEvento(db, c.agency_id, c.id, "aviso_sin_destinatario",

@@ -10,6 +10,7 @@ import { avisarPorEscalar } from "@/lib/seguimiento/avisos"
 import { aplicarSinEnvio, ejecutarDecision } from "@/lib/seguimiento/ejecutor"
 import { correrVisitas } from "@/lib/seguimiento/visitas"
 import { correrEscalamiento } from "@/lib/seguimiento/escalamiento"
+import { NOMBRES_V2 } from "@/lib/whatsapp/plantillas-v2"
 import { plantillaDesdeFila, type PlantillaDisponible } from "@/lib/seguimiento/plantillas"
 import type { Candidato, CompromisoActivo, ConfigAgencia } from "@/lib/seguimiento/tipos"
 
@@ -103,6 +104,9 @@ export async function POST(req: Request) {
   for (const f of filasPlantillas ?? []) {
     const p = plantillaDesdeFila(f)
     if (!p) continue
+    // Regla de Leonardo (27/8): solo las plantillas NUEVAS; las viejas f1/f2/f3 no se usan más.
+    // Sin ninguna nueva aprobada, el agente no puede contactar (posponer/abandonar/escalar sí).
+    if (!(NOMBRES_V2 as readonly string[]).includes(p.nombre)) continue
     plantillasPorAgencia.set(f.agency_id, [...(plantillasPorAgencia.get(f.agency_id) ?? []), p])
   }
 
