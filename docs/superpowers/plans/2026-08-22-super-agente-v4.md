@@ -2612,6 +2612,14 @@ if (config.modo === "activo" && fila) {
 
 ### Task 16: Recordatorios de visita, determinísticos (`visitas.ts`)
 
+> **HECHA 27/8.** `lib/seguimiento/visitas.ts` (+12 tests): `queRecordatorioToca` (24h/3h/1h/no-show,
+> sin repetir, y el no-show solo hasta 48 h después), `variablesRecordatorio` (las variables reales
+> de cada plantilla), `correrVisitas` con `tarea: "visitas"` en el runner. En sombra registra
+> `envio_simulado` (una vez por plantilla y visita); en activo manda por el dispatch del mismo origen
+> y **sin wamid no es éxito**. Corrida real en sombra: Central tiene 2 visitas viejas (>48 h), nada
+> que mandar. Falta (con OK): el segundo llamado del reloj n8n con `{"tarea":"visitas"}`.
+
+
 La confirmación de visita es **deliberadamente casi determinística** (24h/3h/1h). Acá no
 hay LLM — se porta la lógica del flujo viejo al runner, con una mejora: sin extracción de
 dirección por un modelo (usa `visit_address`; si falta, texto genérico).
@@ -2778,6 +2786,13 @@ Variables ya verificadas (24/8, Task 0): 24h/3h = [nombre, hora, dirección];
 
 ### Task 18: El bloque "Agente de seguimiento" en la ficha del lead
 
+> **HECHA 27/8.** `components/seguimiento/SeguimientoPanel.tsx`, debajo del bloque "Equipo y
+> seguimiento" (los compromisos y botones ya viven ahí): últimas 5 decisiones con acción, fecha,
+> confianza, razón, el mensaje propuesto, "El dato" (evidencia), "Miró: …" (las herramientas) y el
+> resultado ("no se envió (modo sombra…)"). Verificado en local, escritorio y celular, con la decisión
+> real del 27/8 sobre el chat de Leonardo.
+
+
 **Files:**
 - Create: `components/whatsapp/SeguimientoPanel.tsx`
 - Modify: `components/whatsapp/LeadTraceability.tsx` (importar y renderizar el bloque)
@@ -2909,6 +2924,17 @@ export default function SeguimientoPanel({ conversationId }: { conversationId: s
 - [ ] **Step 4: Commit** — `git add components/whatsapp/SeguimientoPanel.tsx components/whatsapp/LeadTraceability.tsx && git commit -m "feat(seguimiento): panel con decisiones, evidencia y trace en la ficha del lead"`
 
 ### Task 19: Escalamiento mínimo al director (`escalamiento.ts`)
+
+> **HECHA 27/8 (adaptada a la infraestructura de hoy).** `lib/seguimiento/escalamiento.ts` (+5 tests):
+> `armarAvisoDirectorSinRespuesta` (plantilla `director_asesor_sin_respuesta` + email, con el
+> CONTEXTO del lead y "Qué pasa: Martín lleva N horas sin responderle a X"), `correrEscalamiento`
+> con `tarea: "escalamiento"`: leads con bot apagado cuyo ÚLTIMO mensaje es del lead (role='lead')
+> hace más de `escalamiento_horas` y menos de 14 días; tope `max_escalamientos_dia`; nunca el mismo
+> chat dos veces en 24 h; sin `seguimiento_email_director` (el director sale de `profiles`). Manda por
+> `enviarAviso` (email + WhatsApp). **Corrida real en sombra (27/8 15:08): Central tiene 11 leads
+> esperando a un humano; simuló los 3 del tope** (9, 12 y 14 días sin respuesta). Falta (con OK): el
+> tercer llamado del reloj n8n con `{"tarea":"escalamiento"}`.
+
 
 Versión mínima de la escalera (nivel único → director directo; la escalera completa
 multi-canal es la fase 2, §III.2): si un lead con humano a cargo lleva más de

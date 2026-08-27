@@ -8,6 +8,8 @@ import { registrarEvento } from "@/lib/seguimiento/eventos"
 import { sincronizarCompromisos, crearCompromisoEscalar } from "@/lib/seguimiento/compromisos"
 import { avisarPorEscalar } from "@/lib/seguimiento/avisos"
 import { aplicarSinEnvio, ejecutarDecision } from "@/lib/seguimiento/ejecutor"
+import { correrVisitas } from "@/lib/seguimiento/visitas"
+import { correrEscalamiento } from "@/lib/seguimiento/escalamiento"
 import { plantillaDesdeFila, type PlantillaDisponible } from "@/lib/seguimiento/plantillas"
 import type { Candidato, CompromisoActivo, ConfigAgencia } from "@/lib/seguimiento/tipos"
 
@@ -37,9 +39,19 @@ export async function POST(req: Request) {
   const { tarea = "seguimiento" } = await req.json().catch(() => ({}))
   // El dispatch es un endpoint propio: se le pega al MISMO servidor que corre esto (preview o prod)
   const origen = new URL(req.url).origin
+  // Task 16: recordatorios de visita (determinísticos). Task 19: escalamiento al director.
+  if (tarea === "visitas") {
+    const r = await correrVisitas(db, {
+      origen, dispatchSecret: process.env.DISPATCH_SECRET, bypassSecret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+    })
+    return NextResponse.json({ tarea, ...r })
+  }
+  if (tarea === "escalamiento") {
+    const r = await correrEscalamiento(db)
+    return NextResponse.json({ tarea, ...r })
+  }
   if (tarea !== "seguimiento")
     return NextResponse.json({ error: `tarea desconocida: ${tarea}` }, { status: 400 })
-  // Task 16 suma "visitas"; Task 19 suma "escalamiento"
 
   // ── Task 13: vencer lo vencido y crear los compromisos de visita que falten ──
   await sincronizarCompromisos(db)
