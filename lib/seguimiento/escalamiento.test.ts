@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
-  armarAvisoAsesorEscalera, armarAvisoDirectorSinRespuesta, esperandoHumano, horasTexto, nivelQueToca,
+  armarAvisoAsesorEscalera, armarAvisoDirectorSinRespuesta, casoCuenta, esperandoHumano, horasTexto, nivelQueToca,
 } from "./escalamiento"
 import type { PerfilEquipo } from "./avisos"
 
@@ -88,4 +88,12 @@ describe("horasTexto", () => {
     expect(horasTexto(5.4)).toBe("5 horas")
     expect(horasTexto(72)).toBe("3 días")
   })
+})
+
+describe("casoCuenta: el reloj arranca el día que se enciende", () => {
+  it("sin fecha de encendido cuenta todo (sombra)", () => expect(casoCuenta("2026-08-01T10:00:00Z", null)).toBe(true))
+  it("un caso anterior al encendido es backlog: no se persigue", () => {
+    expect(casoCuenta("2026-08-26T10:00:00Z", "2026-08-27T12:00:00Z")).toBe(false)
+  })
+  it("un caso posterior sí", () => expect(casoCuenta("2026-08-27T15:00:00Z", "2026-08-27T12:00:00Z")).toBe(true))
 })

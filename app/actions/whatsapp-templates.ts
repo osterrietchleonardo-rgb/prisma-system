@@ -16,9 +16,13 @@ export async function injectCoreTemplates(agency_id: string, business_id: string
   const { data: agencia } = await supabase.from('agencies').select('name').eq('id', agency_id).single()
   const nombreAgencia = agencia?.name?.trim() || 'la inmobiliaria'
 
-  // Super Agente: toda agencia que conecta WhatsApp queda con su configuración (en sombra: mira y
-  // registra, no manda). Encenderla es cambiar `modo` a 'activo'. Nunca pisa una fila existente.
-  await supabase.from('seguimiento_config').upsert({ agency_id }, { onConflict: 'agency_id', ignoreDuplicates: true })
+  // Super Agente (decisión de Leonardo, 27/8): toda agencia nueva arranca ACTIVA al conectar
+  // WhatsApp, con el reloj desde este momento. Los avisos van por email desde el día uno y el
+  // WhatsApp se suma a medida que Meta aprueba las plantillas. Nunca pisa una fila existente.
+  await supabase.from('seguimiento_config').upsert(
+    { agency_id, modo: 'activo', activo_desde: new Date().toISOString() },
+    { onConflict: 'agency_id', ignoreDuplicates: true }
+  )
 
   const coreTemplates = [
     // 1. Seguimiento Inactividad F1 (24h)

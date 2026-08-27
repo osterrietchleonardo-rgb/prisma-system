@@ -34,6 +34,15 @@ export const NIVELES: Array<{ horas: Nivel; director: boolean; plantillaAsesor: 
 /** Más viejo que esto ya no es "esperando": es un lead perdido que la ficha tiene que resolver. */
 export const DIAS_MAXIMOS_ESPERA = 14
 
+/**
+ * "El reloj arranca el día que se enciende" (Leonardo, 27/8): un caso cuenta solo si el último
+ * mensaje del lead es posterior al encendido de la agencia. Sin fecha de encendido, cuenta todo.
+ */
+export function casoCuenta(t0ISO: string, activoDesdeISO: string | null | undefined): boolean {
+  if (!activoDesdeISO) return true
+  return Date.parse(t0ISO) >= Date.parse(activoDesdeISO)
+}
+
 type Conv = Pick<Candidato, "id" | "agency_id" | "contact_phone" | "metricas" | "agent_id" | "bot_active" | "last_message_at">
 
 /** ¿Este lead está en manos de un humano (o esperándolo)? */
@@ -182,7 +191,7 @@ export async function correrEscalamiento(
   const ahoraMs = opts.ahoraMs ?? Date.now()
   const resumen: ResumenEscalamiento = { esperando: 0, atendidos: 0, avisos: 0, simulados: 0 }
 
-  const { data: configs } = await db.from("seguimiento_config").select("agency_id, modo")
+  const { data: configs } = await db.from("seguimiento_config").select("agency_id, modo, activo_desde")
   const { data: agencias } = await db.from("agencies").select("id, name")
   const nombreAgencia = new Map<string, string>((agencias ?? []).map((a) => [a.id, a.name ?? "PRISMA"]))
 
@@ -220,6 +229,7 @@ export async function correrEscalamiento(
         .eq("role", "lead").order("created_at", { ascending: false }).limit(1).maybeSingle()
       if (!ultimoLead?.created_at || Date.parse(ultimoLead.created_at) < Date.parse(desde)) continue
       const t0 = ultimoLead.created_at
+      if (!casoCuenta(t0, config.activo_desde)) continue // anterior al encendido: backlog, no se persigue
       const { data: humano } = await db.from("wa_messages").select("id").eq("conversation_id", c.id)
         .eq("role", "human").gt("created_at", t0).limit(1)
       if (humano?.length) { resumen.atendidos++; continue }
