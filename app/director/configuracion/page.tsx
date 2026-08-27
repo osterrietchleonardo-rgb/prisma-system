@@ -43,6 +43,9 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { toast } from "sonner"
+import { VerifiedPhoneField, type VerifiedPhoneValue } from "@/components/shared/VerifiedPhoneField"
+import { normalizePhoneE164, formatPhoneInternational } from "@/lib/whatsapp/phone"
+import type { CountryCode } from "libphonenumber-js"
 import { createClient } from "@/lib/supabase"
 import { Badge } from "@/components/ui/badge"
 
@@ -64,7 +67,11 @@ export default function DirectorConfiguracionPage() {
   const defaultTab = searchParams.get('tab') || 'perfil'
   
   const [loading, setLoading] = useState(false)
-  const [profile, setProfile] = useState<{ full_name: string; email: string; avatar_url: string; agency_id: string }>({
+  // Celular del director: se escribe dos veces (mismo control que asesores y contactos) y se
+  // guarda normalizado (549… sin "+"), que es lo que usan los avisos por WhatsApp del agente.
+  const [phoneEdit, setPhoneEdit] = useState<VerifiedPhoneValue>({ phone: "", phoneConfirm: "", country: "AR" as CountryCode })
+  const [profile, setProfile] = useState<{ full_name: string; email: string; avatar_url: string; agency_id: string; phone: string }>({
+    phone: "",
     full_name: "",
     email: "",
     avatar_url: "",
@@ -159,7 +166,8 @@ export default function DirectorConfiguracionPage() {
           full_name,
           email,
           avatar_url,
-          agency_id
+          agency_id,
+          phone
         `)
         .eq('id', session.user.id)
         .single()
@@ -170,7 +178,8 @@ export default function DirectorConfiguracionPage() {
           full_name: profileData.full_name || "",
           email: profileData.email || session.user.email || "",
           avatar_url: profileData.avatar_url || "",
-          agency_id: profileData.agency_id || ""
+          agency_id: profileData.agency_id || "",
+          phone: profileData.phone || ""
         }))
 
         // Fetch agency settings
@@ -195,17 +204,30 @@ export default function DirectorConfiguracionPage() {
 
   const handleSaveProfile = async () => {
     if (!userId) return
+    // Celular: solo si escribió algo; tiene que ser válido y estar igual las dos veces
+    const tocaCelular = phoneEdit.phone.trim() !== ""
+    const e164 = normalizePhoneE164(phoneEdit.phone, phoneEdit.country)
+    const confirm164 = normalizePhoneE164(phoneEdit.phoneConfirm, phoneEdit.country)
+    if (tocaCelular && (!e164 || e164 !== confirm164)) {
+      toast.error("Revisá el celular: tiene que ser válido y estar escrito igual las dos veces")
+      return
+    }
     try {
       setLoading(true)
       const { error } = await supabase
         .from('profiles')
         .update({
           full_name: profile.full_name,
+          ...(tocaCelular && e164 ? { phone: e164 } : {}),
         })
         .eq('id', userId)
 
       if (error) throw error
-      toast.success("Perfil actualizado correctamente")
+      if (tocaCelular && e164) {
+        setProfile(p => ({ ...p, phone: e164 }))
+        setPhoneEdit({ phone: "", phoneConfirm: "", country: phoneEdit.country })
+      }
+      toast.success(tocaCelular ? "Perfil y celular actualizados" : "Perfil actualizado correctamente")
     } catch (_error) {
       toast.error("Error al actualizar el perfil")
     } finally {
@@ -495,6 +517,20 @@ export default function DirectorConfiguracionPage() {
                     className="bg-muted/50 border-accent/10 text-muted-foreground"
                   />
                 </div>
+
+              <div className="space-y-3 rounded-xl border border-accent/10 bg-background/30 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label className="text-base">Celular (para avisos por WhatsApp)</Label>
+                  <span className="text-sm text-muted-foreground">
+                    {profile.phone ? `Actual: ${formatPhoneInternational(profile.phone) ?? profile.phone}` : "Todavía no cargaste tu celular"}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  A este número te llegan los avisos del agente (un asesor que no puede tomar un chat, un cliente esperando, una aprobación pendiente).
+                  Escribilo dos veces; si lo dejás vacío, no cambia.
+                </p>
+                <VerifiedPhoneField value={phoneEdit} onChange={setPhoneEdit} disabled={loading} />
+              </div>
               </div>
 
               <div className="pt-4 flex justify-end">
