@@ -35,6 +35,8 @@
 25. [Variables de Entorno Completas](#25-variables-de-entorno-completas)
 26. [Diagrama de Flujos Principales](#26-diagrama-de-flujos-principales)
 27. [Sistema de Temas (Claro / Oscuro)](#27-sistema-de-temas-claro--oscuro)
+28. [Buscador IA · solapa Mapa](#28-buscador-ia--solapa-mapa)
+29. [Super Agente de Seguimiento — la lógica](#29-super-agente-de-seguimiento--la-lógica)
 
 ---
 
@@ -796,7 +798,7 @@ PRISMA envía al lead via Evolution/Meta + guarda en DB
 
 ### 9.2 Templates de Seguimiento
 
-PRISMA inyecta 8 templates automáticos para cada agencia:
+PRISMA inyecta 17 plantillas automáticas para cada agencia (8 históricas, 5 nuevas de seguimiento y 4 del equipo). Las 8 históricas:
 
 | Sufijo | Propósito |
 |---|---|
@@ -810,6 +812,8 @@ PRISMA inyecta 8 templates automáticos para cada agencia:
 | `reactivacion_snoozed` | Reactivación de leads "dormidos" |
 
 Cada template tiene el prefijo `ag{agency_id[0:6]}_` para aislamiento multi-tenant en la cuenta de WhatsApp Business.
+
+**Las 5 nuevas de seguimiento (v2, 25/8/2026)** — `{{1}}` nombre del lead (solo el registrado en `metricas`), `{{2}}` la frase del agente; texto fijo con el nombre de la agencia: `seg_retomar`, `seg_valor`, `seg_pendiente` (UTILITY: el lead esperaba a un humano, va solo con "escalar"), `seg_novedad`, `seg_puerta_abierta`. **El Super Agente elige solo entre estas**; las 3 históricas `seg_f1/f2/f3` ya no se usan. **Las 4 del equipo** (UTILITY, 26/8): `asesor_cliente_esperando`, `asesor_sigue_esperando`, `director_asesor_sin_respuesta`, `director_aprobacion_pendiente`. Ver §29.
 
 ### 9.2b El pipeline tiene tres modelos, no uno (31/07/2026)
 
@@ -2550,6 +2554,37 @@ metro, la transparencia dice cuánto creerle.
 
 El lápiz recorta en el navegador, sin consultas nuevas. Las zonas guardadas son
 **privadas**: cada usuario ve solo las suyas, ni el director ve las de un asesor.
+
+## 29. Super Agente de Seguimiento — la lógica
+
+**Para qué existe:** que ningún lead quede sin respuesta y que el director pueda soltar el control sin perderlo. Reemplaza al flujo viejo de seguimientos de n8n (apagado) con un agente que **investiga antes de decidir** y deja rastro de todo. Detalle técnico en `TECNICO-PRISMA.md` §22; visión completa y fases 2-5 en `docs/superpowers/plans/2026-08-22-super-agente-v4.md`.
+
+### 29.1 Los tres relojes
+1. **Seguimiento al cliente** (cada 30 min): la conversación se enfrió — nadie le debe nada al lead y dejó de contestar. Después del **silencio mínimo (20 h sin ningún mensaje de nadie)** el agente puede escribirle, hasta **3 intentos**, dentro de la **ventana 6–23 h**. Antes de contactar lee los mensajes reales y los intentos previos; si nombra una propiedad, la verifica. Decide **contactar / posponer / abandonar / escalar**, con razón, evidencia y confianza. Con confianza < 0,5 no se ejecuta.
+2. **La escalera del lead que espera a un humano** (cada 30 min): el bot lo derivó, o pidió hablar con una persona, o un humano tomó el chat — y desde su último mensaje ningún asesor le escribió. Le avisa al **equipo**, no al cliente: **2 h** asesor · **5 h** asesor + director · **10 h** asesor · **20 h** asesor + director para que decida. "Atendido" lo mide el chat (un mensaje de un asesor al cliente), nunca la promesa. Sin tope por agencia. El caso vuelve a empezar si el lead escribe de nuevo después de ser atendido.
+3. **Recordatorios de visita** (cada 30 min, sin IA): 24 h, 3 h y 1 h antes; aviso post no-show hasta 48 h después.
+
+**El reloj arranca el día del encendido** (`activo_desde`): lo anterior es backlog y no se persigue hasta que se decida reactivarlo.
+
+### 29.2 Modos por agencia
+`apagado` (nada), `sombra` (mira, decide y registra; no manda), `activo` (manda). PRISMAIA apagada por decisión de Leonardo (27/8); Central en sombra hasta su OK; **toda agencia nueva arranca activa** al conectar WhatsApp. Kill-switch global por variable de entorno.
+
+### 29.3 Lo que nunca hace
+No escribe a quien pidió no recibir mensajes ni a un chat con humano al mando; no usa el nombre del perfil de WhatsApp (solo el registrado, una vez por mensaje, sin "che"); no afirma disponibilidad ni precio de una propiedad sin verificarla; no cierra un lead como perdido (abandonar solo apaga el seguimiento, reversible); no reasigna ni aprueba nada por su cuenta; no da por enviado un mensaje sin el id de Meta.
+
+### 29.4 Los avisos al equipo
+Email siempre; WhatsApp además si la persona tiene celular cargado (Mi Perfil para el director, Asesores para cada asesor) y la plantilla nueva está aprobada por Meta en esa agencia — si no está aprobada, va solo el email, **nunca se saltea**. Cada aviso trae contexto: qué busca el cliente, su último mensaje con fecha, y la parte humana etiquetada (comentario del director, motivo del asesor, o "Qué pasa" del agente), más el link al chat en la ruta del rol de quien lo recibe. Los links de otro rol se corrigen solos; el login vuelve al chat.
+
+### 29.5 Reasignación y aprobaciones
+El asesor **no reasigna**: tiene "Lo tomo", "No lo puedo tomar" (motivo obligatorio; se le saca el chat y el pedido llega al director) y "Marcar como perdido". El director tiene "Reasignar a…", "Lo tomo yo", "Dar más tiempo" y "Reactivar". Al reasignar, el asesor nuevo recibe email + WhatsApp con el contexto; si la ventana de 24 h del cliente cerró, el director puede mandarle una plantilla para reabrir la charla. Los pedidos viven en **Aprobaciones**: cada uno se decide una sola vez y vence a las 48 h sin ejecutar nada.
+
+### 29.6 Compromisos y trazabilidad
+`compromisos` es lo que el sistema persigue (visita agendada, respuesta pendiente del asesor…): un compromiso por vencer pesa más que cualquier otra señal. Cada decisión, envío, aviso, reasignación y aprobación queda en la línea de tiempo del lead (`lead_eventos`) y se ve en la ficha del chat: bloque "Equipo y seguimiento" (quién lo tiene, qué está pendiente, botones) y bloque "Agente de seguimiento" (qué decidió, por qué, el dato, qué miró, resultado).
+
+### 29.7 Cifras de la sombra (24–27/8/2026, Central)
+326 decisiones sobre 62 leads (contactar 190, escalar 118, abandonar 13, posponer 5), US$0,05 por decisión, 0 fechas inventadas en las 40 firmadas por Leonardo, 0 propiedades no disponibles ofrecidas; 105 leads esperando a un humano en 14 días (99 más de 20 h). Y el hallazgo del 26/8: los 360 seguimientos por plantilla del flujo viejo (jun–ago) nunca llegaron (§ TECNICO 9.3).
+
+---
 
 ## FIN DEL DOCUMENTO
 

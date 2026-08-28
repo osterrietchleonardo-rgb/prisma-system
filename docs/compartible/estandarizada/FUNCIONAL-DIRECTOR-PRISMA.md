@@ -35,6 +35,9 @@
 24. [Checklist de puesta en marcha](#24-checklist-de-puesta-en-marcha)
 25. [Preguntas frecuentes](#25-preguntas-frecuentes)
 26. [Personalizaciones de tu agencia](#26-personalizaciones-de-tu-agencia)
+27. [El Mapa del Buscador IA](#27-el-mapa-del-buscador-ia)
+28. [Aprobaciones (pedidos de tu equipo)](#28-aprobaciones-pedidos-de-tu-equipo)
+29. [El agente de seguimiento y los avisos que te llegan](#29-el-agente-de-seguimiento-y-los-avisos-que-te-llegan)
 
 ---
 
@@ -382,11 +385,11 @@ Así el equipo no pierde oportunidades: el asesor se entera por email aunque no 
 
 > 🔐 Si al abrir un link de PRISMA (por ejemplo, el del aviso de lead) la app pide **iniciar sesión de nuevo**, después de entrar lleva **directo a donde iba** el usuario, sin dejarlo en la pantalla de inicio. Con la sesión ya abierta, entra sin que le pida nada.
 
-### Seguimientos automáticos
+### Seguimientos automáticos (el agente de seguimiento)
 
-Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **seguimientos solos** a los leads por WhatsApp (recordatorios de visita, reactivación de contactos fríos y follow-ups según el momento del lead), sin que el asesor tenga que acordarse. Es lo que mantiene vivas las conversaciones y suma a las métricas de "seguimientos enviados".
+PRISMA tiene un **agente de seguimiento** que, cada media hora, mira las conversaciones que se enfriaron y decide qué hacer con cada una: retomar con un mensaje, esperar, dejar de insistir o avisarle al equipo. Antes de escribir **lee el chat real** y lo que ya se le mandó, así nunca repite ni inventa. Usa las **plantillas nuevas de seguimiento** (naturales, con el nombre del cliente una sola vez); si tu agencia todavía no las tiene aprobadas por Meta, no escribe. Cómo funciona, con sus reglas y límites, en la sección 29.
 
-> 💡 **Tip:** las plantillas de seguimiento deben estar **aprobadas por Meta** para que los flujos automáticos funcionen. PRISMA revisa el estado todos los días; cuando las 8 están aprobadas, se activan los flujos automáticos.
+> 💡 **Tip:** las plantillas las crea PRISMA cuando conectás WhatsApp y Meta las aprueba de a poco (las de aviso al equipo en minutos; las de seguimiento pueden tardar más). PRISMA revisa el estado todos los días. Mientras tanto, los avisos al equipo salen por email.
 > 💡 El bot responde solo cuando está activo; si un asesor toma el control manual de un chat, el bot se pausa para esa conversación.
 > 📎 **Enviar archivos en un chat:** con el chat en **control manual** (bot pausado), al lado de la caja de mensaje aparece un **clip 📎** para adjuntar foto, PDF, audio o video. El archivo queda **en espera** con vista previa (podés **Cambiarlo** o **Quitarlo** con la ✕) y se manda al tocar **Enviar**, pudiendo acompañarlo con un texto. Aplica tanto al director como a los asesores, y solo dentro de las 24 hs desde el último mensaje del cliente.
 
@@ -397,6 +400,23 @@ Con WhatsApp conectado y las **8 plantillas aprobadas por Meta**, PRISMA hace **
 **Qué es:** los leads capturados por WhatsApp (de toda la agencia).
 
 **Cómo usarlo:** abrí un lead para ver su detalle y el **chat en vivo**. Útil para supervisar conversaciones y reasignar si hace falta.
+
+### En la ficha del chat: "Equipo y seguimiento"
+
+Al abrir un chat, en **Información del contacto** (el ícono de la persona arriba a la derecha) hay un bloque nuevo, **Equipo y seguimiento**, que te dice quién tiene ese cliente, qué está pendiente y qué podés hacer:
+
+- **Asesor a cargo:** quién lo atiende hoy, o "Sin asesor".
+- **Reasignar a…:** elegís otro asesor (o vos), con un comentario opcional que él va a leer. Le llega un **email y un WhatsApp** con qué busca el cliente, su último mensaje, tu comentario y el link directo al chat. Si hace más de 24 horas que el cliente no escribe, aparece la opción de **avisarle que ahora lo sigue el asesor nuevo**: le sale un mensaje al cliente y, si contesta, el asesor nuevo lo toma.
+- **Lo tomo yo:** te asignás el chat a vos.
+- **Dar más tiempo:** le das 24 horas más al asesor antes de que el sistema vuelva a avisar.
+- **Marcar como perdido / Reactivar:** cerrás el lead (con el motivo, que queda en la ficha) o lo volvés a abrir si te arrepentiste. El seguimiento automático nunca cierra un lead solo.
+- **Historial:** debajo, con fecha, todo lo que pasó con ese cliente (quién lo tomó, quién lo soltó y por qué, qué avisos salieron).
+
+Si un asesor marcó **"No lo puedo tomar"**, acá ves su motivo y podés decidir en el momento (o en Aprobaciones, sección 28).
+
+### En la ficha del chat: "Agente de seguimiento"
+
+Justo debajo, el bloque **Agente de seguimiento** muestra las últimas decisiones del agente sobre ese cliente: qué decidió (contactar, posponer, abandonar o escalar), cuándo, con qué confianza, **por qué**, el mensaje que propuso, **el dato** en que se basó y **qué miró** antes de decidir. Si tu agencia está "en sombra", dice que no se envió: el agente mira pero no manda.
 
 **Acciones por fila:**
 - **✏️ Editar:** cambiá nombre, teléfono, etiquetas y **clasificación** del lead. Los cambios se reflejan también en la bandeja del chat y en la agenda de Contactos.
@@ -721,6 +741,7 @@ La pantalla se titula "Ajustes Generales". Tiene 5 pestañas:
 
 **1. Mi Perfil**
 - Tu **nombre** visible y foto. El **email** es de solo lectura.
+- **Tu celular (para avisos por WhatsApp):** escribilo dos veces (sin pegar) y guardá. A ese número te llegan los avisos del sistema: un asesor que no puede tomar un chat, un cliente esperando, una aprobación pendiente. Si lo dejás vacío, no cambia. Los celulares de los asesores se cargan desde **Asesores**.
 
 **2. Inmobiliaria**
 - **Nombre** legal/fantasía de la agencia.
@@ -934,3 +955,42 @@ La hoja no menciona de dónde salieron los datos. Es el documento de tu inmobili
 **El mapa se explica solo.** Cada punto de color del mapa tiene su renglón del mismo color en la lista de al lado, y la propiedad es el punto azul oscuro. Nadie tiene que preguntarle al asesor qué es cada cosa. Los renglones que son una cuenta ("20 farmacias a menos de 500 m") o que caen fuera del pedazo de mapa que se muestra van sin punto: la referencia no nombra nada que el cliente no pueda encontrar mirando.
 
 **La ficha se abre bien desde el celular.** La mayoría de tus clientes abre el link desde el teléfono, y hasta ahora veían la mitad izquierda de cada hoja con el título cortado a mitad de palabra. Ahora ven el documento entero. El PDF no cambió: sigue saliendo en A4 exacto.
+
+---
+
+## 28. Aprobaciones (pedidos de tu equipo)
+
+**Qué es:** la pantalla donde llegan las cosas que solo vos podés decidir. Hoy: cuando un asesor marca **"No lo puedo tomar"** en un chat. En el menú, el ítem **Aprobaciones** muestra un número con los pedidos pendientes.
+
+**Qué muestra:** cada pedido con el cliente, el asesor que lo soltó, **su motivo** con sus palabras, hace cuánto lo pidió y cuándo vence. Los pendientes vienen **agrupados por asesor**, así ves de un vistazo quién está soltando chats. Abajo, el historial de lo ya decidido.
+
+**Cómo usarlo:**
+1. Leé el motivo.
+2. Elegí: **Lo tomo yo**, **Reasignar a…** (elegís el asesor, le escribís un comentario y decidís si avisarle al cliente que ahora lo sigue otra persona) o **Dejar sin asesor** (con el motivo).
+3. Listo: el asesor nuevo recibe el aviso por email y WhatsApp, y el pedido pasa al historial.
+
+- Para encontrar un pedido rápido: **buscador** por cliente, teléfono, asesor o motivo, y **filtros** por asesor y por estado.
+- Cada pedido se decide **una sola vez**; si nadie responde en **48 horas**, vence y el chat queda sin asesor (lo ves en la ficha y lo podés reasignar desde ahí).
+
+> 💡 **Tip:** el aviso "un asesor no puede tomar el chat" te llega por email y por WhatsApp (si cargaste tu celular en Mi Perfil) con un link directo a esta pantalla.
+
+---
+
+## 29. El agente de seguimiento y los avisos que te llegan
+
+**Qué es:** el sistema que se ocupa de que ningún cliente quede sin respuesta, y que te avisa cuando el equipo no responde. Tiene tres partes que corren cada media hora.
+
+**1. Seguimiento al cliente.** Cuando una conversación se enfría (el cliente dejó de contestar y nadie le debe nada), el agente espera al menos **20 horas sin mensajes de nadie**, lee el chat completo y decide: retomar con un mensaje natural, esperar, dejar de insistir o avisarle al equipo. Como mucho le escribe **3 veces** a un cliente, siempre entre las **6 y las 23**, y a partir del segundo mensaje le dice cómo pedir que no le escriban más. Nunca inventa: si nombra una propiedad, la verificó antes; si el cliente no dejó su nombre, no le escribe.
+
+**2. Cuando un cliente queda esperando a una persona.** Si el bot lo derivó a un asesor (o el cliente pidió hablar con alguien, o un asesor tomó el chat) y nadie le contestó, el sistema avisa: a las **2 horas** al asesor; a las **5** al asesor y a vos; a las **10** otra vez al asesor; a las **20**, al asesor y a vos para que decidas (reasignar, tomarlo o dar más tiempo). Cada aviso trae **qué busca el cliente y su último mensaje**. El aviso se apaga solo cuando un asesor le escribe al cliente: contestar "ya lo atiendo" por WhatsApp no alcanza.
+
+**3. Recordatorios de visita.** 24 horas, 3 horas y 1 hora antes de cada visita agendada, y un mensaje si el cliente no fue.
+
+**Cómo te llegan los avisos:** siempre por **email**; también por **WhatsApp** (desde el número de tu agencia) si cargaste tu celular en Mi Perfil y Meta ya aprobó la plantilla. Cada aviso tiene un link que te lleva **directo a ese chat**, aunque tengas que iniciar sesión primero.
+
+**Lo que nunca hace:** escribirle a quien pidió que no le escriban; usar otro nombre que el que el cliente dio; afirmar que una propiedad está disponible sin verificarlo; cerrar un lead como perdido; reasignar chats por su cuenta.
+
+> ℹ️ **Encendido y apagado:** el agente puede estar **apagado**, **en sombra** (mira, decide y registra en la ficha, pero no manda nada) o **activo**. Se activa por agencia, y el reloj empieza a contar el día que se enciende: las conversaciones viejas no se persiguen. Ante cualquier duda, se vuelve a sombra en un segundo sin perder nada.
+
+> 💡 **Tip:** para que los avisos por WhatsApp le lleguen a tu equipo, cargá los celulares de los asesores desde **Asesores**. Mientras no estén, reciben todo por email igual.
+

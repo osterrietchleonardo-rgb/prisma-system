@@ -31,6 +31,8 @@
 20. [Créditos IA: cómo funcionan para vos](#20-créditos-ia-cómo-funcionan-para-vos)
 21. [Preguntas frecuentes](#21-preguntas-frecuentes)
 22. [Personalizaciones de tu agencia](#22-personalizaciones-de-tu-agencia)
+23. [El Mapa del Buscador IA](#23-el-mapa-del-buscador-ia)
+24. [Cuando un cliente queda esperando: los avisos y tus botones](#24-cuando-un-cliente-queda-esperando-los-avisos-y-tus-botones)
 
 ---
 
@@ -314,6 +316,10 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 > 🔐 Si al abrir un link de PRISMA (por ejemplo, el del aviso de lead) la app te pide **iniciar sesión de nuevo**, después de entrar te lleva **directo a donde ibas** —no te deja tirado en el inicio—. Si ya tenés la sesión abierta, entrás sin que te pida nada.
 
+### Avisos por WhatsApp y email cuando un cliente te espera
+
+Además de esos emails, cuando **un cliente quedó esperando que lo atiendas** y pasan las horas sin que le escribas, PRISMA te avisa **por email y por WhatsApp** (desde el número de la agencia, si tu director cargó tu celular): a las 2 horas, a las 5 (ahí también le avisa al director), a las 10 y a las 20. Cada aviso trae **qué busca el cliente y su último mensaje**, y un link directo al chat. Se corta solo cuando **le escribís al cliente**; responder "ya lo atiendo" al aviso no lo corta. Detalle y tus botones en la sección 24.
+
 ---
 
 ## 10. Leads WhatsApp
@@ -325,6 +331,13 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 - Trabajalos igual que los de Tokko: respondé, calificá y agendá visitas.
 - **✏️ Editar** un lead (nombre, teléfono, etiquetas y **clasificación**) o **🗑️ eliminarlo** desde su fila. Los cambios se reflejan también en tu bandeja de chats.
 - Usá la **columna y el filtro de Clasificación** (la etiqueta de color) para separar, por ejemplo, los que te escribieron (`Whatsapp-Consulta`) de los que cargaste a mano (`Whatsapp-Manual`).
+
+### En la ficha del chat: "Equipo y seguimiento" y "Agente de seguimiento"
+
+Al abrir un chat, en **Información del contacto** (el ícono de la persona arriba a la derecha) tenés dos bloques nuevos:
+
+- **Equipo y seguimiento:** quién tiene el chat, qué está pendiente (por ejemplo, "responderle al cliente, vence en 21 h"), tus botones **Lo tomo** / **No lo puedo tomar** / **Marcar como perdido** (o **Reactivar**), y el historial con fecha de todo lo que pasó con ese cliente.
+- **Agente de seguimiento:** qué decidió el agente automático sobre ese cliente y por qué: la razón, el mensaje que propuso, el dato en que se basó y qué miró antes.
 
 ---
 
@@ -641,6 +654,7 @@ Tiene 4 pestañas:
 **1. Perfil**
 - Cambiás tu **nombre** visible y tu foto.
 - Tu **email** es de solo lectura (es tu acceso principal).
+- **Tu celular** lo carga tu director desde su pantalla de Asesores: con él cargado, los avisos del sistema te llegan también por WhatsApp (además del email).
 
 **2. Seguridad**
 - Botón **"Restablecer Contraseña"**: te llega un email con un link seguro para cambiarla.
@@ -853,3 +867,21 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 - La descripción de la propiedad **ya no aparece en la portada**: se mudó a esta hoja. La portada quedó más limpia, con el título arriba y los datos del análisis al pie.
 - Si la dirección que cargaste no se puede ubicar en el mapa, la hoja no se genera y la ficha se crea igual, sin ella. No es un error: es que sin ubicación no hay nada honesto que contar.
 - **La ficha se ve completa desde el celular.** Antes, si tu cliente abría el link desde el teléfono, veía la mitad izquierda de cada hoja y el título cortado a mitad de palabra. Ahora se ve la hoja entera, más chica, igualita a como se ve en la computadora. El PDF no cambió en nada: sigue saliendo en A4.
+
+---
+
+## 24. Cuando un cliente queda esperando: los avisos y tus botones
+
+**Qué pasa:** cuando el bot te deriva un cliente (o el cliente pide hablar con una persona, o tomás un chat vos) y no le escribís, el sistema no se olvida: te avisa a las **2 horas**, a las **5** (y ahí también le avisa a tu director), a las **10** y a las **20** (otra vez al director, para que decida qué hacer). Los avisos llegan por **email** y, si tu director cargó tu celular, por **WhatsApp**. Traen lo que necesitás para responder sin abrir nada más: qué busca el cliente, su último mensaje y el link directo al chat.
+
+**Cómo se corta:** escribiéndole al cliente. Cuando le mandás un mensaje, el sistema lo ve y deja de avisar. Responder "ya lo atiendo" al aviso **no** lo corta: lo que cuenta es el mensaje al cliente.
+
+**Tus botones en la ficha del chat** (bloque "Equipo y seguimiento"):
+- **Lo tomo:** confirmás que te ocupás vos.
+- **No lo puedo tomar:** escribís el motivo (obligatorio) y el chat deja de ser tuyo; le llega a tu director con tu motivo para que lo reasigne. No es mala noticia: es mejor que dejar al cliente esperando.
+- **Marcar como perdido:** si el cliente no contesta más, con el motivo. Se puede **Reactivar** después.
+
+**Cuando te asignan un chat** (el director te lo pasa), te llega un aviso con qué busca el cliente, su último mensaje y **el comentario del director**, y en el chat tenés los mismos botones para tomarlo o devolverlo.
+
+> 💡 **Tip:** el seguimiento automático a los clientes que se enfriaron lo hace PRISMA solo, con mensajes naturales y como mucho tres veces; vos vas a ver en la ficha qué decidió y por qué. Lo tuyo son los clientes que **te esperan a vos**.
+

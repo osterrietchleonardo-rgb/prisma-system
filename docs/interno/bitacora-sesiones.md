@@ -16,6 +16,67 @@
 
 ---
 
+## 2026-08-27 (y la noche del 26): el Super Agente llegó a main
+
+**Estado al cierre:** fase 1 del Super Agente de Seguimiento **completa y en `main`** (Tasks 0-20 del
+plan `docs/superpowers/plans/2026-08-22-super-agente-v4.md`). PRISMAIA **apagada** (decisión de
+Leonardo: "cero decisiones, cero sombra"); Central **en sombra**; se enciende con su OK explícito, cuando
+Kevin cargue los celulares del equipo (26 asesores y 4 directores, hoy 0 celulares). Reloj n8n
+`SuperAgente_Reloj` con tres tareas cada 30 min (`seguimiento`, `visitas`, `escalamiento`). Documentación
+al día: `TECNICO-PRISMA.md` §22, `LOGICA-PRISMA.md` §29, guías del director (§11, §20, §28, §29) y del
+asesor (§9, §10, §18, §24). Repaso de flujos y topes para Leonardo:
+https://claude.ai/code/artifact/47bf29fb-0659-4f1b-b76d-ceb98743b625
+
+**Qué se construyó (commits en `feat/super-agente-fase-1`, merges a main `3137a13`, `5507b02`,
+`32395ab`, `d6d4427`, `3643091`):**
+- **Webhook 503 cuando la base cae** (`fix/webhook-503-base-caida`): durante la caída de Supabase del
+  26/8 (02:20–03:29) el webhook de Meta devolvía 200 sin procesar y Meta no reintentaba; ahora 503.
+- **Tasks 13-14:** compromisos (`compromisos.ts`) y el aviso al asesor en el mismo acto de escalar
+  (`avisos.ts`), probado real al celular de Leonardo.
+- **Reasignación y Aprobaciones** (fase 2 adelantada por pedido de Leonardo): el asesor no reasigna
+  (Lo tomo / No lo puedo tomar con motivo / Marcar perdido / Reactivar); el director reasigna, toma,
+  da tiempo; pantalla `/director/aprobaciones` consume-once con contador, buscador y filtros; tabla
+  `aprobaciones`; link de otro rol → mismo chat en la ruta propia; celular del director en Mi Perfil.
+  Leonardo lo probó de punta a punta desde sus dos cuentas.
+- **Contexto en todos los avisos** (`contexto.ts`): qué busca + último mensaje con fecha + la parte
+  humana etiquetada. Regla suya: "me gusta más esta versión para todos los avisos".
+- **Task 15** (ejecutor, solo en activo), **16** (visitas), **18** (panel del agente en la ficha),
+  **19 → la escalera** 2 h / 5 h / 10 h / 20 h del lead que espera a un humano, verificada contra el chat,
+  sin tope por agencia, con los dos casos de handoff (bot apagado con promesa; bot activo diciendo "el
+  asesor se va a comunicar": 109 chats así en Central en 30 días).
+- **Central:** sus 9 plantillas nuevas creadas en su WABA (3 aprobadas al 27/8).
+
+**Los hallazgos que vale la pena dejar anotados:**
+1. **Los 360 seguimientos por plantilla del flujo viejo (6/6 → 5/8, 300 de Central) nunca llegaron.**
+   `dispatch` le mandaba a Evolution `variables`; Evolution 2.3.7 espera `components`; la plantilla
+   salía sin parámetros, Meta la rechazaba con `(#132000)` y Evolution respondía **201 con el error
+   adentro**, que se tomaba por éxito. Probado con envíos reales: con `components` llegó, con
+   `variables` no. Consecuencia en Central: 130 leads con seguimientos fantasma, 68 cerrados como
+   perdidos por "inactividad tras el 3º seguimiento" que nunca salió. Fix en main (`d660297`). Decisión
+   de Leonardo: no reabrir los 68 hasta tener reasignación y aprobaciones (hoy ya están); "por el
+   momento no". **Regla desde ahora: sin `wamid` no es éxito.**
+2. **Evolution `sendTemplate` no sirve para los avisos al equipo**: los avisos van por Meta Graph
+   directo (el camino de las campañas, con entrega verificada).
+3. **Vercel bloqueó un deploy** (BLOCKED sin error visible) el rato en que el repo estuvo privado: en
+   plan Hobby el autor del commit tiene que ser la cuenta dueña. Leonardo lo volvió a público y puso
+   su email de empresa como global de git.
+4. **Un `next dev` viejo pegado al puerto** hizo que la prueba B del webhook le pegara al servidor
+   equivocado (503 falso); y **`npm run build` comparte `.next` con el dev server**: los builds
+   cortados a mitad dejaron la ficha con "Jest worker encountered 2 child process exceptions" hasta
+   borrar `.next`. Con la máquina cargada el build tarda más de 10 min: se lanza como proceso
+   independiente con log.
+5. **La RLS de `wa_conversations` no deja a un asesor soltar su propio chat** (ALL con `agent_id =
+   auth.uid()`): las acciones del equipo escriben con el cliente de servidor después de verificar rol.
+6. **El primer aviso de reasignación no servía** ("Víctor te asignó el chat de Belen: es de tu
+   zona"): sin contexto no vale nada y los dos puntos no se entendían. De ahí la regla del contexto.
+
+**Decisiones de Leonardo del 27/8 (repaso de flujos y topes):** PRISMAIA apagada; solo plantillas
+nuevas; escalera 2/5/10/20 h sin tope por agencia; 3 intentos por lead; silencio mínimo 20 h; el reloj
+arranca el día del encendido (`activo_desde`, backlog intacto); agencias nuevas arrancan activas al
+conectar WhatsApp. Pendiente: encender Central (cuando Kevin cargue celulares), reabrir el backlog
+(algún día), pasar el reloj n8n a producción, rotar el secreto del acm-extractor, y el bug de los links
+`/director/leads-whatsapp/Mensaje%20de%20voz%20recibido`.
+
 ## 2026-08-26
 
 **Etapa B cerrada: los documentos de cada asesor ya viven adentro del sistema** (rama

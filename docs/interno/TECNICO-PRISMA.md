@@ -29,6 +29,8 @@
 18. [Despliegue y entornos](#18-despliegue-y-entornos)
 19. [Variables de Entorno](#19-variables-de-entorno)
 20. [Deuda técnica y código legacy](#20-deuda-técnica-y-código-legacy)
+21. [Mapa del Buscador IA](#21-mapa-del-buscador-ia)
+22. [Super Agente de Seguimiento (fase 1)](#22-super-agente-de-seguimiento-fase-1)
 
 ---
 
@@ -598,7 +600,7 @@ Sub-workflow `NQtasQlz0N86Oxa6`. El nodo Postgres **`CARTERA_PROPIEDADES`** arma
 > Backups: `PRISMA.BACKUP-2026-08-07{c-PRE-EXPENSAS,d-PRE-SIN-PROMESAS,e-PRE-RESIDUOS}.json`.
 
 ### 9.3 Templates de seguimiento (`POST /api/whatsapp/dispatch`)
-Auth por `DISPATCH_SECRET`. Prefijo por agencia `ag{agency_id[0:6]}_`. 8 templates: `seg_f1_seguimiento`, `seg_f2_valor`, `seg_f3_breakup`, `visita_recordatorio_24h/3h/1h`, `visita_post_noshow`, `reactivacion_snoozed`. Persiste en `wa_messages` + `n8n_chat_histories` + registra en `follow_ups_history` (con snapshot del estado). Broadcast Realtime.
+Auth por `DISPATCH_SECRET`. **Bug histórico corregido el 26/8/2026 (`main` d660297):** el envío por Evolution mandaba el campo `variables`, pero Evolution 2.3.7 (`SendTemplateDto`) espera `components`; la plantilla salía sin parámetros, Meta la rechazaba con `(#132000)` y Evolution respondía **201 con el error en el cuerpo**, que el dispatch tomaba por éxito. Resultado: 360 plantillas (6/6→5/8, 300 de Central) guardadas como enviadas y ninguna entregada. Ahora manda `components`, y un error de Meta en el cuerpo o la falta de `wamid` devuelve 502. **Regla:** sin `wamid` no es éxito. Prefijo por agencia `ag{agency_id[0:6]}_`. 17 templates (8 viejas + 5 v2 + 4 del equipo; el Super Agente usa SOLO las v2): `seg_f1_seguimiento`, `seg_f2_valor`, `seg_f3_breakup`, `visita_recordatorio_24h/3h/1h`, `visita_post_noshow`, `reactivacion_snoozed`. Persiste en `wa_messages` + `n8n_chat_histories` + registra en `follow_ups_history` (con snapshot del estado). Broadcast Realtime.
 
 **Motor de seguimientos (n8n `Seguimiento`, cada 30 min).** Dos ramas: **F** (inactividad, gate `requires_follow_up=true` + `bot_active=true` + nombre presente) y **V** (recordatorios de visita, gate `visit_status='scheduled'` + nombre presente; NO filtra por `bot_active`). Las columnas de visita (`visit_status`, `visit_scheduled_at`, `visit_address`) las gobierna el **trigger `trg_sync_visit_to_conversation`** sobre `scheduled_visits` (función `sync_visit_to_conversation()`), no el bot: mapea `estado_visita`→`visit_status` (agendada/reprogramada→scheduled, confirmada→confirmed, realizada→completed, no_asistio→no_show, cancelada/DELETE→cancelled), matchea por `agency_id`+teléfono normalizado, reactiva `requires_follow_up` al cancelar/no-show. Migración `20260710120000_visitas_calendario_sync.sql`. El nodo `Actualizar_Metricas2` (workflow `PRISMA`) ya NO escribe `visit_status`/`visit_scheduled_at`; el nodo `Edit Fields` (rama V) usa `visit_address` con fallback al LLM `Mensaje V`.
 
@@ -1320,6 +1322,46 @@ terminar** por el techo de 8 s: devuelve 500 con un statement timeout. No rompe 
 
 La cola de trazado la arma la base sola: busca las propiedades que no caen dentro de
 ninguna manzana. Si la red publica en una zona nueva, se traza esa misma noche.
+
+## 22. Super Agente de Seguimiento (fase 1)
+
+Plan maestro (única fuente de la visión y de cada Task): `docs/superpowers/plans/2026-08-22-super-agente-v4.md`. Estado al 28/8/2026: **fase 1 completa y mergeada** (Tasks 0-20), en `main`. PRISMAIA `apagado`; Central `sombra` (se enciende con OK explícito de Leonardo).
+
+### 22.1 Arquitectura: cinco capas, un reloj
+1. **Elegibilidad (SQL)** — `seguimiento_candidatos(p_limit)`: `requires_follow_up`, sin opt-out, `bot_active=true`, `next_follow_up_at <= now()`, embudo abierto, sin visita agendada, **nombre en `metricas.nombre`** (jamás el de WhatsApp), instancia con flujos y plantillas, silencio ≥ `silencio_minimo_horas`, `follow_ups_sent < max_intentos`, y **`last_message_at >= activo_desde`** (el reloj arranca el día del encendido).
+2. **Prioridad** — `lib/seguimiento/prioridad.ts` (`calcularScore`): compromiso por vencer +40, visita hecha +20, señales de `metricas` (presupuesto, zona, propiedad, crédito, urgencia, email), −10 por intento. Pasan `MAX_LLM = 8` por corrida; dedupe de 20 h por lead (`DEDUPE_HORAS`).
+3. **Decisión (loop de agente)** — `lib/seguimiento/agente.ts`: `@anthropic-ai/sdk`, `claude-sonnet-5`, prompt cacheado, herramientas de solo lectura (`leer_mensajes`, `leer_intentos_previos`, `leer_compromisos`, `leer_propiedad` en `herramientas.ts`), decisión como tool call `emitir_decision` validada con Zod (`tipos.ts`: `DecisionAgenteSchema` + `validarCoherencia`), `MAX_ITERACIONES = 6`, `requisitosInvestigacion` (leer mensajes e intentos antes de contactar). Semilla en `semilla.ts`. Costo estimado en `estimarCostoUSD` (3/15/0,3 USD/MTok); tope `TOPE_COSTO_USD = 0.1` → evento `costo_alto`. Solo elige entre las plantillas **v2 aprobadas** de su agencia (`NOMBRES_V2`).
+4. **Ejecución con guardrails** — `guardrails.ts` (`puedeEjecutar`: confianza ≥ 0.5, presupuesto diario por día AR, no repetir en el día, `max_intentos`, opt-out, bot activo, handoff solo bloquea `contactar`; `sigueElegible`: relectura anti-colisión) y `ejecutor.ts` (`ejecutarDecision`: POST al `dispatch` del mismo origen con `x-api-key` y, en preview, `x-vercel-protection-bypass`; `aplicarSinEnvio` para posponer/abandonar — **abandonar nunca cierra como perdido**). Corre **solo con `modo = 'activo'`**.
+5. **Registro** — `seguimiento_decisiones` (razón, confianza, plantilla, frase, `decision_cruda` con evidencia, `contexto_snapshot` con los pasos y tokens, `resultado`, `costo_usd`), `compromisos`, `lead_eventos`, `interacciones_canal`.
+
+**Runner:** `POST /api/seguimiento/run` (`app/api/seguimiento/run/route.ts`), auth `x-api-key = SEGUIMIENTO_SECRET`, body `{"tarea": "seguimiento" | "visitas" | "escalamiento"}`, `maxDuration 300`, `DEADLINE_MS 200000`, `MAX_CANDIDATOS 200`. Kill-switch global: `SEGUIMIENTO_MODO=apagado`. **Reloj:** workflow n8n `SuperAgente_Reloj` (id `qSMsyCv2rgaClTOl`), cron `*/30 * * * *`, tres nodos HTTP (una tarea cada uno), credencial Custom Auth `HcvGXnuZnwH4AHbB` (headers `x-api-key` + `x-vercel-protection-bypass`); apunta al alias del preview de la rama (pasarlo a producción = cambiar la URL, con OK).
+
+### 22.2 Tablas y funciones (todas aditivas, aplicadas por Management API)
+- `2026-08-24-super-agente-fase1.sql`: `seguimiento_config` (modo `apagado|sombra|activo`, `silencio_minimo_horas` 20, `max_intentos` 3, `max_mensajes_dia` 50, `escalamiento_horas`, `max_escalamientos_dia`, `llamadas_habilitadas`), `seguimiento_decisiones`, `compromisos` (tipos `visita_agendada|respuesta_pendiente|documentacion_pendiente|envio_prometido|llamada_prometida`, estados `activo|cumplido|vencido|cancelado`), `lead_eventos`; RLS: director toda su agencia, asesor solo `wa_conversations.agent_id = auth.uid()`; funciones `seguimiento_candidatos`, `seguimiento_esperando_humano`, `seguimiento_marcar_visitas_realizadas`.
+- `2026-08-26-interacciones-canal.sql`: `interacciones_canal` (destinatario `lead|asesor|director`, canal `email|llamada|whatsapp|interno`, dirección, `wamid` único parcial, metadata). Es la memoria de TODO lo que salió o entró por un canal hacia el equipo.
+- `2026-08-27-aprobaciones.sql`: `aprobaciones` consume-once (`tipo`, `solicitada_por`, `accion` jsonb con la llamada exacta, `justificacion`, `estado pendiente|aprobada|rechazada|vencida`, `decision`, `consumida`, `vence_en` 48 h). RLS select solo director; escrituras por service role desde server actions.
+- `2026-08-27-activo-desde.sql`: `seguimiento_config.activo_desde` + `seguimiento_candidatos` con el corte.
+
+### 22.3 Equipo: reasignación, aprobaciones y avisos
+- **Server actions** `app/actions/equipo.ts` (usan `createAdminClient()` porque la RLS no deja al asesor soltar su propio chat): `estadoEquipo`, `tomarChat`, `noPuedoTomar` (justificación ≥ 10 letras; `agent_id = null`; crea `aprobaciones` tipo `reasignar`; avisa al director), `reasignarChat` (director; compromiso `respuesta_pendiente` 24 h; aviso al asesor nuevo; opcional reabrir con el cliente por `seg_pendiente` vía dispatch si la ventana de 24 h cerró y el lead tiene nombre), `darMasTiempo`, `marcarPerdido`, `reactivarLead`, `listarAprobaciones`, `contarAprobacionesPendientes`, `resolverAprobacion` (consume-once: `lo_tomo | reasignar | rechazar`).
+- **UI:** `components/seguimiento/EquipoPanel.tsx` (bloque "Equipo y seguimiento" en `LeadTraceability`), `components/seguimiento/SeguimientoPanel.tsx` (decisiones del agente con razón/evidencia/trace), `app/director/aprobaciones/` (buscador, filtros, agrupado por quién pidió), ítem "Aprobaciones" con contador en `director-sidebar.tsx`. El director carga su celular en Configuración → Mi Perfil (`VerifiedPhoneField`, guarda `profiles.phone` como `549…` sin `+`).
+- **Middleware:** un link de otro rol (`/asesor/leads-whatsapp/[id]` abierto por un director, o al revés) redirige al mismo chat en la ruta propia; el `?next=` del login ya existía.
+- **Avisos** (`lib/seguimiento/avisos.ts` + `contexto.ts` + `equipo.ts`): email por Resend siempre (remitente "Agencia vía PRISMA"), WhatsApp además si el perfil tiene celular y la plantilla del equipo está `APPROVED` en esa agencia (si no: `omitido_plantilla_no_aprobada`, el email va igual). **Meta Graph directo primero** (`phone_number_id` + `token`, el camino de las campañas); Evolution `sendTemplate` con `components` solo como fallback. Todo aviso lleva **contexto** (qué busca desde `metricas` + último mensaje con fecha AR) y cada parte etiquetada ("Comentario de Víctor: «…»", "Motivo de Martín: «…»", "Qué pasa: …"). Registro en `interacciones_canal` (resultado por canal, motivo si se omitió, `wamid`) y `lead_eventos`.
+- **Plantillas del equipo** (`lib/whatsapp/plantillas-v2.ts`, `plantillasEquipo`): `asesor_cliente_esperando`, `asesor_sigue_esperando`, `director_asesor_sin_respuesta`, `director_aprobacion_pendiente` (UTILITY; regla de Meta: sin variable al inicio ni al final). Se crean con `injectCoreTemplates` al conectar WhatsApp, que además crea `seguimiento_config` (`modo='activo'`, `activo_desde=now()`) para toda agencia nueva.
+
+### 22.4 La escalera del lead que espera a un humano (`lib/seguimiento/escalamiento.ts`)
+`esperandoHumano(c)` = `bot_active=false` ∨ `metricas.fue_derivado_a_humano='true'` ∨ `solicito_hablar_con_humano='true'` ∨ `etapa='handoff'`. Caso abierto = último mensaje del lead (`t0`) **sin ningún `wa_messages.role='human'` posterior** (la promesa "ya lo atiendo" por WhatsApp no cierra nada). Niveles desde `t0`: **2 h asesor · 5 h asesor+director · 10 h asesor (`asesor_sigue_esperando`) · 20 h asesor+director**; `nivelQueToca` manda solo el más alto alcanzado y cada nivel una vez por caso (`lead_eventos` tipo `escalera` con `datos.t0` y `datos.nivel`); sin tope por agencia; casos de más de 14 días no cuentan; `casoCuenta(t0, activo_desde)`. Sin asesor asignado, los avisos van al director. En sombra registra `escalera_simulada`. El aviso suelto del agente al `escalar` se delega a la escalera cuando el lead está esperando a un humano (`aviso_delegado_escalera`). Recordatorios de visita: `visitas.ts` (24 h/3 h/1 h/no-show ≤ 48 h, sin IA).
+
+### 22.5 Variables de entorno
+`SEGUIMIENTO_SECRET`, `SEGUIMIENTO_MODO` (kill-switch), `ANTHROPIC_API_KEY` (no dejar `ANTHROPIC_BASE_URL=""`: un valor vacío rompe el cliente), `DISPATCH_SECRET`, `VERCEL_AUTOMATION_BYPASS_SECRET` (self-call al dispatch en preview), `RESEND_API_KEY` + `RESEND_FROM`, `EVOLUTION_API_URL/KEY` (fallback), `NEXT_PUBLIC_APP_URL`.
+
+### 22.6 Runbooks
+- **Encender una agencia:** `update seguimiento_config set modo='activo', activo_desde=now() where agency_id=…` (con OK explícito). **Frenar:** `modo='sombra'` (sigue mirando) o `SEGUIMIENTO_MODO=apagado` en Vercel (todas).
+- **Probar en local sin mandar nada:** todas las agencias en `sombra`/`apagado` y `curl -X POST localhost:3012/api/seguimiento/run -H "x-api-key: $SEGUIMIENTO_SECRET" -d '{"tarea":"escalamiento"}'`. Pruebas manuales (untracked, en el worktree): `manual-real.test.ts`, `manual-aviso-real.test.ts`, `manual-crear-plantillas-v2.test.ts` (`SEGUIMIENTO_CREAR_PLANTILLAS=<agency> SEGUIMIENTO_CATALOGO=todo`), `manual-escalera-sombra.test.ts`.
+- **Estado real de las plantillas en Meta:** `node scratch/_sa-plantillas-estado-meta.mjs <agency_id>` (la fila de `wa_templates` se sincroniza a las 00:00 UTC).
+- **Gotchas:** el dev server y `npm run build` comparten `.next` en el mismo worktree (correr el build con el dev apagado, como proceso independiente si la máquina está cargada); Vercel Hobby bloquea el deploy si el repo es privado y el autor del commit no es la cuenta dueña (`osterrietchleonardo@vakdor.com`); Evolution `findMessages` no guarda los salientes de esta instancia (no sirve para auditar entregas: usar `wamid`).
+
+---
 
 ## FIN DEL DOCUMENTO
 
