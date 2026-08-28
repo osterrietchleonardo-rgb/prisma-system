@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest"
 import PizZip from "pizzip"
 
-import { ponerHuecosEnDocx, rellenarDocx, textoDeDocx, huecosDe } from "@/lib/plantillas/docx"
+import { ponerHuecosEnDocx, rellenarDocx, textoDeDocx, textoPorParte, huecosDe } from "@/lib/plantillas/docx"
 import { detectarHuecos } from "@/lib/plantillas/deteccion"
 import { formDataDe, leerPropuestaConfirmada, reemplazosDelMolde } from "./confirmacion"
-import { verificarContraElOriginal } from "./verificacion"
+import { verificarContraElOriginal, verificarDocumentoEntero } from "./verificacion"
 
 /**
  * EL RECORRIDO ENTERO, contra .docx de verdad.
@@ -132,9 +132,8 @@ async function recorridoCompleto() {
       const datos = formDataDe(leido.propuesta.huecos, p.id)
       if (datos === null) return { quien: p.nombre, coincide: false, observacion: "no entró en la comparación" }
       const armado = rellenarDocx(puesta.zip, datos)
-      const texto = await textoDeDocx(Buffer.from(armado.generate({ type: "nodebuffer" })))
-      const original = await textoDeDocx(buffer(zips.get(p.id)!))
-      const v = verificarContraElOriginal(original, texto)
+      // Las MISMAS partes que el molde toca, igual que el endpoint.
+      const v = verificarDocumentoEntero(textoPorParte(zips.get(p.id)!), textoPorParte(armado))
       return { quien: p.nombre, ...v }
     }),
   )
@@ -260,5 +259,61 @@ describe("el recorrido entero contra .docx de verdad", () => {
     const { deteccion, leido } = await recorridoCompleto()
     expect(leido.propuesta.huecos.length).toBeLessThan(deteccion.huecos.length)
     expect(leido.advertencias.some((a) => a.includes("dice exactamente lo mismo"))).toBe(true)
+  })
+})
+
+describe("las partes que mammoth no lee", () => {
+  /** El mismo .docx, pero con encabezado. */
+  function conEncabezado(parrafos: string[], encabezado: string): PizZip {
+    const base = "application/vnd.openxmlformats-officedocument.wordprocessingml"
+    const zip = docx(parrafos)
+    zip.file(
+      "[Content_Types].xml",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="${base}.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="${base}.header+xml"/></Types>`,
+    )
+    zip
+      .folder("word")!
+      .file(
+        "header1.xml",
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${parrafo(encabezado)}</w:hdr>`,
+      )
+    return zip
+  }
+
+  it("textoPorParte SÍ trae el encabezado; textoDeDocx no", async () => {
+    /**
+     * Este par es el que explica el agujero entero: la comprobación usaba
+     * mammoth, mammoth lee el cuerpo, y todo lo que estuviera en el encabezado
+     * pasaba en verde.
+     */
+    const zip = conEncabezado([parrafo("Cuerpo del contrato.")], "Legajo interno 8892")
+
+    const soloCuerpo = await textoDeDocx(buffer(zip))
+    expect(soloCuerpo).not.toContain("8892")
+
+    const todo = textoPorParte(zip)
+    expect(Object.keys(todo)).toContain("word/header1.xml")
+    expect(todo["word/header1.xml"]).toContain("8892")
+  })
+
+  it("un legajo que vive SOLO en el encabezado deja al otro asesor en rojo", () => {
+    const deAna = conEncabezado([parrafo("Contrato de Ana Ruiz, CUIT 27-31456789-4.")], "Legajo interno 8892")
+    const deBruno = conEncabezado([parrafo("Contrato de Bruno Sosa, CUIT 20-28765432-1.")], "Legajo interno 4471")
+
+    // El molde sale del .docx de Ana; el legajo NO es campo porque la
+    // detección nunca lo vio.
+    const puesta = ponerHuecosEnDocx(deAna, [
+      { buscado: "Ana Ruiz", hueco: "{{NOMBRE}}" },
+      { buscado: "27-31456789-4", hueco: "{{CUIT}}" },
+    ])
+    const armado = rellenarDocx(puesta.zip, { NOMBRE: "Bruno Sosa", CUIT: "20-28765432-1" })
+
+    // El cuerpo solo daría verde. El documento entero, no.
+    expect(verificarContraElOriginal(textoPorParte(deBruno)["word/document.xml"], textoPorParte(armado)["word/document.xml"]).coincide).toBe(true)
+
+    const v = verificarDocumentoEntero(textoPorParte(deBruno), textoPorParte(armado))
+    expect(v.coincide).toBe(false)
+    expect(v.observacion).toContain("encabezado")
+    expect(v.observacion).toContain("4471")
   })
 })

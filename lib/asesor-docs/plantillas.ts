@@ -1,3 +1,5 @@
+import type { PropuestaHueco } from "@/lib/asesor-docs/propuesta"
+
 /**
  * Lo que la solapa "Plantillas" muestra de cada tipo de documento, y las
  * reglas puras que lo deciden.
@@ -280,16 +282,23 @@ export const NADA_SE_GUARDA_TODAVIA =
   "Todavía no se guardó nada. Recién al confirmar se crea la plantilla y se revisa contra el documento de cada asesor."
 
 /**
- * El límite de la verificación, dicho de frente.
+ * El límite de la comprobación, dicho de frente.
  *
- * `textoDeDocx` lee el CUERPO del documento (mammoth no trae encabezado ni
- * pie). Los huecos sí se marcan y se rellenan ahí, pero la comprobación
- * contra el archivo original no los mira. Callarlo dejaría al director creyendo
- * que se revisó el archivo entero.
+ * Mira EXACTAMENTE las mismas partes que el molde modifica: cuerpo,
+ * encabezado, pie, notas al pie y comentarios. Antes miraba solo el cuerpo
+ * —mammoth no trae el resto— y eso dejaba pasar en VERDE un dato de encabezado
+ * que salía con el número de otra persona: la detección tampoco lo ve, así que
+ * nunca es campo, y el molde se lo lleva literal del asesor que hizo de molde.
+ *
+ * Lo que sigue afuera, y por eso hay que decirlo: las notas al FINAL
+ * (`endnotes`), que docxtemplater no rellena y `docx.ts` deja afuera a
+ * propósito, y los cuadros de texto, que no se revisan por dentro para no
+ * arriesgar romper el archivo. Los dos casos se informan aparte cuando pasan.
  */
-export const LIMITE_ENCABEZADO_Y_PIE =
-  "La comprobación mira el cuerpo del documento. Si el contrato tiene datos en el encabezado o en el pie de " +
-  "página, esos se marcan y se rellenan igual, pero hay que revisarlos a ojo."
+export const LIMITE_DE_LA_COMPROBACION =
+  "La comprobación mira el cuerpo, el encabezado, el pie de página, las notas al pie y los comentarios: las mismas " +
+  "partes que la plantilla toca. Lo único que queda afuera son las notas al final del documento y los cuadros de " +
+  "texto; si el contrato usa alguno, te lo avisamos aparte."
 
 /**
  * Hasta cuántas letras un dato se considera demasiado corto.
@@ -328,3 +337,71 @@ export function avisoDeDatoCorto(valor: string): string | null {
 export const SI_ALGUNO_QUEDA_EN_ROJO =
   "Si aunque sea un asesor no coincide, la plantilla se guarda igual pero queda como borrador y no se usa para " +
   "nadie, y vas a ver quién falló y por qué."
+
+// ---------------------------------------------------------------------------
+// El mismo dato escrito dos veces
+// ---------------------------------------------------------------------------
+
+/**
+ * Vive acá y no en `confirmacion.ts` por el mismo motivo que el resto de este
+ * archivo: lo necesita el NAVEGADOR. La barra de la pantalla de revisión tiene
+ * que decir cuántos campos se van a guardar de verdad, y eso depende de esta
+ * fusión — decir "23" cuando se guardan 8 es un número que miente. El tipo
+ * viene con `import type`, que desaparece al compilar y no arrastra nada.
+ */
+/**
+ * Junta en uno solo los huecos que son EL MISMO DATO escrito dos veces.
+ *
+ * El caso, que es el más común de todos en un contrato: el nombre del asesor
+ * aparece en la cláusula de arriba y otra vez en la firma. La detección los ve
+ * como dos lugares distintos y propone dos campos.
+ *
+ * Por qué hay que juntarlos, y no es una prolijidad: `ponerHuecosEnDocx`
+ * reemplaza TODAS las apariciones de cada texto —está escrito así a propósito,
+ * "si el nombre está en la cláusula y en la firma, las dos tienen que cambiar"—.
+ * Así que el primer campo se lleva los dos lugares y el segundo se queda sin
+ * ninguno. El documento sale bien (los dos lugares dicen lo que tienen que
+ * decir), pero queda un campo de adorno: uno que va a figurar en el formulario
+ * de la plantilla y que editarlo no va a cambiar nada. Y, peor, el segundo
+ * aparecería como "no se pudo marcar" y trabaría la plantilla entera por algo
+ * que no está mal.
+ *
+ * La condición para juntar es dura: los dos tienen que tener EXACTAMENTE el
+ * mismo texto para TODOS los asesores. Si difieren aunque sea en uno, son dos
+ * datos distintos que casualmente coinciden en el documento molde — y eso sí es
+ * un problema, porque el .docx no tiene cómo distinguir dos textos idénticos.
+ * En ese caso no se juntan, el segundo queda sin marcar y la verificación lo
+ * pone en rojo, que es lo correcto.
+ *
+ * Un hueco sin ningún valor no se junta con nada: no hay con qué comparar.
+ */
+export function fusionarHuecosIguales(huecos: PropuestaHueco[]): {
+  huecos: PropuestaHueco[]
+  advertencias: string[]
+} {
+  const porContenido = new Map<string, PropuestaHueco>()
+  const salida: PropuestaHueco[] = []
+  const advertencias: string[] = []
+
+  for (const h of huecos) {
+    const claves = Object.keys(h.valores).sort()
+    if (claves.length === 0) {
+      salida.push(h)
+      continue
+    }
+    const firma = JSON.stringify(claves.map((k) => [k, h.valores[k]]))
+
+    const yaEsta = porContenido.get(firma)
+    if (yaEsta) {
+      advertencias.push(
+        `"${h.nombre.trim() || h.id}" dice exactamente lo mismo que "${yaEsta.nombre.trim() || yaEsta.id}" en ` +
+          `todos los asesores: se guarda un campo solo, y ese dato se escribe en los dos lugares del contrato.`,
+      )
+      continue
+    }
+    porContenido.set(firma, h)
+    salida.push(h)
+  }
+
+  return { huecos: salida, advertencias }
+}

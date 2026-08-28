@@ -238,3 +238,93 @@ export function verificarContraElOriginal(original: string, armado: string): Ver
       `borró al revisar, o un dato de esta persona que también aparece en una parte fija del contrato.`,
   }
 }
+
+// ---------------------------------------------------------------------------
+// EL DOCUMENTO ENTERO, NO SOLO EL CUERPO
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ El falso verde que costó una ronda ═══
+ *
+ * `verificarContraElOriginal` compara DOS TEXTOS. Si esos textos salen de
+ * mammoth, son el CUERPO del documento y nada más — y ahí hay un agujero real,
+ * medido:
+ *
+ *   · el encabezado de Ana dice "Legajo interno 8892", el de Bruno "4471";
+ *   · la detección compara cuerpos, así que el legajo NUNCA sale como campo;
+ *   · el molde se arma del .docx de Ana y su encabezado queda con "8892";
+ *   · el contrato de Bruno sale con el legajo de Ana;
+ *   · y la comprobación, mirando solo el cuerpo, decía VERDE.
+ *
+ * Peor todavía: sin nada en rojo, la plantilla podía llegar a `activa`.
+ *
+ * La regla, entonces: **la verificación mira exactamente las mismas partes que
+ * el molde modifica.** `ponerHuecosEnDocx` toca cuerpo, encabezado, pie, notas
+ * al pie y comentarios (`partesDeTextoDeDocx`); `textoPorParte` devuelve esas
+ * mismas, y esto las compara una por una.
+ *
+ * Comparar parte por parte y no todo pegado no es prolijidad: si se
+ * concatenara, una diferencia en el encabezado se informaría con el contexto
+ * del cuerpo y el director iría a buscarla donde no está.
+ *
+ * Lo que sigue quedando afuera, y por eso se avisa por escrito:
+ *  · `word/endnotes.xml` — docxtemplater no lo rellena, así que `docx.ts` lo
+ *    deja afuera a propósito y lo informa como faltante;
+ *  · los cuadros de texto y las formas, que `ponerHuecosEnDocx` no revisa por
+ *    dentro y devuelve en sus `advertencias`.
+ */
+
+/** Cómo se llama cada parte del paquete, para una persona. */
+export function nombreDeParte(ruta: string): string {
+  if (ruta === "word/document.xml") return "el cuerpo del documento"
+  if (/header/i.test(ruta)) return "el encabezado"
+  if (/footnotes/i.test(ruta)) return "las notas al pie"
+  if (/footer/i.test(ruta)) return "el pie de página"
+  if (/comments/i.test(ruta)) return "los comentarios"
+  return `la parte "${ruta}"`
+}
+
+/**
+ * Compara el documento ENTERO contra el original, parte por parte.
+ *
+ * Se informa la PRIMERA parte que no coincide, con el cuerpo primero: es donde
+ * está el contrato y donde el director va a mirar. Una parte que está en uno y
+ * no en el otro también es una diferencia — y de las que más asustan, porque
+ * significa que el molde perdió o inventó un encabezado.
+ */
+export function verificarDocumentoEntero(
+  original: Record<string, string>,
+  armado: Record<string, string>,
+): Verificacion {
+  const rutas = [...new Set([...Object.keys(original), ...Object.keys(armado)])].sort((a, b) => {
+    // El cuerpo primero; el resto por nombre, para que el resultado no dependa
+    // del orden en que el paquete declare sus partes.
+    if (a === "word/document.xml") return -1
+    if (b === "word/document.xml") return 1
+    return a.localeCompare(b)
+  })
+
+  for (const ruta of rutas) {
+    const enUno = Object.prototype.hasOwnProperty.call(original, ruta)
+    const enOtro = Object.prototype.hasOwnProperty.call(armado, ruta)
+
+    if (enUno !== enOtro) {
+      return {
+        coincide: false,
+        observacion:
+          `${enUno ? "Falta" : "Sobra"} ${nombreDeParte(ruta)} en el documento armado con la plantilla. El molde ` +
+          `no tiene la misma estructura que el archivo de esta persona: revisá que los dos sean el mismo tipo de ` +
+          `documento.`,
+      }
+    }
+
+    const v = verificarContraElOriginal(original[ruta] ?? "", armado[ruta] ?? "")
+    if (v.coincide) continue
+
+    // En el cuerpo no hace falta decir dónde: es lo que todo el mundo supone.
+    if (ruta === "word/document.xml") return v
+    return { coincide: false, observacion: `En ${nombreDeParte(ruta)}: ${v.observacion}` }
+  }
+
+  return { coincide: true, observacion: null }
+}

@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest"
-import { normalizarParaComparar, primeraDiferencia, verificarContraElOriginal } from "./verificacion"
+import {
+  nombreDeParte,
+  normalizarParaComparar,
+  primeraDiferencia,
+  verificarContraElOriginal,
+  verificarDocumentoEntero,
+} from "./verificacion"
 
 /**
  * ESTE ARCHIVO ES LA LÍNEA.
@@ -240,5 +246,128 @@ describe("primeraDiferencia", () => {
 
   it("con el texto vacío de un lado devuelve el otro entero", () => {
     expect(primeraDiferencia("hola", "")).toEqual({ enElOriginal: "hola", enElArmado: "", antes: "" })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EL DOCUMENTO ENTERO, NO SOLO EL CUERPO
+// ---------------------------------------------------------------------------
+
+const CUERPO = "word/document.xml"
+const ENCABEZADO = "word/header1.xml"
+const PIE = "word/footer1.xml"
+
+describe("nombreDeParte", () => {
+  it("le pone nombre de persona a cada parte del paquete", () => {
+    expect(nombreDeParte(CUERPO)).toBe("el cuerpo del documento")
+    expect(nombreDeParte(ENCABEZADO)).toBe("el encabezado")
+    expect(nombreDeParte(PIE)).toBe("el pie de página")
+    expect(nombreDeParte("word/footnotes.xml")).toBe("las notas al pie")
+    expect(nombreDeParte("word/comments.xml")).toBe("los comentarios")
+  })
+
+  it("una parte que no conoce igual se puede nombrar", () => {
+    expect(nombreDeParte("word/raro.xml")).toContain("word/raro.xml")
+  })
+
+  it("las notas al pie no se confunden con el pie de página", () => {
+    // "footnotes" contiene "foot": mirando mal, las notas salían como pie.
+    expect(nombreDeParte("word/footnotes.xml")).not.toBe(nombreDeParte(PIE))
+  })
+})
+
+describe("verificarDocumentoEntero", () => {
+  it("todas las partes iguales: verde", () => {
+    const doc = { [CUERPO]: "Contrato de Ana.", [ENCABEZADO]: "Legajo 8892" }
+    expect(verificarDocumentoEntero(doc, { ...doc }).coincide).toBe(true)
+  })
+
+  it("EL FALSO VERDE: un dato que vive solo en el encabezado", () => {
+    /**
+     * Medido antes de existir esta función: la detección compara cuerpos, así
+     * que el legajo nunca es campo; el molde sale del .docx de Ana con SU
+     * legajo adentro; y el contrato de Bruno salía con el número de Ana
+     * mientras la comprobación decía VERDE.
+     */
+    const original = { [CUERPO]: "Contrato de Bruno.", [ENCABEZADO]: "Legajo interno 4471" }
+    const armado = { [CUERPO]: "Contrato de Bruno.", [ENCABEZADO]: "Legajo interno 8892" }
+
+    const r = verificarDocumentoEntero(original, armado)
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain("encabezado")
+    expect(r.observacion).toContain("4471")
+    expect(r.observacion).toContain("8892")
+  })
+
+  it("una diferencia en el pie dice que es en el pie", () => {
+    const r = verificarDocumentoEntero({ [CUERPO]: "x", [PIE]: "Ana" }, { [CUERPO]: "x", [PIE]: "Bruno" })
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain("pie de página")
+  })
+
+  it("el cuerpo se informa sin prefijo: es donde todo el mundo mira", () => {
+    const r = verificarDocumentoEntero({ [CUERPO]: "Ana firma." }, { [CUERPO]: "Bruno firma." })
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).not.toContain("En el cuerpo")
+  })
+
+  it("el cuerpo se revisa PRIMERO, aun contra una parte que va antes por orden alfabético", () => {
+    /**
+     * El caso tiene que usar `comments` y no `header`: "word/c" ya viene antes
+     * que "word/d" solo, así que con el encabezado el test pasaría igual sin la
+     * regla, por el orden alfabético y no por la regla. Con los comentarios,
+     * sacar el "cuerpo primero" manda al director a mirar una nota al margen
+     * teniendo el nombre de otra persona en la cláusula principal.
+     */
+    const COMENTARIOS = "word/comments.xml"
+    const r = verificarDocumentoEntero(
+      { [CUERPO]: "Ana firma.", [COMENTARIOS]: "uno" },
+      { [CUERPO]: "Bruno firma.", [COMENTARIOS]: "dos" },
+    )
+    expect(r.observacion).toContain("Ana")
+    expect(r.observacion).not.toContain("comentarios")
+  })
+
+  it("y una parte que falta antes del cuerpo tampoco lo tapa", () => {
+    const COMENTARIOS = "word/comments.xml"
+    const r = verificarDocumentoEntero(
+      { [CUERPO]: "Ana firma.", [COMENTARIOS]: "uno" },
+      { [CUERPO]: "Bruno firma." },
+    )
+    // El cuerpo manda: la parte que falta se cuenta después.
+    expect(r.observacion).toContain("Ana")
+  })
+
+  it("una parte que falta en el armado es una diferencia, y se dice cuál", () => {
+    const r = verificarDocumentoEntero({ [CUERPO]: "x", [ENCABEZADO]: "y" }, { [CUERPO]: "x" })
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain("Falta")
+    expect(r.observacion).toContain("encabezado")
+  })
+
+  it("una parte que sobra también", () => {
+    const r = verificarDocumentoEntero({ [CUERPO]: "x" }, { [CUERPO]: "x", [ENCABEZADO]: "y" })
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain("Sobra")
+  })
+
+  it("un encabezado vacío en los dos lados no es una diferencia", () => {
+    expect(verificarDocumentoEntero({ [CUERPO]: "x", [ENCABEZADO]: "" }, { [CUERPO]: "x", [ENCABEZADO]: "  " }).coincide).toBe(
+      true,
+    )
+  })
+
+  it("dentro de cada parte rige el mismo criterio de siempre", () => {
+    // Los espacios de más se siguen ignorando también en el encabezado.
+    expect(
+      verificarDocumentoEntero({ [CUERPO]: "x", [ENCABEZADO]: "Legajo  8892" }, { [CUERPO]: "x", [ENCABEZADO]: "Legajo 8892" })
+        .coincide,
+    ).toBe(true)
+  })
+
+  it("el orden en que vengan las partes no cambia el resultado", () => {
+    const a = { [ENCABEZADO]: "y", [CUERPO]: "x", [PIE]: "z" }
+    const b = { [PIE]: "z", [CUERPO]: "x", [ENCABEZADO]: "y" }
+    expect(verificarDocumentoEntero(a, b).coincide).toBe(true)
   })
 })

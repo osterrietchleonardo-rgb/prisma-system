@@ -728,3 +728,35 @@ export function huecosDe(zip: PizZip): string[] {
   }
   return [...nombres]
 }
+
+/**
+ * El texto plano de CADA parte del paquete que este módulo toca, por ruta.
+ *
+ * Existe para que la verificación de la Etapa C pueda comparar EXACTAMENTE
+ * las mismas partes que el molde modifica. `textoDeDocx` usa mammoth, que lee
+ * solo el cuerpo: un dato que viva únicamente en el encabezado no se detecta,
+ * no se convierte en hueco, y la comparación contra el cuerpo daba VERDE
+ * mientras el contrato de una persona salía con el legajo de otra. Medido.
+ *
+ * Recorre la misma lista que `ponerHuecosEnDocx` y `huecosDe`
+ * (`partesDeTextoDeDocx`), que es la que docxtemplater rellena: cuerpo,
+ * encabezado, pie, notas al pie y comentarios. `word/endnotes.xml` queda
+ * afuera acá igual que allá, y por el mismo motivo.
+ *
+ * Es puramente aditivo: no cambia la conducta de nada de lo que ya existía.
+ */
+export function textoPorParte(zip: PizZip): Record<string, string> {
+  exigirDocxValido(zip, "textoPorParte")
+  const salida: Record<string, string> = {}
+  for (const ruta of partesDeTextoDeDocx(zip)) {
+    const archivo = zip.file(ruta)
+    if (!archivo) continue
+    const xml = archivo.asText()
+    // El mismo separador ||| entre párrafos que usa huecosDe, y por lo mismo:
+    // dos párrafos pegados no pueden leerse como una sola palabra.
+    salida[ruta] = segmentosDeNivelSuperior(xml, "p")
+      .map((seg) => desescapar([...xml.slice(seg.inicio, seg.fin).matchAll(RE_TEXTO)].map((t) => t[1]).join("")))
+      .join("|||")
+  }
+  return salida
+}

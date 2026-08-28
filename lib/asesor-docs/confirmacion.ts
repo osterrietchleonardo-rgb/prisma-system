@@ -1,4 +1,5 @@
 import { nombreGenerico, sanearNombre, type PropuestaHueco } from "@/lib/asesor-docs/propuesta"
+import { fusionarHuecosIguales } from "@/lib/asesor-docs/plantillas"
 
 /**
  * Ojo con lo que se agregue acá: este archivo NO lo carga el navegador, y no
@@ -95,63 +96,6 @@ export function nombresFinales(huecos: Array<{ nombre: string }>): {
   })
 
   return { nombres, advertencias }
-}
-
-/**
- * Junta en uno solo los huecos que son EL MISMO DATO escrito dos veces.
- *
- * El caso, que es el más común de todos en un contrato: el nombre del asesor
- * aparece en la cláusula de arriba y otra vez en la firma. La detección los ve
- * como dos lugares distintos y propone dos campos.
- *
- * Por qué hay que juntarlos, y no es una prolijidad: `ponerHuecosEnDocx`
- * reemplaza TODAS las apariciones de cada texto —está escrito así a propósito,
- * "si el nombre está en la cláusula y en la firma, las dos tienen que cambiar"—.
- * Así que el primer campo se lleva los dos lugares y el segundo se queda sin
- * ninguno. El documento sale bien (los dos lugares dicen lo que tienen que
- * decir), pero queda un campo de adorno: uno que va a figurar en el formulario
- * de la plantilla y que editarlo no va a cambiar nada. Y, peor, el segundo
- * aparecería como "no se pudo marcar" y trabaría la plantilla entera por algo
- * que no está mal.
- *
- * La condición para juntar es dura: los dos tienen que tener EXACTAMENTE el
- * mismo texto para TODOS los asesores. Si difieren aunque sea en uno, son dos
- * datos distintos que casualmente coinciden en el documento molde — y eso sí es
- * un problema, porque el .docx no tiene cómo distinguir dos textos idénticos.
- * En ese caso no se juntan, el segundo queda sin marcar y la verificación lo
- * pone en rojo, que es lo correcto.
- *
- * Un hueco sin ningún valor no se junta con nada: no hay con qué comparar.
- */
-export function fusionarHuecosIguales(huecos: PropuestaHueco[]): {
-  huecos: PropuestaHueco[]
-  advertencias: string[]
-} {
-  const porContenido = new Map<string, PropuestaHueco>()
-  const salida: PropuestaHueco[] = []
-  const advertencias: string[] = []
-
-  for (const h of huecos) {
-    const claves = Object.keys(h.valores).sort()
-    if (claves.length === 0) {
-      salida.push(h)
-      continue
-    }
-    const firma = JSON.stringify(claves.map((k) => [k, h.valores[k]]))
-
-    const yaEsta = porContenido.get(firma)
-    if (yaEsta) {
-      advertencias.push(
-        `"${h.nombre.trim() || h.id}" dice exactamente lo mismo que "${yaEsta.nombre.trim() || yaEsta.id}" en ` +
-          `todos los asesores: se guarda un campo solo, y ese dato se escribe en los dos lugares del contrato.`,
-      )
-      continue
-    }
-    porContenido.set(firma, h)
-    salida.push(h)
-  }
-
-  return { huecos: salida, advertencias }
 }
 
 export type PropuestaConfirmada = {
@@ -403,16 +347,111 @@ export function camposConDatoCorto(huecos: HuecoParaGuardar[], moldeAdvisorId: s
  * sería quemar un número de versión y dejar un archivo roto en el camino, para
  * que el director descubra el problema recién cuando alguien pida el contrato.
  */
-export function moldeInservible(camposCortos: string[]): string {
-  const culpables =
-    camposCortos.length === 0
-      ? ""
-      : ` Lo más probable es que sea por ${camposCortos.length === 1 ? "el campo" : "los campos"} ` +
-        `${camposCortos.join(", ")}, cuyo dato es de muy pocas letras y se mete donde no corresponde. Volvé a ` +
-        `detectar y sacá ${camposCortos.length === 1 ? "ese campo" : "esos campos"} antes de confirmar.`
+/**
+ * Los campos cuyo dato se mete DENTRO del nombre de otro campo, y por eso
+ * rompen el molde.
+ *
+ * Es la causa exacta —no una sospecha por el largo— de que el documento quede
+ * sin poder abrirse. El campo se escribe `{{PLAZO_2026}}`; ni el guión bajo ni
+ * las llaves son letras ni números, así que un dato `"2026"` lo encuentra ahí
+ * adentro y lo reemplaza, dejando `{{PLAZO_{{ANIO}}}}`. Las llaves quedan
+ * cruzadas y docxtemplater ya no puede leer el archivo.
+ *
+ * El aviso por largo (`camposConDatoCorto`, 3 caracteres) es una advertencia
+ * temprana para el director; ESTO es el diagnóstico. Un dato de 4 caracteres
+ * como "2026" rompe igual y el largo no lo ve, y sin esto el director recibía
+ * un "no se puede rellenar" y nada más.
+ *
+ * Se mira el nombre YA saneado, que es el que se escribe en el .docx, y se usa
+ * la misma regla de `ponerHuecosEnDocx`: no cuenta si el texto cae partiendo
+ * una palabra por la mitad.
+ */
+export function camposQueChocanConOtroNombre(
+  huecos: HuecoParaGuardar[],
+  moldeAdvisorId: string,
+): Array<{ campo: string; dentroDe: string }> {
+  const esLetraONumero = /[\p{L}\p{N}]/u
+  const choques: Array<{ campo: string; dentroDe: string }> = []
+
+  for (const h of huecos) {
+    const valor = (h.valores[moldeAdvisorId] ?? "").trim()
+    if (valor === "") continue
+
+    for (const otro of huecos) {
+      if (otro === h) continue
+      const escrito = comoQuedaEnElDocumento(otro.nombre)
+      let desde = 0
+      while (desde <= escrito.length) {
+        const at = escrito.indexOf(valor, desde)
+        if (at === -1) break
+        const antes = escrito[at - 1]
+        const despues = escrito[at + valor.length]
+        const parteDePalabra =
+          (antes !== undefined && esLetraONumero.test(antes)) ||
+          (despues !== undefined && esLetraONumero.test(despues))
+        if (!parteDePalabra) {
+          choques.push({ campo: h.nombre, dentroDe: otro.nombre })
+          break
+        }
+        desde = at + 1
+      }
+    }
+  }
+
+  return choques
+}
+
+/**
+ * El mensaje de cuando el molde quedó inservible: se le pusieron los campos y
+ * después no se lo puede rellenar.
+ *
+ * Se dice ANTES de guardar nada, y **con nombre y apellido**. Un
+ * "no se puede rellenar" pelado deja al director sin nada que hacer: no sabe
+ * qué campo sacar y volver a detectar le devuelve exactamente el mismo
+ * problema.
+ */
+export function moldeInservible(args: {
+  choques: Array<{ campo: string; dentroDe: string }>
+  camposCortos: string[]
+}): string {
+  const base =
+    "Al marcar los campos, el documento quedó de una forma que después no se puede rellenar, así que no se guardó nada."
+
+  if (args.choques.length > 0) {
+    /**
+     * Agrupado POR CAMPO CULPABLE, no por par. Un dato de un dígito choca con
+     * el nombre de todos los campos numerados, y listar los ocho pares dejaba
+     * un párrafo que repetía ocho veces el mismo nombre: el director tiene que
+     * leer QUÉ campo sacar, no contra cuántos choca.
+     */
+    const porCampo = new Map<string, string[]>()
+    for (const c of args.choques) porCampo.set(c.campo, [...(porCampo.get(c.campo) ?? []), c.dentroDe])
+
+    const detalle = [...porCampo.entries()].map(([campo, contra]) => {
+      const otros = contra.length - 1
+      const donde = otros === 0 ? `"${contra[0]}"` : `"${contra[0]}" y ${otros} campo${otros === 1 ? "" : "s"} más`
+      return `"${campo}" (se mete adentro de ${donde})`
+    })
+
+    return (
+      `${base} ${detalle.length === 1 ? "El campo que lo rompe es" : "Los campos que lo rompen son"} ` +
+      `${detalle.join(", ")}. Ese dato es tan corto que aparece adentro del nombre de otro campo y le rompe las ` +
+      `llaves. Volvé a detectar y sacá ${detalle.length === 1 ? "ese campo" : "esos campos"} antes de confirmar.`
+    )
+  }
+
+  if (args.camposCortos.length > 0) {
+    const cuantos = args.camposCortos.length
+    return (
+      `${base} Lo más probable es que sea por ${cuantos === 1 ? "el campo" : "los campos"} ` +
+      `${args.camposCortos.join(", ")}, cuyo dato es de muy pocas letras y se mete donde no corresponde. Volvé a ` +
+      `detectar y sacá ${cuantos === 1 ? "ese campo" : "esos campos"} antes de confirmar.`
+    )
+  }
+
   return (
-    "Al marcar los campos, el documento quedó de una forma que después no se puede rellenar, así que no se guardó " +
-    "nada." + culpables
+    `${base} No se pudo señalar un campo en particular: probá sacando los que tengan un dato de pocas letras, o los ` +
+    `que aparezcan repetidos en el contrato.`
   )
 }
 
@@ -464,6 +503,22 @@ export function laPlantillaSePublica(args: {
   if (args.resultados.length === 0) return false
   if (args.huecosNoColocados.length > 0) return false
   return args.resultados.every((r) => r.estado === "ok")
+}
+
+/**
+ * Lo que se guarda en `advisor_doc_templates.estado`.
+ *
+ * Existe para que el endpoint no tenga que escribir `"activa"` ni
+ * `"borrador"` en ninguna parte: ahí, esos dos literales son la regla que no
+ * se puede romper, y un literal suelto en el cableado es un literal que se
+ * puede dar vuelta sin que ninguna función pura se entere. Acá está bajo test,
+ * y el endpoint tiene el suyo.
+ */
+export function estadoDeLaPlantilla(args: {
+  resultados: ResultadoDeAsesor[]
+  huecosNoColocados: string[]
+}): "activa" | "borrador" {
+  return laPlantillaSePublica(args) ? "activa" : "borrador"
 }
 
 /**
@@ -538,3 +593,11 @@ export type RespuestaConfirmacion = {
   /** El renglón de arriba de todo, ya escrito para el director. */
   resumen: string
 }
+
+/**
+ * Se re-exporta desde donde vivía. La función se mudó a `plantillas.ts` para
+ * que la PANTALLA pueda usarla —tiene que poder decir cuántos campos se van a
+ * guardar DE VERDAD, y eso depende de la fusión— sin arrastrar al navegador la
+ * librería de comparación de textos que cuelga de este archivo.
+ */
+export { fusionarHuecosIguales }

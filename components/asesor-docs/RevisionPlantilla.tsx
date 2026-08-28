@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,8 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import {
   avisoDeDatoCorto,
-  LIMITE_ENCABEZADO_Y_PIE,
+  fusionarHuecosIguales,
+  LIMITE_DE_LA_COMPROBACION,
   NADA_SE_GUARDA_TODAVIA,
   PARA_QUE_SIRVE_LA_REVISION,
   SI_ALGUNO_QUEDA_EN_ROJO,
@@ -88,6 +89,13 @@ export function RevisionPlantilla({ nombreDelTipo, propuesta, onCerrar, onConfir
   );
   const [confirmando, setConfirmando] = useState(false);
   const [resultado, setResultado] = useState<RespuestaConfirmacion | null>(null);
+  /**
+   * El error del servidor y SUS AVISOS, que son lo que le dice al director qué
+   * campo sacar. Un `toast` no alcanza: se va solo a los pocos segundos, y
+   * justo acá el director tiene que leer una lista de campos y actuar sobre
+   * ella. Va en la pantalla, arriba de todo, y se queda.
+   */
+  const [errorAlConfirmar, setErrorAlConfirmar] = useState<{ error: string; advertencias: string[] } | null>(null);
 
   /**
    * Los nombres de las personas. La propuesta trae ids de asesor y nada más;
@@ -128,6 +136,18 @@ export function RevisionPlantilla({ nombreDelTipo, propuesta, onCerrar, onConfir
 
   const incluidos = useMemo(() => campos.filter((c) => c.incluido), [campos]);
 
+  /**
+   * Cuántos campos se van a guardar DE VERDAD.
+   *
+   * No es `incluidos.length`: el servidor junta los que son el mismo dato
+   * escrito dos veces (el nombre en la cláusula y en la firma). En la corrida
+   * real fueron 23 detectados, 15 mandados y **8 guardados**. Un contador que
+   * dice 15 cuando se guardan 8 es un número que miente, y el director lo lee
+   * justo antes de apretar. Se usa la MISMA función que usa el servidor, para
+   * que no puedan discrepar.
+   */
+  const aGuardar = useMemo(() => fusionarHuecosIguales(incluidos), [incluidos]);
+
   const renombrar = (id: string, nombre: string) =>
     setCampos((cs) => cs.map((c) => (c.id === id ? { ...c, nombre } : c)));
 
@@ -136,6 +156,7 @@ export function RevisionPlantilla({ nombreDelTipo, propuesta, onCerrar, onConfir
 
   const confirmar = async () => {
     setConfirmando(true);
+    setErrorAlConfirmar(null);
     try {
       const res = await fetch("/api/asesor-docs/confirmar-plantilla", {
         method: "POST",
@@ -155,8 +176,13 @@ export function RevisionPlantilla({ nombreDelTipo, propuesta, onCerrar, onConfir
       const cuerpo = await res.json().catch(() => null);
 
       if (!res.ok) {
-        // Los mensajes del endpoint ya están escritos para el director.
-        toast.error(cuerpo?.error ?? "No se pudo confirmar la plantilla. Probá de nuevo en un rato.");
+        // Los mensajes del endpoint ya están escritos para el director. Los
+        // avisos que vienen con el error se MUESTRAN en la pantalla, no solo en
+        // un toast: son la lista de campos que hay que sacar.
+        const error = cuerpo?.error ?? "No se pudo confirmar la plantilla. Probá de nuevo en un rato.";
+        const advertencias = Array.isArray(cuerpo?.advertencias) ? (cuerpo.advertencias as string[]) : [];
+        setErrorAlConfirmar({ error, advertencias });
+        toast.error(error);
         return;
       }
 
@@ -194,7 +220,10 @@ export function RevisionPlantilla({ nombreDelTipo, propuesta, onCerrar, onConfir
       <SheetContent side="right" className="w-full sm:max-w-3xl flex flex-col p-0 gap-0">
         <div className="shrink-0 border-b px-4 py-4 sm:px-6 space-y-1.5">
           <SheetTitle className="text-base sm:text-lg pr-8">Revisar la plantilla de {nombreDelTipo}</SheetTitle>
-          <p className="text-sm text-muted-foreground">{PARA_QUE_SIRVE_LA_REVISION}</p>
+          {/* Como SheetDescription y no como <p>: Radix lo engancha al panel con
+              aria-describedby, así un lector de pantalla lo lee al abrirlo. Sin
+              esto avisa por consola que el panel no tiene descripción. */}
+          <SheetDescription className="text-sm">{PARA_QUE_SIRVE_LA_REVISION}</SheetDescription>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-6 space-y-4">
@@ -202,6 +231,25 @@ export function RevisionPlantilla({ nombreDelTipo, propuesta, onCerrar, onConfir
             <Resultado resultado={resultado} />
           ) : (
             <>
+              {errorAlConfirmar && (
+                <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+                  <p className="flex items-start gap-2 text-sm text-foreground">
+                    <XCircle className="h-4 w-4 shrink-0 mt-0.5 text-destructive" />
+                    <span>{errorAlConfirmar.error}</span>
+                  </p>
+                  {errorAlConfirmar.advertencias.length > 0 && (
+                    <ul className="space-y-1.5 text-xs text-muted-foreground pl-6">
+                      {errorAlConfirmar.advertencias.map((a, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                          <span>{a}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
               <Encabezado propuesta={propuesta} comoSeLlama={comoSeLlama} />
 
               {campos.length === 0 ? (
@@ -236,7 +284,7 @@ export function RevisionPlantilla({ nombreDelTipo, propuesta, onCerrar, onConfir
                     ))}
                     <li className="flex items-start gap-2">
                       <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600" />
-                      <span>{LIMITE_ENCABEZADO_Y_PIE}</span>
+                      <span>{LIMITE_DE_LA_COMPROBACION}</span>
                     </li>
                   </ul>
                 </div>
@@ -260,8 +308,14 @@ export function RevisionPlantilla({ nombreDelTipo, propuesta, onCerrar, onConfir
               </p>
               <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2">
                 <span className="text-xs text-muted-foreground">
-                  {incluidos.length === 1 ? "1 campo se va a guardar" : `${incluidos.length} campos se van a guardar`}
+                  {aGuardar.huecos.length === 1
+                    ? "1 campo se va a guardar"
+                    : `${aGuardar.huecos.length} campos se van a guardar`}
                   {campos.length !== incluidos.length && ` · ${campos.length - incluidos.length} sacados`}
+                  {aGuardar.advertencias.length > 0 &&
+                    ` · ${aGuardar.advertencias.length} ${
+                      aGuardar.advertencias.length === 1 ? "es el mismo dato repetido" : "son el mismo dato repetido"
+                    }`}
                 </span>
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={cerrar} disabled={confirmando} className="flex-1 sm:flex-none">

@@ -3,21 +3,22 @@ import PizZip from "pizzip"
 
 import { createClient } from "@/lib/supabase/server"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { huecosDe, ponerHuecosEnDocx, rellenarDocx, textoDeDocx } from "@/lib/plantillas/docx"
+import { huecosDe, ponerHuecosEnDocx, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
 import { separarPorEstado, type FilaAsesor } from "@/lib/asesor-docs/propuesta"
 import {
   camposConDatoCorto,
+  camposQueChocanConOtroNombre,
   camposSchema,
+  estadoDeLaPlantilla,
   formDataDe,
-  laPlantillaSePublica,
   leerPropuestaConfirmada,
   moldeInservible,
   reemplazosDelMolde,
   resumenDeLaConfirmacion,
   type ResultadoDeAsesor,
 } from "@/lib/asesor-docs/confirmacion"
-import { LIMITE_ENCABEZADO_Y_PIE } from "@/lib/asesor-docs/plantillas"
-import { verificarContraElOriginal } from "@/lib/asesor-docs/verificacion"
+import { LIMITE_DE_LA_COMPROBACION } from "@/lib/asesor-docs/plantillas"
+import { verificarDocumentoEntero } from "@/lib/asesor-docs/verificacion"
 
 /**
  * Confirmar la plantilla: el ÚNICO lugar de esta etapa que escribe (spec §7.2).
@@ -284,7 +285,7 @@ export async function POST(req: Request) {
     )
   }
 
-  const textoMolde = await textoDeDocx(Buffer.from(zipMolde.generate({ type: "nodebuffer" })))
+  const textoMolde = Object.values(textoPorParte(zipMolde)).join("")
   if (textoMolde.trim() === "") {
     return NextResponse.json(
       { error: "El molde quedó vacío: el documento del asesor no tiene texto que se pueda leer." },
@@ -308,11 +309,17 @@ export async function POST(req: Request) {
    * lo que se va a hacer después, asesor por asesor.
    */
   const camposCortos = camposConDatoCorto(propuesta.huecos, propuesta.moldeAdvisorId)
+  const choques = camposQueChocanConOtroNombre(propuesta.huecos, propuesta.moldeAdvisorId)
   try {
     rellenarDocx(zipMolde, formDataDe(propuesta.huecos, propuesta.moldeAdvisorId) ?? {})
   } catch (e) {
     console.error("confirmar-plantilla: el molde no se puede rellenar:", e)
-    return NextResponse.json({ error: moldeInservible(camposCortos), advertencias }, { status: 400 })
+    /**
+     * Las advertencias viajan junto al error, y la pantalla las MUESTRA: acá es
+     * donde más falta hacen, porque el director tiene que decidir qué campo
+     * sacar y volver a intentar.
+     */
+    return NextResponse.json({ error: moldeInservible({ choques, camposCortos }), advertencias }, { status: 400 })
   }
 
   if (camposCortos.length > 0) {
@@ -416,12 +423,18 @@ export async function POST(req: Request) {
       try {
         const { data, error } = await supabase.storage.from(BUCKET).download(doc.archivo_original_path)
         if (error || !data) throw error ?? new Error("archivo vacío")
-        const textoOriginal = await textoDeDocx(Buffer.from(await data.arrayBuffer()))
+        /**
+         * TODAS las partes que el molde toca —cuerpo, encabezado, pie, notas al
+         * pie y comentarios—, no solo el cuerpo. Comparar únicamente el cuerpo
+         * dejaba pasar en VERDE un legajo de encabezado que salía con el número
+         * de otra persona: la detección nunca lo ve (compara cuerpos), así que
+         * no es campo, y el molde se lo lleva literal del asesor que hizo de
+         * molde. Medido.
+         */
+        const original = textoPorParte(new PizZip(Buffer.from(await data.arrayBuffer())))
 
         const armado = rellenarDocx(zipMolde, datos)
-        const textoArmado = await textoDeDocx(Buffer.from(armado.generate({ type: "nodebuffer" })))
-
-        const v = verificarContraElOriginal(textoOriginal, textoArmado)
+        const v = verificarDocumentoEntero(original, textoPorParte(armado))
         estado = v.coincide ? "ok" : "revisar"
         observacion = v.observacion
       } catch (e) {
@@ -460,13 +473,21 @@ export async function POST(req: Request) {
 
   // ── 5. Publicar, o no ───────────────────────────────────────────────────
   const huecosNoColocados = [...new Set(noColocados)]
-  const publicada = laPlantillaSePublica({ resultados, huecosNoColocados })
+  /**
+   * LA REGLA QUE NO SE PUEDE ROMPER, y el único lugar donde de verdad se
+   * aplica. No se escribe `"activa"` ni `"borrador"` acá a propósito: un
+   * literal suelto en el cableado se puede dar vuelta sin que ninguna función
+   * pura se entere. La decide `estadoDeLaPlantilla`, que está bajo test, y
+   * este endpoint tiene el suyo (`route.test.ts`) por si alguien igual la
+   * saltea.
+   */
+  const estado = estadoDeLaPlantilla({ resultados, huecosNoColocados })
 
   const { error: errTipoUpdate } = await supabase
     .from("advisor_doc_templates")
     .update({
       version_actual: nuevaVersion.id,
-      estado: publicada ? "activa" : "borrador",
+      estado,
       updated_at: new Date().toISOString(),
     })
     .eq("id", propuesta.templateId)
@@ -480,12 +501,12 @@ export async function POST(req: Request) {
     )
   }
 
-  advertencias.push(LIMITE_ENCABEZADO_Y_PIE)
+  advertencias.push(LIMITE_DE_LA_COMPROBACION)
 
   return NextResponse.json({
     versionId: nuevaVersion.id,
     version: nuevaVersion.version,
-    estado: publicada ? "activa" : "borrador",
+    estado,
     camposPuestos: puestos,
     huecosNoColocados,
     resultados,

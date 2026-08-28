@@ -8,10 +8,11 @@ import {
   PARA_QUE_SIRVE,
   PARA_QUE_SIRVE_LA_REVISION,
   NADA_SE_GUARDA_TODAVIA,
-  LIMITE_ENCABEZADO_Y_PIE,
+  LIMITE_DE_LA_COMPROBACION,
   SI_ALGUNO_QUEDA_EN_ROJO,
   LARGO_DE_DATO_CORTO,
   avisoDeDatoCorto,
+  fusionarHuecosIguales,
 } from "./plantillas"
 import { MINIMO_DOCUMENTOS } from "@/lib/plantillas/deteccion"
 import { LARGO_DE_DATO_SOSPECHOSO } from "./confirmacion"
@@ -343,7 +344,7 @@ describe("la prosa de la pantalla de revisión", () => {
   const textos = {
     PARA_QUE_SIRVE_LA_REVISION,
     NADA_SE_GUARDA_TODAVIA,
-    LIMITE_ENCABEZADO_Y_PIE,
+    LIMITE_DE_LA_COMPROBACION,
     SI_ALGUNO_QUEDA_EN_ROJO,
   }
 
@@ -363,8 +364,16 @@ describe("la prosa de la pantalla de revisión", () => {
   it("avisa que el encabezado y el pie quedan fuera de la comprobación", () => {
     // mammoth lee el cuerpo. Callarlo dejaría al director creyendo que se
     // revisó el archivo entero.
-    expect(LIMITE_ENCABEZADO_Y_PIE).toContain("encabezado")
-    expect(LIMITE_ENCABEZADO_Y_PIE).toContain("pie")
+    expect(LIMITE_DE_LA_COMPROBACION).toContain("encabezado")
+    expect(LIMITE_DE_LA_COMPROBACION).toContain("pie")
+    expect(LIMITE_DE_LA_COMPROBACION).toContain("notas al pie")
+    expect(LIMITE_DE_LA_COMPROBACION).toContain("comentarios")
+    // Y lo que SÍ queda afuera, que es lo que de verdad hay que decir: qué no
+    // se revisa Y que eso se informa aparte. Sin la segunda mitad, el director
+    // lee una lista de agujeros y no sabe si tiene que ir a buscarlos él.
+    expect(LIMITE_DE_LA_COMPROBACION).toContain("notas al final")
+    expect(LIMITE_DE_LA_COMPROBACION).toContain("cuadros de texto")
+    expect(LIMITE_DE_LA_COMPROBACION).toContain("te lo avisamos aparte")
   })
 
   it("cuenta de antemano qué pasa si alguno queda en rojo", () => {
@@ -420,5 +429,50 @@ describe("avisoDeDatoCorto", () => {
 
   it("no promete en presente algo que todavía no pasa", () => {
     expect(avisoDeDatoCorto("1")).not.toMatch(PROMESA_EN_PRESENTE)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El contador de la barra: el mismo número que va a guardar el servidor
+// ---------------------------------------------------------------------------
+
+describe("fusionarHuecosIguales, del lado de la pantalla", () => {
+  const A = "11111111-1111-4111-8111-111111111111"
+  const B = "22222222-2222-4222-8222-222222222222"
+  const campo = (id: string, nombre: string, valores: Record<string, string>) => ({
+    id,
+    nombre,
+    contexto: "",
+    valores,
+  })
+
+  it("vive acá para que la barra pueda decir el número de VERDAD", () => {
+    /**
+     * En la corrida real fueron 23 campos detectados, 15 mandados y 8
+     * guardados: la barra decía 15. Un contador que miente justo antes del
+     * clic que guarda es peor que no tener contador. La pantalla usa ESTA
+     * función, la misma que el servidor.
+     */
+    const huecos = [
+      campo("h1", "NOMBRE_1", { [A]: "Ana", [B]: "Bruno" }),
+      campo("h2", "NOMBRE_2", { [A]: "Ana", [B]: "Bruno" }),
+      campo("h3", "CUIT", { [A]: "20-1", [B]: "20-2" }),
+    ]
+    expect(fusionarHuecosIguales(huecos).huecos).toHaveLength(2)
+  })
+
+  it("no junta dos que difieren en un solo asesor", () => {
+    const huecos = [
+      campo("h1", "N1", { [A]: "Ana", [B]: "Bruno" }),
+      campo("h2", "N2", { [A]: "Ana", [B]: "Otro" }),
+    ]
+    expect(fusionarHuecosIguales(huecos).huecos).toHaveLength(2)
+  })
+
+  it("el aviso nombra a los dos campos", () => {
+    const huecos = [campo("h1", "N1", { [A]: "Ana" }), campo("h2", "N2", { [A]: "Ana" })]
+    const r = fusionarHuecosIguales(huecos)
+    expect(r.advertencias[0]).toContain("N1")
+    expect(r.advertencias[0]).toContain("N2")
   })
 })

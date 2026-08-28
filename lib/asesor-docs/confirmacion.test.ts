@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest"
 import {
   camposConDatoCorto,
+  camposQueChocanConOtroNombre,
   camposSchema,
+  estadoDeLaPlantilla,
   comoQuedaEnElDocumento,
   fusionarHuecosIguales,
   LARGO_DE_DATO_SOSPECHOSO,
@@ -337,16 +339,144 @@ describe("camposConDatoCorto", () => {
   })
 })
 
-describe("moldeInservible", () => {
-  it("dice que no se guardó nada", () => {
-    expect(moldeInservible([]).toLowerCase()).toContain("no se guardó nada")
+describe("camposQueChocanConOtroNombre", () => {
+  it("encuentra el dato que se mete adentro del nombre de otro campo", () => {
+    /**
+     * LA CAUSA EXACTA de que el molde quede sin poder abrirse: el campo se
+     * escribe {{PLAZO_2026}} y un dato "2026" lo encuentra ahí adentro, porque
+     * ni el guión bajo ni las llaves son letras ni números. Queda
+     * {{PLAZO_{{ANIO}}}} y docxtemplater ya no puede leer el archivo.
+     */
+    const huecos = [
+      hueco({ id: "h1", nombre: "PLAZO_2026", valores: { [A]: "treinta días corridos" } }),
+      hueco({ id: "h2", nombre: "ANIO", valores: { [A]: "2026" } }),
+    ]
+    expect(camposQueChocanConOtroNombre(huecos, A)).toEqual([{ campo: "ANIO", dentroDe: "PLAZO_2026" }])
   })
 
-  it("nombra los campos sospechosos y qué hacer con ellos", () => {
-    const texto = moldeInservible(["DIA_INICIO", "FORMA_SOCIETARIA"])
+  it("cuatro caracteres: el aviso por largo NO lo ve, y esto sí", () => {
+    // Por eso el diagnóstico no puede ser el largo del dato.
+    const huecos = [
+      hueco({ id: "h1", nombre: "PLAZO_2026", valores: { [A]: "treinta días corridos" } }),
+      hueco({ id: "h2", nombre: "ANIO", valores: { [A]: "2026" } }),
+    ]
+    expect(camposConDatoCorto(huecos, A)).toEqual([])
+    expect(camposQueChocanConOtroNombre(huecos, A)).toHaveLength(1)
+  })
+
+  it("el dato de un dígito choca con el CAMPO_1 de siempre", () => {
+    const huecos = [
+      hueco({ id: "h1", nombre: "CAMPO_1", valores: { [A]: "Juan Pérez" } }),
+      hueco({ id: "h2", nombre: "DIA", valores: { [A]: "1" } }),
+    ]
+    expect(camposQueChocanConOtroNombre(huecos, A)).toEqual([{ campo: "DIA", dentroDe: "CAMPO_1" }])
+  })
+
+  it("no marca un dato que cae partiendo una palabra del nombre por la mitad", () => {
+    // "OMB" está adentro de NOMBRE pero pegado a letras: ponerHuecosEnDocx
+    // tampoco lo reemplazaría, así que no rompe nada.
+    const huecos = [
+      hueco({ id: "h1", nombre: "NOMBRE", valores: { [A]: "Juan Pérez" } }),
+      hueco({ id: "h2", nombre: "OTRO", valores: { [A]: "OMB" } }),
+    ]
+    expect(camposQueChocanConOtroNombre(huecos, A)).toEqual([])
+  })
+
+  it("un dato normal no choca con nada", () => {
+    expect(camposQueChocanConOtroNombre([hueco(), hueco({ id: "h2", nombre: "CUIT" })], A)).toEqual([])
+  })
+
+  it("un campo sin dato en el molde no choca: no hay texto que buscar", () => {
+    const huecos = [
+      hueco({ id: "h1", nombre: "PLAZO_2026", valores: { [A]: "treinta días" } }),
+      hueco({ id: "h2", nombre: "ANIO", valores: { [A]: "  " } }),
+    ]
+    expect(camposQueChocanConOtroNombre(huecos, A)).toEqual([])
+  })
+})
+
+describe("moldeInservible", () => {
+  it("dice que no se guardó nada", () => {
+    expect(moldeInservible({ choques: [], camposCortos: [] }).toLowerCase()).toContain("no se guardó nada")
+  })
+
+  it("cuando hay un choque, lo nombra con los DOS campos", () => {
+    const texto = moldeInservible({ choques: [{ campo: "ANIO", dentroDe: "PLAZO_2026" }], camposCortos: [] })
+    expect(texto).toContain("ANIO")
+    expect(texto).toContain("PLAZO_2026")
+    expect(texto).toContain("Volvé a detectar")
+  })
+
+  it("un campo que choca con muchos se nombra UNA vez, no una por choque", () => {
+    /**
+     * Medido en el navegador: un dato de un dígito choca con el nombre de los
+     * ocho campos numerados, y el mensaje repetía ocho veces "FECHA_INICIO_DIA".
+     * El director tiene que leer qué campo sacar, no contra cuántos choca.
+     */
+    const texto = moldeInservible({
+      choques: ["A_1", "B_1", "C_1", "D_1"].map((dentroDe) => ({ campo: "DIA", dentroDe })),
+      camposCortos: [],
+    })
+    expect(texto.match(/"DIA"/g)).toHaveLength(1)
+    expect(texto).toContain("A_1")
+    expect(texto).toContain("3 campos más")
+  })
+
+  it("con dos campos culpables se nombran los dos", () => {
+    const texto = moldeInservible({
+      choques: [
+        { campo: "DIA", dentroDe: "PLAZO_1" },
+        { campo: "ANIO", dentroDe: "PLAZO_2026" },
+      ],
+      camposCortos: [],
+    })
+    expect(texto).toContain("DIA")
+    expect(texto).toContain("ANIO")
+    expect(texto).toContain("Los campos que lo rompen son")
+  })
+
+  it("el choque manda sobre el aviso por largo: es el diagnóstico, no la sospecha", () => {
+    const texto = moldeInservible({
+      choques: [{ campo: "ANIO", dentroDe: "PLAZO_2026" }],
+      camposCortos: ["OTRO_CORTO"],
+    })
+    expect(texto).toContain("ANIO")
+    expect(texto).not.toContain("OTRO_CORTO")
+  })
+
+  it("sin choque, cae al aviso por largo", () => {
+    const texto = moldeInservible({ choques: [], camposCortos: ["DIA_INICIO", "FORMA_SOCIETARIA"] })
     expect(texto).toContain("DIA_INICIO")
     expect(texto).toContain("FORMA_SOCIETARIA")
     expect(texto).toContain("Volvé a detectar")
+  })
+
+  it("sin nada que señalar, igual dice qué probar: no deja al director mudo", () => {
+    const texto = moldeInservible({ choques: [], camposCortos: [] })
+    expect(texto).toContain("pocas letras")
+  })
+})
+
+describe("estadoDeLaPlantilla", () => {
+  it("todo bien: activa", () => {
+    expect(estadoDeLaPlantilla({ resultados: [resultado()], huecosNoColocados: [] })).toBe("activa")
+  })
+
+  it("uno en rojo: borrador", () => {
+    expect(
+      estadoDeLaPlantilla({
+        resultados: [resultado(), resultado({ advisorId: B, estado: "revisar", observacion: "x" })],
+        huecosNoColocados: [],
+      }),
+    ).toBe("borrador")
+  })
+
+  it("un campo sin marcar: borrador", () => {
+    expect(estadoDeLaPlantilla({ resultados: [resultado()], huecosNoColocados: ["CUIT"] })).toBe("borrador")
+  })
+
+  it("nadie comprobado: borrador", () => {
+    expect(estadoDeLaPlantilla({ resultados: [], huecosNoColocados: [] })).toBe("borrador")
   })
 })
 
