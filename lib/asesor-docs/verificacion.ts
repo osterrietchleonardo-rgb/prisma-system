@@ -353,10 +353,18 @@ export function verificarDocumentoEntero(
   /** Junta las partes de la misma familia, en orden de ruta para que no dependa
    * de cómo las declare el paquete. */
   const porFamilia = (partes: Record<string, string>) => {
-    const mapa = new Map<TipoDeParte, string[]>()
+    const mapa = new Map<string, string[]>()
     for (const ruta of Object.keys(partes).sort()) {
       const tipo = tipoDeParte(ruta)
-      mapa.set(tipo, [...(mapa.get(tipo) ?? []), partes[ruta] ?? ""])
+      /**
+       * Las familias conocidas se juntan (por eso header1 y header2 son lo
+       * mismo). Una parte que NO se conoce va en su propio balde, con la ruta
+       * de clave: juntar dos partes desconocidas distintas las compararía
+       * pegadas, y ahí una diferencia de una podría taparse con la otra. Hoy
+       * no llega ninguna, y esto es para el día que llegue.
+       */
+      const clave = tipo === "otra" ? ruta : tipo
+      mapa.set(clave, [...(mapa.get(clave) ?? []), partes[ruta] ?? ""])
     }
     /**
      * Una familia que existe pero está vacía es lo mismo que no tenerla: un
@@ -364,7 +372,7 @@ export function verificarDocumentoEntero(
      * documento con el encabezado en blanco y otro sin encabezado darían un
      * rojo por algo que nadie ve ni puede arreglar.
      */
-    const salida = new Map<TipoDeParte, string>()
+    const salida = new Map<string, string>()
     for (const [tipo, textos] of mapa) {
       const junto = textos.join("\n")
       if (normalizarParaComparar(junto) !== "") salida.set(tipo, junto)
@@ -375,30 +383,60 @@ export function verificarDocumentoEntero(
   const a = porFamilia(original)
   const b = porFamilia(armado)
 
-  const familias: TipoDeParte[] = ["cuerpo", "encabezado", "pie", "notas-al-pie", "notas-al-final", "comentarios", "otra"]
+  const conocidas: TipoDeParte[] = ["cuerpo", "encabezado", "pie", "notas-al-pie", "notas-al-final", "comentarios"]
+  /** Las conocidas en orden —el cuerpo primero—, y después las que no lo son. */
+  const claves = [
+    ...conocidas,
+    ...[...new Set([...a.keys(), ...b.keys()])].filter((k) => !conocidas.includes(k as TipoDeParte)).sort(),
+  ]
 
-  for (const tipo of familias) {
-    const enUno = a.has(tipo)
-    const enOtro = b.has(tipo)
+  for (const clave of claves) {
+    const enUno = a.has(clave)
+    const enOtro = b.has(clave)
     if (!enUno && !enOtro) continue
 
-    const { nombre, plural } = PARTES[tipo]
+    /**
+     * Ojo acá: la clave de una familia conocida YA es el tipo. Pasarla por
+     * `tipoDeParte` —que espera una RUTA— devolvía "otra" para todas, y con eso
+     * el mensaje perdía la explicación de cómo se arregla. Solo las claves
+     * desconocidas son rutas y necesitan traducirse.
+     */
+    const esConocida = conocidas.includes(clave as TipoDeParte)
+    const tipo: TipoDeParte = esConocida ? (clave as TipoDeParte) : tipoDeParte(clave)
+    const { nombre, plural } = esConocida
+      ? PARTES[clave as TipoDeParte]
+      : { nombre: `la parte "${clave}" del documento`, plural: false }
 
     if (enUno !== enOtro) {
-      const verbo = enUno ? (plural ? "Faltan" : "Falta") : plural ? "Sobran" : "Sobra"
+      if (enUno) {
+        /**
+         * Está en el archivo de la persona y el armado lo dejó VACÍO. La causa
+         * más común no es estructural: es un campo que ocupa toda esa parte y
+         * cuyo dato vino en blanco para este asesor. Decir "revisá que los dos
+         * sean el mismo tipo de documento" ahí es un diagnóstico equivocado, y
+         * manda al director a comparar archivos que están bien.
+         */
+        return {
+          coincide: false,
+          observacion:
+            `En el documento armado con la plantilla, ${nombre} ${plural ? "quedaron" : "quedó"} sin texto. ` +
+            `Puede ser que el campo que ${plural ? "las" : "lo"} completa haya quedado vacío para esta persona, o ` +
+            `que el molde no tenga la misma estructura que su archivo. ${comoSeArregla(tipo)}`,
+        }
+      }
       return {
         coincide: false,
         observacion:
-          `${verbo} ${nombre} en el documento armado con la plantilla. El molde no tiene la misma estructura que ` +
-          `el archivo de esta persona: revisá que los dos sean el mismo tipo de documento.`,
+          `${plural ? "Sobran" : "Sobra"} ${nombre} en el documento armado con la plantilla: el archivo de esta ` +
+          `persona no ${plural ? "las" : "lo"} tiene. Revisá que los dos sean el mismo tipo de documento.`,
       }
     }
 
-    const v = verificarContraElOriginal(a.get(tipo) ?? "", b.get(tipo) ?? "")
+    const v = verificarContraElOriginal(a.get(clave) ?? "", b.get(clave) ?? "")
     if (v.coincide) continue
 
     // En el cuerpo no hace falta decir dónde: es lo que todo el mundo supone.
-    if (tipo === "cuerpo") return v
+    if (clave === "cuerpo") return v
     return { coincide: false, observacion: `En ${nombre}: ${v.observacion} ${comoSeArregla(tipo)}` }
   }
 

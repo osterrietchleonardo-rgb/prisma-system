@@ -85,7 +85,10 @@ export function PlantillasTab() {
       const [t, v, d] = await Promise.all([
         supabase.from("advisor_doc_templates").select("id, nombre, estado, version_actual"),
         supabase.from("advisor_doc_template_versions").select("id, version"),
-        supabase.from("advisor_documents").select("template_id, estado"),
+        // `version_id` no es opcional acá: sin él no se puede saber si un
+        // "revisar" es de la versión que está en uso o de una vieja, y por ahí
+        // se colaba una plantilla "Activa" con un asesor sin comprobar.
+        supabase.from("advisor_documents").select("template_id, estado, version_id"),
       ]);
 
       if (t.error || v.error || d.error) {
@@ -279,6 +282,19 @@ export function PlantillasTab() {
                       {fila.enRojo === 1
                         ? "1 asesor con su documento para revisar"
                         : `${fila.enRojo} asesores con su documento para revisar`}
+                    </span>
+                  )}
+                  {/* El tercer balde. No es rojo —no falló nada— pero tampoco
+                      es verde: de esa persona no se comprobó nada. Sin este
+                      renglón, una plantilla "Activa" con un asesor pausado
+                      adentro se ve exactamente igual que una donde se comparó
+                      a todos. */}
+                  {fila.sinComprobar > 0 && (
+                    <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      {fila.sinComprobar === 1
+                        ? "1 asesor sin comparar contra esta versión"
+                        : `${fila.sinComprobar} asesores sin comparar contra esta versión`}
                     </span>
                   )}
                 </div>

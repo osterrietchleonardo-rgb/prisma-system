@@ -66,8 +66,33 @@ export type FilaPlantilla = {
   version: number | null
   /** Cuántos asesores tienen hoy un documento de este tipo. */
   documentos: number
-  /** Cuántos de esos documentos quedaron marcados para revisar. */
+  /**
+   * Cuántos quedaron en rojo **contra la versión vigente**.
+   *
+   * Contra la vigente y no contra cualquiera: un `revisar` que quedó de una
+   * versión anterior no dice nada de la que está en uso hoy, y contarlo hacía
+   * que la solapa dijera "Activa" y "1 en rojo" al mismo tiempo sobre algo que
+   * el director no podía destrabar. Esos van al balde de abajo.
+   */
   enRojo: number
+  /**
+   * Cuántos NO se compararon contra la versión vigente.
+   *
+   * El balde que faltaba, y que tapaba dos agujeros de golpe:
+   *
+   *  · **el asesor pausado.** Se lo deja afuera de la comparación (spec §7.5) y
+   *    su fila queda con el `version_id` viejo. Si los demás dan verde, la
+   *    plantilla pasa a `activa` — y el día que lo reactiven, su contrato sale
+   *    de un molde que NUNCA se comparó contra su documento. Es exactamente la
+   *    falla que toda esta red vino a evitar. Con 30 asesores, pausar y
+   *    reactivar es rutina.
+   *  · **el que sube su documento después.** Llega con `version_id` en null a
+   *    una plantilla ya activa, y hasta acá no lo contaba nadie.
+   *
+   * El dato ya estaba en la base: `version_id` distinto de `version_actual` es
+   * la constancia. Lo que faltaba era que alguien lo leyera.
+   */
+  sinComprobar: number
 }
 
 // ---------------------------------------------------------------------------
@@ -86,8 +111,14 @@ export type TipoCrudo = {
 /** `advisor_doc_template_versions`. */
 export type VersionCruda = { id: string; version: number }
 
-/** `advisor_documents`, solo las dos columnas que se cuentan. */
-export type DocumentoCrudo = { template_id: string; estado: string | null }
+/**
+ * `advisor_documents`, con lo que hace falta para contar.
+ *
+ * `version_id` no es opcional: sin él no se puede saber si un `revisar` es de
+ * la versión que está en uso o de una vieja, y ahí es donde se colaba una
+ * plantilla `activa` con un asesor sin comprobar.
+ */
+export type DocumentoCrudo = { template_id: string; estado: string | null; version_id: string | null }
 
 /**
  * El estado que se muestra.
@@ -116,11 +147,38 @@ export function armarFilas(args: {
 }): FilaPlantilla[] {
   const numeroDeVersion = new Map(args.versiones.map((v) => [v.id, v.version]))
 
+  const vigentePorTipo = new Map(args.tipos.map((t) => [t.id, t.version_actual]))
+
   const total = new Map<string, number>()
   const rojos = new Map<string, number>()
+  const sinComprobar = new Map<string, number>()
+  const sumar = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1)
+
   for (const doc of args.documentos) {
-    total.set(doc.template_id, (total.get(doc.template_id) ?? 0) + 1)
-    if (doc.estado === "revisar") rojos.set(doc.template_id, (rojos.get(doc.template_id) ?? 0) + 1)
+    sumar(total, doc.template_id)
+
+    const vigente = vigentePorTipo.get(doc.template_id) ?? null
+
+    if (doc.version_id !== null && doc.version_id === vigente) {
+      // Comprobado contra la versión que está en uso: su estado vale.
+      if (doc.estado === "revisar") sumar(rojos, doc.template_id)
+      continue
+    }
+
+    /**
+     * No se comprobó contra la vigente.
+     *
+     *  · Si la plantilla TIENE versión vigente, va al balde sí o sí — incluido
+     *    el que subió su documento después de que quedó activa, que llega con
+     *    `version_id` en null y hasta acá no lo contaba nadie.
+     *  · Si NO tiene versión vigente, se cuenta solo si alguna vez se lo tocó:
+     *    un documento recién subido a una plantilla que todavía no se detectó
+     *    no está "sin comprobar", está esperando que se detecte, y para eso ya
+     *    está el texto de "falta detectar la plantilla". Decir "3 sin
+     *    comprobar" ahí sería ruido en la fila por defecto de toda
+     *    inmobiliaria que arranca.
+     */
+    if (vigente !== null || doc.version_id !== null || doc.estado !== null) sumar(sinComprobar, doc.template_id)
   }
 
   return args.tipos
@@ -136,6 +194,7 @@ export function armarFilas(args: {
       version: t.version_actual ? numeroDeVersion.get(t.version_actual) ?? null : null,
       documentos: total.get(t.id) ?? 0,
       enRojo: rojos.get(t.id) ?? 0,
+      sinComprobar: sinComprobar.get(t.id) ?? 0,
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
 }
@@ -200,7 +259,11 @@ function quienesQuedaron(enRojo: number): string {
  * no tiene por qué saber qué significan, y tener que preguntar es lo mismo que
  * no estar escrito.
  */
-export function explicacionDelEstado(fila: Pick<FilaPlantilla, "estado" | "version" | "enRojo">): string {
+export function explicacionDelEstado(
+  fila: Pick<FilaPlantilla, "estado" | "version" | "enRojo"> & { sinComprobar?: number },
+): string {
+  const sinComprobar = fila.sinComprobar ?? 0
+
   if (fila.estado === "activa") {
     /**
      * "…se generan con esta versión" decía en presente lo mismo que el párrafo
@@ -209,6 +272,39 @@ export function explicacionDelEstado(fila: Pick<FilaPlantilla, "estado" | "versi
      * esta versión quedó confirmada; generar con ella viene después.
      */
     const enUso = "Está en uso: es la versión confirmada. Con ella se le va a generar el documento a cada asesor."
+
+    /**
+     * El aviso que faltaba, y el que más caro sale callar.
+     *
+     * Una plantilla puede quedar `activa` con alguien sin comprobar: el asesor
+     * estaba pausado cuando se confirmó (queda afuera por spec §7.5), o subió
+     * su documento después. La plantilla es correcta para los que se
+     * compararon; para ese, nadie miró nada. Y el día que lo reactiven, su
+     * contrato saldría de un molde que nunca se comparó contra su documento.
+     *
+     * Va ANTES que el aviso de los rojos porque es el que el director no puede
+     * deducir solo: un rojo se ve en la ficha del asesor, esto no se ve en
+     * ningún lado.
+     */
+    if (sinComprobar > 0) {
+      /**
+       * Todo el renglón concuerda en número. Con el texto en plural fijo salía
+       * "1 asesor no se comparó … o estaban pausados … subieron su documento",
+       * que lo lee un director y suena a máquina.
+       */
+      const uno = sinComprobar === 1
+      const quienes = uno ? "1 asesor no se comparó" : `${sinComprobar} asesores no se compararon`
+      const porQue = uno
+        ? "o estaba pausado cuando se confirmó, o subió su documento después"
+        : "o estaban pausados cuando se confirmó, o subieron su documento después"
+      const aQuienes = uno ? "el asesor activo" : "los asesores activos"
+      const deQuienes = uno ? "esa persona" : "esas personas"
+      return (
+        `${enUso} Ojo: ${quienes} contra esta versión — ${porQue}. Para ${deQuienes} no hay nada comprobado: ` +
+        `volvé a detectar la plantilla con ${aQuienes} antes de dar su documento por bueno.`
+      )
+    }
+
     if (fila.enRojo === 0) return enUso
     /**
      * Una plantilla en uso NO debería tener documentos para revisar. Cuando los
@@ -235,6 +331,13 @@ export function explicacionDelEstado(fila: Pick<FilaPlantilla, "estado" | "versi
     return (
       "Es un borrador y todavía no se usa: falta detectar la plantilla a partir de los documentos cargados y " +
       "revisarla."
+    )
+  }
+  if (sinComprobar > 0) {
+    const quienes = sinComprobar === 1 ? "1 asesor no se comparó" : `${sinComprobar} asesores no se compararon`
+    return (
+      `Es un borrador y todavía no se usa: ${quienes} contra la versión que está guardada. Volvé a detectar la ` +
+      `plantilla para incluir${sinComprobar === 1 ? "lo" : "los"}.`
     )
   }
   return "Es un borrador y todavía no se usa: la plantilla ya está detectada pero falta confirmarla."

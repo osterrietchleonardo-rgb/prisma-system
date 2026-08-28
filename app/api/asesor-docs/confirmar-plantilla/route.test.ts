@@ -741,3 +741,105 @@ describe("las notas al final", () => {
     expect(r.cuerpo.estado).toBe("activa")
   })
 })
+
+// ---------------------------------------------------------------------------
+// LA SÉPTIMA VÍA A ACTIVA: pausar y volver a confirmar
+// ---------------------------------------------------------------------------
+
+describe("el asesor que quedó sin comprobar", () => {
+  it("pausar a quien quedó en rojo y volver a confirmar: la plantilla se publica y SE DICE", async () => {
+    /**
+     * El caso, que un director hace todas las semanas:
+     *   1. se confirma y Caro queda en `revisar`;
+     *   2. el director la pausa (hay un módulo entero para eso);
+     *   3. se vuelve a confirmar: Caro queda afuera por spec §7.5, los otros
+     *      dos dan verde y la plantilla pasa a `activa`;
+     *   4. la fila de Caro sigue en `revisar` con el `version_id` viejo.
+     *
+     * Que se publique es correcto: dejar que un pausado congele la plantilla
+     * para siempre sería peor. Lo que NO puede pasar es que se publique en
+     * silencio — si mañana reactivan a Caro, su contrato saldría de un molde
+     * que nunca se comparó contra su documento.
+     */
+    const propuesta = propuestaDe(GENTE)
+    propuesta.huecos = propuesta.huecos.filter((h) => h.nombre !== "ZONA")
+    const primera = await pedir(propuesta)
+    expect(primera.cuerpo.estado).toBe("borrador")
+    expect(documentoDe(CARO).estado).toBe("revisar")
+    const versionVieja = documentoDe(CARO).version_id
+
+    // 2. Se la pausa.
+    base.perfiles.find((x) => x.id === CARO)!.estado = "pausado"
+
+    // 3. Se vuelve a confirmar, ahora con el campo de la zona.
+    const segunda = await pedir(propuestaDe(GENTE))
+
+    expect(segunda.cuerpo.estado).toBe("activa")
+    expect(tipoGuardado().estado).toBe("activa")
+
+    // 4. La fila de Caro no se tocó: sigue en revisar y con la versión vieja.
+    expect(documentoDe(CARO).estado).toBe("revisar")
+    expect(documentoDe(CARO).version_id).toBe(versionVieja)
+    expect(documentoDe(CARO).version_id).not.toBe(tipoGuardado().version_actual)
+
+    // Y ACÁ ESTÁ LO QUE FALTABA: se dice, con nombre y apellido.
+    expect(segunda.cuerpo.sinComprobar).toEqual(["Caro Pena"])
+    expect((segunda.cuerpo.advertencias as string[]).join(" ")).toContain("NO se comprobó contra esta versión")
+    expect(String(segunda.cuerpo.resumen)).toContain("no se comprobó")
+  })
+
+  it("el resumen de una corrida limpia NO habla de gente sin comprobar", async () => {
+    const r = await pedir(propuestaDe(GENTE))
+    expect(r.cuerpo.sinComprobar).toEqual([])
+    expect(String(r.cuerpo.resumen)).not.toContain("no se comprobó")
+    expect(String(r.cuerpo.resumen)).toContain("Listo")
+  })
+
+  it("dos asesores pausados salen los dos nombrados", async () => {
+    base.perfiles.find((x) => x.id === BRUNO)!.estado = "pausado"
+    base.perfiles.find((x) => x.id === CARO)!.estado = "eliminado"
+    const r = await pedir(propuestaDe(GENTE))
+    expect((r.cuerpo.sinComprobar as string[]).length).toBe(2)
+    expect(String(r.cuerpo.resumen)).toContain("2 asesores")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// P3: dos documentos del mismo asesor
+// ---------------------------------------------------------------------------
+
+describe("un asesor con dos documentos del mismo tipo", () => {
+  it("se usa el primero, se avisa, y NO se le escribe estado al segundo", async () => {
+    /**
+     * En producción lo tapa el índice único (advisor_id, template_id), pero el
+     * código no tenía defensa propia: armaba 4 resultados para 3 personas,
+     * verificaba dos veces el mismo archivo y al otro le escribía un estado sin
+     * haberlo mirado.
+     */
+    armarBase(GENTE)
+    const ana = GENTE.find((p) => p.id === ANA)!
+    base.documentos.push({
+      id: "doc-duplicado",
+      advisor_id: ANA,
+      agency_id: AGENCIA,
+      template_id: TIPO,
+      archivo_original_path: rutaDe(ana),
+      nombre_archivo: "duplicado.docx",
+      created_at: "zzz",
+      estado: null,
+      version_id: null,
+      form_data: null,
+    })
+
+    const r = await pedir(propuestaDe(GENTE))
+
+    // Tres personas, tres resultados. No cuatro.
+    expect((r.cuerpo.resultados as unknown[]).length).toBe(3)
+    expect((r.cuerpo.advertencias as string[]).join(" ")).toContain("más de un documento de este tipo")
+
+    // Y al duplicado no se le escribió nada.
+    const duplicado = base.documentos.find((d) => d.id === "doc-duplicado")!
+    expect(duplicado.estado).toBeNull()
+    expect(duplicado.version_id).toBeNull()
+  })
+})

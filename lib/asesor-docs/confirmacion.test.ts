@@ -624,3 +624,67 @@ describe("los avisos de nombres tampoco la tienen", () => {
     for (const a of avisos) expect(a).not.toMatch(PROMESA_EN_PRESENTE)
   })
 })
+
+describe("resumenDeLaConfirmacion: los que no se comprobaron", () => {
+  it("una corrida verde con un pausado adentro NO dice solo 'Listo'", () => {
+    /**
+     * "los 2 asesores comprobados coinciden" es verdad y es incompleto: no
+     * dice cuántos NO se comprobaron. El director que pausó a alguien lee
+     * "Listo" y se queda tranquilo, sin enterarse de que hay una persona de la
+     * que no se miró nada — y el día que la reactiven, su contrato sale de un
+     * molde que nunca se comparó contra su documento.
+     */
+    const texto = resumenDeLaConfirmacion({
+      resultados: [resultado(), resultado({ advisorId: B })],
+      huecosNoColocados: [],
+      version: 2,
+      sinComprobar: 1,
+    })
+    expect(texto).toContain("quedó activa")
+    expect(texto).toContain("1 asesor")
+    expect(texto).toContain("no se comprobó")
+  })
+
+  it("con varios, en plural", () => {
+    const texto = resumenDeLaConfirmacion({
+      resultados: [resultado()],
+      huecosNoColocados: [],
+      version: 1,
+      sinComprobar: 3,
+    })
+    expect(texto).toContain("3 asesores")
+    expect(texto).toContain("no se comprobaron")
+  })
+
+  it("sin nadie afuera, el resumen queda como estaba", () => {
+    const texto = resumenDeLaConfirmacion({ resultados: [resultado()], huecosNoColocados: [], version: 1 })
+    expect(texto).not.toContain("no se comprob")
+    expect(texto).toContain("Listo")
+  })
+
+  it("también se dice cuando la plantilla queda en borrador", () => {
+    const texto = resumenDeLaConfirmacion({
+      resultados: [resultado({ estado: "revisar", observacion: "x" })],
+      huecosNoColocados: [],
+      version: 1,
+      sinComprobar: 1,
+    })
+    expect(texto).toContain("borrador")
+    expect(texto).toContain("no se comprobó")
+  })
+
+  it("el 'no se usa con nadie' no se perdió en ninguna rama", () => {
+    // Al meter la cola nueva se reacomodó el armado de la frase: esto fija que
+    // las tres ramas de borrador sigan diciendo la consecuencia.
+    const ramas = [
+      resumenDeLaConfirmacion({ resultados: [], huecosNoColocados: [], version: 1 }),
+      resumenDeLaConfirmacion({
+        resultados: [resultado({ estado: "revisar", observacion: "x" })],
+        huecosNoColocados: [],
+        version: 1,
+      }),
+      resumenDeLaConfirmacion({ resultados: [resultado()], huecosNoColocados: ["CUIT"], version: 1 }),
+    ]
+    for (const r of ramas) expect(r).toContain("no se usa con nadie")
+  })
+})

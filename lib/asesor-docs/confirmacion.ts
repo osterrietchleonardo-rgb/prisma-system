@@ -554,26 +554,46 @@ export function resumenDeLaConfirmacion(args: {
   resultados: ResultadoDeAsesor[]
   huecosNoColocados: string[]
   version: number
+  /** Cuántos tienen un documento de este tipo y NO se comprobaron. */
+  sinComprobar?: number
 }): string {
   const publicada = laPlantillaSePublica(args)
   const total = args.resultados.length
   const enRojo = args.resultados.filter((r) => r.estado === "revisar").length
+  const sinComprobar = args.sinComprobar ?? 0
+
+  /**
+   * "los N asesores comprobados coinciden" es verdad y es incompleto: no dice
+   * cuántos NO se comprobaron. Un director que pausó a alguien y confirma lee
+   * "Listo" y se queda tranquilo, sin enterarse de que hay una persona de la
+   * que no se miró nada — y el día que la reactiven, su contrato sale de un
+   * molde que nunca se comparó contra su documento.
+   */
+  const cola =
+    sinComprobar === 0
+      ? ""
+      : sinComprobar === 1
+        ? " Ojo: hay 1 asesor con un documento de este tipo que no se comprobó (estaba pausado o desvinculado)."
+        : ` Ojo: hay ${sinComprobar} asesores con un documento de este tipo que no se comprobaron (estaban ` +
+          `pausados o desvinculados).`
 
   if (publicada) {
-    return total === 1
-      ? `Listo: la versión ${args.version} quedó activa y el único asesor comprobado coincide.`
-      : `Listo: la versión ${args.version} quedó activa y los ${total} asesores comprobados coinciden.`
+    const bien =
+      total === 1
+        ? `Listo: la versión ${args.version} quedó activa y el único asesor comprobado coincide.`
+        : `Listo: la versión ${args.version} quedó activa y los ${total} asesores comprobados coinciden.`
+    return bien + cola
   }
 
-  const cola = "queda como borrador y no se usa con nadie."
+  const noSeUsa = "queda como borrador y no se usa con nadie."
 
   if (total === 0) {
-    return `La versión ${args.version} se guardó, pero no se pudo comprobar contra ningún asesor: ${cola}`
+    return `La versión ${args.version} se guardó, pero no se pudo comprobar contra ningún asesor: ${noSeUsa}${cola}`
   }
 
   if (enRojo > 0) {
     const quienes = enRojo === 1 ? "1 asesor no coincide" : `${enRojo} asesores no coinciden`
-    return `La versión ${args.version} se guardó, pero ${quienes} de ${total}: ${cola}`
+    return `La versión ${args.version} se guardó, pero ${quienes} de ${total}: ${noSeUsa}${cola}`
   }
 
   /**
@@ -586,7 +606,7 @@ export function resumenDeLaConfirmacion(args: {
   return (
     `La versión ${args.version} se guardó y los ${total} asesores comprobados coinciden, pero ` +
     `${cuantos === 1 ? "el campo" : "los campos"} ${campos} no ${cuantos === 1 ? "se pudo" : "se pudieron"} ` +
-    `marcar dentro del documento: ${cola}`
+    `marcar dentro del documento: ${noSeUsa}${cola}`
   )
 }
 

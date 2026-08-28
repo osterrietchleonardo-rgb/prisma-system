@@ -82,29 +82,36 @@ describe("estadoDePlantilla", () => {
 
 describe("armarFilas", () => {
   it("cuenta los documentos de cada tipo y los que quedaron en rojo", () => {
+    // Los estados valen contra la versión vigente: por eso los documentos
+    // apuntan a ella. Un "revisar" de otra versión es otra cosa, y tiene su
+    // propio balde más abajo.
     const filas = armarFilas({
-      tipos: [{ id: "t1", nombre: "Contrato", estado: "borrador", version_actual: null }],
-      versiones: [],
+      tipos: [{ id: "t1", nombre: "Contrato", estado: "borrador", version_actual: "v1" }],
+      versiones: [{ id: "v1", version: 1 }],
       documentos: [
-        { template_id: "t1", estado: "ok" },
-        { template_id: "t1", estado: "revisar" },
-        { template_id: "t1", estado: null },
+        { template_id: "t1", estado: "ok", version_id: "v1" },
+        { template_id: "t1", estado: "revisar", version_id: "v1" },
+        { template_id: "t1", estado: null, version_id: "v1" },
       ],
     })
     expect(filas[0].documentos).toBe(3)
     expect(filas[0].enRojo).toBe(1)
+    expect(filas[0].sinComprobar).toBe(0)
   })
 
   it("no cuenta los documentos de otro tipo", () => {
     const filas = armarFilas({
       tipos: [
-        { id: "t1", nombre: "Contrato", estado: "borrador", version_actual: null },
-        { id: "t2", nombre: "Anexo", estado: "borrador", version_actual: null },
+        { id: "t1", nombre: "Contrato", estado: "borrador", version_actual: "v1" },
+        { id: "t2", nombre: "Anexo", estado: "borrador", version_actual: "v2" },
       ],
-      versiones: [],
+      versiones: [
+        { id: "v1", version: 1 },
+        { id: "v2", version: 1 },
+      ],
       documentos: [
-        { template_id: "t1", estado: "revisar" },
-        { template_id: "t2", estado: "ok" },
+        { template_id: "t1", estado: "revisar", version_id: "v1" },
+        { template_id: "t2", estado: "ok", version_id: "v2" },
       ],
     })
     const porNombre = Object.fromEntries(filas.map((f) => [f.nombre, f]))
@@ -488,5 +495,152 @@ describe("fusionarHuecosIguales, del lado de la pantalla", () => {
     const r = fusionarHuecosIguales(huecos)
     expect(r.advertencias[0]).toContain("N1")
     expect(r.advertencias[0]).toContain("N2")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EL ASESOR QUE NADIE COMPARÓ
+// ---------------------------------------------------------------------------
+
+describe("armarFilas: comprobado contra la versión VIGENTE, no contra cualquiera", () => {
+  const tipo = (over = {}) => ({
+    id: "t1",
+    nombre: "Contrato",
+    estado: "activa",
+    version_actual: "v-nueva",
+    ...over,
+  })
+  const doc = (over = {}) => ({ template_id: "t1", estado: "ok", version_id: "v-nueva", ...over })
+
+  it("un rojo de la versión VIGENTE se cuenta en rojo", () => {
+    const filas = armarFilas({
+      tipos: [tipo({ estado: "borrador" })],
+      versiones: [{ id: "v-nueva", version: 2 }],
+      documentos: [doc(), doc({ estado: "revisar" })],
+    })
+    expect(filas[0].enRojo).toBe(1)
+    expect(filas[0].sinComprobar).toBe(0)
+  })
+
+  it("LA SÉPTIMA VÍA: un rojo de una versión VIEJA no se cuenta en rojo, se cuenta sin comprobar", () => {
+    /**
+     * El caso, que un director hace todas las semanas:
+     *   1. se confirma y Caro queda en `revisar`;
+     *   2. el director la pausa;
+     *   3. se vuelve a confirmar: Caro queda afuera (spec §7.5), los otros dos
+     *      dan verde, y la plantilla pasa a `activa`;
+     *   4. la fila de Caro sigue en `revisar` con el `version_id` viejo.
+     *
+     * Contando ese `revisar` como rojo, la solapa decía "Activa" y "1 en rojo"
+     * al mismo tiempo sobre algo que el director no podía destrabar: Caro está
+     * pausada y volver a detectar no la incluye. Y lo grave no era el cartel:
+     * era que si mañana la reactivan, su contrato sale de un molde que NUNCA se
+     * comparó contra su documento.
+     */
+    const filas = armarFilas({
+      tipos: [tipo()],
+      versiones: [{ id: "v-nueva", version: 2 }],
+      documentos: [doc(), doc(), doc({ estado: "revisar", version_id: "v-vieja" })],
+    })
+    expect(filas[0].enRojo).toBe(0)
+    expect(filas[0].sinComprobar).toBe(1)
+  })
+
+  it("el que sube su documento DESPUÉS de que la plantilla quedó activa también entra", () => {
+    // Llega con version_id en null a una plantilla ya confirmada.
+    const filas = armarFilas({
+      tipos: [tipo()],
+      versiones: [{ id: "v-nueva", version: 1 }],
+      documentos: [doc(), doc({ estado: null, version_id: null })],
+    })
+    expect(filas[0].sinComprobar).toBe(1)
+    expect(filas[0].enRojo).toBe(0)
+  })
+
+  it("antes de detectar, NADIE está sin comprobar: sería ruido en la fila por defecto", () => {
+    const filas = armarFilas({
+      tipos: [tipo({ estado: "borrador", version_actual: null })],
+      versiones: [],
+      documentos: [
+        { template_id: "t1", estado: null, version_id: null },
+        { template_id: "t1", estado: null, version_id: null },
+      ],
+    })
+    expect(filas[0].sinComprobar).toBe(0)
+    expect(filas[0].documentos).toBe(2)
+  })
+
+  it("si la versión vigente se borró, los que apuntaban a ella quedan sin comprobar", () => {
+    // version_actual es uuid con ON DELETE SET NULL: puede quedar en null.
+    const filas = armarFilas({
+      tipos: [tipo({ version_actual: null })],
+      versiones: [],
+      documentos: [doc({ version_id: "v-vieja" })],
+    })
+    expect(filas[0].sinComprobar).toBe(1)
+  })
+})
+
+describe("explicacionDelEstado: el asesor sin comparar", () => {
+  it("activa con alguien sin comparar lo DICE, y dice qué hacer", () => {
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, sinComprobar: 1 })
+    expect(texto).toContain("Está en uso")
+    expect(texto).toContain("1 asesor no se comparó")
+    expect(texto).toContain("volvé a detectar")
+  })
+
+  it("el renglón entero concuerda en número, no solo la primera frase", () => {
+    /**
+     * En el navegador salía "1 asesor no se comparó … o estaban pausados …
+     * subieron su documento": la cuenta bien y el resto en plural fijo. Lo lee
+     * un director y suena a máquina.
+     */
+    const uno = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, sinComprobar: 1 })
+    expect(uno).toContain("estaba pausado")
+    expect(uno).toContain("subió su documento")
+    expect(uno).toContain("esa persona")
+    expect(uno).toContain("el asesor activo")
+    expect(uno).not.toContain("estaban")
+    expect(uno).not.toContain("subieron")
+
+    const varios = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, sinComprobar: 3 })
+    expect(varios).toContain("3 asesores no se compararon")
+    expect(varios).toContain("estaban pausados")
+    expect(varios).toContain("subieron su documento")
+    expect(varios).toContain("esas personas")
+    expect(varios).toContain("los asesores activos")
+  })
+
+  it("el aviso de sin comparar va ANTES que el de los rojos", () => {
+    /**
+     * Un rojo se ve entrando en la ficha del asesor; esto no se ve en ningún
+     * lado. Es el que el director no puede deducir solo.
+     */
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 2, sinComprobar: 1 })
+    expect(texto).toContain("no se comparó")
+  })
+
+  it("activa y con todos comparados sigue diciendo lo de siempre", () => {
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, sinComprobar: 0 })
+    expect(texto).toBe("Está en uso: es la versión confirmada. Con ella se le va a generar el documento a cada asesor.")
+  })
+
+  it("un borrador con alguien sin comparar también lo dice", () => {
+    const texto = explicacionDelEstado({ estado: "borrador", version: 1, enRojo: 0, sinComprobar: 1 })
+    expect(texto).toContain("no se comparó")
+    expect(texto).toContain("detectar la plantilla")
+  })
+
+  it("sin el dato, se comporta como antes", () => {
+    // La propiedad es opcional: nadie que ya llamaba a esto se rompe.
+    expect(explicacionDelEstado({ estado: "activa", version: 1, enRojo: 0 })).toContain("Está en uso")
+  })
+
+  it("ninguno de los textos nuevos promete en presente algo que no pasa", () => {
+    for (const sinComprobar of [1, 3]) {
+      for (const estado of ["activa", "borrador"] as const) {
+        expect(explicacionDelEstado({ estado, version: 1, enRojo: 0, sinComprobar })).not.toMatch(PROMESA_EN_PRESENTE)
+      }
+    }
   })
 })

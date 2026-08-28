@@ -173,6 +173,23 @@ export async function POST(req: Request) {
       )
       continue
     }
+    /**
+     * Un asesor con DOS documentos del mismo tipo.
+     *
+     * En producción no puede pasar: hay un índice único (advisor_id,
+     * template_id). Pero el código no tenía defensa propia, y sin ella se
+     * armaban 4 resultados para 3 personas, se verificaba dos veces el mismo
+     * archivo y al otro se le escribía un estado sin haberlo mirado. Un índice
+     * es una defensa de la base; esto es la del código, y cuesta una línea.
+     */
+    if (docPorAsesor.has(fila.advisor_id)) {
+      advertencias.push(
+        `${perfil.full_name?.trim() || "Un asesor"} tiene más de un documento de este tipo: se usa el primero y ` +
+          `el resto no se tocó. Borrá los que sobren.`,
+      )
+      continue
+    }
+
     candidatas.push({ advisorId: fila.advisor_id, estado: perfil.estado, nombre: perfil.full_name })
     docPorAsesor.set(fila.advisor_id, fila)
   }
@@ -486,6 +503,30 @@ export async function POST(req: Request) {
   }
 
   // ── 5. Publicar, o no ───────────────────────────────────────────────────
+
+  /**
+   * Quiénes tienen un documento de este tipo y NO se comprobaron contra esta
+   * versión: los pausados y desvinculados (spec §7.5), y cualquiera que se haya
+   * caído en el camino.
+   *
+   * No frena la publicación —dejar que un solo asesor pausado congele la
+   * plantilla para siempre sería peor— pero se dice, y con nombre. La
+   * constancia en la base ya existe sin escribir nada: su `version_id` sigue
+   * apuntando a otra versión (o a ninguna), y la solapa lo cuenta aparte por
+   * eso. Lo que faltaba no era el dato: era que alguien lo leyera y lo dijera.
+   */
+  const comprobados = new Set(resultados.map((r) => r.advisorId))
+  const sinComprobar = filas.filter((f) => !comprobados.has(f.advisor_id))
+  if (sinComprobar.length > 0) {
+    const quienes = sinComprobar.map((f) => nombreDe(f.advisor_id)).join(", ")
+    advertencias.push(
+      `${sinComprobar.length === 1 ? "Este asesor tiene" : "Estos asesores tienen"} un documento de este tipo y ` +
+        `NO se comprobó contra esta versión: ${quienes}. Su documento quedó como estaba. Cuando ` +
+        `${sinComprobar.length === 1 ? "vuelva a estar activo" : "vuelvan a estar activos"}, volvé a detectar la ` +
+        `plantilla para incluir${sinComprobar.length === 1 ? "lo" : "los"}.`,
+    )
+  }
+
   const huecosNoColocados = [...new Set(noColocados)]
   /**
    * LA REGLA QUE NO SE PUEDE ROMPER, y el único lugar donde de verdad se
@@ -525,6 +566,12 @@ export async function POST(req: Request) {
     huecosNoColocados,
     resultados,
     advertencias,
-    resumen: resumenDeLaConfirmacion({ resultados, huecosNoColocados, version: nuevaVersion.version }),
+    sinComprobar: sinComprobar.map((f) => nombreDe(f.advisor_id)),
+    resumen: resumenDeLaConfirmacion({
+      resultados,
+      huecosNoColocados,
+      version: nuevaVersion.version,
+      sinComprobar: sinComprobar.length,
+    }),
   })
 }

@@ -369,7 +369,7 @@ describe("verificarDocumentoEntero", () => {
   it("una parte que falta en el armado es una diferencia, y se dice cuál", () => {
     const r = verificarDocumentoEntero({ [CUERPO]: "x", [ENCABEZADO]: "y" }, { [CUERPO]: "x" })
     expect(r.coincide).toBe(false)
-    expect(r.observacion).toContain("Falta")
+    expect(r.observacion).toContain("sin texto")
     expect(r.observacion).toContain("encabezado")
   })
 
@@ -474,15 +474,71 @@ describe("verificarDocumentoEntero: los casos que costaron una ronda", () => {
     expect(r.observacion).toContain("borrá el comentario")
   })
 
-  it("la frase de falta/sobra concuerda en número", () => {
+  it("las frases concuerdan en número, en las dos direcciones", () => {
     // "Falta los comentarios" estaba mal escrito y lo leía un director.
-    const enPlural = verificarDocumentoEntero({ [CUERPO]: "x", [COMENTARIOS]: "algo" }, { [CUERPO]: "x" })
-    expect(enPlural.observacion).toContain("Faltan los comentarios")
+    const vacioPlural = verificarDocumentoEntero({ [CUERPO]: "x", [COMENTARIOS]: "algo" }, { [CUERPO]: "x" })
+    expect(vacioPlural.observacion).toContain("los comentarios de Word quedaron sin texto")
 
-    const enSingular = verificarDocumentoEntero({ [CUERPO]: "x", [ENCABEZADO]: "algo" }, { [CUERPO]: "x" })
-    expect(enSingular.observacion).toContain("Falta el encabezado")
+    const vacioSingular = verificarDocumentoEntero({ [CUERPO]: "x", [ENCABEZADO]: "algo" }, { [CUERPO]: "x" })
+    expect(vacioSingular.observacion).toContain("el encabezado quedó sin texto")
 
-    const sobrando = verificarDocumentoEntero({ [CUERPO]: "x" }, { [CUERPO]: "x", [COMENTARIOS]: "algo" })
-    expect(sobrando.observacion).toContain("Sobran los comentarios")
+    const sobraPlural = verificarDocumentoEntero({ [CUERPO]: "x" }, { [CUERPO]: "x", [COMENTARIOS]: "algo" })
+    expect(sobraPlural.observacion).toContain("Sobran los comentarios")
+
+    const sobraSingular = verificarDocumentoEntero({ [CUERPO]: "x" }, { [CUERPO]: "x", [ENCABEZADO]: "algo" })
+    expect(sobraSingular.observacion).toContain("Sobra el encabezado")
+  })
+})
+
+describe("verificarDocumentoEntero: los diagnósticos que estaban mal", () => {
+  const RARA = "word/loQueVenga.xml"
+  const OTRA_RARA = "word/otraCosa.xml"
+
+  it("si una parte queda SIN TEXTO, no se culpa a la estructura", () => {
+    /**
+     * Si un campo ocupa todo el encabezado y el dato de esa persona vino
+     * vacío, el encabezado del armado queda en blanco. Decir "revisá que los
+     * dos sean el mismo tipo de documento" ahí es un diagnóstico equivocado, y
+     * manda al director a comparar archivos que están bien.
+     */
+    const r = verificarDocumentoEntero({ [CUERPO]: "x", [ENCABEZADO]: "Legajo 8892" }, { [CUERPO]: "x" })
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain("quedó sin texto")
+    expect(r.observacion).toContain("vacío para esta persona")
+  })
+
+  it("si SOBRA una parte, ahí sí es estructural", () => {
+    const r = verificarDocumentoEntero({ [CUERPO]: "x" }, { [CUERPO]: "x", [ENCABEZADO]: "Legajo" })
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain("Sobra")
+    expect(r.observacion).toContain("mismo tipo de documento")
+  })
+
+  it("dos partes desconocidas NO se comparan pegadas", () => {
+    /**
+     * Hoy no llega ninguna: `textoPorParte` solo devuelve familias conocidas.
+     * Es para el día que llegue — juntándolas, una diferencia en una podría
+     * taparse con la otra.
+     */
+    const r = verificarDocumentoEntero(
+      { [CUERPO]: "x", [RARA]: "uno", [OTRA_RARA]: "dos" },
+      { [CUERPO]: "x", [RARA]: "dos", [OTRA_RARA]: "uno" },
+    )
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain(RARA)
+  })
+
+  it("una parte desconocida igual en los dos no molesta", () => {
+    const r = verificarDocumentoEntero({ [CUERPO]: "x", [RARA]: "uno" }, { [CUERPO]: "x", [RARA]: "uno" })
+    expect(r.coincide).toBe(true)
+  })
+
+  it("el cuerpo se sigue revisando primero, aun con partes desconocidas", () => {
+    const r = verificarDocumentoEntero(
+      { [CUERPO]: "Ana firma.", [RARA]: "uno" },
+      { [CUERPO]: "Bruno firma.", [RARA]: "dos" },
+    )
+    expect(r.observacion).toContain("Ana")
+    expect(r.observacion).not.toContain(RARA)
   })
 })
