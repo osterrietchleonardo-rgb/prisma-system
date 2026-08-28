@@ -317,3 +317,146 @@ describe("las partes que mammoth no lee", () => {
     expect(v.observacion).toContain("4471")
   })
 })
+
+// ---------------------------------------------------------------------------
+// LA REGRESIÓN, POR EL CAMINO DE VERDAD
+// ---------------------------------------------------------------------------
+
+/**
+ * Estos tests van sobre `.docx` reales y `textoPorParte`, que es por donde pasa
+ * producción. El equivalente en `verificacion.test.ts` compara dos strings, y
+ * eso fue exactamente lo que dejó pasar la regresión: la sentencia
+ * `verificarContraElOriginal("Uno.\n\n\nDos.", "Uno.\nDos.") === true` seguía
+ * en verde mientras producción mandaba "|||" en vez de "\n".
+ */
+describe("el documento entero, armado con .docx de verdad", () => {
+  const BASE = "application/vnd.openxmlformats-officedocument.wordprocessingml"
+
+  /** Un `<w:p>` sin un solo `<w:t>`: el Enter de más, tal como lo escribe Word. */
+  const parrafoVacio = () => `<w:p w:rsidR="00B71C4D"><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>`
+
+  /** Un cuadro de texto: un `<w:p>` ADENTRO de otro `<w:p>`. */
+  const cuadroDeTexto = (adentro: string) =>
+    `<w:p w:rsidR="00B71C4D"><w:r><w:pict><v:shape><v:textbox><w:txbxContent>${parrafo(adentro)}</w:txbxContent></v:textbox></v:shape></w:pict></w:r></w:p>`
+
+  /** Un .docx con las partes que se le pidan además del cuerpo. */
+  function docxCon(
+    parrafos: string[],
+    extras: { encabezado?: string; notaAlFinal?: string; comentario?: string; rutaEncabezado?: string } = {},
+  ): PizZip {
+    const zip = docx(parrafos)
+    const word = zip.folder("word")!
+    const overrides = [`<Override PartName="/word/document.xml" ContentType="${BASE}.document.main+xml"/>`]
+
+    if (extras.encabezado !== undefined) {
+      const ruta = extras.rutaEncabezado ?? "header1.xml"
+      overrides.push(`<Override PartName="/word/${ruta}" ContentType="${BASE}.header+xml"/>`)
+      word.file(
+        ruta,
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${parrafo(extras.encabezado)}</w:hdr>`,
+      )
+    }
+    if (extras.notaAlFinal !== undefined) {
+      // Con la boilerplate de Word adelante: los separadores no tienen <w:t>.
+      word.file(
+        "endnotes.xml",
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:endnote><w:endnote w:id="1">${parrafo(extras.notaAlFinal)}</w:endnote></w:endnotes>`,
+      )
+    }
+    if (extras.comentario !== undefined) {
+      overrides.push(`<Override PartName="/word/comments.xml" ContentType="${BASE}.comments+xml"/>`)
+      word.file(
+        "comments.xml",
+        `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:comment w:id="1" w:author="Leonardo">${parrafo(extras.comentario)}</w:comment></w:comments>`,
+      )
+    }
+
+    zip.file(
+      "[Content_Types].xml",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/>${overrides.join("")}</Types>`,
+    )
+    return zip
+  }
+
+  it("EL ENTER DE MÁS no es una diferencia", () => {
+    /**
+     * El párrafo vacío es lo más común que hay en un Word, y la detección no
+     * puede convertirlo en campo: `diffWords` ignora los espacios. Un rojo acá
+     * es un rojo que el director no tiene cómo arreglar — y el criterio de
+     * `verificacion.ts` lo lista textualmente entre lo que pasa en verde.
+     */
+    const conEnter = docxCon([parrafo("Contrato de Ana."), parrafoVacio(), parrafo("Firma.")])
+    const sinEnter = docxCon([parrafo("Contrato de Ana."), parrafo("Firma.")])
+
+    const r = verificarDocumentoEntero(textoPorParte(conEnter), textoPorParte(sinEnter))
+    expect(r.coincide, r.observacion ?? "").toBe(true)
+  })
+
+  it("dos Enter de más tampoco", () => {
+    const con = docxCon([parrafo("Uno."), parrafoVacio(), parrafoVacio(), parrafo("Dos.")])
+    const sin = docxCon([parrafo("Uno."), parrafo("Dos.")])
+    expect(verificarDocumentoEntero(textoPorParte(con), textoPorParte(sin)).coincide).toBe(true)
+  })
+
+  it("pero dos palabras pegadas contra dos separadas SIGUEN siendo distintas", () => {
+    // El borde del criterio: se colapsan tandas de espacios, no se borran.
+    const a = docxCon([parrafo("Juan Pérez firma.")])
+    const b = docxCon([parrafo("JuanPérez firma.")])
+    expect(verificarDocumentoEntero(textoPorParte(a), textoPorParte(b)).coincide).toBe(false)
+  })
+
+  it("el separador de párrafos NUNCA llega al mensaje del director", () => {
+    const a = docxCon([parrafo("Aclaración de la firma: Ana Ruiz"), parrafo("Fin.")])
+    const b = docxCon([parrafo("Aclaración de la firma: Bruno Sosa"), parrafo("Fin.")])
+    const r = verificarDocumentoEntero(textoPorParte(a), textoPorParte(b))
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).not.toContain("|||")
+    expect(r.observacion).toContain("Ana Ruiz")
+  })
+
+  it("textoPorParte SÍ lee las notas al final, y una distinta queda en rojo", () => {
+    /**
+     * La sexta vía a `activa`: la plantilla no rellena las notas al final, así
+     * que el molde se lleva la del asesor molde al documento de todos.
+     */
+    const deAna = docxCon([parrafo("Contrato.")], { notaAlFinal: "Legajo interno 8892" })
+    const deBruno = docxCon([parrafo("Contrato.")], { notaAlFinal: "Legajo interno 4471" })
+
+    expect(textoPorParte(deAna)["word/endnotes.xml"]).toContain("8892")
+
+    const r = verificarDocumentoEntero(textoPorParte(deBruno), textoPorParte(deAna))
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain("notas al final")
+  })
+
+  it("un .docx sin notas al final de verdad no inventa una diferencia", () => {
+    // La boilerplate de separadores de Word no tiene <w:t>: texto vacío.
+    const conBoilerplate = docxCon([parrafo("Contrato.")], { notaAlFinal: "" })
+    const sinNada = docxCon([parrafo("Contrato.")])
+    expect(verificarDocumentoEntero(textoPorParte(conBoilerplate), textoPorParte(sinNada)).coincide).toBe(true)
+  })
+
+  it("textoPorParte lee lo que hay dentro de un cuadro de texto", () => {
+    /**
+     * El cartel decía que los cuadros de texto quedaban afuera de la
+     * comprobación y no era cierto: `segmentosDeNivelSuperior` devuelve el
+     * `<w:p>` externo entero, con lo anidado adentro.
+     */
+    const zip = docxCon([parrafo("Cuerpo."), cuadroDeTexto("Legajo 8892")])
+    expect(textoPorParte(zip)["word/document.xml"]).toContain("8892")
+  })
+
+  it("el mismo membrete guardado como header1 o header2 no es una diferencia", () => {
+    const a = docxCon([parrafo("Contrato.")], { encabezado: "VAKDOR PROPIEDADES", rutaEncabezado: "header1.xml" })
+    const b = docxCon([parrafo("Contrato.")], { encabezado: "VAKDOR PROPIEDADES", rutaEncabezado: "header2.xml" })
+    expect(verificarDocumentoEntero(textoPorParte(a), textoPorParte(b)).coincide).toBe(true)
+  })
+
+  it("un comentario de Word distinto queda en rojo, y dice que se borra en el Word", () => {
+    const a = docxCon([parrafo("Contrato.")], { comentario: "Hablar con Ana" })
+    const b = docxCon([parrafo("Contrato.")], { comentario: "Hablar con Bruno" })
+    const r = verificarDocumentoEntero(textoPorParte(a), textoPorParte(b))
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain("borrá el comentario")
+  })
+})

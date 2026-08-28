@@ -364,16 +364,30 @@ describe("la prosa de la pantalla de revisión", () => {
   it("avisa que el encabezado y el pie quedan fuera de la comprobación", () => {
     // mammoth lee el cuerpo. Callarlo dejaría al director creyendo que se
     // revisó el archivo entero.
-    expect(LIMITE_DE_LA_COMPROBACION).toContain("encabezado")
-    expect(LIMITE_DE_LA_COMPROBACION).toContain("pie")
-    expect(LIMITE_DE_LA_COMPROBACION).toContain("notas al pie")
-    expect(LIMITE_DE_LA_COMPROBACION).toContain("comentarios")
-    // Y lo que SÍ queda afuera, que es lo que de verdad hay que decir: qué no
-    // se revisa Y que eso se informa aparte. Sin la segunda mitad, el director
-    // lee una lista de agujeros y no sabe si tiene que ir a buscarlos él.
-    expect(LIMITE_DE_LA_COMPROBACION).toContain("notas al final")
-    expect(LIMITE_DE_LA_COMPROBACION).toContain("cuadros de texto")
-    expect(LIMITE_DE_LA_COMPROBACION).toContain("te lo avisamos aparte")
+    // Las seis familias que de verdad se comparan. Si el cartel nombra menos
+    // de las que se miran, el director cree que hay agujeros que no hay.
+    for (const parte of [
+      "cuerpo",
+      "encabezado",
+      "pie de página",
+      "notas al pie",
+      "notas al final",
+      "comentarios",
+      "cuadros de texto",
+    ]) {
+      expect(LIMITE_DE_LA_COMPROBACION).toContain(parte)
+    }
+
+    /**
+     * Y la mitad que le sirve al director: que los campos salen del cuerpo, que
+     * lo de afuera queda en rojo, y que el arreglo es en el Word. La frase
+     * anterior prometía "te lo avisamos aparte" para las notas al final y no
+     * había ningún aviso en ningún lado: una promesa falsa en el cartel es peor
+     * que no decir nada.
+     */
+    expect(LIMITE_DE_LA_COMPROBACION).toContain("rojo")
+    expect(LIMITE_DE_LA_COMPROBACION).toContain("en el Word")
+    expect(LIMITE_DE_LA_COMPROBACION).not.toContain("te lo avisamos aparte")
   })
 
   it("cuenta de antemano qué pasa si alguno queda en rojo", () => {

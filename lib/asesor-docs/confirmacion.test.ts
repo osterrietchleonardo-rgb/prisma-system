@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
+  avisoDeNotasAlFinal,
   camposConDatoCorto,
   camposQueChocanConOtroNombre,
   camposSchema,
@@ -392,6 +393,24 @@ describe("camposQueChocanConOtroNombre", () => {
       hueco({ id: "h2", nombre: "ANIO", valores: { [A]: "  " } }),
     ]
     expect(camposQueChocanConOtroNombre(huecos, A)).toEqual([])
+  })
+})
+
+describe("avisoDeNotasAlFinal", () => {
+  it("no dice nada si no hay notas al final", () => {
+    expect(avisoDeNotasAlFinal("")).toBeNull()
+    expect(avisoDeNotasAlFinal("   \n  ")).toBeNull()
+  })
+
+  it("cuando las hay, explica por qué importan y qué hacer", () => {
+    /**
+     * El cartel prometía "te lo avisamos aparte" y no había ningún aviso en
+     * ninguna parte. Este es el aviso.
+     */
+    const aviso = avisoDeNotasAlFinal("Legajo interno 8892")!
+    expect(aviso).toContain("notas al final")
+    expect(aviso).toContain("molde")
+    expect(aviso).toContain("Word")
   })
 })
 

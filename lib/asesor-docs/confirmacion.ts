@@ -340,6 +340,29 @@ export function camposConDatoCorto(huecos: HuecoParaGuardar[], moldeAdvisorId: s
 }
 
 /**
+ * El aviso de que el contrato tiene notas al FINAL con texto.
+ *
+ * El cartel de la pantalla dice que los campos salen del cuerpo; esto lo hace
+ * concreto y con nombre propio cuando pasa de verdad. La versión anterior del
+ * cartel prometía "te lo avisamos aparte" y **no había ningún aviso en ninguna
+ * parte**: la promesa era falsa.
+ *
+ * No frena nada por sí solo. Lo que frena, si el dato de esa nota cambia de
+ * persona a persona, es la comparación: `textoPorParte` sí lee las notas al
+ * final y la diferencia sale en rojo con el motivo.
+ *
+ * `null` cuando no hay notas al final con texto.
+ */
+export function avisoDeNotasAlFinal(textoDeLasNotas: string): string | null {
+  if (textoDeLasNotas.trim() === "") return null
+  return (
+    "El contrato tiene notas al final del documento. La plantilla no las rellena: la nota que quede es la del " +
+    "documento que se usa de molde, igual para todos. Si ahí hay un dato de cada persona, va a salir en rojo acá " +
+    "abajo y hay que moverlo al cuerpo del contrato en el Word."
+  )
+}
+
+/**
  * El mensaje de cuando el molde quedó inservible: se le pusieron los campos y
  * después no se lo puede rellenar.
  *

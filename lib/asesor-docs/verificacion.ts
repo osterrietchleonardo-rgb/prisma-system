@@ -9,10 +9,11 @@
  * la cláusula. Cuando eso pase, tiene que fallar a los gritos, no en silencio:
  * lo que se guarda acá termina siendo el contrato que alguien firma.
  *
- * Vive en `lib/` y no adentro del endpoint porque los tests del repo solo
- * miran `lib/**`, y este archivo es EL que no puede estar mal: si compara de
- * más, bloquea plantillas que estaban bien; si compara de menos, deja pasar un
- * contrato con el dato de otra persona.
+ * Vive en `lib/` y no adentro del endpoint porque este archivo es EL que no
+ * puede estar mal: si compara de más, bloquea plantillas que estaban bien; si
+ * compara de menos, deja pasar un contrato con el dato de otra persona. El
+ * endpoint tiene sus propios tests desde que `vitest.config.ts` mira también
+ * `app/api/**`; acá viven las reglas, allá el cableado.
  */
 
 // ---------------------------------------------------------------------------
@@ -65,11 +66,12 @@
  * La regla corta, para quien la tenga que tocar: **se ignora cómo se ve el
  * texto; no se ignora lo que dice.**
  *
- * Lo que esto NO alcanza a mirar, y hay que decirlo: `textoDeDocx` usa mammoth,
- * que devuelve el CUERPO del documento. Un dato que viva solo en el encabezado
- * o en el pie queda fuera de esta verificación aunque `ponerHuecosEnDocx` sí lo
- * haya tocado. El endpoint lo avisa por escrito en vez de fingir que revisó
- * todo el archivo.
+ * OJO con el alcance, porque cambió: esta función compara DOS TEXTOS y no
+ * sabe de dónde salieron. La que compara un documento es
+ * `verificarDocumentoEntero`, más abajo, y mira TODO el texto del paquete
+ * —cuerpo, encabezado, pie, notas al pie, notas al final y comentarios— vía
+ * `textoPorParte`. Comparar solo el cuerpo (que es lo que devuelve mammoth)
+ * dejaba pasar en verde un legajo de encabezado con el número de otra persona.
  */
 
 /**
@@ -258,72 +260,146 @@ export function verificarContraElOriginal(original: string, armado: string): Ver
  *
  * Peor todavía: sin nada en rojo, la plantilla podía llegar a `activa`.
  *
- * La regla, entonces: **la verificación mira exactamente las mismas partes que
- * el molde modifica.** `ponerHuecosEnDocx` toca cuerpo, encabezado, pie, notas
- * al pie y comentarios (`partesDeTextoDeDocx`); `textoPorParte` devuelve esas
- * mismas, y esto las compara una por una.
+ * La regla, entonces: **se compara TODO el texto del paquete.** No solo lo que
+ * el molde rellena (cuerpo, encabezado, pie, notas al pie, comentarios) sino
+ * también lo que NO rellena y aun así se lleva puesto de una persona a todas:
+ * las notas al final. `textoPorParte` devuelve exactamente eso.
  *
  * Comparar parte por parte y no todo pegado no es prolijidad: si se
  * concatenara, una diferencia en el encabezado se informaría con el contexto
  * del cuerpo y el director iría a buscarla donde no está.
- *
- * Lo que sigue quedando afuera, y por eso se avisa por escrito:
- *  · `word/endnotes.xml` — docxtemplater no lo rellena, así que `docx.ts` lo
- *    deja afuera a propósito y lo informa como faltante;
- *  · los cuadros de texto y las formas, que `ponerHuecosEnDocx` no revisa por
- *    dentro y devuelve en sus `advertencias`.
  */
 
-/** Cómo se llama cada parte del paquete, para una persona. */
+/** Las familias de partes que puede tener un .docx, para agrupar y nombrar. */
+export type TipoDeParte = "cuerpo" | "encabezado" | "pie" | "notas-al-pie" | "notas-al-final" | "comentarios" | "otra"
+
+/**
+ * De qué familia es una parte del paquete.
+ *
+ * El orden de las preguntas importa: "footnotes" y "endnotes" contienen la
+ * palabra "note", y "footnotes" empieza con "foot" igual que "footer". Mirado
+ * en el orden equivocado, las notas al pie salían informadas como pie de
+ * página y el director iba a buscar al lugar que no era.
+ */
+export function tipoDeParte(ruta: string): TipoDeParte {
+  if (ruta === "word/document.xml") return "cuerpo"
+  if (/footnotes/i.test(ruta)) return "notas-al-pie"
+  if (/endnotes/i.test(ruta)) return "notas-al-final"
+  if (/header/i.test(ruta)) return "encabezado"
+  if (/footer/i.test(ruta)) return "pie"
+  if (/comments/i.test(ruta)) return "comentarios"
+  return "otra"
+}
+
+/** Cómo se llama cada familia, para una persona, y si va en plural. */
+const PARTES: Record<TipoDeParte, { nombre: string; plural: boolean }> = {
+  cuerpo: { nombre: "el cuerpo del documento", plural: false },
+  encabezado: { nombre: "el encabezado", plural: false },
+  pie: { nombre: "el pie de página", plural: false },
+  "notas-al-pie": { nombre: "las notas al pie", plural: true },
+  "notas-al-final": { nombre: "las notas al final", plural: true },
+  comentarios: { nombre: "los comentarios de Word", plural: true },
+  otra: { nombre: "otra parte del documento", plural: false },
+}
+
 export function nombreDeParte(ruta: string): string {
-  if (ruta === "word/document.xml") return "el cuerpo del documento"
-  if (/header/i.test(ruta)) return "el encabezado"
-  if (/footnotes/i.test(ruta)) return "las notas al pie"
-  if (/footer/i.test(ruta)) return "el pie de página"
-  if (/comments/i.test(ruta)) return "los comentarios"
-  return `la parte "${ruta}"`
+  return PARTES[tipoDeParte(ruta)].nombre
 }
 
 /**
- * Compara el documento ENTERO contra el original, parte por parte.
+ * Qué puede hacer el director cuando la diferencia NO está en el cuerpo.
  *
- * Se informa la PRIMERA parte que no coincide, con el cuerpo primero: es donde
- * está el contrato y donde el director va a mirar. Una parte que está en uno y
- * no en el otro también es una diferencia — y de las que más asustan, porque
- * significa que el molde perdió o inventó un encabezado.
+ * Sin esto, el mensaje le dice que algo no coincide y lo deja sin salida:
+ * desde la pantalla de revisión no puede tocar un encabezado ni borrar un
+ * comentario. Desde el Word sí, y alcanza con decirlo.
+ *
+ * El motivo de fondo es el mismo para todas: la detección compara el CUERPO de
+ * los contratos, así que nada que viva afuera puede convertirse en campo.
+ */
+function comoSeArregla(tipo: TipoDeParte): string {
+  const base =
+    "La detección compara el cuerpo de los contratos, así que un dato que viva acá no puede convertirse en campo."
+  if (tipo === "comentarios") {
+    return `${base} Si es una nota de cada persona, borrá el comentario en el Word y volvé a detectar.`
+  }
+  if (tipo === "notas-al-final") {
+    return (
+      `${base} Además, la plantilla no rellena las notas al final: la de esta persona sale con lo que decía la del ` +
+      `documento que se usó de molde. Movelo al cuerpo del contrato o dejalo igual en todos, y volvé a detectar.`
+    )
+  }
+  return `${base} Movelo al cuerpo del contrato o dejalo igual en todos, y volvé a detectar.`
+}
+
+/**
+ * Compara el documento ENTERO contra el original, familia de partes por
+ * familia de partes.
+ *
+ * **Se agrupa por familia y no por ruta**, y eso arregla un falso rojo: Word
+ * numera los encabezados según le convenga (`header1` para la primera página,
+ * `header2` para el resto), y dos documentos con el MISMO membrete pueden
+ * guardarlo con números distintos. Comparando ruta contra ruta, eso salía como
+ * "falta el encabezado" y no había nada que arreglar.
+ *
+ * Se informa la PRIMERA familia que no coincide, con el cuerpo primero: es
+ * donde está el contrato y donde el director va a mirar. Una familia que está
+ * en uno y no en el otro también es una diferencia — y de las que más asustan,
+ * porque significa que el molde perdió o inventó un encabezado.
  */
 export function verificarDocumentoEntero(
   original: Record<string, string>,
   armado: Record<string, string>,
 ): Verificacion {
-  const rutas = [...new Set([...Object.keys(original), ...Object.keys(armado)])].sort((a, b) => {
-    // El cuerpo primero; el resto por nombre, para que el resultado no dependa
-    // del orden en que el paquete declare sus partes.
-    if (a === "word/document.xml") return -1
-    if (b === "word/document.xml") return 1
-    return a.localeCompare(b)
-  })
+  /** Junta las partes de la misma familia, en orden de ruta para que no dependa
+   * de cómo las declare el paquete. */
+  const porFamilia = (partes: Record<string, string>) => {
+    const mapa = new Map<TipoDeParte, string[]>()
+    for (const ruta of Object.keys(partes).sort()) {
+      const tipo = tipoDeParte(ruta)
+      mapa.set(tipo, [...(mapa.get(tipo) ?? []), partes[ruta] ?? ""])
+    }
+    /**
+     * Una familia que existe pero está vacía es lo mismo que no tenerla: un
+     * `word/header1.xml` sin una letra adentro no es un encabezado. Si no, un
+     * documento con el encabezado en blanco y otro sin encabezado darían un
+     * rojo por algo que nadie ve ni puede arreglar.
+     */
+    const salida = new Map<TipoDeParte, string>()
+    for (const [tipo, textos] of mapa) {
+      const junto = textos.join("\n")
+      if (normalizarParaComparar(junto) !== "") salida.set(tipo, junto)
+    }
+    return salida
+  }
 
-  for (const ruta of rutas) {
-    const enUno = Object.prototype.hasOwnProperty.call(original, ruta)
-    const enOtro = Object.prototype.hasOwnProperty.call(armado, ruta)
+  const a = porFamilia(original)
+  const b = porFamilia(armado)
+
+  const familias: TipoDeParte[] = ["cuerpo", "encabezado", "pie", "notas-al-pie", "notas-al-final", "comentarios", "otra"]
+
+  for (const tipo of familias) {
+    const enUno = a.has(tipo)
+    const enOtro = b.has(tipo)
+    if (!enUno && !enOtro) continue
+
+    const { nombre, plural } = PARTES[tipo]
 
     if (enUno !== enOtro) {
+      const verbo = enUno ? (plural ? "Faltan" : "Falta") : plural ? "Sobran" : "Sobra"
       return {
         coincide: false,
         observacion:
-          `${enUno ? "Falta" : "Sobra"} ${nombreDeParte(ruta)} en el documento armado con la plantilla. El molde ` +
-          `no tiene la misma estructura que el archivo de esta persona: revisá que los dos sean el mismo tipo de ` +
-          `documento.`,
+          `${verbo} ${nombre} en el documento armado con la plantilla. El molde no tiene la misma estructura que ` +
+          `el archivo de esta persona: revisá que los dos sean el mismo tipo de documento.`,
       }
     }
 
-    const v = verificarContraElOriginal(original[ruta] ?? "", armado[ruta] ?? "")
+    const v = verificarContraElOriginal(a.get(tipo) ?? "", b.get(tipo) ?? "")
     if (v.coincide) continue
 
     // En el cuerpo no hace falta decir dónde: es lo que todo el mundo supone.
-    if (ruta === "word/document.xml") return v
-    return { coincide: false, observacion: `En ${nombreDeParte(ruta)}: ${v.observacion}` }
+    if (tipo === "cuerpo") return v
+    return { coincide: false, observacion: `En ${nombre}: ${v.observacion} ${comoSeArregla(tipo)}` }
   }
 
   return { coincide: true, observacion: null }

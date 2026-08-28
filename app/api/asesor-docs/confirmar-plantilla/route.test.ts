@@ -167,7 +167,7 @@ function parrafo(texto: string): string {
 
 const BASE_TIPO = "application/vnd.openxmlformats-officedocument.wordprocessingml"
 
-function docx(parrafos: string[], encabezado?: string): PizZip {
+function docx(parrafos: string[], encabezado?: string, notaAlFinal?: string): PizZip {
   const zip = new PizZip()
   const overrides = [`<Override PartName="/word/document.xml" ContentType="${BASE_TIPO}.document.main+xml"/>`]
   const word = zip.folder("word")!
@@ -176,6 +176,14 @@ function docx(parrafos: string[], encabezado?: string): PizZip {
     word.file(
       "header1.xml",
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${parrafo(encabezado)}</w:hdr>`,
+    )
+  }
+  if (notaAlFinal !== undefined) {
+    // Las notas al final NO se declaran en [Content_Types] como parte que
+    // docxtemplater rellene: se leen igual, que es justo el punto.
+    word.file(
+      "endnotes.xml",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:endnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:endnote w:id="1">${parrafo(notaAlFinal)}</w:endnote></w:endnotes>`,
     )
   }
   zip.file(
@@ -192,7 +200,7 @@ function docx(parrafos: string[], encabezado?: string): PizZip {
 
 const buffer = (zip: PizZip) => Buffer.from(zip.generate({ type: "nodebuffer" }))
 
-type Persona = { id: string; nombre: string; cuit: string; zona: string; legajo?: string }
+type Persona = { id: string; nombre: string; cuit: string; zona: string; legajo?: string; notaAlFinal?: string }
 
 const GENTE: Persona[] = [
   { id: ANA, nombre: "Ana Ruiz", cuit: "27-31456789-4", zona: "Villa Urquiza" },
@@ -209,6 +217,7 @@ const contratoDe = (p: Persona) =>
       parrafo(`Aclaracion de la firma de EL ASESOR: ${p.nombre}`),
     ],
     p.legajo,
+    p.notaAlFinal,
   )
 
 const rutaDe = (p: Persona) => `asesores/${AGENCIA}/${p.id}/plantillas/${p.id}.docx`
@@ -607,5 +616,128 @@ describe("lo que se rechaza en la puerta", () => {
     const r = await pedir(propuestaDe(GENTE, "77777777-7777-4777-8777-777777777777"))
     expect(r.status).toBe(409)
     expect(base.escrituras).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Los campos que no se pudieron marcar, y las notas al final
+// ---------------------------------------------------------------------------
+
+describe("huecosNoColocados llega hasta la decisión final", () => {
+  it("un campo que no se pudo marcar deja la plantilla en borrador aunque TODOS estén en verde", async () => {
+    /**
+     * La mitad de la regla que ningún test veía: mutar el cableado a
+     * `estadoDeLaPlantilla({ resultados, huecosNoColocados: [] })` borraba esta
+     * condición sin que nada parpadeara.
+     *
+     * El caso: un campo cuyo dato está VACÍO en todos. No hay texto que buscar,
+     * así que el `{{HUECO}}` nunca entra en el .docx; y como no cambia nada,
+     * los tres asesores verifican bien. Verde por todos lados y un campo que en
+     * el formulario de la plantilla no va a hacer absolutamente nada.
+     */
+    const propuesta = propuestaDe(GENTE)
+    propuesta.huecos.push({
+      id: "hueco-VACIO",
+      nombre: "ANEXO",
+      contexto: "",
+      valores: Object.fromEntries(GENTE.map((p) => [p.id, "   "])),
+    })
+
+    const r = await pedir(propuesta)
+    expect(r.status).toBe(200)
+
+    // Todos en verde...
+    expect((r.cuerpo.resultados as Array<{ estado: string }>).every((x) => x.estado === "ok")).toBe(true)
+    // ...y la plantilla NO se publica, por el campo sin marcar.
+    expect(r.cuerpo.huecosNoColocados).toEqual(["ANEXO"])
+    expect(r.cuerpo.estado).toBe("borrador")
+    expect(tipoGuardado().estado).toBe("borrador")
+
+    // Y el resumen dice el motivo de verdad, no "0 asesores no coinciden".
+    expect(String(r.cuerpo.resumen)).toContain("ANEXO")
+    expect(String(r.cuerpo.resumen)).not.toContain("0 asesores")
+  })
+})
+
+describe("las notas al final", () => {
+  it("una nota al final distinta por persona deja a los demás en rojo", async () => {
+    /**
+     * La sexta vía a `activa`: la plantilla no rellena las notas al final, así
+     * que el molde se lleva la del asesor molde al documento de todos. Con la
+     * comparación mirando solo lo que el molde rellena, esto daba verde y la
+     * plantilla se publicaba con el legajo de otra persona.
+     */
+    const conNota = GENTE.map((p, i) => ({ ...p, notaAlFinal: `Legajo interno ${8892 + i * 100}` }))
+    armarBase(conNota)
+
+    const r = await pedir(propuestaDe(conNota))
+    expect(r.status).toBe(200)
+    expect(r.cuerpo.estado).toBe("borrador")
+
+    const resultados = r.cuerpo.resultados as Array<{ advisorId: string; estado: string; observacion: string | null }>
+    expect(resultados.find((x) => x.advisorId === ANA)!.estado).toBe("ok")
+    for (const otro of [BRUNO, CARO]) {
+      const x = resultados.find((y) => y.advisorId === otro)!
+      expect(x.estado).toBe("revisar")
+      expect(x.observacion).toContain("notas al final")
+      // Y con la salida: se arregla en el Word, no en la pantalla.
+      expect(x.observacion).toContain("volvé a detectar")
+    }
+  })
+
+  it("cuando el molde tiene notas al final, se avisa con nombre propio", async () => {
+    /**
+     * El cartel prometía "te lo avisamos aparte" y no había ningún aviso en
+     * ninguna parte. Este test mira que el aviso llegue de verdad en la
+     * respuesta, que es lo único que el director ve.
+     */
+    const conNota = GENTE.map((p) => ({ ...p, notaAlFinal: "Ley 25.326 de Proteccion de Datos Personales." }))
+    armarBase(conNota)
+
+    const r = await pedir(propuestaDe(conNota))
+    expect((r.cuerpo.advertencias as string[]).join(" ")).toContain("El contrato tiene notas al final")
+  })
+
+  it("sin notas al final NO se avisa de algo que no pasa", async () => {
+    armarBase(GENTE)
+    const r = await pedir(propuestaDe(GENTE))
+    // Ojo: el cartel del límite TAMBIÉN nombra las notas al final. Lo que no
+    // tiene que aparecer es el aviso propio.
+    expect((r.cuerpo.advertencias as string[]).join(" ")).not.toContain("El contrato tiene notas al final")
+  })
+
+  it("si la nota al final dice lo mismo en todos, no molesta", async () => {
+    const igual = GENTE.map((p) => ({ ...p, notaAlFinal: "Ley 25.326 de Protección de Datos Personales." }))
+    armarBase(igual)
+    expect((await pedir(propuestaDe(igual))).cuerpo.estado).toBe("activa")
+  })
+
+  it("un Enter de más en el documento de una persona NO la pone en rojo", async () => {
+    /**
+     * La regresión del "|||", vista desde el endpoint: el párrafo vacío es lo
+     * más común que hay en un Word y la detección no puede convertirlo en
+     * campo. Un rojo acá no tendría arreglo.
+     */
+    armarBase(GENTE)
+    const bruno = GENTE.find((p) => p.id === BRUNO)!
+    base.archivos.set(
+      rutaDe(bruno),
+      buffer(
+        docx([
+          parrafo("CONTRATO DE PARTNERSHIP COMERCIAL INMOBILIARIO"),
+          `<w:p w:rsidR="00B71C4D"><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>`,
+          parrafo(`Y por la otra parte ${bruno.nombre}, mayor de edad, CUIT ${bruno.cuit}, en adelante EL ASESOR.`),
+          parrafo(`Se asigna a EL ASESOR la zona de ${bruno.zona}, con captacion preferente.`),
+          parrafo(`Aclaracion de la firma de EL ASESOR: ${bruno.nombre}`),
+        ]),
+      ),
+    )
+
+    const r = await pedir(propuestaDe(GENTE))
+    const suyo = (r.cuerpo.resultados as Array<{ advisorId: string; estado: string; observacion: string }>).find(
+      (x) => x.advisorId === BRUNO,
+    )!
+    expect(suyo.estado, suyo.observacion ?? "").toBe("ok")
+    expect(r.cuerpo.estado).toBe("activa")
   })
 })

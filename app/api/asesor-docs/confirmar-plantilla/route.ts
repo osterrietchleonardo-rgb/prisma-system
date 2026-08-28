@@ -6,6 +6,7 @@ import { requireTenant } from "@/lib/auth/tenant-validation"
 import { huecosDe, ponerHuecosEnDocx, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
 import { separarPorEstado, type FilaAsesor } from "@/lib/asesor-docs/propuesta"
 import {
+  avisoDeNotasAlFinal,
   camposConDatoCorto,
   camposQueChocanConOtroNombre,
   camposSchema,
@@ -285,7 +286,20 @@ export async function POST(req: Request) {
     )
   }
 
-  const textoMolde = Object.values(textoPorParte(zipMolde)).join("")
+  const partesDelMolde = textoPorParte(zipMolde)
+
+  /**
+   * Las notas al final, dichas con nombre propio.
+   *
+   * El molde se lleva las del asesor molde al documento de todos —
+   * docxtemplater no las rellena—, así que si ahí vive un dato de cada persona
+   * el contrato de una sale con el número de otra. La comparación lo pone en
+   * rojo; esto es para que el director sepa POR QUÉ antes de leer el rojo.
+   */
+  const avisoNotas = avisoDeNotasAlFinal(partesDelMolde["word/endnotes.xml"] ?? "")
+  if (avisoNotas) advertencias.push(avisoNotas)
+
+  const textoMolde = Object.values(partesDelMolde).join("")
   if (textoMolde.trim() === "") {
     return NextResponse.json(
       { error: "El molde quedó vacío: el documento del asesor no tiene texto que se pueda leer." },

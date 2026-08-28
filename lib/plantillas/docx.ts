@@ -576,7 +576,13 @@ function partesDeTextoDeDocx(zip: PizZip): string[] {
   // el paquete NO declara es una parte que docxtemplater tampoco rellena
   // (medido): ponerle el hueco ahí sería dejar un "{{NOMBRE}}" impreso en
   // el membrete del contrato. Es el mismo motivo por el que endnotes queda
-  // afuera -- se informa como faltante, que es la verdad.
+  // afuera de ESTA lista: no se rellena, así que no se le pone hueco.
+  //
+  // Ojo, que la frase anterior decía "se informa como faltante" y no era
+  // cierto: un valor que vive SOLO en una nota al final nunca llega a ser
+  // hueco (la detección compara el cuerpo), así que no puede figurar entre
+  // los faltantes. Lo que lo agarra es la comparación: textoPorParte SÍ lee
+  // las notas al final justamente para eso, y la diferencia sale en rojo.
 
   return [...rutas].filter((r) => zip.file(r))
 }
@@ -730,33 +736,57 @@ export function huecosDe(zip: PizZip): string[] {
 }
 
 /**
- * El texto plano de CADA parte del paquete que este módulo toca, por ruta.
+ * La parte del paquete que guarda `word/endnotes.xml`: las notas al FINAL.
  *
- * Existe para que la verificación de la Etapa C pueda comparar EXACTAMENTE
- * las mismas partes que el molde modifica. `textoDeDocx` usa mammoth, que lee
- * solo el cuerpo: un dato que viva únicamente en el encabezado no se detecta,
- * no se convierte en hueco, y la comparación contra el cuerpo daba VERDE
- * mientras el contrato de una persona salía con el legajo de otra. Medido.
+ * Va aparte de `partesDeTextoDeDocx` a propósito, porque ese recorrido es el
+ * de las partes que docxtemplater RELLENA, y las notas al final no están —
+ * está dicho más arriba y sigue siendo cierto.
  *
- * Recorre la misma lista que `ponerHuecosEnDocx` y `huecosDe`
- * (`partesDeTextoDeDocx`), que es la que docxtemplater rellena: cuerpo,
- * encabezado, pie, notas al pie y comentarios. `word/endnotes.xml` queda
- * afuera acá igual que allá, y por el mismo motivo.
+ * Pero hay que poder leerlas igual: el molde se lleva las notas al final del
+ * asesor que hizo de molde, tal cual, al documento de todos los demás. Si esa
+ * nota tiene el legajo de una persona, el contrato de otra sale con ese
+ * número. Sin poder leerlas no hay forma de darse cuenta.
+ */
+const RUTA_NOTAS_AL_FINAL = "word/endnotes.xml"
+
+/**
+ * El texto plano de cada parte con texto del paquete, por ruta.
+ *
+ * Existe para que la verificación de la Etapa C pueda comparar el documento
+ * ENTERO. `textoDeDocx` usa mammoth, que lee solo el cuerpo: un dato que viva
+ * únicamente en el encabezado no se detecta, no se convierte en hueco, y la
+ * comparación contra el cuerpo daba VERDE mientras el contrato de una persona
+ * salía con el legajo de otra. Medido.
+ *
+ * Cubre lo que rellena docxtemplater (`partesDeTextoDeDocx`: cuerpo,
+ * encabezado, pie, notas al pie y comentarios) **más las notas al final**, que
+ * no se rellenan y justamente por eso hay que compararlas: el molde se las
+ * lleva de una persona a todas.
+ *
+ * Los párrafos se unen con un SALTO DE LÍNEA y no con el "|||" que usa
+ * `huecosDe`. No es un detalle: ese separador existe allá para que un "{{" al
+ * final de un párrafo y un "}}" al principio del siguiente no armen un hueco
+ * fantasma, y acá no se buscan huecos, se compara. Un "|||" no es un espacio,
+ * así que sobrevivía a la normalización y **un párrafo vacío de más —el Enter
+ * de más, lo más común que hay en un Word— pasaba a ser un rojo imposible de
+ * arreglar**, además de aparecer con las barras a la vista en el mensaje que
+ * lee el director. Medido.
  *
  * Es puramente aditivo: no cambia la conducta de nada de lo que ya existía.
  */
 export function textoPorParte(zip: PizZip): Record<string, string> {
   exigirDocxValido(zip, "textoPorParte")
   const salida: Record<string, string> = {}
-  for (const ruta of partesDeTextoDeDocx(zip)) {
+  const rutas = [...partesDeTextoDeDocx(zip)]
+  if (zip.file(RUTA_NOTAS_AL_FINAL) && !rutas.includes(RUTA_NOTAS_AL_FINAL)) rutas.push(RUTA_NOTAS_AL_FINAL)
+
+  for (const ruta of rutas) {
     const archivo = zip.file(ruta)
     if (!archivo) continue
     const xml = archivo.asText()
-    // El mismo separador ||| entre párrafos que usa huecosDe, y por lo mismo:
-    // dos párrafos pegados no pueden leerse como una sola palabra.
     salida[ruta] = segmentosDeNivelSuperior(xml, "p")
       .map((seg) => desescapar([...xml.slice(seg.inicio, seg.fin).matchAll(RE_TEXTO)].map((t) => t[1]).join("")))
-      .join("|||")
+      .join("\n")
   }
   return salida
 }

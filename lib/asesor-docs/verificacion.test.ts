@@ -3,6 +3,7 @@ import {
   nombreDeParte,
   normalizarParaComparar,
   primeraDiferencia,
+  tipoDeParte,
   verificarContraElOriginal,
   verificarDocumentoEntero,
 } from "./verificacion"
@@ -257,22 +258,49 @@ const CUERPO = "word/document.xml"
 const ENCABEZADO = "word/header1.xml"
 const PIE = "word/footer1.xml"
 
+describe("tipoDeParte", () => {
+  it("clasifica cada parte del paquete", () => {
+    expect(tipoDeParte(CUERPO)).toBe("cuerpo")
+    expect(tipoDeParte(ENCABEZADO)).toBe("encabezado")
+    expect(tipoDeParte(PIE)).toBe("pie")
+    expect(tipoDeParte("word/footnotes.xml")).toBe("notas-al-pie")
+    expect(tipoDeParte("word/endnotes.xml")).toBe("notas-al-final")
+    expect(tipoDeParte("word/comments.xml")).toBe("comentarios")
+    expect(tipoDeParte("word/raro.xml")).toBe("otra")
+  })
+
+  it("las notas al pie no se confunden con el pie de página", () => {
+    /**
+     * "footnotes" empieza con "foot" igual que "footer": preguntado en el orden
+     * equivocado, las notas al pie salían informadas como pie y el director iba
+     * a mirar el lugar que no era.
+     */
+    expect(tipoDeParte("word/footnotes.xml")).not.toBe(tipoDeParte(PIE))
+  })
+
+  it("las notas al final no se confunden con las notas al pie", () => {
+    // Las dos tienen "notes" adentro.
+    expect(tipoDeParte("word/endnotes.xml")).not.toBe(tipoDeParte("word/footnotes.xml"))
+  })
+
+  it("todos los encabezados son la misma familia, los numere Word como los numere", () => {
+    /**
+     * Word usa header1 para la primera página y header2 para el resto según le
+     * convenga. Comparando ruta contra ruta, dos documentos con el MISMO
+     * membrete guardado con distinto número salían como "falta el encabezado".
+     */
+    expect(tipoDeParte("word/header1.xml")).toBe(tipoDeParte("word/header2.xml"))
+  })
+})
+
 describe("nombreDeParte", () => {
-  it("le pone nombre de persona a cada parte del paquete", () => {
+  it("le pone nombre de persona a cada familia", () => {
     expect(nombreDeParte(CUERPO)).toBe("el cuerpo del documento")
     expect(nombreDeParte(ENCABEZADO)).toBe("el encabezado")
     expect(nombreDeParte(PIE)).toBe("el pie de página")
     expect(nombreDeParte("word/footnotes.xml")).toBe("las notas al pie")
-    expect(nombreDeParte("word/comments.xml")).toBe("los comentarios")
-  })
-
-  it("una parte que no conoce igual se puede nombrar", () => {
-    expect(nombreDeParte("word/raro.xml")).toContain("word/raro.xml")
-  })
-
-  it("las notas al pie no se confunden con el pie de página", () => {
-    // "footnotes" contiene "foot": mirando mal, las notas salían como pie.
-    expect(nombreDeParte("word/footnotes.xml")).not.toBe(nombreDeParte(PIE))
+    expect(nombreDeParte("word/endnotes.xml")).toBe("las notas al final")
+    expect(nombreDeParte("word/comments.xml")).toBe("los comentarios de Word")
   })
 })
 
@@ -369,5 +397,92 @@ describe("verificarDocumentoEntero", () => {
     const a = { [ENCABEZADO]: "y", [CUERPO]: "x", [PIE]: "z" }
     const b = { [PIE]: "z", [CUERPO]: "x", [ENCABEZADO]: "y" }
     expect(verificarDocumentoEntero(a, b).coincide).toBe(true)
+  })
+})
+
+describe("verificarDocumentoEntero: los casos que costaron una ronda", () => {
+  const COMENTARIOS = "word/comments.xml"
+  const NOTAS_AL_FINAL = "word/endnotes.xml"
+
+  it("un párrafo vacío de más entre partes NO es una diferencia", () => {
+    /**
+     * LA REGRESIÓN. `textoPorParte` unía los párrafos con "|||", que no es un
+     * espacio y por lo tanto sobrevivía a la normalización: el Enter de más
+     * —lo más común que hay en un Word— pasaba a ser un rojo que el director
+     * no podía arreglar, porque la detección compara con `diffWords`, que
+     * ignora los espacios, y un párrafo vacío NUNCA puede ser un campo.
+     *
+     * El test que debía cuidarlo miraba `verificarContraElOriginal` con "\n",
+     * y producción ya no le pasaba "\n". Seguía en verde sobre un camino que
+     * no existía. Este mira lo que pasa de verdad.
+     */
+    const r = verificarDocumentoEntero({ [CUERPO]: "Uno.\n\n\nDos." }, { [CUERPO]: "Uno.\nDos." })
+    expect(r.coincide).toBe(true)
+  })
+
+  it("y el separador NUNCA aparece en lo que lee el director", () => {
+    const r = verificarDocumentoEntero({ [CUERPO]: "Ana\nRuiz\nfirma." }, { [CUERPO]: "Bruno\nSosa\nfirma." })
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).not.toContain("|||")
+  })
+
+  it("el mismo encabezado guardado con otro número NO es una diferencia", () => {
+    // Word numera header1/header2 según la página; el membrete es el mismo.
+    const r = verificarDocumentoEntero({ [CUERPO]: "x", "word/header1.xml": "VAKDOR" }, { [CUERPO]: "x", "word/header2.xml": "VAKDOR" })
+    expect(r.coincide).toBe(true)
+  })
+
+  it("un encabezado en blanco y ninguno son lo mismo", () => {
+    // Un header sin una letra adentro no es un encabezado.
+    expect(verificarDocumentoEntero({ [CUERPO]: "x", [ENCABEZADO]: "   " }, { [CUERPO]: "x" }).coincide).toBe(true)
+  })
+
+  it("una nota al FINAL distinta queda en rojo: es la sexta vía a activa", () => {
+    /**
+     * La plantilla no rellena las notas al final, así que el molde se lleva la
+     * del asesor que hizo de molde al documento de todos. Un legajo ahí salía
+     * en verde y la plantilla llegaba a `activa` con el número de otra persona.
+     */
+    const r = verificarDocumentoEntero(
+      { [CUERPO]: "x", [NOTAS_AL_FINAL]: "Legajo interno 4471" },
+      { [CUERPO]: "x", [NOTAS_AL_FINAL]: "Legajo interno 8892" },
+    )
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain("notas al final")
+    expect(r.observacion).toContain("4471")
+  })
+
+  it("una diferencia fuera del cuerpo dice CÓMO se arregla", () => {
+    /**
+     * Desde la pantalla de revisión el director no puede tocar un encabezado.
+     * Desde el Word sí, y sin decírselo el mensaje lo deja sin salida.
+     */
+    const r = verificarDocumentoEntero({ [CUERPO]: "x", [ENCABEZADO]: "uno" }, { [CUERPO]: "x", [ENCABEZADO]: "dos" })
+    expect(r.observacion).toContain("volvé a detectar")
+    expect(r.observacion).toContain("cuerpo")
+  })
+
+  it("un comentario de Word distinto se arregla borrándolo en el Word, y lo dice", () => {
+    // Se sigue comparando a propósito: si el molde le mete a Bruno el
+    // comentario de Ana, el documento está mal. Pero tiene salida.
+    const r = verificarDocumentoEntero(
+      { [CUERPO]: "x", [COMENTARIOS]: "Revisar con Ana" },
+      { [CUERPO]: "x", [COMENTARIOS]: "Revisar con Bruno" },
+    )
+    expect(r.coincide).toBe(false)
+    expect(r.observacion).toContain("comentarios de Word")
+    expect(r.observacion).toContain("borrá el comentario")
+  })
+
+  it("la frase de falta/sobra concuerda en número", () => {
+    // "Falta los comentarios" estaba mal escrito y lo leía un director.
+    const enPlural = verificarDocumentoEntero({ [CUERPO]: "x", [COMENTARIOS]: "algo" }, { [CUERPO]: "x" })
+    expect(enPlural.observacion).toContain("Faltan los comentarios")
+
+    const enSingular = verificarDocumentoEntero({ [CUERPO]: "x", [ENCABEZADO]: "algo" }, { [CUERPO]: "x" })
+    expect(enSingular.observacion).toContain("Falta el encabezado")
+
+    const sobrando = verificarDocumentoEntero({ [CUERPO]: "x" }, { [CUERPO]: "x", [COMENTARIOS]: "algo" })
+    expect(sobrando.observacion).toContain("Sobran los comentarios")
   })
 })

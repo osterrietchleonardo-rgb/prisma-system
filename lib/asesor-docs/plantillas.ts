@@ -282,23 +282,29 @@ export const NADA_SE_GUARDA_TODAVIA =
   "Todavía no se guardó nada. Recién al confirmar se crea la plantilla y se revisa contra el documento de cada asesor."
 
 /**
- * El límite de la comprobación, dicho de frente.
+ * Qué mira la comprobación y qué NO puede arreglar sola, dicho de frente.
  *
- * Mira EXACTAMENTE las mismas partes que el molde modifica: cuerpo,
- * encabezado, pie, notas al pie y comentarios. Antes miraba solo el cuerpo
- * —mammoth no trae el resto— y eso dejaba pasar en VERDE un dato de encabezado
- * que salía con el número de otra persona: la detección tampoco lo ve, así que
- * nunca es campo, y el molde se lo lleva literal del asesor que hizo de molde.
+ * Mira TODO el texto del paquete: cuerpo, encabezado, pie, notas al pie, notas
+ * al final, comentarios y lo que haya dentro de un cuadro de texto. Antes
+ * miraba solo el cuerpo —mammoth no trae el resto— y eso dejaba pasar en VERDE
+ * un dato de encabezado que salía con el número de otra persona.
  *
- * Lo que sigue afuera, y por eso hay que decirlo: las notas al FINAL
- * (`endnotes`), que docxtemplater no rellena y `docx.ts` deja afuera a
- * propósito, y los cuadros de texto, que no se revisan por dentro para no
- * arriesgar romper el archivo. Los dos casos se informan aparte cuando pasan.
+ * Lo que cambia según dónde esté el dato NO es si se compara, sino si puede
+ * convertirse en campo: la detección compara CUERPOS, así que nada que viva
+ * afuera del cuerpo llega a ser campo nunca. Si ahí hay un dato distinto por
+ * persona, la comparación lo pone en rojo con el motivo y el arreglo es en el
+ * Word. Eso es lo que hay que decirle al director, y es lo único que puede
+ * hacer.
+ *
+ * La versión anterior de esta frase prometía "te lo avisamos aparte" para las
+ * notas al final, y era falso: no había ningún aviso en ninguna parte. Ahora
+ * la promesa es más fuerte y sí se cumple — sale en rojo, con nombre.
  */
 export const LIMITE_DE_LA_COMPROBACION =
-  "La comprobación mira el cuerpo, el encabezado, el pie de página, las notas al pie y los comentarios: las mismas " +
-  "partes que la plantilla toca. Lo único que queda afuera son las notas al final del documento y los cuadros de " +
-  "texto; si el contrato usa alguno, te lo avisamos aparte."
+  "La comprobación mira todo el texto del contrato: el cuerpo, el encabezado, el pie de página, las notas al pie, " +
+  "las notas al final, los comentarios de Word y los cuadros de texto. Ahora bien, los campos salen del CUERPO: si " +
+  "hay un dato distinto por persona fuera del cuerpo, no se puede convertir en campo y va a quedar en rojo con el " +
+  "motivo. Eso se arregla en el Word."
 
 /**
  * Hasta cuántas letras un dato se considera demasiado corto.
