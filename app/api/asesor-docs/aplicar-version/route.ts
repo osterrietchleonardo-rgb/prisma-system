@@ -24,14 +24,18 @@ import {
   camposConElMismoDato,
   camposSchemaDeLaVersionNueva,
   camposSinDato,
+  centinelasPara,
   compararCampos,
+  moldeNoResisteLaPrueba,
   moldeNoSeReconoce,
   moldeRotoPorChoque,
   nombresDelSchema,
+  normalizarHuecosEscritosAMano,
   ordenarComoEnElDocumento,
   reemplazosDeLaVersionNueva,
   resumenDeLaVersionNueva,
   seVaAUsar,
+  textoEsperadoConCentinelas,
   SIN_DATOS_DEL_ASESOR,
   SIN_VERSION_VIGENTE,
   textoDeVistaPrevia,
@@ -98,6 +102,9 @@ const MAX_ARCHIVO = 25 * 1024 * 1024
 const ES_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const TIPO_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+/** Con qué se pegan las partes cuando hace falta mirarlas como un solo texto. */
+const SALTO = "\n"
 
 export async function POST(req: Request) {
   let agencyId: string
@@ -287,7 +294,7 @@ export async function POST(req: Request) {
      * persona al documento de todas. Ese falso verde ya se pagó una vez en esta
      * etapa y está medido en `verificacion.ts`.
      */
-    partesDelNuevo = textoPorParte(zipNuevo)
+    partesDelNuevo = normalizarHuecosEscritosAMano(textoPorParte(zipNuevo))
   } catch (e) {
     console.error("aplicar-version: no se pudo abrir el .docx:", e)
     return NextResponse.json(
@@ -514,9 +521,17 @@ export async function POST(req: Request) {
     )
   }
 
+  /**
+   * Los datos de prueba: uno por campo, que no están en ninguna parte del
+   * documento. Ver `centinelasPara` para el por qué largo.
+   */
+  const centinelas = centinelasPara(camposDeLaVersion, Object.values(partesDelNuevo).join(SALTO))
+
   let armado: PizZip
+  let armadoConCentinelas: PizZip
   try {
     armado = rellenarDocx(zipMolde, datosParaComprobar)
+    armadoConCentinelas = rellenarDocx(zipMolde, centinelas)
   } catch (e) {
     /**
      * El colchón, no el diagnóstico principal: el choque ya frenó más arriba, así
@@ -544,6 +559,31 @@ export async function POST(req: Request) {
           `${verificacion.observacion}`,
         advertencias,
       },
+      { status: 400 },
+    )
+  }
+
+  /**
+   * ═══ Y la que convierte el ida y vuelta en una medición ═══
+   *
+   * Lo de arriba rellena el molde con los datos del MISMO asesor del que salió:
+   * se le sacan sus valores y se los vuelve a poner, así que vuelve a decir lo
+   * mismo. Es necesario y no alcanza.
+   *
+   * Acá se lo rellena con datos que no son de nadie y se compara contra lo que
+   * TENDRÍA que dar, calculado por otro camino: reemplazando los valores sobre
+   * el texto plano. Si un `{{hueco}}` quedó anidado, se perdió, o se llevó
+   * puesto un pedazo de texto fijo, los dos caminos dejan de coincidir — y esa
+   * es la falla que le va a tocar a los OTROS asesores, no a este.
+   */
+  const esperadoConCentinelas = textoEsperadoConCentinelas(partesDelNuevo, [
+    ...usados.map((u) => ({ buscado: u.valor, centinela: centinelas[u.campo] })),
+    ...nuevosAMano.map((u) => ({ buscado: comoQuedaEnElDocumento(u.campo), centinela: centinelas[u.campo] })),
+  ])
+  const pruebaCentinela = verificarDocumentoEntero(esperadoConCentinelas, textoPorParte(armadoConCentinelas))
+  if (!pruebaCentinela.coincide) {
+    return NextResponse.json(
+      { error: moldeNoResisteLaPrueba(pruebaCentinela.observacion), advertencias },
       { status: 400 },
     )
   }

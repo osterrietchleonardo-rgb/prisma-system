@@ -468,6 +468,148 @@ export function avisoDeValoresQueSobreviven(
 }
 
 /**
+ * Deja los huecos escritos a mano en su forma canónica: `{{ COMISION }}` pasa a
+ * ser `{{COMISION}}`.
+ *
+ * ═══ Por qué hace falta, y qué rechazaba sin esto ═══
+ *
+ * `lib/plantillas/docx.ts` documenta —y tiene un `trim` en el parser justo por
+ * eso— que el director escribe los huecos a mano en Word y que ahí sale
+ * "{{ NOMBRE }}" con un espacio de más **muy fácil**. docxtemplater lo rellena
+ * igual, así que el documento está bien.
+ *
+ * Pero la comprobación compara el archivo que subió contra el molde relleno, y
+ * al hueco nuevo se le devuelve su nombre escrito canónico. Sin normalizar, un
+ * lado decía "{{ COMISION }}" y el otro "{{COMISION}}", no coincidían, y el
+ * pedido se rechazaba **con un mensaje que hablaba de otra cosa** — sobre un
+ * archivo que estaba perfecto. Medido: el test del hueco con espacios daba 400.
+ *
+ * Se toca SOLO lo que tiene forma de hueco válido, el mismo alfabeto que usa
+ * `huecosDe`. Un `{{ }}` vacío o un `{{ dos palabras }}` no son huecos y no se
+ * tocan: cambiarlos sería reescribir el contrato de alguien.
+ */
+const HUECO_ESCRITO = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g
+
+export function normalizarHuecosEscritosAMano(partes: Record<string, string>): Record<string, string> {
+  const salida: Record<string, string> = {}
+  for (const ruta of Object.keys(partes)) {
+    salida[ruta] = (partes[ruta] ?? "").replace(HUECO_ESCRITO, (_, nombre: string) => `{{${nombre}}}`)
+  }
+  return salida
+}
+
+// ---------------------------------------------------------------------------
+// LA PRUEBA CON DATOS CENTINELA
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ Por qué el ida y vuelta solo no alcanza ═══
+ *
+ * La comprobación del spec §7.4.5 rellena el molde con los datos del MISMO
+ * asesor del que salió y compara contra su documento. Dicho así es casi una
+ * tautología: se sacan sus valores, se los vuelve a poner, y vuelve a decir lo
+ * mismo. Da verde salvo que el .docx no se pueda abrir.
+ *
+ * Con datos CENTINELA —valores que no están en ninguna parte del documento— deja
+ * de ser un ida y vuelta y pasa a ser una medición: cada hueco tiene que dejar
+ * SU centinela, exactamente donde estaba su valor y en ningún otro lado. Si un
+ * `{{hueco}}` quedó anidado adentro de otro, o se perdió, o se llevó puesto un
+ * pedazo de texto fijo, el centinela aparece donde no va o no aparece donde sí.
+ *
+ * Y lo que se compara contra el resultado no sale del mismo camino: sale de
+ * reemplazar los valores sobre el TEXTO PLANO, con la misma regla de borde de
+ * palabra. Son dos implementaciones independientes —una sobre el XML de Word,
+ * otra sobre texto— y tienen que coincidir. Que coincidan por casualidad es
+ * mucho menos probable que dos errores iguales.
+ */
+
+/** El índice `n` escrito en letras, para que el centinela no tenga dígitos. */
+function letrasDe(n: number): string {
+  let salida = ""
+  let x = n
+  do {
+    salida = String.fromCharCode(65 + (x % 26)) + salida
+    x = Math.floor(x / 26) - 1
+  } while (x >= 0)
+  return salida
+}
+
+/**
+ * Un valor de prueba por campo, garantizado ausente del documento.
+ *
+ * **Sin dígitos ni guiones bajos, a propósito.** El centinela va a quedar dentro
+ * del texto mientras se siguen buscando otros valores, y un centinela con un
+ * "1" adentro podría ser encontrado por un dato corto — que es justamente el
+ * daño que esta prueba tiene que poder ver, no producir. Con letras solas, la
+ * regla de borde de palabra hace imposible que nada caiga adentro.
+ *
+ * Si por lo que fuera el prefijo ya estuviera en el documento, se lo alarga
+ * hasta que no esté. Determinista, y sin poder colgarse: cada vuelta agrega una
+ * letra.
+ */
+export function centinelasPara(campos: string[], textoDelDocumento: string): Record<string, string> {
+  let prefijo = "CENTINELAPRISMA"
+  while (textoDelDocumento.includes(prefijo)) prefijo += "Z"
+
+  const salida: Record<string, string> = {}
+  ;[...new Set(campos)].forEach((campo, i) => {
+    salida[campo] = `${prefijo}${letrasDe(i)}FIN`
+  })
+  return salida
+}
+
+/**
+ * Cómo tendría que quedar el texto del documento si cada valor se reemplazara
+ * por su centinela.
+ *
+ * Es la implementación INDEPENDIENTE contra la que se compara lo que hizo Word.
+ * Reemplaza de más largo a más corto, igual que `ponerHuecosEnDocx`, porque si
+ * un valor contiene a otro hay que consumir el grande antes de que el chico lo
+ * parta por la mitad.
+ */
+export function textoEsperadoConCentinelas(
+  partes: Record<string, string>,
+  reemplazos: Array<{ buscado: string; centinela: string }>,
+): Record<string, string> {
+  const orden = [...reemplazos]
+    .filter((r) => r.buscado !== "")
+    .sort((a, b) => b.buscado.length - a.buscado.length)
+
+  const salida: Record<string, string> = {}
+  for (const ruta of Object.keys(partes)) {
+    let texto = partes[ruta] ?? ""
+    for (const { buscado, centinela } of orden) {
+      const posiciones = aparicionesDe(texto, buscado)
+      // De atrás para adelante: así las posiciones de más adelante siguen valiendo.
+      for (let i = posiciones.length - 1; i >= 0; i--) {
+        const at = posiciones[i]
+        texto = texto.slice(0, at) + centinela + texto.slice(at + buscado.length)
+      }
+    }
+    salida[ruta] = texto
+  }
+  return salida
+}
+
+/**
+ * El mensaje de cuando la plantilla no resiste la prueba con datos centinela.
+ *
+ * Se dice ANTES de guardar nada. Que el molde ponga los datos en lugares que no
+ * le corresponden es exactamente la falla que toda esta etapa vino a evitar, y
+ * la única diferencia con el rojo del ida y vuelta es que esta se ve con datos
+ * que no son de nadie — o sea, la que le va a pasar a los OTROS asesores.
+ */
+export function moldeNoResisteLaPrueba(observacion: string | null): string {
+  return (
+    "La plantilla que salió de este archivo no pone los datos donde corresponde. Se la probó con datos de prueba y " +
+    `el resultado no dio lo esperado: ${observacion ?? "los campos quedaron en lugares distintos de los que tenían"}. ` +
+    "No se guardó nada. Casi siempre es porque un campo quedó metido adentro de otro, o porque un dato que también " +
+    "aparece en una parte fija del contrato se llevó puesta esa parte. Revisá en el Word que cada dato esté escrito " +
+    "de una sola vez y volvé a subirlo."
+  )
+}
+
+/**
  * El mensaje de cuando el dato de un campo se mete adentro del NOMBRE de otro.
  *
  * ═══ Por qué necesita su propio mensaje, y no el de la §7.2 ═══

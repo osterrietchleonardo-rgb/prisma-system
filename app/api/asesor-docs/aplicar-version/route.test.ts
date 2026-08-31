@@ -672,6 +672,20 @@ describe("qué campos cambian", () => {
     expect(schema.map((c) => c.nombre)).toEqual(["COMISION", "NOMBRE", "CUIT", "ZONA"])
   })
 
+  it("un hueco escrito a mano CON ESPACIOS adentro de las llaves también se entiende", async () => {
+    /**
+     * `docx.ts` documenta que el director escribe los huecos a mano en Word y
+     * que ahí sale `{{ NOMBRE }}` con un espacio de más "muy fácil" —tiene un
+     * `trim` en el parser justo por eso—. Si acá el hueco de la comprobación se
+     * escribiera siempre canónico, el archivo con espacios se rechazaba con un
+     * mensaje que hablaba de otra cosa.
+     */
+    const conEspacios = versionNuevaDeAna(["La comision pactada es del {{ COMISION }} sobre la operacion."])
+    const r = await pedir({ zip: conEspacios })
+    expect(r.status).toBe(200)
+    expect((r.cuerpo.campos as { nuevos: string[] }).nuevos).toEqual(["COMISION"])
+  })
+
   it("el rótulo que el director ya le había puesto a un campo se conserva", async () => {
     await pedir({})
     const guardada = base.versiones.find((v) => v.version === 2)!
@@ -723,6 +737,35 @@ describe("la red de seguridad", () => {
     const error = r.cuerpo.error as string
     expect(error).toContain("CUIT")
     expect(error).toContain("TODOS")
+    expect(base.versiones).toHaveLength(1)
+    expect(base.archivos.size).toBe(0)
+  })
+
+  it("si el molde relleno NO devuelve el documento de esa persona, se rechaza", async () => {
+    /**
+     * ═══ El test que faltaba, y por qué faltaba ═══
+     *
+     * La comprobación del spec §7.4.5 —rellenar el molde con los datos del
+     * asesor y comparar contra su documento— no la medía NINGÚN test: cambiar
+     * `if (!verificacion.coincide)` por `if (false && …)` dejaba los 956 en
+     * verde. O sea que la red de seguridad podía no existir y nadie se enteraba.
+     *
+     * El caso es real y ambiguo de verdad: el director dejó la zona escrita
+     * literal en una cláusula y, más abajo, escribió `{{ZONA}}` a mano en otra.
+     * El molde no puede saber cuál de las dos cosas quiso. Rellenarlo con los
+     * datos de Ana pone "Villa Urquiza" en los dos lugares, y el segundo, en su
+     * archivo, decía `{{ZONA}}`. No coincide, y no se guarda nada.
+     */
+    const zip = docx([
+      parrafo("CONTRATO — EDICION 2027"),
+      parrafo("Y por la otra parte Ana Ruiz, CUIT 27-31456789-4, en adelante EL ASESOR."),
+      parrafo("Se asigna a EL ASESOR la zona de Villa Urquiza."),
+      parrafo("Zona alternativa a convenir: {{ZONA}}."),
+    ])
+    const r = await pedir({ zip })
+    expect(r.status).toBe(400)
+    expect(r.cuerpo.error as string).toContain("no reproduce el documento de Ana Ruiz")
+
     expect(base.versiones).toHaveLength(1)
     expect(base.archivos.size).toBe(0)
   })

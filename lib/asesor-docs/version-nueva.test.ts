@@ -14,16 +14,20 @@ import {
   camposConElMismoDato,
   camposSchemaDeLaVersionNueva,
   camposSinDato,
+  centinelasPara,
   compararCampos,
+  moldeNoResisteLaPrueba,
   moldeNoSeReconoce,
   moldeRotoPorChoque,
   nombresDelSchema,
+  normalizarHuecosEscritosAMano,
   ordenarComoEnElDocumento,
   reemplazosDeLaVersionNueva,
   rutasEnOrdenDeLectura,
   resumenDeLaVersionNueva,
   seVaAUsar,
   textoDeVistaPrevia,
+  textoEsperadoConCentinelas,
   ubicarValores,
   ubicarValoresEnPartes,
   valoresQueSobrevivenEnElMolde,
@@ -744,5 +748,131 @@ describe("moldeRotoPorChoque", () => {
     )!
     expect(m.match(/"TRAMO"/g)).toHaveLength(1)
     expect(m).toContain("2 campos más")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LA PRUEBA CON DATOS CENTINELA
+// ---------------------------------------------------------------------------
+
+describe("centinelasPara", () => {
+  it("da un valor distinto por campo, y ninguno está en el documento", () => {
+    const texto = "Contrato de Ana Ruiz, CUIT 27-31456789-4."
+    const c = centinelasPara(["NOMBRE", "CUIT"], texto)
+    expect(c.NOMBRE).not.toBe(c.CUIT)
+    expect(texto).not.toContain(c.NOMBRE)
+    expect(texto).not.toContain(c.CUIT)
+  })
+
+  it("no lleva dígitos ni guiones bajos, para que ningún dato corto caiga adentro", () => {
+    const c = centinelasPara(["A", "B", "C"], "")
+    for (const valor of Object.values(c)) expect(valor).toMatch(/^[A-Z]+$/)
+  })
+
+  it("un dato corto NO se encuentra adentro de un centinela", () => {
+    /**
+     * Es la propiedad que hace utilizable a la prueba: el centinela queda en el
+     * texto mientras se siguen buscando los otros valores. Si un "1" pudiera
+     * meterse adentro, la prueba produciría el daño que tiene que detectar.
+     */
+    const c = centinelasPara(["A"], "")
+    expect(ubicarValores(c.A, { CORTO: "1" })[0].veces).toBe(0)
+    expect(ubicarValores(c.A, { CORTO: "A" })[0].veces).toBe(0)
+  })
+
+  it("si el prefijo ya estuviera en el documento, se alarga hasta que no esté", () => {
+    const c = centinelasPara(["A"], "CENTINELAPRISMAAFIN aparece en el contrato")
+    expect(c.A).not.toBe("CENTINELAPRISMAAFIN")
+    expect("CENTINELAPRISMAAFIN aparece en el contrato").not.toContain(c.A)
+  })
+
+  it("con más de 26 campos sigue dando valores distintos", () => {
+    const campos = Array.from({ length: 30 }, (_, i) => `CAMPO_${i}`)
+    const c = centinelasPara(campos, "")
+    expect(new Set(Object.values(c)).size).toBe(30)
+  })
+})
+
+describe("textoEsperadoConCentinelas", () => {
+  it("cambia cada valor por su centinela, en todas las partes", () => {
+    const esperado = textoEsperadoConCentinelas(
+      { "word/document.xml": "Firma Ana Ruiz. Otra vez Ana Ruiz.", "word/header1.xml": "Legajo 8892" },
+      [
+        { buscado: "Ana Ruiz", centinela: "XNOMBREX" },
+        { buscado: "8892", centinela: "XLEGAJOX" },
+      ],
+    )
+    expect(esperado["word/document.xml"]).toBe("Firma XNOMBREX. Otra vez XNOMBREX.")
+    expect(esperado["word/header1.xml"]).toBe("Legajo XLEGAJOX")
+  })
+
+  it("consume el valor MÁS LARGO primero, igual que ponerHuecosEnDocx", () => {
+    /**
+     * Si entrara primero el corto, partiría al largo por la mitad y el esperado
+     * sería distinto del que produce Word — un rojo inventado por la propia
+     * comprobación.
+     */
+    const esperado = textoEsperadoConCentinelas({ "word/document.xml": "Vive en Belgrano 1234, zona Belgrano." }, [
+      { buscado: "Belgrano", centinela: "XZONAX" },
+      { buscado: "Belgrano 1234", centinela: "XDIRX" },
+    ])
+    expect(esperado["word/document.xml"]).toBe("Vive en XDIRX, zona XZONAX.")
+  })
+
+  it("no toca lo que parte una palabra por la mitad", () => {
+    const esperado = textoEsperadoConCentinelas({ "word/document.xml": "Anabela y Ana Ruiz" }, [
+      { buscado: "Ana", centinela: "XNX" },
+    ])
+    expect(esperado["word/document.xml"]).toBe("Anabela y XNX Ruiz")
+  })
+
+  it("un buscado vacío se ignora en vez de meter el centinela en cada letra", () => {
+    const esperado = textoEsperadoConCentinelas({ "word/document.xml": "Contrato" }, [
+      { buscado: "", centinela: "XX" },
+    ])
+    expect(esperado["word/document.xml"]).toBe("Contrato")
+  })
+})
+
+describe("moldeNoResisteLaPrueba", () => {
+  it("dice que no se guardó nada y qué mirar en el Word", () => {
+    const m = moldeNoResisteLaPrueba("en el cuerpo dice «X» y diría «Y»")
+    expect(m).toContain("no pone los datos donde corresponde")
+    expect(m).toContain("«X»")
+    expect(m).toContain("No se guardó nada")
+    expect(m).toContain("Word")
+  })
+
+  it("sin observación, igual dice algo que se entiende", () => {
+    expect(moldeNoResisteLaPrueba(null)).toContain("quedaron en lugares distintos")
+  })
+})
+
+describe("normalizarHuecosEscritosAMano", () => {
+  it("le saca los espacios de adentro de las llaves", () => {
+    expect(
+      normalizarHuecosEscritosAMano({ "word/document.xml": "La comision es del {{ COMISION }} anual." }),
+    ).toEqual({ "word/document.xml": "La comision es del {{COMISION}} anual." })
+  })
+
+  it("deja igual el que ya venía canónico", () => {
+    const partes = { "word/document.xml": "Zona: {{ZONA}}" }
+    expect(normalizarHuecosEscritosAMano(partes)).toEqual(partes)
+  })
+
+  it("NO toca lo que no es un hueco válido: sería reescribirle el contrato a alguien", () => {
+    const partes = {
+      "word/document.xml": "Un {{ }} vacio, un {{ dos palabras }} y una llave suelta {{ .",
+    }
+    expect(normalizarHuecosEscritosAMano(partes)).toEqual(partes)
+  })
+
+  it("normaliza en todas las partes, no solo en el cuerpo", () => {
+    expect(
+      normalizarHuecosEscritosAMano({
+        "word/document.xml": "{{ A }}",
+        "word/header1.xml": "{{  B  }}",
+      }),
+    ).toEqual({ "word/document.xml": "{{A}}", "word/header1.xml": "{{B}}" })
   })
 })
