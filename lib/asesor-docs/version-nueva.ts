@@ -862,11 +862,29 @@ export function avisoDeCamposSinDato(campos: string[], nombreDelAsesor: string):
 /**
  * El aviso de los datos que aparecen más de una vez.
  *
- * No frena nada: que el nombre esté en la cláusula y en la firma es lo normal, y
- * las dos apariciones TIENEN que cambiar. Pero si una de ellas fuera parte del
- * texto fijo del contrato, el reemplazo se la lleva puesta — y eso lo atrapa la
- * comprobación de más abajo, que es la que manda. Esto es para que el director
- * sepa por dónde mirar si sale en rojo. `null` cuando no hay ninguno.
+ * ═══ Lo que este aviso NO puede prometer, y antes prometía ═══
+ *
+ * Decía: *"si alguno de esos lugares fuera texto fijo del contrato, va a salir
+ * en rojo acá abajo"*. **Ese rojo no ocurre.** Medido con las tres guardas: si
+ * la zona de Ana es "Palermo" y el contrato dice "nuestra oficina de Palermo",
+ * `ponerHuecosEnDocx` convierte las DOS en `{{ZONA}}`; el valor no queda pegado
+ * en el molde (`valoresQueSobrevivenEnElMolde` **verde**), rellenar con los
+ * datos de Ana devuelve su documento exacto (ida y vuelta **verde**) y la
+ * simulación con centinelas reemplaza las mismas dos apariciones (**verde**).
+ * Recién lo ve Bruno, cuando su contrato sale diciendo "nuestra oficina de
+ * Belgrano".
+ *
+ * Es la misma clase de afirmación falsa que ya costó dos rondas en esta etapa:
+ * **la pantalla no puede afirmar algo que el sistema no sabe.** Así que el aviso
+ * dice lo que de verdad va a pasar —los N lugares cambian juntos, para todos— y
+ * lo único que el director puede hacer al respecto, que es mirar la vista previa.
+ *
+ * Lo que sí detecta el caso es la cuenta cruzada (`camposQueParecenTextoFijo`),
+ * y cuando encuentra algo lo dice por su cuenta y con nombre propio. Pero solo
+ * puede hablar si hay otro asesor con datos cargados, así que este aviso no
+ * puede apoyarse en ella.
+ *
+ * `null` cuando no hay ninguno.
  */
 export function avisoDeValoresRepetidos(ubicaciones: UbicacionDeValor[]): string | null {
   const repetidos = ubicaciones.filter((u) => u.situacion === "repetido")
@@ -874,10 +892,13 @@ export function avisoDeValoresRepetidos(ubicaciones: UbicacionDeValor[]): string
   const detalle = repetidos.map((u) => `${u.campo} (${u.veces} veces)`).join(", ")
   const uno = repetidos.length === 1
   return (
-    `${uno ? "Este dato aparece" : "Estos datos aparecen"} más de una vez en el documento y se ` +
-    `${uno ? "va" : "van"} a reemplazar en todos los lugares: ${detalle}. Es lo normal cuando el nombre está en la ` +
-    `cláusula y otra vez en la firma. Si alguno de esos lugares fuera texto fijo del contrato, va a salir en rojo ` +
-    `acá abajo.`
+    `${uno ? "Este dato aparece" : "Estos datos aparecen"} más de una vez en el documento, y los lugares donde ` +
+    `aparece van a cambiar TODOS juntos en el documento de cada asesor: ${detalle}. Es lo normal cuando el nombre ` +
+    `está en la cláusula y otra vez en la firma. Mirá la vista previa de acá abajo y comprobá que ` +
+    `${uno ? "ese dato" : "esos datos"} ${uno ? "sea" : "sean"} de la persona en los ${uno ? "" : ""}lugares donde ` +
+    `${uno ? "aparece" : "aparecen"}: si alguno fuera una parte fija del contrato —"nuestra oficina de Palermo"—, ` +
+    `el documento de los demás va a salir con el dato de esta persona ahí, y eso no lo puede ver nadie desde acá. ` +
+    `Si es así, cambiá esa frase en el Word para que no repita el dato.`
   )
 }
 

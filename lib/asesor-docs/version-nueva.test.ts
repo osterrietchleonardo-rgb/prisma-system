@@ -374,6 +374,23 @@ describe("los textos que ve el director", () => {
     expect(avisoDeValoresRepetidos(ubicarValores("Ana Ruiz", { NOMBRE: "Ana Ruiz" }))).toBeNull()
   })
 
+  it("el aviso de repetidos NO promete un rojo, porque ese rojo no ocurre", () => {
+    /**
+     * Decía "va a salir en rojo acá abajo" y es falso: con la zona de Ana en el
+     * texto fijo, las tres guardas dan verde y el daño recién aparece en el
+     * contrato de Bruno. La pantalla no puede afirmar algo que el sistema no
+     * sabe — es la misma clase de mentira que ya costó dos rondas acá.
+     */
+    const aviso = avisoDeValoresRepetidos(
+      ubicarValores("Ana Ruiz firma. Aclaracion: Ana Ruiz.", { NOMBRE: "Ana Ruiz" }),
+    )!
+    expect(aviso).not.toContain("en rojo")
+    // Y dice lo que sí es cierto, más lo único que el director puede hacer.
+    expect(aviso).toContain("van a cambiar TODOS juntos")
+    expect(aviso).toContain("vista previa")
+    expect(aviso).toContain("no lo puede ver nadie desde acá")
+  })
+
   it("el aviso de los datos que se pasan junta el corto y el pedazo de otro", () => {
     const aviso = avisoDeDatosQueSePasan(
       ubicarValores("Comision 35 por ciento, PLAZO 2026 vigente.", {
