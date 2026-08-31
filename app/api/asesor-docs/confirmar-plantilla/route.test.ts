@@ -50,6 +50,14 @@ type Base = {
   lecturas: Array<{ tabla: string; filtros: Record<string, unknown> }>
   /** Para forzar fallos: nombre de tabla → qué operación tiene que fallar. */
   romper: Record<string, string | undefined>
+  /**
+   * Se llama justo después de cada bajada de Storage.
+   *
+   * Existe para poder meter mano MIENTRAS el pedido corre, que es la única
+   * forma de probar una carrera: el director reemplazándole el .docx a un
+   * asesor entre la comparación y el guardado.
+   */
+  alBajar?: (ruta: string) => void
 }
 
 let base: Base
@@ -88,18 +96,37 @@ const clienteFalso = () => {
 
       if (tipo === "update" || tipo === "delete") {
         base.escrituras.push({ tabla, tipo, datos, filtros })
-        for (const f of filtrar()) {
+        const afectadas = filtrar()
+        for (const f of afectadas) {
           if (tipo === "update") Object.assign(f, datos)
         }
         if (tipo === "delete") {
-          const fuera = new Set(filtrar())
+          const fuera = new Set(afectadas)
           base.versiones = base.versiones.filter((v) => !fuera.has(v))
         }
-        return { data: null, error: null }
+        /**
+         * Las filas afectadas, como las devuelve PostgREST cuando se le
+         * encadena `.select()` a un UPDATE. Antes acá iba `null`, y con eso
+         * "no matcheó ninguna fila" quedaba indistinguible de "se escribió
+         * bien" — que es exactamente lo que el endpoint tiene que poder
+         * distinguir para no publicar una plantilla sobre un archivo que
+         * cambió en el medio.
+         */
+        return { data: afectadas, error: null }
       }
 
       base.lecturas.push({ tabla, filtros })
-      const encontradas = filtrar()
+      /**
+       * COPIAS, no las filas de `base`.
+       *
+       * PostgREST devuelve JSON por la red: lo que lee el endpoint nunca es un
+       * puntero vivo a lo que hay en la base. Devolviendo la fila misma, todo
+       * lo que el endpoint leyó al principio del pedido cambiaba solo si algo
+       * tocaba la base en el medio — y con eso la carrera del .docx que se
+       * reemplaza durante la confirmación era imposible de probar acá, porque
+       * el endpoint "veía" el archivo nuevo sin haberlo releído.
+       */
+      const encontradas = filtrar().map((f) => ({ ...f }))
       return { data: cuantos === null ? encontradas : encontradas.slice(0, cuantos), error: null }
     }
 
@@ -134,6 +161,7 @@ const clienteFalso = () => {
         download: async (ruta: string) => {
           const buf = base.archivos.get(ruta)
           if (!buf) return { data: null, error: { message: "no existe" } }
+          base.alBajar?.(ruta)
           return { data: new Blob([new Uint8Array(buf)]), error: null }
         },
         upload: async (ruta: string, contenido: Buffer) => {
@@ -346,6 +374,106 @@ describe("la regla que no se puede romper, aplicada de verdad", () => {
     expect((r.cuerpo.resultados as Array<{ estado: string }>).every((x) => x.estado === "revisar")).toBe(true)
     expect(r.cuerpo.estado).toBe("borrador")
     expect(tipoGuardado().estado).toBe("borrador")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El .docx que cambia MIENTRAS se confirma
+// ---------------------------------------------------------------------------
+
+/**
+ * La última vía por la que una plantilla llegaba a `activa` sin que alguien
+ * comparara nada.
+ *
+ * El endpoint lee los documentos al empezar, baja el archivo de cada uno, lo
+ * compara y recién al final escribe el veredicto. Si en el medio el director le
+ * reemplaza el .docx a un asesor, el reemplazo deja las cuatro columnas en null
+ * —"a este no lo comparó nadie", que es la verdad—, y este endpoint se las
+ * volvía a llenar un segundo después con el veredicto del archivo VIEJO. Los
+ * tres daban `ok` y la plantilla se publicaba.
+ *
+ * La carrera se mete con el gancho `alBajar`: es el único momento en que el
+ * pedido está a mitad de camino.
+ */
+describe("el documento que se reemplaza en el medio de la confirmación", () => {
+  /** Simula al director subiendo otro .docx para Bruno mientras esto corre. */
+  const reemplazarleElDocxABrunoAlBajar = () => {
+    const rutaNueva = `asesores/${AGENCIA}/${BRUNO}/plantillas/reemplazo.docx`
+    base.archivos.set(rutaNueva, buffer(contratoDe({ ...GENTE[1], zona: "Nuñez" })))
+    base.alBajar = (ruta) => {
+      // Solo cuando ya se bajó el archivo VIEJO de Bruno: ahí es donde duele.
+      if (ruta !== rutaDe(GENTE[1])) return
+      base.alBajar = undefined
+      const doc = documentoDe(BRUNO)
+      // Lo mismo que escribe `camposDelReemplazo` en la pantalla del director.
+      doc.archivo_original_path = rutaNueva
+      doc.nombre_archivo = "reemplazo.docx"
+      doc.version_id = null
+      doc.form_data = null
+      doc.estado = null
+      doc.observacion = null
+    }
+    return rutaNueva
+  }
+
+  it("ese asesor va a rojo y la plantilla NO pasa a activa", async () => {
+    reemplazarleElDocxABrunoAlBajar()
+
+    const r = await pedir(propuestaDe(GENTE))
+    expect(r.status).toBe(200)
+
+    const resultados = r.cuerpo.resultados as Array<{ advisorId: string; estado: string; observacion: string | null }>
+    const bruno = resultados.find((x) => x.advisorId === BRUNO)!
+    expect(bruno.estado).toBe("revisar")
+    expect(bruno.observacion).toBeTruthy()
+
+    // Y con un solo rojo, la regla dura hace el resto.
+    expect(r.cuerpo.estado).toBe("borrador")
+    expect(tipoGuardado().estado).toBe("borrador")
+  })
+
+  it("no le pisa la constancia al archivo nuevo: sus cuatro columnas siguen en null", async () => {
+    reemplazarleElDocxABrunoAlBajar()
+    await pedir(propuestaDe(GENTE))
+
+    /**
+     * Esto es el corazón del asunto. Con las cuatro en null, la solapa cuenta a
+     * Bruno en el balde de "sin comparar" y el director lo ve. Con el veredicto
+     * del archivo viejo pegado encima, la fila diría `estado: 'ok'` contra la
+     * versión vigente sobre un archivo que nadie miró.
+     */
+    const doc = documentoDe(BRUNO)
+    expect(doc.version_id).toBe(null)
+    expect(doc.form_data).toBe(null)
+    expect(doc.estado).toBe(null)
+    expect(doc.observacion).toBe(null)
+
+    // Y los otros dos sí quedaron guardados: el arreglo no rompe el camino sano.
+    expect(documentoDe(ANA).estado).toBe("ok")
+    expect(documentoDe(CARO).estado).toBe("ok")
+  })
+
+  it("la observación le dice al director qué pasó y qué hacer, sin tecnicismos", async () => {
+    reemplazarleElDocxABrunoAlBajar()
+    const r = await pedir(propuestaDe(GENTE))
+
+    const resultados = r.cuerpo.resultados as Array<{ advisorId: string; observacion: string | null }>
+    const texto = resultados.find((x) => x.advisorId === BRUNO)!.observacion!
+    expect(texto).toContain("reemplaz")
+    expect(texto).toContain("Volvé a detectar la plantilla")
+    // Nada de jerga de base de datos en algo que lee un dueño de inmobiliaria.
+    expect(texto.toLowerCase()).not.toContain("update")
+    expect(texto.toLowerCase()).not.toContain("null")
+    expect(texto.toLowerCase()).not.toContain("fila")
+  })
+
+  it("el UPDATE de cada documento va acotado también por la ruta del archivo que se comparó", async () => {
+    await pedir(propuestaDe(GENTE))
+    const updates = base.escrituras.filter((e) => e.tabla === "advisor_documents" && e.tipo === "update")
+    expect(updates).toHaveLength(3)
+    for (const p of GENTE) {
+      expect(updates.some((u) => u.filtros.archivo_original_path === rutaDe(p))).toBe(true)
+    }
   })
 })
 

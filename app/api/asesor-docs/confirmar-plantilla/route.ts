@@ -476,7 +476,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const { error: errUpdate } = await supabase
+    const { data: guardados, error: errUpdate } = await supabase
       .from("advisor_documents")
       .update({
         version_id: nuevaVersion.id,
@@ -487,16 +487,50 @@ export async function POST(req: Request) {
       })
       .eq("id", doc.id)
       .eq("agency_id", agencyId)
-
-    if (errUpdate) {
-      console.error(`confirmar-plantilla: no se pudo guardar el documento ${doc.id}:`, errUpdate.message)
       /**
-       * Un guardado que falla NO puede terminar en verde: los datos de esa
-       * persona no quedaron. Se la pasa a rojo en la respuesta aunque la
-       * comprobación hubiera dado bien, y con eso la plantilla no se publica.
+       * El tercer filtro, y el que impide la última vía a `activa`.
+       *
+       * `doc.archivo_original_path` se leyó al empezar el pedido; todo lo de
+       * arriba —la bajada, la comparación, el veredicto— habla de ESE archivo.
+       * Si mientras tanto el director le reemplaza el .docx a este asesor, el
+       * reemplazo deja las cuatro columnas en null (`camposDelReemplazo`), que
+       * es la verdad: el archivo nuevo no se comparó contra nada. Sin este
+       * `.eq`, este UPDATE se las vuelve a llenar un segundo después con el
+       * veredicto del archivo VIEJO — y si daba `ok`, la plantilla pasa a
+       * `activa` con un documento que nadie miró nunca.
+       *
+       * Acotando por la ruta, la fila ya no matchea y no se escribe nada.
        */
+      .eq("archivo_original_path", doc.archivo_original_path)
+      /**
+       * El `.select()` no es para leer: es la ÚNICA forma de saber si la
+       * escritura tocó alguna fila. Un `.eq` que no matchea no es un error en
+       * PostgREST — devuelve éxito con cero filas afectadas, y `error` viene
+       * en null. Sin esto, "no se escribió nada" se lee exactamente igual que
+       * "se escribió bien".
+       */
+      .select("id")
+
+    const filasTocadas = guardados?.length ?? 0
+
+    /**
+     * Un guardado que falla NO puede terminar en verde: los datos de esa
+     * persona no quedaron. Se la pasa a rojo en la respuesta aunque la
+     * comprobación hubiera dado bien, y con eso la plantilla no se publica.
+     *
+     * "Falló" incluye las dos formas de no quedar guardado: que la base diga
+     * que no, y que la base diga que sí sin tocar ninguna fila.
+     */
+    if (errUpdate || filasTocadas === 0) {
+      console.error(
+        `confirmar-plantilla: no se pudo guardar el documento ${doc.id}:`,
+        errUpdate ? errUpdate.message : "cero filas afectadas (el archivo cambió durante la confirmación)",
+      )
       estado = "revisar"
-      observacion = "La comprobación se hizo, pero no se pudieron guardar sus datos. Probá de nuevo."
+      observacion = errUpdate
+        ? "La comprobación se hizo, pero no se pudieron guardar sus datos. Probá de nuevo."
+        : "Su documento se reemplazó justo mientras se confirmaba la plantilla, así que lo que se comprobó fue el " +
+          "archivo anterior. Volvé a detectar la plantilla para comprobar el nuevo."
     }
 
     resultados.push({ advisorId: asesor.advisorId, nombre: quien, estado, observacion })
