@@ -372,11 +372,15 @@ export function textoDesvinculados(desvinculados: number): string | null {
  * Pero "borrá el documento" tampoco sirve como primera opción, por dos motivos
  * medidos:
  *
- *  · **un desvinculado puede volver.** El director lo reactiva él solo
- *    (`usuarios/[id]/desbloquear` pide `estado === 'eliminado'` y lo deja en
- *    `activo`), y apenas vuelve a estar activo su documento entra otra vez en
- *    la detección. Borrarlo es tirar algo que puede hacer falta la semana que
- *    viene, y que después hay que pedirle de nuevo a esa persona.
+ *  · **un desvinculado puede volver, y el estado se revierte.** Del lado del
+ *    director, sin pedirle nada a nadie: la lista de asesores tiene el filtro
+ *    "eliminado" que lo muestra, el menú le ofrece "Pausar asesor" (solo mira
+ *    si está `pausado`, no si está `eliminado`) y `requireDirectorSobreAsesor`
+ *    tampoco filtra por estado, así que Pausar → Reactivar lo deja en `activo`.
+ *    Del lado de Vakdor, `api/admin-vakdor/usuarios/[id]/desbloquear` lo hace
+ *    en un paso. Apenas vuelve a estar activo su documento entra otra vez en la
+ *    detección, y borrarlo es tirar algo que después hay que volver a pedirle a
+ *    esa persona.
  *  · **borrar se pega un tiro en el pie.** El documento del desvinculado
  *    igual cuenta para el mínimo de `MINIMO_PARA_DETECTAR`: si la
  *    inmobiliaria tenía justo 3, borrarlo deja el botón "Detectar plantilla"

@@ -868,10 +868,13 @@ describe("explicacionDelEstado: el desvinculado, con una instrucción que se pue
    *
    * La primera respuesta a eso fue "borrá su documento", y era peor: se apoyaba
    * en una premisa falsa —que un desvinculado no vuelve— y encima rompía la
-   * pantalla. Un desvinculado SÍ vuelve: el director lo reactiva él solo por
-   * `usuarios/[id]/desbloquear`, que pide `estado === 'eliminado'` y lo deja en
-   * `activo`. Y borrar el documento baja el conteo de la fila, así que con
-   * justo 3 documentos deja el botón "Detectar plantilla" deshabilitado.
+   * pantalla. Un desvinculado SÍ vuelve, y el director lo hace sin pedirle nada
+   * a nadie: la lista tiene el filtro "eliminado", el menú le ofrece "Pausar
+   * asesor" a un eliminado y `requireDirectorSobreAsesor` no filtra por estado,
+   * así que Pausar → Reactivar lo deja en `activo` (y del lado de Vakdor,
+   * `admin-vakdor/usuarios/[id]/desbloquear` lo hace en un paso). Y borrar el
+   * documento baja el conteo de la fila, así que con justo 3 documentos deja el
+   * botón "Detectar plantilla" deshabilitado.
    */
   it("NO manda a detectar de nuevo, y tampoco manda a borrar", () => {
     const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 1 })
