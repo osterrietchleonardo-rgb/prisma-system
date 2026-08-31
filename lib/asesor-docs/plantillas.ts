@@ -482,8 +482,6 @@ export function explicacionDelEstado(
       )
     }
 
-    if (avisoDesvinculados) avisos.push(avisoDesvinculados)
-
     /**
      * Una plantilla en uso NO debería tener documentos para revisar. Cuando los
      * tiene, se dice acá con todas las letras.
@@ -500,6 +498,19 @@ export function explicacionDelEstado(
           `uso: revisá esos documentos antes de darlos por buenos.`,
       )
     }
+
+    /**
+     * ÚLTIMO, y esto se vio en la pantalla y no en un test.
+     *
+     * Es el único aviso que dice "no tenés que hacer nada". Puesto en el medio
+     * —que es donde estaba— partía en dos las dos cosas que el director SÍ
+     * tiene que hacer, y con los tres avisos juntos el párrafo se leía como un
+     * muro donde lo accionable quedaba a los costados de lo informativo.
+     *
+     * Lo que hay que hacer va junto y primero; lo que es solo para saber, al
+     * final.
+     */
+    if (avisoDesvinculados) avisos.push(avisoDesvinculados)
 
     return [enUso, ...avisos].join(" ")
   }
@@ -545,13 +556,15 @@ export function explicacionDelEstado(
     )
   }
 
-  if (avisoDesvinculados) avisos.push(avisoDesvinculados)
-
   if (fila.enRojo > 0) {
     avisos.push(
       `${quienesQuedaron(fila.enRojo)} para revisar. Hasta que estén todos bien, la plantilla no se aplica a nadie.`,
     )
   }
+
+  // Último, por lo mismo que en la rama `activa`: lo accionable junto y
+  // primero, lo informativo al final.
+  if (avisoDesvinculados) avisos.push(avisoDesvinculados)
 
   return [base, ...avisos].join(" ")
 }

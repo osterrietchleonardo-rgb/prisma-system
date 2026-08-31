@@ -961,9 +961,17 @@ describe("explicacionDelEstado: el desvinculado, con una instrucción que se pue
     expect(texto).toContain("1 asesor no se comparó")
     expect(texto).toContain("asesor desvinculado")
     expect(texto).toContain("2 asesores quedaron")
-    // Y en ese orden: primero lo que no se ve en ningún otro lado.
-    expect(texto.indexOf("no se comparó")).toBeLessThan(texto.indexOf("desvinculado"))
-    expect(texto.indexOf("desvinculado")).toBeLessThan(texto.indexOf("quedaron"))
+    /**
+     * El orden, y este se corrigió MIRANDO LA PANTALLA, no leyendo el código.
+     *
+     * Lo accionable va junto y primero; el de los desvinculados —el único que
+     * dice "no tenés que hacer nada"— va último. Estaba en el medio, y con los
+     * tres juntos partía en dos las dos cosas que el director sí tiene que
+     * hacer: el párrafo se leía como un muro con lo accionable a los costados
+     * de lo informativo.
+     */
+    expect(texto.indexOf("no se comparó")).toBeLessThan(texto.indexOf("quedaron"))
+    expect(texto.indexOf("quedaron")).toBeLessThan(texto.indexOf("desvinculado"))
   })
 
   it("no promete en presente algo que todavía no pasa, en ninguna combinación", () => {
@@ -1153,8 +1161,8 @@ describe("explicacionDelEstado: en borrador los avisos también se acumulan", ()
       desvinculados: 1,
     })
     expect(texto).toContain("Es un borrador y todavía no se usa")
-    expect(texto.indexOf("no se compararon")).toBeLessThan(texto.indexOf("desvinculado"))
-    expect(texto.indexOf("desvinculado")).toBeLessThan(texto.indexOf("quedó"))
+    expect(texto.indexOf("no se compararon")).toBeLessThan(texto.indexOf("quedó"))
+    expect(texto.indexOf("quedó")).toBeLessThan(texto.indexOf("desvinculado"))
   })
 
   /**
