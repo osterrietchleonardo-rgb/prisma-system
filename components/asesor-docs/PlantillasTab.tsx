@@ -342,9 +342,9 @@ export function PlantillasTab() {
                       comprobar: hay documentos que sobran. Metidos en el mismo
                       balde, el director leía "volvé a detectar la plantilla"
                       sobre alguien que no va a entrar nunca más en la
-                      detección, y ese aviso no se apagaba jamás. Lo que puede
-                      hacer con esto —borrarlos— está en la explicación de
-                      arriba. */}
+                      detección, y ese aviso no se apagaba jamás. Qué hacer con
+                      esto —nada, salvo que esté seguro de que la persona no
+                      vuelve— está en la explicación de arriba. */}
                   {avisoDesvinculados && (
                     <span className="flex items-center gap-1.5 font-medium">
                       <UserMinus className="h-3.5 w-3.5" />

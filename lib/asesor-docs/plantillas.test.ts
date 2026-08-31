@@ -860,28 +860,56 @@ describe("textoDesvinculados", () => {
 describe("explicacionDelEstado: el desvinculado, con una instrucción que se puede ejecutar", () => {
   /**
    * Lo que hacía falta arreglar: al desvinculado se le decía "volvé a detectar
-   * la plantilla", y volver a detectar no lo incluye NUNCA (spec §7.5). La
-   * única salida es borrar su documento, y eso es lo que tiene que decir.
+   * la plantilla", y volver a detectar no lo incluye NUNCA (spec §7.5).
+   *
+   * La primera respuesta a eso fue "borrá su documento", y era peor: se apoyaba
+   * en una premisa falsa —que un desvinculado no vuelve— y encima rompía la
+   * pantalla. Un desvinculado SÍ vuelve: el director lo reactiva él solo por
+   * `usuarios/[id]/desbloquear`, que pide `estado === 'eliminado'` y lo deja en
+   * `activo`. Y borrar el documento baja el conteo de la fila, así que con
+   * justo 3 documentos deja el botón "Detectar plantilla" deshabilitado.
    */
-  it("dice que se borre el documento y NO manda a detectar de nuevo", () => {
+  it("NO manda a detectar de nuevo, y tampoco manda a borrar", () => {
     const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 1 })
-    expect(texto).toContain("borralo")
     expect(texto).toContain("desvinculado")
     expect(texto).toContain("volver a detectar la plantilla no lo va a cambiar")
+    expect(texto).toContain("No tenés que hacer nada")
+  })
+
+  it("dice que la persona puede volver, que es la premisa que hacía falta", () => {
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 1 })
+    expect(texto).toContain("vuelve a la inmobiliaria")
+    expect(texto).toContain("entra solo en la próxima detección")
+  })
+
+  /**
+   * La parte que el director no puede deducir mirando la pantalla: borrar el
+   * documento de un desvinculado le baja el conteo de la fila y, con justo el
+   * mínimo, le apaga el botón. Si el aviso lo manda a borrar sin decirlo, se
+   * queda trabado sin saber por qué.
+   */
+  it("si nombra borrar, avisa que puede quedarse por debajo del mínimo", () => {
+    for (const desvinculados of [1, 3]) {
+      const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados })
+      expect(texto.toLowerCase()).toContain("borral")
+      expect(texto).toContain("únicamente si estás seguro")
+      expect(texto).toContain(`menos de ${MINIMO_PARA_DETECTAR} documentos`)
+    }
   })
 
   it("con varios, todo el renglón concuerda en número", () => {
     const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 3 })
     expect(texto).toContain("3 documentos de asesores desvinculados")
     expect(texto).toContain("no entran")
-    expect(texto).toContain("borralos desde la ficha de cada uno")
-    expect(texto).not.toContain("borralo desde")
+    expect(texto).toContain("esas personas vuelven")
+    expect(texto).toContain("Borralos desde sus fichas")
+    expect(texto).not.toContain("Borralo desde")
   })
 
   it("en un borrador se dice también, pegado a lo que ya decía", () => {
     const texto = explicacionDelEstado({ estado: "borrador", version: null, enRojo: 0, desvinculados: 1 })
     expect(texto).toContain("falta detectar la plantilla")
-    expect(texto).toContain("borralo desde la ficha de esa persona")
+    expect(texto).toContain("Borralo desde su ficha únicamente si estás seguro")
   })
 
   it("sin desvinculados no aparece nada de esto", () => {

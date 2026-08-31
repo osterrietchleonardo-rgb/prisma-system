@@ -113,8 +113,10 @@ export type FilaPlantilla = {
    * hacía que la fila dijera "hasta que estén todos bien, la plantilla no se
    * aplica a nadie" — falso: la confirmación ni los mira.
    *
-   * Lo único que se puede hacer con ellos es borrar el documento, y eso es lo
-   * que dice el texto.
+   * Y lo que hay que hacer con ellos es NADA: un desvinculado puede volver —el
+   * director lo reactiva él solo— y ahí su documento entra otra vez en la
+   * detección. El texto lo dice así (ver `avisoDeDesvinculados`); borrar queda
+   * como última opción y con la advertencia del mínimo al lado.
    */
   desvinculados: number
 }
@@ -348,9 +350,9 @@ export function textoSinComprobar(sinComprobar: number): string | null {
  * El otro renglón de la fila: cuántos documentos son de asesores
  * desvinculados. `null` cuando no hay ninguno.
  *
- * Se cuentan DOCUMENTOS y no personas a propósito: lo que el director tiene que
- * hacer con esto es borrar archivos, y "3 documentos" es lo que va a ver cuando
- * entre a buscarlos.
+ * Se cuentan DOCUMENTOS y no personas a propósito: es la unidad de todo lo
+ * demás de esta fila —el mínimo para detectar se cuenta en documentos— y es lo
+ * que el director va a ver si entra a buscarlos.
  */
 export function textoDesvinculados(desvinculados: number): string | null {
   if (desvinculados <= 0) return null
@@ -360,21 +362,43 @@ export function textoDesvinculados(desvinculados: number): string | null {
 }
 
 /**
- * Lo mismo, dicho entero, con lo único que el director puede hacer al respecto.
+ * Lo mismo, dicho entero, y qué hacer al respecto: NADA, salvo que el director
+ * esté seguro.
  *
  * La instrucción tiene que ser una que él pueda ejecutar. "Volvé a detectar la
- * plantilla" no lo es: el desvinculado no entra en la detección ni en la
- * confirmación, así que el aviso no se apaga nunca. Borrar el documento sí, y
- * se llega desde la ficha de esa persona (la lista de asesores tiene el filtro
- * de estado que la muestra).
+ * plantilla" no lo era: el desvinculado no entra en la detección ni en la
+ * confirmación, así que ese aviso no se apagaba nunca.
+ *
+ * Pero "borrá el documento" tampoco sirve como primera opción, por dos motivos
+ * medidos:
+ *
+ *  · **un desvinculado puede volver.** El director lo reactiva él solo
+ *    (`usuarios/[id]/desbloquear` pide `estado === 'eliminado'` y lo deja en
+ *    `activo`), y apenas vuelve a estar activo su documento entra otra vez en
+ *    la detección. Borrarlo es tirar algo que puede hacer falta la semana que
+ *    viene, y que después hay que pedirle de nuevo a esa persona.
+ *  · **borrar se pega un tiro en el pie.** El documento del desvinculado
+ *    igual cuenta para el mínimo de `MINIMO_PARA_DETECTAR`: si la
+ *    inmobiliaria tenía justo 3, borrarlo deja el botón "Detectar plantilla"
+ *    deshabilitado y el director se queda sin poder hacer nada.
+ *
+ * Así que la instrucción es la verdad completa: no hay nada que hacer, el aviso
+ * es informativo, y borrar es la última opción — con la advertencia del mínimo
+ * al lado, que es la parte que no se puede deducir mirando la pantalla.
  */
 function avisoDeDesvinculados(desvinculados: number): string | null {
   if (desvinculados <= 0) return null
   return desvinculados === 1
     ? "Aparte, hay 1 documento de un asesor desvinculado: no entra en ninguna comparación, y volver a detectar la " +
-        "plantilla no lo va a cambiar. Si ya no hace falta, borralo desde la ficha de esa persona."
+        "plantilla no lo va a cambiar. No tenés que hacer nada — si esa persona vuelve a la inmobiliaria, su " +
+        "documento entra solo en la próxima detección. Borralo desde su ficha únicamente si estás seguro de que no " +
+        `vuelve, y teniendo en cuenta que con menos de ${MINIMO_PARA_DETECTAR} documentos no se puede volver a ` +
+        `detectar la plantilla.`
     : `Aparte, hay ${desvinculados} documentos de asesores desvinculados: no entran en ninguna comparación, y ` +
-        `volver a detectar la plantilla no los va a cambiar. Si ya no hacen falta, borralos desde la ficha de cada uno.`
+        `volver a detectar la plantilla no los va a cambiar. No tenés que hacer nada — si esas personas vuelven a ` +
+        `la inmobiliaria, sus documentos entran solos en la próxima detección. Borralos desde sus fichas ` +
+        `únicamente si estás seguro de que no vuelven, y teniendo en cuenta que con menos de ` +
+        `${MINIMO_PARA_DETECTAR} documentos no se puede volver a detectar la plantilla.`
 }
 
 /** "1 asesor quedó" / "N asesores quedaron", para no repetirlo en cada rama. */
