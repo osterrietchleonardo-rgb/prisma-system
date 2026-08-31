@@ -183,6 +183,21 @@ export async function POST(req: Request) {
     .from("advisor_doc_template_versions")
     .select("id, version, campos_schema")
     .eq("id", tipo.version_actual)
+    /**
+     * El tercer filtro, y no sobra.
+     *
+     * `version_actual` tiene clave foránea a `advisor_doc_template_versions`,
+     * así que la base garantiza que la fila EXISTA — pero no que sea de ESTA
+     * plantilla. Verificado en `pg_constraint`: la restricción es sobre `id`, y
+     * ninguna dice que la versión apuntada tenga que tener este `template_id`.
+     *
+     * Sin este `.eq`, una plantilla que quedara apuntando a la versión de otra
+     * —por un `version_actual` mal escrito, hoy o el día que la 7b escriba esa
+     * columna— compararía los campos nuevos contra el esquema del documento
+     * equivocado. El resultado no sería un error: sería una lista de
+     * "desaparecidos" y "nuevos" perfectamente redactada y completamente falsa.
+     */
+    .eq("template_id", templateId)
     .eq("agency_id", agencyId)
     .maybeSingle()
 

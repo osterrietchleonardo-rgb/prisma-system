@@ -472,6 +472,29 @@ describe("lo que se rechaza antes de tocar nada", () => {
     expect(r.status).toBe(400)
     expect(r.cuerpo.error).toContain("no tiene ninguna versión activa")
   })
+
+  it("una version_actual que apunta a la versión de OTRA plantilla no se usa", async () => {
+    /**
+     * La clave foránea garantiza que la fila exista, no que sea de esta
+     * plantilla. Si se usara igual, los campos nuevos se compararían contra el
+     * esquema del documento equivocado y la lista de "desaparecidos" saldría
+     * redactada, completa y falsa.
+     */
+    base.versiones.push({
+      id: "ver-de-otra-plantilla",
+      template_id: "99999999-9999-4999-8999-999999999999",
+      agency_id: AGENCIA,
+      version: 7,
+      campos_schema: [{ nombre: "OTRO_CAMPO", label: "Otro", orden: 0 }],
+      origen: "detectada",
+    })
+    base.tipos[0].version_actual = "ver-de-otra-plantilla"
+
+    const r = await pedir({})
+    expect(r.status).toBe(400)
+    expect(r.cuerpo.error).toContain("no tiene ninguna versión activa")
+    expect(base.versiones.some((v) => v.version === 2)).toBe(false)
+  })
 })
 
 // ---------------------------------------------------------------------------
