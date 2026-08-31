@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server"
 import { requireTenant } from "@/lib/auth/tenant-validation"
 import { huecosDe, ponerHuecosEnDocx, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
 import { separarPorEstado } from "@/lib/asesor-docs/propuesta"
+import { validarRutaDeVersionNueva } from "@/lib/asesor-docs/reglas"
 import {
   avisoDeNotasAlFinal,
   camposConDatoCorto,
@@ -130,21 +131,25 @@ export async function POST(req: Request) {
 
   // ── Lo que llega del navegador ──────────────────────────────────────────
   /**
-   * Multipart y no JSON: viene un .docx adentro. Del cliente llegan TRES datos
-   * —qué plantilla, de qué asesor es el documento y el archivo— y ninguno de
-   * ellos es de autoridad: la inmobiliaria y el rol salen de la sesión, y los
-   * dos ids se comprueban después contra la base filtrando por `agency_id`.
+   * El .docx NO viaja en el pedido: lo sube el navegador a Storage y acá llega
+   * su ruta. El cuerpo del pedido lo corta la plataforma bastante antes de los
+   * 25 MB que este endpoint promete, y el número exacto no está confirmado en
+   * ninguna documentación; el camino que no depende de saberlo es este. El molde
+   * tiene que terminar en Storage igual.
+   *
+   * Del cliente llegan TRES datos —qué plantilla, de qué asesor son los datos y
+   * dónde quedó el archivo— y **ninguno es de autoridad**: la inmobiliaria y el
+   * rol salen de la sesión, los dos ids se comprueban contra la base filtrando
+   * por `agency_id`, y la ruta se valida contra el `agency_id` de la sesión.
    */
-  let form: FormData
+  let cuerpo: unknown
   try {
-    form = await req.formData()
+    cuerpo = await req.json()
   } catch {
-    return NextResponse.json({ error: "El pedido no tiene la forma esperada" }, { status: 400 })
+    return NextResponse.json({ error: "El pedido no tiene cuerpo válido" }, { status: 400 })
   }
 
-  const templateId = form.get("templateId")
-  const moldeAdvisorId = form.get("moldeAdvisorId")
-  const archivo = form.get("archivo")
+  const { templateId, moldeAdvisorId, archivoPath } = (cuerpo ?? {}) as Record<string, unknown>
 
   if (typeof templateId !== "string" || !ES_UUID.test(templateId)) {
     return NextResponse.json({ error: "Falta el tipo de documento" }, { status: 400 })
@@ -155,17 +160,19 @@ export async function POST(req: Request) {
       { status: 400 },
     )
   }
-  if (!(archivo instanceof File) || archivo.size === 0) {
-    return NextResponse.json({ error: "Falta el archivo de la versión nueva" }, { status: 400 })
-  }
-  if (archivo.size > MAX_ARCHIVO) {
-    return NextResponse.json({ error: "El archivo pesa más de 25 MB" }, { status: 400 })
-  }
-  if (!archivo.name.toLowerCase().endsWith(".docx")) {
-    return NextResponse.json(
-      { error: "El archivo tiene que ser un .docx de Word. Un PDF no se puede convertir en plantilla." },
-      { status: 400 },
-    )
+
+  /**
+   * LA GUARDA, y la mitad importante de haber pasado el archivo a una ruta.
+   *
+   * El resto de la Etapa C baja rutas que salen de la BASE, ya filtradas por
+   * agencia. Esta la manda el cliente, y el bucket `documents` es **público**:
+   * sin esto, una ruta `asesores/{otra_agencia}/…` se bajaría igual y el
+   * contrato ajeno saldría en texto plano adentro de `vistaPrevia`. El
+   * `agencyId` con el que se valida sale de la SESIÓN, nunca del cuerpo.
+   */
+  const ruta = validarRutaDeVersionNueva(archivoPath, agencyId)
+  if (!ruta.ok) {
+    return NextResponse.json({ error: ruta.error }, { status: 400 })
   }
 
   const supabase = createClient()
@@ -282,11 +289,45 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: SIN_DATOS_DEL_ASESOR }, { status: 400 })
   }
 
-  // ── 3. El texto del .docx nuevo, ENTERO ─────────────────────────────────
+  // ── 3. Bajar el .docx nuevo y sacarle el texto, ENTERO ──────────────────
+  const { data: bajado, error: errBajada } = await supabase.storage.from(BUCKET).download(ruta.path)
+  if (errBajada || !bajado) {
+    console.error("aplicar-version: no se pudo bajar el archivo:", errBajada?.message)
+    return NextResponse.json(
+      { error: "No se encontró el archivo que subiste. Volvé a subirlo y probá de nuevo." },
+      { status: 404 },
+    )
+  }
+
+  const bytes = Buffer.from(await bajado.arrayBuffer())
+
+  /**
+   * Se borra APENAS se lo leyó, en todos los caminos: salga bien o salga mal, el
+   * servidor ya tiene los bytes en memoria y ese archivo no lo necesita nadie
+   * más. En un bucket público un huérfano no es desprolijidad: es un contrato
+   * legible por URL para siempre.
+   *
+   * Es seguro porque la guarda de arriba lo encerró en `_versiones-nuevas`: no
+   * puede ser el .docx original de un asesor, que es la única fuente de verdad
+   * contra la que compara toda la verificación.
+   *
+   * Si falla, se sigue: no borrar un archivo no es motivo para tirarle abajo el
+   * pedido al director, pero sí para dejarlo escrito en el log.
+   */
+  const { error: errBorrado } = await supabase.storage.from(BUCKET).remove([ruta.path])
+  if (errBorrado) console.error("aplicar-version: quedó un archivo sin borrar:", ruta.path, errBorrado.message)
+
+  if (bytes.length === 0) {
+    return NextResponse.json({ error: "El archivo que subiste está vacío." }, { status: 400 })
+  }
+  if (bytes.length > MAX_ARCHIVO) {
+    return NextResponse.json({ error: "El archivo pesa más de 25 MB" }, { status: 400 })
+  }
+
   let zipNuevo: PizZip
   let partesDelNuevo: Record<string, string>
   try {
-    zipNuevo = new PizZip(Buffer.from(await archivo.arrayBuffer()))
+    zipNuevo = new PizZip(bytes)
     /**
      * `textoPorParte` y no `textoDeDocx`: mammoth lee el CUERPO y nada más. Un
      * dato que viva en el encabezado no se encontraría, el campo saldría como

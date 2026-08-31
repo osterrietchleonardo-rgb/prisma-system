@@ -8,6 +8,9 @@ import {
   escaparComodinesIlike,
   camposDelReemplazo,
   MAX_BYTES,
+  carpetaDeVersionesNuevas,
+  rutaDeVersionNueva,
+  validarRutaDeVersionNueva,
 } from "./reglas";
 
 const UN_MB = 1024 * 1024;
@@ -265,5 +268,99 @@ describe("la pantalla del director usa camposDelReemplazo y no un objeto escrito
     for (const columna of ["version_id", "form_data", "estado", "observacion"]) {
       expect(bloque).not.toContain(columna);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LA GUARDA DE LA RUTA DE UNA VERSIÓN NUEVA
+// ---------------------------------------------------------------------------
+
+/**
+ * Lo que esta guarda evita, dicho de una vez: el bucket `documents` es PÚBLICO
+ * y acá la ruta la manda el cliente —a diferencia del resto de la Etapa C, que
+ * baja rutas salidas de la base—. Sin guarda, una ruta de otra inmobiliaria se
+ * baja igual y el contrato ajeno sale en texto plano adentro de la vista previa.
+ */
+describe("validarRutaDeVersionNueva", () => {
+  const AGENCIA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const OTRA = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+  const rechaza = (ruta: unknown) => {
+    const r = validarRutaDeVersionNueva(ruta, AGENCIA);
+    expect(r.ok, `debería rechazar ${JSON.stringify(ruta)}`).toBe(false);
+    return r;
+  };
+
+  it("acepta la ruta que arma rutaDeVersionNueva para esa misma agencia", () => {
+    const ruta = rutaDeVersionNueva(AGENCIA, "abc-123");
+    expect(validarRutaDeVersionNueva(ruta, AGENCIA)).toEqual({ ok: true, path: ruta });
+  });
+
+  it("la carpeta es propia de las versiones nuevas, no cualquiera de la agencia", () => {
+    expect(carpetaDeVersionesNuevas(AGENCIA)).toBe(`asesores/${AGENCIA}/_versiones-nuevas/`);
+  });
+
+  it("rechaza la ruta de OTRA inmobiliaria, y lo dice en castellano", () => {
+    const r = rechaza(rutaDeVersionNueva(OTRA, "abc"));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("no es de tu inmobiliaria");
+  });
+
+  it("rechaza una agencia que solo EMPIEZA igual", () => {
+    // Sin la barra final del prefijo, `asesores/{AGENCIA}-otra/` pasaría.
+    rechaza(`asesores/${AGENCIA}-otra/_versiones-nuevas/abc.docx`);
+  });
+
+  it("rechaza subir de carpeta con ..", () => {
+    rechaza(`asesores/${AGENCIA}/_versiones-nuevas/../../${OTRA}/x.docx`);
+    rechaza(`asesores/${AGENCIA}/_versiones-nuevas/..docx`);
+  });
+
+  it("rechaza una ruta absoluta", () => {
+    rechaza(`/asesores/${AGENCIA}/_versiones-nuevas/abc.docx`);
+  });
+
+  it("rechaza barras invertidas, escapado de URL y caracteres invisibles", () => {
+    rechaza("asesores/" + AGENCIA + "/_versiones-nuevas/ab" + String.fromCharCode(92) + "c.docx");
+    rechaza(`asesores/${AGENCIA}/_versiones-nuevas/%2e%2e/x.docx`);
+    rechaza("asesores/" + AGENCIA + "/_versiones-nuevas/ab" + String.fromCharCode(10) + "c.docx");
+  });
+
+  it("rechaza una carpeta de más adentro: el nombre no lleva barras", () => {
+    rechaza(`asesores/${AGENCIA}/_versiones-nuevas/sub/abc.docx`);
+  });
+
+  it("rechaza otra carpeta de la misma agencia, incluido el documento de un asesor", () => {
+    rechaza(`asesores/${AGENCIA}/11111111-1111-4111-8111-111111111111/plantillas/ana.docx`);
+    rechaza(`asesores/${AGENCIA}/_plantillas/abc/v1.docx`);
+  });
+
+  it("rechaza lo que no es un .docx", () => {
+    rechaza(`asesores/${AGENCIA}/_versiones-nuevas/abc.pdf`);
+    rechaza(`asesores/${AGENCIA}/_versiones-nuevas/abc`);
+  });
+
+  it("acepta el .DOCX en mayúsculas, que es lo que a veces guarda Word", () => {
+    const ruta = `asesores/${AGENCIA}/_versiones-nuevas/abc.DOCX`;
+    expect(validarRutaDeVersionNueva(ruta, AGENCIA).ok).toBe(true);
+  });
+
+  it("rechaza lo que no es un texto, y lo que está vacío", () => {
+    rechaza(null);
+    rechaza(undefined);
+    rechaza(42);
+    rechaza("");
+    rechaza("   ");
+  });
+
+  it("rechaza una ruta absurdamente larga", () => {
+    rechaza(`asesores/${AGENCIA}/_versiones-nuevas/${"a".repeat(600)}.docx`);
+  });
+
+  it("devuelve la ruta EXACTA que se validó, sin recortarla", () => {
+    // Validar una y bajar otra es la forma clásica de que la guarda no sirva.
+    const ruta = rutaDeVersionNueva(AGENCIA, "abc");
+    const r = validarRutaDeVersionNueva(ruta, AGENCIA);
+    expect(r.ok && r.path).toBe(ruta);
   });
 });

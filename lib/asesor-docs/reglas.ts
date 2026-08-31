@@ -97,6 +97,102 @@ export function rutaDeArchivo(
   return `asesores/${agencyId}/${advisorId}/${carpeta}/${id}.${extension}`
 }
 
+// ---------------------------------------------------------------------------
+// EL .docx DE UNA VERSIÓN NUEVA DE PLANTILLA, Y SU GUARDA
+// ---------------------------------------------------------------------------
+
+/**
+ * La carpeta donde el navegador deja el .docx de una versión nueva antes de
+ * pedirle al servidor que la lea (spec §7.4).
+ *
+ * ═══ Por qué es una carpeta aparte y no cualquier ruta de la agencia ═══
+ *
+ * Acá la ruta la manda el CLIENTE, y eso no es lo que hace el resto de la
+ * Etapa C: `detectar-plantilla` baja rutas que salen **de la base**, ya
+ * filtradas por agencia. Una ruta que llega por HTTP la escribe cualquiera.
+ *
+ * Y el bucket `documents` es **público**. Sin guarda, una ruta
+ * `asesores/{otra_agencia}/…` se bajaría igual y el contrato ajeno saldría en
+ * texto plano adentro de la vista previa: una fuga entre inmobiliarias, con el
+ * cliente real en el mismo bucket.
+ *
+ * La carpeta propia hace además que **borrar el archivo sea seguro**. El
+ * servidor lo borra apenas lo lee, para no dejar huérfanos legibles por URL en
+ * un bucket público; si la ruta pudiera ser cualquiera de la agencia, ese mismo
+ * borrado podría llevarse puesto el .docx original de un asesor, que es la
+ * única fuente de verdad contra la que compara toda la verificación.
+ */
+export function carpetaDeVersionesNuevas(agencyId: string): string {
+  return `asesores/${agencyId}/_versiones-nuevas/`
+}
+
+/** Dónde sube el navegador el .docx de la versión nueva. El `id` lo genera él. */
+export function rutaDeVersionNueva(agencyId: string, id: string): string {
+  return `${carpetaDeVersionesNuevas(agencyId)}${id}.docx`
+}
+
+/**
+ * Lo que puede tener el nombre del archivo, y nada más.
+ *
+ * **No hay barra**, y eso es lo que hace que `..` no pueda llegar a ninguna
+ * parte: sin separador no hay nivel al que subir. Se prohíbe igual más abajo,
+ * porque una defensa que depende de leer bien un alfabeto es una defensa que se
+ * rompe el día que alguien le agrega un carácter al alfabeto.
+ */
+const NOMBRE_DE_VERSION_NUEVA = /^[A-Za-z0-9][A-Za-z0-9._-]*\.docx$/i
+
+/**
+ * Valida la ruta que mandó el navegador contra el `agency_id` **de la sesión**.
+ *
+ * El `agencyId` NUNCA puede venir del cuerpo del pedido: si viniera, la guarda
+ * sería el propio atacante diciendo contra qué compararse. El 27-ago-2026 se
+ * cerró en producción un agujero por confiar en un dato de autoridad que venía
+ * del navegador.
+ */
+export function validarRutaDeVersionNueva(
+  path: unknown,
+  agencyId: string,
+): { ok: true; path: string } | { ok: false; error: string } {
+  if (typeof path !== "string" || path.trim() === "") {
+    return { ok: false, error: "Falta el archivo de la versión nueva" }
+  }
+  /**
+   * Sin recortar espacios: se valida EXACTAMENTE lo que después se va a bajar y
+   * a borrar. Recortar acá dejaría una ruta validada distinta de la usada, que
+   * es la forma clásica de que una guarda mire una cosa y el sistema use otra.
+   */
+  if (path.length > 512) {
+    return { ok: false, error: "La ruta del archivo es demasiado larga" }
+  }
+  const rechazo = { ok: false as const, error: "Esa ruta de archivo no es válida" }
+
+  // Barras invertidas, caracteres de control y el escapado de URL: nada de eso
+  // tiene por qué estar en la clave de un archivo, y todos sirven para disfrazar.
+  if (/[\\%\u0000-\u001f\u007f]/.test(path)) return rechazo
+  if (path.startsWith("/")) return rechazo
+  if (path.includes("..")) return rechazo
+
+  const carpeta = carpetaDeVersionesNuevas(agencyId)
+  if (!path.startsWith(carpeta)) {
+    return {
+      ok: false,
+      error:
+        "Ese archivo no es de tu inmobiliaria. Subí el .docx de la versión nueva desde esta misma pantalla y " +
+        "volvé a intentar.",
+    }
+  }
+
+  const nombre = path.slice(carpeta.length)
+  if (!NOMBRE_DE_VERSION_NUEVA.test(nombre)) {
+    return {
+      ok: false,
+      error: "El archivo tiene que ser un .docx de Word. Un PDF no se puede convertir en plantilla.",
+    }
+  }
+
+  return { ok: true, path }
+}
+
 /** Lo que se sabe del archivo nuevo cuando el director reemplaza uno viejo. */
 export type ArchivoDeReemplazo = {
   nombreArchivo: string

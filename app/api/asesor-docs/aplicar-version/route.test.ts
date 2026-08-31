@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
 import { AsyncLocalStorage } from "node:async_hooks"
 import PizZip from "pizzip"
 
+import { rutaDeVersionNueva } from "@/lib/asesor-docs/reglas"
+
 /**
  * EL ENDPOINT DE LA VERSIÓN NUEVA, CON RED.
  *
@@ -48,6 +50,8 @@ type Base = {
   archivos: Map<string, Buffer>
   escrituras: Array<{ tabla: string; tipo: string; datos?: Record<string, unknown>; filtros: Record<string, unknown> }>
   lecturas: Array<{ tabla: string; filtros: Record<string, unknown> }>
+  /** Cada ruta que el endpoint intentó BAJAR. Es lo que mide la guarda de prefijo. */
+  lecturasDeStorage: string[]
   romper: Record<string, string | undefined>
   /**
    * Se llama justo DESPUÉS de cada lectura.
@@ -164,6 +168,18 @@ const clienteFalso = (base: Base) => {
     }),
     storage: {
       from: () => ({
+        download: async (ruta: string) => {
+          base.lecturasDeStorage.push(ruta)
+          const buf = base.archivos.get(ruta)
+          if (!buf) return { data: null, error: { message: "no existe" } }
+          return { data: new Blob([new Uint8Array(buf)]), error: null }
+        },
+        remove: async (rutas: string[]) => {
+          if (base.romper.storage === "remove") return { error: { message: "no se pudo borrar" } }
+          for (const r of rutas) base.archivos.delete(r)
+          base.escrituras.push({ tabla: "storage", tipo: "remove", filtros: { rutas } })
+          return { error: null }
+        },
         upload: async (ruta: string, contenido: Buffer) => {
           if (base.romper.storage === "upload") return { error: { message: "no se pudo subir" } }
           base.archivos.set(ruta, contenido)
@@ -306,30 +322,48 @@ function armarBase() {
     archivos: new Map(),
     escrituras: [],
     lecturas: [],
+    lecturasDeStorage: [],
     romper: {},
   }
 }
 
+/** Donde el navegador deja el .docx de la versión nueva antes de llamar. */
+const RUTA_SUBIDA = rutaDeVersionNueva(AGENCIA, "subida-de-prueba")
+
 const pedir = async (opciones: {
   zip?: PizZip
-  nombreArchivo?: string
+  /** La ruta que manda el cliente. Por defecto, una válida de esta agencia. */
+  archivoPath?: string | null
   templateId?: string | null
   moldeAdvisorId?: string | null
-  sinArchivo?: boolean
+  /** No dejar el archivo en Storage, para probar la ruta que apunta a la nada. */
+  sinSubirlo?: boolean
 }) => {
   const miBase = base
-  const { POST } = await import("./route")
 
-  const form = new FormData()
-  if (opciones.templateId !== null) form.set("templateId", opciones.templateId ?? TIPO)
-  if (opciones.moldeAdvisorId !== null) form.set("moldeAdvisorId", opciones.moldeAdvisorId ?? ANA)
-  if (!opciones.sinArchivo) {
-    const buf = buffer(opciones.zip ?? versionNuevaDeAna())
-    form.set("archivo", new File([new Uint8Array(buf)], opciones.nombreArchivo ?? "contrato-v2.docx"))
+  /**
+   * El navegador SUBE el archivo a Storage y después llama. Se emula dejando el
+   * .docx en el bucket falso antes del pedido.
+   */
+  if (!opciones.sinSubirlo) {
+    base.archivos.set(RUTA_SUBIDA, buffer(opciones.zip ?? versionNuevaDeAna()))
   }
 
+  const { POST } = await import("./route")
+
+  const cuerpo: Record<string, unknown> = {}
+  if (opciones.templateId !== null) cuerpo.templateId = opciones.templateId ?? TIPO
+  if (opciones.moldeAdvisorId !== null) cuerpo.moldeAdvisorId = opciones.moldeAdvisorId ?? ANA
+  if (opciones.archivoPath !== null) cuerpo.archivoPath = opciones.archivoPath ?? RUTA_SUBIDA
+
   const res = await baseDelPedido.run(miBase, () =>
-    POST(new Request("http://localhost/api/asesor-docs/aplicar-version", { method: "POST", body: form })),
+    POST(
+      new Request("http://localhost/api/asesor-docs/aplicar-version", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cuerpo),
+      }),
+    ),
   )
   return { status: res.status, cuerpo: (await res.json()) as Record<string, unknown> }
 }
@@ -416,9 +450,85 @@ describe("autorización", () => {
 
   it("la plantilla de OTRA inmobiliaria no existe para este director, 404", async () => {
     sesion.agencyId = OTRA_AGENCIA
-    const r = await pedir({})
+    /**
+     * Con una ruta de SU propia agencia, para que el pedido llegue hasta la
+     * consulta de la plantilla en vez de frenar antes en la guarda de la ruta.
+     * Lo que se mide acá es el `.eq("agency_id")`, no la guarda.
+     */
+    const suya = rutaDeVersionNueva(OTRA_AGENCIA, "subida-de-prueba")
+    base.archivos.set(suya, buffer(versionNuevaDeAna()))
+
+    const r = await pedir({ archivoPath: suya, sinSubirlo: true })
     expect(r.status).toBe(404)
     expect(base.versiones).toHaveLength(1)
+  })
+
+  // ───────────────────────────────────────────────────────────────────────
+  // LA GUARDA DE LA RUTA
+  // ───────────────────────────────────────────────────────────────────────
+
+  /**
+   * ═══ Por qué esta guarda es la mitad de haber pasado el archivo a una ruta ═══
+   *
+   * El resto de la Etapa C baja rutas que salen de la BASE, ya filtradas por
+   * agencia. Esta la manda el cliente. Y el bucket `documents` es PÚBLICO: sin
+   * guarda, una ruta de otra inmobiliaria se baja igual y el contrato ajeno sale
+   * en texto plano adentro de `vistaPrevia`.
+   *
+   * Lo que se mide no es solo el código de respuesta: es que el archivo **no se
+   * haya bajado**. Un 400 después de haber leído el contrato ajeno ya sería
+   * tarde si mañana ese texto se filtra en un log o en un mensaje de error.
+   */
+  it("una ruta de OTRA inmobiliaria se rechaza, y el archivo NI SE BAJA", async () => {
+    const ajena = rutaDeVersionNueva(OTRA_AGENCIA, "contrato-del-cliente-real")
+    base.archivos.set(ajena, buffer(versionNuevaDeAna()))
+
+    const r = await pedir({ archivoPath: ajena })
+    expect(r.status).toBe(400)
+    expect(r.cuerpo.error as string).toContain("no es de tu inmobiliaria")
+    expect(base.lecturasDeStorage).toEqual([])
+    expect(base.archivos.has(ajena)).toBe(true)
+  })
+
+  it("una ruta con .. se rechaza sin bajar nada", async () => {
+    const r = await pedir({
+      archivoPath: `asesores/${AGENCIA}/_versiones-nuevas/../../${OTRA_AGENCIA}/x.docx`,
+    })
+    expect(r.status).toBe(400)
+    expect(base.lecturasDeStorage).toEqual([])
+  })
+
+  it("una ruta absoluta se rechaza sin bajar nada", async () => {
+    const r = await pedir({ archivoPath: `/${rutaDeVersionNueva(AGENCIA, "x")}` })
+    expect(r.status).toBe(400)
+    expect(base.lecturasDeStorage).toEqual([])
+  })
+
+  it("el .docx de un ASESOR no se puede pasar como versión nueva", async () => {
+    /**
+     * Es el archivo original que subió el director: la única fuente de verdad
+     * contra la que compara toda la verificación. Y como el endpoint borra lo
+     * que lee, poder apuntarle acá sería poder borrarlo.
+     */
+    const original = `asesores/${AGENCIA}/${ANA}/plantillas/ana.docx`
+    base.archivos.set(original, buffer(versionNuevaDeAna()))
+
+    const r = await pedir({ archivoPath: original })
+    expect(r.status).toBe(400)
+    expect(base.lecturasDeStorage).toEqual([])
+    expect(base.archivos.has(original)).toBe(true)
+  })
+
+  it("el archivo que se leyó se borra del bucket, salga bien o salga mal", async () => {
+    const bien = await pedir({})
+    expect(bien.status).toBe(200)
+    expect(base.archivos.has(RUTA_SUBIDA)).toBe(false)
+
+    armarBase()
+    const generico = docx([parrafo("Contrato modelo sin datos de nadie.")])
+    const mal = await pedir({ zip: generico })
+    expect(mal.status).toBe(400)
+    expect(base.archivos.has(RUTA_SUBIDA)).toBe(false)
   })
 
   it("cada consulta lleva el agency_id de la sesión, no el del pedido", async () => {
@@ -433,16 +543,32 @@ describe("autorización", () => {
 // ---------------------------------------------------------------------------
 
 describe("lo que se rechaza antes de tocar nada", () => {
-  it("sin archivo, 400", async () => {
-    const r = await pedir({ sinArchivo: true })
+  it("sin la ruta del archivo, 400", async () => {
+    const r = await pedir({ archivoPath: null })
     expect(r.status).toBe(400)
     expect(r.cuerpo.error).toContain("Falta el archivo")
+    expect(base.lecturasDeStorage).toEqual([])
   })
 
   it("un PDF, 400 y con el motivo", async () => {
-    const r = await pedir({ nombreArchivo: "contrato-v2.pdf" })
+    const r = await pedir({ archivoPath: rutaDeVersionNueva(AGENCIA, "x").replace(".docx", ".pdf") })
     expect(r.status).toBe(400)
     expect(r.cuerpo.error).toContain(".docx")
+    expect(base.lecturasDeStorage).toEqual([])
+  })
+
+  it("una ruta que no apunta a ningún archivo, 404", async () => {
+    const r = await pedir({ sinSubirlo: true })
+    expect(r.status).toBe(404)
+    expect(r.cuerpo.error).toContain("Volvé a subirlo")
+    expect(base.versiones).toHaveLength(1)
+  })
+
+  it("un archivo vacío, 400", async () => {
+    base.archivos.set(RUTA_SUBIDA, Buffer.alloc(0))
+    const r = await pedir({ sinSubirlo: true })
+    expect(r.status).toBe(400)
+    expect(r.cuerpo.error).toContain("vacío")
   })
 
   it("sin decir de qué asesor son los datos, 400", async () => {
