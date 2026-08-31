@@ -318,6 +318,13 @@ async function main() {
     } catch (e) { errores++; console.error(`  item ${item.postingId}: ${e.message}`); }
   }
 
+  // El actor puede repetir un aviso dentro del mismo dataset (SERP + detalle):
+  // deduplicar por id antes de insertar, quedándonos con la última versión.
+  const filasUnicas = [...new Map(filas.map(f => [f.id, f])).values()];
+  filas.length = 0; filas.push(...filasUnicas);
+  const empUnicos = [...new Map(emprendimientos.map(e => [e.id, e])).values()];
+  emprendimientos.length = 0; emprendimientos.push(...empUnicos);
+
   const resumen = {
     ok: filas.filter(x => x.calidad === 'ok').length,
     cuarentena: filas.filter(x => x.calidad === 'cuarentena').length,
