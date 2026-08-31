@@ -19,6 +19,7 @@ import {
   nombresDelSchema,
   ordenarComoEnElDocumento,
   reemplazosDeLaVersionNueva,
+  rutasEnOrdenDeLectura,
   resumenDeLaVersionNueva,
   seVaAUsar,
   textoDeVistaPrevia,
@@ -643,6 +644,15 @@ describe("ordenarComoEnElDocumento", () => {
     expect(ordenarComoEnElDocumento(u).map((x) => x.campo)).toEqual(["ZONA", "NOMBRE", "CUIT"])
   })
 
+  /**
+   * OJO con lo que este test NO mide, porque casi queda vacuo: "word/document.xml"
+   * y "word/header1.xml" ordenados alfabéticamente YA dejan el cuerpo primero
+   * (la "d" va antes que la "h"). Sacar el criterio del cuerpo-primero no lo
+   * ponía en rojo — medido con mutación. Lo que de verdad lo mide es el test de
+   * `rutasEnOrdenDeLectura` de más abajo, con una parte que ordena ANTES que el
+   * cuerpo. Este se queda porque mide la otra mitad: que `primeraAparicion`
+   * lleve el índice de la parte y no solo el caracter.
+   */
   it("el cuerpo va antes que el encabezado, aunque ahí el dato esté en el caracter 0", () => {
     const partes = textoPorParte(docx([parrafo("Firma Ana Ruiz.")], "8892"))
     const u = ubicarValoresEnPartes(partes, { LEGAJO: "8892", NOMBRE: "Ana Ruiz" })
@@ -664,5 +674,39 @@ describe("ordenarComoEnElDocumento", () => {
   it("primeraAparicion es null cuando el valor no está en ninguna parte", () => {
     const partes = textoPorParte(docx([parrafo("Contrato.")]))
     expect(de(ubicarValoresEnPartes(partes, { ZONA: "Saavedra" }), "ZONA").primeraAparicion).toBeNull()
+  })
+})
+
+describe("rutasEnOrdenDeLectura", () => {
+  it("el cuerpo va PRIMERO aunque su ruta ordene después alfabéticamente", () => {
+    /**
+     * El caso que hace falta para medir esto de verdad: `word/comments.xml`
+     * empieza con "c" y ordenado alfabéticamente iría ANTES que
+     * `word/document.xml`. Con el encabezado solo, el criterio del
+     * cuerpo-primero no se puede distinguir de un `sort()` pelado.
+     */
+    expect(
+      rutasEnOrdenDeLectura({
+        "word/comments.xml": "",
+        "word/header1.xml": "",
+        "word/document.xml": "",
+      }),
+    ).toEqual(["word/document.xml", "word/comments.xml", "word/header1.xml"])
+  })
+
+  it("sin cuerpo, el resto queda por ruta", () => {
+    expect(rutasEnOrdenDeLectura({ "word/header2.xml": "", "word/header1.xml": "" })).toEqual([
+      "word/header1.xml",
+      "word/header2.xml",
+    ])
+  })
+
+  it("la vista previa usa ese mismo orden: el cuerpo arriba de los comentarios", () => {
+    const texto = textoDeVistaPrevia({
+      "word/comments.xml": "Nota de Word",
+      "word/document.xml": "CONTRATO",
+    })
+    expect(texto.startsWith("CONTRATO")).toBe(true)
+    expect(texto.indexOf("CONTRATO")).toBeLessThan(texto.indexOf("Nota de Word"))
   })
 })
