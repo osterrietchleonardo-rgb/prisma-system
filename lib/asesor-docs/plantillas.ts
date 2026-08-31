@@ -490,30 +490,56 @@ export function explicacionDelEstado(
     return [enUso, ...avisos].join(" ")
   }
 
-  const base = (() => {
-    if (fila.enRojo > 0) {
-      return (
-        `Es un borrador y todavía no se usa: ${quienesQuedaron(fila.enRojo)} para revisar. Hasta que estén todos ` +
-        `bien, la plantilla no se aplica a nadie.`
-      )
-    }
-    if (fila.version === null) {
-      return (
-        "Es un borrador y todavía no se usa: falta detectar la plantilla a partir de los documentos cargados y " +
+  /**
+   * Qué le falta a este borrador para dejar de serlo. Es lo único que depende
+   * de en qué punto del camino está, y por eso es lo único que elige una rama.
+   */
+  const base =
+    fila.version === null
+      ? "Es un borrador y todavía no se usa: falta detectar la plantilla a partir de los documentos cargados y " +
         "revisarla."
-      )
-    }
-    if (sinComprobar > 0) {
-      const quienes = sinComprobar === 1 ? "1 asesor no se comparó" : `${sinComprobar} asesores no se compararon`
-      return (
-        `Es un borrador y todavía no se usa: ${quienes} contra la versión que está guardada. Volvé a detectar la ` +
-        `plantilla para incluir${sinComprobar === 1 ? "lo" : "los"}.`
-      )
-    }
-    return "Es un borrador y todavía no se usa: la plantilla ya está detectada pero falta confirmarla."
-  })()
+      : fila.enRojo === 0 && sinComprobar === 0
+        ? "Es un borrador y todavía no se usa: la plantilla ya está detectada pero falta confirmarla."
+        : "Es un borrador y todavía no se usa."
 
-  return avisoDesvinculados ? `${base} ${avisoDesvinculados}` : base
+  /**
+   * Y de acá para abajo, los avisos se ACUMULAN — igual que en la rama de
+   * `activa`, y por el mismo motivo.
+   *
+   * Esta rama seguía siendo primer-match-gana: con asesores en rojo Y asesores
+   * sin comparar, el director leía solo lo de los rojos y creía que ese era
+   * todo el problema. Arreglaba los rojos, la plantilla no terminaba de salir,
+   * y el otro motivo no aparecía por ningún lado hasta que los rojos llegaban a
+   * cero. Es el mismo bug que se arregló arriba, un piso más abajo.
+   *
+   * El orden es el mismo que en `activa` a propósito: primero lo que el
+   * director NO puede deducir mirando otra pantalla.
+   */
+  const avisos: string[] = []
+
+  /**
+   * El de "sin comparar" pide versión: sin una versión guardada no hay contra
+   * qué haberse comparado, y lo que hay que hacer —detectar la plantilla— ya lo
+   * dice el `base` con todas las letras. Repetirlo sería decir dos veces la
+   * misma instrucción con dos redacciones distintas.
+   */
+  if (sinComprobar > 0 && fila.version !== null) {
+    const quienes = sinComprobar === 1 ? "1 asesor no se comparó" : `${sinComprobar} asesores no se compararon`
+    avisos.push(
+      `${quienes} contra la versión que está guardada. Volvé a detectar la plantilla para ` +
+        `incluir${sinComprobar === 1 ? "lo" : "los"}.`,
+    )
+  }
+
+  if (avisoDesvinculados) avisos.push(avisoDesvinculados)
+
+  if (fila.enRojo > 0) {
+    avisos.push(
+      `${quienesQuedaron(fila.enRojo)} para revisar. Hasta que estén todos bien, la plantilla no se aplica a nadie.`,
+    )
+  }
+
+  return [base, ...avisos].join(" ")
 }
 
 // ---------------------------------------------------------------------------

@@ -1079,3 +1079,90 @@ describe("la fila dibujada: los renglones tienen que llegar a la pantalla", () =
     expect(dibujar({ documentos: 1 })).toContain("1 asesor tiene este documento cargado")
   })
 })
+
+// ---------------------------------------------------------------------------
+// El borrador también acumula
+// ---------------------------------------------------------------------------
+
+/**
+ * La rama `activa` se arregló en la ronda 4: los avisos se suman en vez de
+ * pisarse. La rama `borrador` se quedó en primer-match-gana, con el mismo bug —
+ * con rojos Y gente sin comparar, el director leía solo lo de los rojos, los
+ * arreglaba, la plantilla no salía igual, y el otro motivo no aparecía hasta
+ * que los rojos llegaban a cero.
+ */
+describe("explicacionDelEstado: en borrador los avisos también se acumulan", () => {
+  it("rojos y sin comparar se dicen LOS DOS, no el primero", () => {
+    const texto = explicacionDelEstado({ estado: "borrador", version: 1, enRojo: 2, sinComprobar: 1 })
+    expect(texto).toContain("1 asesor no se comparó")
+    expect(texto).toContain("2 asesores quedaron")
+    expect(texto).toContain("no se aplica a nadie")
+  })
+
+  it("los tres avisos conviven, y en el mismo orden que en una plantilla activa", () => {
+    const texto = explicacionDelEstado({
+      estado: "borrador",
+      version: 3,
+      enRojo: 1,
+      sinComprobar: 2,
+      desvinculados: 1,
+    })
+    expect(texto).toContain("Es un borrador y todavía no se usa")
+    expect(texto.indexOf("no se compararon")).toBeLessThan(texto.indexOf("desvinculado"))
+    expect(texto.indexOf("desvinculado")).toBeLessThan(texto.indexOf("quedó"))
+  })
+
+  /**
+   * El caso de siempre, que no puede cambiar: sin nada pendiente, el borrador
+   * dice qué le falta y nada más.
+   */
+  it("sin nada pendiente sigue diciendo que falta confirmarla, y nada más", () => {
+    expect(explicacionDelEstado({ estado: "borrador", version: 1, enRojo: 0, sinComprobar: 0 })).toBe(
+      "Es un borrador y todavía no se usa: la plantilla ya está detectada pero falta confirmarla.",
+    )
+  })
+
+  it("sin versión sigue mandando a detectar, y nada más", () => {
+    expect(explicacionDelEstado({ estado: "borrador", version: null, enRojo: 0, sinComprobar: 0 })).toBe(
+      "Es un borrador y todavía no se usa: falta detectar la plantilla a partir de los documentos cargados y " +
+        "revisarla.",
+    )
+  })
+
+  /**
+   * Sin versión guardada no hay contra qué haberse comparado, y lo que hay que
+   * hacer —detectar la plantilla— ya lo dice la primera oración. El aviso de
+   * "sin comparar" ahí sería la misma instrucción dicha dos veces con dos
+   * redacciones distintas.
+   */
+  it("sin versión NO se repite la instrucción de detectar", () => {
+    const texto = explicacionDelEstado({ estado: "borrador", version: null, enRojo: 0, sinComprobar: 2 })
+    expect(texto).toContain("falta detectar la plantilla")
+    expect(texto).not.toContain("no se compararon")
+    expect(texto.match(/detectar la plantilla/g)).toHaveLength(1)
+  })
+
+  /**
+   * Las dos ramas dicen lo mismo del mismo problema. Si mañana alguien toca una
+   * sola, esto lo caza.
+   */
+  it("el aviso de los sin comparar dice la misma cantidad en las dos ramas", () => {
+    for (const cuantos of [1, 4]) {
+      const activa = explicacionDelEstado({ estado: "activa", version: 1, enRojo: 0, sinComprobar: cuantos })
+      const borrador = explicacionDelEstado({ estado: "borrador", version: 1, enRojo: 0, sinComprobar: cuantos })
+      const quienes = cuantos === 1 ? "1 asesor no se comparó" : `${cuantos} asesores no se compararon`
+      expect(activa).toContain(quienes)
+      expect(borrador).toContain(quienes)
+    }
+  })
+
+  it("y el de los rojos también, en las dos", () => {
+    for (const cuantos of [1, 3]) {
+      const activa = explicacionDelEstado({ estado: "activa", version: 1, enRojo: cuantos, sinComprobar: 0 })
+      const borrador = explicacionDelEstado({ estado: "borrador", version: 1, enRojo: cuantos, sinComprobar: 0 })
+      const quienes = cuantos === 1 ? "1 asesor quedó" : `${cuantos} asesores quedaron`
+      expect(activa).toContain(quienes)
+      expect(borrador).toContain(quienes)
+    }
+  })
+})
