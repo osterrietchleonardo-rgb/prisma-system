@@ -97,6 +97,73 @@ export function rutaDeArchivo(
   return `asesores/${agencyId}/${advisorId}/${carpeta}/${id}.${extension}`
 }
 
+/** Lo que se sabe del archivo nuevo cuando el director reemplaza uno viejo. */
+export type ArchivoDeReemplazo = {
+  nombreArchivo: string
+  /** La ruta dentro del bucket, la que devuelve `rutaDeArchivo`. */
+  path: string
+  sizeBytes: number
+  /** El momento del reemplazo, en ISO. Entra por parámetro para poder probarlo. */
+  ahora: string
+}
+
+/**
+ * Qué se escribe en `advisor_documents` cuando el director REEMPLAZA el .docx
+ * de un asesor por otro.
+ *
+ * Vive acá, y no adentro de la pantalla, por el motivo de siempre: ningún test
+ * del repo mira los `.tsx`. Y esto no es cosmético — es la constancia de que el
+ * documento se comparó contra la plantilla.
+ *
+ * LAS CUATRO EN NULL, que es todo el asunto de esta función:
+ *
+ *  · `version_id` es contra qué versión se comparó,
+ *  · `form_data` son los datos que se le sacaron al archivo,
+ *  · `estado` es si dio bien o hay que revisarlo,
+ *  · `observacion` es por qué.
+ *
+ * Las cuatro hablan del archivo VIEJO. Si se dejan pegadas al archivo nuevo, la
+ * fila queda diciendo `estado='ok'` contra la versión vigente —o sea:
+ * "comprobado, todo bien"— sobre un archivo que nadie miró nunca. La solapa lo
+ * lee así y la explicación del estado dice "Está en uso: es la versión
+ * confirmada", sin un solo aviso. Eso es peor que no tener constancia: es una
+ * constancia falsa, y el resto de la red de esta etapa se apoya en que
+ * `version_id` distinto de la vigente sea la señal de "a este no lo comparó
+ * nadie". Este camino, sin las cuatro en null, las desincroniza.
+ *
+ * Con las cuatro en null el asesor vuelve al balde de "sin comparar", que es la
+ * verdad: su documento nuevo no se comparó contra nada.
+ *
+ * (Lo dejó anticipado por escrito la Etapa B, en el `UPDATE` de
+ * `DocumentosDelAsesor.tsx`: "apenas la C empiece a llenarlos con datos
+ * extraídos del archivo, este UPDATE tiene que limpiarlos también".)
+ *
+ * El `INSERT` de la primera subida NO necesita nada de esto: no escribe esas
+ * cuatro columnas y la tabla las crea en null (`20260826120000_documentos_por_
+ * asesor.sql` las declara sin DEFAULT).
+ */
+export function camposDelReemplazo(nuevo: ArchivoDeReemplazo): {
+  nombre_archivo: string
+  archivo_original_path: string
+  size_bytes: number
+  updated_at: string
+  version_id: null
+  form_data: null
+  estado: null
+  observacion: null
+} {
+  return {
+    nombre_archivo: nuevo.nombreArchivo,
+    archivo_original_path: nuevo.path,
+    size_bytes: nuevo.sizeBytes,
+    updated_at: nuevo.ahora,
+    version_id: null,
+    form_data: null,
+    estado: null,
+    observacion: null,
+  }
+}
+
 /** El nombre del archivo sin la extensión, para mostrar en pantalla. */
 export function nombreVisible(nombreArchivo: string): string {
   const limpio = nombreArchivo.trim()

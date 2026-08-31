@@ -14,7 +14,9 @@ import {
 import { FileText, Upload, Download, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
-import { validarArchivo, rutaDeArchivo, nombreVisible, escaparComodinesIlike, type Seccion } from "@/lib/asesor-docs/reglas";
+import {
+  validarArchivo, rutaDeArchivo, nombreVisible, escaparComodinesIlike, camposDelReemplazo, type Seccion,
+} from "@/lib/asesor-docs/reglas";
 import { urlDeDescarga } from "@/lib/asesor-docs/url";
 
 interface Props {
@@ -279,20 +281,23 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
       // asesor se queda sin documento. Con UPDATE además se preservan `id` y
       // `created_at`.
       //
-      // OJO Etapa C: este UPDATE no toca version_id/form_data/estado/observacion.
-      // Hoy son siempre null y no pasa nada, pero apenas la C empiece a llenarlos
-      // con datos extraídos del archivo, reemplazar acá va a dejar esos datos
-      // del archivo VIEJO pegados al archivo nuevo. Cuando eso exista, este
-      // UPDATE tiene que limpiarlos también.
+      // Lo que se escribe NO se arma acá: lo arma `camposDelReemplazo`, que
+      // está en lib y bajo test. Ahí está el porqué de que las cuatro columnas
+      // de la Etapa C (version_id, form_data, estado, observacion) vuelvan a
+      // null: hablan del archivo VIEJO, y dejarlas pegadas al nuevo le pone a
+      // la fila una constancia de "comprobado, todo bien" sobre un archivo que
+      // nadie miró. Era el pendiente que la Etapa B dejó anotado justo acá.
       if (existente) {
         const { error: errUpdate } = await supabase
           .from("advisor_documents")
-          .update({
-            nombre_archivo: archivoPlantilla.name,
-            archivo_original_path: path,
-            size_bytes: archivoPlantilla.size,
-            updated_at: new Date().toISOString(),
-          })
+          .update(
+            camposDelReemplazo({
+              nombreArchivo: archivoPlantilla.name,
+              path,
+              sizeBytes: archivoPlantilla.size,
+              ahora: new Date().toISOString(),
+            }),
+          )
           .eq("id", existente.id);
         if (errUpdate) {
           await supabase.storage.from(STORAGE_BUCKET).remove([path]);
