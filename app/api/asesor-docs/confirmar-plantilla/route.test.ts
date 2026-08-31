@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
+import { AsyncLocalStorage } from "node:async_hooks"
 import PizZip from "pizzip"
 
 /**
@@ -62,7 +63,31 @@ type Base = {
 
 let base: Base
 
-const clienteFalso = () => {
+/**
+ * CADA PEDIDO CON SU BASE, y por qué esto no es una elegancia.
+ *
+ * Este archivo fallaba ~1 de cada 5 corridas completas con un `expected 409 to
+ * be 200`, y producía falsos ROJOS — el peor tipo, porque enseña a descartar
+ * los rojos de este archivo.
+ *
+ * La cadena, reproducida con `--testTimeout=500`: vitest **no cancela el cuerpo
+ * de un test que expira**. El primer test paga el `import("./route")` con toda
+ * su librería de Word encima, se pasa del tiempo, y su petición sigue viva. El
+ * `beforeEach` del siguiente reemplaza `base` por una recién armada, la
+ * petición fugada llega tarde a `createClient()`, agarra la base NUEVA, y su
+ * `INSERT` de versión choca contra el índice único con el test siguiente. El
+ * 409 se lo come un test que no tenía nada que ver.
+ *
+ * Pasar la base por parámetro no alcanza: la petición fugada podía estar
+ * todavía ANTES de `createClient()` cuando el test siguiente arrancaba. Lo que
+ * sí alcanza es atarla al contexto asincrónico del pedido: `pedir` captura la
+ * base ANTES de cualquier `await` y corre el endpoint adentro de ese contexto,
+ * que viaja solo por todos los `await` de la ruta. Una petición fugada escribe
+ * en su propia base, que ya no mira nadie.
+ */
+const baseDelPedido = new AsyncLocalStorage<Base>()
+
+const clienteFalso = (base: Base) => {
   const consulta = (tabla: string, tipo: string, datos?: Record<string, unknown>) => {
     const filtros: Record<string, unknown> = {}
     let cuantos: number | null = null
@@ -133,6 +158,18 @@ const clienteFalso = () => {
     const api: Record<string, unknown> = {
       eq: (col: string, val: unknown) => ((filtros[col] = val), api),
       in: (col: string, val: unknown[]) => ((filtros[col] = val), api),
+      /**
+       * OJO, TRAMPA CONOCIDA Y NO ARREGLADA: `order` es un no-op y `limit(1)`
+       * se queda con el PRIMERO de la lista — o sea la versión más VIEJA, al
+       * revés que producción, donde la ruta pide `.order("version", {
+       * ascending: false }).limit(1)` para quedarse con la más nueva.
+       *
+       * Hoy no muerde porque ningún test confirma dos veces la misma plantilla
+       * con éxito. El día que alguien escriba uno que confirme tres veces, la
+       * segunda va a calcular `version = 1 + 1 = 2` sobre la versión vieja y se
+       * va a comer un 409 que no tiene nada que ver con lo que está probando.
+       * Si aparece ese test, esto se arregla primero.
+       */
       order: () => api,
       limit: (n: number) => ((cuantos = n), api),
       select: () => api,
@@ -175,7 +212,11 @@ const clienteFalso = () => {
   }
 }
 
-vi.mock("@/lib/supabase/server", () => ({ createClient: () => clienteFalso() }))
+vi.mock("@/lib/supabase/server", () => ({
+  // El `?? base` es para cualquier cliente que se cree fuera de un `pedir`; hoy
+  // no hay ninguno, pero fallar por un `undefined` sería un rojo sin sentido.
+  createClient: () => clienteFalso(baseDelPedido.getStore() ?? base),
+}))
 
 // ---------------------------------------------------------------------------
 // Tres contratos en memoria
@@ -266,16 +307,34 @@ function propuestaDe(gente: Persona[], molde = ANA) {
 }
 
 const pedir = async (cuerpo: unknown) => {
+  // ANTES del `await`: si el test expira acá en el medio, esta petición se
+  // queda con la base de SU test y no con la del siguiente. Ver `baseDelPedido`.
+  const miBase = base
   const { POST } = await import("./route")
-  const res = await POST(
-    new Request("http://localhost/api/asesor-docs/confirmar-plantilla", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(cuerpo),
-    }),
+  const res = await baseDelPedido.run(miBase, () =>
+    POST(
+      new Request("http://localhost/api/asesor-docs/confirmar-plantilla", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cuerpo),
+      }),
+    ),
   )
   return { status: res.status, cuerpo: (await res.json()) as Record<string, unknown> }
 }
+
+/**
+ * El módulo de la ruta se carga UNA vez, antes del primer test.
+ *
+ * Sin esto, el primer test paga el `import("./route")` entero —la ruta,
+ * docxtemplater, la librería de comparación de textos— dentro de su propio
+ * presupuesto de tiempo, y es siempre él el que expira cuando el presupuesto se
+ * achica. Cargarlo acá no acelera nada: reparte el costo donde corresponde, en
+ * vez de cobrárselo al que salga primero en la lista.
+ */
+beforeAll(async () => {
+  await import("./route")
+})
 
 const tipoGuardado = () => base.tipos.find((t) => t.id === TIPO)!
 const documentoDe = (id: string) => base.documentos.find((d) => d.advisor_id === id)!
