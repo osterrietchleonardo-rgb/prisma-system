@@ -139,10 +139,15 @@ export async function POST(req: Request) {
       const imgHeight = baseMeta.height || (format === 'post' ? 1080 : 1920);
       console.log(`[DEBUG] Gemini base image dimensions: ${imgWidth}x${imgHeight}`);
 
-      const franjaLegal = armarFranjaLegal(marketingConfig.legal_notice || '', imgWidth, imgHeight);
+      const franjaLegal = await armarFranjaLegal(marketingConfig.legal_notice || '', imgWidth, imgHeight);
       if (franjaLegal) {
-        capas.push({ input: franjaLegal.svg, top: 0, left: 0 });
+        capas.push({ input: franjaLegal.png, top: franjaLegal.top, left: 0 });
         console.log(`[DEBUG] Aviso legal: ${franjaLegal.renglones} renglones, cuerpo ${franjaLegal.cuerpo}px, franja ${franjaLegal.alto}px (${((franjaLegal.alto / imgHeight) * 100).toFixed(1)}% del alto)`);
+        if (franjaLegal.letrasSinDibujo > 0) {
+          // Nunca deberia pasar. Si pasa, el aviso legal de la placa NO dice lo que escribio el
+          // director, y eso hay que verlo en el log y no descubrirlo en una placa publicada.
+          console.error(`[ERROR] Aviso legal: ${franjaLegal.letrasSinDibujo} letras no se pudieron dibujar`);
+        }
       }
 
       // ─── Deterministic Logo Overlay via Sharp ──────────────────────
