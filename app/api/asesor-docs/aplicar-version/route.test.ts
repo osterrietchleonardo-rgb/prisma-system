@@ -338,6 +338,8 @@ const pedir = async (opciones: {
   moldeAdvisorId?: string | null
   /** No dejar el archivo en Storage, para probar la ruta que apunta a la nada. */
   sinSubirlo?: boolean
+  /** Campos de más en el cuerpo, para probar que ninguno es de autoridad. */
+  extra?: Record<string, unknown>
 }) => {
   const miBase = base
 
@@ -355,6 +357,7 @@ const pedir = async (opciones: {
   if (opciones.templateId !== null) cuerpo.templateId = opciones.templateId ?? TIPO
   if (opciones.moldeAdvisorId !== null) cuerpo.moldeAdvisorId = opciones.moldeAdvisorId ?? ANA
   if (opciones.archivoPath !== null) cuerpo.archivoPath = opciones.archivoPath ?? RUTA_SUBIDA
+  Object.assign(cuerpo, opciones.extra ?? {})
 
   const res = await baseDelPedido.run(miBase, () =>
     POST(
@@ -484,6 +487,27 @@ describe("autorización", () => {
     base.archivos.set(ajena, buffer(versionNuevaDeAna()))
 
     const r = await pedir({ archivoPath: ajena })
+    expect(r.status).toBe(400)
+    expect(r.cuerpo.error as string).toContain("no es de tu inmobiliaria")
+    expect(base.lecturasDeStorage).toEqual([])
+    expect(base.archivos.has(ajena)).toBe(true)
+  })
+
+  it("un agency_id metido en el CUERPO no le sirve para bajar la ruta ajena", async () => {
+    /**
+     * La guarda compara contra el `agency_id` de la SESIÓN. Si lo tomara del
+     * cuerpo, la guarda sería el propio atacante diciendo contra qué
+     * compararse: manda la ruta de otra inmobiliaria y, al lado, el agency_id de
+     * esa inmobiliaria. El 27-ago-2026 se cerró en producción un agujero por
+     * confiar en un dato de autoridad que venía del navegador.
+     *
+     * Medido con mutación: pasarle `cuerpo.agencyId` a la guarda no ponía nada
+     * en rojo hasta que existió este test.
+     */
+    const ajena = rutaDeVersionNueva(OTRA_AGENCIA, "contrato-del-cliente-real")
+    base.archivos.set(ajena, buffer(versionNuevaDeAna()))
+
+    const r = await pedir({ archivoPath: ajena, extra: { agencyId: OTRA_AGENCIA, agency_id: OTRA_AGENCIA } })
     expect(r.status).toBe(400)
     expect(r.cuerpo.error as string).toContain("no es de tu inmobiliaria")
     expect(base.lecturasDeStorage).toEqual([])
