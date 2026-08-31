@@ -600,6 +600,36 @@ describe("qué campos cambian", () => {
     expect(encabezado).not.toContain("8892")
   })
 
+  it("un campo VACÍO en el asesor de referencia no se declara desaparecido ni se cae del schema", async () => {
+    /**
+     * `formDataDe` escribe `""` para el campo que ese asesor no tenía. Antes,
+     * ese campo salía como "desaparecido" —una afirmación que el sistema no
+     * puede hacer, porque nunca lo buscó— y encima desaparecía del
+     * `campos_schema`: se le borraba el campo a TODOS los asesores porque UNO no
+     * lo tenía cargado.
+     */
+    base.documentos[0].form_data = { ...DATOS_DE_ANA, LEGAJO: "" }
+    base.versiones[0].campos_schema = [...SCHEMA_VIGENTE, { nombre: "LEGAJO", label: "Legajo", orden: 3 }]
+
+    const r = await pedir({})
+    expect(r.status).toBe(200)
+
+    const campos = r.cuerpo.campos as { nuevos: string[]; desaparecidos: string[]; iguales: string[] }
+    expect(campos.desaparecidos).toEqual([])
+    expect(campos.iguales).toContain("LEGAJO")
+
+    // Y sigue en el esquema de la versión nueva.
+    const guardada = base.versiones.find((v) => v.version === 2)!
+    const nombres = (guardada.campos_schema as Array<{ nombre: string }>).map((c) => c.nombre)
+    expect(nombres).toContain("LEGAJO")
+
+    // Con su propio aviso, que dice la verdad y no "deja de usarse".
+    const avisos = (r.cuerpo.advertencias as string[]).join(" ")
+    expect(avisos).toContain("LEGAJO")
+    expect(avisos).toContain("no se pudo comprobar")
+    expect(avisos).not.toContain("deja de usarse")
+  })
+
   it("el rótulo que el director ya le había puesto a un campo se conserva", async () => {
     await pedir({})
     const guardada = base.versiones.find((v) => v.version === 2)!

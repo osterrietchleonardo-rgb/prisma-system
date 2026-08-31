@@ -240,6 +240,30 @@ export function seVaAUsar(u: UbicacionDeValor): boolean {
 }
 
 /**
+ * Los campos cuyo dato viene VACÍO en el asesor de referencia.
+ *
+ * ═══ Por qué esto NO es un "desaparecido", y por qué importa ═══
+ *
+ * `ubicarValores` separa con cuidado `ausente` (se buscó y no está) de
+ * `sin-dato` (no había qué buscar). Si después los dos se juntan en el mismo
+ * balde, el director lee *"ese dato deja de usarse"* sobre un campo que el
+ * sistema **nunca buscó**. Es una afirmación que no puede hacer, y encima la
+ * paga dos veces: el campo también se cae del `campos_schema` de la versión
+ * nueva, o sea que deja de existir en el formulario de TODOS los asesores por
+ * culpa de que UNO no lo tenía cargado.
+ *
+ * Es alcanzable de verdad: `formDataDe` en `confirmacion.ts` escribe `""` para
+ * el campo que ese asesor no tenía, y hay un test que lo fija. Que hoy en
+ * producción no haya ninguno es suerte, no diseño.
+ *
+ * Lo que corresponde decir es la verdad: **no se pudo comprobar**. El campo
+ * sigue en la plantilla, y sigue sin saberse si el documento nuevo lo tiene.
+ */
+export function camposSinDato(ubicaciones: UbicacionDeValor[]): string[] {
+  return ubicaciones.filter((u) => u.situacion === "sin-dato").map((u) => u.campo)
+}
+
+/**
  * Qué texto hay que cambiar por qué hueco, adentro del .docx que subió el
  * director.
  *
@@ -537,6 +561,28 @@ export function avisoDeCamposDesaparecidos(desaparecidos: string[]): string | nu
     `En la versión nueva ya no ${uno ? "aparece un campo que antes sí estaba" : `aparecen ${desaparecidos.length} campos que antes sí estaban`}: ` +
     `${desaparecidos.join(", ")}. ${uno ? "Ese dato deja" : "Esos datos dejan"} de usarse, pero no se ` +
     `${uno ? "borra" : "borran"}: ${uno ? "queda guardado" : "quedan guardados"} por si volvés a la versión anterior.`
+  )
+}
+
+/**
+ * El aviso de los campos que no se pudieron comprobar porque el asesor de
+ * referencia no tiene ese dato cargado.
+ *
+ * Dice las dos cosas que el director necesita: que el campo **sigue estando**, y
+ * que de ese campo **no se sabe nada** —ni que está en el documento nuevo ni que
+ * no está—. Y qué hacer para saberlo: elegir de referencia a alguien que sí lo
+ * tenga. `null` cuando no hay ninguno.
+ */
+export function avisoDeCamposSinDato(campos: string[], nombreDelAsesor: string): string | null {
+  if (campos.length === 0) return null
+  const uno = campos.length === 1
+  return (
+    `${uno ? "Este campo no se pudo comprobar" : `Estos ${campos.length} campos no se pudieron comprobar`}, porque ` +
+    `${nombreDelAsesor} no ${uno ? "tiene ese dato" : "tiene esos datos"} cargado${uno ? "" : "s"}: ` +
+    `${campos.join(", ")}. ${uno ? "Se deja" : "Se dejan"} en la plantilla tal como ${uno ? "estaba" : "estaban"} ` +
+    `—no ${uno ? "se borra" : "se borran"} nada—, pero no se sabe si el documento nuevo ${uno ? "lo" : "los"} ` +
+    `sigue teniendo. Para averiguarlo, subí el archivo completado con los datos de un asesor que sí ` +
+    `${uno ? "lo" : "los"} tenga.`
   )
 }
 

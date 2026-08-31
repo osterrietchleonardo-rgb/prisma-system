@@ -7,11 +7,13 @@ import {
   avisoDeCamposConElMismoDato,
   avisoDeCamposDesaparecidos,
   avisoDeCamposNuevos,
+  avisoDeCamposSinDato,
   avisoDeDatosQueSePasan,
   avisoDeValoresQueSobreviven,
   avisoDeValoresRepetidos,
   camposConElMismoDato,
   camposSchemaDeLaVersionNueva,
+  camposSinDato,
   compararCampos,
   moldeNoSeReconoce,
   nombresDelSchema,
@@ -572,5 +574,46 @@ describe("camposSchemaDeLaVersionNueva", () => {
 
   it("un campo repetido en la lista no se guarda dos veces", () => {
     expect(camposSchemaDeLaVersionNueva(["NOMBRE", "NOMBRE"], VIEJO)).toHaveLength(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EL CAMPO VACÍO NO ES UN CAMPO DESAPARECIDO
+// ---------------------------------------------------------------------------
+
+describe("camposSinDato", () => {
+  it("separa el que vino vacío del que se buscó y no está", () => {
+    const u = ubicarValores("Contrato de Ana Ruiz", {
+      NOMBRE: "Ana Ruiz",
+      LEGAJO: "",
+      ZONA: "Saavedra",
+    })
+    expect(camposSinDato(u)).toEqual(["LEGAJO"])
+    // ZONA sí se buscó y no apareció: eso sí es un desaparecido.
+    expect(de(u, "ZONA").situacion).toBe("ausente")
+  })
+
+  it("un campo con solo espacios cuenta como vacío, no como ausente", () => {
+    expect(camposSinDato(ubicarValores("Contrato", { LEGAJO: "   " }))).toEqual(["LEGAJO"])
+  })
+
+  it("sin campos vacíos, la lista es vacía", () => {
+    expect(camposSinDato(ubicarValores("Ana Ruiz", { NOMBRE: "Ana Ruiz" }))).toEqual([])
+  })
+
+  it("el aviso dice que NO se borra nada y que no se sabe, no que dejó de usarse", () => {
+    expect(avisoDeCamposSinDato([], "Ana Ruiz")).toBeNull()
+
+    const uno = avisoDeCamposSinDato(["LEGAJO"], "Ana Ruiz")!
+    expect(uno).toContain("LEGAJO")
+    expect(uno).toContain("Ana Ruiz")
+    expect(uno).toContain("no se pudo comprobar")
+    expect(uno).toContain("no se borra")
+    // Lo que NO puede decir, porque el sistema no lo sabe.
+    expect(uno).not.toContain("deja de usarse")
+
+    const dos = avisoDeCamposSinDato(["LEGAJO", "MATRICULA"], "Ana Ruiz")!
+    expect(dos).toContain("2 campos no se pudieron comprobar")
+    expect(dos).toContain("no se borran")
   })
 })

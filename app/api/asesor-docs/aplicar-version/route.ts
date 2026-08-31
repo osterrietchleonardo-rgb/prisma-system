@@ -18,10 +18,12 @@ import {
   avisoDeCamposConElMismoDato,
   avisoDeCamposDesaparecidos,
   avisoDeCamposNuevos,
+  avisoDeCamposSinDato,
   avisoDeDatosQueSePasan,
   avisoDeValoresRepetidos,
   camposConElMismoDato,
   camposSchemaDeLaVersionNueva,
+  camposSinDato,
   compararCampos,
   moldeNoSeReconoce,
   nombresDelSchema,
@@ -314,7 +316,24 @@ export async function POST(req: Request) {
    */
   const huecosAMano = huecosDe(zipNuevo)
   const yaUbicados = new Set(usados.map((u) => u.campo))
-  const camposDeLaVersion = [...usados.map((u) => u.campo), ...huecosAMano.filter((h) => !yaUbicados.has(h))]
+
+  /**
+   * Los campos que el asesor de referencia trae VACÍOS **no se caen de la
+   * versión nueva**.
+   *
+   * No se buscaron —no había qué buscar— así que declararlos "desaparecidos"
+   * sería afirmar algo que el sistema no puede saber, y sacarlos del
+   * `campos_schema` les borraría el campo a TODOS los asesores porque UNO no lo
+   * tenía cargado. Entran en la versión y salen dichos aparte, en su propio
+   * aviso.
+   */
+  const sinDato = camposSinDato(ubicaciones)
+
+  const camposDeLaVersion = [
+    ...usados.map((u) => u.campo),
+    ...sinDato,
+    ...huecosAMano.filter((h) => !yaUbicados.has(h)),
+  ]
 
   const campos = compararCampos(nombresDelSchema(vigente.campos_schema), camposDeLaVersion)
 
@@ -343,6 +362,7 @@ export async function POST(req: Request) {
   for (const aviso of [
     avisoDeCamposNuevos(campos.nuevos),
     avisoDeCamposDesaparecidos(campos.desaparecidos),
+    avisoDeCamposSinDato(sinDato, nombreDelAsesor),
     avisoDeValoresRepetidos(ubicaciones),
     avisoDeDatosQueSePasan(ubicaciones),
   ]) {
