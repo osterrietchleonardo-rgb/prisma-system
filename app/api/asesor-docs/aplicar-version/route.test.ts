@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
 import { AsyncLocalStorage } from "node:async_hooks"
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import PizZip from "pizzip"
 
 import { rutaDeVersionNueva } from "@/lib/asesor-docs/reglas"
@@ -1045,5 +1047,147 @@ describe("el número de versión", () => {
 
     // Y no quedó ningún molde subido a nombre de una versión que no se creó.
     expect(base.archivos.size).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EL HUÉRFANO EN UN BUCKET PÚBLICO
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ Por qué esto necesita un test POR CADA VÍA, y no uno ═══
+ *
+ * El borrado del .docx subido estaba después de la bajada, así que **seis vías
+ * de rechazo salían sin borrarlo**: el 403, dos 404, tres 400 y los 500 de
+ * lectura. Cada una dejaba un contrato **legible por URL** en el bucket
+ * `documents`, que es público — el mismo daño que el cambio a ruta de Storage
+ * vino a evitar, entrando por la otra punta.
+ *
+ * Un test del camino feliz y otro de un rechazo tardío no lo veían, y por eso
+ * acá va la lista entera: cada salida que no sea el 200 tiene su caso.
+ */
+describe("el archivo subido no queda huérfano, salga bien o salga mal", () => {
+  const rechazos: Array<{ que: string; status: number; antes: () => void }> = [
+    { que: "quien pide no es director", status: 403, antes: () => { sesion.role = "asesor" } },
+    { que: "no se puede leer el tipo de documento", status: 500, antes: () => { base.romper.advisor_doc_templates = "select" } },
+    { que: "el tipo es de otra inmobiliaria", status: 404, antes: () => { base.tipos[0].agency_id = OTRA_AGENCIA } },
+    { que: "la plantilla no tiene versión vigente", status: 400, antes: () => { base.tipos[0].version_actual = null } },
+    { que: "no se puede leer la versión vigente", status: 500, antes: () => { base.romper.advisor_doc_template_versions = "select" } },
+    { que: "la versión vigente no existe", status: 400, antes: () => { base.versiones = [] } },
+    { que: "no se puede leer el documento del asesor", status: 500, antes: () => { base.romper.advisor_documents = "select" } },
+    { que: "ese asesor no tiene documento de este tipo", status: 404, antes: () => { base.documentos = base.documentos.filter((d) => d.advisor_id !== ANA) } },
+    { que: "no se puede leer al asesor", status: 500, antes: () => { base.romper.profiles = "select" } },
+    { que: "el asesor no está en la inmobiliaria", status: 404, antes: () => { base.perfiles = base.perfiles.filter((p) => p.id !== ANA) } },
+    { que: "el asesor está pausado", status: 400, antes: () => { base.perfiles[0].estado = "pausado" } },
+    { que: "el asesor no tiene datos guardados", status: 400, antes: () => { base.documentos[0].form_data = null } },
+  ]
+
+  for (const caso of rechazos) {
+    it(`lo borra cuando ${caso.que} (${caso.status})`, async () => {
+      caso.antes()
+      const r = await pedir({})
+      expect(r.status, `el escenario "${caso.que}" ya no devuelve ${caso.status}`).toBe(caso.status)
+      expect(base.archivos.has(RUTA_SUBIDA), "quedó un contrato legible por URL").toBe(false)
+    })
+  }
+
+  it("lo borra cuando el archivo está vacío (400)", async () => {
+    base.archivos.set(RUTA_SUBIDA, Buffer.alloc(0))
+    const r = await pedir({ sinSubirlo: true })
+    expect(r.status).toBe(400)
+    expect(base.archivos.has(RUTA_SUBIDA)).toBe(false)
+  })
+
+  it("lo borra cuando el número de versión choca (409)", async () => {
+    let lecturas = 0
+    base.despuesDeLeer = (tabla) => {
+      if (tabla !== "advisor_doc_template_versions") return
+      lecturas++
+      if (lecturas !== 2) return
+      base.versiones.push({
+        id: "ver-de-otro",
+        template_id: TIPO,
+        agency_id: AGENCIA,
+        version: 2,
+        campos_schema: SCHEMA_VIGENTE,
+      })
+    }
+    const r = await pedir({})
+    expect(r.status).toBe(409)
+    expect(base.archivos.has(RUTA_SUBIDA)).toBe(false)
+  })
+
+  it("lo borra cuando no se puede subir el molde (500)", async () => {
+    base.romper.storage = "upload"
+    const r = await pedir({})
+    expect(r.status).toBe(500)
+    expect(base.archivos.has(RUTA_SUBIDA)).toBe(false)
+  })
+
+  it("y también en el camino feliz", async () => {
+    const r = await pedir({})
+    expect(r.status).toBe(200)
+    expect(base.archivos.has(RUTA_SUBIDA)).toBe(false)
+  })
+
+  /**
+   * ═══ El borde que va al revés, y es el más importante de todos ═══
+   *
+   * Si la ruta NO pasó la guarda de agencia, no se borra nada. Ese archivo no es
+   * nuestro: borrarlo convertiría este endpoint en un borrador de archivos
+   * ajenos servido en bandeja — mandás la ruta de otra inmobiliaria y el sistema
+   * te la borra.
+   */
+  it("NO borra lo que no pasó la guarda de agencia", async () => {
+    const ajena = rutaDeVersionNueva(OTRA_AGENCIA, "contrato-del-cliente-real")
+    base.archivos.set(ajena, buffer(versionNuevaDeAna()))
+
+    const r = await pedir({ archivoPath: ajena })
+    expect(r.status).toBe(400)
+    expect(base.archivos.has(ajena), "se borró un archivo ajeno").toBe(true)
+    expect(base.escrituras.filter((e) => e.tipo === "remove")).toEqual([])
+  })
+
+  it("un fallo al borrar no le tira abajo el pedido al director", async () => {
+    base.romper.storage = "remove"
+    const r = await pedir({})
+    expect(r.status).toBe(200)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LA VÍA QUE TODAVÍA NO EXISTE
+// ---------------------------------------------------------------------------
+
+/**
+ * Los tests de arriba cubren las vías que HAY hoy. Este cubre la que alguien
+ * agregue mañana: si aparece un `return NextResponse.json(algo, { status: N })`
+ * después de la guarda, se pone en rojo y esa vía no llega a producción dejando
+ * un contrato legible por URL.
+ */
+describe("ninguna vía de rechazo futura se saltea el borrado", () => {
+  const FUENTE = readFileSync(path.resolve(__dirname, "route.ts"), "utf8")
+
+  /**
+   * Se corta en `createClient()` porque es la línea siguiente a la guarda: todo
+   * lo de arriba responde ANTES de que exista una ruta validada, y ahí no hay
+   * nada que se pueda borrar.
+   */
+  const CORTE = "const supabase = createClient()"
+  const despuesDeLaGuarda = () => FUENTE.slice(FUENTE.indexOf(CORTE))
+
+  it("el corte existe una sola vez, así que este test mira lo que dice mirar", () => {
+    expect(FUENTE.split(CORTE)).toHaveLength(2)
+  })
+
+  it("después de la guarda no queda ni un `status:` suelto: todos pasan por rechazar", () => {
+    expect(
+      despuesDeLaGuarda().match(/\{ status:/g),
+      "hay una salida que responde sin borrar el archivo subido: pasala por rechazar()",
+    ).toBeNull()
+  })
+
+  it("y ahí solo quedan dos NextResponse.json: el de rechazar y el del 200", () => {
+    expect(despuesDeLaGuarda().match(/NextResponse\.json\(/g) ?? []).toHaveLength(2)
   })
 })

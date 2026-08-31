@@ -120,15 +120,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No estás autenticado" }, { status: 401 })
   }
 
-  /**
-   * La plantilla es de la inmobiliaria entera: la versiona el director y nadie
-   * más. El chequeo va acá aunque la política de RLS ya lo pida, porque una
-   * defensa sola es una defensa que el día que se toque desaparece sin ruido.
-   */
-  if (role !== "director") {
-    return NextResponse.json({ error: "Solo el director puede subir una versión nueva" }, { status: 403 })
-  }
-
   // ── Lo que llega del navegador ──────────────────────────────────────────
   /**
    * El .docx NO viaja en el pedido: lo sube el navegador a Storage y acá llega
@@ -172,10 +163,67 @@ export async function POST(req: Request) {
    */
   const ruta = validarRutaDeVersionNueva(archivoPath, agencyId)
   if (!ruta.ok) {
+    /**
+     * Y acá NO se borra nada, a propósito: ese archivo no es nuestro. Borrar lo
+     * que no pasó la guarda sería convertir este endpoint en un borrador de
+     * archivos ajenos servido en bandeja — mandás la ruta de otra inmobiliaria y
+     * el sistema te la borra. El único caso en que este endpoint borra es el de
+     * un archivo que YA se comprobó que es de la agencia de quien pide, y de su
+     * carpeta de subidas.
+     */
     return NextResponse.json({ error: ruta.error }, { status: 400 })
   }
 
   const supabase = createClient()
+
+  /**
+   * ═══ El archivo subido se borra SALGA BIEN O SALGA MAL ═══
+   *
+   * Medido: con el borrado puesto donde estaba —después de bajar el .docx—
+   * **seis vías de rechazo salían sin borrarlo**: el 403, dos 404, tres 400 y
+   * los 500 de lectura. Cada una de esas dejaba un contrato **legible por URL**
+   * en el bucket `documents`, que es público. Es exactamente el daño que el
+   * cambio a ruta de Storage vino a evitar, entrando por la otra punta.
+   *
+   * Por eso todo camino de salida que no sea el 200 pasa por `rechazar`, y hay
+   * un test que lee este archivo y falla si aparece un `return` que se lo
+   * saltee. La única excepción está arriba, en la guarda.
+   *
+   * Es seguro porque la guarda ya encerró la ruta en `_versiones-nuevas`: no
+   * puede ser el .docx original de un asesor, que es la única fuente de verdad
+   * contra la que compara toda la verificación.
+   */
+  let yaSeBorro = false
+  const borrarLoSubido = async () => {
+    if (yaSeBorro) return
+    yaSeBorro = true
+    const { error } = await supabase.storage.from(BUCKET).remove([ruta.path])
+    /**
+     * Si falla, se sigue: no borrar un archivo no es motivo para tirarle abajo
+     * el pedido al director, pero sí para dejarlo escrito en el log.
+     */
+    if (error) console.error("aplicar-version: quedó un archivo sin borrar:", ruta.path, error.message)
+  }
+
+  /** La ÚNICA forma de devolver algo que no sea el 200. Borra y después responde. */
+  const rechazar = async (cuerpoDeRespuesta: Record<string, unknown>, status: number) => {
+    await borrarLoSubido()
+    return NextResponse.json(cuerpoDeRespuesta, { status })
+  }
+
+  /**
+   * La plantilla es de la inmobiliaria entera: la versiona el director y nadie
+   * más. El chequeo va acá aunque la política de RLS ya lo pida, porque una
+   * defensa sola es una defensa que el día que se toque desaparece sin ruido.
+   *
+   * Va DESPUÉS de la guarda de la ruta y no antes, y no es un descuido: es lo
+   * que le permite a este camino borrar el archivo. Nada de lo que se lee antes
+   * es privilegiado —un JSON, dos uuid y una ruta que se valida contra la
+   * sesión— y el 401 sigue siendo lo primero de todo.
+   */
+  if (role !== "director") {
+    return rechazar({ error: "Solo el director puede subir una versión nueva" }, 403)
+  }
 
   // ── 1. Que la plantilla sea de SU inmobiliaria ──────────────────────────
   const { data: tipo, error: errTipo } = await supabase
@@ -187,13 +235,13 @@ export async function POST(req: Request) {
 
   if (errTipo) {
     console.error("aplicar-version: no se pudo leer el tipo de documento:", errTipo.message)
-    return NextResponse.json({ error: "No se pudo leer el tipo de documento" }, { status: 500 })
+    return rechazar({ error: "No se pudo leer el tipo de documento" }, 500)
   }
   if (!tipo) {
-    return NextResponse.json({ error: "Ese tipo de documento no existe en tu inmobiliaria" }, { status: 404 })
+    return rechazar({ error: "Ese tipo de documento no existe en tu inmobiliaria" }, 404)
   }
   if (!tipo.version_actual) {
-    return NextResponse.json({ error: SIN_VERSION_VIGENTE }, { status: 400 })
+    return rechazar({ error: SIN_VERSION_VIGENTE }, 400)
   }
 
   // ── La versión vigente: de acá salen los campos contra los que se compara ─
@@ -221,10 +269,10 @@ export async function POST(req: Request) {
 
   if (errVigente) {
     console.error("aplicar-version: no se pudo leer la versión vigente:", errVigente.message)
-    return NextResponse.json({ error: "No se pudo leer la versión vigente de la plantilla" }, { status: 500 })
+    return rechazar({ error: "No se pudo leer la versión vigente de la plantilla" }, 500)
   }
   if (!vigente) {
-    return NextResponse.json({ error: SIN_VERSION_VIGENTE }, { status: 400 })
+    return rechazar({ error: SIN_VERSION_VIGENTE }, 400)
   }
 
   // ── 2. El asesor cuyos datos trae el archivo ────────────────────────────
@@ -238,13 +286,10 @@ export async function POST(req: Request) {
 
   if (errDoc) {
     console.error("aplicar-version: no se pudo leer el documento del asesor:", errDoc.message)
-    return NextResponse.json({ error: "No se pudo leer el documento de ese asesor" }, { status: 500 })
+    return rechazar({ error: "No se pudo leer el documento de ese asesor" }, 500)
   }
   if (!doc) {
-    return NextResponse.json(
-      { error: "Ese asesor no tiene cargado ningún documento de este tipo, así que no se le conocen datos." },
-      { status: 404 },
-    )
+    return rechazar({ error: "Ese asesor no tiene cargado ningún documento de este tipo, así que no se le conocen datos." }, 404)
   }
 
   const { data: perfil, error: errPerfil } = await supabase
@@ -256,10 +301,10 @@ export async function POST(req: Request) {
 
   if (errPerfil) {
     console.error("aplicar-version: no se pudo leer el asesor:", errPerfil.message)
-    return NextResponse.json({ error: "No se pudo leer el asesor" }, { status: 500 })
+    return rechazar({ error: "No se pudo leer el asesor" }, 500)
   }
   if (!perfil) {
-    return NextResponse.json({ error: "Ese asesor no está en tu inmobiliaria" }, { status: 404 })
+    return rechazar({ error: "Ese asesor no está en tu inmobiliaria" }, 404)
   }
 
   /**
@@ -271,57 +316,42 @@ export async function POST(req: Request) {
     { advisorId: perfil.id, estado: perfil.estado ?? null, nombre: perfil.full_name ?? null },
   ])
   if (dentro.length === 0) {
-    return NextResponse.json(
-      {
+    return rechazar({
         error:
           "Ese asesor está pausado o desvinculado, así que sus datos no se pueden usar de referencia. Elegí uno " +
           "activo.",
         advertencias: avisosEstado,
-      },
-      { status: 400 },
-    )
+      }, 400)
   }
 
   const nombreDelAsesor = perfil.full_name?.trim() || "ese asesor"
 
   const datos = (doc.form_data ?? null) as Record<string, string> | null
   if (datos === null || typeof datos !== "object" || Object.keys(datos).length === 0) {
-    return NextResponse.json({ error: SIN_DATOS_DEL_ASESOR }, { status: 400 })
+    return rechazar({ error: SIN_DATOS_DEL_ASESOR }, 400)
   }
 
   // ── 3. Bajar el .docx nuevo y sacarle el texto, ENTERO ──────────────────
   const { data: bajado, error: errBajada } = await supabase.storage.from(BUCKET).download(ruta.path)
   if (errBajada || !bajado) {
     console.error("aplicar-version: no se pudo bajar el archivo:", errBajada?.message)
-    return NextResponse.json(
-      { error: "No se encontró el archivo que subiste. Volvé a subirlo y probá de nuevo." },
-      { status: 404 },
-    )
+    return rechazar({ error: "No se encontró el archivo que subiste. Volvé a subirlo y probá de nuevo." }, 404)
   }
 
   const bytes = Buffer.from(await bajado.arrayBuffer())
 
   /**
-   * Se borra APENAS se lo leyó, en todos los caminos: salga bien o salga mal, el
-   * servidor ya tiene los bytes en memoria y ese archivo no lo necesita nadie
-   * más. En un bucket público un huérfano no es desprolijidad: es un contrato
-   * legible por URL para siempre.
-   *
-   * Es seguro porque la guarda de arriba lo encerró en `_versiones-nuevas`: no
-   * puede ser el .docx original de un asesor, que es la única fuente de verdad
-   * contra la que compara toda la verificación.
-   *
-   * Si falla, se sigue: no borrar un archivo no es motivo para tirarle abajo el
-   * pedido al director, pero sí para dejarlo escrito en el log.
+   * Apenas se lo leyó: el servidor ya tiene los bytes en memoria y ese archivo
+   * no lo necesita nadie más. Los caminos de rechazo lo borran solos, por
+   * `rechazar`; este es el del 200, que no pasa por ahí.
    */
-  const { error: errBorrado } = await supabase.storage.from(BUCKET).remove([ruta.path])
-  if (errBorrado) console.error("aplicar-version: quedó un archivo sin borrar:", ruta.path, errBorrado.message)
+  await borrarLoSubido()
 
   if (bytes.length === 0) {
-    return NextResponse.json({ error: "El archivo que subiste está vacío." }, { status: 400 })
+    return rechazar({ error: "El archivo que subiste está vacío." }, 400)
   }
   if (bytes.length > MAX_ARCHIVO) {
-    return NextResponse.json({ error: "El archivo pesa más de 25 MB" }, { status: 400 })
+    return rechazar({ error: "El archivo pesa más de 25 MB" }, 400)
   }
 
   let zipNuevo: PizZip
@@ -338,14 +368,11 @@ export async function POST(req: Request) {
     partesDelNuevo = normalizarHuecosEscritosAMano(textoPorParte(zipNuevo))
   } catch (e) {
     console.error("aplicar-version: no se pudo abrir el .docx:", e)
-    return NextResponse.json(
-      { error: "No se pudo abrir el archivo. Revisá que sea un .docx de Word y volvé a intentar." },
-      { status: 400 },
-    )
+    return rechazar({ error: "No se pudo abrir el archivo. Revisá que sea un .docx de Word y volvé a intentar." }, 400)
   }
 
   if (Object.values(partesDelNuevo).join("").trim() === "") {
-    return NextResponse.json({ error: "El archivo no tiene texto que se pueda leer." }, { status: 400 })
+    return rechazar({ error: "El archivo no tiene texto que se pueda leer." }, 400)
   }
 
   const ubicaciones = ubicarValoresEnPartes(partesDelNuevo, datos)
@@ -359,7 +386,7 @@ export async function POST(req: Request) {
 
   // ── 4. El archivo genérico se rechaza, y con nombre y apellido ──────────
   if (usados.length === 0) {
-    return NextResponse.json({ error: moldeNoSeReconoce(ubicaciones, nombreDelAsesor) }, { status: 400 })
+    return rechazar({ error: moldeNoSeReconoce(ubicaciones, nombreDelAsesor) }, 400)
   }
 
   /**
@@ -420,10 +447,7 @@ export async function POST(req: Request) {
    */
   const mismoDato = camposConElMismoDato(ubicaciones)
   if (mismoDato.length > 0) {
-    return NextResponse.json(
-      { error: avisoDeCamposConElMismoDato(mismoDato, nombreDelAsesor) },
-      { status: 400 },
-    )
+    return rechazar({ error: avisoDeCamposConElMismoDato(mismoDato, nombreDelAsesor) }, 400)
   }
 
   /**
@@ -462,7 +486,7 @@ export async function POST(req: Request) {
    */
   const rotoPorChoque = moldeRotoPorChoque(choques, nombreDelAsesor)
   if (rotoPorChoque) {
-    return NextResponse.json({ error: rotoPorChoque }, { status: 400 })
+    return rechazar({ error: rotoPorChoque }, 400)
   }
 
   const advertencias: string[] = [...avisosEstado]
@@ -495,10 +519,7 @@ export async function POST(req: Request) {
     noColocados = usados.filter((u) => !colocados.has(comoQuedaEnElDocumento(u.campo))).map((u) => u.campo)
   } catch (e) {
     console.error("aplicar-version: no se pudo armar el molde:", e)
-    return NextResponse.json(
-      { error: "No se pudo marcar los campos adentro del archivo. Revisá que sea un .docx de Word." },
-      { status: 400 },
-    )
+    return rechazar({ error: "No se pudo marcar los campos adentro del archivo. Revisá que sea un .docx de Word." }, 400)
   }
 
   if (noColocados.length > 0) {
@@ -510,17 +531,14 @@ export async function POST(req: Request) {
      * igual dejaría un molde que le escribe a todos el dato de esta persona.
      */
     const uno = noColocados.length === 1
-    return NextResponse.json(
-      {
+    return rechazar({
         error:
           `${uno ? "Este campo se encontró" : "Estos campos se encontraron"} en el archivo pero no se ` +
           `${uno ? "pudo" : "pudieron"} marcar adentro: ${noColocados.join(", ")}. Casi siempre es porque Word ` +
           `guardó ese texto partido en pedazos. Volvé a escribirlo de una sola vez en el Word y subí el archivo de ` +
           `nuevo.`,
         advertencias,
-      },
-      { status: 400 },
-    )
+      }, 400)
   }
 
   /**
@@ -556,10 +574,7 @@ export async function POST(req: Request) {
     Object.fromEntries(usados.map((u) => [u.campo, u.valor])),
   )
   if (sobreviven.length > 0) {
-    return NextResponse.json(
-      { error: avisoDeValoresQueSobreviven(sobreviven, nombreDelAsesor), advertencias },
-      { status: 400 },
-    )
+    return rechazar({ error: avisoDeValoresQueSobreviven(sobreviven, nombreDelAsesor), advertencias }, 400)
   }
 
   /**
@@ -581,7 +596,7 @@ export async function POST(req: Request) {
      * de un "no se pudo" pelado.
      */
     console.error("aplicar-version: el molde no se puede rellenar:", e)
-    return NextResponse.json({ error: moldeInservible({ choques, camposCortos }), advertencias }, { status: 400 })
+    return rechazar({ error: moldeInservible({ choques, camposCortos }), advertencias }, 400)
   }
 
   const partesDelArmado = textoPorParte(armado)
@@ -593,15 +608,12 @@ export async function POST(req: Request) {
      * molde no sirve para nadie. Guardarlo igual sería guardar una versión que
      * el día que se aplique le va a cambiar el contrato a los N asesores.
      */
-    return NextResponse.json(
-      {
+    return rechazar({
         error:
           `El molde que salió de este archivo no reproduce el documento de ${nombreDelAsesor}: ` +
           `${verificacion.observacion}`,
         advertencias,
-      },
-      { status: 400 },
-    )
+      }, 400)
   }
 
   /**
@@ -623,10 +635,7 @@ export async function POST(req: Request) {
   ])
   const pruebaCentinela = verificarDocumentoEntero(esperadoConCentinelas, textoPorParte(armadoConCentinelas))
   if (!pruebaCentinela.coincide) {
-    return NextResponse.json(
-      { error: moldeNoResisteLaPrueba(pruebaCentinela.observacion), advertencias },
-      { status: 400 },
-    )
+    return rechazar({ error: moldeNoResisteLaPrueba(pruebaCentinela.observacion), advertencias }, 400)
   }
 
   // ── 6. Guardar la versión y el molde ────────────────────────────────────
@@ -641,7 +650,7 @@ export async function POST(req: Request) {
 
   if (errUltima) {
     console.error("aplicar-version: no se pudo leer la última versión:", errUltima.message)
-    return NextResponse.json({ error: "No se pudo averiguar el número de versión" }, { status: 500 })
+    return rechazar({ error: "No se pudo averiguar el número de versión" }, 500)
   }
 
   const version = (ultima?.version ?? 0) + 1
@@ -676,16 +685,13 @@ export async function POST(req: Request) {
      * pedirle que mire de nuevo.
      */
     const chocaron = errVersion?.code === "23505"
-    return NextResponse.json(
-      {
+    return rechazar({
         error: chocaron
           ? "Alguien más guardó una versión de esta plantilla hace un segundo. Actualizá la lista, fijate cómo " +
             "quedó y volvé a subir el archivo si hace falta."
           : "No se pudo crear la versión de la plantilla.",
         advertencias,
-      },
-      { status: chocaron ? 409 : 500 },
-    )
+      }, chocaron ? 409 : 500)
   }
 
   const { error: errSubida } = await supabase.storage
@@ -700,7 +706,7 @@ export async function POST(req: Request) {
     console.error("aplicar-version: no se pudo subir el molde:", errSubida.message)
     // Sin archivo, la versión no sirve: se la borra en vez de dejarla apuntando a la nada.
     await supabase.from("advisor_doc_template_versions").delete().eq("id", nuevaVersion.id).eq("agency_id", agencyId)
-    return NextResponse.json({ error: "No se pudo guardar el molde de la versión nueva." }, { status: 500 })
+    return rechazar({ error: "No se pudo guardar el molde de la versión nueva." }, 500)
   }
 
   // ── 7. Lo que ve el director ────────────────────────────────────────────
