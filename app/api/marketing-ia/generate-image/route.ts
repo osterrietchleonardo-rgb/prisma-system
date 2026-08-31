@@ -6,6 +6,8 @@ import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/
 import { calculateImageCost } from "@/utils/aiCostCalculator";
 import { GenerateImagePayload } from "@/types/marketing-ia";
 import sharp from "sharp";
+import type { OverlayOptions } from "sharp";
+import { armarFranjaLegal } from "@/lib/marketing-ia/aviso-legal";
 
 const buildImagePrompt = (payload: GenerateImagePayload, branding?: any): string => {
   const dimensiones = {
@@ -44,11 +46,13 @@ ${directive}
 `;
   }
 
+  // El aviso legal NO se le pide al modelo: lo dibuja el codigo despues, con la letra de
+  // verdad (ver lib/marketing-ia/aviso-legal.ts). Aca solo se le avisa que deje limpia la
+  // franja de abajo para que no meta nada donde va a ir el texto.
   const legalNotice = branding?.legal_notice?.trim()
     ? `
-AVISO LEGAL (OBLIGATORIO):
-Incluir el siguiente texto legal en una franja sutil en la parte INFERIOR de la imagen, en letra PEQUEÑA pero perfectamente LEGIBLE, con buen contraste sobre el fondo:
-"${branding.legal_notice.trim()}"`
+FRANJA INFERIOR RESERVADA:
+Dejar la franja inferior de la imagen (aproximadamente el 18% de abajo) limpia y sin texto ni elementos importantes: ahi se sobreimprime despues un aviso legal. La fotografia igual debe llegar hasta el borde.`
     : '';
 
   const estilos = {
@@ -92,7 +96,7 @@ REGLAS DE COMPOSICIÓN:
 - Sin elementos genéricos ni stock photos de baja calidad
 - Resultado fotorrealista de alta calidad para uso comercial en Argentina
 - Si se especificaron colores de marca, el diseño debe ser coherente con ellos.
-- Si se especificó un aviso legal, incluirlo únicamente en la franja inferior en letra pequeña y legible.
+- NO escribir textos legales, matrículas ni datos de contacto: eso se sobreimprime después.
 
 ${payload.extra_prompt ? `INSTRUCCIONES ADICIONALES: ${payload.extra_prompt}` : ''}
   `.trim();
@@ -125,6 +129,21 @@ export async function POST(req: Request) {
     try {
       // Generate clean base image with Gemini AI (without prompt imageParts to avoid logo hallucinations)
       imageBuffer = await generateImage(finalPrompt, 'pro', []);
+
+      // ─── Lo que dibujamos nosotros sobre la imagen de Gemini ────────
+      // Primero el aviso legal, despues el logo apoyado arriba de esa franja. Van juntos en una
+      // sola pasada de sharp para no recomprimir la imagen dos veces.
+      const capas: OverlayOptions[] = [];
+      const baseMeta = await sharp(imageBuffer).metadata();
+      const imgWidth = baseMeta.width || 1080;
+      const imgHeight = baseMeta.height || (format === 'post' ? 1080 : 1920);
+      console.log(`[DEBUG] Gemini base image dimensions: ${imgWidth}x${imgHeight}`);
+
+      const franjaLegal = armarFranjaLegal(marketingConfig.legal_notice || '', imgWidth, imgHeight);
+      if (franjaLegal) {
+        capas.push({ input: franjaLegal.svg, top: 0, left: 0 });
+        console.log(`[DEBUG] Aviso legal: ${franjaLegal.renglones} renglones, cuerpo ${franjaLegal.cuerpo}px, franja ${franjaLegal.alto}px (${((franjaLegal.alto / imgHeight) * 100).toFixed(1)}% del alto)`);
+      }
 
       // ─── Deterministic Logo Overlay via Sharp ──────────────────────
       const logoUrl = marketingConfig.logo_url || agency?.logo_url;
@@ -168,12 +187,6 @@ export async function POST(req: Request) {
           }
 
           if (logoRawBuffer) {
-            // Read real base image dimensions from Gemini imageBuffer
-            const baseMeta = await sharp(imageBuffer).metadata();
-            const imgWidth = baseMeta.width || 1080;
-            const imgHeight = baseMeta.height || (format === 'post' ? 1080 : 1920);
-            console.log(`[DEBUG] Gemini base image dimensions: ${imgWidth}x${imgHeight}`);
-
             // Target logo width scale (small: 12%, medium: 16%, large: 22% of image width)
             const sizePercent = {
               small: 0.12,
@@ -193,12 +206,11 @@ export async function POST(req: Request) {
             const logoH = logoMeta.height || Math.round(targetLogoWidth * 0.5);
 
             const margin = Math.round(imgWidth * 0.04); // 4% margin
-            const hasLegalNotice = Boolean(marketingConfig.legal_notice?.trim());
 
-            // Bottom offset: if legal notice is present, place logo above the legal notice bar (~12% of imgHeight)
-            const bottomOffset = hasLegalNotice 
-              ? Math.round(imgHeight * 0.11) + logoH + 15
-              : logoH + margin;
+            // Si hay aviso legal, el logo se apoya arriba de la franja usando su alto REAL.
+            // Antes se asumia un 11% fijo del alto, que no se correspondia con nada y dejaba el
+            // logo montado sobre el texto o flotando lejos.
+            const bottomOffset = (franjaLegal?.alto ?? 0) + logoH + margin;
 
             const position = marketingConfig.logo_position || 'bottom-right';
             let left = margin;
@@ -228,15 +240,7 @@ export async function POST(req: Request) {
             left = Math.max(margin, Math.min(left, imgWidth - logoW - margin));
             top = Math.max(margin, Math.min(top, imgHeight - logoH - margin));
 
-            imageBuffer = await sharp(imageBuffer)
-              .composite([
-                {
-                  input: resizedLogoBuffer,
-                  top: Math.round(top),
-                  left: Math.round(left),
-                }
-              ])
-              .toBuffer();
+            capas.push({ input: resizedLogoBuffer, top: Math.round(top), left: Math.round(left) });
 
             console.log(`[DEBUG] Sharp logo overlay SUCCESS (${position}, size: ${marketingConfig.logo_size || 'medium'}, pos: [${Math.round(left)}, ${Math.round(top)}])`);
           } else {
@@ -247,6 +251,10 @@ export async function POST(req: Request) {
         }
       } else {
         console.warn('[WARN] No logo_url found in marketing_ai_config or agency record');
+      }
+
+      if (capas.length > 0) {
+        imageBuffer = await sharp(imageBuffer).composite(capas).toBuffer();
       }
 
       // ─── Record image cost ──────────────────────────────────────────
