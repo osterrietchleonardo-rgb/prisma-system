@@ -1,0 +1,30 @@
+# Descubrimiento diario de mercado_avisos: captura lo publicado HOY en las
+# zonas activas (barrido A, centavos por corrida). El cron de Actions se
+# atrasa horas — es esperado y no importa: el filtro es "publicado hoy/ayer",
+# así que corra cuando corra, no pierde nada (usa dentro-de 2 por eso mismo).
+#
+# Secrets que necesita: APIFY_API_KEY, NEXT_PUBLIC_SUPABASE_URL,
+# SUPABASE_SERVICE_ROLE_KEY.
+
+name: mercado-descubrimiento
+
+on:
+  schedule:
+    - cron: '0 10 * * *'   # ~7:00 Argentina (se atrasa; da igual, ver arriba)
+  workflow_dispatch: {}
+
+jobs:
+  descubrir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Descubrimiento Belgrano (todos los tipos)
+        env:
+          APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node mercado-sync/descubrimiento.mjs --location Belgrano --zona belgrano --dentro-de 2
