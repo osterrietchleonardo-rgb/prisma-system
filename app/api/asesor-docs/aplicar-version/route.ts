@@ -26,6 +26,7 @@ import {
   camposSinDato,
   compararCampos,
   moldeNoSeReconoce,
+  moldeRotoPorChoque,
   nombresDelSchema,
   ordenarComoEnElDocumento,
   reemplazosDeLaVersionNueva,
@@ -377,6 +378,45 @@ export async function POST(req: Request) {
     )
   }
 
+  /**
+   * Los mismos diagnósticos de la §7.2, y **antes de tocar el .docx**.
+   *
+   * Los huecos escritos a mano entran en la lista con el valor vacío: no aportan
+   * ningún dato que pueda chocar, pero sí aportan un NOMBRE contra el cual
+   * chocar. Sin ellos, un dato corto que se mete adentro de un `{{COMISION_1}}`
+   * escrito por el director pasaba el chequeo y rompía el molde igual.
+   */
+  const comoHuecos: HuecoParaGuardar[] = [
+    ...ubicaciones.map((u) => ({
+      id: u.campo,
+      nombre: u.campo,
+      label: u.campo,
+      contexto: "",
+      valores: { [moldeAdvisorId]: u.valor },
+    })),
+    ...huecosAMano
+      .filter((h) => !yaUbicados.has(h))
+      .map((h) => ({ id: h, nombre: h, label: h, contexto: "", valores: { [moldeAdvisorId]: "" } })),
+  ]
+  const choques = camposQueChocanConOtroNombre(comoHuecos, moldeAdvisorId)
+  const camposCortos = camposConDatoCorto(comoHuecos, moldeAdvisorId)
+
+  /**
+   * Frena ACÁ, antes de romper el molde, y con un remedio que exista.
+   *
+   * Antes esto se descubría más abajo, cuando `rellenarDocx` tiraba, y el
+   * mensaje de `moldeInservible` terminaba diciendo "volvé a detectar la
+   * plantilla y sacá ese campo" — un camino que en este flujo NO existe: acá no
+   * hay pantalla de revisión donde borrar un campo. Un mensaje correcto que
+   * manda a una pantalla que no lleva a ningún lado deja al director sin nada
+   * que hacer, y con `CAMPO_1`/`CAMPO_2` —el fallback del spec §7.1— cualquier
+   * dato de un dígito lo dispara.
+   */
+  const rotoPorChoque = moldeRotoPorChoque(choques, nombreDelAsesor)
+  if (rotoPorChoque) {
+    return NextResponse.json({ error: rotoPorChoque }, { status: 400 })
+  }
+
   const advertencias: string[] = [...avisosEstado]
   /**
    * Las notas al FINAL, dichas con nombre propio. El molde se las lleva de esta
@@ -474,25 +514,16 @@ export async function POST(req: Request) {
     )
   }
 
-  /**
-   * Los mismos diagnósticos de la §7.2, tal cual: un dato tan corto que se mete
-   * adentro del nombre de otro campo deja el .docx sin poder abrirse, y sin
-   * esto el director recibe un "no se puede rellenar" y nada más.
-   */
-  const comoHuecos: HuecoParaGuardar[] = ubicaciones.map((u) => ({
-    id: u.campo,
-    nombre: u.campo,
-    label: u.campo,
-    contexto: "",
-    valores: { [moldeAdvisorId]: u.valor },
-  }))
-  const choques = camposQueChocanConOtroNombre(comoHuecos, moldeAdvisorId)
-  const camposCortos = camposConDatoCorto(comoHuecos, moldeAdvisorId)
-
   let armado: PizZip
   try {
     armado = rellenarDocx(zipMolde, datosParaComprobar)
   } catch (e) {
+    /**
+     * El colchón, no el diagnóstico principal: el choque ya frenó más arriba, así
+     * que si se llega hasta acá es por algo que todavía no se sabe nombrar. Se
+     * deja el mensaje de la §7.2 —que al menos apunta a los datos cortos— en vez
+     * de un "no se pudo" pelado.
+     */
     console.error("aplicar-version: el molde no se puede rellenar:", e)
     return NextResponse.json({ error: moldeInservible({ choques, camposCortos }), advertencias }, { status: 400 })
   }

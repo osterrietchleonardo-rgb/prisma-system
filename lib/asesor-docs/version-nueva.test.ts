@@ -16,6 +16,7 @@ import {
   camposSinDato,
   compararCampos,
   moldeNoSeReconoce,
+  moldeRotoPorChoque,
   nombresDelSchema,
   ordenarComoEnElDocumento,
   reemplazosDeLaVersionNueva,
@@ -708,5 +709,40 @@ describe("rutasEnOrdenDeLectura", () => {
     })
     expect(texto.startsWith("CONTRATO")).toBe(true)
     expect(texto.indexOf("CONTRATO")).toBeLessThan(texto.indexOf("Nota de Word"))
+  })
+})
+
+describe("moldeRotoPorChoque", () => {
+  it("sin choques no dice nada", () => {
+    expect(moldeRotoPorChoque([], "Ana Ruiz")).toBeNull()
+  })
+
+  it("nombra al campo culpable, contra quién choca, y las dos salidas que existen", () => {
+    const m = moldeRotoPorChoque([{ campo: "ANIO", dentroDe: "PLAZO_2026" }], "Ana Ruiz")!
+    expect(m).toContain("Ana Ruiz")
+    expect(m).toContain('"ANIO"')
+    expect(m).toContain('"PLAZO_2026"')
+    expect(m).toContain("No se guardó nada")
+    expect(m).toContain("otro asesor")
+    expect(m).toContain("del documento en el Word")
+    /**
+     * El remedio que NO existe en este flujo: acá no hay pantalla de revisión
+     * donde borrar un campo, y volver a detectar rearmaría la plantilla desde
+     * los documentos viejos. Es la mitad del arreglo.
+     */
+    expect(m).not.toContain("volvé a detectar")
+  })
+
+  it("agrupa por campo culpable en vez de repetirlo una vez por par", () => {
+    const m = moldeRotoPorChoque(
+      [
+        { campo: "TRAMO", dentroDe: "CAMPO_1" },
+        { campo: "TRAMO", dentroDe: "CAMPO_12" },
+        { campo: "TRAMO", dentroDe: "CAMPO_13" },
+      ],
+      "Ana Ruiz",
+    )!
+    expect(m.match(/"TRAMO"/g)).toHaveLength(1)
+    expect(m).toContain("2 campos más")
   })
 })

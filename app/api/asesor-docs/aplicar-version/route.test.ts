@@ -739,11 +739,16 @@ describe("la red de seguridad", () => {
     expect(base.versiones).toHaveLength(1)
   })
 
-  it("un dato tan corto que rompe el nombre de otro campo se rechaza con el campo culpable", async () => {
+  it("un dato tan corto que rompe el nombre de otro campo frena ANTES, y con una salida que existe", async () => {
     /**
      * "2026" se mete adentro de `{{PLAZO_2026}}` —el guión bajo y las llaves no
      * son letras ni números— y deja las llaves cruzadas. El .docx ya no se puede
-     * rellenar. Es el mismo daño que ya está medido en la confirmación.
+     * rellenar.
+     *
+     * Antes esto se descubría recién cuando `rellenarDocx` tiraba, y el mensaje
+     * terminaba mandando a "volvé a detectar la plantilla y sacá ese campo": un
+     * camino que en este flujo NO existe. Ahora frena antes de tocar el
+     * documento y ofrece las dos salidas que sí existen.
      */
     base.documentos[0].form_data = { PLAZO_2026: "cinco anios", ANIO: "2026" }
     const zip = docx([
@@ -752,7 +757,32 @@ describe("la red de seguridad", () => {
     ])
     const r = await pedir({ zip })
     expect(r.status).toBe(400)
-    expect(r.cuerpo.error as string).toContain("ANIO")
+
+    const error = r.cuerpo.error as string
+    expect(error).toContain("ANIO")
+    expect(error).toContain("PLAZO_2026")
+    // Las dos salidas ejecutables desde esta pantalla.
+    expect(error).toContain("otro asesor")
+    expect(error).toContain("saca")
+    // Y la que NO existe acá.
+    expect(error).not.toContain("volvé a detectar")
+
+    expect(base.versiones).toHaveLength(1)
+    expect(base.archivos.size).toBe(0)
+  })
+
+  it("el choque contra un hueco escrito a mano también frena", async () => {
+    /**
+     * `{{COMISION_1}}` lo escribió el director en el Word, así que no está en el
+     * esquema y no salía en la lista contra la cual se buscan los choques. El
+     * dato "1" se le mete adentro igual y rompe el molde exactamente igual.
+     */
+    base.documentos[0].form_data = { ...DATOS_DE_ANA, TRAMO: "1" }
+    const zip = versionNuevaDeAna(["Tramo 1 del plan.", "La comision del tramo es {{COMISION_1}}."])
+    const r = await pedir({ zip })
+    expect(r.status).toBe(400)
+    expect(r.cuerpo.error as string).toContain("TRAMO")
+    expect(r.cuerpo.error as string).toContain("COMISION_1")
     expect(base.versiones).toHaveLength(1)
   })
 })

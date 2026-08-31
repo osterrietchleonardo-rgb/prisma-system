@@ -468,6 +468,63 @@ export function avisoDeValoresQueSobreviven(
 }
 
 /**
+ * El mensaje de cuando el dato de un campo se mete adentro del NOMBRE de otro.
+ *
+ * ═══ Por qué necesita su propio mensaje, y no el de la §7.2 ═══
+ *
+ * El daño es el mismo que allá: el campo se escribe `{{CAMPO_1}}`, ni el guión
+ * bajo ni las llaves son letras ni números, así que un dato `"1"` lo encuentra
+ * ahí adentro y deja `{{CAMPO_{{CAMPO_2}}}}`. Las llaves quedan cruzadas y el
+ * molde entero deja de servir.
+ *
+ * Lo que cambia es el REMEDIO. `moldeInservible` termina diciendo "volvé a
+ * detectar la plantilla y sacá ese campo", y **ese camino no existe en este
+ * flujo**: acá no hay pantalla de revisión donde borrar un campo, y volver a
+ * detectar rearmaría la plantilla desde los documentos VIEJOS, que es otra cosa.
+ * Un mensaje correcto que manda a una pantalla que no lleva a ningún lado deja
+ * al director sin nada que hacer.
+ *
+ * Y no es un caso exótico: `CAMPO_1`, `CAMPO_2`… es el fallback documentado del
+ * spec §7.1 para cuando la IA no llega a nombrar los huecos. Con esos nombres,
+ * cualquier dato de un dígito choca.
+ *
+ * Las dos salidas que sí existen desde acá son las que se ofrecen.
+ */
+export function moldeRotoPorChoque(
+  choques: Array<{ campo: string; dentroDe: string }>,
+  nombreDelAsesor: string,
+): string | null {
+  if (choques.length === 0) return null
+
+  /**
+   * Agrupado POR CAMPO CULPABLE, igual que en `moldeInservible`: un dato de un
+   * dígito choca contra el nombre de todos los campos numerados, y listar los
+   * ocho pares repite ocho veces el mismo nombre. El director tiene que leer QUÉ
+   * campo lo rompe, no contra cuántos.
+   */
+  const porCampo = new Map<string, string[]>()
+  for (const c of choques) porCampo.set(c.campo, [...(porCampo.get(c.campo) ?? []), c.dentroDe])
+
+  const detalle = [...porCampo.entries()].map(([campo, contra]) => {
+    const otros = contra.length - 1
+    const donde = otros === 0 ? `"${contra[0]}"` : `"${contra[0]}" y ${otros} campo${otros === 1 ? "" : "s"} más`
+    return `"${campo}" (se mete adentro del nombre de ${donde})`
+  })
+  const uno = detalle.length === 1
+
+  return (
+    `No se puede armar la plantilla con los datos de ${nombreDelAsesor}: ` +
+    `${uno ? "el dato del campo" : "los datos de los campos"} ${detalle.join(", ")} ` +
+    `${uno ? "es" : "son"} tan corto${uno ? "" : "s"} que aparece${uno ? "" : "n"} adentro del nombre de otro campo ` +
+    `y le rompe${uno ? "" : "n"} las llaves. No se guardó nada. ` +
+    `Tenés dos salidas: subí el archivo completado con los datos de otro asesor, ` +
+    `${uno ? "cuyo dato de ese campo" : "cuyos datos de esos campos"} sea${uno ? "" : "n"} más largo${uno ? "" : "s"}; ` +
+    `o, si ${uno ? "ese campo ya no va" : "esos campos ya no van"} en la versión nueva, ` +
+    `saca${uno ? "lo" : "los"} del documento en el Word y volvé a subirlo.`
+  )
+}
+
+/**
  * Los campos que, en ESTE asesor, tienen exactamente el mismo dato.
  *
  * Por qué frena todo: el reemplazo es textual. Si `ZONA` y `BARRIO` valen las
