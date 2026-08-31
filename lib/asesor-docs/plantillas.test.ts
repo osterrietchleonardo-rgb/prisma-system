@@ -16,9 +16,12 @@ import {
   avisoDeDatoCorto,
   fusionarHuecosIguales,
   textoSinComprobar,
+  textoDesvinculados,
+  ESTADO_DESVINCULADO,
 } from "./plantillas"
 import { MINIMO_DOCUMENTOS } from "@/lib/plantillas/deteccion"
 import { LARGO_DE_DATO_SOSPECHOSO } from "./confirmacion"
+import { ESTADOS_FUERA, separarPorEstado } from "./propuesta"
 
 /**
  * La familia de formas en PRESENTE del verbo generar: "genera", "generan",
@@ -83,6 +86,17 @@ describe("estadoDePlantilla", () => {
   })
 })
 
+/**
+ * Los tres asesores de siempre, todos en la agencia. Se pasan de verdad y no
+ * como lista vacía: en producción la pantalla SIEMPRE trae los estados, y un
+ * test que corre por un camino por el que producción no pasa no cuida nada.
+ */
+const ACTIVOS = [
+  { id: "a1", estado: "activo" },
+  { id: "a2", estado: "activo" },
+  { id: "a3", estado: "activo" },
+]
+
 describe("armarFilas", () => {
   it("cuenta los documentos de cada tipo y los que quedaron en rojo", () => {
     // Los estados valen contra la versión vigente: por eso los documentos
@@ -92,14 +106,16 @@ describe("armarFilas", () => {
       tipos: [{ id: "t1", nombre: "Contrato", estado: "borrador", version_actual: "v1" }],
       versiones: [{ id: "v1", version: 1 }],
       documentos: [
-        { template_id: "t1", estado: "ok", version_id: "v1" },
-        { template_id: "t1", estado: "revisar", version_id: "v1" },
-        { template_id: "t1", estado: null, version_id: "v1" },
+        { template_id: "t1", estado: "ok", version_id: "v1", advisor_id: "a1" },
+        { template_id: "t1", estado: "revisar", version_id: "v1", advisor_id: "a2" },
+        { template_id: "t1", estado: null, version_id: "v1", advisor_id: "a3" },
       ],
+      asesores: ACTIVOS,
     })
     expect(filas[0].documentos).toBe(3)
     expect(filas[0].enRojo).toBe(1)
     expect(filas[0].sinComprobar).toBe(0)
+    expect(filas[0].desvinculados).toBe(0)
   })
 
   it("no cuenta los documentos de otro tipo", () => {
@@ -113,9 +129,10 @@ describe("armarFilas", () => {
         { id: "v2", version: 1 },
       ],
       documentos: [
-        { template_id: "t1", estado: "revisar", version_id: "v1" },
-        { template_id: "t2", estado: "ok", version_id: "v2" },
+        { template_id: "t1", estado: "revisar", version_id: "v1", advisor_id: "a1" },
+        { template_id: "t2", estado: "ok", version_id: "v2", advisor_id: "a1" },
       ],
+      asesores: ACTIVOS,
     })
     const porNombre = Object.fromEntries(filas.map((f) => [f.nombre, f]))
     expect(porNombre["Contrato"].documentos).toBe(1)
@@ -129,6 +146,7 @@ describe("armarFilas", () => {
       tipos: [{ id: "t1", nombre: "Contrato", estado: "borrador", version_actual: null }],
       versiones: [],
       documentos: [],
+      asesores: ACTIVOS,
     })
     expect(filas).toHaveLength(1)
     expect(filas[0].documentos).toBe(0)
@@ -142,6 +160,7 @@ describe("armarFilas", () => {
         { id: "v7", version: 3 },
       ],
       documentos: [],
+      asesores: ACTIVOS,
     })
     expect(filas[0].version).toBe(3)
   })
@@ -155,6 +174,7 @@ describe("armarFilas", () => {
       tipos: [{ id: "t1", nombre: "Contrato", estado: "activa", version_actual: "v9" }],
       versiones: [{ id: "v1", version: 1 }],
       documentos: [],
+      asesores: ACTIVOS,
     })
     expect(filas[0].version).toBeNull()
   })
@@ -168,6 +188,7 @@ describe("armarFilas", () => {
       ],
       versiones: [],
       documentos: [],
+      asesores: ACTIVOS,
     })
     expect(filas.map((f) => f.nombre)).toEqual(["Anexo", "Contrato", "Ñandú"])
   })
@@ -513,13 +534,31 @@ describe("armarFilas: comprobado contra la versión VIGENTE, no contra cualquier
     version_actual: "v-nueva",
     ...over,
   })
-  const doc = (over = {}) => ({ template_id: "t1", estado: "ok", version_id: "v-nueva", ...over })
+  /**
+   * `advisor_id` va explícito en cada documento: el índice único
+   * (advisor_id, template_id) no deja que una persona tenga dos del mismo
+   * tipo, y quién es el dueño ahora decide en qué balde cae.
+   */
+  const doc = (advisorId: string, over = {}) => ({
+    template_id: "t1",
+    estado: "ok",
+    version_id: "v-nueva",
+    advisor_id: advisorId,
+    ...over,
+  })
+  /** El equipo entero, todos en la agencia. Los desvinculados tienen lo suyo. */
+  const equipo = [
+    { id: "ana", estado: "activo" },
+    { id: "bruno", estado: "activo" },
+    { id: "caro", estado: "pausado" },
+  ]
 
   it("un rojo de la versión VIGENTE se cuenta en rojo", () => {
     const filas = armarFilas({
       tipos: [tipo({ estado: "borrador" })],
       versiones: [{ id: "v-nueva", version: 2 }],
-      documentos: [doc(), doc({ estado: "revisar" })],
+      documentos: [doc("ana"), doc("bruno", { estado: "revisar" })],
+      asesores: equipo,
     })
     expect(filas[0].enRojo).toBe(1)
     expect(filas[0].sinComprobar).toBe(0)
@@ -543,7 +582,8 @@ describe("armarFilas: comprobado contra la versión VIGENTE, no contra cualquier
     const filas = armarFilas({
       tipos: [tipo()],
       versiones: [{ id: "v-nueva", version: 2 }],
-      documentos: [doc(), doc(), doc({ estado: "revisar", version_id: "v-vieja" })],
+      documentos: [doc("ana"), doc("bruno"), doc("caro", { estado: "revisar", version_id: "v-vieja" })],
+      asesores: equipo,
     })
     expect(filas[0].enRojo).toBe(0)
     expect(filas[0].sinComprobar).toBe(1)
@@ -554,7 +594,8 @@ describe("armarFilas: comprobado contra la versión VIGENTE, no contra cualquier
     const filas = armarFilas({
       tipos: [tipo()],
       versiones: [{ id: "v-nueva", version: 1 }],
-      documentos: [doc(), doc({ estado: null, version_id: null })],
+      documentos: [doc("ana"), doc("bruno", { estado: null, version_id: null })],
+      asesores: equipo,
     })
     expect(filas[0].sinComprobar).toBe(1)
     expect(filas[0].enRojo).toBe(0)
@@ -565,9 +606,10 @@ describe("armarFilas: comprobado contra la versión VIGENTE, no contra cualquier
       tipos: [tipo({ estado: "borrador", version_actual: null })],
       versiones: [],
       documentos: [
-        { template_id: "t1", estado: null, version_id: null },
-        { template_id: "t1", estado: null, version_id: null },
+        { template_id: "t1", estado: null, version_id: null, advisor_id: "ana" },
+        { template_id: "t1", estado: null, version_id: null, advisor_id: "bruno" },
       ],
+      asesores: equipo,
     })
     expect(filas[0].sinComprobar).toBe(0)
     expect(filas[0].documentos).toBe(2)
@@ -578,9 +620,115 @@ describe("armarFilas: comprobado contra la versión VIGENTE, no contra cualquier
     const filas = armarFilas({
       tipos: [tipo({ version_actual: null })],
       versiones: [],
-      documentos: [doc({ version_id: "v-vieja" })],
+      documentos: [doc("ana", { version_id: "v-vieja" })],
+      asesores: equipo,
     })
     expect(filas[0].sinComprobar).toBe(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EL DESVINCULADO, Y EL AVISO QUE NO SE PODÍA APAGAR
+// ---------------------------------------------------------------------------
+
+/**
+ * El caso, medido: `PlantillasTab` traía los documentos sin mirar el estado del
+ * asesor, así que el de un desvinculado entraba en el conteo; y las dos rutas
+ * de esta etapa lo dejan afuera para siempre (spec §7.5). Su documento caía en
+ * `sinComprobar` y la fila le decía al director "volvé a detectar la plantilla
+ * con los asesores activos" — que no cambia nada. Un aviso que no se apaga
+ * haciendo lo que el aviso pide es un aviso que se aprende a ignorar, y ahí
+ * deja de servir para el pausado, que sí vuelve.
+ */
+describe("armarFilas: el documento de un desvinculado va a su propio balde", () => {
+  const tipoActivo = { id: "t1", nombre: "Contrato", estado: "activa", version_actual: "v2" }
+  const versiones = [{ id: "v2", version: 2 }]
+
+  it("no se cuenta como sin comprobar: se cuenta como desvinculado", () => {
+    const filas = armarFilas({
+      tipos: [tipoActivo],
+      versiones,
+      documentos: [
+        { template_id: "t1", estado: "ok", version_id: "v2", advisor_id: "ana" },
+        { template_id: "t1", estado: null, version_id: null, advisor_id: "ex" },
+      ],
+      asesores: [
+        { id: "ana", estado: "activo" },
+        { id: "ex", estado: "eliminado" },
+      ],
+    })
+    expect(filas[0].desvinculados).toBe(1)
+    expect(filas[0].sinComprobar).toBe(0)
+    // Sigue estando cargado: el contador de documentos no miente sobre lo que
+    // hay en la lista.
+    expect(filas[0].documentos).toBe(2)
+  })
+
+  /**
+   * Un `revisar` viejo de alguien que ya no está tampoco se destraba revisando
+   * nada: la confirmación ni lo mira. Contado en rojo, un borrador decía "hasta
+   * que estén todos bien, la plantilla no se aplica a nadie", que es falso.
+   */
+  it("un rojo suyo tampoco cuenta en rojo", () => {
+    const filas = armarFilas({
+      tipos: [{ ...tipoActivo, estado: "borrador" }],
+      versiones,
+      documentos: [{ template_id: "t1", estado: "revisar", version_id: "v2", advisor_id: "ex" }],
+      asesores: [{ id: "ex", estado: "eliminado" }],
+    })
+    expect(filas[0].enRojo).toBe(0)
+    expect(filas[0].desvinculados).toBe(1)
+  })
+
+  it("el pausado NO es un desvinculado: sigue en el balde de los que se pueden incluir", () => {
+    const filas = armarFilas({
+      tipos: [tipoActivo],
+      versiones,
+      documentos: [{ template_id: "t1", estado: "ok", version_id: "v-vieja", advisor_id: "caro" }],
+      asesores: [{ id: "caro", estado: "pausado" }],
+    })
+    expect(filas[0].sinComprobar).toBe(1)
+    expect(filas[0].desvinculados).toBe(0)
+  })
+
+  it("la columna es texto libre: se compara sin espacios y sin mayúsculas", () => {
+    const filas = armarFilas({
+      tipos: [tipoActivo],
+      versiones,
+      documentos: [{ template_id: "t1", estado: null, version_id: null, advisor_id: "ex" }],
+      asesores: [{ id: "ex", estado: " Eliminado " }],
+    })
+    expect(filas[0].desvinculados).toBe(1)
+  })
+
+  /**
+   * Un perfil que no vino (la consulta lo dejó afuera, un id que no está) se
+   * trata como si siguiera en la agencia. Decirle al director que borre el
+   * documento de alguien que en realidad está activo es el error caro de los
+   * dos.
+   */
+  it("un asesor que no vino en la lista NO se da por desvinculado", () => {
+    const filas = armarFilas({
+      tipos: [tipoActivo],
+      versiones,
+      documentos: [{ template_id: "t1", estado: null, version_id: null, advisor_id: "fantasma" }],
+      asesores: [],
+    })
+    expect(filas[0].desvinculados).toBe(0)
+    expect(filas[0].sinComprobar).toBe(1)
+  })
+
+  /**
+   * `ESTADO_DESVINCULADO` está escrito a mano en `plantillas.ts` para no
+   * arrastrar al navegador la librería de comparación de textos que cuelga de
+   * `propuesta.ts`. Este test es lo único que impide que los dos se separen: si
+   * mañana el estado se llamara distinto, acá se contaría a nadie y allá se
+   * seguiría excluyendo a la persona, en silencio.
+   */
+  it("el estado que se mira es el mismo que deja al asesor afuera de la comparación", () => {
+    expect(ESTADOS_FUERA).toContain(ESTADO_DESVINCULADO)
+    const { dentro } = separarPorEstado([{ advisorId: "ex", estado: ESTADO_DESVINCULADO }])
+    expect(dentro).toHaveLength(0)
   })
 })
 
@@ -689,6 +837,97 @@ describe("textoSinComprobar", () => {
  * el `.tsx` como texto, igual que hace `lib/acm/ficha-css.test.ts` con la ficha
  * pública.
  */
+describe("textoDesvinculados", () => {
+  it("con uno solo habla en singular", () => {
+    expect(textoDesvinculados(1)).toBe("1 documento de un asesor desvinculado")
+  })
+
+  it("con varios habla en plural y dice cuántos", () => {
+    expect(textoDesvinculados(2)).toBe("2 documentos de asesores desvinculados")
+  })
+
+  it("en cero no dice nada", () => {
+    expect(textoDesvinculados(0)).toBeNull()
+  })
+
+  it("no promete en presente algo que todavía no pasa", () => {
+    for (const cuantos of [1, 2, 9]) {
+      expect(textoDesvinculados(cuantos)).not.toMatch(PROMESA_EN_PRESENTE)
+    }
+  })
+})
+
+describe("explicacionDelEstado: el desvinculado, con una instrucción que se puede ejecutar", () => {
+  /**
+   * Lo que hacía falta arreglar: al desvinculado se le decía "volvé a detectar
+   * la plantilla", y volver a detectar no lo incluye NUNCA (spec §7.5). La
+   * única salida es borrar su documento, y eso es lo que tiene que decir.
+   */
+  it("dice que se borre el documento y NO manda a detectar de nuevo", () => {
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 1 })
+    expect(texto).toContain("borralo")
+    expect(texto).toContain("desvinculado")
+    expect(texto).toContain("volver a detectar la plantilla no lo va a cambiar")
+  })
+
+  it("con varios, todo el renglón concuerda en número", () => {
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 3 })
+    expect(texto).toContain("3 documentos de asesores desvinculados")
+    expect(texto).toContain("no entran")
+    expect(texto).toContain("borralos desde la ficha de cada uno")
+    expect(texto).not.toContain("borralo desde")
+  })
+
+  it("en un borrador se dice también, pegado a lo que ya decía", () => {
+    const texto = explicacionDelEstado({ estado: "borrador", version: null, enRojo: 0, desvinculados: 1 })
+    expect(texto).toContain("falta detectar la plantilla")
+    expect(texto).toContain("borralo desde la ficha de esa persona")
+  })
+
+  it("sin desvinculados no aparece nada de esto", () => {
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 0 })
+    expect(texto).toBe("Está en uso: es la versión confirmada. Con ella se le va a generar el documento a cada asesor.")
+  })
+
+  /**
+   * Los avisos se acumulan. Antes el de "sin comparar" cortaba con un `return`
+   * y el de los rojos no se decía nunca cuando venían los dos juntos: el
+   * director leía un problema y creía que era el único.
+   */
+  it("los tres avisos conviven en la misma explicación", () => {
+    const texto = explicacionDelEstado({
+      estado: "activa",
+      version: 2,
+      enRojo: 2,
+      sinComprobar: 1,
+      desvinculados: 1,
+    })
+    expect(texto).toContain("Está en uso")
+    expect(texto).toContain("1 asesor no se comparó")
+    expect(texto).toContain("asesor desvinculado")
+    expect(texto).toContain("2 asesores quedaron")
+    // Y en ese orden: primero lo que no se ve en ningún otro lado.
+    expect(texto.indexOf("no se comparó")).toBeLessThan(texto.indexOf("desvinculado"))
+    expect(texto.indexOf("desvinculado")).toBeLessThan(texto.indexOf("quedaron"))
+  })
+
+  it("no promete en presente algo que todavía no pasa, en ninguna combinación", () => {
+    for (const estado of ["activa", "borrador"] as const) {
+      for (const version of [null, 1]) {
+        for (const enRojo of [0, 2]) {
+          for (const sinComprobar of [0, 1]) {
+            for (const desvinculados of [0, 1, 3]) {
+              const texto = explicacionDelEstado({ estado, version, enRojo, sinComprobar, desvinculados })
+              expect(texto).not.toMatch(PROMESA_EN_PRESENTE)
+              expect(texto.length).toBeGreaterThan(20)
+            }
+          }
+        }
+      }
+    }
+  })
+})
+
 describe("la solapa no se escribe sus propios contadores", () => {
   const FUENTE = readFileSync(path.resolve(__dirname, "../../components/asesor-docs/PlantillasTab.tsx"), "utf8")
 
@@ -698,5 +937,23 @@ describe("la solapa no se escribe sus propios contadores", () => {
 
   it("y ese texto no está además escrito a mano en el JSX", () => {
     expect(FUENTE).not.toContain("sin comparar contra esta versión")
+  })
+
+  it("el renglón de los desvinculados sale de textoDesvinculados", () => {
+    expect(FUENTE).toContain("textoDesvinculados(fila.desvinculados)")
+  })
+
+  it("y ese texto tampoco está escrito a mano en el JSX", () => {
+    expect(FUENTE).not.toContain("documentos de asesores desvinculados")
+  })
+
+  /**
+   * `armarFilas` no puede saber quién sigue en la agencia si la consulta no
+   * trae el dato. Sin `advisor_id` en el select, el balde de los desvinculados
+   * queda vacío para siempre y nadie se entera.
+   */
+  it("la consulta de documentos trae advisor_id y la de asesores, su estado", () => {
+    expect(FUENTE).toContain('.select("template_id, estado, version_id, advisor_id")')
+    expect(FUENTE).toContain('from("profiles").select("id, estado")')
   })
 })

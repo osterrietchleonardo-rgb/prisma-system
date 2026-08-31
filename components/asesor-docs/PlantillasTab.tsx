@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileStack, Loader2, RotateCcw, Sparkles, Users, AlertTriangle, Info } from "lucide-react";
+import { FileStack, Loader2, RotateCcw, Sparkles, Users, UserMinus, AlertTriangle, Info } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { BloqueError } from "@/components/asesor-docs/DocumentosDelAsesor";
@@ -14,7 +14,9 @@ import {
   explicacionDelEstado,
   motivoParaNoDetectar,
   PARA_QUE_SIRVE,
+  textoDesvinculados,
   textoSinComprobar,
+  type AsesorCrudo,
   type DocumentoCrudo,
   type FilaPlantilla,
   type TipoCrudo,
@@ -89,7 +91,10 @@ export function PlantillasTab() {
         // `version_id` no es opcional acá: sin él no se puede saber si un
         // "revisar" es de la versión que está en uso o de una vieja, y por ahí
         // se colaba una plantilla "Activa" con un asesor sin comprobar.
-        supabase.from("advisor_documents").select("template_id, estado, version_id"),
+        // `advisor_id` tampoco: sin él no se sabe si el dueño del documento
+        // sigue en la inmobiliaria, y el de un desvinculado se quedaba con un
+        // aviso ámbar que no se apagaba nunca.
+        supabase.from("advisor_documents").select("template_id, estado, version_id, advisor_id"),
       ]);
 
       if (t.error || v.error || d.error) {
@@ -101,11 +106,41 @@ export function PlantillasTab() {
         return;
       }
 
+      const documentos = (d.data ?? []) as DocumentoCrudo[];
+
+      /**
+       * La cuarta consulta va después y no adentro del `Promise.all`: pregunta
+       * por los asesores que tienen documento, y esa lista recién existe con la
+       * respuesta de arriba.
+       *
+       * Se piden POR ID, como hacen `detectar-plantilla` y `confirmar-plantilla`,
+       * y no la tabla entera: esta pantalla no tiene por qué mirar perfiles que
+       * no son dueños de ninguno de estos documentos.
+       */
+      const idsDeAsesores = [...new Set(documentos.map((doc) => doc.advisor_id))];
+      const p = idsDeAsesores.length
+        ? await supabase.from("profiles").select("id, estado").in("id", idsDeAsesores)
+        : { data: [] as AsesorCrudo[], error: null };
+
+      if (p.error) {
+        /**
+         * Si esto falla NO se sigue con la lista igual. Sin los estados, un
+         * desvinculado se cuenta como si estuviera activo y la fila vuelve a
+         * decir "volvé a detectar la plantilla" — la instrucción imposible que
+         * este balde vino a sacar. Un dato que falta no es un dato en cero.
+         */
+        console.error("[PlantillasTab] error al leer los asesores:", p.error.message);
+        setErrorCarga("No se pudo cargar la lista de plantillas. Puede ser un problema de conexión — probá de nuevo.");
+        setFilas([]);
+        return;
+      }
+
       setFilas(
         armarFilas({
           tipos: (t.data ?? []) as TipoCrudo[],
           versiones: (v.data ?? []) as VersionCruda[],
-          documentos: (d.data ?? []) as DocumentoCrudo[],
+          documentos,
+          asesores: (p.data ?? []) as AsesorCrudo[],
         }),
       );
     } catch (e) {
@@ -228,6 +263,7 @@ export function PlantillasTab() {
             const motivo = motivoParaNoDetectar(fila.documentos);
             const detectando = detectandoId === fila.templateId;
             const avisoSinComprobar = textoSinComprobar(fila.sinComprobar);
+            const avisoDesvinculados = textoDesvinculados(fila.desvinculados);
             return (
               <div key={fila.templateId} className="rounded-xl border p-4 space-y-3">
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
@@ -299,6 +335,20 @@ export function PlantillasTab() {
                     <span className="flex items-center gap-1.5 text-amber-600 font-medium">
                       <AlertTriangle className="h-3.5 w-3.5" />
                       {avisoSinComprobar}
+                    </span>
+                  )}
+                  {/* Los desvinculados van aparte del ámbar de arriba, y sin
+                      color de alarma a propósito: no hay nada roto ni nada que
+                      comprobar: hay documentos que sobran. Metidos en el mismo
+                      balde, el director leía "volvé a detectar la plantilla"
+                      sobre alguien que no va a entrar nunca más en la
+                      detección, y ese aviso no se apagaba jamás. Lo que puede
+                      hacer con esto —borrarlos— está en la explicación de
+                      arriba. */}
+                  {avisoDesvinculados && (
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <UserMinus className="h-3.5 w-3.5" />
+                      {avisoDesvinculados}
                     </span>
                   )}
                 </div>

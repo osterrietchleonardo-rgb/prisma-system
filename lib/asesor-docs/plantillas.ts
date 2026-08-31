@@ -91,8 +91,32 @@ export type FilaPlantilla = {
    *
    * El dato ya estaba en la base: `version_id` distinto de `version_actual` es
    * la constancia. Lo que faltaba era que alguien lo leyera.
+   *
+   * NO entran acá los desvinculados: tienen su propio balde, abajo.
    */
   sinComprobar: number
+  /**
+   * Cuántos documentos son de asesores DESVINCULADOS.
+   *
+   * Van aparte porque el director no puede hacer nada con ellos por el lado de
+   * la plantilla, y decirle que sí es peor que no decirle nada. Un desvinculado
+   * queda afuera de la detección y de la confirmación (spec §7.5) para
+   * siempre: su documento caía en `sinComprobar`, la fila mostraba un ámbar
+   * permanente y la explicación le pedía "volvé a detectar la plantilla con los
+   * asesores activos" — algo que no cambia nada, porque el desvinculado nunca
+   * va a volver a entrar. Un aviso que no se apaga haciendo lo que el aviso
+   * pide es un aviso que se aprende a ignorar, y entonces deja de servir para
+   * el caso del pausado, que sí importa.
+   *
+   * Tampoco entran en `enRojo` por el mismo motivo: un `revisar` que quedó de
+   * antes de la desvinculación no se destraba revisando nada, y en un borrador
+   * hacía que la fila dijera "hasta que estén todos bien, la plantilla no se
+   * aplica a nadie" — falso: la confirmación ni los mira.
+   *
+   * Lo único que se puede hacer con ellos es borrar el documento, y eso es lo
+   * que dice el texto.
+   */
+  desvinculados: number
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +142,36 @@ export type VersionCruda = { id: string; version: number }
  * la versión que está en uso o de una vieja, y ahí es donde se colaba una
  * plantilla `activa` con un asesor sin comprobar.
  */
-export type DocumentoCrudo = { template_id: string; estado: string | null; version_id: string | null }
+export type DocumentoCrudo = {
+  template_id: string
+  estado: string | null
+  version_id: string | null
+  /** De quién es. Sin esto no se puede saber si el asesor sigue en la agencia. */
+  advisor_id: string
+}
+
+/** `profiles`, con lo único que la solapa necesita saber de cada asesor. */
+export type AsesorCrudo = { id: string; estado: string | null }
+
+/**
+ * El valor de `profiles.estado` de un asesor desvinculado.
+ *
+ * Escrito de nuevo acá y NO importado de `propuesta.ts`, por el mismo motivo
+ * que `MINIMO_PARA_DETECTAR`: este archivo lo carga el navegador y
+ * `propuesta.ts` arrastra `deteccion.ts` con la librería de comparación de
+ * textos entera. Que no se separen lo sostiene un test que lo compara contra
+ * `ESTADOS_FUERA`, que sí corre en Node.
+ */
+export const ESTADO_DESVINCULADO = "eliminado"
+
+/**
+ * Se compara normalizado igual que en `separarPorEstado`: la columna es texto
+ * libre, y un " Eliminado" con mayúscula dejaría al asesor del lado equivocado
+ * justo en el balde que existe para no mentirle al director.
+ */
+function estaDesvinculado(estado: string | null | undefined): boolean {
+  return estado?.trim().toLowerCase() === ESTADO_DESVINCULADO
+}
 
 /**
  * El estado que se muestra.
@@ -144,18 +197,44 @@ export function armarFilas(args: {
   tipos: TipoCrudo[]
   versiones: VersionCruda[]
   documentos: DocumentoCrudo[]
+  /**
+   * Los asesores dueños de esos documentos. Obligatorio: sin esto no se puede
+   * distinguir al pausado (que vuelve) del desvinculado (que no vuelve nunca),
+   * y son los dos avisos que la pantalla tiene que dar distinto.
+   */
+  asesores: AsesorCrudo[]
 }): FilaPlantilla[] {
   const numeroDeVersion = new Map(args.versiones.map((v) => [v.id, v.version]))
 
   const vigentePorTipo = new Map(args.tipos.map((t) => [t.id, t.version_actual]))
 
+  /**
+   * Un asesor que no vino en la lista se trata como si siguiera en la agencia.
+   * Es lo conservador: el aviso de "borralo" sobre alguien que en realidad está
+   * activo sería un consejo de borrar un documento que hace falta.
+   */
+  const desvinculado = new Set(args.asesores.filter((a) => estaDesvinculado(a.estado)).map((a) => a.id))
+
   const total = new Map<string, number>()
   const rojos = new Map<string, number>()
   const sinComprobar = new Map<string, number>()
+  const desvinculados = new Map<string, number>()
   const sumar = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1)
 
   for (const doc of args.documentos) {
     sumar(total, doc.template_id)
+
+    /**
+     * Antes que todo lo demás: el documento de un desvinculado no cuenta ni en
+     * rojo ni en sin comprobar. Los dos avisos terminan en una instrucción
+     * ("revisá esos documentos", "volvé a detectar con los activos") que sobre
+     * un desvinculado no cambia nada, porque no entra ni en la detección ni en
+     * la confirmación (spec §7.5). Lo único ejecutable es borrar el documento.
+     */
+    if (desvinculado.has(doc.advisor_id)) {
+      sumar(desvinculados, doc.template_id)
+      continue
+    }
 
     const vigente = vigentePorTipo.get(doc.template_id) ?? null
 
@@ -195,6 +274,7 @@ export function armarFilas(args: {
       documentos: total.get(t.id) ?? 0,
       enRojo: rojos.get(t.id) ?? 0,
       sinComprobar: sinComprobar.get(t.id) ?? 0,
+      desvinculados: desvinculados.get(t.id) ?? 0,
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
 }
@@ -264,6 +344,39 @@ export function textoSinComprobar(sinComprobar: number): string | null {
     : `${sinComprobar} asesores sin comparar contra esta versión`
 }
 
+/**
+ * El otro renglón de la fila: cuántos documentos son de asesores
+ * desvinculados. `null` cuando no hay ninguno.
+ *
+ * Se cuentan DOCUMENTOS y no personas a propósito: lo que el director tiene que
+ * hacer con esto es borrar archivos, y "3 documentos" es lo que va a ver cuando
+ * entre a buscarlos.
+ */
+export function textoDesvinculados(desvinculados: number): string | null {
+  if (desvinculados <= 0) return null
+  return desvinculados === 1
+    ? "1 documento de un asesor desvinculado"
+    : `${desvinculados} documentos de asesores desvinculados`
+}
+
+/**
+ * Lo mismo, dicho entero, con lo único que el director puede hacer al respecto.
+ *
+ * La instrucción tiene que ser una que él pueda ejecutar. "Volvé a detectar la
+ * plantilla" no lo es: el desvinculado no entra en la detección ni en la
+ * confirmación, así que el aviso no se apaga nunca. Borrar el documento sí, y
+ * se llega desde la ficha de esa persona (la lista de asesores tiene el filtro
+ * de estado que la muestra).
+ */
+function avisoDeDesvinculados(desvinculados: number): string | null {
+  if (desvinculados <= 0) return null
+  return desvinculados === 1
+    ? "Aparte, hay 1 documento de un asesor desvinculado: no entra en ninguna comparación, y volver a detectar la " +
+        "plantilla no lo va a cambiar. Si ya no hace falta, borralo desde la ficha de esa persona."
+    : `Aparte, hay ${desvinculados} documentos de asesores desvinculados: no entran en ninguna comparación, y ` +
+        `volver a detectar la plantilla no los va a cambiar. Si ya no hacen falta, borralos desde la ficha de cada uno.`
+}
+
 /** "1 asesor quedó" / "N asesores quedaron", para no repetirlo en cada rama. */
 function quienesQuedaron(enRojo: number): string {
   return enRojo === 1 ? "1 asesor quedó" : `${enRojo} asesores quedaron`
@@ -277,9 +390,10 @@ function quienesQuedaron(enRojo: number): string {
  * no estar escrito.
  */
 export function explicacionDelEstado(
-  fila: Pick<FilaPlantilla, "estado" | "version" | "enRojo"> & { sinComprobar?: number },
+  fila: Pick<FilaPlantilla, "estado" | "version" | "enRojo"> & { sinComprobar?: number; desvinculados?: number },
 ): string {
   const sinComprobar = fila.sinComprobar ?? 0
+  const avisoDesvinculados = avisoDeDesvinculados(fila.desvinculados ?? 0)
 
   if (fila.estado === "activa") {
     /**
@@ -303,6 +417,14 @@ export function explicacionDelEstado(
      * deducir solo: un rojo se ve en la ficha del asesor, esto no se ve en
      * ningún lado.
      */
+    /**
+     * Los avisos se ACUMULAN, no se pisan. Antes el de "sin comparar" cortaba
+     * con un `return` y el de los rojos no se decía nunca cuando venían los
+     * dos juntos: el director leía uno de los dos problemas y creía que era el
+     * único.
+     */
+    const avisos: string[] = []
+
     if (sinComprobar > 0) {
       /**
        * Todo el renglón concuerda en número. Con el texto en plural fijo salía
@@ -316,13 +438,14 @@ export function explicacionDelEstado(
         : "o estaban pausados cuando se confirmó, o subieron su documento después"
       const aQuienes = uno ? "el asesor activo" : "los asesores activos"
       const deQuienes = uno ? "esa persona" : "esas personas"
-      return (
-        `${enUso} Ojo: ${quienes} contra esta versión — ${porQue}. Para ${deQuienes} no hay nada comprobado: ` +
-        `volvé a detectar la plantilla con ${aQuienes} antes de dar su documento por bueno.`
+      avisos.push(
+        `Ojo: ${quienes} contra esta versión — ${porQue}. Para ${deQuienes} no hay nada comprobado: ` +
+          `volvé a detectar la plantilla con ${aQuienes} antes de dar su documento por bueno.`,
       )
     }
 
-    if (fila.enRojo === 0) return enUso
+    if (avisoDesvinculados) avisos.push(avisoDesvinculados)
+
     /**
      * Una plantilla en uso NO debería tener documentos para revisar. Cuando los
      * tiene, se dice acá con todas las letras.
@@ -333,31 +456,40 @@ export function explicacionDelEstado(
      * la hace MÁS visible, que es exactamente lo que se busca: taparla sería
      * esconder el aviso, no arreglar la causa.
      */
-    return (
-      `${enUso} Pero ${quienesQuedaron(fila.enRojo)} para revisar, y eso no debería pasar con una plantilla en ` +
-      `uso: revisá esos documentos antes de darlos por buenos.`
-    )
+    if (fila.enRojo > 0) {
+      avisos.push(
+        `Pero ${quienesQuedaron(fila.enRojo)} para revisar, y eso no debería pasar con una plantilla en ` +
+          `uso: revisá esos documentos antes de darlos por buenos.`,
+      )
+    }
+
+    return [enUso, ...avisos].join(" ")
   }
-  if (fila.enRojo > 0) {
-    return (
-      `Es un borrador y todavía no se usa: ${quienesQuedaron(fila.enRojo)} para revisar. Hasta que estén todos ` +
-      `bien, la plantilla no se aplica a nadie.`
-    )
-  }
-  if (fila.version === null) {
-    return (
-      "Es un borrador y todavía no se usa: falta detectar la plantilla a partir de los documentos cargados y " +
-      "revisarla."
-    )
-  }
-  if (sinComprobar > 0) {
-    const quienes = sinComprobar === 1 ? "1 asesor no se comparó" : `${sinComprobar} asesores no se compararon`
-    return (
-      `Es un borrador y todavía no se usa: ${quienes} contra la versión que está guardada. Volvé a detectar la ` +
-      `plantilla para incluir${sinComprobar === 1 ? "lo" : "los"}.`
-    )
-  }
-  return "Es un borrador y todavía no se usa: la plantilla ya está detectada pero falta confirmarla."
+
+  const base = (() => {
+    if (fila.enRojo > 0) {
+      return (
+        `Es un borrador y todavía no se usa: ${quienesQuedaron(fila.enRojo)} para revisar. Hasta que estén todos ` +
+        `bien, la plantilla no se aplica a nadie.`
+      )
+    }
+    if (fila.version === null) {
+      return (
+        "Es un borrador y todavía no se usa: falta detectar la plantilla a partir de los documentos cargados y " +
+        "revisarla."
+      )
+    }
+    if (sinComprobar > 0) {
+      const quienes = sinComprobar === 1 ? "1 asesor no se comparó" : `${sinComprobar} asesores no se compararon`
+      return (
+        `Es un borrador y todavía no se usa: ${quienes} contra la versión que está guardada. Volvé a detectar la ` +
+        `plantilla para incluir${sinComprobar === 1 ? "lo" : "los"}.`
+      )
+    }
+    return "Es un borrador y todavía no se usa: la plantilla ya está detectada pero falta confirmarla."
+  })()
+
+  return avisoDesvinculados ? `${base} ${avisoDesvinculados}` : base
 }
 
 // ---------------------------------------------------------------------------
