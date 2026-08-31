@@ -4,10 +4,14 @@ import PizZip from "pizzip"
 import { ponerHuecosEnDocx, textoPorParte } from "@/lib/plantillas/docx"
 import { LARGO_DE_DATO_SOSPECHOSO } from "./confirmacion"
 import {
+  avisoDeCamposConElMismoDato,
   avisoDeCamposDesaparecidos,
   avisoDeCamposNuevos,
   avisoDeDatosQueSePasan,
+  avisoDeValoresQueSobreviven,
   avisoDeValoresRepetidos,
+  camposConElMismoDato,
+  camposSchemaDeLaVersionNueva,
   compararCampos,
   moldeNoSeReconoce,
   nombresDelSchema,
@@ -17,6 +21,7 @@ import {
   textoDeVistaPrevia,
   ubicarValores,
   ubicarValoresEnPartes,
+  valoresQueSobrevivenEnElMolde,
 } from "./version-nueva"
 
 /**
@@ -443,5 +448,129 @@ describe("reemplazosDeLaVersionNueva", () => {
     expect(seVaAUsar(de(u, "NOMBRE"))).toBe(true)
     expect(seVaAUsar(de(u, "ZONA"))).toBe(false)
     expect(seVaAUsar(de(u, "LEGAJO"))).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EL DATO QUE QUEDA PEGADO EN EL MOLDE
+// ---------------------------------------------------------------------------
+
+describe("valoresQueSobrevivenEnElMolde", () => {
+  /**
+   * Es la que le da dientes a la comprobación. Rellenar el molde con los datos
+   * de la MISMA persona de la que salió es casi un ida y vuelta: da verde salvo
+   * que el .docx no se pueda abrir. Lo que de verdad hace daño es un dato de esa
+   * persona que quedó pegado donde el reemplazo no llega, porque ese pedazo se
+   * lo lleva el molde al documento de TODOS.
+   */
+  it("un dato que quedó en una nota al final se ve, y dice en qué parte", () => {
+    const molde = textoPorParte(
+      docx([parrafo("Y por la otra parte {{NOMBRE}}, CUIT {{CUIT}}.")]),
+    )
+    // Las notas al final no las toca el reemplazo: se simulan agregándolas al
+    // texto por parte, que es exactamente lo que devuelve `textoPorParte`.
+    molde["word/endnotes.xml"] = "Legajo del asesor: CUIT 27-31456789-4"
+
+    const sobreviven = valoresQueSobrevivenEnElMolde(molde, {
+      NOMBRE: "Ana Ruiz",
+      CUIT: "27-31456789-4",
+    })
+    expect(sobreviven.map((u) => u.campo)).toEqual(["CUIT"])
+    expect(sobreviven[0].partes).toEqual(["las notas al final"])
+  })
+
+  it("un molde donde todo se convirtió en hueco no deja sobrevivientes", () => {
+    const molde = textoPorParte(docx([parrafo("Y por la otra parte {{NOMBRE}}, CUIT {{CUIT}}.")]))
+    expect(valoresQueSobrevivenEnElMolde(molde, { NOMBRE: "Ana Ruiz", CUIT: "27-31456789-4" })).toEqual([])
+  })
+
+  it("el aviso dice el campo, dónde quedó y la consecuencia para TODOS", () => {
+    expect(avisoDeValoresQueSobreviven([], "Ana Ruiz")).toBeNull()
+
+    const molde = { "word/endnotes.xml": "Legajo 27-31456789-4" }
+    const sobreviven = valoresQueSobrevivenEnElMolde(molde, { CUIT: "27-31456789-4" })
+    const aviso = avisoDeValoresQueSobreviven(sobreviven, "Ana Ruiz")!
+    expect(aviso).toContain("CUIT")
+    expect(aviso).toContain("27-31456789-4")
+    expect(aviso).toContain("las notas al final")
+    expect(aviso).toContain("TODOS")
+    expect(aviso).toContain("Ana Ruiz")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// DOS CAMPOS CON EL MISMO DATO
+// ---------------------------------------------------------------------------
+
+describe("camposConElMismoDato", () => {
+  it("junta en un grupo los campos que valen exactamente lo mismo en esa persona", () => {
+    const u = ubicarValores("Zona Belgrano R para Belgrano R", {
+      ZONA: "Belgrano R",
+      ZONA_FIRMA: "Belgrano R",
+      CUIT: "27-31456789-4",
+    })
+    expect(camposConElMismoDato(u)).toEqual([["ZONA", "ZONA_FIRMA"]])
+  })
+
+  it("un campo que NO aparece en el documento no arma grupo: no va a reemplazar nada", () => {
+    const u = ubicarValores("Contrato sin zonas", { ZONA: "Belgrano R", ZONA_FIRMA: "Belgrano R" })
+    expect(camposConElMismoDato(u)).toEqual([])
+  })
+
+  it("sin repetidos, no hay grupos", () => {
+    const u = ubicarValores("Ana Ruiz en Saavedra", { NOMBRE: "Ana Ruiz", ZONA: "Saavedra" })
+    expect(camposConElMismoDato(u)).toEqual([])
+  })
+
+  it("el aviso dice qué campos y qué hacer al respecto", () => {
+    expect(avisoDeCamposConElMismoDato([], "Ana Ruiz")).toBeNull()
+
+    const aviso = avisoDeCamposConElMismoDato([["ZONA", "ZONA_FIRMA"]], "Ana Ruiz")!
+    expect(aviso).toContain("ZONA y ZONA_FIRMA")
+    expect(aviso).toContain("Ana Ruiz")
+    expect(aviso).toContain("Elegí de referencia a un asesor")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El esquema de la versión nueva
+// ---------------------------------------------------------------------------
+
+describe("camposSchemaDeLaVersionNueva", () => {
+  const VIEJO = [
+    { nombre: "NOMBRE", label: "Nombre y apellido", orden: 0 },
+    { nombre: "CUIT", label: "CUIT del asesor", orden: 1 },
+  ]
+
+  it("hereda el rótulo que el director ya había escrito", () => {
+    expect(camposSchemaDeLaVersionNueva(["CUIT", "NOMBRE"], VIEJO)).toEqual([
+      { nombre: "CUIT", label: "CUIT del asesor", orden: 0 },
+      { nombre: "NOMBRE", label: "Nombre y apellido", orden: 1 },
+    ])
+  })
+
+  it("un campo nuevo se queda con su nombre de rótulo, no vacío", () => {
+    expect(camposSchemaDeLaVersionNueva(["COMISION"], VIEJO)).toEqual([
+      { nombre: "COMISION", label: "COMISION", orden: 0 },
+    ])
+  })
+
+  it("el orden sale de cómo aparecen en el documento nuevo, no del esquema viejo", () => {
+    const schema = camposSchemaDeLaVersionNueva(["CUIT", "COMISION", "NOMBRE"], VIEJO)
+    expect(schema.map((c) => c.orden)).toEqual([0, 1, 2])
+    expect(schema.map((c) => c.nombre)).toEqual(["CUIT", "COMISION", "NOMBRE"])
+  })
+
+  it("no se cae con un esquema viejo que no tiene forma de esquema", () => {
+    expect(camposSchemaDeLaVersionNueva(["NOMBRE"], null)).toEqual([
+      { nombre: "NOMBRE", label: "NOMBRE", orden: 0 },
+    ])
+    expect(camposSchemaDeLaVersionNueva(["NOMBRE"], [{ nombre: "NOMBRE" }])).toEqual([
+      { nombre: "NOMBRE", label: "NOMBRE", orden: 0 },
+    ])
+  })
+
+  it("un campo repetido en la lista no se guarda dos veces", () => {
+    expect(camposSchemaDeLaVersionNueva(["NOMBRE", "NOMBRE"], VIEJO)).toHaveLength(1)
   })
 })

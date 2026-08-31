@@ -322,6 +322,128 @@ export function nombresDelSchema(schema: unknown): string[] {
   return [...new Set(nombres)]
 }
 
+/**
+ * Los valores de esta persona que SIGUEN ESTANDO, literales, adentro del molde
+ * ya armado.
+ *
+ * ═══ Esta es la que le da dientes a la comprobación ═══
+ *
+ * El molde se arma del documento de UNA persona y después se lo rellena con los
+ * datos de ESA MISMA persona para ver si vuelve a dar su documento. Dicho así,
+ * casi siempre da verde: es un ida y vuelta sobre los mismos valores. Lo único
+ * que esa comprobación atrapa es que el molde no se pueda rellenar.
+ *
+ * Lo que de verdad hace daño es otra cosa: un dato de esta persona que quedó
+ * PEGADO en el molde. Pasa donde el reemplazo no llega —las notas al final, que
+ * `ponerHuecosEnDocx` no toca, y los cuadros de texto, que no abre por dentro
+ * para no romper el archivo—. Ese pedazo se lo lleva el molde al documento de
+ * TODOS: el contrato de Bruno sale con el CUIT de Ana. Y la comprobación de ida
+ * y vuelta no lo ve, porque para Ana está bien.
+ *
+ * Se mide sobre el molde y no sobre el resultado: si el valor sigue ahí después
+ * de haber puesto los huecos, no se reemplazó, y punto.
+ */
+export function valoresQueSobrevivenEnElMolde(
+  partesDelMolde: Record<string, string>,
+  valores: Record<string, string>,
+): UbicacionEnPartes[] {
+  return ubicarValoresEnPartes(partesDelMolde, valores).filter((u) => u.veces > 0)
+}
+
+/** El mensaje de arriba, escrito. `null` cuando no sobrevivió ninguno. */
+export function avisoDeValoresQueSobreviven(
+  sobreviven: UbicacionEnPartes[],
+  nombreDelAsesor: string,
+): string | null {
+  if (sobreviven.length === 0) return null
+  const detalle = sobreviven
+    .map((u) => `${u.campo} ("${u.valor}")${u.partes.length > 0 ? ` en ${u.partes.join(" y ")}` : ""}`)
+    .join(", ")
+  const uno = sobreviven.length === 1
+  return (
+    `${uno ? "Este dato" : "Estos datos"} de ${nombreDelAsesor} ${uno ? "quedó" : "quedaron"} adentro de la ` +
+    `plantilla y no se ${uno ? "pudo" : "pudieron"} convertir en campo: ${detalle}. Si se guardara así, el ` +
+    `documento de TODOS los asesores saldría con ${uno ? "ese dato" : "esos datos"} de ${nombreDelAsesor}. Casi ` +
+    `siempre es porque está en una nota al final o en un cuadro de texto: movelo al cuerpo del documento en el Word ` +
+    `y subilo de nuevo.`
+  )
+}
+
+/**
+ * Los campos que, en ESTE asesor, tienen exactamente el mismo dato.
+ *
+ * Por qué frena todo: el reemplazo es textual. Si `ZONA` y `BARRIO` valen las
+ * dos "Belgrano R" para Ana, no hay forma de saber cuál de los dos lugares del
+ * contrato es de cuál campo — y el que entra primero se lleva los dos, dejando
+ * al otro sin ningún lugar en el documento.
+ *
+ * `ponerHuecosEnDocx` lo devuelve como "faltante", que es cierto pero manda al
+ * director al lugar equivocado: el mensaje de faltante habla de texto partido
+ * en pedazos por Word, y acá el texto está entero. Se lo dice con lo que de
+ * verdad pasó, y con lo único que él puede hacer: elegir de referencia a un
+ * asesor cuyos datos no se repitan.
+ *
+ * Devuelve los grupos, no los pares, para no repetir treinta veces el mismo
+ * nombre cuando tres campos coinciden.
+ */
+export function camposConElMismoDato(ubicaciones: UbicacionDeValor[]): string[][] {
+  const porValor = new Map<string, string[]>()
+  for (const u of ubicaciones) {
+    if (!seVaAUsar(u)) continue
+    porValor.set(u.valor, [...(porValor.get(u.valor) ?? []), u.campo])
+  }
+  return [...porValor.values()].filter((campos) => campos.length > 1)
+}
+
+/**
+ * El mensaje de arriba, escrito. `null` cuando no hay ningún grupo repetido.
+ */
+export function avisoDeCamposConElMismoDato(grupos: string[][], nombreDelAsesor: string): string | null {
+  if (grupos.length === 0) return null
+  const detalle = grupos.map((campos) => campos.join(" y ")).join("; ")
+  const uno = grupos.length === 1
+  return (
+    `${uno ? "Estos campos tienen" : "Estos grupos de campos tienen"} exactamente el mismo dato en ` +
+    `${nombreDelAsesor}: ${detalle}. Así no hay forma de saber cuál va en cada lugar del contrato, y el que se ` +
+    `marque primero se lleva los dos lugares. Elegí de referencia a un asesor cuyos datos no se repitan, o unificá ` +
+    `esos campos en uno solo.`
+  )
+}
+
+/**
+ * El `campos_schema` de la versión nueva (spec §8.3), conservando el rótulo que
+ * el director ya le había puesto a cada campo.
+ *
+ * Que el rótulo se herede no es cosmética. El director escribió "CUIT del
+ * asesor" en la versión 1; si al subir la 2 ese campo volviera a llamarse
+ * `CUIT` a secas, el formulario que él conocía cambia solo, sin que haya
+ * cambiado nada del documento. Un campo que no reconoce es un campo que va a
+ * volver a nombrar, y ahí sí se rompe algo: dos versiones de la misma plantilla
+ * con nombres distintos para el mismo dato.
+ *
+ * El `orden` sale de la posición en `campos`, que es el orden en el que
+ * aparecen en el documento nuevo. Ese es el orden que el director espera en el
+ * formulario, y es el que puede haber cambiado a propósito al reescribir el
+ * contrato.
+ */
+export function camposSchemaDeLaVersionNueva(
+  campos: string[],
+  schemaViejo: unknown,
+): Array<{ nombre: string; label: string; orden: number }> {
+  const rotulos = new Map<string, string>()
+  if (Array.isArray(schemaViejo)) {
+    for (const c of schemaViejo) {
+      if (c === null || typeof c !== "object") continue
+      const x = c as Record<string, unknown>
+      if (typeof x.nombre !== "string" || x.nombre.trim() === "") continue
+      if (typeof x.label === "string" && x.label.trim() !== "" && !rotulos.has(x.nombre)) {
+        rotulos.set(x.nombre, x.label)
+      }
+    }
+  }
+  return [...new Set(campos)].map((nombre, orden) => ({ nombre, label: rotulos.get(nombre) ?? nombre, orden }))
+}
+
 // ---------------------------------------------------------------------------
 // Lo que lee el director
 // ---------------------------------------------------------------------------
