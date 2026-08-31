@@ -196,9 +196,17 @@ function parrafo(texto: string): string {
   return `<w:p w:rsidR="00B71C4D">${runs}</w:p>`
 }
 
-function docx(parrafos: string[], notaAlFinal?: string): PizZip {
+function docx(parrafos: string[], notaAlFinal?: string, encabezado?: string): PizZip {
   const zip = new PizZip()
   const word = zip.folder("word")!
+  const overrides = [`<Override PartName="/word/document.xml" ContentType="${BASE_TIPO}.document.main+xml"/>`]
+  if (encabezado !== undefined) {
+    overrides.push(`<Override PartName="/word/header1.xml" ContentType="${BASE_TIPO}.header+xml"/>`)
+    word.file(
+      "header1.xml",
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${parrafo(encabezado)}</w:hdr>`,
+    )
+  }
   if (notaAlFinal !== undefined) {
     // Las notas al final NO se declaran como parte que docxtemplater rellene:
     // se LEEN igual, y ese es justo el punto de uno de los tests de abajo.
@@ -209,7 +217,7 @@ function docx(parrafos: string[], notaAlFinal?: string): PizZip {
   }
   zip.file(
     "[Content_Types].xml",
-    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="${BASE_TIPO}.document.main+xml"/></Types>`,
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/>${overrides.join("")}</Types>`,
   )
   zip.folder("_rels")!.file(".rels", RELS)
   word.file(
@@ -228,7 +236,7 @@ const DATOS_DE_ANA = {
 }
 
 /** La versión NUEVA del contrato, ya completada con los datos de Ana. */
-const versionNuevaDeAna = (extra: string[] = [], notaAlFinal?: string) =>
+const versionNuevaDeAna = (extra: string[] = [], notaAlFinal?: string, encabezado?: string) =>
   docx(
     [
       parrafo("CONTRATO DE PARTNERSHIP COMERCIAL INMOBILIARIO — EDICION 2027"),
@@ -238,6 +246,7 @@ const versionNuevaDeAna = (extra: string[] = [], notaAlFinal?: string) =>
       ...extra.map(parrafo),
     ],
     notaAlFinal,
+    encabezado,
   )
 
 const SCHEMA_VIGENTE = [
@@ -542,6 +551,30 @@ describe("qué campos cambian", () => {
     const guardada = base.versiones.find((v) => v.version === 2)!
     const nombres = (guardada.campos_schema as Array<{ nombre: string }>).map((c) => c.nombre)
     expect(nombres).toContain("COMISION")
+  })
+
+  it("un dato que vive SOLO en el encabezado se encuentra igual", async () => {
+    /**
+     * El falso verde que ya se pagó una vez en esta etapa: mammoth lee el
+     * CUERPO y nada más. Si acá se mirara solo el cuerpo, el legajo saldría
+     * como "desaparecido" —siendo que está— y el molde se llevaría el
+     * encabezado de Ana al documento de todos.
+     */
+    base.documentos[0].form_data = { ...DATOS_DE_ANA, LEGAJO: "8892" }
+    base.versiones[0].campos_schema = [...SCHEMA_VIGENTE, { nombre: "LEGAJO", label: "Legajo", orden: 3 }]
+
+    const r = await pedir({ zip: versionNuevaDeAna([], undefined, "Legajo interno 8892") })
+    expect(r.status).toBe(200)
+
+    const campos = r.cuerpo.campos as { nuevos: string[]; desaparecidos: string[]; iguales: string[] }
+    expect(campos.desaparecidos).toEqual([])
+    expect(campos.iguales).toContain("LEGAJO")
+
+    // Y el hueco entró en el encabezado del molde, no quedó el 8892 de Ana.
+    const guardado = base.archivos.get(`asesores/${AGENCIA}/_plantillas/${TIPO}/v2.docx`)!
+    const encabezado = new PizZip(guardado).file("word/header1.xml")!.asText()
+    expect(encabezado).toContain("{{LEGAJO}}")
+    expect(encabezado).not.toContain("8892")
   })
 
   it("el rótulo que el director ya le había puesto a un campo se conserva", async () => {
