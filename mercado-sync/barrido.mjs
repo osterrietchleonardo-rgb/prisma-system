@@ -101,7 +101,7 @@ async function main() {
   for (let i = 0; i < paginas.length; i += TANDA) tandas.push(paginas.slice(i, i + TANDA));
 
   console.log(`[barrido] ${BASE} · págs ${DESDE}-${HASTA} en ${tandas.length} tandas de ${TANDA} · zona=${ZONA}${DRY ? ' · DRY' : ''}`);
-  let totalItems = 0;
+  let totalItems = 0, vaciasSeguidas = 0;
 
   for (const [idx, tanda] of tandas.entries()) {
     const { usado, tope } = await usoMensual();
@@ -112,12 +112,25 @@ async function main() {
     }
     if (DRY) { console.log(`  DRY: correría págs ${tanda[0]}-${tanda[tanda.length - 1]}`); continue; }
 
-    const datasetId = await correrTanda(tanda);
+    let datasetId = await correrTanda(tanda);
     const destino = join(dataDir, `${ZONA}-p${tanda[0]}-${tanda[tanda.length - 1]}.json`);
-    const n = await bajarDataset(datasetId, destino);
+    let n = await bajarDataset(datasetId, destino);
+    if (n === 0) {
+      // Una página vacía puede ser transitoria (verificado 31/8: la 64 dio 0
+      // y al reintentar trajo sus 30). Reintentar una vez antes de creerle.
+      console.log('  0 items: reintento una vez…');
+      await sleep(15000);
+      datasetId = await correrTanda(tanda);
+      n = await bajarDataset(datasetId, destino);
+    }
     totalItems += n;
     console.log(`  dataset ${datasetId}: ${n} items → ${destino}`);
-    if (n === 0) { console.log('  0 items: fin del inventario, freno acá.'); break; }
+    if (n === 0) {
+      vaciasSeguidas++;
+      if (vaciasSeguidas >= 2) { console.log('  2 páginas vacías seguidas (reintentadas): fin del inventario.'); break; }
+      continue;
+    }
+    vaciasSeguidas = 0;
 
     execFileSync(process.execPath, [
       join(__dirname, 'loader.mjs'),
