@@ -259,123 +259,165 @@ export function PlantillasTab() {
             </p>
           </div>
         ) : (
-          filas.map((fila) => {
-            const motivo = motivoParaNoDetectar(fila.documentos);
-            const detectando = detectandoId === fila.templateId;
-            const avisoSinComprobar = textoSinComprobar(fila.sinComprobar);
-            const avisoDesvinculados = textoDesvinculados(fila.desvinculados);
-            return (
-              <div key={fila.templateId} className="rounded-xl border p-4 space-y-3">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-foreground break-words">{fila.nombre}</p>
-                      <Badge variant="outline" className={PINTA_DEL_ESTADO[fila.estado]}>
-                        {ETIQUETA_DEL_ESTADO[fila.estado]}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground max-w-2xl">{explicacionDelEstado(fila)}</p>
-                  </div>
-
-                  <Button
-                    className="shrink-0 gap-2 self-start"
-                    // Deshabilitado por el mínimo de documentos, o mientras
-                    // corre. El PORQUÉ se escribe abajo, siempre visible.
-                    //
-                    // Y SOLO abajo: acá había además un `title={motivo}` que no
-                    // se mostraba nunca. Un botón deshabilitado de shadcn lleva
-                    // `pointer-events: none`, así que el navegador no registra
-                    // el mouse encima y jamás dibuja el tooltip — verificado.
-                    // En el celular tampoco hay dónde pasar el mouse. Dejarlo
-                    // hacía creer que el motivo estaba cubierto por ahí.
-                    disabled={motivo !== null || detectando}
-                    onClick={() => detectar(fila)}
-                  >
-                    {detectando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    {detectando ? "Comparando…" : "Detectar plantilla"}
-                  </Button>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <Users className="h-3.5 w-3.5" />
-                    {/* "N asesores la usan" era literalmente falso al lado de
-                        "Versión vigente: todavía ninguna" —y esa es la fila por
-                        defecto de toda inmobiliaria que arranca—: sin versión
-                        no hay plantilla que usar. Lo que este número cuenta es
-                        cuántos tienen el documento CARGADO. */}
-                    {fila.documentos === 1
-                      ? "1 asesor tiene este documento cargado"
-                      : `${fila.documentos} asesores tienen este documento cargado`}
-                  </span>
-                  <span>
-                    Versión vigente:{" "}
-                    <span className="text-foreground font-medium">
-                      {fila.version === null ? "todavía ninguna" : `v${fila.version}`}
-                    </span>
-                  </span>
-                  {fila.enRojo > 0 && (
-                    <span className="flex items-center gap-1.5 text-destructive font-medium">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      {fila.enRojo === 1
-                        ? "1 asesor con su documento para revisar"
-                        : `${fila.enRojo} asesores con su documento para revisar`}
-                    </span>
-                  )}
-                  {/* El tercer balde. No es rojo —no falló nada— pero tampoco
-                      es verde: de esa persona no se comprobó nada. Sin este
-                      renglón, una plantilla "Activa" con un asesor pausado
-                      adentro se ve exactamente igual que una donde se comparó
-                      a todos.
-
-                      El texto NO se escribe acá: lo arma `textoSinComprobar`,
-                      que vive en lib y sí está bajo test. Escrito a mano en el
-                      JSX no lo miraba nadie. */}
-                  {avisoSinComprobar && (
-                    <span className="flex items-center gap-1.5 text-amber-600 font-medium">
-                      <AlertTriangle className="h-3.5 w-3.5" />
-                      {avisoSinComprobar}
-                    </span>
-                  )}
-                  {/* Los desvinculados van aparte del ámbar de arriba, y sin
-                      color de alarma a propósito: no hay nada roto ni nada que
-                      comprobar: hay documentos que sobran. Metidos en el mismo
-                      balde, el director leía "volvé a detectar la plantilla"
-                      sobre alguien que no va a entrar nunca más en la
-                      detección, y ese aviso no se apagaba jamás. Qué hacer con
-                      esto —nada, salvo que esté seguro de que la persona no
-                      vuelve— está en la explicación de arriba. */}
-                  {avisoDesvinculados && (
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <UserMinus className="h-3.5 w-3.5" />
-                      {avisoDesvinculados}
-                    </span>
-                  )}
-                </div>
-
-                {motivo && (
-                  <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-                    <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    <span>{motivo}</span>
-                  </p>
-                )}
-
-                {propuesta?.fila.templateId === fila.templateId && (
-                  /* La revisión es OBLIGATORIA antes de guardar (spec §7.2):
-                     apenas la detección devuelve algo, se abre. Nada se guarda
-                     hasta que el director confirma ahí adentro. */
-                  <RevisionPlantilla
-                    nombreDelTipo={fila.nombre}
-                    propuesta={propuesta.datos}
-                    onCerrar={() => setPropuesta(null)}
-                    onConfirmado={cargar}
-                  />
-                )}
-              </div>
-            );
-          })
+          filas.map((fila) => (
+            <FilaDeLaSolapa
+              key={fila.templateId}
+              fila={fila}
+              detectando={detectandoId === fila.templateId}
+              onDetectar={() => detectar(fila)}
+            >
+              {propuesta?.fila.templateId === fila.templateId && (
+                /* La revisión es OBLIGATORIA antes de guardar (spec §7.2):
+                   apenas la detección devuelve algo, se abre. Nada se guarda
+                   hasta que el director confirma ahí adentro. */
+                <RevisionPlantilla
+                  nombreDelTipo={fila.nombre}
+                  propuesta={propuesta.datos}
+                  onCerrar={() => setPropuesta(null)}
+                  onConfirmado={cargar}
+                />
+              )}
+            </FilaDeLaSolapa>
+          ))
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * UNA fila de la solapa: un tipo de documento, sus contadores y su botón.
+ *
+ * Está afuera de `PlantillasTab` y EXPORTADA a propósito, y no es una
+ * prolijidad: es lo único que hace que los renglones de esta fila se puedan
+ * RENDERIZAR en un test.
+ *
+ * El agujero que cierra, medido: los tests que había miraban el archivo como
+ * texto (`toContain("textoSinComprobar(fila.sinComprobar)")`) y probaban que la
+ * función existiera y devolviera la frase correcta. Cambiar `{avisoSinComprobar}`
+ * por `{null}` acá abajo dejaba los 82 tests en verde y borraba el renglón de
+ * la pantalla. Es el mismo hueco por el que en la Task 5 se coló una promesa
+ * falsa en la primera línea que lee todo el mundo.
+ *
+ * `PlantillasTab` no se puede renderizar en un test: llama a `createClient()`
+ * apenas arranca y trae las filas de la base. Esta sí — recibe todo por props y
+ * no toca nada.
+ *
+ * La revisión de la plantilla entra por `children` y se sigue decidiendo
+ * arriba: es lo único de la fila que necesita el estado del padre.
+ */
+export function FilaDeLaSolapa({
+  fila,
+  detectando,
+  onDetectar,
+  children,
+}: {
+  fila: FilaPlantilla;
+  detectando: boolean;
+  onDetectar: () => void;
+  children?: React.ReactNode;
+}) {
+  const motivo = motivoParaNoDetectar(fila.documentos);
+  const avisoSinComprobar = textoSinComprobar(fila.sinComprobar);
+  const avisoDesvinculados = textoDesvinculados(fila.desvinculados);
+
+  return (
+    <div className="rounded-xl border p-4 space-y-3">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-semibold text-foreground break-words">{fila.nombre}</p>
+            <Badge variant="outline" className={PINTA_DEL_ESTADO[fila.estado]}>
+              {ETIQUETA_DEL_ESTADO[fila.estado]}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground max-w-2xl">{explicacionDelEstado(fila)}</p>
+        </div>
+
+        <Button
+          className="shrink-0 gap-2 self-start"
+          // Deshabilitado por el mínimo de documentos, o mientras
+          // corre. El PORQUÉ se escribe abajo, siempre visible.
+          //
+          // Y SOLO abajo: acá había además un `title={motivo}` que no
+          // se mostraba nunca. Un botón deshabilitado de shadcn lleva
+          // `pointer-events: none`, así que el navegador no registra
+          // el mouse encima y jamás dibuja el tooltip — verificado.
+          // En el celular tampoco hay dónde pasar el mouse. Dejarlo
+          // hacía creer que el motivo estaba cubierto por ahí.
+          disabled={motivo !== null || detectando}
+          onClick={onDetectar}
+        >
+          {detectando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          {detectando ? "Comparando…" : "Detectar plantilla"}
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <Users className="h-3.5 w-3.5" />
+          {/* "N asesores la usan" era literalmente falso al lado de
+              "Versión vigente: todavía ninguna" —y esa es la fila por
+              defecto de toda inmobiliaria que arranca—: sin versión
+              no hay plantilla que usar. Lo que este número cuenta es
+              cuántos tienen el documento CARGADO. */}
+          {fila.documentos === 1
+            ? "1 asesor tiene este documento cargado"
+            : `${fila.documentos} asesores tienen este documento cargado`}
+        </span>
+        <span>
+          Versión vigente:{" "}
+          <span className="text-foreground font-medium">
+            {fila.version === null ? "todavía ninguna" : `v${fila.version}`}
+          </span>
+        </span>
+        {fila.enRojo > 0 && (
+          <span className="flex items-center gap-1.5 text-destructive font-medium">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {fila.enRojo === 1
+              ? "1 asesor con su documento para revisar"
+              : `${fila.enRojo} asesores con su documento para revisar`}
+          </span>
+        )}
+        {/* El tercer balde. No es rojo —no falló nada— pero tampoco
+            es verde: de esa persona no se comprobó nada. Sin este
+            renglón, una plantilla "Activa" con un asesor pausado
+            adentro se ve exactamente igual que una donde se comparó
+            a todos.
+
+            El texto NO se escribe acá: lo arma `textoSinComprobar`,
+            que vive en lib y sí está bajo test. Escrito a mano en el
+            JSX no lo miraba nadie. */}
+        {avisoSinComprobar && (
+          <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {avisoSinComprobar}
+          </span>
+        )}
+        {/* Los desvinculados van aparte del ámbar de arriba, y sin
+            color de alarma a propósito: no hay nada roto ni nada que
+            comprobar: hay documentos que sobran. Metidos en el mismo
+            balde, el director leía "volvé a detectar la plantilla"
+            sobre alguien que no va a entrar nunca más en la
+            detección, y ese aviso no se apagaba jamás. Qué hacer con
+            esto —nada, salvo que esté seguro de que la persona no
+            vuelve— está en la explicación de arriba. */}
+        {avisoDesvinculados && (
+          <span className="flex items-center gap-1.5 font-medium">
+            <UserMinus className="h-3.5 w-3.5" />
+            {avisoDesvinculados}
+          </span>
+        )}
+      </div>
+
+      {motivo && (
+        <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>{motivo}</span>
+        </p>
+      )}
+
+      {children}
     </div>
   );
 }

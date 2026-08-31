@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest"
 import { readFileSync } from "node:fs"
 import path from "node:path"
+import React from "react"
+import { renderToStaticMarkup } from "react-dom/server"
+import { FilaDeLaSolapa } from "@/components/asesor-docs/PlantillasTab"
 import {
   armarFilas,
   estadoDePlantilla,
@@ -18,6 +21,7 @@ import {
   textoSinComprobar,
   textoDesvinculados,
   ESTADO_DESVINCULADO,
+  type FilaPlantilla,
 } from "./plantillas"
 import { MINIMO_DOCUMENTOS } from "@/lib/plantillas/deteccion"
 import { LARGO_DE_DATO_SOSPECHOSO } from "./confirmacion"
@@ -983,5 +987,95 @@ describe("la solapa no se escribe sus propios contadores", () => {
   it("la consulta de documentos trae advisor_id y la de asesores, su estado", () => {
     expect(FUENTE).toContain('.select("template_id, estado, version_id, advisor_id")')
     expect(FUENTE).toContain('from("profiles").select("id, estado")')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Que el texto LLEGUE A LA PANTALLA
+// ---------------------------------------------------------------------------
+
+/**
+ * Los de arriba miran el `.tsx` como texto: que la fila llame a
+ * `textoSinComprobar` y que la frase no esté escrita a mano en el JSX. Eso es
+ * necesario, y NO ALCANZA.
+ *
+ * Medido por el revisor: cambiar `{avisoSinComprobar}` por `{null}` en el
+ * componente dejaba los 82 tests en verde. La llamada seguía estando en el
+ * archivo, la función seguía devolviendo la frase correcta, y el renglón
+ * ámbar desaparecía de la pantalla sin que nada se pusiera en rojo. Es el
+ * mismo hueco por el que en la Task 5 se coló una promesa falsa en la primera
+ * línea que lee todo el mundo.
+ *
+ * Así que acá la fila se DIBUJA de verdad, con `renderToStaticMarkup`, y se
+ * mira el HTML que sale. No hace falta ni jsdom ni una librería de testing:
+ * `FilaDeLaSolapa` recibe todo por props y no toca la base ni la red.
+ */
+describe("la fila dibujada: los renglones tienen que llegar a la pantalla", () => {
+  const FILA: FilaPlantilla = {
+    templateId: "t1",
+    nombre: "Contrato Partnership",
+    estado: "activa",
+    version: 2,
+    documentos: 5,
+    enRojo: 0,
+    sinComprobar: 0,
+    desvinculados: 0,
+  }
+
+  /** El texto visible de la fila: el HTML sin etiquetas y sin entidades. */
+  const dibujar = (cambios: Partial<FilaPlantilla> = {}): string =>
+    renderToStaticMarkup(
+      React.createElement(FilaDeLaSolapa, {
+        fila: { ...FILA, ...cambios },
+        detectando: false,
+        onDetectar: () => {},
+      }),
+    )
+      .replace(/<[^>]*>/g, "")
+      .replace(/&#x27;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, "&")
+
+  it("el renglón ámbar de los sin comparar se dibuja, y dice lo que dice la función", () => {
+    expect(dibujar({ sinComprobar: 1 })).toContain(textoSinComprobar(1)!)
+    expect(dibujar({ sinComprobar: 4 })).toContain(textoSinComprobar(4)!)
+  })
+
+  it("y sin nadie sin comparar, ese renglón NO se dibuja", () => {
+    expect(dibujar({ sinComprobar: 0 })).not.toContain("sin comparar contra esta versión")
+  })
+
+  it("el renglón de los desvinculados se dibuja igual", () => {
+    expect(dibujar({ desvinculados: 2 })).toContain(textoDesvinculados(2)!)
+    expect(dibujar({ desvinculados: 0 })).not.toContain("asesor desvinculado")
+  })
+
+  it("el contador de los rojos se dibuja", () => {
+    expect(dibujar({ enRojo: 1 })).toContain("1 asesor con su documento para revisar")
+    expect(dibujar({ enRojo: 3 })).toContain("3 asesores con su documento para revisar")
+    expect(dibujar({ enRojo: 0 })).not.toContain("con su documento para revisar")
+  })
+
+  it("la explicación del estado se dibuja entera, con sus avisos", () => {
+    const fila: FilaPlantilla = { ...FILA, enRojo: 2, sinComprobar: 1, desvinculados: 1 }
+    expect(dibujar(fila)).toContain(explicacionDelEstado(fila))
+  })
+
+  /**
+   * El botón deshabilitado sin motivo es un botón roto: el director aprieta, no
+   * pasa nada, y no tiene forma de saber si le falta algo o si el sistema falló.
+   */
+  it("cuando no se puede detectar, el motivo se dibuja", () => {
+    const html = dibujar({ documentos: 2 })
+    expect(html).toContain(motivoParaNoDetectar(2)!)
+    expect(dibujar({ documentos: 5 })).not.toContain("Para detectar la plantilla hacen falta")
+  })
+
+  it("y el nombre del tipo, su estado y cuántos tienen el documento cargado", () => {
+    const html = dibujar({ documentos: 5 })
+    expect(html).toContain("Contrato Partnership")
+    expect(html).toContain("Activa")
+    expect(html).toContain("5 asesores tienen este documento cargado")
+    expect(dibujar({ documentos: 1 })).toContain("1 asesor tiene este documento cargado")
   })
 })
