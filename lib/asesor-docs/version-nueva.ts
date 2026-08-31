@@ -499,6 +499,196 @@ export function normalizarHuecosEscritosAMano(partes: Record<string, string>): R
 }
 
 // ---------------------------------------------------------------------------
+// LA CUENTA CRUZADA: EL DATO QUE TAMBIÉN ES TEXTO FIJO
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ El agujero que ninguna de las otras guardas puede ver ═══
+ *
+ * Si un valor del asesor de referencia **también vive en el texto fijo** del
+ * contrato —la zona de Ana es "Palermo" y el contrato dice "nuestra oficina de
+ * Palermo"—, `ponerHuecosEnDocx` convierte las DOS en `{{ZONA}}`. Y después:
+ *
+ *  · `valoresQueSobrevivenEnElMolde` da **verde**: no quedó ningún "Palermo";
+ *  · el ida y vuelta da **verde**: rellenar con los datos de Ana devuelve, letra
+ *    por letra, el documento que Ana subió;
+ *  · la prueba con centinelas da **verde**, y no por casualidad: la simulación
+ *    sobre texto plano y el reemplazo sobre el XML comparten la regla de borde
+ *    de palabra, el orden por largo y el reemplazo secuencial. **Coinciden por
+ *    construcción**, así que no pueden discrepar acá.
+ *
+ * El daño recién se ve en el contrato de Bruno: "nuestra oficina de Belgrano".
+ *
+ * Y tampoco alcanza con comparar los documentos generados de varios asesores
+ * entre sí exigiendo que toda diferencia corresponda a un campo declarado:
+ * después del molde, esa diferencia **sí corresponde a un campo declarado** — es
+ * `{{ZONA}}`. **El daño tiene forma de campo, y por eso es invisible.**
+ *
+ * ═══ Lo que sí muerde: contar cruzado ═══
+ *
+ * `{{ZONA}}` quedó **2 veces** en el molde, porque el valor de Ana aparecía 2
+ * veces. Si el valor de ZONA de **Bruno** aparece **1 vez** en el documento de
+ * Bruno, entonces una de esas dos no era el dato de nadie: era texto fijo.
+ *
+ * ═══ Por qué es un aviso y no un freno ═══
+ *
+ * Los documentos de los otros asesores son de la versión **anterior**, así que
+ * una diferencia de cuentas también puede venir de que el contrato se reescribió
+ * — que es exactamente lo que el director está haciendo. Frenar con eso sería
+ * bloquear el caso normal. El spec §7.4.3 pone una **vista previa** justo para
+ * esto: que lo vea antes de decir que sí. El freno duro, comparando N contra N,
+ * es de la etapa que aplica.
+ */
+
+/** Junta las tandas de espacios en uno, para que el pedazo entre en un renglon. */
+const espaciosJuntos = (t: string) => t.split(/\s+/).join(" ")
+
+/** Cuánto texto se muestra a cada lado del valor, para poder ubicarlo en el Word. */
+const LARGO_DEL_CONTEXTO = 45
+
+/** Hasta cuántos lugares se le muestran al director por campo. */
+const LUGARES_QUE_SE_MUESTRAN = 3
+
+/**
+ * Los pedazos del documento donde aparece un valor, con el valor entre comillas
+ * angulares.
+ *
+ * Sin esto el aviso nombra un campo y nada más, y el director no tiene cómo
+ * saber CUÁL de las dos apariciones es la cláusula fija. Con el texto de
+ * alrededor puede abrir el Word, buscarlo y verlo con sus ojos.
+ */
+export function lugaresDeUnValor(
+  partes: Record<string, string>,
+  valor: string,
+  cuantos: number = LUGARES_QUE_SE_MUESTRAN,
+): string[] {
+  if (valor === "") return []
+  const salida: string[] = []
+  for (const ruta of rutasEnOrdenDeLectura(partes)) {
+    const texto = partes[ruta] ?? ""
+    for (const at of aparicionesDe(texto, valor)) {
+      if (salida.length >= cuantos) return salida
+      const desde = Math.max(0, at - LARGO_DEL_CONTEXTO)
+      const hasta = Math.min(texto.length, at + valor.length + LARGO_DEL_CONTEXTO)
+      const antes = (desde > 0 ? "…" : "") + espaciosJuntos(texto.slice(desde, at))
+      const despues = espaciosJuntos(texto.slice(at + valor.length, hasta)) + (hasta < texto.length ? "…" : "")
+      salida.push(antes + "«" + valor + "»" + despues)
+    }
+  }
+  return salida
+}
+
+export type SospechaDeTextoFijo = {
+  campo: string
+  /** Cuántas veces aparece el valor del asesor de referencia. */
+  vecesEnElMolde: number
+  /** Cuántas veces aparece el valor del OTRO asesor en el documento del otro. */
+  vecesEnElOtro: number
+  /** Quién es ese otro, para poder nombrarlo. */
+  otroAsesor: string
+  /** Dónde aparece, en el documento nuevo, para que el director lo ubique. */
+  lugares: string[]
+}
+
+/** Un asesor con el que contrastar: sus datos guardados y el texto de su documento. */
+export type AsesorParaContrastar = {
+  nombre: string
+  valores: Record<string, string>
+  partes: Record<string, string>
+}
+
+/**
+ * Los campos donde la cuenta cruzada dice que sobra al menos una aparición.
+ *
+ * Solo mira los campos que aparecen **dos o más veces** en el documento nuevo:
+ * con una sola aparición no hay "una de las dos" que pueda ser texto fijo, y la
+ * diferencia contra otro asesor sería puro ruido de que el contrato cambió.
+ *
+ * Y solo cuenta como sospecha cuando el otro tiene **menos** apariciones, nunca
+ * más: que el documento de Bruno repita su nombre tres veces no dice nada del de
+ * Ana. Se informa el caso más extremo —el otro asesor con la cuenta más baja—
+ * porque es el que deja más claro cuántas apariciones sobran.
+ */
+export function camposQueParecenTextoFijo(args: {
+  ubicaciones: UbicacionDeValor[]
+  partesDelNuevo: Record<string, string>
+  otros: AsesorParaContrastar[]
+}): SospechaDeTextoFijo[] {
+  const salida: SospechaDeTextoFijo[] = []
+
+  for (const u of args.ubicaciones) {
+    if (u.veces < 2) continue
+
+    let peor: { veces: number; nombre: string } | null = null
+    for (const otro of args.otros) {
+      const suValor = (otro.valores[u.campo] ?? "").trim()
+      if (suValor === "") continue
+
+      let veces = 0
+      for (const ruta of Object.keys(otro.partes)) veces += aparicionesDe(otro.partes[ruta] ?? "", suValor).length
+
+      /**
+       * Cero apariciones se saltea. Significa que ese dato no está en su
+       * documento —lo más probable, que el contrato viejo no lo tenía— y no que
+       * el de acá tenga texto fijo. Contarlo llenaría el aviso de ruido justo
+       * cuando el director reescribió el contrato, que es siempre.
+       */
+      if (veces === 0) continue
+      if (peor === null || veces < peor.veces) peor = { veces, nombre: otro.nombre }
+    }
+
+    if (peor === null || peor.veces >= u.veces) continue
+    salida.push({
+      campo: u.campo,
+      vecesEnElMolde: u.veces,
+      vecesEnElOtro: peor.veces,
+      otroAsesor: peor.nombre,
+      lugares: lugaresDeUnValor(args.partesDelNuevo, u.valor),
+    })
+  }
+
+  return salida
+}
+
+/**
+ * El aviso, escrito para el director: qué campo, cuántas apariciones sobran, y
+ * **en qué lugar del contrato**.
+ *
+ * Sin los lugares el aviso es inútil: le dice que hay un problema con ZONA y lo
+ * deja sin saber cuál de las dos apariciones es la cláusula fija. `null` cuando
+ * no hay ninguna sospecha.
+ */
+export function avisoDeTextoFijoSospechado(sospechas: SospechaDeTextoFijo[]): string | null {
+  if (sospechas.length === 0) return null
+
+  const detalle = sospechas
+    .map((s) => {
+      const sobran = s.vecesEnElMolde - s.vecesEnElOtro
+      const cuantas = s.vecesEnElOtro === 1 ? "1 sola vez" : s.vecesEnElOtro + " veces"
+      const donde =
+        s.lugares.length > 0 ? " Aparece acá: " + s.lugares.map((l) => '"' + l + '"').join(" / ") + "." : ""
+      return (
+        `${s.campo}: en este archivo aparece ${s.vecesEnElMolde} veces, y en el documento de ${s.otroAsesor} su ` +
+        `dato aparece ${cuantas}, así que ${sobran === 1 ? "sobra 1 aparición" : `sobran ${sobran} apariciones`}.` +
+        donde
+      )
+    })
+    .join(" ")
+
+  const uno = sospechas.length === 1
+
+  return (
+    `Mirá esto antes de aplicar la versión. ${uno ? "Un dato" : `${sospechas.length} datos`} de este archivo ` +
+    `${uno ? "parece" : "parecen"} estar también en una parte FIJA del contrato, y si es así el documento de todos ` +
+    `los demás asesores va a salir con el dato de esta persona en ese lugar. ${detalle} ` +
+    `Si alguna de esas apariciones es una frase del contrato y no el dato de la persona, cambiá esa frase en el ` +
+    `Word para que no repita el dato, y volvé a subir el archivo. Ojo: los documentos de los otros son de la ` +
+    `versión anterior, así que la diferencia también puede venir de que reescribiste el contrato — por eso esto se ` +
+    `avisa y no frena.`
+  )
+}
+
+// ---------------------------------------------------------------------------
 // LA PRUEBA CON DATOS CENTINELA
 // ---------------------------------------------------------------------------
 

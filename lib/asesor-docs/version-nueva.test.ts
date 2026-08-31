@@ -8,6 +8,9 @@ import {
   avisoDeCamposDesaparecidos,
   avisoDeCamposNuevos,
   avisoDeCamposSinDato,
+  avisoDeTextoFijoSospechado,
+  camposQueParecenTextoFijo,
+  lugaresDeUnValor,
   avisoDeDatosQueSePasan,
   avisoDeValoresQueSobreviven,
   avisoDeValoresRepetidos,
@@ -891,5 +894,200 @@ describe("normalizarHuecosEscritosAMano", () => {
         "word/header1.xml": "{{  B  }}",
       }),
     ).toEqual({ "word/document.xml": "{{A}}", "word/header1.xml": "{{B}}" })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LA CUENTA CRUZADA
+// ---------------------------------------------------------------------------
+
+/**
+ * El agujero que ninguna de las otras guardas puede ver, y la única cuenta que
+ * lo delata sin salir a comparar N contra N.
+ */
+describe("camposQueParecenTextoFijo", () => {
+  const partesDeAna = textoPorParte(
+    docx([
+      parrafo("Se asigna a EL ASESOR la zona de Palermo."),
+      parrafo("Las consultas se atienden en nuestra oficina de Palermo."),
+      parrafo("Firma: Ana Ruiz."),
+    ]),
+  )
+  const ubicacionesDeAna = ubicarValoresEnPartes(partesDeAna, { ZONA: "Palermo", NOMBRE: "Ana Ruiz" })
+
+  const bruno = (texto: string[]) => ({
+    nombre: "Bruno Sanguinetti",
+    valores: { ZONA: "Belgrano R", NOMBRE: "Bruno Sanguinetti" },
+    partes: textoPorParte(docx(texto.map(parrafo))),
+  })
+
+  it("delata el valor que también es texto fijo: 2 acá, 1 en el otro", () => {
+    const sospechas = camposQueParecenTextoFijo({
+      ubicaciones: ubicacionesDeAna,
+      partesDelNuevo: partesDeAna,
+      otros: [bruno(["Se asigna a EL ASESOR la zona de Belgrano R.", "Firma: Bruno Sanguinetti."])],
+    })
+    expect(sospechas.map((s) => s.campo)).toEqual(["ZONA"])
+    expect(sospechas[0].vecesEnElMolde).toBe(2)
+    expect(sospechas[0].vecesEnElOtro).toBe(1)
+    expect(sospechas[0].otroAsesor).toBe("Bruno Sanguinetti")
+  })
+
+  it("y dice DÓNDE, que es lo único que le permite al director arreglarlo", () => {
+    const sospechas = camposQueParecenTextoFijo({
+      ubicaciones: ubicacionesDeAna,
+      partesDelNuevo: partesDeAna,
+      otros: [bruno(["Se asigna a EL ASESOR la zona de Belgrano R.", "Firma: Bruno Sanguinetti."])],
+    })
+    expect(sospechas[0].lugares).toHaveLength(2)
+    expect(sospechas[0].lugares.join(" ")).toContain("nuestra oficina de «Palermo»")
+    expect(sospechas[0].lugares.join(" ")).toContain("la zona de «Palermo»")
+  })
+
+  it("si las cuentas dan igual, no dice nada", () => {
+    const sospechas = camposQueParecenTextoFijo({
+      ubicaciones: ubicacionesDeAna,
+      partesDelNuevo: partesDeAna,
+      otros: [
+        bruno([
+          "Se asigna a EL ASESOR la zona de Belgrano R.",
+          "Las consultas se atienden en nuestra oficina de Belgrano R.",
+          "Firma: Bruno Sanguinetti.",
+        ]),
+      ],
+    })
+    expect(sospechas).toEqual([])
+  })
+
+  it("un campo que aparece UNA sola vez no se mira: no hay una de las dos que sobre", () => {
+    const partes = textoPorParte(docx([parrafo("La zona de Palermo.")]))
+    const sospechas = camposQueParecenTextoFijo({
+      ubicaciones: ubicarValoresEnPartes(partes, { ZONA: "Palermo" }),
+      partesDelNuevo: partes,
+      otros: [{ nombre: "Bruno", valores: { ZONA: "Belgrano R" }, partes: textoPorParte(docx([parrafo("Nada.")])) }],
+    })
+    expect(sospechas).toEqual([])
+  })
+
+  it("que el OTRO repita más veces no es sospecha de nada", () => {
+    const partes = textoPorParte(docx([parrafo("Palermo y otra vez Palermo.")]))
+    const sospechas = camposQueParecenTextoFijo({
+      ubicaciones: ubicarValoresEnPartes(partes, { ZONA: "Palermo" }),
+      partesDelNuevo: partes,
+      otros: [
+        {
+          nombre: "Bruno",
+          valores: { ZONA: "Belgrano R" },
+          partes: textoPorParte(docx([parrafo("Belgrano R, Belgrano R y Belgrano R.")])),
+        },
+      ],
+    })
+    expect(sospechas).toEqual([])
+  })
+
+  it("el otro que no tiene ese dato, o que no lo tiene en su documento, se saltea", () => {
+    const otros = [
+      { nombre: "Sin dato", valores: { ZONA: "" }, partes: textoPorParte(docx([parrafo("Contrato.")])) },
+      { nombre: "Sin la palabra", valores: { ZONA: "Saavedra" }, partes: textoPorParte(docx([parrafo("Contrato.")])) },
+    ]
+    expect(
+      camposQueParecenTextoFijo({ ubicaciones: ubicacionesDeAna, partesDelNuevo: partesDeAna, otros }),
+    ).toEqual([])
+  })
+
+  it("sin nadie con quien contrastar, no inventa nada", () => {
+    expect(
+      camposQueParecenTextoFijo({ ubicaciones: ubicacionesDeAna, partesDelNuevo: partesDeAna, otros: [] }),
+    ).toEqual([])
+  })
+
+  it("informa al asesor con la cuenta MÁS BAJA, que es el que deja más claro cuánto sobra", () => {
+    const partes = textoPorParte(docx([parrafo("Palermo, Palermo y Palermo otra vez.")]))
+    const sospechas = camposQueParecenTextoFijo({
+      ubicaciones: ubicarValoresEnPartes(partes, { ZONA: "Palermo" }),
+      partesDelNuevo: partes,
+      otros: [
+        { nombre: "Dos", valores: { ZONA: "Nunez" }, partes: textoPorParte(docx([parrafo("Nunez y Nunez.")])) },
+        { nombre: "Uno", valores: { ZONA: "Saavedra" }, partes: textoPorParte(docx([parrafo("Saavedra.")])) },
+      ],
+    })
+    expect(sospechas[0].otroAsesor).toBe("Uno")
+    expect(sospechas[0].vecesEnElOtro).toBe(1)
+  })
+})
+
+describe("lugaresDeUnValor", () => {
+  it("muestra el texto de alrededor con el valor marcado", () => {
+    const partes = { "word/document.xml": "Las consultas se atienden en nuestra oficina de Palermo, de 9 a 18." }
+    const lugares = lugaresDeUnValor(partes, "Palermo")
+    expect(lugares).toHaveLength(1)
+    expect(lugares[0]).toContain("nuestra oficina de «Palermo»")
+    expect(lugares[0]).toContain("de 9 a 18")
+  })
+
+  it("recorta con puntos suspensivos cuando el contrato sigue", () => {
+    const largo = "x".repeat(200)
+    const lugares = lugaresDeUnValor({ "word/document.xml": largo + " Palermo " + largo }, "Palermo")
+    expect(lugares[0].startsWith("…")).toBe(true)
+    expect(lugares[0].endsWith("…")).toBe(true)
+  })
+
+  it("junta los saltos de línea, para que el pedazo entre en un renglón", () => {
+    const lugares = lugaresDeUnValor({ "word/document.xml": "Zona:\n\nPalermo\n\nFirma" }, "Palermo")
+    expect(lugares[0]).not.toContain("\n")
+  })
+
+  it("corta a los tres primeros y no vuelca el contrato entero", () => {
+    const partes = { "word/document.xml": "Palermo. Palermo. Palermo. Palermo. Palermo." }
+    expect(lugaresDeUnValor(partes, "Palermo")).toHaveLength(3)
+  })
+
+  it("el cuerpo va antes que el encabezado, igual que en todo lo demás", () => {
+    const lugares = lugaresDeUnValor(
+      { "word/header1.xml": "Membrete Palermo", "word/document.xml": "Zona de Palermo" },
+      "Palermo",
+    )
+    expect(lugares[0]).toContain("Zona de")
+  })
+
+  it("un valor vacío no devuelve nada", () => {
+    expect(lugaresDeUnValor({ "word/document.xml": "Contrato" }, "")).toEqual([])
+  })
+})
+
+describe("avisoDeTextoFijoSospechado", () => {
+  const sospecha = {
+    campo: "ZONA",
+    vecesEnElMolde: 2,
+    vecesEnElOtro: 1,
+    otroAsesor: "Bruno Sanguinetti",
+    lugares: ["…nuestra oficina de «Palermo», de 9 a 18…"],
+  }
+
+  it("sin sospechas no dice nada", () => {
+    expect(avisoDeTextoFijoSospechado([])).toBeNull()
+  })
+
+  it("nombra el campo, la cuenta, el otro asesor y el LUGAR", () => {
+    const aviso = avisoDeTextoFijoSospechado([sospecha])!
+    expect(aviso).toContain("ZONA")
+    expect(aviso).toContain("Bruno Sanguinetti")
+    expect(aviso).toContain("sobra 1 aparición")
+    expect(aviso).toContain("nuestra oficina de «Palermo»")
+  })
+
+  it("dice qué hacer, y que esto avisa y no frena", () => {
+    const aviso = avisoDeTextoFijoSospechado([sospecha])!
+    expect(aviso).toContain("cambiá esa frase en el Word")
+    expect(aviso).toContain("no frena")
+    // Y por qué puede equivocarse, que es lo que lo hace un aviso honesto.
+    expect(aviso).toContain("versión anterior")
+  })
+
+  it("con dos sospechas las nombra a las dos", () => {
+    const aviso = avisoDeTextoFijoSospechado([sospecha, { ...sospecha, campo: "NOMBRE" }])!
+    expect(aviso).toContain("2 datos")
+    expect(aviso).toContain("ZONA")
+    expect(aviso).toContain("NOMBRE")
   })
 })

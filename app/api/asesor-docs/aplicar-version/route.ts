@@ -24,6 +24,8 @@ import {
   avisoDeValoresRepetidos,
   camposConElMismoDato,
   camposSchemaDeLaVersionNueva,
+  avisoDeTextoFijoSospechado,
+  camposQueParecenTextoFijo,
   camposSinDato,
   centinelasPara,
   compararCampos,
@@ -40,6 +42,7 @@ import {
   SIN_DATOS_DEL_ASESOR,
   SIN_VERSION_VIGENTE,
   textoDeVistaPrevia,
+  type AsesorParaContrastar,
   ubicarValoresEnPartes,
   valoresQueSobrevivenEnElMolde,
   avisoDeValoresQueSobreviven,
@@ -638,6 +641,46 @@ export async function POST(req: Request) {
     return rechazar({ error: moldeNoResisteLaPrueba(pruebaCentinela.observacion), advertencias }, 400)
   }
 
+  // ── 5.b La cuenta cruzada: el dato que también es texto fijo ────────────
+  /**
+   * ═══ El agujero que ninguna de las guardas de arriba puede ver ═══
+   *
+   * Si la zona de Ana es "Palermo" y el contrato dice "nuestra oficina de
+   * Palermo", el reemplazo convierte las DOS en `{{ZONA}}` y las tres
+   * comprobaciones dan **verde** — está medido y explicado en
+   * `camposQueParecenTextoFijo`. El daño recién se ve en el contrato de Bruno.
+   *
+   * Lo que lo delata es contar cruzado: `{{ZONA}}` quedó 2 veces acá, y si el
+   * dato de Bruno aparece 1 sola vez en el documento de Bruno, una de esas dos
+   * no era el dato de nadie.
+   *
+   * Va como ADVERTENCIA, no como freno: los documentos de los otros son de la
+   * versión anterior, así que la diferencia también puede venir de que el
+   * contrato se reescribió — que es justo lo que el director está haciendo. El
+   * spec §7.4.3 pone una vista previa para esto: que lo vea antes de decir que
+   * sí. El freno duro N contra N es de la etapa que aplica.
+   *
+   * Nada de acá adentro puede tumbar el pedido: es un aviso. Si algo falla, se
+   * anota en el log y se sigue sin él.
+   */
+  const repetidos = usados.filter((u) => u.veces >= 2)
+  if (repetidos.length > 0) {
+    try {
+      const otros = await asesoresParaContrastar({
+        supabase,
+        templateId,
+        agencyId,
+        moldeAdvisorId,
+      })
+      const aviso = avisoDeTextoFijoSospechado(
+        camposQueParecenTextoFijo({ ubicaciones: repetidos, partesDelNuevo, otros }),
+      )
+      if (aviso) advertencias.push(aviso)
+    } catch (e) {
+      console.error("aplicar-version: no se pudo hacer la cuenta cruzada:", e)
+    }
+  }
+
   // ── 6. Guardar la versión y el molde ────────────────────────────────────
   const { data: ultima, error: errUltima } = await supabase
     .from("advisor_doc_template_versions")
@@ -735,3 +778,77 @@ export async function POST(req: Request) {
     aplicada: false,
   })
 }
+/**
+ * Con cuántos asesores se contrasta como mucho.
+ *
+ * Cada uno cuesta una bajada de Storage y abrir un .docx, y esto corre dentro
+ * del mismo presupuesto de 60 s del resto del pedido. Con tres alcanza de sobra:
+ * lo que se busca es UN contraejemplo —alguien cuyo dato aparezca menos veces—,
+ * no una estadística.
+ */
+const TOPE_DE_CONTRASTES = 3
+
+/**
+ * Los otros asesores del mismo tipo de documento, con sus datos guardados y el
+ * texto de su .docx original.
+ *
+ * Se saltea en silencio al que no tenga datos cargados o cuyo archivo no se
+ * pueda abrir: esto alimenta un aviso, no una decisión, y un asesor menos deja
+ * el aviso más callado, nunca equivocado.
+ */
+async function asesoresParaContrastar(args: {
+  supabase: ReturnType<typeof createClient>
+  templateId: string
+  agencyId: string
+  moldeAdvisorId: string
+}): Promise<AsesorParaContrastar[]> {
+  const { data: docs, error } = await args.supabase
+    .from("advisor_documents")
+    .select("advisor_id, archivo_original_path, nombre_archivo, form_data")
+    .eq("template_id", args.templateId)
+    .eq("agency_id", args.agencyId)
+    /** El mismo orden que usa `detectar-plantilla`, para que dos corridas iguales digan lo mismo. */
+    .order("created_at", { ascending: true })
+    .order("advisor_id", { ascending: true })
+
+  if (error) {
+    console.error("aplicar-version: no se pudieron leer los otros documentos:", error.message)
+    return []
+  }
+
+  const candidatos = (docs ?? [])
+    .filter((d) => d.advisor_id !== args.moldeAdvisorId)
+    .filter((d) => d.form_data && typeof d.form_data === "object" && Object.keys(d.form_data).length > 0)
+    .slice(0, TOPE_DE_CONTRASTES)
+
+  if (candidatos.length === 0) return []
+
+  const { data: perfiles } = await args.supabase
+    .from("profiles")
+    .select("id, full_name")
+    .in(
+      "id",
+      candidatos.map((d) => d.advisor_id),
+    )
+    .eq("agency_id", args.agencyId)
+
+  const nombrePorId = new Map<string, string>()
+  for (const p of perfiles ?? []) if (p.full_name?.trim()) nombrePorId.set(p.id, p.full_name.trim())
+
+  const salida: AsesorParaContrastar[] = []
+  for (const d of candidatos) {
+    try {
+      const { data, error: errBajada } = await args.supabase.storage.from(BUCKET).download(d.archivo_original_path)
+      if (errBajada || !data) continue
+      salida.push({
+        nombre: nombrePorId.get(d.advisor_id) ?? d.nombre_archivo ?? "otro asesor",
+        valores: d.form_data as Record<string, string>,
+        partes: textoPorParte(new PizZip(Buffer.from(await data.arrayBuffer()))),
+      })
+    } catch (e) {
+      console.error(`aplicar-version: no se pudo leer ${d.archivo_original_path} para contrastar:`, e)
+    }
+  }
+  return salida
+}
+

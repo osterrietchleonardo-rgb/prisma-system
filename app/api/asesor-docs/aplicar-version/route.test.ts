@@ -1191,3 +1191,112 @@ describe("ninguna vía de rechazo futura se saltea el borrado", () => {
     expect(despuesDeLaGuarda().match(/NextResponse\.json\(/g) ?? []).toHaveLength(2)
   })
 })
+
+// ---------------------------------------------------------------------------
+// LA CUENTA CRUZADA, DE PUNTA A PUNTA
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ El agujero, reproducido acá adentro ═══
+ *
+ * La zona de Ana es "Villa Urquiza" y el contrato nuevo dice, además, "nuestra
+ * oficina de Villa Urquiza". El reemplazo convierte las DOS en `{{ZONA}}` y las
+ * tres comprobaciones dan verde: el valor no queda pegado en el molde, el ida y
+ * vuelta devuelve el documento de Ana letra por letra, y la simulación con
+ * centinelas reemplaza las mismas dos apariciones.
+ *
+ * El daño solo se ve en el contrato de Bruno: "nuestra oficina de Belgrano R".
+ *
+ * Lo que lo delata es la cuenta cruzada: 2 acá, 1 en el documento de Bruno.
+ */
+describe("la cuenta cruzada avisa del dato que también es texto fijo", () => {
+  /** El contrato NUEVO de Ana, con su zona también metida en una frase fija. */
+  const conLaZonaEnElTextoFijo = () =>
+    docx([
+      parrafo("CONTRATO DE PARTNERSHIP COMERCIAL INMOBILIARIO — EDICION 2027"),
+      parrafo("Y por la otra parte Ana Ruiz, mayor de edad, CUIT 27-31456789-4, en adelante EL ASESOR."),
+      parrafo("Se asigna a EL ASESOR la zona de Villa Urquiza, con captacion preferente."),
+      parrafo("Las consultas se atienden en nuestra oficina de Villa Urquiza, de 9 a 18."),
+      parrafo("Aclaracion de la firma de EL ASESOR: Ana Ruiz"),
+    ])
+
+  /** El contrato VIEJO de Bruno, donde su zona aparece una sola vez. */
+  const contratoViejoDeBruno = (parrafos?: string[]) =>
+    docx(
+      parrafos?.map(parrafo) ?? [
+        parrafo("CONTRATO DE PARTNERSHIP COMERCIAL INMOBILIARIO"),
+        parrafo("Y por la otra parte Bruno Sanguinetti, CUIT 20-28765432-1, en adelante EL ASESOR."),
+        parrafo("Se asigna a EL ASESOR la zona de Belgrano R."),
+        parrafo("Aclaracion de la firma de EL ASESOR: Bruno Sanguinetti"),
+      ],
+    )
+
+  const conBrunoCargado = (zip = contratoViejoDeBruno()) => {
+    base.documentos[1].form_data = {
+      NOMBRE: "Bruno Sanguinetti",
+      CUIT: "20-28765432-1",
+      ZONA: "Belgrano R",
+    }
+    base.archivos.set(base.documentos[1].archivo_original_path as string, buffer(zip))
+  }
+
+  it("lo avisa, con el campo, la cuenta y el lugar — y NO frena", async () => {
+    conBrunoCargado()
+    const r = await pedir({ zip: conLaZonaEnElTextoFijo() })
+
+    // No frena: el spec §7.4.3 quiere que el director lo vea antes de decir que sí.
+    expect(r.status).toBe(200)
+    expect(base.versiones.some((v) => v.version === 2)).toBe(true)
+
+    const avisos = (r.cuerpo.advertencias as string[]).join(" ")
+    expect(avisos).toContain("ZONA")
+    expect(avisos).toContain("Bruno Sanguinetti")
+    expect(avisos).toContain("sobra 1 aparición")
+    expect(avisos).toContain("nuestra oficina de «Villa Urquiza»")
+  })
+
+  it("cuando el otro repite lo mismo, no avisa nada: era el dato de cada uno", async () => {
+    conBrunoCargado(
+      contratoViejoDeBruno([
+        "CONTRATO DE PARTNERSHIP COMERCIAL INMOBILIARIO",
+        "Y por la otra parte Bruno Sanguinetti, CUIT 20-28765432-1, en adelante EL ASESOR.",
+        "Se asigna a EL ASESOR la zona de Belgrano R.",
+        "Las consultas se atienden en nuestra oficina de Belgrano R, de 9 a 18.",
+        "Aclaracion de la firma de EL ASESOR: Bruno Sanguinetti",
+      ]),
+    )
+    const r = await pedir({ zip: conLaZonaEnElTextoFijo() })
+    expect(r.status).toBe(200)
+    expect((r.cuerpo.advertencias as string[]).join(" ")).not.toContain("parte FIJA")
+  })
+
+  it("sin nadie con datos cargados, no inventa un aviso", async () => {
+    // Bruno sigue con form_data en null, como viene la base.
+    const r = await pedir({ zip: conLaZonaEnElTextoFijo() })
+    expect(r.status).toBe(200)
+    expect((r.cuerpo.advertencias as string[]).join(" ")).not.toContain("parte FIJA")
+  })
+
+  it("si el documento del otro no se puede bajar, se sigue sin el aviso en vez de fallar", async () => {
+    base.documentos[1].form_data = { ZONA: "Belgrano R" }
+    // Y su archivo NO está en Storage.
+    const r = await pedir({ zip: conLaZonaEnElTextoFijo() })
+    expect(r.status).toBe(200)
+    expect((r.cuerpo.advertencias as string[]).join(" ")).not.toContain("parte FIJA")
+  })
+
+  it("las tres comprobaciones de arriba dan verde: por eso hace falta esta", async () => {
+    /**
+     * El testigo de que el agujero es real. Si alguna de las tres lo viera, este
+     * pedido sería un 400 y la cuenta cruzada no haría falta.
+     */
+    conBrunoCargado()
+    const r = await pedir({ zip: conLaZonaEnElTextoFijo() })
+    expect(r.status).toBe(200)
+
+    // Y el molde guardado tiene el hueco en los DOS lugares: es el daño.
+    const guardado = base.archivos.get(`asesores/${AGENCIA}/_plantillas/${TIPO}/v2.docx`)!
+    const cuerpo = new PizZip(guardado).file("word/document.xml")!.asText()
+    expect(cuerpo.match(/\{\{ZONA\}\}/g) ?? []).toHaveLength(2)
+  })
+})
