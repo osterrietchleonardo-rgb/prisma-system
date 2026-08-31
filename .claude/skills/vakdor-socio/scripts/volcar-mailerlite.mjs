@@ -103,7 +103,11 @@ function parsear(t) {
     empresa = mp ? limpio(mp[1]) : emp;
     pais = mp ? limpio(mp[2]) : '';
     empleados = grupo1(d, /TAMANO:.*?(\d+)\s*empleados/s);
-    linkedin = grupo1(d, /LinkedIn:\s*(\S+)/);
+    // Anclado a principio de linea Y exigiendo que sea una URL de perfil. Sin eso agarra
+    // el primer "LinkedIn:" que aparezca en cualquier texto de la ficha: el 31/08/2026 una
+    // linea de ayuda que decia "Si vas por LinkedIn: entra al perfil" hizo que los 68
+    // contactos de Apollo se subieran a MailerLite con el valor "entra".
+    linkedin = grupo1(d, /^\s*LinkedIn:\s*(https?:\/\/\S*linkedin\.com\/\S+)/m);
     nota = grupo1(d, /^NOTA:\s*([\s\S]*?)(?:\n\n|$)/m);
     fuente = /Google Maps \(via Apify\)/.test(d) ? 'Apify (Google Maps) + Apollo' : 'Apollo';
   } else {
