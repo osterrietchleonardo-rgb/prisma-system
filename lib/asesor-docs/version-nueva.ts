@@ -182,7 +182,36 @@ export function ubicarValores(texto: string, valores: Record<string, string>): U
  * valor —"el cuerpo del documento", "el encabezado"—, con los nombres que ya usa
  * la verificación para hablarle al director.
  */
-export type UbicacionEnPartes = UbicacionDeValor & { partes: string[] }
+export type UbicacionEnPartes = UbicacionDeValor & {
+  partes: string[]
+  /**
+   * Dónde aparece por PRIMERA vez, en el orden en que una persona lee el
+   * documento: primero el cuerpo, después las demás partes por ruta.
+   *
+   * `parte` es el índice de la parte en ese recorrido y `pos` el caracter dentro
+   * de ella. Las dos juntas ordenan; ninguna sola alcanza, porque el caracter 3
+   * del encabezado va DESPUÉS del caracter 900 del cuerpo.
+   *
+   * `null` cuando el valor no aparece en ninguna parte.
+   */
+  primeraAparicion: { parte: number; pos: number } | null
+}
+
+/** La parte del paquete donde vive el contrato. */
+const CUERPO = "word/document.xml"
+
+/**
+ * Las partes del documento en el orden en que se leen: el cuerpo primero y el
+ * resto por ruta.
+ *
+ * Es el MISMO criterio que usa `textoDeVistaPrevia` para armar la previsualización.
+ * Si los dos se separaran, el director vería los campos en un orden y el
+ * documento en otro.
+ */
+export function rutasEnOrdenDeLectura(partes: Record<string, string>): string[] {
+  const rutas = Object.keys(partes).sort()
+  return [...rutas.filter((r) => r === CUERPO), ...rutas.filter((r) => r !== CUERPO)]
+}
 
 /**
  * Lo mismo, pero sobre el documento ENTERO: cuerpo, encabezado, pie, notas y
@@ -203,7 +232,7 @@ export function ubicarValoresEnPartes(
   partes: Record<string, string>,
   valores: Record<string, string>,
 ): UbicacionEnPartes[] {
-  const rutas = Object.keys(partes).sort()
+  const rutas = rutasEnOrdenDeLectura(partes)
   const porCampo = new Map<string, UbicacionEnPartes>()
 
   /**
@@ -213,17 +242,22 @@ export function ubicarValoresEnPartes(
    * acá y poder separarse de `ubicarValores` sin que nadie se entere.
    */
   for (const inicial of ubicarValores("", valores)) {
-    porCampo.set(inicial.campo, { ...inicial, posiciones: [], partes: [] })
+    porCampo.set(inicial.campo, { ...inicial, posiciones: [], partes: [], primeraAparicion: null })
   }
 
-  for (const ruta of rutas) {
+  rutas.forEach((ruta, indiceDeParte) => {
     for (const u of ubicarValores(partes[ruta] ?? "", valores)) {
       const acumulado = porCampo.get(u.campo)!
       acumulado.veces += u.veces
       acumulado.posiciones.push(...u.posiciones)
-      if (u.veces > 0) acumulado.partes.push(nombreDeParte(ruta))
+      if (u.veces > 0) {
+        acumulado.partes.push(nombreDeParte(ruta))
+        if (acumulado.primeraAparicion === null) {
+          acumulado.primeraAparicion = { parte: indiceDeParte, pos: u.posiciones[0] }
+        }
+      }
     }
-  }
+  })
 
   for (const u of porCampo.values()) {
     u.partes = [...new Set(u.partes)]
@@ -232,6 +266,46 @@ export function ubicarValoresEnPartes(
   }
 
   return [...porCampo.values()]
+}
+
+/**
+ * Los pone en el orden en que aparecen en el documento, y no en el que venían.
+ *
+ * ═══ Por qué esto tiene que ser verdad y no una intención ═══
+ *
+ * El `orden` del `campos_schema` es el orden del formulario que va a ver el
+ * director. Cuando reescribe el contrato y mueve la cláusula de la zona arriba
+ * de todo, espera que el formulario la muestre arriba de todo: es la mitad del
+ * sentido de subir una versión nueva.
+ *
+ * Antes decía que lo hacía y no lo hacía: el orden que salía era el de las
+ * llaves de `form_data`, que es el de la versión ANTERIOR. El comentario lo
+ * afirmaba, el nombre de un test lo afirmaba, y el test pasaba en verde porque
+ * probaba la función aislada y nunca miraba quién le armaba la entrada. Ahora lo
+ * hace de verdad, y hay un test que lo mide desde el .docx.
+ *
+ * Los que NO aparecen en el documento —los que el asesor de referencia trae
+ * vacíos— van al final conservando el orden que traían: no hay ninguna posición
+ * con la cual ordenarlos, y inventarle una sería peor que ponerlos juntos donde
+ * se los pueda ver.
+ */
+export function ordenarComoEnElDocumento<T extends { primeraAparicion: { parte: number; pos: number } | null }>(
+  ubicaciones: T[],
+): T[] {
+  return ubicaciones
+    .map((u, i) => ({ u, i }))
+    .sort((a, b) => {
+      const x = a.u.primeraAparicion
+      const y = b.u.primeraAparicion
+      // Los que no aparecen, al final, en el orden en que venían.
+      if (x === null && y === null) return a.i - b.i
+      if (x === null) return 1
+      if (y === null) return -1
+      if (x.parte !== y.parte) return x.parte - y.parte
+      if (x.pos !== y.pos) return x.pos - y.pos
+      return a.i - b.i
+    })
+    .map(({ u }) => u)
 }
 
 /** Los campos que sí se pueden convertir en hueco: los que aparecen en el documento. */
@@ -686,9 +760,14 @@ export function resumenDeLaVersionNueva(args: {
  * es un rótulo que no explica nada.
  */
 export function textoDeVistaPrevia(partes: Record<string, string>): string {
-  const rutas = Object.keys(partes).sort()
-  const cuerpo = rutas.filter((r) => r === "word/document.xml")
-  const resto = rutas.filter((r) => r !== "word/document.xml")
+  /**
+   * El MISMO recorrido con el que se ordenan los campos, no una copia: si los
+   * dos se separaran, el director vería el formulario en un orden y el documento
+   * en otro.
+   */
+  const rutas = rutasEnOrdenDeLectura(partes)
+  const cuerpo = rutas.filter((r) => r === CUERPO)
+  const resto = rutas.filter((r) => r !== CUERPO)
 
   const bloques: string[] = []
   for (const ruta of cuerpo) {

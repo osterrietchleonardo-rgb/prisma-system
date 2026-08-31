@@ -27,6 +27,7 @@ import {
   compararCampos,
   moldeNoSeReconoce,
   nombresDelSchema,
+  ordenarComoEnElDocumento,
   reemplazosDeLaVersionNueva,
   resumenDeLaVersionNueva,
   seVaAUsar,
@@ -299,7 +300,13 @@ export async function POST(req: Request) {
   }
 
   const ubicaciones = ubicarValoresEnPartes(partesDelNuevo, datos)
-  const usados = ubicaciones.filter(seVaAUsar)
+  /**
+   * En el orden del DOCUMENTO NUEVO, no en el de `form_data` —que es el de la
+   * versión anterior—. De acá sale el `orden` del `campos_schema`, o sea el
+   * orden del formulario que va a ver el director: si movió la cláusula de la
+   * zona arriba de todo, el formulario tiene que mostrarla arriba de todo.
+   */
+  const usados = ordenarComoEnElDocumento(ubicaciones.filter(seVaAUsar))
 
   // ── 4. El archivo genérico se rechaza, y con nombre y apellido ──────────
   if (usados.length === 0) {
@@ -318,6 +325,18 @@ export async function POST(req: Request) {
   const yaUbicados = new Set(usados.map((u) => u.campo))
 
   /**
+   * Los huecos escritos a mano también entran en el orden del documento, y por
+   * eso se los ubica igual que a los demás: buscando su propio `{{NOMBRE}}` como
+   * si fuera un valor. `huecosDe` devuelve los nombres sin decir dónde estaban,
+   * y sin la posición el campo nuevo caería siempre al final aunque el director
+   * lo haya puesto en el primer párrafo.
+   */
+  const nuevosAMano = ubicarValoresEnPartes(
+    partesDelNuevo,
+    Object.fromEntries(huecosAMano.filter((h) => !yaUbicados.has(h)).map((h) => [h, comoQuedaEnElDocumento(h)])),
+  )
+
+  /**
    * Los campos que el asesor de referencia trae VACÍOS **no se caen de la
    * versión nueva**.
    *
@@ -329,10 +348,18 @@ export async function POST(req: Request) {
    */
   const sinDato = camposSinDato(ubicaciones)
 
+  /**
+   * Los ubicados y los escritos a mano se ordenan JUNTOS, no uno detrás del
+   * otro: si el campo nuevo está en el primer párrafo, va primero en el
+   * formulario. Ponerlos en dos tandas dejaba a los nuevos siempre al final,
+   * que es otra vez el orden de la versión vieja con un disfraz.
+   *
+   * Los que no aparecen —los que vienen vacíos— van al final: no tienen posición
+   * con la cual ordenarse.
+   */
   const camposDeLaVersion = [
-    ...usados.map((u) => u.campo),
+    ...ordenarComoEnElDocumento([...usados, ...nuevosAMano]).map((u) => u.campo),
     ...sinDato,
-    ...huecosAMano.filter((h) => !yaUbicados.has(h)),
   ]
 
   const campos = compararCampos(nombresDelSchema(vigente.campos_schema), camposDeLaVersion)

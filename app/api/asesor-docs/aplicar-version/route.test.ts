@@ -630,6 +630,48 @@ describe("qué campos cambian", () => {
     expect(avisos).not.toContain("deja de usarse")
   })
 
+  it("el orden del campos_schema es el del DOCUMENTO, medido desde el .docx", async () => {
+    /**
+     * De punta a punta y no sobre la función suelta: lo que estaba mal no era la
+     * función —respetaba el orden de su entrada— sino QUIÉN le armaba la entrada.
+     * Salía el orden de las llaves de `form_data`, que es el de la versión
+     * anterior, mientras un comentario y el nombre de un test afirmaban lo
+     * contrario.
+     *
+     * Acá la zona va primero en el Word y el nombre después; en `form_data` van
+     * al revés. El formulario tiene que seguir al documento.
+     */
+    const zonaPrimero = docx([
+      parrafo("CONTRATO — EDICION 2027"),
+      parrafo("Se asigna a EL ASESOR la zona de Villa Urquiza."),
+      parrafo("Y por la otra parte Ana Ruiz, CUIT 27-31456789-4, en adelante EL ASESOR."),
+    ])
+    expect(Object.keys(base.documentos[0].form_data as object)).toEqual(["NOMBRE", "CUIT", "ZONA"])
+
+    const r = await pedir({ zip: zonaPrimero })
+    expect(r.status).toBe(200)
+
+    const schema = base.versiones.find((v) => v.version === 2)!.campos_schema as Array<{
+      nombre: string
+      orden: number
+    }>
+    expect(schema.map((c) => c.nombre)).toEqual(["ZONA", "NOMBRE", "CUIT"])
+    expect(schema.map((c) => c.orden)).toEqual([0, 1, 2])
+  })
+
+  it("un hueco escrito a mano en el primer párrafo no queda al final del formulario", async () => {
+    const comisionArriba = docx([
+      parrafo("La comision pactada es del {{COMISION}} sobre la operacion."),
+      parrafo("Y por la otra parte Ana Ruiz, CUIT 27-31456789-4, en adelante EL ASESOR."),
+      parrafo("Se asigna a EL ASESOR la zona de Villa Urquiza."),
+    ])
+    const r = await pedir({ zip: comisionArriba })
+    expect(r.status).toBe(200)
+
+    const schema = base.versiones.find((v) => v.version === 2)!.campos_schema as Array<{ nombre: string }>
+    expect(schema.map((c) => c.nombre)).toEqual(["COMISION", "NOMBRE", "CUIT", "ZONA"])
+  })
+
   it("el rótulo que el director ya le había puesto a un campo se conserva", async () => {
     await pedir({})
     const guardada = base.versiones.find((v) => v.version === 2)!

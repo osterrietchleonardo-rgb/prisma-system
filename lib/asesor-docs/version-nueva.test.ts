@@ -17,6 +17,7 @@ import {
   compararCampos,
   moldeNoSeReconoce,
   nombresDelSchema,
+  ordenarComoEnElDocumento,
   reemplazosDeLaVersionNueva,
   resumenDeLaVersionNueva,
   seVaAUsar,
@@ -557,7 +558,14 @@ describe("camposSchemaDeLaVersionNueva", () => {
     ])
   })
 
-  it("el orden sale de cómo aparecen en el documento nuevo, no del esquema viejo", () => {
+  it("numera en el orden de la lista que recibe, y NO en el del esquema viejo", () => {
+    /**
+     * Ojo con lo que este test mide y con lo que NO: mide que esta función
+     * respete el orden de SU entrada. Que esa entrada venga en el orden del
+     * documento lo decide el endpoint, y se mide allá, de punta a punta desde el
+     * .docx. El nombre anterior de este test decía "el orden del documento" y
+     * era falso: nunca miraba quién armaba la lista.
+     */
     const schema = camposSchemaDeLaVersionNueva(["CUIT", "COMISION", "NOMBRE"], VIEJO)
     expect(schema.map((c) => c.orden)).toEqual([0, 1, 2])
     expect(schema.map((c) => c.nombre)).toEqual(["CUIT", "COMISION", "NOMBRE"])
@@ -615,5 +623,46 @@ describe("camposSinDato", () => {
     const dos = avisoDeCamposSinDato(["LEGAJO", "MATRICULA"], "Ana Ruiz")!
     expect(dos).toContain("2 campos no se pudieron comprobar")
     expect(dos).toContain("no se borran")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EL ORDEN DEL DOCUMENTO
+// ---------------------------------------------------------------------------
+
+describe("ordenarComoEnElDocumento", () => {
+  it("ordena por dónde aparece primero, no por cómo venían", () => {
+    const partes = textoPorParte(
+      docx([parrafo("Se asigna la zona de Saavedra."), parrafo("Firma Ana Ruiz, CUIT 27-31456789-4.")]),
+    )
+    const u = ubicarValoresEnPartes(partes, {
+      NOMBRE: "Ana Ruiz",
+      CUIT: "27-31456789-4",
+      ZONA: "Saavedra",
+    })
+    expect(ordenarComoEnElDocumento(u).map((x) => x.campo)).toEqual(["ZONA", "NOMBRE", "CUIT"])
+  })
+
+  it("el cuerpo va antes que el encabezado, aunque ahí el dato esté en el caracter 0", () => {
+    const partes = textoPorParte(docx([parrafo("Firma Ana Ruiz.")], "8892"))
+    const u = ubicarValoresEnPartes(partes, { LEGAJO: "8892", NOMBRE: "Ana Ruiz" })
+    expect(ordenarComoEnElDocumento(u).map((x) => x.campo)).toEqual(["NOMBRE", "LEGAJO"])
+    expect(de(u, "LEGAJO").primeraAparicion).not.toBeNull()
+    expect(de(u, "LEGAJO").primeraAparicion!.parte).toBeGreaterThan(de(u, "NOMBRE").primeraAparicion!.parte)
+  })
+
+  it("los que no aparecen van al final, en el orden en que venían", () => {
+    const partes = textoPorParte(docx([parrafo("Firma Ana Ruiz.")]))
+    const u = ubicarValoresEnPartes(partes, {
+      LEGAJO: "",
+      ZONA: "Saavedra",
+      NOMBRE: "Ana Ruiz",
+    })
+    expect(ordenarComoEnElDocumento(u).map((x) => x.campo)).toEqual(["NOMBRE", "LEGAJO", "ZONA"])
+  })
+
+  it("primeraAparicion es null cuando el valor no está en ninguna parte", () => {
+    const partes = textoPorParte(docx([parrafo("Contrato.")]))
+    expect(de(ubicarValoresEnPartes(partes, { ZONA: "Saavedra" }), "ZONA").primeraAparicion).toBeNull()
   })
 })
