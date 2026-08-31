@@ -22,6 +22,29 @@ export default defineConfig({
     // Sin esta exclusión vitest los barre igual y falla con "No test suite found".
     exclude: [...configDefaults.exclude, "lib/mapa/**"],
     environment: "node",
+    /**
+     * Margen para el arranque de los tests de endpoint, que NO es un arreglo de
+     * algo reproducido — y conviene decirlo así.
+     *
+     * El `beforeAll` de esos tests importa la ruta entera y con eso arrastra
+     * `docxtemplater`, `pizzip` y `mammoth`. Un implementador reportó haber
+     * visto `Hook timed out in 10000ms` (el tope que vitest da por defecto) con
+     * la caché de vite fría.
+     *
+     * **Lo intenté reproducir y no pude:** borrando `node_modules/.vite`, la
+     * suite pasó entera SIN este cambio (1010 en verde, exit 0). Así que esto
+     * es precaución, no una cura medida. Si alguien lo ve fallar, acá está el
+     * lugar.
+     *
+     * Se sube el tope y no se precalienta en cada archivo porque el costo de
+     * equivocarse es asimétrico: un rojo falso es más caro que una corrida
+     * lenta. En esta etapa ya hubo uno (`confirmar-plantilla` fallaba 1 de cada
+     * 5 corridas) y lo peligroso no fue el rojo — fue que enseñaba a descartar
+     * los rojos de ese archivo.
+     *
+     * Los tests en sí siguen con el tope por defecto: esto es solo para hooks.
+     */
+    hookTimeout: 60_000,
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, ".") },
