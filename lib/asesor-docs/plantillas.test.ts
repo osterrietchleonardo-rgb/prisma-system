@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest"
+import { readFileSync } from "node:fs"
+import path from "node:path"
 import {
   armarFilas,
   estadoDePlantilla,
@@ -13,6 +15,7 @@ import {
   LARGO_DE_DATO_CORTO,
   avisoDeDatoCorto,
   fusionarHuecosIguales,
+  textoSinComprobar,
 } from "./plantillas"
 import { MINIMO_DOCUMENTOS } from "@/lib/plantillas/deteccion"
 import { LARGO_DE_DATO_SOSPECHOSO } from "./confirmacion"
@@ -642,5 +645,58 @@ describe("explicacionDelEstado: el asesor sin comparar", () => {
         expect(explicacionDelEstado({ estado, version: 1, enRojo: 0, sinComprobar })).not.toMatch(PROMESA_EN_PRESENTE)
       }
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EL RENGLÓN ÁMBAR DE LA FILA
+// ---------------------------------------------------------------------------
+
+describe("textoSinComprobar", () => {
+  it("con uno solo habla en singular", () => {
+    expect(textoSinComprobar(1)).toBe("1 asesor sin comparar contra esta versión")
+  })
+
+  it("con varios habla en plural y dice cuántos", () => {
+    expect(textoSinComprobar(3)).toBe("3 asesores sin comparar contra esta versión")
+  })
+
+  /**
+   * En cero no se dibuja NADA. Un "0 asesores sin comparar" en la fila por
+   * defecto de toda inmobiliaria es ruido: obliga a leer un aviso para
+   * descubrir que no hay nada que hacer.
+   */
+  it("en cero no dice nada", () => {
+    expect(textoSinComprobar(0)).toBeNull()
+  })
+
+  /** Defensa boba, pero un negativo dibujando un aviso sería peor. */
+  it("un número imposible tampoco dice nada", () => {
+    expect(textoSinComprobar(-1)).toBeNull()
+  })
+
+  it("no promete en presente algo que todavía no pasa", () => {
+    for (const cuantos of [1, 2, 9]) {
+      expect(textoSinComprobar(cuantos)).not.toMatch(PROMESA_EN_PRESENTE)
+    }
+  })
+})
+
+/**
+ * Que el texto viva acá no sirve de nada si la pantalla se escribe el suyo. Es
+ * la falla de la Task 5 tal cual: la frase se sacó de un lado y reapareció
+ * treinta líneas más arriba, escrita a mano, donde ningún test la veía. Se lee
+ * el `.tsx` como texto, igual que hace `lib/acm/ficha-css.test.ts` con la ficha
+ * pública.
+ */
+describe("la solapa no se escribe sus propios contadores", () => {
+  const FUENTE = readFileSync(path.resolve(__dirname, "../../components/asesor-docs/PlantillasTab.tsx"), "utf8")
+
+  it("el renglón de los sin comparar sale de textoSinComprobar", () => {
+    expect(FUENTE).toContain("textoSinComprobar(fila.sinComprobar)")
+  })
+
+  it("y ese texto no está además escrito a mano en el JSX", () => {
+    expect(FUENTE).not.toContain("sin comparar contra esta versión")
   })
 })

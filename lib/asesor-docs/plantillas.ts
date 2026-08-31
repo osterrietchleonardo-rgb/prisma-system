@@ -247,6 +247,23 @@ export function motivoParaNoDetectar(documentos: number): string | null {
 // Qué significa cada estado
 // ---------------------------------------------------------------------------
 
+/**
+ * El renglón ámbar de la fila: cuántos NO se compararon contra la versión
+ * vigente. `null` cuando no hay ninguno, y ahí la pantalla no dibuja nada.
+ *
+ * Estaba escrito a mano adentro del JSX y ningún test lo miraba. Es exactamente
+ * lo que ya pasó una vez en la Task 5: se sacó una promesa falsa de un lado y
+ * se la reescribió treinta líneas más arriba, en un pedazo de componente sin
+ * red — y quedó en la primera línea que lee todo el mundo. Los tests del repo
+ * solo miran `lib/**`, así que el texto que el director lee vive acá.
+ */
+export function textoSinComprobar(sinComprobar: number): string | null {
+  if (sinComprobar <= 0) return null
+  return sinComprobar === 1
+    ? "1 asesor sin comparar contra esta versión"
+    : `${sinComprobar} asesores sin comparar contra esta versión`
+}
+
 /** "1 asesor quedó" / "N asesores quedaron", para no repetirlo en cada rama. */
 function quienesQuedaron(enRojo: number): string {
   return enRojo === 1 ? "1 asesor quedó" : `${enRojo} asesores quedaron`

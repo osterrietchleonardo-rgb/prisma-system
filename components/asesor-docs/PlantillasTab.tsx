@@ -14,6 +14,7 @@ import {
   explicacionDelEstado,
   motivoParaNoDetectar,
   PARA_QUE_SIRVE,
+  textoSinComprobar,
   type DocumentoCrudo,
   type FilaPlantilla,
   type TipoCrudo,
@@ -226,6 +227,7 @@ export function PlantillasTab() {
           filas.map((fila) => {
             const motivo = motivoParaNoDetectar(fila.documentos);
             const detectando = detectandoId === fila.templateId;
+            const avisoSinComprobar = textoSinComprobar(fila.sinComprobar);
             return (
               <div key={fila.templateId} className="rounded-xl border p-4 space-y-3">
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
@@ -288,13 +290,15 @@ export function PlantillasTab() {
                       es verde: de esa persona no se comprobó nada. Sin este
                       renglón, una plantilla "Activa" con un asesor pausado
                       adentro se ve exactamente igual que una donde se comparó
-                      a todos. */}
-                  {fila.sinComprobar > 0 && (
+                      a todos.
+
+                      El texto NO se escribe acá: lo arma `textoSinComprobar`,
+                      que vive en lib y sí está bajo test. Escrito a mano en el
+                      JSX no lo miraba nadie. */}
+                  {avisoSinComprobar && (
                     <span className="flex items-center gap-1.5 text-amber-600 font-medium">
                       <AlertTriangle className="h-3.5 w-3.5" />
-                      {fila.sinComprobar === 1
-                        ? "1 asesor sin comparar contra esta versión"
-                        : `${fila.sinComprobar} asesores sin comparar contra esta versión`}
+                      {avisoSinComprobar}
                     </span>
                   )}
                 </div>
