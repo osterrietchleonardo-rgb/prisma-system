@@ -231,7 +231,8 @@ export function armarFilas(args: {
      * rojo ni en sin comprobar. Los dos avisos terminan en una instrucción
      * ("revisá esos documentos", "volvé a detectar con los activos") que sobre
      * un desvinculado no cambia nada, porque no entra ni en la detección ni en
-     * la confirmación (spec §7.5). Lo único ejecutable es borrar el documento.
+     * la confirmación (spec §7.5). Tiene su propio aviso, informativo y sin
+     * color de alarma: ver `avisoDeDesvinculados`.
      */
     if (desvinculado.has(doc.advisor_id)) {
       sumar(desvinculados, doc.template_id)
@@ -389,20 +390,29 @@ export function textoDesvinculados(desvinculados: number): string | null {
  * Así que la instrucción es la verdad completa: no hay nada que hacer, el aviso
  * es informativo, y borrar es la última opción — con la advertencia del mínimo
  * al lado, que es la parte que no se puede deducir mirando la pantalla.
+ *
+ * **El orden es parte del arreglo.** La primera versión de este texto llegaba
+ * al veredicto ("no tenés que hacer nada") recién en la tercera oración, con la
+ * explicación entera en 161 palabras dentro de un `<p text-xs>`. Un aviso que
+ * no rompe nada tiene que leerse en dos segundos o no se lee: va el veredicto
+ * primero y el detalle atrás.
+ *
+ * OJO si alguna vez el desvinculado sale de `fila.documentos`: la última
+ * oración nombra `MINIMO_PARA_DETECTAR` porque hoy su documento SÍ cuenta para
+ * ese mínimo. Si deja de contar, esa oración se vuelve falsa y hay que sacarla
+ * en el mismo commit.
  */
 function avisoDeDesvinculados(desvinculados: number): string | null {
   if (desvinculados <= 0) return null
   return desvinculados === 1
-    ? "Aparte, hay 1 documento de un asesor desvinculado: no entra en ninguna comparación, y volver a detectar la " +
-        "plantilla no lo va a cambiar. No tenés que hacer nada — si esa persona vuelve a la inmobiliaria, su " +
-        "documento entra solo en la próxima detección. Borralo desde su ficha únicamente si estás seguro de que no " +
-        `vuelve, y teniendo en cuenta que con menos de ${MINIMO_PARA_DETECTAR} documentos no se puede volver a ` +
-        `detectar la plantilla.`
-    : `Aparte, hay ${desvinculados} documentos de asesores desvinculados: no entran en ninguna comparación, y ` +
-        `volver a detectar la plantilla no los va a cambiar. No tenés que hacer nada — si esas personas vuelven a ` +
-        `la inmobiliaria, sus documentos entran solos en la próxima detección. Borralos desde sus fichas ` +
-        `únicamente si estás seguro de que no vuelven, y teniendo en cuenta que con menos de ` +
-        `${MINIMO_PARA_DETECTAR} documentos no se puede volver a detectar la plantilla.`
+    ? "Aparte, hay 1 documento de un asesor desvinculado: no tenés que hacer nada. No entra en ninguna " +
+        "comparación, y si esa persona vuelve a la inmobiliaria, su documento entra solo en la próxima detección. " +
+        `Si igual querés borrarlo, tené en cuenta que con menos de ${MINIMO_PARA_DETECTAR} documentos no se puede ` +
+        `volver a detectar la plantilla.`
+    : `Aparte, hay ${desvinculados} documentos de asesores desvinculados: no tenés que hacer nada. No entran en ` +
+        `ninguna comparación, y si esas personas vuelven a la inmobiliaria, sus documentos entran solos en la ` +
+        `próxima detección. Si igual querés borrarlos, tené en cuenta que con menos de ${MINIMO_PARA_DETECTAR} ` +
+        `documentos no se puede volver a detectar la plantilla.`
 }
 
 /** "1 asesor quedó" / "N asesores quedaron", para no repetirlo en cada rama. */

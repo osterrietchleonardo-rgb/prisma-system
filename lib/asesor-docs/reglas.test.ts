@@ -224,6 +224,40 @@ describe("la pantalla del director usa camposDelReemplazo y no un objeto escrito
    * asesor.sql` las declara sin DEFAULT). Este test es lo que sostiene esa
    * afirmación: si mañana el INSERT empieza a escribir alguna, salta.
    */
+  /**
+   * La premisa de la que cuelga el guard de la novena vía.
+   *
+   * `confirmar-plantilla` cierra la carrera "el director reemplaza el .docx
+   * mientras se confirma" acotando su UPDATE por `archivo_original_path`: si el
+   * archivo cambió en el medio, el UPDATE no encuentra la fila y ese asesor va
+   * a rojo en vez de a verde.
+   *
+   * Eso funciona SOLO porque cada subida va a una ruta nueva —un
+   * `crypto.randomUUID()` por archivo, con `upsert: false`—. El día que alguien
+   * la haga pisar el mismo path "para no dejar basura en Storage", el path deja
+   * de cambiar, el UPDATE vuelve a encontrar la fila, y la novena vía reabre
+   * con toda la suite en verde. No había un solo test sobre esto.
+   *
+   * Se CUENTAN las dos subidas (plantilla e información) en vez de mirar si el
+   * patrón aparece "alguna vez": la primera versión de este test usaba un
+   * `toMatch` con dos alternativas y era vacuo — romper una de las dos subidas
+   * lo dejaba en verde porque la otra seguía matcheando. Medido con mutación.
+   */
+  it("cada subida va a una ruta NUEVA: es lo que hace detectable el reemplazo", () => {
+    const subidas = FUENTE.match(/\.upload\(/g) ?? [];
+    const ids = FUENTE.match(/const nuevoId = crypto\.randomUUID\(\);/g) ?? [];
+    expect(subidas.length, "cambió la cantidad de subidas a Storage").toBeGreaterThan(0);
+    expect(
+      ids,
+      "hay una subida que NO genera un id nuevo: si reusa el path, el reemplazo deja de ser detectable",
+    ).toHaveLength(subidas.length);
+
+    expect(FUENTE, "apareció un upsert: pisar el mismo path reabre la novena vía").not.toMatch(
+      /upsert:\s*true/,
+    );
+    expect(FUENTE.match(/upsert:\s*false/g) ?? []).toHaveLength(subidas.length);
+  });
+
   it("el INSERT de la primera subida no escribe ninguna de las cuatro", () => {
     const desde = FUENTE.indexOf('from("advisor_documents").insert(');
     expect(desde, "cambió la forma del INSERT de advisor_documents").toBeGreaterThan(-1);

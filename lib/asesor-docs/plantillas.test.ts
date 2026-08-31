@@ -879,8 +879,29 @@ describe("explicacionDelEstado: el desvinculado, con una instrucción que se pue
   it("NO manda a detectar de nuevo, y tampoco manda a borrar", () => {
     const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 1 })
     expect(texto).toContain("desvinculado")
-    expect(texto).toContain("volver a detectar la plantilla no lo va a cambiar")
-    expect(texto).toContain("No tenés que hacer nada")
+    expect(texto).toContain("No entra en ninguna comparación")
+    expect(texto).toContain("no tenés que hacer nada")
+  })
+
+  /**
+   * El veredicto va PRIMERO, no tercero.
+   *
+   * La versión anterior de este texto explicaba dos cosas y recién después
+   * decía que no había nada que hacer: 161 palabras en un `<p text-xs>` para
+   * un aviso que no rompe nada. Un aviso informativo que no se lee de un
+   * vistazo no se lee.
+   *
+   * Se mide la posición y no el largo total a propósito: el largo cambia solo
+   * con que alguien agregue un aviso más arriba, y eso no es una regresión.
+   */
+  it("el veredicto llega en la primera oración del aviso, no al final", () => {
+    for (const desvinculados of [1, 3]) {
+      const aviso = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados })
+        .split("Aparte, hay")[1]
+      expect(aviso, "cambió el arranque del aviso de desvinculados").toBeTruthy()
+      const primeraOracion = aviso.split(". ")[0]
+      expect(primeraOracion).toContain("no tenés que hacer nada")
+    }
   })
 
   it("dice que la persona puede volver, que es la premisa que hacía falta", () => {
@@ -898,8 +919,7 @@ describe("explicacionDelEstado: el desvinculado, con una instrucción que se pue
   it("si nombra borrar, avisa que puede quedarse por debajo del mínimo", () => {
     for (const desvinculados of [1, 3]) {
       const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados })
-      expect(texto.toLowerCase()).toContain("borral")
-      expect(texto).toContain("únicamente si estás seguro")
+      expect(texto.toLowerCase()).toContain("borrarl")
       expect(texto).toContain(`menos de ${MINIMO_PARA_DETECTAR} documentos`)
     }
   })
@@ -907,16 +927,16 @@ describe("explicacionDelEstado: el desvinculado, con una instrucción que se pue
   it("con varios, todo el renglón concuerda en número", () => {
     const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 3 })
     expect(texto).toContain("3 documentos de asesores desvinculados")
-    expect(texto).toContain("no entran")
+    expect(texto).toContain("No entran")
     expect(texto).toContain("esas personas vuelven")
-    expect(texto).toContain("Borralos desde sus fichas")
-    expect(texto).not.toContain("Borralo desde")
+    expect(texto).toContain("querés borrarlos")
+    expect(texto).not.toContain("borrarlo,")
   })
 
   it("en un borrador se dice también, pegado a lo que ya decía", () => {
     const texto = explicacionDelEstado({ estado: "borrador", version: null, enRojo: 0, desvinculados: 1 })
     expect(texto).toContain("falta detectar la plantilla")
-    expect(texto).toContain("Borralo desde su ficha únicamente si estás seguro")
+    expect(texto).toContain("Si igual querés borrarlo")
   })
 
   it("sin desvinculados no aparece nada de esto", () => {
@@ -1048,8 +1068,30 @@ describe("la fila dibujada: los renglones tienen que llegar a la pantalla", () =
     expect(dibujar({ sinComprobar: 0 })).not.toContain("sin comparar contra esta versión")
   })
 
-  it("el renglón de los desvinculados se dibuja igual", () => {
-    expect(dibujar({ desvinculados: 2 })).toContain(textoDesvinculados(2)!)
+  /**
+   * Este test nació vacuo y hay que dejarlo dicho, porque la trampa se repite.
+   *
+   * Asertaba `toContain(textoDesvinculados(2))` = "2 documentos de asesores
+   * desvinculados"… y esa misma frase la imprime `explicacionDelEstado` en el
+   * `<p>` de arriba, en el MISMO render. Medido por el revisor: borrar
+   * `{avisoDesvinculados}` del componente dejaba los 876 en verde. O sea: el
+   * agujero que este `describe` vino a tapar seguía abierto en el renglón de
+   * al lado.
+   *
+   * Por eso se cuenta cuántas VECES aparece, no si aparece: dos, una por
+   * renglón. El de "sin comparar" no necesita esto porque su frase corta y la
+   * de la explicación están redactadas distinto y no se pisan.
+   */
+  const veces = (texto: string, frase: string) => texto.split(frase).length - 1
+
+  it("el renglón de los desvinculados se dibuja igual, y no lo tapa la explicación de arriba", () => {
+    const frase = textoDesvinculados(2)!
+    const html = dibujar({ desvinculados: 2 })
+    expect(html).toContain(frase)
+    expect(
+      veces(html, frase),
+      "la frase aparece una sola vez: o se cayó el renglón corto, o se cayó la explicación",
+    ).toBe(2)
     expect(dibujar({ desvinculados: 0 })).not.toContain("asesor desvinculado")
   })
 
