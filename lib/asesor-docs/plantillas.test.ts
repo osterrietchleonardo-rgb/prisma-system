@@ -20,6 +20,7 @@ import {
   fusionarHuecosIguales,
   textoSinComprobar,
   textoDesvinculados,
+  textoPendientes,
   ESTADO_DESVINCULADO,
   type FilaPlantilla,
 } from "./plantillas"
@@ -841,6 +842,156 @@ describe("textoSinComprobar", () => {
  * el `.tsx` como texto, igual que hace `lib/acm/ficha-css.test.ts` con la ficha
  * pública.
  */
+/**
+ * ═══ EL BALDE DE `pendiente`, CERRADO ANTES DE PODER LLENARLO ═══
+ *
+ * Hasta la 7b-1 nadie escribía `estado: 'pendiente'`, así que un pendiente
+ * sobre la versión VIGENTE no caía en ningún balde: `enRojo` mira solo
+ * `revisar`, `sinComprobar` exige que el `version_id` NO sea el vigente, y
+ * `desvinculados` mira el estado de la persona. Se contaba en `documentos` y
+ * la pantalla no lo nombraba en ningún lado.
+ *
+ * Estos tests son la red de que eso quedó cerrado. Miran la CUENTA, no el
+ * texto: si alguien saca la línea del `pendiente` de `armarFilas`, el contador
+ * vuelve a cero y el balde se abre otra vez en silencio.
+ */
+describe("armarFilas: el pendiente sobre la versión vigente tiene su propio balde", () => {
+  const filaDe = (documentos: Parameters<typeof armarFilas>[0]["documentos"]) =>
+    armarFilas({
+      tipos: [{ id: "t1", nombre: "Contrato", estado: "activa", version_actual: "v1" }],
+      versiones: [{ id: "v1", version: 1 }],
+      documentos,
+      asesores: ACTIVOS,
+    })[0]
+
+  it("lo cuenta, y no lo mete en rojo ni en sin comprobar", () => {
+    const fila = filaDe([
+      { template_id: "t1", estado: "ok", version_id: "v1", advisor_id: "a1" },
+      { template_id: "t1", estado: "pendiente", version_id: "v1", advisor_id: "a2" },
+    ])
+    expect(fila.pendientes).toBe(1)
+    expect(fila.enRojo).toBe(0)
+    expect(fila.sinComprobar).toBe(0)
+    expect(fila.documentos).toBe(2)
+  })
+
+  it("varios pendientes se suman", () => {
+    const fila = filaDe([
+      { template_id: "t1", estado: "pendiente", version_id: "v1", advisor_id: "a1" },
+      { template_id: "t1", estado: "pendiente", version_id: "v1", advisor_id: "a2" },
+      { template_id: "t1", estado: "revisar", version_id: "v1", advisor_id: "a3" },
+    ])
+    expect(fila.pendientes).toBe(2)
+    expect(fila.enRojo).toBe(1)
+  })
+
+  /**
+   * Un `pendiente` que quedó de OTRA versión no es un pendiente de la que está
+   * en uso: ese ya lo cuenta `sinComprobar`, y contarlo dos veces le mostraría
+   * al director dos problemas donde hay uno.
+   */
+  it("un pendiente de otra versión sigue yendo a sin comprobar y no acá", () => {
+    const fila = filaDe([{ template_id: "t1", estado: "pendiente", version_id: "v-vieja", advisor_id: "a1" }])
+    expect(fila.pendientes).toBe(0)
+    expect(fila.sinComprobar).toBe(1)
+  })
+
+  /** El desvinculado sigue teniendo prioridad: su balde es el suyo y nada más. */
+  it("el pendiente de un desvinculado no se cuenta acá", () => {
+    const fila = armarFilas({
+      tipos: [{ id: "t1", nombre: "Contrato", estado: "activa", version_actual: "v1" }],
+      versiones: [{ id: "v1", version: 1 }],
+      documentos: [{ template_id: "t1", estado: "pendiente", version_id: "v1", advisor_id: "a1" }],
+      asesores: [{ id: "a1", estado: ESTADO_DESVINCULADO }],
+    })[0]
+    expect(fila.pendientes).toBe(0)
+    expect(fila.desvinculados).toBe(1)
+  })
+
+  it("sin ninguno, el contador es cero", () => {
+    const fila = filaDe([{ template_id: "t1", estado: "ok", version_id: "v1", advisor_id: "a1" }])
+    expect(fila.pendientes).toBe(0)
+  })
+})
+
+describe("textoPendientes", () => {
+  it("con uno solo habla en singular", () => {
+    expect(textoPendientes(1)).toBe("1 asesor con un dato nuevo sin completar")
+  })
+
+  it("con varios habla en plural y dice cuántos", () => {
+    expect(textoPendientes(2)).toBe("2 asesores con un dato nuevo sin completar")
+  })
+
+  it("en cero no dice nada", () => {
+    expect(textoPendientes(0)).toBeNull()
+  })
+
+  it("un número imposible tampoco dice nada", () => {
+    expect(textoPendientes(-1)).toBeNull()
+  })
+
+  it("no promete en presente algo que todavía no pasa", () => {
+    for (const cuantos of [1, 2, 9]) {
+      expect(textoPendientes(cuantos)).not.toMatch(PROMESA_EN_PRESENTE)
+    }
+  })
+})
+
+describe("explicacionDelEstado: el pendiente se nombra, y dice qué hacer", () => {
+  it("en una plantilla activa lo dice, con la consecuencia al lado", () => {
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, pendientes: 1 })
+    expect(texto).toContain("A 1 asesor le falta completar un dato")
+    expect(texto).toContain("sigue con la versión anterior")
+    expect(texto).toContain("no se puede poner en uso")
+  })
+
+  it("en plural concuerda todo el renglón", () => {
+    const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, pendientes: 3 })
+    expect(texto).toContain("A 3 asesores les falta")
+    expect(texto).toContain("siguen con la versión anterior")
+  })
+
+  it("en un borrador también se dice", () => {
+    const texto = explicacionDelEstado({ estado: "borrador", version: 1, enRojo: 0, pendientes: 2 })
+    expect(texto).toContain("les falta completar un dato")
+  })
+
+  /**
+   * Testigo de que el aviso NO se pisa con los otros: con los cuatro juntos
+   * tienen que estar los cuatro. Es el mismo bug de primer-match-gana que ya se
+   * arregló dos veces en esta función.
+   */
+  it("convive con los otros tres avisos sin pisarlos", () => {
+    const texto = explicacionDelEstado({
+      estado: "activa",
+      version: 2,
+      enRojo: 1,
+      sinComprobar: 1,
+      pendientes: 1,
+      desvinculados: 1,
+    })
+    expect(texto).toContain("no se comparó")
+    expect(texto).toContain("le falta completar un dato")
+    expect(texto).toContain("para revisar")
+    expect(texto).toContain("asesor desvinculado")
+  })
+
+  it("en cero no agrega nada", () => {
+    expect(explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, pendientes: 0 })).toBe(
+      "Está en uso: es la versión confirmada. Con ella se le va a generar el documento a cada asesor.",
+    )
+  })
+
+  it("tampoco promete en presente", () => {
+    for (const estado of ["activa", "borrador"] as const) {
+      for (const pendientes of [1, 3]) {
+        expect(explicacionDelEstado({ estado, version: 1, enRojo: 0, pendientes })).not.toMatch(PROMESA_EN_PRESENTE)
+      }
+    }
+  })
+})
+
 describe("textoDesvinculados", () => {
   it("con uno solo habla en singular", () => {
     expect(textoDesvinculados(1)).toBe("1 documento de un asesor desvinculado")
@@ -1051,6 +1202,7 @@ describe("la fila dibujada: los renglones tienen que llegar a la pantalla", () =
     enRojo: 0,
     sinComprobar: 0,
     desvinculados: 0,
+    pendientes: 0,
   }
 
   /** El texto visible de la fila: el HTML sin etiquetas y sin entidades. */

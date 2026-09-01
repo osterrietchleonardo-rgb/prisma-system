@@ -119,6 +119,27 @@ export type FilaPlantilla = {
    * como última opción y con la advertencia del mínimo al lado.
    */
   desvinculados: number
+  /**
+   * Cuántos quedaron en `pendiente` **contra la versión vigente**.
+   *
+   * ═══ El balde que faltaba, cerrado ANTES de poder llenarlo ═══
+   *
+   * `advisor_documents.estado` acepta tres valores desde la Etapa B (`ok`,
+   * `revisar`, `pendiente`), y hasta hoy nadie escribía `pendiente`: la
+   * confirmación de la §7.2 solo pone `ok` o `revisar`. Por eso un
+   * `pendiente` sobre la versión vigente **no caía en ningún balde**: ni en
+   * `enRojo`, ni en `sinComprobar` —su `version_id` SÍ es el vigente—, ni en
+   * `desvinculados`. Se contaba solo en `documentos` y la solapa no lo
+   * nombraba en ningún lado: el décimo camino por el que la pantalla dice que
+   * está todo bien cuando no lo está.
+   *
+   * La 7b-1 los crea: el asesor al que la versión nueva le trajo un campo que
+   * antes no existía queda `pendiente` y **sigue con la versión anterior**
+   * (spec §7.4.2). Su documento es el de la versión vieja y le falta un dato
+   * para poder pasar a la nueva — que es justo lo que el director tiene que
+   * ver, porque `activar-version` se niega mientras quede uno así.
+   */
+  pendientes: number
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +242,7 @@ export function armarFilas(args: {
   const rojos = new Map<string, number>()
   const sinComprobar = new Map<string, number>()
   const desvinculados = new Map<string, number>()
+  const pendientes = new Map<string, number>()
   const sumar = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1)
 
   for (const doc of args.documentos) {
@@ -244,6 +266,14 @@ export function armarFilas(args: {
     if (doc.version_id !== null && doc.version_id === vigente) {
       // Comprobado contra la versión que está en uso: su estado vale.
       if (doc.estado === "revisar") sumar(rojos, doc.template_id)
+      /**
+       * Y el `pendiente`, que hasta acá se caía por el agujero del `continue`.
+       * Va en su propio balde y no en `enRojo`: no hay nada roto que revisar
+       * —el documento que tiene es correcto, el de la versión anterior—, lo que
+       * falta es un dato que solo el director puede cargar. Meterlo en rojo le
+       * mandaría a buscar un error que no existe.
+       */
+      if (doc.estado === "pendiente") sumar(pendientes, doc.template_id)
       continue
     }
 
@@ -278,6 +308,7 @@ export function armarFilas(args: {
       enRojo: rojos.get(t.id) ?? 0,
       sinComprobar: sinComprobar.get(t.id) ?? 0,
       desvinculados: desvinculados.get(t.id) ?? 0,
+      pendientes: pendientes.get(t.id) ?? 0,
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
 }
@@ -348,6 +379,24 @@ export function textoSinComprobar(sinComprobar: number): string | null {
 }
 
 /**
+ * El renglón del balde nuevo: cuántos asesores quedaron `pendiente` contra la
+ * versión vigente. `null` cuando no hay ninguno.
+ *
+ * Vive acá y no en el JSX por la regla de siempre —los tests del repo solo
+ * miran `lib/**`— y esa regla ya cobró dos veces en esta etapa.
+ *
+ * Se cuentan ASESORES y no documentos, al revés que el renglón de los
+ * desvinculados: acá lo que el director tiene que hacer es cargarle un dato a
+ * una persona, así que la unidad que le sirve es la persona.
+ */
+export function textoPendientes(pendientes: number): string | null {
+  if (pendientes <= 0) return null
+  return pendientes === 1
+    ? "1 asesor con un dato nuevo sin completar"
+    : `${pendientes} asesores con un dato nuevo sin completar`
+}
+
+/**
  * El otro renglón de la fila: cuántos documentos son de asesores
  * desvinculados. `null` cuando no hay ninguno.
  *
@@ -415,6 +464,30 @@ function avisoDeDesvinculados(desvinculados: number): string | null {
         `documentos no se puede volver a detectar la plantilla.`
 }
 
+/**
+ * El aviso del balde nuevo, dicho entero y con lo que hay que hacer.
+ *
+ * Es el ÚNICO estado de esta pantalla que no significa "algo salió mal": el
+ * documento que tiene ese asesor está bien, es el de la versión anterior, y lo
+ * que falta es un dato que la versión nueva trajo y que nadie cargó todavía
+ * (spec §7.4.2). Por eso no dice "revisá" ni "falló": dice qué falta y quién
+ * lo puede completar.
+ *
+ * Y dice la consecuencia, que es la parte que el director no puede deducir
+ * mirando la pantalla: mientras quede uno así, la versión nueva no se puede
+ * poner en uso.
+ */
+function avisoDePendientes(pendientes: number): string | null {
+  if (pendientes <= 0) return null
+  return pendientes === 1
+    ? "A 1 asesor le falta completar un dato que la versión nueva trajo, así que sigue con la versión anterior: " +
+        "cargale ese dato y volvé a aplicarle la versión. Hasta que no quede ninguno así, la versión nueva no se " +
+        "puede poner en uso."
+    : `A ${pendientes} asesores les falta completar un dato que la versión nueva trajo, así que siguen con la ` +
+        `versión anterior: cargales ese dato y volvé a aplicarles la versión. Hasta que no quede ninguno así, la ` +
+        `versión nueva no se puede poner en uso.`
+}
+
 /** "1 asesor quedó" / "N asesores quedaron", para no repetirlo en cada rama. */
 function quienesQuedaron(enRojo: number): string {
   return enRojo === 1 ? "1 asesor quedó" : `${enRojo} asesores quedaron`
@@ -428,9 +501,14 @@ function quienesQuedaron(enRojo: number): string {
  * no estar escrito.
  */
 export function explicacionDelEstado(
-  fila: Pick<FilaPlantilla, "estado" | "version" | "enRojo"> & { sinComprobar?: number; desvinculados?: number },
+  fila: Pick<FilaPlantilla, "estado" | "version" | "enRojo"> & {
+    sinComprobar?: number
+    desvinculados?: number
+    pendientes?: number
+  },
 ): string {
   const sinComprobar = fila.sinComprobar ?? 0
+  const avisoPendientes = avisoDePendientes(fila.pendientes ?? 0)
   const avisoDesvinculados = avisoDeDesvinculados(fila.desvinculados ?? 0)
 
   if (fila.estado === "activa") {
@@ -492,6 +570,8 @@ export function explicacionDelEstado(
      * la hace MÁS visible, que es exactamente lo que se busca: taparla sería
      * esconder el aviso, no arreglar la causa.
      */
+    if (avisoPendientes) avisos.push(avisoPendientes)
+
     if (fila.enRojo > 0) {
       avisos.push(
         `Pero ${quienesQuedaron(fila.enRojo)} para revisar, y eso no debería pasar con una plantilla en ` +
@@ -555,6 +635,8 @@ export function explicacionDelEstado(
         `incluir${sinComprobar === 1 ? "lo" : "los"}.`,
     )
   }
+
+  if (avisoPendientes) avisos.push(avisoPendientes)
 
   if (fila.enRojo > 0) {
     avisos.push(
