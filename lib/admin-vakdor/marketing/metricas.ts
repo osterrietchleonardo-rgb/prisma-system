@@ -29,12 +29,32 @@ export interface SourceHealth {
   clarity: "ok" | "cache" | "error" | "sin_token"
   /** Días que realmente cubre Clarity (su API solo admite 1, 2 o 3). */
   clarityDias: number
+  /**
+   * Por qué Buffer no trajo datos, en castellano. El caso típico: el plan gratuito
+   * solo guarda 31 días, así que el período de 90 vuelve vacío. Sin esto el panel
+   * mostraba ceros con el cartel en verde.
+   */
+  bufferMotivo?: string
 }
 
 export interface GscQuery {
   query: string
   clicks: number
   impressions: number
+  position: number
+}
+
+/**
+ * Totales del sitio en Google, SIN abrir por consulta.
+ *
+ * Hace falta pedirlo aparte: Google esconde las búsquedas de poco volumen, así que
+ * sumar la tabla de consultas da menos de lo real. Medido el 31-ago-2026, el sitio
+ * tenía 3 clics y 72 impresiones en 30 días, y la tabla de consultas mostraba 0 y 18.
+ */
+export interface GscTotales {
+  clicks: number
+  impressions: number
+  ctrPct: number
   position: number
 }
 
@@ -90,6 +110,8 @@ export interface ClarityMetricsPayload {
   avgScrollDepthPct: number
   totalSessions: number
   distinctUsers: number
+  /** Sesiones que Clarity marcó como robots. Al 31-ago-2026 eran 17 de 19. */
+  botSessions: number
   pagesPerSession: number
   scriptErrorsPct: number
   popularPages: Array<{ url: string; visitsCount: number }>
@@ -102,6 +124,12 @@ export interface MarketingMetricsPayload {
   sources: SourceHealth
   periodo: "7d" | "30d" | "90d"
   gscQueries: GscQuery[]
+  /**
+   * Totales reales del sitio en Google. Van aparte de `gscQueries` porque Google
+   * esconde las búsquedas de poco volumen: la tabla puede decir 0 clics cuando hubo 3.
+   * `null` si Search Console no respondió.
+   */
+  gscTotales: GscTotales | null
   /** Búsquedas en posición 4-20: conviene mejorar esas páginas antes de escribir una nueva. */
   gscOportunidades: GscOportunidad[]
   bufferStats: {
@@ -162,6 +190,7 @@ export async function fetchClarityMetrics(): Promise<{ data: ClarityMetricsPaylo
     avgScrollDepthPct: 0,
     totalSessions: 0,
     distinctUsers: 0,
+    botSessions: 0,
     pagesPerSession: 0,
     scriptErrorsPct: 0,
     popularPages: [],
@@ -188,6 +217,7 @@ export async function fetchClarityMetrics(): Promise<{ data: ClarityMetricsPaylo
       let avgScrollDepthPct = 0
       let totalSessions = 0
       let distinctUsers = 0
+      let botSessions = 0
       let pagesPerSession = 0
       let scriptErrorsPct = 0
       let popularPages: Array<{ url: string; visitsCount: number }> = []
@@ -211,7 +241,9 @@ export async function fetchClarityMetrics(): Promise<{ data: ClarityMetricsPaylo
         if (item.metricName === "Traffic") {
           totalSessions = Number(item.information?.[0]?.totalSessionCount ?? 0)
           distinctUsers = Number(item.information?.[0]?.distinctUserCount ?? 0)
-          pagesPerSession = Number(item.information?.[0]?.pagesPerSessionPercentage ?? 0)
+          botSessions = Number(item.information?.[0]?.totalBotSessionCount ?? 0)
+          // Clarity lo devuelve con 16 decimales y el panel lo imprimía crudo.
+          pagesPerSession = Math.round(Number(item.information?.[0]?.pagesPerSessionPercentage ?? 0) * 10) / 10
         }
         if (item.metricName === "PopularPages") {
           popularPages = (item.information ?? []).map((p: any) => ({
@@ -228,6 +260,7 @@ export async function fetchClarityMetrics(): Promise<{ data: ClarityMetricsPaylo
         avgScrollDepthPct,
         totalSessions,
         distinctUsers,
+        botSessions,
         pagesPerSession,
         scriptErrorsPct,
         popularPages,
@@ -525,6 +558,54 @@ export async function fetchGscQueries(periodo: "7d" | "30d" | "90d"): Promise<{ 
 }
 
 /**
+ * Totales del sitio en Search Console (sin dimensiones).
+ *
+ * Es la única forma de ver los clics que Google sí contó pero no atribuye a ninguna
+ * consulta visible. Falla suave: si no responde, el panel muestra la tabla igual.
+ */
+export async function fetchGscTotales(
+  periodo: "7d" | "30d" | "90d",
+): Promise<{ data: GscTotales | null; estado: SourceHealth["gsc"] }> {
+  try {
+    const token = await getGoogleAccessToken("https://www.googleapis.com/auth/webmasters.readonly")
+    const days = getPeriodDays(periodo)
+    const end = new Date(Date.now() - 86400000)
+    const start = new Date(Date.now() - days * 86400000)
+    const iso = (d: Date) => d.toISOString().slice(0, 10)
+
+    const res = await fetchWithTimeout(
+      `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE_URL)}/searchAnalytics/query`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ startDate: iso(start), endDate: iso(end) }),
+        cache: "no-store",
+      },
+      3500
+    )
+
+    if (res.ok) {
+      const row = (await res.json()).rows?.[0]
+      if (!row) return { data: { clicks: 0, impressions: 0, ctrPct: 0, position: 0 }, estado: "ok" }
+      return {
+        data: {
+          clicks: Number(row.clicks ?? 0),
+          impressions: Number(row.impressions ?? 0),
+          ctrPct: Math.round(Number(row.ctr ?? 0) * 1000) / 10,
+          position: Math.round(Number(row.position ?? 0) * 10) / 10,
+        },
+        estado: "ok",
+      }
+    }
+    console.error("GSC totales respondió", res.status)
+  } catch (err) {
+    console.error("GSC totales fetch error:", err)
+  }
+
+  return { data: null, estado: "error" }
+}
+
+/**
  * Oportunidades SEO (posición 4-20).
  *
  * Consulta APARTE de fetchGscQueries: pide la dimensión `page` además de `query`, lo que
@@ -583,8 +664,10 @@ export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise
     publicaciones: BufferPublishedPost[]
   }
   estado: SourceHealth["buffer"]
+  motivo?: string
 }> {
   let estado: SourceHealth["buffer"] = "sin_token"
+  let motivo: string | undefined
   let postCount = 0
   let totalImpressions = 0
   let reach = 0
@@ -631,8 +714,26 @@ export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise
       )
 
       if (res.ok) {
-        estado = "ok"
         const body = await res.json()
+
+        // Buffer contesta 200 aunque GraphQL haya fallado: el error viene en `errors`
+        // y `data` en null. Mirar solo `res.ok` hacía que el panel pintara el cartel
+        // verde sobre seis tarjetas en cero. El caso real: el plan gratuito solo
+        // guarda 31 días, así que el período de 90 SIEMPRE volvía vacío.
+        const errores: string[] = Array.isArray(body?.errors)
+          ? body.errors.map((e: any) => String(e?.message ?? "")).filter(Boolean)
+          : []
+
+        if (errores.length > 0) {
+          estado = "error"
+          motivo = errores[0].includes("31 days")
+            ? "Buffer gratuito: solo guarda los últimos 31 días"
+            : errores[0]
+          console.error("Buffer devolvió errores:", errores.join(" | "))
+          return { data: { totalPosts: 0, totalImpressions: 0, reach: 0, totalReactions: 0, totalComments: 0, avgEngagementRate: 0, publicaciones: [] }, estado, motivo }
+        }
+
+        estado = "ok"
         const metrics = body?.data?.aggregatedPostMetrics?.metrics ?? []
         postCount = metrics.find((m: any) => m.type === "postCount")?.value ?? 0
         totalImpressions = metrics.find((m: any) => m.type === "impressions")?.value ?? 0
@@ -642,11 +743,13 @@ export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise
         avgEngagementRate = metrics.find((m: any) => m.type === "engagementRate")?.value ?? 0
       } else {
         estado = "error"
+        motivo = `Buffer respondió ${res.status}`
         console.error("Buffer respondió", res.status)
       }
     }
   } catch (err) {
     estado = "error"
+    motivo = "Buffer no respondió a tiempo"
     console.error("Buffer fetch error:", err)
   }
 
@@ -662,6 +765,7 @@ export async function fetchBufferRanking(periodo: "7d" | "30d" | "90d"): Promise
       publicaciones: [],
     },
     estado,
+    motivo,
   }
 }
 
@@ -705,14 +809,26 @@ export async function fetchMarketingContentStats(): Promise<ContentDistribution>
 /**
  * Orquestador de payload
  */
-export async function loadMarketingMetricsPayload(periodo: "7d" | "30d" | "90d"): Promise<MarketingMetricsPayload> {
-  const [ga4, gsc, buffer, contentDistribution, clarity, oportunidades] = await Promise.all([
+export async function loadMarketingMetricsPayload(
+  periodo: "7d" | "30d" | "90d",
+  /**
+   * La distribución de contenidos NO se dibuja en el panel: solo la usa el prompt del
+   * cron. Pedirla en cada carga era una consulta a `marketing_ideas` para nada.
+   */
+  opciones: { incluirDistribucionContenido?: boolean } = {},
+): Promise<MarketingMetricsPayload> {
+  const { incluirDistribucionContenido = true } = opciones
+
+  const [ga4, gsc, buffer, contentDistribution, clarity, oportunidades, totales] = await Promise.all([
     fetchGa4Metrics(periodo),
     fetchGscQueries(periodo),
     fetchBufferRanking(periodo),
-    fetchMarketingContentStats(),
+    incluirDistribucionContenido
+      ? fetchMarketingContentStats()
+      : Promise.resolve({ porFormato: {}, porAngulo: {}, totalPublicadas: 0, totalIdeas: 0 } as ContentDistribution),
     fetchClarityMetrics(),
     fetchGscOportunidades(periodo),
+    fetchGscTotales(periodo),
   ])
 
   return {
@@ -724,9 +840,11 @@ export async function loadMarketingMetricsPayload(periodo: "7d" | "30d" | "90d")
       buffer: buffer.estado,
       clarity: clarity.estado,
       clarityDias: CLARITY_DIAS,
+      bufferMotivo: buffer.motivo,
     },
     periodo,
     gscQueries: gsc.data,
+    gscTotales: totales.data,
     gscOportunidades: oportunidades.data,
     bufferStats: buffer.data,
     contentDistribution,

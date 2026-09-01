@@ -85,11 +85,33 @@ export function MarketingMetricsSection() {
     : sources.gsc === "ok" ? { texto: "🔍 Search Console", tono: "ok" as const }
     : { texto: "✕ Search Console sin respuesta", tono: "bad" as const }
 
+  // Cuando Buffer falla, decimos POR QUÉ. Antes contestaba 200 con el error adentro
+  // y este badge salía verde arriba de seis tarjetas en cero.
   const badgeBuffer =
     !sources ? { texto: "Buffer sin datos", tono: "off" as const }
     : sources.buffer === "ok" ? { texto: "💼 Buffer", tono: "ok" as const }
     : sources.buffer === "sin_token" ? { texto: "Buffer sin token", tono: "off" as const }
-    : { texto: "✕ Buffer sin respuesta", tono: "bad" as const }
+    : { texto: `✕ ${sources.bufferMotivo ?? "Buffer sin respuesta"}`, tono: "bad" as const }
+
+  /**
+   * Frescura REAL del análisis, en vez del horario prometido. Los cron de GitHub Actions
+   * se atrasan de 2 a 5 horas y a veces no corren: el 31-ago-2026 el de las 07:00 no se
+   * ejecutó y el panel seguía anunciando "07:00 y 18:00" como si nada.
+   */
+  const horasDesdeAnalisis = aiTimestamp ? (Date.now() - new Date(aiTimestamp).getTime()) / 3600000 : null
+
+  function textoFrescura(h: number) {
+    if (h < 1) return "recién actualizado"
+    if (h < 24) return `hace ${Math.round(h)} h`
+    const d = Math.floor(h / 24)
+    return `hace ${d} ${d === 1 ? "día" : "días"}`
+  }
+
+  const badgeAnalisis =
+    horasDesdeAnalisis === null
+      ? { texto: "⏰ Sin análisis guardado", tono: "warn" as const }
+      : { texto: `⏰ Análisis ${textoFrescura(horasDesdeAnalisis)}`, tono: horasDesdeAnalisis > 18 ? ("bad" as const) : ("off" as const) }
+
   const clarity = data?.clarityStats ?? {
     rageClicksPct: 0,
     deadClicksPct: 0,
@@ -97,6 +119,7 @@ export function MarketingMetricsSection() {
     avgScrollDepthPct: 0,
     totalSessions: 0,
     distinctUsers: 0,
+    botSessions: 0,
     pagesPerSession: 0,
     scriptErrorsPct: 0,
     popularPages: [],
@@ -126,7 +149,7 @@ export function MarketingMetricsSection() {
             <Badge {...badgeClarity} />
             <Badge {...badgeGsc} />
             <Badge {...badgeBuffer} />
-            <Badge texto="⏰ Cron: 07:00 y 18:00 (AR)" tono="off" />
+            <Badge {...badgeAnalisis} />
           </div>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", margin: 0 }}>
             Panel unificado de auditoría para vakdor.com: usuarios activos/nuevos, rebote, tiempo en página, Microsoft Clarity, GSC y Buffer.
@@ -542,6 +565,21 @@ export function MarketingMetricsSection() {
                 así que estos números no cambian con el selector de arriba. Además permite solo 10 consultas por día, por eso se cachean.
               </div>
 
+              {/* Cuántas de esas sesiones son personas. Con 2 sesiones humanas, ningún
+                  porcentaje de abajo significa nada, y eso tiene que verse. */}
+              <div style={{
+                fontSize: 10,
+                lineHeight: 1.4,
+                padding: "6px 8px",
+                borderRadius: 6,
+                color: clarity.botSessions > clarity.totalSessions ? "#fca5a5" : "rgba(255,255,255,0.55)",
+                background: clarity.botSessions > clarity.totalSessions ? "rgba(239,68,68,0.08)" : "rgba(255,255,255,0.03)",
+                border: `1px solid ${clarity.botSessions > clarity.totalSessions ? "rgba(239,68,68,0.25)" : "rgba(255,255,255,0.07)"}`,
+              }}>
+                <b>{clarity.totalSessions}</b> {clarity.totalSessions === 1 ? "sesión real" : "sesiones reales"} y <b>{clarity.botSessions}</b> de robots.
+                {clarity.totalSessions < 30 ? " Con tan poca muestra, los porcentajes de abajo no alcanzan para decidir nada." : ""}
+              </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
                 <div style={{ padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
                   <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginBottom: 2 }}>Scroll Depth Promedio</div>
@@ -665,6 +703,30 @@ export function MarketingMetricsSection() {
                 <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>SEO vakdor.com</span>
               </div>
 
+              {/* Totales REALES del sitio. Van arriba de la tabla porque Google esconde
+                  las búsquedas de poco volumen: la lista de abajo suma menos que esto.
+                  Sin esta fila el panel mostraba 0 clics cuando en realidad hubo 3. */}
+              {data?.gscTotales ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                  {[
+                    { k: "Clics", v: data.gscTotales.clicks.toLocaleString(), c: "#4ade80" },
+                    { k: "Impresiones", v: data.gscTotales.impressions.toLocaleString(), c: "#fff" },
+                    { k: "CTR", v: `${data.gscTotales.ctrPct}%`, c: "#fde047" },
+                    { k: "Posición media", v: `${data.gscTotales.position}`, c: "#7dd3fc" },
+                  ].map((m) => (
+                    <div key={m.k} style={{ padding: 10, background: "rgba(255,255,255,0.03)", borderRadius: 8, textAlign: "center" }}>
+                      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", marginBottom: 3 }}>{m.k}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: m.c }}>{m.v}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", lineHeight: 1.45 }}>
+                Arriba, el total real del sitio. Abajo, solo las búsquedas que Google deja ver:
+                las de muy pocas impresiones las oculta, así que la lista suele sumar menos clics que el total.
+              </div>
+
               <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto" }}>
                 {(data?.gscQueries ?? []).length > 0 ? (
                   (data?.gscQueries ?? []).map((q, idx) => (
@@ -774,16 +836,18 @@ export function MarketingMetricsSection() {
                   <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: "rgba(194,120,60,0.2)", color: ACCENT, fontWeight: 800 }}>
                     Gemini 3.5 Flash
                   </span>
-                  <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: "rgba(168,85,247,0.2)", color: "#c084fc", fontWeight: 700 }}>
-                    ⏰ 07:00 y 18:00 (AR)
-                  </span>
+                  <Badge {...badgeAnalisis} />
                   <span style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)", fontWeight: 700 }}>
                     Período: {periodo === "7d" ? "7 días" : periodo === "30d" ? "30 días" : "90 días"}
                   </span>
                 </div>
                 <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 4 }}>
                   {aiTimestamp
-                    ? `Generado el ${new Date(aiTimestamp).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`
+                    ? `Generado el ${new Date(aiTimestamp).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}${
+                        horasDesdeAnalisis !== null && horasDesdeAnalisis > 18
+                          ? " · los números de arriba son de ahora, este texto no"
+                          : ""
+                      }`
                     : "Todavía no hay análisis guardado para este período."}
                 </div>
               </div>
@@ -841,7 +905,7 @@ export function MarketingMetricsSection() {
             ) : (
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", fontStyle: "italic", textAlign: "center", padding: "16px 0" }}>
                 Sin análisis para {periodo === "7d" ? "7 días" : periodo === "30d" ? "30 días" : "90 días"} todavía.
-                El cron lo genera para los tres períodos a las 07:00 y a las 18:00 (AR).
+                Lo genera una tarea programada para los tres períodos, dos veces por día. Puede demorarse varias horas.
               </div>
             )}
           </div>

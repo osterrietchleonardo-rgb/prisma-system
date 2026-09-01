@@ -14,7 +14,9 @@ export async function GET(request: NextRequest) {
   const p = url.searchParams.get("periodo")
   const periodo = (p === "7d" || p === "90d" ? p : "30d") as "7d" | "30d" | "90d"
 
-  const payload = await loadMarketingMetricsPayload(periodo)
+  // Sin la distribución de contenidos: el panel no la dibuja en ningún lado y
+  // pedirla era una consulta a `marketing_ideas` en cada carga. El cron sí la usa.
+  const payload = await loadMarketingMetricsPayload(periodo, { incluirDistribucionContenido: false })
 
   // Consultar si hay un análisis IA ya guardado para este período
   const db = getAdminDb()
