@@ -3,7 +3,13 @@ import PizZip from "pizzip"
 
 import { createClient } from "@/lib/supabase/server"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { huecosMalEscritos, huecosQueQuedanEnElTexto, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
+import {
+  huecosDe,
+  huecosMalEscritos,
+  huecosQueQuedanEnElTexto,
+  rellenarDocx,
+  textoPorParte,
+} from "@/lib/plantillas/docx"
 import { separarPorEstado } from "@/lib/asesor-docs/propuesta"
 import { rutaDelDocumentoGenerado } from "@/lib/asesor-docs/reglas"
 import {
@@ -435,7 +441,16 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
    * `huecosDelMolde`. Se hace igual en las dos para que se vea que es la misma.
    */
   const datosQueElMoldeUsa = Object.fromEntries(
-    Object.entries(datosCompletos).filter(([campo]) => campo in huecosDelMolde),
+    /**
+     * `hasOwnProperty` y no `in`: `in` recorre el prototipo, así que un campo
+     * llamado `constructor` o `toString` daría verdadero contra un mapa que no
+     * lo tiene. Hoy `contarHuecosDelMolde` devuelve un objeto sin prototipo y
+     * el punto es discutible — pero esa es una decisión de OTRO archivo, y
+     * apoyarse en ella es apoyarse en algo que nadie prometió.
+     */
+    Object.entries(datosCompletos).filter(([campo]) =>
+      Object.prototype.hasOwnProperty.call(huecosDelMolde, campo),
+    ),
   )
 
   const sospechasDeTextoFijo = camposQueParecenTextoFijo({
@@ -469,10 +484,24 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
      * `huecosQueQuedanEnElTexto` mira las PARTES YA EXTRAÍDAS —que sí incluyen
      * las notas al final— y no distingue bien escrito de mal escrito, porque
      * para esta comprobación da igual: si quedó una llave en el papel, el
-     * documento no sale. Es estrictamente más que lo que había: cubre todo lo
-     * que cubrían las dos juntas, y además la parte ciega.
+     * documento no sale.
+     *
+     * ═══ Y va la UNIÓN, no el reemplazo. Esto fue un error mío ═══
+     *
+     * Al arreglar la ceguera puse `huecosQueQuedanEnElTexto` EN LUGAR de las
+     * dos anteriores, y escribí que era "estrictamente más". **Era falso, y lo
+     * midió la revisión:** con un `{{\nZONA}}` —el salto de línea adentro de
+     * las llaves, en el mismo `<w:t>`— `huecosDe` lo ve y la función nueva no,
+     * porque su patrón excluye el salto de línea a propósito (si no, un `{{` al
+     * final de un párrafo y un `}}` al principio del siguiente armarían un
+     * hallazgo fantasma).
+     *
+     * O sea que cada una ve algo que la otra no. Se suman las dos: la vieja
+     * aporta los huecos partidos por saltos de línea, la nueva aporta las notas
+     * al final, los mal escritos y las entidades. `frenosDeLaGeneracion`
+     * deduplica.
      */
-    huecosQueQuedaron: huecosQueQuedanEnElTexto(partesDelGenerado),
+    huecosQueQuedaron: [...huecosQueQuedanEnElTexto(partesDelGenerado), ...huecosDe(zipGenerado)],
     /**
      * Y la quinta, que mira el MOLDE. Tiene que ser el molde: en el documento
      * generado ese hueco ya no está —docxtemplater lo dejó en blanco— así que

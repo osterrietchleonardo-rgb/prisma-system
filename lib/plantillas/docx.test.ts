@@ -7,6 +7,7 @@ import {
   rellenarDocx,
   huecosDe,
   huecosMalEscritos,
+  huecosQueQuedanEnElTexto,
   textoDeDocx,
   textoPorParte,
 } from "./docx"
@@ -960,6 +961,56 @@ describe("huecosMalEscritos", () => {
 
   it("el válido pegado al inválido: se avisa solo el malo", () => {
     expect(huecosMalEscritos({ a: "A: {{ZONA}} y {{ZONA-2}}." })).toEqual(["{{ZONA-2}}"])
+  })
+
+  /**
+   * ═══ Por qué `huecosQueQuedanEnElTexto` NO reemplaza a `huecosDe` ═══
+   *
+   * Al cerrar el agujero de la nota al final puse la función nueva EN LUGAR de
+   * `huecosDe`, y escribí que era "estrictamente más". **Era falso**, y lo midió
+   * la revisión: cada una ve algo que la otra no.
+   *
+   * Sonda, sobre el mismo `.docx` en cada fila:
+   *
+   * | caso                                   | huecosDe   | la nueva      |
+   * |----------------------------------------|------------|---------------|
+   * | salto de línea CRUDO adentro del <w:t> | ["ZONA"]   | []            |
+   * | hueco partido por un <w:br/>           | ["ZONA"]   | ["{{ZONA}}"]  |
+   * | hueco partido en dos <w:t>             | ["ZONA"]   | ["{{ZONA}}"]  |
+   * | hueco partido entre DOS párrafos       | []         | []            |
+   *
+   * La nueva excluye el salto de línea a propósito: `textoPorParte` pega los
+   * párrafos con `
+`, así que sin esa exclusión un `{{` al final de un párrafo
+   * y un `}}` al principio del siguiente armarían un hallazgo fantasma — la
+   * última fila de la tabla. El precio es la primera fila.
+   *
+   * Por eso el endpoint las SUMA. Este test es lo que impide que alguien vuelva
+   * a reemplazar una por otra creyendo que sobra.
+   *
+   * Honestidad sobre el alcance: **no pude construir un caso ALCANZABLE desde
+   * la app** donde la primera fila decida —el molde sale de
+   * `ponerHuecosEnDocx`, que escribe los huecos limpios, y un valor con salto
+   * de línea lo convierte `linebreaks: true` en `<w:br/>`, que es la segunda
+   * fila—. O sea que la unión es defensa en profundidad, no una vía medida. Se
+   * dice así en vez de venderla como otra cosa.
+   */
+  it("cada una ve algo que la otra no: el salto de línea crudo lo ve solo huecosDe", () => {
+    const conSaltoCrudo = armarDocx(`<w:p><w:r><w:t>Zona: {{
+ZONA}}.</w:t></w:r></w:p>`)
+    expect(huecosDe(conSaltoCrudo), "huecosDe dejó de ver el salto de línea crudo").toEqual(["ZONA"])
+    expect(
+      huecosQueQuedanEnElTexto(textoPorParte(conSaltoCrudo)),
+      "si esto empieza a verlo, el comentario del endpoint hay que actualizarlo",
+    ).toEqual([])
+  })
+
+  it("y el hueco partido entre DOS párrafos no lo ve ninguna, que es lo correcto", () => {
+    const partidoEntreParrafos = armarDocx(
+      `<w:p><w:r><w:t>Zona: {{</w:t></w:r></w:p><w:p><w:r><w:t>ZONA}}.</w:t></w:r></w:p>`,
+    )
+    expect(huecosDe(partidoEntreParrafos)).toEqual([])
+    expect(huecosQueQuedanEnElTexto(textoPorParte(partidoEntreParrafos))).toEqual([])
   })
 
   /**

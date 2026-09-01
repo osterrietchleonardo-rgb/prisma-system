@@ -1134,3 +1134,69 @@ describe("lo que pasa si la escritura falla", () => {
     expect(filaDe(BRUNO).estado).toBe("ok")
   })
 })
+
+// ---------------------------------------------------------------------------
+// LOS NOMBRES DE HUECO QUE SON PROPIEDADES DE Object
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ La tercera cara del daño silencioso ═══
+ *
+ * `{{__proto__}}`, `{{constructor}}`, `{{toString}}` son nombres de hueco
+ * PERFECTAMENTE VÁLIDOS según el alfabeto (letras y guión bajo), y a la vez son
+ * propiedades que todo objeto de JavaScript hereda. Un contrato que dice
+ * "Sucursal: {{__proto__}}" no es raro de escribir si alguien copió un ejemplo.
+ *
+ * Medido por la revisión antes del arreglo:
+ *
+ *  · `{{__proto__}}` → `status=200`, la fila escrita, el archivo subido, y el
+ *    contrato diciendo "Sucursal: ." — **las cinco comprobaciones en verde y un
+ *    blanco en el papel**. Asignar `__proto__` en un objeto literal es un
+ *    no-op, así que el hueco nunca entraba al mapa de `contarHuecosDelMolde`.
+ *  · `{{constructor}}` → **500 con stack** (`… .trim is not a function`), no un
+ *    mensaje. Falla cerrado, pero el director no entiende nada.
+ *
+ * Es la misma clase que el `{{ZONA-2}}` y que el `{{ZONA}}` de la nota al
+ * final, y `docx.ts` ya tenía este guard documentado para su propio parser:
+ * `generar.ts` no lo había heredado.
+ */
+describe("un hueco que se llama como una propiedad de Object", () => {
+  const conElHueco = (nombre: string) => {
+    base.archivos.set(RUTA_MOLDE_NUEVO, buffer(moldeNuevo([`Sucursal: {{${nombre}}}.`])))
+  }
+
+  /**
+   * Ninguno de estos está en el `form_data` de Bruno, así que el resultado
+   * correcto es el MISMO que para cualquier campo nuevo que le falte:
+   * `pendiente`, con la versión anterior, y sin documento generado.
+   */
+  for (const nombre of ["__proto__", "constructor", "toString", "valueOf", "hasOwnProperty"]) {
+    it(`{{${nombre}}} se trata como un campo que le falta, no como un blanco ni como un 500`, async () => {
+      conElHueco(nombre)
+      const r = await pedir()
+
+      expect(r.status, `{{${nombre}}} tendría que dar 200 y quedar pendiente`).toBe(200)
+      expect(r.cuerpo.estado).toBe("pendiente")
+      expect(r.cuerpo.camposQueFaltan).toContain(nombre)
+
+      /** Y sobre todo: NO se generó ni se subió nada. */
+      expect(filaDe(BRUNO).version_id).toBe(VER_VIEJA)
+      expect(filaDe(BRUNO).docx_path ?? null).toBeNull()
+      expect(base.escrituras.filter((e) => e.tabla === "storage")).toEqual([])
+    })
+  }
+
+  /**
+   * Y el caso que cierra el círculo: si el dato SÍ está cargado con ese nombre,
+   * el documento se genera igual que con cualquier otro campo. El guard no
+   * puede convertirse en una prohibición.
+   */
+  it("pero si el dato existe con ese nombre, el documento se genera igual", async () => {
+    conElHueco("constructor")
+    filaDe(BRUNO).form_data = { ...DATOS[BRUNO], constructor: "Sucursal Norte" }
+    const r = await pedir()
+    expect(r.status).toBe(200)
+    expect(r.cuerpo.estado).toBe("ok")
+    expect(filaDe(BRUNO).version_id).toBe(VER_NUEVA)
+  })
+})

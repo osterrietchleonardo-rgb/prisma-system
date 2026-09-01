@@ -103,7 +103,25 @@ const HUECO = new RegExp(
  * Contarlo es lo que lo delata.
  */
 export function contarHuecosDelMolde(partesDelMolde: Record<string, string>): Record<string, number> {
-  const cuenta: Record<string, number> = {}
+  /**
+   * `Object.create(null)` y no `{}`, y no es prolijidad: es un BLANCO en un
+   * contrato.
+   *
+   * Medido end-to-end por la revisión: con `{{__proto__}}` en el molde, el
+   * endpoint devolvía `status=200`, escribía la fila, subía el archivo, y el
+   * contrato decía `"…Sucursal: ."`. Asignar `__proto__` en un objeto literal
+   * es un no-op —no crea la clave—, así que ese hueco nunca entraba al mapa:
+   * la 1 no lo contaba, la 3 no lo veía (docxtemplater lo dejó en blanco, no
+   * quedó marca) y la 5 decía que el nombre es *válido*, porque lo es.
+   *
+   * Las cinco comprobaciones en verde y un blanco en el papel. Es la misma
+   * clase que el `{{ZONA-2}}` y que el `{{ZONA}}` de la nota al final: el
+   * daño silencioso. Un objeto sin prototipo no tiene esa trampa.
+   *
+   * `docx.ts` ya documentaba este guard para su propio `parser` —con
+   * `hasOwnProperty`— y `generar.ts` no lo había heredado.
+   */
+  const cuenta: Record<string, number> = Object.create(null)
   for (const ruta of Object.keys(partesDelMolde)) {
     for (const m of (partesDelMolde[ruta] ?? "").matchAll(HUECO)) {
       cuenta[m[1]] = (cuenta[m[1]] ?? 0) + 1
@@ -160,7 +178,20 @@ function todoElTexto(partes: Record<string, string>): string {
  * lugar en blanco, y un blanco en un contrato no se ve.
  */
 export function huecosSinDato(huecosDelMolde: Record<string, number>, datos: Record<string, string> | null): string[] {
-  const tiene = (campo: string) => (datos?.[campo] ?? "").trim() !== ""
+  /**
+   * `hasOwnProperty` y no un `datos?.[campo]` pelado, por lo mismo que arriba.
+   *
+   * Medido: con `{{constructor}}` —o `{{toString}}`, `{{valueOf}}`,
+   * `{{hasOwnProperty}}`— el acceso devolvía la función del prototipo y el
+   * `.trim()` explotaba con `TypeError: … .trim is not a function`, o sea un
+   * 500 con stack en vez de un mensaje. Falla cerrado, pero el director no
+   * entiende nada y no puede hacer nada.
+   */
+  const tiene = (campo: string) => {
+    if (!datos || !Object.prototype.hasOwnProperty.call(datos, campo)) return false
+    const valor = datos[campo]
+    return typeof valor === "string" && valor.trim() !== ""
+  }
   return Object.keys(huecosDelMolde)
     .filter((campo) => !tiene(campo))
     .sort()
