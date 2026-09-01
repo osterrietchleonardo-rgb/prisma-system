@@ -3,7 +3,7 @@ import PizZip from "pizzip"
 
 import { createClient } from "@/lib/supabase/server"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { huecosDe, huecosMalEscritos, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
+import { huecosMalEscritos, huecosQueQuedanEnElTexto, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
 import { separarPorEstado } from "@/lib/asesor-docs/propuesta"
 import { rutaDelDocumentoGenerado } from "@/lib/asesor-docs/reglas"
 import {
@@ -425,15 +425,28 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
     partesDelGenerado,
     partesDeSuOriginal,
     /**
-     * Los dos, y no solo `huecosDe`.
+     * TODA marca con forma de hueco que quedó en el papel, mirando el
+     * documento ENTERO. Ni `huecosDe` ni `huecosMalEscritos` alcanzaban.
      *
-     * `huecosDe` lista los huecos BIEN escritos que quedaron sin rellenar. Lo
-     * que parece un hueco y no lo es —un `{{ZONA-2}}` que se coló adentro del
-     * dato guardado de esta persona— no lo ve, y saldría impreso literal en el
-     * contrato. Ese caso es RUIDOSO (se ve en el papel), a diferencia del del
-     * molde, que sale como un blanco y tiene su propia comprobación abajo.
+     * Acá estaba `[...huecosDe(zipGenerado), ...huecosMalEscritos(partesDelGenerado)]`
+     * y dejaba pasar el peor caso de la etapa, medido contra este mismo
+     * endpoint: un `{{ZONA}}` **bien escrito** en una nota al final salía
+     * `status=200`, `estado:'ok'`, y el contrato generado decía
+     * `"Nota: la zona {{ZONA}} se revisa cada anio."` — con las llaves puestas,
+     * en un documento que alguien firma.
+     *
+     * Se le escapaba por las dos: `huecosDe` recorre las partes que
+     * docxtemplater RELLENA, y `word/endnotes.xml` no está entre ellas (no
+     * puede estar: el rellenado no la toca); y `huecosMalEscritos` callaba
+     * porque ese hueco está **bien** escrito.
+     *
+     * `huecosQueQuedanEnElTexto` mira las PARTES YA EXTRAÍDAS —que sí incluyen
+     * las notas al final— y no distingue bien escrito de mal escrito, porque
+     * para esta comprobación da igual: si quedó una llave en el papel, el
+     * documento no sale. Es estrictamente más que lo que había: cubre todo lo
+     * que cubrían las dos juntas, y además la parte ciega.
      */
-    huecosQueQuedaron: [...huecosDe(zipGenerado), ...huecosMalEscritos(partesDelGenerado)],
+    huecosQueQuedaron: huecosQueQuedanEnElTexto(partesDelGenerado),
     /**
      * Y la quinta, que mira el MOLDE. Tiene que ser el molde: en el documento
      * generado ese hueco ya no está —docxtemplater lo dejó en blanco— así que

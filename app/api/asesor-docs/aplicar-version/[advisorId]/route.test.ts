@@ -624,15 +624,34 @@ describe("el campo que la versión nueva trajo y esta persona no tiene", () => {
 
 describe("1. que sus datos hayan aterrizado", () => {
   /**
-   * ═══ Cómo se aísla esta comprobación ═══
+   * ═══ Esta comprobación YA NO SE PUEDE AISLAR en el endpoint, y hay que
+   *     decirlo en vez de taparlo ═══
    *
-   * El molde tiene `{{ZONA}}` **solo en una nota al final**. docxtemplater NO
-   * rellena las notas al final (está documentado y medido en `docx.ts`), así que
-   * el dato de Bruno no llega nunca. Y `huecosDe` tampoco LEE las notas al
-   * final, así que la comprobación 3 no ve nada. Las otras dos tampoco: no hay
-   * dato ajeno, y ningún valor de Bruno aparece dos veces.
+   * Antes se aislaba con el molde que tiene `{{ZONA}}` **solo en una nota al
+   * final**: docxtemplater no las rellena, así que el dato no llegaba nunca, y
+   * `huecosDe` tampoco las leía, así que la 3 no veía nada. La 1 era la única
+   * que frenaba.
    *
-   * Resultado: la única que puede frenar acá es la 1.
+   * Ese aislamiento vivía de una CEGUERA, y la ceguera era el agujero: un
+   * `{{ZONA}}` bien escrito en la nota al final salía impreso, con las llaves
+   * puestas, en un contrato que alguien firma. Al taparlo —la 3 ahora mira el
+   * documento entero— este escenario dispara las dos.
+   *
+   * Y no es que falte buscar otro escenario: **para que la 1 pueda fallar,
+   * un hueco tiene que haber quedado sin rellenar, y cualquier hueco sin
+   * rellenar deja una marca que la 3 ahora ve.** Las dos son coextensivas acá.
+   *
+   * Medido, apagando la 1 en `generar.ts` y corriendo la suite: 3 rojos, y en
+   * ESTE test el resultado pasa a `['hueco-sin-rellenar']` — el endpoint
+   * **sigue frenando y sigue sin escribir nada**. Cambia el diagnóstico, no la
+   * protección.
+   *
+   * Entonces la 1 se queda, pero por lo que de verdad aporta: **nombra el campo
+   * y dice cuántas veces tenía que aparecer**, que es lo que el director
+   * necesita para arreglarlo. Como red independiente ya no cuenta, y su
+   * capacidad de distinguir se sigue midiendo donde sí es distinguible: en los
+   * tests de `frenosDeLaGeneracion`, que le pasan las entradas directo (ahí
+   * apagarla también da rojo).
    */
   const soloEnLaNota = () => {
     base.archivos.set(
@@ -657,10 +676,35 @@ describe("1. que sus datos hayan aterrizado", () => {
     expect(r.status).toBe(409)
   })
 
-  it("es esta comprobación la que actuó, y no otra", async () => {
+  it("acá actúan la 1 y la 3, y las otras dos siguen calladas", async () => {
     soloEnLaNota()
     const r = await pedir()
-    expect((r.cuerpo.motivos as Array<{ codigo: string }>).map((m) => m.codigo)).toEqual(["no-aterrizo"])
+    const codigos = (r.cuerpo.motivos as Array<{ codigo: string }>).map((m) => m.codigo)
+    /**
+     * Las DOS, y en ese orden. Que estén las dos no es un defecto: las dos
+     * dicen algo cierto —el dato no llegó, y quedó una marca en el papel— y el
+     * director necesita las dos para entender qué pasó.
+     *
+     * Lo que este test cuida es que las otras DOS sigan sin disparar: si
+     * mañana aparece `dato-ajeno` o `texto-fijo` acá, alguna se volvió
+     * demasiado sensible y hay que mirarla.
+     */
+    expect(codigos).toEqual(["no-aterrizo", "hueco-sin-rellenar"])
+  })
+
+  /**
+   * El caso que la 3 sola NO podría explicar: el hueco quedó sin rellenar en
+   * una parte que el director no mira nunca. Sin la 1, el mensaje diría "quedó
+   * una marca" sin decir DE QUÉ CAMPO ni dónde tenía que aparecer.
+   */
+  it("y el mensaje nombra el campo, que es lo único que la 1 aporta hoy", async () => {
+    soloEnLaNota()
+    const r = await pedir()
+    const noAterrizo = (r.cuerpo.motivos as Array<{ codigo: string; mensaje: string }>).find(
+      (m) => m.codigo === "no-aterrizo",
+    )
+    expect(noAterrizo, "desapareció el motivo que nombra el campo").toBeTruthy()
+    expect(noAterrizo!.mensaje).toContain("ZONA")
   })
 
   it("con el molde sano, la misma persona SÍ se escribe", async () => {
@@ -745,6 +789,60 @@ describe("3. que no quede un hueco sin rellenar", () => {
     const r = await pedir()
     expect((r.cuerpo.motivos as Array<{ codigo: string }>).map((m) => m.codigo)).toEqual(["hueco-sin-rellenar"])
     expect(String(r.cuerpo.error)).toContain("{{FIRMA}}")
+  })
+
+  /**
+   * ═══ El agujero que esta comprobación estaba dejando pasar ═══
+   *
+   * Un `{{ZONA}}` **BIEN escrito** en una nota al final. Medido contra este
+   * mismo endpoint antes del arreglo: `status=200`, `estado:'ok'`, la fila
+   * escrita, y el contrato generado diciendo
+   * `"Nota: la zona {{ZONA}} se revisa cada anio."` — con las llaves puestas,
+   * en el papel que alguien firma.
+   *
+   * Se le escapaba a las cinco: la 3 usaba `huecosDe`, que recorre las partes
+   * que docxtemplater RELLENA y las notas al final no están ahí; la 5 callaba
+   * porque el hueco está bien escrito; la 1 queda tapada acá **a propósito**
+   * —la zona de Bruno está en el cuerpo como texto FIJO, así que su dato sí
+   * "aterriza" y la cuenta cierra—; y la 4 solo lo vería si el documento viejo
+   * de otro nombrara su dato menos veces.
+   *
+   * Es el hermano del `{{ZONA-2}}` y peor: aquél salía como un blanco, éste
+   * sale con la marca a la vista.
+   *
+   * Este escenario es además el único que aísla a la 3 de la 1, ahora que las
+   * dos miran el documento entero.
+   */
+  const huecoBienEscritoEnLaNota = () => {
+    base.archivos.set(
+      RUTA_MOLDE_NUEVO,
+      buffer(
+        docx(
+          [
+            parrafo("CONTRATO EDICION 2027"),
+            parrafo("Y por la otra parte {{NOMBRE}}, mayor de edad, CUIT {{CUIT}}, en adelante EL ASESOR."),
+            // La zona de Bruno, pero como texto FIJO: su dato aterriza igual.
+            parrafo("Se asigna a EL ASESOR la zona de Belgrano, con captacion preferente."),
+          ],
+          "Nota: la zona {{ZONA}} se revisa cada anio.",
+        ),
+      ),
+    )
+  }
+
+  it("un hueco BIEN escrito en la nota al final también frena, y no se escribe nada", async () => {
+    huecoBienEscritoEnLaNota()
+    const r = await pedir()
+    /** La conducta PRIMERO. Antes del arreglo, acá había un 200 y una fila. */
+    expect(nadaSeEscribioDe(BRUNO)).toEqual(COMO_ESTABA)
+    expect(r.status).toBe(409)
+  })
+
+  it("y lo agarra SOLO la 3: el dato de Bruno sí aterrizó", async () => {
+    huecoBienEscritoEnLaNota()
+    const r = await pedir()
+    expect((r.cuerpo.motivos as Array<{ codigo: string }>).map((m) => m.codigo)).toEqual(["hueco-sin-rellenar"])
+    expect(String(r.cuerpo.error)).toContain("{{ZONA}}")
   })
 })
 

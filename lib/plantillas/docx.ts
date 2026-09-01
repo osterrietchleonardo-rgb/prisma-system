@@ -784,17 +784,64 @@ export function huecosDe(zip: PizZip): string[] {
  * Devuelve el texto TAL COMO ESTÁ ESCRITO —`"{{ZONA-2}}"`, con las llaves— sin
  * repetir, porque es lo que el director tiene que buscar en el Word.
  */
-const RE_PARECE_HUECO = new RegExp(`${APERTURA_DE_HUECO}[^{}
-]*${CIERRE_DE_HUECO}`, "g")
+/**
+ * El cuerpo del hueco: cualquier cosa MENOS los caracteres de los propios
+ * delimitadores y menos un salto de línea.
+ *
+ * Los delimitadores salen de `DELIMITADORES`, no escritos a mano: si mañana
+ * dejaran de ser `{{`/`}}`, esta clase los sigue sola.
+ *
+ * Y el salto de línea queda afuera por el fantasma: `textoPorParte` pega los
+ * párrafos con `\n`, así que un `{{` al final de un párrafo y un `}}` al
+ * principio del siguiente armarían un hallazgo que no existe. Es el mismo
+ * motivo por el que `huecosDe` mete un `|||` entre párrafos.
+ */
+const CARACTERES_DE_DELIMITADOR = [...new Set([...DELIMITADORES.start, ...DELIMITADORES.end])].join("")
+const RE_PARECE_HUECO = new RegExp(
+  `${APERTURA_DE_HUECO}[^${escapeRegExp(CARACTERES_DE_DELIMITADOR)}\r\n]*${CIERRE_DE_HUECO}`,
+  "g",
+)
 
 export function huecosMalEscritos(partes: Record<string, string>): string[] {
-  const malos = new Set<string>()
+  return huecosQueQuedanEnElTexto(partes).filter((h) => !huecoValido(h))
+}
+
+/**
+ * TODA marca con forma de hueco que quedó escrita en el texto, esté bien o mal
+ * escrita: `{{ZONA}}`, `{{ZONA-2}}`, `{{ }}`.
+ *
+ * ═══ Por qué existe aparte de `huecosDe`, y qué agujero tapa ═══
+ *
+ * `huecosDe` recorre `partesDeTextoDeDocx`, o sea **las partes que docxtemplater
+ * RELLENA**. `word/endnotes.xml` no está ahí —y no puede estar, porque el
+ * rellenado no la toca— pero `textoPorParte` sí la lee.
+ *
+ * Medido el 2026-09-01 sobre un molde con `{{ZONA}}` en una nota al final:
+ *
+ * ```
+ * partesGen     = {"word/document.xml":"Zona: Belgrano.",
+ *                  "word/endnotes.xml":"Nota: la zona {{ZONA}} se revisa cada anio."}
+ * huecosDe(gen) = []   ← ciego: la nota al final no está entre sus partes
+ * malEscritos   = []   ← ciego: el hueco está BIEN escrito
+ * ```
+ *
+ * O sea: el contrato sale a la firma con `{{ZONA}}` impreso, con las llaves
+ * puestas, y las dos funciones que ya existían dicen que no hay nada. Es el
+ * hermano del `{{ZONA-2}}`, y peor: aquél salía como un blanco, éste sale con
+ * la marca a la vista.
+ *
+ * Por eso esta función trabaja sobre las PARTES ya extraídas (`textoPorParte`)
+ * y no sobre el zip: lo que hay que mirar es el documento ENTERO, no lo que el
+ * rellenado promete tocar.
+ *
+ * Devuelve el texto tal como está escrito, sin repetir.
+ */
+export function huecosQueQuedanEnElTexto(partes: Record<string, string>): string[] {
+  const encontrados = new Set<string>()
   for (const ruta of Object.keys(partes)) {
-    for (const m of (partes[ruta] ?? "").matchAll(RE_PARECE_HUECO)) {
-      if (!huecoValido(m[0])) malos.add(m[0])
-    }
+    for (const m of (partes[ruta] ?? "").matchAll(RE_PARECE_HUECO)) encontrados.add(m[0])
   }
-  return [...malos]
+  return [...encontrados]
 }
 
 /**
