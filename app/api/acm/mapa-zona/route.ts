@@ -22,6 +22,7 @@
 // que llama no elige qué se dibuja).
 import { NextResponse } from "next/server";
 import sharp from "sharp";
+import { anchoDelTexto, comoPaths, contornosDeTexto } from "@/lib/tipografia/contornos";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { AcmFichaSnapshot } from "@/lib/acm/ficha";
 // Zoom, recorte, colores y el cálculo de qué punto entra en cuadro viven en lib/acm/zona-mapa.ts
@@ -101,9 +102,30 @@ export async function GET(req: Request) {
     // la ficha no nombra ninguna otra. Van los dos porque son dos licencias distintas — los
     // datos son de OpenStreetMap y el dibujo es de CARTO. Va chico, sobre una banda
     // semitransparente para que se lea sobre cualquier mapa.
+    //
+    // POR QUE EL TEXTO SE DIBUJA COMO FORMAS Y NO CON <text>: en el runtime de Vercel no hay
+    // ninguna fuente instalada, asi que un <text> sale como una fila de cuadraditos vacios.
+    // Estuvo saliendo asi en TODAS las fichas hasta el 1-sep-2026 — o sea, sin el credito que la
+    // licencia exige — y no se veia en local, donde Windows si tiene fuentes. Ver
+    // lib/tipografia/contornos.ts. La banda se dimensiona con el ancho REAL del texto, que ahora
+    // lo sabemos porque lo medimos nosotros.
+    const CUERPO_CREDITO = 17;
+    const PAD = 10;
+    const TEXTO_CREDITO = "© OpenStreetMap © CARTO";
+    const anchoBanda = Math.ceil(anchoDelTexto(TEXTO_CREDITO, CUERPO_CREDITO)) + PAD * 2;
+    const letras = contornosDeTexto(
+      TEXTO_CREDITO,
+      ANCHO - anchoBanda + PAD,
+      ALTO - 11,
+      CUERPO_CREDITO
+    );
+    if (letras.letrasRotas > 0) {
+      // Nunca deberia pasar. Si pasa, el mapa sale sin el credito que exige la licencia.
+      console.error(`[ERROR] Credito del mapa: ${letras.letrasRotas} letras no se pudieron dibujar`);
+    }
     const credito =
-      `<rect x="${ANCHO - 300}" y="${ALTO - 34}" width="300" height="34" fill="#ffffff" fill-opacity="0.72"/>` +
-      `<text x="${ANCHO - 10}" y="${ALTO - 11}" text-anchor="end" font-family="sans-serif" font-size="17" fill="#4a4a4a">© OpenStreetMap © CARTO</text>`;
+      `<rect x="${ANCHO - anchoBanda}" y="${ALTO - 34}" width="${anchoBanda}" height="34" fill="#ffffff" fill-opacity="0.72"/>` +
+      comoPaths(letras.paths, "#4a4a4a");
 
     const svg = Buffer.from(
       `<svg xmlns="http://www.w3.org/2000/svg" width="${ANCHO}" height="${ALTO}">${marcas.join("")}${credito}</svg>`
