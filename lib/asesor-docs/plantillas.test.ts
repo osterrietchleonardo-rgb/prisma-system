@@ -1254,6 +1254,9 @@ describe("la fila dibujada: los renglones tienen que llegar a la pantalla", () =
     sinComprobar: 0,
     desvinculados: 0,
     pendientes: 0,
+    yaAplicados: 0,
+    versionYaAplicada: null,
+    versionIdYaAplicada: null,
   }
 
   /** El texto visible de la fila: el HTML sin etiquetas y sin entidades. */

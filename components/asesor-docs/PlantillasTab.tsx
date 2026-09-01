@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileStack, Loader2, RotateCcw, Sparkles, Users, UserMinus, AlertTriangle, Info, FileUp } from "lucide-react";
+import {
+  FileStack, Loader2, RotateCcw, Sparkles, Users, UserMinus, AlertTriangle, Info, FileUp, CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { BloqueError } from "@/components/asesor-docs/DocumentosDelAsesor";
@@ -13,13 +15,16 @@ import { VersionNueva } from "@/components/asesor-docs/VersionNueva";
 import {
   armarFilas,
   asesoresDeLaPlantilla,
+  botonDePonerEnUso,
   explicacionDelEstado,
   motivoParaNoDetectar,
+  motivoParaNoPonerEnUsoDesdeLaFila,
   motivoParaNoSubirVersion,
   PARA_QUE_SIRVE,
   textoDesvinculados,
   textoPendientes,
   textoSinComprobar,
+  textoYaAplicados,
   type AsesorCrudo,
   type DocumentoCrudo,
   type FilaPlantilla,
@@ -83,6 +88,8 @@ export function PlantillasTab() {
    * misma inmobiliaria no tienen para qué existir.
    */
   const [subiendoVersionEn, setSubiendoVersionEn] = useState<string | null>(null);
+  /** Qué fila está poniendo su versión en uso ahora mismo. */
+  const [activandoEn, setActivandoEn] = useState<string | null>(null);
   /**
    * Los crudos se guardan además de las filas armadas: la pantalla de la
    * versión nueva necesita saber QUIÉNES son los asesores de ese tipo de
@@ -246,6 +253,42 @@ export function PlantillasTab() {
     }
   };
 
+  /**
+   * Poner en uso la versión que ya se le aplicó a todos, desde la fila.
+   *
+   * Es el mismo pedido que hace el panel; existe acá también porque el panel
+   * arranca siempre pidiendo un Word, y el director que aplicó y cerró sin
+   * activar se quedaba sin ninguna forma de terminar.
+   *
+   * El 409 se muestra tal cual: `activar-version` se niega con los NOMBRES de
+   * los que quedaron atrás, y ese mensaje ya está escrito para el director.
+   */
+  const ponerEnUso = async (fila: FilaPlantilla) => {
+    if (fila.versionIdYaAplicada === null || activandoEn !== null) return;
+    setActivandoEn(fila.templateId);
+    try {
+      const res = await fetch("/api/asesor-docs/activar-version", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Dos ids y nada más: quién soy y de qué inmobiliaria lo sabe el
+        // servidor por la sesión.
+        body: JSON.stringify({ templateId: fila.templateId, versionId: fila.versionIdYaAplicada }),
+      });
+      const cuerpo = await res.json().catch(() => null);
+      if (!res.ok) {
+        toast.error(cuerpo?.error ?? "No se pudo poner en uso esa versión. Probá de nuevo.");
+        return;
+      }
+      toast.success(cuerpo?.resumen ?? "La versión quedó en uso.");
+      cargar();
+    } catch (e) {
+      console.error("[PlantillasTab] falló el pedido de activación:", e);
+      toast.error("No se pudo hablar con el servidor. Revisá la conexión y probá de nuevo.");
+    } finally {
+      setActivandoEn(null);
+    }
+  };
+
   return (
     /**
      * El alto, que en la Etapa A costó una ronda entera: contenedor en
@@ -312,6 +355,8 @@ export function PlantillasTab() {
               detectando={detectandoId === fila.templateId}
               onDetectar={() => detectar(fila)}
               onSubirVersion={() => setSubiendoVersionEn(fila.templateId)}
+              onPonerEnUso={() => ponerEnUso(fila)}
+              poniendoEnUso={activandoEn === fila.templateId}
             >
               {propuesta?.fila.templateId === fila.templateId && (
                 /* La revisión es OBLIGATORIA antes de guardar (spec §7.2):
@@ -371,6 +416,8 @@ export function FilaDeLaSolapa({
   detectando,
   onDetectar,
   onSubirVersion,
+  onPonerEnUso,
+  poniendoEnUso = false,
   children,
 }: {
   fila: FilaPlantilla;
@@ -378,6 +425,16 @@ export function FilaDeLaSolapa({
   onDetectar: () => void;
   /** Abre la pantalla de la versión nueva. Opcional para poder dibujar la fila sola. */
   onSubirVersion?: () => void;
+  /**
+   * Pone en uso la versión que ya se le aplicó a todos.
+   *
+   * Existe porque el panel arranca SIEMPRE pidiendo un Word: el director que
+   * aplicó y cerró sin activar se quedaba sin ninguna forma de terminar, y el
+   * aviso de la fila le decía "falta ponerla en uso" sin nada que apretar. Una
+   * instrucción que no se puede ejecutar es peor que no decir nada.
+   */
+  onPonerEnUso?: () => void;
+  poniendoEnUso?: boolean;
   children?: React.ReactNode;
 }) {
   /**
@@ -389,6 +446,15 @@ export function FilaDeLaSolapa({
    */
   const motivo = motivoParaNoDetectar(fila.participan, fila.documentos);
   const motivoVersion = motivoParaNoSubirVersion(fila);
+  const avisoYaAplicados = textoYaAplicados(fila.yaAplicados);
+  /**
+   * El botón de poner en uso solo existe cuando hay algo que poner en uso. El
+   * `motivo` decide si se puede apretar, y se escribe abajo siempre visible por
+   * lo mismo que los otros dos: un botón de shadcn deshabilitado lleva
+   * `pointer-events: none` y nunca dibuja su tooltip.
+   */
+  const hayQuePonerEnUso = fila.versionIdYaAplicada !== null;
+  const motivoActivar = motivoParaNoPonerEnUsoDesdeLaFila(fila);
   const avisoSinComprobar = textoSinComprobar(fila.sinComprobar);
   const avisoPendientes = textoPendientes(fila.pendientes);
   const avisoDesvinculados = textoDesvinculados(fila.desvinculados);
@@ -442,6 +508,25 @@ export function FilaDeLaSolapa({
             <FileUp className="h-4 w-4" />
             Subir versión nueva
           </Button>
+
+          {/* Y el tercero, que solo aparece cuando hay una versión aplicada
+              esperando. No es un botón permanente de la fila: es la salida del
+              estado intermedio, y desaparece apenas la versión queda en uso. */}
+          {hayQuePonerEnUso && (
+            <Button
+              variant="secondary"
+              className="gap-2"
+              disabled={motivoActivar !== null || poniendoEnUso || detectando}
+              onClick={onPonerEnUso}
+            >
+              {poniendoEnUso ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              {botonDePonerEnUso(fila.versionYaAplicada)}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -484,6 +569,16 @@ export function FilaDeLaSolapa({
           <span className="flex items-center gap-1.5 text-amber-600 font-medium">
             <AlertTriangle className="h-3.5 w-3.5" />
             {avisoSinComprobar}
+          </span>
+        )}
+        {/* El estado intermedio: ya tienen su documento de la versión nueva y
+            falta ponerla en uso. Sin color de alarma a propósito — de esas
+            personas está todo hecho y todo comprobado; lo que falta es un paso
+            del director. El texto lo arma `textoYaAplicados`, en lib. */}
+        {avisoYaAplicados && (
+          <span className="flex items-center gap-1.5 text-green-600 font-medium">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {avisoYaAplicados}
           </span>
         )}
         {/* El cuarto balde: a esa persona le falta un dato que la versión
@@ -529,6 +624,16 @@ export function FilaDeLaSolapa({
         <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
           <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <span>{motivoVersion}</span>
+        </p>
+      )}
+
+      {/* Y el del tercero. Es el más importante de los tres cuando aparece: el
+          director acaba de aplicarle la versión a todos y este renglón es el que
+          le dice por qué todavía no la puede poner en uso. */}
+      {hayQuePonerEnUso && motivoActivar && (
+        <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>{motivoActivar}</span>
         </p>
       )}
 

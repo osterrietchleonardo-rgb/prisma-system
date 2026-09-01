@@ -19,12 +19,15 @@ import {
   armarFilas,
   asesoresDeLaPlantilla,
   ASI_EMPIEZA_LA_ESPERA_DE_UN_DATO,
+  botonDePonerEnUso,
+  explicacionDelEstado,
   COMO_SE_APLICA,
   COMO_TIENE_QUE_SER_EL_ARCHIVO,
   EL_ARCHIVO_SIGUE_ELEGIDO,
   etiquetaDeResultado,
   motivoParaNoElegirAsesor,
   motivoParaNoPonerEnUso,
+  motivoParaNoPonerEnUsoDesdeLaFila,
   motivoParaNoSubirVersion,
   NADA_SE_APLICO_TODAVIA,
   PARA_QUE_SIRVE_LA_VERSION_NUEVA,
@@ -37,6 +40,7 @@ import {
   tituloDeCamposNuevos,
   tituloDeLaVistaPrevia,
   tituloDeLosQueFaltan,
+  textoYaAplicados,
   type AsesorDeLaPlantilla,
   type FilaPlantilla,
   type ResultadoDeAplicacion,
@@ -696,6 +700,9 @@ describe("la fila de la solapa: el botón de la versión nueva", () => {
     sinComprobar: 0,
     desvinculados: 0,
     pendientes: 0,
+    yaAplicados: 0,
+    versionYaAplicada: null,
+    versionIdYaAplicada: null,
   }
 
   const dibujar = (cambios: Partial<FilaPlantilla> = {}) =>
@@ -842,5 +849,307 @@ describe("la pantalla de la versión nueva no se escribe su propia prosa", () =>
     const veces = CODIGO.split("setArchivo(null)").length - 1
     expect(veces, "alguien suelta el archivo en un camino de error").toBe(2)
     expect(CODIGO).toContain("const validacion = validarArchivo(file.name, file.size")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EL ESTADO INTERMEDIO: YA APLICADO, TODAVÍA SIN PONER EN USO
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ El bloqueante de la revisión ═══
+ *
+ * `aplicar-version/{advisorId}` le escribe a cada asesor su `version_id` nuevo, y
+ * `activar-version` es lo ÚNICO que mueve `version_actual`. Entre las dos hay un
+ * estado donde `doc.version_id !== vigente` — y NO es un borde: mientras quede un
+ * `pendiente` la versión no se puede poner en uso, así que la fila se queda ahí
+ * hasta que el director le complete el dato a esa persona.
+ *
+ * Antes esos asesores caían en `sinComprobar` y la fila decía cuatro cosas falsas
+ * sobre ellos, más una instrucción peor que falsa: volver a detectar la
+ * plantilla, que la reconstruiría desde los documentos que acababan de salir de
+ * ella.
+ */
+describe("armarFilas: el que ya recibió la versión nueva no está 'sin comprobar'", () => {
+  const tipoEnV1 = { id: "t1", nombre: "Contrato", estado: "activa", version_actual: "v1" }
+  const versiones = [
+    { id: "v1", version: 1 },
+    { id: "v2", version: 2 },
+  ]
+  const armar = (
+    documentos: Parameters<typeof armarFilas>[0]["documentos"],
+    asesores = [{ id: "a1", estado: "activo" }],
+  ) => armarFilas({ tipos: [tipoEnV1], versiones, documentos, asesores })[0]
+
+  it("va a su propio balde, y NO al de sin comprobar", () => {
+    const fila = armar([{ template_id: "t1", estado: "ok", version_id: "v2", advisor_id: "a1" }])
+    expect(fila.yaAplicados, "el balde nuevo").toBe(1)
+    expect(fila.sinComprobar, "no puede seguir contándose como sin comparar").toBe(0)
+    expect(fila.enRojo).toBe(0)
+  })
+
+  it("trae con qué ponerla en uso: el número y el id de esa versión", () => {
+    const fila = armar([{ template_id: "t1", estado: "ok", version_id: "v2", advisor_id: "a1" }])
+    expect(fila.versionYaAplicada).toBe(2)
+    expect(fila.versionIdYaAplicada).toBe("v2")
+  })
+
+  /**
+   * Lo que `sinComprobar` SÍ cuida no se puede romper: el pausado que quedó con
+   * la versión vieja y el que subió su documento después tienen un `version_id`
+   * más VIEJO o nulo, no más nuevo.
+   */
+  it("el que quedó con una versión MÁS VIEJA sigue contándose como sin comparar", () => {
+    const fila = armarFilas({
+      tipos: [{ id: "t1", nombre: "Contrato", estado: "activa", version_actual: "v2" }],
+      versiones,
+      documentos: [{ template_id: "t1", estado: "ok", version_id: "v1", advisor_id: "a1" }],
+      asesores: [{ id: "a1", estado: "activo" }],
+    })[0]
+    expect(fila.sinComprobar).toBe(1)
+    expect(fila.yaAplicados).toBe(0)
+  })
+
+  it("el que subió su documento después, con version_id en null, también sigue ahí", () => {
+    const fila = armar([{ template_id: "t1", estado: null, version_id: null, advisor_id: "a1" }])
+    expect(fila.sinComprobar).toBe(1)
+    expect(fila.yaAplicados).toBe(0)
+  })
+
+  /** Si la consulta no trajo esa fila de versión, no se afirma nada nuevo. */
+  it("sin poder saber el número de la versión, cae donde caía antes", () => {
+    const fila = armarFilas({
+      tipos: [tipoEnV1],
+      versiones: [{ id: "v1", version: 1 }],
+      documentos: [{ template_id: "t1", estado: "ok", version_id: "v9", advisor_id: "a1" }],
+      asesores: [{ id: "a1", estado: "activo" }],
+    })[0]
+    expect(fila.yaAplicados).toBe(0)
+    expect(fila.sinComprobar).toBe(1)
+  })
+
+  /**
+   * El caso central del §7.4.2, y el que la revisión midió como el peor: dos ya
+   * aplicados y uno en `pendiente`. Antes juntaba el aviso correcto del
+   * pendiente con dos falsos.
+   */
+  it("con uno en pendiente, cada uno cae en su balde y ninguno en sin comprobar", () => {
+    const fila = armarFilas({
+      tipos: [tipoEnV1],
+      versiones,
+      documentos: [
+        { template_id: "t1", estado: "ok", version_id: "v2", advisor_id: "a1" },
+        { template_id: "t1", estado: "ok", version_id: "v2", advisor_id: "a2" },
+        { template_id: "t1", estado: "pendiente", version_id: "v1", advisor_id: "a3" },
+      ],
+      asesores: [
+        { id: "a1", estado: "activo" },
+        { id: "a2", estado: "activo" },
+        { id: "a3", estado: "activo" },
+      ],
+    })[0]
+    expect(fila.yaAplicados).toBe(2)
+    expect(fila.pendientes).toBe(1)
+    expect(fila.sinComprobar, "el estado normal del §7.4.2 no puede mentir").toBe(0)
+  })
+
+  /** Con dos versiones nuevas conviviendo gana la más alta: es la única activable. */
+  it("con v2 y v3 dando vueltas, se ofrece la más nueva", () => {
+    const fila = armarFilas({
+      tipos: [tipoEnV1],
+      versiones: [...versiones, { id: "v3", version: 3 }],
+      documentos: [
+        { template_id: "t1", estado: "ok", version_id: "v2", advisor_id: "a1" },
+        { template_id: "t1", estado: "ok", version_id: "v3", advisor_id: "a2" },
+      ],
+      asesores: [
+        { id: "a1", estado: "activo" },
+        { id: "a2", estado: "activo" },
+      ],
+    })[0]
+    expect(fila.yaAplicados).toBe(2)
+    expect(fila.versionIdYaAplicada).toBe("v3")
+    expect(fila.versionYaAplicada).toBe(3)
+  })
+})
+
+describe("lo que la fila DICE en el estado intermedio", () => {
+  const enElMedio = {
+    estado: "activa" as const,
+    version: 1,
+    enRojo: 0,
+    sinComprobar: 0,
+    yaAplicados: 3,
+    versionYaAplicada: 2,
+  }
+
+  it("ya no dice que no se compararon ni manda a detectar de nuevo", () => {
+    const texto = explicacionDelEstado(enElMedio)
+    expect(texto, "la afirmación falsa").not.toContain("no se compararon")
+    expect(texto, "la instrucción que reconstruiría la plantilla desde su propia salida").not.toContain(
+      "volvé a detectar",
+    )
+  })
+
+  /**
+   * Y la PRIMERA línea también era falsa: los documentos de esos asesores están
+   * hechos con la versión nueva, no con la vigente.
+   */
+  it("tampoco arranca diciendo que la vigente es la de los documentos de todos", () => {
+    expect(explicacionDelEstado(enElMedio)).not.toContain(
+      "es la versión con la que están hechos los documentos de los asesores activos",
+    )
+  })
+
+  it("dice lo que pasó, con los dos números de versión", () => {
+    const texto = explicacionDelEstado(enElMedio)
+    expect(texto).toContain("3 asesores ya tienen su documento de la versión 2")
+    expect(texto).toContain("todavía usa la versión 1")
+  })
+
+  it("y dice que a esas personas no hay que comprobarles nada", () => {
+    expect(explicacionDelEstado(enElMedio)).toContain("no hay que comprobarle nada")
+  })
+
+  /** La instrucción tiene que nombrar el botón que de verdad está en la fila. */
+  it("manda a apretar el botón, con el rótulo exacto que tiene el botón", () => {
+    expect(explicacionDelEstado(enElMedio)).toContain(botonDePonerEnUso(2))
+  })
+
+  it("con uno solo, todo el renglón concuerda en número", () => {
+    const texto = explicacionDelEstado({ ...enElMedio, yaAplicados: 1 })
+    expect(texto).toContain("1 asesor ya tiene su documento")
+    expect(texto).toContain("A esa persona no hay que comprobarle nada")
+  })
+
+  /** Sin los números todavía tiene que decir algo que se entienda. */
+  it("sin saber los números de versión, no escribe 'la versión null'", () => {
+    const texto = explicacionDelEstado({ ...enElMedio, version: null, versionYaAplicada: null })
+    expect(texto).not.toContain("null")
+    expect(texto).toContain("la versión nueva")
+  })
+
+  it("sin nadie aplicado, la explicación vuelve a arrancar como siempre", () => {
+    expect(explicacionDelEstado({ ...enElMedio, yaAplicados: 0 })).toContain("Está en uso")
+  })
+
+  /** El aviso del pendiente sigue diciéndose: los dos hechos son ciertos a la vez. */
+  it("con un pendiente adentro se dicen los dos, y ninguno falso", () => {
+    const texto = explicacionDelEstado({ ...enElMedio, yaAplicados: 2, pendientes: 1 })
+    expect(texto).toContain("2 asesores ya tienen su documento")
+    expect(texto).toContain("le falta completar un dato")
+    expect(texto).not.toContain("no se compararon")
+  })
+
+  it("en un borrador también se dice", () => {
+    const texto = explicacionDelEstado({ ...enElMedio, estado: "borrador" })
+    expect(texto).toContain("ya tienen su documento de la versión 2")
+  })
+})
+
+describe("motivoParaNoPonerEnUsoDesdeLaFila", () => {
+  const listo = { yaAplicados: 3, pendientes: 0, participan: 3 }
+
+  it("con todos aplicados y ninguno esperando un dato, se puede", () => {
+    expect(motivoParaNoPonerEnUsoDesdeLaFila(listo)).toBeNull()
+  })
+
+  it("con alguien esperando un dato, no: y dice qué hacer primero", () => {
+    const motivo = motivoParaNoPonerEnUsoDesdeLaFila({ ...listo, pendientes: 1 })
+    expect(motivo).toContain("completá el dato")
+    expect(motivo).toContain("no se puede poner en uso")
+  })
+
+  it("en plural concuerda", () => {
+    expect(motivoParaNoPonerEnUsoDesdeLaFila({ ...listo, pendientes: 2 })).toContain("a los 2 asesores")
+  })
+
+  /** El mismo freno del arrastrado 4, por el otro camino. */
+  it("sin ningún asesor activo no se puede: dejaría la plantilla como borrador", () => {
+    expect(motivoParaNoPonerEnUsoDesdeLaFila({ ...listo, participan: 0 })).toContain("como borrador")
+  })
+
+  it("sin nada aplicado tampoco hay nada que poner en uso", () => {
+    expect(motivoParaNoPonerEnUsoDesdeLaFila({ ...listo, yaAplicados: 0 })).not.toBeNull()
+  })
+})
+
+describe("la fila dibujada en el estado intermedio", () => {
+  const FILA: FilaPlantilla = {
+    templateId: "t1",
+    nombre: "Contrato Partnership",
+    estado: "activa",
+    version: 1,
+    documentos: 3,
+    participan: 3,
+    enRojo: 0,
+    sinComprobar: 0,
+    desvinculados: 0,
+    pendientes: 0,
+    yaAplicados: 3,
+    versionYaAplicada: 2,
+    versionIdYaAplicada: "v2",
+  }
+
+  const dibujar = (cambios: Partial<FilaPlantilla> = {}) =>
+    visible(
+      React.createElement(FilaDeLaSolapa, {
+        fila: { ...FILA, ...cambios },
+        detectando: false,
+        onDetectar: () => {},
+        onSubirVersion: () => {},
+        onPonerEnUso: () => {},
+      }),
+    )
+
+  it("el renglón de los ya aplicados se dibuja", () => {
+    expect(dibujar()).toContain(textoYaAplicados(3)!)
+    expect(dibujar({ yaAplicados: 1 })).toContain(textoYaAplicados(1)!)
+  })
+
+  it("sin ninguno, ese renglón no está", () => {
+    expect(dibujar({ yaAplicados: 0, versionIdYaAplicada: null })).not.toContain(
+      "ya tiene el documento de la versión nueva",
+    )
+  })
+
+  /**
+   * El botón que hace que la instrucción se pueda ejecutar. Sin él, el aviso
+   * manda a apretar algo que no existe: el panel arranca siempre pidiendo un
+   * Word, así que el director que aplicó y cerró no tenía forma de terminar.
+   *
+   * ═══ Y se cuentan las VECES, no si aparece ═══
+   *
+   * La misma trampa que ya cobró una vez con el renglón de los desvinculados, y
+   * acá la piso yo: el rótulo del botón lo imprime TAMBIÉN la explicación de
+   * arriba —a propósito, para mandarlo a apretar el botón con su nombre exacto—
+   * así que un `toContain` pelado pasaba en verde con el botón borrado. Medido:
+   * `{hayQuePonerEnUso && (` → `{false && (` sobrevivía.
+   *
+   * Dos veces: una en la explicación, otra en el botón.
+   */
+  const veces = (texto: string, frase: string) => texto.split(frase).length - 1
+
+  it("el botón de poner en uso se dibuja, y no lo tapa la explicación de arriba", () => {
+    const html = dibujar()
+    expect(
+      veces(html, botonDePonerEnUso(2)),
+      "aparece una sola vez: o se cayó el botón, o se cayó la explicación que lo nombra",
+    ).toBe(2)
+  })
+
+  it("sin ninguna versión aplicada, ese botón NO está", () => {
+    expect(dibujar({ yaAplicados: 0, versionIdYaAplicada: null, versionYaAplicada: null })).not.toContain(
+      "Poner la versión",
+    )
+  })
+
+  it("cuando no se puede apretar, el motivo se dibuja", () => {
+    const html = dibujar({ pendientes: 1 })
+    expect(html).toContain(motivoParaNoPonerEnUsoDesdeLaFila({ yaAplicados: 3, pendientes: 1, participan: 3 })!)
+  })
+
+  it("y la explicación entera de la fila también", () => {
+    expect(dibujar()).toContain(explicacionDelEstado(FILA))
   })
 })

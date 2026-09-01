@@ -127,9 +127,55 @@ export type FilaPlantilla = {
    * El dato ya estaba en la base: `version_id` distinto de `version_actual` es
    * la constancia. Lo que faltaba era que alguien lo leyera.
    *
-   * NO entran acá los desvinculados: tienen su propio balde, abajo.
+   * NO entran acá los desvinculados: tienen su propio balde, abajo. Y TAMPOCO
+   * los que ya recibieron una versión MÁS NUEVA que la vigente: ver
+   * `yaAplicados`, que es el balde que se llevó ese caso.
    */
   sinComprobar: number
+  /**
+   * Cuántos ya tienen el documento de una versión MÁS NUEVA que la vigente.
+   *
+   * ═══ El estado intermedio, que es el estado NORMAL ═══
+   *
+   * `aplicar-version/{advisorId}` le escribe a cada asesor su `version_id`
+   * nuevo, y `activar-version` es lo ÚNICO que mueve
+   * `advisor_doc_templates.version_actual`. Entre una cosa y la otra hay un
+   * estado en el que `doc.version_id !== vigente` — y no es un borde: mientras
+   * quede un `pendiente`, la versión NO se puede poner en uso (spec §7.4.2), así
+   * que la fila se queda así hasta que el director le complete el dato a esa
+   * persona.
+   *
+   * Sin este balde esos asesores caían en `sinComprobar`, y la fila decía cuatro
+   * cosas falsas seguidas sobre ellos: que no se compararon (se compararon: les
+   * corrieron las cinco comprobaciones de `frenosDeLaGeneracion` hace treinta
+   * segundos), que estaban pausados, que subieron su documento después, y que
+   * "no hay nada comprobado". Y remataba con una instrucción **peor que falsa**:
+   * *volvé a detectar la plantilla*, que reconstruiría la plantilla a partir de
+   * los documentos que acaban de SALIR de la plantilla — el círculo por el que
+   * existe la columna `docx_path` aparte de `archivo_original_path`.
+   *
+   * Se distingue comparando **números de versión**, no ids: "más nuevo" es una
+   * relación de orden y el id no la tiene. Lo que `sinComprobar` sí cuida —el
+   * pausado que quedó con la versión vieja, el que subió su documento después—
+   * tiene un `version_id` más VIEJO o nulo, así que sigue cayendo donde caía.
+   */
+  yaAplicados: number
+  /** El número de esa versión más nueva. `null` cuando no hay ninguna. */
+  versionYaAplicada: number | null
+  /**
+   * Y su id, que es lo que hace falta para poder ponerla en uso desde la fila.
+   *
+   * Sin esto el aviso diría "falta ponerla en uso" y no habría con qué: el panel
+   * arranca siempre pidiendo un Word, así que el director que cerró después de
+   * aplicar se quedaba sin ninguna forma de terminar. Una instrucción que no se
+   * puede ejecutar es peor que no decir nada.
+   *
+   * Si conviven dos versiones más nuevas (v2 y v3, porque una candidata quemó
+   * número), gana la MÁS alta: es la única que puede quedar en uso sin dejar a
+   * nadie adelante, y si alguien quedó en la de al medio `activar-version`
+   * se niega con su nombre.
+   */
+  versionIdYaAplicada: string | null
   /**
    * Cuántos documentos son de asesores DESVINCULADOS.
    *
@@ -363,6 +409,9 @@ export function armarFilas(args: {
   const sinComprobar = new Map<string, number>()
   const desvinculados = new Map<string, number>()
   const pendientes = new Map<string, number>()
+  const yaAplicados = new Map<string, number>()
+  /** La versión más NUEVA que ya tiene alguien, por tipo. Ver `versionIdYaAplicada`. */
+  const laMasNueva = new Map<string, { id: string; numero: number }>()
   const sumar = (m: Map<string, number>, k: string) => m.set(k, (m.get(k) ?? 0) + 1)
 
   for (const doc of args.documentos) {
@@ -383,6 +432,13 @@ export function armarFilas(args: {
     }
 
     const vigente = vigentePorTipo.get(doc.template_id) ?? null
+    /**
+     * Los NÚMEROS, no los ids: "más nueva" es una relación de orden, y un uuid
+     * no la tiene. `null` cuando la consulta no trajo esa fila de versión, y ahí
+     * no se afirma nada: el caso cae donde caía antes.
+     */
+    const numeroVigente = vigente !== null ? numeroDeVersion.get(vigente) ?? null : null
+    const numeroDelDoc = doc.version_id !== null ? numeroDeVersion.get(doc.version_id) ?? null : null
 
     if (doc.version_id !== null && doc.version_id === vigente) {
       // Comprobado contra la versión que está en uso: su estado vale.
@@ -404,6 +460,27 @@ export function armarFilas(args: {
        * mandaría a buscar un error que no existe.
        */
       if (doc.estado === "pendiente") sumar(pendientes, doc.template_id)
+      continue
+    }
+
+    /**
+     * YA APLICADO, esperando que la versión se ponga en uso.
+     *
+     * Su `version_id` apunta a una versión MÁS NUEVA que la vigente, que es
+     * algo que solo puede haber escrito `aplicar-version/{advisorId}` después
+     * de correrle las cinco comprobaciones y subirle el .docx. O sea: de este
+     * asesor está TODO comprobado, y contra la versión nueva.
+     *
+     * Va antes del balde de abajo porque, sin esto, caía ahí y la fila le decía
+     * al director que esas personas no se compararon con nadie y que volviera a
+     * detectar la plantilla. Ver `yaAplicados`.
+     */
+    if (numeroDelDoc !== null && numeroVigente !== null && numeroDelDoc > numeroVigente) {
+      sumar(yaAplicados, doc.template_id)
+      const previa = laMasNueva.get(doc.template_id)
+      if (!previa || numeroDelDoc > previa.numero) {
+        laMasNueva.set(doc.template_id, { id: doc.version_id!, numero: numeroDelDoc })
+      }
       continue
     }
 
@@ -436,6 +513,9 @@ export function armarFilas(args: {
       version: t.version_actual ? numeroDeVersion.get(t.version_actual) ?? null : null,
       documentos: total.get(t.id) ?? 0,
       participan: participan.get(t.id) ?? 0,
+      yaAplicados: yaAplicados.get(t.id) ?? 0,
+      versionYaAplicada: laMasNueva.get(t.id)?.numero ?? null,
+      versionIdYaAplicada: laMasNueva.get(t.id)?.id ?? null,
       enRojo: rojos.get(t.id) ?? 0,
       sinComprobar: sinComprobar.get(t.id) ?? 0,
       desvinculados: desvinculados.get(t.id) ?? 0,
@@ -544,6 +624,112 @@ export function textoPendientes(pendientes: number): string | null {
 }
 
 /**
+ * El renglón del estado intermedio: cuántos ya tienen el documento de la
+ * versión nueva. `null` cuando no hay ninguno.
+ *
+ * Es un renglón VERDE en espíritu, no ámbar: de esas personas está todo hecho y
+ * todo comprobado. Lo que falta no es de ellas, es un paso del director.
+ */
+export function textoYaAplicados(yaAplicados: number): string | null {
+  if (yaAplicados <= 0) return null
+  return yaAplicados === 1
+    ? "1 asesor ya tiene el documento de la versión nueva"
+    : `${yaAplicados} asesores ya tienen el documento de la versión nueva`
+}
+
+/** Cómo se nombra una versión cuando se sabe su número, y cuando no. */
+function comoSeLlamaLaVersion(numero: number | null, siNoSeSabe: string): string {
+  return numero === null ? siNoSeSabe : `la versión ${numero}`
+}
+
+/**
+ * El rótulo del botón que pone en uso la versión ya aplicada.
+ *
+ * Vive acá, con el resto de la prosa: el aviso de arriba manda al director a
+ * apretar "el botón de acá al lado", y si el rótulo se escribiera a mano en el
+ * `.tsx` los dos podrían separarse sin que nadie se entere — el aviso nombraría
+ * un botón que dice otra cosa.
+ */
+export function botonDePonerEnUso(versionYaAplicada: number | null): string {
+  return versionYaAplicada === null ? "Poner la versión nueva en uso" : `Poner la versión ${versionYaAplicada} en uso`
+}
+
+/**
+ * El estado intermedio, dicho entero: ya se aplicó y todavía no se puso en uso.
+ *
+ * ═══ Lo que este aviso reemplaza, que era cuatro veces falso ═══
+ *
+ * Antes estos asesores caían en `sinComprobar` y la fila decía: *"N asesores no
+ * se compararon contra esta versión — o estaban pausados cuando se confirmó, o
+ * subieron su documento después. Para esas personas no hay nada comprobado:
+ * volvé a detectar la plantilla…"*. Se compararon, no estaban pausados, no
+ * subieron nada después, y está todo comprobado. Y la instrucción mandaba a
+ * reconstruir la plantilla desde documentos que acababan de salir de la
+ * plantilla.
+ *
+ * Lo que dice ahora es lo que pasa, y termina en lo único que hay que hacer.
+ * `null` cuando no hay ninguno.
+ */
+export function avisoDeYaAplicados(args: {
+  yaAplicados: number
+  /** El número de la versión vigente. */
+  version: number | null
+  /** El número de la que ya tienen. */
+  versionYaAplicada: number | null
+}): string | null {
+  const { yaAplicados } = args
+  if (yaAplicados <= 0) return null
+
+  const uno = yaAplicados === 1
+  const quienes = uno ? "1 asesor ya tiene" : `${yaAplicados} asesores ya tienen`
+  const aEsos = uno ? "A esa persona" : "A esas personas"
+  const nueva = comoSeLlamaLaVersion(args.versionYaAplicada, "la versión nueva")
+  const vieja = comoSeLlamaLaVersion(args.version, "la anterior")
+
+  return (
+    `Hay una versión nueva a medio poner: ${quienes} su documento de ${nueva}, y la plantilla todavía usa ` +
+    `${vieja}. ${aEsos} no hay que comprobarle nada: su documento salió de la versión nueva y pasó todas las ` +
+    `comprobaciones. Lo que falta es poner esa versión en uso, con el botón "${botonDePonerEnUso(args.versionYaAplicada)}".`
+  )
+}
+
+/**
+ * Por qué NO se puede poner en uso desde la fila la versión ya aplicada. `null`
+ * cuando sí se puede.
+ *
+ * Es el hermano de `motivoParaNoPonerEnUso`, que mira la corrida que está
+ * pasando adentro del panel; este mira lo que quedó guardado en la base, que es
+ * lo único que hay cuando el director cerró el panel y volvió al día siguiente.
+ *
+ * El primer caso es el mismo freno del arrastrado 4: con cero asesores activos,
+ * `activar-version` no tiene a nadie atrás, la activación pasa, y
+ * `estadoDeLaPlantilla` con la lista vacía devuelve `borrador` — poner en uso
+ * degradaría la plantilla sin que nadie lo hubiera pedido.
+ */
+export function motivoParaNoPonerEnUsoDesdeLaFila(
+  fila: Pick<FilaPlantilla, "yaAplicados" | "pendientes" | "participan">,
+): string | null {
+  if (fila.yaAplicados <= 0) {
+    return "Todavía no hay ninguna versión aplicada que poner en uso."
+  }
+  if (fila.participan === 0) {
+    return (
+      "No queda ningún asesor activo con este documento, así que poner la versión en uso dejaría la plantilla " +
+      "como borrador. Reactivá a alguien primero."
+    )
+  }
+  if (fila.pendientes > 0) {
+    const uno = fila.pendientes === 1
+    return (
+      `Primero completá el dato que le falta ${uno ? "al asesor" : `a los ${fila.pendientes} asesores`} de acá ` +
+      `arriba y volvé a aplicarle${uno ? "" : "s"} la versión. Mientras quede uno así, la versión nueva no se ` +
+      `puede poner en uso.`
+    )
+  }
+  return null
+}
+
+/**
  * El otro renglón de la fila: cuántos documentos son de asesores
  * desvinculados. `null` cuando no hay ninguno.
  *
@@ -647,11 +833,19 @@ export function explicacionDelEstado(
     sinComprobar?: number
     desvinculados?: number
     pendientes?: number
+    yaAplicados?: number
+    versionYaAplicada?: number | null
   },
 ): string {
   const sinComprobar = fila.sinComprobar ?? 0
   const avisoPendientes = avisoDePendientes(fila.pendientes ?? 0)
   const avisoDesvinculados = avisoDeDesvinculados(fila.desvinculados ?? 0)
+  const yaAplicados = fila.yaAplicados ?? 0
+  const avisoYaAplicados = avisoDeYaAplicados({
+    yaAplicados,
+    version: fila.version,
+    versionYaAplicada: fila.versionYaAplicada ?? null,
+  })
 
   if (fila.estado === "activa") {
     /**
@@ -664,6 +858,20 @@ export function explicacionDelEstado(
     const enUso =
       "Está en uso: es la versión con la que están hechos los documentos de los asesores activos. Cuando cambie " +
       "el contrato, subí el Word de la versión nueva desde el botón de acá al lado."
+
+    /**
+     * ═══ Y la primera línea CAMBIA cuando hay una versión a medio poner ═══
+     *
+     * "es la versión con la que están hechos los documentos de los asesores
+     * activos" era la quinta afirmación falsa del estado intermedio, y la peor
+     * ubicada: la primera que se lee. Con gente ya aplicada, los documentos de
+     * esos asesores están hechos con la versión NUEVA, no con la vigente.
+     *
+     * Así que en ese estado el arranque no es "está en uso" sino la verdad
+     * completa —quién tiene qué, y qué falta—, y de ahí para abajo se acumulan
+     * los avisos de siempre.
+     */
+    const arranque = avisoYaAplicados ?? enUso
 
     /**
      * El aviso que faltaba, y el que más caro sale callar.
@@ -737,7 +945,7 @@ export function explicacionDelEstado(
      */
     if (avisoDesvinculados) avisos.push(avisoDesvinculados)
 
-    return [enUso, ...avisos].join(" ")
+    return [arranque, ...avisos].join(" ")
   }
 
   /**
@@ -766,6 +974,13 @@ export function explicacionDelEstado(
    * director NO puede deducir mirando otra pantalla.
    */
   const avisos: string[] = []
+
+  /**
+   * Y acá también: una plantilla que quedó en borrador puede tener gente ya
+   * aplicada a una versión más nueva. Va PRIMERO de los avisos porque es el que
+   * dice qué pasó recién y qué falta para terminar.
+   */
+  if (avisoYaAplicados) avisos.push(avisoYaAplicados)
 
   /**
    * El de "sin comparar" pide versión: sin una versión guardada no hay contra
