@@ -50,21 +50,25 @@ async function main() {
     const filas = await r.json();
     if (!filas.length) break;
 
-    for (const f of filas) {
-      const txt = [f.titulo, f.descripcion, f.barrio, (f.amenities || []).join(', ')].filter(Boolean).join(' ').trim();
-      try {
-        if (!txt) throw new Error('sin texto');
-        const vec = await embed(txt);
-        const p = await fetch(`${SB_URL}/rest/v1/mercado_avisos?id=eq.${f.id}`, {
-          method: 'PATCH',
-          headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-          body: JSON.stringify({ embedding: JSON.stringify(vec) }),
-        });
-        if (!p.ok) throw new Error(`patch ${p.status}`);
-        hechos++;
-        if (hechos % 100 === 0) console.log(`[embeddings] ${hechos} listos…`);
-      } catch (e) { errores++; console.error(`  ${f.id}: ${e.message}`); if (errores > 30) throw new Error('demasiados errores, freno'); }
-      await sleep(120);   // ~8/s: bajo el rate limit sin apurar
+    // 5 en paralelo: el manejo de 429 con backoff ya está en embed()
+    for (let i = 0; i < filas.length; i += 5) {
+      await Promise.all(filas.slice(i, i + 5).map(async (f) => {
+        const txt = [f.titulo, f.descripcion, f.barrio, (f.amenities || []).join(', ')].filter(Boolean).join(' ').trim();
+        try {
+          if (!txt) throw new Error('sin texto');
+          const vec = await embed(txt);
+          const p = await fetch(`${SB_URL}/rest/v1/mercado_avisos?id=eq.${f.id}`, {
+            method: 'PATCH',
+            headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ embedding: JSON.stringify(vec) }),
+          });
+          if (!p.ok) throw new Error(`patch ${p.status}`);
+          hechos++;
+          if (hechos % 200 === 0) console.log(`[embeddings] ${hechos} listos…`);
+        } catch (e) { errores++; console.error(`  ${f.id}: ${e.message}`); }
+      }));
+      if (errores > 60) throw new Error('demasiados errores, freno');
+      await sleep(80);
     }
   }
   console.log(`[embeddings] fin: ${hechos} embebidos · ${errores} errores`);
