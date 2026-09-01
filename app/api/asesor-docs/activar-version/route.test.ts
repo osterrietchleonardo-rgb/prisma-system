@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { AsyncLocalStorage } from "node:async_hooks"
+import { readFileSync } from "node:fs"
+import path from "node:path"
+
+import { estadoDeLaPlantilla } from "@/lib/asesor-docs/confirmacion"
 
 /**
  * PONER EN USO UNA VERSIÓN, Y LA REGLA QUE NO SE PUEDE ROMPER.
@@ -104,8 +108,8 @@ function armarBase() {
       { id: TIPO, nombre: "Contrato Partnership", agency_id: AGENCIA, estado: "activa", version_actual: VER_VIEJA },
     ],
     documentos: [
-      { id: "doc-ana", advisor_id: ANA, agency_id: AGENCIA, template_id: TIPO, version_id: VER_NUEVA },
-      { id: "doc-bruno", advisor_id: BRUNO, agency_id: AGENCIA, template_id: TIPO, version_id: VER_NUEVA },
+      { id: "doc-ana", advisor_id: ANA, agency_id: AGENCIA, template_id: TIPO, version_id: VER_NUEVA, estado: "ok" },
+      { id: "doc-bruno", advisor_id: BRUNO, agency_id: AGENCIA, template_id: TIPO, version_id: VER_NUEVA, estado: "ok" },
     ],
     perfiles: [
       { id: ANA, agency_id: AGENCIA, estado: "activo", full_name: "Ana Ruiz" },
@@ -148,25 +152,114 @@ beforeEach(() => {
 })
 
 describe("con todos los activos en la versión nueva, la pone en uso", () => {
-  it("escribe version_actual y nada más", async () => {
+  it("escribe version_actual y el estado, y nada más", async () => {
     const r = await pedir()
     expect(r.status).toBe(200)
     expect(base.tipos[0].version_actual).toBe(VER_NUEVA)
 
     const updates = base.escrituras.filter((e) => e.tabla === "advisor_doc_templates")
     expect(updates).toHaveLength(1)
-    expect(Object.keys(updates[0].datos ?? {}).sort()).toEqual(["updated_at", "version_actual"])
+    expect(Object.keys(updates[0].datos ?? {}).sort()).toEqual(["estado", "updated_at", "version_actual"])
   })
 
   /**
-   * Que una plantilla pase de `borrador` a `activa` lo decide la verificación de
-   * la §7.3 en `confirmar-plantilla`. Dos lugares decidiendo lo mismo con
-   * reglas distintas es cómo se llega a que la pantalla mienta.
+   * ═══ El cartel tiene que decir la verdad ═══
+   *
+   * La solapa lee `estado` para decir "Está en uso". Una plantilla con la
+   * versión nueva aplicada a TODOS y el cartel diciendo "Borrador" es la
+   * pantalla mintiendo — que es lo que esta etapa viene cerrando.
    */
-  it("NO toca el estado de la plantilla", async () => {
+  it("un borrador con todos en verde pasa a activa", async () => {
     base.tipos[0].estado = "borrador"
+    const r = await pedir()
+    expect(base.tipos[0].estado).toBe("activa")
+    expect(r.cuerpo.estado).toBe("activa")
+  })
+
+  /**
+   * Y por el otro lado: la regla de publicación de la §7.3 sigue mandando. Un
+   * asesor en rojo sobre la versión que se activa deja la plantilla en
+   * borrador, aunque la versión pase a ser la vigente. Alcanza con UNO.
+   */
+  it("con un asesor en rojo sobre esa versión, se queda en borrador", async () => {
+    base.tipos[0].estado = "borrador"
+    base.documentos[1].estado = "revisar"
+    await pedir()
+    expect(base.tipos[0].version_actual).toBe(VER_NUEVA)
+    expect(base.tipos[0].estado).toBe("borrador")
+  })
+
+  /** Un estado que nadie escribió tampoco publica: "no se comprobó" no es "está bien". */
+  it("con un asesor sin estado, se queda en borrador", async () => {
+    base.tipos[0].estado = "borrador"
+    base.documentos[1].estado = null
     await pedir()
     expect(base.tipos[0].estado).toBe("borrador")
+  })
+
+  /**
+   * El pausado no frena la activación (spec §7.5) y tampoco entra en la cuenta
+   * de la publicación: dejar que un pausado congele el cartel para siempre
+   * sería el mismo aviso que no se apaga haciendo lo que el aviso pide.
+   */
+  it("un pausado en rojo no impide que el cartel diga activa", async () => {
+    base.tipos[0].estado = "borrador"
+    base.documentos[1].estado = "revisar"
+    base.perfiles[1].estado = "pausado"
+    await pedir()
+    expect(base.tipos[0].estado).toBe("activa")
+  })
+
+  /**
+   * ═══ EL TESTIGO DE QUE LA REGLA NO SE DUPLICÓ ═══
+   *
+   * La condición de publicación vive en `laPlantillaSePublica`, y
+   * `estadoDeLaPlantilla` es lo único que la traduce a las dos palabras que van
+   * a la base. Si alguien la escribiera de nuevo acá —un ternario, un
+   * `every(...) ? "activa" : "borrador"`— habría dos reglas que se pueden
+   * separar sin que nadie se entere, y la pantalla mentiría por el otro lado.
+   *
+   * Se lee el archivo como texto, igual que hace `ficha-css.test.ts` con la
+   * ficha pública: los literales NO pueden aparecer, y el llamado SÍ.
+   */
+  it("la regla de publicación no está escrita de nuevo en el endpoint", () => {
+    const fuente = readFileSync(path.join(process.cwd(), "app/api/asesor-docs/activar-version/route.ts"), "utf8")
+    /**
+     * Se sacan los renglones de comentario, donde las dos palabras se nombran a
+     * propósito y muchas veces. Se filtra por renglón y no con un regex de
+     * bloque: es lo que se puede leer de un vistazo dentro de seis meses.
+     */
+    const esComentario = (linea: string) => {
+      const t = linea.trim()
+      return t.startsWith("*") || t.startsWith("/*") || t.startsWith("//")
+    }
+    const codigo = fuente
+      .split("\n")
+      .filter((l) => !esComentario(l))
+      .join("\n")
+    expect(codigo).toContain("estadoDeLaPlantilla(")
+    expect(codigo).not.toMatch(/["']activa["']/)
+    expect(codigo).not.toMatch(/["']borrador["']/)
+  })
+
+  /**
+   * Y el testigo de que es LA MISMA función, no una que se le parece: se le
+   * pide a `estadoDeLaPlantilla` el mismo escenario y tiene que dar lo mismo
+   * que quedó en la base.
+   */
+  it("lo que queda en la base es exactamente lo que dice estadoDeLaPlantilla", async () => {
+    base.tipos[0].estado = "borrador"
+    base.documentos[1].estado = "revisar"
+    await pedir()
+    expect(base.tipos[0].estado).toBe(
+      estadoDeLaPlantilla({
+        resultados: [
+          { advisorId: ANA, nombre: "Ana Ruiz", estado: "ok", observacion: null },
+          { advisorId: BRUNO, nombre: "Bruno Sanguinetti", estado: "revisar", observacion: null },
+        ],
+        huecosNoColocados: [],
+      }),
+    )
   })
 
   it("no escribe ni una fila de advisor_documents", async () => {

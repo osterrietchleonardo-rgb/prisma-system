@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { requireTenant } from "@/lib/auth/tenant-validation"
 import { separarPorEstado, type FilaAsesor } from "@/lib/asesor-docs/propuesta"
 import { faltanAsesoresParaActivar } from "@/lib/asesor-docs/generar"
+import { estadoDeLaPlantilla, type ResultadoDeAsesor } from "@/lib/asesor-docs/confirmacion"
 
 /**
  * Poner en uso una versión de la plantilla (spec §7.4.4).
@@ -29,10 +30,30 @@ import { faltanAsesoresParaActivar } from "@/lib/asesor-docs/generar"
  * plantilla trabada para siempre. Se los dice igual, como advertencia, porque
  * el día que vuelvan su contrato va a ser el de la versión vieja.
  *
- * Lo que este endpoint **no** hace: no toca `estado`. Que una plantilla pase de
- * `borrador` a `activa` lo decide la verificación de la §7.3 en
- * `confirmar-plantilla`, con `estadoDeLaPlantilla`, y meter mano acá sería
- * tener dos lugares decidiendo lo mismo con reglas distintas.
+ * ═══ Y el `estado`, que sale de la MISMA regla, no de una copia ═══
+ *
+ * Este endpoint también escribe `advisor_doc_templates.estado`, y tiene que
+ * hacerlo: la solapa lee esa columna para decir "Está en uso". Una plantilla
+ * con la versión nueva aplicada a todos y el cartel diciendo "Borrador" es la
+ * pantalla mintiendo, que es justo lo que esta etapa viene cerrando.
+ *
+ * Pero **la condición de publicación no se escribe de nuevo acá**. Sale de
+ * `estadoDeLaPlantilla`, la misma función que usa `confirmar-plantilla`, que a
+ * su vez se apoya en `laPlantillaSePublica`. Dos lugares decidiendo lo mismo
+ * con reglas distintas es cómo se llega a que la pantalla mienta por el otro
+ * lado, y acá los literales `"activa"` y `"borrador"` **no aparecen**: hay un
+ * test estructural que lee este archivo y falla si alguien los escribe.
+ *
+ * Lo que se traduce, y cómo:
+ *
+ *  · un asesor activo con `estado: 'ok'` sobre la versión que se activa → `ok`;
+ *  · cualquier otra cosa —`revisar`, `pendiente`, `null`— → `revisar`, que es
+ *    lo que `laPlantillaSePublica` entiende por "esto lo tiene que mirar
+ *    alguien". No hay pérdida de información: para cuando se llega acá, todos
+ *    los activos ya están en la versión nueva, así que el único que puede
+ *    quedar en `revisar` es uno que la confirmación de la §7.3 marcó así.
+ *  · `huecosNoColocados: []` porque acá no hay molde a la vista; los huecos que
+ *    no entraron los frena la §7.2, antes de que exista esta versión.
  */
 
 export const dynamic = "force-dynamic"
@@ -106,7 +127,7 @@ export async function POST(req: Request) {
   // ── Quiénes tienen este documento, y en qué versión están ────────────────
   const { data: documentos, error: errDocs } = await supabase
     .from("advisor_documents")
-    .select("advisor_id, version_id")
+    .select("advisor_id, version_id, estado")
     .eq("template_id", templateId)
     .eq("agency_id", agencyId)
     .order("created_at", { ascending: true })
@@ -167,9 +188,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: motivo, faltan: atrasados.map((f) => f.advisor_id), advertencias }, { status: 409 })
   }
 
+  /**
+   * Los activos, traducidos a la forma que entiende la regla de publicación.
+   * Ver el comentario de arriba: la condición vive en un solo lugar.
+   */
+  const resultados: ResultadoDeAsesor[] = filas
+    .filter((f) => activos.has(f.advisor_id))
+    .map((f) => ({
+      advisorId: f.advisor_id,
+      nombre: nombreDe(f.advisor_id),
+      estado: f.estado === "ok" ? "ok" : "revisar",
+      observacion: null,
+    }))
+
+  const estado = estadoDeLaPlantilla({ resultados, huecosNoColocados: [] })
+
   const { data: tocadas, error: errUpdate } = await supabase
     .from("advisor_doc_templates")
-    .update({ version_actual: versionId, updated_at: new Date().toISOString() })
+    .update({ version_actual: versionId, estado, updated_at: new Date().toISOString() })
     .eq("id", templateId)
     .eq("agency_id", agencyId)
     /**
@@ -196,6 +232,7 @@ export async function POST(req: Request) {
     templateId,
     versionId,
     version: version.version,
+    estado,
     advertencias,
     resumen: `La versión ${version.version} de "${tipo.nombre}" quedó en uso.`,
   })
