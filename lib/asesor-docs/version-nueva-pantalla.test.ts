@@ -9,6 +9,7 @@ import {
   CamposQueCambian,
   FilaDeAplicacion,
   ListaDeAvisos,
+  LoQueSeLeyo,
   PasoElegir,
   TablaDeUbicaciones,
   VistaPrevia,
@@ -41,7 +42,7 @@ import {
   type ResultadoDeAplicacion,
 } from "./plantillas"
 import { ASI_EMPIEZA_EL_PENDIENTE, observacionDePendiente } from "./generar"
-import type { UbicacionDeValor } from "./version-nueva"
+import type { RespuestaVersionNueva, UbicacionDeValor } from "./version-nueva"
 
 /**
  * LA PANTALLA DE LA VERSIÓN NUEVA (spec §7.4 y §7.5).
@@ -469,6 +470,70 @@ describe("el paso de elegir el archivo, dibujado", () => {
   })
 })
 
+/**
+ * ═══ El agujero de `{avisoX}` → `{null}`, un piso más arriba ═══
+ *
+ * Los `describe` de acá abajo dibujan cada pieza por separado, y eso NO alcanza:
+ * medido con mutación, sacar `<ListaDeAvisos>` del panel dejaba los 1331 tests
+ * en verde. La pieza seguía existiendo y dibujando bien; nadie miraba si el
+ * panel la montaba — y con ella se iba la cuenta cruzada, que es lo único que ve
+ * el caso "nuestra oficina de Palermo" antes de que salga el contrato de todos.
+ *
+ * El panel completo no se puede dibujar acá (el `Sheet` de Radix necesita un
+ * DOM), así que las cinco piezas viven juntas en `LoQueSeLeyo`, que sí se
+ * dibuja. Lo único que queda sin red es la línea que la monta, y esa tiene su
+ * test estructural más abajo.
+ */
+describe("todo lo que se leyó de la versión llega junto a la pantalla", () => {
+  const leida: RespuestaVersionNueva = {
+    versionId: "v2",
+    version: 2,
+    campos: { nuevos: ["COMISION"], desaparecidos: ["OFICINA"], iguales: ["NOMBRE"] },
+    ubicaciones: [
+      {
+        campo: "ZONA",
+        valor: "Palermo",
+        veces: 2,
+        posiciones: [10, 90],
+        situacion: "repetido",
+        corto: false,
+        dentroDe: [],
+      },
+    ],
+    vistaPrevia: { advisorId: "a1", nombre: "Ana Pérez", texto: "CONTRATO de Ana Pérez." },
+    advertencias: ["Mirá esto antes de aplicar la versión: ZONA aparece 2 veces."],
+    resumen: "Se leyó la versión 2 y se ubicaron 3 campos adentro del documento.",
+    aplicada: false,
+  }
+
+  const html = visible(React.createElement(LoQueSeLeyo, { leida }))
+
+  it("el resumen del servidor", () => {
+    expect(html).toContain(leida.resumen)
+  })
+
+  it("los campos que cambian, con sus nombres", () => {
+    expect(html).toContain(tituloDeCamposNuevos(1))
+    expect(html).toContain("COMISION")
+    expect(html).toContain("OFICINA")
+  })
+
+  /** Es el único lugar donde el director ve la cuenta cruzada antes de aplicar. */
+  it("los avisos del servidor, enteros", () => {
+    expect(html).toContain(leida.advertencias[0])
+  })
+
+  it("qué encontró de esa persona adentro del archivo", () => {
+    expect(html).toContain("ZONA")
+    expect(html).toContain("Palermo")
+  })
+
+  it("y la vista previa del §7.4.3", () => {
+    expect(html).toContain(tituloDeLaVistaPrevia("Ana Pérez"))
+    expect(html).toContain("CONTRATO de Ana Pérez.")
+  })
+})
+
 describe("los avisos del servidor, dibujados", () => {
   it("cada aviso llega entero a la pantalla", () => {
     const avisos = ["El dato ZONA aparece 2 veces.", "Mirá esto antes de aplicar la versión."]
@@ -746,6 +811,15 @@ describe("la pantalla de la versión nueva no se escribe su propia prosa", () =>
   it("la ruta de Storage sale de la función de lib", () => {
     expect(CODIGO).toContain("rutaDeVersionNueva(agencyId, crypto.randomUUID())")
     expect(CODIGO).not.toContain("_versiones-nuevas/")
+  })
+
+  /**
+   * La única línea del panel que ningún dibujo alcanza: la que monta las cinco
+   * piezas. Si desaparece, el director ve la pantalla vacía entre el resumen y
+   * la barra de abajo.
+   */
+  it("el panel monta lo que se leyó", () => {
+    expect(CODIGO).toContain("<LoQueSeLeyo leida={leida} />")
   })
 
   /**

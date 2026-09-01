@@ -452,11 +452,7 @@ export function VersionNueva({ templateId, nombreDelTipo, asesores, onCerrar, on
             />
           ) : (
             <>
-              <ResumenDeLaVersion resumen={leida.resumen} />
-              <CamposQueCambian campos={leida.campos} />
-              <ListaDeAvisos avisos={leida.advertencias} />
-              <TablaDeUbicaciones ubicaciones={leida.ubicaciones} />
-              <VistaPrevia nombre={leida.vistaPrevia.nombre} texto={leida.vistaPrevia.texto} />
+              <LoQueSeLeyo leida={leida} />
 
               {arranco && (
                 <div className="space-y-3">
@@ -677,6 +673,36 @@ export function PasoElegir({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * TODO lo que el director lee de la versión recién leída, en un solo lugar.
+ *
+ * ═══ Por qué esto existe y no son cinco etiquetas sueltas en el panel ═══
+ *
+ * Las cinco piezas de abajo se dibujan una por una en los tests, y aun así
+ * sacar cualquiera de ellas del panel **no ponía nada en rojo**: la pieza
+ * seguía existiendo, seguía dibujando bien, y nadie miraba si el panel la
+ * montaba. Es el mismo agujero de `{avisoX}` → `{null}` de la solapa, un piso
+ * más arriba — medido con mutación: borrar `<ListaDeAvisos>` dejaba los 1331
+ * tests en verde y el director perdía la cuenta cruzada, que es lo único que
+ * ve el caso "nuestra oficina de Palermo" antes de que salga el contrato de
+ * todos.
+ *
+ * El panel completo NO se puede dibujar en un test: el `Sheet` de Radix
+ * necesita un DOM. Esto sí, y con esto la parte sin red queda en UNA sola
+ * línea del panel, que además tiene su test estructural.
+ */
+export function LoQueSeLeyo({ leida }: { leida: RespuestaVersionNueva }) {
+  return (
+    <>
+      <ResumenDeLaVersion resumen={leida.resumen} />
+      <CamposQueCambian campos={leida.campos} />
+      <ListaDeAvisos avisos={leida.advertencias} />
+      <TablaDeUbicaciones ubicaciones={leida.ubicaciones} />
+      <VistaPrevia nombre={leida.vistaPrevia.nombre} texto={leida.vistaPrevia.texto} />
+    </>
   );
 }
 
