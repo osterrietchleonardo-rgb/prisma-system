@@ -67,6 +67,32 @@ export type FilaPlantilla = {
   /** Cuántos asesores tienen hoy un documento de este tipo. */
   documentos: number
   /**
+   * De esos, cuántos ENTRAN de verdad en la comparación.
+   *
+   * ═══ El balde que decidía mal el botón, medido ═══
+   *
+   * `documentos` cuenta a todos, incluidos los pausados y los desvinculados. Y
+   * el botón "Detectar plantilla" se habilitaba con ese número: con 3
+   * documentos donde uno era de un pausado, el botón quedaba habilitado, el
+   * director lo apretaba, y `detectar-plantilla` —que saca a los pausados y a
+   * los desvinculados con `separarPorEstado` antes de comparar— seguía con 2 y
+   * devolvía una propuesta con la advertencia de que los huecos hay que
+   * revisarlos a mano. O sea: el botón prometía una detección que la ruta no
+   * podía hacer.
+   *
+   * Así que el mínimo se cuenta sobre los que participan, que es lo mismo que
+   * cuenta la ruta. `documentos` sigue existiendo y sigue mostrándose —es
+   * cierto que esas personas tienen el documento cargado— pero ya no decide
+   * nada.
+   *
+   * El que no aparece en la lista de asesores tampoco participa: la ruta lo
+   * deja afuera con nombre y apellido ("no se encontró al asesor del archivo
+   * …"). Es al revés que en `desvinculados`, y a propósito: ahí lo conservador
+   * es no aconsejar borrar; acá lo conservador es no habilitar un botón que va
+   * a fallar.
+   */
+  participan: number
+  /**
    * Cuántos quedaron en rojo **contra la versión vigente**.
    *
    * Contra la vigente y no contra cualquiera: un `revisar` que quedó de una
@@ -188,12 +214,43 @@ export type AsesorCrudo = { id: string; estado: string | null }
 export const ESTADO_DESVINCULADO = "eliminado"
 
 /**
+ * El otro estado que deja a un asesor afuera de la comparación (`ESTADOS_FUERA`
+ * en `propuesta.ts`, que es lo que usa `separarPorEstado`).
+ *
+ * Escrito de nuevo acá por el mismo motivo que `ESTADO_DESVINCULADO`, y atado
+ * por el mismo test: los dos juntos tienen que dar `ESTADOS_FUERA`. Si mañana
+ * se agrega un tercer estado que queda afuera y este archivo no se entera, el
+ * botón "Detectar plantilla" se vuelve a habilitar con documentos que la ruta
+ * no va a mirar.
+ */
+export const ESTADO_PAUSADO = "pausado"
+
+/** Normalizado igual que en `separarPorEstado`: la columna es texto libre. */
+function normalizar(estado: string | null | undefined): string | null {
+  const limpio = estado?.trim().toLowerCase()
+  return limpio ? limpio : null
+}
+
+/**
  * Se compara normalizado igual que en `separarPorEstado`: la columna es texto
  * libre, y un " Eliminado" con mayúscula dejaría al asesor del lado equivocado
  * justo en el balde que existe para no mentirle al director.
  */
 function estaDesvinculado(estado: string | null | undefined): boolean {
-  return estado?.trim().toLowerCase() === ESTADO_DESVINCULADO
+  return normalizar(estado) === ESTADO_DESVINCULADO
+}
+
+/**
+ * Si ese asesor entra en la comparación.
+ *
+ * Un estado que el sistema NO conoce entra, igual que en `separarPorEstado`:
+ * la regla es "pausados y desvinculados", y un estado nuevo no es ninguno de
+ * los dos. Dejarlo afuera acá inventaría una regla que allá no existe, y el
+ * botón quedaría deshabilitado por documentos que la ruta sí iba a comparar.
+ */
+function participaEnLaComparacion(estado: string | null | undefined): boolean {
+  const e = normalizar(estado)
+  return e !== ESTADO_PAUSADO && e !== ESTADO_DESVINCULADO
 }
 
 /**
@@ -238,7 +295,17 @@ export function armarFilas(args: {
    */
   const desvinculado = new Set(args.asesores.filter((a) => estaDesvinculado(a.estado)).map((a) => a.id))
 
+  /**
+   * Quiénes entran en la comparación, con la MISMA regla que la ruta: el que
+   * no está en la lista no entra (la ruta lo deja afuera por no encontrarlo), y
+   * de los que están, quedan los que no son pausados ni desvinculados.
+   */
+  const participa = new Set(
+    args.asesores.filter((a) => participaEnLaComparacion(a.estado)).map((a) => a.id),
+  )
+
   const total = new Map<string, number>()
+  const participan = new Map<string, number>()
   const rojos = new Map<string, number>()
   const sinComprobar = new Map<string, number>()
   const desvinculados = new Map<string, number>()
@@ -247,6 +314,7 @@ export function armarFilas(args: {
 
   for (const doc of args.documentos) {
     sumar(total, doc.template_id)
+    if (participa.has(doc.advisor_id)) sumar(participan, doc.template_id)
 
     /**
      * Antes que todo lo demás: el documento de un desvinculado no cuenta ni en
@@ -305,6 +373,7 @@ export function armarFilas(args: {
        */
       version: t.version_actual ? numeroDeVersion.get(t.version_actual) ?? null : null,
       documentos: total.get(t.id) ?? 0,
+      participan: participan.get(t.id) ?? 0,
       enRojo: rojos.get(t.id) ?? 0,
       sinComprobar: sinComprobar.get(t.id) ?? 0,
       desvinculados: desvinculados.get(t.id) ?? 0,
@@ -338,22 +407,38 @@ export const MINIMO_PARA_DETECTAR = 3
  * exactamente lo mismo que un botón roto: el director prueba, no pasa nada, y
  * no tiene forma de saber si le falta algo o si el sistema falló.
  */
-export function motivoParaNoDetectar(documentos: number): string | null {
-  if (documentos >= MINIMO_PARA_DETECTAR) return null
+export function motivoParaNoDetectar(participan: number, documentos: number = participan): string | null {
+  if (participan >= MINIMO_PARA_DETECTAR) return null
 
-  const faltan = MINIMO_PARA_DETECTAR - documentos
+  const faltan = MINIMO_PARA_DETECTAR - participan
   const cuantosHay =
-    documentos === 0
+    participan === 0
       ? "todavía no hay ninguno cargado"
-      : documentos === 1
+      : participan === 1
         ? "hoy hay 1"
-        : `hoy hay ${documentos}`
+        : `hoy hay ${participan}`
   const cuantosFaltan = faltan === 1 ? "1 asesor más" : `${faltan} asesores más`
 
+  /**
+   * Si el número que se muestra arriba ("5 asesores tienen este documento
+   * cargado") es más grande que el que decide el botón, hay que decir por qué.
+   * Sin esta oración el director lee dos números distintos sobre lo mismo en la
+   * misma fila y no tiene forma de saber cuál vale.
+   */
+  const afuera = documentos - participan
+  const porQue =
+    afuera <= 0
+      ? ""
+      : afuera === 1
+        ? ` De los ${documentos} que están cargados, 1 es de un asesor pausado o desvinculado y no entra en la ` +
+          `comparación.`
+        : ` De los ${documentos} que están cargados, ${afuera} son de asesores pausados o desvinculados y no ` +
+          `entran en la comparación.`
+
   return (
-    `Para detectar la plantilla hacen falta al menos ${MINIMO_PARA_DETECTAR} documentos de este tipo y ` +
-    `${cuantosHay}. Comparando menos no se puede distinguir qué parte del contrato es texto fijo y qué parte es ` +
-    `el dato de cada persona. Subí este mismo documento a ${cuantosFaltan}.`
+    `Para detectar la plantilla hacen falta al menos ${MINIMO_PARA_DETECTAR} documentos de este tipo, de asesores ` +
+    `activos, y ${cuantosHay}.${porQue} Comparando menos no se puede distinguir qué parte del contrato es texto ` +
+    `fijo y qué parte es el dato de cada persona. Subí este mismo documento a ${cuantosFaltan}.`
   )
 }
 
@@ -419,26 +504,18 @@ export function textoDesvinculados(desvinculados: number): string | null {
  * plantilla" no lo era: el desvinculado no entra en la detección ni en la
  * confirmación, así que ese aviso no se apagaba nunca.
  *
- * Pero "borrá el documento" tampoco sirve como primera opción, por dos motivos
- * medidos:
- *
- *  · **un desvinculado puede volver, y el estado se revierte.** Del lado del
- *    director, sin pedirle nada a nadie: la lista de asesores tiene el filtro
- *    "eliminado" que lo muestra, el menú le ofrece "Pausar asesor" (solo mira
- *    si está `pausado`, no si está `eliminado`) y `requireDirectorSobreAsesor`
- *    tampoco filtra por estado, así que Pausar → Reactivar lo deja en `activo`.
- *    Del lado de Vakdor, `api/admin-vakdor/usuarios/[id]/desbloquear` lo hace
- *    en un paso. Apenas vuelve a estar activo su documento entra otra vez en la
- *    detección, y borrarlo es tirar algo que después hay que volver a pedirle a
- *    esa persona.
- *  · **borrar se pega un tiro en el pie.** El documento del desvinculado
- *    igual cuenta para el mínimo de `MINIMO_PARA_DETECTAR`: si la
- *    inmobiliaria tenía justo 3, borrarlo deja el botón "Detectar plantilla"
- *    deshabilitado y el director se queda sin poder hacer nada.
+ * Pero "borrá el documento" tampoco sirve como primera opción: **un
+ * desvinculado puede volver, y el estado se revierte.** Del lado del director,
+ * sin pedirle nada a nadie: la lista de asesores tiene el filtro "eliminado"
+ * que lo muestra, el menú le ofrece "Pausar asesor" (solo mira si está
+ * `pausado`, no si está `eliminado`) y `requireDirectorSobreAsesor` tampoco
+ * filtra por estado, así que Pausar → Reactivar lo deja en `activo`. Del lado
+ * de Vakdor, `api/admin-vakdor/usuarios/[id]/desbloquear` lo hace en un paso.
+ * Apenas vuelve a estar activo su documento entra otra vez en la detección, y
+ * borrarlo es tirar algo que después hay que volver a pedirle a esa persona.
  *
  * Así que la instrucción es la verdad completa: no hay nada que hacer, el aviso
- * es informativo, y borrar es la última opción — con la advertencia del mínimo
- * al lado, que es la parte que no se puede deducir mirando la pantalla.
+ * es informativo, y borrar es la última opción.
  *
  * **El orden es parte del arreglo.** La primera versión de este texto llegaba
  * al veredicto ("no tenés que hacer nada") recién en la tercera oración, con la
@@ -446,22 +523,25 @@ export function textoDesvinculados(desvinculados: number): string | null {
  * no rompe nada tiene que leerse en dos segundos o no se lee: va el veredicto
  * primero y el detalle atrás.
  *
- * OJO si alguna vez el desvinculado sale de `fila.documentos`: la última
- * oración nombra `MINIMO_PARA_DETECTAR` porque hoy su documento SÍ cuenta para
- * ese mínimo. Si deja de contar, esa oración se vuelve falsa y hay que sacarla
- * en el mismo commit.
+ * ═══ Y la oración que se cayó, que es la mitad de este comentario ═══
+ *
+ * Hasta hoy esto terminaba con "si igual querés borrarlo, tené en cuenta que
+ * con menos de 3 documentos no se puede volver a detectar la plantilla", y era
+ * cierto porque el mínimo se contaba sobre `fila.documentos`, que incluía a los
+ * desvinculados. Ahora se cuenta sobre `fila.participan`, que no los incluye:
+ * borrar el documento de un desvinculado **no cambia nada** del botón. La
+ * oración pasó a ser falsa y salió en el mismo commit que cambió el mínimo. El
+ * aviso viejo decía OJO con esto en su propio comentario, y esto es ese ojo.
  */
 function avisoDeDesvinculados(desvinculados: number): string | null {
   if (desvinculados <= 0) return null
   return desvinculados === 1
     ? "Aparte, hay 1 documento de un asesor desvinculado: no tenés que hacer nada. No entra en ninguna " +
-        "comparación, y si esa persona vuelve a la inmobiliaria, su documento entra solo en la próxima detección. " +
-        `Si igual querés borrarlo, tené en cuenta que con menos de ${MINIMO_PARA_DETECTAR} documentos no se puede ` +
-        `volver a detectar la plantilla.`
+        "comparación ni cuenta para poder detectar la plantilla, y si esa persona vuelve a la inmobiliaria, su " +
+        "documento entra solo en la próxima detección."
     : `Aparte, hay ${desvinculados} documentos de asesores desvinculados: no tenés que hacer nada. No entran en ` +
-        `ninguna comparación, y si esas personas vuelven a la inmobiliaria, sus documentos entran solos en la ` +
-        `próxima detección. Si igual querés borrarlos, tené en cuenta que con menos de ${MINIMO_PARA_DETECTAR} ` +
-        `documentos no se puede volver a detectar la plantilla.`
+        `ninguna comparación ni cuentan para poder detectar la plantilla, y si esas personas vuelven a la ` +
+        `inmobiliaria, sus documentos entran solos en la próxima detección.`
 }
 
 /**

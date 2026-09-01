@@ -317,7 +317,14 @@ export function FilaDeLaSolapa({
   onDetectar: () => void;
   children?: React.ReactNode;
 }) {
-  const motivo = motivoParaNoDetectar(fila.documentos);
+  /**
+   * Los DOS números, y el orden importa: el que decide es `participan` —el
+   * mismo que cuenta la ruta de detección— y `documentos` entra solo para poder
+   * explicar la diferencia cuando la hay. Con `fila.documentos` a secas, el
+   * botón se habilitaba con 3 documentos donde uno era de un pausado y la ruta
+   * comparaba 2.
+   */
+  const motivo = motivoParaNoDetectar(fila.participan, fila.documentos);
   const avisoSinComprobar = textoSinComprobar(fila.sinComprobar);
   const avisoDesvinculados = textoDesvinculados(fila.desvinculados);
 

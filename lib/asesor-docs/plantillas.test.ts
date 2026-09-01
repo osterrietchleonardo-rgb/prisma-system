@@ -22,6 +22,7 @@ import {
   textoDesvinculados,
   textoPendientes,
   ESTADO_DESVINCULADO,
+  ESTADO_PAUSADO,
   type FilaPlantilla,
 } from "./plantillas"
 import { MINIMO_DOCUMENTOS } from "@/lib/plantillas/deteccion"
@@ -184,6 +185,54 @@ describe("armarFilas", () => {
     expect(filas[0].version).toBeNull()
   })
 
+  /**
+   * `participan` es el número del que depende el botón, y tiene que contar lo
+   * MISMO que cuenta `detectar-plantilla`: los que no están pausados ni
+   * desvinculados, y solo los que aparecen en la lista de asesores.
+   */
+  it("participan cuenta solo a los que entran de verdad en la comparación", () => {
+    const filas = armarFilas({
+      tipos: [{ id: "t1", nombre: "Contrato", estado: "borrador", version_actual: null }],
+      versiones: [],
+      documentos: [
+        { template_id: "t1", estado: null, version_id: null, advisor_id: "a1" },
+        { template_id: "t1", estado: null, version_id: null, advisor_id: "a2" },
+        { template_id: "t1", estado: null, version_id: null, advisor_id: "a3" },
+        { template_id: "t1", estado: null, version_id: null, advisor_id: "a4" },
+      ],
+      asesores: [
+        { id: "a1", estado: "activo" },
+        { id: "a2", estado: "pausado" },
+        { id: "a3", estado: ESTADO_DESVINCULADO },
+        // a4 no aparece: la ruta lo deja afuera por no encontrarlo.
+      ],
+    })
+    expect(filas[0].documentos).toBe(4)
+    expect(filas[0].participan).toBe(1)
+  })
+
+  it("un estado que el sistema no conoce SÍ participa, igual que en separarPorEstado", () => {
+    const filas = armarFilas({
+      tipos: [{ id: "t1", nombre: "Contrato", estado: "borrador", version_actual: null }],
+      versiones: [],
+      documentos: [{ template_id: "t1", estado: null, version_id: null, advisor_id: "a1" }],
+      asesores: [{ id: "a1", estado: "vacaciones" }],
+    })
+    expect(filas[0].participan).toBe(1)
+    // Y la regla de allá dice lo mismo: entra, con una advertencia.
+    expect(separarPorEstado([{ advisorId: "a1", estado: "vacaciones" }]).dentro).toHaveLength(1)
+  })
+
+  it("el pausado con mayúsculas y espacios tampoco participa", () => {
+    const filas = armarFilas({
+      tipos: [{ id: "t1", nombre: "Contrato", estado: "borrador", version_actual: null }],
+      versiones: [],
+      documentos: [{ template_id: "t1", estado: null, version_id: null, advisor_id: "a1" }],
+      asesores: [{ id: "a1", estado: " Pausado " }],
+    })
+    expect(filas[0].participan).toBe(0)
+  })
+
   it("ordena por nombre para que la lista no cambie de orden entre recargas", () => {
     const filas = armarFilas({
       tipos: [
@@ -239,6 +288,32 @@ describe("motivoParaNoDetectar", () => {
     const motivo = motivoParaNoDetectar(1)
     expect(motivo).toContain("detectar")
     expect(motivo).not.toContain("deducir")
+  })
+
+  /**
+   * El agujero que se cierra acá, medido en la 7b-1: el botón se habilitaba con
+   * `fila.documentos`, que cuenta a los pausados y a los desvinculados, y la
+   * ruta comparaba solo a los activos. Con 3 documentos donde uno era de un
+   * pausado, el botón quedaba habilitado y la detección salía con 2.
+   */
+  it("con documentos de más que no participan, el motivo sigue existiendo", () => {
+    // 4 cargados, 2 que participan: el botón NO se puede habilitar.
+    expect(motivoParaNoDetectar(2, 4)).not.toBeNull()
+    expect(motivoParaNoDetectar(2, 4)).toContain("hoy hay 2")
+  })
+
+  it("y dice por qué los números no coinciden, en vez de dejar dos cifras sueltas", () => {
+    expect(motivoParaNoDetectar(2, 3)).toContain("1 es de un asesor pausado o desvinculado")
+    expect(motivoParaNoDetectar(1, 4)).toContain("3 son de asesores pausados o desvinculados")
+  })
+
+  it("cuando todos participan no inventa una explicación que no hace falta", () => {
+    expect(motivoParaNoDetectar(2, 2)).not.toContain("pausado")
+    expect(motivoParaNoDetectar(2)).not.toContain("pausado")
+  })
+
+  it("con los que participan al mínimo no hay motivo, aunque haya más cargados", () => {
+    expect(motivoParaNoDetectar(MINIMO_PARA_DETECTAR, MINIMO_PARA_DETECTAR + 4)).toBeNull()
   })
 })
 
@@ -735,6 +810,17 @@ describe("armarFilas: el documento de un desvinculado va a su propio balde", () 
     const { dentro } = separarPorEstado([{ advisorId: "ex", estado: ESTADO_DESVINCULADO }])
     expect(dentro).toHaveLength(0)
   })
+
+  /**
+   * Y los DOS juntos tienen que ser exactamente `ESTADOS_FUERA`, no un
+   * subconjunto: si mañana se agrega un tercer estado que deja al asesor afuera
+   * y este archivo no se entera, `participan` lo seguiría contando y el botón
+   * "Detectar plantilla" se habilitaría con documentos que la ruta no mira.
+   */
+  it("los dos estados escritos a mano acá son TODOS los que dejan afuera", () => {
+    expect([ESTADO_PAUSADO, ESTADO_DESVINCULADO].sort()).toEqual([...ESTADOS_FUERA].sort())
+    expect(separarPorEstado([{ advisorId: "p", estado: ESTADO_PAUSADO }]).dentro).toHaveLength(0)
+  })
 })
 
 describe("explicacionDelEstado: el asesor sin comparar", () => {
@@ -1062,17 +1148,34 @@ describe("explicacionDelEstado: el desvinculado, con una instrucción que se pue
   })
 
   /**
-   * La parte que el director no puede deducir mirando la pantalla: borrar el
-   * documento de un desvinculado le baja el conteo de la fila y, con justo el
-   * mínimo, le apaga el botón. Si el aviso lo manda a borrar sin decirlo, se
-   * queda trabado sin saber por qué.
+   * ═══ La oración que se cayó, y por qué este test es al revés que antes ═══
+   *
+   * Hasta la 7b-2 el aviso terminaba con "si igual querés borrarlo, tené en
+   * cuenta que con menos de 3 documentos no se puede volver a detectar la
+   * plantilla", y este test exigía esa oración. Era cierta mientras el mínimo se
+   * contaba sobre `fila.documentos`, que incluía a los desvinculados.
+   *
+   * Ahora el mínimo se cuenta sobre `fila.participan`, que NO los incluye:
+   * borrar el documento de un desvinculado no cambia nada del botón. La oración
+   * pasó a ser falsa, y un test que la exigiera estaría blindando la decisión
+   * equivocada. Así que se da vuelta: el aviso no puede volver a decirlo.
    */
-  it("si nombra borrar, avisa que puede quedarse por debajo del mínimo", () => {
+  it("ya no promete que borrarlo baja del mínimo, porque dejó de contar para el mínimo", () => {
     for (const desvinculados of [1, 3]) {
       const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados })
-      expect(texto.toLowerCase()).toContain("borrarl")
-      expect(texto).toContain(`menos de ${MINIMO_PARA_DETECTAR} documentos`)
+      expect(texto).not.toContain(`menos de ${MINIMO_PARA_DETECTAR} documentos`)
+      expect(texto).toContain("no tenés que hacer nada")
     }
+  })
+
+  /** Y lo dice de frente, que es lo que reemplaza a la oración que se cayó. */
+  it("dice que no cuenta para poder detectar la plantilla", () => {
+    expect(explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 1 })).toContain(
+      "ni cuenta para poder detectar la plantilla",
+    )
+    expect(explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 3 })).toContain(
+      "ni cuentan para poder detectar la plantilla",
+    )
   })
 
   it("con varios, todo el renglón concuerda en número", () => {
@@ -1080,14 +1183,14 @@ describe("explicacionDelEstado: el desvinculado, con una instrucción que se pue
     expect(texto).toContain("3 documentos de asesores desvinculados")
     expect(texto).toContain("No entran")
     expect(texto).toContain("esas personas vuelven")
-    expect(texto).toContain("querés borrarlos")
-    expect(texto).not.toContain("borrarlo,")
+    expect(texto).toContain("sus documentos entran solos")
+    expect(texto).not.toContain("su documento entra solo")
   })
 
   it("en un borrador se dice también, pegado a lo que ya decía", () => {
     const texto = explicacionDelEstado({ estado: "borrador", version: null, enRojo: 0, desvinculados: 1 })
     expect(texto).toContain("falta detectar la plantilla")
-    expect(texto).toContain("Si igual querés borrarlo")
+    expect(texto).toContain("Aparte, hay 1 documento de un asesor desvinculado")
   })
 
   it("sin desvinculados no aparece nada de esto", () => {
@@ -1199,6 +1302,7 @@ describe("la fila dibujada: los renglones tienen que llegar a la pantalla", () =
     estado: "activa",
     version: 2,
     documentos: 5,
+    participan: 5,
     enRojo: 0,
     sinComprobar: 0,
     desvinculados: 0,
@@ -1271,9 +1375,21 @@ describe("la fila dibujada: los renglones tienen que llegar a la pantalla", () =
    * pasa nada, y no tiene forma de saber si le falta algo o si el sistema falló.
    */
   it("cuando no se puede detectar, el motivo se dibuja", () => {
-    const html = dibujar({ documentos: 2 })
-    expect(html).toContain(motivoParaNoDetectar(2)!)
-    expect(dibujar({ documentos: 5 })).not.toContain("Para detectar la plantilla hacen falta")
+    const html = dibujar({ documentos: 2, participan: 2 })
+    expect(html).toContain(motivoParaNoDetectar(2, 2)!)
+    expect(dibujar({ documentos: 5, participan: 5 })).not.toContain("Para detectar la plantilla hacen falta")
+  })
+
+  /**
+   * El que decide el botón es `participan`, no `documentos`. Si la fila se
+   * dibujara con `documentos` —que es como estaba— un tipo con 3 cargados de
+   * los cuales uno es de un pausado se vería SIN motivo y con el botón
+   * habilitado, y la detección saldría con 2.
+   */
+  it("con documentos de más que no participan, el motivo se dibuja igual", () => {
+    const html = dibujar({ documentos: 3, participan: 2 })
+    expect(html).toContain(motivoParaNoDetectar(2, 3)!)
+    expect(html).toContain("1 es de un asesor pausado o desvinculado")
   })
 
   it("y el nombre del tipo, su estado y cuántos tienen el documento cargado", () => {
