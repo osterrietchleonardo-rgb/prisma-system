@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { rutaDeVersionNueva, validarArchivo, type Seccion } from "@/lib/asesor-docs/reglas";
 import {
+  aplicarDeAUno,
   COMO_SE_APLICA,
   COMO_TIENE_QUE_SER_EL_ARCHIVO,
   EL_ARCHIVO_SIGUE_ELEGIDO,
@@ -34,6 +35,7 @@ import {
   PARA_QUE_SIRVE_LA_VERSION_NUEVA,
   PARA_QUE_SIRVE_LA_VISTA_PREVIA,
   PARA_QUE_SIRVE_PONER_EN_USO,
+  resultadoDeLaAplicacion,
   resumenDelProgreso,
   textoDelArchivoElegido,
   tituloDeCamposDesaparecidos,
@@ -308,20 +310,19 @@ export function VersionNueva({ templateId, nombreDelTipo, asesores, onCerrar, on
       });
       const cuerpo = await res.json().catch(() => null);
 
-      if (res.ok) {
-        /**
-         * El 200 tiene DOS formas, y confundirlas sería contar un pendiente
-         * como si estuviera hecho. `estado: 'ok'` es "su documento nuevo está
-         * escrito"; cualquier otro 200 —`pendiente`, o `revisar` cuando ya
-         * estaba en rojo— es "le falta un dato y sigue con la versión
-         * anterior" (spec §7.4.2).
-         */
-        if (cuerpo?.estado === "ok") return { estado: "ok", mensaje: cuerpo?.resumen ?? null };
-        return { estado: "pendiente", mensaje: cuerpo?.mensaje ?? null };
-      }
-      /** El 409 es LA RED: alguna de las cinco comprobaciones frenó la escritura. */
-      if (res.status === 409) return { estado: "frenado", mensaje: cuerpo?.error ?? null };
-      return { estado: "error", mensaje: cuerpo?.error ?? "No se pudo aplicar la versión a esta persona." };
+      /**
+       * Quién decide qué significa esta respuesta vive en lib
+       * (`resultadoDeLaAplicacion`) y no acá: escrita a mano en el `.tsx` no la
+       * miraba ningún test, y contar todo 200 como "Listo" dejaba los 1337 en
+       * verde — con la pantalla diciendo que están todos hechos con uno en
+       * `pendiente`, que llega con 200 y no tiene documento nuevo.
+       */
+      const estado = resultadoDeLaAplicacion({ ok: res.ok, status: res.status, estado: cuerpo?.estado });
+
+      /** Cada resultado tiene su propio campo, porque el endpoint los manda aparte. */
+      if (estado === "ok") return { estado, mensaje: cuerpo?.resumen ?? null };
+      if (estado === "pendiente") return { estado, mensaje: cuerpo?.mensaje ?? null };
+      return { estado, mensaje: cuerpo?.error ?? "No se pudo aplicar la versión a esta persona." };
     } catch (e) {
       console.error("[VersionNueva] falló el pedido de aplicación:", e);
       return {
@@ -335,27 +336,31 @@ export function VersionNueva({ templateId, nombreDelTipo, asesores, onCerrar, on
     setPorAsesor((previo) => ({ ...previo, [advisorId]: valor }));
 
   /**
-   * De a UNO y en serie (spec §7.5). El `for...of` con `await` adentro es lo
-   * que lo hace secuencial de verdad: un `Promise.all` mandaría N pedidos a la
-   * vez, cada uno de los cuales baja el molde, el original y hasta tres
-   * documentos más, y no habría progreso que mostrar.
+   * De a UNO y en serie (spec §7.5).
    *
-   * Y uno que falla NO corta el bucle: el `catch` vive adentro de `aplicarAUno`,
-   * que siempre devuelve un resultado. Es literal del spec: "para que uno que
-   * falla no voltee a los otros".
+   * El bucle NO está acá: está en `aplicarDeAUno`, en lib, y no es una
+   * prolijidad. La exigencia que más caro sale romper del §7.5 es "que uno que
+   * falla no voltee a los otros", y estando el `for` adentro de este componente
+   * **nadie la medía**: agregarle un `break` dejaba los 1337 tests en verde,
+   * porque el panel no se puede dibujar en un test (el `Sheet` de Radix necesita
+   * un DOM). Movida a lib, tiene sus tests y sus mutaciones.
    */
   const aplicarATodos = async () => {
     if (!leida || aplicando) return;
+    const versionId = leida.versionId;
     setAplicando(true);
     setArranco(true);
     setErrorAlActivar(null);
     try {
-      for (const asesor of activos) {
-        marcar(asesor.advisorId, { estado: "corriendo", mensaje: null });
-        const resultado = await aplicarAUno(asesor, leida.versionId);
-        setHuboCambios(true);
-        marcar(asesor.advisorId, resultado);
-      }
+      await aplicarDeAUno({
+        asesores: activos,
+        aplicar: (asesor) => aplicarAUno(asesor, versionId),
+        alEmpezar: (asesor) => marcar(asesor.advisorId, { estado: "corriendo", mensaje: null }),
+        alTerminar: (asesor, resultado) => {
+          setHuboCambios(true);
+          marcar(asesor.advisorId, resultado);
+        },
+      });
     } finally {
       setAplicando(false);
     }
@@ -464,24 +469,14 @@ export function VersionNueva({ templateId, nombreDelTipo, asesores, onCerrar, on
             <>
               <LoQueSeLeyo leida={leida} />
 
-              {arranco && (
-                <div className="space-y-3">
-                  <BarraDeProgreso
-                    hechos={cuenta.total - cuenta.esperando}
-                    total={cuenta.total}
-                    resumen={resumenDelProgreso(cuenta)}
-                  />
-                  {activos.map((asesor) => (
-                    <FilaDeAplicacion
-                      key={asesor.advisorId}
-                      asesor={asesor}
-                      resultado={porAsesor[asesor.advisorId] ?? { estado: "esperando", mensaje: null }}
-                      bloqueado={aplicando}
-                      onReintentar={() => reintentarUno(asesor)}
-                    />
-                  ))}
-                </div>
-              )}
+              <ElProgreso
+                arranco={arranco}
+                activos={activos}
+                porAsesor={porAsesor}
+                cuenta={cuenta}
+                aplicando={aplicando}
+                onReintentar={reintentarUno}
+              />
 
               {errorAlActivar && (
                 <BloqueDeError error={errorAlActivar.error}>
@@ -536,46 +531,16 @@ export function VersionNueva({ templateId, nombreDelTipo, asesores, onCerrar, on
               </div>
             </>
           ) : (
-            <>
-              <p className="text-xs text-muted-foreground">
-                {arranco ? PARA_QUE_SIRVE_PONER_EN_USO : `${NADA_SE_APLICO_TODAVIA} ${COMO_SE_APLICA}`}
-              </p>
-              {/* El motivo de por qué el botón de poner en uso está apagado va
-                  SIEMPRE visible y no en un tooltip: un botón de shadcn
-                  deshabilitado lleva `pointer-events: none`, así que el
-                  navegador nunca dibuja el tooltip, y en el celular no hay
-                  dónde pasar el mouse. Está medido en la solapa. */}
-              {arranco && motivoParaNoActivar !== null && !enUso && (
-                <p className="text-xs text-amber-600">{motivoParaNoActivar}</p>
-              )}
-              <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={cerrar}
-                  disabled={aplicando || activando}
-                  className="flex-1 sm:flex-none"
-                >
-                  Cerrar
-                </Button>
-                {!arranco ? (
-                  <Button onClick={aplicarATodos} disabled={aplicando} className="flex-1 sm:flex-none gap-2">
-                    {aplicando ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-                    {aplicando ? "Aplicando…" : "Aplicar a los asesores"}
-                  </Button>
-                ) : (
-                  !enUso && (
-                    <Button
-                      onClick={ponerEnUso}
-                      disabled={aplicando || activando || motivoParaNoActivar !== null}
-                      className="flex-1 sm:flex-none gap-2"
-                    >
-                      {activando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                      {activando ? "Poniendo en uso…" : "Poner esta versión en uso"}
-                    </Button>
-                  )
-                )}
-              </div>
-            </>
+            <BarraDeLaAplicacion
+              arranco={arranco}
+              aplicando={aplicando}
+              activando={activando}
+              enUso={enUso}
+              motivoParaNoActivar={motivoParaNoActivar}
+              onAplicar={aplicarATodos}
+              onPonerEnUso={ponerEnUso}
+              onCerrar={cerrar}
+            />
           )}
         </div>
       </SheetContent>
@@ -683,6 +648,150 @@ export function PasoElegir({
         )}
       </div>
     </div>
+  );
+}
+
+
+/**
+ * TODO lo que el §7.5 pide que se vea mientras corre la aplicación, junto.
+ *
+ * ═══ Por qué esto es un componente y no dos etiquetas en el panel ═══
+ *
+ * Es la misma receta de `LoQueSeLeyo`, aplicada al bloque que aquel arreglo dejó
+ * afuera — y es el que tiene las exigencias que más caro sale romper. Medido por
+ * la revisión sobre el panel anterior: sacar `<BarraDeProgreso>` **sobrevivía**,
+ * y reemplazar `activos.map` por `[].map` **también**. Cada pieza se dibujaba
+ * bien en su propio test; nadie miraba si el panel las montaba.
+ *
+ * El panel entero no se puede dibujar en un test (el `Sheet` de Radix necesita
+ * un DOM). Esto sí, y con esto lo que queda sin red es UNA línea, que tiene su
+ * test estructural.
+ */
+export function ElProgreso({
+  arranco,
+  activos,
+  porAsesor,
+  cuenta,
+  aplicando,
+  onReintentar,
+}: {
+  /**
+   * Si el director ya apretó "Aplicar". Antes de eso no hay progreso que
+   * mostrar y esto no dibuja nada.
+   *
+   * La condición vive ACÁ ADENTRO y no en el panel a propósito: en el panel era
+   * un `{arranco && (` que ningún test podía ver — cambiarlo por `{false && (`
+   * borraba la barra de progreso y las filas de estado sin poner nada en rojo,
+   * porque el panel no se puede dibujar. Acá adentro se dibuja, y el cableado
+   * del panel queda siendo una sola expresión fija que un assert estructural
+   * fija entera.
+   */
+  arranco: boolean;
+  activos: AsesorDeLaPlantilla[];
+  porAsesor: Record<string, EstadoPorAsesor>;
+  cuenta: { total: number; ok: number; pendientes: number; frenados: number; errores: number; esperando: number };
+  aplicando: boolean;
+  onReintentar: (asesor: AsesorDeLaPlantilla) => void;
+}) {
+  if (!arranco) return null;
+  return (
+    <div className="space-y-3">
+      <BarraDeProgreso
+        hechos={cuenta.total - cuenta.esperando}
+        total={cuenta.total}
+        resumen={resumenDelProgreso(cuenta)}
+      />
+      {activos.map((asesor) => (
+        <FilaDeAplicacion
+          key={asesor.advisorId}
+          asesor={asesor}
+          resultado={porAsesor[asesor.advisorId] ?? { estado: "esperando", mensaje: null }}
+          /**
+           * Bloqueado mientras corre, que es la cuarta exigencia del §7.5: dos
+           * clics no pueden disparar dos procesos.
+           */
+          bloqueado={aplicando}
+          onReintentar={() => onReintentar(asesor)}
+        />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * La barra de abajo del paso "ya se leyó la versión": qué falta, y los botones.
+ *
+ * Exportada y dibujable por lo mismo que `ElProgreso`, y además porque acá vive
+ * el cartel que evita el peor malentendido de toda la pantalla: que ver la vista
+ * previa se lea como "el cambio ya está hecho". Medido por la revisión: cambiar
+ * el ternario por `PARA_QUE_SIRVE_PONER_EN_USO` fijo —o sea, borrar
+ * `NADA_SE_APLICO_TODAVIA` de la pantalla— no ponía nada en rojo. El texto estaba
+ * usado por nombre y nadie miraba CUÁNDO.
+ */
+export function BarraDeLaAplicacion({
+  arranco,
+  aplicando,
+  activando,
+  enUso,
+  motivoParaNoActivar,
+  onAplicar,
+  onPonerEnUso,
+  onCerrar,
+}: {
+  /** Si el director ya apretó "Aplicar", aunque todavía no haya terminado ninguno. */
+  arranco: boolean;
+  aplicando: boolean;
+  activando: boolean;
+  enUso: boolean;
+  motivoParaNoActivar: string | null;
+  onAplicar: () => void;
+  onPonerEnUso: () => void;
+  onCerrar: () => void;
+}) {
+  return (
+    <>
+      {/* Antes de arrancar, lo que importa es que TODAVÍA NO SE APLICÓ NADA;
+          después, qué significa poner la versión en uso. Los dos textos viven en
+          lib, y cuál va en cada momento es una decisión, no una cosmética. */}
+      <p className="text-xs text-muted-foreground">
+        {arranco ? PARA_QUE_SIRVE_PONER_EN_USO : `${NADA_SE_APLICO_TODAVIA} ${COMO_SE_APLICA}`}
+      </p>
+      {/* El motivo de por qué el botón de poner en uso está apagado va SIEMPRE
+          visible y no en un tooltip: un botón de shadcn deshabilitado lleva
+          `pointer-events: none`, así que el navegador nunca dibuja el tooltip, y
+          en el celular no hay dónde pasar el mouse. Está medido en la solapa. */}
+      {arranco && motivoParaNoActivar !== null && !enUso && (
+        <p className="text-xs text-amber-600">{motivoParaNoActivar}</p>
+      )}
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
+        <Button variant="outline" onClick={onCerrar} disabled={aplicando || activando} className="flex-1 sm:flex-none">
+          Cerrar
+        </Button>
+        {!arranco ? (
+          /**
+           * Bloqueado mientras corre: la cuarta exigencia del §7.5, para que dos
+           * clics no disparen dos procesos. El guard de verdad está adentro de
+           * `aplicarATodos` (`if (!leida || aplicando) return`); esto es lo que
+           * el director ve.
+           */
+          <Button onClick={onAplicar} disabled={aplicando} className="flex-1 sm:flex-none gap-2">
+            {aplicando ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
+            {aplicando ? "Aplicando…" : "Aplicar a los asesores"}
+          </Button>
+        ) : (
+          !enUso && (
+            <Button
+              onClick={onPonerEnUso}
+              disabled={aplicando || activando || motivoParaNoActivar !== null}
+              className="flex-1 sm:flex-none gap-2"
+            >
+              {activando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              {activando ? "Poniendo en uso…" : "Poner esta versión en uso"}
+            </Button>
+          )
+        )}
+      </div>
+    </>
   );
 }
 

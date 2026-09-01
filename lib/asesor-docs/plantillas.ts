@@ -1266,6 +1266,85 @@ export const COMO_SE_APLICA =
 /** Cómo terminó cada asesor. Es lo que la pantalla pinta y lo que se cuenta. */
 export type ResultadoDeAplicacion = "esperando" | "corriendo" | "ok" | "pendiente" | "frenado" | "error"
 
+/**
+ * Cómo se lee la respuesta de `POST /aplicar-version/{advisorId}`.
+ *
+ * ═══ Vive acá y no adentro del componente porque es una DECISIÓN ═══
+ *
+ * El 200 tiene dos formas y confundirlas cuenta un pendiente como si estuviera
+ * hecho: con la traducción rota, la pantalla diría *"Listo: los 3 asesores
+ * activos ya tienen su documento de la versión nueva"* con uno en `pendiente`
+ * —que llega con 200 y NO tiene documento nuevo— y habilitaría "Poner esta
+ * versión en uso", que se comería un 409.
+ *
+ * Estaba escrita a mano adentro del `.tsx` y no la miraba ningún test: medido
+ * por la revisión, devolver `"ok"` a secas dejaba los 1337 en verde. Es
+ * exactamente lo que este archivo existe para evitar.
+ *
+ * Se falla del lado seguro en las dos puntas: un 200 sin `estado` reconocible NO
+ * se cuenta como hecho, y cualquier respuesta que no sea 200 ni 409 es un error,
+ * no un pendiente.
+ */
+export function resultadoDeLaAplicacion(args: {
+  ok: boolean
+  status: number
+  /** `estado` del cuerpo, tal como vino: es `unknown` de verdad. */
+  estado: unknown
+}): ResultadoDeAplicacion {
+  if (args.ok) {
+    /**
+     * `'ok'` es lo único que significa "su documento nuevo está escrito".
+     * `'pendiente'` y `'revisar'` —el segundo cuando ya estaba en rojo— son
+     * "le falta un dato y sigue con la versión anterior" (spec §7.4.2).
+     */
+    return args.estado === "ok" ? "ok" : "pendiente"
+  }
+  /** El 409 es LA RED: alguna de las cinco comprobaciones frenó la escritura. */
+  if (args.status === 409) return "frenado"
+  return "error"
+}
+
+/**
+ * Le aplica la versión a cada asesor, **de a uno y en serie** (spec §7.5).
+ *
+ * ═══ Por qué esto no puede vivir adentro del componente ═══
+ *
+ * El §7.5 pide cuatro cosas, y ésta es la que más caro sale romper: *"para que
+ * uno que falla no voltee a los otros"*. Estaba escrita como un `for…of` adentro
+ * del panel, y medido por la revisión: agregarle un `break` cuando un asesor no
+ * sale `ok` **dejaba los 1337 tests en verde**. El panel no se puede dibujar en
+ * un test (el `Sheet` de Radix necesita un DOM), así que la regla se muda acá,
+ * donde sí se puede correr.
+ *
+ * `aplicar` NUNCA tiene que tirar: quien la escribe es el que traduce la
+ * respuesta, y una excepción suya cortaría el bucle igual que un `break`. Por
+ * las dudas se la envuelve, y el que tira cuenta como `error` — nunca como
+ * motivo para dejar a los demás sin su documento.
+ *
+ * `alEmpezar` y `alTerminar` son los que pintan la fila: sin ellos no hay
+ * progreso que mostrar, que es la otra exigencia del §7.5.
+ */
+export async function aplicarDeAUno<T>(args: {
+  asesores: T[]
+  aplicar: (asesor: T) => Promise<{ estado: ResultadoDeAplicacion; mensaje: string | null }>
+  alEmpezar: (asesor: T) => void
+  alTerminar: (asesor: T, resultado: { estado: ResultadoDeAplicacion; mensaje: string | null }) => void
+}): Promise<void> {
+  for (const asesor of args.asesores) {
+    args.alEmpezar(asesor)
+    let resultado: { estado: ResultadoDeAplicacion; mensaje: string | null }
+    try {
+      resultado = await args.aplicar(asesor)
+    } catch {
+      resultado = {
+        estado: "error",
+        mensaje: "No se pudo hablar con el servidor. Revisá la conexión y probá con esta persona de nuevo.",
+      }
+    }
+    args.alTerminar(asesor, resultado)
+  }
+}
+
 /** La etiqueta corta de cada estado, la que va al lado del nombre. */
 export function etiquetaDeResultado(estado: ResultadoDeAplicacion): string {
   switch (estado) {

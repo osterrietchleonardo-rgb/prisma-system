@@ -5,8 +5,10 @@ import React from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 
 import {
+  BarraDeLaAplicacion,
   BarraDeProgreso,
   CamposQueCambian,
+  ElProgreso,
   FilaDeAplicacion,
   ListaDeAvisos,
   LoQueSeLeyo,
@@ -17,6 +19,7 @@ import {
 import { FilaDeLaSolapa } from "@/components/asesor-docs/PlantillasTab"
 import {
   armarFilas,
+  aplicarDeAUno,
   asesoresDeLaPlantilla,
   ASI_EMPIEZA_LA_ESPERA_DE_UN_DATO,
   botonDePonerEnUso,
@@ -33,6 +36,7 @@ import {
   PARA_QUE_SIRVE_LA_VERSION_NUEVA,
   PARA_QUE_SIRVE_LA_VISTA_PREVIA,
   PARA_QUE_SIRVE_PONER_EN_USO,
+  resultadoDeLaAplicacion,
   resumenDelProgreso,
   textoDelArchivoElegido,
   textoPendientes,
@@ -830,14 +834,39 @@ describe("la pantalla de la versión nueva no se escribe su propia prosa", () =>
   })
 
   /**
-   * De a UNO y en serie (spec §7.5). Un `Promise.all` mandaría N pedidos a la
-   * vez —cada uno baja el molde, el original y hasta tres documentos más— y no
-   * habría progreso que mostrar ni forma de que uno que falla no voltee a los
-   * otros.
+   * ═══ Las tres líneas del panel que ningún dibujo alcanza ═══
+   *
+   * El bucle del §7.5 y la traducción del 200 se mudaron a lib, donde se
+   * CORREN; el bloque de progreso y la barra de abajo se mudaron a componentes
+   * exportados, donde se DIBUJAN. Lo que queda acá es el cableado, y estos tres
+   * asserts son su red: si alguien vuelve a escribir el bucle a mano adentro del
+   * panel, o deja de montar una de las dos piezas, esto se pone en rojo.
    */
-  it("los asesores se aplican en serie, no todos juntos", () => {
-    expect(CODIGO).toContain("for (const asesor of activos)")
-    expect(CODIGO).not.toContain("Promise.all")
+  it("el bucle de aplicar sale de lib, no está escrito a mano en el panel", () => {
+    expect(CODIGO).toContain("await aplicarDeAUno({")
+    expect(CODIGO, "el bucle volvió al panel, donde ningún test lo mide").not.toContain("for (const asesor of")
+  })
+
+  it("la traducción de la respuesta sale de lib", () => {
+    expect(CODIGO).toContain("resultadoDeLaAplicacion({ ok: res.ok, status: res.status, estado: cuerpo?.estado })")
+  })
+
+  /**
+   * Y se pega el cableado ENTERO, no el nombre del componente.
+   *
+   * Con `toContain("<ElProgreso")` sobrevivían dos mutaciones medidas: envolverlo
+   * en `{false && (…)}` —el nombre sigue estando— y renombrar el componente
+   * (`<BarraDeLaAplicacionQueNoExiste` contiene `<BarraDeLaAplicacion`). Pegando
+   * la primera prop al nombre, las dos caen.
+   */
+  const APRETADO = CODIGO.replace(/\s+/g, " ")
+
+  it("el panel monta el progreso, con su condición adentro y no afuera", () => {
+    expect(APRETADO).toContain("<ElProgreso arranco={arranco}")
+  })
+
+  it("y monta la barra de aplicar", () => {
+    expect(APRETADO).toContain("<BarraDeLaAplicacion arranco={arranco}")
   })
 
   /**
@@ -1151,5 +1180,355 @@ describe("la fila dibujada en el estado intermedio", () => {
 
   it("y la explicación entera de la fila también", () => {
     expect(dibujar()).toContain(explicacionDelEstado(FILA))
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LAS CUATRO EXIGENCIAS DEL §7.5, CON RED
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ Lo que la revisión midió, y que mi reporte anterior declaró cazado ═══
+ *
+ * Tres de las cuatro cosas que pide el §7.5 estaban escritas y bien, y ninguna
+ * tenía quien la cuidara: sacar la barra de progreso, reemplazar `activos.map`
+ * por `[].map`, y meterle un `break` al bucle **sobrevivían las tres**. El
+ * `disabled={aplicando}` también.
+ *
+ * Mi reporte las dio por medidas, y no lo estaban: lo que estaba medido era la
+ * PIEZA SUELTA (`BarraDeProgreso` dibuja bien aislada) y un patrón de texto
+ * sobre el `.tsx` (`for (const asesor of activos)` sin `Promise.all`) — que
+ * seguía estando igual después de agregarle un `break`. Son dos niveles
+ * distintos y el reporte no los distinguió. Esa es la sobreafirmación.
+ *
+ * El arreglo es el de `475197a` por partida doble: el bloque de aplicación sale
+ * a `ElProgreso` y `BarraDeLaAplicacion` —que se dibujan— y el bucle sale a
+ * `aplicarDeAUno`, en lib, que se corre.
+ */
+
+describe("resultadoDeLaAplicacion: qué significa cada respuesta", () => {
+  it("200 con estado ok es lo único que cuenta como hecho", () => {
+    expect(resultadoDeLaAplicacion({ ok: true, status: 200, estado: "ok" })).toBe("ok")
+  })
+
+  /**
+   * El caso del §7.4.2: le falta un dato, llega con 200, y NO tiene documento
+   * nuevo. Contarlo como hecho hacía que la pantalla dijera "los 3 ya tienen su
+   * documento" y habilitara "Poner esta versión en uso", que se comería un 409.
+   */
+  it("200 con pendiente NO es hecho", () => {
+    expect(resultadoDeLaAplicacion({ ok: true, status: 200, estado: "pendiente" })).toBe("pendiente")
+  })
+
+  /** `revisar` es el 200 del que ya estaba en rojo: tampoco tiene documento nuevo. */
+  it("200 con revisar tampoco", () => {
+    expect(resultadoDeLaAplicacion({ ok: true, status: 200, estado: "revisar" })).toBe("pendiente")
+  })
+
+  /** Se falla del lado seguro: un 200 raro nunca se cuenta como hecho. */
+  it("un 200 sin estado reconocible no se da por hecho", () => {
+    for (const estado of [undefined, null, "", "cualquier_cosa", 1, {}]) {
+      expect(resultadoDeLaAplicacion({ ok: true, status: 200, estado })).toBe("pendiente")
+    }
+  })
+
+  it("el 409 es la red que frenó la escritura", () => {
+    expect(resultadoDeLaAplicacion({ ok: false, status: 409, estado: undefined })).toBe("frenado")
+  })
+
+  it("y cualquier otra cosa es un error, no un pendiente", () => {
+    for (const status of [400, 403, 404, 500]) {
+      expect(resultadoDeLaAplicacion({ ok: false, status, estado: undefined })).toBe("error")
+    }
+  })
+})
+
+describe("aplicarDeAUno: de a uno, en serie, y uno que falla no voltea a los otros", () => {
+  const tres = ["a1", "a2", "a3"]
+
+  const correr = async (
+    aplicar: (a: string) => Promise<{ estado: ResultadoDeAplicacion; mensaje: string | null }>,
+  ) => {
+    const empezaron: string[] = []
+    const terminaron: Array<{ asesor: string; estado: ResultadoDeAplicacion }> = []
+    await aplicarDeAUno({
+      asesores: tres,
+      aplicar,
+      alEmpezar: (a) => empezaron.push(a),
+      alTerminar: (a, r) => terminaron.push({ asesor: a, estado: r.estado }),
+    })
+    return { empezaron, terminaron }
+  }
+
+  it("le aplica a todos, en el orden que vinieron", async () => {
+    const { empezaron, terminaron } = await correr(async () => ({ estado: "ok", mensaje: null }))
+    expect(empezaron).toEqual(tres)
+    expect(terminaron.map((t) => t.asesor)).toEqual(tres)
+  })
+
+  /**
+   * ═══ La exigencia que más caro sale romper ═══
+   *
+   * El §7.5 existe para esto. Con un `break` en el bucle, el primero que falla
+   * deja a los otros dos sin su documento — y la pantalla mostraría dos filas en
+   * "Todavía no" para siempre, sin que nada explique por qué.
+   */
+  it("el primero que se frena NO corta: los demás siguen", async () => {
+    const { terminaron } = await correr(async (a) =>
+      a === "a1" ? { estado: "frenado", mensaje: "algo" } : { estado: "ok", mensaje: null },
+    )
+    expect(terminaron.map((t) => t.asesor), "alguien puso un break").toEqual(tres)
+    expect(terminaron.map((t) => t.estado)).toEqual(["frenado", "ok", "ok"])
+  })
+
+  it("y si fallan todos, igual se intentó con todos", async () => {
+    const { terminaron } = await correr(async () => ({ estado: "error", mensaje: "no anduvo" }))
+    expect(terminaron).toHaveLength(3)
+  })
+
+  /**
+   * Una excepción cortaría el bucle igual que un `break`, y el que la tira es
+   * el `fetch` del navegador — o sea, la conexión de Leonardo. Se la envuelve, y
+   * el que tira cuenta como error, nunca como motivo para dejar a los demás sin
+   * su documento.
+   */
+  it("una excepción tampoco corta el bucle: cuenta como error y sigue", async () => {
+    const { terminaron } = await correr(async (a) => {
+      if (a === "a2") throw new Error("se cortó la red")
+      return { estado: "ok", mensaje: null }
+    })
+    expect(terminaron.map((t) => t.estado)).toEqual(["ok", "error", "ok"])
+  })
+
+  /**
+   * En SERIE, no todos juntos: cada pedido baja el molde, el original y hasta
+   * tres documentos más. En paralelo no habría progreso que mostrar y se
+   * multiplicaría por N el trabajo del servidor al mismo tiempo.
+   */
+  it("no arranca el siguiente hasta que termina el anterior", async () => {
+    const orden: string[] = []
+    let enVuelo = 0
+    let maximoEnVuelo = 0
+    await aplicarDeAUno({
+      asesores: tres,
+      aplicar: async (a) => {
+        enVuelo += 1
+        maximoEnVuelo = Math.max(maximoEnVuelo, enVuelo)
+        await new Promise((listo) => setTimeout(listo, 1))
+        orden.push(a)
+        enVuelo -= 1
+        return { estado: "ok" as ResultadoDeAplicacion, mensaje: null }
+      },
+      alEmpezar: () => {},
+      alTerminar: () => {},
+    })
+    expect(maximoEnVuelo, "hay más de un pedido a la vez: dejó de ser en serie").toBe(1)
+    expect(orden).toEqual(tres)
+  })
+
+  /** Y avisa ANTES de arrancar con cada uno: sin eso no hay fila que pintar. */
+  it("avisa que empieza antes de que termine", async () => {
+    const eventos: string[] = []
+    await aplicarDeAUno({
+      asesores: ["a1"],
+      aplicar: async () => ({ estado: "ok" as ResultadoDeAplicacion, mensaje: null }),
+      alEmpezar: () => eventos.push("empieza"),
+      alTerminar: () => eventos.push("termina"),
+    })
+    expect(eventos).toEqual(["empieza", "termina"])
+  })
+
+  it("con la lista vacía no hace nada y no se rompe", async () => {
+    const { terminaron } = await correr(async () => ({ estado: "ok", mensaje: null }))
+    expect(terminaron).toHaveLength(3)
+    await expect(
+      aplicarDeAUno({ asesores: [], aplicar: async () => ({ estado: "ok", mensaje: null }), alEmpezar: () => {}, alTerminar: () => {} }),
+    ).resolves.toBeUndefined()
+  })
+})
+
+describe("el progreso entero, dibujado (spec §7.5)", () => {
+  const activos = [ANA, BRUNO]
+  const cuenta = { total: 2, ok: 1, pendientes: 1, frenados: 0, errores: 0, esperando: 0 }
+  const porAsesor: Record<string, { estado: ResultadoDeAplicacion; mensaje: string | null }> = {
+    a1: { estado: "ok", mensaje: "Ana Pérez ya tiene su documento de la versión 2." },
+    a2: { estado: "pendiente", mensaje: "La versión nueva trae un campo que esta persona no tiene: COMISION." },
+  }
+
+  const dibujar = (aplicando = false) =>
+    visible(
+      React.createElement(ElProgreso, { arranco: true, activos, porAsesor, cuenta, aplicando, onReintentar: () => {} }),
+    )
+
+  /** Exigencia 1 del §7.5: barra de progreso. */
+  it("la barra de progreso está, con su renglón", () => {
+    expect(dibujar()).toContain(resumenDelProgreso(cuenta))
+  })
+
+  /** Exigencia 2 del §7.5: estado por fila. */
+  it("cada asesor tiene su fila, con su nombre, su estado y su motivo", () => {
+    const html = dibujar()
+    for (const asesor of activos) expect(html).toContain(asesor.nombre)
+    expect(html).toContain(etiquetaDeResultado("ok"))
+    expect(html).toContain(etiquetaDeResultado("pendiente"))
+    expect(html).toContain("COMISION")
+  })
+
+  /**
+   * Antes de que el director apriete "Aplicar" no hay progreso que mostrar. La
+   * condición vive acá adentro y no en el panel: en el panel era un `{arranco &&`
+   * que ningún test podía ver.
+   */
+  it("antes de arrancar no dibuja nada", () => {
+    const html = visible(
+      React.createElement(ElProgreso, {
+        arranco: false,
+        activos,
+        porAsesor,
+        cuenta,
+        aplicando: false,
+        onReintentar: () => {},
+      }),
+    )
+    expect(html).toBe("")
+  })
+
+  it("con la lista vacía no dibuja filas de nadie", () => {
+    const html = visible(
+      React.createElement(ElProgreso, {
+        arranco: true,
+        activos: [],
+        porAsesor,
+        cuenta: { ...cuenta, total: 0 },
+        aplicando: false,
+        onReintentar: () => {},
+      }),
+    )
+    expect(html).not.toContain("Ana Pérez")
+  })
+
+  /**
+   * Exigencia 4 del §7.5: bloqueado mientras corre. Se mira el HTML crudo y no
+   * el texto, porque `disabled` es un atributo.
+   *
+   * Y se busca `disabled=""` con el signo igual, no la palabra suelta: las
+   * clases de shadcn traen `disabled:pointer-events-none` adentro del
+   * `className`, así que un `toContain("disabled")` da verde SIEMPRE y no mide
+   * nada. Es la misma trampa de buscar una frase que otro renglón ya imprime.
+   */
+  it("mientras corre, el botón de reintentar de cada fila queda deshabilitado", () => {
+    const crudo = (aplicando: boolean) =>
+      renderToStaticMarkup(
+        React.createElement(ElProgreso, {
+          arranco: true,
+          activos,
+          porAsesor,
+          cuenta,
+          aplicando,
+          onReintentar: () => {},
+        }),
+      )
+    expect(crudo(true), "el botón de reintentar se puede apretar mientras corre").toContain('disabled=""')
+    expect(crudo(false)).not.toContain('disabled=""')
+  })
+})
+
+describe("la barra de abajo del paso de aplicar, dibujada", () => {
+  const dibujar = (cambios: Partial<React.ComponentProps<typeof BarraDeLaAplicacion>> = {}) =>
+    visible(
+      React.createElement(BarraDeLaAplicacion, {
+        arranco: false,
+        aplicando: false,
+        activando: false,
+        enUso: false,
+        motivoParaNoActivar: null,
+        onAplicar: () => {},
+        onPonerEnUso: () => {},
+        onCerrar: () => {},
+        ...cambios,
+      }),
+    )
+
+  /**
+   * El cartel que evita el peor malentendido de la pantalla: ver la vista previa
+   * armada se lee como "el cambio ya está hecho". Es el hermano de
+   * `NADA_SE_GUARDA_TODAVIA` de la §7.2, y estaba usado por nombre sin que nadie
+   * mirara CUÁNDO.
+   */
+  it("antes de aplicar dice que todavía no se aplicó nada, y cómo se aplica", () => {
+    const html = dibujar()
+    expect(html).toContain(NADA_SE_APLICO_TODAVIA)
+    expect(html).toContain(COMO_SE_APLICA)
+  })
+
+  it("y ofrece aplicar", () => {
+    expect(dibujar()).toContain("Aplicar a los asesores")
+  })
+
+  it("una vez que arrancó, ese cartel se va y aparece qué significa poner en uso", () => {
+    const html = dibujar({ arranco: true })
+    expect(html).not.toContain(NADA_SE_APLICO_TODAVIA)
+    expect(html).toContain(PARA_QUE_SIRVE_PONER_EN_USO)
+    expect(html).toContain("Poner esta versión en uso")
+  })
+
+  it("el motivo de por qué no se puede poner en uso se dibuja", () => {
+    const motivo = motivoParaNoPonerEnUso({ total: 3, ok: 1 })!
+    expect(dibujar({ arranco: true, motivoParaNoActivar: motivo })).toContain(motivo)
+  })
+
+  it("cuando ya quedó en uso, ese motivo no se repite ni se ofrece de nuevo", () => {
+    const html = dibujar({ arranco: true, enUso: true, motivoParaNoActivar: "algo" })
+    expect(html).not.toContain("Poner esta versión en uso")
+    expect(html).not.toContain("algo")
+  })
+
+  /**
+   * Exigencia 4 del §7.5, del lado del botón que dispara todo.
+   *
+   * ═══ Y se CUENTAN los `disabled`, no se busca uno ═══
+   *
+   * En esta barra hay DOS botones y el de "Cerrar" también se deshabilita
+   * mientras corre, así que un `toContain` da verde con el `disabled` del botón
+   * de aplicar borrado. Medido: `disabled={aplicando}` → `disabled={false}`
+   * sobrevivía. Con `aplicando` son dos; sin él, ninguno.
+   */
+  const cuantosDeshabilitados = (html: string) => html.split('disabled=""').length - 1
+
+  it("mientras corre, el botón de aplicar queda deshabilitado", () => {
+    const crudo = (aplicando: boolean) =>
+      renderToStaticMarkup(
+        React.createElement(BarraDeLaAplicacion, {
+          arranco: false,
+          aplicando,
+          activando: false,
+          enUso: false,
+          motivoParaNoActivar: null,
+          onAplicar: () => {},
+          onPonerEnUso: () => {},
+          onCerrar: () => {},
+        }),
+      )
+    expect(
+      cuantosDeshabilitados(crudo(true)),
+      "faltan botones bloqueados: dos clics podrían disparar dos procesos",
+    ).toBe(2)
+    expect(cuantosDeshabilitados(crudo(false))).toBe(0)
+  })
+
+  it("y el de poner en uso también, cuando hay un motivo para no poder", () => {
+    const crudo = renderToStaticMarkup(
+      React.createElement(BarraDeLaAplicacion, {
+        arranco: true,
+        aplicando: false,
+        activando: false,
+        enUso: false,
+        motivoParaNoActivar: "todavía no",
+        onAplicar: () => {},
+        onPonerEnUso: () => {},
+        onCerrar: () => {},
+      }),
+    )
+    expect(crudo).toContain('disabled=""')
   })
 })
