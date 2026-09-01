@@ -936,6 +936,75 @@ describe("4. la cuenta cruzada, acá como freno (el caso Palermo)", () => {
     expect((r.cuerpo.motivos as Array<{ codigo: string }>).map((m) => m.codigo)).toEqual(["texto-fijo"])
     expect(String(r.cuerpo.error)).toContain("sobra 1 aparición")
   })
+
+  /**
+   * ═══ El falso freno: un campo que la versión nueva YA NO TIENE ═══
+   *
+   * El dato viejo sigue en `form_data` **a propósito** — el §7.4.2 manda no
+   * borrarlo, para que volver a la versión anterior siga funcionando. Pero si
+   * la cuenta cruzada corre sobre el `form_data` entero, ese valor aparece en
+   * el contrato como texto normal (ya no hay `{{OFICINA}}` que lo haya puesto)
+   * y lo denuncia como si fuera texto fijo contaminado.
+   *
+   * Resultado medido por la revisión antes del arreglo: **409 nombrando
+   * `OFICINA`**, mandando al director a cambiar una frase legítima, y sin
+   * salida posible hasta que exista la pantalla.
+   *
+   * Y no es un caso raro: pasa cada vez que una versión nueva saca un campo,
+   * que es la mitad del sentido de versionar.
+   */
+  const conUnCampoQueLaVersionNuevaYaNoTiene = () => {
+    /** El dato viejo queda guardado, como manda el §7.4.2. */
+    filaDe(BRUNO).form_data = { ...DATOS[BRUNO], OFICINA: "Cabildo" }
+    /**
+     * Y otro asesor TAMBIÉN tiene ese campo viejo, con su documento nombrando
+     * su valor una sola vez. Es lo que hace que la cuenta cruzada tenga contra
+     * qué comparar: sin esto se saltea el campo y el falso freno no aparece.
+     */
+    filaDe(ANA).form_data = { ...DATOS[ANA], OFICINA: "Santa Fe" }
+    base.archivos.set(
+      RUTA_ORIGINAL(ANA),
+      buffer(
+        docx([
+          parrafo("CONTRATO DE PARTNERSHIP COMERCIAL INMOBILIARIO"),
+          parrafo(`Y por la otra parte ${DATOS[ANA].NOMBRE}, mayor de edad, CUIT ${DATOS[ANA].CUIT}.`),
+          parrafo(`Se asigna a EL ASESOR la zona de ${DATOS[ANA].ZONA}, con captacion preferente.`),
+          parrafo("La oficina de Santa Fe atiende de 9 a 18."),
+        ]),
+      ),
+    )
+    /**
+     * Y su valor vive DOS veces en el contrato nuevo como texto común: es una
+     * frase del molde, no el dato de nadie. Sin el filtro, la cuenta cruzada
+     * lo ve repetido y frena.
+     */
+    base.archivos.set(
+      RUTA_MOLDE_NUEVO,
+      buffer(
+        moldeNuevo([
+          "La oficina de Cabildo atiende de 9 a 18.",
+          "Toda notificacion se cursa a la oficina de Cabildo.",
+        ]),
+      ),
+    )
+  }
+
+  it("un campo que la versión nueva ya no tiene NO frena: se aplica igual", async () => {
+    conUnCampoQueLaVersionNuevaYaNoTiene()
+    const r = await pedir()
+    expect(
+      (r.cuerpo.motivos as Array<{ codigo: string }> | undefined)?.map((m) => m.codigo) ?? [],
+      "frenó por un campo que ya no participa de nada",
+    ).toEqual([])
+    expect(r.status).toBe(200)
+    expect(filaDe(BRUNO).version_id).toBe(VER_NUEVA)
+  })
+
+  it("y el dato viejo sigue guardado, que es lo que pide el §7.4.2", async () => {
+    conUnCampoQueLaVersionNuevaYaNoTiene()
+    await pedir()
+    expect((filaDe(BRUNO).form_data as Record<string, string>).OFICINA).toBe("Cabildo")
+  })
 })
 
 describe("5. que no haya un hueco mal escrito en el molde (el agujero silencioso)", () => {

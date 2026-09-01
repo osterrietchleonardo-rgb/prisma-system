@@ -418,8 +418,28 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
    * documento de Bruno dice su zona dos veces, y el documento de los otros
    * asesores tiene su dato una sola.
    */
+  /**
+   * Solo los campos QUE EL MOLDE TIENE, no el `form_data` entero.
+   *
+   * Medido por la revisión: corriendo sobre todo el `form_data`, la cuenta
+   * cruzada devolvía 409 nombrando `OFICINA` —un campo que la versión nueva ya
+   * no tiene— y mandaba al director a cambiar una frase legítima del contrato.
+   * Falla cerrado, sin salida, por un dato que ya no participa de nada.
+   *
+   * Y el dato sigue en `form_data` **a propósito**: el §7.4.2 manda no
+   * borrarlo, para que volver a la versión anterior siga funcionando. O sea que
+   * el caso no es raro: es lo que pasa cada vez que una versión nueva saca un
+   * campo, que es la mitad del sentido de versionar.
+   *
+   * Es la MISMA decisión que ya toma la comprobación 1, que cuenta contra
+   * `huecosDelMolde`. Se hace igual en las dos para que se vea que es la misma.
+   */
+  const datosQueElMoldeUsa = Object.fromEntries(
+    Object.entries(datosCompletos).filter(([campo]) => campo in huecosDelMolde),
+  )
+
   const sospechasDeTextoFijo = camposQueParecenTextoFijo({
-    ubicaciones: ubicarValoresEnPartes(partesDelGenerado, datosCompletos).filter((u) => u.veces >= 2),
+    ubicaciones: ubicarValoresEnPartes(partesDelGenerado, datosQueElMoldeUsa).filter((u) => u.veces >= 2),
     partesDelNuevo: partesDelGenerado,
     otros: otrosParaContrastar,
   })
