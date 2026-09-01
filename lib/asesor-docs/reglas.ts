@@ -97,6 +97,38 @@ export function rutaDeArchivo(
   return `asesores/${agencyId}/${advisorId}/${carpeta}/${id}.${extension}`
 }
 
+/**
+ * Dónde vive el `.docx` que PRISMA le GENERA a un asesor con una versión de la
+ * plantilla (spec §8.4, columna `docx_path`).
+ *
+ * ═══ Por qué esto NO puede pisar `archivo_original_path` ═══
+ *
+ * `archivo_original_path` es el `.docx` que subió el director, y es la única
+ * fuente de verdad contra la que compara toda la verificación de esta etapa. Si
+ * el generado lo pisara, la próxima comprobación compararía la plantilla contra
+ * un archivo que salió de la plantilla misma: **daría verde siempre, contra
+ * cualquier error**. Es exactamente la razón por la que la columna `docx_path`
+ * existe aparte.
+ *
+ * Por eso el generado vive en su propia carpeta —`plantillas/generados/`— y no
+ * en `plantillas/`, que es la que devuelve `rutaDeArchivo`. Con la carpeta de
+ * por medio, pisarlo es imposible aunque los ids coincidan; hay un test que lo
+ * mide comparando las dos rutas con los MISMOS argumentos.
+ *
+ * El número de versión va en el nombre a propósito: una versión anterior no se
+ * borra nunca (spec §7.4), así que su documento generado tampoco. Y hace que
+ * reintentar la misma aplicación escriba encima del mismo archivo en vez de
+ * dejar un huérfano nuevo por intento.
+ */
+export function rutaDelDocumentoGenerado(
+  agencyId: string,
+  advisorId: string,
+  documentId: string,
+  version: number,
+): string {
+  return `asesores/${agencyId}/${advisorId}/plantillas/generados/${documentId}-v${version}.docx`
+}
+
 // ---------------------------------------------------------------------------
 // EL .docx DE UNA VERSIÓN NUEVA DE PLANTILLA, Y SU GUARDA
 // ---------------------------------------------------------------------------

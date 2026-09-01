@@ -11,6 +11,7 @@ import {
   carpetaDeVersionesNuevas,
   rutaDeVersionNueva,
   validarRutaDeVersionNueva,
+  rutaDelDocumentoGenerado,
 } from "./reglas";
 
 const UN_MB = 1024 * 1024;
@@ -409,5 +410,47 @@ describe("validarRutaDeVersionNueva", () => {
     ]) {
       expect(bueno(nombre), `"${nombre}" no tendría que pasar`).toBe(false);
     }
+  });
+});
+
+/**
+ * ═══ LA RUTA QUE NO PUEDE PISAR AL ORIGINAL ═══
+ *
+ * `archivo_original_path` es el .docx que subió el director, y es la única
+ * fuente de verdad contra la que compara toda la verificación de esta etapa. Si
+ * el documento GENERADO lo pisara, la próxima comprobación compararía la
+ * plantilla contra un archivo que salió de la plantilla misma: daría verde
+ * siempre, contra cualquier error.
+ *
+ * Este test lo mide en vez de confiar en el nombre de la carpeta: se piden las
+ * dos rutas con los MISMOS argumentos y tienen que dar distinto.
+ */
+describe("rutaDelDocumentoGenerado", () => {
+  const AG = "ag-1";
+  const AD = "ad-1";
+  const DOC = "doc-1";
+
+  it("nunca coincide con la ruta del archivo original, ni con los mismos ids", () => {
+    for (const version of [1, 2, 99]) {
+      expect(rutaDelDocumentoGenerado(AG, AD, DOC, version)).not.toBe(
+        rutaDeArchivo(AG, AD, "plantilla", DOC, "docx")
+      );
+    }
+  });
+
+  it("vive adentro de la carpeta del asesor, en su propio subnivel", () => {
+    expect(rutaDelDocumentoGenerado(AG, AD, DOC, 2)).toBe(
+      `asesores/${AG}/${AD}/plantillas/generados/${DOC}-v2.docx`
+    );
+  });
+
+  /** Una versión anterior no se borra nunca (spec §7.4), así que su documento tampoco. */
+  it("cada versión tiene su propio archivo", () => {
+    expect(rutaDelDocumentoGenerado(AG, AD, DOC, 1)).not.toBe(rutaDelDocumentoGenerado(AG, AD, DOC, 2));
+  });
+
+  /** Y reintentar la MISMA aplicación escribe encima, en vez de dejar un huérfano por intento. */
+  it("dos veces la misma versión dan la misma ruta", () => {
+    expect(rutaDelDocumentoGenerado(AG, AD, DOC, 2)).toBe(rutaDelDocumentoGenerado(AG, AD, DOC, 2));
   });
 });
