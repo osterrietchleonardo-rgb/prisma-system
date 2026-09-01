@@ -139,6 +139,16 @@ export function VersionNueva({ templateId, nombreDelTipo, asesores, onCerrar, on
 
   const [porAsesor, setPorAsesor] = useState<Record<string, EstadoPorAsesor>>({});
   const [aplicando, setAplicando] = useState(false);
+  /**
+   * Si el director ya apretó "Aplicar", aunque todavía no haya terminado ni uno.
+   *
+   * Es un estado propio y no se deduce de los resultados a propósito: el primer
+   * pedido puede tardar hasta un minuto —baja el molde, el original y hasta
+   * tres documentos más por cada asesor—, y dedujera de los resultados, durante
+   * todo ese rato la pantalla se quedaría igual que antes de apretar. El
+   * director no tendría forma de saber si el clic entró.
+   */
+  const [arranco, setArranco] = useState(false);
   const [activando, setActivando] = useState(false);
   const [errorAlActivar, setErrorAlActivar] = useState<{ error: string; faltan: string[] } | null>(null);
   const [enUso, setEnUso] = useState(false);
@@ -337,6 +347,7 @@ export function VersionNueva({ templateId, nombreDelTipo, asesores, onCerrar, on
   const aplicarATodos = async () => {
     if (!leida || aplicando) return;
     setAplicando(true);
+    setArranco(true);
     setErrorAlActivar(null);
     try {
       for (const asesor of activos) {
@@ -377,7 +388,6 @@ export function VersionNueva({ templateId, nombreDelTipo, asesores, onCerrar, on
     };
   }, [activos, porAsesor]);
 
-  const arranco = cuenta.esperando < cuenta.total;
   const motivoParaNoActivar = motivoParaNoPonerEnUso({ total: cuenta.total, ok: cuenta.ok });
 
   const ponerEnUso = async () => {
