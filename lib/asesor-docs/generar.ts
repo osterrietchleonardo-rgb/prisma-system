@@ -521,6 +521,36 @@ export function sugerenciaDeHueco(malEscrito: string): string {
  *
  * `null` cuando no hay ninguna sospecha.
  */
+/**
+ * ═══ NOTA PARA LA 7b-2: la salida de este freno, si alguna vez se agrega ═══
+ *
+ * Esta es la ÚNICA de las cinco que puede frenar un cambio legítimo: si el
+ * director puso el mismo campo dos veces a propósito, todos los asesores lo
+ * tendrán dos veces y los documentos viejos —contra los que se contrasta— lo
+ * tienen una. La salida existe y el mensaje la dice: cambiar la frase en el
+ * Word. La otra salida —un segundo clic explícito— es de la 7b-2, no de acá:
+ * el spec §7.4.4 dice que el reemplazo va "recién con el OK explícito", y ese
+ * OK lo da una pantalla, no un parámetro que cualquiera puede mandar.
+ *
+ * Cuando se agregue, tiene que cumplir tres cosas, y la tercera es la que
+ * importa dentro de seis meses:
+ *
+ *  1. **Que sea específico, no un `forzar: true`.** Tiene que nombrar QUÉ se
+ *     saltea: los campos concretos que la cuenta cruzada marcó. Un booleano
+ *     global apagaría también el freno de una sospecha que el director nunca
+ *     vio, porque apareció después de que él miró la pantalla.
+ *  2. **Que no pueda saltear ninguna de las otras cuatro.** Las otras cuatro no
+ *     tienen falso positivo conocido: un blanco, un dato ajeno, un hueco a la
+ *     vista y un campo que no aterriza son daño, siempre.
+ *  3. **Que quede ESCRITO en la fila del asesor**, no solo en el pedido. Si el
+ *     salteo vive nada más que en el HTTP, dentro de seis meses nadie va a
+ *     saber por qué el contrato de esa persona tiene el campo repetido: se va a
+ *     leer como un error de la plantilla. La constancia va en `observacion` del
+ *     `advisor_documents` —con el campo, la cuenta que se ignoró y la fecha—
+ *     junto a un `estado` que la solapa pueda contar aparte. Es la misma
+ *     decisión que ya tomó `camposDelReemplazo`: la fila tiene que decir la
+ *     verdad de lo que se comprobó y de lo que no.
+ */
 export function avisoDeTextoFijoQueFrena(sospechas: SospechaDeTextoFijo[], nombre: string): string | null {
   if (sospechas.length === 0) return null
   const uno = sospechas.length === 1

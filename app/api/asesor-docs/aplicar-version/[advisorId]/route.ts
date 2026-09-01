@@ -513,12 +513,31 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
       errUpdate ? errUpdate.message : "cero filas afectadas (el archivo cambió durante la aplicación)",
     )
     /**
-     * El archivo quedó subido y la fila no lo apunta. **No se lo borra**: el
-     * único identificador que se tiene de él es la ruta, y esa ruta es
-     * determinista por documento y versión — o sea que es la MISMA que apuntaría
-     * una aplicación anterior que sí salió bien. Borrar acá le sacaría al asesor
-     * un documento vivo por culpa de un intento fallido. Queda anotado en el log
-     * y el próximo intento lo pisa.
+     * ═══ EL ARCHIVO HUÉRFANO NO SE BORRA, Y NO ES UN OLVIDO ═══
+     *
+     * Acá el .docx quedó subido y la fila no lo apunta. La tentación es
+     * agregarle un `remove` para no dejar basura. **NO LO HAGAS**, y este
+     * comentario existe para que el próximo que lea esto no lo "arregle":
+     *
+     *  · El único identificador que se tiene de ese archivo es su ruta, y esa
+     *    ruta es **determinista por documento y versión**
+     *    (`rutaDelDocumentoGenerado`). O sea que es exactamente la MISMA que
+     *    apuntaría una aplicación anterior de esta misma versión que sí salió
+     *    bien. Un `remove` acá le sacaría al asesor un documento VIVO —el que
+     *    su fila apunta y él puede descargar— por culpa de un intento fallido
+     *    posterior. Cambiar un huérfano por un documento borrado es un peor
+     *    negocio.
+     *  · No hay forma de distinguir los dos casos sin leer primero la fila y
+     *    comparar su `docx_path`, y esa lectura tiene su propia carrera.
+     *  · El huérfano vive en la carpeta del PROPIO asesor, en el mismo bucket
+     *    donde ya está su `.docx` original: no abre ninguna clase de exposición
+     *    nueva. Es distinto del archivo de `_versiones-nuevas` de la 7a, que sí
+     *    se borra siempre — ese lo sube el navegador y no es de nadie.
+     *  · Y se limpia solo: el próximo intento sobre la misma versión escribe
+     *    encima (`upsert: true`).
+     *
+     * Queda anotado en el log, que es lo que corresponde: una constancia, no
+     * una acción destructiva.
      */
     return NextResponse.json(
       {
