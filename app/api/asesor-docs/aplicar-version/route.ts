@@ -145,16 +145,6 @@ export async function POST(req: Request) {
 
   const { templateId, moldeAdvisorId, archivoPath } = (cuerpo ?? {}) as Record<string, unknown>
 
-  if (typeof templateId !== "string" || !ES_UUID.test(templateId)) {
-    return NextResponse.json({ error: "Falta el tipo de documento" }, { status: 400 })
-  }
-  if (typeof moldeAdvisorId !== "string" || !ES_UUID.test(moldeAdvisorId)) {
-    return NextResponse.json(
-      { error: "Falta decir de qué asesor son los datos con los que está completado el archivo" },
-      { status: 400 },
-    )
-  }
-
   /**
    * LA GUARDA, y la mitad importante de haber pasado el archivo a una ruta.
    *
@@ -226,6 +216,29 @@ export async function POST(req: Request) {
    */
   if (role !== "director") {
     return rechazar({ error: "Solo el director puede subir una versión nueva" }, 403)
+  }
+
+  /**
+   * Los dos uuid se validan ACÁ ABAJO, y el orden es el arreglo.
+   *
+   * Estaban arriba de la guarda, así que un `templateId` mal formado devolvía
+   * 400 **sin borrar el archivo**: el director subía su contrato, se equivocaba
+   * en un id, y el .docx quedaba legible por URL en un bucket público. Dos vías
+   * más del mismo huérfano que este endpoint acaba de cerrar en las otras seis.
+   *
+   * Bajarlos es seguro y no debilita nada: la guarda de la ruta **no los
+   * necesita** —le alcanzan la ruta y el `agencyId` de la sesión—, así que
+   * mover los uuid para abajo no le saca información a la única defensa que
+   * decide de quién es el archivo.
+   */
+  if (typeof templateId !== "string" || !ES_UUID.test(templateId)) {
+    return rechazar({ error: "Falta el tipo de documento" }, 400)
+  }
+  if (typeof moldeAdvisorId !== "string" || !ES_UUID.test(moldeAdvisorId)) {
+    return rechazar(
+      { error: "Falta decir de qué asesor son los datos con los que está completado el archivo" },
+      400,
+    )
   }
 
   // ── 1. Que la plantilla sea de SU inmobiliaria ──────────────────────────

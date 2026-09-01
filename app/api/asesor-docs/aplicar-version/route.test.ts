@@ -1102,6 +1102,52 @@ describe("el archivo subido no queda huérfano, salga bien o salga mal", () => {
     })
   }
 
+  /**
+   * Las dos vías que quedaban afuera, y quedaban por el ORDEN.
+   *
+   * Los dos uuid se validaban ARRIBA de la guarda de la ruta, así que un id mal
+   * formado devolvía 400 sin borrar: el director subía su contrato, se
+   * equivocaba en un id, y el .docx quedaba legible por URL en un bucket
+   * público. Bajarlos abajo de la guarda las cierra.
+   *
+   * El test va con el caso feliz al lado a propósito: sin él, alguien podría
+   * "arreglarlo" haciendo que el endpoint borre ANTES de saber de quién es el
+   * archivo, que es el agujero de al lado y peor.
+   */
+  const idsInvalidos: Array<{ que: string; cuerpo: Record<string, unknown> }> = [
+    { que: "el tipo de documento no es un uuid", cuerpo: { templateId: "no-soy-un-uuid" } },
+    { que: "el tipo de documento no viene", cuerpo: { templateId: null } },
+    { que: "el asesor del molde no es un uuid", cuerpo: { moldeAdvisorId: "tampoco" } },
+    { que: "el asesor del molde no viene", cuerpo: { moldeAdvisorId: null } },
+  ]
+
+  for (const caso of idsInvalidos) {
+    it(`lo borra cuando ${caso.que} (400)`, async () => {
+      const r = await pedir(caso.cuerpo)
+      expect(r.status).toBe(400)
+      expect(
+        base.archivos.has(RUTA_SUBIDA),
+        "un id mal escrito no puede dejar el contrato legible por URL",
+      ).toBe(false)
+    })
+  }
+
+  it("pero una ruta que NO pasó la guarda no se borra, aunque los ids estén mal", async () => {
+    /**
+     * El borde que hace que lo de arriba no se convierta en un arma: si la ruta
+     * es de otra inmobiliaria, ese archivo no es nuestro para borrar. Con los
+     * ids inválidos ADEMÁS mal puestos, el endpoint tiene que seguir sin
+     * tocarlo — si borrara, sería un borrador de archivos ajenos servido en
+     * bandeja.
+     */
+    const ajena = `asesores/${OTRA_AGENCIA}/_versiones-nuevas/contrato.docx`
+    base.archivos.set(ajena, buffer(versionNuevaDeAna()))
+
+    const r = await pedir({ archivoPath: ajena, templateId: "no-soy-un-uuid" })
+    expect(r.status).toBe(400)
+    expect(base.archivos.has(ajena), "borró un archivo que no es de esta inmobiliaria").toBe(true)
+  })
+
   it("lo borra cuando el archivo está vacío (400)", async () => {
     base.archivos.set(RUTA_SUBIDA, Buffer.alloc(0))
     const r = await pedir({ sinSubirlo: true })

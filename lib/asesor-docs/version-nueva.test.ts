@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import PizZip from "pizzip"
 
-import { ponerHuecosEnDocx, textoPorParte } from "@/lib/plantillas/docx"
+import { DELIMITADORES, ponerHuecosEnDocx, textoPorParte } from "@/lib/plantillas/docx"
 import { LARGO_DE_DATO_SOSPECHOSO } from "./confirmacion"
 import {
   avisoDeCamposConElMismoDato,
@@ -878,6 +878,27 @@ describe("normalizarHuecosEscritosAMano", () => {
   it("deja igual el que ya venía canónico", () => {
     const partes = { "word/document.xml": "Zona: {{ZONA}}" }
     expect(normalizarHuecosEscritosAMano(partes)).toEqual(partes)
+  })
+
+  /**
+   * ═══ El testigo de que la forma del hueco sale de DELIMITADORES ═══
+   *
+   * `HUECO_ESCRITO` era la TERCERA copia de `{{` y `}}` escritos a mano, y
+   * `docx.ts` documenta el daño MEDIDO de que dos de esas copias discrepen.
+   *
+   * Yo había escrito que esto "no se puede demostrar con una mutación", y era
+   * demasiado fuerte: es cierto que cambiar los delimitadores pone 102 tests en
+   * rojo con o sin el arreglo, así que la mutación no discrimina. Pero el
+   * observable correcto no es "¿algo se puso en rojo?" sino **"¿este test sigue
+   * verde?"**. Con el fixture armado DESDE la constante, el código de hoy pasa
+   * y el de ayer —el regex a mano— fallaría, porque buscaría `{{` en un texto
+   * que ya no lo tiene.
+   */
+  it("la forma que busca sale de DELIMITADORES, no de dos llaves escritas a mano", () => {
+    const { start, end } = DELIMITADORES
+    expect(
+      normalizarHuecosEscritosAMano({ "word/document.xml": `Zona: ${start}  ZONA  ${end}.` }),
+    ).toEqual({ "word/document.xml": `Zona: ${start}ZONA${end}.` })
   })
 
   it("NO toca lo que no es un hueco válido: sería reescribirle el contrato a alguien", () => {
