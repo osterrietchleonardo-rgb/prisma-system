@@ -5,6 +5,7 @@ import path from "node:path"
 import PizZip from "pizzip"
 
 import { rutaDelDocumentoGenerado } from "@/lib/asesor-docs/reglas"
+import { huecosDe, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
 
 /**
  * APLICARLE LA VERSIÓN A UN ASESOR: LA PRIMERA VEZ QUE PRISMA ESCRIBE UN
@@ -778,6 +779,71 @@ describe("4. la cuenta cruzada, acá como freno (el caso Palermo)", () => {
     const r = await pedir()
     expect((r.cuerpo.motivos as Array<{ codigo: string }>).map((m) => m.codigo)).toEqual(["texto-fijo"])
     expect(String(r.cuerpo.error)).toContain("sobra 1 aparición")
+  })
+})
+
+describe("5. que no haya un hueco mal escrito en el molde (el agujero silencioso)", () => {
+  /**
+   * ═══ Por qué es la más grave, y cómo se aísla ═══
+   *
+   * El director escribió `{{ZONA-2}}` en el Word — un guión en el nombre de un
+   * campo es de lo más natural. `huecosDe` no lo lista, docxtemplater sí lo
+   * trata como campo, no encuentra el dato y **lo deja en blanco**. La medición
+   * completa está en `lib/plantillas/docx.test.ts`.
+   *
+   * Las otras cuatro pasan, y no por casualidad: para todas, ese campo **no
+   * existe**. Los tres datos de Bruno aterrizan; no hay dato ajeno; en el
+   * documento generado no queda ningún hueco —el mal escrito desapareció, ese
+   * es el problema—; nada aparece dos veces. Es la única que puede verlo, y por
+   * eso mira el MOLDE y no el resultado.
+   */
+  const conUnHuecoMalEscrito = () => {
+    base.archivos.set(RUTA_MOLDE_NUEVO, buffer(moldeNuevo(["Zona secundaria: {{ZONA-2}}."])))
+  }
+
+  it("frena y no escribe NADA de esa persona", async () => {
+    conUnHuecoMalEscrito()
+    const r = await pedir()
+    /** La conducta PRIMERO: es el testigo. El status es el corolario. */
+    expect(nadaSeEscribioDe(BRUNO)).toEqual(COMO_ESTABA)
+    expect(r.status).toBe(409)
+  })
+
+  it("es esta comprobación la que actuó, y muestra el hueco y su corrección", async () => {
+    conUnHuecoMalEscrito()
+    const r = await pedir()
+    expect((r.cuerpo.motivos as Array<{ codigo: string }>).map((m) => m.codigo)).toEqual(["hueco-mal-escrito"])
+    expect(String(r.cuerpo.error)).toContain("{{ZONA-2}}")
+    expect(String(r.cuerpo.error)).toContain("{{ZONA_2}}")
+  })
+
+  /**
+   * Y la prueba de que sin la comprobación el daño es INVISIBLE: con ese molde,
+   * el documento que se generaría sale con un blanco donde iba la zona
+   * secundaria, y ninguna de las otras cuatro tiene nada que decir.
+   */
+  it("el daño que tapa: el documento saldría con un blanco", () => {
+    const generado = rellenarDocx(moldeNuevo(["Zona secundaria: {{ZONA-2}}."]), DATOS[BRUNO])
+    const texto = Object.values(textoPorParte(generado)).join("")
+    expect(texto).toContain("Zona secundaria: .")
+    expect(texto).not.toContain("ZONA-2")
+    expect(huecosDe(generado)).toEqual([])
+  })
+})
+
+/**
+ * El primo RUIDOSO del anterior, y por eso cae en la comprobación 3 y no en la
+ * 5: si el `{{ZONA-2}}` viene adentro del DATO guardado de esta persona, no lo
+ * borra nadie — sale impreso literal en el contrato. Feo, pero visible. Igual
+ * no se escribe.
+ */
+describe("un hueco mal escrito que viene adentro del dato", () => {
+  it("frena por la comprobación 3, y no escribe nada", async () => {
+    filaDe(BRUNO).form_data = { ...DATOS[BRUNO], ZONA: "Belgrano {{ZONA-2}}" }
+    const r = await pedir()
+    expect(nadaSeEscribioDe(BRUNO)).toEqual(COMO_ESTABA)
+    expect((r.cuerpo.motivos as Array<{ codigo: string }>).map((m) => m.codigo)).toEqual(["hueco-sin-rellenar"])
+    expect(String(r.cuerpo.error)).toContain("{{ZONA-2}}")
   })
 })
 

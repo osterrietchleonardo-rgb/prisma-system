@@ -1,7 +1,15 @@
 import { describe, it, expect } from "vitest"
 import fs from "node:fs"
 import PizZip from "pizzip"
-import { ponerHueco, ponerHuecosEnDocx, rellenarDocx, huecosDe, textoDeDocx } from "./docx"
+import {
+  ponerHueco,
+  ponerHuecosEnDocx,
+  rellenarDocx,
+  huecosDe,
+  huecosMalEscritos,
+  textoDeDocx,
+  textoPorParte,
+} from "./docx"
 
 // ---------------------------------------------------------------------------
 // Helpers para armar un .docx en memoria
@@ -889,5 +897,104 @@ describe.runIf(!!RUTA_DOCX_REAL)("contra un .docx real (opcional, vía PLANTILLA
     const datos = Object.fromEntries(palabras.map((p, i) => [`P${i}`, p]))
     const salida = rellenarDocx(r.zip, datos)
     expect(await textoDeDocx(salida.generate({ type: "nodebuffer" }))).toBe(original)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LO QUE PARECE UN HUECO Y NO LO ES
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ El agujero silencioso, y su medición ═══
+ *
+ * Un `{{ZONA-2}}` escrito a mano en el Word no lo lista `huecosDe` —el nombre
+ * del hueco solo admite letras, números y guión bajo— pero docxtemplater SÍ lo
+ * trata como campo, no encuentra el dato, y el `nullGetter` lo deja **en
+ * blanco**. El contrato sale a la firma con un blanco donde iba un dato, y
+ * ninguna comprobación de la etapa lo puede ver.
+ *
+ * El primer test de acá abajo es el que sostiene todo lo demás: mide la
+ * conducta REAL de la librería en vez de confiar en que sigue siendo la que se
+ * midió el 2026-09-01. Si docxtemplater algún día empezara a dejar el
+ * `{{ZONA-2}}` literal —que sería ruidoso y estaría bien— este test lo avisa.
+ */
+describe("huecosMalEscritos", () => {
+  it("la conducta que hace falta tapar: el hueco mal escrito sale como un BLANCO", () => {
+    const zip = armarDocx(`<w:p>${comoLoParteWord("Zona principal: {{ZONA}}. Zona secundaria: {{ZONA-2}}.")}</w:p>`)
+
+    // `huecosDe` no lo ve: para él ese campo no existe.
+    expect(huecosDe(zip)).toEqual(["ZONA"])
+
+    // Y el documento armado sale con un blanco donde iba el dato.
+    const armado = Object.values(textoPorParte(rellenarDocx(zip, { ZONA: "Palermo" }))).join("")
+    expect(armado).toContain("Zona principal: Palermo.")
+    expect(armado).toContain("Zona secundaria: .")
+    expect(armado).not.toContain("ZONA-2")
+
+    // Esto es lo único que puede delatarlo.
+    expect(huecosMalEscritos(textoPorParte(zip))).toEqual(["{{ZONA-2}}"])
+  })
+
+  /**
+   * Los cinco bordes, todos medidos contra la librería real: los cinco salen
+   * como un blanco, así que los cinco se avisan. Que `normalizarHuecosEscritosAMano`
+   * decida NO TOCAR el `{{ }}` vacío y el `{{ dos palabras }}` es otra cosa: no
+   * tocarlos es correcto —reescribir el contrato de alguien sería peor— pero
+   * callarlos no, porque el blanco lo dejan igual.
+   */
+  it.each([
+    ["un guión en el nombre", "{{ZONA-2}}"],
+    ["un punto en el nombre", "{{ZONA.2}}"],
+    ["vacío con espacio", "{{ }}"],
+    ["vacío del todo", "{{}}"],
+    ["dos palabras", "{{ dos palabras }}"],
+    ["un acento", "{{ZÓNA}}"],
+    ["un signo", "{{$ZONA}}"],
+  ])("avisa %s", (_caso, escrito) => {
+    expect(huecosMalEscritos({ "word/document.xml": `Texto ${escrito} más texto.` })).toEqual([escrito])
+  })
+
+  it("un hueco bien escrito no se avisa, con o sin espacios", () => {
+    expect(huecosMalEscritos({ a: "{{ZONA}} {{ZONA_2}} {{ NOMBRE }} {{CAMPO_14}}" })).toEqual([])
+  })
+
+  it("el válido pegado al inválido: se avisa solo el malo", () => {
+    expect(huecosMalEscritos({ a: "A: {{ZONA}} y {{ZONA-2}}." })).toEqual(["{{ZONA-2}}"])
+  })
+
+  /**
+   * `{{` sin cierre y `}}` sin apertura NO se avisan acá, y es a propósito: los
+   * dos hacen TIRAR a `rellenarDocx` —medido, "Multi error"—, así que ya son
+   * ruidosos. Buscarlos agregaría falsos positivos sobre la prosa de un
+   * contrato sin cerrar ningún agujero.
+   */
+  it("no inventa un hallazgo con las llaves sueltas", () => {
+    expect(huecosMalEscritos({ a: "Pagar {{ el saldo" })).toEqual([])
+    expect(huecosMalEscritos({ a: "Pagar el saldo }} ya" })).toEqual([])
+  })
+
+  /**
+   * EL FANTASMA. `textoPorParte` pega los párrafos con un salto de línea. Sin
+   * excluirlo, un `{{` al final de un párrafo y un `}}` al principio del
+   * siguiente serían un hallazgo inventado que frenaría un documento sano. Es
+   * el mismo agujero que `huecosDe` tapa con su `|||`.
+   */
+  it("un salto de línea en el medio NO arma un hallazgo", () => {
+    const conSalto = "fin del parrafo {{" + String.fromCharCode(10) + "y el otro }} sigue"
+    expect(huecosMalEscritos({ a: conSalto })).toEqual([])
+  })
+
+  it("mira todas las partes del paquete, no solo el cuerpo", () => {
+    expect(
+      huecosMalEscritos({ "word/document.xml": "sano {{ZONA}}", "word/endnotes.xml": "nota {{LEGAJO-1}}" })
+    ).toEqual(["{{LEGAJO-1}}"])
+  })
+
+  it("no repite el mismo hallazgo dos veces", () => {
+    expect(huecosMalEscritos({ a: "{{ZONA-2}} y otra vez {{ZONA-2}}" })).toEqual(["{{ZONA-2}}"])
+  })
+
+  it("un documento sin nada raro devuelve la lista vacía", () => {
+    expect(huecosMalEscritos({ a: "Contrato normal, sin campos." })).toEqual([])
   })
 })

@@ -736,6 +736,68 @@ export function huecosDe(zip: PizZip): string[] {
 }
 
 /**
+ * Lo que PARECE un hueco y no lo es: `{{ZONA-2}}`, `{{ }}`, `{{ dos palabras }}`.
+ *
+ * ═══ El agujero más caro de la etapa, y es SILENCIOSO ═══
+ *
+ * Medido con las librerías reales el 2026-09-01, sobre un .docx armado en
+ * memoria y rellenado de verdad:
+ *
+ * | entrada                 | `huecosDe`  | texto armado      |
+ * |-------------------------|-------------|-------------------|
+ * | `{{ZONA-2}}`            | `[]`        | `"A: ."` ← BLANCO |
+ * | `{{ZONA.2}}`            | `[]`        | `"A: ."` ← BLANCO |
+ * | `{{ }}` y `{{}}`        | `[]`        | `"A: ."` ← BLANCO |
+ * | `{{ dos palabras }}`    | `[]`        | `"A: ."` ← BLANCO |
+ * | `{{ZÓNA}}` (con acento) | `[]`        | `"A: ."` ← BLANCO |
+ * | `{{ZONA}} y {{ZONA-2}}` | `["ZONA"]`  | `"A: Palermo y ."`|
+ * | `{{ZONA_2}}` (control)  | `["ZONA_2"]`| `"A: Belgrano."`  |
+ *
+ * O sea: el director escribe `{{ZONA-2}}` en el Word —un guión en el nombre de
+ * un campo es de lo más natural—, `huecosDe` NO lo lista, así que la
+ * comprobación de "no quedó ningún hueco sin rellenar" pasa en verde, y **el
+ * contrato sale a la firma con un blanco donde iba un dato**. Un blanco no se
+ * ve. Es el peor resultado posible de toda esta red.
+ *
+ * ═══ Por qué el arreglo NO es ensanchar el alfabeto ═══
+ *
+ * `NOMBRE_DE_HUECO` lo comparten `huecosDe`, la validación de la detección y el
+ * armado del molde de la versión nueva. Moverlo cambia qué se detecta en todos
+ * lados. El arreglo es hacerlo **ruidoso**, que es puramente aditivo: esta
+ * función encuentra la secuencia y quien la llame decide qué hacer con ella.
+ *
+ * ═══ Qué NO busca, y por qué ═══
+ *
+ * Un `{{` sin su cierre, o un `}}` sin su apertura. Medido: los dos hacen
+ * **tirar** a `rellenarDocx` ("Multi error"), así que ya son ruidosos y los dos
+ * endpoints que rellenan los agarran con su `try`. Buscarlos acá agregaría
+ * falsos positivos —un `{{` suelto en la prosa de un contrato— sin cerrar
+ * ningún agujero.
+ *
+ * El cuerpo del hueco no puede tener llaves ni **saltos de línea**:
+ * `textoPorParte` pega los párrafos con `
+`, y sin esa restricción un `{{` al
+ * final de un párrafo y un `}}` al principio del siguiente armarían un hallazgo
+ * fantasma que frenaría un documento sano. Es el mismo motivo por el que
+ * `huecosDe` mete un `|||` entre párrafos.
+ *
+ * Devuelve el texto TAL COMO ESTÁ ESCRITO —`"{{ZONA-2}}"`, con las llaves— sin
+ * repetir, porque es lo que el director tiene que buscar en el Word.
+ */
+const RE_PARECE_HUECO = new RegExp(`${APERTURA_DE_HUECO}[^{}
+]*${CIERRE_DE_HUECO}`, "g")
+
+export function huecosMalEscritos(partes: Record<string, string>): string[] {
+  const malos = new Set<string>()
+  for (const ruta of Object.keys(partes)) {
+    for (const m of (partes[ruta] ?? "").matchAll(RE_PARECE_HUECO)) {
+      if (!huecoValido(m[0])) malos.add(m[0])
+    }
+  }
+  return [...malos]
+}
+
+/**
  * La parte del paquete que guarda `word/endnotes.xml`: las notas al FINAL.
  *
  * Va aparte de `partesDeTextoDeDocx` a propósito, porque ese recorrido es el

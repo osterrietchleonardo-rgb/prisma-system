@@ -3,7 +3,7 @@ import PizZip from "pizzip"
 
 import { createClient } from "@/lib/supabase/server"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { huecosDe, ponerHuecosEnDocx, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
+import { huecosDe, huecosMalEscritos, ponerHuecosEnDocx, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
 import { separarPorEstado } from "@/lib/asesor-docs/propuesta"
 import { validarRutaDeVersionNueva } from "@/lib/asesor-docs/reglas"
 import {
@@ -15,6 +15,7 @@ import {
   type HuecoParaGuardar,
 } from "@/lib/asesor-docs/confirmacion"
 import { verificarDocumentoEntero } from "@/lib/asesor-docs/verificacion"
+import { avisoDeHuecoMalEscritoAlSubir } from "@/lib/asesor-docs/generar"
 import {
   avisoDeCamposConElMismoDato,
   avisoDeCamposDesaparecidos,
@@ -389,6 +390,32 @@ export async function POST(req: Request) {
 
   if (Object.values(partesDelNuevo).join("").trim() === "") {
     return rechazar({ error: "El archivo no tiene texto que se pueda leer." }, 400)
+  }
+
+  /**
+   * ═══ El hueco MAL ESCRITO, dicho al subir y no tres pantallas después ═══
+   *
+   * Medido el 2026-09-01 con las librerías reales (la tabla está en
+   * `huecosMalEscritos`): un `{{ZONA-2}}` escrito a mano no lo lista `huecosDe`
+   * —el nombre de un campo solo admite letras, números y guión bajo— pero
+   * docxtemplater sí lo trata como campo, no encuentra el dato, y **lo deja en
+   * blanco**. Ese archivo se guardaría como versión, pasaría las tres
+   * comprobaciones de acá abajo en verde, y el día que se aplique el contrato
+   * de cada asesor saldría con un blanco donde iba un dato.
+   *
+   * Va ACÁ ARRIBA, apenas se le pudo leer el texto, y no al final: el director
+   * está mirando la pantalla donde acaba de subir el archivo, con el Word
+   * abierto al lado. Es el único momento en que arreglarlo le cuesta treinta
+   * segundos.
+   *
+   * Frena, no avisa: un molde con un blanco invisible no sirve para nadie, y
+   * guardarlo sería guardar una versión que el día que se aplique le rompe el
+   * contrato a los N asesores. La red de la 7b-1 lo vuelve a mirar antes de
+   * escribirle a cada persona, pero para entonces la versión ya está guardada.
+   */
+  const malEscritos = huecosMalEscritos(partesDelNuevo)
+  if (malEscritos.length > 0) {
+    return rechazar({ error: avisoDeHuecoMalEscritoAlSubir(malEscritos)! }, 400)
   }
 
   const ubicaciones = ubicarValoresEnPartes(partesDelNuevo, datos)

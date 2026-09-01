@@ -664,6 +664,79 @@ describe("lo que se rechaza antes de tocar nada", () => {
 // EL PUNTO 1 DEL SPEC §7.4: el archivo genérico
 // ---------------------------------------------------------------------------
 
+/**
+ * ═══ EL HUECO MAL ESCRITO, RECHAZADO AL SUBIR ═══
+ *
+ * Medido con las librerías reales el 2026-09-01 (la tabla completa está en
+ * `huecosMalEscritos`, en `lib/plantillas/docx.ts`): un `{{ZONA-2}}` escrito a
+ * mano en el Word NO lo lista `huecosDe` —el nombre de un campo solo admite
+ * letras, números y guión bajo— pero docxtemplater sí lo trata como campo, no
+ * encuentra el dato, y **lo deja en blanco**.
+ *
+ * Sin esto, ese archivo se guardaba como versión, pasaba las tres
+ * comprobaciones de este endpoint en VERDE, y el día que se aplicara el
+ * contrato de cada asesor salía con un blanco donde iba un dato. Un blanco no
+ * se ve.
+ *
+ * Se rechaza acá, cuando el director acaba de subir el archivo y tiene el Word
+ * abierto al lado: es el único momento en que arreglarlo le cuesta treinta
+ * segundos.
+ */
+describe("el hueco mal escrito se rechaza al subir, antes de guardar la versión", () => {
+  const conHuecoMalEscrito = (texto: string) => versionNuevaDeAna([texto])
+
+  it("no guarda la versión, y el testigo es que no se creó ninguna", async () => {
+    const r = await pedir({ zip: conHuecoMalEscrito("La comision pactada es de {{COMISION-2}}.") })
+    /** La conducta primero: no hay versión nueva y el archivo subido se borró. */
+    expect(base.versiones).toHaveLength(1)
+    expect(base.archivos.has(RUTA_SUBIDA)).toBe(false)
+    expect(r.status).toBe(400)
+  })
+
+  it("el mensaje nombra el hueco, dice que saldría en blanco y muestra la corrección", async () => {
+    const r = await pedir({ zip: conHuecoMalEscrito("La comision pactada es de {{COMISION-2}}.") })
+    expect(r.cuerpo.error).toContain("{{COMISION-2}}")
+    expect(r.cuerpo.error).toContain("EN BLANCO")
+    expect(r.cuerpo.error).toContain("{{COMISION_2}}")
+    expect(r.cuerpo.error).toContain("volvé a subir")
+  })
+
+  /**
+   * Los cinco bordes, todos medidos: los cinco dejan un blanco, así que los
+   * cinco se rechazan. Que `normalizarHuecosEscritosAMano` decida NO TOCAR el
+   * `{{ }}` vacío y el `{{ dos palabras }}` es otra cosa — no reescribir el
+   * contrato de nadie está bien; callar el blanco, no.
+   */
+  it.each([
+    ["un guión", "Zona secundaria: {{ZONA-2}}."],
+    ["un punto", "Zona secundaria: {{ZONA.2}}."],
+    ["vacío", "Zona secundaria: {{ }}."],
+    ["dos palabras", "Zona secundaria: {{ dos palabras }}."],
+    ["un acento", "Zona secundaria: {{ZÓNA}}."],
+  ])("lo rechaza con %s", async (_caso, texto) => {
+    const r = await pedir({ zip: conHuecoMalEscrito(texto) })
+    expect(base.versiones).toHaveLength(1)
+    expect(r.status).toBe(400)
+  })
+
+  /**
+   * Y el falso rojo que NO puede tener: un hueco bien escrito a mano es
+   * exactamente el camino del spec §7.4.2 —así es como el director declara un
+   * campo nuevo— y tiene que seguir pasando.
+   */
+  it("un hueco BIEN escrito a mano sigue guardando la versión", async () => {
+    const r = await pedir({ zip: conHuecoMalEscrito("La comision pactada es de {{COMISION_2}}.") })
+    expect(r.status).toBe(200)
+    expect(base.versiones).toHaveLength(2)
+  })
+
+  it("y con espacios de más adentro, también", async () => {
+    const r = await pedir({ zip: conHuecoMalEscrito("La comision pactada es de {{ COMISION_2 }}.") })
+    expect(r.status).toBe(200)
+    expect(base.versiones).toHaveLength(2)
+  })
+})
+
 describe("el archivo genérico se rechaza, y con nombre y apellido", () => {
   it("un contrato modelo sin los datos de nadie no pasa, y el error dice qué se buscó", async () => {
     const generico = docx([

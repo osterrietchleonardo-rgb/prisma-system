@@ -37,6 +37,11 @@ import { lugaresDeUnValor, type SospechaDeTextoFijo } from "@/lib/asesor-docs/ve
  *  4. **La cuenta cruzada de la 7a, acá como FRENO** (`avisoDeTextoFijoQueFrena`).
  *     Allá es una advertencia a propósito, porque el §7.4.3 es una vista previa
  *     y el director todavía tiene que decir que sí. Acá ya dijo que sí.
+ *  5. **Que no haya un hueco MAL ESCRITO en el molde**
+ *     (`avisoDeHuecosMalEscritos`). La quinta, agregada después de medir que un
+ *     `{{ZONA-2}}` sale como un **blanco** y que ninguna de las otras cuatro lo
+ *     puede ver. Es la única que mira el molde y no el documento generado, y la
+ *     única cuyo daño es invisible en el resultado.
  *
  * Todo el texto que lee el director vive en este archivo y no en el `.tsx` ni
  * suelto adentro del endpoint: los tests del repo miran `lib/**`, y esa regla
@@ -388,10 +393,109 @@ export function avisoDeHuecosSinRellenar(huecos: string[], nombre: string): stri
   return (
     `No se le generó el documento a ${nombre}: ${uno ? "quedó un lugar" : `quedaron ${huecos.length} lugares`} sin ` +
     `rellenar y el contrato saldría con ${uno ? "la marca" : "las marcas"} a la vista — ` +
-    `${huecos.map((h) => `${DELIMITADORES.start}${h}${DELIMITADORES.end}`).join(", ")}. Revisá cómo está escrito ` +
+    `${huecos.map(comoSeVeElHueco).join(", ")}. Revisá cómo está escrito ` +
     `${uno ? "ese campo" : "esos campos"} en el Word de la versión nueva y volvé a subirla. Su documento no se ` +
     `tocó: sigue con la versión anterior.`
   )
+}
+
+/**
+ * Cómo se ve el hueco adentro del contrato.
+ *
+ * Los que vienen de `huecosDe` son nombres pelados (`ZONA`); los que vienen de
+ * `huecosMalEscritos` ya traen las llaves (`{{ZONA-2}}`). Se muestran siempre
+ * como se ven en el papel, que es lo que el director tiene que buscar en el
+ * Word.
+ */
+function comoSeVeElHueco(h: string): string {
+  return h.startsWith(DELIMITADORES.start) ? h : `${DELIMITADORES.start}${h}${DELIMITADORES.end}`
+}
+
+// ---------------------------------------------------------------------------
+// 5. QUE NO HAYA UN HUECO MAL ESCRITO EN EL MOLDE
+// ---------------------------------------------------------------------------
+
+/**
+ * El aviso del agujero SILENCIOSO, y el unico de las cinco cuyo dano no deja
+ * rastro en el documento generado.
+ *
+ * `huecosMalEscritos`, en `lib/plantillas/docx.ts`, tiene la medicion completa.
+ * En dos renglones: un `{{ZONA-2}}` escrito a mano en el Word no lo lista
+ * `huecosDe` -el nombre de un campo solo admite letras, numeros y guion bajo-
+ * pero docxtemplater si lo trata como campo, no encuentra el dato, y lo deja
+ * **en blanco**. El contrato sale a la firma con un blanco donde iba un dato.
+ *
+ * Por eso esta comprobacion mira el MOLDE y no el documento generado: en el
+ * generado ya no hay nada que ver, el hueco desaparecio. Ninguna de las otras
+ * cuatro puede agarrarlo -- para todas, ese campo no existe.
+ *
+ * El mensaje tiene que ser accionable: se nombra el hueco TAL COMO ESTA
+ * ESCRITO, se dice que se admite, y se muestra la forma buena al lado de la
+ * mala. Decir "hay un campo mal escrito" sin nada mas manda al director a leer
+ * un contrato de quince paginas buscando cual.
+ */
+export function avisoDeHuecosMalEscritos(malEscritos: string[], nombre: string): string | null {
+  if (malEscritos.length === 0) return null
+  const uno = malEscritos.length === 1
+  const cuantos = uno
+    ? "un campo escrito de una forma que el sistema no puede leer"
+    : `${malEscritos.length} campos escritos de una forma que el sistema no puede leer`
+  return (
+    `No se le generó el documento a ${nombre}: la plantilla de esta versión tiene ${cuantos}, y ` +
+    `${uno ? "ese lugar saldría EN BLANCO" : "esos lugares saldrían EN BLANCO"} en el contrato, sin ningún aviso. ` +
+    `${uno ? "Está escrito así" : "Están escritos así"}: ${malEscritos.join(", ")}. Los nombres de campo solo ` +
+    `admiten letras, números y guión bajo — ${malEscritos[0]} tendría que ser ${sugerenciaDeHueco(malEscritos[0])}. ` +
+    `Corregilo en el Word de la versión nueva y volvé a subirla. Su documento no se tocó: sigue con la versión ` +
+    `anterior.`
+  )
+}
+
+/**
+ * El MISMO hallazgo, dicho en el momento de SUBIR la version nueva (spec
+ * §7.4.1) en vez de en el de aplicarla.
+ *
+ * Es la misma comprobacion y el mismo daño, y por eso comparte la deteccion
+ * (`huecosMalEscritos`) y la sugerencia: si los dos mensajes se escribieran
+ * aparte, el dia que alguien ensanche el alfabeto uno de los dos quedaria
+ * mintiendo. Lo que cambia es el tiempo verbal y el remedio, porque cambia el
+ * momento: al subir todavia no hay ningun asesor de por medio ni ninguna
+ * version guardada, asi que no corresponde decir "su documento no se toco" —
+ * no hay documento de nadie en juego.
+ *
+ * `null` cuando no hay ninguno, para que el llamador no tenga que preguntar
+ * dos veces.
+ */
+export function avisoDeHuecoMalEscritoAlSubir(malEscritos: string[]): string | null {
+  if (malEscritos.length === 0) return null
+  const uno = malEscritos.length === 1
+  return (
+    `${uno ? "Este campo está escrito" : `Estos ${malEscritos.length} campos están escritos`} de una forma que el ` +
+    `sistema no puede leer: ${malEscritos.join(", ")}. Si se guardara así, ` +
+    `${uno ? "ese lugar saldría EN BLANCO" : "esos lugares saldrían EN BLANCO"} en el contrato de todos los ` +
+    `asesores, sin ningún aviso. Los nombres de campo solo admiten letras, números y guión bajo — ` +
+    `${malEscritos[0]} tendría que ser ${sugerenciaDeHueco(malEscritos[0])}. Corregilo en el Word y volvé a subir ` +
+    `el archivo.`
+  )
+}
+
+/**
+ * Como tendria que haber quedado escrito: todo lo que no es letra, numero ni
+ * guion bajo pasa a ser un guion bajo.
+ *
+ * Es una SUGERENCIA, no una correccion automatica: el sistema no reescribe el
+ * contrato de nadie (`normalizarHuecosEscritosAMano` ya tomo esa decision y por
+ * el mismo motivo). Sirve para que el mensaje muestre la forma buena al lado de
+ * la mala, que es la diferencia entre un aviso que se entiende y uno que hay
+ * que interpretar.
+ *
+ * Con un `{{ }}` vacio no hay nada que proponer, asi que se muestra un ejemplo
+ * cualquiera en vez de un `{{}}` que no ayuda a nadie.
+ */
+export function sugerenciaDeHueco(malEscrito: string): string {
+  const adentro = malEscrito.slice(DELIMITADORES.start.length, malEscrito.length - DELIMITADORES.end.length)
+  const propuesto = adentro.trim().replace(/[^A-Za-z0-9_]+/g, "_").replace(/^_+|_+$/g, "")
+  const nombre = propuesto === "" ? "COMISION" : propuesto
+  return `${DELIMITADORES.start}${nombre}${DELIMITADORES.end}`
 }
 
 // ---------------------------------------------------------------------------
@@ -448,7 +552,7 @@ export function avisoDeTextoFijoQueFrena(sospechas: SospechaDeTextoFijo[], nombr
  * `mensaje` es lo que lee el director.
  */
 export type MotivoDeFreno = {
-  codigo: "no-aterrizo" | "dato-ajeno" | "hueco-sin-rellenar" | "texto-fijo"
+  codigo: "hueco-mal-escrito" | "no-aterrizo" | "dato-ajeno" | "hueco-sin-rellenar" | "texto-fijo"
   mensaje: string
 }
 
@@ -468,10 +572,20 @@ export function frenosDeLaGeneracion(args: {
   partesDelGenerado: Record<string, string>
   partesDeSuOriginal: Record<string, string>
   huecosQueQuedaron: string[]
+  /** Lo que parece un hueco y no lo es, ADENTRO DEL MOLDE. Ver `avisoDeHuecosMalEscritos`. */
+  malEscritosEnElMolde: string[]
   exclusivosDeOtros: ValorAjeno[]
   sospechasDeTextoFijo: SospechaDeTextoFijo[]
 }): MotivoDeFreno[] {
   const motivos: MotivoDeFreno[] = []
+
+  /**
+   * PRIMERA de la lista a proposito: es la unica que habla del molde entero y
+   * no de esta persona, asi que arreglarla arregla el documento de todos. Si el
+   * director va a corregir una sola cosa, que sea esta.
+   */
+  const malEscritos = avisoDeHuecosMalEscritos(args.malEscritosEnElMolde, args.nombre)
+  if (malEscritos) motivos.push({ codigo: "hueco-mal-escrito", mensaje: malEscritos })
 
   const noAterrizaron = avisoDeCamposQueNoAterrizaron(
     camposQueNoAterrizaron({

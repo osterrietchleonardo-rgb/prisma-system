@@ -3,7 +3,7 @@ import PizZip from "pizzip"
 
 import { createClient } from "@/lib/supabase/server"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { huecosDe, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
+import { huecosDe, huecosMalEscritos, rellenarDocx, textoPorParte } from "@/lib/plantillas/docx"
 import { separarPorEstado } from "@/lib/asesor-docs/propuesta"
 import { rutaDelDocumentoGenerado } from "@/lib/asesor-docs/reglas"
 import {
@@ -424,7 +424,22 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
     datos: datosCompletos,
     partesDelGenerado,
     partesDeSuOriginal,
-    huecosQueQuedaron: huecosDe(zipGenerado),
+    /**
+     * Los dos, y no solo `huecosDe`.
+     *
+     * `huecosDe` lista los huecos BIEN escritos que quedaron sin rellenar. Lo
+     * que parece un hueco y no lo es —un `{{ZONA-2}}` que se coló adentro del
+     * dato guardado de esta persona— no lo ve, y saldría impreso literal en el
+     * contrato. Ese caso es RUIDOSO (se ve en el papel), a diferencia del del
+     * molde, que sale como un blanco y tiene su propia comprobación abajo.
+     */
+    huecosQueQuedaron: [...huecosDe(zipGenerado), ...huecosMalEscritos(partesDelGenerado)],
+    /**
+     * Y la quinta, que mira el MOLDE. Tiene que ser el molde: en el documento
+     * generado ese hueco ya no está —docxtemplater lo dejó en blanco— así que
+     * mirarlo ahí no encontraría nada. Está medido en `huecosMalEscritos`.
+     */
+    malEscritosEnElMolde: huecosMalEscritos(partesDelMolde),
     exclusivosDeOtros,
     sospechasDeTextoFijo,
   })

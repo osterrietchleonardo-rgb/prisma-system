@@ -4,6 +4,9 @@ import {
   avisoDeCamposQueNoAterrizaron,
   avisoDeDatosDeOtro,
   avisoDeHuecosSinRellenar,
+  avisoDeHuecoMalEscritoAlSubir,
+  avisoDeHuecosMalEscritos,
+  sugerenciaDeHueco,
   avisoDeTextoFijoQueFrena,
   camposQueNoAterrizaron,
   contarHuecosDelMolde,
@@ -321,6 +324,106 @@ describe("avisoDeHuecosSinRellenar", () => {
 })
 
 // ---------------------------------------------------------------------------
+// 5. EL HUECO MAL ESCRITO: EL AGUJERO SILENCIOSO
+// ---------------------------------------------------------------------------
+
+/**
+ * La medición de por qué esto existe está en `lib/plantillas/docx.test.ts`, que
+ * corre docxtemplater de verdad y comprueba que un `{{ZONA-2}}` sale como un
+ * BLANCO. Acá se cuida lo otro: que el mensaje sirva para arreglarlo.
+ */
+describe("avisoDeHuecosMalEscritos", () => {
+  it("nombra el hueco como está escrito, dice que saldría en blanco y muestra la forma buena", () => {
+    const texto = avisoDeHuecosMalEscritos(["{{ZONA-2}}"], "Bruno Sanguinetti")!
+    expect(texto).toContain("Bruno Sanguinetti")
+    expect(texto).toContain("{{ZONA-2}}")
+    expect(texto).toContain("EN BLANCO")
+    expect(texto).toContain("{{ZONA_2}}")
+    expect(texto).toContain("letras, números y guión bajo")
+    expect(texto).toContain("no se tocó")
+  })
+
+  it("con varios habla en plural y los nombra a todos", () => {
+    const texto = avisoDeHuecosMalEscritos(["{{ZONA-2}}", "{{ }}"], "Bruno")!
+    expect(texto).toContain("2 campos")
+    expect(texto).toContain("{{ZONA-2}}")
+    expect(texto).toContain("{{ }}")
+  })
+
+  it("sin ninguno, devuelve null", () => {
+    expect(avisoDeHuecosMalEscritos([], "Bruno")).toBeNull()
+  })
+})
+
+describe("sugerenciaDeHueco", () => {
+  it.each([
+    ["{{ZONA-2}}", "{{ZONA_2}}"],
+    ["{{ZONA.2}}", "{{ZONA_2}}"],
+    ["{{ dos palabras }}", "{{dos_palabras}}"],
+    ["{{$ZONA}}", "{{ZONA}}"],
+    ["{{ZONA_2}}", "{{ZONA_2}}"],
+  ])("de %s propone %s", (malo, bueno) => {
+    expect(sugerenciaDeHueco(malo)).toBe(bueno)
+  })
+
+  /**
+   * Con el hueco vacío no hay nada que proponer, y devolver `{{}}` no ayudaría a
+   * nadie: se muestra un ejemplo cualquiera para que el director vea la FORMA.
+   */
+  it.each(["{{}}", "{{ }}", "{{---}}"])("de %s, que no deja nada, propone un ejemplo", (vacio) => {
+    expect(sugerenciaDeHueco(vacio)).toBe("{{COMISION}}")
+  })
+
+  /**
+   * La sugerencia es una sugerencia: el sistema NO reescribe el contrato de
+   * nadie. Es la misma decisión que ya tomó `normalizarHuecosEscritosAMano`.
+   */
+  it("siempre propone algo que pasa el alfabeto", () => {
+    for (const malo of ["{{ZONA-2}}", "{{ZONA.2}}", "{{ dos palabras }}", "{{}}", "{{ZÓNA}}"]) {
+      expect(sugerenciaDeHueco(malo)).toMatch(/^\{\{[A-Za-z0-9_]+\}\}$/)
+    }
+  })
+})
+
+describe("avisoDeHuecoMalEscritoAlSubir", () => {
+  /**
+   * El mismo hallazgo, dicho al SUBIR. Cambia el tiempo verbal y el remedio,
+   * no el diagnóstico: al subir no hay ningún documento de nadie en juego, así
+   * que decir "su documento no se tocó" sería hablar de algo que no existe.
+   */
+  it("habla del contrato de TODOS y no del de una persona", () => {
+    const texto = avisoDeHuecoMalEscritoAlSubir(["{{ZONA-2}}"])!
+    expect(texto).toContain("{{ZONA-2}}")
+    expect(texto).toContain("EN BLANCO")
+    expect(texto).toContain("todos los asesores")
+    expect(texto).toContain("{{ZONA_2}}")
+    expect(texto).toContain("volvé a subir")
+    expect(texto).not.toContain("no se tocó")
+  })
+
+  it("con varios, concuerda el renglón", () => {
+    expect(avisoDeHuecoMalEscritoAlSubir(["{{A-1}}", "{{B-2}}"])).toContain("Estos 2 campos")
+  })
+
+  it("sin ninguno, devuelve null", () => {
+    expect(avisoDeHuecoMalEscritoAlSubir([])).toBeNull()
+  })
+
+  /**
+   * Los dos mensajes salen de la MISMA detección y de la MISMA sugerencia: si
+   * alguien escribiera uno aparte, el día que cambie el alfabeto uno de los dos
+   * quedaría mintiendo.
+   */
+  it("los dos mensajes proponen exactamente la misma corrección", () => {
+    for (const malo of ["{{ZONA-2}}", "{{ dos palabras }}", "{{}}"]) {
+      const bueno = sugerenciaDeHueco(malo)
+      expect(avisoDeHuecosMalEscritos([malo], "Bruno")).toContain(bueno)
+      expect(avisoDeHuecoMalEscritoAlSubir([malo])).toContain(bueno)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
 // 4. LA CUENTA CRUZADA, ACÁ COMO FRENO
 // ---------------------------------------------------------------------------
 
@@ -360,12 +463,18 @@ describe("frenosDeLaGeneracion", () => {
     partesDelGenerado: { [CUERPO]: "Bruno Sanguinetti, zona Belgrano." },
     partesDeSuOriginal: { [CUERPO]: "Bruno Sanguinetti, zona Belgrano." },
     huecosQueQuedaron: [] as string[],
+    malEscritosEnElMolde: [] as string[],
     exclusivosDeOtros: [],
     sospechasDeTextoFijo: [],
   }
 
   it("con todo bien, la lista viene vacía — que es lo único que habilita a escribir", () => {
     expect(frenosDeLaGeneracion(base)).toEqual([])
+  })
+
+  it("el hueco mal escrito del molde aporta el suyo, y va primero", () => {
+    const frenos = frenosDeLaGeneracion({ ...base, malEscritosEnElMolde: ["{{ZONA-2}}"], huecosQueQuedaron: ["CUIT"] })
+    expect(frenos.map((f) => f.codigo)).toEqual(["hueco-mal-escrito", "hueco-sin-rellenar"])
   })
 
   it("cada comprobación aporta su propio código", () => {
