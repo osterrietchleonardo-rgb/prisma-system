@@ -197,11 +197,52 @@ export function huecosSinDato(huecosDelMolde: Record<string, number>, datos: Rec
     .sort()
 }
 
+/**
+ * Con qué arranca SIEMPRE la anotación del pendiente.
+ *
+ * Es la marca que permite reconocer una anotación nuestra dentro de una
+ * `observacion` que ya venía escrita, y de eso dependen dos cosas:
+ *
+ *  · que reintentar no la apile (ver abajo);
+ *  · que la solapa pueda contar aparte al que está en rojo Y además esperando
+ *    un dato. La copia que vive en `plantillas.ts` está atada a esta por un
+ *    test, igual que `MINIMO_PARA_DETECTAR`: ese archivo lo carga el navegador
+ *    y no puede importar de acá.
+ */
+export const ASI_EMPIEZA_EL_PENDIENTE = "La versión nueva trae "
+
+/** Con qué se pega la anotación nueva a la que ya estaba. */
+const PEGAMENTO = "\n\nAdemás: "
+
+/**
+ * Lo que ya estaba anotado y NO lo escribimos nosotros.
+ *
+ * ═══ El apilado, medido ═══
+ *
+ * Aplicar tres veces con el dato todavía faltante daba `largo = 259 / 459 /
+ * 659`, con "Además:" repetido 1, 2 y 3 veces: cada intento pegaba su párrafo
+ * atrás del anterior, incluido el que ya era suyo. Y reintentar es
+ * **exactamente lo que este mensaje le pide al director** ("completá ese dato y
+ * volvé a aplicarle la versión"), así que no es un caso de borde: es el camino
+ * normal. A los pocos intentos la ficha del asesor es un muro que dice tres
+ * veces lo mismo y ya no se lee.
+ *
+ * Se corta en la PRIMERA marca de pegado: lo de la izquierda es lo que había
+ * antes de que nos metiéramos. Y si eso que queda es a su vez una anotación
+ * nuestra —el caso de una persona que no estaba en rojo, donde la primera vez
+ * la observación quedó siendo solo el pendiente— no queda nada que conservar.
+ */
+function loQueNoEscribimosNosotros(observacionAnterior: string): string {
+  const at = observacionAnterior.indexOf(PEGAMENTO)
+  const base = (at === -1 ? observacionAnterior : observacionAnterior.slice(0, at)).trim()
+  return base.startsWith(ASI_EMPIEZA_EL_PENDIENTE) ? "" : base
+}
+
 /** Lo que queda escrito en `observacion` para que el director sepa qué falta. */
 export function observacionDePendiente(campos: string[], observacionAnterior?: string | null): string {
   const uno = campos.length === 1
   const propia =
-    `La versión nueva trae ${uno ? "un campo" : `${campos.length} campos`} que esta persona todavía no tiene ` +
+    `${ASI_EMPIEZA_EL_PENDIENTE}${uno ? "un campo" : `${campos.length} campos`} que esta persona todavía no tiene ` +
     `cargado${uno ? "" : "s"}: ${campos.join(", ")}. Su documento quedó como estaba, con la versión anterior. ` +
     `Completá ${uno ? "ese dato" : "esos datos"} y volvé a aplicarle la versión.`
 
@@ -217,9 +258,13 @@ export function observacionDePendiente(campos: string[], observacionAnterior?: s
    * Los dos hechos son ciertos a la vez: le falta un dato para la versión
    * nueva, Y su documento actual tenía un problema. Se dicen los dos, y el
    * anterior arriba porque es el que ya venía sin resolver.
+   *
+   * Lo que NO se conserva es lo que ya habíamos escrito nosotros: eso se
+   * reemplaza, para que reintentar no apile. Ver `loQueNoEscribimosNosotros`.
    */
-  if (!observacionAnterior?.trim()) return propia
-  return `${observacionAnterior.trim()}\n\nAdemás: ${propia}`
+  const base = loQueNoEscribimosNosotros(observacionAnterior ?? "")
+  if (base === "") return propia
+  return `${base}${PEGAMENTO}${propia}`
 }
 
 /**

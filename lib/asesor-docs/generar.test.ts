@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest"
 
 import {
+  ASI_EMPIEZA_EL_PENDIENTE,
+  estadoAlQuedarPendiente,
   avisoDeCamposQueNoAterrizaron,
   avisoDeDatosDeOtro,
   avisoDeHuecosSinRellenar,
@@ -91,6 +93,97 @@ describe("huecosSinDato: el campo nuevo que esta persona no tiene (spec §7.4.2)
     expect(texto).toContain("COMISION")
     expect(texto).toContain("versión anterior")
     expect(texto).toContain("volvé a aplicarle la versión")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// observacionDePendiente: lo que ya estaba, y lo que NO se apila
+// ---------------------------------------------------------------------------
+
+/**
+ * Esta rama tenía cobertura por mutación desde el endpoint y ningún test
+ * propio. Acá está el suyo, con las tres cosas que tiene que hacer: conservar
+ * el rojo que ya venía, no pisar nada, y no apilarse al reintentar.
+ */
+describe("observacionDePendiente: conserva lo anterior sin apilarlo", () => {
+  const ROJO = "Su documento no coincide con la plantilla: falta el CUIT en la cláusula 3."
+
+  it("el rojo que ya estaba se conserva, y va primero", () => {
+    const texto = observacionDePendiente(["COMISION"], ROJO)
+    expect(texto.startsWith(ROJO)).toBe(true)
+    expect(texto).toContain("Además:")
+    expect(texto).toContain("COMISION")
+  })
+
+  it("sin nada anterior, no inventa un 'Además'", () => {
+    expect(observacionDePendiente(["COMISION"], null)).not.toContain("Además:")
+    expect(observacionDePendiente(["COMISION"], "   ")).not.toContain("Además:")
+  })
+
+  /**
+   * ═══ El apilado, que es el bug medido ═══
+   *
+   * Aplicar tres veces con el dato todavía faltante daba 259 / 459 / 659
+   * caracteres, con "Además:" repetido 1, 2 y 3 veces. Y reintentar es
+   * exactamente lo que el mensaje le pide al director, así que es el camino
+   * normal, no un caso de borde.
+   */
+  it("reintentar tres veces da SIEMPRE el mismo texto, no uno tres veces más largo", () => {
+    const uno = observacionDePendiente(["COMISION"], ROJO)
+    const dos = observacionDePendiente(["COMISION"], uno)
+    const tres = observacionDePendiente(["COMISION"], dos)
+    expect(dos).toBe(uno)
+    expect(tres).toBe(uno)
+    expect(tres.split("Además:")).toHaveLength(2)
+  })
+
+  it("y tampoco se apila cuando la persona NO venía en rojo", () => {
+    const uno = observacionDePendiente(["COMISION"], null)
+    const dos = observacionDePendiente(["COMISION"], uno)
+    expect(dos).toBe(uno)
+    expect(dos).not.toContain("Además:")
+  })
+
+  /** Si en el reintento falta OTRO campo, gana el motivo nuevo: es el vigente. */
+  it("al reintentar se reemplaza por lo que falta AHORA, no se suma", () => {
+    const uno = observacionDePendiente(["COMISION"], ROJO)
+    const dos = observacionDePendiente(["ZONA"], uno)
+    expect(dos).toContain(ROJO)
+    expect(dos).toContain("ZONA")
+    expect(dos).not.toContain("COMISION")
+    expect(dos.split("Además:")).toHaveLength(2)
+  })
+
+  /**
+   * La marca con la que se reconoce una anotación nuestra tiene que ser la
+   * misma con la que arrancan de verdad. Si se separaran, el corte no
+   * encontraría nada y el apilado volvería en silencio.
+   */
+  it("el texto arranca con la marca que se usa para reconocerlo", () => {
+    expect(observacionDePendiente(["COMISION"]).startsWith(ASI_EMPIEZA_EL_PENDIENTE)).toBe(true)
+    expect(observacionDePendiente(["COMISION", "ZONA"]).startsWith(ASI_EMPIEZA_EL_PENDIENTE)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// estadoAlQuedarPendiente
+// ---------------------------------------------------------------------------
+
+/**
+ * También estaba cubierta solo por mutación desde el endpoint. Es la que
+ * impide que la pantalla diga algo más tranquilizador que la verdad: `revisar`
+ * se cuenta en rojo y `pendiente` no.
+ */
+describe("estadoAlQuedarPendiente", () => {
+  it("un rojo NO se degrada a pendiente", () => {
+    expect(estadoAlQuedarPendiente("revisar")).toBe("revisar")
+  })
+
+  it("cualquier otra cosa queda pendiente", () => {
+    expect(estadoAlQuedarPendiente("ok")).toBe("pendiente")
+    expect(estadoAlQuedarPendiente("pendiente")).toBe("pendiente")
+    expect(estadoAlQuedarPendiente(null)).toBe("pendiente")
+    expect(estadoAlQuedarPendiente(undefined)).toBe("pendiente")
   })
 })
 
