@@ -309,6 +309,21 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
       .eq("id", doc.id)
       .eq("agency_id", agencyId)
       /**
+       * El MISMO candado que lleva el UPDATE del éxito, y por el mismo motivo.
+       *
+       * Faltaba acá, y la asimetría era el agujero: si mientras corría esto el
+       * director le reemplazó el .docx al asesor, `camposDelReemplazo` dejó
+       * `estado` y `observacion` en null —que es la verdad: el archivo nuevo no
+       * se comparó contra nada— y este UPDATE se las volvía a llenar un segundo
+       * después con "le falta un dato de la versión nueva", que es un motivo
+       * calculado sobre el archivo ANTERIOR. Una constancia escrita sobre un
+       * archivo que nadie miró es exactamente lo que `camposDelReemplazo` vino
+       * a evitar.
+       *
+       * Con el candado, ese caso no escribe nada y se lo dice.
+       */
+      .eq("archivo_original_path", doc.archivo_original_path)
+      /**
        * El `.select()` no es para leer: es la ÚNICA forma de saber si la
        * escritura tocó alguna fila. Un `.eq` que no matchea no es un error en
        * PostgREST —devuelve éxito con cero filas—, así que sin esto "no se
@@ -320,10 +335,23 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
     if (errPendiente || (tocadas?.length ?? 0) === 0) {
       console.error(
         "aplicar-version/[advisorId]: no se pudo marcar pendiente:",
-        errPendiente?.message ?? "cero filas afectadas",
+        errPendiente
+          ? errPendiente.message
+          : "cero filas afectadas (el archivo cambió mientras se aplicaba)",
       )
+      /**
+       * Los dos casos se dicen distinto, igual que en el UPDATE del éxito: uno
+       * es "no se pudo escribir" y el otro es "lo que se miró ya no es lo que
+       * hay". Un solo mensaje mandaría al director a reintentar sobre un
+       * archivo que cambió, y el reintento volvería a decir lo mismo.
+       */
       return NextResponse.json(
-        { error: `A ${nombre} le falta un dato de la versión nueva, pero no se pudo dejar anotado. Probá de nuevo.` },
+        {
+          error: errPendiente
+            ? `A ${nombre} le falta un dato de la versión nueva, pero no se pudo dejar anotado. Probá de nuevo.`
+            : `El documento de ${nombre} se reemplazó justo mientras se aplicaba la versión, así que lo que se ` +
+              `miró fue el archivo anterior. Volvé a detectar la plantilla para comprobar el nuevo.`,
+        },
         { status: 500 },
       )
     }

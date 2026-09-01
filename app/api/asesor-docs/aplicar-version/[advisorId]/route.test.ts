@@ -674,6 +674,68 @@ describe("el campo que la versión nueva trajo y esta persona no tiene", () => {
     expect(r.status).toBe(500)
     expect(filaDe(BRUNO).estado).toBe("ok")
   })
+
+  /**
+   * ═══ El candado que faltaba en ESTE camino ═══
+   *
+   * El UPDATE del éxito lleva `.eq("archivo_original_path", …)` y el del
+   * pendiente no lo llevaba. La asimetría era el agujero: si el director le
+   * reemplaza el .docx mientras corre esto, `camposDelReemplazo` deja `estado`
+   * y `observacion` en null —la verdad: el archivo nuevo no se comparó contra
+   * nada— y este UPDATE se las volvía a llenar con un motivo calculado sobre el
+   * archivo ANTERIOR.
+   */
+  it("si le reemplazaron el archivo en el medio, el pendiente no se escribe", async () => {
+    conCampoNuevo()
+    let lecturas = 0
+    base.despuesDeLeer = (tabla) => {
+      if (tabla !== "advisor_documents") return
+      lecturas += 1
+      /**
+       * La PRIMERA, y no la segunda como en el camino del éxito: el pendiente
+       * frena antes: lee su fila, baja el molde, y con eso ya decide. No llega a
+       * mirar a los otros asesores.
+       */
+      if (lecturas === 1) {
+        const fila = filaDe(BRUNO)
+        fila.archivo_original_path = `asesores/${AGENCIA}/${BRUNO}/plantillas/otro.docx`
+        fila.estado = null
+        fila.observacion = null
+      }
+    }
+    const r = await pedir()
+    expect(r.status).toBe(500)
+    /** Ni el estado ni el motivo: la fila queda como la dejó el reemplazo. */
+    expect(filaDe(BRUNO).estado).toBeNull()
+    expect(filaDe(BRUNO).observacion).toBeNull()
+    expect(String(r.cuerpo.error)).toContain("se reemplazó justo mientras")
+  })
+
+  /**
+   * ═══ El apilado, medido: 259 / 459 / 659 ═══
+   *
+   * Reintentar es exactamente lo que el mensaje le pide al director ("completá
+   * ese dato y volvé a aplicarle la versión"), así que es el camino normal. Cada
+   * intento pegaba su párrafo atrás del anterior y la ficha del asesor terminaba
+   * diciendo tres veces lo mismo.
+   */
+  it("aplicar tres veces con el dato todavía faltante no hace crecer la observación", async () => {
+    conCampoNuevo()
+    filaDe(BRUNO).estado = "revisar"
+    filaDe(BRUNO).observacion = "Su documento no coincide con la plantilla en la clausula 4."
+
+    await pedir()
+    const unaVez = String(filaDe(BRUNO).observacion)
+    await pedir()
+    await pedir()
+    const tresVeces = String(filaDe(BRUNO).observacion)
+
+    expect(tresVeces).toBe(unaVez)
+    expect(tresVeces.split("Además:")).toHaveLength(2)
+    // Y las dos cosas siguen dichas.
+    expect(tresVeces).toContain("clausula 4")
+    expect(tresVeces).toContain("COMISION")
+  })
 })
 
 // ---------------------------------------------------------------------------
