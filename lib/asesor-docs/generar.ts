@@ -167,13 +167,43 @@ export function huecosSinDato(huecosDelMolde: Record<string, number>, datos: Rec
 }
 
 /** Lo que queda escrito en `observacion` para que el director sepa qué falta. */
-export function observacionDePendiente(campos: string[]): string {
+export function observacionDePendiente(campos: string[], observacionAnterior?: string | null): string {
   const uno = campos.length === 1
-  return (
+  const propia =
     `La versión nueva trae ${uno ? "un campo" : `${campos.length} campos`} que esta persona todavía no tiene ` +
     `cargado${uno ? "" : "s"}: ${campos.join(", ")}. Su documento quedó como estaba, con la versión anterior. ` +
     `Completá ${uno ? "ese dato" : "esos datos"} y volvé a aplicarle la versión.`
-  )
+
+  /**
+   * Lo que ya estaba anotado se CONSERVA, y va primero.
+   *
+   * Medido: si esta persona estaba en `revisar` por la §7.3, el UPDATE del
+   * pendiente le pisaba la `observacion` y se llevaba puesta la explicación de
+   * por qué estaba en rojo. El director quedaba con un motivo nuevo y sin el
+   * viejo — y el viejo era el que decía que su documento no coincidía con la
+   * plantilla.
+   *
+   * Los dos hechos son ciertos a la vez: le falta un dato para la versión
+   * nueva, Y su documento actual tenía un problema. Se dicen los dos, y el
+   * anterior arriba porque es el que ya venía sin resolver.
+   */
+  if (!observacionAnterior?.trim()) return propia
+  return `${observacionAnterior.trim()}\n\nAdemás: ${propia}`
+}
+
+/**
+ * Qué estado le queda a una persona a la que le falta un campo de la versión
+ * nueva.
+ *
+ * NUNCA baja un `revisar` a `pendiente`. Los dos son problemas, pero no son el
+ * mismo tamaño: `revisar` dice "su documento NO coincide con la plantilla" y
+ * la solapa lo cuenta en rojo; `pendiente` dice "le falta cargar un dato" y no
+ * se cuenta en rojo. Degradar el uno al otro hace que la pantalla diga algo
+ * **más tranquilizador que la verdad**, que es exactamente lo que esta etapa
+ * viene cerrando en todos lados.
+ */
+export function estadoAlQuedarPendiente(estadoActual: string | null | undefined): "revisar" | "pendiente" {
+  return estadoActual === "revisar" ? "revisar" : "pendiente"
 }
 
 // ---------------------------------------------------------------------------

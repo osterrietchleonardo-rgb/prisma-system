@@ -457,10 +457,24 @@ describe("archivo_original_path no se toca por ningún camino", () => {
     for (const u of updates) expect(Object.keys(u.datos ?? {})).not.toContain("archivo_original_path")
   })
 
-  it("la ruta del original sigue apuntando al archivo del director", async () => {
+  it("la ruta del original sigue apuntando al archivo del director, y el archivo es el mismo", async () => {
     await pedir()
     expect(filaDe(BRUNO).archivo_original_path).toBe(RUTA_ORIGINAL(BRUNO))
-    expect(base.archivos.get(RUTA_ORIGINAL(BRUNO))).toEqual(buffer(originalDe(DATOS[BRUNO])))
+    /**
+     * Se compara el CONTENIDO, no los bytes, y no es una comodidad.
+     *
+     * `zip.generate()` mete la fecha de cada entrada en el .zip con
+     * granularidad de dos segundos, así que dos zips del MISMO contenido
+     * generados a distinto tiempo dan buffers distintos. Con `toEqual` sobre
+     * los buffers este test se cae solo cada tanto — me pasó, con los dos
+     * buffers midiendo 5.521 bytes iguales de largo y distintos de contenido.
+     *
+     * Un rojo que aparece y desaparece sin que cambie el código enseña a
+     * descartar los rojos de este archivo, y este archivo es el que cuida que
+     * el .docx del director no se pise nunca.
+     */
+    const textoDe = (b: Buffer | undefined) => textoPorParte(new PizZip(b!))["word/document.xml"]
+    expect(textoDe(base.archivos.get(RUTA_ORIGINAL(BRUNO)))).toBe(textoDe(buffer(originalDe(DATOS[BRUNO]))))
   })
 
   /**
@@ -603,6 +617,50 @@ describe("el campo que la versión nueva trajo y esta persona no tiene", () => {
     conCampoNuevo()
     await pedir()
     expect(base.escrituras.filter((e) => e.tabla === "storage")).toEqual([])
+  })
+
+  /**
+   * ═══ El pendiente NO puede pisar un rojo ═══
+   *
+   * Si esta persona ya estaba en `revisar` por la §7.3 —su documento no
+   * coincidía con la plantilla—, marcarla `pendiente` la SACA del contador de
+   * rojos de la solapa y le pisa la observación que explicaba el problema. El
+   * director termina leyendo un motivo nuevo, sin el viejo, y la pantalla dice
+   * algo **más tranquilizador que la verdad**.
+   *
+   * Los dos hechos son ciertos a la vez y los dos tienen que quedar escritos.
+   */
+  it("si ya estaba en rojo, sigue en rojo: no se degrada a pendiente", async () => {
+    conCampoNuevo()
+    filaDe(BRUNO).estado = "revisar"
+    filaDe(BRUNO).observacion = "Su documento no coincide con la plantilla en la clausula 4."
+
+    const r = await pedir()
+    expect(r.status).toBe(200)
+
+    const fila = filaDe(BRUNO)
+    expect(fila.estado, "un revisar no puede bajar a pendiente").toBe("revisar")
+    expect(fila.version_id).toBe(VER_VIEJA)
+  })
+
+  it("y la explicación del rojo NO se pierde: quedan las dos", async () => {
+    conCampoNuevo()
+    filaDe(BRUNO).estado = "revisar"
+    filaDe(BRUNO).observacion = "Su documento no coincide con la plantilla en la clausula 4."
+
+    await pedir()
+    const observacion = String(filaDe(BRUNO).observacion)
+    expect(observacion, "se perdió el motivo del rojo").toContain("clausula 4")
+    expect(observacion, "se perdió el campo que falta").toContain("COMISION")
+    // El motivo viejo va primero: es el que ya venía sin resolver.
+    expect(observacion.indexOf("clausula 4")).toBeLessThan(observacion.indexOf("COMISION"))
+  })
+
+  it("pero si NO estaba en rojo, sí queda pendiente", async () => {
+    conCampoNuevo()
+    filaDe(BRUNO).estado = "ok"
+    await pedir()
+    expect(filaDe(BRUNO).estado).toBe("pendiente")
   })
 
   /**

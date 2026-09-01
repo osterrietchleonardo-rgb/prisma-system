@@ -10,6 +10,7 @@ import {
   contarHuecosDelMolde,
   frenosDeLaGeneracion,
   huecosSinDato,
+  estadoAlQuedarPendiente,
   observacionDePendiente,
   resumenDeLaGeneracion,
   valoresExclusivosDeOtros,
@@ -230,7 +231,11 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
   // ── 3. Su documento, sus datos y su archivo original ────────────────────
   const { data: doc, error: errDoc } = await supabase
     .from("advisor_documents")
-    .select("id, advisor_id, archivo_original_path, form_data, version_id")
+    /**
+     * `estado` y `observacion` vienen para NO PISARLOS al marcar pendiente: si
+     * esta persona ya estaba en rojo por la §7.3, ese rojo sigue siendo cierto.
+     */
+    .select("id, advisor_id, archivo_original_path, form_data, version_id, estado, observacion")
     .eq("template_id", templateId)
     .eq("agency_id", agencyId)
     .eq("advisor_id", advisorId)
@@ -285,7 +290,8 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
   // ── 4. El campo nuevo que esta persona no tiene (spec §7.4.2) ───────────
   const faltantes = huecosSinDato(huecosDelMolde, datos)
   if (faltantes.length > 0) {
-    const observacion = observacionDePendiente(faltantes)
+    const observacion = observacionDePendiente(faltantes, doc.observacion)
+    const estadoPendiente = estadoAlQuedarPendiente(doc.estado)
     /**
      * Se escribe SOLO el estado y el motivo. `version_id` **no se toca**: esa
      * persona sigue con la versión anterior, que es la verdad y lo que dice el
@@ -293,7 +299,7 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
      */
     const { data: tocadas, error: errPendiente } = await supabase
       .from("advisor_documents")
-      .update({ estado: "pendiente", observacion, updated_at: new Date().toISOString() })
+      .update({ estado: estadoPendiente, observacion, updated_at: new Date().toISOString() })
       .eq("id", doc.id)
       .eq("agency_id", agencyId)
       /**
@@ -319,7 +325,7 @@ export async function POST(req: Request, { params }: { params: { advisorId: stri
     return NextResponse.json({
       advisorId,
       nombre,
-      estado: "pendiente",
+      estado: estadoPendiente,
       camposQueFaltan: faltantes,
       mensaje: observacion,
       advertencias: avisosEstado,
