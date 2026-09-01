@@ -159,10 +159,20 @@ export async function GET(req: Request) {
     return new NextResponse(new Uint8Array(png), {
       headers: {
         "Content-Type": "image/png",
-        // El mapa de una coordenada no cambia nunca: que lo cachee el CDN y no le pidamos tiles
-        // a OSM cada vez que alguien abre la ficha. Es lo que mantiene el uso dentro de lo que
-        // permite su política.
-        "Cache-Control": "public, max-age=31536000, immutable",
+        // El grueso del cacheo lo hace el CDN (`s-maxage`), que es lo que evita pedirle piezas a
+        // CARTO cada vez que alguien abre una ficha y mantiene el uso dentro de lo que permite el
+        // plan libre. Vercel lo limpia solo en cada deploy, asi que un arreglo del mapa entra de
+        // una.
+        //
+        // POR QUE EL NAVEGADOR CACHEA SOLO UNA HORA, Y POR QUE YA NO DICE `immutable`: esto decia
+        // "el mapa de una coordenada no cambia nunca" y guardaba un año con `immutable`, que le
+        // pide al navegador que NI SIQUIERA PREGUNTE — ni con F5. La premisa resulto falsa dos
+        // veces el mismo dia (1-sep-2026): se arreglo el credito de OpenStreetMap, que salia como
+        // cuadraditos vacios, y se le saco la marca de agua "API KEY REQUIRED" de CARTO. Las dos
+        // veces el cliente siguio viendo la version vieja y solo se arreglaba con Ctrl+Shift+R,
+        // que no se le puede pedir a nadie. Una hora es corto para que cualquier arreglo llegue
+        // y largo para no volver a bajar la imagen mientras alguien lee la ficha.
+        "Cache-Control": "public, max-age=3600, s-maxage=31536000, stale-while-revalidate=86400",
       },
     });
   } catch (e: any) {
