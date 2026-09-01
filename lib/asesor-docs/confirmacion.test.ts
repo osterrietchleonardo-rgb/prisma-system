@@ -585,13 +585,22 @@ describe("resumenDeLaConfirmacion", () => {
 
 describe("los resúmenes no prometen en presente algo que todavía no pasa", () => {
   /**
-   * La misma familia de verbos que vigila `plantillas.test.ts`, y por el mismo
-   * motivo: que PRISMA le arme solo el documento a cada asesor TODAVÍA NO PASA.
-   * Esta tarea rellena la plantilla para COMPROBAR, en memoria, y no guarda
-   * ningún documento generado — `advisor_documents` ni siquiera tiene la
-   * columna donde guardarlo. El futuro y el condicional sí están permitidos.
+   * ═══ Por qué ÉSTE sobrevive, y su justificación vieja no ═══
    *
-   * Se borra en el MISMO commit que haga andar la generación de verdad.
+   * Decía "que PRISMA le arme solo el documento a cada asesor TODAVÍA NO PASA" y
+   * "`advisor_documents` ni siquiera tiene la columna donde guardarlo", y
+   * terminaba con "se borra en el MISMO commit que haga andar la generación de
+   * verdad". Las tres cosas quedaron viejas en la 7b-2: la generación anda,
+   * `docx_path` existe en producción, y su hermano de `plantillas.test.ts` sí se
+   * borró en ese commit — éste no, y nadie lo dijo.
+   *
+   * Igual se queda, y ahora por un motivo que sí se sostiene: lo que vigila son
+   * los resúmenes de la pantalla de CONFIRMACIÓN (spec §7.2), donde no se genera
+   * ningún documento — se rellena la plantilla en memoria para COMPARARLA contra
+   * el archivo de cada asesor, y no se guarda nada. Un resúmen de esa pantalla
+   * que dijera que ahí se genera algo seguiría siendo falso hoy.
+   *
+   * El futuro y el condicional siguen permitidos.
    */
   const PROMESA_EN_PRESENTE = /\b(?:re)?gener(?:a|an|amos|as|ás)\b/i
 

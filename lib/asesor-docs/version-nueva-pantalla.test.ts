@@ -38,6 +38,7 @@ import {
   PARA_QUE_SIRVE_PONER_EN_USO,
   resultadoDeLaAplicacion,
   resumenDelProgreso,
+  textoDeLosQueQuedanAfuera,
   textoDelArchivoElegido,
   textoPendientes,
   tituloDeCamposDesaparecidos,
@@ -847,6 +848,16 @@ describe("la pantalla de la versión nueva no se escribe su propia prosa", () =>
     expect(CODIGO, "el bucle volvió al panel, donde ningún test lo mide").not.toContain("for (const asesor of")
   })
 
+  /**
+   * Era la única prosa de esta pantalla escrita a mano en el JSX. Se dibuja en
+   * el test de arriba, así que no estaba sin red — pero la regla de la etapa no
+   * tiene excepciones, porque una excepción es el precedente de la siguiente.
+   */
+  it("el texto de los que quedan afuera sale de lib, y no está copiado acá", () => {
+    expect(CODIGO).toContain("textoDeLosQueQuedanAfuera(afuera.map((a) => a.nombre))")
+    expect(CODIGO).not.toContain("no está en la lista")
+  })
+
   it("la traducción de la respuesta sale de lib", () => {
     expect(CODIGO).toContain("resultadoDeLaAplicacion({ ok: res.ok, status: res.status, estado: cuerpo?.estado })")
   })
@@ -1530,5 +1541,29 @@ describe("la barra de abajo del paso de aplicar, dibujada", () => {
       }),
     )
     expect(crudo).toContain('disabled=""')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LA PROSA QUE VIVÍA EN EL .tsx
+// ---------------------------------------------------------------------------
+
+describe("textoDeLosQueQuedanAfuera", () => {
+  it("con nadie afuera no dice nada", () => {
+    expect(textoDeLosQueQuedanAfuera([])).toBeNull()
+  })
+
+  it("con uno lo nombra y dice por qué", () => {
+    const texto = textoDeLosQueQuedanAfuera(["Carla Gómez"])!
+    expect(texto).toContain("Carla Gómez")
+    expect(texto).toContain("pausado o desvinculado")
+    expect(texto).toContain("queda archivado como está")
+  })
+
+  it("con varios los nombra a todos, y concuerda en plural", () => {
+    const texto = textoDeLosQueQuedanAfuera(["Ana", "Bruno"])!
+    expect(texto).toContain("2 asesores no están en la lista")
+    expect(texto).toContain("Ana, Bruno")
+    expect(texto).toContain("quedan archivados")
   })
 })

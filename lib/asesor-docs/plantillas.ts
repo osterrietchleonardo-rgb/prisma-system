@@ -1032,11 +1032,18 @@ export function explicacionDelEstado(
 /**
  * Para qué sirve la revisión, en dos renglones y sin tecnicismos.
  *
- * Rige la misma regla que `PARA_QUE_SIRVE`: se puede decir qué va a poder
- * hacer, no se puede describir en presente algo que todavía no pasa. Hasta que
- * exista la pantalla que le arma el documento a cada asesor (Tarea 7 en
- * adelante), acá no se promete en presente; lo vigila `PROMESA_EN_PRESENTE`
- * en `plantillas.test.ts`, la misma que cuida el resto de la solapa.
+ * Rige la misma regla que `PARA_QUE_SIRVE`: no se puede describir en presente
+ * algo que todavía no pasa.
+ *
+ * OJO con este comentario, que estuvo desactualizado: decía que lo vigilaba
+ * `PROMESA_EN_PRESENTE` en `plantillas.test.ts`, **y esa guardia ya no existe**
+ * — se borró en la 7b-2, en el mismo commit que hizo andar la generación de
+ * punta a punta. Un comentario que promete una red que no está es peor que no
+ * tener comentario: el que lo lee cree que puede escribir tranquilo.
+ *
+ * Lo que sí queda cuidándolo: este texto es de la pantalla de REVISIÓN, donde
+ * efectivamente no se genera nada — se compara y se propone. Si alguna vez
+ * dijera que acá se genera un documento, sería falso igual.
  */
 export const PARA_QUE_SIRVE_LA_REVISION =
   "Estos son los datos que cambian de asesor a asesor. Revisá que cada uno sea de verdad un dato de la persona y " +
@@ -1217,6 +1224,31 @@ export function motivoParaNoElegirAsesor(activosConDocumento: number): string | 
   return (
     "No hay ningún asesor activo con este documento cargado, así que no hay datos conocidos con los que leer la " +
     "versión nueva. Reactivá a alguno, o subile este documento a un asesor activo."
+  )
+}
+
+/**
+ * Quiénes NO están en la lista de asesores, y por qué. `null` cuando están
+ * todos.
+ *
+ * Un asesor que el director ve en la solapa y no encuentra acá es una pregunta
+ * sin respuesta; el spec §7.5 los deja afuera y eso se dice, no se esconde.
+ *
+ * Estaba escrito a mano adentro del JSX —la única excepción que había quedado a
+ * la regla de esta etapa— y no hay motivo para que lo sea: los tests del repo
+ * solo miran `lib/**`, y una excepción es el precedente de la siguiente.
+ */
+export function textoDeLosQueQuedanAfuera(nombres: string[]): string | null {
+  if (nombres.length === 0) return null
+  if (nombres.length === 1) {
+    return (
+      `${nombres[0]} no está en la lista: está pausado o desvinculado, así que su documento queda archivado como ` +
+      `está y no entra en esto.`
+    )
+  }
+  return (
+    `${nombres.length} asesores no están en la lista (${nombres.join(", ")}): están pausados o desvinculados, ` +
+    `así que sus documentos quedan archivados como están y no entran en esto.`
   )
 }
 

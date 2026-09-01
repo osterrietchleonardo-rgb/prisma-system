@@ -31,6 +31,7 @@ import {
   etiquetaDeResultado,
   motivoParaNoElegirAsesor,
   motivoParaNoPonerEnUso,
+  textoDeLosQueQuedanAfuera,
   NADA_SE_APLICO_TODAVIA,
   PARA_QUE_SIRVE_LA_VERSION_NUEVA,
   PARA_QUE_SIRVE_LA_VISTA_PREVIA,
@@ -574,6 +575,13 @@ export function PasoElegir({
   motivoSinAsesores: string | null;
   error: { error: string; advertencias: string[] } | null;
 }) {
+  /**
+   * El texto sale de lib y no de acá. Era la única prosa de esta pantalla
+   * escrita a mano en el JSX, y la regla de la etapa no tiene excepciones por
+   * un motivo medido: ningún test del repo mira los `.tsx`.
+   */
+  const avisoDeLosQueQuedanAfuera = textoDeLosQueQuedanAfuera(afuera.map((a) => a.nombre));
+
   return (
     <div className="space-y-4">
       {error && (
@@ -637,14 +645,8 @@ export function PasoElegir({
         {/* Quiénes NO están en la lista, y por qué. Un asesor que el director
             ve en la solapa y no encuentra acá es una pregunta sin respuesta; el
             spec §7.5 los deja afuera y eso se dice, no se esconde. */}
-        {afuera.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {afuera.length === 1
-              ? `${afuera[0].nombre} no está en la lista: está pausado o desvinculado, así que su documento queda archivado como está y no entra en esto.`
-              : `${afuera.length} asesores no están en la lista (${afuera
-                  .map((a) => a.nombre)
-                  .join(", ")}): están pausados o desvinculados, así que sus documentos quedan archivados como están y no entran en esto.`}
-          </p>
+        {avisoDeLosQueQuedanAfuera && (
+          <p className="text-xs text-muted-foreground">{avisoDeLosQueQuedanAfuera}</p>
         )}
       </div>
     </div>
