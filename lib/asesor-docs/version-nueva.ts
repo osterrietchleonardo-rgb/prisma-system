@@ -1,5 +1,6 @@
 import { comoQuedaEnElDocumento, LARGO_DE_DATO_SOSPECHOSO } from "@/lib/asesor-docs/confirmacion"
 import { nombreDeParte } from "@/lib/asesor-docs/verificacion"
+import { DELIMITADORES } from "@/lib/plantillas/docx"
 
 /**
  * Subir una versión nueva de la plantilla (spec §7.4), primera mitad: LEERLA y
@@ -488,12 +489,27 @@ export function avisoDeValoresQueSobreviven(
  * `huecosDe`. Un `{{ }}` vacío o un `{{ dos palabras }}` no son huecos y no se
  * tocan: cambiarlos sería reescribir el contrato de alguien.
  */
-const HUECO_ESCRITO = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g
+/**
+ * La forma se ARMA con `DELIMITADORES`, no se escribe a mano.
+ *
+ * Era la tercera copia de `{{` y `}}` en el repo, y `docx.ts` documenta el daño
+ * MEDIDO de que dos de esas copias discrepen. Un regex escrito a mano no se
+ * entera de que alguien cambió los delimitadores; uno armado desde la constante
+ * sigue el cambio solo.
+ */
+const paraRegex = (d: string) => d.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+const HUECO_ESCRITO = new RegExp(
+  `${paraRegex(DELIMITADORES.start)}\\s*([A-Za-z0-9_]+)\\s*${paraRegex(DELIMITADORES.end)}`,
+  "g",
+)
 
 export function normalizarHuecosEscritosAMano(partes: Record<string, string>): Record<string, string> {
   const salida: Record<string, string> = {}
   for (const ruta of Object.keys(partes)) {
-    salida[ruta] = (partes[ruta] ?? "").replace(HUECO_ESCRITO, (_, nombre: string) => `{{${nombre}}}`)
+    salida[ruta] = (partes[ruta] ?? "").replace(
+      HUECO_ESCRITO,
+      (_, nombre: string) => `${DELIMITADORES.start}${nombre}${DELIMITADORES.end}`,
+    )
   }
   return salida
 }

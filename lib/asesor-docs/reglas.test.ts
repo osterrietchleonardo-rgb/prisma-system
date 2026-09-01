@@ -363,4 +363,51 @@ describe("validarRutaDeVersionNueva", () => {
     const r = validarRutaDeVersionNueva(ruta, AGENCIA);
     expect(r.ok && r.path).toBe(ruta);
   });
+
+  /**
+   * ═══ El supuesto del que cuelgan tres mutaciones "equivalentes" ═══
+   *
+   * En la revisión, tres mutaciones de esta guarda sobrevivieron y eran
+   * equivalentes DE VERDAD: el alfabeto del nombre ya las subsumía. Pero
+   * dejan de serlo apenas alguien ensanche ese alfabeto —para permitir un
+   * espacio, un acento, un `%`— y **no había un solo test que se pusiera en
+   * rojo** cuando eso pasara.
+   *
+   * Es la regla que esta etapa ya pagó dos veces: un veredicto de equivalencia
+   * no es una propiedad del código, es "no lo distingo con las pruebas Y el
+   * código de HOY", y las dos cosas se mueven. Así que el supuesto se fija acá,
+   * en vez de heredarse.
+   *
+   * Si mañana el alfabeto tiene que ser más ancho, este test se cambia a
+   * propósito y en el mismo commit — que es exactamente lo que se busca.
+   */
+  it("el nombre solo admite letras, números, punto, guion y guion bajo", () => {
+    const bueno = (nombre: string) =>
+      validarRutaDeVersionNueva(`asesores/${AGENCIA}/_versiones-nuevas/${nombre}`, AGENCIA).ok;
+
+    // El alfabeto que hoy se permite, arrancando siempre con letra o número.
+    expect(bueno("v2.docx")).toBe(true);
+    expect(bueno("Contrato_v2.docx")).toBe(true);
+    expect(bueno("contrato-2027.docx")).toBe(true);
+    expect(bueno("9.docx")).toBe(true);
+
+    // Y todo lo que queda afuera. Cada uno de estos, admitido, revive alguna de
+    // las tres mutaciones que hoy son equivalentes.
+    for (const nombre of [
+      "con espacio.docx",
+      "acentuado_ñ.docx",
+      "100%.docx",
+      "con/barra.docx",
+      "con\\contrabarra.docx",
+      "..docx",
+      "-arranca-con-guion.docx",
+      "_arranca-con-guion-bajo.docx",
+      ".arranca-con-punto.docx",
+      "sin-extension",
+      "doble.docx.pdf",
+      "MAYUS.DOC",
+    ]) {
+      expect(bueno(nombre), `"${nombre}" no tendría que pasar`).toBe(false);
+    }
+  });
 });

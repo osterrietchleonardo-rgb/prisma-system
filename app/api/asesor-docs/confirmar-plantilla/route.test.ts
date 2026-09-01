@@ -332,9 +332,20 @@ const pedir = async (cuerpo: unknown) => {
  * achica. Cargarlo acá no acelera nada: reparte el costo donde corresponde, en
  * vez de cobrárselo al que salga primero en la lista.
  */
+/**
+ * Importar la ruta arrastra docxtemplater, pizzip y mammoth. Con la cache de
+ * vite fria eso puede pasar los 10 s que vitest da por defecto para un hook.
+ *
+ * El tope va ACA y no en `vitest.config.ts`: uno global alto taparia un cuelgue
+ * futuro en cualquiera de los otros archivos, que hoy arrancan en milisegundos.
+ * Un tope suelto solo donde el arranque es caro.
+ *
+ * No se pudo reproducir el timeout (borrando `node_modules/.vite` la suite paso
+ * entera sin esto). Queda como precaucion, y se dice asi.
+ */
 beforeAll(async () => {
   await import("./route")
-})
+}, 60_000)
 
 const tipoGuardado = () => base.tipos.find((t) => t.id === TIPO)!
 const documentoDe = (id: string) => base.documentos.find((d) => d.advisor_id === id)!
