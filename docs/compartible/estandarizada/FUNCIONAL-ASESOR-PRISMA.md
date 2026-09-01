@@ -361,10 +361,12 @@ Al abrir un chat, en **Información del contacto** (el ícono de la persona arri
 
 ### Fotos (arreglar las fotos de una propiedad)
 
-**Qué es:** agarra una foto de la ficha de tu propiedad y te la deja publicable. No hace falta que subas nada ni que sepas editar.
+**Qué es:** agarra una foto y te la deja publicable. No hace falta que sepas editar.
 
 **Cómo se usa:**
-1. Elegís la **propiedad** de tu cartera y después **cuál de sus fotos** querés trabajar.
+1. Arriba de todo elegís **de dónde sale la foto**. Son dos botones:
+   - **De una propiedad** — buscás la propiedad en tu cartera y después elegís **cuál de sus fotos** trabajar. Es lo de siempre.
+   - **Subir una foto mía** — para la propiedad que **todavía no cargaste en Tokko**. Le ponés un nombre, elegís la foto de tu computadora o tu celular, y la trabajás igual. Después subís a Tokko **la corregida** y listo: la cargás una sola vez, ya linda.
 2. Marcás qué querés que le haga. Podés elegir más de una cosa y se aplican en este orden:
    - **Mejorar la foto** — levanta una foto oscura o de día nublado. Si la sacaste con el cielo blanco, te la pasa a día de sol. No mueve nada de lugar.
    - **Despejar el ambiente** — saca adornos, cuadros, objetos personales y los muebles que hay hoy.
@@ -375,6 +377,10 @@ Al abrir un chat, en **Información del contacto** (el ícono de la persona arri
 **Si algo no te cierra, lo cambiás vos:** abajo del resultado arrastrás sobre la foto para encerrar lo que querés tocar y decís qué hacer. **Con nombrarlo alcanza** — "el perchero" — y si no escribís nada, saca lo que marcaste. Podés marcar **varias cosas a la vez** y se hacen todas juntas. También podés pedir algo para toda la foto ("poné cortinas claras en la ventana").
 
 > 💡 Para **sacar** algo la marca es exacta. Para **agregar** algo es una indicación de por dónde, no un lugar clavado.
+
+> 📱 **El nombre que le pongas a una foto que subas vos es con el que la vas a encontrar después** en **Mis Generaciones → Fotos retocadas**. Poné algo que reconozcas: "Depto Rivadavia 4500 — living". Si la propiedad ya está en Tokko no hace falta: queda con el nombre de la ficha.
+
+> 📸 Las fotos sacadas **con el celular entran derechas**, aunque las hayas sacado de pie. Se aceptan JPG, PNG y WEBP. Si el iPhone te la guarda en HEIC, el sistema la convierte solo al subirla.
 
 **Lo que el sistema cuida solo, sin que le digas nada:**
 - El **piso** queda igual: mismo material, mismo dibujo, mismo color.

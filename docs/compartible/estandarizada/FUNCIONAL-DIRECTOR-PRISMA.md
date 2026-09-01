@@ -473,10 +473,12 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 
 ### Fotos (arreglar las fotos de una propiedad)
 
-**Qué es:** agarra una foto de la ficha de una propiedad y la deja publicable. No hay que subir nada ni saber editar. **Tus asesores también la tienen.**
+**Qué es:** agarra una foto y la deja publicable. No hay que saber editar. **Tus asesores también la tienen.**
 
 **Cómo se usa:**
-1. Se elige la **propiedad** de la cartera y después **cuál de sus fotos** trabajar.
+1. Arriba de todo se elige **de dónde sale la foto**, con dos botones:
+   - **De una propiedad** — se busca en la cartera y después se elige **cuál de sus fotos** trabajar.
+   - **Subir una foto mía** — para la propiedad que **todavía no está cargada en Tokko**. Se le pone un nombre, se sube la foto desde la computadora o el celular y se trabaja igual. Después se sube a Tokko **la corregida**: la propiedad se carga una sola vez, ya con las fotos lindas. Esto le ahorra al equipo tener que cargar las fotos dos veces.
 2. Se marca qué hacerle. Se puede elegir más de una y se aplican en este orden:
    - **Mejorar la foto** — levanta una foto oscura o de día nublado. Si el cielo salió blanco, la pasa a día de sol. No mueve nada de lugar.
    - **Despejar el ambiente** — saca adornos, cuadros, objetos personales y los muebles que hay hoy.
@@ -487,6 +489,10 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 **Si algo no cierra, se corrige ahí mismo:** se arrastra sobre la foto para encerrar lo que se quiere tocar y se dice qué hacer. **Con nombrarlo alcanza** — "el perchero" — y si no se escribe nada, saca lo que quedó marcado. Se pueden marcar **varias cosas a la vez** y se hacen todas juntas.
 
 > 💡 Para **sacar** algo la marca es exacta. Para **agregar** algo es una indicación de por dónde, no un lugar clavado.
+
+> 📱 **Una foto subida se busca por el nombre que le pusieron** en **Historial / Galería → Fotos retocadas**. Vale la pena pedirle al equipo que use algo reconocible ("Depto Rivadavia 4500 — living"): sin eso, después no la encuentran. Las que salen de una ficha quedan con el nombre de la propiedad, sin que nadie escriba nada.
+
+> 📸 Las fotos sacadas **con el celular entran derechas**. Se aceptan JPG, PNG y WEBP; el HEIC del iPhone se convierte solo al subirlo.
 
 **Lo que el sistema cuida solo, sin que nadie se lo aclare:**
 - El **piso** queda igual: mismo material, mismo dibujo, mismo color.
