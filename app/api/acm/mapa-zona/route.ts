@@ -38,6 +38,17 @@ export const maxDuration = 30;
 
 const UA = "PRISMA-acm/1.0 (inmobiliaria; contacto: osterrietchleonardo@vakdor.com)";
 
+// CARTO regalo estos mapas durante años y desde 2026 pide una clave para saber quien los usa:
+// a quien no la manda le estampa "API KEY REQUIRED" en diagonal sobre CADA pieza del mapa. Salio
+// asi en todas las fichas hasta el 1-sep-2026. La clave es gratis hasta 5 millones de piezas por
+// mes (nosotros gastamos 12 por ficha abierta) y la condicion es que el credito de CARTO y
+// OpenStreetMap se vea en el mapa — se dibuja mas abajo.
+//
+// La piden nuestros servidores y no el navegador, asi que la clave NUNCA llega al cliente: por
+// eso va sin NEXT_PUBLIC_. Vive en las variables de entorno de Vercel; si falta, el mapa igual
+// se arma pero vuelve la marca de agua, y por eso se avisa en el log.
+const CARTO_KEY = process.env.CARTO_API_KEY;
+
 export async function GET(req: Request) {
   try {
     const token = new URL(req.url).searchParams.get("token") || "";
@@ -61,6 +72,10 @@ export async function GET(req: Request) {
     const marcadores = marcadoresDibujados(zona.centro, zona.pois);
     const { x0, y0 } = origenDelRecorte(zona.centro);
 
+    if (!CARTO_KEY) {
+      console.error("[ERROR] Falta CARTO_API_KEY: el mapa va a salir con la marca de agua 'API KEY REQUIRED'.");
+    }
+
     // Bajar las tiles. Una que falle deja un hueco del color de fondo, no rompe el mapa entero.
     const tiles: Array<{ input: Buffer; top: number; left: number }> = [];
     await Promise.all(
@@ -70,7 +85,10 @@ export async function GET(req: Request) {
           // "voyager" y no "light_all": el segundo es tan claro que en el papel se ve lavado y
           // no se distinguen las manzanas. Voyager mantiene la limpieza pero deja los parques
           // en verde y las avenidas marcadas, que es lo que le da contexto al lector.
-          const r = await fetch(`https://basemaps.cartocdn.com/rastertiles/voyager/${ZOOM}/${x0 + dx}/${y0 + dy}.png`, {
+          const url =
+            `https://basemaps.cartocdn.com/rastertiles/voyager/${ZOOM}/${x0 + dx}/${y0 + dy}.png` +
+            (CARTO_KEY ? `?key=${CARTO_KEY}` : "");
+          const r = await fetch(url, {
             headers: { "User-Agent": UA },
             signal: AbortSignal.timeout(8000),
           });
