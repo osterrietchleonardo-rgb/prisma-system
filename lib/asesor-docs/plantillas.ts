@@ -23,30 +23,39 @@ import type { PropuestaHueco } from "@/lib/asesor-docs/propuesta"
  * Para qué sirve esta pantalla, en dos renglones.
  *
  * Dice la maquinaria (comparar, detectar) **y el premio** (que PRISMA le arme
- * después el documento a cada asesor). Sin el premio, el director lee un
- * procedimiento y no entiende para qué apretaría el botón.
+ * el documento a cada asesor). Sin el premio, el director lee un procedimiento
+ * y no entiende para qué apretaría el botón.
  *
- * El premio va **en futuro, y a propósito**: generar el documento de cada
- * asesor TODAVÍA NO EXISTE. Hoy la única ruta de esta etapa es
- * `detectar-plantilla`, que compara y devuelve una propuesta sin guardar nada;
- * ni `confirmar-plantilla` ni ninguna pantalla llaman a `rellenarDocx`. Decirlo
- * en presente ("le genera el documento a cada asesor") le promete al director
- * algo que va a buscar y no va a encontrar, y esa es la única forma segura de
- * que deje de creerle a la pantalla. La regla, entonces: **se puede decir qué
- * va a poder hacer; no se puede describir en presente algo que hoy no pasa.**
- * Ante la duda, quedarse corto.
+ * ═══ Y acá el premio pasó a estar en PRESENTE, con fecha ═══
+ *
+ * Durante toda la Etapa C esta frase estuvo **en futuro a propósito**, y había
+ * un test —`PROMESA_EN_PRESENTE`— que prohibía escribirla en presente en
+ * cualquier texto de la solapa. El motivo era que generar el documento de cada
+ * asesor NO EXISTÍA: `detectar-plantilla` comparaba y devolvía una propuesta,
+ * `confirmar-plantilla` guardaba la plantilla, y nadie llamaba a
+ * `rellenarDocx`. Decirlo en presente le prometía al director algo que iba a
+ * buscar y no iba a encontrar.
+ *
+ * Con la 7b-2 empezó a pasar de verdad: la solapa sube la versión nueva, la
+ * aplica asesor por asesor contra `aplicar-version/{advisorId}` —que rellena el
+ * molde, le pasa las cinco comprobaciones y guarda el `.docx` de esa persona— y
+ * después la pone en uso. Así que el test se borró en ESE commit, ni antes ni
+ * después, y esta frase se escribió en presente en el mismo movimiento.
+ *
+ * Lo que NO cambió es la regla de fondo, que sigue valiendo para todo lo que se
+ * agregue: **no se puede describir en presente algo que hoy no pasa.** Ante la
+ * duda entre prometer y quedarse corto, corto.
  *
  * Vive acá y no adentro del `.tsx` por el mismo motivo que el resto de este
  * archivo: los tests del repo solo miran `lib/**`. La versión anterior de esta
- * frase vivía en el componente, y por eso la promesa en presente pasó una
- * ronda entera sin que ningún test la viera. Ahora la vigila
- * `PROMESA_EN_PRESENTE` en `plantillas.test.ts`, junto con todo lo que
- * devuelve `explicacionDelEstado`.
+ * frase vivía en el componente, y por eso una promesa falsa pasó una ronda
+ * entera sin que ningún test la viera.
  */
 export const PARA_QUE_SIRVE =
   "Un tipo de documento por fila. Cuando varios asesores tienen el mismo contrato cargado, PRISMA los compara y " +
-  "detecta qué parte es texto fijo y qué parte es el dato de cada persona. Con eso arma la plantilla; más " +
-  "adelante le va a generar el documento a cada asesor con sus datos."
+  "detecta qué parte es texto fijo y qué parte es el dato de cada persona. Con eso arma la plantilla y le genera " +
+  "el documento a cada asesor con sus datos: cuando cambie una cláusula, subís el Word una sola vez y se lo " +
+  "aplicás a todos desde acá."
 
 // ---------------------------------------------------------------------------
 // La forma de cada fila
@@ -197,6 +206,50 @@ export type DocumentoCrudo = {
   version_id: string | null
   /** De quién es. Sin esto no se puede saber si el asesor sigue en la agencia. */
   advisor_id: string
+  /**
+   * Por qué está como está. Opcional: la solapa no la MUESTRA —es un párrafo
+   * largo por asesor y va en su ficha— pero sí la mira para un caso que si no
+   * queda mudo. Ver `esperaUnDato`.
+   */
+  observacion?: string | null
+}
+
+/**
+ * Con qué arranca la anotación que deja `observacionDePendiente` en
+ * `generar.ts`, escrita de nuevo acá a mano y NO importada de allá.
+ *
+ * El motivo es el de siempre en este archivo: lo carga el NAVEGADOR, y
+ * `generar.ts` importa `confirmacion.ts`, que arrastra la librería de
+ * comparación de textos (900 KB) a cada visita del director. Es la misma
+ * decisión, y la misma solución, que `MINIMO_PARA_DETECTAR`: un test que corre
+ * en Node importa las dos y las compara.
+ */
+export const ASI_EMPIEZA_LA_ESPERA_DE_UN_DATO = "La versión nueva trae "
+
+/**
+ * Si a este documento le falta un dato que la versión nueva trajo.
+ *
+ * ═══ El caso que quedaba mudo, y por qué se lee la observación ═══
+ *
+ * `estadoAlQuedarPendiente` **conserva el `revisar`** cuando la persona ya
+ * estaba en rojo, y eso es lo correcto: `revisar` dice "su documento no
+ * coincide con la plantilla" y `pendiente` dice "le falta cargar un dato";
+ * degradar el uno al otro haría que la pantalla diga algo más tranquilizador
+ * que la verdad.
+ *
+ * Pero deja un agujero por el otro lado: esa persona se cuenta en rojo y **nada
+ * dice que además le falta un dato**. El director arregla el rojo, vuelve a
+ * aplicar, y se encuentra con que sigue sin pasar — por un motivo que la solapa
+ * nunca nombró. Los dos hechos son ciertos a la vez y los dos tienen que
+ * contarse.
+ *
+ * El dato existe y está escrito: la `observacion` lleva las dos cosas desde la
+ * 7b-1. Lo que faltaba era que alguien la leyera. No se PARSEA el texto —solo
+ * se busca la marca con la que arranca lo que escribe PRISMA— y la marca está
+ * atada por un test a la de `generar.ts`.
+ */
+function esperaUnDato(doc: DocumentoCrudo): boolean {
+  return (doc.observacion ?? "").includes(ASI_EMPIEZA_LA_ESPERA_DE_UN_DATO)
 }
 
 /** `profiles`, con lo único que la solapa necesita saber de cada asesor. */
@@ -333,7 +386,16 @@ export function armarFilas(args: {
 
     if (doc.version_id !== null && doc.version_id === vigente) {
       // Comprobado contra la versión que está en uso: su estado vale.
-      if (doc.estado === "revisar") sumar(rojos, doc.template_id)
+      if (doc.estado === "revisar") {
+        sumar(rojos, doc.template_id)
+        /**
+         * Y si además le falta un dato, se cuenta TAMBIÉN en el otro balde. No
+         * es una doble cuenta: son dos cosas distintas que le pasan a la misma
+         * persona, y las dos hay que hacerlas. Contarlo en uno solo dejaba la
+         * otra sin nombrar en ningún lado de la pantalla. Ver `esperaUnDato`.
+         */
+        if (esperaUnDato(doc)) sumar(pendientes, doc.template_id)
+      }
       /**
        * Y el `pendiente`, que hasta acá se caía por el agujero del `continue`.
        * Va en su propio balde y no en `enRojo`: no hay nada roto que revisar
@@ -593,12 +655,15 @@ export function explicacionDelEstado(
 
   if (fila.estado === "activa") {
     /**
-     * "…se generan con esta versión" decía en presente lo mismo que el párrafo
-     * de arriba: que PRISMA ya le arma el documento a cada asesor. No lo hace
-     * (ver `PARA_QUE_SIRVE`). Lo que SÍ es cierto de una fila `activa` es que
-     * esta versión quedó confirmada; generar con ella viene después.
+     * Ahora sí en presente, y con una afirmación más fuerte que la anterior:
+     * `activar-version` **se niega** mientras quede un asesor activo con el
+     * documento de otra versión, así que de una fila `activa` es cierto que los
+     * documentos de los activos están hechos con esta versión. Los avisos de
+     * abajo son los que dicen quién queda por fuera de esa afirmación.
      */
-    const enUso = "Está en uso: es la versión confirmada. Con ella se le va a generar el documento a cada asesor."
+    const enUso =
+      "Está en uso: es la versión con la que están hechos los documentos de los asesores activos. Cuando cambie " +
+      "el contrato, subí el Word de la versión nueva desde el botón de acá al lado."
 
     /**
      * El aviso que faltaba, y el que más caro sale callar.
@@ -834,6 +899,327 @@ export function avisoDeDatoCorto(valor: string): string | null {
 export const SI_ALGUNO_QUEDA_EN_ROJO =
   "Si aunque sea un asesor no coincide, la plantilla se guarda igual pero queda como borrador y no se usa para " +
   "nadie, y vas a ver quién falló y por qué."
+
+// ---------------------------------------------------------------------------
+// LA VERSIÓN NUEVA (spec §7.4 y §7.5)
+// ---------------------------------------------------------------------------
+
+/**
+ * Todo lo que lee el director en la pantalla de la versión nueva vive acá, por
+ * los dos motivos de siempre y que se suman:
+ *
+ *  · los tests del repo solo miran `lib/**`, y en esta etapa una promesa falsa
+ *    escrita a mano en un `.tsx` pasó una ronda entera sin que nadie la viera;
+ *  · este archivo lo carga el NAVEGADOR y no importa nada pesado. Los textos
+ *    del SERVIDOR —los avisos de campos nuevos, desaparecidos, repetidos, la
+ *    cuenta cruzada— ya vienen escritos adentro de la respuesta del endpoint
+ *    (`version-nueva.ts`), y la pantalla los muestra tal cual. Acá está solo lo
+ *    que el servidor no puede decir porque no lo sabe: lo que pasa antes de
+ *    mandar el pedido y lo que pasa entre un pedido y el siguiente.
+ */
+
+/** Qué es esta pantalla, arriba de todo. */
+export const PARA_QUE_SIRVE_LA_VERSION_NUEVA =
+  "Cambió el contrato y hay que rehacerle el documento a todos. Subís el Word una sola vez, mirás cómo queda, y " +
+  "recién si está bien se lo aplicás a cada asesor con sus propios datos."
+
+/**
+ * Cómo tiene que estar el archivo (spec §7.4.1), dicho ANTES de elegirlo.
+ *
+ * Es la condición más rara de todo el flujo y la que más rechazos genera: no se
+ * sube una plantilla con huecos, se sube el contrato nuevo **ya completado con
+ * los datos de una persona**. El endpoint la explica cuando rechaza; decirla
+ * antes es la diferencia entre que el director la lea una vez o que la
+ * descubra fallando.
+ */
+export const COMO_TIENE_QUE_SER_EL_ARCHIVO =
+  "El Word tiene que ser la versión nueva YA COMPLETADA con los datos de uno de tus asesores, y abajo tenés que " +
+  "decir cuál. No es un archivo con los campos en blanco: PRISMA busca los datos de esa persona adentro del " +
+  "documento, y donde los encuentra sabe que ahí va un dato de cada uno. Si un campo es nuevo y todavía no lo " +
+  "tiene nadie, escribilo en el Word entre llaves dobles, así: {{COMISION}}."
+
+/**
+ * Por qué NO se puede subir una versión nueva todavía. `null` cuando sí se
+ * puede.
+ *
+ * Un botón deshabilitado que no dice por qué es lo mismo que un botón roto, y
+ * acá el motivo no es adivinable: la versión nueva se lee comparando contra la
+ * VIGENTE, así que sin una plantilla ya detectada y confirmada no hay contra
+ * qué comparar. Es la misma negativa que devuelve el endpoint
+ * (`SIN_VERSION_VIGENTE`), dicha antes de que el director elija el archivo.
+ */
+export function motivoParaNoSubirVersion(
+  fila: Pick<FilaPlantilla, "version" | "estado">,
+): string | null {
+  if (fila.version === null) {
+    return (
+      "Para subir una versión nueva primero tiene que haber una versión vigente contra la cual compararla. " +
+      "Detectá la plantilla con los documentos que ya tenés cargados y confirmala; después vas a poder subir " +
+      "versiones nuevas desde acá."
+    )
+  }
+  if (fila.estado !== "activa") {
+    return (
+      "Esta plantilla está en borrador: todavía no quedó confirmada, así que no se le puede subir una versión " +
+      "nueva encima. Terminá de resolver lo que dice acá arriba y confirmala primero."
+    )
+  }
+  return null
+}
+
+/**
+ * El archivo elegido, para que el director vea que sigue ahí.
+ *
+ * ═══ Por qué esto es un renglón y no un detalle ═══
+ *
+ * El servidor **borra el archivo apenas lo lee**, salga bien o salga mal, así
+ * que cualquier reintento tiene que volver a subirlo. La pantalla se queda con
+ * el archivo en memoria justo para eso: si el director no tiene que volver a
+ * buscarlo en el disco después de cada rechazo, hay que decírselo, porque
+ * "elegí un archivo" con un error rojo al lado se lee como que hay que empezar
+ * de cero.
+ */
+export function textoDelArchivoElegido(nombre: string, bytes: number): string {
+  const kb = bytes / 1024
+  const tamano = kb >= 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(kb))} KB`
+  return `${nombre} · ${tamano}`
+}
+
+/** Y el aviso de que sigue elegido, para después de un rechazo. */
+export const EL_ARCHIVO_SIGUE_ELEGIDO =
+  "El archivo que elegiste sigue acá: arreglá lo de arriba en el Word, volvé a elegirlo si lo cambiaste, y probá " +
+  "de nuevo. No hace falta empezar de cero."
+
+/**
+ * Quiénes pueden ser el asesor de referencia, y qué pasa si no hay ninguno.
+ *
+ * `null` cuando sí hay. Pausados y desvinculados no pueden serlo (spec §7.5, y
+ * el endpoint lo rechaza): sus datos no pueden ser la referencia con la que se
+ * lee la versión nueva de toda la inmobiliaria.
+ */
+export function motivoParaNoElegirAsesor(activosConDocumento: number): string | null {
+  if (activosConDocumento > 0) return null
+  return (
+    "No hay ningún asesor activo con este documento cargado, así que no hay datos conocidos con los que leer la " +
+    "versión nueva. Reactivá a alguno, o subile este documento a un asesor activo."
+  )
+}
+
+/** El rótulo de la lista de campos que la versión nueva trae y antes no había. */
+export function tituloDeCamposNuevos(cuantos: number): string {
+  return cuantos === 1 ? "1 campo nuevo" : `${cuantos} campos nuevos`
+}
+
+/** El rótulo de los que ya no están. */
+export function tituloDeCamposDesaparecidos(cuantos: number): string {
+  return cuantos === 1 ? "1 campo que ya no está" : `${cuantos} campos que ya no están`
+}
+
+/** Qué es la vista previa (spec §7.4.3), y por qué hay que mirarla. */
+export function tituloDeLaVistaPrevia(nombreDelAsesor: string): string {
+  return `Así queda el documento de ${nombreDelAsesor} con la versión nueva`
+}
+
+export const PARA_QUE_SIRVE_LA_VISTA_PREVIA =
+  "Es el texto del documento armado con la versión nueva y los datos de esa persona. Leelo: es lo último que se " +
+  "puede mirar antes de que esto se convierta en el contrato de todos. Si algún dato aparece donde iba una frase " +
+  "del contrato, arreglá el Word y volvé a subirlo."
+
+/**
+ * Que todavía no se aplicó nada. Va en la barra de abajo, siempre visible.
+ *
+ * Es el hermano de `NADA_SE_GUARDA_TODAVIA` de la §7.2 y existe por lo mismo:
+ * ver la versión leída, con sus campos y su vista previa, se lee como que el
+ * cambio ya está hecho. No lo está — el spec §7.4.4 dice que el reemplazo va
+ * "recién con el OK explícito", y ese OK es el botón de al lado.
+ */
+export const NADA_SE_APLICO_TODAVIA =
+  "La versión quedó guardada pero todavía no se le aplicó a nadie: cada asesor sigue con el documento que tiene " +
+  "hoy. Al aplicar, PRISMA le arma el documento nuevo a cada uno con sus datos."
+
+/**
+ * Cómo corre el reemplazo (spec §7.5), dicho antes de arrancar.
+ *
+ * Las tres cosas que el director tiene que saber para no asustarse en el medio:
+ * va de a uno, uno que falla no voltea a los otros, y no hay que tocar nada
+ * mientras corre.
+ */
+export const COMO_SE_APLICA =
+  "Se aplica de a un asesor por vez. Si a alguno le falta un dato o algo no cierra, ese queda con su documento de " +
+  "antes y los demás siguen igual: ninguno se lleva puesto al otro. No cierres esta pantalla mientras corre."
+
+/** Cómo terminó cada asesor. Es lo que la pantalla pinta y lo que se cuenta. */
+export type ResultadoDeAplicacion = "esperando" | "corriendo" | "ok" | "pendiente" | "frenado" | "error"
+
+/** La etiqueta corta de cada estado, la que va al lado del nombre. */
+export function etiquetaDeResultado(estado: ResultadoDeAplicacion): string {
+  switch (estado) {
+    case "esperando":
+      return "Todavía no"
+    case "corriendo":
+      return "Armando su documento…"
+    case "ok":
+      return "Listo"
+    case "pendiente":
+      return "Le falta un dato"
+    case "frenado":
+      return "Se frenó"
+    case "error":
+      return "No se pudo"
+  }
+}
+
+/**
+ * El renglón de arriba del progreso: cuántos van, y qué pasó con los que no
+ * salieron bien.
+ *
+ * Dice el número Y la consecuencia, igual que el resto de esta etapa. "3 de 5"
+ * sin decir qué pasó con los otros dos deja al director mirando una barra que
+ * no llega al final y sin saber si tiene que hacer algo.
+ */
+export function resumenDelProgreso(args: {
+  total: number
+  ok: number
+  pendientes: number
+  frenados: number
+  errores: number
+}): string {
+  const { total, ok, pendientes, frenados, errores } = args
+  const hechos = ok + pendientes + frenados + errores
+
+  if (hechos < total) {
+    return `Aplicando: ${hechos} de ${total}. Esperá a que termine.`
+  }
+
+  const problemas = pendientes + frenados + errores
+  if (problemas === 0) {
+    return total === 1
+      ? "Listo: el único asesor activo ya tiene su documento de la versión nueva."
+      : `Listo: los ${total} asesores activos ya tienen su documento de la versión nueva.`
+  }
+
+  const detalle: string[] = []
+  if (pendientes > 0) {
+    detalle.push(
+      pendientes === 1 ? "a 1 le falta cargar un dato" : `a ${pendientes} les falta cargar un dato`,
+    )
+  }
+  if (frenados > 0) detalle.push(frenados === 1 ? "1 se frenó" : `${frenados} se frenaron`)
+  if (errores > 0) detalle.push(errores === 1 ? "1 no se pudo intentar" : `${errores} no se pudieron intentar`)
+
+  return (
+    `${ok} de ${total} quedaron con la versión nueva, y ${detalle.join(", ")}. Los que no salieron siguen con el ` +
+    `documento que tenían: leé el motivo de cada uno acá abajo, arreglá lo que haga falta y volvé a intentar con ` +
+    `esa persona.`
+  )
+}
+
+/**
+ * Por qué NO se puede poner en uso la versión todavía. `null` cuando sí se
+ * puede.
+ *
+ * ═══ El primer caso es un freno que la pantalla agrega, no uno que existía ═══
+ *
+ * `activar-version` solo exige que ningún asesor ACTIVO quede atrás. Con cero
+ * asesores activos esa condición se cumple sola: la versión se activaría, y el
+ * `estado` que calcula `estadoDeLaPlantilla` con la lista vacía es `borrador`
+ * — o sea que poner en uso una versión **degradaría la plantilla de `activa` a
+ * `borrador`** sin que nadie hubiera pedido eso. Hoy ese camino no se puede
+ * alcanzar desde ninguna pantalla; esta pantalla es la primera que podría
+ * alcanzarlo, así que lo frena de este lado antes de mandar el pedido.
+ */
+export function motivoParaNoPonerEnUso(args: {
+  total: number
+  ok: number
+}): string | null {
+  if (args.total === 0) {
+    return (
+      "No hay ningún asesor activo con este documento, así que no hay a quién aplicarle la versión y no tiene " +
+      "sentido ponerla en uso: la plantilla volvería a quedar como borrador. Reactivá a alguien o subile el " +
+      "documento a un asesor activo."
+    )
+  }
+  if (args.ok < args.total) {
+    const faltan = args.total - args.ok
+    return (
+      `Todavía no: ${faltan === 1 ? "queda 1 asesor" : `quedan ${faltan} asesores`} con el documento de la ` +
+      `versión anterior. Si esta versión se pusiera en uso igual, la pantalla diría que están todos en la nueva ` +
+      `mientras su contrato sigue siendo el viejo.`
+    )
+  }
+  return null
+}
+
+/** Qué significa poner en uso, al lado del botón. */
+export const PARA_QUE_SIRVE_PONER_EN_USO =
+  "Poner en uso hace que esta pase a ser la versión vigente de la plantilla. La anterior no se borra: queda " +
+  "archivada por si hay que volver atrás."
+
+/**
+ * El rótulo de los que faltan cuando el servidor se niega a activar.
+ *
+ * El mensaje del endpoint ya los nombra, y aun así la pantalla los lista
+ * aparte: el pedido devuelve los ids en `faltan`, y traducirlos a nombres es lo
+ * único que convierte "quedan 2 asesores" en algo sobre lo que el director
+ * pueda actuar sin salir a buscar quiénes son.
+ */
+export function tituloDeLosQueFaltan(cuantos: number): string {
+  return cuantos === 1 ? "Falta este asesor:" : `Faltan estos ${cuantos} asesores:`
+}
+
+/**
+ * Los asesores de un tipo de documento, tal como la pantalla los necesita.
+ *
+ * Sale de cruzar los documentos con los perfiles, que es lo que la solapa ya
+ * trae. Vive acá y no adentro del componente por lo de siempre: es la lista de
+ * a quién se le va a escribir un contrato, y decidir mal quién entra es
+ * exactamente el tipo de error que no se ve hasta que alguien firma.
+ */
+export type AsesorDeLaPlantilla = {
+  advisorId: string
+  nombre: string
+  /** Si entra en la comparación y en la aplicación (spec §7.5). */
+  participa: boolean
+}
+
+/** El nombre con el que se le habla al director. Nunca un uuid pelado. */
+const SIN_NOMBRE = "Asesor sin nombre cargado"
+
+/**
+ * Quiénes tienen este tipo de documento, ordenados por nombre.
+ *
+ * El orden es por nombre y no por el que venga de la base: el director busca a
+ * una persona en una lista, y una lista que cambia de orden entre dos recargas
+ * lo obliga a leerla entera cada vez.
+ */
+export function asesoresDeLaPlantilla(args: {
+  templateId: string
+  documentos: DocumentoCrudo[]
+  asesores: Array<AsesorCrudo & { full_name?: string | null }>
+}): AsesorDeLaPlantilla[] {
+  const perfil = new Map(args.asesores.map((a) => [a.id, a]))
+  const vistos = new Set<string>()
+  const salida: AsesorDeLaPlantilla[] = []
+
+  for (const doc of args.documentos) {
+    if (doc.template_id !== args.templateId) continue
+    if (vistos.has(doc.advisor_id)) continue
+    vistos.add(doc.advisor_id)
+    const p = perfil.get(doc.advisor_id)
+    salida.push({
+      advisorId: doc.advisor_id,
+      nombre: p?.full_name?.trim() || SIN_NOMBRE,
+      /**
+       * El que no aparece en la lista de perfiles NO participa, igual que en
+       * `participan`: los dos endpoints lo dejan afuera, así que incluirlo
+       * llevaría al director a pedir algo que va a fallar.
+       */
+      participa: p !== undefined && participaEnLaComparacion(p.estado),
+    })
+  }
+
+  return salida.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"))
+}
 
 // ---------------------------------------------------------------------------
 // El mismo dato escrito dos veces

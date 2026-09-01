@@ -30,34 +30,36 @@ import { LARGO_DE_DATO_SOSPECHOSO } from "./confirmacion"
 import { ESTADOS_FUERA, separarPorEstado } from "./propuesta"
 
 /**
- * La familia de formas en PRESENTE del verbo generar: "genera", "generan",
- * "se generan", "generamos", "regenera", "regeneran", "generás".
+ * ═══ ACÁ ESTABA `PROMESA_EN_PRESENTE`, Y SE BORRÓ EN LA 7b-2 ═══
  *
- * POR QUÉ EXISTE ESTO, para quien lo lea dentro de seis meses:
+ * Era un patrón —la familia entera de "genera / generan / regeneran /
+ * generamos / generás"— que prohibía que cualquier texto de esta solapa dijera
+ * en presente que PRISMA le arma el documento a cada asesor. Existía porque no
+ * lo hacía:
+ * la única ruta era `detectar-plantilla`, que comparaba y devolvía una
+ * propuesta sin guardar nada, y `rellenarDocx` era una primitiva que no
+ * llamaba ninguna pantalla. Decirlo en presente le prometía al director algo
+ * que iba a buscar y no iba a encontrar. Ya había pasado dos veces, y la
+ * segunda explica por qué el patrón miraba una familia entera y no una
+ * palabra: se sacó la promesa de `explicacionDelEstado` —con un
+ * `not.toContain("regeneran")` cuidándola— y reapareció con OTRO VERBO ("le
+ * genera") treinta líneas más arriba, en la primera oración que lee todo el
+ * mundo.
  *
- * Que PRISMA le arme solo el documento a cada asesor **todavía no está
- * escrito**. La única ruta de esta etapa es `detectar-plantilla`, que compara
- * los documentos y devuelve una propuesta SIN guardar nada; no hay
- * `confirmar-plantilla`, y `rellenarDocx` existe como primitiva de librería
- * que no llama ninguna pantalla ni ningún endpoint.
+ * Su propio comentario decía cuándo se borraba: **en el MISMO commit que
+ * hiciera andar la generación de punta a punta, no antes.** Ese commit es
+ * este. La solapa sube la versión nueva, se la aplica a cada asesor contra
+ * `aplicar-version/{advisorId}` —que rellena el molde, le pasa las cinco
+ * comprobaciones y guarda el `.docx` de esa persona— y después la pone en uso.
+ * Así que la promesa dejó de ser una promesa, y `PARA_QUE_SIRVE` pasó a estar
+ * en presente en este mismo commit.
  *
- * Contarlo en presente ya pasó dos veces. La segunda es la que explica por qué
- * el test mira una familia entera y no una palabra: se sacó la promesa de
- * `explicacionDelEstado` —con un `not.toContain("regeneran")` cuidándola— y la
- * misma promesa reapareció con OTRO VERBO ("le genera") treinta líneas más
- * arriba, en la primera oración de la pantalla, que es la que ve todo el
- * mundo. `not.toContain("regeneran")` la dejó pasar entera.
- *
- * El futuro está permitido a propósito: "le va a generar", "generará",
- * "falta generarle". La pantalla PUEDE decir qué va a poder hacer; lo que no
- * puede es describir en presente algo que hoy no pasa. Ante la duda entre
- * prometer y quedarse corto, corto.
- *
- * Cuando la generación exista de verdad —un endpoint que la corra y una
- * pantalla que la muestre— este test se borra en el MISMO commit que la hace
- * andar, no antes.
+ * Lo que NO se borró es la regla de fondo, y vale para todo lo que se agregue
+ * de acá en adelante: **no se puede describir en presente algo que hoy no
+ * pasa.** Ante la duda entre prometer y quedarse corto, corto. Lo que la
+ * reemplaza son los tests de abajo, que miden lo contrario: que lo que la
+ * pantalla afirma sea alcanzable de verdad desde ella.
  */
-const PROMESA_EN_PRESENTE = /\b(?:re)?gener(?:a|an|amos|as|ás)\b/i
 
 /**
  * `MINIMO_PARA_DETECTAR` está escrito a mano en `plantillas.ts` para no
@@ -343,14 +345,15 @@ describe("explicacionDelEstado", () => {
   })
 
   /**
-   * Que los documentos se armen o se rehagan solos TODAVÍA NO EXISTE (es una
-   * tarea posterior). Describirlo en presente le promete al director algo que
-   * la pantalla no hace. La familia completa, y el porqué, en
-   * `PROMESA_EN_PRESENTE`, arriba.
+   * Y ahora sí lo dice, porque ahora sí pasa. La afirmación es más fuerte que
+   * la anterior y se puede sostener: `activar-version` se NIEGA mientras quede
+   * un asesor activo con el documento de otra versión, así que de una fila
+   * `activa` es cierto que los documentos de los activos son de esta versión.
    */
-  it("activa no promete que los documentos se generen ni se regeneren solos", () => {
+  it("activa dice que los documentos de los activos están hechos con esta versión", () => {
     const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0 })
-    expect(texto).not.toMatch(PROMESA_EN_PRESENTE)
+    expect(texto).toContain("están hechos los documentos de los asesores activos")
+    expect(texto).toContain("subí el Word de la versión nueva")
   })
 
   /**
@@ -390,60 +393,34 @@ describe("explicacionDelEstado", () => {
 })
 
 /**
- * La red que faltaba: todo lo que la pantalla dice, revisado contra
- * `PROMESA_EN_PRESENTE`. El texto de arriba de la pantalla se mudó de
- * `PlantillasTab.tsx` a `plantillas.ts` justamente para que estos tests lo
- * alcancen — ningún test del repo mira los `.tsx`.
+ * Lo que reemplaza a `PROMESA_EN_PRESENTE`, y mide lo contrario que él.
+ *
+ * Aquel prohibía prometer. Estos exigen que lo que la pantalla promete se pueda
+ * hacer DESDE la pantalla: si mañana alguien saca el botón de la versión nueva
+ * y deja el párrafo, el párrafo vuelve a ser una promesa falsa — la misma
+ * clase de falla, entrando por la otra punta.
  */
-describe("nada de lo que se muestra promete en presente algo que todavía no pasa", () => {
-  it("el párrafo de para qué sirve no lo promete", () => {
-    expect(PARA_QUE_SIRVE).not.toMatch(PROMESA_EN_PRESENTE)
+describe("lo que el párrafo de arriba promete se puede hacer desde acá", () => {
+  const FUENTE = readFileSync(path.resolve(__dirname, "../../components/asesor-docs/PlantillasTab.tsx"), "utf8")
+
+  it("cuenta el premio: que PRISMA le genera el documento a cada asesor", () => {
+    // Sin el premio, el director lee un procedimiento y no entiende para qué
+    // apretaría el botón.
+    expect(PARA_QUE_SIRVE).toContain("le genera el documento a cada asesor")
+  })
+
+  it("y cuenta cómo: subir el Word una vez y aplicárselo a todos", () => {
+    expect(PARA_QUE_SIRVE).toContain("subís el Word una sola vez")
   })
 
   /**
-   * Y el otro lado de la moneda: sacar la promesa no puede significar borrar
-   * el premio. Si el director no lee para qué le sirve apretar el botón, no lo
-   * aprieta. Se dice, en futuro.
+   * La otra mitad, y la que de verdad impide que esto vuelva a ser mentira: el
+   * botón que hace lo que el párrafo promete tiene que estar en la pantalla, y
+   * la pantalla que lo hace tiene que estar montada.
    */
-  it("pero sí cuenta lo que PRISMA va a poder hacer", () => {
-    expect(PARA_QUE_SIRVE).toContain("va a generar")
-  })
-
-  it("ninguna explicación de estado lo promete, en ninguna combinación", () => {
-    for (const estado of ["activa", "borrador"] as const) {
-      for (const version of [null, 1, 2]) {
-        for (const enRojo of [0, 1, 5]) {
-          expect(explicacionDelEstado({ estado, version, enRojo })).not.toMatch(PROMESA_EN_PRESENTE)
-        }
-      }
-    }
-  })
-
-  /**
-   * Un patrón que no agarra nada pasa todos los tests de arriba y no protege
-   * de nada. Acá se comprueba contra frases escritas a mano que el patrón
-   * distingue el presente del futuro.
-   */
-  it("el patrón agarra la familia entera y deja pasar el futuro", () => {
-    for (const promesa of [
-      "de ahí en adelante le genera el documento a cada asesor",
-      "los documentos de los asesores se generan con esta versión",
-      "al subir una versión nueva se regenera todo",
-      "los documentos se regeneran solos",
-      "generamos el documento de cada asesor",
-      "vos generás el documento",
-    ]) {
-      expect(promesa).toMatch(PROMESA_EN_PRESENTE)
-    }
-
-    for (const permitido of [
-      "más adelante le va a generar el documento a cada asesor",
-      "lo generará con los datos de cada uno",
-      "falta generarle el documento a cada asesor",
-      "la generación del documento viene después",
-    ]) {
-      expect(permitido).not.toMatch(PROMESA_EN_PRESENTE)
-    }
+  it("el botón de subir la versión nueva existe, y abre la pantalla que la aplica", () => {
+    expect(FUENTE).toContain("Subir versión nueva")
+    expect(FUENTE).toContain("<VersionNueva")
   })
 })
 
@@ -459,11 +436,13 @@ describe("la prosa de la pantalla de revisión", () => {
     SI_ALGUNO_QUEDA_EN_ROJO,
   }
 
-  for (const [nombre, texto] of Object.entries(textos)) {
-    it(`${nombre} no promete en presente algo que todavía no pasa`, () => {
-      expect(texto).not.toMatch(PROMESA_EN_PRESENTE)
-    })
-  }
+  it("ninguno de esos textos quedó vacío al mudarse a lib", () => {
+    // Se mudaron del `.tsx` a `lib` para que los tests los alcancen. Un texto
+    // vacío pasaría cualquier assertion de "no dice X" sin que nadie se entere.
+    for (const [nombre, texto] of Object.entries(textos)) {
+      expect(texto.length, `${nombre} se quedó sin texto`).toBeGreaterThan(40)
+    }
+  })
 
   it("dice con todas las letras que todavía no se guardó nada", () => {
     // Sin esta frase, ver la lista de campos armada se lee como que la
@@ -550,10 +529,6 @@ describe("avisoDeDatoCorto", () => {
   it("el límite: avisa justo en el largo y no uno más", () => {
     expect(avisoDeDatoCorto("x".repeat(LARGO_DE_DATO_CORTO))).not.toBeNull()
     expect(avisoDeDatoCorto("x".repeat(LARGO_DE_DATO_CORTO + 1))).toBeNull()
-  })
-
-  it("no promete en presente algo que todavía no pasa", () => {
-    expect(avisoDeDatoCorto("1")).not.toMatch(PROMESA_EN_PRESENTE)
   })
 })
 
@@ -864,7 +839,10 @@ describe("explicacionDelEstado: el asesor sin comparar", () => {
 
   it("activa y con todos comparados sigue diciendo lo de siempre", () => {
     const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, sinComprobar: 0 })
-    expect(texto).toBe("Está en uso: es la versión confirmada. Con ella se le va a generar el documento a cada asesor.")
+    expect(texto).toBe(
+      "Está en uso: es la versión con la que están hechos los documentos de los asesores activos. Cuando " +
+        "cambie el contrato, subí el Word de la versión nueva desde el botón de acá al lado.",
+    )
   })
 
   it("un borrador con alguien sin comparar también lo dice", () => {
@@ -876,14 +854,6 @@ describe("explicacionDelEstado: el asesor sin comparar", () => {
   it("sin el dato, se comporta como antes", () => {
     // La propiedad es opcional: nadie que ya llamaba a esto se rompe.
     expect(explicacionDelEstado({ estado: "activa", version: 1, enRojo: 0 })).toContain("Está en uso")
-  })
-
-  it("ninguno de los textos nuevos promete en presente algo que no pasa", () => {
-    for (const sinComprobar of [1, 3]) {
-      for (const estado of ["activa", "borrador"] as const) {
-        expect(explicacionDelEstado({ estado, version: 1, enRojo: 0, sinComprobar })).not.toMatch(PROMESA_EN_PRESENTE)
-      }
-    }
   })
 })
 
@@ -912,12 +882,6 @@ describe("textoSinComprobar", () => {
   /** Defensa boba, pero un negativo dibujando un aviso sería peor. */
   it("un número imposible tampoco dice nada", () => {
     expect(textoSinComprobar(-1)).toBeNull()
-  })
-
-  it("no promete en presente algo que todavía no pasa", () => {
-    for (const cuantos of [1, 2, 9]) {
-      expect(textoSinComprobar(cuantos)).not.toMatch(PROMESA_EN_PRESENTE)
-    }
   })
 })
 
@@ -1016,12 +980,6 @@ describe("textoPendientes", () => {
   it("un número imposible tampoco dice nada", () => {
     expect(textoPendientes(-1)).toBeNull()
   })
-
-  it("no promete en presente algo que todavía no pasa", () => {
-    for (const cuantos of [1, 2, 9]) {
-      expect(textoPendientes(cuantos)).not.toMatch(PROMESA_EN_PRESENTE)
-    }
-  })
 })
 
 describe("explicacionDelEstado: el pendiente se nombra, y dice qué hacer", () => {
@@ -1065,16 +1023,9 @@ describe("explicacionDelEstado: el pendiente se nombra, y dice qué hacer", () =
 
   it("en cero no agrega nada", () => {
     expect(explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, pendientes: 0 })).toBe(
-      "Está en uso: es la versión confirmada. Con ella se le va a generar el documento a cada asesor.",
+      "Está en uso: es la versión con la que están hechos los documentos de los asesores activos. Cuando " +
+        "cambie el contrato, subí el Word de la versión nueva desde el botón de acá al lado.",
     )
-  })
-
-  it("tampoco promete en presente", () => {
-    for (const estado of ["activa", "borrador"] as const) {
-      for (const pendientes of [1, 3]) {
-        expect(explicacionDelEstado({ estado, version: 1, enRojo: 0, pendientes })).not.toMatch(PROMESA_EN_PRESENTE)
-      }
-    }
   })
 })
 
@@ -1089,12 +1040,6 @@ describe("textoDesvinculados", () => {
 
   it("en cero no dice nada", () => {
     expect(textoDesvinculados(0)).toBeNull()
-  })
-
-  it("no promete en presente algo que todavía no pasa", () => {
-    for (const cuantos of [1, 2, 9]) {
-      expect(textoDesvinculados(cuantos)).not.toMatch(PROMESA_EN_PRESENTE)
-    }
   })
 })
 
@@ -1195,7 +1140,10 @@ describe("explicacionDelEstado: el desvinculado, con una instrucción que se pue
 
   it("sin desvinculados no aparece nada de esto", () => {
     const texto = explicacionDelEstado({ estado: "activa", version: 2, enRojo: 0, desvinculados: 0 })
-    expect(texto).toBe("Está en uso: es la versión confirmada. Con ella se le va a generar el documento a cada asesor.")
+    expect(texto).toBe(
+      "Está en uso: es la versión con la que están hechos los documentos de los asesores activos. Cuando " +
+        "cambie el contrato, subí el Word de la versión nueva desde el botón de acá al lado.",
+    )
   })
 
   /**
@@ -1228,14 +1176,13 @@ describe("explicacionDelEstado: el desvinculado, con una instrucción que se pue
     expect(texto.indexOf("quedaron")).toBeLessThan(texto.indexOf("desvinculado"))
   })
 
-  it("no promete en presente algo que todavía no pasa, en ninguna combinación", () => {
+  it("nunca queda vacía, en ninguna combinación", () => {
     for (const estado of ["activa", "borrador"] as const) {
       for (const version of [null, 1]) {
         for (const enRojo of [0, 2]) {
           for (const sinComprobar of [0, 1]) {
             for (const desvinculados of [0, 1, 3]) {
               const texto = explicacionDelEstado({ estado, version, enRojo, sinComprobar, desvinculados })
-              expect(texto).not.toMatch(PROMESA_EN_PRESENTE)
               expect(texto.length).toBeGreaterThan(20)
             }
           }
@@ -1269,9 +1216,9 @@ describe("la solapa no se escribe sus propios contadores", () => {
    * trae el dato. Sin `advisor_id` en el select, el balde de los desvinculados
    * queda vacío para siempre y nadie se entera.
    */
-  it("la consulta de documentos trae advisor_id y la de asesores, su estado", () => {
-    expect(FUENTE).toContain('.select("template_id, estado, version_id, advisor_id")')
-    expect(FUENTE).toContain('from("profiles").select("id, estado")')
+  it("la consulta de documentos trae advisor_id y la observación, y la de asesores su nombre", () => {
+    expect(FUENTE).toContain('.select("template_id, estado, version_id, advisor_id, observacion")')
+    expect(FUENTE).toContain('from("profiles").select("id, estado, full_name")')
   })
 })
 

@@ -4,17 +4,21 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileStack, Loader2, RotateCcw, Sparkles, Users, UserMinus, AlertTriangle, Info } from "lucide-react";
+import { FileStack, Loader2, RotateCcw, Sparkles, Users, UserMinus, AlertTriangle, Info, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import { BloqueError } from "@/components/asesor-docs/DocumentosDelAsesor";
 import { RevisionPlantilla } from "@/components/asesor-docs/RevisionPlantilla";
+import { VersionNueva } from "@/components/asesor-docs/VersionNueva";
 import {
   armarFilas,
+  asesoresDeLaPlantilla,
   explicacionDelEstado,
   motivoParaNoDetectar,
+  motivoParaNoSubirVersion,
   PARA_QUE_SIRVE,
   textoDesvinculados,
+  textoPendientes,
   textoSinComprobar,
   type AsesorCrudo,
   type DocumentoCrudo,
@@ -73,6 +77,33 @@ export function PlantillasTab() {
 
   const [detectandoId, setDetectandoId] = useState<string | null>(null);
   const [propuesta, setPropuesta] = useState<{ fila: FilaPlantilla; datos: Propuesta } | null>(null);
+  /**
+   * Qué fila tiene abierta la pantalla de la versión nueva. Una sola por vez:
+   * son dos endpoints que escriben, y dos aplicaciones en paralelo sobre la
+   * misma inmobiliaria no tienen para qué existir.
+   */
+  const [subiendoVersionEn, setSubiendoVersionEn] = useState<string | null>(null);
+  /**
+   * Los crudos se guardan además de las filas armadas: la pantalla de la
+   * versión nueva necesita saber QUIÉNES son los asesores de ese tipo de
+   * documento —con nombre y estado— y eso no entra en un contador. Se cruzan
+   * con `asesoresDeLaPlantilla`, que vive en lib y está bajo test.
+   */
+  const [documentos, setDocumentos] = useState<DocumentoCrudo[]>([]);
+  const [asesores, setAsesores] = useState<Array<AsesorCrudo & { full_name?: string | null }>>([]);
+
+  /** Cuando la lista se cae, los crudos se caen con ella: ver `vaciar`. */
+  const vaciar = useCallback(() => {
+    setFilas([]);
+    /**
+     * Dejar los crudos pegados haría que la pantalla de la versión nueva
+     * pudiera abrirse con una lista de asesores vieja — y esa lista decide a
+     * quién se le escribe un contrato.
+     */
+    setDocumentos([]);
+    setAsesores([]);
+    setSubiendoVersionEn(null);
+  }, []);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -94,7 +125,13 @@ export function PlantillasTab() {
         // `advisor_id` tampoco: sin él no se sabe si el dueño del documento
         // sigue en la inmobiliaria, y el de un desvinculado se quedaba con un
         // aviso ámbar que no se apagaba nunca.
-        supabase.from("advisor_documents").select("template_id, estado, version_id, advisor_id"),
+        //
+        // Y `observacion` no se MUESTRA acá —es un párrafo largo por asesor y
+        // va en su ficha— pero sí se mira: es el único lugar donde consta que
+        // a un asesor que quedó en rojo le falta ADEMÁS un dato de la versión
+        // nueva. Sin ella ese caso no cae en ningún balde y la solapa no lo
+        // nombra en ningún lado. Ver `esperaUnDato` en lib.
+        supabase.from("advisor_documents").select("template_id, estado, version_id, advisor_id, observacion"),
       ]);
 
       if (t.error || v.error || d.error) {
@@ -102,7 +139,7 @@ export function PlantillasTab() {
         // esto es lo único que le queda a quien tenga que investigar.
         console.error("[PlantillasTab] error al cargar:", t.error?.message, v.error?.message, d.error?.message);
         setErrorCarga("No se pudo cargar la lista de plantillas. Puede ser un problema de conexión — probá de nuevo.");
-        setFilas([]);
+        vaciar();
         return;
       }
 
@@ -118,9 +155,15 @@ export function PlantillasTab() {
        * no son dueños de ninguno de estos documentos.
        */
       const idsDeAsesores = [...new Set(documentos.map((doc) => doc.advisor_id))];
+      /**
+       * `full_name` entra porque la pantalla de la versión nueva le pide al
+       * director que ELIJA a una persona y después le muestra fila por fila
+       * cómo le fue a cada una. Un uuid no le dice nada a nadie, y el nombre
+       * del archivo no es el nombre de la persona.
+       */
       const p = idsDeAsesores.length
-        ? await supabase.from("profiles").select("id, estado").in("id", idsDeAsesores)
-        : { data: [] as AsesorCrudo[], error: null };
+        ? await supabase.from("profiles").select("id, estado, full_name").in("id", idsDeAsesores)
+        : { data: [] as Array<AsesorCrudo & { full_name?: string | null }>, error: null };
 
       if (p.error) {
         /**
@@ -131,16 +174,19 @@ export function PlantillasTab() {
          */
         console.error("[PlantillasTab] error al leer los asesores:", p.error.message);
         setErrorCarga("No se pudo cargar la lista de plantillas. Puede ser un problema de conexión — probá de nuevo.");
-        setFilas([]);
+        vaciar();
         return;
       }
 
+      const perfiles = (p.data ?? []) as Array<AsesorCrudo & { full_name?: string | null }>;
+      setDocumentos(documentos);
+      setAsesores(perfiles);
       setFilas(
         armarFilas({
           tipos: (t.data ?? []) as TipoCrudo[],
           versiones: (v.data ?? []) as VersionCruda[],
           documentos,
-          asesores: (p.data ?? []) as AsesorCrudo[],
+          asesores: perfiles,
         }),
       );
     } catch (e) {
@@ -153,7 +199,7 @@ export function PlantillasTab() {
        */
       console.error("[PlantillasTab] excepción al cargar:", e);
       setErrorCarga("No se pudo cargar la lista de plantillas. Puede ser un problema de conexión — probá de nuevo.");
-      setFilas([]);
+      vaciar();
     } finally {
       setCargando(false);
     }
@@ -265,6 +311,7 @@ export function PlantillasTab() {
               fila={fila}
               detectando={detectandoId === fila.templateId}
               onDetectar={() => detectar(fila)}
+              onSubirVersion={() => setSubiendoVersionEn(fila.templateId)}
             >
               {propuesta?.fila.templateId === fila.templateId && (
                 /* La revisión es OBLIGATORIA antes de guardar (spec §7.2):
@@ -275,6 +322,19 @@ export function PlantillasTab() {
                   propuesta={propuesta.datos}
                   onCerrar={() => setPropuesta(null)}
                   onConfirmado={cargar}
+                />
+              )}
+              {subiendoVersionEn === fila.templateId && (
+                /* La versión nueva (spec §7.4 y §7.5): subir el Word, verlo, y
+                   aplicárselo a cada asesor. Los asesores se cruzan acá y no
+                   adentro: la pantalla no consulta la base, recibe la lista ya
+                   armada por una función que está bajo test. */
+                <VersionNueva
+                  templateId={fila.templateId}
+                  nombreDelTipo={fila.nombre}
+                  asesores={asesoresDeLaPlantilla({ templateId: fila.templateId, documentos, asesores })}
+                  onCerrar={() => setSubiendoVersionEn(null)}
+                  onAplicado={cargar}
                 />
               )}
             </FilaDeLaSolapa>
@@ -310,11 +370,14 @@ export function FilaDeLaSolapa({
   fila,
   detectando,
   onDetectar,
+  onSubirVersion,
   children,
 }: {
   fila: FilaPlantilla;
   detectando: boolean;
   onDetectar: () => void;
+  /** Abre la pantalla de la versión nueva. Opcional para poder dibujar la fila sola. */
+  onSubirVersion?: () => void;
   children?: React.ReactNode;
 }) {
   /**
@@ -325,7 +388,9 @@ export function FilaDeLaSolapa({
    * comparaba 2.
    */
   const motivo = motivoParaNoDetectar(fila.participan, fila.documentos);
+  const motivoVersion = motivoParaNoSubirVersion(fila);
   const avisoSinComprobar = textoSinComprobar(fila.sinComprobar);
+  const avisoPendientes = textoPendientes(fila.pendientes);
   const avisoDesvinculados = textoDesvinculados(fila.desvinculados);
 
   return (
@@ -341,23 +406,43 @@ export function FilaDeLaSolapa({
           <p className="text-xs text-muted-foreground max-w-2xl">{explicacionDelEstado(fila)}</p>
         </div>
 
-        <Button
-          className="shrink-0 gap-2 self-start"
-          // Deshabilitado por el mínimo de documentos, o mientras
-          // corre. El PORQUÉ se escribe abajo, siempre visible.
-          //
-          // Y SOLO abajo: acá había además un `title={motivo}` que no
-          // se mostraba nunca. Un botón deshabilitado de shadcn lleva
-          // `pointer-events: none`, así que el navegador no registra
-          // el mouse encima y jamás dibuja el tooltip — verificado.
-          // En el celular tampoco hay dónde pasar el mouse. Dejarlo
-          // hacía creer que el motivo estaba cubierto por ahí.
-          disabled={motivo !== null || detectando}
-          onClick={onDetectar}
-        >
-          {detectando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {detectando ? "Comparando…" : "Detectar plantilla"}
-        </Button>
+        <div className="shrink-0 flex flex-wrap items-center gap-2 self-start">
+          <Button
+            className="gap-2"
+            // Deshabilitado por el mínimo de documentos, o mientras
+            // corre. El PORQUÉ se escribe abajo, siempre visible.
+            //
+            // Y SOLO abajo: acá había además un `title={motivo}` que no
+            // se mostraba nunca. Un botón deshabilitado de shadcn lleva
+            // `pointer-events: none`, así que el navegador no registra
+            // el mouse encima y jamás dibuja el tooltip — verificado.
+            // En el celular tampoco hay dónde pasar el mouse. Dejarlo
+            // hacía creer que el motivo estaba cubierto por ahí.
+            disabled={motivo !== null || detectando}
+            onClick={onDetectar}
+          >
+            {detectando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {detectando ? "Comparando…" : "Detectar plantilla"}
+          </Button>
+
+          {/* La versión nueva (spec §7.4): es LO QUE ESTA ETAPA VINO A HACER,
+              cambiar el contrato una vez y que se rehaga el documento de todos
+              sin volver a subirlo asesor por asesor. Va al lado de detectar y
+              no escondido en un menú.
+
+              Se apaga cuando no hay una versión vigente contra la cual
+              comparar, y el motivo se escribe abajo con el otro: mismo motivo
+              que el de detectar para no ponerlo en un tooltip. */}
+          <Button
+            variant="outline"
+            className="gap-2"
+            disabled={motivoVersion !== null || detectando}
+            onClick={onSubirVersion}
+          >
+            <FileUp className="h-4 w-4" />
+            Subir versión nueva
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -401,6 +486,19 @@ export function FilaDeLaSolapa({
             {avisoSinComprobar}
           </span>
         )}
+        {/* El cuarto balde: a esa persona le falta un dato que la versión
+            nueva trajo, así que sigue con la versión anterior (spec §7.4.2).
+            No es rojo —no hay nada roto— pero es lo que traba poner la versión
+            en uso, y sin este renglón el director no tiene de dónde sacarlo.
+
+            El texto lo arma `textoPendientes`, que vive en lib y sí está bajo
+            test. Escrito a mano en el JSX no lo miraría nadie. */}
+        {avisoPendientes && (
+          <span className="flex items-center gap-1.5 text-amber-600 font-medium">
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {avisoPendientes}
+          </span>
+        )}
         {/* Los desvinculados van aparte del ámbar de arriba, y sin
             color de alarma a propósito: no hay nada roto ni nada que
             comprobar: hay documentos que sobran. Metidos en el mismo
@@ -421,6 +519,16 @@ export function FilaDeLaSolapa({
         <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
           <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <span>{motivo}</span>
+        </p>
+      )}
+
+      {/* Y el del otro botón. Los dos se dicen, no el primero: son dos botones
+          apagados por motivos distintos, y con uno solo escrito el director se
+          queda mirando el otro sin saber qué le falta. */}
+      {motivoVersion && (
+        <p className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+          <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+          <span>{motivoVersion}</span>
         </p>
       )}
 
