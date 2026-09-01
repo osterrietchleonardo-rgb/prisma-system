@@ -7,17 +7,9 @@
 // matricula equivocada expone mas que no tener ninguno. Aca el texto se dibuja de verdad: sale
 // exacto, del largo que sea.
 //
-// POR QUE LAS LETRAS SON FORMAS Y NO TEXTO: el runtime de Vercel no tiene fuentes instaladas,
-// asi que un <text> de SVG sale como cuadraditos vacios (medido contra produccion). Cada letra
-// se convierte a su contorno con opentype.js y viaja como <path>. No hay ninguna fuente que
-// resolver en el servidor.
-// Import con nombre y no por defecto: opentype.js no tiene export por defecto en su build
-// ESM, que es el que usa el runtime del servidor de Next. Con `import opentype from ...` el
-// objeto llega undefined y revienta recien al generar la primera placa, no al compilar.
+// Como se dibujan las letras (y por que no son texto) esta en lib/tipografia/contornos.ts.
 import sharp from "sharp";
-import { parse as leerFuente } from "opentype.js";
-import type { Font, Glyph } from "opentype.js";
-import { INTER_REGULAR_WOFF } from "./fuente-inter";
+import { anchoDelTexto, comoPaths, contornosDeTexto } from "@/lib/tipografia/contornos";
 
 // Todo se mide contra un ancho de referencia de 1080 px (el lado de una placa de Instagram) y
 // despues se escala, asi la franja se ve igual en un post cuadrado que en una historia.
@@ -41,59 +33,6 @@ const OPACIDAD_FRANJA = 0.62;
 const COLOR_TEXTO = "#ffffff";
 const OPACIDAD_TEXTO = 0.93;
 
-let fuenteCache: Font | null = null;
-
-function fuente(): Font {
-  if (!fuenteCache) {
-    const b = INTER_REGULAR_WOFF;
-    fuenteCache = leerFuente(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
-  }
-  return fuenteCache;
-}
-
-// Se arma glifo por glifo en vez de usar font.getPath(). El motor de shaping de opentype.js se
-// cuelga con las tablas de Inter ("substFormat: 2 is not yet supported") y con las fuentes
-// variables devuelve coordenadas NaN que rompen el dibujo entero. Letra por letra no se toca
-// nada de eso, y para un texto legal en castellano no hace falta shaping.
-function anchoDe(texto: string, cuerpo: number): number {
-  const f = fuente();
-  const escala = cuerpo / f.unitsPerEm;
-  let x = 0;
-  let previo: Glyph | null = null;
-  for (const ch of texto) {
-    const g = f.charToGlyph(ch);
-    if (previo) x += f.getKerningValue(previo, g) * escala;
-    x += (g.advanceWidth ?? 0) * escala;
-    previo = g;
-  }
-  return x;
-}
-
-/** Cuenta las letras que opentype.js devolvio rotas desde el ultimo armado. */
-let letrasRotas = 0;
-
-function pathDe(texto: string, x0: number, y: number, cuerpo: number): string[] {
-  const f = fuente();
-  const escala = cuerpo / f.unitsPerEm;
-  let x = x0;
-  let previo: Glyph | null = null;
-  const partes: string[] = [];
-  for (const ch of texto) {
-    const g = f.charToGlyph(ch);
-    if (previo) x += f.getKerningValue(previo, g) * escala;
-    // Un decimal alcanza y sobra para una letra de 15 px, y achica el archivo un 20%.
-    const d = g.getPath(x, y, cuerpo).toPathData(1);
-    // Ninguna letra con NaN llega al dibujo: el rasterizador abandona el <path> apenas lo ve y
-    // todo lo que viene despues desaparece sin ningun error. Aislada en su propio <path>, una
-    // letra rota se lleva puesta como mucho a si misma. Ver POR QUE EL CUERPO ES ENTERO.
-    if (d && d.includes("NaN")) letrasRotas++;
-    else if (d) partes.push(d);
-    x += (g.advanceWidth ?? 0) * escala;
-    previo = g;
-  }
-  return partes;
-}
-
 // Respeta los saltos de linea que haya escrito el director (suelen separar el aviso de la firma
 // de la agencia) y acomoda cada parrafo dentro del ancho disponible.
 function repartirEnRenglones(texto: string, cuerpo: number, anchoUtil: number): string[] {
@@ -106,17 +45,17 @@ function repartirEnRenglones(texto: string, cuerpo: number, anchoUtil: number): 
     let actual = "";
     for (const palabra of limpio.split(" ")) {
       const tentativa = actual ? `${actual} ${palabra}` : palabra;
-      if (anchoDe(tentativa, cuerpo) <= anchoUtil) {
+      if (anchoDelTexto(tentativa, cuerpo) <= anchoUtil) {
         actual = tentativa;
         continue;
       }
       if (actual) renglones.push(actual);
 
       // Una sola palabra mas larga que el renglon (una URL, por ejemplo): se parte a lo bruto.
-      if (anchoDe(palabra, cuerpo) > anchoUtil) {
+      if (anchoDelTexto(palabra, cuerpo) > anchoUtil) {
         let trozo = "";
         for (const ch of palabra) {
-          if (anchoDe(trozo + ch, cuerpo) > anchoUtil && trozo) {
+          if (anchoDelTexto(trozo + ch, cuerpo) > anchoUtil && trozo) {
             renglones.push(trozo);
             trozo = ch;
           } else {
@@ -197,7 +136,7 @@ export async function armarFranjaLegal(
 
   if (!renglones.length) return null;
 
-  letrasRotas = 0;
+  let letrasRotas = 0;
 
   const altoSvg = Math.ceil(altoFranja);
   const altoRenglon = Math.ceil(cuerpo * INTERLINEA);
@@ -213,9 +152,9 @@ export async function armarFranjaLegal(
   // SVG directo a composite() deja renglones incompletos.
   const capas = await Promise.all(
     renglones.map(async (r, i) => {
-      const paths = pathDe(r, margenX, cuerpo * 0.82, cuerpo)
-        .map((d) => `<path d="${d}" fill="${COLOR_TEXTO}" fill-opacity="${OPACIDAD_TEXTO}"/>`)
-        .join("");
+      const c = contornosDeTexto(r, margenX, cuerpo * 0.82, cuerpo);
+      letrasRotas += c.letrasRotas;
+      const paths = comoPaths(c.paths, COLOR_TEXTO, OPACIDAD_TEXTO);
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ancho}" height="${altoRenglon}">${paths}</svg>`;
       return {
         input: await sharp(Buffer.from(svg)).png().toBuffer(),
