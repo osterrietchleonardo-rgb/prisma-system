@@ -651,8 +651,9 @@ describe("1. que sus datos hayan aterrizado", () => {
   it("frena y no escribe NADA de esa persona", async () => {
     soloEnLaNota()
     const r = await pedir()
-    expect(r.status).toBe(409)
+    /** La conducta PRIMERO: es el testigo. El status es el corolario. */
     expect(nadaSeEscribioDe(BRUNO)).toEqual(COMO_ESTABA)
+    expect(r.status).toBe(409)
   })
 
   it("es esta comprobación la que actuó, y no otra", async () => {
@@ -688,8 +689,9 @@ describe("2. que no se le haya colado el dato de otro", () => {
   it("frena y no escribe NADA de esa persona", async () => {
     conElCuitDeAna()
     const r = await pedir()
-    expect(r.status).toBe(409)
+    /** La conducta PRIMERO: es el testigo. El status es el corolario. */
     expect(nadaSeEscribioDe(BRUNO)).toEqual(COMO_ESTABA)
+    expect(r.status).toBe(409)
   })
 
   it("es esta comprobación la que actuó, y nombra al dueño del dato", async () => {
@@ -732,8 +734,9 @@ describe("3. que no quede un hueco sin rellenar", () => {
   it("frena y no escribe NADA de esa persona", async () => {
     conUnHuecoEnElDato()
     const r = await pedir()
-    expect(r.status).toBe(409)
+    /** La conducta PRIMERO: es el testigo. El status es el corolario. */
     expect(nadaSeEscribioDe(BRUNO)).toEqual(COMO_ESTABA)
+    expect(r.status).toBe(409)
   })
 
   it("es esta comprobación la que actuó, y muestra el hueco tal como se ve", async () => {
@@ -765,8 +768,9 @@ describe("4. la cuenta cruzada, acá como freno (el caso Palermo)", () => {
   it("frena y no escribe NADA de esa persona", async () => {
     conLaZonaDosVeces()
     const r = await pedir()
-    expect(r.status).toBe(409)
+    /** La conducta PRIMERO: es el testigo. El status es el corolario. */
     expect(nadaSeEscribioDe(BRUNO)).toEqual(COMO_ESTABA)
+    expect(r.status).toBe(409)
   })
 
   it("es esta comprobación la que actuó, y dice cuántas apariciones sobran", async () => {

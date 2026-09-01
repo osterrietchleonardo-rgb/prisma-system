@@ -183,9 +183,10 @@ describe("LA REGLA: se niega si queda alguien activo atrás", () => {
   it("con un asesor activo en la versión vieja, no escribe NADA", async () => {
     base.documentos[1].version_id = VER_VIEJA
     const r = await pedir()
-    expect(r.status).toBe(409)
+    /** La conducta PRIMERO: es el testigo. El status es el corolario. */
     expect(base.tipos[0].version_actual).toBe(VER_VIEJA)
     expect(base.escrituras).toEqual([])
+    expect(r.status).toBe(409)
   })
 
   it("y lo nombra, con nombre de persona", async () => {
@@ -199,8 +200,8 @@ describe("LA REGLA: se niega si queda alguien activo atrás", () => {
   it("un asesor sin ninguna versión también frena", async () => {
     base.documentos[1].version_id = null
     const r = await pedir()
-    expect(r.status).toBe(409)
     expect(base.tipos[0].version_actual).toBe(VER_VIEJA)
+    expect(r.status).toBe(409)
   })
 
   /**
@@ -212,8 +213,8 @@ describe("LA REGLA: se niega si queda alguien activo atrás", () => {
     base.documentos[1].version_id = VER_VIEJA
     base.documentos[1].estado = "pendiente"
     const r = await pedir()
-    expect(r.status).toBe(409)
     expect(base.tipos[0].version_actual).toBe(VER_VIEJA)
+    expect(r.status).toBe(409)
   })
 })
 
@@ -238,8 +239,8 @@ describe("los pausados y desvinculados no frenan (spec §7.5)", () => {
     base.documentos[1].version_id = VER_VIEJA
     base.perfiles = base.perfiles.filter((p) => p.id !== BRUNO)
     const r = await pedir()
-    expect(r.status).toBe(409)
     expect(base.tipos[0].version_actual).toBe(VER_VIEJA)
+    expect(r.status).toBe(409)
   })
 })
 
