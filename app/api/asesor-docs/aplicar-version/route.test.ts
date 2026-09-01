@@ -1300,3 +1300,71 @@ describe("la cuenta cruzada avisa del dato que también es texto fijo", () => {
     expect(cuerpo.match(/\{\{ZONA\}\}/g) ?? []).toHaveLength(2)
   })
 })
+
+// ---------------------------------------------------------------------------
+// EL TESTIGO QUE AÍSLA A LA PRUEBA CON CENTINELAS
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ Qué cuida este test que ningún otro cuida ═══
+ *
+ * La prueba con datos centinela y el ida y vuelta del §7.4.5 disparaban siempre
+ * juntos, así que ningún test decía cuál de las dos actuaba: la mutación quedaba
+ * cazada por el TEXTO del mensaje, no por la conducta.
+ *
+ * Este escenario las separa. El dato de un campo —"Anabel"— es pedazo de otra
+ * palabra del contrato —"Anabella"—, y ahí `ponerHueco` NO tiene que tocar nada:
+ * es la regla de borde de palabra que `docx.ts` documenta. Si esa regla se
+ * rompiera:
+ *
+ *  · `valoresQueSobrevivenEnElMolde` seguiría **verde**: "Anabel" ya no está en
+ *    ninguna parte del molde, se lo llevó el reemplazo de más;
+ *  · el ida y vuelta seguiría **verde**: rellenar con "Anabel" devuelve
+ *    "Anabella" y el documento vuelve igualito;
+ *  · la prueba con centinelas quedaría en **rojo**, porque la simulación sobre
+ *    texto plano —que sí respeta el borde— no toca "Anabella" y el molde sí.
+ *
+ * O sea: **este es el caso donde la centinela es la única que puede hablar.**
+ * Medido con una mutación de `partePalabra` en `lib/plantillas/docx.ts`, que
+ * pone este test en rojo con el mensaje de `moldeNoResisteLaPrueba`.
+ */
+describe("la prueba con centinelas, aislada de la del ida y vuelta", () => {
+  const conUnDatoQueEsPedazoDeOtraPalabra = () =>
+    docx([
+      parrafo("CONTRATO DE PARTNERSHIP COMERCIAL INMOBILIARIO — EDICION 2027"),
+      parrafo("Y por la otra parte Ana Ruiz, mayor de edad, CUIT 27-31456789-4, en adelante EL ASESOR."),
+      parrafo("Se asigna a EL ASESOR la zona de Villa Urquiza, con captacion preferente."),
+      parrafo("Las firmas las certifica la escribana Anabel."),
+      parrafo("El estudio Anabella y Asociados interviene como tercero."),
+      parrafo("Aclaracion de la firma de EL ASESOR: Ana Ruiz"),
+    ])
+
+  const conLaEscribana = () => {
+    base.documentos[0].form_data = { ...DATOS_DE_ANA, ESCRIBANA: "Anabel" }
+    base.versiones[0].campos_schema = [...SCHEMA_VIGENTE, { nombre: "ESCRIBANA", label: "Escribana", orden: 3 }]
+  }
+
+  it("el dato que es pedazo de otra palabra se marca donde va, y NO adentro de la otra", async () => {
+    conLaEscribana()
+    const r = await pedir({ zip: conUnDatoQueEsPedazoDeOtraPalabra() })
+    expect(r.status).toBe(200)
+
+    const guardado = base.archivos.get(`asesores/${AGENCIA}/_plantillas/${TIPO}/v2.docx`)!
+    const cuerpo = new PizZip(guardado).file("word/document.xml")!.asText()
+
+    // El hueco entró una sola vez: donde el dato era el dato.
+    expect(cuerpo.match(/\{\{ESCRIBANA\}\}/g) ?? []).toHaveLength(1)
+    // Y el estudio quedó intacto: no es el dato de nadie.
+    expect(cuerpo).toContain("Anabella")
+  })
+
+  it("y el documento del asesor vuelve igualito, que es lo que mira el ida y vuelta", async () => {
+    conLaEscribana()
+    const r = await pedir({ zip: conUnDatoQueEsPedazoDeOtraPalabra() })
+    expect(r.status).toBe(200)
+
+    const vista = r.cuerpo.vistaPrevia as { texto: string }
+    expect(vista.texto).toContain("la escribana Anabel.")
+    expect(vista.texto).toContain("El estudio Anabella y Asociados")
+  })
+})
