@@ -435,7 +435,7 @@ Justo debajo, el bloque **Agente de seguimiento** muestra las últimas decisione
 1. **Crear Anuncio:** el generador principal (ver abajo).
 2. **Fotos:** arregla las fotos de una propiedad (ver abajo).
 3. **Clientes Ideales (IPC):** donde creás y administrás tus perfiles de cliente ideal.
-4. **Mi Forma de Trabajar:** tu operación real y tus 2 ofertas irresistibles (ver abajo).
+4. **Mi ADN:** tu operación real y tus 2 ofertas irresistibles (ver abajo).
 5. **Historial / Galería:** con dos vistas — **Anuncios y copys** (todo lo generado, agrupado por tanda: lo ves, editás el texto, descargás la imagen y lo borrás) y **Fotos retocadas** (las fotos de propiedades que trabajaste).
 6. **Guía Mágica:** una guía práctica de 5 fases para hacer campañas de captación de leads de calidad en Meta (Facebook/Instagram) Ads: segmentación, el anuncio, el formulario "filtro de oro", retargeting y medición. Es material de lectura, no genera nada.
 7. **Configuración IA:** los ajustes de marca de la agencia (solo director, ver abajo).
@@ -448,7 +448,7 @@ Justo debajo, el bloque **Agente de seguimiento** muestra las últimas decisione
 3. Apretás el botón de generar: en una sola acción la IA crea **3 variantes** usando 3 ángulos distintos (PAS, Transformación y Autoridad/Datos), para que elijas la que mejor convierta.
 4. El resultado queda en la pestaña **Historial / Galería**.
 
-**Mi Forma de Trabajar (tu oferta irresistible):**
+**Mi ADN (tu oferta irresistible):**
 Es un formulario que se completa **una sola vez** y es **de cada persona**: la tuya es tuya y la de cada asesor es suya (los números tienen que ser de quien habla en el anuncio). Cargás cómo trabajás —a qué porcentaje de tu tasación cerrás, cuántos compradores tenés en base, en cuánto entregás la tasación, qué te bancás vos para que el dueño no mueva un dedo, tus casos reales— y la IA te arma **2 ofertas irresistibles**: una para captar propietarios y otra para vender. Esas ofertas después entran solas en todos tus anuncios y guiones.
 
 > ⚠️ Los números que se cargan **salen publicados**. Vale la pena que le pidas a tu equipo que cargue los reales.

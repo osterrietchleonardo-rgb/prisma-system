@@ -13,7 +13,7 @@ describe("catálogo de campos de la forma de trabajar", () => {
     expect(CAMPOS_CAPTACION).toHaveLength(7)
     // Venta: rebaja + off-market cuentan como 2 campos separados (la pregunta 2 se parte en dos)
     expect(CAMPOS_VENTA).toHaveLength(6)
-    expect(CAMPOS_PERFIL).toHaveLength(8)
+    expect(CAMPOS_PERFIL).toHaveLength(7)
   })
 
   it("no repite nombres de campo dentro de cada bloque", () => {

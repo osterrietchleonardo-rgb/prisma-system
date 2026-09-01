@@ -15,8 +15,7 @@ export interface CampoOperacion {
 
 export const CAMPOS_PERFIL: CampoOperacion[] = [
   { name: "anios_experiencia", label: "¿Cuántos años hace que trabajás en el rubro?", placeholder: "Ej: 8 años", etiquetaPrompt: "Años de experiencia", multilinea: false },
-  { name: "matricula", label: "Matrícula o colegio (si corresponde)", placeholder: "Ej: CUCICBA 1234", etiquetaPrompt: "Matrícula", multilinea: false },
-  { name: "zona_dominio", label: "¿En qué zona conocés cada cuadra?", placeholder: "Ej: Caballito, Flores y Almagro", etiquetaPrompt: "Zona que domina", multilinea: false },
+  { name: "zona_dominio", label: "¿En qué zona sos experto?", placeholder: "Ej: Caballito, Flores y Almagro", etiquetaPrompt: "Zona que domina", multilinea: false },
   { name: "especialidad", label: "¿En qué te especializás?", placeholder: "Ej: departamentos usados de 2 y 3 ambientes", etiquetaPrompt: "Especialidad", multilinea: false },
   { name: "operaciones_cerradas", label: "¿Cuántas operaciones cerraste en tu carrera?", placeholder: "Ej: más de 300", etiquetaPrompt: "Operaciones cerradas en su carrera", multilinea: false },
   { name: "casos_reales", label: "Contá 2 o 3 casos reales: zona, qué pasó y con qué resultado", placeholder: "Ej: Un PH en Flores que estaba publicado hacía 11 meses; lo republicamos con fotos nuevas y precio corregido, y se vendió en 34 días al 96% del pedido.", etiquetaPrompt: "Casos reales (prueba social)", multilinea: true },

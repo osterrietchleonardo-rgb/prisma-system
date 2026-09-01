@@ -86,7 +86,6 @@ export function FotosIA() {
   const [resultado, setResultado] = useState<string | null>(null)
   const [relevamiento, setRelevamiento] = useState<any>(null)
   const [referencia, setReferencia] = useState<string | null>(null)
-  const [costo, setCosto] = useState(0)
   const [aviso, setAviso] = useState<string | null>(null)
 
   // ── Retoque sobre el resultado ─────────────────────────────────────
@@ -120,7 +119,6 @@ export function FotosIA() {
       setCambios([])
       setPedidoSuelto("")
       setAviso(null)
-      setCosto(0)
       setPaso("resultado")
     }
     // Al montar puede haber una foto esperando: el panel estaba desmontado
@@ -170,7 +168,6 @@ export function FotosIA() {
     setPaso("trabajando")
     setHechos([])
     setAviso(null)
-    setCosto(0)
     setCambios([])
 
     let actual = fotoElegida
@@ -179,7 +176,6 @@ export function FotosIA() {
     // la foto legible para el inventario.
     let ref: string = fotoElegida
     let rel: any = null
-    let acumulado = 0
     const sinAprobar: string[] = []
 
     try {
@@ -207,7 +203,6 @@ export function FotosIA() {
         } else {
           rel = data.relevamiento
         }
-        acumulado += data.costo_usd || 0
         if (!data.aprobado) sinAprobar.push(modo)
         setHechos((h) => [...h, modo])
       }
@@ -215,7 +210,6 @@ export function FotosIA() {
       setResultado(actual)
       setReferencia(ref)
       setRelevamiento(rel)
-      setCosto(acumulado)
       avisarGaleria()
       if (sinAprobar.length) {
         setAviso("Alguna parte quedó con detalles: mirala bien antes de publicarla.")
@@ -252,7 +246,6 @@ export function FotosIA() {
       setResultado(data.url)
       setCambios([])
       setPedidoSuelto("")
-      setCosto((c) => c + (data.costo_usd || 0))
       avisarGaleria()
       setAviso(data.aprobado ? null : "El retoque quedó con detalles: revisalo.")
       toast.success("Retoque aplicado")
@@ -507,9 +500,6 @@ export function FotosIA() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <Encabezado titulo="Así quedó" bajada="Compará con la original. Si algo no te cierra, marcalo abajo y pedí el cambio." />
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="font-mono text-xs">
-            US$ {costo.toFixed(2)}
-          </Badge>
           <Button variant="outline" size="sm" asChild>
             <a href={resultado ?? "#"} download target="_blank" rel="noreferrer">
               <Download className="w-4 h-4 mr-2" /> Descargar

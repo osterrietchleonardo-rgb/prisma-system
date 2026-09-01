@@ -59,7 +59,7 @@ export default function MarketingIAPage() {
             <UserSearch className="w-4 h-4 mr-2" /> Clientes Ideales (IPC)
           </TabsTrigger>
           <TabsTrigger value="forma-trabajo" className="text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
-            <Briefcase className="w-4 h-4 mr-2" /> Mi Forma de Trabajar
+            <Briefcase className="w-4 h-4 mr-2" /> Mi ADN
           </TabsTrigger>
           <TabsTrigger value="history" className="text-xs sm:text-md font-bold data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-lg whitespace-nowrap">
             <History className="w-4 h-4 mr-2" /> Mis Generaciones

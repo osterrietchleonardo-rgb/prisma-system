@@ -9,7 +9,6 @@ const base: AdvisorOperation = {
     anios_experiencia: "8 años",
     casos_reales: "Un PH en Flores parado 11 meses, vendido en 34 dias",
     no_prometer: "Nunca prometer un plazo exacto de venta",
-    matricula: "",
     zona_dominio: "",
     especialidad: "",
     operaciones_cerradas: "",

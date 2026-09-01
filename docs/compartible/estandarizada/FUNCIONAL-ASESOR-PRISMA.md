@@ -345,14 +345,14 @@ Al abrir un chat, en **Información del contacto** (el ícono de la persona arri
 
 **Qué es:** un generador de contenido publicitario con inteligencia artificial (la pantalla se titula "Marketing IA Asesor").
 
-**Tiene 6 pestañas:** Crear Anuncio · **Fotos** · Clientes Ideales (IPC) · Mi Forma de Trabajar · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
+**Tiene 6 pestañas:** Crear Anuncio · **Fotos** · Clientes Ideales (IPC) · Mi ADN · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
 
 **Cómo usarlo paso a paso:**
 1. En **Clientes Ideales (IPC)** creás un **perfil IPC** (Cliente Ideal). Elegís el objetivo:
    - **Captar** (conseguir propietarios que quieran vender), o
    - **Vender** (atraer compradores para una propiedad).
    Después completás los datos del perfil paso a paso (motivo, urgencia, ángulo, tono, llamada a la acción, nivel de conciencia, etc.).
-2. En **Mi Forma de Trabajar** cargás **cómo trabajás vos** (ver más abajo). Se hace **una sola vez** y es lo que hace que tus anuncios dejen de sonar genéricos.
+2. En **Mi ADN** cargás **cómo trabajás vos** (ver más abajo). Se hace **una sola vez** y es lo que hace que tus anuncios dejen de sonar genéricos.
 3. En **Crear Anuncio** elegís el **IPC** y el **tipo de copy**:
    - **Video/Reel** → te salen **3 guiones para hablar a cámara** (sin imágenes). Elegís además la **estructura del guión** o dejás "Sugerida" y la elegimos por vos.
    - **Post/Texto** → como siempre: elegís **formato de imagen** (Reels, Post o Historia) y **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante), y te salen 3 anuncios completos (texto + imagen).
@@ -389,12 +389,12 @@ Al abrir un chat, en **Información del contacto** (el ícono de la persona arri
 > 💰 Cada paso consume **3 créditos**. Los tres modos juntos son 9.
 
 
-### Mi Forma de Trabajar (tu oferta irresistible)
+### Mi ADN (tu oferta irresistible)
 
 **Para qué sirve:** el IPC dice *a quién* le hablás. Esta pestaña dice *quién sos vos y por qué te tienen que elegir a vos y no a la inmobiliaria de la otra cuadra*. Con tus datos, la IA te arma **dos ofertas irresistibles**: una para **captar** (dueños que quieren vender) y otra para **vender** (gente que quiere comprar). Después esas ofertas se meten solas en todos tus anuncios.
 
 **Son 4 pasos:**
-1. **Mi perfil** (opcional, pero es el que más suma): años en el rubro, matrícula, la zona que conocés de memoria, en qué te especializás, cuántas operaciones cerraste, **2 o 3 casos reales** tuyos y qué incluye tu servicio. También hay un campo para decir **qué NO se puede prometer nunca** en tus anuncios: la IA lo respeta a rajatabla.
+1. **Mi perfil** (opcional, pero es el que más suma): años en el rubro, la zona en la que sos experto, en qué te especializás, cuántas operaciones cerraste, **2 o 3 casos reales** tuyos y qué incluye tu servicio. También hay un campo para decir **qué NO se puede prometer nunca** en tus anuncios: la IA lo respeta a rajatabla.
 2. **Captación:** cuántas propiedades vendiste en los últimos 6 meses, a qué porcentaje de tu tasación se cerraron, cuántos compradores tenés en tu base, en cuánto entregás la tasación, cuánto tardás en conseguir la primera oferta y qué te bancás vos para que el dueño no mueva un dedo.
 3. **Venta:** qué hacés para que el comprador esté seguro de que no paga de más, cuánta rebaja conseguís, cuántas exclusivas tenés, en cuánto le mandás la primera selección, en cuántas semanas reserva y qué trámites le sacás de encima.
 4. **Mis 2 ofertas:** apretás **"Generar mis 2 ofertas"** y la IA te las escribe con tus números. Las podés **corregir a mano** y guardar. Si más adelante cambian tus números, las regenerás.

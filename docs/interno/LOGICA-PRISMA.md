@@ -1133,15 +1133,15 @@ Los IPC son perfiles estratégicos de marketing que definen:
   - **Captar:** tipo_propietario, motivo_venta, urgencia, preocupaciones, objeción_principal, angulo_marketing, tono, promesa_central, CTA
   - **Vender:** tipo_comprador_ideal, necesidad_concreta, atractivos_propiedad, angulo_copy, mensaje_central, CTA, propiedad_tokko_id (opcional)
 
-> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Fotos · Clientes Ideales (IPC) · Mi Forma de Trabajar · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (6 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) tiene dos vistas: **Anuncios y copys** (los anuncios agrupados por tanda, con ver/editar/descargar/borrar) y **Fotos retocadas** (`galeria-fotos.tsx`, ver 13.7).
+> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Fotos · Clientes Ideales (IPC) · Mi ADN · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (6 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) tiene dos vistas: **Anuncios y copys** (los anuncios agrupados por tanda, con ver/editar/descargar/borrar) y **Fotos retocadas** (`galeria-fotos.tsx`, ver 13.7).
 
-### 13.1.b Mi Forma de Trabajar y la oferta irresistible (fórmula de Hormozi)
+### 13.1.b Mi ADN y la oferta irresistible (fórmula de Hormozi)
 
 El IPC dice **a quién** le hablamos; esta pestaña dice **quién habla y con qué respaldo**. Es lo que diferencia al asesor de cualquier otra inmobiliaria, y es **por usuario** (cada asesor la suya; el director carga la propia como uno más).
 
 Formulario en 4 pasos (`components/marketing-ia/forma-trabajo-form.tsx`), guardado por `upsert` con RLS en `advisor_operations`:
 
-1. **Mi perfil** (opcional): años en el rubro, matrícula, zona que domina, especialidad, operaciones cerradas, **casos reales** (la materia prima de la "prueba social"), qué incluye el servicio y **qué NO se puede prometer nunca**.
+1. **Mi perfil** (opcional): años en el rubro, zona en la que es experto, especialidad, operaciones cerradas, **casos reales** (la materia prima de la "prueba social"), qué incluye el servicio y **qué NO se puede prometer nunca**. Son 7 campos: la **matrícula** se sacó el 1-sep-2026 (rama `feat/marketing-mi-adn`) porque no aportaba nada al anuncio; la que ya esté guardada sigue en el `jsonb` pero no se muestra ni entra en los prompts.
 2. **Captación** (obligatorio): las 6 preguntas de Hormozi para dueños — propiedades vendidas en 6 meses, % del ACM al que cierra, diferencial de confianza, compradores activos en base, tiempo de entrega del ACM, días hasta la primera oferta, y qué se banca el asesor para que el dueño no mueva un dedo.
 3. **Venta** (obligatorio): las 5 preguntas para compradores — diferencial de confianza, % de rebaja negociada, exclusivas/off-market, tiempo hasta la primera selección curada, semanas hasta la reserva y trámites que le saca de encima.
 4. **Mis 2 ofertas** (`ofertas-irresistibles.tsx`): botón que genera las dos (1 crédito, `POST /api/marketing-ia/generar-oferta`). Quedan **guardadas y editables a mano**; regenerar una que fue editada pide confirmación explícita.
@@ -1255,7 +1255,7 @@ Busca propiedades para vincular a un IPC de tipo "vender". Lee la **cartera comp
 
 **Persistencia:** cada paso es una fila de `property_photos`, con `sesion_id` agrupando todo lo que se le hizo a una misma foto. La galería muestra **una tarjeta por sesión** que se abre en carrusel: primero la original de la ficha, después cada paso, con seguir editando / descargar / borrar en cada uno. RLS por usuario; se guarda `agency_id` para poder abrirla a toda la agencia sin migrar datos.
 
-**Costo:** 3 créditos por paso (cubre hasta 3 generaciones si el control rechaza). US$ 0,134 por generación, 45 a 90 segundos por paso.
+**Costo:** 3 créditos por paso (cubre hasta 3 generaciones si el control rechaza). US$ 0,134 por generación, 45 a 90 segundos por paso. En pantalla el asesor ve **solo los créditos** (el aviso debajo del botón "Trabajar la foto"): el badge con el monto en dólares sobre el resultado se sacó el 1-sep-2026 (rama `feat/marketing-mi-adn`) — es costo crudo del proveedor y no es información para el asesor. El backend lo sigue devolviendo (`costo_usd`) y registrando en Finanzas.
 
 **Límites conocidos:**
 - El control verifica que los **elementos** estén, **no que las proporciones se respeten**: aprobó el ambiente reconstruido del "todo junto". Esa clase de falla todavía pide ojo humano.
