@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
 import { AsyncLocalStorage } from "node:async_hooks"
 import { readFileSync } from "node:fs"
 import path from "node:path"
@@ -143,6 +143,28 @@ const pedir = async (opciones: { templateId?: string | null; versionId?: string 
   )
   return { status: res.status, cuerpo: (await res.json()) as Record<string, unknown> }
 }
+
+/**
+ * Importar la ruta ACÁ y no adentro del primer test.
+ *
+ * Este archivo era el único de los cuatro tests de endpoint sin este bloque, y
+ * se notaba: el primer `pedir()` cargaba la ruta entera —y con ella pizzip,
+ * docxtemplater y mammoth— DENTRO del presupuesto de 5 s de un test. Medido
+ * corriendo el archivo solo: **1.726 ms para ese test, el 95% del tiempo del
+ * archivo**, cuando el resto son milisegundos.
+ *
+ * Con la suite completa, esos 1,7 s compiten con los otros workers y pasan los
+ * 5 s: el test daba `Test timed out in 5000ms` **dos veces**, con 12.376 ms en
+ * la primera. Un rojo que no tiene nada que ver con lo que el test prueba, y
+ * que aparece y desaparece sin que cambie el código — lo peor que puede pasar
+ * en un archivo que cuida la regla de que una versión no se pone en uso con
+ * gente atrás.
+ *
+ * El tope de 60 s es del hook, no del test: los tests siguen con el suyo.
+ */
+beforeAll(async () => {
+  await import("./route")
+}, 60_000)
 
 beforeEach(() => {
   sesion.agencyId = AGENCIA
