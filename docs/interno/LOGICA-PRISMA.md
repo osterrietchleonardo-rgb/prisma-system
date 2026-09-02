@@ -2590,6 +2590,26 @@ El asesor **no reasigna**: tiene "Lo tomo", "No lo puedo tomar" (motivo obligato
 
 ### 29.7 Cifras de la sombra (24–27/8/2026, Central)
 326 decisiones sobre 62 leads (contactar 190, escalar 118, abandonar 13, posponer 5), US$0,05 por decisión, 0 fechas inventadas en las 40 firmadas por Leonardo, 0 propiedades no disponibles ofrecidas; 105 leads esperando a un humano en 14 días (99 más de 20 h). Y el hallazgo del 26/8: los 360 seguimientos por plantilla del flujo viejo (jun–ago) nunca llegaron (§ TECNICO 9.3).
+Sombra completa (24–31/8): 725 decisiones / 105 leads / US$38 (≈0,052 por decisión); el filtro
+de plantillas v2 bloqueó 2 elecciones viejas (`bloqueada_plantilla_no_disponible`); el freno de
+confianza (<0,5) nunca actuó; en 38 de 105 leads el agente cambió de acción entre días.
+
+### 29.8 Central en ACTIVO (encendida el 31/8/2026 21:07 AR)
+`modo='activo', activo_desde=now()`: el reloj arranca de cero, el backlog no se persigue.
+Primeras 36 h (1–2/9): 75 corridas del reloj sin fallas; **la escalera destapó 17 leads nuevos
+esperando a un humano y 7 fueron atendidos en promedio 2,1 h después del aviso** (142 avisos:
+71 emails + 71 WhatsApps, todos con wamid, a 16 asesores y 2 directores); una sola decisión del
+agente de seguimiento (escalar por info dudosa del bot, bloqueada por la ventana horaria a las
+23:00 — correcto); costo IA total US$0,10. La escalera no usa IA: sus avisos son gratis.
+
+### 29.9 La Trazabilidad (2/9/2026)
+La bitácora por cliente para el director (§ TECNICO 22.7): hechos, no mensajes — corridas del
+chat agrupadas, eventos con la `descripcion` legible de `lead_eventos`, los emails de n8n
+anotados en el momento del envío (con asunto real; los fallidos como `aviso_fallido`), el
+prendido/apagado del bot por trigger, las visitas por trigger del calendario, y las notas del
+director ancladas en cualquier punto de la historia (`datos.anclada_tras` ordena; el ts real no
+se toca). Regla de diseño: el registro se hace en el momento del hecho con el contexto en la
+mano, nunca reconstruyendo después (la misma regla que los wamid).
 
 ---
 

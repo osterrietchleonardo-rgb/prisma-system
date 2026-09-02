@@ -16,6 +16,51 @@
 
 ---
 
+## 2026-09-02 (y el encendido del 31/8): Central en ACTIVO + la Trazabilidad de Kevin
+
+**Estado al cierre:** el Super Agente corre EN ACTIVO para Central desde el **31/8 21:07 AR**
+(`modo='activo'`, `activo_desde` = ese momento; PRISMAIA sigue apagada). Reloj n8n pasado del
+preview a **producción** (`prisma.vakdor.com/api/seguimiento/run`, respaldo
+`scratch/_sa-reloj-RESPALDO-2026-08-31-pre-prod.json`). La **Trazabilidad** (rama
+`feat/trazabilidad-equipo`) quedó lista, probada por Leonardo y mergeada; docs al día
+(TECNICO §22.7, LOGICA §29.8-29.9, guía del director §28).
+
+**El encendido (31/8):** Kevin cargó 24/29 celulares de asesores; el suyo dijo cargarlo pero
+`profiles.phone` quedó vacío (deploy/RLS/código verificados OK — probable traba de la validación
+doble) → Leonardo lo pasó por WhatsApp y se seteó a mano (`5491159375655`). Sorpresa buena: Meta
+ya había aprobado las 12 plantillas de Central (¡en `wa_templates` llevan prefijo `ag4962bf_`!).
+El análisis final de la sombra (725 decisiones / US$38 / 8 días) está en LOGICA §29.7.
+
+**Primeras 36 h en activo (1–2/9):** 75/75 corridas del reloj OK. La escalera destapó 17 leads
+esperando a un humano; **7 atendidos en promedio 2,1 h después del aviso** (contra 9-14 días del
+backlog de la sombra). 142 avisos, 71 WhatsApps todos con wamid, a 16 asesores + 2 directores.
+Una sola decisión del agente (escalar por info dudosa del bot; la bloqueó la ventana horaria a
+las 23:00, correcto). Costo IA: US$0,10. Leonardo: "bien, vamos a darle más tiempo".
+
+**La Trazabilidad (pedido de Kevin por audio, transcripto con Whisper):** él quería un listado
+donde ver "Ailén hace tantas horas no contestó" y si el asesor se movió después de sus llamadas.
+Leonardo lo convirtió en una **bitácora cronológica por cliente** (hechos, no mensajes), dentro
+de la página **"Equipo"** (ex Aprobaciones, ahora con dos solapas). Piezas: constructor puro
+`lib/equipo/trazabilidad.ts` (22 tests), triggers de visitas y de `bot_active` (aplicados y
+probados en prod), notas del director ancladas en cualquier punto, y **los emails de n8n
+anotados al enviarse** (nodo `Anotar_Email_En_Bitacora` en `Gestion_Handoff` y `Avisar_Asesor`,
+con OK; si Resend no devuelve id queda "NO se pudo enviar el email de aviso…"). Kevin ya la
+había empezado a usar antes del merge (dejó una nota real probándola).
+
+**Gotchas nuevos:** en dev local, un `getUser()` fallido del lado servidor (rate limit de auth
+por logins repetidos desde la misma IP) hace que @supabase/ssr borre las cookies → te patea al
+login; en producción no pasa. El PUT de la API de n8n rechaza `settings.availableInMCP` y
+`binaryMode` → filtrar claves antes de mandar. El campo de Mi Perfil que "no guardó" para Kevin
+merece una mirada (¿validación silenciosa?).
+
+**Pendiente:** primera verificación real del anotador de emails (cuando haya un handoff real en
+Central); repaso diario del agente con Leonardo; en cola con OK: rotar el secreto del
+acm-extractor, bug de links con texto en vez de id, backlog de Central ("por el momento no"),
+limpiar 2 visitas scheduled viejas, 5 asesores + 3 directores sin celular; v2 de trazabilidad
+(tracking de Tokko, botón "ya tomé contacto").
+
+---
+
 ## 2026-08-27 (y la noche del 26): el Super Agente llegó a main
 
 **Estado al cierre:** fase 1 del Super Agente de Seguimiento **completa y en `main`** (Tasks 0-20 del

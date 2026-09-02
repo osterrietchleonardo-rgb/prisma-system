@@ -1362,6 +1362,42 @@ Plan maestro (única fuente de la visión y de cada Task): `docs/superpowers/pla
 - **Estado real de las plantillas en Meta:** `node scratch/_sa-plantillas-estado-meta.mjs <agency_id>` (la fila de `wa_templates` se sincroniza a las 00:00 UTC).
 - **Gotchas:** el dev server y `npm run build` comparten `.next` en el mismo worktree (correr el build con el dev apagado, como proceso independiente si la máquina está cargada); Vercel Hobby bloquea el deploy si el repo es privado y el autor del commit no es la cuenta dueña (`osterrietchleonardo@vakdor.com`); Evolution `findMessages` no guarda los salientes de esta instancia (no sirve para auditar entregas: usar `wamid`).
 
+### 22.7 Trazabilidad del equipo (2/9/2026 — pedido de Kevin por audio)
+
+La bitácora cronológica por cliente que ve SOLO el director: `/director/aprobaciones` pasó a ser
+la página **"Equipo"** con dos solapas (Aprobaciones intacta + Trazabilidad). Deep-link
+`?tab=trazabilidad`.
+
+- **Constructor puro:** `lib/equipo/trazabilidad.ts` — `construirTraza({mensajes, eventos, internos})`
+  fusiona `wa_messages` (corridas del mismo rol agrupadas en un hecho, sin texto; plantillas e
+  internos sueltos), `lead_eventos` (usa `descripcion`, que ya viene legible) e
+  `interacciones_canal` con `direccion='entrada'` (las salidas NO: ya están narradas en
+  `lead_eventos` y duplicarían). Categorías → `CATEGORIA_POR_TIPO`; un tipo desconocido cae en
+  `agente`, no rompe. 22 tests.
+- **Notas del director:** tipo `nota_director` en `lead_eventos`; `datos.anclada_tras` (ts del
+  renglón elegido) manda el ORDEN (`claveDeOrden` = ancla + 0,5 ms), el `ts` real de la nota no
+  se toca. Server action `agregarNotaTraza` (3–500 caracteres, solo director).
+- **Server actions** (`app/actions/equipo.ts`): `listarConversacionesConActividad` (lead_eventos
+  de los últimos 14 días, tope 2000 filas, reduce en JS) y `trazaDeConversacion` (tope 600 filas
+  por fuente). Ambas verifican rol director y leen con `createAdminClient()`.
+- **Triggers nuevos** (aplicados por Management API; las migraciones del repo no corren solas):
+  - `2026-09-02-trazabilidad.sql`: `scheduled_visits` → `lead_eventos` tipo `visita_*`
+    (agendada/reprogramada/confirmada/realizada/no_asistio/cancelada), resolviendo la
+    conversación por agency+teléfono; EXCEPTION → NULL (jamás voltea la visita).
+  - `2026-09-02-trazabilidad-bot.sql`: `wa_conversations.bot_active` → `bot_apagado`/`bot_prendido`
+    (WHEN old≠new: los updates de `last_message_at` no pasan). Sin histórico previo.
+- **Emails de n8n en la bitácora:** nodo `Anotar_Email_En_Bitacora` (Postgres, cred
+  `MEMORIA_PRISMA`, `onError=continueRegularOutput`) agregado tras `Enviar_Email_Resend` en
+  **`Gestion_Handoff`** y **`Avisar_Asesor`**: con id de Resend inserta `aviso_equipo`
+  ("Se le avisó por email… «asunto real»"); sin id inserta `aviso_fallido` ("NO se pudo enviar el
+  email de aviso…" + error en `datos`). Respaldos: `scratch/_traza-n8n-RESPALDO-*-2026-09-02.json`.
+  Gotcha del PUT de n8n: `settings` rechaza `availableInMCP`/`binaryMode` → filtrar claves.
+- **UI:** `app/director/aprobaciones/TrazabilidadClient.tsx` — lista con filtros, timeline con
+  altura fija y scroll (60vh), "+" por renglón para la nota anclada, X para cerrar (celular:
+  Volver). El header del panel usa un alias de ruta (`director-header.tsx`) para decir "Equipo".
+- **v2 pendiente:** el tracking (`lead_activities` apunta a leads Tokko, no a conversaciones);
+  botón "ya tomé contacto" del director si lo sigue pidiendo.
+
 ---
 
 ## FIN DEL DOCUMENTO
