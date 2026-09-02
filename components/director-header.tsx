@@ -65,7 +65,9 @@ export function DirectorHeader({ userName, userEmail, agencyName, agencyId, user
 
   const segments = pathname.split('/').filter(Boolean)
   const lastSegment = segments[segments.length - 1] || 'Dashboard'
-  const pageTitle = customTitle || (lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' '))
+  // Rutas cuyo nombre visible no coincide con el segmento de la URL
+  const ALIAS: Record<string, string> = { aprobaciones: 'Equipo' }
+  const pageTitle = customTitle || ALIAS[lastSegment] || (lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1).replace(/-/g, ' '))
 
   // AI Credits calculations
   const remainingCredits = aiCredits ? aiCredits.allocated - aiCredits.consumed : 0;
