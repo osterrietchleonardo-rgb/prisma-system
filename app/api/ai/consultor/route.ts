@@ -524,7 +524,9 @@ export async function POST(req: Request) {
       if (typeKeywords.length > 0) {
         if (isPisoSearch) {
           propTypePatterns = ['%piso%', '%departamento%'];
-          rmxTypePatterns = ['%piso%', '%apartment%', '%accommodation%'];
+          // '%departamento%' agregado en el corte a mercado_avisos (tipos en castellano);
+          // los patrones en inglés quedan por si hay data legada, no matchean de más.
+          rmxTypePatterns = ['%piso%', '%departamento%', '%apartment%', '%accommodation%'];
         } else {
           propTypePatterns = ilike(typeKeywords);
           const allTypes = [...typeKeywords];
@@ -534,7 +536,7 @@ export async function POST(req: Request) {
           // "monoambiente" en el título (ya quedan acotados a 1 ambiente por el filtro de ambientes de arriba).
           if (onlyMonoambiente) {
             propTypePatterns = Array.from(new Set([...propTypePatterns, '%departamento%']));
-            rmxTypePatterns = Array.from(new Set([...rmxTypePatterns, '%apartment%', '%accommodation%', '%studio%']));
+            rmxTypePatterns = Array.from(new Set([...rmxTypePatterns, '%departamento%', '%apartment%', '%accommodation%', '%studio%']));
           }
         }
       }

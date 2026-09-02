@@ -198,13 +198,13 @@ describe("tipos-propiedad", () => {
 
   test("Departamento traduce a los valores reales de cada tabla", () => {
     assert.deepEqual(valoresDeTipo("departamento", "cartera"), ["Departamento", "Condo"])
-    assert.deepEqual(valoresDeTipo("departamento", "colaboracion"), ["Apartment"])
+    // Desde el corte a mercado_avisos (2-sep-2026) la red habla castellano.
+    assert.deepEqual(valoresDeTipo("departamento", "colaboracion"), ["Departamento"])
   })
 
-  test("Lote existe en la cartera pero NO en la red: lista vacia, no null", () => {
-    // La diferencia importa: [] significa "no preguntes, no lo distingue".
+  test("Lote ahora existe en las dos fuentes: mercado_avisos trae Terrenos", () => {
     assert.deepEqual(valoresDeTipo("lote", "cartera"), ["Lote"])
-    assert.deepEqual(valoresDeTipo("lote", "colaboracion"), [])
+    assert.deepEqual(valoresDeTipo("lote", "colaboracion"), ["Terrenos"])
   })
 
   test("los valores crudos de la base se muestran en castellano", () => {

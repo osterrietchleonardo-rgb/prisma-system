@@ -48,6 +48,11 @@ create index if not exists mercado_avisos_zona_texto_trgm_idx
   on public.mercado_avisos using gin (public.acm_norm(coalesce(barrio,'') || ' ' || coalesce(ciudad,'')) gin_trgm_ops)
   where estado = 'activo' and calidad = 'ok';
 
+-- Espejo de idx_roomix_barrio_filtros: la rama de barrio del mapa.
+create index if not exists mercado_avisos_barrio_filtros_idx
+  on public.mercado_avisos (barrio_normalizado(barrio), operacion, ambientes)
+  where estado = 'activo' and calidad = 'ok';
+
 -- ─────────────────── Buscador IA: buscar_roomix → mercado_avisos ───────────────────
 -- Validada el 2-sep contra producción (función de prueba, luego borrada): Belgrano 3 amb
 -- venta = 100 filas con id numérico-texto; embedding real sim 0.902–1.000; polígono sobre
@@ -486,3 +491,90 @@ $function$;
 
 alter function public.acm_match_roomix(text, text, text[], numeric, integer, integer, integer, integer, text[], text[], boolean, text, boolean, text, boolean, boolean, boolean, boolean, smallint, smallint, integer)
   set statement_timeout = '25s';
+
+-- ─────────────────── Mapa: mapa_colaboracion → mercado_avisos ───────────────────
+-- Validada el 2-sep contra producción (función de prueba, luego borrada): bbox Belgrano
+-- Venta = 1000 pins (996 con foto, 0 refs null); tipo 'Departamento' (vocabulario nuevo
+-- en castellano) = 1000; rama de barrio 'belgrano' + 3 amb = 1000; Alquiler = 0 (corte
+-- limpio). EXPLAIN: el bbox usa mercado_avisos_punto_idx (3 ms). Los tipos de salida
+-- dormitorios/banos/ambientes van con ::int (mercado usa smallint) y el ref sale con
+-- COALESCE(slug, id::text) como en la vista. OJO: el vocabulario de tipos del filtro
+-- cambió a castellano — viaja junto con lib/mapa/tipos-propiedad.ts y lib/acm/subject.ts.
+
+CREATE OR REPLACE FUNCTION public.mapa_colaboracion(p_sur double precision, p_oeste double precision, p_norte double precision, p_este double precision, p_operacion text DEFAULT NULL::text, p_tipos text[] DEFAULT NULL::text[], p_precio_min numeric DEFAULT NULL::numeric, p_precio_max numeric DEFAULT NULL::numeric, p_moneda text DEFAULT NULL::text, p_ambientes integer[] DEFAULT NULL::integer[], p_limit integer DEFAULT 1000, p_barrio text DEFAULT NULL::text)
+ RETURNS TABLE(ref text, title text, price numeric, currency text, property_type text, status text, bedrooms integer, bathrooms integer, total_area numeric, address text, city text, foto text, lat double precision, lng double precision, assigned_agent_id uuid, agent_name text, agent_email text, agencia_nombre text, canonical_url text, ambientes integer)
+ LANGUAGE plpgsql
+ STABLE
+AS $function$
+DECLARE
+  -- Las dos salen del parametro UNA vez, para que el plan las vea como constantes.
+  v_hay_cinco boolean := p_ambientes IS NOT NULL AND 5 = ANY(p_ambientes);
+  v_hay_barrio boolean := p_barrio IS NOT NULL AND btrim(p_barrio) <> '';
+BEGIN
+  IF v_hay_barrio THEN
+    RETURN QUERY
+    -- MATERIALIZED no es decorativo: sin el, Postgres aplana el CTE, vuelve a elegir el
+    -- indice geografico y estamos donde empezamos.
+    WITH cand AS MATERIALIZED (
+      SELECT r.*
+      FROM mercado_avisos r
+      WHERE (r.estado = 'activo' AND r.calidad = 'ok')
+        AND barrio_normalizado(r.barrio::text) = p_barrio
+        AND (p_operacion IS NULL
+             OR (p_operacion = 'Venta'    AND r.operacion = 'venta')
+             OR (p_operacion = 'Alquiler' AND r.operacion = 'alquiler'))
+        AND (p_ambientes IS NULL
+             OR r.ambientes = ANY(p_ambientes)
+             OR (v_hay_cinco AND r.ambientes >= 5))
+    )
+    SELECT
+      COALESCE(c.slug, c.id::text)::text, c.titulo, c.precio, c.moneda::text, c.tipo::text,
+      CASE WHEN c.operacion = 'alquiler' THEN 'Alquiler' ELSE 'Venta' END,
+      c.dormitorios::int, c.banos::int, c.superficie_total_m2,
+      COALESCE(c.direccion, c.barrio::text, ''),
+      c.barrio::text,
+      c.fotos[1], c.lat, c.lng,
+      NULL::uuid, ''::text, ''::text,
+      COALESCE(c.publicador_nombre::text, 'Inmobiliaria colaboradora'),
+      c.url_publica,
+      c.ambientes::int
+    FROM cand c
+    WHERE c.lat IS NOT NULL AND c.lng IS NOT NULL
+      AND point(c.lng, c.lat) <@ box(point(p_oeste, p_sur), point(p_este, p_norte))
+      AND (p_tipos      IS NULL OR c.tipo::text = ANY(p_tipos))
+      AND (p_moneda     IS NULL OR c.moneda = p_moneda)
+      AND (p_precio_min IS NULL OR c.precio >= p_precio_min)
+      AND (p_precio_max IS NULL OR c.precio <= p_precio_max)
+    LIMIT p_limit;
+
+  ELSE
+    RETURN QUERY
+    SELECT
+      COALESCE(r.slug, r.id::text)::text, r.titulo, r.precio, r.moneda::text, r.tipo::text,
+      CASE WHEN r.operacion = 'alquiler' THEN 'Alquiler' ELSE 'Venta' END,
+      r.dormitorios::int, r.banos::int, r.superficie_total_m2,
+      COALESCE(r.direccion, r.barrio::text, ''),
+      r.barrio::text,
+      r.fotos[1], r.lat, r.lng,
+      NULL::uuid, ''::text, ''::text,
+      COALESCE(r.publicador_nombre::text, 'Inmobiliaria colaboradora'),
+      r.url_publica,
+      r.ambientes::int
+    FROM mercado_avisos r
+    WHERE (r.estado = 'activo' AND r.calidad = 'ok')
+      AND r.lat IS NOT NULL AND r.lng IS NOT NULL
+      AND point(r.lng, r.lat) <@ box(point(p_oeste, p_sur), point(p_este, p_norte))
+      AND (p_operacion IS NULL
+           OR (p_operacion = 'Venta'    AND r.operacion = 'venta')
+           OR (p_operacion = 'Alquiler' AND r.operacion = 'alquiler'))
+      AND (p_tipos      IS NULL OR r.tipo::text = ANY(p_tipos))
+      AND (p_moneda     IS NULL OR r.moneda = p_moneda)
+      AND (p_precio_min IS NULL OR r.precio >= p_precio_min)
+      AND (p_precio_max IS NULL OR r.precio <= p_precio_max)
+      AND (p_ambientes IS NULL
+           OR r.ambientes = ANY(p_ambientes)
+           OR (v_hay_cinco AND r.ambientes >= 5))
+    LIMIT p_limit;
+  END IF;
+END;
+$function$;
