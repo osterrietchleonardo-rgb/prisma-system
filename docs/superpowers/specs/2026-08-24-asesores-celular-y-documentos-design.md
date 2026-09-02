@@ -282,7 +282,7 @@ La plantilla, por agencia.
 | `agency_id` | uuid | FK `agencies` |
 | `nombre` | text | "Contrato de Asesor" |
 | `estado` | text | `borrador` \| `activa` |
-| `version_actual` | int | apunta a la versión vigente |
+| `version_actual` | uuid | FK a `advisor_doc_template_versions.id`: apunta a la fila de la versión vigente, no a su número |
 | `created_by`, `created_at`, `updated_at` | | |
 
 ### 8.3 `advisor_doc_template_versions`

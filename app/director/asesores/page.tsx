@@ -68,6 +68,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DocumentosDelAsesor } from "@/components/asesor-docs/DocumentosDelAsesor"
+import { PlantillasTab } from "@/components/asesor-docs/PlantillasTab"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
 import { QRCodeSVG } from "qrcode.react"
@@ -447,7 +448,7 @@ export default function AsesoresPage() {
   }
 
   return (
-    <div className="flex flex-col h-full space-y-4 p-4 md:p-8 pt-6">
+    <div className="flex flex-col h-full overflow-hidden space-y-4 p-4 md:p-8 pt-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
@@ -523,6 +524,22 @@ export default function AsesoresPage() {
         </div>
       </div>
 
+      {/* Solapas al nivel de la página: la lista de asesores queda donde estaba
+          y las plantillas se suman AL LADO, no en su lugar.
+
+          El alto sigue el patrón que ya usa el panel del asesor (más abajo, en
+          el Sheet): contenedor en columna, la barra de solapas fija
+          (`shrink-0`) y el contenido con su propio scroll. Ninguna altura en
+          píxeles: escrita a mano solo cierra con el encabezado del día que se
+          escribió, y cuando el encabezado crece la parte de abajo queda
+          cortada. */}
+      <Tabs defaultValue="asesores" className="flex-1 min-h-0 flex flex-col">
+        <TabsList className="shrink-0 self-start">
+          <TabsTrigger value="asesores">Asesores</TabsTrigger>
+          <TabsTrigger value="plantillas">Plantillas</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="asesores" className="flex-1 min-h-0 overflow-y-auto pr-1 mt-4 data-[state=inactive]:hidden">
       {/* Barra de Filtros (Búsqueda, Asesor ordenado alfabéticamente, Estado) */}
       <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 mb-4">
         {/* Búsqueda por texto */}
@@ -764,6 +781,12 @@ export default function AsesoresPage() {
           ))}
         </div>
       )}
+        </TabsContent>
+
+        <TabsContent value="plantillas" className="flex-1 min-h-0 flex flex-col mt-4 data-[state=inactive]:hidden">
+          <PlantillasTab />
+        </TabsContent>
+      </Tabs>
 
       {/* Performance Side Panel */}
       <Sheet open={!!selectedAgent} onOpenChange={() => setSelectedAgent(null)}>
