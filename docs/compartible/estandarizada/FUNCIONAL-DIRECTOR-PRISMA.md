@@ -575,6 +575,48 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 
 > 💡 **Tip:** si un asesor te dice que le falta un documento o que el que tiene quedó viejo, es él avisándote a vos — desde su lado no lo puede arreglar solo.
 
+### Cambiar el contrato de todos
+
+**Qué es:** cambió una cláusula del contrato que tienen todos tus asesores y hay que rehacérselo a cada uno. Antes eso significaba rehacer el Word persona por persona y subirlo uno por uno. Ahora **subís el Word una sola vez** y PRISMA le arma el documento a cada asesor con **sus propios datos**.
+
+**Dónde está:** en la página **Asesores**, arriba de todo, tenés la solapa **"Plantillas"**. Hay una fila por cada tipo de documento (por ejemplo, "Contrato de Asesor"), con la versión que está en uso, cuántos asesores lo tienen cargado y si quedó alguno para revisar.
+
+**Lo primero, y es lo más raro de todo esto:** el Word que subís tiene que ser el contrato nuevo **YA COMPLETADO con los datos de una de tus personas**, y abajo tenés que decir de cuál. **No es un archivo con los campos en blanco.** El motivo: PRISMA busca los datos de esa persona adentro del documento (sabe cuál es su nombre, su CUIT, su zona) y **donde los encuentra sabe que ahí va el dato de cada uno**. Si subís un modelo genérico o con los lugares vacíos, no tiene contra qué comparar y te lo rechaza explicándote esto mismo.
+
+**Si el contrato nuevo trae un campo que antes no existía** (una comisión, una zona nueva), ese no lo tiene nadie cargado, así que no hay nada que buscar. Ese lo escribís vos en el Word **entre llaves dobles**, así:
+
+```
+{{COMISION}}
+```
+
+El nombre del campo admite **solo letras, números y guión bajo**. Nada de guiones, espacios ni acentos: `{{ZONA-2}}` **no sirve**, y PRISMA te frena al subir el archivo y te dice cómo tendría que estar escrito (`{{ZONA_2}}`). Es a propósito: si lo dejara pasar, ese lugar saldría **en blanco** en el contrato de todos y nadie se enteraría hasta que alguien lo firme.
+
+**Paso a paso:**
+
+1. Solapa **"Plantillas"** → la fila del documento → botón **"Subir versión nueva"**. Si el botón está apagado, **abajo te dice por qué** (lo más común: esa plantilla todavía está en borrador, hay que confirmarla primero).
+2. Elegí el Word y, abajo, contestá **"¿Con los datos de quién está completado?"**. En esa lista aparecen solo los asesores **activos** que tienen ese documento cargado; los pausados y los desvinculados quedan afuera (sus documentos no se tocan, quedan archivados como están) y la pantalla te dice quiénes son.
+3. **"Leer la versión nueva".** PRISMA te muestra qué campos trae de nuevo, cuáles ya no están, y una **vista previa** del documento de esa persona armado con la versión nueva. **Leela**: es lo último que se puede mirar antes de que esto se convierta en el contrato de todos. Si ves un dato metido donde iba una frase del contrato, arreglá el Word y volvé a subirlo.
+4. **"Aplicar a los asesores".** Acá se arma el documento de cada uno con sus datos. Va **de a una persona por vez**, con el estado al lado de cada nombre; si a alguno le falta un dato o algo no cierra, **ese queda con su documento de antes y los demás siguen igual**. No cierres la pantalla mientras corre.
+5. **"Poner esta versión en uso".** Recién con este segundo botón la versión nueva pasa a ser la vigente.
+6. **Comprobalo:** entrá a la ficha de cualquier asesor y bajá su documento. Va a bajar con el número de versión en el nombre —por ejemplo **"Contrato de Asesor - v2.docx"**— y adentro tiene que estar el cambio que hiciste, con **los datos de esa persona**, no los de la que usaste para armar la versión.
+
+> ⚠️ **Son dos pasos y dos botones, y es la confusión más fácil de tener.** "Aplicar" arma el documento de cada uno. "Poner la versión en uso" la vuelve la oficial. Podés aplicar hoy y ponerla en uso mañana: mientras tanto, la fila te avisa que hay una versión a medio poner y te deja el botón ahí para terminar.
+> 💡 **La versión anterior no se borra nunca.** Queda guardada, así que subir una versión nueva no es una decisión irreversible.
+> 💡 **Si el archivo te lo rechaza, no empieces de cero:** el Word que elegiste sigue seleccionado. Corregí lo que te dice el mensaje, volvé a elegirlo si lo cambiaste, y probá de nuevo.
+> 💡 **El Word que subiste vos no se pisa nunca.** El documento que baja cada asesor es uno nuevo, generado; el archivo original que cargaste queda guardado aparte. Por eso el que se baja lleva el número de versión en el nombre: si mañana aplicás la v3, el asesor va a poder distinguir en su carpeta de Descargas cuál es cuál.
+
+### Cuando alguien queda esperando un dato
+
+**Qué pasa:** la versión nueva trae un campo que **esa persona en particular no tiene cargado**. PRISMA entonces **no le arma el documento nuevo**, y hace bien: se lo armaría con ese lugar en blanco, y un blanco adentro de un contrato no se ve. Esa persona **sigue con su contrato de antes, que es lo correcto** — no perdió nada.
+
+**Dónde lo ves:** mientras corre, al lado de su nombre dice **"Le falta un dato"**. Después, en la fila de la plantilla queda un renglón en ámbar que te dice a cuántos les falta y qué hacer.
+
+**Qué hacer:** completarle ese dato a esa persona y **volver a aplicarle la versión**. El botón "Aplicar a los asesores" se puede apretar de nuevo las veces que haga falta: reaplicar no rompe nada ni duplica nada, a quien ya está listo lo deja igual.
+
+> ⚠️ **Lo que NO hay que hacer: apretar "Subir versión nueva" para reintentar.** Es un error fácil de cometer porque los dos botones quedan uno al lado del otro — pero eso **crea otra versión** y te quema un número (pasás de la 2 a la 3 sin haber cambiado nada del contrato). Para reintentar se vuelve a **aplicar**, no a subir.
+> ⚠️ **Mientras quede una sola persona así, la versión nueva no se puede poner en uso.** El botón va a estar gris y **abajo vas a leer el motivo**, con el nombre de quién falta. No está roto: te está diciendo que la mitad del equipo tendría el contrato nuevo y la otra mitad el viejo, y la versión oficial no puede ser una cosa a medias.
+> 💡 **Si ese campo es nuevo y no lo tiene cargado nadie**, hablá con el equipo de PRISMA (Vakdor) antes de aplicar la versión: hoy no hay una pantalla donde escribirle ese dato a cada persona una por una.
+
 ---
 
 ## 15. Documentos (base de conocimiento)

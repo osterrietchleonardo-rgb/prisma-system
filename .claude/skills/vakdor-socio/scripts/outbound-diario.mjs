@@ -64,6 +64,50 @@ const JS_BANDEJA_SALES = String.raw`
   }));
 })()`;
 
+/*
+ * POR QUE ESTE SCROLL EXISTE. Hasta el 02/09/2026 la bandeja de Sales Navigator se leia sin
+ * scrollear ni una vez: se tomaban los `li.conversation-list-item` que ya estaban en el DOM
+ * y nada mas. Devolvia ~70 hilos. El barrido de bandejas, con el scroll puesto el 31/08,
+ * devuelve 806. Los 736 que faltaban son personas a las que Leonardo YA les escribio y que
+ * el buscador volvia a proponer como candidatos nuevos.
+ *
+ * Lo confirmo Diego Luciano (Keymex America) el 02/09/2026: habia contestado que no por
+ * LinkedIn y aparecio como candidato [8] del dia.
+ *
+ * El contenedor NO se busca por clase —las de LinkedIn son hashes que cambian— sino por
+ * comportamiento: el ancestro mas cercano cuyo contenido no entra. Mismo criterio que
+ * JS_SCROLL_MENSAJES y JS_SCROLL_BUSQUEDA.
+ *
+ * NO se scrollea un numero fijo de veces: se scrollea HASTA QUE DEJA DE CRECER. Medido el
+ * 02/09/2026 sobre la bandeja real: arranca en 20 hilos, a las 25 pasadas va 100, a las 50
+ * va 180, a las 75 llega a 247 y ahi se planta. Un tope fijo de 25 —la primera version de
+ * este arreglo— habria dejado afuera 147 de los 247. Por eso la condicion de corte es el
+ * crecimiento y no un contador: si LinkedIn cambia el tamano de pagina, esto se adapta solo.
+ *
+ * El contenedor NO se busca por clase —las de LinkedIn son hashes que cambian— sino por
+ * comportamiento: el ancestro mas cercano cuyo contenido no entra. Mismo criterio que
+ * JS_SCROLL_MENSAJES y JS_SCROLL_BUSQUEDA.
+ */
+const JS_SCROLL_SALES = String.raw`async page => {
+  const contar = () => page.evaluate(() => document.querySelectorAll('li.conversation-list-item').length);
+  const cont = await page.evaluateHandle(() => {
+    const li = document.querySelector('li.conversation-list-item');
+    let e = li; while (e && e.scrollHeight <= e.clientHeight + 50) e = e.parentElement;
+    return e;
+  });
+  if (!cont) return 0;
+  let previo = await contar();
+  // Tope duro de 200 pasadas: si la bandeja creciera sin parar, el script no se cuelga.
+  for (let vuelta = 0, quietas = 0; vuelta < 200 && quietas < 8; vuelta++) {
+    await cont.evaluate(e => e.scrollBy(0, e.clientHeight * 0.8));
+    await page.waitForTimeout(700 + Math.random() * 600);
+    const ahora = await contar();
+    quietas = ahora > previo ? 0 : quietas + 1;
+    previo = ahora;
+  }
+  return previo;
+}`;
+
 const JS_SCROLL_MENSAJES = String.raw`async page => {
   const cont = await page.evaluateHandle(() => {
     const li = document.querySelector('li.msg-conversation-listitem');
@@ -135,6 +179,7 @@ async function leerBandejas() {
   const hilos = [];
   pw(['goto', 'https://www.linkedin.com/sales/inbox/']);
   await dormir(8000);
+  pw(['run-code', JS_SCROLL_SALES]);
   hilos.push(...(json(pw(['eval', JS_BANDEJA_SALES])) || []));
   await pausaHumana();
 
