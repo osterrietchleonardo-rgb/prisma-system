@@ -9,6 +9,7 @@ import {
   camposDelReemplazo,
   archivoQueSeBaja,
   nombreDelGenerado,
+  versionDeLaRutaDelGenerado,
   MAX_BYTES,
   carpetaDeVersionesNuevas,
   rutaDeVersionNueva,
@@ -541,23 +542,69 @@ describe("archivoQueSeBaja", () => {
    * El asesor baja los dos a la misma carpeta de Descargas. Si se llaman igual,
    * el navegador le pone "(1)" y no tiene forma de saber cuál es cuál.
    */
-  it("el generado se distingue por el nombre, y la extensión queda al final", () => {
-    const r = archivoQueSeBaja({ ...SIN_GENERAR, docx_path: "x.docx" });
-    expect(r.nombre).toBe("Acuerdo de Confidencialidad - actualizado.docx");
+  /**
+   * ═══ El número, y el caso que lo pide ═══
+   *
+   * Esto decía "- actualizado", y lo corrigió Leonardo con un caso que el
+   * argumento original no cubría: **el asesor baja los dos a la misma carpeta
+   * de Descargas.** Con el mismo nombre, el navegador le agrega "(1)" y no
+   * tiene forma de saber cuál es el último.
+   */
+  it("el nombre lleva el número de versión, y la extensión queda al final", () => {
+    const r = archivoQueSeBaja({ ...SIN_GENERAR, docx_path: "asesores/ag/as/plantillas/generados/id-v2.docx" });
+    expect(r.nombre).toBe("Acuerdo de Confidencialidad - v2.docx");
     expect(r.nombre.endsWith(".docx"), "Word no abre un archivo sin la extensión al final").toBe(true);
   });
 
-  it("y sin extensión no se rompe", () => {
-    expect(nombreDelGenerado("Acuerdo")).toBe("Acuerdo - actualizado");
+  it("dos versiones distintas dan dos nombres distintos, que es todo el punto", () => {
+    const dos = archivoQueSeBaja({ ...SIN_GENERAR, docx_path: "asesores/ag/as/plantillas/generados/id-v2.docx" });
+    const tres = archivoQueSeBaja({ ...SIN_GENERAR, docx_path: "asesores/ag/as/plantillas/generados/id-v3.docx" });
+    expect(dos.nombre).not.toBe(tres.nombre);
+    expect(tres.nombre).toContain("v3");
   });
 
   /**
-   * "Actualizado" y no "generado" ni "v2": el asesor no sabe qué es una versión
-   * ni tiene por qué (spec §8.7). Lo único que necesita saber es cuál vale.
+   * Y si el número NO se puede leer, se cae a "actualizado" en vez de mentir
+   * con un número inventado. Un nombre menos preciso es molesto; uno que dice
+   * "v1" sobre el archivo de la v3 es una afirmación falsa.
    */
-  it("no le habla de versiones al asesor", () => {
-    const nombre = nombreDelGenerado("Contrato.docx");
-    expect(nombre.toLowerCase()).not.toContain("versi");
-    expect(nombre.toLowerCase()).not.toContain("generad");
+  it("si la ruta no dice la versión, no se inventa un número", () => {
+    const r = archivoQueSeBaja({ ...SIN_GENERAR, docx_path: "una/ruta/rara.docx" });
+    expect(r.nombre).toBe("Acuerdo de Confidencialidad - actualizado.docx");
+  });
+
+  it("y sin extensión no se rompe", () => {
+    expect(nombreDelGenerado("Acuerdo", 2)).toBe("Acuerdo - v2");
+    expect(nombreDelGenerado("Acuerdo")).toBe("Acuerdo - actualizado");
+  });
+});
+
+/**
+ * ═══ Las dos funciones de la ruta del generado, ida y vuelta ═══
+ *
+ * `rutaDelDocumentoGenerado` la arma y `versionDeLaRutaDelGenerado` le lee el
+ * número. Tienen que coincidir, y por eso viven pegadas y se prueban juntas:
+ * la lección más repetida de esta etapa es que la forma del hueco estaba
+ * escrita a mano en tres lugares y las tres discrepaban.
+ */
+describe("versionDeLaRutaDelGenerado", () => {
+  it("le lee el número a lo que arma rutaDelDocumentoGenerado", () => {
+    for (const v of [1, 2, 7, 13, 100]) {
+      const ruta = rutaDelDocumentoGenerado("AG", "AS", "doc-1", v);
+      expect(versionDeLaRutaDelGenerado(ruta), `no pudo leer la v${v} de ${ruta}`).toBe(v);
+    }
+  });
+
+  it("y devuelve null cuando no hay número que leer", () => {
+    expect(versionDeLaRutaDelGenerado(null)).toBeNull();
+    expect(versionDeLaRutaDelGenerado("")).toBeNull();
+    expect(versionDeLaRutaDelGenerado("asesores/ag/as/plantillas/id.docx")).toBeNull();
+    expect(versionDeLaRutaDelGenerado("algo-v.docx")).toBeNull();
+    // Un id que TERMINA en algo parecido no alcanza: hace falta el "-v" y el .docx
+    expect(versionDeLaRutaDelGenerado("asesores/ag/as/generados/id-v2.pdf")).toBeNull();
+  });
+
+  it("un cero no es una versión: las versiones arrancan en 1", () => {
+    expect(versionDeLaRutaDelGenerado("x-v0.docx")).toBeNull();
   });
 });

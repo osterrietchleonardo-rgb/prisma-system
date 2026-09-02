@@ -129,6 +129,27 @@ export function rutaDelDocumentoGenerado(
   return `asesores/${agencyId}/${advisorId}/plantillas/generados/${documentId}-v${version}.docx`
 }
 
+/**
+ * El número de versión leído de esa misma ruta. `null` si no se lo puede leer.
+ *
+ * Va PEGADO al que la arma, y con un test que las hace ida y vuelta, por la
+ * lección más repetida de esta etapa: la forma del hueco estaba escrita a mano
+ * en tres lugares y las tres discrepaban. Dos funciones que tienen que
+ * coincidir viven juntas o terminan separándose.
+ *
+ * Se lee de la ruta y no de una consulta nueva a propósito: la ruta es **el
+ * archivo que se está bajando**, así que el número no puede quedar desfasado
+ * del contenido. Un `version_id` traído aparte podría, si alguien cambia el
+ * orden de dos escrituras.
+ */
+export function versionDeLaRutaDelGenerado(path: string | null): number | null {
+  if (!path) return null
+  const m = /-v(\d+)\.docx$/i.exec(path)
+  if (!m) return null
+  const n = Number(m[1])
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
 // ---------------------------------------------------------------------------
 // EL .docx DE UNA VERSIÓN NUEVA DE PLANTILLA, Y SU GUARDA
 // ---------------------------------------------------------------------------
@@ -369,23 +390,40 @@ export function archivoQueSeBaja(doc: {
   if (!doc.docx_path) {
     return { path: doc.archivo_original_path, nombre: doc.nombre_archivo, esGenerado: false }
   }
-  return { path: doc.docx_path, nombre: nombreDelGenerado(doc.nombre_archivo), esGenerado: true }
+  return {
+    path: doc.docx_path,
+    nombre: nombreDelGenerado(doc.nombre_archivo, versionDeLaRutaDelGenerado(doc.docx_path)),
+    esGenerado: true,
+  }
 }
 
 /**
  * Cómo se llama el archivo generado cuando el asesor lo baja.
  *
  * Se le pega el sufijo ANTES de la extensión: "Acuerdo.docx" queda como
- * "Acuerdo - actualizado.docx", no como "Acuerdo.docx - actualizado", que no
- * lo abre Word.
+ * "Acuerdo - v2.docx", no como "Acuerdo.docx - v2", que no lo abre Word.
  *
- * "Actualizado" y no "generado" ni "v2": el asesor no sabe qué es una versión
- * ni tiene por qué (spec §8.7). Lo único que necesita saber es que ese es el
- * que vale.
+ * ═══ Por qué el NÚMERO y no "actualizado" ═══
+ *
+ * La primera versión de esto decía "- actualizado", con el argumento de que el
+ * asesor no sabe qué es una versión ni tiene por qué (spec §8.7). Lo corrigió
+ * Leonardo con un caso que el argumento no cubría: **el asesor baja los dos a
+ * la misma carpeta de Descargas.** Con "- actualizado", bajar después de la v2
+ * y otra vez después de la v3 le deja dos archivos con el MISMO nombre, y el
+ * navegador le agrega "(1)": no tiene forma de saber cuál es el último.
+ *
+ * El §8.7 dice que el asesor no ve la LISTA de plantillas ni el historial de
+ * versiones, y eso se sigue cumpliendo. Un número en el nombre del archivo no
+ * es el historial: es lo único que distingue dos descargas.
+ *
+ * El número sale de la RUTA del archivo que se está bajando, no de una
+ * consulta aparte, así que no puede quedar desfasado del contenido. Si no se
+ * puede leer, se cae a "actualizado" en vez de mentir con un número.
  */
-export function nombreDelGenerado(nombreArchivo: string): string {
+export function nombreDelGenerado(nombreArchivo: string, version?: number | null): string {
   const limpio = nombreArchivo.trim()
+  const sufijo = typeof version === "number" && version > 0 ? `v${version}` : "actualizado"
   const i = limpio.lastIndexOf(".")
-  if (i <= 0) return `${limpio} - actualizado`
-  return `${limpio.slice(0, i)} - actualizado${limpio.slice(i)}`
+  if (i <= 0) return `${limpio} - ${sufijo}`
+  return `${limpio.slice(0, i)} - ${sufijo}${limpio.slice(i)}`
 }
