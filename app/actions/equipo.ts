@@ -10,6 +10,7 @@ import {
   validarJustificacion, venceEn, ventanaCerrada,
 } from "@/lib/seguimiento/equipo"
 import { contextoDelLead as contextoDelLeadDb } from "@/lib/seguimiento/contexto"
+import { construirTraza, type EventoTraza, type FilaEvento, type FilaMensaje } from "@/lib/equipo/trazabilidad"
 import { registrarEvento } from "@/lib/seguimiento/eventos"
 import { nombreValido } from "@/lib/seguimiento/semilla"
 import type { Candidato } from "@/lib/seguimiento/tipos"
@@ -513,4 +514,111 @@ export async function resolverAprobacion(id: string, decision: DecisionAprobacio
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Trazabilidad (solapa "Equipo" → Trazabilidad; solo directores)
+// La bitácora cronológica que pidió Kevin (2/9): cada acción sobre cada cliente.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ConversacionConActividad = {
+  conversation_id: string
+  nombre: string
+  telefono: string | null
+  asesor: { id: string; full_name: string | null } | null
+  ultimoEvento: string
+  ultimoTs: string
+  eventos: number
+}
+
+const DIAS_ACTIVIDAD = 14
+const TOPE_EVENTOS_LISTADO = 2000
+const TOPE_FILAS_TRAZA = 600
+
+/**
+ * Chats de la agencia con actividad del agente/equipo (lead_eventos) en los últimos días.
+ * Los filtros por asesor y por cliente los aplica la UI sobre esta lista (viene acotada).
+ */
+export async function listarConversacionesConActividad(dias = DIAS_ACTIVIDAD): Promise<{
+  conversaciones: ConversacionConActividad[]
+  asesores: EstadoEquipo["asesores"]
+}> {
+  const yo = await quienSoy()
+  if (yo.role !== "director") throw new Error("Solo el director ve la trazabilidad.")
+  const admin = createAdminClient()
+  const desde = new Date(Date.now() - dias * 24 * 3600 * 1000).toISOString()
+
+  // Más nuevo primero: al quedarnos con la primera aparición de cada chat, esa es su último evento.
+  const { data: eventos } = await admin.from("lead_eventos")
+    .select("conversation_id, descripcion, ts")
+    .eq("agency_id", yo.agency_id).gte("ts", desde)
+    .order("ts", { ascending: false }).limit(TOPE_EVENTOS_LISTADO)
+
+  const porChat = new Map<string, { ultimoEvento: string; ultimoTs: string; eventos: number }>()
+  for (const e of eventos ?? []) {
+    const visto = porChat.get(e.conversation_id)
+    if (visto) visto.eventos += 1
+    else porChat.set(e.conversation_id, { ultimoEvento: e.descripcion, ultimoTs: e.ts, eventos: 1 })
+  }
+
+  const ids = [...porChat.keys()]
+  const { data: convs } = await admin.from("wa_conversations")
+    .select("id, contact_phone, metricas, agent_id")
+    .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"])
+  const { data: perfiles } = await admin.from("profiles").select("id, full_name")
+    .eq("agency_id", yo.agency_id).is("deleted_at", null)
+  const nombreDe = new Map((perfiles ?? []).map((p) => [p.id, p.full_name ?? null]))
+
+  const conversaciones: ConversacionConActividad[] = (convs ?? []).map((c) => {
+    const resumen = porChat.get(c.id)!
+    const nombre = nombreValido(c as Candidato)
+      ? String((c.metricas as Record<string, unknown>).nombre).trim()
+      : "Un cliente"
+    return {
+      conversation_id: c.id,
+      nombre,
+      telefono: c.contact_phone ?? null,
+      asesor: c.agent_id ? { id: c.agent_id, full_name: nombreDe.get(c.agent_id) ?? null } : null,
+      ultimoEvento: resumen.ultimoEvento,
+      ultimoTs: resumen.ultimoTs,
+      eventos: resumen.eventos,
+    }
+  }).sort((a, b) => Date.parse(b.ultimoTs) - Date.parse(a.ultimoTs))
+
+  const { data: asesores } = await admin.from("profiles").select("id, full_name, role")
+    .eq("agency_id", yo.agency_id).eq("estado", "activo").is("deleted_at", null).order("full_name")
+  return { conversaciones, asesores: (asesores ?? []) as EstadoEquipo["asesores"] }
+}
+
+/** La línea de tiempo completa de un chat: mensajes + eventos + internos, en orden. */
+export async function trazaDeConversacion(conversationId: string): Promise<{
+  lead: { nombre: string; telefono: string | null; asesor: string | null }
+  eventos: EventoTraza[]
+}> {
+  const yo = await quienSoy()
+  if (yo.role !== "director") throw new Error("Solo el director ve la trazabilidad.")
+  const c = await leerChat(yo, conversationId)
+  const admin = createAdminClient()
+
+  // Si el chat es larguísimo se muestran las últimas N filas de cada fuente (lo reciente es lo que importa).
+  const [{ data: mensajes }, { data: eventos }, { data: internos }] = await Promise.all([
+    admin.from("wa_messages").select("role, message_type, content, created_at")
+      .eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(TOPE_FILAS_TRAZA),
+    admin.from("lead_eventos").select("tipo, descripcion, ts")
+      .eq("conversation_id", conversationId).order("ts", { ascending: false }).limit(TOPE_FILAS_TRAZA),
+    admin.from("interacciones_canal").select("contenido, ts")
+      .eq("conversation_id", conversationId).eq("direccion", "entrada")
+      .order("ts", { ascending: false }).limit(TOPE_FILAS_TRAZA),
+  ])
+
+  const traza = construirTraza({
+    mensajes: (mensajes ?? []) as FilaMensaje[],
+    eventos: (eventos ?? []) as FilaEvento[],
+    internos: (internos ?? []).map((i) => ({ contenido: i.contenido, ts: i.ts })),
+  })
+  const nombre = nombreValido(c as Candidato)
+    ? String((c.metricas as Record<string, unknown>).nombre).trim()
+    : "Un cliente"
+  const asesor = c.agent_id ? (await perfil(c.agent_id))?.full_name ?? null : null
+  return { lead: { nombre, telefono: c.contact_phone ?? null, asesor }, eventos: traza }
 }

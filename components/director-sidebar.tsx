@@ -39,7 +39,7 @@ const navItems = [
   { name: "Leads Tokko", href: "/director/leads", icon: Users },
   { name: "Asesor IA WhatsApp", href: "/director/asesor-ia-whatsapp", icon: MessageSquare },
   { name: "Leads WhatsApp", href: "/director/leads-whatsapp", icon: MessageSquare },
-  { name: "Aprobaciones", href: "/director/aprobaciones", icon: ClipboardCheck },
+  { name: "Equipo", href: "/director/aprobaciones", icon: ClipboardCheck },
   { name: "Marketing IA", href: "/director/marketing-ia", icon: Sparkles },
   { name: "Contratos IA", href: "/director/contratos-ia", icon: FileSignature },
   { name: "Asesores", href: "/director/asesores", icon: UserCircle },
