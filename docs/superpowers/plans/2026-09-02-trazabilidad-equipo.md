@@ -93,6 +93,17 @@
 - OK de Leonardo → merge a main (flujo clásico desde el worktree del Socio) → docs
   (TECNICO, LOGICA, FUNCIONAL-DIRECTOR: sección de la solapa) → bitácora.
 
+## Correcciones de Leonardo tras la primera versión (2/9, aplicadas)
+
+1. **Hechos, no mensajes**: una corrida de mensajes seguidos del mismo lado es UN renglón
+   ("El cliente escribió (3 mensajes)"), sin el texto — la conversación entera está en
+   "Ver el chat". La plantilla del bot y lo interno siguen sueltos.
+2. **Altura fija con scroll** para la historia (60vh) y para la lista de chats (70vh).
+3. **Notas internas del director en cualquier punto**: el "+" de cada renglón ancla la nota
+   justo después de ese paso (`lead_eventos` tipo `nota_director`, `datos.anclada_tras`
+   ordena; el ts real de la nota no se toca); "Agregar una nota" al final. Ej.: "avisé por
+   llamada", "me lo crucé en la ofi". Solo directores.
+
 ## Para v2 (NO en esta rama)
 - Registrar el email de handoff que manda n8n en `interacciones_canal` (toca n8n → OK aparte).
 - Botón "ya tomé contacto" del director (acción fuera del chat) si Kevin lo sigue pidiendo
