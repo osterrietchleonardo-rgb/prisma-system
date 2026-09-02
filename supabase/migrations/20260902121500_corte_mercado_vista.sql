@@ -72,3 +72,26 @@ grant select on public.roomix_properties to authenticated, service_role;
 
 comment on view public.roomix_properties is
   'Vista de compatibilidad sobre mercado_avisos (venta + calidad ok + activo). El corte del 2-sep-2026. La tabla vieja es roomix_properties_legacy.';
+
+-- El ALTER TABLE RENAME del corte arrastró la vista dependiente acm_barrios_disponibles
+-- a roomix_properties_legacy (las vistas siguen el rename por OID; las funciones no).
+-- Se repunta a la vista de compatibilidad: los conteos del desplegable de barrios del ACM
+-- pasan a salir de mercado_avisos.
+create or replace view public.acm_barrios_disponibles as
+ with red as (
+   select acm_norm(btrim(coalesce(nullif(r.neighborhood, ''), r.city, ''))) as clave,
+          mode() within group (order by btrim(coalesce(nullif(r.neighborhood, ''), r.city, ''))) as nombre,
+          count(*)::integer as avisos
+   from public.roomix_properties r
+   where r.is_active = true and r.embedding is not null
+     and btrim(coalesce(nullif(r.neighborhood, ''), r.city, '')) <> ''
+   group by 1
+ ), cat as (
+   select distinct c.barrio as clave from public.acm_barrio_relacion c
+ )
+ select coalesce(red.clave, cat.clave) as clave,
+        coalesce(red.nombre, initcap(cat.clave)) as nombre,
+        coalesce(red.avisos, 0) as avisos,
+        (cat.clave is not null) as en_mapa_de_zonas
+ from red full join cat on cat.clave = red.clave
+ where coalesce(red.avisos, 0) >= 25 or cat.clave is not null;
