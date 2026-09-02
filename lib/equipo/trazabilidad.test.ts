@@ -70,10 +70,10 @@ describe("construirTraza: el guion completo de Kevin", () => {
     ])
   })
 
-  it("la respuesta del asesor es su propio renglón (la confirmación que busca Kevin)", () => {
+  it("la respuesta del asesor es su propio renglón, como hecho, sin el texto del mensaje", () => {
     const asesor = traza.find((e) => e.categoria === "asesor")
     expect(asesor?.titulo).toBe("El asesor le respondió al cliente")
-    expect(asesor?.detalle).toContain("soy Ailén")
+    expect(asesor?.detalle).toBeUndefined()
   })
 
   it("los eventos usan la descripción legible que ya trae la base", () => {
@@ -81,13 +81,92 @@ describe("construirTraza: el guion completo de Kevin", () => {
   })
 })
 
+describe("construirTraza: hechos, no mensajes (feedback de Leonardo 2/9)", () => {
+  it("una corrida de mensajes seguidos del mismo lado se agrupa en un solo hecho", () => {
+    const traza = construirTraza({
+      mensajes: [
+        { role: "lead", message_type: "text", content: "hola", created_at: "2026-09-01T10:00:00Z" },
+        { role: "lead", message_type: "text", content: "estás?", created_at: "2026-09-01T10:00:10Z" },
+        { role: "lead", message_type: "audio", content: null, created_at: "2026-09-01T10:00:20Z" },
+        { role: "bot", message_type: "text", content: "hola!", created_at: "2026-09-01T10:01:00Z" },
+        { role: "bot", message_type: "text", content: "sí, contame", created_at: "2026-09-01T10:01:05Z" },
+        { role: "lead", message_type: "text", content: "quiero ver el depto", created_at: "2026-09-01T10:02:00Z" },
+      ],
+      eventos: [],
+    })
+    expect(traza.map((e) => e.titulo)).toEqual([
+      "El cliente escribió (3 mensajes)",
+      "El bot respondió (2 mensajes)",
+      "El cliente escribió",
+    ])
+    // el grupo conserva la hora del PRIMER mensaje de la corrida
+    expect(traza[0].ts).toBe("2026-09-01T10:00:00Z")
+  })
+
+  it("los renglones del chat no llevan el texto del mensaje (para eso está Ver el chat)", () => {
+    const traza = construirTraza({
+      mensajes: [{ role: "lead", message_type: "text", content: "algo privado", created_at: "2026-09-01T10:00:00Z" }],
+      eventos: [],
+    })
+    expect(traza[0].detalle).toBeUndefined()
+  })
+
+  it("una plantilla del bot corta la agrupación: es un hecho en sí misma", () => {
+    const traza = construirTraza({
+      mensajes: [
+        { role: "bot", message_type: "text", content: "te escribo…", created_at: "2026-09-01T10:00:00Z" },
+        { role: "bot", message_type: "template", content: "Hola Juan, retomo…", created_at: "2026-09-01T10:00:30Z" },
+        { role: "bot", message_type: "text", content: "…seguimos", created_at: "2026-09-01T10:01:00Z" },
+      ],
+      eventos: [],
+    })
+    expect(traza.map((e) => e.titulo)).toEqual([
+      "El bot respondió",
+      "Se le envió una plantilla de WhatsApp",
+      "El bot respondió",
+    ])
+  })
+})
+
+describe("construirTraza: notas del director ancladas", () => {
+  it("una nota anclada entra justo después del paso elegido, no al final", () => {
+    const traza = construirTraza({
+      mensajes: [
+        { role: "lead", message_type: "text", content: "hola", created_at: "2026-09-01T10:00:00Z" },
+        { role: "human", message_type: "text", content: "hola!", created_at: "2026-09-01T18:00:00Z" },
+      ],
+      eventos: [
+        { tipo: "escalera", descripcion: "Nivel 2 h → asesor avisado", ts: "2026-09-01T12:00:00Z" },
+        // Escrita HOY, pero anclada tras el aviso de las 12: va ahí, no al final.
+        {
+          tipo: "nota_director", descripcion: "Nota de Kevin: «lo llamé por teléfono, quedó en ir el jueves»",
+          ts: "2026-09-02T09:00:00Z", datos: { anclada_tras: "2026-09-01T12:00:00Z" },
+        },
+      ],
+    })
+    expect(traza.map((e) => e.categoria)).toEqual(["cliente", "aviso", "interno", "asesor"])
+    expect(traza[2].titulo).toContain("lo llamé por teléfono")
+  })
+
+  it("sin ancla, la nota se ordena por su propia fecha", () => {
+    const traza = construirTraza({
+      mensajes: [],
+      eventos: [
+        { tipo: "escalera", descripcion: "Nivel 2 h", ts: "2026-09-01T12:00:00Z" },
+        { tipo: "nota_director", descripcion: "Nota de Kevin: «visto»", ts: "2026-09-02T09:00:00Z" },
+      ],
+    })
+    expect(traza.map((e) => e.titulo)).toEqual(["Nivel 2 h", "Nota de Kevin: «visto»"])
+  })
+})
+
 describe("construirTraza: bordes", () => {
-  it("un audio del cliente no muestra detalle (no hay texto que recortar)", () => {
+  it("un audio del cliente es el mismo hecho que un texto: el cliente escribió", () => {
     const traza = construirTraza({
       mensajes: [{ role: "lead", message_type: "audio", content: null, created_at: "2026-09-01T10:00:00Z" }],
       eventos: [],
     })
-    expect(traza[0].titulo).toBe("El cliente mandó un audio")
+    expect(traza[0].titulo).toBe("El cliente escribió")
     expect(traza[0].detalle).toBeUndefined()
   })
 

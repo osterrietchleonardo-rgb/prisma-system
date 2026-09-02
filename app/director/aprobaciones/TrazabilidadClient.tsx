@@ -8,11 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import {
-  ArrowLeft, Bell, Bot, CalendarDays, EyeOff, Loader2, MessageSquare, RefreshCw, Search, Sparkles, UserCheck, Users,
+  ArrowLeft, Bell, Bot, CalendarDays, EyeOff, Loader2, MessageSquare, Plus, RefreshCw, Search, Sparkles, StickyNote, UserCheck, Users,
 } from "lucide-react"
 import {
-  listarConversacionesConActividad, trazaDeConversacion,
+  agregarNotaTraza, listarConversacionesConActividad, trazaDeConversacion,
   type ConversacionConActividad, type EstadoEquipo,
 } from "@/app/actions/equipo"
 import { fechaHoraAR, type CategoriaTraza, type EventoTraza } from "@/lib/equipo/trazabilidad"
@@ -49,6 +50,10 @@ export default function TrazabilidadClient({ conversaciones: inicial, asesores }
   const [traza, setTraza] = useState<Traza | null>(null)
   const [cargando, setCargando] = useState(false)
   const [refrescando, setRefrescando] = useState(false)
+  // La nota del director: "final" = al final de la historia; un número = después de ese renglón.
+  const [notaEn, setNotaEn] = useState<number | "final" | null>(null)
+  const [notaTexto, setNotaTexto] = useState("")
+  const [guardandoNota, setGuardandoNota] = useState(false)
 
   const filtradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
@@ -64,6 +69,8 @@ export default function TrazabilidadClient({ conversaciones: inicial, asesores }
     setSeleccion(conversationId)
     setCargando(true)
     setTraza(null)
+    setNotaEn(null)
+    setNotaTexto("")
     try {
       setTraza(await trazaDeConversacion(conversationId))
     } catch (e) {
@@ -71,6 +78,24 @@ export default function TrazabilidadClient({ conversaciones: inicial, asesores }
       setSeleccion(null)
     } finally {
       setCargando(false)
+    }
+  }
+
+  async function guardarNota() {
+    if (!seleccion || !traza || notaEn === null) return
+    setGuardandoNota(true)
+    try {
+      const ancla = notaEn === "final" ? null : traza.eventos[notaEn]?.ts ?? null
+      const r = await agregarNotaTraza(seleccion, notaTexto, ancla)
+      if (r.ok) {
+        setNotaEn(null)
+        setNotaTexto("")
+        setTraza(await trazaDeConversacion(seleccion))
+      } else {
+        toast.error(r.error)
+      }
+    } finally {
+      setGuardandoNota(false)
     }
   }
 
@@ -122,7 +147,7 @@ export default function TrazabilidadClient({ conversaciones: inicial, asesores }
               {conversaciones.length === 0 ? "Todavía no hay actividad registrada." : "Nada coincide con el filtro."}
             </CardContent></Card>
           )}
-          <div className="rounded-xl border divide-y overflow-hidden">
+          <div className="rounded-xl border divide-y overflow-hidden max-h-[70vh] overflow-y-auto">
             {filtradas.map((c) => (
               <button
                 key={c.conversation_id}
@@ -179,9 +204,28 @@ export default function TrazabilidadClient({ conversaciones: inicial, asesores }
                 )}
 
                 {!cargando && traza && traza.eventos.length > 0 && (
-                  <ol className="relative space-y-0">
-                    {traza.eventos.map((e, i) => <Renglon key={i} evento={e} />)}
-                  </ol>
+                  <>
+                    {/* Altura fija con scroll: la historia no estira la pantalla (pedido 2/9) */}
+                    <div className="relative space-y-0 max-h-[60vh] overflow-y-auto pr-1">
+                      {traza.eventos.map((e, i) => (
+                        <div key={i}>
+                          <Renglon evento={e} onNota={() => { setNotaEn(i); setNotaTexto("") }} />
+                          {notaEn === i && (
+                            <ComposerNota texto={notaTexto} onTexto={setNotaTexto} guardando={guardandoNota}
+                              onGuardar={guardarNota} onCancelar={() => setNotaEn(null)} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {notaEn === "final" ? (
+                      <ComposerNota texto={notaTexto} onTexto={setNotaTexto} guardando={guardandoNota}
+                        onGuardar={guardarNota} onCancelar={() => setNotaEn(null)} />
+                    ) : (
+                      <Button variant="outline" size="sm" onClick={() => { setNotaEn("final"); setNotaTexto("") }}>
+                        <StickyNote className="w-4 h-4 mr-1" /> Agregar una nota
+                      </Button>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -192,11 +236,11 @@ export default function TrazabilidadClient({ conversaciones: inicial, asesores }
   )
 }
 
-function Renglon({ evento }: { evento: EventoTraza }) {
+function Renglon({ evento, onNota }: { evento: EventoTraza; onNota: () => void }) {
   const estilo = ESTILO[evento.categoria]
   const Icono = estilo.icono
   return (
-    <li className="flex gap-3 py-2 border-l-2 border-muted pl-3 ml-2 relative">
+    <div className="group flex gap-3 py-2 border-l-2 border-muted pl-3 ml-2 relative">
       <span className="absolute -left-[9px] top-3 bg-background rounded-full">
         <Icono className={`w-4 h-4 ${estilo.color}`} />
       </span>
@@ -208,6 +252,40 @@ function Renglon({ evento }: { evento: EventoTraza }) {
         <p className={`text-sm ${evento.categoria === "asesor" ? "font-medium" : ""}`}>{evento.titulo}</p>
         {evento.detalle && <p className="text-xs text-muted-foreground break-words">«{evento.detalle}»</p>}
       </div>
-    </li>
+      <button
+        type="button"
+        onClick={onNota}
+        title="Agregar una nota acá"
+        className="self-start mt-1 p-1 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0"
+      >
+        <Plus className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  )
+}
+
+function ComposerNota({ texto, onTexto, guardando, onGuardar, onCancelar }: {
+  texto: string
+  onTexto: (t: string) => void
+  guardando: boolean
+  onGuardar: () => void
+  onCancelar: () => void
+}) {
+  return (
+    <div className="ml-5 my-2 p-3 rounded-lg border bg-muted/30 space-y-2">
+      <Textarea
+        value={texto}
+        onChange={(e) => onTexto(e.target.value)}
+        rows={2}
+        autoFocus
+        placeholder='Tu nota interna acá ("avisé por llamada", "me lo crucé en la ofi y le dije")'
+      />
+      <div className="flex gap-2">
+        <Button size="sm" onClick={onGuardar} disabled={guardando || texto.trim().length < 3}>
+          {guardando && <Loader2 className="w-4 h-4 mr-1 animate-spin" />} Guardar la nota
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onCancelar} disabled={guardando}>Cancelar</Button>
+      </div>
+    </div>
   )
 }

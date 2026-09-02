@@ -43,6 +43,8 @@ export type FilaEvento = {
   tipo: string
   descripcion: string
   ts: string
+  /** nota_director trae {anclada_tras}: el momento de la historia DESPUÉS del cual va la nota. */
+  datos?: Record<string, unknown> | null
 }
 
 export type FilaInterno = {
@@ -73,35 +75,42 @@ export function fechaHoraAR(iso: string): string {
   return `${v("day")}/${v("month")} ${v("hour")}:${v("minute")}`
 }
 
-const TITULO_POR_TIPO_DE_MENSAJE: Record<string, string> = {
-  audio: "mandó un audio",
-  image: "mandó una imagen",
-  document: "mandó un documento",
-  video: "mandó un video",
-}
-
-function eventoDeMensaje(m: FilaMensaje): EventoTraza | null {
-  const queMando = TITULO_POR_TIPO_DE_MENSAJE[m.message_type ?? "text"]
-  switch (m.role) {
-    case "lead":
-      return {
-        ts: m.created_at,
-        categoria: "cliente",
-        titulo: queMando ? `El cliente ${queMando}` : "El cliente escribió",
-        detalle: queMando ? undefined : recortar(m.content) || undefined,
-      }
-    case "bot":
-      if (m.message_type === "template") {
-        return { ts: m.created_at, categoria: "bot", titulo: "Se le envió una plantilla de WhatsApp", detalle: recortar(m.content) || undefined }
-      }
-      return { ts: m.created_at, categoria: "bot", titulo: "El bot respondió", detalle: recortar(m.content) || undefined }
-    case "human":
-      return { ts: m.created_at, categoria: "asesor", titulo: "El asesor le respondió al cliente", detalle: recortar(m.content) || undefined }
-    case "internal":
-      return { ts: m.created_at, categoria: "interno", titulo: "Marca interna (el cliente no la ve)", detalle: recortar(m.content) || undefined }
-    default:
-      return null // rol desconocido: mejor omitir que inventar
+/**
+ * Los mensajes del chat entran como HECHOS, no como mensajes (Leonardo, 2/9): una corrida
+ * de mensajes seguidos del mismo lado se vuelve un solo renglón ("El cliente escribió
+ * (3 mensajes)"), sin el texto. La conversación entera está a un click en "Ver el chat".
+ * Una plantilla del bot y los mensajes internos sí van sueltos: son hechos en sí mismos.
+ */
+function hechosDeMensajes(mensajes: FilaMensaje[]): EventoTraza[] {
+  const ordenados = [...mensajes].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at))
+  const hechos: Array<EventoTraza & { grupo?: string; cuenta?: number }> = []
+  for (const m of ordenados) {
+    // Renglones individuales: la plantilla, lo interno. Cortan cualquier agrupación en curso.
+    if (m.role === "bot" && m.message_type === "template") {
+      hechos.push({ ts: m.created_at, categoria: "bot", titulo: "Se le envió una plantilla de WhatsApp" })
+      continue
+    }
+    if (m.role === "internal") {
+      hechos.push({ ts: m.created_at, categoria: "interno", titulo: "Marca interna (el cliente no la ve)", detalle: recortar(m.content) || undefined })
+      continue
+    }
+    const base = m.role === "lead"
+      ? { grupo: "lead", categoria: "cliente" as const, titulo: "El cliente escribió" }
+      : m.role === "bot"
+        ? { grupo: "bot", categoria: "bot" as const, titulo: "El bot respondió" }
+        : m.role === "human"
+          ? { grupo: "human", categoria: "asesor" as const, titulo: "El asesor le respondió al cliente" }
+          : null
+    if (!base) continue // rol desconocido: mejor omitir que inventar
+    const anterior = hechos[hechos.length - 1]
+    if (anterior?.grupo === base.grupo) {
+      anterior.cuenta = (anterior.cuenta ?? 1) + 1
+      anterior.titulo = `${base.titulo} (${anterior.cuenta} mensajes)`
+      continue // el renglón conserva la hora del PRIMER mensaje de la corrida
+    }
+    hechos.push({ ts: m.created_at, ...base })
   }
+  return hechos.map(({ grupo: _g, cuenta: _c, ...e }) => e)
 }
 
 /** A qué categoría va cada tipo de lead_eventos. Los que no figuran caen por prefijo o en "agente". */
@@ -117,6 +126,7 @@ const CATEGORIA_POR_TIPO: Record<string, CategoriaTraza> = {
   escalamiento_simulado: "aviso",
   aviso_equipo: "aviso",
   aviso_simulado: "aviso",
+  nota_director: "interno",
   asesor_tomo: "equipo",
   asesor_no_puede: "equipo",
   reasignacion: "equipo",
@@ -139,6 +149,16 @@ function eventoDeLeadEvento(e: FilaEvento): EventoTraza {
   return { ts: e.ts, categoria: categoriaDeEvento(e.tipo), titulo: e.descripcion }
 }
 
+/**
+ * Dónde va cada cosa en la historia. Una nota del director anclada ("agregá esto entre
+ * tal paso y el siguiente") se ordena justo DESPUÉS de su ancla: el medio milisegundo
+ * de más nunca empata con un evento real y no toca el ts verdadero de la nota.
+ */
+function claveDeOrden(e: { ts: string; datos?: Record<string, unknown> | null }): number {
+  const ancla = typeof e.datos?.anclada_tras === "string" ? Date.parse(e.datos.anclada_tras) : NaN
+  return Number.isNaN(ancla) ? Date.parse(e.ts) : ancla + 0.5
+}
+
 function eventoDeInterno(i: FilaInterno): EventoTraza {
   return {
     ts: i.ts,
@@ -149,8 +169,8 @@ function eventoDeInterno(i: FilaInterno): EventoTraza {
 }
 
 /**
- * Fusiona las fuentes en una sola línea de tiempo, del evento más viejo al más nuevo.
- * Con timestamps iguales el orden es estable (primero mensajes, después eventos, después internos),
+ * Fusiona las fuentes en una sola línea de tiempo, del hecho más viejo al más nuevo.
+ * Con claves iguales el orden es estable (primero mensajes, después eventos, después internos),
  * así una corrida repetida siempre pinta lo mismo.
  */
 export function construirTraza(entrada: {
@@ -158,16 +178,13 @@ export function construirTraza(entrada: {
   eventos: FilaEvento[]
   internos?: FilaInterno[]
 }): EventoTraza[] {
-  const todos: EventoTraza[] = [
-    ...entrada.mensajes.map(eventoDeMensaje).filter((e): e is EventoTraza => e !== null),
-    ...entrada.eventos.map(eventoDeLeadEvento),
-    ...(entrada.internos ?? []).map(eventoDeInterno),
+  const todos: Array<{ e: EventoTraza; clave: number }> = [
+    ...hechosDeMensajes(entrada.mensajes).map((e) => ({ e, clave: Date.parse(e.ts) })),
+    ...entrada.eventos.map((ev) => ({ e: eventoDeLeadEvento(ev), clave: claveDeOrden(ev) })),
+    ...(entrada.internos ?? []).map(eventoDeInterno).map((e) => ({ e, clave: Date.parse(e.ts) })),
   ]
   return todos
-    .map((e, i) => ({ e, i }))
-    .sort((a, b) => {
-      const dif = Date.parse(a.e.ts) - Date.parse(b.e.ts)
-      return dif !== 0 ? dif : a.i - b.i
-    })
+    .map(({ e, clave }, i) => ({ e, clave, i }))
+    .sort((a, b) => (a.clave !== b.clave ? a.clave - b.clave : a.i - b.i))
     .map(({ e }) => e)
 }

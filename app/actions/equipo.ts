@@ -604,7 +604,7 @@ export async function trazaDeConversacion(conversationId: string): Promise<{
   const [{ data: mensajes }, { data: eventos }, { data: internos }] = await Promise.all([
     admin.from("wa_messages").select("role, message_type, content, created_at")
       .eq("conversation_id", conversationId).order("created_at", { ascending: false }).limit(TOPE_FILAS_TRAZA),
-    admin.from("lead_eventos").select("tipo, descripcion, ts")
+    admin.from("lead_eventos").select("tipo, descripcion, ts, datos")
       .eq("conversation_id", conversationId).order("ts", { ascending: false }).limit(TOPE_FILAS_TRAZA),
     admin.from("interacciones_canal").select("contenido, ts")
       .eq("conversation_id", conversationId).eq("direccion", "entrada")
@@ -621,4 +621,30 @@ export async function trazaDeConversacion(conversationId: string): Promise<{
     : "Un cliente"
   const asesor = c.agent_id ? (await perfil(c.agent_id))?.full_name ?? null : null
   return { lead: { nombre, telefono: c.contact_phone ?? null, asesor }, eventos: traza }
+}
+
+/**
+ * Nota interna del director en la bitácora ("avisé por llamada", "me lo crucé en la ofi").
+ * `ancladaTras` es el ts del renglón DESPUÉS del cual va la nota; sin él, va al final
+ * por su propia fecha. Solo la ven los directores: vive en lead_eventos, no en el chat.
+ */
+export async function agregarNotaTraza(conversationId: string, texto: string, ancladaTras?: string | null): Promise<Resultado> {
+  try {
+    const yo = await quienSoy()
+    if (yo.role !== "director") return { ok: false, error: "Solo el director agrega notas acá." }
+    const limpio = texto.replace(/\s+/g, " ").trim()
+    if (limpio.length < 3) return { ok: false, error: "Escribí la nota (mínimo 3 letras)." }
+    if (limpio.length > 500) return { ok: false, error: "Muy larga: hasta 500 caracteres." }
+    const c = await leerChat(yo, conversationId)
+    const ancla = ancladaTras && !Number.isNaN(Date.parse(ancladaTras)) ? new Date(ancladaTras).toISOString() : null
+    await registrarEvento(
+      createAdminClient(), c.agency_id, c.id, "nota_director",
+      `Nota de ${yo.full_name}: «${limpio}»`,
+      { perfil_id: yo.id, ...(ancla ? { anclada_tras: ancla } : {}) },
+      `director:${yo.id}`
+    )
+    return { ok: true }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
 }
