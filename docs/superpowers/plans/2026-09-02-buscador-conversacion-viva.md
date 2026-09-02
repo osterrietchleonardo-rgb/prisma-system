@@ -61,6 +61,18 @@ al final (el usage llega con `stream_options: { include_usage: true }`).
   Escritorio + celular (390×844). `state-save` tras el login (gotcha del dev local).
 - Tests + tsc + build; OK de Leonardo; PR a main; docs (TECNICO/LOGICA breve) + bitácora.
 
+## Agregados de Leonardo durante la construcción (2/9)
+
+- **Markdown renderizado** (HECHO en esta rama): los agentes escriben markdown y el chat lo
+  mostraba crudo (numerales, asteriscos) o directamente se los borraba (`replace(/\*\*/g,"")`
+  en las 4 páginas). Nuevo `components/shared/MarkdownIA.tsx` (react-markdown + remark-gfm,
+  estilos medidos para burbuja de chat); los mensajes del asistente pasan por ahí en los 4
+  chats; los del usuario quedan planos.
+- **Herramienta de PDF/reporte descargable** (PARA EL PUNTO 2): que el Buscador pueda armar
+  un PDF con propiedades elegidas y el Tutor uno con la info consultada, descargables. Encaja
+  exactamente en el bucle con herramientas; referencia local: skill Vakdor-PDF.
+
 ## Qué NO entra acá
-Bucle con herramientas (punto 2), memoria como proyección del diario, tocar la lógica de
-búsqueda/SQL, el modelo (sigue gpt-5.4-mini), y los horarios de notificación de Kevin.
+Bucle con herramientas (punto 2 — ahora incluye la herramienta de PDF), memoria como
+proyección del diario, tocar la lógica de búsqueda/SQL, el modelo (sigue gpt-5.4-mini), y los
+horarios de notificación de Kevin.

@@ -1,6 +1,7 @@
 "use client"
 
 import { consumirStreamIA } from "@/lib/buscador-stream"
+import { MarkdownIA } from "@/components/shared/MarkdownIA"
 
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Sparkles, Send, Bot, User, Loader2, BookOpen, Quote, ChevronRight, MessageSquare, Plus, History, BrainCircuit, Pencil, Trash2, Check, X, GraduationCap } from "lucide-react"
@@ -439,7 +440,6 @@ export default function AdvisorTutorIAPage() {
                   )}>
                     {fragments.map((fragment, idx) => {
                       const isFirst = idx === 0;
-                      const cleanFragment = fragment.replace(/\*\*/g, "");
 
                       return (
                         <div
@@ -450,10 +450,10 @@ export default function AdvisorTutorIAPage() {
                               ? "bg-accent/15 dark:bg-accent/20 text-[#432c18] dark:text-accent-foreground border-accent/10 rounded-tr-none" 
                               : "bg-background border-border/40 rounded-tl-none",
                             !isFirst && (message.role === "user" ? "rounded-tr-[1.5rem]" : "rounded-tl-[1.5rem]"),
-                             "whitespace-pre-wrap"
+                             message.role === "user" && "whitespace-pre-wrap"
                           )}
                         >
-                          {cleanFragment}
+                          {message.role === "assistant" ? <MarkdownIA texto={fragment} /> : fragment}
                           
                           {isFirst && (
                              <div className={cn(
