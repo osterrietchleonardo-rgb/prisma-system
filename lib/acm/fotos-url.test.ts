@@ -103,6 +103,28 @@ describe("urlFotoRed", () => {
   });
 });
 
+// El corte a mercado_avisos (2-sep-2026): las fotos de la fuente nueva viven en
+// imgar.zonapropcdn.com (verificado contra produccion: 20.407 avisos, un solo host). Van por
+// el MISMO proxy que las de roomix y por el mismo motivo: que el navegador del asesor no
+// deje su Referer en el CDN de un tercero.
+const MERCADO = "https://imgar.zonapropcdn.com/avisos/1/00/59/17/71/85/wxh/2054528304.jpg";
+
+describe("urlFotoRed con el CDN de ZonaProp (mercado_avisos)", () => {
+  it("manda la foto de ZonaProp por nuestro proxy", () => {
+    expect(urlFotoRed(MERCADO)).toBe(`/api/foto-red?u=${encodeURIComponent(MERCADO)}`);
+  });
+
+  it("no cae con un host impostor que CONTIENE al de ZonaProp", () => {
+    const impostor = "https://imgar.zonapropcdn.com.evil.com/a.jpg";
+    expect(urlFotoRed(impostor)).toBe(impostor);
+  });
+
+  it("no le cambia la extension: el arreglo .webp->.jpg es un problema de roomix, no de ZonaProp", () => {
+    const webp = "https://imgar.zonapropcdn.com/avisos/1/foto.webp";
+    expect(urlFotoRed(webp)).toBe(`/api/foto-red?u=${encodeURIComponent(webp)}`);
+  });
+});
+
 // El agujero que encontro una revision el 26/08/2026: el proxy validaba el archivo con
 // `tipo.startsWith("image/")`, y `image/svg+xml` pasa ese filtro. Un SVG no es una foto: es
 // texto que puede traer un <script>, y servido desde prisma.vakdor.com correria con los

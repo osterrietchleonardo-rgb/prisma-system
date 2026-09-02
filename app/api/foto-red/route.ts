@@ -21,7 +21,7 @@
 // navegable con el material de un tercero.
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
-import { HOSTS_ROOMIX, esTipoFotoPermitido } from "@/lib/acm/fotos-url";
+import { HOSTS_RED, esTipoFotoPermitido } from "@/lib/acm/fotos-url";
 
 export const runtime = "nodejs";
 
@@ -63,7 +63,7 @@ export async function GET(req: Request) {
   } catch {
     return new Response("URL invalida", { status: 400 });
   }
-  if (parsed.protocol !== "https:" || !HOSTS_ROOMIX.some((re) => re.test(parsed.hostname))) {
+  if (parsed.protocol !== "https:" || !HOSTS_RED.some((re) => re.test(parsed.hostname))) {
     return new Response("host no permitido", { status: 400 });
   }
 

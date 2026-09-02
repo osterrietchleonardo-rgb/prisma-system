@@ -27,6 +27,13 @@ export function normalizarImagenes(images: unknown): string[] {
 export const HOSTS_CARTERA = [/^static\.tokkobroker\.com$/, /\.supabase\.co$/];
 /** CDN real de fotos de la red de colaboración (roomix). */
 export const HOSTS_ROOMIX = [/^cdn\.roomix\.ai$/];
+/** CDN real de fotos de `mercado_avisos` (ZonaProp). Verificado contra producción el
+ *  2-sep-2026: los 20.407 avisos con foto usan un único host, imgar.zonapropcdn.com. */
+export const HOSTS_MERCADO = [/(^|\.)zonapropcdn\.com$/];
+/** La red completa: toda foto que no es de la cartera propia sale por nuestro proxy
+ *  (`RUTA_FOTO_RED`), por el mismo motivo en las dos fuentes — que el navegador del asesor
+ *  no deje su `Referer` escrito en el CDN de un tercero. */
+export const HOSTS_RED = [...HOSTS_ROOMIX, ...HOSTS_MERCADO];
 
 /** Primeras `n` URLs de `images` que pasan la allowlist de hosts dada, en el orden en que están
  *  guardadas (sin curar — política validada en la ronda de holdout de San Telmo). */
@@ -94,7 +101,7 @@ export function urlFotoRed(url: string): string {
   } catch {
     return url;
   }
-  if (parsed.protocol !== "https:" || !HOSTS_ROOMIX.some((re) => re.test(parsed.hostname))) return url;
+  if (parsed.protocol !== "https:" || !HOSTS_RED.some((re) => re.test(parsed.hostname))) return url;
   return `${RUTA_FOTO_RED}?u=${encodeURIComponent(normalizarFotoRoomix(url))}`;
 }
 

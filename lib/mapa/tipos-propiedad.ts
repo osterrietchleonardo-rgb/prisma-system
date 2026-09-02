@@ -11,18 +11,17 @@
 //     Oficina 7 · Hotel 3 · Weekend House 3 · Garage 3 · Warehouse 1 ·
 //     Commercial Building 1
 //
-//   colaboracion (roomix_properties, 74.413 activas)
-//     Apartment 51.343 · House 11.357 · Accommodation 11.193
+//   colaboracion (mercado_avisos, contado el 2026-09-02 tras el corte)
+//     Departamento 19.628 · Casa 234 · Local comercial 211 · Terrenos 174 · PH 140 ·
+//     Edificio 28 · Cochera 14 · Oficina comercial 5 · Fondo de comercio 2
 //
 // POR QUE LAS OPCIONES SON GRUESAS
-// La red de colaboracion solo distingue TRES canastas, y "Accommodation" es el cajon
-// de sastre: promedia 0,8 ambientes y sus titulos hablan de locales, oficinas y
-// galpones. Ofrecer "Cochera" cuando la red no sabe que es una cochera seria prometer
-// en pantalla algo que la base no puede cumplir. Estas cuatro opciones son la
-// granularidad real que se puede comparar entre cartera y colaboracion.
+// El desplegable se mantiene en cuatro canastas aunque la fuente nueva distinga mas:
+// son la granularidad que se puede comparar entre cartera y colaboracion sin prometer
+// en pantalla algo que una de las dos no puede cumplir.
 //
-// "Casa / PH" incluye los PH a proposito: la red los mete adentro de House (hay
-// titulos como "PH 3 Ambientes + Quincho" clasificados asi).
+// "Casa / PH" junta Casa y PH a proposito: la etiqueta del desplegable siempre fue esa,
+// y mercado_avisos los trae separados.
 
 export interface TipoMapa {
   /** Lo que viaja por la URL y se guarda en las zonas. Estable, no cambia con el texto. */
@@ -31,7 +30,7 @@ export interface TipoMapa {
   etiqueta: string
   /** Valores de properties.property_type. Vacio = la cartera no distingue este tipo. */
   cartera: string[]
-  /** Valores de roomix_properties.property_type. Vacio = la red no distingue este tipo. */
+  /** Valores de mercado_avisos.tipo (vía la vista roomix_properties). Vacio = la red no distingue este tipo. */
   colaboracion: string[]
 }
 
@@ -40,26 +39,26 @@ export const TIPOS_MAPA: TipoMapa[] = [
     valor: "departamento",
     etiqueta: "Departamento",
     cartera: ["Departamento", "Condo"],
-    colaboracion: ["Apartment"],
+    colaboracion: ["Departamento"],
   },
   {
     valor: "casa",
     etiqueta: "Casa / PH",
     cartera: ["Casa", "Weekend House"],
-    colaboracion: ["House"],
+    colaboracion: ["Casa", "PH"],
   },
   {
     valor: "comercial",
     etiqueta: "Comercial y otros",
     cartera: ["Bussiness Premises", "Commercial Building", "Oficina", "Warehouse", "Garage", "Hotel"],
-    colaboracion: ["Accommodation"],
+    colaboracion: ["Local comercial", "Oficina comercial", "Fondo de comercio", "Edificio", "Cochera"],
   },
   {
-    // La red no tiene canasta para los lotes: solo aparecen los de la cartera propia.
+    // Desde el corte a mercado_avisos la red SÍ distingue los lotes (Terrenos).
     valor: "lote",
     etiqueta: "Lote / Terreno",
     cartera: ["Lote"],
-    colaboracion: [],
+    colaboracion: ["Terrenos"],
   },
 ]
 
@@ -71,7 +70,9 @@ export const TIPOS_MAPA: TipoMapa[] = [
  * eso se leia literal y quedaba "Apartment · 1 amb. · 50 m2".
  */
 const EN_CASTELLANO: Record<string, string> = {
-  // red de colaboracion
+  // red de colaboracion: mercado_avisos ya viene en castellano; solo se retocan los plurales.
+  Terrenos: "Lote / Terreno",
+  // legado roomix (por si quedara algun dato viejo dando vueltas)
   Apartment: "Departamento",
   House: "Casa / PH",
   Accommodation: "Comercial y otros",

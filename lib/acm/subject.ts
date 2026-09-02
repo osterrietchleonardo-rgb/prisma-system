@@ -88,14 +88,18 @@ const PROP_TYPE: Record<TipoPropiedad, string[]> = {
   oficina: ["%oficina%", "%office%"],
   terreno: ["%lote%", "%terreno%", "%land%"],
 };
-// roomix: tipos schema.org en inglés (Apartment, Accommodation, House).
+// red de colaboración (mercado_avisos, desde el corte del 2-sep-2026): tipos reales de
+// ZonaProp en castellano. Verificado contra producción: Departamento 19.628 · Casa 234 ·
+// Local comercial 211 · Terrenos 174 · PH 140 · Edificio 28 · Cochera 14 · Oficina
+// comercial 5 · Fondo de comercio 2. El SQL matchea `tipo ilike patrón OR titulo ilike
+// patrón`, así que el patrón en castellano también pesca los títulos.
 const ROOMIX_TYPE: Record<TipoPropiedad, string[]> = {
-  departamento: ["%apartment%", "%accommodation%", "%condo%"],
-  casa: ["%house%", "%singlefamily%"],
-  ph: ["%apartment%", "%house%", "%accommodation%"],
-  local: ["%commercial%", "%store%"],
-  oficina: ["%office%"],
-  terreno: ["%land%"],
+  departamento: ["%departamento%"],
+  casa: ["%casa%"],
+  ph: ["%ph%"],
+  local: ["%local%", "%fondo de comercio%"],
+  oficina: ["%oficina%"],
+  terreno: ["%terreno%"],
 };
 
 export function propTypePatterns(tipo?: TipoPropiedad): string[] {

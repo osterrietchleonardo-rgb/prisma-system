@@ -30,3 +30,35 @@ describe("sujetoToEmbeddingText", () => {
     expect(sujetoToEmbeddingText({ ...base, descripcion_ia: "   " })).toBe(sujetoToEmbeddingText(base));
   });
 });
+
+// El corte a mercado_avisos (2-sep-2026): los comparables de la red dejaron la taxonomía
+// schema.org de roomix (Apartment/House/Accommodation) y pasaron a los tipos reales de
+// ZonaProp en castellano (Departamento, Casa, PH, Local comercial, Terrenos, Oficina
+// comercial…). Estos tests simulan el `r.tipo ilike patron` de acm_match_roomix: si los
+// patrones no matchean el vocabulario real, el ACM devuelve CERO comparables de la red.
+import { roomixTypePatterns } from "./subject";
+
+const ilikeMatchea = (valor: string, patrones: string[]) =>
+  patrones.some((p) => new RegExp("^" + p.replaceAll("%", ".*") + "$", "i").test(valor));
+
+describe("roomixTypePatterns contra los tipos reales de mercado_avisos", () => {
+  it("departamento matchea 'Departamento'", () => {
+    expect(ilikeMatchea("Departamento", roomixTypePatterns("departamento"))).toBe(true);
+  });
+  it("casa matchea 'Casa'", () => {
+    expect(ilikeMatchea("Casa", roomixTypePatterns("casa"))).toBe(true);
+  });
+  it("ph matchea 'PH'", () => {
+    expect(ilikeMatchea("PH", roomixTypePatterns("ph"))).toBe(true);
+  });
+  it("terreno matchea 'Terrenos'", () => {
+    expect(ilikeMatchea("Terrenos", roomixTypePatterns("terreno"))).toBe(true);
+  });
+  it("local matchea 'Local comercial' y 'Fondo de comercio'", () => {
+    expect(ilikeMatchea("Local comercial", roomixTypePatterns("local"))).toBe(true);
+    expect(ilikeMatchea("Fondo de comercio", roomixTypePatterns("local"))).toBe(true);
+  });
+  it("oficina matchea 'Oficina comercial'", () => {
+    expect(ilikeMatchea("Oficina comercial", roomixTypePatterns("oficina"))).toBe(true);
+  });
+});

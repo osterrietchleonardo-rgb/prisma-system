@@ -36,15 +36,15 @@ import {
   type AtributosFotoIA,
 } from "@/lib/acm/analisis-fotos";
 import { descargarFotoValidada } from "@/lib/acm/fotos-descarga";
-import { normalizarImagenes, primerasFotosPermitidas, HOSTS_CARTERA, HOSTS_ROOMIX } from "@/lib/acm/fotos-url";
+import { normalizarImagenes, primerasFotosPermitidas, HOSTS_CARTERA, HOSTS_RED } from "@/lib/acm/fotos-url";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 // Un comparable puede venir de la cartera propia (fotos de Tokko/Supabase) o de la red de
-// colaboración (CDN de roomix): la allowlist combina los hosts de las dos fuentes porque acá no
-// se sabe de antemano cuál va a resolver cada URL.
-const HOSTS_PERMITIDOS = [...HOSTS_CARTERA, ...HOSTS_ROOMIX];
+// colaboración (CDN de roomix o de ZonaProp/mercado_avisos): la allowlist combina los hosts de
+// las fuentes porque acá no se sabe de antemano cuál va a resolver cada URL.
+const HOSTS_PERMITIDOS = [...HOSTS_CARTERA, ...HOSTS_RED];
 
 interface ComparableIn {
   id: string;
