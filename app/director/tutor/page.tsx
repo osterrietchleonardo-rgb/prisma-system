@@ -1,5 +1,7 @@
 "use client"
 
+import { consumirStreamIA } from "@/lib/buscador-stream"
+
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Sparkles, Send, Bot, User, Loader2, BookOpen, Quote, ChevronRight, MessageSquare, Plus, History, BrainCircuit, Pencil, Trash2, Check, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -32,6 +34,9 @@ export default function TutorIAPage() {
   ])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  // La conversacion en vivo: el paso que el Tutor esta haciendo, y el texto a medida que escribe.
+  const [pasoVivo, setPasoVivo] = useState<string | null>(null)
+  const [textoVivo, setTextoVivo] = useState<string | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -98,6 +103,8 @@ export default function TutorIAPage() {
       console.error("Error loading session:", e)
     } finally {
       setIsLoading(false)
+      setPasoVivo(null)
+      setTextoVivo(null)
     }
   }
 
@@ -155,6 +162,8 @@ export default function TutorIAPage() {
     setInput("")
     setMessages(prev => [...prev, { role: "user", content: userMessage, created_at: new Date().toISOString() }])
     setIsLoading(true)
+    setPasoVivo("Leyendo tu pregunta…")
+    setTextoVivo("")
 
     try {
       const response = await fetch("/api/ai/tutor", {
@@ -166,24 +175,36 @@ export default function TutorIAPage() {
             role: m.role, 
             content: m.content 
           })),
-          sessionId: currentSessionId
+          sessionId: currentSessionId,
+          stream: true
         })
       })
 
       if (!response.ok) throw new Error("Error en el servidor")
 
-      const data = await response.json()
-      
-      if (!currentSessionId && data.sessionId) {
-        setCurrentSessionId(data.sessionId)
+      // El final llega igual por stream o por JSON: aca se cuelga el mensaje completo.
+      const terminar = (data: { text?: string; sessionId?: string | null; sources?: Message["sources"] }) => {
+        if (!currentSessionId && data.sessionId) setCurrentSessionId(data.sessionId)
+        setMessages(prev => [...prev, {
+          role: "assistant",
+          content: data.text ?? "",
+          sources: data.sources,
+          created_at: new Date().toISOString()
+        }])
       }
 
-      setMessages(prev => [...prev, { 
-        role: "assistant", 
-        content: data.text,
-        sources: data.sources,
-        created_at: new Date().toISOString() 
-      }])
+      let errorDelStream: string | null = null
+      const modo = await consumirStreamIA(response, (e) => {
+        if (e.tipo === "paso") setPasoVivo(e.texto)
+        else if (e.tipo === "delta") { setPasoVivo(null); setTextoVivo(prev => (prev ?? "") + e.texto) }
+        else if (e.tipo === "final") terminar(e as Parameters<typeof terminar>[0])
+        else if (e.tipo === "error") errorDelStream = e.error
+      })
+      if (errorDelStream) throw new Error(errorDelStream)
+      if (modo === null) {
+        // El server respondio JSON clasico (version vieja): mismo camino de siempre.
+        terminar(await response.json())
+      }
 
       // Auto-refresh credit badge after consumption
       window.dispatchEvent(new CustomEvent('prisma-refresh-credits'))
@@ -482,12 +503,16 @@ export default function TutorIAPage() {
                   <Loader2 className="w-6 h-6 animate-spin" />
                 </div>
                 <div className="bg-background/50 border border-border/50 px-6 py-5 rounded-[2rem] rounded-tl-none shadow-inner">
+                  {textoVivo ? (
+                    <p className="text-sm whitespace-pre-wrap max-w-[60ch]">{textoVivo}<span className="animate-pulse">▍</span></p>
+                  ) : (
                   <div className="flex gap-1.5 items-center text-sm font-medium text-muted-foreground italic">
                     <span className="animate-bounce delay-0">.</span>
                     <span className="animate-bounce delay-150">.</span>
                     <span className="animate-bounce delay-300">.</span>
-                    <span className="ml-3 uppercase tracking-widest text-[10px] font-bold text-accent">Analizando conocimiento y actualizando historial...</span>
+                    <span className="ml-3 uppercase tracking-widest text-[10px] font-bold text-accent">{pasoVivo ?? "Pensando…"}</span>
                   </div>
+                  )}
                 </div>
               </div>
             )}

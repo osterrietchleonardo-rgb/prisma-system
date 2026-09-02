@@ -7,13 +7,58 @@ import { openaiIA } from "@/lib/openai"
 
 export const dynamic = "force-dynamic";
 
+type EventoTutor =
+  | { tipo: "paso"; texto: string }
+  | { tipo: "delta"; texto: string }
+  | { tipo: "final"; [k: string]: unknown }
+  | { tipo: "error"; error: string }
+
 export async function POST(req: NextRequest) {
+  const body = await req.json()
+
+  // Modo clásico (sin stream): exactamente la respuesta JSON de siempre.
+  if (!body.stream) {
+    try {
+      return NextResponse.json(await procesarTutor(body, () => {}))
+    } catch (error: any) {
+      console.error("Tutor IA API Error:", error)
+      return NextResponse.json({ error: error.message || "Error interno" }, { status: 500 })
+    }
+  }
+
+  // Modo en vivo: NDJSON — pasos, texto a medida que se escribe, y el final.
+  const encoder = new TextEncoder()
+  const stream = new ReadableStream({
+    async start(controller) {
+      const emitir = (e: EventoTutor) => {
+        try { controller.enqueue(encoder.encode(JSON.stringify(e) + "\n")) } catch { /* cliente cortó */ }
+      }
+      try {
+        emitir({ tipo: "final", ...(await procesarTutor(body, emitir)) })
+      } catch (error: any) {
+        console.error("Tutor IA API Error (stream):", error)
+        emitir({ tipo: "error", error: error?.message ?? String(error) })
+      } finally {
+        try { controller.close() } catch { /* ya cerrado */ }
+      }
+    },
+  })
+  return new Response(stream, {
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache" },
+  })
+}
+
+async function procesarTutor(
+  entrada: { message: string; history?: unknown[]; sessionId?: string | null; stream?: boolean },
+  emitir: (e: EventoTutor) => void,
+) {
   const supabase = createClient()
-  
-  try {
+
+  {
     const { userId, agencyId, role } = await requireTenant();
-    
-    const { message, history, sessionId } = await req.json()
+
+    const { message, history, sessionId } = entrada
+    const enVivo = Boolean(entrada.stream)
 
     // Consume credits before processing (returns transaction ID for real-cost tracking)
     const txId = await consumeAiCredits("tutor_ia", 1, `Tutor Message: ${message.substring(0, 50)}`);
@@ -53,6 +98,7 @@ export async function POST(req: NextRequest) {
     
     Responde ÚNICAMENTE con la palabra de la intención.`;
 
+    emitir({ tipo: "paso", texto: "Leyendo tu pregunta…" })
     const intentCheck = await openaiIA.generateContent({
       contents: [{ role: "user", parts: [{ text: intentAnalysisPrompt }] }]
     })
@@ -62,6 +108,7 @@ export async function POST(req: NextRequest) {
     let documents = []
 
     if (isRetrieval) {
+      emitir({ tipo: "paso", texto: "Buscando en los manuales y documentos de tu agencia…" })
       const queryEmbedding = await generateEmbedding(message)
       const { data: dbDocs, error: rpcError } = await supabase.rpc("match_agency_documents", {
         query_embedding: queryEmbedding,
@@ -82,10 +129,12 @@ export async function POST(req: NextRequest) {
     Tu objetivo es ayudar a los asesores y directores a entender sus procesos, manuales y herramientas basándote en la información que han subido.
 
     TU PERSONALIDAD Y TONO:
-    - Utilizas un tono profesional, formal y respetuoso en español (voseo formal: "mirá", "tenés", pero sin coloquialismos como "che" o "viste").
-    - Eres un asesor corporativo. Mantienes la formalidad sin dejar de ser resolutivo y claro.
-    - Tus respuestas deben ser precisas, bien estructuradas y directas al punto.
-    - Tienes iniciativa. Si notas que el usuario tiene dudas, ofrece proactivamente evaluarlo o profundizar en la explicación.
+    - Sos un mentor con experiencia real en inmobiliarias: cercano, claro y con ganas de que la persona aprenda. Voseo rioplatense natural ("mirá", "tenés", "dale"), cálido sin perder precisión.
+    - REACCIONÁ a lo que te cuentan antes de explicar: si alguien dice "me trabé con esto" o "es mi primera semana", acusá recibo en media frase — que se note que escuchaste — y recién ahí andá al contenido.
+    - VARIÁ la forma: no empieces dos respuestas seguidas igual ni cierres siempre con la misma fórmula. A veces cerrás con una pregunta para chequear que se entendió, a veces con un ejemplo, a veces con nada.
+    - Explicá como se explica en persona: primero la idea en una frase simple, después el detalle. Viñetas solo cuando de verdad ordenan.
+    - Tenés iniciativa: si notás dudas, ofrecé profundizar o tomar una mini-evaluación — con tus palabras, no siempre la misma frase.
+    - Frases PROHIBIDAS por robóticas: "¡Claro!", "Por supuesto", "¿En qué más puedo ayudarte?", "No dudes en", "Estoy aquí para", "Como asistente".
     
     MANEJO DEL CONOCIMIENTO:
     - SOLO si hay información en la "BASE DE CONOCIMIENTO" de abajo, usala como fuente principal.
@@ -106,13 +155,18 @@ export async function POST(req: NextRequest) {
       parts: [{ text: m.content }]
     }))
 
-    const result = await openaiIA.generateContent({
+    emitir({ tipo: "paso", texto: "Escribiendo la respuesta…" })
+    const contenidos = {
       contents: [
         { role: "user", parts: [{ text: systemPrompt }] },
         ...chatHistory,
         { role: "user", parts: [{ text: message }] }
       ]
-    })
+    }
+    // En vivo, el texto va saliendo al chat a medida que el modelo lo escribe.
+    const result = enVivo
+      ? await openaiIA.generateContentStream(contenidos, (delta) => emitir({ tipo: "delta", texto: delta }))
+      : await openaiIA.generateContent(contenidos)
 
     const responseText = result.response.text()
 
@@ -154,17 +208,12 @@ export async function POST(req: NextRequest) {
       })();
     }
 
-    return NextResponse.json({ 
+    return {
       text: responseText,
       reply: responseText, // Added for compatibility with ChatInterface
       sources: documents.map((d: any) => ({ title: d.title, type: d.type, similarity: d.similarity })),
-      sessionId: currentSessionId
-    })
-
-
-  } catch (error: any) {
-    console.error("Tutor IA API Error:", error)
-    return NextResponse.json({ error: error.message || "Error interno" }, { status: 500 })
+      sessionId: currentSessionId,
+    }
   }
 }
 

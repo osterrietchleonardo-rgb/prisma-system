@@ -52,9 +52,57 @@ const CANDIDATAS_CON_ZONA = 1500;
 /** Debajo de esto, un filtro de amenities se afloja solo y se le avisa al asesor. */
 const MINIMO_ANTES_DE_AFLOJAR = 20;
 
+/** Un evento del stream del Buscador: un paso del pensamiento, un pedazo de texto o el final. */
+export type EventoBuscador =
+  | { tipo: "paso"; texto: string }
+  | { tipo: "delta"; texto: string }
+  | { tipo: "final"; content: string; reply: string; sessionId: string | null; matchedProperties: unknown }
+  | { tipo: "error"; error: string }
+
 export async function POST(req: Request) {
-  try {
-    const { message, sessionId, history } = await req.json();
+  const body = await req.json();
+
+  // Modo clásico (sin stream): exactamente la respuesta JSON de siempre.
+  if (!body.stream) {
+    try {
+      const payload = await procesarBusqueda(body, () => {});
+      return NextResponse.json(payload);
+    } catch (error: any) {
+      console.error("Consultor API error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+  }
+
+  // Modo en vivo: NDJSON — pasos del pensamiento, el texto a medida que se escribe, y el final.
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const emitir = (e: EventoBuscador) => {
+        try { controller.enqueue(encoder.encode(JSON.stringify(e) + "\n")); } catch { /* cliente cortó */ }
+      };
+      try {
+        const payload = await procesarBusqueda(body, emitir);
+        emitir({ tipo: "final", ...payload });
+      } catch (error: any) {
+        console.error("Consultor API error (stream):", error);
+        emitir({ tipo: "error", error: error?.message ?? String(error) });
+      } finally {
+        try { controller.close(); } catch { /* ya cerrado */ }
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: { "Content-Type": "application/x-ndjson; charset=utf-8", "Cache-Control": "no-cache" },
+  });
+}
+
+async function procesarBusqueda(
+  entrada: { message: string; sessionId?: string | null; history?: unknown[]; stream?: boolean },
+  emitir: (e: EventoBuscador) => void,
+): Promise<{ content: string; reply: string; sessionId: string | null; matchedProperties: unknown }> {
+  {
+    const { message, sessionId, history } = entrada;
+    const enVivo = Boolean(entrada.stream);
     const { userId, agencyId } = await requireTenant();
     console.log("Buscador IA Request:", { message, sessionId, agencyId });
 
@@ -226,6 +274,7 @@ export async function POST(req: Request) {
       ? `\n\nCONVERSACIÓN PREVIA (mantené el hilo: arrastrá los filtros ya mencionados salvo que el usuario los cambie):\n${priorTurns.map((m: any) => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content}`).join('\n')}\n`
       : '';
 
+    emitir({ tipo: "paso", texto: "Leyendo tu consulta y el hilo de la charla…" });
     const intentCheck = await openaiIA.generateContent({
       contents: [{
         role: "user",
@@ -494,6 +543,7 @@ export async function POST(req: Request) {
     console.log("Compuerta:", { needsMoreInfo, wantsAnyway, missingCritical, missingNiceToHave, pedirMas, yaVistas: yaMostradas.size });
 
     if (isRetrieval && !needsMoreInfo) {
+      emitir({ tipo: "paso", texto: "Buscando en tu cartera, en la agencia y en la red de colaboración…" });
       const FULL_SELECT = 'id, title, address, city, property_type, price, currency, bedrooms, bathrooms, total_area, covered_area, status, images, description, tokko_data, assigned_agent_id, assigned_agent, agent_profile:profiles(full_name, email)';
 
       // ─── ESTRATEGIA "Cartera_Propiedades" (paridad con n8n): filtros duros + embeddings + % match, todo en SQL ───
@@ -692,6 +742,7 @@ export async function POST(req: Request) {
         if (!sinAmenities.error && (sinAmenities.data || []).length > estrictas) {
           rmxRanked = sinAmenities.data;
           redAflojada = { pedidos: amenityKeywords, estrictas };
+          emitir({ tipo: "paso", texto: `Con ${amenityKeywords.join(" y ")} había poco: amplío la búsqueda para mostrarte más opciones…` });
           console.log(`Red: con ${amenityKeywords.join(' + ')} solo ${estrictas}; se aflojó a ${(rmxRanked || []).length}`);
         }
       }
@@ -706,6 +757,7 @@ export async function POST(req: Request) {
       // fondo —ese es que la consulta no tarde 9 s— pero le devuelve al asesor las propiedades
       // de la red en vez de un "no encontré nada" que es falso.
       if (rmxErr && (rmxErr as any).code === '57014') {
+        emitir({ tipo: "paso", texto: "La red de colaboración tardó en responder: probando de nuevo…" });
         console.warn('buscar_roomix se cortó por tiempo; reintentando una vez');
         const reintento = await redDb.rpc('buscar_roomix', rmxArgs);
         rmxRanked = reintento.data;
@@ -917,11 +969,14 @@ INSTRUCCIÓN SOBRE NOTAS: Interpretá las notas y directivas de arriba. Si algun
     - REGLA ANTI-ERROR (no negociable): NUNCA digas "mirá las tarjetas de abajo", "te muestro las opciones" ni des a entender que hay propiedades en pantalla si NO se encontró ninguna o si todavía no buscaste. Solo mencionás tarjetas/resultados cuando el contexto confirma que SÍ hay propiedades.
 
     PERSONALIDAD Y ESTILO CONVERSACIONAL:
-    - Profesional y cálido, 100% humano. Voseo formal ("tenés", "podés", "encontré", "mirá"). Nada robótico ni acartonado.
-    - Sos un asesor experto que ASESORA, no un buscador que tira resultados. Mostrá criterio inmobiliario.
+    - Sos un colega inmobiliario con calle, cálido y directo. Voseo rioplatense natural ("tenés", "podés", "dale", "mirá"). Hablás como se habla en una inmobiliaria de Buenos Aires, no como un sistema.
+    - REACCIONÁ primero, informá después: si el usuario contó algo ("el cliente quiere mudarse ya", "se me cayó una operación"), acusá recibo con naturalidad en media frase antes de ir a los datos. Que se note que escuchaste.
+    - VARIÁ la forma: no empieces dos respuestas seguidas igual, y no cierres siempre con la misma fórmula. A veces cerrás con una pregunta, a veces con una observación de criterio ("ojo que en esa zona el m² viene subiendo"), a veces no cerrás con nada.
+    - Sos un asesor experto que ASESORA, no un buscador que tira resultados. Mostrá criterio inmobiliario: qué destacarías, qué descartarías y por qué, en una frase.
     - INDAGÁ para afinar: si faltan datos clave (operación, zona, presupuesto, ambientes), preguntá de forma natural 1 o 2 cosas por vez (nunca un interrogatorio). Si el contexto dice "PARA AFINAR", seguilo.
     - Cuando tenga sentido, preguntá pensando en el cliente final del asesor ("¿el cliente prioriza estar en piso alto o le importa más la zona?").
-    - Siempre ofrecé refinar la búsqueda al final de tu respuesta.
+    - Cuando sume, proponé un próximo paso concreto — con palabras distintas cada vez, nunca la misma coletilla.
+    - Frases y muletillas PROHIBIDAS por robóticas: "¡Claro!", "Por supuesto", "¿En qué más puedo ayudarte?", "No dudes en", "Estoy aquí para", "Como asistente".
 
     MEMORIA DE LA CONVERSACIÓN:
     - Tenés memoria de TODO este chat. Seguí el hilo: no repitas propiedades ya mostradas ni vuelvas a preguntar lo ya respondido.
@@ -943,7 +998,8 @@ OJO: el usuario YA te pidió ver resultados igual, y aun así le estás pregunta
     Respondé SIEMPRE en español de Argentina.`;
 
 
-    const chatResult = await openaiIA.generateContent({
+    emitir({ tipo: "paso", texto: needsMoreInfo ? "Pensando qué preguntarte para afinar…" : "Escribiendo la respuesta…" });
+    const contenidosChat = {
       contents: [
         { role: 'user', parts: [{ text: systemPrompt }] },
         ...priorTurns.map((m: any) => ({
@@ -952,7 +1008,11 @@ OJO: el usuario YA te pidió ver resultados igual, y aun así le estás pregunta
         })),
         { role: 'user', parts: [{ text: message }] }
       ]
-    });
+    };
+    // En vivo, el texto va saliendo al chat a medida que el modelo lo escribe.
+    const chatResult = enVivo
+      ? await openaiIA.generateContentStream(contenidosChat, (delta) => emitir({ tipo: "delta", texto: delta }))
+      : await openaiIA.generateContent(contenidosChat);
 
     marcar("7-modelo-escribe-la-respuesta");
     console.log("Tiempos (ms):", { ...tramos, TOTAL: Date.now() - t0 });
@@ -1009,16 +1069,13 @@ OJO: el usuario YA te pidió ver resultados igual, y aun así le estás pregunta
       }
     })();
 
-    return NextResponse.json({ 
-      content: assistantContent, 
+    return {
+      content: assistantContent,
       reply: assistantContent, // Added for compatibility with Asesor frontend
-      sessionId: currentSessionId,
-      matchedProperties: newMatchedProperties 
-    });
+      sessionId: currentSessionId ?? null,
+      matchedProperties: newMatchedProperties,
+    };
 
-  } catch (error: any) {
-    console.error("Consultor API error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
 
