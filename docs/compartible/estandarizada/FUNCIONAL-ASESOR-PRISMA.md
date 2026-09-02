@@ -630,7 +630,7 @@ Al lado de "Biblioteca Digital" y "Documentos Oficiales" tenés una tercera sola
 - Es **solo lectura**: podés mirar y descargar, pero no podés subir, cambiar ni borrar nada desde acá. Eso lo maneja la dirección.
 - Si te falta un documento, o el que tenés quedó viejo y hay que cambiarlo, **pedíselo a la dirección**: son quienes lo suben y lo actualizan.
 
-> 💡 **Tip:** si una plantilla se actualiza (por ejemplo, cambia un modelo de contrato), la dirección sube la versión nueva y esa **reemplaza automáticamente** a la anterior — vos siempre vas a ver la última versión, sin tener que fijarte cuál es la vieja.
+> 💡 **Tip:** si cambia un documento que tienen todos (por ejemplo, se actualiza el contrato), **vos no tenés que hacer nada**: la dirección lo cambia una sola vez y **el tuyo se actualiza solo, con tus propios datos**. Lo que ves acá es siempre lo último, sin tener que fijarte cuál era el viejo.
 
 ---
 
