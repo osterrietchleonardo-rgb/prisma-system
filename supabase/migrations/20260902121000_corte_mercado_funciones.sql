@@ -169,6 +169,14 @@ grant execute on function public.buscar_roomix to anon, authenticated, service_r
 -- excluir-sujeto + m2 cubierta = 50. Dos gotchas de tipos cazados por la validación:
 -- cand exporta updated_at con alias (la fuente es actualizado_en) y la salida castea
 -- amb/dorm/ant ::int (mercado usa smallint donde roomix tenía integer).
+--
+-- FIX OBRA (2-sep, reportado por Leonardo: un pozo apareció como comparable de un usado de
+-- 5 años): roomix codificaba pozo como edad NEGATIVA y a-estrenar como 0 — acm_pasa_obra
+-- espera esa codificación. mercado_avisos nunca guarda 0 ni negativos (verificado: 0 filas);
+-- el pozo viaja en `en_construccion` (1.137 avisos, 1.038 sin edad → se colaban como
+-- "usada", que acepta NULL). El gate y el score derivan la edad: en_construccion → -1.
+-- Verificado: sujeto usado → 0 pozos colados; sujeto en pozo → 50/50 en construcción.
+-- "A estrenar" pleno queda para el loader (la señal solo vive en el texto del aviso).
 
 CREATE OR REPLACE FUNCTION public.acm_match_roomix(p_query_embedding text DEFAULT NULL::text, p_operation text DEFAULT 'venta'::text, p_type_patterns text[] DEFAULT '{}'::text[], p_m2 numeric DEFAULT NULL::numeric, p_rooms integer DEFAULT NULL::integer, p_dormitorios integer DEFAULT NULL::integer, p_bathrooms integer DEFAULT NULL::integer, p_antiguedad integer DEFAULT NULL::integer, p_loc_patterns text[] DEFAULT '{}'::text[], p_amenities text[] DEFAULT '{}'::text[], p_exclude_ph boolean DEFAULT false, p_obra text DEFAULT 'off'::text, p_obra_sin_dato boolean DEFAULT true, p_barrio text DEFAULT NULL::text, p_zona_niveles boolean DEFAULT false, p_m2_cubierta boolean DEFAULT false, p_dedup boolean DEFAULT false, p_excluir_sujeto boolean DEFAULT false, p_zona_min smallint DEFAULT 50, p_peso_semantica smallint DEFAULT 10, p_limit integer DEFAULT 50)
  RETURNS TABLE(id character varying, match_pct integer, sc_zona integer, sc_superficie integer, sc_ambientes integer, sc_dormitorios integer, sc_banos integer, sc_antiguedad integer, sc_amenities integer, sc_semantica integer, cand_m2 numeric, cand_amb integer, cand_dorm integer, cand_ant integer)
@@ -221,7 +229,7 @@ begin
         case when r.ambientes > 0 then r.ambientes when r.dormitorios > 0 then r.dormitorios + 1 else null end as amb,
         case when r.dormitorios > 0 then r.dormitorios else null end as dorm,
         r.banos as ban,
-        case when r.antiguedad_anios >= 0 then r.antiguedad_anios else null end as ant,
+        case when r.en_construccion then null when r.antiguedad_anios >= 0 then r.antiguedad_anios else null end as ant,
         z.score as zona,
         -- Clave de duplicado: mismo aviso cargado varias veces (misma dirección, precio y medidas).
         public.acm_norm(btrim(coalesce(r.direccion,''))) || '|' || coalesce(r.precio, 0)::text || '|' ||
@@ -251,7 +259,7 @@ begin
           or abs((case when r.ambientes > 0 then r.ambientes when r.dormitorios > 0 then r.dormitorios + 1 else null end) - p_rooms) <= 1)
         and (not p_exclude_ph
           or (coalesce(r.tipo,'') || ' ' || coalesce(r.titulo,'') || ' ' || coalesce(r.descripcion,'')) !~* '\mph\M')
-        and public.acm_pasa_obra(r.antiguedad_anios, p_obra, p_obra_sin_dato, true)
+        and public.acm_pasa_obra(case when r.en_construccion then -1 else r.antiguedad_anios end, p_obra, p_obra_sin_dato, true)
         -- La propiedad base no es comparable de sí misma: mismos m² cubiertos (±1%), mismos
         -- baños y misma antigüedad (±2 años) = es el aviso del sujeto, no un comparable.
         and (not p_excluir_sujeto or not (
@@ -363,7 +371,7 @@ begin
         case when r.ambientes > 0 then r.ambientes when r.dormitorios > 0 then r.dormitorios + 1 else null end as amb,
         case when r.dormitorios > 0 then r.dormitorios else null end as dorm,
         r.banos as ban,
-        case when r.antiguedad_anios >= 0 then r.antiguedad_anios else null end as ant,
+        case when r.en_construccion then null when r.antiguedad_anios >= 0 then r.antiguedad_anios else null end as ant,
         public.acm_norm(btrim(coalesce(r.direccion,''))) || '|' || coalesce(r.precio, 0)::text || '|' ||
           coalesce(r.superficie_total_m2, 0)::text || '|' || coalesce(r.ambientes, 0)::text || '|' ||
           coalesce(r.banos, 0)::text as dkey,
@@ -389,7 +397,7 @@ begin
           or public.acm_norm(coalesce(r.barrio,'') || ' ' || coalesce(r.ciudad,'')) like any (v_loc_norm))
         and (not p_exclude_ph
           or (coalesce(r.tipo,'') || ' ' || coalesce(r.titulo,'') || ' ' || coalesce(r.descripcion,'')) !~* '\mph\M')
-        and public.acm_pasa_obra(r.antiguedad_anios, p_obra, p_obra_sin_dato, true)
+        and public.acm_pasa_obra(case when r.en_construccion then -1 else r.antiguedad_anios end, p_obra, p_obra_sin_dato, true)
         and (not p_excluir_sujeto or not (
                p_m2 is not null and p_bathrooms is not null
            and (case when p_m2_cubierta then coalesce(nullif(r.superficie_cubierta_m2,0), r.superficie_total_m2) else r.superficie_total_m2 end) is not null
