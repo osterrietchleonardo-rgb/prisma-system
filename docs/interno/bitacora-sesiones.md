@@ -47,6 +47,16 @@ anotados al enviarse** (nodo `Anotar_Email_En_Bitacora` en `Gestion_Handoff` y `
 con OK; si Resend no devuelve id queda "NO se pudo enviar el email de aviso…"). Kevin ya la
 había empezado a usar antes del merge (dejó una nota real probándola).
 
+**Y a la noche, la conversación viva del Buscador IA y el Tutor IA** (rama
+`feat/buscador-conversacion-viva`, TECNICO §23): streaming NDJSON con pasos de pensamiento
+visibles + texto tipeándose, prompts con tono rioplatense real (reaccionar antes de informar,
+coletillas prohibidas), y el markdown de los agentes renderizado (antes los 4 chats BORRABAN
+los `**`). Diagnóstico previo: los dos eran tuberías de una pasada; el plan de 3 puntos
+(2 y 3 = bucle con herramientas al estilo Super Agente + herramienta de PDF descargable)
+está en el plan del 2/9. Pendientes que trajo Kevin: nada de avisos de madrugada (la escalera
+hoy avisa a cualquier hora), y el misterio de Johanna (recibió una consulta sin celular en el
+perfil ni el número del bot — ver qué canal fue).
+
 **Gotchas nuevos:** en dev local, un `getUser()` fallido del lado servidor (rate limit de auth
 por logins repetidos desde la misma IP) hace que @supabase/ssr borre las cookies → te patea al
 login; en producción no pasa. El PUT de la API de n8n rechaza `settings.availableInMCP` y

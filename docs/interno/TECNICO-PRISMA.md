@@ -1398,6 +1398,26 @@ la página **"Equipo"** con dos solapas (Aprobaciones intacta + Trazabilidad). D
 - **v2 pendiente:** el tracking (`lead_activities` apunta a leads Tokko, no a conversaciones);
   botón "ya tomé contacto" del director si lo sigue pidiendo.
 
+## 23. Buscador IA y Tutor IA: la conversación en vivo (2/9/2026)
+
+Punto 1 del plan de agentes (`docs/superpowers/plans/2026-09-02-buscador-conversacion-viva.md`);
+los puntos 2-3 (bucle con herramientas al estilo del Super Agente, con la herramienta de
+PDF descargable) quedaron pendientes.
+
+- **Streaming NDJSON opcional en los dos routes** (`app/api/ai/consultor` y `app/api/ai/tutor`):
+  con `stream: true` responden `application/x-ndjson` — eventos `{tipo:'paso'}` en cada hito
+  del pipeline, `{tipo:'delta'}` con los tokens del modelo (vía
+  `openaiIA.generateContentStream`, `lib/openai.ts`, usage con `include_usage`) y
+  `{tipo:'final'}` con el payload de siempre. Sin `stream`, el JSON clásico intacto.
+  El cuerpo del POST vive en `procesarBusqueda`/`procesarTutor(entrada, emitir)`.
+- **Front:** `lib/buscador-stream.ts` (consumidor NDJSON con fallback a JSON) + estados
+  `pasoVivo`/`textoVivo` en las 4 páginas de chat; el texto se tipea con cursor.
+- **Markdown renderizado:** `components/shared/MarkdownIA.tsx` (react-markdown + remark-gfm)
+  para los mensajes del asistente en los 4 chats — antes se BORRABAN los `**` con un replace.
+- **Prompts:** el Buscador reacciona antes de informar, varía aperturas/cierres y tiene
+  muletillas prohibidas; las REGLAS ANTI-ERROR (red de colaboración, no inventar tarjetas)
+  se conservan todas. El Tutor perdió la formalidad impuesta.
+
 ---
 
 ## FIN DEL DOCUMENTO
