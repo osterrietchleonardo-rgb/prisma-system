@@ -3,6 +3,7 @@
 // Se separa del endpoint HTTP a proposito, para poder verificarla contra la base real
 // con un script, sin necesidad de sesion ni cookies.
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { urlFotoRed } from "../acm/fotos-url.ts"
 import { normalizarTexto } from "./lugares.ts"
 import { valoresDeTipo } from "./tipos-propiedad.ts"
 import type { BBox, FiltrosMapa, PropiedadMapa, RespuestaMapa } from "./tipos.ts"
@@ -63,7 +64,9 @@ function aPropiedadMapa(f: FilaMapa, esColaboracion: boolean, userId: string): P
     total_area: num(f.total_area),
     address: f.address,
     city: f.city,
-    images: f.foto ? [f.foto] : [],
+    // La foto del pin pasa por nuestro proxy: el CSP de la app (img-src) no permite CDNs
+    // de terceros, y además así el navegador del asesor no deja su Referer en el CDN ajeno.
+    images: f.foto ? [urlFotoRed(f.foto)] : [],
     similarity: 0,
     source,
     agent_name: f.agent_name || (esColaboracion ? "" : "Sin asignar"),
