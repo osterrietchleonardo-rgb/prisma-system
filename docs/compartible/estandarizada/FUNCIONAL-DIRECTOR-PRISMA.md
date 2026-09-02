@@ -1006,9 +1006,16 @@ La hoja no menciona de dónde salieron los datos. Es el documento de tu inmobili
 
 ---
 
-## 28. Aprobaciones (pedidos de tu equipo)
+## 28. Equipo: Aprobaciones y Trazabilidad
 
-**Qué es:** la pantalla donde llegan las cosas que solo vos podés decidir. Hoy: cuando un asesor marca **"No lo puedo tomar"** en un chat. En el menú, el ítem **Aprobaciones** muestra un número con los pedidos pendientes.
+**Qué es:** la pantalla de control de tu equipo, en el menú bajo el nombre **Equipo** (el número
+al lado son los pedidos pendientes). Tiene dos solapas: **Aprobaciones** (lo que solo vos podés
+decidir) y **Trazabilidad** (la historia completa de cada cliente con su asesor).
+
+### Aprobaciones
+
+Acá llegan las cosas que necesitan tu decisión. Hoy: cuando un asesor marca **"No lo puedo
+tomar"** en un chat.
 
 **Qué muestra:** cada pedido con el cliente, el asesor que lo soltó, **su motivo** con sus palabras, hace cuánto lo pidió y cuándo vence. Los pendientes vienen **agrupados por asesor**, así ves de un vistazo quién está soltando chats. Abajo, el historial de lo ya decidido.
 
@@ -1021,6 +1028,34 @@ La hoja no menciona de dónde salieron los datos. Es el documento de tu inmobili
 - Cada pedido se decide **una sola vez**; si nadie responde en **48 horas**, vence y el chat queda sin asesor (lo ves en la ficha y lo podés reasignar desde ahí).
 
 > 💡 **Tip:** el aviso "un asesor no puede tomar el chat" te llega por email y por WhatsApp (si cargaste tu celular en Mi Perfil) con un link directo a esta pantalla.
+
+### Trazabilidad (la historia de cada cliente)
+
+**Qué es:** la bitácora, renglón por renglón y con hora, de todo lo que pasó con un cliente:
+escribió, el bot le respondió, pidió hablar con una persona, **se le mandó el email de aviso al
+asesor** (con el asunto real — y si el email no pudo salir, también lo dice), los avisos de
+2/5/10/20 horas de la escalera, **el momento en que el asesor le respondió de verdad** (en
+verde, es el renglón que más importa), el bot se apagó o volvió a atender, la visita se agendó,
+confirmó o canceló, y cada movimiento del equipo: "no lo puedo tomar" con el motivo, la
+reasignación con tu comentario, "dar más tiempo".
+
+**Cómo usarla:**
+1. Entrá a **Equipo** → solapa **Trazabilidad**.
+2. A la izquierda están los chats con actividad de los últimos 14 días. Filtrá por **asesor**
+   (o "Sin asesor asignado") o buscá por **cliente o teléfono**.
+3. Tocá un chat y se abre su historia. No muestra el texto de los mensajes — dice el hecho
+   ("El cliente escribió (3 mensajes)"); para leer la conversación está el botón **Ver el chat**.
+4. Para cerrar la historia: la **X** (en el celular, **Volver**).
+
+**Tus notas internas:** en cualquier renglón, el **+** te deja anotar algo justo en ese punto de
+la historia — *"lo llamé por teléfono"*, *"me lo crucé en la ofi y le dije"* — y abajo de todo
+está **"Agregar una nota"**. Las notas las ven solo los directores; el asesor y el cliente, jamás.
+
+> 💡 **Tip:** cuando te llega el aviso de que un asesor lleva horas sin responder, entrá acá y
+> filtrá por ese asesor: ves toda la película de un vistazo, y si vos lo resolvés por afuera
+> (una llamada, un mensaje directo), dejalo anotado con el + para que mañana se entienda qué pasó.
+
+**Solo directores.** Los asesores no ven esta solapa ni nada de lo que anotes.
 
 ---
 

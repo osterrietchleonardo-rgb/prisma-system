@@ -1,25 +1,44 @@
-import { listarAprobaciones } from "@/app/actions/equipo"
+import { listarAprobaciones, listarConversacionesConActividad } from "@/app/actions/equipo"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AprobacionesClient from "./AprobacionesClient"
+import TrazabilidadClient from "./TrazabilidadClient"
 
 export const dynamic = "force-dynamic"
 
 export const metadata = {
-  title: "Aprobaciones - Prisma System",
+  title: "Equipo - Prisma System",
 }
 
-export default async function AprobacionesPage() {
-  const datos = await listarAprobaciones()
+export default async function EquipoPage({ searchParams }: { searchParams?: { tab?: string } }) {
+  const [aprobaciones, actividad] = await Promise.all([
+    listarAprobaciones(),
+    listarConversacionesConActividad(),
+  ])
+  const solapa = searchParams?.tab === "trazabilidad" ? "trazabilidad" : "aprobaciones"
   return (
-    <div className="flex-1 p-4 md:p-8 space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto w-full">
+    <div className="flex-1 p-4 md:p-8 space-y-6 animate-in fade-in duration-500 max-w-6xl mx-auto w-full">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-          Aprobaciones
+          Equipo
         </h1>
         <p className="text-muted-foreground">
-          Lo que el equipo o el agente necesitan que decidas. Cada pedido se resuelve una sola vez; si nadie responde en 48 h, no se ejecuta nada.
+          Lo que necesita tu decisión y la historia completa de cada cliente con su asesor.
         </p>
       </div>
-      <AprobacionesClient pendientes={datos.pendientes} historial={datos.historial} asesores={datos.asesores} />
+      <Tabs defaultValue={solapa} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="aprobaciones">
+            Aprobaciones{aprobaciones.pendientes.length > 0 ? ` (${aprobaciones.pendientes.length})` : ""}
+          </TabsTrigger>
+          <TabsTrigger value="trazabilidad">Trazabilidad</TabsTrigger>
+        </TabsList>
+        <TabsContent value="aprobaciones">
+          <AprobacionesClient pendientes={aprobaciones.pendientes} historial={aprobaciones.historial} asesores={aprobaciones.asesores} />
+        </TabsContent>
+        <TabsContent value="trazabilidad">
+          <TrazabilidadClient conversaciones={actividad.conversaciones} asesores={actividad.asesores} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
