@@ -7,6 +7,8 @@ import {
   nombreVisible,
   escaparComodinesIlike,
   camposDelReemplazo,
+  archivoQueSeBaja,
+  nombreDelGenerado,
   MAX_BYTES,
   carpetaDeVersionesNuevas,
   rutaDeVersionNueva,
@@ -171,7 +173,7 @@ describe("camposDelReemplazo", () => {
     // `toBeNull` y no `toBeUndefined`: tienen que VIAJAR en el UPDATE. Una
     // columna que no se manda es una columna que queda como estaba, que es
     // justo el problema.
-    for (const columna of ["version_id", "form_data", "estado", "observacion"] as const) {
+    for (const columna of ["version_id", "form_data", "estado", "observacion", "docx_path"] as const) {
       expect(columna in campos, `${columna} no viaja en el UPDATE`).toBe(true);
       expect(campos[columna], `${columna} tendría que volver a null`).toBeNull();
     }
@@ -190,9 +192,10 @@ describe("camposDelReemplazo", () => {
    * pero sí de que alguien agregue o saque un campo de este UPDATE sin pasar
    * por el comentario que explica por qué están las cuatro.
    */
-  it("escribe estas ocho columnas y ninguna otra", () => {
+  it("escribe estas nueve columnas y ninguna otra", () => {
     expect(Object.keys(camposDelReemplazo(REEMPLAZO)).sort()).toEqual([
       "archivo_original_path",
+      "docx_path",
       "estado",
       "form_data",
       "nombre_archivo",
@@ -201,6 +204,19 @@ describe("camposDelReemplazo", () => {
       "updated_at",
       "version_id",
     ]);
+  });
+
+  /**
+   * `docx_path` se sumó tarde, y este test es el que lo va a defender.
+   *
+   * Lo encontró Leonardo usando la app: aplicó la versión nueva, el flujo dijo
+   * que estaba todo bien, y los documentos de los asesores seguían siendo los
+   * viejos. El generado se guardaba y **la pantalla mostraba el original**. Al
+   * arreglar eso, `docx_path` pasó a decidir qué contrato se baja — y una
+   * columna que decide eso NO puede sobrevivir a un reemplazo.
+   */
+  it("el generado no sobrevive a un reemplazo: si no, se bajaría el contrato viejo", () => {
+    expect(camposDelReemplazo(REEMPLAZO).docx_path).toBeNull();
   });
 });
 
@@ -260,6 +276,34 @@ describe("la pantalla del director usa camposDelReemplazo y no un objeto escrito
       /upsert:\s*true/,
     );
     expect(FUENTE.match(/upsert:\s*false/g) ?? []).toHaveLength(subidas.length);
+  });
+
+  /**
+   * ═══ Que la pantalla BAJE el generado, no solo que exista la regla ═══
+   *
+   * Este es el test que faltaba, y su ausencia costó la única falla que
+   * encontró Leonardo usando la app: la regla podía estar perfecta en `lib` y
+   * la pantalla seguir bajando `archivo_original_path`. Nadie lo miraba.
+   *
+   * Se lee el archivo como texto porque el botón vive adentro de un
+   * componente que no se puede dibujar en un test, y porque lo que hay que
+   * fijar no es el aspecto: es **qué archivo recibe una persona**.
+   */
+  it("el botón de descargar pasa por archivoQueSeBaja, no por el original a secas", () => {
+    expect(FUENTE, "la regla dejó de usarse").toContain("archivoQueSeBaja(doc)");
+    /**
+     * Y que no quede el camino viejo al lado: un `descargar(doc.archivo_original_path`
+     * suelto sería exactamente el defecto de origen.
+     */
+    expect(FUENTE, "volvió el camino que bajaba el archivo viejo").not.toContain(
+      "descargar(doc.archivo_original_path",
+    );
+  });
+
+  it("y al borrar el documento también se borra el generado", () => {
+    expect(FUENTE, "el contrato generado quedaría huérfano en un bucket público").toContain(
+      "if (doc.docx_path) await borrarDeStorage(doc.docx_path);",
+    );
   });
 
   it("el INSERT de la primera subida no escribe ninguna de las cuatro", () => {
@@ -452,5 +496,68 @@ describe("rutaDelDocumentoGenerado", () => {
   /** Y reintentar la MISMA aplicación escribe encima, en vez de dejar un huérfano por intento. */
   it("dos veces la misma versión dan la misma ruta", () => {
     expect(rutaDelDocumentoGenerado(AG, AD, DOC, 2)).toBe(rutaDelDocumentoGenerado(AG, AD, DOC, 2));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// QUÉ ARCHIVO SE BAJA
+// ---------------------------------------------------------------------------
+
+/**
+ * El agujero que Leonardo encontró USANDO LA APP, y que ningún test vio.
+ *
+ * Subió la versión nueva, siguió los pasos, el sistema dijo que estaba todo
+ * bien —y estaba: los tres .docx generados eran correctos, con la cláusula
+ * nueva, el encabezado, el pie y el nombre de cada persona— y los documentos
+ * que mostraba la pantalla seguían siendo los viejos.
+ *
+ * La etapa entera generaba el documento, lo verificaba con cinco
+ * comprobaciones y lo guardaba, y después NO LO MOSTRABA: toda la
+ * verificación miró el camino de escritura y nadie miró el de lectura.
+ */
+describe("archivoQueSeBaja", () => {
+  const SIN_GENERAR = {
+    archivo_original_path: "asesores/ag/as/plantillas/id.docx",
+    docx_path: null,
+    nombre_archivo: "Acuerdo de Confidencialidad.docx",
+  };
+
+  it("sin versión aplicada, se baja el que subió el director", () => {
+    const r = archivoQueSeBaja(SIN_GENERAR);
+    expect(r.path).toBe("asesores/ag/as/plantillas/id.docx");
+    expect(r.nombre).toBe("Acuerdo de Confidencialidad.docx");
+    expect(r.esGenerado).toBe(false);
+  });
+
+  it("con una versión aplicada, se baja el GENERADO", () => {
+    const r = archivoQueSeBaja({ ...SIN_GENERAR, docx_path: "asesores/ag/as/plantillas/generados/id-v2.docx" });
+    expect(r.path, "seguía bajando el original: es el agujero que se cerró").toBe(
+      "asesores/ag/as/plantillas/generados/id-v2.docx",
+    );
+    expect(r.esGenerado).toBe(true);
+  });
+
+  /**
+   * El asesor baja los dos a la misma carpeta de Descargas. Si se llaman igual,
+   * el navegador le pone "(1)" y no tiene forma de saber cuál es cuál.
+   */
+  it("el generado se distingue por el nombre, y la extensión queda al final", () => {
+    const r = archivoQueSeBaja({ ...SIN_GENERAR, docx_path: "x.docx" });
+    expect(r.nombre).toBe("Acuerdo de Confidencialidad - actualizado.docx");
+    expect(r.nombre.endsWith(".docx"), "Word no abre un archivo sin la extensión al final").toBe(true);
+  });
+
+  it("y sin extensión no se rompe", () => {
+    expect(nombreDelGenerado("Acuerdo")).toBe("Acuerdo - actualizado");
+  });
+
+  /**
+   * "Actualizado" y no "generado" ni "v2": el asesor no sabe qué es una versión
+   * ni tiene por qué (spec §8.7). Lo único que necesita saber es cuál vale.
+   */
+  it("no le habla de versiones al asesor", () => {
+    const nombre = nombreDelGenerado("Contrato.docx");
+    expect(nombre.toLowerCase()).not.toContain("versi");
+    expect(nombre.toLowerCase()).not.toContain("generad");
   });
 });

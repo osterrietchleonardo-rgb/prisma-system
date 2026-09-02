@@ -15,6 +15,7 @@ import { FileText, Upload, Download, Trash2, Loader2, AlertTriangle } from "luci
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase";
 import {
+  archivoQueSeBaja,
   validarArchivo, rutaDeArchivo, nombreVisible, escaparComodinesIlike, camposDelReemplazo, type Seccion,
 } from "@/lib/asesor-docs/reglas";
 import { urlDeDescarga } from "@/lib/asesor-docs/url";
@@ -39,6 +40,11 @@ type Plantilla = {
   id: string;
   nombre_archivo: string;
   archivo_original_path: string;
+  /**
+   * El .docx GENERADO a partir de la plantilla. `null` mientras no se le haya
+   * aplicado ninguna versión.
+   */
+  docx_path: string | null;
   template_id: string;
   size_bytes: number | null;
   created_at: string;
@@ -111,9 +117,18 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
     setCargando(true);
     setErrorCarga(null);
     try {
+      /**
+       * `docx_path` en las DOS variantes, y es lo que Leonardo encontró usando
+       * la app: aplicó la versión nueva, el flujo dijo que estaba todo bien, y
+       * los documentos de los asesores seguían siendo los viejos. El documento
+       * generado se guardaba y esta pantalla ni lo pedía.
+       *
+       * En la del asesor importa igual o más: es LA pantalla donde él ve su
+       * contrato.
+       */
       const columnasPlantillas = readOnly
-        ? "id, nombre_archivo, archivo_original_path, template_id, size_bytes, created_at"
-        : "id, nombre_archivo, archivo_original_path, template_id, size_bytes, created_at, advisor_doc_templates(nombre)";
+        ? "id, nombre_archivo, archivo_original_path, docx_path, template_id, size_bytes, created_at"
+        : "id, nombre_archivo, archivo_original_path, docx_path, template_id, size_bytes, created_at, advisor_doc_templates(nombre)";
       const [p, i] = await Promise.all([
         supabase
           .from("advisor_documents")
@@ -349,6 +364,15 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
       // porque urlDeDescarga arma la dirección igual, sin consultar nada.
       const { error } = await supabase.from("advisor_documents").delete().eq("id", doc.id);
       if (error) { toast.error("No se pudo eliminar: " + traducirErrorBase(error.message)); return; }
+      /**
+       * Los DOS archivos: el que subió el director y el generado.
+       *
+       * Sin esto, borrar el documento de una persona dejaba su contrato
+       * generado en un bucket público, con la fila ya borrada — o sea, sin
+       * nadie que supiera que estaba ahí. Es la misma familia de huérfano que
+       * la etapa ya cerró en el endpoint de subir la versión.
+       */
+      if (doc.docx_path) await borrarDeStorage(doc.docx_path);
       const okStorage = await borrarDeStorage(doc.archivo_original_path);
       if (!okStorage) {
         // El borrado es por autor: con dos directores, el segundo no puede
@@ -597,9 +621,18 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
                   </div>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  {/* Se baja el GENERADO si ya se le aplicó una versión, y si
+                      no, el que subió el director. La regla vive en `lib`
+                      (`archivoQueSeBaja`) porque decide QUÉ CONTRATO recibe una
+                      persona, y eso no puede quedar sin test adentro de un
+                      .tsx. El título dice cuál de los dos es. */}
                   <Button
-                    variant="ghost" size="icon" title="Descargar"
-                    onClick={() => descargar(doc.archivo_original_path, doc.nombre_archivo)}
+                    variant="ghost" size="icon"
+                    title={archivoQueSeBaja(doc).esGenerado ? "Descargar el documento actualizado" : "Descargar"}
+                    onClick={() => {
+                      const cual = archivoQueSeBaja(doc);
+                      descargar(cual.path, cual.nombre);
+                    }}
                   >
                     <Download className="h-4 w-4" />
                   </Button>

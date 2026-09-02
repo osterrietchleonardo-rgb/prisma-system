@@ -279,6 +279,7 @@ export function camposDelReemplazo(nuevo: ArchivoDeReemplazo): {
   form_data: null
   estado: null
   observacion: null
+  docx_path: null
 } {
   return {
     nombre_archivo: nuevo.nombreArchivo,
@@ -289,6 +290,22 @@ export function camposDelReemplazo(nuevo: ArchivoDeReemplazo): {
     form_data: null,
     estado: null,
     observacion: null,
+    /**
+     * `docx_path` tambien, y es la quinta columna que se suma tarde.
+     *
+     * Apareció al arreglar lo que Leonardo encontró usando la app: el documento
+     * GENERADO se guardaba y la pantalla seguía mostrando el que había subido
+     * el director. Al hacer que la pantalla muestre el generado, esta columna
+     * pasó a decidir QUÉ CONTRATO SE BAJA — y sin limpiarla acá, reemplazar el
+     * .docx de una persona dejaba su `docx_path` viejo apuntando al generado de
+     * la versión anterior: la pantalla mostraría ese contrato viejo como si
+     * fuera el de su archivo nuevo.
+     *
+     * Es exactamente la misma familia que las otras cuatro, y por el mismo
+     * motivo: una columna que sobrevive a un reemplazo se vuelve una afirmación
+     * falsa sobre el archivo que la reemplazó.
+     */
+    docx_path: null,
   }
 }
 
@@ -317,4 +334,58 @@ export function nombreVisible(nombreArchivo: string): string {
  */
 export function escaparComodinesIlike(texto: string): string {
   return texto.replace(/[\\%_]/g, (c) => `\\${c}`)
+}
+
+// ---------------------------------------------------------------------------
+// QUÉ ARCHIVO SE BAJA
+// ---------------------------------------------------------------------------
+
+/**
+ * El documento de esa persona hoy: el GENERADO si ya se le aplicó una versión,
+ * y si no, el que subió el director.
+ *
+ * ═══ Por qué esto existe, y por qué es de las cosas más caras de la etapa ═══
+ *
+ * Lo encontró Leonardo usando la app, no un test: subió la versión nueva, siguió
+ * los pasos, el sistema le dijo que estaba todo bien —y estaba: los tres .docx
+ * generados eran correctos, con la cláusula nueva, el encabezado, el pie y el
+ * nombre de cada persona— y **los documentos que mostraba la pantalla seguían
+ * siendo los viejos**. La pantalla bajaba `archivo_original_path`, que es el
+ * archivo que el director subió, y nadie leía `docx_path`.
+ *
+ * O sea: la etapa entera generaba el documento, lo verificaba con cinco
+ * comprobaciones y lo guardaba, y después **no lo mostraba**. Toda la
+ * verificación miró el camino de escritura; nadie miró el de lectura.
+ *
+ * La regla es una línea, pero el nombre del archivo también cambia: el asesor
+ * tiene que poder distinguir en su carpeta de Descargas el contrato nuevo del
+ * que ya tenía.
+ */
+export function archivoQueSeBaja(doc: {
+  archivo_original_path: string
+  docx_path: string | null
+  nombre_archivo: string
+}): { path: string; nombre: string; esGenerado: boolean } {
+  if (!doc.docx_path) {
+    return { path: doc.archivo_original_path, nombre: doc.nombre_archivo, esGenerado: false }
+  }
+  return { path: doc.docx_path, nombre: nombreDelGenerado(doc.nombre_archivo), esGenerado: true }
+}
+
+/**
+ * Cómo se llama el archivo generado cuando el asesor lo baja.
+ *
+ * Se le pega el sufijo ANTES de la extensión: "Acuerdo.docx" queda como
+ * "Acuerdo - actualizado.docx", no como "Acuerdo.docx - actualizado", que no
+ * lo abre Word.
+ *
+ * "Actualizado" y no "generado" ni "v2": el asesor no sabe qué es una versión
+ * ni tiene por qué (spec §8.7). Lo único que necesita saber es que ese es el
+ * que vale.
+ */
+export function nombreDelGenerado(nombreArchivo: string): string {
+  const limpio = nombreArchivo.trim()
+  const i = limpio.lastIndexOf(".")
+  if (i <= 0) return `${limpio} - actualizado`
+  return `${limpio.slice(0, i)} - actualizado${limpio.slice(i)}`
 }
