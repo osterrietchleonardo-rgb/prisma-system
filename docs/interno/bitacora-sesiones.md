@@ -16,6 +16,164 @@
 
 ---
 
+## 2026-09-02
+
+**Etapa C cerrada: el director cambia el contrato una sola vez y PRISMA le rehace el
+documento a cada asesor con sus propios datos** (rama `feat/asesores-plantillas-versionado`,
+worktree `PRISMA-SYSTEM-asesores-docs`; spec §7, §8.2, §8.3 y §8.7 de
+`docs/superpowers/specs/2026-08-24-asesores-celular-y-documentos-design.md`, plan en
+`docs/superpowers/plans/2026-08-26-asesores-etapa-c-plantillas-versionado.md`). Estado:
+`3046e52`, árbol limpio, **1400 tests en verde + 4 skipped**, `tsc --noEmit` en 0 y
+`npm run build` en 0 **sin un solo warning**. Falta la corrida de punta a punta en producción
+—necesita el OK de Leonardo— y el merge a `main`.
+
+> **El ledger entero está en
+> `.superpowers/sdd/2026-08-26-asesores-etapa-c-plantillas-versionado/progress.md`** (710
+> líneas, 36 rulings). Acá va solo lo que sirve para no repetir trabajo ni repetir errores;
+> los commits se leen en `git log`.
+
+**Qué se construyó:** la solapa **"Plantillas"** en `/director/asesores`. Deduce la plantilla
+comparando entre sí los contratos ya cargados de 3 o más asesores activos, obliga a revisarla
+antes de guardar, y después deja **subir una versión nueva** —el Word ya completado con los
+datos de UNA persona—, ver qué campos cambian y una vista previa real, y aplicársela a cada
+asesor **en dos pasos separados**: "Aplicar a los asesores" arma el documento de cada uno, y
+"Poner esta versión en uso" la vuelve la vigente. Tres migraciones aplicadas a producción,
+todas con OK explícito: `ee447af` (historial de versiones), `e4cd6e3` + `0afe980` (el freno de
+seguridad, abajo) y **`20260831130000_advisor_documents_docx_path.sql`, aplicada el
+2026-09-01** — columna nullable, **huella de datos idéntica antes y después**
+(`6a5be9ace2433b8cadc30dfff9f799d2`), idempotencia comprobada aplicándola dos veces.
+
+**Las decisiones, con su porqué — esto es lo que no está en ningún otro lado:**
+
+1. **Por qué existe `docx_path`, y es la decisión más importante de la etapa.** El documento
+   generado se guarda en una columna **propia**, nunca pisando `archivo_original_path`. Si lo
+   pisara, la próxima comprobación compararía la plantilla contra un archivo **que salió de la
+   plantilla misma**: daría verde siempre, contra cualquier error. Ese candado está cuidado
+   por las dos puntas (la fila y el archivo en Storage) con mutaciones que se vuelven a correr
+   en cada ronda.
+2. **La red de seguridad de la §7.3 NO se transfiere a una versión nueva, y no hay reemplazo
+   fácil.** En la primera detección hay verdad de referencia: el `.docx` original de cada
+   asesor. En una versión nueva, el original de Bruno es de la versión **vieja**, así que
+   comparar el regenerado contra él da distinto en todos lados — que es justamente lo que se
+   quería. La idea obvia de reemplazo —**comparar entre sí los documentos regenerados**— se
+   probó y **se descartó con medición** (caso "Palermo"): si un dato del asesor molde también
+   vive en el texto fijo del contrato, al regenerar la diferencia **sí cae en un campo
+   declarado**. **El daño tiene forma de campo, y por eso es invisible.** Lo que sí muerde es
+   la **cuenta cruzada**: `{{ZONA}}` quedó 2 veces para Ana, pero el valor de Bruno aparece 1
+   vez en el original de Bruno → una de las dos era texto fijo. Es advertencia al subir la
+   versión (§7.4.3, el director todavía está decidiendo) y **freno duro al aplicar** (§7.5, ya
+   decidió y estamos por escribir).
+3. **Se puede contar un caso aparte en la pantalla sin migrar la base, y hay dos precedentes.**
+   `advisor_documents.estado` tiene un CHECK con `('ok','revisar','pendiente')`: un cuarto
+   valor **es una migración en producción**. Los dos casos nuevos se resolvieron sin tocarla —
+   `esperaUnDato` lee una **marca al principio de `observacion`** (atada por test a la que
+   escribe `generar.ts`), y `yaAplicados` compara **números de versión** (`version_id` contra
+   `version_actual`). **Que la próxima tarea no arranque pidiendo un `ALTER`.**
+4. **Freno de seguridad fuera del plan, con OK de Leonardo** (`e4cd6e3`, `0afe980`). La
+   revisión de la migración destapó que `Profiles: update_self` tenía `with_check = NULL`, así
+   que **cualquier usuario podía cambiarse su propio `role` y su propio `agency_id`** — 46
+   tablas dependían de eso para aislar inmobiliarias. La política **no estaba en las
+   migraciones del repo**: se había creado por dashboard. Dos lecciones caras: la primera
+   versión del trigger era `SECURITY DEFINER` y **no frenaba nada** (adentro, `current_user`
+   es la dueña de la función), y **se descubrió volviendo a correr el ataque, no leyendo el
+   código**.
+
+**Los tres "blancos silenciosos", que son la misma familia y la que más caro sale.** Un
+contrato que sale a la firma mal, con la app informando éxito:
+
+- **`{{ZONA-2}}`** — un guion en el nombre del campo. `huecosDe` no lo lista (el alfabeto es
+  `[A-Za-z0-9_]`) pero docxtemplater sí lo trata como campo, no encuentra el dato y **lo deja
+  en blanco**. Se cerró **haciéndolo ruidoso**, no ensanchando el alfabeto compartido:
+  `huecosMalEscritos` rechaza al **subir** el archivo, con el nombre tal como está escrito y
+  la forma correcta al lado.
+- **`{{ZONA}}` bien escrito en una nota al final** — sale **impreso con las llaves puestas**.
+  Las cinco comprobaciones pasaban, cada una por su motivo. Y el arreglo tuvo consecuencia, y
+  se dijo en vez de taparse: al mirar las partes ya extraídas, **la comprobación 1 dejó de
+  poder aislarse de la 3** — son coextensivas en el endpoint. *Dos defensas que siempre
+  disparan juntas son una sola con dos nombres.*
+- **`{{__proto__}}`** — blanco otra vez, con las cinco comprobaciones en verde y `status=200`.
+  Asignar `__proto__` en un objeto literal es un no-op. `docx.ts` ya documentaba el guard para
+  su parser; `generar.ts` **no lo había heredado**. Cerrado con `Object.create(null)` +
+  `hasOwnProperty`, y con el test que cierra el círculo: si el dato SÍ existe con ese nombre,
+  el documento se genera igual — **el guard no puede volverse prohibición**.
+
+**La regla en su cuarta instancia: la pieza cubierta no implica el cableado cubierto.** Cuatro
+veces esta etapa tuvo un componente probado y el cable que le pasa los datos sin cuidar: la
+promesa falsa escrita a mano en `PlantillasTab.tsx` (ningún test tocaba ese archivo), el
+renglón ámbar armado en el JSX, `{avisoSinComprobar}` → `{null}` con 0 rojos, y
+`activos={[]}` en `ElProgreso` dejando los 1397 en verde con el panel **sin las filas de
+estado del §7.5**. La cura que quedó: **todo texto que ve el director vive en `lib/`** (los
+tests del repo solo miran `lib/**`), y el bucle de aplicación también, porque el `Sheet` de
+Radix no se puede dibujar en un test.
+
+**Modos de medición fallida nuevos.** El ledger lleva 16; estos son los que no estaban:
+
+- **El `disabled` suelto no mide nada, nunca.** Las clases de shadcn traen
+  `disabled:pointer-events-none`, así que el atributo aparece igual; hay que buscar
+  `disabled=""` con el igual. **NO generaliza, y se auditó:** `grep -rln "disabled"` sobre los
+  `*.test.ts(x)` devuelve **un solo archivo** — en todo el repo hay **dos** archivos de test
+  que dibujan componentes. No hay barrida pendiente.
+- **El zip guarda la fecha de cada entrada con granularidad de dos segundos**, así que comparar
+  **bytes** de dos `.docx` del mismo contenido es flaky. Se cayó una vez con los dos midiendo
+  5.521 bytes — y ese test es justo el que cuida que el `.docx` del director no se pise nunca.
+  Se compara contenido.
+- **El test de endpoint sin precalentar se pasa de los 5 s.** El primer `pedir()` cargaba
+  pizzip + docxtemplater + mammoth adentro del presupuesto de un test (1.726 ms corriendo
+  solo, 12.376 ms compitiendo con los otros workers). Se arregla con `beforeAll` que precarga
+  el módulo. **No es acelerar: es sacar la carga del reloj de 5 s de un test.**
+- **Un carácter de retroceso (0x08) adentro de un regex**, que `grep` **no muestra**: el
+  patrón se veía perfecto y no matcheaba nada. Lo encontró `cat -A`. Es el más difícil de ver
+  de todos.
+
+Y la regla de método que se pagó sola en toda la etapa, ya cerrada por construcción en los
+runners: **aplicar cada mutación con un script que aborte si el patrón no aparece exactamente
+una vez, si el archivo no cambió, o si no corrieron todos los tests**. Con guarda, el modo de
+falla es *"la medición se niega"*; sin guarda, es *"la medición miente"*. Corolario que costó
+dos rondas: **"mutante equivalente" no es una propiedad del código, es "no lo distingo con las
+pruebas Y EL CÓDIGO de hoy"** — se re-mide cada ronda, no se hereda.
+
+**Guías actualizadas:** `FUNCIONAL-DIRECTOR-PRISMA.md` suma "Cambiar el contrato de todos" y
+"Cuando alguien queda esperando un dato" (§14); `FUNCIONAL-ASESOR-PRISMA.md` suma una línea en
+"Mis Documentos" — al asesor no le cambia nada salvo que su documento se actualiza solo (§8.7:
+no ve versiones ni plantillas).
+
+**Lo que quedó abierto (sin maquillar):**
+
+- **La corrida de punta a punta en producción NO se hizo, y necesita el OK de Leonardo.**
+  Aplicar una versión de verdad **escribe**: subiría "Acuerdo de Confidencialidad" a v2 y
+  regeneraría los 3 documentos de la agencia de prueba. Es reversible —la versión anterior no
+  se borra nunca— pero es un cambio visible sobre lo que él está mirando. Todo lo demás se
+  probó en el navegador (escritorio 1400x1000 y celular 390x844, consola sin un error ni un
+  warning), pero **los estados nuevos se vieron interceptando `fetch`, no con datos reales**.
+- **No hay dónde cargar el dato que falta.** Cuando la versión nueva trae un campo que esa
+  persona no tiene, queda `pendiente` con su documento viejo y la pantalla dice "completá ese
+  dato y volvé a aplicarle la versión" — pero **el único que escribe `form_data` es
+  `confirmar-plantilla`**, y ninguna pantalla deja editarlo. Hoy el `pendiente` no se puede
+  resolver desde la app. El spec §7.4.2 lo declara normal pero nunca diseñó dónde se completa.
+- **Cada `.docx` que se sube quema un número de versión aunque no se confirme.** Queda como
+  está, a propósito: es consistente con `confirmar-plantilla`. La pantalla no las muestra como
+  historial válido (`origen` + `version_actual` alcanzan para distinguirlas), pero el número
+  igual se gasta.
+- **El salteo de la cuenta cruzada no se implementó** (Ruling AJ). El director que puso el
+  mismo campo dos veces a propósito queda frenado; la salida hoy es que el mensaje del freno
+  le dice **qué frase del Word cambiar**. Cuando se retome: la forma ya está escrita en el
+  código —específica, sin poder apagar las otras cuatro, y **con la constancia en
+  `advisor_documents.observacion`, no en el pedido HTTP**— y los dos precedentes del punto 3
+  de arriba evitan tener que migrar el CHECK.
+- **Seis mutaciones sobrevivieron la revisión final** y quedaron declaradas: son "si alguien
+  rompe esta línea mañana nadie se entera", deuda de red, no una mentira existente.
+- **Deuda ajena anotada, de otras partes del sistema:** el FAB de WhatsApp tapa contenido en
+  celular (es `fixed`, un `pb` extra no alcanza) y el encabezado de la página del director se
+  come 377 px en 375×667; 5 rutas declaran `maxDuration = 300` en un plan **Hobby** (una es
+  interactiva) y un `maxDuration` que el plan no soporta **no falla al desplegar**;
+  `reanudarAsesor` pone `estado='activo'` pero no limpia `deleted_at` ni desbloquea el email;
+  `lib/queries/director.ts:204` usa `.neq("estado","eliminado")`, que en PostgREST **también
+  deja afuera las filas con estado nulo**; y la política del asesor sobre `advisor_documents`
+  sigue siendo `advisor_id = auth.uid()` **sin filtro de agencia** (hoy inofensiva: la clave
+  compuesta impide que exista un documento cruzado).
+
+---
+
 ## 2026-08-26
 
 **Etapa B cerrada: los documentos de cada asesor ya viven adentro del sistema** (rama
