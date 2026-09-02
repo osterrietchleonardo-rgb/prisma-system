@@ -63,6 +63,39 @@ limpiar 2 visitas scheduled viejas, 5 asesores + 3 directores sin celular; v2 de
 
 ## 2026-09-02 — sesion Socio: Etapa C de plantillas de documentos
 
+**EL CORTE A `mercado_avisos` ESTÁ APLICADO EN PRODUCCIÓN** (rama
+`feat/corte-mercado-avisos`, worktree `.claude/worktrees/corte-mercado-avisos`; spec
+`docs/superpowers/specs/2026-09-02-corte-mercado-avisos-design.md`, plan
+`docs/superpowers/plans/2026-09-02-corte-mercado-avisos.md`). Con OK explícito de Leonardo,
+en UNA transacción: `roomix_properties` → `roomix_properties_legacy` (archivada, 369.478
+filas, NO borrar sin su OK), vista de compatibilidad `roomix_properties` sobre
+`mercado_avisos` (venta + calidad ok + activo, 20.436 avisos), y las 3 funciones calientes
+(`buscar_roomix`, `acm_match_roomix`, `mapa_colaboracion`) reescritas DIRECTO contra
+`mercado_avisos` con 7 índices espejo. Rollback listo en
+`supabase/rollback/20260902_corte_mercado_rollback.sql` (cuerpos vivos pre-corte).
+
+**Verificado en el navegador como Leonardo (escritorio + celular emulado), todo verde:**
+Buscador "3 amb Belgrano hasta 300k" → 100 resultados con fotos por el proxy; ACM Vidal
+2800 → 100 comparables de la red al 97% con precio/m² y publicador real (Korn Propiedades);
+Mapa → +1000 pins, ficha del pin con fotos proxeadas; alquiler y barrios sin cargar →
+vacío elegante (corte limpio, decidido por él); 0 errores de consola. Heatmaps
+recomputados desde la fuente nueva (7 barrios · 2.357 celdas · 2.394 manzanas).
+
+**Errores que la verificación cazó (para no repetir):** (1) `ALTER TABLE RENAME` arrastra
+las VISTAS dependientes (por OID) — `acm_barrios_disponibles` quedó apuntando a la legacy y
+hubo que repuntarla; las funciones no sufren esto (guardan texto). (2) mercado usa
+`smallint` donde roomix tenía `integer` → casts `::int` en las salidas. (3) `cand` exportaba
+`updated_at` renombrado sin alias y las CTEs de abajo lo pedían. (4) TRES mapas de
+vocabulario en TS apuntaban a la taxonomía inglesa de roomix (Apartment/House) y contra
+mercado daban CERO: `lib/acm/subject.ts` (ROOMIX_TYPE), `lib/mapa/tipos-propiedad.ts`,
+y 2 ramas del consultor — pasados a castellano con 11 tests nuevos. (5) Las fotos de
+ZonaProp (`imgar.zonapropcdn.com`) necesitaban entrar a la allowlist del proxy `foto-red`.
+
+**Pendiente:** merge de la rama a `main` (los cambios de TS viajan con el deploy — hacerlo
+YA: hasta el deploy, el prod viejo filtra tipos con vocabulario inglés y el ACM de la red
+da vacío). El `roomix-worker` de EasyPanel sigue apagado (regla dura); Leonardo decide
+cuándo borrarlo. Fase 2 (explotar historial de precios, días en mercado, H3) es spec aparte.
+
 **Etapa C cerrada: el director cambia el contrato una sola vez y PRISMA le rehace el
 documento a cada asesor con sus propios datos** (rama `feat/asesores-plantillas-versionado`,
 worktree `PRISMA-SYSTEM-asesores-docs`; spec §7, §8.2, §8.3 y §8.7 de
