@@ -172,6 +172,41 @@ no ve versiones ni plantillas).
   sigue siendo `advisor_id = auth.uid()` **sin filtro de agencia** (hoy inofensiva: la clave
   compuesta impide que exista un documento cruzado).
 
+### Lo que encontró Leonardo probándolo, y es la lección más cara de la etapa
+
+Corrió el flujo entero de punta a punta —subió la v2, la aplicó, la puso en uso— y **los
+documentos de los asesores seguían siendo los viejos**. La generación estaba perfecta: se
+bajaron los tres de producción y los tres abrían, con encabezado, pie, la cláusula nueva,
+ningún `{{hueco}}` sin rellenar y el nombre de cada persona. Lo que fallaba era que **nadie
+mostraba el resultado**: la pantalla bajaba `archivo_original_path` y ni siquiera pedía
+`docx_path` en el `select`.
+
+**Cinco comprobaciones antes de escribir, treinta y cinco mutaciones, cuatro rondas de
+revisión — y ninguna miró el camino de LECTURA.** Todo el esfuerzo se fue en que no se
+escribiera un contrato mal generado; que el contrato bien generado *llegara* no lo verificó
+nadie. Es la quinta instancia de "la pieza cubierta no implica el cableado cubierto", y la
+más cara: el cable que faltaba era el que va del sistema a la persona.
+
+**Regla que sale de acá:** cuando una tarea escribe algo que alguien tiene que ver, el plan
+tiene que nombrar explícitamente **quién lo lee y por dónde**, y eso se prueba igual que la
+escritura. Una revisión que solo sigue el camino de escritura da por terminada una función
+que no hace nada visible.
+
+El arreglo fueron tres cosas, no una, y la segunda es la que importa: `archivoQueSeBaja` en
+`lib` decide qué archivo se baja; **`camposDelReemplazo` tuvo que limpiar también
+`docx_path`** —sin eso, mostrar el generado abría un agujero nuevo: reemplazar el .docx de
+una persona le mostraría el contrato de la versión anterior como si fuera el de su archivo
+nuevo—; y borrar el documento se lleva los dos archivos.
+
+**Y una segunda corrección suya, sobre el nombre del archivo.** Se bajaba como
+"… - actualizado.docx", con el argumento de que el asesor no ve versiones (§8.7). Él preguntó
+qué pasa con la versión siguiente: el asesor baja los dos **a la misma carpeta de Descargas**,
+y con el mismo nombre el navegador le agrega "(1)". Ahora lleva el número (`- v2.docx`), leído
+**de la ruta del archivo que se está bajando** para que no pueda quedar desfasado del
+contenido, y con caída a "actualizado" si no se puede leer en vez de inventar un número. El
+§8.7 se sigue cumpliendo: no ve la lista ni el historial, y un número en un nombre de archivo
+no es el historial.
+
 ---
 
 ## 2026-08-26

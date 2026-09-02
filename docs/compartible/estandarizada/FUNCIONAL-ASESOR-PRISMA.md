@@ -630,7 +630,7 @@ Al lado de "Biblioteca Digital" y "Documentos Oficiales" tenés una tercera sola
 - Es **solo lectura**: podés mirar y descargar, pero no podés subir, cambiar ni borrar nada desde acá. Eso lo maneja la dirección.
 - Si te falta un documento, o el que tenés quedó viejo y hay que cambiarlo, **pedíselo a la dirección**: son quienes lo suben y lo actualizan.
 
-> 💡 **Tip:** si cambia un documento que tienen todos (por ejemplo, se actualiza el contrato), **vos no tenés que hacer nada**: la dirección lo cambia una sola vez y **el tuyo se actualiza solo, con tus propios datos**. Lo que ves acá es siempre lo último, sin tener que fijarte cuál era el viejo.
+> 💡 **Tip:** si cambia un documento que tienen todos (por ejemplo, se actualiza el contrato), **vos no tenés que hacer nada**: la dirección lo cambia una sola vez y **el tuyo se actualiza solo, con tus propios datos**. Lo que ves acá es siempre lo último, sin tener que fijarte cuál era el viejo. Cuando lo bajás, el archivo trae un número al final del nombre (por ejemplo **"Contrato de Asesor - v2.docx"**): es para que puedas distinguirlo del que hayas bajado antes.
 
 ---
 

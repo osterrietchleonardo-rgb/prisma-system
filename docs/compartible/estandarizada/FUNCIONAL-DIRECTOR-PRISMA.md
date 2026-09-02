@@ -572,10 +572,12 @@ El nombre del campo admite **solo letras, números y guión bajo**. Nada de guio
 3. **"Leer la versión nueva".** PRISMA te muestra qué campos trae de nuevo, cuáles ya no están, y una **vista previa** del documento de esa persona armado con la versión nueva. **Leela**: es lo último que se puede mirar antes de que esto se convierta en el contrato de todos. Si ves un dato metido donde iba una frase del contrato, arreglá el Word y volvé a subirlo.
 4. **"Aplicar a los asesores".** Acá se arma el documento de cada uno con sus datos. Va **de a una persona por vez**, con el estado al lado de cada nombre; si a alguno le falta un dato o algo no cierra, **ese queda con su documento de antes y los demás siguen igual**. No cierres la pantalla mientras corre.
 5. **"Poner esta versión en uso".** Recién con este segundo botón la versión nueva pasa a ser la vigente.
+6. **Comprobalo:** entrá a la ficha de cualquier asesor y bajá su documento. Va a bajar con el número de versión en el nombre —por ejemplo **"Contrato de Asesor - v2.docx"**— y adentro tiene que estar el cambio que hiciste, con **los datos de esa persona**, no los de la que usaste para armar la versión.
 
 > ⚠️ **Son dos pasos y dos botones, y es la confusión más fácil de tener.** "Aplicar" arma el documento de cada uno. "Poner la versión en uso" la vuelve la oficial. Podés aplicar hoy y ponerla en uso mañana: mientras tanto, la fila te avisa que hay una versión a medio poner y te deja el botón ahí para terminar.
 > 💡 **La versión anterior no se borra nunca.** Queda guardada, así que subir una versión nueva no es una decisión irreversible.
 > 💡 **Si el archivo te lo rechaza, no empieces de cero:** el Word que elegiste sigue seleccionado. Corregí lo que te dice el mensaje, volvé a elegirlo si lo cambiaste, y probá de nuevo.
+> 💡 **El Word que subiste vos no se pisa nunca.** El documento que baja cada asesor es uno nuevo, generado; el archivo original que cargaste queda guardado aparte. Por eso el que se baja lleva el número de versión en el nombre: si mañana aplicás la v3, el asesor va a poder distinguir en su carpeta de Descargas cuál es cuál.
 
 ### Cuando alguien queda esperando un dato
 
