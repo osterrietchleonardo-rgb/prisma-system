@@ -872,12 +872,31 @@ describe("la pantalla de la versión nueva no se escribe su propia prosa", () =>
    */
   const APRETADO = CODIGO.replace(/\s+/g, " ")
 
-  it("el panel monta el progreso, con su condición adentro y no afuera", () => {
-    expect(APRETADO).toContain("<ElProgreso arranco={arranco}")
+  /**
+   * El cableado ENTERO, no la primera prop.
+   *
+   * Con `toContain("<ElProgreso arranco={arranco}")` **todavía sobrevivía una
+   * mutación**, medida por el controlador: pasarle `activos={[]}` en vez de
+   * `activos={activos}` dejaba los 1397 en verde. El componente sí está
+   * probado —se dibuja y muestra una fila por asesor—, pero **el cableado que
+   * le pasa la lista no lo miraba nadie**, así que el panel podía quedarse sin
+   * las filas de estado por fila que pide el §7.5 y ningún test se enteraba.
+   *
+   * Es la misma lección que ya dejó dos veces esta pantalla: **la pieza
+   * cubierta no implica el cableado cubierto**. Se fijan las props de las que
+   * depende que el §7.5 se cumpla, no todas: `arranco` (que se dibuje),
+   * `activos` (una fila por persona) y `porAsesor` (el estado de cada una).
+   */
+  it("el panel monta el progreso, con su condición adentro y con la gente de verdad", () => {
+    expect(APRETADO).toContain("<ElProgreso arranco={arranco} activos={activos} porAsesor={porAsesor}")
   })
 
-  it("y monta la barra de aplicar", () => {
-    expect(APRETADO).toContain("<BarraDeLaAplicacion arranco={arranco}")
+  /**
+   * Y de la barra, las tres que deciden si el director puede apretar dos veces
+   * o activar cuando no corresponde.
+   */
+  it("y monta la barra de aplicar, con lo que decide si se puede apretar", () => {
+    expect(APRETADO).toContain("<BarraDeLaAplicacion arranco={arranco} aplicando={aplicando} activando={activando}")
   })
 
   /**
