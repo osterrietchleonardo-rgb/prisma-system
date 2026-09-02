@@ -432,7 +432,17 @@ export function VersionNueva({ templateId, nombreDelTipo, asesores, onCerrar, on
   };
 
   const cerrar = () => {
-    if (aplicando) return;
+    /**
+     * También durante `activando`, no solo durante `aplicando`.
+     *
+     * Miraba solo `aplicando`, así que un Escape mientras corría "poner en uso"
+     * cerraba el panel: la solapa recargaba **antes** de que el servidor
+     * terminara y mostraba el estado intermedio unos segundos sobre una versión
+     * que ya estaba en uso. No hace daño —la operación es idempotente y el
+     * servidor la termina igual— pero el director ve un estado que ya no es
+     * cierto, que es lo único que esta pantalla no puede hacer.
+     */
+    if (aplicando || activando) return;
     if (huboCambios) onAplicado();
     onCerrar();
   };

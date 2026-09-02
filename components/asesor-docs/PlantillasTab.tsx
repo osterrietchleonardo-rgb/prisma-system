@@ -264,7 +264,23 @@ export function PlantillasTab() {
    * los que quedaron atrás, y ese mensaje ya está escrito para el director.
    */
   const ponerEnUso = async (fila: FilaPlantilla) => {
+    /**
+     * El MISMO motivo que apaga el botón, comprobado también acá.
+     *
+     * El `disabled` del botón era todo lo que impedía activar cuando no
+     * corresponde: a diferencia del panel, este handler no tenía guard propio.
+     * Un `disabled` es un adorno del navegador —se saltea con un clic
+     * programático, o con un cambio de estilos— y acá al otro lado hay un
+     * `UPDATE` sobre `version_actual`, que es lo que la solapa lee para decir
+     * "está en uso".
+     *
+     * El servidor igual frena los tres casos que importan (`activar-version`
+     * mira los atrasados, los pendientes y los rojos), así que esto es la
+     * segunda puerta, no la única. Pero una defensa sola es una defensa que el
+     * día que alguien toque el botón desaparece sin ruido.
+     */
     if (fila.versionIdYaAplicada === null || activandoEn !== null) return;
+    if (motivoParaNoPonerEnUsoDesdeLaFila(fila) !== null) return;
     setActivandoEn(fila.templateId);
     try {
       const res = await fetch("/api/asesor-docs/activar-version", {

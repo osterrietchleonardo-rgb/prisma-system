@@ -858,6 +858,23 @@ describe("la pantalla de la versión nueva no se escribe su propia prosa", () =>
     expect(CODIGO).not.toContain("no está en la lista")
   })
 
+  /**
+   * Cerrar el panel se frena mientras corre CUALQUIERA de las dos cosas.
+   *
+   * Miraba solo `aplicando`, así que un Escape durante "poner en uso" cerraba
+   * el panel, la solapa recargaba antes de que el servidor terminara, y el
+   * director veía el estado intermedio unos segundos sobre una versión que ya
+   * estaba en uso. No hace daño —es idempotente— pero le muestra algo que ya
+   * no es cierto, que es lo único que esta pantalla no puede hacer.
+   *
+   * Va como assert de código porque el `cerrar()` no se puede alcanzar desde
+   * un test: el `Sheet` de Radix necesita un DOM. Medido: sacarle el
+   * `|| activando` deja los 1402 en verde.
+   */
+  it("cerrar el panel se frena también mientras se pone la versión en uso", () => {
+    expect(CODIGO).toContain("if (aplicando || activando) return;")
+  })
+
   it("la traducción de la respuesta sale de lib", () => {
     expect(CODIGO).toContain("resultadoDeLaAplicacion({ ok: res.ok, status: res.status, estado: cuerpo?.estado })")
   })
@@ -892,11 +909,24 @@ describe("la pantalla de la versión nueva no se escribe su propia prosa", () =>
   })
 
   /**
-   * Y de la barra, las tres que deciden si el director puede apretar dos veces
-   * o activar cuando no corresponde.
+   * Y de la barra, las que deciden si el director puede apretar dos veces o
+   * activar cuando no corresponde.
+   *
+   * El comentario anterior decía que las tres primeras cubrían "activar cuando
+   * no corresponde" **y era falso**: lo midió la revisión final, poniendo
+   * `motivoParaNoActivar={null}` — sobrevivía. Esa prop es justamente la que
+   * decide si el botón de activar está apagado, así que va en el assert.
+   *
+   * `enUso` queda afuera a propósito: decide qué dice el botón, no si se puede
+   * apretar. Se fija lo que manda, no todo — un assert que pega el JSX entero
+   * se rompe con cualquier reformateo y eso también cuesta.
    */
   it("y monta la barra de aplicar, con lo que decide si se puede apretar", () => {
     expect(APRETADO).toContain("<BarraDeLaAplicacion arranco={arranco} aplicando={aplicando} activando={activando}")
+  })
+
+  it("y le pasa el motivo por el que NO se puede activar, que es lo que apaga el botón", () => {
+    expect(APRETADO).toContain("motivoParaNoActivar={motivoParaNoActivar}")
   })
 
   /**

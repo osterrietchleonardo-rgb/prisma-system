@@ -1195,6 +1195,24 @@ describe("explicacionDelEstado: el desvinculado, con una instrucción que se pue
 describe("la solapa no se escribe sus propios contadores", () => {
   const FUENTE = readFileSync(path.resolve(__dirname, "../../components/asesor-docs/PlantillasTab.tsx"), "utf8")
 
+  /**
+   * ═══ La segunda puerta del botón de poner en uso ═══
+   *
+   * El `disabled` del botón lo cuida un test que lo dibuja, pero el HANDLER no
+   * se puede alcanzar desde ningún test: sacarle el guard deja los 1402 en
+   * verde (medido). Y un `disabled` es un adorno del navegador —se saltea con
+   * un clic programático— mientras que al otro lado hay un `UPDATE` sobre
+   * `version_actual`, que es lo que la solapa lee para decir "está en uso".
+   *
+   * El servidor frena los tres casos que importan, así que esto es la segunda
+   * puerta y no la única. Pero una defensa sola es una defensa que el día que
+   * alguien toque el botón desaparece sin ruido — y acá se comprueba leyendo
+   * el archivo, que es lo único que alcanza a este código.
+   */
+  it("el handler de poner en uso comprueba el MISMO motivo que apaga el botón", () => {
+    expect(FUENTE).toContain("if (motivoParaNoPonerEnUsoDesdeLaFila(fila) !== null) return;")
+  })
+
   it("el renglón de los sin comparar sale de textoSinComprobar", () => {
     expect(FUENTE).toContain("textoSinComprobar(fila.sinComprobar)")
   })
@@ -1259,6 +1277,32 @@ describe("la fila dibujada: los renglones tienen que llegar a la pantalla", () =
     versionIdYaAplicada: null,
   }
 
+  /**
+   * El HTML CRUDO de la fila, con etiquetas: hace falta para mirar `disabled`.
+   *
+   * ═══ Por qué `disabled` se busca CON el igual ═══
+   *
+   * Buscar la palabra `disabled` suelta **no mide nada nunca**: las clases de
+   * shadcn traen `disabled:pointer-events-none disabled:opacity-50`
+   * (`components/ui/button.tsx`), así que la palabra está en el `class` del
+   * botón esté apagado o encendido. Un test que la busque pasa siempre.
+   *
+   * Con el igual —`disabled=""`— solo aparece cuando React lo puso de verdad.
+   * Lo encontró el implementador con una mutación que le sobrevivía, y la
+   * revisión final auditó si hacía falta una barrida por el repo: **no** —
+   * `grep -rln "disabled" --include=*.test.ts --include=*.test.tsx` devuelve un
+   * solo archivo, y es el que ya está arreglado.
+   */
+  const dibujarCrudo = (cambios: Partial<FilaPlantilla> = {}): string =>
+    renderToStaticMarkup(
+      React.createElement(FilaDeLaSolapa, {
+        fila: { ...FILA, ...cambios },
+        detectando: false,
+        onDetectar: () => {},
+        onPonerEnUso: () => {},
+      }),
+    )
+
   /** El texto visible de la fila: el HTML sin etiquetas y sin entidades. */
   const dibujar = (cambios: Partial<FilaPlantilla> = {}): string =>
     renderToStaticMarkup(
@@ -1307,6 +1351,93 @@ describe("la fila dibujada: los renglones tienen que llegar a la pantalla", () =
       "la frase aparece una sola vez: o se cayó el renglón corto, o se cayó la explicación",
     ).toBe(2)
     expect(dibujar({ desvinculados: 0 })).not.toContain("asesor desvinculado")
+  })
+
+  /**
+   * ═══ El botón de poner en uso: que esté APAGADO cuando no corresponde ═══
+   *
+   * La revisión final midió que este botón era lo menos cubierto de la ronda:
+   * cuatro mutaciones sobre su cableado, cuatro sobrevivientes. Los tests
+   * dibujaban la fila y comprobaban que el MOTIVO se escribe, pero ninguno
+   * comprobaba que el botón estuviera apagado — y a diferencia del panel, el
+   * handler de la fila no tenía guard propio: el `disabled` era todo.
+   *
+   * (Ahora sí lo tiene, y por eso este test es la segunda puerta y no la
+   * única. Pero el servidor no frena el caso de cero asesores activos.)
+   */
+  /**
+   * El estado intermedio: la plantilla usa la v1 y ya hay documentos hechos con
+   * la v2. El `version: 1` importa — mi primera versión de este fixture ponía
+   * la vigente y la aplicada las dos en 2, o sea "no hay nada pendiente", y el
+   * botón directamente no se dibujaba. El test fallaba por una contradicción
+   * mía, no por el código.
+   */
+  const VERSION_APLICADA = {
+    version: 1,
+    versionYaAplicada: 2,
+    versionIdYaAplicada: "v-2",
+    yaAplicados: 2,
+  }
+
+  /**
+   * Si ESE botón está apagado, no "si hay algún botón apagado".
+   *
+   * La primera versión de este test contaba todos los `disabled=""` de la fila
+   * y **fallaba por un motivo que no tenía nada que ver**: con menos de 3
+   * documentos, "Detectar plantilla" también está apagado. Un test que se cae
+   * por el botón de al lado no mide lo que dice medir.
+   */
+  const botonDePonerEnUsoApagado = (html: string): boolean => {
+    /**
+     * Se recorren los `<button>` y se busca el que TIENE ese texto adentro.
+     *
+     * Mi primer intento hacía `indexOf("Poner la versión")` y miraba el
+     * `<button` anterior — y agarraba la frase que la EXPLICACIÓN usa para
+     * decirle al director qué botón apretar (`… con el botón "Poner la versión
+     * 2 en uso"`), no el botón. Dos suposiciones mías equivocadas seguidas
+     * sobre la misma fila: por eso el helper se escribe mirando la estructura,
+     * no la distancia.
+     */
+    const botones = html.match(/<button[^>]*>[\s\S]*?<\/button>/g) ?? []
+    /**
+     * Sin el acento a propósito: el archivo pasó por varias herramientas y la
+     * "ó" no matcheaba aunque el HTML la tuviera (lo midió una sonda: el HTML
+     * incluía la frase y el filtro devolvía cero). "Poner la versi" identifica
+     * al botón igual y no depende de cómo quedó codificado este archivo.
+     */
+    const suyo = botones.filter((b) => b.includes("Poner la versi"))
+    expect(suyo.length, "no hay exactamente un botón de poner en uso").toBe(1)
+    return suyo[0].includes('disabled=""')
+  }
+
+  it("con todos los activos ya aplicados, el botón de poner en uso está ENCENDIDO", () => {
+    const html = dibujarCrudo({ ...VERSION_APLICADA, participan: 2, pendientes: 0, enRojo: 0 })
+    expect(botonDePonerEnUsoApagado(html), "tendría que poder apretarse").toBe(false)
+  })
+
+  it("pero con uno esperando un dato, está APAGADO", () => {
+    const html = dibujarCrudo({ ...VERSION_APLICADA, participan: 3, pendientes: 1, enRojo: 0 })
+    expect(
+      botonDePonerEnUsoApagado(html),
+      "no se puede poner en uso mientras quede alguien esperando un dato",
+    ).toBe(true)
+  })
+
+  it("y sin ningún asesor activo también, porque activar dejaría la plantilla en borrador", () => {
+    const html = dibujarCrudo({ ...VERSION_APLICADA, participan: 0, pendientes: 0, enRojo: 0 })
+    expect(botonDePonerEnUsoApagado(html)).toBe(true)
+  })
+
+  /**
+   * Y el que NO apaga, que es tan importante como los que sí: un asesor en rojo
+   * sobre la versión VIEJA no bloquea poner en uso la nueva. Si bloqueara, el
+   * director quedaría trabado por un problema de la versión que está
+   * reemplazando. Quien decide de verdad es el servidor, que mira quién no está
+   * en la versión nueva.
+   */
+  it("un rojo de la versión vieja NO lo apaga", () => {
+    const html = dibujarCrudo({ ...VERSION_APLICADA, participan: 3, pendientes: 0, enRojo: 1 })
+    expect(botonDePonerEnUsoApagado(html)).toBe(false)
   })
 
   it("el contador de los rojos se dibuja", () => {
