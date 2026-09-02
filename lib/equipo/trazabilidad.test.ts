@@ -36,6 +36,9 @@ describe("categoriaDeEvento", () => {
     expect(categoriaDeEvento("escalera")).toBe("aviso")
     expect(categoriaDeEvento("reasignacion")).toBe("equipo")
     expect(categoriaDeEvento("visita_agendada")).toBe("visita")
+    expect(categoriaDeEvento("bot_apagado")).toBe("bot")
+    expect(categoriaDeEvento("bot_prendido")).toBe("bot")
+    expect(categoriaDeEvento("nota_director")).toBe("interno")
   })
   it("un tipo nuevo del equipo cae en equipo por prefijo", () => {
     expect(categoriaDeEvento("asesor_algo_nuevo")).toBe("equipo")

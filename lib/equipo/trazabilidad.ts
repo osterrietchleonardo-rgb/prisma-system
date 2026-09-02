@@ -127,6 +127,8 @@ const CATEGORIA_POR_TIPO: Record<string, CategoriaTraza> = {
   aviso_equipo: "aviso",
   aviso_simulado: "aviso",
   nota_director: "interno",
+  bot_apagado: "bot",
+  bot_prendido: "bot",
   asesor_tomo: "equipo",
   asesor_no_puede: "equipo",
   reasignacion: "equipo",

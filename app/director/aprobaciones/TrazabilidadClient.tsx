@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  ArrowLeft, Bell, Bot, CalendarDays, EyeOff, Loader2, MessageSquare, Plus, RefreshCw, Search, Sparkles, StickyNote, UserCheck, Users,
+  ArrowLeft, Bell, Bot, CalendarDays, EyeOff, Loader2, MessageSquare, Plus, RefreshCw, Search, Sparkles, StickyNote, UserCheck, Users, X,
 } from "lucide-react"
 import {
   agregarNotaTraza, listarConversacionesConActividad, trazaDeConversacion,
@@ -190,6 +190,11 @@ export default function TrazabilidadClient({ conversaciones: inicial, asesores }
                   </div>
                   <Button size="sm" variant="outline" asChild>
                     <Link href={`/director/leads-whatsapp/${seleccion}`}><MessageSquare className="w-4 h-4 mr-1" /> Ver el chat</Link>
+                  </Button>
+                  {/* Cerrar el log (pedido 2/9); en celular ya está "Volver" */}
+                  <Button size="sm" variant="ghost" className="hidden md:inline-flex" title="Cerrar"
+                    onClick={() => { setSeleccion(null); setTraza(null); setNotaEn(null) }}>
+                    <X className="w-4 h-4" />
                   </Button>
                 </div>
 
