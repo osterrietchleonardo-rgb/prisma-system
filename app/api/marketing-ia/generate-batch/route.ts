@@ -7,6 +7,7 @@ import { AdvisorOperation, EstructuraId, IpcProfile, CopyType, CopyAngle, Consci
 import { buildPropertyDirective } from "@/lib/marketing-ia/property-context";
 import { buildOperacionDirective } from "@/lib/marketing-ia/operacion-context";
 import { nivelDesdeIpc, NIVEL_DESCRIPCION } from "@/lib/marketing-ia/niveles";
+import { REGLA_VOZ } from "@/lib/marketing-ia/voz";
 import { ESTRUCTURAS, resolverEstructura, esquemaJsonGuion, guiaBloquesParaPrompt } from "@/lib/marketing-ia/estructuras";
 
 export const dynamic = "force-dynamic";
@@ -81,7 +82,8 @@ ${operacion ?? ""}
 
 NIVEL DE CONSCIENCIA PARA LAS 3 VARIANTES: Nivel ${config.consciousness_level ?? 1}/4 — ${nivelDesc}
 ${config.extra_context ? `- CONTEXTO EXTRA DEL USUARIO: ${config.extra_context}` : ''}
-${directive?.trim() ? `DIRECTIVA CREATIVA DE LA AGENCIA (OBLIGATORIO RESPETAR EN LAS 3 VARIANTES): ${directive.trim()}` : ''}
+${REGLA_VOZ}
+${directive?.trim() ? `DIRECTIVA CREATIVA DE LA AGENCIA (OBLIGATORIO RESPETAR EN LAS 3 VARIANTES, manda por encima de la regla de voz): ${directive.trim()}` : ''}
 
 REGLA DE ORO / INSTRUCCIÓN CRÍTICA 1:
 ¡Las 3 variantes DEBEN seguir estrictamente las definiciones del IPC! Respetar el ángulo de marketing/copy recomendado, el tono sugerido, la promesa central, las objeciones y el dolor principal definidos en el perfil. Las variantes son solo diferentes formas de presentar este mismo mensaje sin alterar la identidad y el tono elegido.

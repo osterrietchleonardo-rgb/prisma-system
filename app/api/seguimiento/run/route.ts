@@ -5,6 +5,12 @@ import { decidirConAgente, estimarCostoUSD } from "@/lib/seguimiento/agente"
 import { crearHerramientas } from "@/lib/seguimiento/herramientas"
 import { renderizarSemilla } from "@/lib/seguimiento/semilla"
 import { registrarEvento } from "@/lib/seguimiento/eventos"
+import { sincronizarCompromisos, crearCompromisoEscalar } from "@/lib/seguimiento/compromisos"
+import { avisarPorEscalar } from "@/lib/seguimiento/avisos"
+import { aplicarSinEnvio, ejecutarDecision } from "@/lib/seguimiento/ejecutor"
+import { correrVisitas } from "@/lib/seguimiento/visitas"
+import { correrEscalamiento } from "@/lib/seguimiento/escalamiento"
+import { NOMBRES_V2 } from "@/lib/whatsapp/plantillas-v2"
 import { plantillaDesdeFila, type PlantillaDisponible } from "@/lib/seguimiento/plantillas"
 import type { Candidato, CompromisoActivo, ConfigAgencia } from "@/lib/seguimiento/tipos"
 
@@ -32,9 +38,24 @@ export async function POST(req: Request) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
   const { tarea = "seguimiento" } = await req.json().catch(() => ({}))
+  // El dispatch es un endpoint propio: se le pega al MISMO servidor que corre esto (preview o prod)
+  const origen = new URL(req.url).origin
+  // Task 16: recordatorios de visita (determinísticos). Task 19: escalamiento al director.
+  if (tarea === "visitas") {
+    const r = await correrVisitas(db, {
+      origen, dispatchSecret: process.env.DISPATCH_SECRET, bypassSecret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+    })
+    return NextResponse.json({ tarea, ...r })
+  }
+  if (tarea === "escalamiento") {
+    const r = await correrEscalamiento(db)
+    return NextResponse.json({ tarea, ...r })
+  }
   if (tarea !== "seguimiento")
     return NextResponse.json({ error: `tarea desconocida: ${tarea}` }, { status: 400 })
-  // Task 16 suma "visitas"; Task 19 suma "escalamiento"
+
+  // ── Task 13: vencer lo vencido y crear los compromisos de visita que falten ──
+  await sincronizarCompromisos(db)
 
   // ── Capa 1: elegibilidad en SQL ──
   const { data: candidatos, error } = await db.rpc("seguimiento_candidatos", {
@@ -46,6 +67,8 @@ export async function POST(req: Request) {
   const configPorAgencia = new Map<string, ConfigAgencia>(
     (configs ?? []).map((c) => [c.agency_id, c])
   )
+  const { data: agencias } = await db.from("agencies").select("id, name")
+  const nombreAgencia = new Map<string, string>((agencias ?? []).map((a) => [a.id, a.name ?? "PRISMA"]))
 
   // ── Capa 2: puntuar, ordenar ──
   const puntuados = await Promise.all(
@@ -81,12 +104,15 @@ export async function POST(req: Request) {
   for (const f of filasPlantillas ?? []) {
     const p = plantillaDesdeFila(f)
     if (!p) continue
+    // Regla de Leonardo (27/8): solo las plantillas NUEVAS; las viejas f1/f2/f3 no se usan más.
+    // Sin ninguna nueva aprobada, el agente no puede contactar (posponer/abandonar/escalar sí).
+    if (!(NOMBRES_V2 as readonly string[]).includes(p.nombre)) continue
     plantillasPorAgencia.set(f.agency_id, [...(plantillasPorAgencia.get(f.agency_id) ?? []), p])
   }
 
   // ── Capa 3: el agente decide, uno por uno (secuencial: previsible) ──
   const inicio = Date.now()
-  const resultados: Array<{ conversation_id: string; accion: string; razon: string }> = []
+  const resultados: Array<{ conversation_id: string; accion: string; razon: string; aviso?: string; resultado?: string }> = []
   for (const { c, compromisos, score } of cola) {
     if (Date.now() - inicio > DEADLINE_MS) break // lo que queda espera la próxima corrida
     const config = configPorAgencia.get(c.agency_id)
@@ -151,7 +177,38 @@ export async function POST(req: Request) {
       if (costo > TOPE_COSTO_USD)
         await registrarEvento(db, c.agency_id, c.id, "costo_alto",
           `Decisión por encima del tope: US$${costo.toFixed(4)} (tope ${TOPE_COSTO_USD})`, { tokens })
-      void fila // Task 15 usa fila.id para enchufar el ejecutor cuando config.modo === "activo"
+      // ── Task 14: escalar ⇒ el asesor asume "respuesta_pendiente" (24 h) y se le avisa en
+      //    el mismo acto (email + WhatsApp si tiene celular). En sombra: compromiso sí,
+      //    aviso simulado (queda registrado a quién habría ido).
+      if (decision.accion === "escalar") {
+        const comp = await crearCompromisoEscalar(db, c, decision.razon, fila?.id ?? null)
+        if (comp === "creado")
+          await registrarEvento(db, c.agency_id, c.id, "compromiso_creado",
+            `El asesor asume responder en 24 h: ${decision.razon}`, { decision_id: fila?.id ?? null })
+        const aviso = await avisarPorEscalar(db, c, decision, config, fila?.id ?? null,
+          nombreAgencia.get(c.agency_id) ?? "PRISMA")
+        resultados[resultados.length - 1].aviso = aviso
+      }
+      // ── Task 15: SOLO en modo activo se ejecuta. Contactar (y el mensaje empático de una
+      //    escalada) pasan por el ejecutor con todos los guardrails; posponer/abandonar solo
+      //    mueven el estado. En sombra, nada de esto corre: la decisión queda registrada.
+      if (config.modo === "activo" && fila?.id && plantillaValida) {
+        try {
+          if (decision.accion === "contactar" || (decision.accion === "escalar" && decision.plantilla)) {
+            const r = await ejecutarDecision(db, decision, c, config, fila.id, {
+              origen,
+              dispatchSecret: process.env.DISPATCH_SECRET,
+              bypassSecret: process.env.VERCEL_AUTOMATION_BYPASS_SECRET,
+            })
+            resultados[resultados.length - 1].resultado = r.resultado
+          } else if (decision.accion === "posponer" || decision.accion === "abandonar") {
+            resultados[resultados.length - 1].resultado = await aplicarSinEnvio(db, decision, c, fila.id)
+          }
+        } catch (e) {
+          await registrarEvento(db, c.agency_id, c.id, "error", `ejecutor falló: ${String(e).slice(0, 200)}`)
+          await db.from("seguimiento_decisiones").update({ resultado: `error_${String(e).slice(0, 60)}` }).eq("id", fila.id)
+        }
+      }
     } catch (e) {
       // Degradación elegante: si el agente falla, NO se manda nada y se registra
       await registrarEvento(db, c.agency_id, c.id, "error", `agente falló: ${String(e).slice(0, 200)}`)

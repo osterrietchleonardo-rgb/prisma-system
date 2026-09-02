@@ -386,7 +386,7 @@ export function MarketingAiSettings() {
               Aviso Legal
             </CardTitle>
             <CardDescription>
-              Texto legal que se incluirá en letra pequeña y legible en la parte inferior de cada imagen generada, sin tapar otros elementos. Por ejemplo: matrícula, datos del corredor responsable o aclaraciones obligatorias.
+              Texto legal que se imprime al pie de cada imagen generada, palabra por palabra y tal como lo escribís acá. Por ejemplo: matrícula, datos del corredor responsable o aclaraciones obligatorias. Cuanto más largo, más chica queda la letra: hasta unos 400 caracteres se lee cómodo en el celular.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -394,10 +394,10 @@ export function MarketingAiSettings() {
               value={config.legal_notice}
               onChange={(e) => setConfig(prev => ({ ...prev, legal_notice: e.target.value }))}
               placeholder={'Ej: Mat. CUCICBA 1234 - Corredor Responsable: Juan Pérez. Valores sujetos a confirmación.'}
-              className="min-h-[90px] resize-none"
-              maxLength={300}
+              className="min-h-[150px] resize-y"
+              maxLength={1500}
             />
-            <p className="text-[10px] text-muted-foreground mt-2 text-right">{config.legal_notice.length}/300</p>
+            <p className="text-[10px] text-muted-foreground mt-2 text-right">{config.legal_notice.length}/1500</p>
           </CardContent>
         </Card>
       </div>

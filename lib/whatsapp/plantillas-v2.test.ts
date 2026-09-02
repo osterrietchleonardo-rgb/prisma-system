@@ -16,6 +16,12 @@ describe("catálogo de plantillas v2 (clientes)", () => {
       expect(p.body_examples).toHaveLength(2)
     }
   })
+  it("regla de Meta (26/8): ninguna variable al principio ni al final del cuerpo", () => {
+    for (const p of [...cat, ...plantillasEquipo("ag57c613")]) {
+      expect(p.body.trim().startsWith("{{")).toBe(false)
+      expect(p.body.trim().endsWith("}}")).toBe(false)
+    }
+  })
   it("ninguna trae la BAJA fija (la agrega el ejecutor desde el 2º seguimiento)", () => {
     for (const p of cat) expect(p.body).not.toMatch(/BAJA/)
   })

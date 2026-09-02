@@ -2,6 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
+import { contarAprobacionesPendientes } from "@/app/actions/equipo"
 import { cn } from "@/lib/utils"
 import { 
   Home, 
@@ -19,7 +21,8 @@ import {
   TrendingUp,
   FileSignature,
   MessageSquare,
-  BarChart2
+  BarChart2,
+  ClipboardCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -36,6 +39,7 @@ const navItems = [
   { name: "Leads Tokko", href: "/director/leads", icon: Users },
   { name: "Asesor IA WhatsApp", href: "/director/asesor-ia-whatsapp", icon: MessageSquare },
   { name: "Leads WhatsApp", href: "/director/leads-whatsapp", icon: MessageSquare },
+  { name: "Aprobaciones", href: "/director/aprobaciones", icon: ClipboardCheck },
   { name: "Marketing IA", href: "/director/marketing-ia", icon: Sparkles },
   { name: "Contratos IA", href: "/director/contratos-ia", icon: FileSignature },
   { name: "Asesores", href: "/director/asesores", icon: UserCircle },
@@ -59,6 +63,15 @@ interface DirectorSidebarProps {
 
 export function DirectorSidebar({ className, agencyName, agencyId, userName, userRole, onSelect }: DirectorSidebarProps) {
   const pathname = usePathname()
+  // contador de aprobaciones pendientes (se refresca al navegar y cada 60 s)
+  const [pendientes, setPendientes] = useState(0)
+  useEffect(() => {
+    let vivo = true
+    const leer = () => contarAprobacionesPendientes().then((n) => { if (vivo) setPendientes(n) }).catch(() => {})
+    leer()
+    const t = setInterval(leer, 60_000)
+    return () => { vivo = false; clearInterval(t) }
+  }, [pathname])
 
   return (
     <div className={cn("flex flex-col h-full border-r bg-card", className)}>
@@ -123,6 +136,11 @@ export function DirectorSidebar({ className, agencyName, agencyId, userName, use
               >
                 <item.icon className="w-4 h-4" />
                 {item.name}
+                {item.href === "/director/aprobaciones" && pendientes > 0 && (
+                  <span className="ml-auto text-[10px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">
+                    {pendientes}
+                  </span>
+                )}
               </Link>
             )
           })}

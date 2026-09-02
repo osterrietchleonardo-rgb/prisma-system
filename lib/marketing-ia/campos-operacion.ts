@@ -15,8 +15,7 @@ export interface CampoOperacion {
 
 export const CAMPOS_PERFIL: CampoOperacion[] = [
   { name: "anios_experiencia", label: "¿Cuántos años hace que trabajás en el rubro?", placeholder: "Ej: 8 años", etiquetaPrompt: "Años de experiencia", multilinea: false },
-  { name: "matricula", label: "Matrícula o colegio (si corresponde)", placeholder: "Ej: CUCICBA 1234", etiquetaPrompt: "Matrícula", multilinea: false },
-  { name: "zona_dominio", label: "¿En qué zona conocés cada cuadra?", placeholder: "Ej: Caballito, Flores y Almagro", etiquetaPrompt: "Zona que domina", multilinea: false },
+  { name: "zona_dominio", label: "¿En qué zona sos experto?", placeholder: "Ej: Caballito, Flores y Almagro", etiquetaPrompt: "Zona que domina", multilinea: false },
   { name: "especialidad", label: "¿En qué te especializás?", placeholder: "Ej: departamentos usados de 2 y 3 ambientes", etiquetaPrompt: "Especialidad", multilinea: false },
   { name: "operaciones_cerradas", label: "¿Cuántas operaciones cerraste en tu carrera?", placeholder: "Ej: más de 300", etiquetaPrompt: "Operaciones cerradas en su carrera", multilinea: false },
   { name: "casos_reales", label: "Contá 2 o 3 casos reales: zona, qué pasó y con qué resultado", placeholder: "Ej: Un PH en Flores que estaba publicado hacía 11 meses; lo republicamos con fotos nuevas y precio corregido, y se vendió en 34 días al 96% del pedido.", etiquetaPrompt: "Casos reales (prueba social)", multilinea: true },
@@ -49,12 +48,35 @@ interface OperacionParcial {
   venta: Record<string, unknown>;
 }
 
-const bloqueCompleto = (valores: Record<string, unknown>, campos: CampoOperacion[]) =>
-  campos.every((c) => typeof valores?.[c.name] === "string" && (valores[c.name] as string).trim().length >= 2)
+/**
+ * Un campo está cargado cuando tiene al menos un carácter que no sea espacio.
+ *
+ * Antes se exigían dos, y eso dejaba afuera respuestas legítimas de un dígito: "2" de rebaja
+ * promedio, "5" años, "8" operaciones. El asesor completaba las 13 preguntas y el paso de las
+ * ofertas le seguía diciendo que faltaban datos, sin decirle cuál.
+ */
+const cargado = (valores: Record<string, unknown>, campo: CampoOperacion) =>
+  typeof valores?.[campo.name] === "string" && (valores[campo.name] as string).trim().length > 0
+
+export interface CampoFaltante {
+  bloque: "Captación" | "Venta";
+  label: string;
+}
+
+/** Qué preguntas de Captación y Venta quedan sin responder. El perfil nunca entra acá. */
+export function camposFaltantes(op: OperacionParcial): CampoFaltante[] {
+  const bloques: { bloque: CampoFaltante["bloque"]; valores: Record<string, unknown>; campos: CampoOperacion[] }[] = [
+    { bloque: "Captación", valores: op.captacion ?? {}, campos: CAMPOS_CAPTACION },
+    { bloque: "Venta", valores: op.venta ?? {}, campos: CAMPOS_VENTA },
+  ]
+  return bloques.flatMap(({ bloque, valores, campos }) =>
+    campos.filter((c) => !cargado(valores, c)).map((c) => ({ bloque, label: c.label }))
+  )
+}
 
 /** Se pueden generar las ofertas cuando Captación y Venta están completos. El perfil nunca bloquea. */
 export function operacionCompleta(op: OperacionParcial): boolean {
-  return bloqueCompleto(op.captacion, CAMPOS_CAPTACION) && bloqueCompleto(op.venta, CAMPOS_VENTA)
+  return camposFaltantes(op).length === 0
 }
 
 /** Tipos derivados: si alguien agrega un campo al catálogo, TypeScript pide sumarlo a la interface. */

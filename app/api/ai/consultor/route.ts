@@ -5,7 +5,9 @@ import { generateEmbedding } from "@/lib/gemini";
 import { openaiIA } from "@/lib/openai";
 import { NextResponse } from "next/server";
 import { consumeAiCredits, requireTenant, updateAiTransactionCost } from "@/lib/auth/tenant-validation";
-import { normalizarImagenes } from "@/lib/acm/fotos-url";
+import { normalizarImagenes, urlsFotoRed } from "@/lib/acm/fotos-url";
+import { poligonoParaSql } from "@/lib/mapa/poligono-sql";
+import { fusionarFiltrosDeZona } from "@/lib/mapa/filtros-de-zona";
 import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +34,20 @@ const TOPE_POR_SECCION = 100;
  * techo: ningún barrio puede costar más, por grande que sea.
  */
 const CANDIDATAS_ANTES_DE_FRENAR = 8000;
+
+/**
+ * Lo mismo, pero cuando el asesor acotó a una zona que dibujó a mano.
+ *
+ * Se frena mucho antes y es a propósito. Un dibujo del tamaño de un barrio puede tener miles
+ * adentro ("zona prueba": 8.856), y leerlas todas para ordenarlas cuesta lo mismo que una
+ * búsqueda por barrio: 17,8 s la primera vez, medido. Con 1.500 son 134 ms.
+ *
+ * Se resigna algo: entre las 8.856 de adentro, las 100 que se muestran salen de las primeras
+ * 1.500 que encuentra, no de todas. Vale la pena porque acá el filtro fuerte YA es la zona —
+ * el asesor marcó el área justamente para no tener que elegir entre miles— y porque Leonardo
+ * lo pidió así: "que muestre las 100, lo más fácil".
+ */
+const CANDIDATAS_CON_ZONA = 1500;
 
 /** Debajo de esto, un filtro de amenities se afloja solo y se le avisa al asesor. */
 const MINIMO_ANTES_DE_AFLOJAR = 20;
@@ -113,6 +129,23 @@ export async function POST(req: Request) {
       }
     }
 
+    // ─── Las zonas que el usuario dibujo y guardo en el mapa ───
+    // PRIVADAS: se filtra por user_id y no por agencia. Ni el director ve las de un asesor —
+    // asi esta escrito en /api/mapa/zonas y asi tiene que seguir. Se consulta con el cliente
+    // de servicio (que saltea RLS), por eso el filtro explicito no es opcional.
+    let zonasDelUsuario: { id: string; nombre: string; geojson: any; filtros: any }[] = [];
+    try {
+      const { data: zonas } = await createAdminClient()
+        .from("mapa_zonas")
+        .select("id, nombre, geojson, filtros")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      zonasDelUsuario = (zonas || []) as any;
+    } catch (zonaErr) {
+      console.error("No se pudieron cargar las zonas del mapa:", zonaErr);
+    }
+
     // 4. Intent Analysis + Keyword Extraction
 
     // Argentine real-estate slang mapper
@@ -182,6 +215,13 @@ export async function POST(req: Request) {
     };
 
 
+    // Las zonas del asesor van al extractor para que pueda reconocer cual nombro. Solo los
+    // nombres: el dibujo en si son cientos de coordenadas que no le sirven para nada al modelo
+    // y costarian una fortuna en tokens.
+    const zonasContext = zonasDelUsuario.length > 0
+      ? `\n\nZONAS QUE ESTE USUARIO DIBUJO Y GUARDO EN EL MAPA (son suyas, nadie mas las ve):\n${zonasDelUsuario.map((z) => `- "${z.nombre}"`).join("\n")}\n`
+      : '';
+
     const convoContext = priorTurns.length > 0
       ? `\n\nCONVERSACIÓN PREVIA (mantené el hilo: arrastrá los filtros ya mencionados salvo que el usuario los cambie):\n${priorTurns.map((m: any) => `${m.role === 'user' ? 'Usuario' : 'Asistente'}: ${m.content}`).join('\n')}\n`
       : '';
@@ -209,7 +249,8 @@ export async function POST(req: Request) {
           "free_text_keywords": ["características concretas que NO entran en los filtros de arriba: ej 'frente', 'contrafrente', 'a estrenar', 'apto crédito', 'pozo/en construcción', 'reciclado', 'luminoso', 'al río', 'esquina', nombre de barrio cerrado/edificio, etc. Si no hay: []"],
           "search_summary": "frase corta en lenguaje natural que describe la búsqueda ACUMULADA del usuario (tipo, zona, ambientes, operación, presupuesto y matices subjetivos como 'luminoso', 'para una familia', 'a estrenar'). Ej: 'departamento 2 ambientes luminoso a estrenar en venta en Almagro hasta 120000 usd'. Si todavía no hay criterios concretos: ''",
           "force_search": false,
-          "pedir_mas": false
+          "pedir_mas": false,
+          "zona_dibujada": "el NOMBRE EXACTO, de la lista de abajo, de la zona que nombró; si no nombró ninguna: null"
         }
 
         REGLAS CRÍTICAS:
@@ -230,11 +271,12 @@ export async function POST(req: Request) {
         - ESPACIO EXTERIOR (importante): si piden espacio al aire libre de forma genérica o con "o" (ej "patio o balcón", "balcón o terraza", "espacio aéreo", "aire libre", "con expansión", "algo afuera/al exterior", "espacio verde propio") → poné UN SOLO amenity: "espacio aereo" (NO listes patio y balcón por separado: así matchea si tiene CUALQUIERA y no se penaliza por tener solo uno). Listá el específico (ej solo "balcón", solo "patio") únicamente cuando pidan ESE puntual y excluyente.
         - JERGA INMOBILIARIA AR (traducí a los campos): "espacio aéreo/expansión/aire libre" → amenity "espacio aereo". "a estrenar/sin estrenar/nuevo/recién terminado" → free_text "a estrenar". "pozo/en pozo/del pozo/en construcción/preventa/desde pozo" → free_text "pozo". "apto crédito/apto banco/apto hipotecario" → free_text "apto credito". "apto profesional/uso profesional/apto oficina" → amenity "apto profesional". "semipiso" → type "departamento" + free_text "semipiso". "monoambiente/mono" → type "monoambiente". "dúplex/tríplex" → type "duplex". "PH" → type "ph". "frente/contrafrente/lateral" → free_text con ese término. "reciclado/a reciclar/a refaccionar/a remodelar" → free_text con ese término. "categoría/premium/de lujo/alta gama/super luxe" → free_text "categoria". "fondo/parque/jardín propio" → amenity "jardin". "cochera fija/cubierta/descubierta" → amenity "cochera". Términos subjetivos puros ("luminoso", "amplio", "moderno", "para la familia") NO van a filtros: van SOLO en search_summary (los captura el significado).
         - search_summary: SIEMPRE redactalo acumulando todo lo dicho (incluí los matices subjetivos). Es la base de la búsqueda por significado; nunca lo dejes vacío si ya hay aunque sea un criterio.
+        - "zona_dibujada": el asesor tiene zonas que dibujó a mano en el mapa y les puso nombre. Si nombra una —"en BUSQUEDA MAXI", "dentro de la zona de Maxi", "en mi zona guardada", "la que dibujé ayer"— devolvé su NOMBRE EXACTO tal cual figura en la lista. Tolerá que la escriba distinto, en minúsculas o incompleta: "busqueda maxi", "la de maxi" y "MAXI" son la misma. Si no nombra ninguna, o si el nombre que dice no se parece a ninguna de la lista, devolvé null (nunca inventes uno). Si dos de la lista podrían ser, elegí null: después se le pregunta.
         - "pedir_mas": true SOLO cuando el usuario pide MÁS OPCIONES DE LO MISMO, sin cambiar ningún criterio: "mostrame más", "otras", "hay más?", "no me gustan, mostrame otras", "seguí", "más opciones", "y qué más tenés". Es false si CAMBIA o AGREGA algo (ahí es una búsqueda nueva, aunque diga "mostrame"): "ahora con cochera" → false, "mostrame en Núñez" → false, "más barato" → false. La diferencia importa: con true no se le repiten las propiedades que ya vio; con false se busca de nuevo desde cero.
         - "force_search": tu JUICIO sobre si el usuario quiere ver resultados YA con lo que haya, AUNQUE falten datos. Poné true si de CUALQUIER forma (no hay frase fija) da a entender que no tiene/no quiere dar más datos o que avancés: "mostrame igual", "dale mostrame", "quiero ver lo que hay", "no tengo más", "no importa", "lo que sea", "buscá ya", "avanzá", "así está bien", "no me preguntes más", "ya está", etc. Poné false si todavía está respondiendo/dando datos o pregunta otra cosa. Interpretá la intención humana, no busques palabras exactas.
         - Mensaje general ("qué tenés?", "mostrá propiedades") → intent: RETRIEVAL con todo []/null/ambas.
         - Saludo/charla → intent: GENERAL.
-        ${convoContext}
+        ${zonasContext}${convoContext}
         ÚLTIMO MENSAJE DEL USUARIO: "${message}"` }]
       }]
     });
@@ -259,6 +301,8 @@ export async function POST(req: Request) {
     let forceSearch = false;
     /** El usuario pide MÁS de lo mismo: no se le repiten las que ya vio. */
     let pedirMas = false;
+    /** Nombre de la zona dibujada que nombró, tal como figura en su lista. */
+    let zonaPedida: string | null = null;
 
     try {
       const parsed = JSON.parse(intentResText);
@@ -286,6 +330,7 @@ export async function POST(req: Request) {
       searchSummary = typeof parsed.search_summary === "string" ? parsed.search_summary.trim() : "";
       forceSearch = parsed.force_search === true || parsed.force_search === "true";
       pedirMas = parsed.pedir_mas === true || parsed.pedir_mas === "true";
+      zonaPedida = typeof parsed.zona_dibujada === "string" && parsed.zona_dibujada.trim() ? parsed.zona_dibujada.trim() : null;
     } catch(e) {
       isRetrieval = intentResText.toUpperCase().includes("RETRIEVAL");
     }
@@ -345,6 +390,48 @@ export async function POST(req: Request) {
 
     console.log("Search params:", { isRetrieval, operation, locationKeywords, typeKeywords, amenityKeywords, agencyKeywords, priceMax, priceMin, priceCurrency, roomsFilter, bedroomsFilter, bathroomsFilter, floorPreference, freeTextKeywords });
 
+    // ─── La zona dibujada que nombró, convertida a algo que Postgres entienda ───
+    // El modelo devuelve el nombre tal cual figura en la lista del usuario; acá se busca por
+    // nombre normalizado (sin acentos ni mayúsculas) para tolerar cómo lo escribió.
+    let zonaElegida: { nombre: string; poligono: string; filtros: any } | null = null;
+    if (zonaPedida) {
+      const norm = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+      const z = zonasDelUsuario.find((x) => norm(x.nombre) === norm(zonaPedida!))
+        || zonasDelUsuario.find((x) => norm(x.nombre).includes(norm(zonaPedida!)));
+      const poligono = z ? poligonoParaSql(z.geojson) : null;
+      if (z && poligono) {
+        zonaElegida = { nombre: z.nombre, poligono, filtros: z.filtros || null };
+      } else {
+        // Se nombró una zona que no existe o cuyo dibujo está roto. NO se busca en todos lados
+        // como si nada: el asesor acotó a propósito y merece saber que no se pudo.
+        console.warn("Zona pedida sin resolver:", zonaPedida, z ? "(dibujo inválido)" : "(no está en su lista)");
+      }
+    }
+    // ─── Los filtros con los que guardó la zona rellenan lo que no dijo hoy ───
+    // Cuando dibujó el área tenía puestos operación, tipo, ambientes y presupuesto, y la zona
+    // los guardó junto con el trazo. Volvérselos a preguntar es hacerle repetir lo que ya
+    // definió. Gana siempre lo que dice en la conversación: la zona solo completa los huecos.
+    let deLaZona: string[] = [];
+    if (zonaElegida?.filtros) {
+      const fusion = fusionarFiltrosDeZona(
+        { operation, typeKeywords, roomsFilter, bedroomsFilter, priceMax, priceMin, priceCurrency },
+        zonaElegida.filtros,
+      );
+      operation = fusion.criterios.operation;
+      // El tipo guardado por el mapa pasa por el mismo traductor de jerga que usa el chat: sin
+      // esto, una zona guardada como "PH" no encontraría los que Tokko guarda como "Condo".
+      typeKeywords = fusion.criterios.typeKeywords.flatMap((t: string) => SLANG_MAP[t.toLowerCase().trim()] || [t]);
+      roomsFilter = fusion.criterios.roomsFilter;
+      bedroomsFilter = fusion.criterios.bedroomsFilter;
+      priceMax = fusion.criterios.priceMax;
+      priceMin = fusion.criterios.priceMin;
+      priceCurrency = fusion.criterios.priceCurrency;
+      deLaZona = fusion.tomadoDeLaZona;
+      if (deLaZona.length) console.log("De los filtros guardados con la zona se tomó:", deLaZona.join(" · "));
+    }
+
+    console.log("Zona:", { zonaPedida, resuelta: zonaElegida?.nombre || null, tiene: zonasDelUsuario.length });
+
     // ─── COMPUERTA DE DATOS MÍNIMOS ───────────────────────────────────────────
     // Pedimos los 5 datos clave (operación, tipo, zona, ambientes, presupuesto) para que la búsqueda
     // salga con la mayor info posible. Mientras falte alguno, NO se busca: el asistente pregunta
@@ -364,8 +451,16 @@ export async function POST(req: Request) {
     /** Sin estos la consulta escanea la tabla entera y se cae por timeout. No son negociables. */
     const missingCritical: string[] = [];
     if (operation === "ambas") missingCritical.push("la operación (compra o alquiler)");
-    if (locationKeywords.length === 0) missingCritical.push("la zona o barrio");
-    if (!roomsFilter && !bedroomsFilter) missingCritical.push("la cantidad de ambientes o dormitorios");
+    // Una zona dibujada ES la ubicación, y de las buenas: se resuelve por índice geográfico en
+    // 12 ms. Pedirle además el barrio a quien ya marcó el área en el mapa sería absurdo — y el
+    // motivo por el que la zona era obligatoria (sin ella la consulta escaneaba la tabla entera
+    // y moría por timeout) acá no aplica.
+    if (locationKeywords.length === 0 && !zonaElegida) missingCritical.push("la zona o barrio");
+    // Los ambientes tampoco se exigen cuando hay una zona dibujada, y por el mismo motivo que la
+    // zona: eran obligatorios para que la consulta no escanease la tabla entera. Un dibujo la
+    // acota a un puñado de manzanas por índice geográfico. Pedirle los ambientes a quien dijo
+    // "mostrame lo que hay en mi zona" es ponerle un trámite sin razón.
+    if (!roomsFilter && !bedroomsFilter && !zonaElegida) missingCritical.push("la cantidad de ambientes o dormitorios");
 
     /** Estos mejoran el resultado, pero si el usuario dice "mostrame lo que haya", se busca igual. */
     const missingNiceToHave: string[] = [];
@@ -380,8 +475,11 @@ export async function POST(req: Request) {
 
     // Falta algo crítico → se pregunta, diga lo que diga el usuario. Falta solo algo deseable →
     // se pregunta salvo que haya pedido ver igual.
+    // Con una zona dibujada tampoco se le pide el presupuesto ni el tipo antes de mostrar. El
+    // asesor marcó un área en el mapa y preguntó qué hay adentro: eso es un pedido completo, no
+    // uno a medias. Se le muestra y después se le ofrece afinar, que es el orden natural.
     const needsMoreInfo =
-      isRetrieval && (missingCritical.length > 0 || (missingNiceToHave.length > 0 && !wantsAnyway));
+      isRetrieval && (missingCritical.length > 0 || (missingNiceToHave.length > 0 && !wantsAnyway && !zonaElegida));
 
     // Qué se le pide. Si ya dijo "mostrame lo que haya", no tiene sentido insistirle con el
     // presupuesto: se le piden SOLO los críticos, que son los que impiden buscar.
@@ -513,6 +611,9 @@ export async function POST(req: Request) {
         p_floor_min: floorMin,
         p_floor_max: floorMax,
         p_free_text_patterns: freeTextPatterns,
+        // El dibujo de la zona, si nombró una. En null la función busca en todos lados, igual
+        // que siempre.
+        p_poligono: zonaElegida?.poligono ?? null,
       };
       let propiasRanked: any[] = [];
       let agenciaRanked: any[] = [];
@@ -556,7 +657,8 @@ export async function POST(req: Request) {
         // 100 que la función vieja (verificado en Belgrano, Palermo, Retiro, Villa Ortúzar y
         // Puerto Madero) y en los barrios grandes tarda menos de la mitad. Ver la migración
         // 20260826030000_buscador_red_frena_y_rankea.sql.
-        p_candidatas: CANDIDATAS_ANTES_DE_FRENAR,
+        p_poligono: zonaElegida?.poligono ?? null,
+        p_candidatas: zonaElegida ? CANDIDATAS_CON_ZONA : CANDIDATAS_ANTES_DE_FRENAR,
         // Cuando pide "mostrame otras", las que ya vio quedan afuera de la búsqueda. Los ids
         // de la red vienen con el prefijo `roomix_` en la pantalla; en la tabla no lo llevan.
         p_excluir_ids: pedirMas ? [...yaMostradasRed] : [],
@@ -673,7 +775,7 @@ export async function POST(req: Request) {
           status: rp.operation === 'rent' ? 'Alquiler' : 'Venta',
           // El `.webp` que publica roomix da 404 en su propio CDN el 12% de las veces
           // y la foto queda rota (ver `normalizarFotoRoomix`).
-          images: normalizarImagenes(rp.images),
+          images: urlsFotoRed(normalizarImagenes(rp.images)),
           description: rp.description || '',
           amenities: rp.amenities || [],
           source: 'roomix',
@@ -726,8 +828,23 @@ ${pisoFallback ? `AVISO IMPORTANTE: El usuario buscó un "piso" (depto planta co
 Respondé con un resumen MUY BREVE (2-4 oraciones): cuántas encontraste y ofrecé refinar la búsqueda.`
         : `No se encontraron propiedades con esos criterios.${pisoFallback ? ' Tampoco se encontraron departamentos.' : ''} Explicá cordialmente y sugerí alternativas concretas (ampliar zona, cambiar precio, quitar algún filtro).`;
 
-      // La red no contestó: hay que DECIRLO. Si no, el resumen sale como "encontré 10" (las de la
-      // agencia) y el asesor se queda pensando que afuera no hay nada.
+      // ─── Se buscó adentro de un dibujo: decirlo, y decir con qué criterios ───
+      // Va PEGADO ADELANTE del contexto y no agregado al final, por dos razones. La primera es
+      // que acá `propertyContext` recién se asignó con `=`: cualquier cosa escrita antes de esta
+      // línea se pierde (me pasó, y el aviso nunca llegó al modelo). La segunda es que puesto al
+      // final, entre las demás notas, el modelo lo pasaba por arriba y contestaba "encontré 100
+      // propiedades en la zona" sin nombrarla. Las dos cosas, verificadas en el navegador.
+      if (zonaElegida) {
+        const conQue = deLaZona.length > 0
+          ? ` Y NO le preguntaste nada porque esos criterios (${deLaZona.join(", ")}) salieron de los filtros con los que ÉL MISMO guardó esa zona: decile cuáles usaste, en la misma frase, y ofrecele cambiarlos si hoy busca otra cosa.`
+          : "";
+        propertyContext = `ARRANCÁ TU RESPUESTA POR ESTO, es lo primero que tiene que leer: todo lo que sigue está DENTRO de la zona que el asesor dibujó y guardó como "${zonaElegida.nombre}". Nombrala con esas palabras exactas para que sepa que se respetó su dibujo.${conQue}\n\n` + propertyContext;
+      } else if (zonaPedida) {
+        // Nombró una zona que no se pudo resolver. Lo peor sería buscar en todos lados y
+        // mostrarle 100 propiedades como si nada: acotó a propósito.
+        propertyContext = `OJO — NOMBRÓ UNA ZONA QUE NO ENCONTRÉ: dijo "${zonaPedida}" y no coincide con ninguna de las zonas que tiene dibujadas${zonasDelUsuario.length ? ` (las suyas son: ${zonasDelUsuario.map((z) => z.nombre).join(", ")})` : " (no tiene ninguna guardada todavía)"}. Lo de abajo se buscó SIN esa zona. Decíselo antes que nada y preguntale cuál quiso decir.\n\n` + propertyContext;
+      }
+
       // Pidió más: que el modelo lo diga como lo que es, una tanda nueva, y no como si
       // hubiera vuelto a buscar de cero.
       if (pedirMas) {
@@ -741,6 +858,8 @@ SON PROPIEDADES NUEVAS: el asesor pidió ver más y estas NO se le mostraron ant
 SOBRE LO QUE PEDISTE DE MÁS (${redAflojada.pedidos.join(", ")}): en la red solo ${redAflojada.estrictas === 0 ? "no hay ninguna" : `hay ${redAflojada.estrictas}`} que lo cumpla en esta zona con el resto de los criterios. Para que el asesor tenga con qué comparar se agregaron propiedades que NO lo tienen. Decíselo en una frase, sin vueltas, al principio de tu respuesta.`;
       }
 
+      // La red no contestó: hay que DECIRLO. Si no, el resumen sale como "encontré 10" (las de
+      // la agencia) y el asesor se queda pensando que afuera no hay nada.
       if (redFallo) {
         propertyContext += `\nAVISO OBLIGATORIO — LA RED DE COLABORACIÓN NO RESPONDIÓ: la búsqueda en la red de colaboración (los avisos publicados por otras inmobiliarias) se cortó por un problema técnico, así que lo que ves arriba NO la incluye. NO digas ni des a entender que afuera de la agencia no hay propiedades: no lo sabemos. Decíselo en una frase corta y ofrecele reintentar en un momento.`;
       }

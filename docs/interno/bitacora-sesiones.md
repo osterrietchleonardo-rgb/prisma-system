@@ -208,6 +208,66 @@ contenido, y con caída a "actualizado" si no se puede leer en vez de inventar u
 no es el historial.
 
 ---
+## 2026-08-27 (y la noche del 26): el Super Agente llegó a main
+
+**Estado al cierre:** fase 1 del Super Agente de Seguimiento **completa y en `main`** (Tasks 0-20 del
+plan `docs/superpowers/plans/2026-08-22-super-agente-v4.md`). PRISMAIA **apagada** (decisión de
+Leonardo: "cero decisiones, cero sombra"); Central **en sombra**; se enciende con su OK explícito, cuando
+Kevin cargue los celulares del equipo (26 asesores y 4 directores, hoy 0 celulares). Reloj n8n
+`SuperAgente_Reloj` con tres tareas cada 30 min (`seguimiento`, `visitas`, `escalamiento`). Documentación
+al día: `TECNICO-PRISMA.md` §22, `LOGICA-PRISMA.md` §29, guías del director (§11, §20, §28, §29) y del
+asesor (§9, §10, §18, §24). Repaso de flujos y topes para Leonardo:
+https://claude.ai/code/artifact/47bf29fb-0659-4f1b-b76d-ceb98743b625
+
+**Qué se construyó (commits en `feat/super-agente-fase-1`, merges a main `3137a13`, `5507b02`,
+`32395ab`, `d6d4427`, `3643091`):**
+- **Webhook 503 cuando la base cae** (`fix/webhook-503-base-caida`): durante la caída de Supabase del
+  26/8 (02:20–03:29) el webhook de Meta devolvía 200 sin procesar y Meta no reintentaba; ahora 503.
+- **Tasks 13-14:** compromisos (`compromisos.ts`) y el aviso al asesor en el mismo acto de escalar
+  (`avisos.ts`), probado real al celular de Leonardo.
+- **Reasignación y Aprobaciones** (fase 2 adelantada por pedido de Leonardo): el asesor no reasigna
+  (Lo tomo / No lo puedo tomar con motivo / Marcar perdido / Reactivar); el director reasigna, toma,
+  da tiempo; pantalla `/director/aprobaciones` consume-once con contador, buscador y filtros; tabla
+  `aprobaciones`; link de otro rol → mismo chat en la ruta propia; celular del director en Mi Perfil.
+  Leonardo lo probó de punta a punta desde sus dos cuentas.
+- **Contexto en todos los avisos** (`contexto.ts`): qué busca + último mensaje con fecha + la parte
+  humana etiquetada. Regla suya: "me gusta más esta versión para todos los avisos".
+- **Task 15** (ejecutor, solo en activo), **16** (visitas), **18** (panel del agente en la ficha),
+  **19 → la escalera** 2 h / 5 h / 10 h / 20 h del lead que espera a un humano, verificada contra el chat,
+  sin tope por agencia, con los dos casos de handoff (bot apagado con promesa; bot activo diciendo "el
+  asesor se va a comunicar": 109 chats así en Central en 30 días).
+- **Central:** sus 9 plantillas nuevas creadas en su WABA (3 aprobadas al 27/8).
+
+**Los hallazgos que vale la pena dejar anotados:**
+1. **Los 360 seguimientos por plantilla del flujo viejo (6/6 → 5/8, 300 de Central) nunca llegaron.**
+   `dispatch` le mandaba a Evolution `variables`; Evolution 2.3.7 espera `components`; la plantilla
+   salía sin parámetros, Meta la rechazaba con `(#132000)` y Evolution respondía **201 con el error
+   adentro**, que se tomaba por éxito. Probado con envíos reales: con `components` llegó, con
+   `variables` no. Consecuencia en Central: 130 leads con seguimientos fantasma, 68 cerrados como
+   perdidos por "inactividad tras el 3º seguimiento" que nunca salió. Fix en main (`d660297`). Decisión
+   de Leonardo: no reabrir los 68 hasta tener reasignación y aprobaciones (hoy ya están); "por el
+   momento no". **Regla desde ahora: sin `wamid` no es éxito.**
+2. **Evolution `sendTemplate` no sirve para los avisos al equipo**: los avisos van por Meta Graph
+   directo (el camino de las campañas, con entrega verificada).
+3. **Vercel bloqueó un deploy** (BLOCKED sin error visible) el rato en que el repo estuvo privado: en
+   plan Hobby el autor del commit tiene que ser la cuenta dueña. Leonardo lo volvió a público y puso
+   su email de empresa como global de git.
+4. **Un `next dev` viejo pegado al puerto** hizo que la prueba B del webhook le pegara al servidor
+   equivocado (503 falso); y **`npm run build` comparte `.next` con el dev server**: los builds
+   cortados a mitad dejaron la ficha con "Jest worker encountered 2 child process exceptions" hasta
+   borrar `.next`. Con la máquina cargada el build tarda más de 10 min: se lanza como proceso
+   independiente con log.
+5. **La RLS de `wa_conversations` no deja a un asesor soltar su propio chat** (ALL con `agent_id =
+   auth.uid()`): las acciones del equipo escriben con el cliente de servidor después de verificar rol.
+6. **El primer aviso de reasignación no servía** ("Víctor te asignó el chat de Belen: es de tu
+   zona"): sin contexto no vale nada y los dos puntos no se entendían. De ahí la regla del contexto.
+
+**Decisiones de Leonardo del 27/8 (repaso de flujos y topes):** PRISMAIA apagada; solo plantillas
+nuevas; escalera 2/5/10/20 h sin tope por agencia; 3 intentos por lead; silencio mínimo 20 h; el reloj
+arranca el día del encendido (`activo_desde`, backlog intacto); agencias nuevas arrancan activas al
+conectar WhatsApp. Pendiente: encender Central (cuando Kevin cargue celulares), reabrir el backlog
+(algún día), pasar el reloj n8n a producción, rotar el secreto del acm-extractor, y el bug de los links
+`/director/leads-whatsapp/Mensaje%20de%20voz%20recibido`.
 
 ## 2026-08-26
 
@@ -266,6 +326,69 @@ archivos que esta rama sí modificó cae en la lista del lint. Detalle completo 
 - La búsqueda del tipo de documento **no escapa los comodines** (`%`, `_`) — es la **cuarta
   aparición** de ese mismo patrón en el proyecto. No se tocó porque no era parte del alcance
   de esta etapa, pero ya son cuatro lugares con el mismo defecto suelto.
+
+**El reclamo de roomix, y el proxy de fotos que salió de ahí** (rama `feat/fotos-red-proxy`,
+worktree propio `PRISMA-SYSTEM-fotos-red`; mergeada y desplegada el mismo día, `b6fd474`).
+El contexto completo del asunto está en `20 Frentes/roomix.md` del vault.
+
+**Lo que llegó:** a las 09:22 un aviso de abuse de DigitalOcean con 24 h para responder o
+suspender el droplet (n8n, chatwoot, evolution-api — o sea el bot de Central), y a las 12:54
+el reclamo de roomix por scraping: 20,2 M de requests y US$1.500 de daño estimado. Los dos
+respondidos dentro del día. El `roomix-worker` de EasyPanel quedó apagado.
+
+**Los números del relevamiento, que son el dato que faltaba:** `roomix_properties` tiene
+369.478 filas (267.547 activas, 178.340 sin `lastmod`) contra 353 activas de cartera propia
+de Central. En los 112 ACM generados hay **6.370 comparables de la red contra 303 propios**, y
+**72 de esos 112 no tuvieron ningún comparable propio**. El ACM, como funciona hoy, es la base
+de roomix con nuestra interfaz.
+
+**El proxy** (`app/api/foto-red/route.ts`): hasta hoy cada foto se la pedía el NAVEGADOR del
+asesor a `cdn.roomix.ai`, lo que además dejaba `Referer: https://prisma.vakdor.com/` en los
+registros de ellos — una de las cosas que reclamaron. Ahora se baja una vez server-side, se
+guarda en el bucket privado `red-fotos` y sale de nuestro lado.
+
+*Las decisiones que valen, con su porqué:*
+
+**Bajo demanda, no copiando todo.** El catálogo son 1.480.427 fotos (~212 GB) y solo hay 112
+ACM. Copiarlo entero habría significado pegarle a roomix el pico de tráfico más grande de toda
+la historia del asunto, el mismo día que les dijimos que parábamos.
+
+**`cdn.roomix.ai` sale de `next.config` y del CSP, a propósito.** Es *fail closed*: si quedó
+algún punto sin migrar, la foto se ve rota en vez de seguir pegándoles sin que nos enteremos.
+
+**El endpoint recibe una URL del cliente**, así que lo único que lo separa de un SSRF abierto
+es la allowlist de hosts, igual que en `fotos-descarga.ts`, más `redirect: "error"`. Probado
+con un impostor `cdn.roomix.ai.evil.com`, con `http` y sin parámetro: los tres dan 400.
+
+**Se tocó `opt()` en la ficha pública** para que `next/image` optimice también nuestras rutas
+internas. Sin eso el PDF de la ficha volvía a pesar decenas de MB.
+
+**Queda afuera:** `fotos-comparables` (el análisis con IA) sigue bajando del CDN server-side.
+No deja Referer y solo corre a pedido, pero no es cero.
+
+*Errores propios de la sesión:*
+
+**Verifiqué con un regex equivocado y casi reporto un falso negativo.** Al chequear que los
+endpoints ya no devolvieran URLs de roomix busqué `https://cdn.roomix.ai` en la respuesta y
+dio 0 por el proxy y 0 directo — o sea, ninguna foto. La URL viaja **URL-encodeada** dentro
+del parámetro (`%3A%2F%2F`). Un "0" en los dos lados no era éxito: era la señal de que la
+verificación no estaba mirando nada. Regla: cuando una comprobación da cero en todas sus
+categorías, lo primero que se duda es la comprobación.
+
+**Y probé primero con un ACM de Central estando logueado como PRISMAIA - VAKDOR**: el 404 no
+era un bug, era el scope por agencia funcionando. Para probar hace falta un ACM de la agencia
+con la que uno entra.
+
+*Gotchas del entorno:*
+
+1. **Un worktree nuevo no tiene `node_modules` ni `.env`.** Hay que correr `npm install` y
+   copiar `.env` y `.env.local` antes de poder compilar o levantar nada.
+2. **`npx tsc` agarra otro binario** ("This is not the tsc command you are looking for"): va
+   `./node_modules/.bin/tsc`.
+3. **El clasificador de permisos bloqueó cinco acciones** en esta sesión (apagar el servicio de
+   EasyPanel dos veces, un heredoc largo, y dos ediciones). Tres salieron al reintentar; el
+   apagado lo terminó haciendo Leonardo. Cuando un bloqueo se repite dos veces, conviene frenar
+   y pedirlo en vez de buscarle la vuelta.
 
 ---
 
@@ -337,6 +460,61 @@ tocó (comillas sin escapar en JSX y `prefer-const`, repartidos por `app/`, `com
   seguridad, y Leonardo la va a decidir aparte.
 - Los 2 códigos de invitación viejos sin email siguen funcionando como antes, a propósito: no
   se migraron.
+
+**El Socio acusó en falso, y el arreglo es la parte que importa** (misma jornada, sesión de
+`/socio`)
+
+Se le marcó a Leonardo como deuda el resumen para Kevin, que **ya estaba mandado**. Era la
+**segunda vez** con el mismo ritual: la primera quedó anotada en la descripción de la tarea
+anterior (`wdvf3a8b1u`, 21/08: *"YA ESTABA HECHO. Leonardo lo había preparado por su
+cuenta"*), y nadie leyó esa nota antes de repetir el error.
+
+*La causa:* Leonardo ejecuta los rituales que tienen a otra persona del otro lado por WhatsApp
+o LinkedIn, y ClickUp no se entera. El estado del tablero **no es evidencia** de que algo no se
+hizo — solo de que nadie lo cerró.
+
+*El arreglo, en `.claude/skills/vakdor-socio/SKILL.md`:* en la fase ③ se pregunta antes de
+afirmar que un ritual con un tercero está incumplido; en la fase ⑦ se repasan uno por uno y se
+cierran en el momento, anotando por dónde salieron. Con el límite escrito al lado para que no
+se vuelva excusa: **solo vale para lo que depende de otra persona**; lo verificable contra el
+código o producción se sigue verificando. También quedó como memoria del proyecto
+(`ritual-vencido-no-es-incumplido.md`).
+
+**El guion de outbound dejó de ser una corazonada** (`20 Frentes/outbound.md` del vault, fuera
+del repo). El mensaje que trajo el sí de Sergio Bermúdez es el mismo que trajo el de Damián
+Ostrovsky, casi palabra por palabra; el guion que estaba escrito tiene cero respuestas. Se
+reemplazó el Toque 1, el viejo quedó abajo marcado como descartado con su porqué, y se corrigió
+una contradicción que el frente arrastraba: decía *"prohibido hablar de tu producto"* y lo que
+funciona **sí habla del producto**. La regla real es **no pedir la reunión en el primer
+mensaje**.
+
+*Errores propios de esta sesión, que es lo que más sirve:*
+
+**Una edición se perdió por trabajar en el worktree equivocado.** Las dos reglas del
+`SKILL.md` se escribieron en `PRISMA-SYSTEM` (el principal) sin commitear, y **otra terminal
+cambió de rama en ese mismo worktree** (de `feat/outbound-canal-por-grado` a
+`chore/sanear-backup-n8n`): el cambio desapareció. Se detectó porque `git status` dejó de
+mostrarlo como modificado. Regla que faltaba explicitar: **la sesión de `/socio` trabaja en
+`PRISMA-SYSTEM-socio`**, que existe justamente para eso. Lo que vive fuera de git —el vault,
+ClickUp, la memoria— sobrevivió sin un rasguño; lo único que se perdió fue lo del repo.
+
+**No volví a mirar el reloj en cinco horas.** Se leyó la hora al abrir (14:35) y después se
+razonó todo el día sobre esa hora, planificando "las dos horas que quedan" cuando ya eran las
+19:37 y la jornada había terminado. Lo delató el timestamp de un log, no una verificación. La
+memoria `mirar-la-hora-antes-de-decirla` ya advertía esto y **igual volvió a pasar**: leerla
+una vez no alcanza, hay que releerla cada vez que se habla de tiempo o se arma un plan.
+
+**Se escribió un bloque entero al vault sin acentos**, por miedo a los escapes del heredoc —
+incluido el texto de un mensaje que Leonardo iba a copiarle a un CEO. El heredoc con
+delimitador citado (`<<'EOF'`) no expande nada: los acentos pasan bien.
+
+*Dos gotchas más de este entorno:*
+
+1. Los scripts que usan `@composio/core` **solo corren con el cwd en
+   `.claude/skills/vakdor-socio/`**: el `node_modules` vive ahí, no en la raíz del repo.
+2. **`/tmp` de Git Bash no es el `/tmp` de node**: un archivo escrito en `/tmp` desde Bash,
+   node lo busca en `C:	mp` y falla con ENOENT. Los temporales van al scratchpad de la
+   sesión, con ruta absoluta.
 
 ---
 

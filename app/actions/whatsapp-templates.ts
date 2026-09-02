@@ -1,7 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { plantillasV2 } from '@/lib/whatsapp/plantillas-v2'
+import { plantillasV2, plantillasEquipo } from '@/lib/whatsapp/plantillas-v2'
 
 // Generador de prefijo para evitar colisiones en Meta (Business Account único)
 function generateAgencyPrefix(agency_id: string): string {
@@ -15,6 +15,14 @@ export async function injectCoreTemplates(agency_id: string, business_id: string
   // Las plantillas v2 del Super Agente llevan el nombre de la agencia en el texto fijo
   const { data: agencia } = await supabase.from('agencies').select('name').eq('id', agency_id).single()
   const nombreAgencia = agencia?.name?.trim() || 'la inmobiliaria'
+
+  // Super Agente (decisión de Leonardo, 27/8): toda agencia nueva arranca ACTIVA al conectar
+  // WhatsApp, con el reloj desde este momento. Los avisos van por email desde el día uno y el
+  // WhatsApp se suma a medida que Meta aprueba las plantillas. Nunca pisa una fila existente.
+  await supabase.from('seguimiento_config').upsert(
+    { agency_id, modo: 'activo', activo_desde: new Date().toISOString() },
+    { onConflict: 'agency_id', ignoreDuplicates: true }
+  )
 
   const coreTemplates = [
     // 1. Seguimiento Inactividad F1 (24h)
@@ -105,6 +113,8 @@ export async function injectCoreTemplates(agency_id: string, business_id: string
     },
     // 9-13. Seguimiento v2 (Super Agente, Task 12b): {{1}} nombre, {{2}} mensaje del agente
     ...plantillasV2(prefix, nombreAgencia),
+    // 14-17. Avisos al EQUIPO (asesores/director), Task 12e: UTILITY, con link a PRISMA
+    ...plantillasEquipo(prefix),
   ]
 
   for (const tpl of coreTemplates) {

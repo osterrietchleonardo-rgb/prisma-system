@@ -64,6 +64,50 @@ const JS_BANDEJA_SALES = String.raw`
   }));
 })()`;
 
+/*
+ * POR QUE ESTE SCROLL EXISTE. Hasta el 02/09/2026 la bandeja de Sales Navigator se leia sin
+ * scrollear ni una vez: se tomaban los `li.conversation-list-item` que ya estaban en el DOM
+ * y nada mas. Devolvia ~70 hilos. El barrido de bandejas, con el scroll puesto el 31/08,
+ * devuelve 806. Los 736 que faltaban son personas a las que Leonardo YA les escribio y que
+ * el buscador volvia a proponer como candidatos nuevos.
+ *
+ * Lo confirmo Diego Luciano (Keymex America) el 02/09/2026: habia contestado que no por
+ * LinkedIn y aparecio como candidato [8] del dia.
+ *
+ * El contenedor NO se busca por clase —las de LinkedIn son hashes que cambian— sino por
+ * comportamiento: el ancestro mas cercano cuyo contenido no entra. Mismo criterio que
+ * JS_SCROLL_MENSAJES y JS_SCROLL_BUSQUEDA.
+ *
+ * NO se scrollea un numero fijo de veces: se scrollea HASTA QUE DEJA DE CRECER. Medido el
+ * 02/09/2026 sobre la bandeja real: arranca en 20 hilos, a las 25 pasadas va 100, a las 50
+ * va 180, a las 75 llega a 247 y ahi se planta. Un tope fijo de 25 —la primera version de
+ * este arreglo— habria dejado afuera 147 de los 247. Por eso la condicion de corte es el
+ * crecimiento y no un contador: si LinkedIn cambia el tamano de pagina, esto se adapta solo.
+ *
+ * El contenedor NO se busca por clase —las de LinkedIn son hashes que cambian— sino por
+ * comportamiento: el ancestro mas cercano cuyo contenido no entra. Mismo criterio que
+ * JS_SCROLL_MENSAJES y JS_SCROLL_BUSQUEDA.
+ */
+const JS_SCROLL_SALES = String.raw`async page => {
+  const contar = () => page.evaluate(() => document.querySelectorAll('li.conversation-list-item').length);
+  const cont = await page.evaluateHandle(() => {
+    const li = document.querySelector('li.conversation-list-item');
+    let e = li; while (e && e.scrollHeight <= e.clientHeight + 50) e = e.parentElement;
+    return e;
+  });
+  if (!cont) return 0;
+  let previo = await contar();
+  // Tope duro de 200 pasadas: si la bandeja creciera sin parar, el script no se cuelga.
+  for (let vuelta = 0, quietas = 0; vuelta < 200 && quietas < 8; vuelta++) {
+    await cont.evaluate(e => e.scrollBy(0, e.clientHeight * 0.8));
+    await page.waitForTimeout(700 + Math.random() * 600);
+    const ahora = await contar();
+    quietas = ahora > previo ? 0 : quietas + 1;
+    previo = ahora;
+  }
+  return previo;
+}`;
+
 const JS_SCROLL_MENSAJES = String.raw`async page => {
   const cont = await page.evaluateHandle(() => {
     const li = document.querySelector('li.msg-conversation-listitem');
@@ -135,6 +179,7 @@ async function leerBandejas() {
   const hilos = [];
   pw(['goto', 'https://www.linkedin.com/sales/inbox/']);
   await dormir(8000);
+  pw(['run-code', JS_SCROLL_SALES]);
   hilos.push(...(json(pw(['eval', JS_BANDEJA_SALES])) || []));
   await pausaHumana();
 
@@ -260,13 +305,67 @@ async function identificadorPublico(urlLead) {
 
 const linkChat = (ident) => 'https://www.linkedin.com/messaging/thread/new/?recipient=' + ident;
 
+/**
+ * El mail de trabajo, buscado en Apollo por el perfil de LinkedIn.
+ *
+ * POR QUE EXISTE. Hasta el 27/08/2026 este buscador cargaba al pipeline SOLO el link de
+ * LinkedIn. Resultado: de 165 tareas del pipeline, 81 no tenian mail y no podian entrar a
+ * MailerLite ni recibir un segundo canal si LinkedIn no contestaba. La mitad del trabajo
+ * quedaba en un solo canal.
+ *
+ * Cuesta un credito de Apollo por lead que encuentra (10 por dia, con el tope de 10
+ * candidatos del script). Solo se acepta el mail si Apollo lo da como `verified`: un
+ * `guessed` que rebota ensucia la reputacion del dominio, y para eso es mejor no tenerlo.
+ *
+ * SIN `APOLLO_API_KEY` en .env el script sigue funcionando igual que antes, solo que sin
+ * mail. Se saca en Apollo: Settings > Integrations > API.
+ */
+async function mailDeApollo(identPublico) {
+  if (!env.APOLLO_API_KEY || !identPublico) return null;
+  try {
+    const r = await fetch('https://api.apollo.io/api/v1/people/match', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', accept: 'application/json', 'x-api-key': env.APOLLO_API_KEY },
+      body: JSON.stringify({ linkedin_url: `https://www.linkedin.com/in/${identPublico}` }),
+    });
+    if (!r.ok) { console.log(`  apollo: HTTP ${r.status} para ${identPublico}`); return null; }
+    const j = await r.json();
+    const p = j.person;
+    if (!p || !p.email) return null;
+    if (p.email_status && p.email_status !== 'verified') {
+      console.log(`  apollo: ${identPublico} tiene mail pero es "${p.email_status}", se descarta`);
+      return null;
+    }
+    return { email: p.email, empresa: p.organization?.name || '', empleados: p.organization?.estimated_num_employees || '' };
+  } catch (e) {
+    console.log(`  apollo: fallo la busqueda de ${identPublico} (${e.message})`);
+    return null;
+  }
+}
+
 // -------------------------------------------------------------------- ClickUp
 
+/**
+ * Todos los nombres que ya estan en el pipeline, PAGINANDO.
+ *
+ * ClickUp devuelve 100 tareas por pagina y no avisa: manda 100 y listo. Mientras el
+ * pipeline tuvo menos de 100 esto no se noto. El 27/08/2026 se cargaron 59 candidatos de
+ * Apollo, el pipeline paso a 145, y desde ahi leer solo la primera pagina dejaba 45
+ * personas afuera del filtro: el outbound las hubiera vuelto a cargar como si fueran
+ * nuevas. Se corta con `last_page`, no contando cuantas vinieron.
+ */
 async function yaEnPipeline() {
   const H = { Authorization: env.CLICKUP_API_KEY };
   const ids = JSON.parse(fs.readFileSync(path.join(RAIZ, 'scratch/clickup-ids.json'), 'utf8'));
-  const j = await (await fetch(`https://api.clickup.com/api/v2/list/${ids.lPipeline}/task?include_closed=true`, { headers: H })).json();
-  return new Set((j.tasks || []).map(t => normalizar(t.name)));
+  const nombres = new Set();
+  for (let pag = 0; pag < 50; pag++) {
+    const u = `https://api.clickup.com/api/v2/list/${ids.lPipeline}/task?include_closed=true&page=${pag}`;
+    const j = await (await fetch(u, { headers: H })).json();
+    for (const t of (j.tasks || [])) nombres.add(normalizar(t.name));
+    if (j.last_page || !(j.tasks || []).length) break;
+    await dormir(200);
+  }
+  return nombres;
 }
 
 async function cargarAlPipeline(lista, soloSaludo) {
@@ -298,6 +397,26 @@ async function cargarAlPipeline(lista, soloSaludo) {
          `Cargo y empresa: ${bloqueCargo(c.resto, c.nombre)}`, '',
          `Perfil en Sales Navigator: ${perfil}`,
          'NO SE PUDO SACAR EL LINK AL CHAT: abri el perfil y usa el boton "Mensaje".', ''];
+    /*
+     * El mail va con la etiqueta "Mail:" a proposito. `volcar-mailerlite.mjs` solo acepta un
+     * mail que este declarado con esa etiqueta, y no el primero que aparezca en el texto: en
+     * la ficha de Ruben Frattini el primer mail era el de otra persona que el habia sumado a
+     * la conversacion. Si se cambia el formato de esta linea, hay que cambiarlo alla tambien.
+     */
+    const apollo = await mailDeApollo(ident);
+    if (apollo) {
+      lineas.push('SEGUNDO CANAL (el mail, verificado por Apollo):', `Mail: ${apollo.email}`,
+        'No mandar LinkedIn y mail el mismo dia.', '');
+      if (apollo.empleados) {
+        lineas.push(`Apollo le cuenta ${apollo.empleados} empleados en LinkedIn a ${apollo.empresa || 'la empresa'}.`,
+          'Ojo: empleados NO es lo mismo que asesores ni que propiedades publicadas.', '');
+      }
+    } else if (env.APOLLO_API_KEY) {
+      lineas.push('SIN MAIL: Apollo no tiene un mail verificado para esta persona. Solo LinkedIn.', '');
+    } else {
+      lineas.push('SIN MAIL: falta APOLLO_API_KEY en .env, asi que no se busco. Solo LinkedIn.', '');
+    }
+
     if (tibio) lineas.push('YA SON CONTACTO: solo recibio un saludo, nunca la propuesta. Arranca mas tibio.', '');
     if (c.guardado) lineas.push('Figura "Guardado" en Sales Navigator pero NO hay ningun mensaje en las bandejas.', '');
     lineas.push(`Seleccionado el ${new Date().toISOString().slice(0, 10)} por el outbound diario.`,

@@ -1,0 +1,64 @@
+# Refresco mensual de mercado_avisos (barrido B) + verificación de bajas (C).
+#
+# Por zona: relee el inventario completo (precios, republicaciones, altas que
+# el descubrimiento se perdió) y después verifica de a uno los avisos que el
+# refresco no vio — el ÚNICO camino que marca 'caido'. Al final, embeddings
+# de lo nuevo. Costo ≈ US$ 25-27/mes las 7 zonas con Apify.
+#
+# max-parallel 3: el plan de Apify permite 5 corridas simultáneas y el
+# descubrimiento diario también necesita lugar. Palermo (~400 págs) tarda
+# ~4,5 h: el timeout de 350 min le da margen sin chocar el techo de 6 h.
+
+name: mercado-refresco
+
+on:
+  schedule:
+    - cron: '0 6 3 * *'    # día 3 de cada mes (el cron se atrasa; da igual)
+  workflow_dispatch: {}
+
+jobs:
+  refrescar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    strategy:
+      max-parallel: 3
+      fail-fast: false
+      matrix:
+        include:
+          - { base: departamentos-venta-palermo,       zona: palermo,       hasta: 410 }
+          - { base: departamentos-venta-belgrano,      zona: belgrano,      hasta: 230 }
+          - { base: departamentos-venta-nunez,         zona: nunez,         hasta: 115 }
+          - { base: departamentos-venta-villa-urquiza, zona: villa-urquiza, hasta: 105 }
+          - { base: departamentos-venta-colegiales,    zona: colegiales,    hasta: 58 }
+          - { base: departamentos-venta-saavedra,      zona: saavedra,      hasta: 50 }
+          - { base: departamentos-venta-coghlan,       zona: coghlan,       hasta: 25 }
+    env:
+      APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Refresco ${{ matrix.zona }}
+        run: node mercado-sync/barrido.mjs --base ${{ matrix.base }} --desde 1 --hasta ${{ matrix.hasta }} --tanda 1 --zona ${{ matrix.zona }} --tope-usd 33
+      - name: Verificación de bajas ${{ matrix.zona }}
+        run: node mercado-sync/verificacion.mjs --zona ${{ matrix.zona }} --dias 25 --max 500
+
+  embeddings:
+    needs: refrescar
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Embeddings de lo nuevo
+        run: node mercado-sync/embeddings.mjs --lote 40

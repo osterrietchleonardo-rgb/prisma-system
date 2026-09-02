@@ -24,6 +24,10 @@ CÓMO LEER ESTOS DATOS (respetalo, no inventes):
 - "count" son PERSONAS distintas y "eventCount" son veces que ocurrió. Usá personas para hablar de conversión.
 - "noCalificados" son los que enviaron el formulario y el pre-filtro NO les abrió el calendario. No es una fuga a corregir con copy: es filtrado a propósito.
 - "sources" dice qué fuentes respondieron. Si alguna está en "error" o "sin_token", sus números son cero por falta de datos, NO por mal rendimiento: decilo así.
+  Si "sources.bufferMotivo" trae un texto, ese es el motivo exacto: nombralo y NO lo interpretes como un problema de tracking ni como bajo rendimiento del canal.
+- "gscTotales" son los clics e impresiones REALES del sitio en Google. "gscQueries" siempre suma menos, porque Google esconde las búsquedas de poco volumen.
+  Para hablar de clics orgánicos usá SIEMPRE "gscTotales"; usá "gscQueries" solo para hablar de qué términos aparecen y en qué posición.
+- "clarityStats.botSessions" son sesiones de robots. Si son la mayoría de "distinctUsers", avisá que los porcentajes de Clarity no tienen muestra suficiente.
 - Clarity cubre solo los últimos ${payload.sources.clarityDias} días, sin importar el período elegido.
 - De LinkedIn solo hay TOTALES del período (posts, impresiones, alcance, reacciones, comentarios).
   NO tenés el detalle post por post, así que NO menciones publicaciones concretas, ni ganchos, ni títulos, ni cuál funcionó mejor.

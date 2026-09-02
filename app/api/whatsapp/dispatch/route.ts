@@ -102,11 +102,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Evolution API no configurada' }, { status: 500 })
       }
 
+      // BUG HISTÓRICO (descubierto 26/8/2026): esto mandaba `variables`, pero Evolution
+      // (SendTemplateDto, verificado en 2.3.7) espera `components`. Sin ese campo la plantilla
+      // salía SIN parámetros, Meta la rechazaba con (#132000) y Evolution respondía 201 con el
+      // error adentro: 360 seguimientos (6/6 → 5/8) quedaron guardados como enviados y ninguno
+      // llegó. Ahora va `components`, y un error de Meta en el cuerpo es un error.
       const evoPayload = {
         number: cleanPhone,
         name: finalTemplateName,
         language: "es_AR",
-        variables: [
+        components: [
           {
             type: "body",
             parameters: (variables || []).map((v: string) => ({
@@ -131,7 +136,16 @@ export async function POST(req: Request) {
         console.error('[Dispatch] Error Evolution:', evoData)
         return NextResponse.json({ error: `Evolution Error: ${JSON.stringify(evoData)}` }, { status: 502 })
       }
+      // Evolution devuelve 201 aunque Meta haya rechazado el envío: el error viene en el cuerpo
+      if (evoData?.error_data || evoData?.code) {
+        console.error('[Dispatch] Meta rechazó la plantilla (vía Evolution):', evoData)
+        return NextResponse.json({ error: `Meta Error: ${evoData.message ?? JSON.stringify(evoData)}` }, { status: 502 })
+      }
       wamid = evoData?.key?.id || evoData?.messageId || null
+      if (!wamid) {
+        console.error('[Dispatch] Evolution no devolvió id de mensaje; no se da por enviado:', evoData)
+        return NextResponse.json({ error: 'Evolution no devolvió id de mensaje' }, { status: 502 })
+      }
 
     } else if (instance.phone_number_id && instance.token) {
       // Fallback a Meta Graph API

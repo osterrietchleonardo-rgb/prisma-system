@@ -89,6 +89,8 @@ export interface Candidato {
   agency_id: string
   contact_phone: string
   contact_name: string | null
+  /** Asesor asignado (`wa_conversations.agent_id`); null = nadie. Task 14: a él va el aviso. */
+  agent_id?: string | null
   funnel_status: string
   visit_status: string
   visit_scheduled_at: string | null

@@ -35,6 +35,8 @@
 25. [Variables de Entorno Completas](#25-variables-de-entorno-completas)
 26. [Diagrama de Flujos Principales](#26-diagrama-de-flujos-principales)
 27. [Sistema de Temas (Claro / Oscuro)](#27-sistema-de-temas-claro--oscuro)
+28. [Buscador IA · solapa Mapa](#28-buscador-ia--solapa-mapa)
+29. [Super Agente de Seguimiento — la lógica](#29-super-agente-de-seguimiento--la-lógica)
 
 ---
 
@@ -796,7 +798,7 @@ PRISMA envía al lead via Evolution/Meta + guarda en DB
 
 ### 9.2 Templates de Seguimiento
 
-PRISMA inyecta 8 templates automáticos para cada agencia:
+PRISMA inyecta 17 plantillas automáticas para cada agencia (8 históricas, 5 nuevas de seguimiento y 4 del equipo). Las 8 históricas:
 
 | Sufijo | Propósito |
 |---|---|
@@ -810,6 +812,8 @@ PRISMA inyecta 8 templates automáticos para cada agencia:
 | `reactivacion_snoozed` | Reactivación de leads "dormidos" |
 
 Cada template tiene el prefijo `ag{agency_id[0:6]}_` para aislamiento multi-tenant en la cuenta de WhatsApp Business.
+
+**Las 5 nuevas de seguimiento (v2, 25/8/2026)** — `{{1}}` nombre del lead (solo el registrado en `metricas`), `{{2}}` la frase del agente; texto fijo con el nombre de la agencia: `seg_retomar`, `seg_valor`, `seg_pendiente` (UTILITY: el lead esperaba a un humano, va solo con "escalar"), `seg_novedad`, `seg_puerta_abierta`. **El Super Agente elige solo entre estas**; las 3 históricas `seg_f1/f2/f3` ya no se usan. **Las 4 del equipo** (UTILITY, 26/8): `asesor_cliente_esperando`, `asesor_sigue_esperando`, `director_asesor_sin_respuesta`, `director_aprobacion_pendiente`. Ver §29.
 
 ### 9.2b El pipeline tiene tres modelos, no uno (31/07/2026)
 
@@ -1129,15 +1133,15 @@ Los IPC son perfiles estratégicos de marketing que definen:
   - **Captar:** tipo_propietario, motivo_venta, urgencia, preocupaciones, objeción_principal, angulo_marketing, tono, promesa_central, CTA
   - **Vender:** tipo_comprador_ideal, necesidad_concreta, atractivos_propiedad, angulo_copy, mensaje_central, CTA, propiedad_tokko_id (opcional)
 
-> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Fotos · Clientes Ideales (IPC) · Mi Forma de Trabajar · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (6 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) tiene dos vistas: **Anuncios y copys** (los anuncios agrupados por tanda, con ver/editar/descargar/borrar) y **Fotos retocadas** (`galeria-fotos.tsx`, ver 13.7).
+> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Fotos · Clientes Ideales (IPC) · Mi ADN · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (6 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) tiene dos vistas: **Anuncios y copys** (los anuncios agrupados por tanda, con ver/editar/descargar/borrar) y **Fotos retocadas** (`galeria-fotos.tsx`, ver 13.7).
 
-### 13.1.b Mi Forma de Trabajar y la oferta irresistible (fórmula de Hormozi)
+### 13.1.b Mi ADN y la oferta irresistible (fórmula de Hormozi)
 
 El IPC dice **a quién** le hablamos; esta pestaña dice **quién habla y con qué respaldo**. Es lo que diferencia al asesor de cualquier otra inmobiliaria, y es **por usuario** (cada asesor la suya; el director carga la propia como uno más).
 
 Formulario en 4 pasos (`components/marketing-ia/forma-trabajo-form.tsx`), guardado por `upsert` con RLS en `advisor_operations`:
 
-1. **Mi perfil** (opcional): años en el rubro, matrícula, zona que domina, especialidad, operaciones cerradas, **casos reales** (la materia prima de la "prueba social"), qué incluye el servicio y **qué NO se puede prometer nunca**.
+1. **Mi perfil** (opcional): años en el rubro, zona en la que es experto, especialidad, operaciones cerradas, **casos reales** (la materia prima de la "prueba social"), qué incluye el servicio y **qué NO se puede prometer nunca**. Son 7 campos: la **matrícula** se sacó el 1-sep-2026 (rama `feat/marketing-mi-adn`) porque no aportaba nada al anuncio; la que ya esté guardada sigue en el `jsonb` pero no se muestra ni entra en los prompts.
 2. **Captación** (obligatorio): las 6 preguntas de Hormozi para dueños — propiedades vendidas en 6 meses, % del ACM al que cierra, diferencial de confianza, compradores activos en base, tiempo de entrega del ACM, días hasta la primera oferta, y qué se banca el asesor para que el dueño no mueva un dedo.
 3. **Venta** (obligatorio): las 5 preguntas para compradores — diferencial de confianza, % de rebaja negociada, exclusivas/off-market, tiempo hasta la primera selección curada, semanas hasta la reserva y trámites que le saca de encima.
 4. **Mis 2 ofertas** (`ofertas-irresistibles.tsx`): botón que genera las dos (1 crédito, `POST /api/marketing-ia/generar-oferta`). Quedan **guardadas y editables a mano**; regenerar una que fue editada pide confirmación explícita.
@@ -1226,9 +1230,16 @@ Busca propiedades para vincular a un IPC de tipo "vender". Lee la **cartera comp
 
 ### 13.7 Fotos de propiedades retocadas con IA
 
-**Qué resuelve:** el asesor elige una foto de la ficha de Tokko y la deja publicable sin salir de PRISMA. Tres modos que se aplican **en secuencia**: `mejorar` (luz, color y cielo), `limpiar` (saca los objetos y muebles del dueño) y `ambientar` (home staging).
+**Qué resuelve:** el asesor deja una foto publicable sin salir de PRISMA. Tres modos que se aplican **en secuencia**: `mejorar` (luz, color y cielo), `limpiar` (saca los objetos y muebles del dueño) y `ambientar` (home staging).
 
-**Piezas:** `lib/marketing-ia/fotos-ia.ts` (relevar, reglas, generar, controlar, reintento), `lib/marketing-ia/fotos-marcado.ts` (marcado por zonas, traductor de pedidos, detección y protección de textos), `POST /api/marketing-ia/editar-foto`, `GET /api/marketing-ia/fotos-propiedad`, `components/marketing-ia/fotos-ia.tsx` y `galeria-fotos.tsx`. Modelo: `gemini-3-pro-image-preview` para las imágenes, `gemini-3.5-flash` para relevar, controlar e interpretar.
+**De dónde sale la foto (dos caminos, en subsolapas):** *De una propiedad* — de la ficha de Tokko, como siempre — o *Subir una foto mía*, para la propiedad que **todavía no está cargada en Tokko**: se mejora la foto acá y después se sube la corregida a la ficha, una sola vez (compromiso de reunión, 1-sep-2026, rama `feat/marketing-subir-foto-propia`). Van como subsolapas y no una debajo de la otra porque con la lista de propiedades de por medio la opción de subir quedaba tan abajo que no se sabía que existía.
+
+**Piezas:** `lib/marketing-ia/fotos-ia.ts` (relevar, reglas, generar, controlar, reintento), `lib/marketing-ia/fotos-marcado.ts` (marcado por zonas, traductor de pedidos, detección y protección de textos), `lib/marketing-ia/subida-foto.ts` (qué archivo se acepta y dónde se guarda), `POST /api/marketing-ia/editar-foto`, `POST /api/marketing-ia/subir-foto`, `GET /api/marketing-ia/fotos-propiedad`, `components/marketing-ia/fotos-ia.tsx` y `galeria-fotos.tsx`. Modelo: `gemini-3-pro-image-preview` para las imágenes, `gemini-3.5-flash` para relevar, controlar e interpretar.
+
+**La foto subida (`POST /api/marketing-ia/subir-foto`, 0 créditos):** solo deja el archivo en el bucket y devuelve su URL; el retoque sigue siendo `editar-foto`, que baja la foto de cualquier URL. Acepta JPG, PNG y WEBP hasta 15 MB (comparación **exacta** del tipo, no `startsWith("image/")`: `image/svg+xml` y `image/jpeg-evil` lo cumplirían). Va a `fotos-ia/<userId>/subidas/`, aparte de las que salen de una ficha.
+
+- **La orientación se aplica dos veces, y hace falta.** El navegador achica con `createImageBitmap(file, { imageOrientation: "from-image" })` — eso baja el peso para subir con datos móviles y de paso reencodea a JPEG, así que un HEIC de iPhone nunca llega al servidor. Y el servidor hace `sharp().rotate()`, que aplica el EXIF y lo borra. **Es obligatorio**: `traerFoto` de `editar-foto` hace `sharp(bruto).jpeg()` **sin** `.rotate()`, así que un EXIF que sobreviva se traduce en una foto retocada acostada. Verificado el 1-sep-2026 con un JPEG apaisado con `orientation: 6`: quedó guardado en 800x1200 con los píxeles ya girados y sin EXIF residual.
+- **Sin propiedad, el nombre es lo que la identifica.** El asesor escribe un nombre (obligatorio) que se guarda en `property_photos.propiedad`, con `tokko_id` en null — el endpoint ya hacía `Number(tokkoId) || null`, y la carpeta cae en `sueltas`. El buscador de la galería ya filtra por ese campo, así que la encuentra escribiendo el nombre. Si el nombre fuera opcional, la foto quedaría sin etiqueta y sería imposible de encontrar: por eso bloquea.
 
 **El circuito de cada paso:**
 1. **Relevar** (flash) — se lee de la foto la geometría, el piso (material, tamaño de pieza, dirección de juntas, veteado), el inventario de lo que es del inmueble con su peso `grave`/`menor`, y los defectos visibles. **Nada de esto está hardcodeado**: sale de cada foto.
@@ -1249,9 +1260,9 @@ Busca propiedades para vincular a un IPC de tipo "vender". Lee la **cartera comp
 
 **Textos:** antes de editar se detectan solos los carteles, teléfonos, números de casa y chapas de calle, y al final se pegan de vuelta desde la original. **La zona protegida va ajustada al objeto**: con fondo adentro se nota el recuadro.
 
-**Persistencia:** cada paso es una fila de `property_photos`, con `sesion_id` agrupando todo lo que se le hizo a una misma foto. La galería muestra **una tarjeta por sesión** que se abre en carrusel: primero la original de la ficha, después cada paso, con seguir editando / descargar / borrar en cada uno. RLS por usuario; se guarda `agency_id` para poder abrirla a toda la agencia sin migrar datos.
+**Persistencia:** cada paso es una fila de `property_photos`, con `sesion_id` agrupando todo lo que se le hizo a una misma foto. La galería muestra **una tarjeta por sesión** que se abre en carrusel: primero la original (la de la ficha, o la que subió el asesor), después cada paso, con seguir editando / descargar / borrar en cada uno. RLS por usuario; se guarda `agency_id` para poder abrirla a toda la agencia sin migrar datos.
 
-**Costo:** 3 créditos por paso (cubre hasta 3 generaciones si el control rechaza). US$ 0,134 por generación, 45 a 90 segundos por paso.
+**Costo:** 3 créditos por paso (cubre hasta 3 generaciones si el control rechaza). US$ 0,134 por generación, 45 a 90 segundos por paso. En pantalla el asesor ve **solo los créditos** (el aviso debajo del botón "Trabajar la foto"): el badge con el monto en dólares sobre el resultado se sacó el 1-sep-2026 (rama `feat/marketing-mi-adn`) — es costo crudo del proveedor y no es información para el asesor. El backend lo sigue devolviendo (`costo_usd`) y registrando en Finanzas.
 
 **Límites conocidos:**
 - El control verifica que los **elementos** estén, **no que las proporciones se respeten**: aprobó el ambiente reconstruido del "todo junto". Esa clase de falla todavía pide ojo humano.
@@ -2550,6 +2561,37 @@ metro, la transparencia dice cuánto creerle.
 
 El lápiz recorta en el navegador, sin consultas nuevas. Las zonas guardadas son
 **privadas**: cada usuario ve solo las suyas, ni el director ve las de un asesor.
+
+## 29. Super Agente de Seguimiento — la lógica
+
+**Para qué existe:** que ningún lead quede sin respuesta y que el director pueda soltar el control sin perderlo. Reemplaza al flujo viejo de seguimientos de n8n (apagado) con un agente que **investiga antes de decidir** y deja rastro de todo. Detalle técnico en `TECNICO-PRISMA.md` §22; visión completa y fases 2-5 en `docs/superpowers/plans/2026-08-22-super-agente-v4.md`.
+
+### 29.1 Los tres relojes
+1. **Seguimiento al cliente** (cada 30 min): la conversación se enfrió — nadie le debe nada al lead y dejó de contestar. Después del **silencio mínimo (20 h sin ningún mensaje de nadie)** el agente puede escribirle, hasta **3 intentos**, dentro de la **ventana 6–23 h**. Antes de contactar lee los mensajes reales y los intentos previos; si nombra una propiedad, la verifica. Decide **contactar / posponer / abandonar / escalar**, con razón, evidencia y confianza. Con confianza < 0,5 no se ejecuta.
+2. **La escalera del lead que espera a un humano** (cada 30 min): el bot lo derivó, o pidió hablar con una persona, o un humano tomó el chat — y desde su último mensaje ningún asesor le escribió. Le avisa al **equipo**, no al cliente: **2 h** asesor · **5 h** asesor + director · **10 h** asesor · **20 h** asesor + director para que decida. "Atendido" lo mide el chat (un mensaje de un asesor al cliente), nunca la promesa. Sin tope por agencia. El caso vuelve a empezar si el lead escribe de nuevo después de ser atendido.
+3. **Recordatorios de visita** (cada 30 min, sin IA): 24 h, 3 h y 1 h antes; aviso post no-show hasta 48 h después.
+
+**El reloj arranca el día del encendido** (`activo_desde`): lo anterior es backlog y no se persigue hasta que se decida reactivarlo.
+
+### 29.2 Modos por agencia
+`apagado` (nada), `sombra` (mira, decide y registra; no manda), `activo` (manda). PRISMAIA apagada por decisión de Leonardo (27/8); Central en sombra hasta su OK; **toda agencia nueva arranca activa** al conectar WhatsApp. Kill-switch global por variable de entorno.
+
+### 29.3 Lo que nunca hace
+No escribe a quien pidió no recibir mensajes ni a un chat con humano al mando; no usa el nombre del perfil de WhatsApp (solo el registrado, una vez por mensaje, sin "che"); no afirma disponibilidad ni precio de una propiedad sin verificarla; no cierra un lead como perdido (abandonar solo apaga el seguimiento, reversible); no reasigna ni aprueba nada por su cuenta; no da por enviado un mensaje sin el id de Meta.
+
+### 29.4 Los avisos al equipo
+Email siempre; WhatsApp además si la persona tiene celular cargado (Mi Perfil para el director, Asesores para cada asesor) y la plantilla nueva está aprobada por Meta en esa agencia — si no está aprobada, va solo el email, **nunca se saltea**. Cada aviso trae contexto: qué busca el cliente, su último mensaje con fecha, y la parte humana etiquetada (comentario del director, motivo del asesor, o "Qué pasa" del agente), más el link al chat en la ruta del rol de quien lo recibe. Los links de otro rol se corrigen solos; el login vuelve al chat.
+
+### 29.5 Reasignación y aprobaciones
+El asesor **no reasigna**: tiene "Lo tomo", "No lo puedo tomar" (motivo obligatorio; se le saca el chat y el pedido llega al director) y "Marcar como perdido". El director tiene "Reasignar a…", "Lo tomo yo", "Dar más tiempo" y "Reactivar". Al reasignar, el asesor nuevo recibe email + WhatsApp con el contexto; si la ventana de 24 h del cliente cerró, el director puede mandarle una plantilla para reabrir la charla. Los pedidos viven en **Aprobaciones**: cada uno se decide una sola vez y vence a las 48 h sin ejecutar nada.
+
+### 29.6 Compromisos y trazabilidad
+`compromisos` es lo que el sistema persigue (visita agendada, respuesta pendiente del asesor…): un compromiso por vencer pesa más que cualquier otra señal. Cada decisión, envío, aviso, reasignación y aprobación queda en la línea de tiempo del lead (`lead_eventos`) y se ve en la ficha del chat: bloque "Equipo y seguimiento" (quién lo tiene, qué está pendiente, botones) y bloque "Agente de seguimiento" (qué decidió, por qué, el dato, qué miró, resultado).
+
+### 29.7 Cifras de la sombra (24–27/8/2026, Central)
+326 decisiones sobre 62 leads (contactar 190, escalar 118, abandonar 13, posponer 5), US$0,05 por decisión, 0 fechas inventadas en las 40 firmadas por Leonardo, 0 propiedades no disponibles ofrecidas; 105 leads esperando a un humano en 14 días (99 más de 20 h). Y el hallazgo del 26/8: los 360 seguimientos por plantilla del flujo viejo (jun–ago) nunca llegaron (§ TECNICO 9.3).
+
+---
 
 ## FIN DEL DOCUMENTO
 

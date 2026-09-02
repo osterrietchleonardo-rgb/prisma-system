@@ -129,6 +129,13 @@ export async function middleware(request: NextRequest) {
         loginUrl.searchParams.set('next', `${url.pathname}${url.search}`)
         return NextResponse.redirect(loginUrl)
       }
+      // Link de OTRO rol (27/8): el director que abre /asesor/leads-whatsapp/[id] (o el asesor
+      // que abre /director/…) va al MISMO chat en su propia ruta, no al dashboard.
+      const rolUsuario = user.user_metadata?.role
+      const cruzado = url.pathname.match(/^\/(asesor|director)\/leads-whatsapp\/([^/]+)$/)
+      if (cruzado && (rolUsuario === 'director' || rolUsuario === 'asesor') && cruzado[1] !== rolUsuario) {
+        return NextResponse.redirect(new URL(`/${rolUsuario}/leads-whatsapp/${cruzado[2]}${url.search}`, request.url))
+      }
       // Account status (pausado/eliminado) checked in layout.tsx server components
     }
   } catch (e) {

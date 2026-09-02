@@ -31,6 +31,8 @@
 20. [Créditos IA: cómo funcionan para vos](#20-créditos-ia-cómo-funcionan-para-vos)
 21. [Preguntas frecuentes](#21-preguntas-frecuentes)
 22. [Personalizaciones de tu agencia](#22-personalizaciones-de-tu-agencia)
+23. [El Mapa del Buscador IA](#23-el-mapa-del-buscador-ia)
+24. [Cuando un cliente queda esperando: los avisos y tus botones](#24-cuando-un-cliente-queda-esperando-los-avisos-y-tus-botones)
 
 ---
 
@@ -314,6 +316,10 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 > 🔐 Si al abrir un link de PRISMA (por ejemplo, el del aviso de lead) la app te pide **iniciar sesión de nuevo**, después de entrar te lleva **directo a donde ibas** —no te deja tirado en el inicio—. Si ya tenés la sesión abierta, entrás sin que te pida nada.
 
+### Avisos por WhatsApp y email cuando un cliente te espera
+
+Además de esos emails, cuando **un cliente quedó esperando que lo atiendas** y pasan las horas sin que le escribas, PRISMA te avisa **por email y por WhatsApp** (desde el número de la agencia, si tu director cargó tu celular): a las 2 horas, a las 5 (ahí también le avisa al director), a las 10 y a las 20. Cada aviso trae **qué busca el cliente y su último mensaje**, y un link directo al chat. Se corta solo cuando **le escribís al cliente**; responder "ya lo atiendo" al aviso no lo corta. Detalle y tus botones en la sección 24.
+
 ---
 
 ## 10. Leads WhatsApp
@@ -326,20 +332,27 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 - **✏️ Editar** un lead (nombre, teléfono, etiquetas y **clasificación**) o **🗑️ eliminarlo** desde su fila. Los cambios se reflejan también en tu bandeja de chats.
 - Usá la **columna y el filtro de Clasificación** (la etiqueta de color) para separar, por ejemplo, los que te escribieron (`Whatsapp-Consulta`) de los que cargaste a mano (`Whatsapp-Manual`).
 
+### En la ficha del chat: "Equipo y seguimiento" y "Agente de seguimiento"
+
+Al abrir un chat, en **Información del contacto** (el ícono de la persona arriba a la derecha) tenés dos bloques nuevos:
+
+- **Equipo y seguimiento:** quién tiene el chat, qué está pendiente (por ejemplo, "responderle al cliente, vence en 21 h"), tus botones **Lo tomo** / **No lo puedo tomar** / **Marcar como perdido** (o **Reactivar**), y el historial con fecha de todo lo que pasó con ese cliente.
+- **Agente de seguimiento:** qué decidió el agente automático sobre ese cliente y por qué: la razón, el mensaje que propuso, el dato en que se basó y qué miró antes.
+
 ---
 
 ## 11. Marketing IA
 
 **Qué es:** un generador de contenido publicitario con inteligencia artificial (la pantalla se titula "Marketing IA Asesor").
 
-**Tiene 6 pestañas:** Crear Anuncio · **Fotos** · Clientes Ideales (IPC) · Mi Forma de Trabajar · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
+**Tiene 6 pestañas:** Crear Anuncio · **Fotos** · Clientes Ideales (IPC) · Mi ADN · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
 
 **Cómo usarlo paso a paso:**
 1. En **Clientes Ideales (IPC)** creás un **perfil IPC** (Cliente Ideal). Elegís el objetivo:
    - **Captar** (conseguir propietarios que quieran vender), o
    - **Vender** (atraer compradores para una propiedad).
    Después completás los datos del perfil paso a paso (motivo, urgencia, ángulo, tono, llamada a la acción, nivel de conciencia, etc.).
-2. En **Mi Forma de Trabajar** cargás **cómo trabajás vos** (ver más abajo). Se hace **una sola vez** y es lo que hace que tus anuncios dejen de sonar genéricos.
+2. En **Mi ADN** cargás **cómo trabajás vos** (ver más abajo). Se hace **una sola vez** y es lo que hace que tus anuncios dejen de sonar genéricos.
 3. En **Crear Anuncio** elegís el **IPC** y el **tipo de copy**:
    - **Video/Reel** → te salen **3 guiones para hablar a cámara** (sin imágenes). Elegís además la **estructura del guión** o dejás "Sugerida" y la elegimos por vos.
    - **Post/Texto** → como siempre: elegís **formato de imagen** (Reels, Post o Historia) y **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante), y te salen 3 anuncios completos (texto + imagen).
@@ -348,10 +361,12 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 
 ### Fotos (arreglar las fotos de una propiedad)
 
-**Qué es:** agarra una foto de la ficha de tu propiedad y te la deja publicable. No hace falta que subas nada ni que sepas editar.
+**Qué es:** agarra una foto y te la deja publicable. No hace falta que sepas editar.
 
 **Cómo se usa:**
-1. Elegís la **propiedad** de tu cartera y después **cuál de sus fotos** querés trabajar.
+1. Arriba de todo elegís **de dónde sale la foto**. Son dos botones:
+   - **De una propiedad** — buscás la propiedad en tu cartera y después elegís **cuál de sus fotos** trabajar. Es lo de siempre.
+   - **Subir una foto mía** — para la propiedad que **todavía no cargaste en Tokko**. Le ponés un nombre, elegís la foto de tu computadora o tu celular, y la trabajás igual. Después subís a Tokko **la corregida** y listo: la cargás una sola vez, ya linda.
 2. Marcás qué querés que le haga. Podés elegir más de una cosa y se aplican en este orden:
    - **Mejorar la foto** — levanta una foto oscura o de día nublado. Si la sacaste con el cielo blanco, te la pasa a día de sol. No mueve nada de lugar.
    - **Despejar el ambiente** — saca adornos, cuadros, objetos personales y los muebles que hay hoy.
@@ -362,6 +377,10 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 **Si algo no te cierra, lo cambiás vos:** abajo del resultado arrastrás sobre la foto para encerrar lo que querés tocar y decís qué hacer. **Con nombrarlo alcanza** — "el perchero" — y si no escribís nada, saca lo que marcaste. Podés marcar **varias cosas a la vez** y se hacen todas juntas. También podés pedir algo para toda la foto ("poné cortinas claras en la ventana").
 
 > 💡 Para **sacar** algo la marca es exacta. Para **agregar** algo es una indicación de por dónde, no un lugar clavado.
+
+> 📱 **El nombre que le pongas a una foto que subas vos es con el que la vas a encontrar después** en **Mis Generaciones → Fotos retocadas**. Poné algo que reconozcas: "Depto Rivadavia 4500 — living". Si la propiedad ya está en Tokko no hace falta: queda con el nombre de la ficha.
+
+> 📸 Las fotos sacadas **con el celular entran derechas**, aunque las hayas sacado de pie. Se aceptan JPG, PNG y WEBP. Si el iPhone te la guarda en HEIC, el sistema la convierte solo al subirla.
 
 **Lo que el sistema cuida solo, sin que le digas nada:**
 - El **piso** queda igual: mismo material, mismo dibujo, mismo color.
@@ -376,12 +395,12 @@ Mientras el bot atiende, **te avisa por email** (remitente "PRISMA IA") y ademá
 > 💰 Cada paso consume **3 créditos**. Los tres modos juntos son 9.
 
 
-### Mi Forma de Trabajar (tu oferta irresistible)
+### Mi ADN (tu oferta irresistible)
 
 **Para qué sirve:** el IPC dice *a quién* le hablás. Esta pestaña dice *quién sos vos y por qué te tienen que elegir a vos y no a la inmobiliaria de la otra cuadra*. Con tus datos, la IA te arma **dos ofertas irresistibles**: una para **captar** (dueños que quieren vender) y otra para **vender** (gente que quiere comprar). Después esas ofertas se meten solas en todos tus anuncios.
 
 **Son 4 pasos:**
-1. **Mi perfil** (opcional, pero es el que más suma): años en el rubro, matrícula, la zona que conocés de memoria, en qué te especializás, cuántas operaciones cerraste, **2 o 3 casos reales** tuyos y qué incluye tu servicio. También hay un campo para decir **qué NO se puede prometer nunca** en tus anuncios: la IA lo respeta a rajatabla.
+1. **Mi perfil** (opcional, pero es el que más suma): años en el rubro, la zona en la que sos experto, en qué te especializás, cuántas operaciones cerraste, **2 o 3 casos reales** tuyos y qué incluye tu servicio. También hay un campo para decir **qué NO se puede prometer nunca** en tus anuncios: la IA lo respeta a rajatabla.
 2. **Captación:** cuántas propiedades vendiste en los últimos 6 meses, a qué porcentaje de tu tasación se cerraron, cuántos compradores tenés en tu base, en cuánto entregás la tasación, cuánto tardás en conseguir la primera oferta y qué te bancás vos para que el dueño no mueva un dedo.
 3. **Venta:** qué hacés para que el comprador esté seguro de que no paga de más, cuánta rebaja conseguís, cuántas exclusivas tenés, en cuánto le mandás la primera selección, en cuántas semanas reserva y qué trámites le sacás de encima.
 4. **Mis 2 ofertas:** apretás **"Generar mis 2 ofertas"** y la IA te las escribe con tus números. Las podés **corregir a mano** y guardar. Si más adelante cambian tus números, las regenerás.
@@ -641,6 +660,7 @@ Tiene 4 pestañas:
 **1. Perfil**
 - Cambiás tu **nombre** visible y tu foto.
 - Tu **email** es de solo lectura (es tu acceso principal).
+- **Tu celular** lo carga tu director desde su pantalla de Asesores: con él cargado, los avisos del sistema te llegan también por WhatsApp (además del email).
 
 **2. Seguridad**
 - Botón **"Restablecer Contraseña"**: te llega un email con un link seguro para cambiarla.
@@ -853,3 +873,21 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 - La descripción de la propiedad **ya no aparece en la portada**: se mudó a esta hoja. La portada quedó más limpia, con el título arriba y los datos del análisis al pie.
 - Si la dirección que cargaste no se puede ubicar en el mapa, la hoja no se genera y la ficha se crea igual, sin ella. No es un error: es que sin ubicación no hay nada honesto que contar.
 - **La ficha se ve completa desde el celular.** Antes, si tu cliente abría el link desde el teléfono, veía la mitad izquierda de cada hoja y el título cortado a mitad de palabra. Ahora se ve la hoja entera, más chica, igualita a como se ve en la computadora. El PDF no cambió en nada: sigue saliendo en A4.
+
+---
+
+## 24. Cuando un cliente queda esperando: los avisos y tus botones
+
+**Qué pasa:** cuando el bot te deriva un cliente (o el cliente pide hablar con una persona, o tomás un chat vos) y no le escribís, el sistema no se olvida: te avisa a las **2 horas**, a las **5** (y ahí también le avisa a tu director), a las **10** y a las **20** (otra vez al director, para que decida qué hacer). Los avisos llegan por **email** y, si tu director cargó tu celular, por **WhatsApp**. Traen lo que necesitás para responder sin abrir nada más: qué busca el cliente, su último mensaje y el link directo al chat.
+
+**Cómo se corta:** escribiéndole al cliente. Cuando le mandás un mensaje, el sistema lo ve y deja de avisar. Responder "ya lo atiendo" al aviso **no** lo corta: lo que cuenta es el mensaje al cliente.
+
+**Tus botones en la ficha del chat** (bloque "Equipo y seguimiento"):
+- **Lo tomo:** confirmás que te ocupás vos.
+- **No lo puedo tomar:** escribís el motivo (obligatorio) y el chat deja de ser tuyo; le llega a tu director con tu motivo para que lo reasigne. No es mala noticia: es mejor que dejar al cliente esperando.
+- **Marcar como perdido:** si el cliente no contesta más, con el motivo. Se puede **Reactivar** después.
+
+**Cuando te asignan un chat** (el director te lo pasa), te llega un aviso con qué busca el cliente, su último mensaje y **el comentario del director**, y en el chat tenés los mismos botones para tomarlo o devolverlo.
+
+> 💡 **Tip:** el seguimiento automático a los clientes que se enfriaron lo hace PRISMA solo, con mensajes naturales y como mucho tres veces; vos vas a ver en la ficha qué decidió y por qué. Lo tuyo son los clientes que **te esperan a vos**.
+

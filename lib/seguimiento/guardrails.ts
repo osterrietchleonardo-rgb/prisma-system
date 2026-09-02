@@ -22,7 +22,7 @@ export function puedeEjecutar(
   config: ConfigAgencia,
   enviadosHoyAgencia: number
 ): Veredicto {
-  if (d.accion !== "contactar") return { ok: true } // solo el envío tiene guardrails de envío
+  if (!d.plantilla) return { ok: true } // posponer/abandonar/escalar sin mensaje: no hay envío que frenar
   if (d.confianza < 0.5) return { ok: false, motivo: "confianza_baja" }
   if (enviadosHoyAgencia >= config.max_mensajes_dia)
     return { ok: false, motivo: "presupuesto_diario_agotado" }
@@ -30,7 +30,9 @@ export function puedeEjecutar(
   if (c.follow_ups_sent >= config.max_intentos) return { ok: false, motivo: "max_intentos" }
   if (c.opt_out) return { ok: false, motivo: "opt_out" }
   if (!c.bot_active) return { ok: false, motivo: "humano_al_mando" }
-  if (enHandoff(c)) return { ok: false, motivo: "en_handoff" }
+  // El handoff frena los SEGUIMIENTOS; el mensaje empático de una escalada (seg_pendiente)
+  // existe justamente para el lead en handoff que nadie atendió (Task 14 Step 1b).
+  if (d.accion === "contactar" && enHandoff(c)) return { ok: false, motivo: "en_handoff" }
   return { ok: true }
 }
 

@@ -21,7 +21,7 @@ import {
 import { obtenerZona } from "@/lib/acm/zona";
 import { generarRelato } from "@/lib/acm/zona-relato";
 import { recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
-import { normalizarImagenes } from "@/lib/acm/fotos-url";
+import { normalizarImagenes, urlsFotoRed } from "@/lib/acm/fotos-url";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -40,8 +40,10 @@ const MAX_IMAGES = 16;
 // Normaliza el campo images (jsonb) a un array de URLs, sacando vacíos y duplicados. La parte
 // de normalizar (string vs {url}, filtrar basura) es la misma que usa el resto del ACM — ver
 // lib/acm/fotos-descarga.ts; acá se le suma dedup + tope de cantidad, propios de la ficha.
+// `urlsFotoRed` al final: las de la red salen por nuestro proxy en vez del CDN de roomix; las
+// de cartera propia (Tokko, Storage) pasan sin tocarse. Ver `lib/acm/fotos-url.ts`.
 function allImages(images: any): string[] {
-  return Array.from(new Set(normalizarImagenes(images))).slice(0, MAX_IMAGES);
+  return urlsFotoRed(Array.from(new Set(normalizarImagenes(images))).slice(0, MAX_IMAGES));
 }
 
 // Amenities del comparable de cartera desde tokko_data.tags.

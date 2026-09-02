@@ -13,6 +13,8 @@ import { Copy, Edit2, Check, Clock, Home, Info, User, Calendar, MapPin, Building
 import { toast } from "sonner"
 
 import { deleteConversation } from "@/app/actions/whatsapp"
+import EquipoPanel from "@/components/seguimiento/EquipoPanel"
+import SeguimientoPanel from "@/components/seguimiento/SeguimientoPanel"
 import { Button } from "@/components/ui/button"
 
 interface LeadTraceabilityProps {
@@ -192,6 +194,11 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
 
   return (
     <div className="flex flex-col gap-4 p-4">
+      {/* 0. Equipo y seguimiento: quién lo tiene, qué está pendiente, y los botones por rol */}
+      <EquipoPanel conversationId={conversation.id} />
+      {/* 0b. Qué decidió el agente y por qué (razón, evidencia, qué miró) */}
+      <SeguimientoPanel conversationId={conversation.id} />
+
       {/* 1. Datos del lead */}
       <Card>
         <CardHeader className="pb-3">

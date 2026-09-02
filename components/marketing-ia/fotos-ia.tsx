@@ -13,13 +13,14 @@ import { PropertySelector } from "@/components/marketing-ia/property-selector"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import {
   Sun, Sparkles, Sofa, ArrowLeft, Loader2, Check, Download, Wand2,
-  ImageIcon, Trash2, MousePointerSquareDashed, RotateCcw,
+  ImageIcon, Trash2, MousePointerSquareDashed, RotateCcw, Upload,
 } from "lucide-react"
 import { TokkoProperty } from "@/types/marketing-ia"
 import { toast } from "sonner"
@@ -50,6 +51,9 @@ const MODOS = [
     detalle: "Amuebla un ambiente vacío respetando paredes, aberturas y piso.",
   },
 ]
+
+/** Lado mayor con el que se sube una foto propia. La IA devuelve menos que esto igual. */
+const MAX_LADO_SUBIDA = 1600
 
 const ESTILOS = [
   { id: "moderno", nombre: "Moderno y sobrio" },
@@ -86,7 +90,6 @@ export function FotosIA() {
   const [resultado, setResultado] = useState<string | null>(null)
   const [relevamiento, setRelevamiento] = useState<any>(null)
   const [referencia, setReferencia] = useState<string | null>(null)
-  const [costo, setCosto] = useState(0)
   const [aviso, setAviso] = useState<string | null>(null)
 
   // ── Retoque sobre el resultado ─────────────────────────────────────
@@ -94,10 +97,19 @@ export function FotosIA() {
   const [pedidoSuelto, setPedidoSuelto] = useState("")
   const [retocando, setRetocando] = useState(false)
 
-  // Cuando se retoma una foto desde la galería, la propiedad no está cargada:
-  // el título y el id vienen con la foto.
-  const [tituloRetomado, setTituloRetomado] = useState("")
+  // Con qué nombre se guarda cuando no hay una propiedad de Tokko cargada. Pasa
+  // en dos casos: al retomar una foto desde la galería (viene con la foto), y al
+  // subir una foto propia (lo escribe el asesor). Es lo que después se busca en
+  // la galería, así que sin esto la foto queda sin nombre y no la encuentra más.
+  const [tituloSinPropiedad, setTituloSinPropiedad] = useState("")
   const [tokkoRetomado, setTokkoRetomado] = useState<number | string | null>(null)
+
+  // ── Subir una foto propia (la propiedad todavía no está en Tokko) ──
+  // De dónde sale la foto: de una ficha de Tokko o del teléfono del asesor.
+  const [origen, setOrigen] = useState<"cartera" | "subida">("cartera")
+  const [nombreSubida, setNombreSubida] = useState("")
+  const [subiendo, setSubiendo] = useState(false)
+  const archivoRef = useRef<HTMLInputElement>(null)
 
   // Todo lo que se le hace a una misma foto comparte sesión: así la galería
   // muestra una sola tarjeta con sus pasos adentro en vez de una por paso.
@@ -113,14 +125,13 @@ export function FotosIA() {
       setFotoElegida(d.referencia_url || d.url)
       setReferencia(d.referencia_url || d.url)
       setRelevamiento(d.relevamiento || null)
-      setTituloRetomado(d.propiedad || "")
+      setTituloSinPropiedad(d.propiedad || "")
       setTokkoRetomado(d.tokko_id ?? null)
       // Se sigue en la misma sesión: el retoque entra en la tarjeta que ya existe.
       setSesion(d.sesion_id || crypto.randomUUID())
       setCambios([])
       setPedidoSuelto("")
       setAviso(null)
-      setCosto(0)
       setPaso("resultado")
     }
     // Al montar puede haber una foto esperando: el panel estaba desmontado
@@ -148,6 +159,65 @@ export function FotosIA() {
     }
   }
 
+  /**
+   * Achica la foto en el navegador antes de mandarla.
+   *
+   * Dos motivos. Uno: una foto de celular son 12 megapíxeles y subirla entera
+   * con datos móviles tarda una eternidad, cuando la IA devuelve bastante menos
+   * igual. Dos: el canvas la reencodea a JPEG, así que un HEIC de iPhone llega
+   * como JPEG y sharp lo puede abrir.
+   *
+   * `imageOrientation: "from-image"` es lo que respeta la orientación del EXIF.
+   * Sin eso, una foto sacada en vertical entra acostada y la IA la retoca
+   * acostada. Si el navegador no lo soporta, cae al modo normal y de eso se
+   * encarga el `.rotate()` del servidor.
+   */
+  const achicar = async (file: File): Promise<Blob> => {
+    let bitmap: ImageBitmap
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" })
+    } catch {
+      bitmap = await createImageBitmap(file)
+    }
+    const escala = Math.min(1, MAX_LADO_SUBIDA / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement("canvas")
+    canvas.width = Math.round(bitmap.width * escala)
+    canvas.height = Math.round(bitmap.height * escala)
+    canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close()
+    const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/jpeg", 0.92))
+    if (!blob) throw new Error("No se pudo preparar la foto. Probá con otra.")
+    return blob
+  }
+
+  const subirFoto = async (file: File | null | undefined) => {
+    if (!file) return
+    const nombre = nombreSubida.trim()
+    if (!nombre) return toast.error("Poné un nombre para poder encontrarla después en la galería")
+
+    setSubiendo(true)
+    try {
+      const cuerpo = new FormData()
+      cuerpo.append("file", new File([await achicar(file)], "foto.jpg", { type: "image/jpeg" }))
+      const res = await fetch("/api/marketing-ia/subir-foto", { method: "POST", body: cuerpo })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "No se pudo subir la foto")
+
+      // Sin propiedad de Tokko: el nombre que escribió es lo que la identifica.
+      setPropiedad(null)
+      setTokkoRetomado(null)
+      setTituloSinPropiedad(nombre)
+      setFotoElegida(data.url)
+      setFotos([])
+      // Hay una sola foto: el paso de elegir cuál no tiene sentido.
+      setPaso("opciones")
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
   const pedir = async (cuerpo: any) => {
     const res = await fetch("/api/marketing-ia/editar-foto", {
       method: "POST",
@@ -170,7 +240,6 @@ export function FotosIA() {
     setPaso("trabajando")
     setHechos([])
     setAviso(null)
-    setCosto(0)
     setCambios([])
 
     let actual = fotoElegida
@@ -179,7 +248,6 @@ export function FotosIA() {
     // la foto legible para el inventario.
     let ref: string = fotoElegida
     let rel: any = null
-    let acumulado = 0
     const sinAprobar: string[] = []
 
     try {
@@ -193,7 +261,7 @@ export function FotosIA() {
           relevamiento: rel,
           proteger_textos: protegerTextos,
           tokko_id: propiedad?.id,
-          propiedad_titulo: propiedad?.title || tituloRetomado,
+          propiedad_titulo: propiedad?.title || tituloSinPropiedad,
           sesion_id: nuevaSesion,
           foto_original: fotoElegida,
         })
@@ -207,7 +275,6 @@ export function FotosIA() {
         } else {
           rel = data.relevamiento
         }
-        acumulado += data.costo_usd || 0
         if (!data.aprobado) sinAprobar.push(modo)
         setHechos((h) => [...h, modo])
       }
@@ -215,7 +282,6 @@ export function FotosIA() {
       setResultado(actual)
       setReferencia(ref)
       setRelevamiento(rel)
-      setCosto(acumulado)
       avisarGaleria()
       if (sinAprobar.length) {
         setAviso("Alguna parte quedó con detalles: mirala bien antes de publicarla.")
@@ -245,14 +311,13 @@ export function FotosIA() {
         pedido_suelto: pedidoSuelto,
         proteger_textos: protegerTextos,
         tokko_id: propiedad?.id ?? tokkoRetomado,
-        propiedad_titulo: propiedad?.title || tituloRetomado,
+        propiedad_titulo: propiedad?.title || tituloSinPropiedad,
         sesion_id: sesion,
         foto_original: fotoElegida,
       })
       setResultado(data.url)
       setCambios([])
       setPedidoSuelto("")
-      setCosto((c) => c + (data.costo_usd || 0))
       avisarGaleria()
       setAviso(data.aprobado ? null : "El retoque quedó con detalles: revisalo.")
       toast.success("Retoque aplicado")
@@ -264,8 +329,11 @@ export function FotosIA() {
   }
 
   const volverAEmpezar = () => {
-    setTituloRetomado("")
+    setTituloSinPropiedad("")
     setTokkoRetomado(null)
+    // Sin propiedad, la foto vino del teléfono: vuelve a esa subsolapa y no a
+    // la lista de la cartera, que no es de donde salió.
+    if (!propiedad) setOrigen("subida")
     setPaso(propiedad ? "foto" : "propiedad")
     setResultado(null)
     setCambios([])
@@ -278,22 +346,114 @@ export function FotosIA() {
     return (
       <div className="space-y-6">
         <Encabezado
-          titulo="Elegí la propiedad"
-          bajada="Las fotos salen de la ficha que ya está cargada. No hace falta subir nada."
+          titulo="¿De dónde sacamos la foto?"
+          bajada="De una propiedad que ya está en Tokko, o subila vos si todavía no la cargaste."
         />
-        <PropertySelector
-          onSelect={setPropiedad}
-          onContinue={() => {
-            // El selector se comparte con el flujo de copys, que permite seguir
-            // sin propiedad. Acá no: sin propiedad no hay fotos que trabajar.
-            if (!propiedad) {
-              toast.error("Elegí una propiedad: las fotos salen de su ficha")
-              return
-            }
-            setPaso("foto")
-            traerFotos(propiedad)
-          }}
-        />
+
+        {/* Van como subsolapas y no una debajo de la otra: con la lista de
+            propiedades de por medio, la opción de subir quedaba tan abajo que
+            no se sabía que existía sin scrollear hasta el fondo. */}
+        <div className="inline-flex items-center gap-1 p-1 rounded-xl bg-muted/50">
+          {([
+            { id: "cartera", texto: "De una propiedad", icono: ImageIcon },
+            { id: "subida", texto: "Subir una foto mía", icono: Upload },
+          ] as const).map((o) => {
+            const Icono = o.icono
+            return (
+              <button
+                key={o.id}
+                onClick={() => setOrigen(o.id)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition whitespace-nowrap",
+                  origen === o.id
+                    ? "bg-background shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Icono className="w-4 h-4" />
+                {o.texto}
+              </button>
+            )
+          })}
+        </div>
+
+        {origen === "cartera" ? (
+          <PropertySelector
+            onSelect={setPropiedad}
+            onContinue={() => {
+              // El selector se comparte con el flujo de copys, que permite seguir
+              // sin propiedad. Acá no: sin propiedad no hay fotos de la ficha que
+              // trabajar — para eso está la otra subsolapa.
+              if (!propiedad) {
+                toast.error('Elegí una propiedad, o pasá a "Subir una foto mía"')
+                return
+              }
+              setPaso("foto")
+              traerFotos(propiedad)
+            }}
+          />
+        ) : (
+          <Card className="p-5 sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-muted grid place-items-center shrink-0">
+                <Upload className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold">Para la propiedad que todavía no está en Tokko</p>
+                <p className="text-sm text-muted-foreground">
+                  Subí la foto y trabajala igual. Después subís a Tokko la corregida y listo: la cargás una sola vez.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="nombre-foto-suelta" className="text-xs font-bold">
+                  ¿Cómo la querés llamar?
+                </Label>
+                <Input
+                  id="nombre-foto-suelta"
+                  value={nombreSubida}
+                  onChange={(e) => setNombreSubida(e.target.value)}
+                  maxLength={80}
+                  disabled={subiendo}
+                  placeholder="Ej: Depto Rivadavia 4500 — living"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Con este nombre la vas a buscar en <strong>Historial</strong> cuando la quieras subir a Tokko.
+                </p>
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full font-bold"
+                disabled={subiendo || !nombreSubida.trim()}
+                onClick={() => archivoRef.current?.click()}
+              >
+                {subiendo ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Subiendo…
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" /> Elegir la foto
+                  </>
+                )}
+              </Button>
+              <input
+                ref={archivoRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  subirFoto(e.target.files?.[0])
+                  // Sin esto, elegir el mismo archivo dos veces seguidas no dispara nada.
+                  e.target.value = ""
+                }}
+              />
+            </div>
+          </Card>
+        )}
       </div>
     )
   }
@@ -318,9 +478,21 @@ export function FotosIA() {
             ))}
           </div>
         ) : fotos.length === 0 ? (
-          <Card className="p-10 text-center text-muted-foreground">
-            <ImageIcon className="w-10 h-10 mx-auto mb-3 opacity-40" />
-            Esta propiedad todavía no tiene fotos cargadas en Tokko.
+          <Card className="p-10 text-center text-muted-foreground space-y-4">
+            <ImageIcon className="w-10 h-10 mx-auto opacity-40" />
+            <p>Esta propiedad todavía no tiene fotos cargadas en Tokko.</p>
+            {/* Sin esto la pantalla es un callejón sin salida: le dice que no hay
+                fotos y lo deja ahí. Cae parado en la subsolapa de subir, no en
+                la lista de propiedades que ya sabemos que no le sirve. */}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setOrigen("subida")
+                setPaso("propiedad")
+              }}
+            >
+              <Upload className="w-4 h-4 mr-2" /> Subir una foto mía
+            </Button>
           </Card>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -355,7 +527,18 @@ export function FotosIA() {
     const elegidos = MODOS.filter((m) => modos[m.id])
     return (
       <div className="space-y-6">
-        <Volver onClick={() => setPaso("foto")} texto="Elegir otra foto" />
+        {/* Una foto subida no vino de una ficha: el paso de "elegir cuál" no existe. */}
+        {propiedad ? (
+          <Volver onClick={() => setPaso("foto")} texto="Elegir otra foto" />
+        ) : (
+          <Volver
+            onClick={() => {
+              setOrigen("subida")
+              setPaso("propiedad")
+            }}
+            texto="Subir otra foto"
+          />
+        )}
         <Encabezado titulo="¿Qué le hacemos?" bajada="Podés elegir más de una. Se aplican en este orden." />
 
         <div className="grid lg:grid-cols-[1fr_400px] gap-8 items-start">
@@ -507,9 +690,6 @@ export function FotosIA() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <Encabezado titulo="Así quedó" bajada="Compará con la original. Si algo no te cierra, marcalo abajo y pedí el cambio." />
         <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="font-mono text-xs">
-            US$ {costo.toFixed(2)}
-          </Badge>
           <Button variant="outline" size="sm" asChild>
             <a href={resultado ?? "#"} download target="_blank" rel="noreferrer">
               <Download className="w-4 h-4 mr-2" /> Descargar
@@ -528,7 +708,8 @@ export function FotosIA() {
       <div className="grid md:grid-cols-2 gap-5">
         <figure className="space-y-2">
           <figcaption className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-            Antes · como está en la ficha
+            {/* Una foto subida no salió de ninguna ficha: decirlo sería mentir. */}
+            {propiedad ? "Antes · como está en la ficha" : "Antes · la que subiste"}
           </figcaption>
           <div className="rounded-xl overflow-hidden border">
             {fotoElegida && <img src={fotoElegida} alt="Antes" className="w-full" />}

@@ -176,7 +176,6 @@ export type EstructuraId = 'variante_1' | 'variante_2' | 'aida' | 'pas' | 'bab' 
 
 export type PerfilOperacion = {
   anios_experiencia: string;
-  matricula: string;
   zona_dominio: string;
   especialidad: string;
   operaciones_cerradas: string;

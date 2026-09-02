@@ -2262,9 +2262,38 @@ escalera en sombra.
 
 - [ ] **Step 1:** OK de Leonardo sobre el catálogo y el orden.
 - [ ] **Step 2:** P1 en la app (perfil + Equipo) con su verificación en navegador.
-- [x] **Step 3 (26/8):** P2 en el webhook de la app (evolution + meta), con tests y prueba real. Falta el OK para mergear (llega con el merge de la rama, Task 20).
-- [ ] **Step 4:** ~~sumar las de asesor/director a `plantillas-v2.ts`~~ (hecho 25/8: `plantillasEquipo()`,
-  con tests) → crearlas en PRISMAIA con el one-off (OK); esperar Meta; probar un aviso real a Leonardo.
+- [x] **Step 3 (26/8):** P2 en el webhook de la app (evolution + meta), con tests. **Mergeado a `main`
+  (`b39e455`, fast-forward de 28 commits, 393 tests + build OK) y probado en PRODUCCIÓN con un
+  mensaje real de Leonardo desde su celular (perfil de asesor de PRISMAIA): log
+  `[Meta Webhook] Mensaje interno … registrado, confirmación enviada`, fila en
+  `interacciones_canal`, cero `wa_messages`, el bot NO contestó.** Hechos que salieron del camino:
+  - En producción los mensajes entran por **`/api/webhooks/meta`** (Meta directo a la app);
+    Evolution solo ENVÍA. Su webhook de instancia (`byEvents: true`) manda sufijos
+    `/send-message` que dan 404 (ruido). El webhook global de Evolution está deshabilitado.
+    Un desvío temporal del webhook de instancia de PRISMAIA al preview no sirvió (canal
+    equivocado) y se restauró.
+  - La confirmación es texto libre: Meta solo la entrega si el asesor escribió en las últimas
+    24 h (probada: llegó desde +54 9 221 202-4714). En el flujo real la ventana siempre está
+    abierta. Meta escribe los celulares AR sin el 9 → el gate compara en forma canónica.
+  - **Caída de Supabase** (~02:20 a 03:29 AR, instancia Micro 1 GB, reinicio manual desde el
+    dashboard): durante la caída el webhook de Meta **devolvió 200 sin poder procesar** (la
+    búsqueda de instancia falla → "no encontrada" → 200) y Meta NO reintenta con 200 → **los
+    mensajes de leads que llegaron en esa ventana se perdieron en silencio**. **Resuelto el
+    26/8** (rama `fix/webhook-503-base-caida`, en `main` como `3137a13`): los dos webhooks
+    (`meta` y `evolution`) responden **503** cuando la base no contesta (al buscar la
+    instancia, chequear duplicados o crear la conversación) y Meta reintenta; un
+    `phone_number_id` desconocido sigue dando 200. Probado en local: base inalcanzable → 503;
+    base sana + instancia desconocida → 200 sin escribir nada. Sigue pendiente:
+    `system_events` (§III.2.8.2) avisándole a Leonardo de la caída.
+  - Bug visto en logs: links a `/director/leads-whatsapp/Mensaje%20de%20voz%20recibido`
+    (texto del mensaje en vez del id).
+  - Regla de Leonardo: el link del aviso se adapta al rol del destinatario y apunta al chat
+    concreto (`/director/leads-whatsapp/[id]` para el director, que ve todo y reasigna desde
+    la configuración de ese chat).
+- [x] **Step 4 (26/8):** `plantillasEquipo()` en el provisionador y **creadas y APROBADAS por Meta en PRISMAIA**
+  (primer intento rechazado: "las variables no pueden estar al principio ni al final" → cierre fijo
+  tras el link, regla fijada en test). Meta reclasificó `asesor_sigue_esperando` como MARKETING
+  (el resto UTILITY). Falta: probar un aviso real de escalera al celular de Leonardo (con la Task 14).
 - [ ] **Step 5:** Central: clientes + asesores juntas (OK).
 
 ---
@@ -2272,6 +2301,9 @@ escalera en sombra.
 # DÍA 5 — Compromisos: lo que el sistema persigue
 
 ### Task 13: Módulo de compromisos (`compromisos.ts`)
+
+> **HECHA 26/8.** `lib/seguimiento/compromisos.ts` (+ 5 tests): `derivarCompromisosDeVisita`,
+> `sincronizarCompromisos` (corre al inicio de cada corrida) y `crearCompromisoEscalar` (Task 14).
 
 **Files:**
 - Create: `lib/seguimiento/compromisos.ts`
@@ -2366,6 +2398,23 @@ export async function sincronizarCompromisos(db: SupabaseClient) {
 
 ### Task 14: Compromisos creados por el agente (escalar ⇒ respuesta_pendiente)
 
+> **HECHA 26/8, incluido el Step 1b.** En el runner, `escalar` ⇒ compromiso `respuesta_pendiente`
+> (24 h, máx. 1 activo por chat, en sombra también) + `avisarPorEscalar` (`lib/seguimiento/avisos.ts`,
+> 13 tests): destinatario = asesor asignado activo, si no el director; email por Resend siempre
+> (remitente "Agencia vía PRISMA") y WhatsApp además si tiene celular, con la plantilla UTILITY
+> `asesor_cliente_esperando` **solo si Meta la aprobó en esa agencia**; link al chat concreto con la
+> URL del rol (`/{director|asesor}/leads-whatsapp/[id]`); una vez por chat cada 24 h; TODO queda en
+> `interacciones_canal` (canal, resultado, motivo si se omitió, wamid) y en `lead_eventos`. En sombra
+> no manda: registra `aviso_simulado` con a quién habría ido. **Probado de verdad el 26/8 12:45**
+> desde el número de PRISMAIA al celular y al Gmail del perfil "Leonardo Asesor": email y WhatsApp
+> `enviado`, 0 `wa_messages` en el chat del lead (el aviso no ensucia la conversación).
+> **Hallazgo 26/8 (importa para Task 15):** Evolution `sendTemplate` respondió 200 sin id y el
+> WhatsApp de las 12:45 **nunca llegó**; Evolution tampoco lo registró. Las campañas (entrega
+> verificada) mandan plantillas por **Meta Graph directo** (`phone_number_id` + `token`). El aviso
+> ahora va por Meta directo primero (13:42: `wamid.HBgN…` real) y Evolution solo si no hay token.
+> **El ejecutor (Task 15) NO debe usar `/api/whatsapp/dispatch` tal cual**: ese endpoint manda por
+> Evolution `sendTemplate` cuando la instancia es `evolution`, el camino que falló.
+
 **Files:**
 - Modify: `app/api/seguimiento/run/route.ts`
 
@@ -2406,6 +2455,16 @@ if (decision.accion === "escalar") {
 # DÍA 6 — Ejecución real, gradual
 
 ### Task 15: El ejecutor (`ejecutor.ts`) — de la decisión al dispatch
+
+> **HECHA 27/8.** `lib/seguimiento/ejecutor.ts` (+12 tests): `ejecutarDecision` (presupuesto diario
+> por día AR, `puedeEjecutar`, relectura anti-colisión, nombre SOLO de `metricas`, `armarVariables`,
+> POST al `dispatch` propio del mismo origen —con bypass de Vercel en preview—, y **sin wamid no es
+> éxito**) y `aplicarSinEnvio` (posponer/abandonar; abandonar NUNCA cierra como perdido). El mensaje
+> empático de una escalada (`seg_pendiente`) también pasa por el ejecutor, con los mismos frenos salvo
+> el de handoff (existe para eso) y sin sumar intento. Enchufado en el runner **solo en modo
+> `activo`**: las dos agencias siguen en sombra, así que nada sale hasta la Task 17 (con OK).
+> Central: las 9 plantillas nuevas creadas en su WABA el 27/8 (PENDING → Meta).
+
 
 **Files:**
 - Create: `lib/seguimiento/ejecutor.ts`
@@ -2552,6 +2611,14 @@ if (config.modo === "activo" && fila) {
 - [ ] **Step 5: Commit** — `git add lib/seguimiento/ejecutor.ts lib/seguimiento/ejecutor.test.ts app/api/seguimiento/run/route.ts && git commit -m "feat(seguimiento): ejecutor con doble verificacion y presupuesto diario (capa 4)"`
 
 ### Task 16: Recordatorios de visita, determinísticos (`visitas.ts`)
+
+> **HECHA 27/8.** `lib/seguimiento/visitas.ts` (+12 tests): `queRecordatorioToca` (24h/3h/1h/no-show,
+> sin repetir, y el no-show solo hasta 48 h después), `variablesRecordatorio` (las variables reales
+> de cada plantilla), `correrVisitas` con `tarea: "visitas"` en el runner. En sombra registra
+> `envio_simulado` (una vez por plantilla y visita); en activo manda por el dispatch del mismo origen
+> y **sin wamid no es éxito**. Corrida real en sombra: Central tiene 2 visitas viejas (>48 h), nada
+> que mandar. Falta (con OK): el segundo llamado del reloj n8n con `{"tarea":"visitas"}`.
+
 
 La confirmación de visita es **deliberadamente casi determinística** (24h/3h/1h). Acá no
 hay LLM — se porta la lógica del flujo viejo al runner, con una mejora: sin extracción de
@@ -2700,6 +2767,27 @@ Variables ya verificadas (24/8, Task 0): 24h/3h = [nombre, hora, dirección];
 
 ### Task 17: Encender de verdad (⚠️ REQUIERE OK DE LEONARDO)
 
+> **Decisiones de Leonardo del 27/8 (repaso de flujos y topes), ya implementadas:**
+> - **PRISMAIA apagada** (cero decisiones, cero sombra): `seguimiento_config.modo = 'apagado'`.
+> - **Solo plantillas nuevas**: el agente elige entre las v2 aprobadas (f1/f2/f3 no se usan más); los
+>   avisos al equipo van por email siempre y por WhatsApp solo con plantilla nueva aprobada — nunca se saltea.
+> - **La escalera del lead que espera a un humano** (reemplaza al escalamiento mínimo de la Task 19):
+>   esperando = derivado / etapa handoff / pidió humano / bot apagado, sin ningún mensaje HUMANO después del
+>   último del lead (cubre bot apagado con promesa y bot activo "el asesor se va a comunicar"). Niveles
+>   desde el último mensaje del lead: **2 h asesor · 5 h asesor + director · 10 h asesor · 20 h asesor +
+>   director** para decidir; cada nivel una vez por caso; sin tope por agencia (30 asesores → 30 avisos);
+>   "atendido" lo mide el chat, no la promesa. Sombra real en Central: 105 esperando, 7 atendidos, 99 > 20 h.
+> - **El reloj arranca el día del encendido**: `seguimiento_config.activo_desde` (migración
+>   `2026-08-27-activo-desde.sql`, aplicada); el agente y la escalera solo miran conversaciones con
+>   movimiento posterior. El backlog queda intacto para reactivarlo después ("por el momento no").
+> - **Silencio mínimo: 20 h.** 3 intentos por lead: OK.
+> - **Agencias nuevas arrancan ACTIVAS** al conectar WhatsApp (`injectCoreTemplates` crea la config con
+>   `modo='activo'` y `activo_desde=now()`): email desde el día uno, WhatsApp a medida que Meta aprueba.
+>
+> **Encender Central = `update seguimiento_config set modo='activo', activo_desde=now()`** (con OK explícito).
+> Kill-switch: volver a `sombra`, o `SEGUIMIENTO_MODO=apagado` en Vercel para todas.
+
+
 - [ ] **Step 1: Checklist previo:** sombra revisada (Task 12, criterio de salida
   cumplido) · suite verde · deploy en Vercel con `SEGUIMIENTO_SECRET` y
   `SEGUIMIENTO_MODO=activo` · reloj corriendo · plantillas de fase 1 todas `approved`
@@ -2718,6 +2806,13 @@ Variables ya verificadas (24/8, Task 0): 24h/3h = [nombre, hora, dirección];
 # DÍA 7 — Trazabilidad visible, escalamiento y cierre
 
 ### Task 18: El bloque "Agente de seguimiento" en la ficha del lead
+
+> **HECHA 27/8.** `components/seguimiento/SeguimientoPanel.tsx`, debajo del bloque "Equipo y
+> seguimiento" (los compromisos y botones ya viven ahí): últimas 5 decisiones con acción, fecha,
+> confianza, razón, el mensaje propuesto, "El dato" (evidencia), "Miró: …" (las herramientas) y el
+> resultado ("no se envió (modo sombra…)"). Verificado en local, escritorio y celular, con la decisión
+> real del 27/8 sobre el chat de Leonardo.
+
 
 **Files:**
 - Create: `components/whatsapp/SeguimientoPanel.tsx`
@@ -2850,6 +2945,17 @@ export default function SeguimientoPanel({ conversationId }: { conversationId: s
 - [ ] **Step 4: Commit** — `git add components/whatsapp/SeguimientoPanel.tsx components/whatsapp/LeadTraceability.tsx && git commit -m "feat(seguimiento): panel con decisiones, evidencia y trace en la ficha del lead"`
 
 ### Task 19: Escalamiento mínimo al director (`escalamiento.ts`)
+
+> **HECHA 27/8 (adaptada a la infraestructura de hoy).** `lib/seguimiento/escalamiento.ts` (+5 tests):
+> `armarAvisoDirectorSinRespuesta` (plantilla `director_asesor_sin_respuesta` + email, con el
+> CONTEXTO del lead y "Qué pasa: Martín lleva N horas sin responderle a X"), `correrEscalamiento`
+> con `tarea: "escalamiento"`: leads con bot apagado cuyo ÚLTIMO mensaje es del lead (role='lead')
+> hace más de `escalamiento_horas` y menos de 14 días; tope `max_escalamientos_dia`; nunca el mismo
+> chat dos veces en 24 h; sin `seguimiento_email_director` (el director sale de `profiles`). Manda por
+> `enviarAviso` (email + WhatsApp). **Corrida real en sombra (27/8 15:08): Central tiene 11 leads
+> esperando a un humano; simuló los 3 del tope** (9, 12 y 14 días sin respuesta). Falta (con OK): el
+> tercer llamado del reloj n8n con `{"tarea":"escalamiento"}`.
+
 
 Versión mínima de la escalera (nivel único → director directo; la escalera completa
 multi-canal es la fase 2, §III.2): si un lead con humano a cargo lleva más de
@@ -3166,6 +3272,40 @@ create table aprobaciones (
 );
 create index on aprobaciones (agency_id, estado, creado_en desc);
 ```
+
+### III.2.2b HECHO 26/8 — Reasignación, "Lo tomo" / "No lo puedo tomar" y Aprobaciones
+
+Primera pieza de la fase 2, construida antes que el ejecutor por decisión de Leonardo (26/8):
+sin esto, reabrir leads o escalar es mandar avisos a nadie. Reglas suyas:
+- **El asesor no reasigna.** Tiene «Lo tomo», «No lo puedo tomar» (justificación obligatoria,
+  se le saca la asignación —deja de ver el chat por la RLS— y el pedido llega al director) y
+  «Marcar como perdido» (justificación).
+- **El director** tiene «Reasignar a…» (con motivo opcional), «Lo tomo yo», «Dar más tiempo»
+  (+24 h al compromiso) y «Marcar como perdido». Al reasignar, el asesor nuevo recibe email +
+  WhatsApp (`asesor_cliente_esperando`) con el detalle y el link a SU chat, donde están los
+  botones. Si la ventana de 24 h del cliente está cerrada, el director puede tildar «Avisarle al
+  cliente»: sale `seg_pendiente` por el `dispatch` (arreglado) con "Tu consulta ahora la sigue X";
+  solo si la plantilla está aprobada en esa agencia y el cliente tiene nombre registrado.
+- **Aprobaciones consume-once** (`aprobaciones`, migración `2026-08-27-aprobaciones.sql`,
+  aplicada): pantalla propia `/director/aprobaciones` con contador en el menú; cada pedido se
+  decide UNA vez (Lo tomo yo / Reasignar a… / Dejar sin asesor con motivo); a las 48 h sin
+  respuesta vence y no se ejecuta nada. Todo queda en `lead_eventos` y en `interacciones_canal`.
+
+Dónde vive: `lib/seguimiento/equipo.ts` (+13 tests), `app/actions/equipo.ts` (las escrituras,
+con el cliente de servidor porque la RLS no deja al asesor soltar su chat),
+`components/seguimiento/EquipoPanel.tsx` (bloque "Equipo y seguimiento" en la ficha),
+`app/director/aprobaciones/`, ítem en `director-sidebar.tsx`.
+**Feedback de Leonardo del 27/8, aplicado:** (1) el aviso al asesor lleva CONTEXTO (qué busca el
+lead desde `metricas` + su último mensaje con fecha) y el comentario del director va etiquetado
+("Comentario de Víctor: «…»"); (2) un lead "perdido" se puede **Reactivar** desde la ficha, y los
+botones del asesor no desaparecen por estar perdido; (3) el link de OTRO rol
+(`/asesor/leads-whatsapp/[id]` abierto por el director, o al revés) va al mismo chat en la ruta
+propia, en el middleware — el `?next=` del login ya existía; (4) Aprobaciones: buscador (cliente,
+teléfono, asesor, motivo), filtro por asesor y por estado, y pendientes agrupadas por quién las pidió.
+**Probado el 26/8 en local con la agencia de prueba, escritorio y celular:** reasignar desde la
+ficha (aviso real recibido), pedido pendiente → «Lo tomo yo» (consumido una vez), «Dar más
+tiempo» (48 h), «Dejar sin asesor» con motivo. Sin probar en vivo: el lado del asesor (se prueba
+con la cuenta de asesor de Leonardo) y la reapertura por plantilla con ventana cerrada.
 
 ### III.2.3 La escalera del asesor (frente 2)
 
