@@ -75,16 +75,27 @@ comment on view public.roomix_properties is
 
 -- El ALTER TABLE RENAME del corte arrastró la vista dependiente acm_barrios_disponibles
 -- a roomix_properties_legacy (las vistas siguen el rename por OID; las funciones no).
--- Se repunta a la vista de compatibilidad: los conteos del desplegable de barrios del ACM
--- pasan a salir de mercado_avisos.
+-- Repuntada a la vista de compatibilidad, y con el conteo en DOS niveles:
+-- El desplegable contaba 0 en los sub-barrios (mercado guarda barrio y sub_barrio en
+-- columnas separadas). Cuenta en los dos niveles. Reportado por Leonardo el 3-sep.
 create or replace view public.acm_barrios_disponibles as
- with red as (
+ with niveles as (
    select acm_norm(btrim(coalesce(nullif(r.neighborhood, ''), r.city, ''))) as clave,
-          mode() within group (order by btrim(coalesce(nullif(r.neighborhood, ''), r.city, ''))) as nombre,
-          count(*)::integer as avisos
+          btrim(coalesce(nullif(r.neighborhood, ''), r.city, '')) as nombre
    from public.roomix_properties r
    where r.is_active = true and r.embedding is not null
      and btrim(coalesce(nullif(r.neighborhood, ''), r.city, '')) <> ''
+   union all
+   select acm_norm(btrim(m.sub_barrio)) as clave,
+          btrim(m.sub_barrio) as nombre
+   from public.mercado_avisos m
+   where m.estado = 'activo' and m.calidad = 'ok' and m.operacion = 'venta'
+     and m.embedding is not null and btrim(coalesce(m.sub_barrio, '')) <> ''
+ ), red as (
+   select clave,
+          mode() within group (order by nombre) as nombre,
+          count(*)::integer as avisos
+   from niveles
    group by 1
  ), cat as (
    select distinct c.barrio as clave from public.acm_barrio_relacion c
