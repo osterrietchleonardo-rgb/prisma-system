@@ -882,6 +882,8 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 
 **Cómo se corta:** escribiéndole al cliente. Cuando le mandás un mensaje, el sistema lo ve y deja de avisar. Responder "ya lo atiendo" al aviso **no** lo corta: lo que cuenta es el mensaje al cliente.
 
+**La noche no juega en contra:** las horas se cuentan solo entre las **6 y las 23**. Si un cliente escribe a las 3 de la mañana, para el sistema empieza a esperar a las 6, y tu primer aviso llega a las 8 — dormir no es dejar plantado a nadie. Y nunca te va a sonar un aviso de madrugada: lo que pase de noche te llega a partir de las 6.
+
 **Tus botones en la ficha del chat** (bloque "Equipo y seguimiento"):
 - **Lo tomo:** confirmás que te ocupás vos.
 - **No lo puedo tomar:** escribís el motivo (obligatorio) y el chat deja de ser tuyo; le llega a tu director con tu motivo para que lo reasigne. No es mala noticia: es mejor que dejar al cliente esperando.

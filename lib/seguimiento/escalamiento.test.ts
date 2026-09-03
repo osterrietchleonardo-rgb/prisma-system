@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
-  armarAvisoAsesorEscalera, armarAvisoDirectorSinRespuesta, casoCuenta, esperandoHumano, horasTexto, nivelQueToca,
+  armarAvisoAsesorEscalera, armarAvisoDirectorSinRespuesta, casoCuenta, correrEscalamiento, esperandoHumano, horasTexto, nivelQueToca,
 } from "./escalamiento"
 import type { PerfilEquipo } from "./avisos"
 
@@ -96,4 +96,43 @@ describe("casoCuenta: el reloj arranca el día que se enciende", () => {
     expect(casoCuenta("2026-08-26T10:00:00Z", "2026-08-27T12:00:00Z")).toBe(false)
   })
   it("un caso posterior sí", () => expect(casoCuenta("2026-08-27T15:00:00Z", "2026-08-27T12:00:00Z")).toBe(true))
+})
+
+describe("correrEscalamiento: nada de madrugada (Kevin, 2/9)", () => {
+  // Un instante en hora ARGENTINA (UTC-3 fijo).
+  const ar = (iso: string) => Date.parse(iso + "-03:00")
+
+  it("fuera de 6-23 AR no toca ni la base y lo dice", async () => {
+    const dbQueNoSePuedeUsar = new Proxy({}, {
+      get() { throw new Error("la corrida de madrugada no debería tocar la base") },
+    }) as never
+    const r = await correrEscalamiento(dbQueNoSePuedeUsar, { ahoraMs: ar("2026-09-03T03:30:00") })
+    expect(r).toEqual({ esperando: 0, atendidos: 0, avisos: 0, simulados: 0, fueraDeVentana: true })
+  })
+
+  it("a las 23:00 en punto tampoco (la ventana cierra 22:59)", async () => {
+    const db = new Proxy({}, { get() { throw new Error("no debería") } }) as never
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-03T23:00:00") })
+    expect(r.fueraDeVentana).toBe(true)
+  })
+})
+
+describe("los niveles se miden en horas hábiles (la noche no corre)", () => {
+  // Verificación de la matemática que usa la corrida: un lead de las 3 am NO alcanza el
+  // nivel 2 a las 6:30 (0,5 h hábiles) y SÍ a las 8 (2 h); el director (5 h) recién a las 11.
+  it("lead de las 3 am: asesor a las 8, director a las 11", async () => {
+    const { horasHabiles } = await import("@/lib/whatsapp/sending-window")
+    const ar = (iso: string) => Date.parse(iso + "-03:00")
+    const t0 = ar("2026-09-03T03:00:00")
+    expect(nivelQueToca(horasHabiles(t0, ar("2026-09-03T06:30:00")), [])).toBeNull()
+    expect(nivelQueToca(horasHabiles(t0, ar("2026-09-03T08:00:00")), [])).toBe(2)
+    expect(nivelQueToca(horasHabiles(t0, ar("2026-09-03T11:00:00")), [2])).toBe(5)
+  })
+  it("lead de las 22:00: 1 h antes de dormir + 1 h a la mañana = nivel 2 a las 7:00", async () => {
+    const { horasHabiles } = await import("@/lib/whatsapp/sending-window")
+    const ar = (iso: string) => Date.parse(iso + "-03:00")
+    const t0 = ar("2026-09-03T22:00:00")
+    expect(nivelQueToca(horasHabiles(t0, ar("2026-09-04T06:45:00")), [])).toBeNull()
+    expect(nivelQueToca(horasHabiles(t0, ar("2026-09-04T07:00:00")), [])).toBe(2)
+  })
 })

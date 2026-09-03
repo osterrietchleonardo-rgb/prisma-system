@@ -41,3 +41,28 @@ export function ventanaEnvioLabel(): string {
   const fmt = (h: number) => (h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`)
   return `${fmt(SENDING_WINDOW_START_HOUR)}–${fmt(SENDING_WINDOW_END_HOUR)} (Argentina)`
 }
+
+// Argentina no tiene horario de verano: UTC-3 fijo. Eso permite calcular las horas
+// hábiles con aritmética pura, sin Intl por cada iteración.
+const OFFSET_AR_MS = -3 * 3600e3
+const DIA_MS = 24 * 3600e3
+
+/**
+ * Horas HÁBILES (dentro de la ventana 6-23 AR) transcurridas entre dos instantes.
+ * Es la medida justa de "cuánto lleva esperando el cliente" para los avisos al equipo:
+ * el que duerme no está ignorando a nadie (Kevin, 2/9/2026). Un lead que escribe a las
+ * 3:00 recién empieza a "esperar" a las 6:00; uno de las 22:00 suma 1 h, congela a las
+ * 23:00 y retoma a las 6:00.
+ */
+export function horasHabiles(desdeMs: number, hastaMs: number): number {
+  if (!Number.isFinite(desdeMs) || !Number.isFinite(hastaMs) || hastaMs <= desdeMs) return 0
+  const a = desdeMs + OFFSET_AR_MS
+  const b = hastaMs + OFFSET_AR_MS
+  let total = 0
+  for (let dia = Math.floor(a / DIA_MS) * DIA_MS; dia < b; dia += DIA_MS) {
+    const desde = Math.max(a, dia + SENDING_WINDOW_START_HOUR * 3600e3)
+    const hasta = Math.min(b, dia + SENDING_WINDOW_END_HOUR * 3600e3)
+    if (hasta > desde) total += hasta - desde
+  }
+  return total / 3600e3
+}

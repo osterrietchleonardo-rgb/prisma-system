@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { dentroDeVentanaEnvio, horasHabiles } from "@/lib/whatsapp/sending-window"
 import { enviarAviso, linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
 import { bloqueContextoHtml, contextoDelLead, lineaContextoWhatsApp, type ContextoLead } from "./contexto"
 import { registrarEvento } from "./eventos"
@@ -14,11 +15,15 @@ import type { Candidato } from "./tipos"
  * a comunicar para coordinar la visita". "Atendido" lo mide el dato (un mensaje humano en el
  * chat después del último del lead), nunca la promesa del asesor por WhatsApp.
  *
- * LOS NIVELES, contados desde el último mensaje del lead:
+ * LOS NIVELES, contados desde el último mensaje del lead EN HORAS HÁBILES (6-23 AR; Kevin,
+ * 2/9: "si está durmiendo no es que no quiera contestar" — la noche no corre en contra del
+ * asesor: un lead de las 3 am recién "empieza a esperar" a las 6):
  *   2 h  → asesor asignado (sin asesor: director)
  *   5 h  → asesor + director
  *   10 h → asesor ("sigue esperando")
  *   20 h → asesor + director, para que decida (reasignar, tomarlo, dar tiempo)
+ * Además, NINGÚN aviso sale fuera de 6-23 AR: fuera de ventana la corrida entera se saltea
+ * y el caso madura en la primera corrida de la mañana.
  * Cada nivel una sola vez por caso; si el lead vuelve a escribir después de ser atendido, es un
  * caso nuevo. Sin tope por agencia: si 30 asesores no contestan, se avisa a los 30. El WhatsApp
  * sale con la plantilla nueva si Meta la aprobó; si no, va el email igual. Nunca se saltea.
@@ -179,6 +184,8 @@ export interface ResumenEscalamiento {
   atendidos: number
   avisos: number
   simulados: number
+  /** true si la corrida no evaluó nada por estar fuera de la ventana 6-23 AR. */
+  fueraDeVentana?: boolean
 }
 
 const MAX_POR_CORRIDA = 300
@@ -190,6 +197,11 @@ export async function correrEscalamiento(
   const appUrl = opts.appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://prisma.vakdor.com"
   const ahoraMs = opts.ahoraMs ?? Date.now()
   const resumen: ResumenEscalamiento = { esperando: 0, atendidos: 0, avisos: 0, simulados: 0 }
+
+  // Nada de avisos de madrugada (Kevin, 2/9): fuera de 6-23 AR la corrida entera se saltea.
+  // No se pierde nada: el reloj cada 30 min vuelve a pasar, y los niveles se miden en horas
+  // hábiles, así que ningún caso "madura" durante la noche.
+  if (!dentroDeVentanaEnvio(new Date(ahoraMs))) return { ...resumen, fueraDeVentana: true }
 
   const { data: configs } = await db.from("seguimiento_config").select("agency_id, modo, activo_desde")
   const { data: agencias } = await db.from("agencies").select("id, name")
@@ -233,7 +245,9 @@ export async function correrEscalamiento(
       const { data: humano } = await db.from("wa_messages").select("id").eq("conversation_id", c.id)
         .eq("role", "human").gt("created_at", t0).limit(1)
       if (humano?.length) { resumen.atendidos++; continue }
-      const horas = (ahoraMs - Date.parse(t0)) / 3600e3
+      // Horas HÁBILES (6-23 AR): la noche no cuenta. El prefiltro de arriba usa horas de
+      // reloj y solo puede sobre-incluir (hábiles ≤ reloj), nunca dejar afuera un caso maduro.
+      const horas = horasHabiles(Date.parse(t0), ahoraMs)
       if (horas < 2) continue
       resumen.esperando++
 

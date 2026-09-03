@@ -1067,6 +1067,8 @@ está **"Agregar una nota"**. Las notas las ven solo los directores; el asesor y
 
 **2. Cuando un cliente queda esperando a una persona.** Si el bot lo derivó a un asesor (o el cliente pidió hablar con alguien, o un asesor tomó el chat) y nadie le contestó, el sistema avisa: a las **2 horas** al asesor; a las **5** al asesor y a vos; a las **10** otra vez al asesor; a las **20**, al asesor y a vos para que decidas (reasignar, tomarlo o dar más tiempo). Cada aviso trae **qué busca el cliente y su último mensaje**. El aviso se apaga solo cuando un asesor le escribe al cliente: contestar "ya lo atiendo" por WhatsApp no alcanza.
 
+**La noche no cuenta y nada te llega de madrugada.** Las horas de espera se miden solo entre las **6 y las 23**: si un cliente escribe a las 3 de la mañana, recién "empieza a esperar" a las 6, y el primer aviso al asesor sale a las 8 — dormir no es ignorar a un cliente. Además, ningún aviso (ni email ni WhatsApp) sale entre las 23 y las 6: si algo pasa de madrugada, el email llega programado a las 6 en punto.
+
 **3. Recordatorios de visita.** 24 horas, 3 horas y 1 hora antes de cada visita agendada, y un mensaje si el cliente no fue.
 
 **Cómo te llegan los avisos:** siempre por **email**; también por **WhatsApp** (desde el número de tu agencia) si cargaste tu celular en Mi Perfil y Meta ya aprobó la plantilla. Cada aviso tiene un link que te lleva **directo a ese chat**, aunque tengas que iniciar sesión primero.
