@@ -12,7 +12,7 @@ export default function DirectorFeedbackPage() {
         </p>
       </div>
 
-      <div className="flex justify-center pt-4">
+      <div className="flex flex-col items-center pt-4">
         <FeedbackForm />
       </div>
     </div>

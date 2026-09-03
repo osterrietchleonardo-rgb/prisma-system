@@ -47,6 +47,9 @@ const feedbackSchema = z.object({
 
 type FeedbackFormValues = z.infer<typeof feedbackSchema>
 
+const MAX_EVIDENCE_MB = 8
+const MAX_EVIDENCE_BYTES = MAX_EVIDENCE_MB * 1024 * 1024
+
 const feedbackTypes = [
   { value: "sugerencia", label: "Sugerencia de Mejora", icon: Lightbulb, color: "text-amber-500", bg: "bg-amber-500/10" },
   { value: "oportunidad", label: "Nueva Oportunidad", icon: Rocket, color: "text-blue-500", bg: "bg-blue-500/10" },
@@ -81,8 +84,20 @@ export function FeedbackForm() {
 
   function handleEvidenceChange(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files || [])
+
+    const tooHeavy = files.filter(f => f.size > MAX_EVIDENCE_BYTES)
+    if (tooHeavy.length > 0) {
+      toast.error(
+        tooHeavy.length === 1 ? "La foto pesa demasiado" : "Algunas fotos pesan demasiado",
+        {
+          description: `${tooHeavy.map(f => f.name).join(", ")} — máx. ${MAX_EVIDENCE_MB}MB por foto. Probá con una captura de pantalla o una foto más liviana.`,
+        }
+      )
+    }
+
+    const validFiles = files.filter(f => f.size <= MAX_EVIDENCE_BYTES)
     const remaining = 2 - evidenceFiles.length
-    const toAdd = files.slice(0, remaining)
+    const toAdd = validFiles.slice(0, remaining)
     const newFiles = [...evidenceFiles, ...toAdd]
     setEvidenceFiles(newFiles)
     const newPreviews = newFiles.map(f => URL.createObjectURL(f))
@@ -110,9 +125,15 @@ export function FeedbackForm() {
       const result = await submitFeedback(payload)
       if (result.success) {
         setIsSuccess(true)
-        toast.success("¡Gracias por tu feedback!", {
-          description: "Tu mensaje ha sido enviado correctamente.",
-        })
+        if (result.warning) {
+          toast.warning("Sugerencia enviada, con un problema", {
+            description: result.warning,
+          })
+        } else {
+          toast.success("¡Gracias por tu feedback!", {
+            description: "Tu mensaje ha sido enviado correctamente.",
+          })
+        }
         form.reset()
         setEvidenceFiles([])
         setEvidencePreviews([])
@@ -235,7 +256,7 @@ export function FeedbackForm() {
             <Label className="text-sm font-semibold flex items-center gap-2">
               <ImagePlus className="w-4 h-4 text-muted-foreground" />
               Evidencia visual
-              <span className="text-xs text-muted-foreground font-normal">(opcional · máx. 2 fotos)</span>
+              <span className="text-xs text-muted-foreground font-normal">(opcional · máx. 2 fotos · {MAX_EVIDENCE_MB}MB c/u)</span>
             </Label>
 
             <div className="flex items-start gap-3 flex-wrap">

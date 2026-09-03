@@ -36,6 +36,7 @@ export async function submitFeedback(formData: FormData) {
 
   // Upload evidence images to Storage
   const evidenceUrls: string[] = []
+  const failedUploads: string[] = []
   if (evidenceFiles && evidenceFiles.length > 0) {
     for (const file of evidenceFiles.slice(0, 2)) {
       if (!file || typeof file === "string" || file.size === 0) continue
@@ -52,6 +53,7 @@ export async function submitFeedback(formData: FormData) {
         evidenceUrls.push(urlData.publicUrl)
       } else {
         console.error("Error uploading evidence image:", uploadError)
+        failedUploads.push(file.name || "foto")
       }
     }
   }
@@ -75,8 +77,13 @@ export async function submitFeedback(formData: FormData) {
 
   revalidatePath("/director/feedback")
   revalidatePath("/asesor/feedback")
-  
-  return { success: true }
+
+  return {
+    success: true,
+    warning: failedUploads.length > 0
+      ? `Se envió tu sugerencia, pero ${failedUploads.length === 1 ? "esta foto no se pudo subir" : "estas fotos no se pudieron subir"}: ${failedUploads.join(", ")}. Probá con una más liviana.`
+      : undefined,
+  }
 }
 
 export async function getUserFeedbackHistory(): Promise<{
