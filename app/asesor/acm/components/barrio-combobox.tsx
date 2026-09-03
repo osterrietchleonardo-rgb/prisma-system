@@ -148,7 +148,11 @@ export function BarrioCombobox({
               <span className="text-[11px] shrink-0 text-muted-foreground">
                 {o.propio
                   ? "de tu cartera"
-                  : `${o.avisos.toLocaleString("es-AR")} aviso${o.avisos === 1 ? "" : "s"}`}
+                  : o.avisos > 0
+                    ? `${o.avisos.toLocaleString("es-AR")} aviso${o.avisos === 1 ? "" : "s"}`
+                    : /* "0 avisos" suena a roto; la verdad es que esa zona todavía no se
+                         cargó a la red — el número aparece solo cuando se cargue. */
+                      "sin avisos aún"}
               </span>
             </button>
           ))}

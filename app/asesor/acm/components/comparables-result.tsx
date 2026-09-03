@@ -116,10 +116,13 @@ const fmtFecha = (iso: string) => {
 };
 
 function ComparableCard({
-  c, selectable, selected, onToggle, sujeto, fotos,
+  c, selectable, selected, onToggle, sujeto, fotos, medianaM2,
 }: {
   c: AcmComparable; selectable?: boolean; selected?: boolean; onToggle?: (id: string) => void;
   sujeto: Sujeto;
+  /** Mediana de US$/m² del conjunto mostrado (fase 2): posiciona a cada comparable como
+   *  caro/barato RELATIVO sin que el asesor tenga que calcular nada. null = sin datos. */
+  medianaM2?: number | null;
   /** undefined = este comparable no entra en el top 10 analizado (o la capa está apagada).
    *  "cargando" = el pedido está en vuelo. Si no, el resultado (o su error) ya volvió. */
   fotos?: "cargando" | FotoResultadoComparable;
@@ -186,6 +189,29 @@ function ComparableCard({
                     lindero
                   </span>
                 )}
+                {/* Fase 2: badges de lectura de precio. No tocan el % — cambian cómo se LEE
+                    al comparable (un aviso que bajó 12% o lleva 120 días publicado no se usa
+                    igual para tasar que uno recién entrado a precio pleno). */}
+                {c.variacion_pct != null && c.variacion_pct <= -3 && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                    ↓ bajó {Math.abs(Math.round(c.variacion_pct))}%
+                  </span>
+                )}
+                {c.en_construccion && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-orange-500/15 text-orange-600 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                    en construcción
+                  </span>
+                )}
+                {c.dueno_directo && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-600 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                    dueño directo
+                  </span>
+                )}
+                {c.apto_credito && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-600 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                    apto crédito
+                  </span>
+                )}
               </p>
             </div>
             <div className="text-right shrink-0">
@@ -212,11 +238,38 @@ function ComparableCard({
           <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1 mt-2">
             <div>
               <p className="text-base sm:text-lg font-black text-foreground whitespace-nowrap">{fmtPrecio(c)}</p>
-              {c.precio_m2 ? <p className="text-[11px] text-muted-foreground">{c.moneda === "ARS" ? "$" : "US$"} {c.precio_m2.toLocaleString("es-AR")}/m²</p> : null}
+              {c.precio_m2 ? (
+                <p className="text-[11px] text-muted-foreground">
+                  {c.moneda === "ARS" ? "$" : "US$"} {c.precio_m2.toLocaleString("es-AR")}/m²
+                  {/* Posición vs la mediana del conjunto: la lectura más rápida de caro/barato
+                      relativo. |±3%| se calla: a esa distancia es ruido, no señal. */}
+                  {medianaM2 != null && medianaM2 > 0 && Math.abs((c.precio_m2 - medianaM2) / medianaM2) >= 0.03 && (
+                    <span className={`ml-1 font-bold ${c.precio_m2 > medianaM2 ? "text-red-500/80" : "text-emerald-600"}`}>
+                      {c.precio_m2 > medianaM2 ? "+" : "−"}{Math.abs(Math.round(((c.precio_m2 - medianaM2) / medianaM2) * 100))}% vs mediana
+                    </span>
+                  )}
+                </p>
+              ) : null}
+              {c.expensas ? (
+                <p className="text-[11px] text-muted-foreground">
+                  Expensas {c.expensas_moneda === "USD" ? "US$" : "$"} {Math.round(c.expensas).toLocaleString("es-AR")}
+                </p>
+              ) : null}
             </div>
             <div className="text-right text-[11px] text-muted-foreground ml-auto">
-              <p className="truncate max-w-[160px]">{c.responsable}</p>
-              {c.fecha_publicacion && <p>{fmtFecha(c.fecha_publicacion)}</p>}
+              <p className="truncate max-w-[160px]">
+                {c.responsable}
+                {c.publicador_puntaje != null && (
+                  <span className="ml-1 whitespace-nowrap">★ {c.publicador_puntaje.toLocaleString("es-AR", { maximumFractionDigits: 1 })}{c.publicador_resenas ? ` (${c.publicador_resenas})` : ""}</span>
+                )}
+              </p>
+              {c.dias_publicado != null ? (
+                <p className={c.dias_publicado > 90 ? "text-amber-600 font-semibold" : undefined}>
+                  publicado hace {c.dias_publicado} día{c.dias_publicado === 1 ? "" : "s"}
+                </p>
+              ) : c.fecha_publicacion ? (
+                <p>{fmtFecha(c.fecha_publicacion)}</p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -324,6 +377,12 @@ function Section({
   /** Mapa id → resultado (o "cargando") solo para los comparables que entraron al top analizado. */
   fotosPorId: Map<string, "cargando" | FotoResultadoComparable>;
 }) {
+  // Fase 2: mediana de US$/m² del conjunto que se está mostrando. Se calcula acá (una vez
+  // por sección, sobre <=100 números) y viaja a cada tarjeta para el "±% vs mediana".
+  const conM2 = items.map((i) => i.precio_m2).filter((v): v is number => v != null && v > 0).sort((a, b) => a - b);
+  const medianaM2 = conM2.length >= 5
+    ? (conM2.length % 2 ? conM2[(conM2.length - 1) / 2] : (conM2[conM2.length / 2 - 1] + conM2[conM2.length / 2]) / 2)
+    : null;
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
@@ -359,6 +418,7 @@ function Section({
               onToggle={onToggle}
               sujeto={sujeto}
               fotos={fotosPorId.get(c.id)}
+              medianaM2={medianaM2}
             />
           ))}
         </div>
