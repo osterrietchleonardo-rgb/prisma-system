@@ -20,6 +20,10 @@ import {
   locPatterns,
   amenityTokens,
   amenityLabels,
+  sujetoCochera,
+  orientacionParam,
+  disposicionParam,
+  COCHERA_PATRON,
 } from "@/lib/acm/subject";
 import { buildChecklist, type SubScores } from "@/lib/acm/checklist";
 import { TOPE_COMPARABLES } from "@/lib/tasacion/types";
@@ -147,6 +151,12 @@ export async function POST(req: Request) {
         p_dedup: true,
         p_excluir_sujeto: true,
         p_limit: limit,
+        // ── Fase 2: las dimensiones nuevas (solo la red las tiene) ──
+        p_cochera: sujetoCochera(sujeto),
+        p_cochera_patron: COCHERA_PATRON,
+        p_piso: sujeto.piso ?? null,
+        p_orientacion: orientacionParam(sujeto),
+        p_disposicion: disposicionParam(sujeto),
       }),
     ]);
 
@@ -195,7 +205,7 @@ export async function POST(req: Request) {
             // I3 de la revisión final). Lista acotada a lo que efectivamente lee el `.map` de
             // abajo (líneas ~265-280).
             .select(
-              "id, title, address, neighborhood, property_type, area_m2, bedrooms, bathrooms, price, currency, images, canonical_url, roomix_agency_name, date_posted, amenities"
+              "id, title, address, neighborhood, property_type, area_m2, bedrooms, bathrooms, price, currency, images, canonical_url, roomix_agency_name, date_posted, amenities, cocheras, floor, orientacion, disposicion, expensas, expensas_moneda, dias_publicado, variacion_precio_pct, es_dueno_directo, apto_credito, en_construccion, publicador_puntaje, publicador_resenas"
             )
             .in("id", roomixIds)
         : Promise.resolve({ data: [] as any[], error: null as any }),
@@ -216,7 +226,15 @@ export async function POST(req: Request) {
     const tipoLabel = sujeto.tipo_propiedad || "—";
     // En el checklist el estado de obra pisa el número de años (fmtAnios: 0 = a estrenar, -1 = en pozo).
     const antiguedadLabel = sujeto.en_pozo ? -1 : sujeto.a_estrenar ? 0 : antiguedad;
-    const sujetoForChecklist = { tipo: tipoLabel, zona: sujetoZona, m2, ambientes, dormitorios, banos, antiguedad: antiguedadLabel, amenities: sujetoAmenLabels };
+    const sujetoForChecklist = {
+      tipo: tipoLabel, zona: sujetoZona, m2, ambientes, dormitorios, banos,
+      antiguedad: antiguedadLabel, amenities: sujetoAmenLabels,
+      // Fase 2: lo que el sujeto declara para las dimensiones nuevas.
+      cocheras: sujetoCochera(sujeto),
+      piso: sujeto.piso ?? null,
+      orientacion: orientacionParam(sujeto),
+      disposicion: disposicionParam(sujeto),
+    };
 
     const cartera: AcmComparable[] = (carteraFull.data || [])
       .map((p: any): AcmComparable | null => {
@@ -278,7 +296,13 @@ export async function POST(req: Request) {
             operacion,
             pesoSemantica,
             sujeto: sujetoForChecklist,
-            comp: { tipo: r.property_type || "", zona: [r.neighborhood, r.address].filter(Boolean).join(" "), m2: candM2, ambientes: candAmb, dormitorios: candDorm, banos: r.bathrooms ?? null, antiguedad: candAnt, amenities: compAmen },
+            comp: {
+              tipo: r.property_type || "", zona: [r.neighborhood, r.address].filter(Boolean).join(" "),
+              m2: candM2, ambientes: candAmb, dormitorios: candDorm, banos: r.bathrooms ?? null,
+              antiguedad: candAnt, amenities: compAmen,
+              cocheras: r.cocheras ?? null, piso: r.floor ?? null,
+              orientacion: r.orientacion ?? null, disposicion: r.disposicion ?? null,
+            },
           }),
           titulo: r.title || "",
           direccion: r.address || r.neighborhood || "",
@@ -297,6 +321,16 @@ export async function POST(req: Request) {
           url: r.canonical_url || null,
           responsable: r.roomix_agency_name || "Inmobiliaria colaboradora",
           fecha_publicacion: r.date_posted || null,
+          // ── Fase 2: los badges de lectura de precio (no tocan el %) ──
+          variacion_pct: r.variacion_precio_pct != null ? Number(r.variacion_precio_pct) : null,
+          dias_publicado: r.dias_publicado ?? null,
+          expensas: r.expensas != null ? Number(r.expensas) : null,
+          expensas_moneda: r.expensas_moneda || "ARS",
+          dueno_directo: Boolean(r.es_dueno_directo),
+          apto_credito: Boolean(r.apto_credito),
+          en_construccion: Boolean(r.en_construccion),
+          publicador_puntaje: r.publicador_puntaje != null ? Number(r.publicador_puntaje) : null,
+          publicador_resenas: r.publicador_resenas ?? null,
         };
       })
       .filter((x): x is AcmComparable => x !== null)

@@ -101,7 +101,10 @@ function featuresPorId(item) {
   for (const f of item.featuresListCardSimplified || []) {
     if (f.featureId && out[f.featureId] === undefined) out[f.featureId] = f.value;
     if (f.featureId === 'CFT6') out.CFT6 = f.value;                 // expensas: solo está acá
-    if (f.featureId === 'CFT4' && out.CFT4 === undefined) out.CFT4 = f.value;
+    // OJO: acá vivía un backstop de CFT4 "para cocheras". Era un bug doble (3-sep-2026,
+    // medido contra los payloads): en el DETALLE CFT4 es "N toilette" (3.570 toilettes
+    // contados como cocheras) y las cocheras reales viajan en CFT7 ("N coch.", 1.804
+    // perdidas). Las cocheras salen SOLO de CFT7 — ver el mapeo de abajo.
   }
   return out;
 }
@@ -157,7 +160,7 @@ function mapear(item, zona) {
     subtipo: get(item, 'labels.realEstateSubtype') || null,
     tipo_id: soloNum(get(item, 'ids.real_estate_type_id')),
     es_emprendimiento: get(item, 'ids.posting_type_code') === 'DEVELOPMENT',
-    en_construccion: /en\s+construcci/i.test((item.title || '') + ' ' + (desc || '')),
+    en_construccion: /en\s+construcci/i.test((item.title || '') + ' ' + (desc || '') + ' ' + String(f.CFT5 ?? '')),
 
     precio: item.list_price_amount ?? null,
     moneda: item.list_price_currency || null,
@@ -173,8 +176,12 @@ function mapear(item, zona) {
     ambientes: soloNum(/(\d+)/.exec(String(f.CFT1 ?? get(item, 'units.roomsRange') ?? ''))?.[1]),
     dormitorios: soloNum(/(\d+)/.exec(String(f.CFT2 ?? ''))?.[1]),
     banos: soloNum(/(\d+)/.exec(String(f.CFT3 ?? get(item, 'units.bathroomRange') ?? ''))?.[1]),
-    cocheras: soloNum(/(\d+)/.exec(String(f.CFT4 ?? get(item, 'units.garagesRange') ?? '0'))?.[1]) ?? 0,
-    antiguedad_anios: soloNum(/(\d+)/.exec(String(f.CFT5 ?? ''))?.[1]),
+    // CFT7 = "N coch." (detalle) o "N" (card). CFT4 NO: en el detalle es el toilette.
+    cocheras: soloNum(/(\d+)/.exec(String(f.CFT7 ?? get(item, 'units.garagesRange') ?? '0'))?.[1]) ?? 0,
+    // CFT5 trae "N años"… o "A estrenar" (9.048 avisos, 44%): eso es antigüedad CERO, la
+    // codificación que acm_pasa_obra y fmtAnios ya entienden. "En construcción" va abajo.
+    antiguedad_anios: /a estrenar/i.test(String(f.CFT5 ?? '')) ? 0
+      : soloNum(/(\d+)/.exec(String(f.CFT5 ?? ''))?.[1]),
     piso: soloNum(/(?:^|\s)piso\s+(\d{1,2})\b|(\d{1,2})(?:er|do|to|mo|vo|no)?\s*piso\b/i.exec((item.title || '') + ' ' + (desc || ''))?.slice(1).find(Boolean)),
     pisos_edificio: soloNum(f['1000015']),
     disposicion: ['Frente', 'Contrafrente', 'Lateral', 'Interno'].includes(f['1000019']) ? f['1000019'].toLowerCase() : null,

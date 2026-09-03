@@ -46,6 +46,11 @@ export interface FichaComparable {
   amenities: string[];
   images: string[];
   responsable: string;
+  // Fase 2 (opcionales; las fichas viejas no los traen): lectura de precio para el cliente.
+  variacion_pct?: number | null;
+  dias_publicado?: number | null;
+  expensas?: number | null;
+  expensas_moneda?: string | null;
   pulso: FichaPulso;
   /** 100 mismo barrio · 70 sub-barrio · 50 lindero. Ausente en fichas anteriores a ago-2026. */
   zona_score?: number | null;

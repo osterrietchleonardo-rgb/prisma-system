@@ -183,6 +183,12 @@ export async function POST(req: Request) {
         precio: c.precio ?? null,
         moneda: c.moneda || "USD",
         precio_m2: c.precio_m2 ?? null,
+        // Fase 2: los badges de precio también en la ficha del cliente (la reputación del
+        // publicador NO viaja: es lectura interna del asesor).
+        variacion_pct: c.variacion_pct ?? null,
+        dias_publicado: c.dias_publicado ?? null,
+        expensas: c.expensas ?? null,
+        expensas_moneda: c.expensas_moneda ?? null,
         descripcion,
         amenities,
         images,

@@ -542,6 +542,17 @@ function ComparableSheet({
           <div className="comp-price">
             <div className="comp-price-val" style={{ color: primary }}>{fmtMoney(c.precio, c.moneda)}</div>
             {c.match_pct ? <div className="comp-match" style={{ backgroundColor: accent, color: onAccent }}>{c.match_pct}% comparable</div> : null}
+            {/* Fase 2: la lectura de precio también para el cliente — un comparable que bajó
+                o que lleva meses publicado no sostiene el mismo precio que uno recién entrado. */}
+            {(c.variacion_pct != null && c.variacion_pct <= -3) || c.dias_publicado != null || c.expensas ? (
+              <div className="muted" style={{ fontSize: "11px", marginTop: "4px" }}>
+                {c.variacion_pct != null && c.variacion_pct <= -3 && (
+                  <span style={{ fontWeight: 700 }}>↓ bajó {Math.abs(Math.round(c.variacion_pct))}% · </span>
+                )}
+                {c.dias_publicado != null && <span>publicado hace {c.dias_publicado} día{c.dias_publicado === 1 ? "" : "s"}</span>}
+                {c.expensas ? <span>{c.dias_publicado != null ? " · " : ""}expensas {c.expensas_moneda === "USD" ? "US$" : "$"} {Math.round(c.expensas).toLocaleString("es-AR")}</span> : null}
+              </div>
+            ) : null}
           </div>
         </div>
 
