@@ -160,7 +160,10 @@ function mapear(item, zona) {
     subtipo: get(item, 'labels.realEstateSubtype') || null,
     tipo_id: soloNum(get(item, 'ids.real_estate_type_id')),
     es_emprendimiento: get(item, 'ids.posting_type_code') === 'DEVELOPMENT',
-    en_construccion: /en\s+construcci/i.test((item.title || '') + ' ' + (desc || '') + ' ' + String(f.CFT5 ?? '')),
+    // "en construcción" y "en/de pozo" son lo mismo para el ACM: obra que aún no se puede
+    // comparar contra una usada. "de pozo" no matchea "pozo de aire y luz" (ahí el 'de' va
+    // DESPUÉS de pozo), así que no hay falsos positivos. Medido 3-sep: 964 avisos.
+    en_construccion: /en\s+construcci|(?:en|de)\s+pozo/i.test((item.title || '') + ' ' + (desc || '') + ' ' + String(f.CFT5 ?? '')),
 
     precio: item.list_price_amount ?? null,
     moneda: item.list_price_currency || null,
