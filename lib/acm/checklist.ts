@@ -151,7 +151,12 @@ export function buildChecklist(args: {
       dimension: "cocheras",
       label: "Cochera",
       sujeto_val: fmtCochera(sujeto.cocheras),
-      comp_val: fmtCochera(comp.cocheras),
+      // El comparable muestra lo que la comparación CONCLUYÓ, no el número crudo: un aviso
+      // con cocheras=0 cuyo texto sí menciona cochera puntúa 100 (defensa por texto contra
+      // el "0 por no parseado"). Mostrar "0" con 100% se leía contradictorio — se muestra
+      // Sí/No según el score, que es lo que de verdad importa y concuerda con el %.
+      comp_val: sub.sc_cocheras == null ? fmtCochera(comp.cocheras)
+        : sub.sc_cocheras >= 100 ? "Sí" : "No",
       estado: estado(sub.sc_cocheras ?? null),
       peso: sub.sc_cocheras == null ? 0 : PESOS.cocheras,
       score: sub.sc_cocheras ?? null,
