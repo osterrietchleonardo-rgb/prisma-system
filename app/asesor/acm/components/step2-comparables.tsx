@@ -97,9 +97,9 @@ export function Step2Comparables({ comparables, onChange, onNext, onPrev }: Step
       calidad_construccion: 'estandar',
       dormitorios: p.room_amount ? p.room_amount - 1 : 0,
       banos: p.bathroom_amount || 0,
-      orientacion: 'norte', // Default
+      orientacion: 'nd', // Tokko no trae orientación → N/A, no se puntúa contra un default
       piso: 0,
-      vista: 'frente', // Default
+      vista: 'nd', // idem
       amenidades: {
         cochera_cubierta: p.parking_lot_amount > 0,
         cochera_descubierta: false,

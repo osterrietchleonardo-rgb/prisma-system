@@ -22,8 +22,11 @@ export const SUJETO_INICIAL: Sujeto = {
   antiguedad_anios: 0,
   estado_conservacion: "bueno",
   calidad_construccion: "estandar",
-  orientacion: "norte",
-  vista: "frente",
+  // 'nd' = N/A por defecto: si el asesor no elige orientación/vista, NO se puntúan (peso 0),
+  // igual que la antigüedad en 0 = "no cargó". Antes venían "norte"/"frente" y se comparaban
+  // contra un default que el asesor no había tocado, sesgando el ranking hacia esas.
+  orientacion: "nd",
+  vista: "nd",
   amenidades: {
     cochera_cubierta: false,
     cochera_descubierta: false,

@@ -49,7 +49,9 @@ describe("buildChecklist con las dimensiones de la fase 2", () => {
 
   it("los valores del sujeto y del comparable se leen como texto humano", () => {
     expect(por("cocheras").sujeto_val).toBe("Sí");
-    expect(por("cocheras").comp_val).toBe("1");
+    // sc_cocheras=100 (rescatado o real) → el comparable muestra "Sí", no el número crudo:
+    // el asesor lee la conclusión de la comparación, coherente con el 100%.
+    expect(por("cocheras").comp_val).toBe("Sí");
     expect(por("piso").sujeto_val).toBe("Piso 3");
     expect(por("piso").comp_val).toBe("Piso 5");
     expect(por("orientacion").comp_val).toBe("—");
