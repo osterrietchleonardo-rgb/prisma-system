@@ -16,6 +16,32 @@
 
 ---
 
+## 2026-09-03 — sesión Super Agente: horarios hábiles, el misterio de Johanna, y la semilla de agentes por campaña
+
+**Horarios de aviso (pedido de Kevin, rama `feat/avisos-horario-habil`):** la escalera mide la
+espera en **horas hábiles (6-23 AR)** — `horasHabiles` en `lib/whatsapp/sending-window.ts`; la
+noche no corre en contra del asesor (lead de las 3 am → aviso de 2 h a las 8, director a las 11)
+— y **fuera de 6-23 la corrida entera se saltea** (`fueraDeVentana`). Los emails de n8n de
+madrugada (`Avisar_Asesor`, `Gestion_Handoff`) se **programan en Resend** (`scheduled_at` →
+próximas 6:00; AR es UTC-3 fijo): aplicado en vivo con respaldo
+(`scratch/_horario-n8n-RESPALDO-*-2026-09-03.json`) y probado real contra Resend (200 + id;
+email de prueba programado a Leonardo). De paso, `Avisar_Asesor` pasó a armar el cuerpo con
+`JSON.stringify` (`resend_body_final`, como Gestion_Handoff): comillas seguras en el HTML.
+El anotador de la bitácora ahora dice "programado para las 6:00" (`datos.programado_para`).
+El camino del cliente ya estaba gateado (dispatch + ejecutor); no se tocó.
+
+**El misterio de Johanna, resuelto (sin bug):** los emails que recibió (21 y 26/8, a
+`johannaf@maxre.com.ar`) fueron avisos normales de "consultan por tu propiedad" — Iberá al
+3200 está asignada a ella en Tokko (tiene 40 propiedades a su nombre). Cero WhatsApp (no tiene
+celular cargado). Que no use PRISMA no frena el aviso, y está bien. Acción posible de Kevin:
+reasignar esas propiedades en Tokko.
+
+**Anotado en memoria** (`agentes-personalizados-campanas-whatsapp.md`): la idea de Leonardo de
+usar la arquitectura de agentes (streaming + pensamiento + herramientas) para agentes
+personalizados por campaña de WhatsApp; condición previa: extraer `lib/agente/` (punto 2).
+
+---
+
 ## 2026-09-02 (y el encendido del 31/8) — sesion Super Agente: Central en ACTIVO + la Trazabilidad de Kevin
 
 **Estado al cierre:** el Super Agente corre EN ACTIVO para Central desde el **31/8 21:07 AR**
