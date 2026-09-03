@@ -16,6 +16,11 @@ export interface SubScores {
   sc_antiguedad: number | null;
   sc_amenities: number | null;
   sc_semantica: number | null;
+  // Fase 2 (3-sep-2026). Opcionales: las búsquedas guardadas viejas no los traen → "na".
+  sc_cocheras?: number | null;
+  sc_piso?: number | null;
+  sc_orientacion?: number | null;
+  sc_disposicion?: number | null;
 }
 
 // Pesos base del % (deben coincidir con los de las funciones SQL acm_match_*). La ZONA volvió a
@@ -23,7 +28,7 @@ export interface SubScores {
 // hermano · 50 limítrofe), así un comparable de Núñez nunca le gana a uno de Belgrano.
 // El semántico NO está acá: es variable (10, o 20 cuando el sujeto trae descripción de la IA) y
 // llega por argumento.
-const PESOS = { zona: 20, superficie: 22, ambientes: 16, dormitorios: 14, banos: 12, antiguedad: 14, amenities: 12 } as const;
+const PESOS = { zona: 20, superficie: 22, ambientes: 16, dormitorios: 14, banos: 12, antiguedad: 14, amenities: 12, cocheras: 10, piso: 6, orientacion: 5, disposicion: 5 } as const;
 
 function estado(score: number | null): ChecklistItem["estado"] {
   if (score === null || score === undefined) return "na";
@@ -41,13 +46,34 @@ const fmtAnios = (v: number | null | undefined) => {
   return `${v} años`;
 };
 
+// Fase 2: qué se muestra en las filas nuevas. El sujeto declara cochera como sí/no
+// (los switches), el comparable como número contado; el piso 0 es PB.
+const fmtCochera = (v: boolean | number | null | undefined) => {
+  if (v === true) return "Sí";
+  if (v === false || v === null || v === undefined) return "—";
+  return String(v);
+};
+const fmtPiso = (v: number | null | undefined) =>
+  v === null || v === undefined ? "—" : v === 0 ? "PB" : `Piso ${v}`;
+const fmtTexto = (v: string | null | undefined) => (v ? v : "—");
+
+interface LadoChecklist {
+  tipo: string; zona: string; m2: number | null; ambientes: number | null;
+  dormitorios: number | null; banos: number | null; antiguedad: number | null; amenities: string[];
+  // Fase 2 (opcionales: el ACM de cartera y las búsquedas viejas no los traen).
+  cocheras?: boolean | number | null;
+  piso?: number | null;
+  orientacion?: string | null;
+  disposicion?: string | null;
+}
+
 export function buildChecklist(args: {
   sub: SubScores;
   operacion: string;
   /** Peso del ítem semántico: 20 si el sujeto trae descripción de la IA, 10 si no. */
   pesoSemantica: number;
-  sujeto: { tipo: string; zona: string; m2: number | null; ambientes: number | null; dormitorios: number | null; banos: number | null; antiguedad: number | null; amenities: string[] };
-  comp: { tipo: string; zona: string; m2: number | null; ambientes: number | null; dormitorios: number | null; banos: number | null; antiguedad: number | null; amenities: string[] };
+  sujeto: LadoChecklist;
+  comp: LadoChecklist;
 }): ChecklistItem[] {
   const { sub, sujeto, comp, operacion, pesoSemantica } = args;
   const amenSujeto = sujeto.amenities.length ? sujeto.amenities.join(", ") : "—";
@@ -120,6 +146,25 @@ export function buildChecklist(args: {
       peso: PESOS.banos,
       score: sub.sc_banos,
     },
+    // ── Fase 2: estructura (después de baños) ──
+    {
+      dimension: "cocheras",
+      label: "Cochera",
+      sujeto_val: fmtCochera(sujeto.cocheras),
+      comp_val: fmtCochera(comp.cocheras),
+      estado: estado(sub.sc_cocheras ?? null),
+      peso: sub.sc_cocheras == null ? 0 : PESOS.cocheras,
+      score: sub.sc_cocheras ?? null,
+    },
+    {
+      dimension: "piso",
+      label: "Piso",
+      sujeto_val: fmtPiso(sujeto.piso),
+      comp_val: fmtPiso(comp.piso),
+      estado: estado(sub.sc_piso ?? null),
+      peso: sub.sc_piso == null ? 0 : PESOS.piso,
+      score: sub.sc_piso ?? null,
+    },
     {
       dimension: "antiguedad",
       label: "Antigüedad",
@@ -128,6 +173,25 @@ export function buildChecklist(args: {
       estado: estado(sub.sc_antiguedad),
       peso: PESOS.antiguedad,
       score: sub.sc_antiguedad,
+    },
+    // ── Fase 2: la cara del departamento (después de antigüedad) ──
+    {
+      dimension: "orientacion",
+      label: "Orientación",
+      sujeto_val: fmtTexto(sujeto.orientacion),
+      comp_val: fmtTexto(comp.orientacion),
+      estado: estado(sub.sc_orientacion ?? null),
+      peso: sub.sc_orientacion == null ? 0 : PESOS.orientacion,
+      score: sub.sc_orientacion ?? null,
+    },
+    {
+      dimension: "disposicion",
+      label: "Disposición",
+      sujeto_val: fmtTexto(sujeto.disposicion),
+      comp_val: fmtTexto(comp.disposicion),
+      estado: estado(sub.sc_disposicion ?? null),
+      peso: sub.sc_disposicion == null ? 0 : PESOS.disposicion,
+      score: sub.sc_disposicion ?? null,
     },
     {
       dimension: "amenities",

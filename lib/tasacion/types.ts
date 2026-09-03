@@ -108,7 +108,7 @@ export const TOPE_COMPARABLES = 100;
 
 // Cada renglón del checklist de comparabilidad (qué coincide y qué no).
 export interface ChecklistItem {
-  dimension: 'tipo' | 'operacion' | 'zona' | 'superficie' | 'ambientes' | 'dormitorios' | 'banos' | 'antiguedad' | 'amenities' | 'semantica';
+  dimension: 'tipo' | 'operacion' | 'zona' | 'superficie' | 'ambientes' | 'dormitorios' | 'banos' | 'cocheras' | 'piso' | 'antiguedad' | 'orientacion' | 'disposicion' | 'amenities' | 'semantica';
   label: string;
   sujeto_val: string;
   comp_val: string;
@@ -144,6 +144,18 @@ export interface AcmComparable {
   // Responsable de la publicación + fecha (para la red de colaboración / portales).
   responsable: string;
   fecha_publicacion: string | null; // ISO o null
+
+  // ── Fase 2 (solo red de colaboración; opcionales para no romper búsquedas guardadas) ──
+  // Badges de lectura de precio: no tocan el %, cambian cómo el asesor lee al comparable.
+  variacion_pct?: number | null;      // % vs el primer precio visto (negativo = bajó)
+  dias_publicado?: number | null;
+  expensas?: number | null;
+  expensas_moneda?: string | null;
+  dueno_directo?: boolean;
+  apto_credito?: boolean;
+  en_construccion?: boolean;
+  publicador_puntaje?: number | null; // reputación pública del publicador (★)
+  publicador_resenas?: number | null;
 }
 
 // Lo que devuelve la extracción por URL (modo "Analizar").

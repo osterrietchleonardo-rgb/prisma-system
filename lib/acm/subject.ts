@@ -151,9 +151,41 @@ export function amenityTokens(a?: Amenidades): string[] {
   if (!a) return [];
   const out: string[] = [];
   (Object.keys(AMENITY_TOKENS) as (keyof Amenidades)[]).forEach((k) => {
+    // Fase 2 (3-sep-2026): la cochera dejó de ser un patrón de amenities — ahora es su
+    // propia dimensión del % (peso 10, dato duro `cocheras` + defensa por texto con
+    // COCHERA_PATRON). Dejarla acá la puntuaría dos veces.
+    if (k === "cochera_cubierta" || k === "cochera_descubierta") return;
     if (a[k]) out.push(AMENITY_TOKENS[k]);
   });
   return Array.from(new Set(out));
+}
+
+// ── Fase 2: las dimensiones nuevas viajan como parámetros propios ──
+
+/** La defensa por texto del score de cocheras: el `cocheras = 0` de la fuente no siempre
+ *  significa "no tiene" (medido 3-sep: 30% de los 0 mencionan cochera en el texto). */
+export const COCHERA_PATRON = "cocher|garage|garaje|estacionamiento";
+
+/** ¿El sujeto pide cochera? Cualquiera de los dos switches del form la pide. */
+export function sujetoCochera(s: Partial<Sujeto>): boolean {
+  return Boolean(s.amenidades?.cochera_cubierta || s.amenidades?.cochera_descubierta);
+}
+
+// El form habla en castellano ('norte'…'so'); mercado_avisos guarda la rosa de los
+// vientos (N/NE/E/SE/S/SO/O/NO). 'nd' = no declara → no compara.
+const ORIENTACION_BASE: Record<string, string> = {
+  norte: "N", sur: "S", este: "E", oeste: "O", ne: "NE", no: "NO", se: "SE", so: "SO",
+};
+export function orientacionParam(s: Partial<Sujeto>): string | null {
+  return ORIENTACION_BASE[s.orientacion ?? ""] ?? null;
+}
+
+// La VISTA del form mapea a `disposicion` de la base solo donde la base la distingue
+// (frente/contrafrente/lateral/interno); al_verde/panoramica/nd no tienen contraparte.
+const VISTA_BASE = new Set(["frente", "contrafrente", "lateral"]);
+export function disposicionParam(s: Partial<Sujeto>): string | null {
+  const v = s.vista ?? "";
+  return VISTA_BASE.has(v) ? v : null;
 }
 
 export function amenityLabels(a?: Amenidades): string[] {

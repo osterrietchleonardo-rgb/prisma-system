@@ -62,3 +62,46 @@ describe("roomixTypePatterns contra los tipos reales de mercado_avisos", () => {
     expect(ilikeMatchea("Oficina comercial", roomixTypePatterns("oficina"))).toBe(true);
   });
 });
+
+// ACM Fase 2 (3-sep-2026): las dimensiones nuevas viajan como parámetros propios de la
+// función SQL. Los mappers traducen del vocabulario del form al de mercado_avisos
+// (verificado contra producción: orientacion N/NE/E/SE/S/SO/O/NO · disposicion
+// frente/contrafrente/lateral/interno).
+import { sujetoCochera, orientacionParam, disposicionParam, COCHERA_PATRON, amenityTokens } from "./subject";
+
+describe("fase 2: mappers nuevos del sujeto", () => {
+  it("cochera: cualquiera de los dos switches la pide", () => {
+    expect(sujetoCochera({ amenidades: { cochera_cubierta: true } as any })).toBe(true);
+    expect(sujetoCochera({ amenidades: { cochera_descubierta: true } as any })).toBe(true);
+    expect(sujetoCochera({ amenidades: {} as any })).toBe(false);
+    expect(sujetoCochera({})).toBe(false);
+  });
+
+  it("orientación viaja en el vocabulario de la base (N/NE/…)", () => {
+    expect(orientacionParam({ orientacion: "norte" } as any)).toBe("N");
+    expect(orientacionParam({ orientacion: "oeste" } as any)).toBe("O");
+    expect(orientacionParam({ orientacion: "so" } as any)).toBe("SO");
+    expect(orientacionParam({ orientacion: "nd" } as any)).toBeNull();
+    expect(orientacionParam({})).toBeNull();
+  });
+
+  it("vista → disposición solo cuando la base la distingue", () => {
+    expect(disposicionParam({ vista: "frente" } as any)).toBe("frente");
+    expect(disposicionParam({ vista: "contrafrente" } as any)).toBe("contrafrente");
+    expect(disposicionParam({ vista: "panoramica" } as any)).toBeNull();
+    expect(disposicionParam({ vista: "nd" } as any)).toBeNull();
+    expect(disposicionParam({})).toBeNull();
+  });
+
+  it("la cochera ya no genera patrón de amenities (ahora puntúa sola, peso 10)", () => {
+    const tokens = amenityTokens({ cochera_cubierta: true, pileta: true } as any);
+    expect(tokens.some((t) => /cocher/.test(t))).toBe(false);
+    expect(tokens.some((t) => /pileta/.test(t))).toBe(true);
+  });
+
+  it("el patrón de defensa por texto existe y pesca las variantes", () => {
+    for (const palabra of ["cochera", "garage", "garaje", "estacionamiento"]) {
+      expect(new RegExp(COCHERA_PATRON, "i").test(palabra)).toBe(true);
+    }
+  });
+});
