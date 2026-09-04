@@ -282,6 +282,23 @@ describe("procesarNotaDelCaso", () => {
     }
   })
 
+  it("si el marcador falla pero el veredicto era NO atendido, la escalera sigue (nunca frena a un lead que espera)", async () => {
+    const errores = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      const { db } = armarDb(
+        { wa_messages: [nota], lead_eventos: [], scheduled_visits: [], wa_contacts: null },
+        { lead_eventos: "boom" }
+      )
+      const llamar = async () => ({
+        atendido: false, pedir_registro_chat: false, pedir_registro_visita: false,
+        pedir_registro_actividad: false, razon: "Es solo un recordatorio",
+      })
+      expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar }))).toBe("escalera_sigue")
+    } finally {
+      errores.mockRestore()
+    }
+  })
+
   it("veredicto atendido con pedidos: registra nota_evaluada y manda el aviso (enviar inyectado)", async () => {
     const { db, inserts } = armarDb({
       wa_messages: [nota], lead_eventos: [], scheduled_visits: [], wa_contacts: null,

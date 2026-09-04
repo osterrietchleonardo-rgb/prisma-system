@@ -307,7 +307,8 @@ export async function procesarNotaDelCaso(
 
   // El marcador va INLINE y chequeado (no por registrarEvento, que traga el error): es lo
   // único que evita re-evaluar y re-avisar en cada barrida. Si no se pudo guardar, no se
-  // manda nada — mejor un aviso que no sale que el mismo mail cada 30 minutos.
+  // manda nada — mejor un aviso que no sale que el mismo mail cada 30 minutos. Pero un
+  // caso NO atendido sigue escalando igual: el marcador fallido nunca frena la escalera.
   const { error: errMarca } = await db.from("lead_eventos").insert({
     agency_id: c.agency_id,
     conversation_id: c.id,
@@ -320,7 +321,7 @@ export async function procesarNotaDelCaso(
   })
   if (errMarca) {
     console.error("[seguimiento] nota_evaluada no se pudo registrar:", errMarca.message)
-    return "atendido_sin_aviso"
+    return veredicto.atendido ? "atendido_sin_aviso" : "escalera_sigue"
   }
 
   if (!veredicto.atendido) return "escalera_sigue"
