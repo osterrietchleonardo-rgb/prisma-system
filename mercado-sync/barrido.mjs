@@ -95,19 +95,30 @@ async function main() {
   const dataDir = join(__dirname, 'data');
   mkdirSync(dataDir, { recursive: true });
 
+  // CHECKPOINT por tanda: este entorno corta los procesos largos. Guardamos la última
+  // página cargada de esta zona; al relanzar, se retoma desde ahí (un corte pierde a lo
+  // sumo la tanda en curso, no el barrio). ckpt {done:true} = barrio terminado.
+  const ckptFile = join(dataDir, `ckpt-${ZONA}.json`);
+  let ckpt = {};
+  try { ckpt = JSON.parse(readFileSync(ckptFile, 'utf8')); } catch {}
+  if (ckpt.done) { console.log(`[barrido] ${ZONA} ya está marcado como terminado (ckpt). Nada que hacer.`); return; }
+  const desdeEfectivo = Math.max(DESDE, (ckpt.lastPage || 0) + 1);
+  if (desdeEfectivo > DESDE) console.log(`[barrido] retomo ${ZONA} desde pág ${desdeEfectivo} (checkpoint).`);
+
   const paginas = [];
-  for (let p = DESDE; p <= HASTA; p++) paginas.push(p);
+  for (let p = desdeEfectivo; p <= HASTA; p++) paginas.push(p);
   const tandas = [];
   for (let i = 0; i < paginas.length; i += TANDA) tandas.push(paginas.slice(i, i + TANDA));
 
   console.log(`[barrido] ${BASE} · págs ${DESDE}-${HASTA} en ${tandas.length} tandas de ${TANDA} · zona=${ZONA}${DRY ? ' · DRY' : ''}`);
-  let totalItems = 0, vaciasSeguidas = 0;
+  let totalItems = 0, vaciasSeguidas = 0, frenadoPorTope = false, terminado = false;
 
   for (const [idx, tanda] of tandas.entries()) {
     const { usado, tope } = await usoMensual();
     console.log(`[tanda ${idx + 1}/${tandas.length}] uso Apify: $${usado?.toFixed(2)} de $${tope}`);
     if (usado != null && usado >= TOPE) {
       console.error(`[barrido] FRENO: el uso ($${usado.toFixed(2)}) alcanzó el tope de seguridad ($${TOPE}). Lo cargado queda; se retoma cuando haya crédito.`);
+      frenadoPorTope = true;
       break;
     }
     if (DRY) { console.log(`  DRY: correría págs ${tanda[0]}-${tanda[tanda.length - 1]}`); continue; }
@@ -127,7 +138,12 @@ async function main() {
     console.log(`  dataset ${datasetId}: ${n} items → ${destino}`);
     if (n === 0) {
       vaciasSeguidas++;
-      if (vaciasSeguidas >= 2) { console.log('  2 páginas vacías seguidas (reintentadas): fin del inventario.'); break; }
+      if (vaciasSeguidas >= 2) {
+        console.log('  2 páginas vacías seguidas (reintentadas): fin del inventario.');
+        writeFileSync(ckptFile, JSON.stringify({ done: true, lastPage: tanda[tanda.length - 1] }));
+        terminado = true;
+        break;
+      }
       continue;
     }
     vaciasSeguidas = 0;
@@ -137,6 +153,15 @@ async function main() {
       '--file', destino, '--zona', ZONA, '--tipo', 'refresco',
       '--paginas', String(tanda.length), '--esperados', '0',
     ], { stdio: 'inherit', env: process.env });
+    // Checkpoint DESPUÉS de cargar la tanda: si nos cortan, retomamos desde acá.
+    writeFileSync(ckptFile, JSON.stringify({ lastPage: tanda[tanda.length - 1], done: false }));
+  }
+
+  // Si recorrimos todo el rango hasta HASTA sin frenar por tope, el barrio está
+  // terminado: HASTA=210 es el techo de paginación de ZonaProp, no hay más allá.
+  if (!frenadoPorTope && !terminado && !DRY) {
+    writeFileSync(ckptFile, JSON.stringify({ done: true, lastPage: HASTA }));
+    console.log(`[barrido] ${ZONA}: agotado el rango de páginas (techo ${HASTA}). Marcado como terminado.`);
   }
 
   console.log(`[barrido] fin: ${totalItems} items bajados en total.`);

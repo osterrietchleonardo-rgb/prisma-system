@@ -16,6 +16,74 @@
 
 ---
 
+## 2026-09-04 (cierre) — CABA COMPLETO: los 41 barrios
+
+Leonardo dio el OK para terminar CABA. Subió el límite Apify a US$100; se corrió con tope US$96.
+Los ~18 barrios que faltaban (los chicos del sur/oeste) cerraron por **~US$8** — mucho menos que
+los US$15-20 estimados, eran aún más chicos. **CABA entero terminado: 41/41 barrios.**
+
+- **Total: 62.164 avisos** (arrancó el día en 25.068 → +37.096 en la jornada). 59.705 calidad ok
+  (96%) · 746 dueños directos. Embeddings al día tras la carga (los ~2.500 nuevos se embebieron;
+  solo la cuarentena queda sin vector, a propósito).
+- **Uso Apify total de CABA: US$84,62** (de US$33 al inicio → ~US$51,6 gastados en toda la carga
+  de CABA). Límite de la cuenta US$100.
+- Barrios que cerraron en esta segunda vuelta: san-cristóbal, parque-chacabuco, monte-castro,
+  puerto-madero, agronomía, la-paternal, villa-general-mitre, villa-santa-rita, villa-real,
+  versalles, vélez-sársfield, mataderos, liniers, parque-avellaneda, villa-lugano, nueva-pompeya,
+  villa-soldati, villa-riachuelo, parque-chas, la-boca.
+- La infra de carga resumible aguantó ~15 relanzamientos (cortes del entorno, ahora "low on
+  memory"); cero pérdida de datos gracias al checkpoint por tanda. Runs Apify `FAILED` transitorios
+  cortaron un par de barrios que se retomaron solos al relanzar.
+- **PENDIENTE su OK:** ver CABA completo en ACM/Buscador/Mapa en producción + mergear el CÓDIGO de
+  los scripts (worktree `cargar-caba`). Los datos ya están vivos y embebidos.
+
+## 2026-09-04 — CABA cargado hasta el presupuesto: 21 barrios nuevos, freno limpio en US$76
+
+**Qué se hizo**
+
+- Se cargaron **21 barrios de CABA** a `mercado_avisos` vía Apify (actor `memo23/zonaprop-scraper`),
+  frenando exactamente en el presupuesto acordado con Leonardo ("vamos por todo CABA, frenamos a los
+  US$43"): el uso Apify pasó de US$33 a **US$76,45** (≈US$43,4 gastados). El freno duro en US$76 cortó
+  solo, a mitad de san-cristóbal.
+- **Total en la base: 55.116 avisos** (+30.048 nuevos). 52.909 calidad ok (96%) · 671 dueños directos ·
+  **54.354 con embedding** (98,6%; el resto es cuarentena, que a propósito no se embebe). Embeddings:
+  33.268 nuevos vectores, 0 errores (Gemini `gemini-embedding-001`, casi gratis).
+- **21 barrios completos** (fin natural o techo de paginación 210): almagro, balvanera, barracas, boedo,
+  caballito, chacarita, constitución, flores, floresta, monserrat, parque-patricios, recoleta, retiro,
+  san-nicolás, san-telmo, villa-crespo, villa-del-parque, villa-devoto, villa-luro, villa-ortúzar,
+  villa-pueyrredón. **A medio hacer:** san-cristóbal (checkpoint en su página, retoma solo). **Faltan** ~19
+  barrios chicos del sur/oeste (villa-lugano, mataderos, liniers, la-boca, etc.) para cuando haya más crédito.
+
+**El problema que se resolvió: el entorno mata los procesos largos**
+
+- Los tramos de background se cortan cada ~90 s a pocos minutos (variable). Una tanda de 30 páginas tarda
+  ~90-120 s, así que el ciclo background no avanzaba: abortaba huérfano, relanzaba, lo cortaban.
+- **Solución:** correr en **foreground acotado a 9 min** (`timeout 540000`) — aguanta mucho más que el
+  cortador de background — y hacer todo **resumible por checkpoint**. Se le agregó a `barrido.mjs` un
+  checkpoint por tanda (`data/ckpt-<zona>.json`, `{lastPage, done}`): un corte pierde a lo sumo la tanda
+  en curso (~US$0,9), nunca el barrio. Un orquestador nuevo `mercado-sync/cargar-caba.mjs` recorre los 41
+  barrios de CABA en orden de inventario, saltea los `done`, aborta runs Apify huérfanos al arrancar y
+  frena en `--tope-usd`. Relanzarlo retoma exacto donde quedó. Fueron ~11 relanzamientos.
+- Gotcha propio cazado en vivo: un barrio que llega al techo de paginación de ZonaProp (página 210) NO
+  gatilla el terminador de "2 páginas vacías", así que quedaba sin marcar `done` y el orquestador lo leía
+  como freno-por-tope y cortaba. Arreglo: marcar `done` también al agotar el rango de páginas sin frenar
+  por tope. Solo el freno por tope deja el barrio pendiente.
+- Otro: aborté por error un run que creí huérfano pero era la tanda activa de otro proceso — sin daño
+  (lo cargado queda; se re-scrapea desde checkpoint). Y los runs Apify que terminan `FAILED` (transitorio
+  del actor) hacen que el orquestador corte ese barrio; se retoma al relanzar.
+
+**Estado / pendiente**
+
+- Todo en la rama/worktree `cargar-caba` (scripts `mercado-sync/cargar-caba.mjs` y el checkpoint de
+  `barrido.mjs`). **PENDIENTE su OK:** ver los barrios nuevos en el ACM/Buscador/Mapa en producción, y
+  mergear los cambios de scripts. Los avisos ya están en la base (producción) y embebidos, así que el
+  Buscador y el ACM ya los usan; lo que falta mergear es el código de los scripts de carga.
+- Para seguir con los ~19 barrios que faltan: subir el límite Apify y `ENV_FILE=./.env node
+  mercado-sync/cargar-caba.mjs --tope-usd <nuevo>` — retoma desde san-cristóbal solo.
+- Memoria actualizada: [[mercado-avisos-reemplazo-roomix]].
+
+---
+
 ## 2026-09-03 — sesión Super Agente: horarios hábiles, el misterio de Johanna, y la semilla de agentes por campaña
 
 **Horarios de aviso (pedido de Kevin, rama `feat/avisos-horario-habil`):** la escalera mide la
