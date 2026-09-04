@@ -1398,6 +1398,58 @@ la página **"Equipo"** con dos solapas (Aprobaciones intacta + Trazabilidad). D
 - **v2 pendiente:** el tracking (`lead_activities` apunta a leads Tokko, no a conversaciones);
   botón "ya tomé contacto" del director si lo sigue pidiendo.
 
+### 22.8 Las notas internas hablan con Sofía (4/9/2026)
+
+Diseño completo: `docs/superpowers/specs/2026-09-04-notas-internas-ia-design.md`. Disparador: Eric
+(Central) atendió a Nicolás Bellia **por teléfono**, apagó el bot y dejó una nota interna
+("Ya estamos en contacto con el cliente, se coordino una visita para el Viernes") que la
+escalera no leía: dispararon los niveles 2h/5h/10h igual (`lead_eventos` id 1878, cortado a
+mano). Decisión de Leonardo: **la detección es determinista, la interpretación es de la IA**.
+
+- **Detección** (`notaPosterior`, `lib/seguimiento/nota-interna.ts`): la última fila de
+  `wa_messages` con `role='internal'` posterior a `t0` (último mensaje del lead), **excluyendo**
+  el marcador automático `"⚠️ Handoff activado"` (mismo `role`, lo escribe el sistema al
+  apagarse el bot — con un `.not("content", "like", "⚠️ Handoff activado%")`). Sin nota real
+  posterior a `t0`, la escalera de `escalamiento.ts` corre exactamente igual que antes (22.4);
+  la IA solo entra a tallar cuando un asesor escribió algo.
+- **Veredicto de la IA** (`crearLlamadaVeredicto`): una sola llamada a `claude-sonnet-5`
+  (`MODELO` de `lib/admin-vakdor/marketing/claude.ts`), `tool_choice` forzado a
+  `emitir_veredicto`, sin `thinking` (incompatible con tool forzado), `max_tokens: 1000`.
+  Devuelve `{atendido, pedir_registro_chat, pedir_registro_visita, pedir_registro_actividad,
+  razon}` validado con Zod (`VeredictoNotaSchema`). La semilla (`semillaVeredicto`) le pasa la
+  nota, la conversación completa (mismo formato que `leer_mensajes`), si hay visita registrada
+  (`visit_scheduled_at` de la conversación O una fila futura en `scheduled_visits` con teléfono
+  que matchea por los últimos 8 dígitos) y las actividades de `performance_logs` de los últimos
+  14 días (vía `wa_contacts.id → performance_logs.wa_contact_id`), más la propiedad de interés
+  (`metricas.propiedad_interes`/`propiedad_consultada`).
+- **Una evaluación por nota**: antes de llamar a la IA, `procesarNotaDelCaso` busca en
+  `lead_eventos` un `nota_evaluada` previo con `datos.nota_id` = esta nota; si existe, no
+  vuelve a llamar ni a avisar (`atendido_sin_aviso` / `escalera_sigue` según el veredicto
+  guardado). Una nota NUEVA del asesor dispara una evaluación nueva.
+- **Eventos nuevos en `lead_eventos`:** `nota_evaluada` (uno por `nota_id`, con el veredicto
+  completo en `datos`); `nota_error` (si la llamada a la IA falla, la escalera sigue como si no
+  hubiera nota — degradación registrada, nunca silenciosa: "un aviso de más molesta menos que
+  un cliente perdido"); `aviso_registro_simulado` (en `modo != 'activo'`: qué se le habría
+  pedido al asesor, sin mandar nada).
+- **El aviso de registro** (`armarAvisoRegistro` + `enviarAviso`, un único mensaje por nota):
+  si `atendido=true` y hay algún `pedir_registro_*`, sale UN aviso que reconoce la gestión y
+  pide solo lo que falta (chat / visita en el calendario / actividad en el tracking). Plantilla
+  `asesor_registro_pendiente` — está definida en el tipo pero **NO existe aprobada en Meta
+  todavía**, así que `enviarAviso` la omite (`omitido_plantilla_no_aprobada`) y el aviso sale
+  **solo por email**. Crear/aprobar la plantilla en Meta queda para la fase de notificaciones.
+- **El agente de decisiones (capa 3, `agente.ts`) también lee la última nota**: va en la
+  semilla igual que el marcador de handoff, y el prompt le dice que los renglones `[internal]`
+  mandan sobre su criterio propio ("no dar seguimiento" ⇒ no contactar; visita ya coordinada ⇒
+  no recontactar; un recordatorio suelto ⇒ contexto, no orden).
+- **Prueba en seco antes del merge** (Task 8, `scratch/_probar-veredicto-nota.mjs`, cero
+  escrituras, una sola llamada real a la API con los datos reales del caso Nicolás): con la
+  nota real de Eric el veredicto salió `atendido: true, pedir_registro_chat: true,
+  pedir_registro_visita: true, pedir_registro_actividad: true` (razón: la gestión fue real pero
+  quedó fuera de PRISMA — sin chat, sin visita en el calendario, sin actividad en el tracking).
+  Con una nota-recordatorio inventada ("ojo: pregunta siempre por cochera", misma conversación)
+  salió `atendido: false` con los cuatro pedidos en `false`. Los dos casos pasaron en el primer
+  intento, sin tocar `PROMPT_NOTA`.
+
 ## 23. Buscador IA y Tutor IA: la conversación en vivo (2/9/2026)
 
 Punto 1 del plan de agentes (`docs/superpowers/plans/2026-09-02-buscador-conversacion-viva.md`);

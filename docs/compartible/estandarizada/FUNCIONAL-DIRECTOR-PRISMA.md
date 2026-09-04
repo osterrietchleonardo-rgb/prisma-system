@@ -1069,6 +1069,8 @@ está **"Agregar una nota"**. Las notas las ven solo los directores; el asesor y
 
 **La noche no cuenta y nada te llega de madrugada.** Las horas de espera se miden solo entre las **6 y las 23**: si un cliente escribe a las 3 de la mañana, recién "empieza a esperar" a las 6, y el primer aviso al asesor sale a las 8 — dormir no es ignorar a un cliente. Además, ningún aviso (ni email ni WhatsApp) sale entre las 23 y las 6: si algo pasa de madrugada, el email llega programado a las 6 en punto.
 
+**Las notas internas de tu equipo ahora frenan esos avisos.** Si un asesor atendió a un cliente por teléfono o en persona y lo dejó anotado en el chat, Sofía lee esa nota: si confirma que la gestión ya está hecha, los avisos de "cliente esperando" se frenan para ese caso, y no le llega nada de más a nadie. Lo que quedó sin registrar en PRISMA (la visita, la gestión en el chat, la actividad en el tracking) se le pide al asesor en ese mismo momento, en un solo correo.
+
 **3. Recordatorios de visita.** 24 horas, 3 horas y 1 hora antes de cada visita agendada, y un mensaje si el cliente no fue.
 
 **Cómo te llegan los avisos:** siempre por **email**; también por **WhatsApp** (desde el número de tu agencia) si cargaste tu celular en Mi Perfil y Meta ya aprobó la plantilla. Cada aviso tiene un link que te lleva **directo a ese chat**, aunque tengas que iniciar sesión primero.
