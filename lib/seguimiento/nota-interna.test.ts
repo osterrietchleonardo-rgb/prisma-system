@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 import { MARCADOR_HANDOFF, notaPosterior, coincideTelefono, contextoRegistro, semillaVeredicto, VeredictoNotaSchema, armarAvisoRegistro, procesarNotaDelCaso } from "./nota-interna"
 import type { PerfilEquipo } from "./avisos"
 
@@ -38,13 +38,16 @@ describe("coincideTelefono: últimos 8 dígitos, sin importar el formato", () =>
 
 describe("contextoRegistro", () => {
   // Fake por tabla: from(tabla) elige la respuesta que el test cargó.
-  function dbPorTabla(tablas: Record<string, unknown>) {
+  // `gtes` recoge los argumentos de cada .gte(): el fake no filtra, así que la única forma
+  // de probar el corte por fecha es mirar con qué valor se consultó.
+  function dbPorTabla(tablas: Record<string, unknown>, gtes: Array<[string, unknown]> = []) {
     return {
       from(tabla: string) {
         const respuesta = tablas[tabla]
         const chain: Record<string, unknown> = {}
-        for (const m of ["select", "eq", "not", "gt", "gte", "order", "limit", "in", "lt"])
+        for (const m of ["select", "eq", "not", "gt", "order", "limit", "in", "lt"])
           chain[m] = () => chain
+        chain.gte = (col: string, val: unknown) => { gtes.push([col, val]); return chain }
         chain.maybeSingle = async () => ({ data: Array.isArray(respuesta) ? respuesta[0] ?? null : respuesta })
         chain.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: respuesta ?? [] }).then(res)
         return chain
@@ -68,6 +71,20 @@ describe("contextoRegistro", () => {
   it("visit_scheduled_at en la conversación alcanza solo", async () => {
     const r = await contextoRegistro(dbPorTabla({ scheduled_visits: [], wa_contacts: null }),
       { ...c, visit_scheduled_at: "2026-09-05T15:00:00Z" }, ahora)
+    expect(r.visitaRegistrada).toBe(true)
+  })
+  it("a las 22:30 AR (que en UTC ya es mañana) el corte de visitas usa el día argentino", async () => {
+    // 22:30 del 4/9 en Argentina = 01:30 UTC del 5/9. Con el corte en UTC, la visita de HOY
+    // (4/9) quedaba afuera y el asesor recibía un pedido de registrar algo ya registrado.
+    const gtes: Array<[string, unknown]> = []
+    const r = await contextoRegistro(
+      dbPorTabla(
+        { scheduled_visits: [{ telefono: "+54 1136299626", fecha_visita: "2026-09-04" }], wa_contacts: null },
+        gtes
+      ),
+      c, Date.parse("2026-09-04T22:30:00-03:00")
+    )
+    expect(gtes.find(([col]) => col === "fecha_visita")?.[1]).toBe("2026-09-04")
     expect(r.visitaRegistrada).toBe(true)
   })
   it("con wa_contact las actividades de performance_logs vuelven", async () => {
@@ -159,18 +176,43 @@ describe("procesarNotaDelCaso", () => {
   const t0 = "2026-09-03T20:09:43Z"
   const ahoraMs = Date.parse("2026-09-04T12:00:00-03:00")
 
-  /** Fake con inserts observables. tablas[nombre] puede ser fila (maybeSingle) o lista (then). */
-  function armarDb(tablas: Record<string, unknown>) {
+  /**
+   * Fake con inserts observables. tablas[nombre] puede ser fila (maybeSingle) o lista (then).
+   * SÍ respeta `.contains("datos", {...})`: es lo único que distingue las DOS consultas a
+   * `lead_eventos` (¿ya hubo veredicto atendido para este caso? vs. ¿esta nota ya se evaluó?).
+   * `erroresInsert[tabla]` hace que el insert de esa tabla devuelva `{ error: { message } }`.
+   */
+  function armarDb(tablas: Record<string, unknown>, erroresInsert: Record<string, string> = {}) {
     const inserts: Array<{ tabla: string; fila: Record<string, unknown> }> = []
     const db = {
       from(tabla: string) {
         const respuesta = tablas[tabla]
+        let filtroDatos: Record<string, unknown> | null = null
+        const filas = (): Array<Record<string, unknown>> => {
+          const lista = Array.isArray(respuesta)
+            ? (respuesta as Array<Record<string, unknown>>)
+            : respuesta == null ? [] : [respuesta as Record<string, unknown>]
+          if (!filtroDatos) return lista
+          const f = filtroDatos
+          return lista.filter((fila) => {
+            const d = (fila.datos ?? {}) as Record<string, unknown>
+            return Object.entries(f).every(([k, v]) => d[k] === v)
+          })
+        }
         const chain: Record<string, unknown> = {}
-        for (const m of ["select", "eq", "not", "gt", "gte", "order", "limit", "contains", "in", "lt"])
+        for (const m of ["select", "eq", "not", "gt", "gte", "order", "limit", "in", "lt"])
           chain[m] = () => chain
-        chain.maybeSingle = async () => ({ data: Array.isArray(respuesta) ? respuesta[0] ?? null : respuesta ?? null })
-        chain.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: respuesta ?? [] }).then(res)
-        chain.insert = (fila: Record<string, unknown>) => { inserts.push({ tabla, fila }); return { select: () => ({ single: async () => ({ data: { id: "x" } }) }), then: (r: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(r) } }
+        chain.contains = (col: string, val: Record<string, unknown>) => {
+          if (col === "datos") filtroDatos = val
+          return chain
+        }
+        chain.maybeSingle = async () => ({ data: filas()[0] ?? null })
+        chain.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: filas() }).then(res)
+        chain.insert = (fila: Record<string, unknown>) => {
+          inserts.push({ tabla, fila })
+          const error = erroresInsert[tabla] ? { message: erroresInsert[tabla] } : null
+          return { select: () => ({ single: async () => ({ data: { id: "x" }, error }) }), then: (r: (v: unknown) => unknown) => Promise.resolve({ error }).then(r) }
+        }
         return chain
       },
     }
@@ -194,6 +236,50 @@ describe("procesarNotaDelCaso", () => {
     const llamar = async () => { throw new Error("no debería re-evaluar") }
     expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar }))).toBe("atendido_sin_aviso")
     expect(inserts).toHaveLength(0)
+  })
+
+  it("nota ya evaluada como NO atendida: la escalera sigue, sin volver a llamar a la IA", async () => {
+    const { db, inserts } = armarDb({
+      wa_messages: [nota],
+      lead_eventos: [{ datos: { nota_id: "n-1", t0, atendido: false } }],
+    })
+    const llamar = async () => { throw new Error("no debería re-evaluar") }
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar }))).toBe("escalera_sigue")
+    expect(inserts).toHaveLength(0)
+  })
+
+  it("'atendido' es pegajoso: una segunda nota inofensiva NO re-arma la escalera", async () => {
+    // El caso ya tuvo un veredicto atendido (nota n-1). Llega una nota nueva ("ojo, pregunta
+    // por cochera"): no se re-evalúa nada y la escalera sigue frenada para este mismo t0.
+    const notaB = { id: "n-2", content: "Ojo que pregunta por cochera", created_at: "2026-09-03T22:40:00Z" }
+    const { db, inserts } = armarDb({
+      wa_messages: [notaB],
+      lead_eventos: [{ datos: { nota_id: "n-1", t0, atendido: true } }],
+    })
+    const llamar = async () => { throw new Error("no debería llamar a la IA") }
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar }))).toBe("atendido_sin_aviso")
+    expect(inserts).toHaveLength(0)
+  })
+
+  it("si el marcador nota_evaluada no se puede guardar, NO se manda el aviso (si no, se reenvía en cada barrida)", async () => {
+    const errores = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      const { db } = armarDb(
+        { wa_messages: [nota], lead_eventos: [], scheduled_visits: [], wa_contacts: null },
+        { lead_eventos: "boom" }
+      )
+      const enviados: unknown[] = []
+      const enviar = (async (..._args: unknown[]) => { enviados.push(_args[2]); return { email: "enviado", whatsapp: "omitido_plantilla_no_aprobada" } }) as never
+      const llamar = async () => ({
+        atendido: true, pedir_registro_chat: true, pedir_registro_visita: false,
+        pedir_registro_actividad: false, razon: "Gestión telefónica",
+      })
+      expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar, enviar }))).toBe("atendido_sin_aviso")
+      expect(enviados).toHaveLength(0)
+      expect(errores).toHaveBeenCalled()
+    } finally {
+      errores.mockRestore()
+    }
   })
 
   it("veredicto atendido con pedidos: registra nota_evaluada y manda el aviso (enviar inyectado)", async () => {

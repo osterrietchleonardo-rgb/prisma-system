@@ -3,7 +3,7 @@ import { dentroDeVentanaEnvio, horasHabiles } from "@/lib/whatsapp/sending-windo
 import { enviarAviso, linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
 import { bloqueContextoHtml, contextoDelLead, lineaContextoWhatsApp, type ContextoLead } from "./contexto"
 import { registrarEvento } from "./eventos"
-import { procesarNotaDelCaso, type LlamarVeredicto } from "./nota-interna"
+import { procesarNotaDelCaso, type LlamarVeredicto, type ResultadoNota } from "./nota-interna"
 import type { Candidato } from "./tipos"
 
 /**
@@ -198,6 +198,13 @@ export interface ResumenEscalamiento {
 
 const MAX_POR_CORRIDA = 300
 
+/**
+ * Techo de llamadas a la IA por corrida (todas las agencias juntas). Pasado el tope la
+ * escalera sigue funcionando exactamente como antes de esta feature, y la barrida
+ * siguiente (30 min) retoma los casos que quedaron sin evaluar.
+ */
+export const MAX_NOTAS_IA = 20
+
 export async function correrEscalamiento(
   db: SupabaseClient,
   opts: { appUrl?: string; fetchFn?: typeof fetch; ahoraMs?: number; llamarNota?: LlamarVeredicto } = {}
@@ -210,6 +217,8 @@ export async function correrEscalamiento(
   // No se pierde nada: el reloj cada 30 min vuelve a pasar, y los niveles se miden en horas
   // hábiles, así que ningún caso "madura" durante la noche.
   if (!dentroDeVentanaEnvio(new Date(ahoraMs))) return { ...resumen, fueraDeVentana: true }
+
+  let notasEvaluadas = 0 // contador de TODA la corrida, no por agencia
 
   const { data: configs } = await db.from("seguimiento_config").select("agency_id, modo, activo_desde")
   const { data: agencias } = await db.from("agencies").select("id, name")
@@ -262,11 +271,22 @@ export async function correrEscalamiento(
       // mensaje del lead, la IA decide si el cliente ya está atendido. Determinista solo
       // la detección; la interpretación jamás (una nota puede ser cualquier cosa).
       const asesor = c.agent_id ? await perfil(c.agent_id) : null
-      const rNota = await procesarNotaDelCaso(db, c, t0, {
-        modo: config.modo, asesor, appUrl,
-        nombreAgencia: nombreAgencia.get(c.agency_id) ?? "PRISMA",
-        ahoraMs, fetchFn: opts.fetchFn, llamar: opts.llamarNota,
-      })
+      let rNota: ResultadoNota = "sin_nota"
+      if (notasEvaluadas < MAX_NOTAS_IA) {
+        try {
+          rNota = await procesarNotaDelCaso(db, c, t0, {
+            modo: config.modo, asesor, appUrl,
+            nombreAgencia: nombreAgencia.get(c.agency_id) ?? "PRISMA",
+            ahoraMs, fetchFn: opts.fetchFn, llamar: opts.llamarNota,
+          })
+          if (rNota !== "sin_nota") notasEvaluadas++
+        } catch (e) {
+          // La escalera es lo que corre en producción: si la feature nueva explota, se anota
+          // y el caso sigue el camino de siempre. Nunca se cae la barrida entera.
+          await registrarEvento(db, c.agency_id, c.id, "nota_error",
+            `procesarNotaDelCaso falló; la escalera sigue: ${String(e).slice(0, 150)}`, { t0 })
+        }
+      }
       if (rNota.startsWith("atendido")) {
         resumen.atendidos++
         if (rNota === "atendido_avisado") resumen.avisos++

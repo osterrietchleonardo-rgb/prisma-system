@@ -22,7 +22,7 @@ export async function notaPosterior(
   conversationId: string,
   t0ISO: string
 ): Promise<NotaInterna | null> {
-  const { data } = await db
+  const { data, error } = await db
     .from("wa_messages")
     .select("id, content, created_at")
     .eq("conversation_id", conversationId)
@@ -32,6 +32,9 @@ export async function notaPosterior(
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle()
+  // Si esta query falla, la feature entera deja de existir sin que nadie se entere:
+  // "sin nota" y "no pude leer la nota" son cosas distintas y tienen que quedar a la vista.
+  if (error) console.error("[seguimiento] notaPosterior:", error.message)
   return (data as NotaInterna | null) ?? null
 }
 
@@ -62,12 +65,18 @@ export async function contextoRegistro(
   c: { agency_id: string; contact_phone: string; visit_scheduled_at: string | null },
   ahoraMs: number
 ): Promise<{ visitaRegistrada: boolean; actividades: ActividadTracking[] }> {
-  const hoy = new Date(ahoraMs).toISOString().slice(0, 10)
+  // El día es el ARGENTINO, no el UTC: a las 21 de acá en UTC ya es mañana, y con el corte
+  // en UTC las visitas de hoy quedaban afuera (el asesor recibía un pedido de registrar
+  // algo que ya estaba registrado).
+  const hoy = new Date(ahoraMs)
+    .toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" })
+    .slice(0, 10)
   const { data: visitas } = await db
     .from("scheduled_visits")
     .select("telefono, fecha_visita")
     .eq("agency_id", c.agency_id)
     .gte("fecha_visita", hoy)
+    .order("fecha_visita", { ascending: true })
     .limit(50)
   const enCalendario = (visitas ?? []).some((v: { telefono: string | null }) =>
     coincideTelefono(String(v.telefono ?? ""), c.contact_phone))
@@ -148,13 +157,25 @@ export function semillaVeredicto(input: {
   ].join("\n\n")
 }
 
+/**
+ * Un solo cliente para toda la corrida (perezoso: se arma la primera vez que hace falta).
+ * `timeout` es lo que impide que una llamada colgada frene la barrida entera, y un solo
+ * reintento alcanza: si la IA no contesta, la escalera sigue como siempre.
+ */
+let clienteAnthropic: Anthropic | null = null
+function anthropic(): Anthropic {
+  if (!clienteAnthropic) {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) throw new Error("Falta ANTHROPIC_API_KEY")
+    clienteAnthropic = new Anthropic({ apiKey, timeout: 20_000, maxRetries: 1 })
+  }
+  return clienteAnthropic
+}
+
 /** Una sola llamada, tool forzado, sin thinking (incompatible con tool_choice forzado). */
 export function crearLlamadaVeredicto(): LlamarVeredicto {
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) throw new Error("Falta ANTHROPIC_API_KEY")
-  const client = new Anthropic({ apiKey })
   return async (semilla) => {
-    const res = await client.messages.create({
+    const res = await anthropic().messages.create({
       model: MODELO,
       max_tokens: 1000,
       system: PROMPT_NOTA,
@@ -187,7 +208,7 @@ export function armarAvisoRegistro(
   appUrl: string,
   nombreAgencia: string
 ): Aviso {
-  const cliente = nombreCliente(c as never)
+  const cliente = nombreCliente(c)
   const tel = `+${c.contact_phone.replace(/\D/g, "")}`
   const link = linkAlChat(perfil, c.id, appUrl)
   const pedidos: string[] = []
@@ -250,6 +271,15 @@ export async function procesarNotaDelCaso(
   const nota = await notaPosterior(db, c.id, t0)
   if (!nota) return "sin_nota"
 
+  // "Atendido" es PEGAJOSO para el caso, no para la nota: si ya hubo un veredicto atendido
+  // con este mismo t0, una segunda nota inofensiva ("ojo, pregunta por cochera") no puede
+  // re-armar la escalera y disparar el nivel más alto pendiente.
+  const { data: yaAtendido } = await db
+    .from("lead_eventos").select("datos")
+    .eq("conversation_id", c.id).eq("tipo", "nota_evaluada")
+    .contains("datos", { t0, atendido: true }).limit(1)
+  if (yaAtendido?.length) return "atendido_sin_aviso"
+
   const { data: previa } = await db
     .from("lead_eventos").select("datos")
     .eq("conversation_id", c.id).eq("tipo", "nota_evaluada")
@@ -275,11 +305,23 @@ export async function procesarNotaDelCaso(
     return "error_ia"
   }
 
-  await registrarEvento(db, c.agency_id, c.id, "nota_evaluada",
-    veredicto.atendido
+  // El marcador va INLINE y chequeado (no por registrarEvento, que traga el error): es lo
+  // único que evita re-evaluar y re-avisar en cada barrida. Si no se pudo guardar, no se
+  // manda nada — mejor un aviso que no sale que el mismo mail cada 30 minutos.
+  const { error: errMarca } = await db.from("lead_eventos").insert({
+    agency_id: c.agency_id,
+    conversation_id: c.id,
+    tipo: "nota_evaluada",
+    actor: "agente_seguimiento",
+    descripcion: veredicto.atendido
       ? `Nota del asesor leída: el cliente ya está atendido, la escalera se frena — ${veredicto.razon}`
       : `Nota del asesor leída: no indica atención, la escalera sigue — ${veredicto.razon}`,
-    { nota_id: nota.id, t0, ...veredicto })
+    datos: { nota_id: nota.id, t0, ...veredicto },
+  })
+  if (errMarca) {
+    console.error("[seguimiento] nota_evaluada no se pudo registrar:", errMarca.message)
+    return "atendido_sin_aviso"
+  }
 
   if (!veredicto.atendido) return "escalera_sigue"
   const hayPedidos = veredicto.pedir_registro_chat || veredicto.pedir_registro_visita || veredicto.pedir_registro_actividad

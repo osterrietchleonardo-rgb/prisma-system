@@ -39,7 +39,7 @@ export function renderizarSemilla(
       ? [`ATENCIÓN: este lead fue DERIVADO a un asesor humano. Verificá en los mensajes si algún [human] le escribió. Si nadie lo atendió, la acción correcta es "escalar" (no "contactar": el sistema bloquea seguimientos automáticos a leads en handoff).`]
       : []),
     ...(notaInterna
-      ? [`NOTA INTERNA del asesor (${notaInterna.fechaAR}; el cliente NO la ve): «${notaInterna.texto}». Es la voz del equipo y manda sobre tu criterio: si dice que el cliente ya fue atendido por otro canal, que no se le dé seguimiento o que ya hay una visita coordinada, NO lo contactes (posponé o abandoná citando la nota). Si es solo un recordatorio o un dato, usala como contexto.`]
+      ? [`NOTA INTERNA del asesor (${notaInterna.fechaAR}; el cliente NO la ve): «${notaInterna.texto}». Es la voz del equipo y manda sobre tu criterio: si dice que el cliente ya fue atendido por otro canal, que no se le dé seguimiento o que ya hay una visita coordinada, NO lo contactes (posponé o abandoná citando la nota). Si es solo un recordatorio o un dato, usala como contexto. Si arriba hay un bloque ATENCIÓN de derivación, esta nota manda sobre él.`]
       : []),
     `Datos capturados del lead:\n${metricas}`,
     `Plantillas DISPONIBLES para esta agencia (texto fijo; {{1}} = nombre, {{2}} = tu frase_cierre). Elegí SOLO entre estas:\n${plantillas}`,

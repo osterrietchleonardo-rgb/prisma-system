@@ -140,7 +140,8 @@ describe("los niveles se miden en horas hábiles (la noche no corre)", () => {
 describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
   const ar = (iso: string) => Date.parse(iso + "-03:00")
 
-  function armarDbCorrida() {
+  /** `tablasQueTiran` simula una tabla que revienta al leerla (permiso, timeout, columna que no está). */
+  function armarDbCorrida(tablasQueTiran: string[] = []) {
     const inserts: Array<{ tabla: string; fila: Record<string, unknown> }> = []
     const tablas: Record<string, unknown> = {
       seguimiento_config: [{ agency_id: "ag-1", modo: "activo", activo_desde: "2026-08-31T00:00:00Z" }],
@@ -162,6 +163,7 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
     let vecesWaMessages = 0
     const db = {
       from(tabla: string) {
+        if (tablasQueTiran.includes(tabla)) throw new Error(`la tabla ${tabla} no se puede leer`)
         let respuesta = tablas[tabla]
         if (tabla === "wa_messages") {
           // orden real de las llamadas en la corrida: último del lead → humano → nota → leer_mensajes
@@ -191,8 +193,9 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
       atendido: true, pedir_registro_chat: true, pedir_registro_visita: false,
       pedir_registro_actividad: false, razon: "Gestión telefónica",
     })
-    const fetchQueNoDebeSalir = (async () => { throw new Error("con email null no debería llamar a Resend") }) as never
-    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchQueNoDebeSalir, appUrl: "https://x" })
+    // El fetch no promete nada: sin RESEND_API_KEY el email ni se intenta (omitido_sin_resend).
+    const fetchOk = (async () => ({ ok: true, json: async () => ({}) })) as never
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
     expect(r.atendidos).toBe(1)
     expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(false)
     expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_evaluada")).toBe(true)
@@ -208,5 +211,17 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
     const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
     expect(r.avisos).toBe(1)
     expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(true)
+  })
+
+  it("si la lectura de la nota explota, la corrida NO se cae: sale el nivel y queda el evento nota_error", async () => {
+    // scheduled_visits reventando hace explotar a procesarNotaDelCaso FUERA de su try interno.
+    // La escalera es lo que corre en producción: no puede morirse porque la feature nueva falle.
+    const { db, inserts } = armarDbCorrida(["scheduled_visits"])
+    const llamarNota = async () => { throw new Error("API caída") }
+    const fetchOk = (async () => ({ ok: true, json: async () => ({}) })) as never
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(1)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(true)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_error")).toBe(true)
   })
 })
