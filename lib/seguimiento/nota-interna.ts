@@ -240,7 +240,9 @@ export function armarAvisoRegistro(
     asunto: `${cliente}: gestión anotada — falta el registro en PRISMA — ${nombreAgencia}`,
     html,
     plantilla: "asesor_registro_pendiente",
-    variables: [primerNombre(perfil), unaLinea(`Vimos tu nota sobre ${cliente} (${tel}); los avisos se frenaron. Te pedimos registrar: ${queRegistrar || "nada, todo al día"}.`, 700), link],
+    // {{2}} de la plantilla `asesor_registro_pendiente`: la plantilla ya se presenta como PRISMA y
+    // aclara que no es un reclamo; acá va solo lo del caso, sin dar nada por sabido.
+    variables: [primerNombre(perfil), unaLinea(`Vimos tu nota interna sobre ${cliente} (${tel}) y entendemos que ya lo estás atendiendo, así que frenamos los avisos de cliente esperando por este caso. Falta registrar en PRISMA: ${queRegistrar || "nada, está todo al día"}.`, 700), link],
   }
 }
 

@@ -157,6 +157,8 @@ describe("armarAvisoRegistro: un solo aviso, tono de ayuda, solo los pedidos que
     expect(a.link).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-1")
     expect(a.variables).toHaveLength(3)
     expect(a.variables[0]).toBe("Eric")
+    expect(a.variables[1]).toBe("Vimos tu nota interna sobre Nicolás (+5491136299626) y entendemos que ya lo estás atendiendo, así que frenamos los avisos de cliente esperando por este caso. Falta registrar en PRISMA: un mensaje al cliente desde el chat, la visita en el calendario, la actividad en el tracking.")
+    expect(a.variables[2]).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-1")
   })
   it("solo el pedido que aplica: sin visita ni tracking no los menciona", () => {
     const a = armarAvisoRegistro(eric, conv, nota, {
