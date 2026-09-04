@@ -2,7 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import Anthropic from "@anthropic-ai/sdk"
 import { z } from "zod"
 import { MODELO } from "@/lib/admin-vakdor/marketing/claude"
-import { linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
+import { enviarAviso, linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
+import { registrarEvento } from "./eventos"
+import { crearHerramientas } from "./herramientas"
+import type { Candidato } from "./tipos"
 
 /** El sistema escribe este marcador con role='internal' al apagarse el bot: NO es una nota del asesor. */
 export const MARCADOR_HANDOFF = "⚠️ Handoff activado"
@@ -218,4 +221,77 @@ export function armarAvisoRegistro(
     plantilla: "asesor_registro_pendiente",
     variables: [primerNombre(perfil), unaLinea(`Vimos tu nota sobre ${cliente} (${tel}); los avisos se frenaron. Te pedimos registrar: ${queRegistrar || "nada, todo al día"}.`, 700), link],
   }
+}
+
+export type ResultadoNota =
+  | "sin_nota" | "escalera_sigue" | "atendido_sin_aviso"
+  | "atendido_avisado" | "atendido_simulado" | "error_ia"
+
+/**
+ * El caso tiene nota → la IA decide. Una evaluación por nota (evento `nota_evaluada`
+ * con nota_id); si la IA falla, la escalera sigue como hoy (evento `nota_error`):
+ * un aviso de más molesta menos que un cliente perdido.
+ */
+export async function procesarNotaDelCaso(
+  db: SupabaseClient,
+  c: Pick<Candidato, "id" | "agency_id" | "contact_phone" | "metricas" | "visit_scheduled_at">,
+  t0: string,
+  opts: {
+    modo: string
+    asesor: PerfilEquipo | null
+    appUrl: string
+    nombreAgencia: string
+    ahoraMs: number
+    fetchFn?: typeof fetch
+    llamar?: LlamarVeredicto
+    enviar?: typeof enviarAviso
+  }
+): Promise<ResultadoNota> {
+  const nota = await notaPosterior(db, c.id, t0)
+  if (!nota) return "sin_nota"
+
+  const { data: previa } = await db
+    .from("lead_eventos").select("datos")
+    .eq("conversation_id", c.id).eq("tipo", "nota_evaluada")
+    .contains("datos", { nota_id: nota.id })
+    .order("ts", { ascending: false }).limit(1).maybeSingle()
+  if (previa?.datos) return (previa.datos as { atendido?: boolean }).atendido ? "atendido_sin_aviso" : "escalera_sigue"
+
+  const registro = await contextoRegistro(db, c, opts.ahoraMs)
+  const mensajes = await crearHerramientas(db, c as Candidato).leer_mensajes({ cantidad: 30 })
+  const propiedadInteres =
+    String(c.metricas?.propiedad_interes ?? c.metricas?.propiedad_consultada ?? "").trim() || null
+  const ahoraISO = new Date(opts.ahoraMs).toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).slice(0, 16)
+
+  let veredicto: VeredictoNota
+  try {
+    veredicto = await (opts.llamar ?? crearLlamadaVeredicto())(
+      semillaVeredicto({ nota, mensajes, ...registro, propiedadInteres, ahoraISO })
+    )
+  } catch (e) {
+    await registrarEvento(db, c.agency_id, c.id, "nota_error",
+      `La IA no pudo evaluar la nota interna; la escalera sigue como siempre: ${String(e).slice(0, 150)}`,
+      { nota_id: nota.id, t0 })
+    return "error_ia"
+  }
+
+  await registrarEvento(db, c.agency_id, c.id, "nota_evaluada",
+    veredicto.atendido
+      ? `Nota del asesor leída: el cliente ya está atendido, la escalera se frena — ${veredicto.razon}`
+      : `Nota del asesor leída: no indica atención, la escalera sigue — ${veredicto.razon}`,
+    { nota_id: nota.id, t0, ...veredicto })
+
+  if (!veredicto.atendido) return "escalera_sigue"
+  const hayPedidos = veredicto.pedir_registro_chat || veredicto.pedir_registro_visita || veredicto.pedir_registro_actividad
+  if (!hayPedidos || !opts.asesor) return "atendido_sin_aviso"
+
+  const aviso = armarAvisoRegistro(opts.asesor, c, nota, veredicto, opts.appUrl, opts.nombreAgencia)
+  if (opts.modo !== "activo") {
+    await registrarEvento(db, c.agency_id, c.id, "aviso_registro_simulado",
+      `[${opts.modo}] se le habría pedido al asesor ${opts.asesor.full_name ?? ""} registrar la gestión en PRISMA`,
+      { nota_id: nota.id, asunto: aviso.asunto })
+    return "atendido_simulado"
+  }
+  await (opts.enviar ?? enviarAviso)(db, c as never, aviso, opts.nombreAgencia, { fetchFn: opts.fetchFn })
+  return "atendido_avisado"
 }

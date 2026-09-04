@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { MARCADOR_HANDOFF, notaPosterior, coincideTelefono, contextoRegistro, semillaVeredicto, VeredictoNotaSchema, armarAvisoRegistro } from "./nota-interna"
+import { MARCADOR_HANDOFF, notaPosterior, coincideTelefono, contextoRegistro, semillaVeredicto, VeredictoNotaSchema, armarAvisoRegistro, procesarNotaDelCaso } from "./nota-interna"
 import type { PerfilEquipo } from "./avisos"
 
 /** Fake mínimo: cada from() devuelve una cadena donde todo método se encadena y
@@ -148,5 +148,94 @@ describe("armarAvisoRegistro: un solo aviso, tono de ayuda, solo los pedidos que
     expect(a.html).toContain("chat de PRISMA")
     expect(a.html).not.toContain("calendario")
     expect(a.html).not.toContain("tracking")
+  })
+})
+
+describe("procesarNotaDelCaso", () => {
+  const nota = { id: "n-1", content: "Ya lo llamé, visita el viernes", created_at: "2026-09-03T21:20:00Z" }
+  const c = { id: "conv-1", agency_id: "ag-1", contact_phone: "5491136299626",
+    metricas: { nombre: "Nicolás", propiedad_interes: "San Martin 2300" }, visit_scheduled_at: null }
+  const asesor: PerfilEquipo = { id: "p-1", full_name: "Eric Zambrana", role: "asesor", email: "e@x.com", phone: null }
+  const t0 = "2026-09-03T20:09:43Z"
+  const ahoraMs = Date.parse("2026-09-04T12:00:00-03:00")
+
+  /** Fake con inserts observables. tablas[nombre] puede ser fila (maybeSingle) o lista (then). */
+  function armarDb(tablas: Record<string, unknown>) {
+    const inserts: Array<{ tabla: string; fila: Record<string, unknown> }> = []
+    const db = {
+      from(tabla: string) {
+        const respuesta = tablas[tabla]
+        const chain: Record<string, unknown> = {}
+        for (const m of ["select", "eq", "not", "gt", "gte", "order", "limit", "contains", "in", "lt"])
+          chain[m] = () => chain
+        chain.maybeSingle = async () => ({ data: Array.isArray(respuesta) ? respuesta[0] ?? null : respuesta ?? null })
+        chain.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: respuesta ?? [] }).then(res)
+        chain.insert = (fila: Record<string, unknown>) => { inserts.push({ tabla, fila }); return { select: () => ({ single: async () => ({ data: { id: "x" } }) }), then: (r: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(r) } }
+        return chain
+      },
+    }
+    return { db: db as never, inserts }
+  }
+  const opciones = (extra: Record<string, unknown> = {}) => ({
+    modo: "activo", asesor, appUrl: "https://prisma.vakdor.com", nombreAgencia: "Central", ahoraMs, ...extra,
+  })
+
+  it("sin nota: 'sin_nota' y NO llama a la IA", async () => {
+    const { db } = armarDb({ wa_messages: null })
+    const llamar = async () => { throw new Error("no debería llamar a la IA") }
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar }))).toBe("sin_nota")
+  })
+
+  it("nota ya evaluada como atendida: usa el veredicto guardado, sin IA y sin re-aviso", async () => {
+    const { db, inserts } = armarDb({
+      wa_messages: [nota],
+      lead_eventos: [{ datos: { nota_id: "n-1", atendido: true } }],
+    })
+    const llamar = async () => { throw new Error("no debería re-evaluar") }
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar }))).toBe("atendido_sin_aviso")
+    expect(inserts).toHaveLength(0)
+  })
+
+  it("veredicto atendido con pedidos: registra nota_evaluada y manda el aviso (enviar inyectado)", async () => {
+    const { db, inserts } = armarDb({
+      wa_messages: [nota], lead_eventos: [], scheduled_visits: [], wa_contacts: null,
+    })
+    const enviados: unknown[] = []
+    const enviar = (async (..._args: unknown[]) => { enviados.push(_args[2]); return { email: "enviado", whatsapp: "omitido_plantilla_no_aprobada" } }) as never
+    const llamar = async () => ({
+      atendido: true, pedir_registro_chat: true, pedir_registro_visita: true,
+      pedir_registro_actividad: true, razon: "Gestión telefónica con visita",
+    })
+    const r = await procesarNotaDelCaso(db, c, t0, opciones({ llamar, enviar }))
+    expect(r).toBe("atendido_avisado")
+    expect(enviados).toHaveLength(1)
+    const evento = inserts.find((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_evaluada")
+    expect(evento?.fila.datos).toMatchObject({ nota_id: "n-1", t0, atendido: true })
+  })
+
+  it("veredicto NO atendido (nota-recordatorio): la escalera sigue", async () => {
+    const { db } = armarDb({ wa_messages: [nota], lead_eventos: [], scheduled_visits: [], wa_contacts: null })
+    const llamar = async () => ({
+      atendido: false, pedir_registro_chat: false, pedir_registro_visita: false,
+      pedir_registro_actividad: false, razon: "Es solo un recordatorio",
+    })
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar }))).toBe("escalera_sigue")
+  })
+
+  it("en sombra no manda: registra el simulado", async () => {
+    const { db, inserts } = armarDb({ wa_messages: [nota], lead_eventos: [], scheduled_visits: [], wa_contacts: null })
+    const llamar = async () => ({
+      atendido: true, pedir_registro_chat: true, pedir_registro_visita: false,
+      pedir_registro_actividad: false, razon: "Ya atendido",
+    })
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ modo: "sombra", llamar }))).toBe("atendido_simulado")
+    expect(inserts.some((i) => (i.fila.tipo as string) === "aviso_registro_simulado")).toBe(true)
+  })
+
+  it("si la IA falla: 'error_ia', evento nota_error, y la escalera sigue como hoy", async () => {
+    const { db, inserts } = armarDb({ wa_messages: [nota], lead_eventos: [], scheduled_visits: [], wa_contacts: null })
+    const llamar = async () => { throw new Error("API caída") }
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar }))).toBe("error_ia")
+    expect(inserts.some((i) => (i.fila.tipo as string) === "nota_error")).toBe(true)
   })
 })
