@@ -8,13 +8,14 @@ import { GenerateImagePayload } from "@/types/marketing-ia";
 import sharp from "sharp";
 import type { OverlayOptions } from "sharp";
 import { armarFranjaLegal } from "@/lib/marketing-ia/aviso-legal";
+import { formatoDe } from "@/lib/marketing-ia/formatos";
 
 const buildImagePrompt = (payload: GenerateImagePayload, branding?: any): string => {
-  const dimensiones = {
-    reels:   '1080x1920, formato vertical 9:16, optimizado para Instagram Reels',
-    post:    '1080x1080, formato cuadrado 1:1, optimizado para Instagram Post',
-    historia:'1080x1920, formato vertical 9:16, optimizado para Instagram Historia'
-  }[payload.format];
+  // El tamano ya NO depende de que el modelo lea bien esta linea: va por parametro
+  // (imageConfig.aspectRatio) y despues se recorta a la medida exacta con sharp. Esto queda solo
+  // como contexto de encuadre, para que componga pensando en vertical o en cuadrado.
+  const f = formatoDe(payload.format);
+  const dimensiones = `${f.ancho}x${f.alto}, formato ${f.ratio}, para ${f.destino}`;
 
   let brandingCtx = '';
   if (branding) {
@@ -119,6 +120,7 @@ export async function POST(req: Request) {
     const marketingConfig = agency?.marketing_ai_config || {};
     const finalPrompt = buildImagePrompt(payload, marketingConfig);
     const { draft_id, style, format, extra_prompt } = payload;
+    const especificacion = formatoDe(format);
 
     // Consume AI Credits (returns transaction ID for cost tracking)
     const txId = await consumeAiCredits("marketing_ia", 2, `Generate Image: ${payload.format} ${payload.style}`);
@@ -128,16 +130,32 @@ export async function POST(req: Request) {
     let imageBuffer: Buffer;
     try {
       // Generate clean base image with Gemini AI (without prompt imageParts to avoid logo hallucinations)
-      imageBuffer = await generateImage(finalPrompt, 'pro', []);
+      imageBuffer = await generateImage(finalPrompt, 'pro', [], {
+        aspectRatio: especificacion.ratio,
+        // 2K en vez de lo que salga: en gemini-3-pro-image 1K y 2K cuestan lo mismo
+        // (utils/aiCostCalculator.ts), y sin pedirlo las placas venian de 768 px de ancho.
+        imageSize: '2K',
+      });
+
+      // ─── La placa se lleva a la medida exacta ANTES de dibujarle nada encima ─────────
+      // El orden importa: el aviso legal y el logo se miden contra el alto de la imagen, asi que
+      // recortar despues dejaria el texto legal reescalado y borroso.
+      // Y el recorte hace falta aunque el formato se pida por parametro, porque los buckets de
+      // Gemini son aproximados: pidiendole 4:5 devuelve 0.8056 y pidiendole 9:16 devuelve 0.5581.
+      // Sin esto, Instagram recibe una placa que no es del formato que dice ser y la recorta sola.
+      const medidaGemini = await sharp(imageBuffer).metadata();
+      imageBuffer = await sharp(imageBuffer)
+        .resize(especificacion.ancho, especificacion.alto, { fit: 'cover', position: 'centre' })
+        .toBuffer();
+      console.log(`[DEBUG] Placa ${format}: Gemini devolvio ${medidaGemini.width}x${medidaGemini.height}, recortada a ${especificacion.ancho}x${especificacion.alto}`);
 
       // ─── Lo que dibujamos nosotros sobre la imagen de Gemini ────────
       // Primero el aviso legal, despues el logo apoyado arriba de esa franja. Van juntos en una
       // sola pasada de sharp para no recomprimir la imagen dos veces.
       const capas: OverlayOptions[] = [];
-      const baseMeta = await sharp(imageBuffer).metadata();
-      const imgWidth = baseMeta.width || 1080;
-      const imgHeight = baseMeta.height || (format === 'post' ? 1080 : 1920);
-      console.log(`[DEBUG] Gemini base image dimensions: ${imgWidth}x${imgHeight}`);
+      // Ya no hay que adivinar: la placa acaba de quedar exactamente de esta medida.
+      const imgWidth = especificacion.ancho;
+      const imgHeight = especificacion.alto;
 
       const franjaLegal = await armarFranjaLegal(marketingConfig.legal_notice || '', imgWidth, imgHeight);
       if (franjaLegal) {
@@ -264,7 +282,10 @@ export async function POST(req: Request) {
 
       // ─── Record image cost ──────────────────────────────────────────
       const promptTokensEst = Math.ceil(finalPrompt.length / 4);
-      const imageRes = payload.format === 'post' ? '1k' : '2k';
+      // Se pide 2K siempre (arriba), asi que se cobra 2K siempre. Antes esto era una suposicion
+      // sobre un tamano que nunca se habia pedido. En este modelo 1k y 2k valen igual: no cambia
+      // lo que se gasta, cambia que ahora sea cierto.
+      const imageRes = '2k';
       const { totalCostUSD } = calculateImageCost({ model: "gemini-3-pro-image", imageCount: 1, resolution: imageRes });
       updateAiTransactionCost(txId, promptTokensEst, 0, totalCostUSD);
     } catch (apiError: any) {
@@ -307,9 +328,12 @@ export async function POST(req: Request) {
       .from('marketing-images')
       .getPublicUrl(fileName);
 
-    // Get dimensions based on format
-    const width = 1080;
-    const height = format === 'post' ? 1080 : 1920;
+    // La medida se MIDE sobre el archivo que se acaba de subir; no se deduce del formato. Hasta
+    // el 3-sep-2026 aca se escribia 1080x1920 a mano y la ficha mentia: los archivos reales
+    // median 768x1376. Si algun dia el recorte falla, se ve en la base y no en Instagram.
+    const medidaFinal = await sharp(imageBuffer).metadata();
+    const width = medidaFinal.width ?? especificacion.ancho;
+    const height = medidaFinal.height ?? especificacion.alto;
 
     const { data: savedImage, error: dbError } = await supabaseAdmin
       .from('generated_images')
