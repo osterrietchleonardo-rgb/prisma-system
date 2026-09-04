@@ -1,4 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
+import Anthropic from "@anthropic-ai/sdk"
+import { z } from "zod"
+import { MODELO } from "@/lib/admin-vakdor/marketing/claude"
 
 /** El sistema escribe este marcador con role='internal' al apagarse el bot: NO es una nota del asesor. */
 export const MARCADOR_HANDOFF = "⚠️ Handoff activado"
@@ -81,4 +84,82 @@ export async function contextoRegistro(
     actividades = (acts ?? []) as ActividadTracking[]
   }
   return { visitaRegistrada, actividades }
+}
+
+export const VeredictoNotaSchema = z.object({
+  atendido: z.boolean(),
+  pedir_registro_chat: z.boolean(),
+  pedir_registro_visita: z.boolean(),
+  pedir_registro_actividad: z.boolean(),
+  razon: z.string().min(1),
+})
+export type VeredictoNota = z.infer<typeof VeredictoNotaSchema>
+export type LlamarVeredicto = (semilla: string) => Promise<VeredictoNota>
+
+/** Decisión de Leonardo (4/9): la nota NO se interpreta con reglas — la lee la IA. */
+const PROMPT_NOTA = `Sos el intérprete de notas internas del agente de seguimiento de una inmobiliaria argentina. El sistema escala avisos cuando un cliente queda esperando a un asesor; una nota interna del asesor puede indicar que en realidad ya lo está atendiendo por otro canal. Leé la nota y la conversación y emití un veredicto honesto:
+- atendido: true SOLO si la nota indica que el asesor ya está gestionando a ESTE cliente (lo llamó, coordinó una visita, le está resolviendo algo, o pide explícitamente que no se le dé seguimiento). Un recordatorio o un detalle ("ojo que pregunta por cochera") NO es atención.
+- pedir_registro_chat: true si la gestión ocurrió fuera de PRISMA (teléfono, presencial) y no quedó registrada en el chat.
+- pedir_registro_visita: true SOLO si la nota menciona una visita coordinada Y el dato dice que NO está registrada en el calendario.
+- pedir_registro_actividad: true SOLO si la gestión que cuenta la nota no aparece reflejada en las actividades del tracking (mirá tipo, fecha y propiedad de cada actividad contra lo que la nota cuenta y la propiedad consultada).
+- razon: una o dos frases en castellano citando la nota; la puede leer el asesor.
+Si la nota es ambigua, atendido=false: la escalera existe para que ningún cliente quede sin atender, y un aviso de más molesta menos que un cliente perdido.`
+
+const HERRAMIENTA_VEREDICTO = {
+  name: "emitir_veredicto",
+  description: "Emití tu veredicto sobre la nota interna.",
+  input_schema: {
+    type: "object",
+    properties: {
+      atendido: { type: "boolean" },
+      pedir_registro_chat: { type: "boolean" },
+      pedir_registro_visita: { type: "boolean" },
+      pedir_registro_actividad: { type: "boolean" },
+      razon: { type: "string" },
+    },
+    required: ["atendido", "pedir_registro_chat", "pedir_registro_visita", "pedir_registro_actividad", "razon"],
+    additionalProperties: false,
+  },
+} as const
+
+export function semillaVeredicto(input: {
+  nota: NotaInterna
+  mensajes: string
+  visitaRegistrada: boolean
+  actividades: ActividadTracking[]
+  propiedadInteres: string | null
+  ahoraISO: string
+}): string {
+  const acts = input.actividades.length
+    ? input.actividades.map((a) => `  - ${a.type} · ${a.fecha_actividad ?? "sin fecha"} · ${a.propiedad_ref ?? "sin propiedad"}`).join("\n")
+    : "  (ninguna)"
+  return [
+    `Fecha y hora actual (Argentina): ${input.ahoraISO}`,
+    `NOTA INTERNA del asesor (el cliente NO la ve): «${input.nota.content}»`,
+    `Propiedad de interés del cliente según sus datos: ${input.propiedadInteres ?? "(sin dato)"}`,
+    `Visita registrada en el calendario de PRISMA: ${input.visitaRegistrada ? "SÍ" : "NO"}`,
+    `Actividades del asesor en el tracking para este cliente (últimos 14 días):\n${acts}`,
+    `Conversación real ([internal] son notas del equipo; el cliente no las ve):\n${input.mensajes}`,
+    `Emití tu veredicto con emitir_veredicto.`,
+  ].join("\n\n")
+}
+
+/** Una sola llamada, tool forzado, sin thinking (incompatible con tool_choice forzado). */
+export function crearLlamadaVeredicto(): LlamarVeredicto {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) throw new Error("Falta ANTHROPIC_API_KEY")
+  const client = new Anthropic({ apiKey })
+  return async (semilla) => {
+    const res = await client.messages.create({
+      model: MODELO,
+      max_tokens: 1000,
+      system: PROMPT_NOTA,
+      tools: [HERRAMIENTA_VEREDICTO] as unknown as Anthropic.Messages.ToolUnion[],
+      tool_choice: { type: "tool", name: "emitir_veredicto" },
+      messages: [{ role: "user", content: semilla }],
+    })
+    const uso = res.content.find((b) => b.type === "tool_use")
+    if (!uso || uso.type !== "tool_use") throw new Error("la IA no emitió veredicto")
+    return VeredictoNotaSchema.parse(uso.input)
+  }
 }
