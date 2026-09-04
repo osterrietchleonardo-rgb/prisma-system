@@ -9,6 +9,7 @@ import sharp from "sharp";
 import type { OverlayOptions } from "sharp";
 import { armarFranjaLegal } from "@/lib/marketing-ia/aviso-legal";
 import { formatoDe } from "@/lib/marketing-ia/formatos";
+import { halodeContraste, prepararLogo } from "@/lib/marketing-ia/logo";
 
 const buildImagePrompt = (payload: GenerateImagePayload, branding?: any): string => {
   // El tamano ya NO depende de que el modelo lea bien esta linea: va por parametro
@@ -210,23 +211,12 @@ export async function POST(req: Request) {
           }
 
           if (logoRawBuffer) {
-            // Target logo width scale (small: 12%, medium: 16%, large: 22% of image width)
-            const sizePercent = {
-              small: 0.12,
-              medium: 0.16,
-              large: 0.22
-            }[marketingConfig.logo_size as 'small' | 'medium' | 'large'] || 0.16;
-
-            const targetLogoWidth = Math.round(imgWidth * sizePercent);
-
-            // Resize logo maintaining aspect ratio and transparent PNG intact
-            const resizedLogoBuffer = await sharp(logoRawBuffer)
-              .resize({ width: targetLogoWidth, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-              .toBuffer();
-
-            const logoMeta = await sharp(resizedLogoBuffer).metadata();
-            const logoW = logoMeta.width || targetLogoWidth;
-            const logoH = logoMeta.height || Math.round(targetLogoWidth * 0.5);
+            // El logo se recorta (se le saca el vacio del archivo) y se lleva al tamano elegido.
+            // El porque de cada paso esta en lib/marketing-ia/logo.ts.
+            const logoListo = await prepararLogo(logoRawBuffer, imgWidth, marketingConfig.logo_size);
+            const resizedLogoBuffer = logoListo.png;
+            const logoW = logoListo.ancho;
+            const logoH = logoListo.alto;
 
             const margin = Math.round(imgWidth * 0.04); // 4% margin
 
@@ -263,9 +253,14 @@ export async function POST(req: Request) {
             left = Math.max(margin, Math.min(left, imgWidth - logoW - margin));
             top = Math.max(margin, Math.min(top, imgHeight - logoH - margin));
 
+            // Antes del logo va el halo, si es que hace falta: se mide el logo contra el pedazo
+            // de foto donde cae. Si ya contrasta, esto no agrega nada.
+            const contraste = await halodeContraste(imageBuffer, logoListo, { left, top });
+            capas.push(...contraste.capas);
             capas.push({ input: resizedLogoBuffer, top: Math.round(top), left: Math.round(left) });
 
-            console.log(`[DEBUG] Sharp logo overlay SUCCESS (${position}, size: ${marketingConfig.logo_size || 'medium'}, pos: [${Math.round(left)}, ${Math.round(top)}])`);
+            console.log(`[DEBUG] Logo: ${logoW}x${logoH} (${marketingConfig.logo_size || 'medium'}${logoListo.recorto ? ', se le recorto el vacio' : ''}), ${position} en [${Math.round(left)}, ${Math.round(top)}]`);
+            console.log(`[DEBUG] Logo contraste: marca ${logoListo.claridad.toFixed(0)} vs fondo ${contraste.claridadFondo.toFixed(0)} = ${contraste.contraste.toFixed(0)} -> ${contraste.halo ? 'halo ' + contraste.halo : 'sin halo'}`);
           } else {
             console.warn('[WARN] Could not retrieve logo buffer for overlay. logoUrl:', logoUrl);
           }
