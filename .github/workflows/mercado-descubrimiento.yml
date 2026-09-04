@@ -1,10 +1,11 @@
-# Descubrimiento diario de mercado_avisos: captura lo publicado HOY en las
-# zonas activas (barrido A, centavos por corrida). El cron de Actions se
-# atrasa horas — es esperado y no importa: el filtro es "publicado hoy/ayer",
-# así que corra cuando corra, no pierde nada (usa dentro-de 2 por eso mismo).
+# Descubrimiento diario de mercado_avisos: captura lo publicado en TODO CABA
+# (filterLocation "Capital Federal", barrido A, centavos por corrida) y lo
+# embebe. El cron de Actions se atrasa horas — es esperado y no importa: el
+# filtro es "publicado en los últimos 2 días", así que corra cuando corra no
+# pierde nada, y el solape lo cubre el refresco mensual.
 #
 # Secrets que necesita: APIFY_API_KEY, NEXT_PUBLIC_SUPABASE_URL,
-# SUPABASE_SERVICE_ROLE_KEY.
+# SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY.
 
 name: mercado-descubrimiento
 
@@ -22,9 +23,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Descubrimiento Belgrano (todos los tipos)
+      # Todo CABA en una sola corrida: filterLocation "Capital Federal" trae lo
+      # publicado en cualquier barrio de la ciudad (verificado 4-sep: 48 items de
+      # ~48 barrios distintos). --zona caba no tiene centroide → el loader saca el
+      # barrio del propio aviso y saltea el geo-check (que igual cubre el refresco
+      # mensual por-barrio). --max alto para no truncar un día real de CABA.
+      - name: Descubrimiento CABA (todos los barrios, todos los tipos)
         env:
           APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node mercado-sync/descubrimiento.mjs --location Belgrano --zona belgrano --dentro-de 2
+        run: node mercado-sync/descubrimiento.mjs --location "Capital Federal" --zona caba --dentro-de 2 --max 1500
+      - name: Embeddings de lo nuevo
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: node mercado-sync/embeddings.mjs --lote 60

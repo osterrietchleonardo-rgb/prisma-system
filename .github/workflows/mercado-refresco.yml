@@ -1,13 +1,16 @@
 # Refresco mensual de mercado_avisos (barrido B) + verificación de bajas (C).
 #
-# Por zona: relee el inventario completo (precios, republicaciones, altas que
-# el descubrimiento se perdió) y después verifica de a uno los avisos que el
-# refresco no vio — el ÚNICO camino que marca 'caido'. Al final, embeddings
-# de lo nuevo. Costo ≈ US$ 25-27/mes las 7 zonas con Apify.
+# Por zona: relee el inventario completo con --tanda 30 (precios, republicaciones,
+# altas que el descubrimiento se perdió) y después verifica los avisos que el
+# refresco no vio — el ÚNICO camino que marca 'caido'. Al final, embeddings de lo
+# nuevo. Cubre los 48 barrios de CABA (41 + 7 linderos). Costo ≈ US$ 60-70/mes con
+# Apify. NO pasa --ckpt: siempre relee todo desde la página 1, sin saltear.
 #
 # max-parallel 3: el plan de Apify permite 5 corridas simultáneas y el
-# descubrimiento diario también necesita lugar. Palermo (~400 págs) tarda
-# ~4,5 h: el timeout de 350 min le da margen sin chocar el techo de 6 h.
+# descubrimiento diario también necesita lugar. Cada zona es un job propio con su
+# timeout de 350 min; con tanda 30 hasta la más grande entra con margen.
+# OJO PRESUPUESTO: --tope-usd 95 corta si el uso mensual llega a US$95; conviene
+# tener el límite de la cuenta Apify en US$120 para que un mes pesado no choque.
 
 name: mercado-refresco
 
@@ -24,14 +27,57 @@ jobs:
       max-parallel: 3
       fail-fast: false
       matrix:
-        include:
-          - { base: departamentos-venta-palermo,       zona: palermo,       hasta: 410 }
-          - { base: departamentos-venta-belgrano,      zona: belgrano,      hasta: 230 }
-          - { base: departamentos-venta-nunez,         zona: nunez,         hasta: 115 }
-          - { base: departamentos-venta-villa-urquiza, zona: villa-urquiza, hasta: 105 }
-          - { base: departamentos-venta-colegiales,    zona: colegiales,    hasta: 58 }
-          - { base: departamentos-venta-saavedra,      zona: saavedra,      hasta: 50 }
-          - { base: departamentos-venta-coghlan,       zona: coghlan,       hasta: 25 }
+        # Los 48 barrios de CABA (41 + 7 linderos). hasta 220 = pasa el techo de
+        # paginación de ZonaProp (~210); el barrido corta solo al agotar el inventario.
+        zona:
+          - recoleta
+          - caballito
+          - almagro
+          - balvanera
+          - villa-crespo
+          - barracas
+          - flores
+          - retiro
+          - villa-devoto
+          - villa-del-parque
+          - monserrat
+          - san-nicolas
+          - constitucion
+          - san-telmo
+          - chacarita
+          - villa-ortuzar
+          - villa-pueyrredon
+          - boedo
+          - parque-patricios
+          - villa-luro
+          - floresta
+          - san-cristobal
+          - parque-chacabuco
+          - monte-castro
+          - puerto-madero
+          - agronomia
+          - la-paternal
+          - villa-general-mitre
+          - villa-santa-rita
+          - villa-real
+          - versalles
+          - velez-sarsfield
+          - mataderos
+          - liniers
+          - parque-avellaneda
+          - villa-lugano
+          - nueva-pompeya
+          - villa-soldati
+          - villa-riachuelo
+          - parque-chas
+          - la-boca
+          - belgrano
+          - palermo
+          - nunez
+          - villa-urquiza
+          - colegiales
+          - saavedra
+          - coghlan
     env:
       APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -42,7 +88,7 @@ jobs:
         with:
           node-version: 22
       - name: Refresco ${{ matrix.zona }}
-        run: node mercado-sync/barrido.mjs --base ${{ matrix.base }} --desde 1 --hasta ${{ matrix.hasta }} --tanda 1 --zona ${{ matrix.zona }} --tope-usd 33
+        run: node mercado-sync/barrido.mjs --base departamentos-venta-${{ matrix.zona }} --desde 1 --hasta 220 --tanda 30 --zona ${{ matrix.zona }} --tope-usd 95
       - name: Verificación de bajas ${{ matrix.zona }}
         run: node mercado-sync/verificacion.mjs --zona ${{ matrix.zona }} --dias 25 --max 500
 

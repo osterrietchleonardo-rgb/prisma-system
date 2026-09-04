@@ -34,6 +34,7 @@ const TANDA = parseInt(arg('tanda', '30'));
 const ZONA = arg('zona', BASE);
 const TOPE = parseFloat(arg('tope-usd', '9.0'));
 const DRY = process.argv.includes('--dry');
+const USA_CKPT = process.argv.includes('--ckpt');   // checkpoint resumible (solo carga inicial)
 
 if (!BASE) { console.error('Falta --base <slug de búsqueda>'); process.exit(1); }
 
@@ -95,14 +96,17 @@ async function main() {
   const dataDir = join(__dirname, 'data');
   mkdirSync(dataDir, { recursive: true });
 
-  // CHECKPOINT por tanda: este entorno corta los procesos largos. Guardamos la última
-  // página cargada de esta zona; al relanzar, se retoma desde ahí (un corte pierde a lo
-  // sumo la tanda en curso, no el barrio). ckpt {done:true} = barrio terminado.
+  // CHECKPOINT por tanda (SOLO con --ckpt): para la carga inicial resumible, que este
+  // entorno corta. Guardamos la última página cargada; al relanzar, se retoma desde ahí
+  // (un corte pierde a lo sumo la tanda en curso). ckpt {done:true} = barrio terminado.
+  // El refresco mensual NO pasa --ckpt: siempre relee todo desde --desde, sin saltear.
   const ckptFile = join(dataDir, `ckpt-${ZONA}.json`);
   let ckpt = {};
-  try { ckpt = JSON.parse(readFileSync(ckptFile, 'utf8')); } catch {}
-  if (ckpt.done) { console.log(`[barrido] ${ZONA} ya está marcado como terminado (ckpt). Nada que hacer.`); return; }
-  const desdeEfectivo = Math.max(DESDE, (ckpt.lastPage || 0) + 1);
+  if (USA_CKPT) {
+    try { ckpt = JSON.parse(readFileSync(ckptFile, 'utf8')); } catch {}
+    if (ckpt.done) { console.log(`[barrido] ${ZONA} ya está marcado como terminado (ckpt). Nada que hacer.`); return; }
+  }
+  const desdeEfectivo = USA_CKPT ? Math.max(DESDE, (ckpt.lastPage || 0) + 1) : DESDE;
   if (desdeEfectivo > DESDE) console.log(`[barrido] retomo ${ZONA} desde pág ${desdeEfectivo} (checkpoint).`);
 
   const paginas = [];
@@ -140,7 +144,7 @@ async function main() {
       vaciasSeguidas++;
       if (vaciasSeguidas >= 2) {
         console.log('  2 páginas vacías seguidas (reintentadas): fin del inventario.');
-        writeFileSync(ckptFile, JSON.stringify({ done: true, lastPage: tanda[tanda.length - 1] }));
+        if (USA_CKPT) writeFileSync(ckptFile, JSON.stringify({ done: true, lastPage: tanda[tanda.length - 1] }));
         terminado = true;
         break;
       }
@@ -154,12 +158,12 @@ async function main() {
       '--paginas', String(tanda.length), '--esperados', '0',
     ], { stdio: 'inherit', env: process.env });
     // Checkpoint DESPUÉS de cargar la tanda: si nos cortan, retomamos desde acá.
-    writeFileSync(ckptFile, JSON.stringify({ lastPage: tanda[tanda.length - 1], done: false }));
+    if (USA_CKPT) writeFileSync(ckptFile, JSON.stringify({ lastPage: tanda[tanda.length - 1], done: false }));
   }
 
   // Si recorrimos todo el rango hasta HASTA sin frenar por tope, el barrio está
   // terminado: HASTA=210 es el techo de paginación de ZonaProp, no hay más allá.
-  if (!frenadoPorTope && !terminado && !DRY) {
+  if (USA_CKPT && !frenadoPorTope && !terminado && !DRY) {
     writeFileSync(ckptFile, JSON.stringify({ done: true, lastPage: HASTA }));
     console.log(`[barrido] ${ZONA}: agotado el rango de páginas (techo ${HASTA}). Marcado como terminado.`);
   }
