@@ -213,7 +213,7 @@ export function armarAvisoRegistro(
   const link = linkAlChat(perfil, c.id, appUrl)
   const pedidos: string[] = []
   if (v.pedir_registro_chat)
-    pedidos.push("Dejá una línea con lo gestionado en el <strong>chat de PRISMA</strong> del contacto: lo que queda ahí lo ve todo el equipo, y Sofía deja de avisarte por un cliente que ya estás atendiendo.")
+    pedidos.push("Lo que hablaron por teléfono no quedó en PRISMA. Mandale al cliente desde el <strong>chat de PRISMA</strong> un mensaje confirmando lo acordado (día y hora de la visita, lo que le prometiste): así queda el registro para todo el equipo y Sofía sabe que lo estás atendiendo.")
   if (v.pedir_registro_visita)
     pedidos.push("La visita que mencionás no figura en el <strong>calendario</strong> de PRISMA: cargala así los recordatorios al cliente corren solos.")
   if (v.pedir_registro_actividad)
@@ -229,7 +229,7 @@ export function armarAvisoRegistro(
     `</div>`,
   ].filter(Boolean).join("\n")
   const queRegistrar = [
-    v.pedir_registro_chat ? "el chat" : null,
+    v.pedir_registro_chat ? "un mensaje al cliente desde el chat" : null,
     v.pedir_registro_visita ? "la visita en el calendario" : null,
     v.pedir_registro_actividad ? "la actividad en el tracking" : null,
   ].filter(Boolean).join(", ")
