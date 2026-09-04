@@ -26,6 +26,7 @@ const LOCATION = arg('location');
 const ZONA = arg('zona', (LOCATION || '').toLowerCase());
 const TIPO_PROP = arg('tipo-prop', '');            // vacío = todos los tipos
 const DENTRO = arg('dentro-de', '1');              // 1|2|3 días
+const MAX = parseInt(arg('max', '50'));            // tope de items por corrida
 if (!LOCATION) { console.error('Falta --location'); process.exit(1); }
 
 const envFile = process.env.ENV_FILE;
@@ -43,7 +44,7 @@ async function main() {
     filterOperation: 'venta',
     filterLocation: LOCATION,
     filterPublishedWithin: DENTRO,
-    maxItems: 50,
+    maxItems: MAX,
     proxy: { useApifyProxy: true },
   };
   if (TIPO_PROP) input.filterPropertyType = TIPO_PROP;
@@ -81,7 +82,7 @@ async function main() {
     '--paginas', '1', '--esperados', '0',
   ], { stdio: 'inherit', env: process.env });
 
-  if (n >= 50) console.warn('[descubrimiento] AVISO: se alcanzó el tope de 50 del actor; mañana correr con --dentro-de 2 para cubrir el resto.');
+  if (n >= MAX) console.warn(`[descubrimiento] AVISO: se alcanzó el tope de ${MAX} items; subir --max o correr con --dentro-de 2 para cubrir el resto.`);
 }
 
 main().catch(e => { console.error('[descubrimiento] FATAL:', e.message); process.exit(1); });

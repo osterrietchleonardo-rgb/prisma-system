@@ -86,7 +86,7 @@ async function main() {
         join(__dirname, 'barrido.mjs'),
         '--base', `departamentos-venta-${barrio}`,
         '--desde', '1', '--hasta', String(HASTA), '--tanda', String(TANDA),
-        '--zona', barrio, '--tope-usd', String(TOPE),
+        '--zona', barrio, '--tope-usd', String(TOPE), '--ckpt',
       ], { stdio: 'inherit', env: process.env });
       // barrido.mjs marca ckpt.done al agotar el inventario. Si volvió sin marcarlo,
       // fue el freno por tope (no un barrio terminado): cortamos acá.
