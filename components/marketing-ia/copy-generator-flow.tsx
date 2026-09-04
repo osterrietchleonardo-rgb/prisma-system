@@ -7,9 +7,11 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, Video, FileText, Loader2, ArrowRight, Smartphone, Camera } from "lucide-react"
+import { Sparkles, Video, FileText, Loader2, ArrowRight, Smartphone, Camera, RectangleVertical, Square } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { CopyType, EstructuraId, ImageFormat, ImageStyle, IpcProfile, TokkoProperty } from "@/types/marketing-ia"
 import { ESTRUCTURAS_LISTA } from "@/lib/marketing-ia/estructuras"
+import { FORMATOS_OFRECIDOS } from "@/lib/marketing-ia/formatos"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -22,7 +24,7 @@ export function CopyGeneratorFlow() {
   
   const [copyType, setCopyType] = useState<CopyType>('video')
   const [estructura, setEstructura] = useState<EstructuraId | 'sugerida'>('sugerida')
-  const [format, setFormat] = useState<ImageFormat>('reels')
+  const [format, setFormat] = useState<ImageFormat>('post_vertical')
   const [style, setStyle] = useState<ImageStyle>('moderno')
   const [extraContext, setExtraContext] = useState("")
   const [tieneOferta, setTieneOferta] = useState(true)
@@ -145,11 +147,14 @@ export function CopyGeneratorFlow() {
     }
   }
 
-  const formats = [
-    { id: 'reels', label: 'Reels', icon: Smartphone, ratio: '9:16' },
-    { id: 'post', label: 'Post', icon: Camera, ratio: '1:1' },
-    { id: 'historia', label: 'Historia', icon: Smartphone, ratio: '9:16' },
-  ]
+  // Los formatos y sus medidas viven en un solo lugar (lib/marketing-ia/formatos.ts): la pantalla,
+  // el prompt de Gemini y lo que se guarda en la base ya no pueden decir cosas distintas.
+  const iconos: Record<string, LucideIcon> = {
+    post_vertical: RectangleVertical,
+    reels: Smartphone,
+    post: Square,
+  }
+  const formats = FORMATOS_OFRECIDOS.map((f) => ({ ...f, icon: iconos[f.id] ?? Square }))
 
   const styles: Array<{ id: ImageStyle; label: string }> = [
     { id: 'moderno', label: 'Moderno' },
@@ -295,7 +300,7 @@ export function CopyGeneratorFlow() {
                     onClick={() => setFormat(f.id as ImageFormat)}
                   >
                     <f.icon className="mx-auto mb-2 w-6 h-6 text-accent" />
-                    <p className="text-xs font-bold">{f.label}</p>
+                    <p className="text-xs font-bold leading-tight">{f.etiqueta}</p>
                     <p className="text-[10px] text-muted-foreground">{f.ratio}</p>
                   </Card>
                 ))}

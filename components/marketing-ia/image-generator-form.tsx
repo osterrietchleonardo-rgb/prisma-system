@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Download, Loader2, Sparkles, RefreshCw, Smartphone, Camera, PenTool } from "lucide-react"
+import { Download, Loader2, Sparkles, RefreshCw, Smartphone, Camera, RectangleVertical, Square, PenTool } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
+import { FORMATOS_OFRECIDOS } from "@/lib/marketing-ia/formatos"
 import { ImageFormat, ImageStyle, CopyContent, TokkoProperty } from "@/types/marketing-ia"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -18,7 +20,7 @@ interface ImageGeneratorFormProps {
 }
 
 export function ImageGeneratorForm({ draftId, copyContent, tokkoProperty, onBack }: ImageGeneratorFormProps) {
-  const [format, setFormat] = useState<ImageFormat>('reels')
+  const [format, setFormat] = useState<ImageFormat>('post_vertical')
   const [style, setStyle] = useState<ImageStyle>('moderno')
   const [extraPrompt, setExtraPrompt] = useState("")
   const [isGenerating, setIsGenerating] = useState(false)
@@ -75,11 +77,14 @@ export function ImageGeneratorForm({ draftId, copyContent, tokkoProperty, onBack
     }
   }
 
-  const formats = [
-    { id: 'reels', label: 'Reels', icon: Smartphone, ratio: '9:16' },
-    { id: 'post', label: 'Post', icon: Camera, ratio: '1:1' },
-    { id: 'historia', label: 'Historia', icon: Smartphone, ratio: '9:16' },
-  ]
+  // Los formatos y sus medidas viven en un solo lugar (lib/marketing-ia/formatos.ts): la pantalla,
+  // el prompt de Gemini y lo que se guarda en la base ya no pueden decir cosas distintas.
+  const iconos: Record<string, LucideIcon> = {
+    post_vertical: RectangleVertical,
+    reels: Smartphone,
+    post: Square,
+  }
+  const formats = FORMATOS_OFRECIDOS.map((f) => ({ ...f, icon: iconos[f.id] ?? Square }))
 
   const styles: Array<{ id: ImageStyle; label: string }> = [
     { id: 'moderno', label: 'Moderno' },
@@ -121,7 +126,7 @@ export function ImageGeneratorForm({ draftId, copyContent, tokkoProperty, onBack
                   onClick={() => setFormat(f.id as ImageFormat)}
                 >
                   <f.icon className="mx-auto mb-2 w-6 h-6 text-accent" />
-                  <p className="text-xs font-bold">{f.label}</p>
+                  <p className="text-xs font-bold leading-tight">{f.etiqueta}</p>
                   <p className="text-[10px] text-muted-foreground">{f.ratio}</p>
                 </Card>
               ))}
@@ -185,7 +190,11 @@ export function ImageGeneratorForm({ draftId, copyContent, tokkoProperty, onBack
               <div 
                 className={cn(
                   "relative group shadow-2xl rounded-lg overflow-hidden bg-black/5 flex items-center justify-center",
-                  format === 'post' ? "aspect-square w-full max-w-[320px]" : "aspect-[9/16] h-full max-h-[500px]"
+                  // La vista previa respeta el formato elegido. Antes solo distinguia cuadrado
+                  // de vertical largo, asi que un 4:5 se veria estirado a 9:16.
+                  format === 'post' ? "aspect-square w-full max-w-[320px]"
+                    : format === 'post_vertical' ? "aspect-[4/5] h-full max-h-[500px]"
+                    : "aspect-[9/16] h-full max-h-[500px]"
                 )}
               >
                 <img 
