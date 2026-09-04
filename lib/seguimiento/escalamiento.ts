@@ -3,6 +3,7 @@ import { dentroDeVentanaEnvio, horasHabiles } from "@/lib/whatsapp/sending-windo
 import { enviarAviso, linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
 import { bloqueContextoHtml, contextoDelLead, lineaContextoWhatsApp, type ContextoLead } from "./contexto"
 import { registrarEvento } from "./eventos"
+import { procesarNotaDelCaso, type LlamarVeredicto } from "./nota-interna"
 import type { Candidato } from "./tipos"
 
 /**
@@ -27,6 +28,13 @@ import type { Candidato } from "./tipos"
  * Cada nivel una sola vez por caso; si el lead vuelve a escribir después de ser atendido, es un
  * caso nuevo. Sin tope por agencia: si 30 asesores no contestan, se avisa a los 30. El WhatsApp
  * sale con la plantilla nueva si Meta la aprobó; si no, va el email igual. Nunca se saltea.
+ *
+ * LA NOTA INTERNA HABLA (Leonardo, 4/9, tras la queja de Eric): si el asesor dejó una
+ * nota interna después del último mensaje del lead, la IA la lee junto con la
+ * conversación y decide. "Atendido" ⇒ la escalera se frena para ese caso y, si la
+ * gestión quedó fuera de PRISMA, sale UN aviso pidiendo registrar (chat / visita en
+ * calendario / actividad en tracking). Nota ambigua o solo-recordatorio ⇒ la escalera
+ * sigue: un aviso de más molesta menos que un cliente perdido.
  */
 
 export type Nivel = 2 | 5 | 10 | 20
@@ -48,7 +56,7 @@ export function casoCuenta(t0ISO: string, activoDesdeISO: string | null | undefi
   return Date.parse(t0ISO) >= Date.parse(activoDesdeISO)
 }
 
-type Conv = Pick<Candidato, "id" | "agency_id" | "contact_phone" | "metricas" | "agent_id" | "bot_active" | "last_message_at">
+type Conv = Pick<Candidato, "id" | "agency_id" | "contact_phone" | "metricas" | "agent_id" | "bot_active" | "last_message_at" | "visit_scheduled_at">
 
 /** ¿Este lead está en manos de un humano (o esperándolo)? */
 export function esperandoHumano(c: Pick<Candidato, "bot_active" | "metricas">): boolean {
@@ -192,7 +200,7 @@ const MAX_POR_CORRIDA = 300
 
 export async function correrEscalamiento(
   db: SupabaseClient,
-  opts: { appUrl?: string; fetchFn?: typeof fetch; ahoraMs?: number } = {}
+  opts: { appUrl?: string; fetchFn?: typeof fetch; ahoraMs?: number; llamarNota?: LlamarVeredicto } = {}
 ): Promise<ResumenEscalamiento> {
   const appUrl = opts.appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://prisma.vakdor.com"
   const ahoraMs = opts.ahoraMs ?? Date.now()
@@ -212,7 +220,7 @@ export async function correrEscalamiento(
     const desde = new Date(ahoraMs - DIAS_MAXIMOS_ESPERA * 24 * 3600e3).toISOString()
     const { data: candidatos } = await db
       .from("wa_conversations")
-      .select("id, agency_id, contact_phone, metricas, agent_id, bot_active, last_message_at")
+      .select("id, agency_id, contact_phone, metricas, agent_id, bot_active, last_message_at, visit_scheduled_at")
       .eq("agency_id", config.agency_id)
       .eq("opt_out", false)
       .not("funnel_status", "in", "(closed_won,closed_lost)")
@@ -249,6 +257,22 @@ export async function correrEscalamiento(
       // reloj y solo puede sobre-incluir (hábiles ≤ reloj), nunca dejar afuera un caso maduro.
       const horas = horasHabiles(Date.parse(t0), ahoraMs)
       if (horas < 2) continue
+
+      // La nota interna del asesor habla (Leonardo, 4/9): si hay una posterior al último
+      // mensaje del lead, la IA decide si el cliente ya está atendido. Determinista solo
+      // la detección; la interpretación jamás (una nota puede ser cualquier cosa).
+      const asesor = c.agent_id ? await perfil(c.agent_id) : null
+      const rNota = await procesarNotaDelCaso(db, c, t0, {
+        modo: config.modo, asesor, appUrl,
+        nombreAgencia: nombreAgencia.get(c.agency_id) ?? "PRISMA",
+        ahoraMs, fetchFn: opts.fetchFn, llamar: opts.llamarNota,
+      })
+      if (rNota.startsWith("atendido")) {
+        resumen.atendidos++
+        if (rNota === "atendido_avisado") resumen.avisos++
+        continue
+      }
+
       resumen.esperando++
 
       // niveles ya mandados PARA ESTE CASO (mismo t0)
@@ -259,7 +283,6 @@ export async function correrEscalamiento(
       if (!nivel) continue
       const def = NIVELES.find((n) => n.horas === nivel)!
 
-      const asesor = c.agent_id ? await perfil(c.agent_id) : null
       const contexto = await contextoDelLead(db, c)
       const agencia = nombreAgencia.get(c.agency_id) ?? "PRISMA"
       const destinos: Array<{ quien: "asesor" | "director"; aviso: Aviso }> = []
