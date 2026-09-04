@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
-import { MARCADOR_HANDOFF, notaPosterior, coincideTelefono, contextoRegistro, semillaVeredicto, VeredictoNotaSchema } from "./nota-interna"
+import { MARCADOR_HANDOFF, notaPosterior, coincideTelefono, contextoRegistro, semillaVeredicto, VeredictoNotaSchema, armarAvisoRegistro } from "./nota-interna"
+import type { PerfilEquipo } from "./avisos"
 
 /** Fake mínimo: cada from() devuelve una cadena donde todo método se encadena y
  *  maybeSingle() resuelve la primera fila que el test le dio para esa tabla. */
@@ -115,5 +116,37 @@ describe("VeredictoNotaSchema", () => {
       pedir_registro_actividad: false, razon: "La nota dice que ya lo llamó",
     }).success).toBe(true)
     expect(VeredictoNotaSchema.safeParse({ atendido: true }).success).toBe(false)
+  })
+})
+
+describe("armarAvisoRegistro: un solo aviso, tono de ayuda, solo los pedidos que aplican", () => {
+  const eric: PerfilEquipo = { id: "p-1", full_name: "Eric Zambrana", role: "asesor", email: "e@x.com", phone: "549115..." }
+  const conv = { id: "conv-1", contact_phone: "5491136299626", metricas: { nombre: "Nicolás" } }
+  const nota = { id: "n-1", content: "Ya estamos en contacto con el cliente, se coordinó una visita para el Viernes", created_at: "2026-09-03T21:20:00Z" }
+  const APP = "https://prisma.vakdor.com"
+
+  it("con los tres pedidos: reconoce la gestión, frena la escalera y lista chat + visita + tracking", () => {
+    const a = armarAvisoRegistro(eric, conv, nota, {
+      atendido: true, pedir_registro_chat: true, pedir_registro_visita: true,
+      pedir_registro_actividad: true, razon: "La nota dice que ya lo llamó y coordinó visita",
+    }, APP, "Central")
+    expect(a.plantilla).toBe("asesor_registro_pendiente")
+    expect(a.html).toContain("Perfecto que ya lo estés atendiendo")
+    expect(a.html).toContain("se frenaron para este caso")
+    expect(a.html).toContain("chat de PRISMA")
+    expect(a.html).toContain("calendario")
+    expect(a.html).toContain("tracking")
+    expect(a.link).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-1")
+    expect(a.variables).toHaveLength(3)
+    expect(a.variables[0]).toBe("Eric")
+  })
+  it("solo el pedido que aplica: sin visita ni tracking no los menciona", () => {
+    const a = armarAvisoRegistro(eric, conv, nota, {
+      atendido: true, pedir_registro_chat: true, pedir_registro_visita: false,
+      pedir_registro_actividad: false, razon: "Gestión telefónica",
+    }, APP, "Central")
+    expect(a.html).toContain("chat de PRISMA")
+    expect(a.html).not.toContain("calendario")
+    expect(a.html).not.toContain("tracking")
   })
 })

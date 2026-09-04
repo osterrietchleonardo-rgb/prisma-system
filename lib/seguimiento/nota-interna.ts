@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import Anthropic from "@anthropic-ai/sdk"
 import { z } from "zod"
 import { MODELO } from "@/lib/admin-vakdor/marketing/claude"
+import { linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
 
 /** El sistema escribe este marcador con role='internal' al apagarse el bot: NO es una nota del asesor. */
 export const MARCADOR_HANDOFF = "⚠️ Handoff activado"
@@ -161,5 +162,60 @@ export function crearLlamadaVeredicto(): LlamarVeredicto {
     const uso = res.content.find((b) => b.type === "tool_use")
     if (!uso || uso.type !== "tool_use") throw new Error("la IA no emitió veredicto")
     return VeredictoNotaSchema.parse(uso.input)
+  }
+}
+
+function primerNombre(p: Pick<PerfilEquipo, "full_name">): string {
+  return (p.full_name ?? "").trim().split(/\s+/)[0] || "Hola"
+}
+function esc(s: string): string {
+  return s.replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch] as string)
+}
+
+/**
+ * UN solo aviso por nota (regla de Leonardo, 4/9): reconoce la gestión, avisa que la
+ * escalera se frenó, y pide SOLO los registros que faltan. Tono de ayuda, jamás un reto.
+ */
+export function armarAvisoRegistro(
+  perfil: PerfilEquipo,
+  c: { id: string; contact_phone: string; metricas: Record<string, unknown> },
+  nota: NotaInterna,
+  v: VeredictoNota,
+  appUrl: string,
+  nombreAgencia: string
+): Aviso {
+  const cliente = nombreCliente(c as never)
+  const tel = `+${c.contact_phone.replace(/\D/g, "")}`
+  const link = linkAlChat(perfil, c.id, appUrl)
+  const pedidos: string[] = []
+  if (v.pedir_registro_chat)
+    pedidos.push("Dejá una línea con lo gestionado en el <strong>chat de PRISMA</strong> del contacto: lo que queda ahí lo ve todo el equipo, y Sofía deja de avisarte por un cliente que ya estás atendiendo.")
+  if (v.pedir_registro_visita)
+    pedidos.push("La visita que mencionás no figura en el <strong>calendario</strong> de PRISMA: cargala así los recordatorios al cliente corren solos.")
+  if (v.pedir_registro_actividad)
+    pedidos.push("Registrá la gestión en el <strong>tracking</strong> (la actividad con este cliente y la propiedad): es lo que después cuenta como trabajo hecho.")
+  const html = [
+    `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;color:#1a1a1a">`,
+    `<p>Hola ${esc(primerNombre(perfil))},</p>`,
+    `<p>Vimos tu nota sobre <strong>${esc(cliente)}</strong> (${esc(tel)}): <em>«${esc(unaLinea(nota.content, 200))}»</em></p>`,
+    `<p>Perfecto que ya lo estés atendiendo — los avisos de "cliente esperando" se frenaron para este caso.</p>`,
+    pedidos.length ? `<p>Para que nada se pierda:</p><ul>${pedidos.map((p) => `<li>${p}</li>`).join("")}</ul>` : "",
+    `<p><a href="${link}" style="display:inline-block;background:#111;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Abrir el chat en PRISMA</a></p>`,
+    `<p style="color:#888;font-size:13px">— Agente de seguimiento de PRISMA · ${esc(nombreAgencia)}</p>`,
+    `</div>`,
+  ].filter(Boolean).join("\n")
+  const queRegistrar = [
+    v.pedir_registro_chat ? "el chat" : null,
+    v.pedir_registro_visita ? "la visita en el calendario" : null,
+    v.pedir_registro_actividad ? "la actividad en el tracking" : null,
+  ].filter(Boolean).join(", ")
+  return {
+    destinatario: perfil,
+    esAsignado: true,
+    link,
+    asunto: `${cliente}: gestión anotada — falta el registro en PRISMA — ${nombreAgencia}`,
+    html,
+    plantilla: "asesor_registro_pendiente",
+    variables: [primerNombre(perfil), unaLinea(`Vimos tu nota sobre ${cliente} (${tel}); los avisos se frenaron. Te pedimos registrar: ${queRegistrar || "nada, todo al día"}.`, 700), link],
   }
 }
