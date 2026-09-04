@@ -71,3 +71,6 @@ scratch/n8n-backups/
 # siguen igual: se revisaron uno por uno y no tienen claves, y uno de ellos,
 # scratch/clickup-ids.json, lo usa el CLAUDE.md.
 scratch/
+
+# Artefactos operativos de mercado-sync (JSON scrapeados y checkpoints): no versionar.
+mercado-sync/data/
