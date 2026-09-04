@@ -16,6 +16,52 @@
 
 ---
 
+## 2026-09-04 — sesión Super Agente: las notas internas hablan con Sofía (queja de Eric)
+
+**Qué pasó.** Queja en el admin (`system_feedback` dee8cc57, Eric Zambrana, Central, 3/9 22:00 AR):
+atendió a Nicolás Bellia por teléfono, apagó el bot y dejó nota interna ("se coordinó visita para
+el viernes") y la escalera igual le mandó nivel 2 h (19:30), 5 h con Kevin (22:31) y 10 h (4/9
+10:31). Causa: `esperandoHumano()` con bot apagado + "atendido" = solo un mensaje `role=human` en
+el chat; las notas (`role=internal`) eran invisibles para la escalera y para el agente. Esa misma
+mañana los asesores de Central dejaron 8+ notas ("No tomar seguimiento…") — adoptaron la nota
+como canal hacia Sofía. Corte manual del nivel 20 con OK (lead_eventos 1878, tipo
+`escalera_simulada` con el t0 exacto).
+
+**Qué se construyó (PR #46, merge `45943c6`, deploy READY ~15:40 AR; 1651 tests, main tenía 1595).**
+Decisión de Leonardo: la nota la interpreta la IA, nunca reglas. `lib/seguimiento/nota-interna.ts`:
+detección por query (excluye "⚠️ Handoff activado"), `contextoRegistro` (visita en
+`visit_scheduled_at` o `scheduled_visits` por últimos 8 dígitos; actividades de `performance_logs`
+vía `wa_contacts`), veredicto Claude con tool forzado + Zod (`atendido`, `pedir_registro_chat/
+visita/actividad`, `razon`; ~US$0,011), `armarAvisoRegistro` (UN email; plantilla
+`asesor_registro_pendiente` no existe en Meta ⇒ solo email), `procesarNotaDelCaso` (un
+`nota_evaluada` por nota_id; atendido pegajoso por t0; `nota_error` ⇒ la escalera sigue;
+`MAX_NOTAS_IA=20`/barrida; sombra no envía; insert del marcador chequeado inline). La escalera
+lo llama antes de disparar un nivel; el agente de decisiones recibe la última nota en la semilla.
+Prueba en seco con la nota real: atendido + 3 pedidos; con "ojo: pregunta por cochera": no
+atendido. La query real verificada con supabase-js contra producción. Docs: TECNICO §22.8,
+FUNCIONAL asesor §24 y director §29. Ejecutado con subagentes (8 tareas + review final de rama
+con 14 hallazgos, todos cerrados). Spec: `docs/superpowers/specs/2026-09-04-notas-internas-ia-design.md`.
+
+**Decisiones tomadas por el agente (revisables):** errores de lectura de base se siguen tragando
+salvo en `notaPosterior` (console.error) — dirección de falla segura; tope de IA por corrida, no
+por agencia; si falla el marcador `nota_evaluada`, el atendido no manda email y el NO atendido
+sigue escalando; texto del pedido del chat = "mandale al cliente desde el chat de PRISMA la
+confirmación de lo acordado" (no otra nota interna).
+
+**Aclaración para Kevin (mensaje entregado a Leonardo):** "5 horas" y "10 horas" son escalones
+distintos (2/5/10/20 h hábiles), no un error de cuenta.
+
+**Pendiente.** (1) Crear `asesor_registro_pendiente` en la WABA de Central — necesita OK; texto
+propuesto "Hola {{1}}, {{2}} Entrá y dejalo registrado desde acá: {{3}} ¡Gracias!". (2) La respuesta
+libre del asesor por WhatsApp al aviso (Eric: "revisá la nota interna", 19:34) recibe texto enlatado
+y no alimenta nada → mismo veredicto IA. (3) Pasar TODAS las notas post-t0 a la IA. (4) Menores
+diferidos: colisión de 8 dígitos entre códigos de área; `estado_visita` cancelada cuenta como
+registrada; contadores mezclados en el resumen de la corrida; `usage` no se guarda en
+`nota_evaluada`; evaluar recién después de `nivelQueToca`; fake `.contains` pass-through en
+escalamiento.test.ts. (5) Idea de Leonardo para spec propio: resumen semanal por asesor
+(conversaciones vs tracking vs calendario + uso de módulos). (6) Verificar la primera barrida real
+con nota: `lead_eventos` tipo `nota_evaluada` sin `escalera` posterior para ese t0.
+
 ## 2026-09-04 (cierre) — CABA COMPLETO: los 41 barrios
 
 Leonardo dio el OK para terminar CABA. Subió el límite Apify a US$100; se corrió con tope US$96.
