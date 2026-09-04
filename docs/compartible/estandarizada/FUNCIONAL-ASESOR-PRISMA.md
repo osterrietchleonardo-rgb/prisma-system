@@ -891,5 +891,7 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 
 **Cuando te asignan un chat** (el director te lo pasa), te llega un aviso con qué busca el cliente, su último mensaje y **el comentario del director**, y en el chat tenés los mismos botones para tomarlo o devolverlo.
 
+**Si atendiste a un cliente por teléfono o en persona:** dejá una **nota interna** en el chat contando qué hiciste, como ya venís haciendo. Sofía la lee: si dice que ya lo estás atendiendo, deja de mandarte avisos de "cliente esperando" por ese caso. Y si la nota menciona algo que en PRISMA todavía no quedó cargado —la visita en el calendario, la gestión en el chat, la actividad en tu tracking— te lo pide, todo junto, en un solo correo.
+
 > 💡 **Tip:** el seguimiento automático a los clientes que se enfriaron lo hace PRISMA solo, con mensajes naturales y como mucho tres veces; vos vas a ver en la ficha qué decidió y por qué. Lo tuyo son los clientes que **te esperan a vos**.
 

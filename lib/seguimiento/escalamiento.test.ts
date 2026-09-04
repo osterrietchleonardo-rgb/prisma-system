@@ -136,3 +136,92 @@ describe("los niveles se miden en horas hábiles (la noche no corre)", () => {
     expect(nivelQueToca(horasHabiles(t0, ar("2026-09-04T07:00:00")), [])).toBe(2)
   })
 })
+
+describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
+  const ar = (iso: string) => Date.parse(iso + "-03:00")
+
+  /** `tablasQueTiran` simula una tabla que revienta al leerla (permiso, timeout, columna que no está). */
+  function armarDbCorrida(tablasQueTiran: string[] = []) {
+    const inserts: Array<{ tabla: string; fila: Record<string, unknown> }> = []
+    const tablas: Record<string, unknown> = {
+      seguimiento_config: [{ agency_id: "ag-1", modo: "activo", activo_desde: "2026-08-31T00:00:00Z" }],
+      agencies: [{ id: "ag-1", name: "Central" }],
+      wa_conversations: [{
+        id: "conv-1", agency_id: "ag-1", contact_phone: "5491136299626",
+        metricas: { nombre: "Nicolás" }, agent_id: "p-1", bot_active: false,
+        last_message_at: "2026-09-03T20:09:43Z", visit_scheduled_at: null,
+      }],
+      profiles: [{ id: "p-1", full_name: "Eric Zambrana", role: "asesor", email: "e@x.com", phone: null }],
+      // wa_messages responde según los filtros: para simplificar, el último del lead y la nota
+      wa_messages_ultimo_lead: { created_at: "2026-09-03T20:09:43Z" },
+      wa_messages_humano: [],
+      wa_messages_nota: { id: "n-1", content: "Ya lo llamé, visita el viernes", created_at: "2026-09-03T21:20:00Z" },
+      lead_eventos: [],
+      scheduled_visits: [], wa_contacts: null, performance_logs: [],
+      interacciones_canal: [], wa_templates: null, whatsapp_instances: null,
+    }
+    let vecesWaMessages = 0
+    const db = {
+      from(tabla: string) {
+        if (tablasQueTiran.includes(tabla)) throw new Error(`la tabla ${tabla} no se puede leer`)
+        let respuesta = tablas[tabla]
+        if (tabla === "wa_messages") {
+          // orden real de las llamadas en la corrida: último del lead → humano → nota → leer_mensajes
+          const orden = ["wa_messages_ultimo_lead", "wa_messages_humano", "wa_messages_nota", "wa_messages_humano"]
+          respuesta = tablas[orden[Math.min(vecesWaMessages, orden.length - 1)]]
+          vecesWaMessages++
+        }
+        const chain: Record<string, unknown> = {}
+        for (const m of ["select", "eq", "not", "gt", "gte", "order", "limit", "contains", "in", "lt"])
+          chain[m] = () => chain
+        chain.maybeSingle = async () => ({ data: Array.isArray(respuesta) ? (respuesta as unknown[])[0] ?? null : respuesta ?? null })
+        chain.is = () => chain
+        chain.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: respuesta ?? [] }).then(res)
+        chain.insert = (fila: Record<string, unknown>) => {
+          inserts.push({ tabla, fila })
+          return { select: () => ({ single: async () => ({ data: { id: "x" } }) }), then: (r: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(r) }
+        }
+        return chain
+      },
+    }
+    return { db: db as never, inserts }
+  }
+
+  it("veredicto atendido ⇒ atendidos++, ni un nivel de escalera sale", async () => {
+    const { db, inserts } = armarDbCorrida()
+    const llamarNota = async () => ({
+      atendido: true, pedir_registro_chat: true, pedir_registro_visita: false,
+      pedir_registro_actividad: false, razon: "Gestión telefónica",
+    })
+    // El fetch no promete nada: sin RESEND_API_KEY el email ni se intenta (omitido_sin_resend).
+    const fetchOk = (async () => ({ ok: true, json: async () => ({}) })) as never
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.atendidos).toBe(1)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(false)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_evaluada")).toBe(true)
+  })
+
+  it("veredicto NO atendido ⇒ la escalera manda el nivel como siempre", async () => {
+    const { db, inserts } = armarDbCorrida()
+    const llamarNota = async () => ({
+      atendido: false, pedir_registro_chat: false, pedir_registro_visita: false,
+      pedir_registro_actividad: false, razon: "Solo un recordatorio",
+    })
+    const fetchOk = (async () => ({ ok: true, json: async () => ({ id: "r-1" }) })) as never
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(1)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(true)
+  })
+
+  it("si la lectura de la nota explota, la corrida NO se cae: sale el nivel y queda el evento nota_error", async () => {
+    // scheduled_visits reventando hace explotar a procesarNotaDelCaso FUERA de su try interno.
+    // La escalera es lo que corre en producción: no puede morirse porque la feature nueva falle.
+    const { db, inserts } = armarDbCorrida(["scheduled_visits"])
+    const llamarNota = async () => { throw new Error("API caída") }
+    const fetchOk = (async () => ({ ok: true, json: async () => ({}) })) as never
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(1)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(true)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_error")).toBe(true)
+  })
+})
