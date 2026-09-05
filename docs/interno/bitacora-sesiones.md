@@ -154,6 +154,46 @@ reasignar esas propiedades en Tokko.
 usar la arquitectura de agentes (streaming + pensamiento + herramientas) para agentes
 personalizados por campaña de WhatsApp; condición previa: extraer `lib/agente/` (punto 2).
 
+**Marketing — el 4:5 y el logo (rama `feat/marketing-formato-4-5`, dos commits: `5c8ec3d` y
+`e334190`).** Kevin pidió el formato 4:5 de Instagram. Verificado: no existía. Pero al mirarlo
+apareció algo más grande: **el tamaño nunca se le pedía a Gemini**. Se le escribía dentro del
+texto del prompt ("hacela de 1080x1920") y después se guardaba `1080x1920` en la base **sin
+medir el archivo**. Los archivos reales medían 768x1376. La ficha mentía desde siempre.
+
+- Ahora el formato va por `imageConfig.aspectRatio` **y además** se recorta con sharp a la
+  medida exacta: los buckets de Gemini son aproximados (pidiéndole 4:5 devuelve 0,806;
+  pidiéndole 9:16, 0,558). Medido, no supuesto.
+- La medida que se guarda **se mide** sobre el archivo subido.
+- Tres formatos en `lib/marketing-ia/formatos.ts` (un solo lugar; antes estaban a mano en
+  cuatro): Post vertical 4:5 (nuevo, por defecto), Reel / Historia 9:16 (eran dos botones
+  del mismo tamaño) y Post cuadrado 1:1. `historia` sigue válida para las 12 placas viejas.
+- Se pide 2K: en `gemini-3-pro-image` **1K y 2K cuestan lo mismo**, así que las placas pasan
+  de 768 a 1080 px de ancho gratis.
+- **Migración aplicada a producción** (`20260903190000`): el CHECK de `generated_images` sólo
+  aceptaba reels/post/historia. Sin abrirlo, el insert falla con 23514 **después** de generar
+  y pagar la imagen.
+
+**El logo de Central, "chiquito y clarito" (`lib/marketing-ia/logo.ts`).** Eran dos cosas
+sumadas, las dos medidas: (1) su PNG es un lienzo de 500x500 con la marca en 411x135 — el 73%
+del alto es vacío — y el código agrandaba el **lienzo entero** al 16%, así que la marca salía
+al 13,2%; (2) su logo es blanco (claridad 243/255) y se pegaba sin nada detrás, sobre fotos
+que la IA genera "luminosas". Se resolvió **sin atarlo a ese logo**: se recorta el vacío de
+cualquier archivo, y el halo se decide midiendo en el momento la marca contra el fondo donde
+cae (claro sobre claro → halo oscuro; oscuro sobre oscuro → halo claro; si ya contrasta, nada).
+Cada placa deja en el log qué midió y qué decidió.
+
+**Dos errores propios, los dos del mismo tipo: dar por buena una prueba sin verla fallar.**
+
+- La prueba que ata los formatos a la migración **daba verde con la migración rota**: buscaba
+  `'post_vertical'` en todo el archivo y lo encontraba **en un comentario**. Ahora lee sólo la
+  cláusula `CHECK`. Regla vieja, error nuevo: romper el código a propósito y ver fallar.
+- El primer banco de pruebas del logo usaba **placas ya generadas, que ya tenían el logo
+  pegado**: comparaba un logo encima de otro. Se rehízo con fotos de Tokko sin marca.
+
+**Pendiente:** PRISMAIA - VAKDOR tiene cargado el **aviso legal de Central** (matrículas de
+Guastello y Belsito) y sale en las placas de Leonardo. Y quedaron 2 placas de prueba en su
+galería (4 créditos).
+
 ---
 
 ## 2026-09-02 (y el encendido del 31/8) — sesion Super Agente: Central en ACTIVO + la Trazabilidad de Kevin
@@ -436,6 +476,104 @@ contenido, y con caída a "actualizado" si no se puede leer en vez de inventar u
 no es el historial.
 
 ---
+## 2026-08-31 y 2026-09-01
+
+Dos días de sesión de `/socio` seguidos. Casi todo el trabajo fue sobre **el propio Socio y el
+pipeline de outbound**, no sobre la app. Lo que más sirve de acá abajo son los errores propios:
+esta vez fueron muchos y casi todos del mismo tipo.
+
+> [!warning] CORRECCIÓN AL CIERRE DEL 01/09: dos cosas que esta entrada daba por ciertas cambiaron
+> **`mercado_avisos` YA EXISTE.** A la mañana del 01/09 se verificó que no estaba en el repo y
+> se usó ese dato para descartar una línea del Inbox. A la tarde se mergeó `24a4d2e` (21.401
+> avisos, 7 barrios, verificación de bajas y refresco mensual). El reemplazo de roomix está en
+> `main`. No repetir esa verificación de memoria: mirar el repo.
+>
+> **Tres de las doce tareas de la reunión ya están hechas**, el mismo día que se cargaron:
+> `151c167` ("Mi ADN", fuera el campo "operaciones cerradas", y fuera el precio en
+> `components/marketing-ia/fotos-ia.tsx`) y `32bb38c` (editar una foto suelta, sin propiedad
+> asociada). Ojo con la del precio: se sacó de `fotos-ia.tsx`, que es donde Kevin lo vio, pero
+> `components/ai-credits-dashboard.tsx` sigue con `fmtUsd()` y `usd_cost`.
+>
+> **Y el 01/09 fue el día del outbound:** 85 leads movidos (79 a toque 1), todos de 1er grado,
+> contra un récord anterior de 10. El detalle en `10 Bitácora/2026-09-01.md` del vault.
+
+
+**Lo que se construyó y se mergeó**
+
+- `fix/volcar-mailerlite-linkedin-anclado` → **mergeada a `main` (`bbbcb96`)**. El regex
+  `/LinkedIn:\s*(\S+)/` no estaba anclado y agarraba el primer `LinkedIn:` de cualquier texto
+  de la ficha. Ahora exige principio de línea y que lo capturado sea una URL de `linkedin.com`.
+- `feat/socio-lee-enviados` (`bf4922e`, **sin mergear**). El recolector ahora lee la **carpeta
+  de Enviados de Zoho** y el parte muestra `enviados_7d`. El id de la carpeta
+  (`5457602000000008022`) **no se puede descubrir por API** —Composio no expone acciones de
+  carpetas para Zoho— y se encontró probando ids y quedándose con la única donde todos los
+  remitentes son `@vakdor.com`. Queda configurable por `ZOHO_FOLDER_ENVIADOS`, con un control
+  que la ignora y avisa si deja de parecer la de enviados.
+- `.claude/skills/vakdor-socio/scripts/conexiones-ipc.mjs` (**sin commitear**). Barre las
+  conexiones de 1er grado de LinkedIn, las cruza contra las dos bandejas y el pipeline, filtra
+  por IPC2 y las carga a ClickUp. Solo lectura salvo que se le pase `--cargar`.
+
+**Lo que se decidió**
+
+- **El outbound de la tanda de Apollo va por mail, no por LinkedIn.** Apollo trae el mail y el
+  perfil pero **no trae el grado**, y el link de chat directo de LinkedIn
+  (`messaging/thread/new/?recipient=`) **solo funciona con contactos de 1er grado**. La regla
+  quedó escrita en `20 Frentes/outbound.md` del vault, que es lo único que evita repetirlo:
+  el generador de esas fichas fue un script de una sola vez que ni siquiera está en el repo.
+- **El orden de una lista de ClickUp no se puede escribir por API.** Se intentó con
+  `orderindex` en los tres sentidos posibles y el orden no se movió nunca: ClickUp acepta el
+  `PUT`, devuelve 200 y mantiene su propio orden (por fecha de creación). Lo que **sí** se
+  escribe es `priority`, y ordenar la vista por prioridad resuelve el mismo problema.
+
+**Los errores propios, que es lo que más sirve**
+
+1. **Cuatro veces el mismo defecto: un texto propio rompiendo un parser propio.** Al corregir
+   las 68 fichas se escribió una línea de ayuda que decía *"Si vas por LinkedIn: entrá al
+   perfil"*, y `volcar-mailerlite.mjs` —que lee el primer `LinkedIn:`— subió a MailerLite el
+   valor `"entra"` en los 68 registros. Después, el clasificador de 1er grado marcó 166 fichas
+   como 1er grado porque el aviso decía *"solo se abre si YA sos contacto de 1er grado"*.
+   **Regla: todo patrón que se busca en un texto libre va anclado a principio de línea, y antes
+   de escribir una plantilla hay que mirar qué otros scripts la parsean.**
+2. **Se contaron 100 fichas de pipeline cuando había 168.** La API de ClickUp devuelve 100 por
+   página y no avisa. El propio `outbound-diario.mjs` ya tenía un comentario advirtiéndolo, del
+   27/08, y se leyó igual sin paginar. Todos los números del parte de esa mañana salieron mal.
+3. **Se nombró el archivo equivocado para arreglar.** Se dijo que el bug estaba en
+   `volcar-mailerlite.mjs:144`, que **lee** el link, no lo escribe. El generador real no existe
+   en el repo. Un grep positivo no dice quién escribe: dice quién menciona.
+4. **Se reportó un "link truncado" que era el propio `.slice(0, 80)` del script de inspección.**
+   Se llegó a formular una hipótesis (corte a 80 caracteres) que dos muestras parecían
+   confirmar. La comprobación de la hipótesis fue la que la desmintió: el largo máximo real era
+   116. **Cuando una medición confirma sospechosamente bien, lo primero que se duda es la
+   medición.**
+5. **El barrido de bandejas leía Sales Navigator sin scrollear ni una vez.** Devolvía 55 hilos;
+   con el scroll agregado devuelve **806**. Con 55 hilos, 55 personas ya contactadas figuraban
+   como "falta escribirles" — entre ellas Ignacio O'Keefe, que ya había dicho que no el 19/08.
+6. **El Socio nunca había leído el correo enviado.** Veía lo que le contestan pero no lo que
+   Leonardo manda, y como los toques por mail no pasan por ClickUp, acusó de pendientes a leads
+   ya contactados. Lo dijo él: *"deberías saberlo"*. Es la causa raíz de 5, no un caso aparte.
+
+**Gotchas del entorno**
+
+1. **Los procesos en segundo plano se cortan a los ~10 minutos.** Un barrido de 1618 conexiones
+   no entra. Todo script largo tiene que **guardar a disco apenas consigue algo** y poder
+   reanudar: la primera versión guardaba al final y una corrida perdió 806 hilos y 208
+   conexiones ya leídas.
+2. **No pipear la salida de un proceso largo a `grep` o `tail`**: se retiene hasta que el pipe
+   cierra y no se puede ver el avance. Redirigir a un archivo.
+3. **Un worktree nuevo no tiene `node_modules` de la skill.** El recolector reportó `zoho` como
+   fuente caída, que es la conducta correcta, pero hay que correr `npm install` dentro de
+   `.claude/skills/vakdor-socio/` en cada worktree.
+4. **Los heredoc de bash se rompen con contenido largo con comillas.** Para scripts grandes,
+   escribir el archivo con la herramienta de escritura, no con `cat <<EOF`.
+5. **`python` en esta máquina imprime en cp1252 y explota con acentos.** Va `python -X utf8` y
+   `sys.stdout.reconfigure(encoding='utf-8')`.
+6. **La página de conexiones de LinkedIn no scrollea el documento** (`scrollHeight ==
+   innerHeight == 654`): scrollea un contenedor interno (`main#workspace`). Las clases son
+   hashes que cambian, así que se busca por comportamiento: el elemento grande cuyo contenido
+   no entra.
+
+---
+
 ## 2026-08-27 (y la noche del 26): el Super Agente llegó a main
 
 **Estado al cierre:** fase 1 del Super Agente de Seguimiento **completa y en `main`** (Tasks 0-20 del
