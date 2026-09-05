@@ -69,8 +69,14 @@ export async function generateMetadata({ params }: { params: { token: string } }
 // Pie de marca de cada hoja (logo + aviso legal + rótulo). Va DENTRO de cada hoja (in-flow),
 // no fijo, para que salga idéntico en pantalla y en PDF, sin artefactos de impresión.
 function SheetFooter({ brand, agencyName, primary }: { brand: FichaBrand; agencyName: string; primary: string }) {
+  const legal = (brand?.legal_notice || "").trim();
+  // Arriba de este largo el aviso ya no entra en la columna del medio y el pie se estira para
+  // abajo. El número no es a ojo: la columna del medio mide 352 px y a 9 px entran ~78 letras
+  // por renglón, así que en 220 caracteres el texto llega a los 3 renglones que mide el logo.
+  // De ahí en adelante el pie se reacomoda para darle lugar (ver .sf-ancho en el CSS).
+  const avisoLargo = legal.length > 220;
   return (
-    <footer className="sheet-footer">
+    <footer className={avisoLargo ? "sheet-footer sf-ancho" : "sheet-footer"}>
       <div className="sf-left">
         {brand?.logo_url ? (
           // Chip del MISMO color del banner superior: garantiza que el logo (venga claro u oscuro)
@@ -83,7 +89,10 @@ function SheetFooter({ brand, agencyName, primary }: { brand: FichaBrand; agency
           <strong style={{ color: primary }}>{agencyName || "PRISMA"}</strong>
         )}
       </div>
-      {brand?.legal_notice ? <div className="sf-legal">{brand.legal_notice}</div> : <div />}
+      {/* El div vacío no es de adorno: sin él, la agencia que no configuró aviso legal deja
+          libre la columna del medio y el rótulo se corre al centro en vez de quedarse en su
+          esquina. (En el modo ancho siempre hay aviso, por definición del umbral de arriba.) */}
+      {legal ? <div className="sf-legal">{legal}</div> : <div />}
       <div className="sf-right">Análisis Comparativo de Mercado</div>
     </footer>
   );
@@ -614,6 +623,25 @@ const CSS = `
 
 /* Pie de marca — mismo en cada hoja (in-flow, abajo de todo). */
 .sheet-footer { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 2.2fr 1fr; align-items: center; gap: 12px; padding: 8px var(--pad); border-top: 1px solid #ece8df; background: #faf9f6; }
+
+/* AVISO LEGAL LARGO. El de una inmobiliaria pasa los 800 caracteres (matrículas, leyes,
+   decretos, domicilio). Metido en la columna del medio se partía en 11 renglones y la banda del
+   pie se comía 150px = el 13% de CADA hoja, con la mitad del ancho de la hoja vacía a los dos
+   costados. Acá el pie se reacomoda en dos filas: arriba el logo en su esquina y el aviso
+   ocupando TODO el resto del ancho a su derecha —arranca donde termina el logo y nunca le pasa
+   por debajo—, y abajo el rótulo, que deja la esquina derecha libre y pasa al centro. Es el
+   rótulo el que le hace lugar al aviso: sacarlo de la esquina son 200px más de renglón. */
+.sheet-footer.sf-ancho { grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 7px; }
+.sf-ancho .sf-left { grid-area: 1 / 1; }
+.sf-ancho .sf-legal { grid-area: 1 / 2; }
+.sf-ancho .sf-right { grid-area: 2 / 1 / 3 / 3; text-align: center; }
+/* Justificado, no centrado: en un bloque ancho de 6 renglones el centrado deja los bordes
+   dentados y se lee como un texto desarmado. Justificado da el bloque parejo de un aviso legal
+   de contrato. En el modo normal (la columna del medio) sigue centrado.
+   text-wrap: pretty evita que el último renglón quede con un pedazo suelto: sin él el teléfono
+   del aviso se partía al medio ("4789-" arriba y "3700" abajo), que en un texto legal se lee
+   como un error. El navegador que no lo entienda lo ignora y queda como antes. */
+.sf-ancho .sf-legal { text-align: justify; text-wrap: pretty; }
 .sf-logo-chip { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; }
 .sf-logo { height: 26px; max-height: 26px; max-width: 40mm; width: auto; object-fit: contain; object-position: left center; display: block; }
 .sf-left strong { font-size: 13px; }
