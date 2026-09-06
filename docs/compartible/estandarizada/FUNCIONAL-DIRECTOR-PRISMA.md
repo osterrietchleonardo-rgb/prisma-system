@@ -71,10 +71,20 @@ Antes de operar, dejá lista la base. Andá a **Configuración** (último ítem 
 
 ## 3. Cómo moverte por PRISMA
 
-- **Menú lateral izquierdo:** tu navegación principal (18 secciones).
+- **Menú lateral izquierdo:** tu navegación principal. Las secciones están agrupadas por lo que hay adentro de cada una:
+  - **Mi día:** Dashboard, Calendario.
+  - **Bandejas:** Asesor IA WhatsApp (las conversaciones que entran).
+  - **Contactos:** Pipeline, Leads Tokko, Leads WhatsApp (los listados de gente).
+  - **Propiedades:** Propiedades, Buscador IA, ACM, Pulso de Mercado.
+  - **Herramientas IA:** Marketing IA, Contratos IA.
+  - **Mi equipo:** Equipo, Asesores, Tracking Performance.
+  - **Ayuda:** Tutor IA, Documentos, Sugerencias.
+- Cada grupo se abre y se cierra tocando su título. Podés cerrarlos todos; el grupo de la sección en la que estás queda con el título en color cobre para que no pierdas dónde estás. Al entrar a una sección, su grupo se abre solo. El menú se acuerda de qué grupos dejaste abiertos.
+- Si en el grupo **Mi equipo** hay aprobaciones pendientes, el contador aparece sobre "Equipo" y, si el grupo está cerrado, sobre el título del grupo.
+- **Cerrar la barra en la computadora:** arriba a la derecha de la barra hay un botón para esconderla y ver el contenido a todo lo ancho. Para volver a abrirla, usá el botón **"Barra lateral"** que aparece arriba a la izquierda. PRISMA se acuerda de cómo la dejaste. En el celular no cambia nada: la barra sigue saliendo desde el botón de las tres líneas.
 - Arriba a la derecha: **botón de tema** (☀️/🌙) para modo claro u oscuro.
 - Tu nombre y rol ("Director") aparecen arriba del menú.
-- **"Cerrar Sesión"** está al final del menú.
+- **"Configuración"** y **"Cerrar Sesión"** están al final del menú, siempre a mano.
 
 Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, métricas globales y la configuración.
 

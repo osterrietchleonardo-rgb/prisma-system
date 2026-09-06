@@ -158,6 +158,11 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
     fetchLogs();
     fetchAgencyConfig();
     window.dispatchEvent(new CustomEvent('prisma-header-title', { detail: "Tracking Performance" }));
+    // Al salir se limpia el título, como hacen las fichas de lead y propiedad: si no,
+    // el header sigue diciendo "Tracking Performance" en todas las páginas siguientes.
+    return () => {
+      window.dispatchEvent(new CustomEvent('prisma-header-title', { detail: null }));
+    };
   }, [fetchLogs, fetchAgencyConfig]);
 
   // Derive unique advisors from logs for the director filter dropdown

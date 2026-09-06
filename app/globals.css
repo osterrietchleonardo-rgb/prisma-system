@@ -275,3 +275,11 @@
 }
 
 
+
+/* ===== Barra lateral de escritorio: se esconde con un botón =====
+   El estado va en <html data-barra="oculta"> y lo maneja components/barra-lateral.tsx.
+   Solo escritorio (md+): en el celular la barra es el cajón de la hamburguesa y no cambia. */
+@media (min-width: 768px) {
+  html[data-barra="oculta"] .barra-escritorio { width: 0; }
+  html[data-barra="oculta"] .btn-abrir-barra { display: inline-flex; }
+}

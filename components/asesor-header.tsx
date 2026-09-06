@@ -13,6 +13,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { AsesorSidebar } from "@/components/asesor-sidebar"
+import { BotonAbrirBarra } from "@/components/barra-lateral"
 import { usePathname } from "next/navigation"
 import { GlobalSearch } from "@/components/shared/global-search"
 import { NotificationPopover } from "@/components/shared/notification-popover"
@@ -83,6 +84,8 @@ export function AsesorHeader({ userName, userEmail, agencyName, agencyId, userRo
               />
             </SheetContent>
           </Sheet>
+          {/* Escritorio: vuelve a abrir la barra cuando está cerrada */}
+          <BotonAbrirBarra />
 
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Asesor</span>

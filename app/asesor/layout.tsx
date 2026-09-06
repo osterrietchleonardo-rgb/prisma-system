@@ -2,6 +2,7 @@ import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { AsesorSidebar } from "@/components/asesor-sidebar"
 import { AsesorHeader } from "@/components/asesor-header"
+import { SCRIPT_ESTADO_BARRA } from "@/lib/nav/barra-lateral"
 import { BandejaFab } from "@/components/whatsapp/BandejaFab"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getTokenIssuedAt } from "@/lib/auth/session"
@@ -102,9 +103,12 @@ export default async function AsesorLayout({
 
   return (
     <div className="h-screen flex overflow-hidden bg-muted/40 font-plus-jakarta">
-      {/* Sidebar - desktop */}
-      <aside className="hidden md:flex md:w-72 md:flex-col md:flex-shrink-0 z-50">
+      {/* Sidebar - desktop. Se cierra con el botón de la barra; el estado se lee del
+          navegador ANTES del primer dibujo para que no salte (components/barra-lateral.tsx). */}
+      <script dangerouslySetInnerHTML={{ __html: SCRIPT_ESTADO_BARRA }} />
+      <aside className="barra-escritorio hidden md:flex md:w-72 md:flex-col md:flex-shrink-0 z-50 overflow-hidden transition-[width] duration-200 motion-reduce:transition-none">
         <AsesorSidebar
+          className="w-72 shrink-0"
           agencyName={agencyName}
           agencyId={profile?.agency_id}
           userName={profile?.full_name || "Usuario"}
