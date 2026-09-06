@@ -56,10 +56,18 @@
 
 ## 2. Cómo moverte por PRISMA
 
-- El **menú lateral izquierdo** es tu navegación principal. Cada ítem es una sección.
+- El **menú lateral izquierdo** es tu navegación principal. Las secciones están agrupadas por lo que hay adentro de cada una:
+  - **Mi día:** Mi Dashboard, Mi Calendario, Tracking Performance.
+  - **Bandejas:** WhatsApp Bandeja (las conversaciones que entran).
+  - **Contactos:** Mi Pipeline, Leads Tokko, Leads WhatsApp (los listados de gente).
+  - **Propiedades:** Mis Propiedades, Buscador IA, ACM, Pulso de Mercado.
+  - **Herramientas IA:** Marketing IA, Contratos IA.
+  - **Ayuda:** Tutor IA, Biblioteca, Sugerencias.
+- Cada grupo se abre y se cierra tocando su título. Podés cerrarlos todos; el grupo de la sección en la que estás queda con el título en color cobre. Al entrar a una sección, su grupo se abre solo, y el menú se acuerda de qué grupos dejaste abiertos.
+- **Cerrar la barra en la computadora:** arriba a la derecha de la barra hay un botón para esconderla y ver el contenido a todo lo ancho. Para volver a abrirla, usá el botón **"Barra lateral"** arriba a la izquierda. En el celular no cambia nada: la barra sigue saliendo desde el botón de las tres líneas.
 - Arriba a la derecha tenés el **botón de tema** (☀️/🌙) para cambiar entre modo claro y oscuro.
 - Tu **nombre y rol** ("Asesor") aparecen arriba del menú.
-- Para salir, usá **"Cerrar Sesión"** al final del menú.
+- **"Configuración"** y **"Cerrar Sesión"** están al final del menú, siempre a mano.
 
 **Regla de oro del asesor:** vos ves **solo tu información** (tus leads, tus propiedades, tus visitas) o lo que la agencia comparte para todos (documentos, datos de mercado). No ves los datos de otros asesores, salvo el ranking general del equipo.
 

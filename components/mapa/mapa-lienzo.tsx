@@ -226,6 +226,35 @@ function Vigia({ onMover }: { onMover: (b: BBox) => void }) {
   return null
 }
 
+/**
+ * Leaflet mide su caja UNA vez al montar y solo se vuelve a medir con el resize
+ * de la ventana. Si la caja cambia por otra cosa —cerrar la barra lateral, un
+ * panel que se pliega— el mapa sigue dibujando con el ancho viejo y queda una
+ * franja vacia al costado. Este vigia mira la caja y le avisa cada vez que cambia.
+ */
+function AjustarAlContenedor() {
+  const mapa = useMap()
+  useEffect(() => {
+    const caja = mapa.getContainer()
+    if (typeof ResizeObserver === "undefined") return
+    let pedido: number | null = null
+    const obs = new ResizeObserver(() => {
+      // Un solo invalidateSize por cuadro, aunque la transicion dispare muchos cambios.
+      if (pedido !== null) return
+      pedido = requestAnimationFrame(() => {
+        pedido = null
+        mapa.invalidateSize({ animate: false })
+      })
+    })
+    obs.observe(caja)
+    return () => {
+      obs.disconnect()
+      if (pedido !== null) cancelAnimationFrame(pedido)
+    }
+  }, [mapa])
+  return null
+}
+
 /** Encuadra el mapa a un rectangulo cuando el usuario aplica una zona guardada o un trazo. */
 function Encuadrar({ a }: { a: BBox | null }) {
   const mapa = useMap()
@@ -507,6 +536,7 @@ export default function MapaLienzo({
       style={{ background: "#e4e4e7" }}
       preferCanvas
     >
+      <AjustarAlContenedor />
       <FondoDelMapa onProveedor={onProveedor} />
 
       {/* Antes de los marcadores: queda por debajo y no les roba el click. */}
