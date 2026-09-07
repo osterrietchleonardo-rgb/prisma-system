@@ -1,5 +1,5 @@
-// Crea el bucket donde se guardan los PDF/Word institucionales que sube cada agencia
-// para que salgan dentro de la ficha del ACM. Se corre UNA sola vez.
+// Crea (o pone al día) el bucket donde se guardan los PDF/Word institucionales que sube cada
+// agencia para que salgan dentro de la ficha del ACM.
 //
 //   node scripts/crear-bucket-acm-material.mjs
 //
@@ -7,7 +7,11 @@
 // configuración. El único que los abre es el servidor, con el cliente admin, cuando el
 // director toca "Volver a leer". Por eso se guarda la ruta interna y no una URL pública.
 //
-// Es idempotente: si el bucket ya existe, avisa y no toca nada.
+// El tope es de 50 MB. Arrancó en 25 y no alcanzaba: el carpetón "Our Company" de Central pesa
+// 25,45 MB y quedaba afuera por 0,45 MB. Un contrato es texto, pero un documento institucional
+// es todo imágenes.
+//
+// Es idempotente: si el bucket ya existe, le pone al día el tope y sigue.
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 
@@ -31,24 +35,41 @@ if (!url || !key) {
   process.exit(1);
 }
 
-const supabase = createClient(url, key);
-
-const { data, error } = await supabase.storage.createBucket("acm-material", {
+const BUCKET = "acm-material";
+const OPCIONES = {
   public: false,
-  fileSizeLimit: 25 * 1024 * 1024,
+  fileSizeLimit: 50 * 1024 * 1024,
   allowedMimeTypes: [
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ],
-});
+};
 
-if (error) {
-  if (/already exists/i.test(error.message)) {
-    console.log("El bucket acm-material ya existía. No se tocó nada.");
-    process.exit(0);
-  }
+const supabase = createClient(url, key);
+
+const { error } = await supabase.storage.createBucket(BUCKET, OPCIONES);
+
+if (error && !/already exists/i.test(error.message)) {
   console.error("No se pudo crear el bucket:", error.message);
   process.exit(1);
 }
 
-console.log("Bucket acm-material creado (privado, 25 MB por archivo).", data ?? "");
+if (error) {
+  // Ya existía: se le pone al día el tope, por si quedó de una versión anterior.
+  const { error: upErr } = await supabase.storage.updateBucket(BUCKET, OPCIONES);
+  if (upErr) {
+    console.error("El bucket existía pero no se pudo actualizar:", upErr.message);
+    process.exit(1);
+  }
+  console.log(`El bucket ${BUCKET} ya existía. Tope actualizado a 50 MB.`);
+} else {
+  console.log(`Bucket ${BUCKET} creado (privado, 50 MB por archivo).`);
+}
+
+// Verificación: se relee lo que quedó, no se confía en la respuesta de la escritura.
+const { data: buckets } = await supabase.storage.listBuckets();
+const b = buckets?.find((x) => x.name === BUCKET);
+console.log(
+  `Verificado -> ${b?.name}: ${b?.public ? "PUBLICO" : "privado"}, ` +
+  `tope ${b?.file_size_limit ? (b.file_size_limit / 1024 / 1024).toFixed(0) + " MB" : "global"}`,
+);

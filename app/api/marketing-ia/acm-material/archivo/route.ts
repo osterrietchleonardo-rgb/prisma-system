@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     if (!file) return NextResponse.json({ error: "No llegó ningún archivo." }, { status: 400 });
 
     if (file.size > MAX_ARCHIVO) {
-      return NextResponse.json({ error: "El archivo pasa los 25 MB." }, { status: 400 });
+      return NextResponse.json({ error: "El archivo pasa los 50 MB." }, { status: 400 });
     }
 
     const ext = extensionDe(file.name);

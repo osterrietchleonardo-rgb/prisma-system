@@ -19,7 +19,13 @@ describe("extensionDe", () => {
 });
 
 describe("MAX_ARCHIVO", () => {
-  it("es 25 MB, el mismo tope que Contratos", () => {
-    expect(MAX_ARCHIVO).toBe(25 * 1024 * 1024);
+  it("es 50 MB", () => {
+    expect(MAX_ARCHIVO).toBe(50 * 1024 * 1024);
+  });
+
+  it("entra el carpetón institucional más pesado de Central, que pesa 25,45 MB", () => {
+    // Con el tope viejo de 25 MB este archivo quedaba afuera por 0,45 MB. Medido sobre el
+    // archivo real: "Our Company 2025 - Central.pdf".
+    expect(MAX_ARCHIVO).toBeGreaterThan(26_685_910);
   });
 });

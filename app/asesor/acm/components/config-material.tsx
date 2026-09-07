@@ -196,7 +196,7 @@ export function ConfigMaterial({
             </Button>
           )}
         </div>
-        <p className="text-[10px] text-muted-foreground">PDF o Word (.docx), hasta 25 MB cada uno.</p>
+        <p className="text-[10px] text-muted-foreground">PDF o Word (.docx), hasta 50 MB cada uno.</p>
       </div>
 
       {/* ── Las cuatro secciones ── */}

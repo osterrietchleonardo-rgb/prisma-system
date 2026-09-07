@@ -140,8 +140,8 @@ describe("qué archivos entran", () => {
     expect(storage.subidas).toEqual([]);
   });
 
-  it("rechaza un archivo de más de 25 MB", async () => {
-    const res = await POST(pedidoDeSubida("enorme.pdf", 25 * 1024 * 1024 + 1));
+  it("rechaza un archivo de más de 50 MB", async () => {
+    const res = await POST(pedidoDeSubida("enorme.pdf", 50 * 1024 * 1024 + 1));
     expect(res.status).toBe(400);
     expect(storage.subidas).toEqual([]);
   });

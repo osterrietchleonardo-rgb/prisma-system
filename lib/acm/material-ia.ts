@@ -31,6 +31,8 @@ REGLAS QUE NO SE NEGOCIAN:
 3. No copies datos de contacto, direcciones, teléfonos ni nombres de personas: la ficha ya los pone por su cuenta.
 4. Hablale al propietario de usted o de vos, con frases cortas. Nada de mayúsculas sostenidas ni signos de exclamación.
 5. Respetá el máximo de caracteres de cada sección.
+6. Cortá cada sección en 3 o 4 párrafos separados por una línea en blanco (\\n\\n). Un bloque
+   corrido de mil caracteres no lo lee nadie: cada párrafo tiene que tratar un tema.
 
 Devolvé ÚNICAMENTE un JSON con esta forma, sin texto alrededor y sin backticks:
 {"quienes_somos":"...","como_comercializamos":"...","como_preparar":"...","roles_venta":"..."}
@@ -49,6 +51,7 @@ REGLAS QUE NO SE NEGOCIAN:
 2. Español rioplatense, frases cortas, tono profesional y cercano.
 3. Nada de mayúsculas sostenidas ni signos de exclamación.
 4. Máximo ${meta.tope} caracteres.
+5. Cortalo en 3 o 4 párrafos separados por una línea en blanco (\\n\\n), cada uno con un tema.
 
 Devolvé ÚNICAMENTE un JSON, sin backticks: {"texto":"..."}
 

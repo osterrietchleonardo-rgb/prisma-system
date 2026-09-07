@@ -5,8 +5,15 @@
 // los logos no pasan a la ficha.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** 25 MB, el mismo tope que Contratos. */
-export const MAX_ARCHIVO = 25 * 1024 * 1024;
+/**
+ * 50 MB.
+ *
+ * Arrancó en 25 MB, copiado de Contratos, y no alcanzaba: un contrato es texto, pero un
+ * carpetón institucional es todo imágenes. El "Our Company" de Central pesa 25,45 MB y quedaba
+ * afuera por 0,45 MB — medido, no estimado. Del archivo solo se extrae el texto, así que el
+ * peso no cuesta nada más que la subida.
+ */
+export const MAX_ARCHIVO = 50 * 1024 * 1024;
 
 export const EXTENSIONES_OK = ["pdf", "docx"] as const;
 export type ExtensionOk = (typeof EXTENSIONES_OK)[number];
