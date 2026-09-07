@@ -7,11 +7,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { FileText, Loader2, Sparkles, Trash2, Wand2 } from "lucide-react";
 import {
-  SECCIONES, normalizarMaterial,
+  SECCIONES, formaDeMaterial,
   type AcmMaterial, type AcmMaterialArchivo, type ClaveSeccion,
 } from "@/lib/acm/material";
 
 type Propuestas = Partial<Record<ClaveSeccion, string>>;
+
+/** Debajo de esto no hay nada que acomodar, y no vale gastar un crédito. Igual que el endpoint. */
+const MIN_PARA_ACOMODAR = 20;
 
 /** Saca una sección del mapa de propuestas sin mutarlo. */
 function sinLaSeccion(propuestas: Propuestas, clave: ClaveSeccion): Propuestas {
@@ -23,7 +26,9 @@ function sinLaSeccion(propuestas: Propuestas, clave: ClaveSeccion): Propuestas {
 export function ConfigMaterial({
   value, onChange,
 }: { value: AcmMaterial; onChange: (v: AcmMaterial) => void }) {
-  const material = normalizarMaterial(value);
+  // La forma, SIN limpiar: acá se está escribiendo. La limpieza va al guardar (el endpoint
+  // normaliza). Si se limpiara en cada tecla, no se podría escribir un espacio.
+  const material = formaDeMaterial(value);
   const [subiendo, setSubiendo] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
   const [acomodando, setAcomodando] = useState<ClaveSeccion | null>(null);
@@ -222,9 +227,13 @@ export function ConfigMaterial({
               <div className="flex items-center justify-between gap-3">
                 <Button
                   variant="ghost" size="sm"
-                  disabled={acomodando === s.clave || actual.trim().length < 20}
+                  disabled={acomodando === s.clave || actual.trim().length < MIN_PARA_ACOMODAR}
                   onClick={() => acomodar(s.clave)}
                   className="text-xs h-7"
+                  // Sin esto el botón se ve gris y no se entiende por qué.
+                  title={actual.trim().length < MIN_PARA_ACOMODAR
+                    ? `Escribí al menos ${MIN_PARA_ACOMODAR} caracteres para que la IA tenga algo que acomodar.`
+                    : "La IA ordena lo que escribiste, sin agregarle nada."}
                 >
                   {acomodando === s.clave
                     ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />

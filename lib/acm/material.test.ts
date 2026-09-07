@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SECCIONES, esRutaDeLaAgencia, normalizarMaterial, seccionesParaFicha, TOPES } from "./material";
+import { SECCIONES, esRutaDeLaAgencia, formaDeMaterial, normalizarMaterial, seccionesParaFicha, TOPES } from "./material";
 
 describe("esRutaDeLaAgencia", () => {
   const AGENCIA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -54,6 +54,35 @@ describe("SECCIONES", () => {
       expect(s.ayuda.length).toBeGreaterThan(20);
       expect(s.donde.length).toBeGreaterThan(5);
     }
+  });
+});
+
+describe("formaDeMaterial (la que usa el cuadro de texto mientras se escribe)", () => {
+  it("NO toca los espacios: se está escribiendo", () => {
+    // El bug: con trim() en cada tecla, apretás espacio y desaparece, así que nunca podés
+    // empezar la segunda palabra. Lo encontró Leonardo escribiendo a mano; las pruebas
+    // automáticas no lo veían porque pegan el texto entero de una.
+    const m = formaDeMaterial({ secciones: { quienes_somos: "Somos Central " } });
+    expect(m.secciones.quienes_somos).toBe("Somos Central ");
+  });
+
+  it("conserva los saltos de línea y la sangría mientras se escribe", () => {
+    const conSaltos = "Primer párrafo.\n\n  Segundo párrafo.\n";
+    expect(formaDeMaterial({ secciones: { como_preparar: conSaltos } }).secciones.como_preparar)
+      .toBe(conSaltos);
+  });
+
+  it("igual asegura la forma: las cuatro claves y la lista de archivos", () => {
+    const m = formaDeMaterial(undefined);
+    expect(Object.keys(m.secciones).sort()).toEqual([
+      "como_comercializamos", "como_preparar", "quienes_somos", "roles_venta",
+    ]);
+    expect(m.archivos).toEqual([]);
+  });
+
+  it("ignora claves inventadas, igual que la otra", () => {
+    const m = formaDeMaterial({ secciones: { quienes_somos: "Hola", inventada: "no va" } });
+    expect(m.secciones).not.toHaveProperty("inventada");
   });
 });
 

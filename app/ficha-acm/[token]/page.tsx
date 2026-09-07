@@ -881,7 +881,9 @@ const CSS = `
    estas hojas son las únicas de la ficha que son texto corrido de punta a punta.
    El cuerpo es más grande que el del resto de la ficha (15px contra 13): son pocas palabras
    en una hoja entera, y con 13px quedaba un párrafo chico arriba y el resto de la hoja vacío. */
-.material-body { max-width: 60ch; padding-top: 4px; }
+/* 72ch a 15px es casi todo el ancho útil de la hoja. Con 60ch el texto usaba el 74% y
+   dejaba 139px de aire a la derecha: se leía como un error de maquetación, no como margen. */
+.material-body { max-width: 72ch; padding-top: 4px; }
 .material-body p { margin: 0 0 17px; font-size: 15px; line-height: 1.75; color: #3d3d3d; }
 .material-body p:first-child::first-letter { font-size: 1.05em; }
 .material-body p:last-child { margin-bottom: 0; }

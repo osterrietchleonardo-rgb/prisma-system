@@ -74,18 +74,8 @@ function seccionesVacias(): AcmSecciones {
   return { quienes_somos: "", como_comercializamos: "", como_preparar: "", roles_venta: "" };
 }
 
-/** Limpia lo que venga de la base o de la IA: recorta al tope y descarta lo que no reconoce. */
-export function normalizarMaterial(raw: unknown): AcmMaterial {
-  const obj = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-
-  const secciones = seccionesVacias();
-  const crudas = (obj.secciones && typeof obj.secciones === "object" ? obj.secciones : {}) as Record<string, unknown>;
-  for (const s of SECCIONES) {
-    const v = crudas[s.clave];
-    if (esTexto(v)) secciones[s.clave] = v.trim().slice(0, s.tope);
-  }
-
-  const archivos: AcmMaterialArchivo[] = Array.isArray(obj.archivos)
+function archivosDe(obj: Record<string, unknown>): AcmMaterialArchivo[] {
+  return Array.isArray(obj.archivos)
     ? obj.archivos.flatMap((a) => {
         if (!a || typeof a !== "object") return [];
         const { id, nombre, path, subido_el } = a as Record<string, unknown>;
@@ -93,8 +83,50 @@ export function normalizarMaterial(raw: unknown): AcmMaterial {
         return [{ id, nombre, path, subido_el }];
       })
     : [];
+}
 
-  return { archivos, secciones };
+const comoObjeto = (raw: unknown) =>
+  (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+
+const seccionesCrudas = (obj: Record<string, unknown>) =>
+  (obj.secciones && typeof obj.secciones === "object" ? obj.secciones : {}) as Record<string, unknown>;
+
+/**
+ * La forma, sin tocar el contenido. Es la que usa el cuadro de texto MIENTRAS se escribe.
+ *
+ * No hace trim ni recorta: si limpiara en cada tecla, apretar la barra espaciadora borraría el
+ * espacio reción escrito y nunca se podría empezar la segunda palabra. Pasó de verdad, y las
+ * pruebas automáticas no lo veían porque pegan el texto entero de una sola vez.
+ * La limpieza va cuando se guarda, en normalizarMaterial.
+ */
+export function formaDeMaterial(raw: unknown): AcmMaterial {
+  const obj = comoObjeto(raw);
+  const crudas = seccionesCrudas(obj);
+
+  const secciones = seccionesVacias();
+  for (const s of SECCIONES) {
+    const v = crudas[s.clave];
+    if (esTexto(v)) secciones[s.clave] = v;
+  }
+
+  return { archivos: archivosDe(obj), secciones };
+}
+
+/**
+ * Limpia lo que venga de la base o de la IA: recorta al tope y descarta lo que no reconoce.
+ * Es la de GUARDAR y la de LEER, nunca la de escribir: para eso está formaDeMaterial.
+ */
+export function normalizarMaterial(raw: unknown): AcmMaterial {
+  const obj = comoObjeto(raw);
+  const crudas = seccionesCrudas(obj);
+
+  const secciones = seccionesVacias();
+  for (const s of SECCIONES) {
+    const v = crudas[s.clave];
+    if (esTexto(v)) secciones[s.clave] = v.trim().slice(0, s.tope);
+  }
+
+  return { archivos: archivosDe(obj), secciones };
 }
 
 /**
