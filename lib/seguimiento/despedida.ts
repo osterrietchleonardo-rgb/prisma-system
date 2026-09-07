@@ -30,6 +30,7 @@ const PROMPT_DESPEDIDA = `Sos el intérprete de conversaciones del agente de seg
 - requiere_respuesta: true si el mensaje contiene o implica una pregunta, un pedido, un dato que el asesor tenía que confirmar (un horario propuesto, una dirección, un presupuesto que el asesor pidió), un reclamo, un "sigo esperando", o si es un audio o un mensaje que no se puede leer.
 - IMPORTANTE: si lo último que recibió el cliente antes de su mensaje fue una PROMESA de contacto ("el asesor se va a comunicar", "te llamo mañana", "te confirmo y te aviso"), un "gracias" NO cierra nada: el cliente está esperando ese contacto y sigue esperando hasta que un asesor le escriba o lo llame → requiere_respuesta: true. Lo mismo si el asesor le hizo una pregunta y el cliente la contestó: ahora espera el siguiente paso.
 - Los mensajes [bot] son del asistente automático (Sofía), los [human] son de un asesor de la inmobiliaria, los [internal] son notas del equipo que el cliente no ve.
+- Si el bot está APAGADO en el chat, una persona del equipo lo tomó. Si desde ese momento ningún [human] le escribió al cliente, el cliente está esperando a esa persona → requiere_respuesta: true, aunque su último mensaje haya sido una respuesta a una pregunta del bot. Solo una despedida clara del cliente ("gracias, no necesito más", "ya alquilé") cierra un chat con el bot apagado.
 - razon: una frase en castellano citando el último mensaje del cliente; la puede leer el director.
 Ante la duda, requiere_respuesta=true.`
 
@@ -47,9 +48,18 @@ const HERRAMIENTA_VEREDICTO = {
   },
 } as const
 
-export function semillaDespedida(input: { mensajes: string; ahoraISO: string }): string {
+/**
+ * `botApagadoDesde`: fecha AR del último apagado si el bot está apagado; null si sigue
+ * encendido. Sin este dato la IA leía "el cliente le debe una respuesta al bot" en chats donde
+ * el bot ya no estaba (Alex, 7/9): un asesor lo había tomado sin escribir.
+ */
+export function semillaDespedida(input: { mensajes: string; ahoraISO: string; botApagadoDesde: string | null }): string {
+  const bot = input.botApagadoDesde
+    ? `APAGADO desde ${input.botApagadoDesde} (una persona del equipo tomó el chat; si desde entonces ningún [human] escribió, el cliente sigue esperando a esa persona)`
+    : "ENCENDIDO (el bot sigue contestando en este chat)"
   return [
     `Fecha y hora actual (Argentina): ${input.ahoraISO}`,
+    `Bot (Sofía) en este chat: ${bot}`,
     `Conversación real, del más viejo al más nuevo:\n${input.mensajes}`,
     `¿El último mensaje del cliente necesita respuesta del asesor? Emití tu veredicto con emitir_veredicto.`,
   ].join("\n\n")
@@ -94,9 +104,26 @@ export type ResultadoDespedida = {
  * las barridas siguientes lo reutilizan sin volver a pagar. Si la IA falla queda
  * `despedida_error` y la escalera sigue como siempre.
  */
+const FECHA_AR = (iso: string) =>
+  new Date(iso).toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).slice(0, 16)
+
+/** Desde cuándo está apagado el bot (último evento `bot_apagado`); null si está encendido. */
+export async function botApagadoDesde(
+  db: SupabaseClient,
+  c: Pick<Candidato, "id" | "bot_active">
+): Promise<string | null> {
+  if (c.bot_active !== false) return null
+  const { data } = await db
+    .from("lead_eventos").select("ts")
+    .eq("conversation_id", c.id).eq("tipo", "bot_apagado")
+    .order("ts", { ascending: false }).limit(1).maybeSingle()
+  const ts = (data as { ts?: string } | null)?.ts
+  return ts ? FECHA_AR(ts) : "(fecha desconocida)"
+}
+
 export async function procesarDespedidaDelCaso(
   db: SupabaseClient,
-  c: Pick<Candidato, "id" | "agency_id" | "contact_phone" | "metricas">,
+  c: Pick<Candidato, "id" | "agency_id" | "contact_phone" | "metricas" | "bot_active">,
   t0: string,
   opts: { ahoraMs: number; llamar?: LlamarDespedida }
 ): Promise<ResultadoDespedida> {
@@ -111,11 +138,12 @@ export async function procesarDespedidaDelCaso(
   }
 
   const mensajes = await crearHerramientas(db, c as Candidato).leer_mensajes({ cantidad: 30 })
-  const ahoraISO = new Date(opts.ahoraMs).toLocaleString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" }).slice(0, 16)
+  const apagadoDesde = await botApagadoDesde(db, c)
+  const ahoraISO = FECHA_AR(new Date(opts.ahoraMs).toISOString())
 
   let veredicto: VeredictoDespedida
   try {
-    veredicto = await (opts.llamar ?? crearLlamadaDespedida())(semillaDespedida({ mensajes, ahoraISO }))
+    veredicto = await (opts.llamar ?? crearLlamadaDespedida())(semillaDespedida({ mensajes, ahoraISO, botApagadoDesde: apagadoDesde }))
   } catch (e) {
     await registrarEvento(db, c.agency_id, c.id, "despedida_error",
       `La IA no pudo leer si el cliente espera respuesta; la escalera sigue como siempre: ${String(e).slice(0, 150)}`,
