@@ -26,7 +26,7 @@ pieza con la marca de la inmobiliaria**.
 | Marca de la agencia | `agencies.marketing_ai_config` | Colores, tipografía y logo; con default navy+dorado si no configuró |
 | Proxy de fotos de la red | `lib/acm/fotos-url.ts` (`urlsFotoRed`) | El CDN de origen da 404 el 12% de las veces |
 
-**El id es el mismo en las dos pantallas:** `roomix_<slug>` para la red, el uuid para
+**El id es el mismo en las dos solapas:** `roomix_<slug>` para la red, el uuid para
 `properties`. El endpoint actual ya acepta las dos formas, así que la selección no necesita
 traducir nada entre el mapa y el chat.
 
@@ -41,13 +41,25 @@ traducir nada entre el mapa y el chat.
    que era el mayor riesgo de la función.
 2. **La selección es de un solo uso.** Se marca, se genera el link, se termina. No se
    guarda para editar después. Mismo criterio que el ACM.
-3. **Cada pantalla tiene su propia selección.** El mapa no comparte canasta con el
-   Buscador. No hay estado que sobreviva al cambio de página.
+3. **Una sola selección para las dos solapas.** Lo marcado en el chat sigue marcado al
+   pasar al mapa y al revés, y se manda todo junto en una ficha. Se vacía al salir de la
+   página.
+
+   > **Esta decisión se tomó dos veces, y la primera fue sobre una premisa falsa.** Se
+   > había dicho que el mapa y el Buscador eran dos pantallas distintas y Leonardo eligió,
+   > razonablemente, una selección por pantalla. **No son dos pantallas:** el mapa es una
+   > solapa adentro de la página del Buscador —mismo componente, misma ruta, un botón
+   > arriba que cambia entre "Buscador" y "Mapa" (`app/asesor/consultor-ia/page.tsx:284-308`)—
+   > y `MapaTab` no se importa desde ningún otro lado. Con eso, compartir la selección pasó
+   > a ser lo **barato** (un solo provider arriba de la solapa) y separarla, lo caro (dos
+   > providers y vaciar uno al cambiar de solapa). Y separarla tenía un costo peor que el
+   > trabajo: el asesor que marca cuatro en el chat y toca "Mapa" para ver dónde caen,
+   > al volver las perdía.
 4. **Las dos notas son opcionales:** una por propiedad y una final del grupo. **Si están
    vacías, no se dibujan** — ni el título, ni el recuadro, ni el espacio.
 5. **La página es para el celular**, y tiene que verse bien también en la compu. **No hay
    botón de PDF ni versión para imprimir.**
-6. **Se marca desde el listado y desde adentro del detalle, en las dos pantallas.** En el
+6. **Se marca desde el listado y desde adentro del detalle, en las dos solapas.** En el
    Buscador, desde las tarjetas de las tres secciones —propia, agencia y red— y también
    desde el detalle si lo abrió. En el mapa, desde el popup que abre el pin y desde el
    detalle, pudiendo abrir varios pines uno tras otro e ir sumando.
@@ -56,7 +68,7 @@ traducir nada entre el mapa y el chat.
 
 ### 1. Dónde se marca
 
-**Se marca desde el listado y desde adentro del detalle, en las dos pantallas.** El asesor
+**Se marca desde el listado y desde adentro del detalle, en las dos solapas.** El asesor
 no tiene que abrir una propiedad para poder elegirla, pero si la abrió para mirarla bien,
 tampoco tiene que cerrarla para marcarla.
 
@@ -66,7 +78,7 @@ Suena a muchos lugares. Son **tres componentes**, porque el código ya está uni
 |---|---|
 | `components/mapa/mapa-resultados.tsx` (`MapaResultados`) | Los **tres** listados del mapa: el panel de la derecha (`mapa-tab.tsx:481`), el popup del pin con varias propiedades y el popup del globito — los dos últimos son el mismo `MapaListaModal`, que dibuja sus filas con este componente (`mapa-lista-modal.tsx:107`) |
 | `consultor-results.tsx:82` (`UnifiedPropertyCard`) | Las **tres** secciones del Buscador: propia, agencia y red |
-| `consultor-results.tsx:253` (`UnifiedPropertyDetail`) | El detalle abierto, en **las dos** pantallas: el Buscador lo abre desde sus tarjetas y el mapa desde `MapaFicha` (`mapa-ficha.tsx:26`) |
+| `consultor-results.tsx:253` (`UnifiedPropertyDetail`) | El detalle abierto, en **las dos** solapas: el Buscador lo abre desde sus tarjetas y el mapa desde `MapaFicha` (`mapa-ficha.tsx:26`) |
 
 En los dos listados, un **check en la esquina** de cada fila/tarjeta. En el detalle, un
 botón que dice **"Agregar a la selección"** y, si ya está adentro, **"Sacar de la
@@ -93,18 +105,23 @@ que es el más común en el mapa, es el único lugar donde se puede marcar.
 
 ### 1.b Dónde vive la selección
 
-Un **contexto de React por pantalla** (`SeleccionProvider`), montado en la página del mapa
-y en la del Buscador. Los tres componentes de arriba leen de ahí.
+Un **contexto de React** (`SeleccionProvider`) montado **una sola vez por página, arriba de
+la barra de solapas**, en los dos archivos donde vive el Buscador:
+`app/asesor/consultor-ia/page.tsx` y `app/director/consultor/page.tsx`. Los tres
+componentes de la tabla de arriba leen de ahí.
 
 No es adorno arquitectónico: `MapaResultados` está a tres niveles de profundidad adentro
-del popup, y `UnifiedPropertyDetail` lo comparten dos pantallas distintas. Pasar la
-selección por props obligaría a tocar la firma de cinco componentes y a que el mapa y el
-Buscador se pongan de acuerdo en una forma común. Con el contexto, además, **si no hay
-provider el check y el botón simplemente no se dibujan** — así ninguna otra pantalla que
-reuse estos componentes hereda una función que no le corresponde.
+del popup del mapa, y `UnifiedPropertyDetail` lo abren la solapa del chat y la del mapa.
+Pasar la selección por props obligaría a tocar la firma de cinco componentes.
 
-Como cada pantalla monta su propio provider, la decisión 3 (cada pantalla con su selección)
-sale sola: al cambiar de página el contexto se desmonta y la selección se vacía.
+Dos cosas salen gratis de montarlo ahí arriba:
+
+- **La decisión 3** (una sola selección para las dos solapas): el provider está por encima
+  del `view === "mapa" ? … : …`, así que cambiar de solapa no lo desmonta. Al salir de la
+  página sí se desmonta, y la selección se vacía sola.
+- **Ninguna otra pantalla hereda la función.** Si no hay provider, el check y el botón
+  simplemente no se dibujan. Importa porque `UnifiedPropertyDetail` es un componente
+  compartido y mañana puede usarlo otra pantalla que no tenga nada que ver con esto.
 
 ### 2. La barra flotante
 
@@ -231,6 +248,9 @@ Casos, en el navegador de escritorio **y** en celular emulado:
 10. Que lo marcado en un lado se vea marcado en el otro: marcar en el listado, abrir el
     detalle, y que el botón ya diga "Sacar de la selección".
 11. En el celular: que la barra flotante no tape el último resultado de la lista.
+12. **Que la selección cruce las solapas:** marcar dos en el chat, tocar "Mapa", marcar una
+    tercera, volver a "Buscador", y que sigan las tres. Y que salir de la página y volver
+    la deje vacía.
 
 ## Lo que queda afuera a propósito
 
@@ -238,7 +258,6 @@ Casos, en el navegador de escritorio **y** en celular emulado:
   una plantilla aprobada por Meta que lleve el link como variable — y eso es un trámite con
   Meta, no código.
 - **Guardar la selección para editarla después.** Decisión 2.
-- **Una canasta compartida entre el mapa y el Buscador.** Decisión 3.
 - **PDF / versión para imprimir.** Decisión 5.
 - **Arrastrar para reordenar.**
 - **Saber si el cliente la abrió.** `view_count` se guarda igual (viene con el molde), pero
