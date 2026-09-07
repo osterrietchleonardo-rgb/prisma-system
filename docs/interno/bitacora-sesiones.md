@@ -16,6 +16,40 @@
 
 ---
 
+## 2026-09-07 — sesión Super Agente: la despedida no es una espera (caso de Kevin)
+
+**Qué pasó.** Kevin (WhatsApp 10:54): el chat de Agustins (…789) terminó en «Gracias!!» (6/9
+10:01) después de que Micaela le contestó con el bot apagado, y la escalera igual mandó 2 h
+(12:31), 5 h con Kevin (15:31) y 10 h (20:31). Verificado en `wa_messages` y `lead_eventos`
+(conversación 86fe2d06). La escalera era determinista: bot apagado + último mensaje del lead
+sin humano después = esperando; no leía QUÉ dijo el cliente, y la IA del 4/9 solo entraba con
+nota. En 7 días: 66 casos, 233 niveles; a ojo 22 de 82 últimos mensajes eran cierres.
+Decisión de Leonardo: "que los asesores anoten cada chat no es escalable ni consistente" ⇒
+la IA lee la conversación aunque no haya nota. Clasificado como acotado (sin spec).
+
+**Qué se construyó (rama `feat/escalera-despedida`, worktree superagente).**
+`lib/seguimiento/despedida.ts` (gemelo de `nota-interna.ts`): veredicto `{requiere_respuesta,
+razon}` con tool forzado + Zod, conversación de 30 mensajes en la semilla, regla clave en el
+prompt: "gracias" tras una PROMESA de contacto NO es cierre. `procesarDespedidaDelCaso` con
+marcador `despedida_evaluada` por t0 (insert inline chequeado; si falla, el veredicto igual
+manda porque por una despedida no se avisa a nadie), `despedida_error` si la IA falla. En
+`escalamiento.ts`: entra tras la nota (`sin_nota` o `escalera_sigue`), `resumen.despedidas`,
+tope `MAX_LLAMADAS_IA = 20` compartido (renombrado de `MAX_NOTAS_IA`), try/catch propio.
+Trazabilidad: los dos tipos en "agente". Tests: 8 nuevos en `despedida.test.ts`, 5 en la
+corrida; 207 en `lib/seguimiento` + `lib/equipo`, tsc limpio. **Prueba real** (manual, solo
+lectura, 81 casos de la semana, 55 s): 14 despedidas, 67 esperas, 0 errores; los "gracias"
+tras promesa del bot quedaron como espera (correcto). Docs: TECNICO §22.9, FUNCIONAL asesor
+§24 y director §29.
+
+**Decisiones tomadas por el agente (revisables):** con `error_ia` de la nota no se evalúa la
+despedida; el marcador fallido no anula el veredicto (distinto de la nota, donde sí frena el
+email); no se avisa al asesor cuando hay despedida (no hay nada que registrar); se cuentan solo
+las llamadas reales para el tope.
+
+**Pendiente.** OK de Leonardo → PR → merge → vigilar la primera barrida con el código nuevo
+(evento `despedida_evaluada` en la ficha de Agustins si vuelve a escribir, o en cualquier caso
+nuevo). Mensaje a Kevin ya entregado. Sigue todo lo pendiente del 4/9.
+
 ## 2026-09-04 — sesión Super Agente: las notas internas hablan con Sofía (queja de Eric)
 
 **Qué pasó.** Queja en el admin (`system_feedback` dee8cc57, Eric Zambrana, Central, 3/9 22:00 AR):
