@@ -6,6 +6,14 @@
 // Leaflet valen de 400 a 700, así que un `fixed` con z-index normal queda tapado por los
 // pines y las calles. Mismo motivo por el que la ficha del mapa usa portal
 // (components/mapa/mapa-ficha.tsx) y por el que lo hace el ACM.
+//
+// EL Z-INDEX ES BAJO (40) A PROPÓSITO. Al estar colgada del <body> ya no compite con las
+// capas del mapa —el contenedor del mapa es `isolate`, así que sus z-index no salen de ahí—
+// y con 40 queda POR DEBAJO del fondo oscuro del cajón del menú lateral (z-50). Eso importa:
+// con z-1200 la barra quedaba brillante encima de la pantalla oscurecida, pareciendo tocable
+// cuando el menú ya había bloqueado todo lo de atrás. Un botón que se ve y no se toca.
+// Verificado en el navegador: con el menú abierto queda tapada, con el menú cerrado recibe
+// el toque sobre el mapa.
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { FileText, X } from "lucide-react"
@@ -29,7 +37,7 @@ export function BarraSeleccion({ onContinuar }: { onContinuar: () => void }) {
   }
 
   return createPortal(
-    <div className="fixed bottom-5 left-1/2 z-[1200] flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-accent/30 bg-card px-4 py-3 shadow-2xl shadow-black/30">
+    <div className="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-2xl border border-accent/30 bg-card px-4 py-3 shadow-2xl shadow-black/30">
       <span className="whitespace-nowrap text-sm font-semibold">
         {cuantas} {cuantas === 1 ? "elegida" : "elegidas"}
       </span>
