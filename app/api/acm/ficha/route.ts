@@ -22,6 +22,7 @@ import { obtenerZona } from "@/lib/acm/zona";
 import { generarRelato } from "@/lib/acm/zona-relato";
 import { recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
 import { normalizarImagenes, urlsFotoRed } from "@/lib/acm/fotos-url";
+import { seccionesParaFicha } from "@/lib/acm/material";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -244,6 +245,12 @@ export async function POST(req: Request) {
       legal_notice: typeof mk.legal_notice === "string" ? mk.legal_notice : "",
     };
 
+    // Material institucional que cargó la agencia (módulo ACM → Configuración). Null si no
+    // cargó nada: en ese caso la ficha sale igual que antes de que esta función existiera.
+    // La lista de archivos NO viaja: el propietario no tiene por qué recibir los nombres de
+    // los archivos internos de la agencia.
+    const material = seccionesParaFicha(mk.acm_material);
+
     const profile = profileRes.data;
     // El token se genera ANTES del snapshot porque la URL del mapa lo lleva adentro: el mapa se
     // dibuja leyendo la propia ficha, que es lo que lo hace visible para un cliente sin sesión.
@@ -282,6 +289,7 @@ export async function POST(req: Request) {
       },
       agency: { id: agencyRes.data?.id || agencyId, name: agencyRes.data?.name || "" },
       brand,
+      material,
       created_at: new Date().toISOString(),
     };
 

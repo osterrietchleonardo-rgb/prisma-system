@@ -11,6 +11,7 @@ import { Sujeto, Operacion, AcmComparable, TOPE_COMPARABLES } from "@/lib/tasaci
 import { SubjectInput } from "./subject-input";
 import { ComparablesResult } from "./comparables-result";
 import { MisAcm } from "./mis-acm";
+import { ConfiguracionTab } from "./configuracion-tab";
 
 export const SUJETO_INICIAL: Sujeto = {
   direccion: "",
@@ -51,7 +52,11 @@ export const SUJETO_INICIAL: Sujeto = {
 };
 
 // Componente principal del ACM (lo reutilizan tanto el asesor como el director).
-export function AcmModule() {
+// `esDirector` habilita la solapa Configuración, donde se carga el material institucional que
+// sale dentro de la ficha. Solo la pasa app/director/acm/page.tsx: al asesor no le llega y la
+// solapa no existe para él. Los endpoints igual devuelven 403 — esto es comodidad, no la
+// defensa.
+export function AcmModule({ esDirector = false }: { esDirector?: boolean }) {
   const [sujeto, setSujeto] = useState<Sujeto>(SUJETO_INICIAL);
   const [operacion, setOperacion] = useState<Operacion>("venta");
   const [considerarPh, setConsiderarPh] = useState(true); // ACM: considerar PH como comparables (solo aplica a Casa)
@@ -69,7 +74,7 @@ export function AcmModule() {
     roomixFallo: boolean;
   } | null>(null);
   // Historial "Mis ACM": id de la búsqueda guardada (para linkearle la ficha) + solapa activa.
-  const [tab, setTab] = useState<"nuevo" | "historial">("nuevo");
+  const [tab, setTab] = useState<"nuevo" | "historial" | "configuracion">("nuevo");
   const [searchId, setSearchId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [abriendoId, setAbriendoId] = useState<string | null>(null);
@@ -192,12 +197,15 @@ export function AcmModule() {
         </div>
       </div>
 
-      {/* Solapas: análisis nuevo / historial guardado */}
+      {/* Solapas: análisis nuevo / historial guardado / configuración (solo el director) */}
       <div className="inline-flex items-center gap-1 p-1 rounded-xl border border-accent/10 bg-card/30">
         {([
           ["nuevo", "Nuevo ACM"],
           ["historial", "Mis ACM"],
-        ] as const).map(([key, label]) => (
+          ["configuracion", "Configuración"],
+        ] as const)
+          .filter(([key]) => key !== "configuracion" || esDirector)
+          .map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -215,17 +223,21 @@ export function AcmModule() {
         <CardHeader className="border-b border-accent/5 pb-4">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold uppercase tracking-widest text-accent">
-              {tab === "historial"
-                ? "Historial · Tus análisis guardados"
-                : view === "input"
-                  ? "1 · Elegí la propiedad a analizar"
-                  : "2 · Comparables encontrados"}
+              {tab === "configuracion"
+                ? "Configuración · Cómo sale la ficha para el propietario"
+                : tab === "historial"
+                  ? "Historial · Tus análisis guardados"
+                  : view === "input"
+                    ? "1 · Elegí la propiedad a analizar"
+                    : "2 · Comparables encontrados"}
             </p>
             <Badge variant="outline" className="text-[10px] border-accent/10">ACM</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-8">
-          {tab === "historial" ? (
+          {tab === "configuracion" && esDirector ? (
+            <ConfiguracionTab />
+          ) : tab === "historial" ? (
             <MisAcm onAbrir={handleAbrirGuardado} abriendoId={abriendoId} refreshKey={refreshKey} />
           ) : view === "input" ? (
             <SubjectInput
