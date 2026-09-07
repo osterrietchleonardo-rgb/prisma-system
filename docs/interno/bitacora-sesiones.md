@@ -16,6 +16,68 @@
 
 ---
 
+## 2026-09-07 — sesión Selección: varias propiedades en UNA ficha para el cliente
+
+**Qué se construyó**
+
+- **Selección múltiple → una sola ficha con la marca de la agencia.** El asesor marca
+  propiedades en el Buscador o en el Mapa, repasa, y genera un link para mandarle al cliente.
+  Tabla `shared_selections` (mismo molde que las otras dos fichas), `POST /api/seleccion`,
+  y la página pública `/seleccion/[token]`, pensada para el celular y sin versión imprimible.
+- **Tres componentes cubren todo**, porque el código ya estaba unificado: `MapaResultados`
+  (los tres listados del mapa), `UnifiedPropertyCard` (las tres secciones del Buscador) y
+  `UnifiedPropertyDetail` (el detalle, en las dos solapas).
+- **Se sacó "Compartir ficha"** y su endpoint. La selección lo reemplaza: hace lo mismo con
+  una sola propiedad, pero pasando por el repaso. **La página `/ficha/[token]` y su tabla se
+  quedan**: los links que los clientes ya tienen tienen que seguir abriendo.
+- **Índice `mercado_avisos_slug_idx`.** Buscar un aviso por su código hacía Seq Scan de las
+  dos particiones: 217 ms el peor caso con caché caliente, y con caché fría se pasaba de los
+  8 s del rol `authenticated` (pasó de verdad: 503 en 10.171 ms). Ahora 5 ms, y deja de
+  crecer con la tabla.
+
+**El hallazgo que cambió el diseño**
+
+- **La descripción del aviso delata al colega.** El logo y el teléfono ya estaban tapados
+  (§10.8), pero la descripción la escribe la inmobiliaria que publica: de 60.278 avisos,
+  **55% traen matrícula/corredor y 42% el nombre del publicador**. Eso ya viajaba a la ficha
+  de UNA propiedad, en producción.
+- **No se puede limpiar solo.** El nombre cae en el medio del texto el 65% de las veces, y en
+  un aviso "Goyena Bienes Raíces" matcheaba con **"Av. Pedro Goyena 1600"** — la calle de la
+  propiedad. Decisión de Leonardo: que lo revise una persona.
+- **La salida:** el repaso muestra título y descripción editables; las frases con
+  matrícula/corredor se listan y se sacan de un toque; el nombre del publicador solo se
+  señala. Sobre 1.000 avisos reales: 642 con fuga, **cero se escapan**.
+
+**Errores propios**
+
+- **Se le presentó a Leonardo "¿la selección cruza las dos pantallas?" sobre una premisa
+  falsa.** El mapa NO es otra pantalla: es una solapa de la página del Buscador
+  (`app/asesor/consultor-ia/page.tsx:284`). Eso daba vuelta el costo — compartir la selección
+  pasó a ser lo barato. Se le volvió a preguntar con la premisa corregida.
+- **Se dijo que había un bug con las notas y no lo había.** La búsqueda distinguía mayúsculas
+  y el título del bloque va en mayúsculas por CSS.
+- **Se corrió `npm run build` con el servidor de desarrollo levantado** y se leyó una página
+  de error creyendo que era la ficha. El build le pisa el `.next` al dev server.
+
+**Dos bugs que solo aparecieron mirando la pantalla**
+
+- **La barra flotante tapaba el campo del chat.** Con una propiedad marcada, el asesor no
+  podía tipear la siguiente búsqueda. Se arregla reservando la franja en el provider.
+- **Después de traer `main` (menú lateral nuevo), la barra quedaba brillando encima de la
+  pantalla oscurecida por el cajón del menú**, pareciendo tocable. La causa era un `z-[1200]`
+  heredado de cuando la barra vivía adentro del mapa. `elementFromPoint` daba lo mismo en el
+  caso bueno y en el malo: **solo la captura mostraba la diferencia**.
+
+**Quedó pendiente**
+
+- Mergear a `main` y **el push lo hace Leonardo**.
+- La foto de un aviso de la red puede traer el cartel de la inmobiliaria ("KINACH
+  PROPIEDADES"). Está en los píxeles, no hay código que lo saque.
+- Mandar el WhatsApp desde PRISMA quedó fuera de alcance a propósito: necesita una plantilla
+  aprobada por Meta que lleve el link como variable.
+
+---
+
 ## 2026-09-07 — sesión Super Agente: la despedida no es una espera (caso de Kevin)
 
 **Qué pasó.** Kevin (WhatsApp 10:54): el chat de Agustins (…789) terminó en «Gracias!!» (6/9
