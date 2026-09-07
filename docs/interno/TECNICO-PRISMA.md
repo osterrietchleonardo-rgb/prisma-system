@@ -1495,6 +1495,24 @@ la IA lee la conversación aunque no haya nota.
   conservador (el bot tenía una pregunta abierta). Salvedad de la prueba: la IA leyó la
   conversación de HOY, no la del momento del caso, así que algunos "cierres" son porque el
   asesor ya contestó después.
+- **El bot apagado va en la semilla (7/9, segunda tanda).** En la primera barrida real la IA
+  leyó el chat de Alex (3c908919) como despedida: "el cliente le debe una respuesta al bot",
+  sin saber que el bot estaba apagado desde el 4/9 15:14 y que ningún asesor había escrito.
+  `botApagadoDesde(db, c)` (último `bot_apagado` de `lead_eventos`, fecha AR) entra en
+  `semillaDespedida` como "Bot (Sofía) en este chat: APAGADO desde … / ENCENDIDO", y el prompt
+  dice que con el bot apagado y sin `[human]` posterior el cliente espera a una persona. Dato
+  de fondo que salió de ahí: en Central, 78 de 253 chats con actividad en 14 días tienen el
+  bot apagado sin NINGÚN mensaje humano (38 por handoff automático con marcador, 40 apagados a
+  mano, solo 5 con nota del asesor); esos chats no los toma el seguimiento al cliente
+  (`seguimiento_candidatos` exige `bot_active = true`) y solo la escalera los persigue.
+- **El aviso de la escalera dice qué hacer si ya lo atendió por afuera (7/9, OK de Leonardo).**
+  `armarAvisoAsesorEscalera`: párrafo en el email de todos los niveles ("mandale desde el chat
+  de PRISMA… o dejá una nota interna… registrá la visita en el calendario y la gestión en el
+  tracking") y una frase corta al final de `{{2}}` en el WhatsApp de 2/5 h
+  (`asesor_cliente_esperando`), garantizada recortando el contexto y no la indicación
+  (`unaLinea(…, 700 - indicacion.length) + indicacion`). En el de 10/20 h
+  (`asesor_sigue_esperando`) no entra: `{{2}}` es solo "cliente, que busca X" y la plantilla
+  aprobada no tiene otro hueco. Antes el aviso solo decía "respondele desde acá".
 
 ## 23. Buscador IA y Tutor IA: la conversación en vivo (2/9/2026)
 

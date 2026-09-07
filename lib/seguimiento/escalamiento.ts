@@ -135,10 +135,17 @@ export function armarAvisoAsesorEscalera(
       `<p>Hola ${esc(primerNombre(perfil))},</p>`,
       `<p><strong>Qué pasa:</strong> ${esc(cliente)} (${esc(tel)}) quedó esperando que lo atienda un asesor y lleva <strong>${esc(espera)}</strong> sin respuesta.${esc(avisoDirector)}</p>`,
       ...bloqueContextoHtml(info.contexto),
+      // Leonardo, 7/9: la mitad de los chats apagados de Central los apagó una persona sin escribir
+      // ni anotar. El aviso dice qué hacer si ya lo atendió por afuera, para que Sofía se entere y
+      // el trabajo quede registrado. Chat o nota: cualquiera de las dos frena estos avisos.
+      `<p><strong>Si ya lo atendiste por teléfono o en persona:</strong> mandale desde el chat de PRISMA un mensaje confirmando lo que acordaron, o dejá una <strong>nota interna</strong> contando qué hiciste — con cualquiera de las dos, Sofía se entera y estos avisos se frenan. Y registrá la visita en el <strong>calendario</strong> y la gestión en el <strong>tracking</strong>.</p>`,
       `<p>${porQueVos} Si no lo podés tomar, marcá «No lo puedo tomar» en el chat y el director lo reasigna.</p>`,
     ],
     link, "Abrir el chat en PRISMA", nombreAgencia
   )
+  // Va en el WhatsApp de 2/5 h ({{2}}, tope 700): se arma DESPUÉS del contexto pero se
+  // garantiza recortando el contexto, no la indicación.
+  const indicacion = " Si ya lo atendiste por teléfono, confirmáselo desde el chat de PRISMA o dejá una nota interna, y registrá la visita y la actividad."
   const base = { destinatario: perfil, esAsignado: info.esAsignado, link, html }
   if (nivel.plantillaAsesor === "asesor_sigue_esperando") {
     // "Hola {{1}}, {{2}} sigue esperando desde hace {{3}}. Si no lo podés tomar, avisá por acá y lo reasignamos: {{4}} ¡Gracias!"
@@ -154,7 +161,7 @@ export function armarAvisoAsesorEscalera(
     ...base,
     asunto: `${cliente} está esperando hace ${espera} — ${nombreAgencia}`,
     plantilla: "asesor_cliente_esperando",
-    variables: [primerNombre(perfil), unaLinea(`${cliente} (${tel}) lleva ${espera} esperando que lo atiendas.${lineaContextoWhatsApp(info.contexto)}${avisoDirector}`, 700), link],
+    variables: [primerNombre(perfil), unaLinea(`${cliente} (${tel}) lleva ${espera} esperando que lo atiendas.${lineaContextoWhatsApp(info.contexto)}${avisoDirector}`, 700 - indicacion.length) + indicacion, link],
   }
 }
 
