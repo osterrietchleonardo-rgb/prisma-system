@@ -26,15 +26,23 @@
  */
 const PATRONES_SEGUROS: RegExp[] = [
   /matr[ií]cula/i,
-  /\bcucicba\b/i,
-  /\bcmcpsi\b/i,
-  /\bcopropi\b/i,
+  // Sin borde de palabra al final: la matrícula viene pegada al organismo el 0,6% de las
+  // veces ("CMCPSI5675", "CUCICBA6421"), y `\b` no matchea entre una letra y un número.
+  /\bcucicba/i,
+  /\bcmcpsi/i,
+  /\bcopropi/i,
   /corredor(a)?\s+inmobiliari/i,
   /martiller[oa]/i,
   /no\s+ejerce\s+el\s+corretaje/i,
   /\bxintel\b/i,
   /cont[áa]ctanos|contactanos|cont[áa]ctenos|llamanos|ll[áa]manos|escribinos/i,
   /consultas?\s+al\s+(tel|wh?ats)/i,
+  // "Contacto: Fulana de Tal" al empezar la frase. Encontrado mirando una ficha real: el
+  // aviso arrancaba con "Corredor Responsable: … / Contacto: Guadalupe Cabrera", o sea que
+  // lo primero que leía el cliente eran los datos del colega. Anclado al principio a
+  // propósito, para no confundirlo con "en contacto con la naturaleza".
+  /^contacto\s*:/i,
+  /^(tel[eé]fono|whatsapp|cel(ular)?)\s*:/i,
 ]
 
 /** Un nombre más corto que esto no distingue nada ("SUM", "AR"). */

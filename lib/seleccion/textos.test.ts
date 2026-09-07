@@ -38,6 +38,32 @@ describe("fragmentosSeguros", () => {
     expect(fragmentosSeguros(t)).toEqual(["Contactanos por WhatsApp para coordinar la visita."])
   })
 
+  /**
+   * Encontrado mirando una ficha real, no midiendo: el aviso "LOCAL COMERCIAL GALERIA LAS
+   * VEGAS" ARRANCA con los datos del colega, y la línea "Contacto: Guadalupe Cabrera" se
+   * escapaba de todos los patrones. Es lo primero que leería el cliente.
+   */
+  it("encuentra la línea de contacto del colega", () => {
+    const t = "Corredor Responsable: Silvia Vergara CPI 7783.\nContacto: Guadalupe Cabrera\nLOCAL COMERCIAL EN GALERÍA."
+    expect(fragmentosSeguros(t)).toContain("Contacto: Guadalupe Cabrera")
+  })
+
+  it("NO confunde 'en contacto con la naturaleza' con un dato de contacto", () => {
+    const t = "Casa en un entorno único, en contacto con la naturaleza y muy tranquila."
+    expect(fragmentosSeguros(t)).toEqual([])
+  })
+
+  /**
+   * La matrícula pegada al organismo, sin espacio. Se escapaba en el 0,6% de los avisos
+   * (4 de 667): `\bcmcpsi\b` no matchea "CMCPSI5675" porque entre la "I" y el "5" no hay
+   * borde de palabra.
+   */
+  it("encuentra la matrícula pegada al organismo, sin espacio", () => {
+    const t = "Oficina a cargo de Jorge Becco, Bienes Raíces CMCPSI5675 Libro 9 Folio 45."
+    expect(fragmentosSeguros(t)).toHaveLength(1)
+    expect(sacarFragmentos(t, fragmentosSeguros(t))).toBe("")
+  })
+
   it("una descripción limpia no devuelve nada", () => {
     const t = "Departamento de 2 ambientes, muy amplio, balcón corrido y mucha luz natural."
     expect(fragmentosSeguros(t)).toEqual([])
