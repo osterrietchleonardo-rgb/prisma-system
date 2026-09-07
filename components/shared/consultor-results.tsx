@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
-import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { BotonSeleccion, CheckSeleccion, candidataDePropiedad } from '@/components/seleccion/marca-seleccion'
 
 export type PropertySource = 'own' | 'agency' | 'roomix'
 
@@ -104,7 +104,13 @@ export function UnifiedPropertyCard({ property }: { property: UnifiedProperty })
   return (
     <>
       <div className={`overflow-hidden rounded-2xl border ${border.base} bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm group ${border.hover} transition-all shadow-lg hover:shadow-xl relative cursor-pointer flex flex-col h-full`} onClick={() => setShowDetail(true)}>
-        
+
+        {/* Check para armar la selección que se le manda al cliente. z-30 para quedar por
+            encima del badge (z-20), y debajo de él para no taparle el texto. */}
+        <div className="absolute top-6 right-1 z-30">
+          <CheckSeleccion candidata={candidataDePropiedad(property)} />
+        </div>
+
         {/* Badge Superior Dinámico */}
         <div className={`absolute top-0 left-0 right-0 z-20 px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-center shadow-md bg-gradient-to-r ${badge.gradient} text-white`}>
           <span className="truncate block">{badgeLabel}</span>
@@ -258,33 +264,10 @@ export function UnifiedPropertyDetail({
   onClose: () => void
 }) {
   const [selectedImg, setSelectedImg] = useState(0)
-  const [sharing, setSharing] = useState(false)
   const images = property.images && property.images.length > 0 ? property.images : []
   const badge = BADGE_CONFIG[property.source]
   const headerGradient = DETAIL_HEADER_COLORS[property.source]
 
-  // Genera una ficha pública de lujo (con la marca de la agencia + datos del asesor logueado) y la abre.
-  const handleShare = async () => {
-    if (sharing) return
-    setSharing(true)
-    try {
-      const res = await fetch('/api/ficha/share', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ source: property.source, id: property.id }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'No se pudo generar la ficha')
-      const url = `${window.location.origin}${data.path}`
-      try { await navigator.clipboard.writeText(url) } catch { /* sin clipboard */ }
-      window.open(data.path, '_blank', 'noopener')
-      toast.success('Ficha lista y link copiado al portapapeles')
-    } catch (e: any) {
-      toast.error(e.message || 'Error al generar la ficha')
-    } finally {
-      setSharing(false)
-    }
-  }
 
   const agentInfo = property.source === 'roomix'
     ? property.roomix_agency_name || 'Inmobiliaria colaboradora'
@@ -433,18 +416,18 @@ export function UnifiedPropertyDetail({
             </div>
           )}
 
-          {/* Botón Compartir ficha (página pública de lujo con la marca + datos del asesor) */}
-          <div className="pt-4 border-t flex justify-end">
-            <button
-              onClick={handleShare}
-              disabled={sharing}
-              className="px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-colors border border-accent/30 text-accent hover:bg-accent/10 disabled:opacity-60"
-            >
-              {sharing ? 'Generando ficha…' : 'Compartir ficha'}
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-            </button>
+          {/* Sumar a la selección que se le manda al cliente.
+              Este botón es el ÚNICO lugar para marcar un pin del mapa que tiene una sola
+              propiedad, porque ese va derecho al detalle sin pasar por listado.
+
+              ACÁ ESTABA "COMPARTIR FICHA" (sacado el 7-sep-2026). Generaba la ficha de UNA
+              propiedad en un solo toque, sin pantalla intermedia — y por eso publicaba la
+              descripción del aviso tal cual, con la matrícula y el nombre del colega adentro
+              (55% y 42% de los avisos de la red). La selección lo reemplaza: hace lo mismo
+              con una sola propiedad, pero pasando por el repaso donde el asesor lee y corrige
+              lo que va a ver su cliente. Decisión de Leonardo. */}
+          <div className="pt-4 border-t flex flex-wrap items-center justify-end gap-2">
+            <BotonSeleccion candidata={candidataDePropiedad(property)} />
           </div>
 
           {/* Acciones Footer */}

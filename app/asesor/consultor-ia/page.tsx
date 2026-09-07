@@ -16,6 +16,10 @@ import { consumirStreamIA } from "@/lib/buscador-stream"
 import { MarkdownIA } from "@/components/shared/MarkdownIA"
 import { Map } from "lucide-react"
 import { MapaTab } from "@/components/mapa/mapa-tab"
+import { SeleccionProvider } from "@/components/seleccion/seleccion-contexto"
+import { BarraSeleccion } from "@/components/seleccion/barra-seleccion"
+import { RepasoSeleccion } from "@/components/seleccion/repaso-seleccion"
+import { PistaSeleccion } from "@/components/seleccion/pista-seleccion"
 
 interface Property {
   id: string
@@ -66,6 +70,8 @@ export default function AdvisorConsultorIAPage() {
     }
   ])
   const [view, setView] = useState<"chat" | "mapa">("chat")
+  // Repaso de la seleccion (las notas) antes de generar la ficha del cliente.
+  const [repasando, setRepasando] = useState(false)
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   // La conversación en vivo: el paso que el Buscador está haciendo, y el texto a medida que escribe.
@@ -280,6 +286,10 @@ export default function AdvisorConsultorIAPage() {
   }
 
   return (
+    /* El provider va ARRIBA de la barra de solapas a propósito: así lo que el asesor marca
+       en el Buscador sigue marcado al pasar al Mapa y al revés, y se manda todo junto en
+       una sola ficha. Al salir de la página se desmonta y la selección se vacía sola. */
+    <SeleccionProvider>
     <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* Barra de solapas: Buscador / Mapa */}
       <div className="flex items-center gap-1 border-b bg-card/30 backdrop-blur-sm px-3 shrink-0">
@@ -302,6 +312,9 @@ export default function AdvisorConsultorIAPage() {
           <Map className="w-4 h-4" /> Mapa
         </button>
       </div>
+
+      {/* Para que se entienda de una que las tarjetas se pueden marcar. */}
+      <PistaSeleccion />
 
       {view === "mapa" ? (
         <div className="flex-1 min-h-0 overflow-y-auto p-3">
@@ -566,5 +579,9 @@ export default function AdvisorConsultorIAPage() {
     </div>
       )}
     </div>
+
+    <BarraSeleccion onContinuar={() => setRepasando(true)} />
+    <RepasoSeleccion abierto={repasando} onCerrar={() => setRepasando(false)} />
+    </SeleccionProvider>
   )
 }

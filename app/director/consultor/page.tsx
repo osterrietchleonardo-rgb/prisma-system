@@ -15,6 +15,10 @@ import { ConsultorResultsSection, MatchedPropertiesResponse, UnifiedProperty } f
 import { BuscadorNotasSettings } from "@/components/consultor/buscador-notas-settings"
 import { NotebookPen, Map } from "lucide-react"
 import { MapaTab } from "@/components/mapa/mapa-tab"
+import { SeleccionProvider } from "@/components/seleccion/seleccion-contexto"
+import { BarraSeleccion } from "@/components/seleccion/barra-seleccion"
+import { RepasoSeleccion } from "@/components/seleccion/repaso-seleccion"
+import { PistaSeleccion } from "@/components/seleccion/pista-seleccion"
 import { consumirStreamIA } from "@/lib/buscador-stream"
 import { MarkdownIA } from "@/components/shared/MarkdownIA"
 interface Property {
@@ -73,6 +77,8 @@ export default function ConsultorIAPage() {
   const [agencyId, setAgencyId] = useState<string>("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [view, setView] = useState<"chat" | "notas" | "mapa">("chat")
+  // Repaso de la seleccion (las notas) antes de generar la ficha del cliente.
+  const [repasando, setRepasando] = useState(false)
   
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -291,6 +297,10 @@ export default function ConsultorIAPage() {
   }
 
   return (
+    /* El provider va ARRIBA de la barra de solapas a proposito: asi lo que el director marca
+       en el Buscador sigue marcado al pasar al Mapa y al reves, y se manda todo junto en
+       una sola ficha. Al salir de la pagina se desmonta y la seleccion se vacia sola. */
+    <SeleccionProvider>
     <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* Barra de solapas: Buscador / Notas (Notas solo para el director) */}
       <div className="flex items-center gap-1 border-b bg-card/30 backdrop-blur-sm px-3">
@@ -322,6 +332,9 @@ export default function ConsultorIAPage() {
           <Map className="w-4 h-4" /> Mapa
         </button>
       </div>
+
+      {/* Para que se entienda de una que las tarjetas se pueden marcar. */}
+      <PistaSeleccion />
 
       {view === "mapa" ? (
         <div className="flex-1 min-h-0 overflow-y-auto p-3">
@@ -595,5 +608,9 @@ export default function ConsultorIAPage() {
       </div>
       )}
     </div>
+
+    <BarraSeleccion onContinuar={() => setRepasando(true)} />
+    <RepasoSeleccion abierto={repasando} onCerrar={() => setRepasando(false)} />
+    </SeleccionProvider>
   )
 }
