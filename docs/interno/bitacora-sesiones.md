@@ -59,7 +59,9 @@ Hallazgo para Kevin: 78 de 253 chats de Central con bot apagado y ningún mensaj
 exige `bot_active = true`, así que esos chats solo los persigue la escalera. El aviso de la
 escalera hoy NO pide dejar nota / registrar tracking / calendario (solo "respondele desde acá");
 el pedido de registro sale únicamente cuando hay nota (4/9). Leonardo preguntó si ya lo pedía:
-no. Sigue todo lo pendiente del 4/9.
+no → con su OK, en la misma tanda: párrafo en el email de todos los niveles y frase corta al
+final de `{{2}}` del WhatsApp de 2/5 h (garantizada: se recorta el contexto, no la indicación);
+en 10/20 h no entra por la forma de la plantilla aprobada. 212 tests. Sigue todo lo pendiente del 4/9.
 
 ## 2026-09-04 — sesión Super Agente: las notas internas hablan con Sofía (queja de Eric)
 

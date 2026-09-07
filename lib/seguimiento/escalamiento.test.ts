@@ -47,10 +47,27 @@ describe("armarAvisoAsesorEscalera", () => {
     const a = armarAvisoAsesorEscalera(asesor, conv, { nivel: 2, horas: 2.2, esAsignado: true, contexto }, APP, "Central")
     expect(a.plantilla).toBe("asesor_cliente_esperando")
     expect(a.variables[0]).toBe("Martín")
-    expect(a.variables[1]).toBe("Laura Gómez (+5491155550000) lleva 2 horas esperando que lo atiendas. Busca: venta, casa en La Plata. Último mensaje del cliente (26/8 12:37): «¿Se puede visitar el sábado?».")
+    expect(a.variables[1]).toBe("Laura Gómez (+5491155550000) lleva 2 horas esperando que lo atiendas. Busca: venta, casa en La Plata. Último mensaje del cliente (26/8 12:37): «¿Se puede visitar el sábado?». Si ya lo atendiste por teléfono, confirmáselo desde el chat de PRISMA o dejá una nota interna, y registrá la visita y la actividad.")
     expect(a.variables[2]).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-1")
     expect(a.html).toContain("Qué busca:")
     expect(a.html).toContain("«No lo puedo tomar»")
+  })
+  // Leonardo, 7/9: 40 chats de Central apagados a mano sin escribir ni anotar. El aviso tiene que
+  // decir qué hacer si ya lo atendió por afuera: chat o nota (para Sofía), calendario y tracking.
+  it("todos los niveles: el email dice qué hacer si ya lo atendió por teléfono (chat o nota, calendario, tracking)", () => {
+    for (const nivel of [2, 5, 10, 20] as const) {
+      const a = armarAvisoAsesorEscalera(asesor, conv, { nivel, horas: nivel, esAsignado: true, contexto }, APP, "C")
+      expect(a.html).toContain("Si ya lo atendiste por teléfono o en persona")
+      expect(a.html).toContain("nota interna")
+      expect(a.html).toContain("calendario")
+      expect(a.html).toContain("tracking")
+    }
+  })
+  it("la indicación entra en el WhatsApp de 2/5 h aunque el contexto sea largo (va antes del corte de 700)", () => {
+    const largo = { busca: "venta, " + "departamento de 3 ambientes con cochera y balcón ".repeat(8), ultimoMensaje: { texto: "x".repeat(300), fechaAR: "26/8 12:37" } }
+    const a = armarAvisoAsesorEscalera(asesor, conv, { nivel: 2, horas: 2, esAsignado: true, contexto: largo }, APP, "C")
+    expect(a.variables[1].length).toBeLessThanOrEqual(700)
+    expect(a.variables[1]).toContain("dejá una nota interna")
   })
   it("5 h: avisa que el director también recibe el aviso", () => {
     const a = armarAvisoAsesorEscalera(asesor, conv, { nivel: 5, horas: 5, esAsignado: true }, APP, "C")
