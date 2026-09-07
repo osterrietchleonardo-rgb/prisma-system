@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { BotonSeleccion, CheckSeleccion, candidataDePropiedad } from '@/components/seleccion/marca-seleccion'
 
 export type PropertySource = 'own' | 'agency' | 'roomix'
 
@@ -104,7 +105,13 @@ export function UnifiedPropertyCard({ property }: { property: UnifiedProperty })
   return (
     <>
       <div className={`overflow-hidden rounded-2xl border ${border.base} bg-white/50 dark:bg-zinc-900/50 backdrop-blur-sm group ${border.hover} transition-all shadow-lg hover:shadow-xl relative cursor-pointer flex flex-col h-full`} onClick={() => setShowDetail(true)}>
-        
+
+        {/* Check para armar la selección que se le manda al cliente. z-30 para quedar por
+            encima del badge (z-20), y debajo de él para no taparle el texto. */}
+        <div className="absolute top-6 right-1 z-30">
+          <CheckSeleccion candidata={candidataDePropiedad(property)} />
+        </div>
+
         {/* Badge Superior Dinámico */}
         <div className={`absolute top-0 left-0 right-0 z-20 px-3 py-1.5 text-[9px] font-bold uppercase tracking-widest text-center shadow-md bg-gradient-to-r ${badge.gradient} text-white`}>
           <span className="truncate block">{badgeLabel}</span>
@@ -433,8 +440,11 @@ export function UnifiedPropertyDetail({
             </div>
           )}
 
-          {/* Botón Compartir ficha (página pública de lujo con la marca + datos del asesor) */}
-          <div className="pt-4 border-t flex justify-end">
+          {/* Pie: sumar a la selección de varias, o compartir la ficha de esta sola.
+              El botón de selección es el ÚNICO lugar para marcar un pin del mapa que tiene
+              una sola propiedad, porque ese va derecho al detalle sin pasar por listado. */}
+          <div className="pt-4 border-t flex flex-wrap items-center justify-end gap-2">
+            <BotonSeleccion candidata={candidataDePropiedad(property)} />
             <button
               onClick={handleShare}
               disabled={sharing}

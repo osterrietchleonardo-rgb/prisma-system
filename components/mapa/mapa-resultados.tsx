@@ -8,6 +8,7 @@
 // para que nunca desaparezcan en silencio.
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MapPinOff } from "lucide-react"
+import { CheckSeleccion, candidataDePropiedad } from "@/components/seleccion/marca-seleccion"
 import { precioCreible } from "@/lib/mapa/lugares"
 import { tipoEnCastellano } from "@/lib/mapa/tipos-propiedad"
 import type { FuenteMapa, PropiedadMapa } from "@/lib/mapa/tipos"
@@ -98,12 +99,21 @@ export function MapaResultados({
         {ordenadas.map((p) => {
           const ubicada = p.lat !== null && p.lng !== null
           return (
-            <button
+            // La fila era un <button> entero. Ahora lleva el check de la seleccion adentro,
+            // y un boton dentro de otro boton es HTML invalido: el navegador se come uno de
+            // los dos clicks. Por eso el contenedor pasa a <div> y quedan DOS zonas tocables
+            // separadas: el check, y el resto que abre la ficha.
+            <div
               key={p.id}
-              onClick={() => onAbrir(p.id)}
               onMouseEnter={() => ubicada && onEnfocar?.(p)}
-              className="flex w-full gap-3 rounded-xl border border-zinc-200 bg-white/60 p-2 text-left transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:border-zinc-600"
+              className="flex w-full items-center gap-1 rounded-xl border border-zinc-200 bg-white/60 p-2 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:border-zinc-600"
             >
+              <CheckSeleccion candidata={candidataDePropiedad(p)} />
+
+              <button
+                onClick={() => onAbrir(p.id)}
+                className="flex min-w-0 flex-1 gap-3 text-left"
+              >
               <img
                 src={p.images[0] || SIN_FOTO}
                 alt={p.title || "Propiedad"}
@@ -128,7 +138,8 @@ export function MapaResultados({
                     .join(" · ")}
                 </p>
               </div>
-            </button>
+              </button>
+            </div>
           )
         })}
     </div>
