@@ -2226,3 +2226,54 @@ Mostrarle lo que anduvo y lo que no. **No mergear a `main` sin su OK explícito.
 - [ ] **Step 5: Anotar el día en la bitácora**
 
 Agregar la entrada en `docs/interno/bitacora-sesiones.md`: qué se construyó, las decisiones (incluida la premisa falsa del mapa como pantalla aparte y cómo se corrigió), y lo que quedó pendiente.
+
+---
+
+### Task 12: El asesor revisa y corrige los textos (agregada el 7-sep, ya ejecutada)
+
+Salió del hallazgo documentado en la spec: la descripción del aviso de la red trae la
+identidad del colega (55% matrícula/corredor, 42% el nombre), y limpiarla sola no es
+confiable (el caso "Av. Pedro Goyena" vs "Goyena Bienes Raíces"). Decisión de Leonardo: que
+lo revise y lo edite una persona.
+
+**Files:**
+- Create: `lib/seleccion/textos.ts` + `lib/seleccion/textos.test.ts`
+- Create: `app/api/seleccion/textos/route.ts`
+- Modify: `app/api/seleccion/route.ts` (+ su test)
+- Modify: `components/seleccion/repaso-seleccion.tsx`
+
+**Interfaces:**
+```ts
+// lib/seleccion/textos.ts
+export function fragmentosSeguros(texto: string): string[]
+export function sacarFragmentos(texto: string, fragmentos: string[]): string
+export function menciones(texto: string, nombrePublicador: string | null | undefined): string[]
+
+// POST /api/seleccion/textos
+// body: { propiedades: Array<{ source, id }> }
+// 200:  { textos: Array<{ id, titulo, descripcion, publicador }>, omitidas }
+
+// POST /api/seleccion — acepta ahora `titulo` y `descripcion` por propiedad.
+// El texto revisado gana sobre el de la base; en blanco, vale el de la base.
+```
+
+- [x] **Step 1-4: TDD de la lógica pura** — 15 tests. `fragmentosSeguros` trabaja por FRASE
+  entera (sacar "CUCICBA" y dejar "Martillero responsable Ricardo Tiscornia 6020" no sirve).
+  `menciones` nunca alimenta el sacado de un toque.
+- [x] **Step 5: Medición contra datos reales** — 500 avisos: 329 con fuga evidente, los 329
+  quedan limpios, 7% del texto sacado en promedio, 139 con el nombre además señalado.
+- [x] **Step 6: El endpoint de textos y el override en el de creación** — con 3 tests nuevos,
+  y verificado con mutación: sacar el override hace fallar "publica el texto que el asesor
+  revisó, no el de la base", y solo ese.
+- [x] **Step 7: La pantalla** — título y descripción editables por propiedad, recuadro ámbar
+  que lista las frases y las saca de un toque, aviso aparte para el nombre del publicador.
+- [x] **Step 8: Verificado en el navegador** — dos avisos de la red: encontró 2 y 3 frases,
+  el botón las sacó (1713→1609 y 2977→2744 caracteres, fuga eliminada en las dos), el aviso
+  desapareció solo, y el snapshot publicado quedó con los textos limpios. La página del
+  cliente: cero fugas.
+
+**Lo que NO resuelve:** la foto puede traer el cartel de la inmobiliaria ("KINACH
+PROPIEDADES" en el aviso de prueba). Está en los píxeles.
+
+**Pendiente de decisión de Leonardo:** la ficha de UNA propiedad (`/api/ficha/share`) tiene
+la misma fuga y hoy está en producción sin revisión. La lógica ya está lista para reusarse.

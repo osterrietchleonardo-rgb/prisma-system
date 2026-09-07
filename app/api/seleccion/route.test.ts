@@ -193,6 +193,45 @@ describe("POST /api/seleccion", () => {
     expect(base.insertadas).toHaveLength(0)
   })
 
+  /**
+   * LA REGLA QUE SOSTIENE LA REVISIÓN DEL ASESOR.
+   *
+   * El 55% de los avisos de la red trae la matrícula del colega adentro de la descripción, y
+   * eso no se puede limpiar solo de forma confiable. El asesor lo corrige en el repaso, y lo
+   * que se publica tiene que ser SU texto — no el de la base. Si esto se rompe, la corrección
+   * se pierde en silencio y el cliente termina leyendo los datos del colega igual.
+   */
+  it("publica el texto que el asesor revisó, no el de la base", async () => {
+    await pedir({
+      propiedades: [
+        {
+          source: "own",
+          id: PROPIA_1,
+          titulo: "Dos ambientes con balcón en Caballito",
+          descripcion: "Luminoso y al frente. Cerca del subte.",
+        },
+      ],
+    })
+
+    const p = (base.insertadas[0].snapshot as any).properties[0]
+    expect(p.title).toBe("Dos ambientes con balcón en Caballito")
+    expect(p.description).toBe("Luminoso y al frente. Cerca del subte.")
+  })
+
+  it("si no mandó texto revisado, vale el de la base", async () => {
+    await pedir({ propiedades: [{ source: "own", id: PROPIA_1 }] })
+
+    const p = (base.insertadas[0].snapshot as any).properties[0]
+    expect(p.title).toBe("Uno")
+  })
+
+  it("un texto revisado en blanco no borra el de la base", async () => {
+    await pedir({ propiedades: [{ source: "own", id: PROPIA_1, titulo: "   " }] })
+
+    const p = (base.insertadas[0].snapshot as any).properties[0]
+    expect(p.title).toBe("Uno")
+  })
+
   it("no acepta una selección vacía", async () => {
     const r = await pedir({ propiedades: [] })
 

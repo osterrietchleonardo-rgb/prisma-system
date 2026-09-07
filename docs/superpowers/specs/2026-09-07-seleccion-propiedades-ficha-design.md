@@ -64,6 +64,57 @@ traducir nada entre el mapa y el chat.
    desde el detalle si lo abrió. En el mapa, desde el popup que abre el pin y desde el
    detalle, pudiendo abrir varios pines uno tras otro e ir sumando.
 
+7. **El asesor lee y corrige los textos antes de generar la ficha.** Ver la sección
+   siguiente: es la decisión más importante que se tomó, y salió de un hallazgo.
+
+## El hallazgo que cambió el diseño: la descripción delata al colega
+
+Probando la ficha con datos reales apareció esto al final de una propiedad de la red:
+
+> *Kinach, Gustavo Luis — Corredor Inmobiliario CUCICBA — Matrícula 1516*
+
+El logo, el teléfono y los links del colega ya estaban tapados (§10.8). Lo que nadie había
+mirado es que **la descripción del aviso la escribe la inmobiliaria que publica, y ahí adentro
+mete su propia identidad**. Medido sobre los 60.278 avisos de la vista:
+
+| | |
+|---|---|
+| 33.368 (**55%**) | dicen matrícula, CUCICBA, corredor inmobiliario o martillero |
+| 25.489 (**42%**) | traen el nombre del publicador |
+| 4.390 (**7%**) | invitan a contactarlo ("whatsapp", "contactanos", "llamanos") |
+
+**Esto ya pasa hoy en producción**, en la ficha de UNA propiedad: verificado contra la base,
+`shared_properties` y `shared_selections` guardan la misma descripción de 1350 caracteres con
+el mismo nombre adentro.
+
+**Por qué no se limpia solo.** Medido sobre 400 avisos: el nombre del publicador cae en el
+MEDIO del texto en el 65% de los casos, y los formatos no se parecen entre sí. El caso que
+cierra la discusión: en un aviso, "Goyena Bienes Raíces" matcheaba con **"Av. Pedro Goyena
+1600"**, que es la calle de la propiedad. Un limpiador automático le habría borrado la
+dirección al aviso. Una regla que borre lo suficiente rompe descripciones legítimas; una que
+no rompa nada deja pasar fugas.
+
+**La decisión de Leonardo:** *"si la limpieza es gratis y confiable sí; si no, antes de generar
+la ficha se le muestran al asesor todos los textos que se incluirán para cada propiedad, y
+tiene la posibilidad de editar/mejorar; cuando acepte, se genera."* No es confiable, así que
+va la revisión — de **título y descripción de todas** las propiedades, de las tres fuentes.
+
+**Cómo se resuelve, en dos niveles, y ninguno borra solo** (`lib/seleccion/textos.ts`):
+
+- **Frases seguras** — las que dicen matrícula, CUCICBA, corredor, martillero, "no ejerce el
+  corretaje", XINTEL o invitan a contactar. Se listan y el asesor las saca **de un toque**.
+  Medido sobre 500 avisos reales: de los 329 con fuga evidente, **los 329 quedan limpios**, y
+  se saca apenas el **7% del texto** en promedio.
+- **Menciones al nombre del publicador** — solo se señalan, con el aviso de que puede ser el
+  nombre de la calle. **Nunca entran en el sacado de un toque**, justamente por el caso Goyena.
+
+> Ese "los 329 quedan limpios" prueba que el sacado por frases funciona completo, **no** que la
+> lista de patrones sea exhaustiva. Por eso el asesor igual lee y edita: la máquina señala, la
+> persona decide.
+
+**Lo que no se puede arreglar con código:** en la foto de esa misma propiedad se ve un cartel
+que dice "KINACH PROPIEDADES". Eso está en los píxeles del aviso.
+
 ## El diseño
 
 ### 1. Dónde se marca
@@ -140,10 +191,25 @@ marcadas por un toque de más es caro).
 
 ### 3. El repaso antes de generar
 
-"Continuar" abre una pantalla con las elegidas **en el orden en que se fueron marcando**.
-De cada una: la foto de portada, el título, el precio, un campo de **nota opcional** y un
-botón para sacarla. Abajo de todo, el campo de la **nota final del grupo**, también
-opcional. Y el botón **"Crear la ficha"**.
+"Continuar" abre la pantalla donde el asesor **lee y corrige lo que va a ver su cliente**.
+Las elegidas van **en el orden en que se marcaron**, y de cada una:
+
+- La foto de portada y el precio.
+- El **título** y la **descripción**, editables. Lo que quede ahí es exactamente lo que se
+  publica: el endpoint prioriza el texto revisado sobre el de la base, incluso si mientras
+  tanto cambió, porque es el que el asesor aprobó.
+- Si hay frases que identifican al colega, un recuadro ámbar que **las lista** y un botón
+  para **sacarlas de un toque**. Si aparece el nombre del publicador, un aviso aparte que
+  solo lo señala.
+- Un campo de **nota opcional** suya, y un botón para sacar la propiedad.
+
+Abajo de todo, la **nota final del grupo**, también opcional, y **"Crear la ficha"**.
+
+Los textos se piden al servidor al abrir el repaso (`POST /api/seleccion/textos`): el
+listado del mapa trae solo la portada, así que la descripción completa —que es justo la que
+hay que revisar— no está en pantalla. Ese endpoint devuelve además el nombre del publicador,
+**solo para señalar dónde mirar**; es de uso interno, como el teléfono del colega en la
+tarjeta del Buscador, y nunca se guarda en el snapshot.
 
 No hay arrastrar para reordenar. Se evaluó y no se hace todavía: es bastante trabajo (touch
 + mouse + accesibilidad) para un problema que el orden de marcado ya resuelve casi siempre.

@@ -15,8 +15,27 @@ export const maxDuration = 60
 
 const MAX_NOTA = 400
 const MAX_NOTA_FINAL = 1000
+const MAX_TITULO = 200
+const MAX_DESCRIPCION = 4000
 
 const recortar = (v: unknown, tope: number) => (typeof v === "string" ? v.trim().slice(0, tope) : "")
+
+/**
+ * El texto que el asesor revisó gana sobre el de la base.
+ *
+ * La descripción de un aviso de la red trae, en el 55% de los casos, la matrícula o el
+ * corredor de la inmobiliaria que publica, y en el 42% su nombre. No se puede limpiar solo
+ * de forma confiable (ver lib/seleccion/textos.ts), así que el asesor lo lee y lo corrige en
+ * el repaso. Lo que quedó ahí es lo que se publica — incluso si mientras tanto cambió en la
+ * base, porque es lo que él aprobó.
+ *
+ * Si no mandó nada, vale lo de la base: así el endpoint sigue sirviendo sin la pantalla de
+ * repaso.
+ */
+const textoRevisado = (editado: unknown, deLaBase: string, tope: number) => {
+  const limpio = recortar(editado, tope)
+  return limpio || deLaBase
+}
 
 export async function POST(req: Request) {
   try {
@@ -72,7 +91,12 @@ export async function POST(req: Request) {
         omitidas.push({ id, motivo: resultado.motivo })
         continue
       }
-      properties.push({ ...resultado.propiedad, nota: recortar(elegida?.nota, MAX_NOTA) })
+      properties.push({
+        ...resultado.propiedad,
+        title: textoRevisado(elegida?.titulo, resultado.propiedad.title || "", MAX_TITULO),
+        description: textoRevisado(elegida?.descripcion, resultado.propiedad.description, MAX_DESCRIPCION),
+        nota: recortar(elegida?.nota, MAX_NOTA),
+      })
     }
 
     if (properties.length === 0) {
