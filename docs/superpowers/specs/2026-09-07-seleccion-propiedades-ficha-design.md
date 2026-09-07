@@ -47,32 +47,64 @@ traducir nada entre el mapa y el chat.
    vacías, no se dibujan** — ni el título, ni el recuadro, ni el espacio.
 5. **La página es para el celular**, y tiene que verse bien también en la compu. **No hay
    botón de PDF ni versión para imprimir.**
-6. **En el mapa se selecciona desde el detalle que se abre al tocar un pin**, pudiendo
-   abrir varios, uno tras otro, e ir sumando.
-7. **En el Buscador se selecciona de las tres secciones** — propia, agencia y red de
-   colaboración — indistintamente.
+6. **Se marca desde el listado y desde adentro del detalle, en las dos pantallas.** En el
+   Buscador, desde las tarjetas de las tres secciones —propia, agencia y red— y también
+   desde el detalle si lo abrió. En el mapa, desde el popup que abre el pin y desde el
+   detalle, pudiendo abrir varios pines uno tras otro e ir sumando.
 
 ## El diseño
 
 ### 1. Dónde se marca
 
-Los cuatro caminos del mapa —pin suelto, pin agrupado, cúmulo y la lista de la derecha—
-terminan todos en el mismo `setFichaId(id)` → `MapaFicha` → `UnifiedPropertyDetail`
-(`components/mapa/mapa-tab.tsx:277-582`). Y el Buscador abre **ese mismo componente** desde
-sus tarjetas.
+**Se marca desde el listado y desde adentro del detalle, en las dos pantallas.** El asesor
+no tiene que abrir una propiedad para poder elegirla, pero si la abrió para mirarla bien,
+tampoco tiene que cerrarla para marcarla.
 
-Por eso el botón de sumar a la selección va **adentro de `UnifiedPropertyDetail`**: un solo
-lugar cubre las cuatro entradas del mapa y las tres secciones del Buscador. Dice
-**"Agregar a la selección"**, y cuando la propiedad ya está adentro dice **"Sacar de la
+Suena a muchos lugares. Son **tres componentes**, porque el código ya está unificado:
+
+| Componente | Qué cubre |
+|---|---|
+| `components/mapa/mapa-resultados.tsx` (`MapaResultados`) | Los **tres** listados del mapa: el panel de la derecha (`mapa-tab.tsx:481`), el popup del pin con varias propiedades y el popup del globito — los dos últimos son el mismo `MapaListaModal`, que dibuja sus filas con este componente (`mapa-lista-modal.tsx:107`) |
+| `consultor-results.tsx:82` (`UnifiedPropertyCard`) | Las **tres** secciones del Buscador: propia, agencia y red |
+| `consultor-results.tsx:253` (`UnifiedPropertyDetail`) | El detalle abierto, en **las dos** pantallas: el Buscador lo abre desde sus tarjetas y el mapa desde `MapaFicha` (`mapa-ficha.tsx:26`) |
+
+En los dos listados, un **check en la esquina** de cada fila/tarjeta. En el detalle, un
+botón que dice **"Agregar a la selección"** y, si ya está adentro, **"Sacar de la
 selección"**.
 
-En el Buscador, además, cada `UnifiedPropertyCard` lleva un check en la esquina para poder
-marcar sin abrir el detalle. Tocar la tarjeta sigue abriendo el detalle como siempre: el
-check tiene su propio área y frena la propagación del click.
+Un pin que tiene **una sola** propiedad no abre popup: va derecho al detalle
+(`mapa-tab.tsx:278`). Por eso el botón adentro del detalle no es un extra — para ese caso,
+que es el más común en el mapa, es el único lugar donde se puede marcar.
 
 > **Por qué no hay "modo selección" que haya que activar antes.** Se descartó: obliga a
 > decidir que vas a armar una ficha *antes* de haber visto las propiedades, que es al revés
-> de cómo se trabaja. El botón está siempre.
+> de cómo se trabaja. Los checks y el botón están siempre.
+
+**Dos trampas de implementación, anotadas acá para que no se descubran tarde:**
+
+- Las filas de `MapaResultados` son hoy un `<button>` entero (`mapa-resultados.tsx:101`).
+  Un check adentro de un botón es HTML inválido y el navegador se come uno de los dos
+  clicks. La fila pasa a ser un `<div>` con dos zonas tocables separadas. Lo mismo en
+  `UnifiedPropertyCard`, que es un `<div onClick>`: el check tiene que frenar la
+  propagación o marcar abriría el detalle.
+- El check tiene que medir **44px de lado tocable** en celular, aunque el dibujo sea más
+  chico. Es exactamente el caso de "un botón que se ve pero no se toca" que ya pasó antes:
+  la captura de pantalla no lo delata, hay que medir dónde cae el dedo.
+
+### 1.b Dónde vive la selección
+
+Un **contexto de React por pantalla** (`SeleccionProvider`), montado en la página del mapa
+y en la del Buscador. Los tres componentes de arriba leen de ahí.
+
+No es adorno arquitectónico: `MapaResultados` está a tres niveles de profundidad adentro
+del popup, y `UnifiedPropertyDetail` lo comparten dos pantallas distintas. Pasar la
+selección por props obligaría a tocar la firma de cinco componentes y a que el mapa y el
+Buscador se pongan de acuerdo en una forma común. Con el contexto, además, **si no hay
+provider el check y el botón simplemente no se dibujan** — así ninguna otra pantalla que
+reuse estos componentes hereda una función que no le corresponde.
+
+Como cada pantalla monta su propio provider, la decisión 3 (cada pantalla con su selección)
+sale sola: al cambiar de página el contexto se desmonta y la selección se vacía.
 
 ### 2. La barra flotante
 
@@ -188,9 +220,17 @@ Casos, en el navegador de escritorio **y** en celular emulado:
 4. Con las dos notas cargadas.
 5. Mezcla de las tres fuentes: propia, agencia y red.
 6. Una de la red dada de baja → se genera con el resto y avisa.
-7. En el mapa: abrir un pin, sumar, cerrar, abrir otro pin, sumar, y generar.
-8. En el Buscador: sumar de las tres secciones, y de dos búsquedas distintas del mismo chat.
-9. En el celular: que la barra flotante no tape el último resultado de la lista.
+7. En el mapa, los **cuatro** caminos de marcado, y que los cuatro sumen a la misma
+   selección: el check en el panel de la derecha, el check en el popup de un pin con
+   varias, el check en el popup del globito, y el botón adentro del detalle de un pin con
+   una sola. Abrir un pin, sumar, cerrar, abrir otro, sumar, y generar.
+8. En el Buscador, los **dos** caminos: el check en la tarjeta y el botón adentro del
+   detalle. De las tres secciones, y de dos búsquedas distintas del mismo chat.
+9. Que marcar desde el check **no** abra el detalle, y que tocar la fila **sí** lo abra.
+   Las dos cosas, en compu y en celular.
+10. Que lo marcado en un lado se vea marcado en el otro: marcar en el listado, abrir el
+    detalle, y que el botón ya diga "Sacar de la selección".
+11. En el celular: que la barra flotante no tape el último resultado de la lista.
 
 ## Lo que queda afuera a propósito
 
