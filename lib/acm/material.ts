@@ -1,0 +1,109 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ACM · Material institucional que carga cada agencia y que se imprime dentro de
+// la ficha que recibe el propietario. Vive en agencies.marketing_ai_config.acm_material.
+// Las cuatro secciones son FIJAS: si la IA pudiera inventar secciones, cada
+// propietario recibiría una ficha con una forma distinta.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ClaveSeccion =
+  | "quienes_somos" | "como_comercializamos" | "como_preparar" | "roles_venta";
+
+export interface SeccionMeta {
+  clave: ClaveSeccion;
+  titulo: string;
+  tope: number;
+  /** Qué archivo de su carpeta tiene que buscar el director. Sin esto la función queda vacía. */
+  ayuda: string;
+  /** Dónde va a salir en la ficha, para que entienda qué está armando. */
+  donde: string;
+}
+
+export const SECCIONES: readonly SeccionMeta[] = [
+  {
+    clave: "quienes_somos",
+    titulo: "Quiénes somos",
+    tope: 1200,
+    ayuda: "Qué subir: la carpeta de presentación, el «quiénes somos» de tu web, o el brochure que le das al cliente en la primera reunión.",
+    donde: "Sale en la hoja 2, antes del precio.",
+  },
+  {
+    clave: "como_comercializamos",
+    titulo: "Cómo comercializamos su propiedad",
+    tope: 1800,
+    ayuda: "Qué subir: tu plan de marketing — en qué portales publicás, cómo trabajás con otras inmobiliarias, cada cuánto le informás al propietario.",
+    donde: "Sale al final, después de las conclusiones.",
+  },
+  {
+    clave: "como_preparar",
+    titulo: "Cómo preparar su propiedad",
+    tope: 1500,
+    ayuda: "Qué subir: la guía de cómo preparar la casa para las muestras — orden, luz, limpieza, qué hacer el día de la visita.",
+    donde: "Sale en la última hoja.",
+  },
+  {
+    clave: "roles_venta",
+    titulo: "El rol de cada uno en la venta",
+    tope: 500,
+    ayuda: "Qué subir: el cuadro de quién define qué — quién pone el precio de oferta, quién el estado de la propiedad, quién el plan de marketing y quién termina definiendo el precio final.",
+    donde: "Sale al lado del gráfico del precio.",
+  },
+] as const;
+
+export const TOPES = Object.fromEntries(
+  SECCIONES.map((s) => [s.clave, s.tope]),
+) as Record<ClaveSeccion, number>;
+
+export interface AcmMaterialArchivo {
+  id: string;
+  nombre: string;
+  /** Ruta dentro del bucket privado `acm-material`. No es una URL: nadie lo muestra. */
+  path: string;
+  subido_el: string;
+}
+
+export type AcmSecciones = Record<ClaveSeccion, string>;
+
+export interface AcmMaterial {
+  archivos: AcmMaterialArchivo[];
+  secciones: AcmSecciones;
+}
+
+const esTexto = (v: unknown): v is string => typeof v === "string";
+
+function seccionesVacias(): AcmSecciones {
+  return { quienes_somos: "", como_comercializamos: "", como_preparar: "", roles_venta: "" };
+}
+
+/** Limpia lo que venga de la base o de la IA: recorta al tope y descarta lo que no reconoce. */
+export function normalizarMaterial(raw: unknown): AcmMaterial {
+  const obj = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+
+  const secciones = seccionesVacias();
+  const crudas = (obj.secciones && typeof obj.secciones === "object" ? obj.secciones : {}) as Record<string, unknown>;
+  for (const s of SECCIONES) {
+    const v = crudas[s.clave];
+    if (esTexto(v)) secciones[s.clave] = v.trim().slice(0, s.tope);
+  }
+
+  const archivos: AcmMaterialArchivo[] = Array.isArray(obj.archivos)
+    ? obj.archivos.flatMap((a) => {
+        if (!a || typeof a !== "object") return [];
+        const { id, nombre, path, subido_el } = a as Record<string, unknown>;
+        if (!esTexto(id) || !esTexto(nombre) || !esTexto(path) || !esTexto(subido_el)) return [];
+        return [{ id, nombre, path, subido_el }];
+      })
+    : [];
+
+  return { archivos, secciones };
+}
+
+/**
+ * Lo único que viaja al snapshot de la ficha. La lista de archivos NO va: el propietario no
+ * tiene por qué recibir los nombres de los archivos internos de la agencia.
+ * Devuelve null si no hay ni una sección con texto — así la ficha sale igual que siempre.
+ */
+export function seccionesParaFicha(raw: unknown): AcmSecciones | null {
+  const { secciones } = normalizarMaterial(raw);
+  const hayAlgo = SECCIONES.some((s) => secciones[s.clave].trim().length > 0);
+  return hayAlgo ? secciones : null;
+}
