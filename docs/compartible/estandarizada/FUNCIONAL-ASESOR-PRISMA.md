@@ -901,5 +901,7 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 
 **Si atendiste a un cliente por teléfono o en persona:** dejá una **nota interna** en el chat contando qué hiciste, como ya venís haciendo. Sofía la lee: si dice que ya lo estás atendiendo, deja de mandarte avisos de "cliente esperando" por ese caso. Y si la nota menciona algo que en PRISMA todavía no quedó cargado —la visita en el calendario, la gestión en el chat, la actividad en tu tracking— te lo pide, todo junto, en un solo correo.
 
+**Si el cliente se despidió, no te avisa.** Cuando le contestaste y el cliente cerró con un "Gracias", un "Dale, buen finde" o un "ya alquilé", Sofía lee la conversación y entiende que no está esperando nada: no te llega ningún aviso y no hace falta que dejes una nota. Ojo con una diferencia: si lo último que el cliente recibió fue una **promesa** ("el asesor se va a comunicar", "te confirmo y te aviso") y él respondió "gracias", para Sofía **sigue esperando** ese contacto, y los avisos salen igual hasta que le escribas. Ante la duda, avisa: un aviso de más molesta menos que un cliente perdido.
+
 > 💡 **Tip:** el seguimiento automático a los clientes que se enfriaron lo hace PRISMA solo, con mensajes naturales y como mucho tres veces; vos vas a ver en la ficha qué decidió y por qué. Lo tuyo son los clientes que **te esperan a vos**.
 

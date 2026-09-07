@@ -123,6 +123,8 @@ const CATEGORIA_POR_TIPO: Record<string, CategoriaTraza> = {
   aviso_delegado_escalera: "agente",
   nota_evaluada: "agente",
   nota_error: "agente",
+  despedida_evaluada: "agente",
+  despedida_error: "agente",
   aviso_registro_simulado: "aviso",
   escalera: "aviso",
   escalera_simulada: "aviso",

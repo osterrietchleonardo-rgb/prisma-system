@@ -1081,6 +1081,8 @@ está **"Agregar una nota"**. Las notas las ven solo los directores; el asesor y
 
 **Las notas internas de tu equipo ahora frenan esos avisos.** Si un asesor atendió a un cliente por teléfono o en persona y lo dejó anotado en el chat, Sofía lee esa nota: si confirma que la gestión ya está hecha, los avisos de "cliente esperando" se frenan para ese caso, y no le llega nada de más a nadie. Lo que quedó sin registrar en PRISMA (la visita, la gestión en el chat, la actividad en el tracking) se le pide al asesor en ese mismo momento, en un solo correo.
 
+**Y una despedida del cliente tampoco dispara avisos.** Si el asesor le contestó y el cliente cerró con un "Gracias", un "Dale, buen finde" o un "ya alquilé", Sofía lee la conversación y entiende que ese cliente no está esperando nada: no sale ningún aviso, ni al asesor ni a vos, y nadie tiene que dejar una nota. En la Trazabilidad del lead queda escrito qué leyó y por qué. La excepción importante: si lo último que el cliente recibió fue una promesa ("el asesor se va a comunicar") y respondió "gracias", para Sofía sigue esperando ese contacto y los avisos salen igual. Ante la duda, avisa.
+
 **3. Recordatorios de visita.** 24 horas, 3 horas y 1 hora antes de cada visita agendada, y un mensaje si el cliente no fue.
 
 **Cómo te llegan los avisos:** siempre por **email**; también por **WhatsApp** (desde el número de tu agencia) si cargaste tu celular en Mi Perfil y Meta ya aprobó la plantilla. Cada aviso tiene un link que te lleva **directo a ese chat**, aunque tengas que iniciar sesión primero.

@@ -1450,6 +1450,52 @@ mano). Decisión de Leonardo: **la detección es determinista, la interpretació
   salió `atendido: false` con los cuatro pedidos en `false`. Los dos casos pasaron en el primer
   intento, sin tocar `PROMPT_NOTA`.
 
+### 22.9 La despedida no es una espera (7/9/2026)
+
+Disparador: Kevin (7/9, 10:54) con el caso de Agustins (…789): Micaela apagó el bot, le
+contestó (6/9 9:59 y 10:00), el cliente cerró con «Gracias!!» (10:01) y la escalera disparó
+igual los niveles 2 h (12:31), 5 h con Kevin (15:31) y 10 h (20:31). En los 7 días previos,
+**14 de 81 casos escalados** terminaban en un cierre así (medido con la IA, ver abajo).
+Decisión de Leonardo: "que los asesores anoten cada chat no es escalable ni consistente" ⇒
+la IA lee la conversación aunque no haya nota.
+
+- **Módulo** `lib/seguimiento/despedida.ts`, gemelo de `nota-interna.ts`: `procesarDespedidaDelCaso(db, c, t0, {ahoraMs, llamar?})`
+  devuelve `{ resultado: "despedida" | "requiere_respuesta" | "error_ia", llamoIA }`. Una
+  sola llamada a `MODELO` (tool forzado `emitir_veredicto`, `max_tokens: 600`, Zod
+  `VeredictoDespedidaSchema` = `{requiere_respuesta, razon}`), con la conversación completa
+  (`leer_mensajes({cantidad: 30})`) y la hora AR en la semilla. **No mira registro ni
+  calendario**: la pregunta es una sola, ¿el último mensaje del cliente necesita respuesta?
+- **El prompt tiene una regla que importa**: un "gracias" después de una PROMESA de contacto
+  ("el asesor se va a comunicar", "te confirmo y te aviso") NO es cierre — el cliente sigue
+  esperando ese contacto. Es lo que separa a la IA de un regex: en la prueba real, 8 de los
+  "gracias" de la semana quedaron como espera por esa regla. Audios ("Mensaje de voz
+  recibido"), preguntas, horarios propuestos y reclamos ⇒ espera. Ante la duda, espera.
+- **Dónde entra** (`escalamiento.ts`): después de la nota. Si `rNota` es `sin_nota` o
+  `escalera_sigue` (nota-recordatorio), se evalúa la despedida; con `atendido*` ya se frenó y
+  no se gasta; con `error_ia` de la nota no se insiste (la API caída lo está para las dos).
+  `despedida` ⇒ `resumen.despedidas++` y `continue` — ningún nivel, a nadie, y sin aviso al
+  asesor (no hay nada que registrar).
+- **Una evaluación por caso**: marcador `despedida_evaluada` en `lead_eventos` con
+  `datos = {t0, requiere_respuesta, razon}`; las barridas siguientes lo reutilizan
+  (`.contains("datos", {t0})`) sin volver a llamar. Insert inline y chequeado; si falla, el
+  veredicto igual manda (por una despedida no se avisa a nadie; lo peor es re-preguntar en la
+  barrida siguiente, acotado por el tope). Si la IA falla: `despedida_error` y la escalera
+  sigue. Un `throw` fuera de su try queda en `despedida_error` y no tira la barrida.
+- **Tope compartido**: `MAX_NOTAS_IA` pasó a `MAX_LLAMADAS_IA = 20` por corrida, notas +
+  despedidas juntas; solo cuentan las llamadas reales (`llamoIA`), no los marcadores leídos.
+- **Trazabilidad**: `despedida_evaluada` y `despedida_error` van a la categoría "agente"
+  (`lib/equipo/trazabilidad.ts`); el director ve la razón en la ficha del lead.
+- **Prueba real antes del merge** (`lib/seguimiento/manual-despedida-semana.test.ts`, no se
+  commitea; `SEGUIMIENTO_MANUAL=1`, solo lectura, 81 llamadas reales, 55 s): 14 despedidas,
+  67 esperas, 0 errores. Despedidas: «Gracias!!» (Agustins), «Entonces imposible. Gracias.»,
+  «dale. Le consulto y te aviso», «Ya estamos hablando», «Gracias ya alquile», «Gracias, por
+  ahora no tengo más preguntas.», «Ahora te escribo gracias». Esperas correctas: «Dale gracias,
+  buen Finde semana», «Ok graciss», «Muchas gracias. Fuiste muy amable!!», «Gracias» (todas
+  tras una promesa del bot); «Lo estamos viendo por nuestra cuenta» quedó como espera por
+  conservador (el bot tenía una pregunta abierta). Salvedad de la prueba: la IA leyó la
+  conversación de HOY, no la del momento del caso, así que algunos "cierres" son porque el
+  asesor ya contestó después.
+
 ## 23. Buscador IA y Tutor IA: la conversación en vivo (2/9/2026)
 
 Punto 1 del plan de agentes (`docs/superpowers/plans/2026-09-02-buscador-conversacion-viva.md`);

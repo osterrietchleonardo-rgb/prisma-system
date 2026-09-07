@@ -107,7 +107,7 @@ describe("correrEscalamiento: nada de madrugada (Kevin, 2/9)", () => {
       get() { throw new Error("la corrida de madrugada no debería tocar la base") },
     }) as never
     const r = await correrEscalamiento(dbQueNoSePuedeUsar, { ahoraMs: ar("2026-09-03T03:30:00") })
-    expect(r).toEqual({ esperando: 0, atendidos: 0, avisos: 0, simulados: 0, fueraDeVentana: true })
+    expect(r).toEqual({ esperando: 0, atendidos: 0, avisos: 0, simulados: 0, despedidas: 0, fueraDeVentana: true })
   })
 
   it("a las 23:00 en punto tampoco (la ventana cierra 22:59)", async () => {
@@ -141,7 +141,7 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
   const ar = (iso: string) => Date.parse(iso + "-03:00")
 
   /** `tablasQueTiran` simula una tabla que revienta al leerla (permiso, timeout, columna que no está). */
-  function armarDbCorrida(tablasQueTiran: string[] = []) {
+  function armarDbCorrida(tablasQueTiran: string[] = [], extra: { nota?: unknown } = {}) {
     const inserts: Array<{ tabla: string; fila: Record<string, unknown> }> = []
     const tablas: Record<string, unknown> = {
       seguimiento_config: [{ agency_id: "ag-1", modo: "activo", activo_desde: "2026-08-31T00:00:00Z" }],
@@ -155,7 +155,7 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
       // wa_messages responde según los filtros: para simplificar, el último del lead y la nota
       wa_messages_ultimo_lead: { created_at: "2026-09-03T20:09:43Z" },
       wa_messages_humano: [],
-      wa_messages_nota: { id: "n-1", content: "Ya lo llamé, visita el viernes", created_at: "2026-09-03T21:20:00Z" },
+      wa_messages_nota: "nota" in extra ? extra.nota : { id: "n-1", content: "Ya lo llamé, visita el viernes", created_at: "2026-09-03T21:20:00Z" },
       lead_eventos: [],
       scheduled_visits: [], wa_contacts: null, performance_logs: [],
       interacciones_canal: [], wa_templates: null, whatsapp_instances: null,
@@ -223,5 +223,56 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
     expect(r.avisos).toBe(1)
     expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(true)
     expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_error")).toBe(true)
+  })
+
+  // Sin nota, la IA lee la conversación (Kevin, 7/9: el «Gracias!!» de Agustins disparó 2/5/10 h).
+  const fetchOk = (async () => ({ ok: true, json: async () => ({ id: "r-1" }) })) as never
+  const despedida = async () => ({ requiere_respuesta: false, razon: "Cerró con «Gracias!!»" })
+  const espera = async () => ({ requiere_respuesta: true, razon: "Pregunta por la dirección" })
+  const tipos = (inserts: Array<{ tabla: string; fila: Record<string, unknown> }>) =>
+    inserts.filter((i) => i.tabla === "lead_eventos").map((i) => i.fila.tipo as string)
+
+  it("sin nota y el cliente se despidió ⇒ despedidas++, ni un nivel sale, ni a la IA de la nota se llama", async () => {
+    const { db, inserts } = armarDbCorrida([], { nota: null })
+    const llamarNota = async () => { throw new Error("sin nota no se llama") }
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, llamarDespedida: despedida, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.despedidas).toBe(1)
+    expect(r.avisos).toBe(0)
+    expect(tipos(inserts)).toEqual(["despedida_evaluada"])
+  })
+
+  it("sin nota y el cliente espera algo ⇒ el nivel sale como siempre, con el marcador guardado", async () => {
+    const { db, inserts } = armarDbCorrida([], { nota: null })
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarDespedida: espera, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(1)
+    expect(r.despedidas).toBe(0)
+    expect(tipos(inserts)).toContain("despedida_evaluada")
+    expect(tipos(inserts)).toContain("escalera")
+  })
+
+  it("nota-recordatorio (no atendido) + despedida del cliente ⇒ también frena", async () => {
+    const { db, inserts } = armarDbCorrida()
+    const llamarNota = async () => ({ atendido: false, pedir_registro_chat: false, pedir_registro_visita: false, pedir_registro_actividad: false, razon: "Solo un recordatorio" })
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, llamarDespedida: despedida, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.despedidas).toBe(1)
+    expect(tipos(inserts)).not.toContain("escalera")
+  })
+
+  it("nota 'atendido' ⇒ la despedida ni se evalúa (ya se frenó por la nota)", async () => {
+    const { db } = armarDbCorrida()
+    const llamarNota = async () => ({ atendido: true, pedir_registro_chat: false, pedir_registro_visita: false, pedir_registro_actividad: false, razon: "Lo llamó" })
+    const llamarDespedida = async () => { throw new Error("no debería evaluar la despedida") }
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, llamarDespedida, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.atendidos).toBe(1)
+    expect(r.despedidas).toBe(0)
+  })
+
+  it("si la lectura de la despedida explota, la corrida NO se cae: sale el nivel y queda despedida_error", async () => {
+    const { db, inserts } = armarDbCorrida([], { nota: null })
+    const llamarDespedida = async () => { throw new Error("API caída") }
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarDespedida, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(1)
+    expect(tipos(inserts)).toContain("despedida_error")
+    expect(tipos(inserts)).toContain("escalera")
   })
 })
