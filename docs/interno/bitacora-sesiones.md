@@ -16,6 +16,49 @@
 
 ---
 
+## 2026-09-07 — sesión ACM: el material de la agencia dentro de la ficha del propietario
+
+**De dónde salió.** Leonardo pidió leer los 3 PDF de Central en Descargas (`20 PASOS 2025`,
+`Nueva bienvenida Experiencia CentralRE`, `Our Company 2025`) y decir cuáles convenía sumar al
+ACM. Diagnóstico: la ficha justifica muy bien el precio pero no dice QUIÉN se lo está diciendo
+al propietario ni qué pasa después. Se descartó "Our Company" como hoja (brochure de lujo en
+inglés, otra conversación) y se eligió el contenido del carpetón de bienvenida + los 20 pasos.
+Dato ya existente que nadie usaba: `brand.legal_notice` **ya se imprime al pie de cada hoja**
+(`page.tsx:86`) — la matrícula no había que construirla, había que cargarla.
+
+**Qué se construyó (rama `worktree-feat+acm-material-agencia`, mergeada; 13 commits).**
+Spec y plan en `docs/superpowers/{specs,plans}/2026-09-05-acm-material-agencia*`.
+Solapa **Configuración** dentro del módulo de ACM (no en Marketing IA: ahí es donde el director
+está cuando piensa en la ficha), **solo director** vía prop desde `app/director/acm/page.tsx`
+—`AcmModule` lo comparten los dos roles— más 403 en todos los endpoints. Cuatro secciones
+fijas: `quienes_somos` (hoja 2, antes del precio), `como_comercializamos` y `como_preparar`
+(al final), `roles_venta` (pegado a la Pirámide). Sube PDF/Word → `pdf-parse-fork`/`mammoth` →
+Gemini reparte → **el director acepta sección por sección**, así reemplazar un archivo nunca
+pisa una corrección a mano. Bucket privado `acm-material`. `lib/acm/material*.ts`,
+`app/api/marketing-ia/acm-material/{,archivo,leer,acomodar}`. La ficha congela las secciones en
+el snapshot: **sin material cargado sale exactamente igual que antes**, y una ficha ya emitida
+no cambia aunque después se borre la configuración (verificado).
+
+**Los cuatro errores que aparecieron probando de verdad, no en los tests.**
+1. **Path traversal**: pedir que la ruta "empiece con el agencyId" deja pasar `A/../B/ajeno.pdf`.
+   Se podía leer y borrar material de otra inmobiliaria. Lo marcó la revisión automática de
+   commit. Se cerró con `esRutaDeLaAgencia()`, que exige la forma exacta `<uuid>/<uuid>.<ext>`.
+2. **El tope de 25 MB** (copiado de Contratos) dejaba afuera el material real: "Our Company"
+   pesa 25,45 MB. Un contrato es texto; un carpetón es todo imágenes. Ahora 50 MB.
+3. **No se podían escribir espacios** en los cuadros de texto: el componente pasaba el valor por
+   `normalizarMaterial()` en cada render y esa función hace `trim()`. Lo encontró Leonardo, no
+   los tests, porque `fill()` de Playwright pega el texto de una sola vez. Ver
+   [[prueba-escribiendo-tecla-por-tecla]].
+4. **El endpoint no usa las fotos que le mandan**: las busca en la base por `source` + `id`
+   (`ficha/route.ts:149-168`). Una ficha de prueba armada a mano sale sin fotos y NO es un bug.
+
+**Qué quedó.** Central todavía no cargó su material (la configuración de PRISMAIA - VAKDOR
+quedó con el de Central, cargado como ejemplo). Pendiente avisarle a Víctor que el aviso legal
+y la matrícula se cargan en Marketing IA → Configuración. Idea no implementada: si el director
+sube archivos y no guarda, quedan huérfanos en el bucket.
+
+---
+
 ## 2026-09-07 — sesión Super Agente: la despedida no es una espera (caso de Kevin)
 
 **Qué pasó.** Kevin (WhatsApp 10:54): el chat de Agustins (…789) terminó en «Gracias!!» (6/9
