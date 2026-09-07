@@ -16,15 +16,22 @@ describe("semillaDespedida: la conversación entera y la hora, nada inventado", 
     const s = semillaDespedida({
       mensajes: "(horas en Argentina)\n[2026-09-06 10:00] [human] te habla Micaela\n[2026-09-06 10:01] [lead] Gracias!!",
       ahoraISO: "2026-09-06 12:31",
+      botApagadoDesde: null,
     })
     expect(s).toContain("2026-09-06 12:31")
     expect(s).toContain("[lead] Gracias!!")
     expect(s).toContain("emitir_veredicto")
+    expect(s).toContain("ENCENDIDO")
+  })
+  it("con el bot apagado lo dice y desde cuándo (Alex, 7/9: un asesor tomó el chat sin escribir)", () => {
+    const s = semillaDespedida({ mensajes: "[lead] Mi nombre es alex", ahoraISO: "2026-09-07 12:01", botApagadoDesde: "2026-09-04 15:14" })
+    expect(s).toContain("APAGADO desde 2026-09-04 15:14")
+    expect(s).not.toContain("ENCENDIDO")
   })
 })
 
 describe("procesarDespedidaDelCaso", () => {
-  const c = { id: "conv-1", agency_id: "ag-1", contact_phone: "5491170637789", metricas: { nombre: "Agustins" } }
+  const c = { id: "conv-1", agency_id: "ag-1", contact_phone: "5491170637789", metricas: { nombre: "Agustins" }, bot_active: false }
   const t0 = "2026-09-06T13:01:00Z"
   const ahoraMs = Date.parse("2026-09-06T12:31:00-03:00")
 
@@ -108,6 +115,22 @@ describe("procesarDespedidaDelCaso", () => {
     const { db } = armarDb({ wa_messages: mensajes, lead_eventos: [{ datos: { t0, requiere_respuesta: true } }] })
     const llamar = async () => { throw new Error("no debería llamar a la IA") }
     expect(await procesarDespedidaDelCaso(db, c, t0, { ahoraMs, llamar })).toEqual({ resultado: "requiere_respuesta", llamoIA: false })
+  })
+
+  it("la semilla le cuenta a la IA que el bot está apagado y desde cuándo (último evento bot_apagado)", async () => {
+    const { db } = armarDb({ wa_messages: mensajes, lead_eventos: [{ tipo: "bot_apagado", ts: "2026-09-04T18:14:00Z" }] })
+    let semilla = ""
+    const llamar = async (s: string) => { semilla = s; return { requiere_respuesta: true, razon: "Lo tomó un asesor y no escribió" } }
+    await procesarDespedidaDelCaso(db, c, t0, { ahoraMs, llamar })
+    expect(semilla).toContain("APAGADO desde 2026-09-04 15:14")
+  })
+
+  it("con el bot encendido la semilla lo dice y no consulta el apagado", async () => {
+    const { db } = armarDb({ wa_messages: mensajes, lead_eventos: [] })
+    let semilla = ""
+    const llamar = async (s: string) => { semilla = s; return { requiere_respuesta: true, razon: "x" } }
+    await procesarDespedidaDelCaso(db, { ...c, bot_active: true }, t0, { ahoraMs, llamar })
+    expect(semilla).toContain("ENCENDIDO")
   })
 
   it("si la IA falla: 'error_ia', evento despedida_error, y la escalera sigue como hoy", async () => {

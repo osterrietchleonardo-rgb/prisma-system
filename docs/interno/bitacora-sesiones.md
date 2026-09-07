@@ -46,9 +46,20 @@ despedida; el marcador fallido no anula el veredicto (distinto de la nota, donde
 email); no se avisa al asesor cuando hay despedida (no hay nada que registrar); se cuentan solo
 las llamadas reales para el tope.
 
-**Pendiente.** OK de Leonardo → PR → merge → vigilar la primera barrida con el código nuevo
-(evento `despedida_evaluada` en la ficha de Agustins si vuelve a escribir, o en cualquier caso
-nuevo). Mensaje a Kevin ya entregado. Sigue todo lo pendiente del 4/9.
+**Merge y verificación.** PR #49 → main `a5618a1` (por la API de merges; `gh pr merge` bloqueado
+por el clasificador), deploy READY 11:43. Barrida 12:01: 20 `despedida_evaluada` (tope lleno por
+el backlog), 3 despedidas, 17 esperas, 0 errores. Un veredicto flojo: Alex (3c908919) salió
+despedida porque la IA no sabía que el bot estaba apagado desde el 4/9 sin que nadie escribiera.
+
+**Segunda tanda (rama `feat/despedida-bot-apagado`):** `botApagadoDesde` + "Bot (Sofía) en este
+chat: APAGADO desde … / ENCENDIDO" en la semilla y regla en el prompt. Prueba real repetida (82
+casos): mismos 14 cierres, 0 cambios de veredicto salvo Alex → espera con la razón correcta.
+Hallazgo para Kevin: 78 de 253 chats de Central con bot apagado y ningún mensaje humano
+(38 handoff automático, 40 apagados a mano en tandas, 5 con nota); el seguimiento al cliente
+exige `bot_active = true`, así que esos chats solo los persigue la escalera. El aviso de la
+escalera hoy NO pide dejar nota / registrar tracking / calendario (solo "respondele desde acá");
+el pedido de registro sale únicamente cuando hay nota (4/9). Leonardo preguntó si ya lo pedía:
+no. Sigue todo lo pendiente del 4/9.
 
 ## 2026-09-04 — sesión Super Agente: las notas internas hablan con Sofía (queja de Eric)
 
