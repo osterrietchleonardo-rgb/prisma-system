@@ -71,10 +71,20 @@ Antes de operar, dejá lista la base. Andá a **Configuración** (último ítem 
 
 ## 3. Cómo moverte por PRISMA
 
-- **Menú lateral izquierdo:** tu navegación principal (18 secciones).
+- **Menú lateral izquierdo:** tu navegación principal. Las secciones están agrupadas por lo que hay adentro de cada una:
+  - **Mi día:** Dashboard, Calendario.
+  - **Bandejas:** Asesor IA WhatsApp (las conversaciones que entran).
+  - **Contactos:** Pipeline, Leads Tokko, Leads WhatsApp (los listados de gente).
+  - **Propiedades:** Propiedades, Buscador IA, ACM, Pulso de Mercado.
+  - **Herramientas IA:** Marketing IA, Contratos IA.
+  - **Mi equipo:** Equipo, Asesores, Tracking Performance.
+  - **Ayuda:** Tutor IA, Documentos, Sugerencias.
+- Cada grupo se abre y se cierra tocando su título. Podés cerrarlos todos; el grupo de la sección en la que estás queda con el título en color cobre para que no pierdas dónde estás. Al entrar a una sección, su grupo se abre solo. El menú se acuerda de qué grupos dejaste abiertos.
+- Si en el grupo **Mi equipo** hay aprobaciones pendientes, el contador aparece sobre "Equipo" y, si el grupo está cerrado, sobre el título del grupo.
+- **Cerrar la barra en la computadora:** arriba a la derecha de la barra hay un botón para esconderla y ver el contenido a todo lo ancho. Para volver a abrirla, usá el botón **"Barra lateral"** que aparece arriba a la izquierda. PRISMA se acuerda de cómo la dejaste. En el celular no cambia nada: la barra sigue saliendo desde el botón de las tres líneas.
 - Arriba a la derecha: **botón de tema** (☀️/🌙) para modo claro u oscuro.
 - Tu nombre y rol ("Director") aparecen arriba del menú.
-- **"Cerrar Sesión"** está al final del menú.
+- **"Configuración"** y **"Cerrar Sesión"** están al final del menú, siempre a mano.
 
 Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, métricas globales y la configuración.
 
@@ -1070,6 +1080,8 @@ está **"Agregar una nota"**. Las notas las ven solo los directores; el asesor y
 **La noche no cuenta y nada te llega de madrugada.** Las horas de espera se miden solo entre las **6 y las 23**: si un cliente escribe a las 3 de la mañana, recién "empieza a esperar" a las 6, y el primer aviso al asesor sale a las 8 — dormir no es ignorar a un cliente. Además, ningún aviso (ni email ni WhatsApp) sale entre las 23 y las 6: si algo pasa de madrugada, el email llega programado a las 6 en punto.
 
 **Las notas internas de tu equipo ahora frenan esos avisos.** Si un asesor atendió a un cliente por teléfono o en persona y lo dejó anotado en el chat, Sofía lee esa nota: si confirma que la gestión ya está hecha, los avisos de "cliente esperando" se frenan para ese caso, y no le llega nada de más a nadie. Lo que quedó sin registrar en PRISMA (la visita, la gestión en el chat, la actividad en el tracking) se le pide al asesor en ese mismo momento, en un solo correo.
+
+**Y una despedida del cliente tampoco dispara avisos.** Si el asesor le contestó y el cliente cerró con un "Gracias", un "Dale, buen finde" o un "ya alquilé", Sofía lee la conversación y entiende que ese cliente no está esperando nada: no sale ningún aviso, ni al asesor ni a vos, y nadie tiene que dejar una nota. En la Trazabilidad del lead queda escrito qué leyó y por qué. La excepción importante: si lo último que el cliente recibió fue una promesa ("el asesor se va a comunicar") y respondió "gracias", para Sofía sigue esperando ese contacto y los avisos salen igual. Ante la duda, avisa.
 
 **3. Recordatorios de visita.** 24 horas, 3 horas y 1 hora antes de cada visita agendada, y un mensaje si el cliente no fue.
 

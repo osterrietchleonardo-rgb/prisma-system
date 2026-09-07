@@ -23,6 +23,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { DirectorSidebar } from "@/components/director-sidebar"
+import { BotonAbrirBarra } from "@/components/barra-lateral"
 import { usePathname } from "next/navigation"
 import { GlobalSearch } from "@/components/shared/global-search"
 import { NotificationPopover } from "@/components/shared/notification-popover"
@@ -97,6 +98,8 @@ export function DirectorHeader({ userName, userEmail, agencyName, agencyId, user
               />
             </SheetContent>
           </Sheet>
+          {/* Escritorio: vuelve a abrir la barra cuando está cerrada */}
+          <BotonAbrirBarra />
           
           <div className="flex flex-col">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Panel</span>

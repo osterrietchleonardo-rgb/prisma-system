@@ -1056,7 +1056,7 @@ Vive en `components/admin-vakdor/marketing-metrics-section.tsx` (UI) + `lib/admi
 ## 17. Frontend: estructura y convenciones
 
 - **App Router** con grupos: `(public)`, `director`, `asesor`, `admin-vakdor`. Layouts por rol con guards.
-- **Navegación:** `components/director-sidebar.tsx` (18 ítems) y `components/asesor-sidebar.tsx` (17 ítems). Headers con `ModeToggle`.
+- **Navegación (sep-2026, menú agrupado):** la lista de páginas vive en **un solo lugar**, `lib/nav/menu.ts` (19 renglones del director / 17 del asesor, en 7 grupos; nombres y rutas idénticos a los anteriores — `lib/nav/menu.test.ts` los compara renglón por renglón contra la lista vieja y falla si alguno cambia). Cada renglón declara nombre/href por rol y su grupo (Tracking cambia de grupo por rol: `mi-equipo` para el director, `mi-dia` para el asesor); un grupo sin renglones no se dibuja; ningún icono se repite. `components/sidebar-nav.tsx` dibuja los grupos plegables (todos se pueden cerrar; el grupo activo se abre al navegar; estado en `localStorage` `prisma.menu.abiertos.<rol>`; los contadores de los renglones suben al título del grupo cuando está plegado) y `components/{director,asesor}-sidebar.tsx` solo conservan cabecera, pie (Configuración + logout) y el contador de aprobaciones. **Barra lateral que se cierra en escritorio:** `components/barra-lateral.tsx` (botones) + `lib/nav/barra-lateral.ts` (script inline que lee `localStorage` `prisma.barra` ANTES del primer dibujo y pone `<html data-barra="oculta">`) + reglas en `app/globals.css` (`.barra-escritorio` a `width:0`, `.btn-abrir-barra` visible). El estado no pasa por React a propósito: sin salto de hidratación y sin animación de entrada. Gotcha resuelto: Leaflet no se re-mide al cambiar su caja → `AjustarAlContenedor` en `components/mapa/mapa-lienzo.tsx` (`ResizeObserver` → `invalidateSize`). Headers con `ModeToggle`.
 - **Accesos personalizables por agencia:** algunos módulos se habilitan/deshabilitan por `agency_id`. El primer caso vive en `lib/access/contratos-ia.ts` (`CONTRATOS_IA_AGENCIA_DESHABILITADA` + helper `contratosIaDeshabilitado(agencyId)`). Se aplica en dos capas: (1) **UI** — los sidebars reciben `agencyId` (layout → sidebar, y layout → header → sidebar móvil) y, si coincide, renderizan "Contratos IA" como `<div>` atenuado no clickeable con badge "Deshabilitada" en vez de `<Link>`; (2) **acceso directo** — las páginas `app/{director,asesor}/contratos-ia/page.tsx` (ahora server components `async`) leen `profiles.agency_id` y hacen `redirect()` al dashboard del rol si la agencia está deshabilitada. Patrón a reutilizar para futuras customizaciones por cliente.
 - **UI:** shadcn/ui (Radix), iconos `lucide-react`, toasts `sonner`. Estado: hooks estándar + `zustand` (Kanban).
 - **Tema** (`next-themes`, estrategia `class`): `defaultTheme="dark"`, `enableSystem={false}`. Tokens semánticos HSL en `app/globals.css` (`:root` claro / `.dark` oscuro). Regla: nunca `text-white` standalone sobre superficies theme-aware (usar `text-foreground`); `text-white` solo sobre fondos de color fijo. Excepciones oscuras: landing pública, simulaciones de marketing, panel Vakdor, drafts Roomix.
@@ -1449,6 +1449,70 @@ mano). Decisión de Leonardo: **la detección es determinista, la interpretació
   Con una nota-recordatorio inventada ("ojo: pregunta siempre por cochera", misma conversación)
   salió `atendido: false` con los cuatro pedidos en `false`. Los dos casos pasaron en el primer
   intento, sin tocar `PROMPT_NOTA`.
+
+### 22.9 La despedida no es una espera (7/9/2026)
+
+Disparador: Kevin (7/9, 10:54) con el caso de Agustins (…789): Micaela apagó el bot, le
+contestó (6/9 9:59 y 10:00), el cliente cerró con «Gracias!!» (10:01) y la escalera disparó
+igual los niveles 2 h (12:31), 5 h con Kevin (15:31) y 10 h (20:31). En los 7 días previos,
+**14 de 81 casos escalados** terminaban en un cierre así (medido con la IA, ver abajo).
+Decisión de Leonardo: "que los asesores anoten cada chat no es escalable ni consistente" ⇒
+la IA lee la conversación aunque no haya nota.
+
+- **Módulo** `lib/seguimiento/despedida.ts`, gemelo de `nota-interna.ts`: `procesarDespedidaDelCaso(db, c, t0, {ahoraMs, llamar?})`
+  devuelve `{ resultado: "despedida" | "requiere_respuesta" | "error_ia", llamoIA }`. Una
+  sola llamada a `MODELO` (tool forzado `emitir_veredicto`, `max_tokens: 600`, Zod
+  `VeredictoDespedidaSchema` = `{requiere_respuesta, razon}`), con la conversación completa
+  (`leer_mensajes({cantidad: 30})`) y la hora AR en la semilla. **No mira registro ni
+  calendario**: la pregunta es una sola, ¿el último mensaje del cliente necesita respuesta?
+- **El prompt tiene una regla que importa**: un "gracias" después de una PROMESA de contacto
+  ("el asesor se va a comunicar", "te confirmo y te aviso") NO es cierre — el cliente sigue
+  esperando ese contacto. Es lo que separa a la IA de un regex: en la prueba real, 8 de los
+  "gracias" de la semana quedaron como espera por esa regla. Audios ("Mensaje de voz
+  recibido"), preguntas, horarios propuestos y reclamos ⇒ espera. Ante la duda, espera.
+- **Dónde entra** (`escalamiento.ts`): después de la nota. Si `rNota` es `sin_nota` o
+  `escalera_sigue` (nota-recordatorio), se evalúa la despedida; con `atendido*` ya se frenó y
+  no se gasta; con `error_ia` de la nota no se insiste (la API caída lo está para las dos).
+  `despedida` ⇒ `resumen.despedidas++` y `continue` — ningún nivel, a nadie, y sin aviso al
+  asesor (no hay nada que registrar).
+- **Una evaluación por caso**: marcador `despedida_evaluada` en `lead_eventos` con
+  `datos = {t0, requiere_respuesta, razon}`; las barridas siguientes lo reutilizan
+  (`.contains("datos", {t0})`) sin volver a llamar. Insert inline y chequeado; si falla, el
+  veredicto igual manda (por una despedida no se avisa a nadie; lo peor es re-preguntar en la
+  barrida siguiente, acotado por el tope). Si la IA falla: `despedida_error` y la escalera
+  sigue. Un `throw` fuera de su try queda en `despedida_error` y no tira la barrida.
+- **Tope compartido**: `MAX_NOTAS_IA` pasó a `MAX_LLAMADAS_IA = 20` por corrida, notas +
+  despedidas juntas; solo cuentan las llamadas reales (`llamoIA`), no los marcadores leídos.
+- **Trazabilidad**: `despedida_evaluada` y `despedida_error` van a la categoría "agente"
+  (`lib/equipo/trazabilidad.ts`); el director ve la razón en la ficha del lead.
+- **Prueba real antes del merge** (`lib/seguimiento/manual-despedida-semana.test.ts`, no se
+  commitea; `SEGUIMIENTO_MANUAL=1`, solo lectura, 81 llamadas reales, 55 s): 14 despedidas,
+  67 esperas, 0 errores. Despedidas: «Gracias!!» (Agustins), «Entonces imposible. Gracias.»,
+  «dale. Le consulto y te aviso», «Ya estamos hablando», «Gracias ya alquile», «Gracias, por
+  ahora no tengo más preguntas.», «Ahora te escribo gracias». Esperas correctas: «Dale gracias,
+  buen Finde semana», «Ok graciss», «Muchas gracias. Fuiste muy amable!!», «Gracias» (todas
+  tras una promesa del bot); «Lo estamos viendo por nuestra cuenta» quedó como espera por
+  conservador (el bot tenía una pregunta abierta). Salvedad de la prueba: la IA leyó la
+  conversación de HOY, no la del momento del caso, así que algunos "cierres" son porque el
+  asesor ya contestó después.
+- **El bot apagado va en la semilla (7/9, segunda tanda).** En la primera barrida real la IA
+  leyó el chat de Alex (3c908919) como despedida: "el cliente le debe una respuesta al bot",
+  sin saber que el bot estaba apagado desde el 4/9 15:14 y que ningún asesor había escrito.
+  `botApagadoDesde(db, c)` (último `bot_apagado` de `lead_eventos`, fecha AR) entra en
+  `semillaDespedida` como "Bot (Sofía) en este chat: APAGADO desde … / ENCENDIDO", y el prompt
+  dice que con el bot apagado y sin `[human]` posterior el cliente espera a una persona. Dato
+  de fondo que salió de ahí: en Central, 78 de 253 chats con actividad en 14 días tienen el
+  bot apagado sin NINGÚN mensaje humano (38 por handoff automático con marcador, 40 apagados a
+  mano, solo 5 con nota del asesor); esos chats no los toma el seguimiento al cliente
+  (`seguimiento_candidatos` exige `bot_active = true`) y solo la escalera los persigue.
+- **El aviso de la escalera dice qué hacer si ya lo atendió por afuera (7/9, OK de Leonardo).**
+  `armarAvisoAsesorEscalera`: párrafo en el email de todos los niveles ("mandale desde el chat
+  de PRISMA… o dejá una nota interna… registrá la visita en el calendario y la gestión en el
+  tracking") y una frase corta al final de `{{2}}` en el WhatsApp de 2/5 h
+  (`asesor_cliente_esperando`), garantizada recortando el contexto y no la indicación
+  (`unaLinea(…, 700 - indicacion.length) + indicacion`). En el de 10/20 h
+  (`asesor_sigue_esperando`) no entra: `{{2}}` es solo "cliente, que busca X" y la plantilla
+  aprobada no tiene otro hueco. Antes el aviso solo decía "respondele desde acá".
 
 ## 23. Buscador IA y Tutor IA: la conversación en vivo (2/9/2026)
 
