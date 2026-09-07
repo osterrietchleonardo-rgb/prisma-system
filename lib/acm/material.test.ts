@@ -108,6 +108,18 @@ describe("seccionesParaFicha", () => {
     expect(s?.como_preparar).toBe("");
   });
 
+  it("una agencia sin material no manda secciones: la ficha sale igual que siempre", () => {
+    const config: Record<string, unknown> = { brand_colors: ["#123456"], logo_url: "x.png" };
+    expect(seccionesParaFicha(config.acm_material)).toBeNull();
+  });
+
+  it("manda las secciones cuando la agencia cargó aunque sea una", () => {
+    const config = { acm_material: { secciones: { como_preparar: "Ventilá la casa." } } };
+    const s = seccionesParaFicha(config.acm_material);
+    expect(s?.como_preparar).toBe("Ventilá la casa.");
+    expect(s?.quienes_somos).toBe("");
+  });
+
   it("nunca deja pasar la lista de archivos a la ficha", () => {
     const s = seccionesParaFicha({
       archivos: [{ id: "1", nombre: "interno.pdf", path: "ag/1.pdf", subido_el: "2026-09-05T10:00:00Z" }],
