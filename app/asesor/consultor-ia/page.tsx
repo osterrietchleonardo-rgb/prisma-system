@@ -19,6 +19,7 @@ import { MapaTab } from "@/components/mapa/mapa-tab"
 import { SeleccionProvider } from "@/components/seleccion/seleccion-contexto"
 import { BarraSeleccion } from "@/components/seleccion/barra-seleccion"
 import { RepasoSeleccion } from "@/components/seleccion/repaso-seleccion"
+import { PistaSeleccion } from "@/components/seleccion/pista-seleccion"
 
 interface Property {
   id: string
@@ -311,6 +312,9 @@ export default function AdvisorConsultorIAPage() {
           <Map className="w-4 h-4" /> Mapa
         </button>
       </div>
+
+      {/* Para que se entienda de una que las tarjetas se pueden marcar. */}
+      <PistaSeleccion />
 
       {view === "mapa" ? (
         <div className="flex-1 min-h-0 overflow-y-auto p-3">
