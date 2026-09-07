@@ -16,7 +16,7 @@
 - **Si la agencia no cargó nada, la ficha del ACM sale EXACTAMENTE como sale hoy.** Es la regla que no se rompe.
 - Las cuatro claves de sección son fijas y se llaman: `quienes_somos`, `como_comercializamos`, `como_preparar`, `roles_venta`.
 - Topes de caracteres: `quienes_somos` 1200 · `como_comercializamos` 1800 · `como_preparar` 1500 · `roles_venta` 500.
-- Tope de archivo: 25 MB (`25 * 1024 * 1024`), el mismo de Contratos.
+- Tope de archivo: 50 MB (`50 * 1024 * 1024`). Arrancó en 25 copiado de Contratos y no alcanzaba: el carpetón de Central pesa 25,45 MB.
 - Bucket privado `acm-material`, ruta `<agencyId>/<uuid>.<ext>`.
 - Solo el rol `director` puede escribir configuración. La solapa se le esconde al asesor, y además **todos** los endpoints nuevos devuelven 403: la solapa oculta es comodidad, el 403 es la defensa.
 - **Nunca reemplazar `marketing_ai_config` entero.** El material se guarda con merge en el servidor sobre la clave `acm_material`; pisarlo borraría los colores, el logo y el aviso legal de la agencia.
@@ -307,8 +307,8 @@ describe("extensionDe", () => {
 });
 
 describe("MAX_ARCHIVO", () => {
-  it("es 25 MB, el mismo tope que Contratos", () => {
-    expect(MAX_ARCHIVO).toBe(25 * 1024 * 1024);
+  it("es 50 MB", () => {
+    expect(MAX_ARCHIVO).toBe(50 * 1024 * 1024);
   });
 });
 ```
@@ -329,8 +329,8 @@ Expected: FAIL — `Failed to resolve import "./material-extraer"`
 // los logos no pasan a la ficha.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** 25 MB, el mismo tope que Contratos. */
-export const MAX_ARCHIVO = 25 * 1024 * 1024;
+/** 50 MB. Un carpetón institucional es todo imágenes; 25 MB no alcanzaba. */
+export const MAX_ARCHIVO = 50 * 1024 * 1024;
 
 export const EXTENSIONES_OK = ["pdf", "docx"] as const;
 export type ExtensionOk = (typeof EXTENSIONES_OK)[number];
@@ -614,7 +614,7 @@ const supabase = createClient(
 
 const { data, error } = await supabase.storage.createBucket("acm-material", {
   public: false,
-  fileSizeLimit: 25 * 1024 * 1024,
+  fileSizeLimit: 50 * 1024 * 1024,
   allowedMimeTypes: [
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -669,7 +669,7 @@ export async function POST(req: Request) {
     if (!file) return NextResponse.json({ error: "No llegó ningún archivo." }, { status: 400 });
 
     if (file.size > MAX_ARCHIVO) {
-      return NextResponse.json({ error: "El archivo pasa los 25 MB." }, { status: 400 });
+      return NextResponse.json({ error: "El archivo pasa los 50 MB." }, { status: 400 });
     }
 
     const ext = extensionDe(file.name);
@@ -1252,7 +1252,7 @@ export function ConfigMaterial({
             </Button>
           )}
         </div>
-        <p className="text-[10px] text-muted-foreground">PDF o Word (.docx), hasta 25 MB cada uno.</p>
+        <p className="text-[10px] text-muted-foreground">PDF o Word (.docx), hasta 50 MB cada uno.</p>
       </div>
 
       {/* ── Las cuatro secciones ── */}

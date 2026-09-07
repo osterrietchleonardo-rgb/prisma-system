@@ -194,8 +194,12 @@ Encabezado de la tarjeta:
 
 Debajo del encabezado, la lista de lo que hay cargado hoy. Por cada archivo: nombre,
 fecha de subida, y dos acciones — **Reemplazar** y **Quitar**. Abajo de todo,
-**Agregar archivo**. Sin límite de cantidad; tope de 25 MB por archivo, el mismo de
-Contratos.
+**Agregar archivo**. Sin límite de cantidad; tope de **50 MB** por archivo.
+
+> El tope arrancó en 25 MB, copiado de Contratos, y no alcanzaba: el "Our Company
+> 2025" de Central pesa 25,45 MB y quedaba afuera por 0,45 MB. Un contrato es texto;
+> un carpetón institucional es todo imágenes. Como del archivo solo se extrae el
+> texto, el peso no cuesta nada más que la subida. Medido, no estimado.
 
 Cuando la lista cambia (se agrega, se quita o se reemplaza algo), aparece el botón
 **Volver a leer con IA**. No se dispara solo: el director decide cuándo.
@@ -257,6 +261,9 @@ leer* y en cada *Acomodar con IA*. Es por operación de IA, nunca por ACM genera
    B, la regla equivalente: acomoda lo que el director escribió, no le agrega datos.
 2. **Siempre devuelve español rioplatense.** "Our Company 2025" tiene medio contenido
    en inglés.
+3. **Corta cada sección en 3 o 4 párrafos.** Sin esto la IA devuelve un bloque corrido
+   de mil caracteres: ocupa un cuarto de la hoja, deja el resto en blanco, y no hay
+   quien lo lea. Se vio recién al mirar la ficha impresa.
 
 ## Qué NO se toca
 
