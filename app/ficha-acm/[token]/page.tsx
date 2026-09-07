@@ -192,6 +192,17 @@ export default async function FichaAcmPage({ params }: { params: { token: string
         <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
       </section>
 
+      {/* ══════════ QUIÉNES SOMOS ══════════ */}
+      {/* Solo si la agencia lo cargó en ACM → Configuración. Va antes de la valuación: el
+          propietario sabe con quién está hablando antes de leer el precio. */}
+      {snap.material?.quienes_somos ? (
+        <MaterialSheet
+          titulo="Quiénes somos" texto={snap.material.quienes_somos}
+          primary={primary} accent={accent} onPrimary={onPrimary}
+          brand={brand} agencyName={agencyName}
+        />
+      ) : null}
+
       {/* ══════════ LA PROPIEDAD Y SU ENTORNO ══════════ */}
       {/* Ausente en las fichas anteriores a ago-2026 y cuando el asesor destildó la hoja. */}
       {snap.zona && (
@@ -258,6 +269,19 @@ export default async function FichaAcmPage({ params }: { params: { token: string
 
           <PiramidePrecios primary={primary} accent={accent} desvio={comparison.desvio_prom_pct} />
 
+          {/* Quién define qué. Refuerza la pirámide: el precio final no lo pone ni el
+              propietario ni la agencia. Solo si la agencia lo cargó. */}
+          {snap.material?.roles_venta ? (
+            <div className="roles-box">
+              <h4 style={{ color: primary, fontFamily: "var(--font-display)" }}>
+                El rol de cada uno en la venta
+              </h4>
+              {snap.material.roles_venta.split(/\n\s*\n/).map((p, i) => (
+                <p key={i}>{p.trim()}</p>
+              ))}
+            </div>
+          ) : null}
+
           {comparison.conclusiones.length > 0 && (
             <div className="conclusiones">
               <h3 style={{ fontFamily: "var(--font-display)", color: primary }}>Conclusiones del estudio</h3>
@@ -313,7 +337,56 @@ export default async function FichaAcmPage({ params }: { params: { token: string
 
         <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
       </section>
+
+      {/* ══════════ CÓMO COMERCIALIZAMOS · CÓMO PREPARAR ══════════ */}
+      {/* Después del precio: primero la valuación, después el servicio. Cada una sale solo si
+          la agencia la cargó en ACM → Configuración. */}
+      {snap.material?.como_comercializamos ? (
+        <MaterialSheet
+          titulo="Cómo comercializamos su propiedad" texto={snap.material.como_comercializamos}
+          primary={primary} accent={accent} onPrimary={onPrimary}
+          brand={brand} agencyName={agencyName}
+        />
+      ) : null}
+
+      {snap.material?.como_preparar ? (
+        <MaterialSheet
+          titulo="Cómo preparar su propiedad" texto={snap.material.como_preparar}
+          primary={primary} accent={accent} onPrimary={onPrimary}
+          brand={brand} agencyName={agencyName}
+        />
+      ) : null}
     </div>
+  );
+}
+
+// ── Hoja de material institucional de la agencia ─────────────────────────────
+// Una hoja por sección cargada. El texto lo escribió (o revisó y aprobó) el director en el
+// módulo ACM → Configuración; acá se imprime tal cual, con la marca de la agencia.
+// Los párrafos vienen separados por línea en blanco.
+function MaterialSheet({
+  titulo, texto, primary, accent, onPrimary, brand, agencyName,
+}: {
+  titulo: string; texto: string; primary: string; accent: string; onPrimary: string;
+  brand: FichaBrand; agencyName: string;
+}) {
+  return (
+    <section className="sheet">
+      <div className="pulso" style={{ backgroundColor: primary, color: onPrimary }}>
+        <div>
+          <span className="pulso-eyebrow" style={{ color: accent }}>{agencyName.toUpperCase()}</span>
+          <div className="pulso-barrio">{titulo}</div>
+        </div>
+      </div>
+      <div className="sheet-body">
+        <div className="material-body">
+          {texto.split(/\n\s*\n/).map((p, i) => (
+            <p key={i}>{p.trim()}</p>
+          ))}
+        </div>
+      </div>
+      <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
+    </section>
   );
 }
 
@@ -802,6 +875,19 @@ const CSS = `
 .piramide-item-efecto { font-size: 11.5px; font-weight: 700; line-height: 1.3; margin-top: 1px; }
 .piramide-foot { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 10.5px; color: #7b7b7b; line-height: 1.45; }
 .piramide-chip { flex-shrink: 0; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+
+/* Material institucional de la agencia.
+   El ancho tope está en ch, no en px: una línea de más de ~65 caracteres cansa de leer, y
+   estas hojas son las únicas de la ficha que son texto corrido de punta a punta. */
+.material-body { max-width: 62ch; }
+.material-body p { margin: 0 0 12px; font-size: 13px; line-height: 1.65; color: #3d3d3d; }
+.material-body p:last-child { margin-bottom: 0; }
+
+/* El rol de cada uno, abajo de la Pirámide */
+.roles-box { margin: 0 0 18px; padding: 13px 16px; border-radius: 10px; background: #f6f6f4; }
+.roles-box h4 { margin: 0 0 7px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.roles-box p { margin: 0 0 7px; font-size: 12px; line-height: 1.55; color: #3d3d3d; }
+.roles-box p:last-child { margin-bottom: 0; }
 
 /* Conclusiones */
 .conclusiones ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
