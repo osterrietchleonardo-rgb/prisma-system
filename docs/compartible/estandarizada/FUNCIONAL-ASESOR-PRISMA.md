@@ -616,6 +616,7 @@ Con los comparables a la vista podés armar una **ficha profesional** para pasar
 - Una **hoja final** con la **matriz comparativa de valores por m²** (con los **promedios de superficie, precio y $/m²** de la muestra), un gráfico de **"La Pirámide del Precio"** que muestra cómo cae la demanda cuando el precio se aleja del valor de mercado, las **conclusiones** (las que revisaste) y tus **datos de contacto** para que el cliente te escriba (WhatsApp / email).
 - Sobre tu nombre, en la tarjeta de contacto, aparece **tu clasificación** (Client Director / Client Support, la que te puso tu director; si no tenés, dice "Asesor/a").
 - Tu **logo** y el **aviso legal** en el pie de cada hoja (si el director los cargó en la configuración de marca).
+- **Puede traer hojas de tu inmobiliaria**, si tu director las cargó: *Quiénes somos* (antes del precio), *Cómo comercializamos su propiedad* y *Cómo preparar su propiedad* (al final), y *El rol de cada uno en la venta* (al lado del gráfico del precio). **No tenés que hacer nada**: si están cargadas salen solas en todas las fichas, y si no, la ficha sale como siempre. Sirven para que el propietario sepa con quién está hablando y qué va a pasar después de la valuación.
 
 > 💡 **Tip:** la ficha usa los **colores y el logo** de tu agencia (los configura el director en **Marketing IA → Identidad Visual**). Si todavía no están cargados, sale con un diseño elegante por defecto.
 > 💰 Crear la ficha **no consume créditos**.
