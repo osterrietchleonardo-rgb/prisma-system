@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const AGENCIA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const OTRA_AGENCIA = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const ARCHIVO = "11111111-2222-4333-8444-555555555555";
 
 const sesion = { agencyId: AGENCIA, userId: "u1", role: "director" as string | null };
 
@@ -75,7 +76,7 @@ describe("solo el director escribe", () => {
 
   it("un asesor no puede borrar, y el storage NO se toca", async () => {
     sesion.role = "asesor";
-    const res = await DELETE(pedidoDeBorrado(`${AGENCIA}/algo.pdf`));
+    const res = await DELETE(pedidoDeBorrado(`${AGENCIA}/${ARCHIVO}.pdf`));
     expect(res.status).toBe(403);
     expect(storage.borrados).toEqual([]);
   });
@@ -90,7 +91,7 @@ describe("solo el director escribe", () => {
 
 describe("una agencia solo borra lo suyo", () => {
   it("rechaza borrar un archivo de otra agencia", async () => {
-    const res = await DELETE(pedidoDeBorrado(`${OTRA_AGENCIA}/robado.pdf`));
+    const res = await DELETE(pedidoDeBorrado(`${OTRA_AGENCIA}/${ARCHIVO}.pdf`));
     expect(res.status).toBe(400);
     expect(storage.borrados).toEqual([]);
   });
@@ -101,10 +102,18 @@ describe("una agencia solo borra lo suyo", () => {
     expect(storage.borrados).toEqual([]);
   });
 
+  it("rechaza el .. que SÍ empieza con el id propio", async () => {
+    // Este es el ataque real: `A/../B/ajeno.pdf` pasa un startsWith(`A/`). Si el storage
+    // normalizara ese `..`, se estaría borrando el material de otra inmobiliaria.
+    const res = await DELETE(pedidoDeBorrado(`${AGENCIA}/../${OTRA_AGENCIA}/${ARCHIVO}.pdf`));
+    expect(res.status).toBe(400);
+    expect(storage.borrados).toEqual([]);
+  });
+
   it("borra el suyo", async () => {
-    const res = await DELETE(pedidoDeBorrado(`${AGENCIA}/propio.pdf`));
+    const res = await DELETE(pedidoDeBorrado(`${AGENCIA}/${ARCHIVO}.pdf`));
     expect(res.status).toBe(200);
-    expect(storage.borrados).toEqual([[`${AGENCIA}/propio.pdf`]]);
+    expect(storage.borrados).toEqual([[`${AGENCIA}/${ARCHIVO}.pdf`]]);
   });
 });
 

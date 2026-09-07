@@ -98,6 +98,20 @@ export function normalizarMaterial(raw: unknown): AcmMaterial {
 }
 
 /**
+ * ¿Esta ruta es un archivo de ESTA agencia?
+ *
+ * Las rutas llegan del navegador, así que hay que tratarlas como texto hostil. No alcanza con
+ * pedir que empiece con el id de la agencia: `A/../B/ajeno.pdf` también empieza con `A/`, y si
+ * el storage normalizara ese `..` se estaría leyendo (o borrando) el material de otra
+ * inmobiliaria. Por eso no se prohíben caracteres sueltos: se exige la forma EXACTA que arma
+ * el propio endpoint de subida, `<agencyId>/<uuid>.<pdf|docx>`, y nada más.
+ */
+export function esRutaDeLaAgencia(path: unknown, agencyId: string): path is string {
+  if (typeof path !== "string" || !/^[0-9a-fA-F-]{36}$/.test(agencyId)) return false;
+  return new RegExp(`^${agencyId}/[0-9a-fA-F-]{36}\\.(pdf|docx)$`).test(path);
+}
+
+/**
  * Lo único que viaja al snapshot de la ficha. La lista de archivos NO va: el propietario no
  * tiene por qué recibir los nombres de los archivos internos de la agencia.
  * Devuelve null si no hay ni una sección con texto — así la ficha sale igual que siempre.

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { MAX_ARCHIVO, extensionDe } from "@/lib/acm/material-extraer";
+import { esRutaDeLaAgencia } from "@/lib/acm/material";
 
 export const dynamic = "force-dynamic";
 
@@ -72,8 +73,10 @@ export async function DELETE(req: Request) {
     }
 
     const { path } = (await req.json()) as { path?: string };
-    // Una agencia solo borra lo suyo: la ruta tiene que empezar con su propio id.
-    if (!path || !path.startsWith(`${agencyId}/`)) {
+    // La ruta llega del navegador, así que se exige la forma exacta que arma la subida.
+    // Un startsWith no alcanza: `A/../B/ajeno.pdf` también empieza con el id propio, y con eso
+    // se podría borrar el material de otra inmobiliaria.
+    if (!esRutaDeLaAgencia(path, agencyId)) {
       return NextResponse.json({ error: "Archivo no válido." }, { status: 400 });
     }
 

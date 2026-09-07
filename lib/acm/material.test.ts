@@ -1,5 +1,46 @@
 import { describe, it, expect } from "vitest";
-import { SECCIONES, normalizarMaterial, seccionesParaFicha, TOPES } from "./material";
+import { SECCIONES, esRutaDeLaAgencia, normalizarMaterial, seccionesParaFicha, TOPES } from "./material";
+
+describe("esRutaDeLaAgencia", () => {
+  const AGENCIA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const OTRA = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const ARCHIVO = "11111111-2222-4333-8444-555555555555";
+
+  it("acepta la forma exacta que arma el endpoint de subida", () => {
+    expect(esRutaDeLaAgencia(`${AGENCIA}/${ARCHIVO}.pdf`, AGENCIA)).toBe(true);
+    expect(esRutaDeLaAgencia(`${AGENCIA}/${ARCHIVO}.docx`, AGENCIA)).toBe(true);
+  });
+
+  it("rechaza el archivo de otra agencia", () => {
+    expect(esRutaDeLaAgencia(`${OTRA}/${ARCHIVO}.pdf`, AGENCIA)).toBe(false);
+  });
+
+  it("rechaza salirse con .. aunque empiece con el id propio", () => {
+    // El agujero real: `A/../B/x.pdf` pasa un startsWith(`A/`) y llegaría al storage.
+    expect(esRutaDeLaAgencia(`${AGENCIA}/../${OTRA}/${ARCHIVO}.pdf`, AGENCIA)).toBe(false);
+    expect(esRutaDeLaAgencia(`${AGENCIA}/..%2f${OTRA}/${ARCHIVO}.pdf`, AGENCIA)).toBe(false);
+    expect(esRutaDeLaAgencia(`${AGENCIA}\\..\\${OTRA}\\${ARCHIVO}.pdf`, AGENCIA)).toBe(false);
+  });
+
+  it("rechaza subcarpetas, colados y extensiones que no subimos", () => {
+    expect(esRutaDeLaAgencia(`${AGENCIA}/sub/${ARCHIVO}.pdf`, AGENCIA)).toBe(false);
+    expect(esRutaDeLaAgencia(`${AGENCIA}/${ARCHIVO}.pdf.exe`, AGENCIA)).toBe(false);
+    expect(esRutaDeLaAgencia(`${AGENCIA}/${ARCHIVO}.sql`, AGENCIA)).toBe(false);
+    expect(esRutaDeLaAgencia(`${AGENCIA}/`, AGENCIA)).toBe(false);
+  });
+
+  it("no se deja engañar por un id de agencia que sea prefijo de otro", () => {
+    expect(esRutaDeLaAgencia(`${AGENCIA}extra/${ARCHIVO}.pdf`, AGENCIA)).toBe(false);
+  });
+
+  it("con basura, o con un id de agencia que no es un uuid, dice que no", () => {
+    expect(esRutaDeLaAgencia(null, AGENCIA)).toBe(false);
+    expect(esRutaDeLaAgencia(42, AGENCIA)).toBe(false);
+    expect(esRutaDeLaAgencia(`x/${ARCHIVO}.pdf`, "")).toBe(false);
+    // Un agencyId con metacaracteres no debe poder armar una regex permisiva.
+    expect(esRutaDeLaAgencia(`cualquier/cosa.pdf`, ".*")).toBe(false);
+  });
+});
 
 describe("SECCIONES", () => {
   it("son cuatro, en el orden en que se muestran en la configuración", () => {

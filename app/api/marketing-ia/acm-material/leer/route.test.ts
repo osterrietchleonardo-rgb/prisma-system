@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const AGENCIA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const OTRA_AGENCIA = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+const ARCHIVO = "11111111-2222-4333-8444-555555555555";
 
 const sesion = { agencyId: AGENCIA, userId: "u1", role: "director" as string | null };
 const creditos = { consumidos: 0 };
@@ -80,7 +81,7 @@ beforeEach(() => {
 describe("solo el director relee", () => {
   it("un asesor recibe 403 y no gasta un credito", async () => {
     sesion.role = "asesor";
-    const res = await POST(pedido([`${AGENCIA}/uno.pdf`]));
+    const res = await POST(pedido([`${AGENCIA}/11111111-2222-4333-8444-555555555555.pdf`]));
     expect(res.status).toBe(403);
     expect(creditos.consumidos).toBe(0);
     expect(storage.bajados).toEqual([]);
@@ -89,12 +90,21 @@ describe("solo el director relee", () => {
 
 describe("solo lee lo de su propia agencia", () => {
   it("ignora las rutas de otra agencia", async () => {
-    await POST(pedido([`${AGENCIA}/propio.pdf`, `${OTRA_AGENCIA}/ajeno.pdf`]));
-    expect(storage.bajados).toEqual([`${AGENCIA}/propio.pdf`]);
+    await POST(pedido([`${AGENCIA}/33333333-2222-4333-8444-555555555555.pdf`, `${OTRA_AGENCIA}/ajeno.pdf`]));
+    expect(storage.bajados).toEqual([`${AGENCIA}/33333333-2222-4333-8444-555555555555.pdf`]);
   });
 
   it("si TODAS las rutas son ajenas, no baja nada ni gasta credito", async () => {
-    const res = await POST(pedido([`${OTRA_AGENCIA}/ajeno.pdf`]));
+    const res = await POST(pedido([`${OTRA_AGENCIA}/${ARCHIVO}.pdf`]));
+    expect(res.status).toBe(400);
+    expect(storage.bajados).toEqual([]);
+    expect(creditos.consumidos).toBe(0);
+  });
+
+  it("rechaza el .. que SÍ empieza con el id propio", async () => {
+    // El ataque real: `A/../B/ajeno.pdf` pasa un startsWith(`A/`). Si el storage normalizara
+    // ese `..`, PRISMA le estaría leyendo el material a otra inmobiliaria.
+    const res = await POST(pedido([`${AGENCIA}/../${OTRA_AGENCIA}/${ARCHIVO}.pdf`]));
     expect(res.status).toBe(400);
     expect(storage.bajados).toEqual([]);
     expect(creditos.consumidos).toBe(0);
@@ -110,7 +120,7 @@ describe("no cobra por nada", () => {
 
   it("si los archivos no tienen texto (un escaneo) avisa y no gasta credito", async () => {
     storage.vacios = ["si"];
-    const res = await POST(pedido([`${AGENCIA}/escaneado.pdf`]));
+    const res = await POST(pedido([`${AGENCIA}/44444444-2222-4333-8444-555555555555.pdf`]));
     expect(res.status).toBe(400);
     expect(await res.json()).toHaveProperty("error", expect.stringContaining("escaneadas"));
     expect(creditos.consumidos).toBe(0);
@@ -120,7 +130,7 @@ describe("no cobra por nada", () => {
 
 describe("el camino feliz", () => {
   it("lee, cobra UN credito y devuelve las cuatro secciones", async () => {
-    const res = await POST(pedido([`${AGENCIA}/uno.pdf`, `${AGENCIA}/dos.pdf`]));
+    const res = await POST(pedido([`${AGENCIA}/11111111-2222-4333-8444-555555555555.pdf`, `${AGENCIA}/22222222-2222-4333-8444-555555555555.pdf`]));
     expect(res.status).toBe(200);
     expect(creditos.consumidos).toBe(1);
 
@@ -132,7 +142,7 @@ describe("el camino feliz", () => {
 
   it("una respuesta ilegible de la IA no rompe: devuelve las cuatro vacias", async () => {
     ia.respuesta = "perdon, no pude";
-    const res = await POST(pedido([`${AGENCIA}/uno.pdf`]));
+    const res = await POST(pedido([`${AGENCIA}/11111111-2222-4333-8444-555555555555.pdf`]));
     expect(res.status).toBe(200);
 
     const { secciones } = await res.json();

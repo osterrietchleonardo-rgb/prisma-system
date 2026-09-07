@@ -9,6 +9,7 @@ import {
 import { calculateCost, tokensFromUsage } from "@/utils/aiCostCalculator";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { extensionDe, extraerTexto } from "@/lib/acm/material-extraer";
+import { esRutaDeLaAgencia } from "@/lib/acm/material";
 import { promptReparto, parsearReparto } from "@/lib/acm/material-ia";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +30,9 @@ export async function POST(req: Request) {
     }
 
     const { paths } = (await req.json()) as { paths?: string[] };
-    // Solo se leen archivos de la propia agencia: el listado llega del navegador.
-    const propios = (paths ?? []).filter(
-      (p) => typeof p === "string" && p.startsWith(`${agencyId}/`),
-    );
+    // El listado llega del navegador, así que se exige la forma exacta que arma la subida.
+    // Un startsWith no alcanza: `A/../B/ajeno.pdf` también empieza con el id propio.
+    const propios = (paths ?? []).filter((p) => esRutaDeLaAgencia(p, agencyId));
     if (propios.length === 0) {
       return NextResponse.json({ error: "No hay archivos para leer." }, { status: 400 });
     }
