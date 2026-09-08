@@ -429,8 +429,10 @@ export function SubjectInput({
                   <span className="text-sm">{z.nombre}</span>
                 </label>
               ))}
+              {/* amber-700 en claro / amber-500 en oscuro: el amber-500 solo no se lee sobre
+                  fondo claro. Misma corrección que d56395e aplicó en toda la app. */}
               {modoZonasSinElegir && (
-                <p className="text-xs text-amber-500 mt-1">Elegí al menos una zona para poder buscar.</p>
+                <p className="text-xs text-amber-700 dark:text-amber-500 mt-1">Elegí al menos una zona para poder buscar.</p>
               )}
             </div>
           )}
