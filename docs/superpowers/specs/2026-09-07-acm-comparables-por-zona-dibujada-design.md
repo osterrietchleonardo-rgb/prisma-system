@@ -104,6 +104,12 @@ comentario de `lib/mapa/poligono-sql.ts`.
 5. **Zona vacía o pobre: avisar y ofrecer el botón.** Se muestra lo que hay con el número real,
    y al lado un botón "Buscar sin la zona" que rehace la búsqueda por barrio. El sistema nunca
    amplía solo ni en silencio.
+6. **Dos modos excluyentes, y el de hoy es el que viene puesto.** El asesor elige *o* buscar por
+   barrio (lo de siempre) *o* buscar dentro de sus zonas. Elegido uno, los controles del otro
+   quedan apagados: no existe un estado mezclado. **Por defecto no hay ninguna zona tildada**, o
+   sea que un ACM que se abre y se busca sin tocar nada se comporta exactamente como hoy.
+   (Dicho con precisión: el modo de hoy no busca en "toda la base" — busca por barrio, con o sin
+   linderos según el switch.)
 
 ## El diseño
 
@@ -181,19 +187,39 @@ zonas?: { id: string; nombre: string }[];
 
 ### 4. Pantalla — `subject-input.tsx` y `acm-module.tsx`
 
-Arriba del botón "Buscar comparables", un bloque nuevo:
+Arriba del botón "Buscar comparables", un bloque nuevo con **dónde buscar**, en dos opciones
+excluyentes (una sola se puede elegir, tipo radio):
 
-- Título: **"Buscar solo dentro de mis zonas del mapa"**, con una línea que explica qué hace.
-- Casillas con las zonas del usuario, de `GET /api/mapa/zonas` (que ya devuelve solo las suyas).
-- **Sin zonas guardadas:** una línea que dice dónde se crean (la solapa Mapa del Buscador IA).
-  No bloquea nada; el ACM sigue funcionando como hoy.
-- **Con al menos una tildada:** el switch "incluir barrios linderos" se apaga y se deshabilita,
-  con la razón escrita al lado ("el dibujo reemplaza al barrio").
-- El barrio del sujeto **sigue siendo obligatorio** (`isValido` no cambia): va en la ficha del
-  cliente y en la fila "Zona" del checklist. Pero deja de filtrar, y eso se aclara en pantalla.
+**Opción 1 — "En el barrio de la propiedad" — es la que viene puesta.**
+Es el comportamiento de hoy, sin un solo cambio. Debajo, el switch "incluir barrios linderos",
+tal cual está ahora.
 
-`acm-module.tsx` guarda el estado `zonasElegidas` y lo manda en el body, y lo limpia en
-`handleReset()` junto con el resto.
+**Opción 2 — "Solo dentro de mis zonas del mapa".**
+Debajo, las casillas con las zonas del usuario, de `GET /api/mapa/zonas` (que ya devuelve solo
+las suyas). Se puede tildar más de una y se suman.
+
+Las reglas de la exclusión:
+
+- **Ninguna zona tildada al abrir.** El estado inicial es la opción 1. Un ACM que se abre y se
+  busca sin tocar nada devuelve exactamente lo que devuelve hoy.
+- **Elegida la opción 2, el switch "incluir barrios linderos" se deshabilita** y muestra la razón
+  al lado ("el dibujo reemplaza al barrio"). No se apaga el valor guardado: se ignora mientras
+  dure el modo zona, y vuelve como estaba si se vuelve a la opción 1.
+- **Elegida la opción 1, las casillas de zonas se deshabilitan** y se destildan todas. Al volver
+  a la opción 2 hay que elegir de nuevo — nada queda tildado "por atrás".
+- **La opción 2 con cero zonas tildadas no busca.** El botón "Buscar comparables" queda
+  deshabilitado con el motivo escrito ("Elegí al menos una zona"), en vez de buscar en silencio
+  como si fuera la opción 1.
+- **Sin zonas guardadas:** la opción 2 aparece deshabilitada, con una línea que dice dónde se
+  crean (la solapa Mapa del Buscador IA). No bloquea nada; el ACM sigue funcionando como hoy.
+- El barrio del sujeto **sigue siendo obligatorio en los dos modos** (`isValido` no cambia): va
+  en la ficha del cliente y en la fila "Zona" del checklist. En el modo zona deja de filtrar, y
+  eso se aclara en pantalla.
+
+`acm-module.tsx` guarda `modoZona: "barrio" | "zonas"` y `zonasElegidas`, los manda en el body y
+los limpia en `handleReset()` junto con el resto. El body lleva `zona_ids` **solo** en el modo
+zonas: en el modo barrio no viaja el campo, así que el servidor no tiene que adivinar la
+intención a partir de un array vacío.
 
 ### 5. Resultados — `comparables-result.tsx`
 
@@ -233,6 +259,11 @@ aserción de que todo id devuelto con zona cumple `point(lng,lat) <@ polígono`.
 
 **Sin zona elegida, el resultado tiene que ser idéntico al de hoy.** Se compara la lista de ids y
 los `match_pct` de una búsqueda real antes y después del cambio de las funciones.
+
+**Los dos modos no se mezclan.** Se prueba en el navegador que: al pasar a "mis zonas" el switch
+de linderos queda deshabilitado; al volver a "barrio" las zonas quedan destildadas; con la
+opción 2 y cero zonas el botón de buscar no se puede apretar; y el botón "Buscar sin la zona" de
+los resultados deja el formulario en la opción 1.
 
 **En el navegador,** con la cuenta propia (PRISMAIA - VAKDOR, que tiene dos zonas guardadas:
 "test" y "zona prueba"), en escritorio y en celular con emulación. Nunca con la cuenta del
