@@ -16,6 +16,55 @@
 
 ---
 
+## 2026-09-08 — Primera zona de GBA: terrenos de Don Torcuato (y el bug de ubicación que destapó)
+
+**Qué pidió Leonardo:** ver si había terrenos en ZonaProp en Don Torcuato y Monte Grande, y
+después cargar los de Don Torcuato "con cuidado con todas las variables".
+
+**El sondeo (US$0,13)**
+
+- **Don Torcuato: sí**, mercado real. **Monte Grande: trampa** — tanto el filtro por nombre como
+  el slug `terrenos-venta-monte-grande` de ZonaProp resuelven al **Monte Grande de LA RIOJA**, no
+  al de Esteban Echeverría. Al de Buenos Aires se llega por el partido
+  (`terrenos-venta-esteban-echeverria`): en 60 avisos, 14 son de Monte Grande y 37 de Canning.
+  Ojo con esos precios: muchos son loteos financiados donde el número publicado parece ser el
+  ANTICIPO, no el total (USD 8.000 por 600 m² en Canning no cierra).
+
+**El bug que destapó: la ubicación de GBA venía mal**
+
+`partirBarrio` asumía el formato de CABA (`"Belgrano C, Belgrano, Capital Federal"` = sub/barrio/
+ciudad). Las etiquetas de GBA traen **una parte más**: `"Don Torcuato, Tigre, GBA Norte"` — la
+última es la REGIÓN. Sin arreglarlo, la localidad caía en `sub_barrio` y **el partido (Tigre)
+quedaba de barrio**; y encima incoherente, porque un aviso con sub-barrio real
+(`"San Fermin, Don Torcuato, Tigre, GBA Norte"`) sí daba barrio correcto. Arreglo: se saca la
+región primero y el resto se parte igual que siempre; `region` ahora se guarda ("GBA Norte").
+**CABA queda intacto** (su última parte nunca matchea `/^GBA/`) — probado con test de regresión
+sobre la función real, 9 casos, todos verdes.
+
+**Método que evitó gastar de más:** todo el mapeo se validó **en seco y gratis** — se bajó el
+dataset ya pagado del sondeo y se corrió `loader.mjs --dry` sobre él antes de cargar nada.
+
+**La carga (US$0,16)**
+
+- **137 avisos, fin natural de inventario** (páginas 31+ vacías = Don Torcuato está completo).
+- **133 calidad ok · 133 embebidos, 0 errores.** Todos con `barrio="Don Torcuato"`,
+  `ciudad="Tigre"`, `region="GBA Norte"`, `provincia="Buenos Aires"`, `tipo="Terrenos"`.
+- Precio mediana **USD 180.000** · USD/m² mediana **286** · m² mediana 656. Los máximos (USD 6-16 M)
+  son legítimos: fracciones industriales de 1,8-2 ha sobre Panamericana.
+- Se agregó centroide `don-torcuato` (medido sobre 40 avisos reales: máx 2,28 km → radio 5 km).
+  Atrapó 2 avisos con coordenadas de otra localidad. Los otros 2 apartados son avisos de
+  **alquiler** colados en una búsqueda de venta (uno era de Pilar).
+- Ya aparece en `acm_barrios_disponibles` con 133 avisos. Nota: `en_mapa_de_zonas=false` — el
+  dibujo de zonas del mapa es de CABA, así que en Don Torcuato se filtra por barrio, no por zona
+  dibujada.
+
+**Presupuesto: OJO.** Apify quedó en **US$90,27 de US$100**. El descubrimiento diario de CABA
+consume ~US$1,34/día → **choca el techo alrededor del 15-16 de septiembre** y deja de capturar
+avisos nuevos hasta octubre. Se le pidió a Leonardo (4-sep y de nuevo hoy) subir el límite a
+US$120. Sigue pendiente.
+
+---
+
 ## 2026-09-04 (cierre) — CABA COMPLETO: los 41 barrios
 
 Leonardo dio el OK para terminar CABA. Subió el límite Apify a US$100; se corrió con tope US$96.
