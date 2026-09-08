@@ -60,6 +60,20 @@ export interface Sujeto {
   // resultado. Ausente/undefined en una búsqueda vieja = estricto (nunca hereda el default
   // 50 de la función SQL).
   incluir_linderos?: boolean;
+  /**
+   * Zonas del mapa con las que se acotó esta búsqueda. Vive acá —y no en un estado aparte— por
+   * el mismo motivo que `incluir_linderos`: `sujeto` es lo único que queda fotografiado en
+   * `acm_searches.sujeto`, así que es el único lugar desde donde "Mis ACM" puede reabrir la
+   * búsqueda sabiendo con qué zonas se hizo.
+   *
+   * Se guarda el id y el nombre, NO el dibujo: los comparables ya vienen fotografiados en
+   * `resultados`, y una zona que después se borra o se redibuja no tiene que cambiar un ACM que
+   * ya se le mandó a un cliente. (Que eso pasa está visto: la zona "BUSQUEDA MAXI" existía el
+   * 7-sep y el 8 ya no.)
+   *
+   * Ausente o vacío = búsqueda por barrio, que es el modo por defecto.
+   */
+  zonas?: { id: string; nombre: string }[];
   estado_conservacion: EstadoConservacion;
   calidad_construccion: CalidadConstruccion;
   // Opcionales a proposito: 0 es una respuesta real (monoambiente, PB) y hay que poder
