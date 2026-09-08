@@ -65,7 +65,31 @@ rol de `create_agent`), sin librería. La arquitectura es la que ellos mismos re
 6. **Confirmar el prompt caching** en todos los agentes con Claude (el loop del seguimiento ya
    lo mide; Buscador y Tutor corren sobre OpenAI/Gemini, revisar qué ofrece cada uno).
 
-## 4. Cuándo volver a mirar LangGraph
+## 4. Si algún día se construye un "deep agent" para PRISMA: la lógica a tomar
+
+Leonardo (8/9): "dejalo anotado para futuras mejoras y para tomar lógica para posibles
+creaciones de super deep agents para PRISMA". Deep Agents define un harness en cuatro
+componentes; esto es cómo se traduce cada uno a PRISMA, sin la librería.
+
+| Componente (Deep Agents) | Qué es | Traducción a PRISMA | Ya existe |
+|---|---|---|---|
+| **Entorno de ejecución** | Herramientas, sistema de archivos virtual, sandbox para código, streaming de eventos. | Herramientas = lo que hoy son `leer_mensajes`, `leer_propiedad`, etc.; "archivos" = tablas de Supabase (propiedades, chats, ACM) detrás de herramientas de lectura/escritura con permisos por rol; streaming = el NDJSON del Buscador. Sandbox de código: no hace falta en el producto. | Parcial: herramientas de lectura sí; escritura con permisos, no. |
+| **Gestión de contexto** | Skills con carga progresiva, memoria persistente (`AGENTS.md`), resumen automático del historial, descarga de resultados grandes, prompt caching. | Skills = conocimiento por tema (crédito hipotecario, alquiler, expensas, zona) que el agente lee solo cuando la consulta lo pide; memoria = `metricas` del lead + `notas_ia` de la propiedad + perfil de la agencia; resumen = necesario para chats de WhatsApp largos (hoy n8n manda todo); caching = parte fija del system prompt marcada como cacheable. | Memoria sí; skills, resumen y caching general, no. |
+| **Delegación** | Subagentes efímeros con contexto propio que devuelven un solo informe; planificación con lista de tareas opcional. | Un agente principal que delega: "buscá comparables", "leé este PDF", "revisá el calendario" a subagentes que devuelven un resumen corto. Es el patrón para el Buscador con herramientas y para el resumen semanal por asesor. Lista de tareas: solo para corridas largas (por ejemplo, un informe semanal por agencia). | No. Hoy cada agente es plano. |
+| **Dirección (steering)** | Pausa para aprobación humana en herramientas sensibles (`interrupt_on`), permisos por ruta. | Ya existe la versión PRISMA: Aprobaciones del director, "Lo tomo / No lo puedo tomar", guardarraíles que rechazan una decisión. Falta generalizarlo: cualquier herramienta de **escritura** (mandar un mensaje, cambiar un estado, agendar) pasa por una capa de permiso por rol y, si es sensible, por aprobación. | Parcial. |
+
+Reglas que valen para cualquier deep agent de PRISMA, aprendidas del Super Agente:
+1. **Ninguna afirmación sin el dato leído** (regla de oro del prompt actual): las herramientas de
+   lectura son la única fuente; lo que no se leyó no existe.
+2. **Decisión final por herramienta obligatoria**, validada con esquema, y rechazada si no se
+   investigó lo que había que investigar.
+3. **Techo de vueltas y de costo por corrida**, medido en tokens y guardado.
+4. **Todo lo que hace queda en la bitácora del lead** con la razón en castellano, legible por el
+   director. Un deep agent que no deja rastro no entra a producción.
+5. **Sombra antes que activo**: toda capacidad nueva corre primero registrando qué habría hecho.
+6. **Set de evaluación** con casos reales antes de tocar un prompt (§3.1).
+
+## 5. Cuándo volver a mirar LangGraph
 
 - Si un agente necesita **conversaciones largas que se pausan y retoman** por horas o días, con
   el estado intermedio de una investigación (no solo el resultado) y varias ramas en paralelo.
