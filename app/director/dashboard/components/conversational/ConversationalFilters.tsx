@@ -102,7 +102,7 @@ export function ConversationalFilters({
           onClick={handleAnalyze}
           disabled={isProcessing || (period === "custom" && (!dateRange?.from || !dateRange?.to))}
           size="sm"
-          className="h-9 gap-2 bg-accent hover:bg-accent/90 text-white font-semibold text-xs"
+          className="h-9 gap-2 bg-accent hover:bg-accent/90 text-accent-foreground font-semibold text-xs"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isProcessing ? "animate-spin" : ""}`} />
           {isProcessing ? "Analizando..." : "Actualizar análisis"}

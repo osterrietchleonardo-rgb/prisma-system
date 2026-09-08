@@ -36,7 +36,7 @@ const CopyButton = ({ value, label }: { value: string, label: string }) => {
         size="icon" 
         className={cn(
           "h-8 w-8 shrink-0 transition-all",
-          copied ? "text-green-500" : "text-muted-foreground hover:text-foreground"
+          copied ? "text-green-700 dark:text-green-500" : "text-muted-foreground hover:text-foreground"
         )}
         onClick={handleCopy}
       >
@@ -409,7 +409,7 @@ export function SetupWizard() {
 
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex gap-4">
                 <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-900/80 leading-relaxed dark:text-amber-200/80">
+                <p className="text-sm text-amber-900/80 leading-relaxed dark:text-amber-200">
                   <span className="font-bold text-amber-700 dark:text-amber-400">Atención:</span> No uses el token "temporal" que te muestran en la configuración inicial de la API, pues caduca en 24h. Solo el token de "Usuario del Sistema" es permanente.
                 </p>
               </div>
@@ -434,7 +434,7 @@ export function SetupWizard() {
                     <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
                     <p className="text-sm font-bold text-amber-900 dark:text-amber-400">Configuración Obligatoria del Webhook</p>
                   </div>
-                  <p className="text-xs text-amber-900/80 dark:text-amber-200/80 mb-4 leading-relaxed">
+                  <p className="text-xs text-amber-900/80 dark:text-amber-200 mb-4 leading-relaxed">
                     Para que PRISMA pueda recibir los mensajes de tus clientes, debes configurar el Webhook manualmente en el panel de Meta (en la sección Configuración de la API). Copia y pega estos datos:
                   </p>
                   <div className="space-y-3">
@@ -447,7 +447,7 @@ export function SetupWizard() {
                       value="PrismaSaaS2026_Verificacion!" 
                     />
                   </div>
-                  <p className="text-[11px] text-amber-900/80 dark:text-amber-200/80 mt-4 leading-relaxed font-medium">
+                  <p className="text-[11px] text-amber-900/80 dark:text-amber-200 mt-4 leading-relaxed font-medium">
                     Luego haz clic en "Verificar y guardar". Finalmente, en "Campos de webhook" abajo, haz clic en Administrar y asegúrate de suscribirte a los campos <span className="font-bold">messages</span> y <span className="font-bold">message_template_status_update</span>.
                   </p>
                 </div>
@@ -496,7 +496,7 @@ export function SetupWizard() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-bold text-muted-foreground">Token Permanente</label>
-                    <span className="text-[10px] bg-amber-500/10 px-2 py-0.5 rounded text-amber-600 dark:text-amber-500 font-mono tracking-widest uppercase">System User Token</span>
+                    <span className="text-[10px] bg-amber-500/10 px-2 py-0.5 rounded text-amber-800 dark:text-amber-500 font-mono tracking-widest uppercase">System User Token</span>
                   </div>
                   <div className="relative">
                     <Input 

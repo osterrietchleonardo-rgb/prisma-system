@@ -22,10 +22,10 @@ const typeIcons: Record<string, any> = {
 }
 
 const typeColors: Record<string, string> = {
-  lead: "text-blue-400",
-  property: "text-amber-400",
-  closing: "text-emerald-400",
-  system: "text-purple-400",
+  lead: "text-blue-600 dark:text-blue-400",
+  property: "text-amber-700 dark:text-amber-400",
+  closing: "text-emerald-700 dark:text-emerald-400",
+  system: "text-purple-600 dark:text-purple-400",
 }
 
 const typeBgs: Record<string, string> = {
@@ -112,7 +112,7 @@ export function NotificationPopover() {
                         <p className={`text-sm font-bold tracking-tight ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
                           {notification.title}
                         </p>
-                        <span className="text-[9px] font-bold text-muted-foreground/40 uppercase">
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase">
                           {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true, locale: es })}
                         </span>
                       </div>

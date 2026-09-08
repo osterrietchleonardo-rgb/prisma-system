@@ -57,8 +57,8 @@ function tierToNumber(tier: string | null | undefined): number {
 
 const STATUS_LABEL: Record<string, string> = { active: "Activa", paused: "Pausada", completed: "Finalizada" }
 const STATUS_STYLE: Record<string, string> = {
-  active: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-  paused: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/20",
+  active: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border-emerald-500/20",
+  paused: "bg-amber-500/15 text-amber-800 dark:text-amber-400 border-amber-500/20",
   completed: "bg-zinc-500/15 text-zinc-500 border-zinc-500/20",
 }
 

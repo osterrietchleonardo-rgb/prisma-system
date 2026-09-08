@@ -40,9 +40,9 @@ export function KpiCards({ dolares, cierre, icc, escrituras }: KpiCardsProps) {
       badge: cierre.general?.brecha_pct != null
         ? `${cierre.general.brecha_pct}% vs publicado`
         : null,
-      badgeColor: "text-violet-300/90",
+      badgeColor: "text-violet-600 dark:text-violet-300",
       icon: <Building2 className="w-5 h-5" />,
-      accent: "text-violet-400",
+      accent: "text-violet-600 dark:text-violet-400",
       bg: "from-violet-500/10 to-violet-500/5 border-violet-500/20",
       hasError: !!cierre.error || cierre.general?.valor == null,
       errorSource: "ucema.edu.ar",
@@ -52,7 +52,7 @@ export function KpiCards({ dolares, cierre, icc, escrituras }: KpiCardsProps) {
       value: fmt(dolares.mep?.venta ?? null, "$"),
       sub: "Venta (bolsa)",
       icon: <DollarSign className="w-5 h-5" />,
-      accent: "text-violet-400",
+      accent: "text-violet-600 dark:text-violet-400",
       bg: "from-violet-500/10 to-violet-500/5 border-violet-500/20",
       hasError: !!dolares.error || dolares.mep === null,
       errorSource: "dolarapi.com",
@@ -64,9 +64,9 @@ export function KpiCards({ dolares, cierre, icc, escrituras }: KpiCardsProps) {
         ? `Var. mensual: ${icc.data.var_nivel_general_pct >= 0 ? "+" : ""}${icc.data.var_nivel_general_pct}% · i.a.: +${icc.data.var_anual_pct}%`
         : "Base 2012=100 · IDECBA",
       badge: icc.data ? `${icc.data.indice_tiempo}` : null,
-      badgeColor: "text-amber-400/80",
+      badgeColor: "text-amber-700 dark:text-amber-400",
       icon: <HardHat className="w-5 h-5" />,
-      accent: "text-amber-400",
+      accent: "text-amber-700 dark:text-amber-400",
       bg: "from-amber-500/10 to-amber-500/5 border-amber-500/20",
       hasError: !!icc.error || icc.data === null,
       errorSource: "estadisticaciudad.gob.ar",
@@ -80,9 +80,9 @@ export function KpiCards({ dolares, cierre, icc, escrituras }: KpiCardsProps) {
       badge: escrituras.var_anual_pct != null
         ? `${escrituras.var_anual_pct >= 0 ? "+" : ""}${escrituras.var_anual_pct}% i.a.`
         : null,
-      badgeColor: (escrituras.var_anual_pct ?? 0) >= 0 ? "text-emerald-400" : "text-red-400",
+      badgeColor: (escrituras.var_anual_pct ?? 0) >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
       icon: <FileText className="w-5 h-5" />,
-      accent: "text-emerald-400",
+      accent: "text-emerald-700 dark:text-emerald-400",
       bg: "from-emerald-500/10 to-emerald-500/5 border-emerald-500/20",
       hasError: escrituras.cantidad_mensual === null,
       errorSource: "colegio-escribanos.org.ar",
@@ -102,7 +102,7 @@ export function KpiCards({ dolares, cierre, icc, escrituras }: KpiCardsProps) {
           <div className="flex items-start justify-between mb-3">
             <div className={`${card.accent} opacity-80`}>{card.icon}</div>
             {card.hasError && (
-              <div className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5">
+              <div className="flex items-center gap-1 text-[10px] text-amber-800 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-0.5">
                 <AlertTriangle className="w-2.5 h-2.5" />
                 Sin datos
               </div>

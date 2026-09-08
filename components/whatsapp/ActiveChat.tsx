@@ -634,7 +634,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                 const agentEmail = Array.isArray(agentData) ? agentData[0]?.email : agentData?.email;
                 if (agentEmail) {
                   return (
-                    <span className="text-[10px] text-accent/70 bg-accent/5 px-1.5 py-0.5 rounded border border-accent/10 font-medium">
+                    <span className="text-[10px] text-accent bg-accent/5 px-1.5 py-0.5 rounded border border-accent/10 font-medium">
                       Asesor: {agentEmail}
                     </span>
                   );
@@ -951,7 +951,7 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
                   <div className="flex flex-col gap-2">
                     {/* Aviso de ventana de 24 hs cerrada */}
                     {!is24hWindowOpen && (
-                      <div className="p-2.5 md:p-3 bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 rounded-md text-xs text-center border border-red-100 dark:border-red-900/50">
+                      <div className="p-2.5 md:p-3 bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-400 rounded-md text-xs text-center border border-red-100 dark:border-red-900/50">
                         <span className="font-semibold">Ventana de 24 hs cerrada.</span>{" "}
                         <span className="md:hidden">
                           Pasaron más de 24 hs desde el último mensaje del cliente. Solo podés mandarle plantillas.
@@ -1220,7 +1220,7 @@ function DeliveryStatus({ msg }: { msg: WAMessage }) {
   }
   // sent / delivered / read
   const label = s === 'read' ? '✓✓ Leído' : s === 'delivered' ? '✓✓ Entregado' : '✓ Enviado'
-  const color = s === 'read' ? 'text-sky-500' : 'text-muted-foreground'
+  const color = s === 'read' ? 'text-sky-700 dark:text-sky-500' : 'text-muted-foreground'
   return <span className={color} title={label}>{label}</span>
 }
 

@@ -522,8 +522,8 @@ export default function ContactsTab({ instance, hideActions = false }: ContactsT
                                     status === "en_cola" ? "outline" : "outline"
                                  }
                                  className={
-                                    status === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" :
-                                    status === "en_cola" ? "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30" : ""
+                                    status === "enviado" ? "bg-green-700 hover:bg-green-800 text-white" :
+                                    status === "en_cola" ? "bg-blue-500/15 text-blue-800 dark:text-blue-400 border-blue-500/30" : ""
                                  }
                                >
                                  {status === "en_cola" ? "EN COLA" : status.toUpperCase()}

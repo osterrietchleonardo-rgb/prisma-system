@@ -143,7 +143,7 @@ export function PropertySelector({ onSelect, onContinue }: PropertySelectorProps
                     "h-7 text-[10px]",
                     selectedId === p.id 
                       ? "bg-accent text-accent-foreground hover:bg-accent/90" 
-                      : "bg-background border-muted hover:border-accent"
+                      : "bg-background text-foreground border-muted hover:border-accent"
                   )}
                 >
                   {selectedId === p.id ? "Seleccionado" : "Seleccionar"}

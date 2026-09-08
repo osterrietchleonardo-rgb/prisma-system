@@ -50,8 +50,8 @@ import type { Propuesta } from "@/lib/asesor-docs/propuesta";
 
 /** Cómo se ve cada estado. El texto largo lo pone `explicacionDelEstado`. */
 const PINTA_DEL_ESTADO: Record<FilaPlantilla["estado"], string> = {
-  activa: "bg-green-500/10 text-green-600 border-green-500/20",
-  borrador: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  activa: "bg-green-500/10 text-green-800 dark:text-green-400 border-green-500/20",
+  borrador: "bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20",
 };
 
 const ETIQUETA_DEL_ESTADO: Record<FilaPlantilla["estado"], string> = {

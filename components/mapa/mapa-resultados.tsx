@@ -89,7 +89,7 @@ export function MapaResultados({
   const contenido = (
     <div className="space-y-2 p-2">
         {sinUbicacion.length > 0 && (
-          <p className="px-1 pb-1 text-[11px] text-amber-600 dark:text-amber-500">
+          <p className="px-1 pb-1 text-[11px] text-amber-700 dark:text-amber-500">
             {sinUbicacion.length}{" "}
             {sinUbicacion.length === 1 ? "propiedad no tiene" : "propiedades no tienen"} ubicación
             cargada: están en la lista pero no en el mapa.
@@ -125,11 +125,11 @@ export function MapaResultados({
                   <span className="text-[9px] uppercase tracking-wider text-zinc-500">
                     {ETIQUETA_FUENTE[p.source]}
                   </span>
-                  {!ubicada && <MapPinOff className="h-3 w-3 text-amber-500" />}
+                  {!ubicada && <MapPinOff className="h-3 w-3 text-amber-700 dark:text-amber-500" />}
                 </div>
                 <p className="truncate text-sm font-semibold">{precio(p)}</p>
                 <p className="truncate text-xs text-zinc-500">{p.address || p.city || "Sin dirección"}</p>
-                <p className="truncate text-[11px] text-zinc-400">
+                <p className="truncate text-[11px] text-zinc-600 dark:text-zinc-400">
                   {/* `ambientes`, no `bedrooms`: hasta el 2026-08-14 esta linea decia
                       "3 amb." mostrando los DORMITORIOS, y en la cartera de Central los
                       dos numeros difieren en el 84% de las propiedades. */}

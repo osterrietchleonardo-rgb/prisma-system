@@ -320,13 +320,13 @@ export function ContratoWizard({ wizardState, setWizardState, onBack, isEditing 
           <div className="flex flex-col items-end gap-1">
             <Button
               onClick={handleFinalize}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-green-700 hover:bg-green-800 text-white"
               disabled={saving}
             >
               {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Finalizar y generar PDF
             </Button>
-            <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1">
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
               Esta acción consume <span className="font-semibold">5 créditos IA</span>
             </p>

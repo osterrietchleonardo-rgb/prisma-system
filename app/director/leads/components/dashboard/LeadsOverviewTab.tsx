@@ -70,9 +70,9 @@ export function LeadsOverviewTab({ leads }: LeadsOverviewTabProps) {
     const owners = leads.filter(l => l.is_owner).length;
     const companies = leads.filter(l => l.es_corporativo).length;
     return [
-      { name: "Buyers/Inquiries", count: buyers, color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
-      { name: "Propietarios", count: owners, color: "bg-orange-500/10 text-orange-500 border-orange-500/20" },
-      { name: "Empresas", count: companies, color: "bg-purple-500/10 text-purple-500 border-purple-500/20" }
+      { name: "Buyers/Inquiries", count: buyers, color: "bg-blue-500/10 text-blue-800 dark:text-blue-500 border-blue-500/20" },
+      { name: "Propietarios", count: owners, color: "bg-orange-500/10 text-orange-800 dark:text-orange-500 border-orange-500/20" },
+      { name: "Empresas", count: companies, color: "bg-purple-500/10 text-purple-800 dark:text-purple-500 border-purple-500/20" }
     ];
   }, [leads]);
 

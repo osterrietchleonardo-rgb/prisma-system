@@ -415,7 +415,7 @@ export default function ConsultorIAPage() {
                       <div className="flex gap-1 animate-in zoom-in-95 duration-200 bg-background/80 backdrop-blur-sm p-1 rounded-lg border shadow-sm">
                         <Button 
                           size="icon" 
-                          className="h-7 w-7 bg-destructive hover:bg-destructive/90 text-white rounded-md shadow-sm"
+                          className="h-7 w-7 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-md shadow-sm"
                           onClick={(e) => handleDelete(s.id, e)}
                         >
                           <Check className="w-4 h-4" />
@@ -599,9 +599,9 @@ export default function ConsultorIAPage() {
               <Send className="w-5 h-5" />
             </Button>
           </form>
-          <p className="text-[10px] text-muted-foreground/40 text-center w-full flex items-center justify-center gap-1 mt-2">
+          <p className="text-[10px] text-muted-foreground text-center w-full flex items-center justify-center gap-1 mt-2">
             <Sparkles className="w-3 h-3" />
-            Cada respuesta consume <span className="font-semibold text-muted-foreground/60">1 crédito IA</span>
+            Cada respuesta consume <span className="font-semibold text-muted-foreground">1 crédito IA</span>
           </p>
         </CardFooter>
       </div>

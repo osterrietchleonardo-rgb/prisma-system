@@ -491,7 +491,7 @@ export default function AsesoresPage() {
                         {inviteCode}
                       </div>
                       <Button variant="outline" size="icon" className="h-12 w-12" onClick={copyToClipboard}>
-                        {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                        {copied ? <Check className="h-4 w-4 text-green-700 dark:text-green-500" /> : <Copy className="h-4 w-4" />}
                       </Button>
                     </div>
                   </div>
@@ -749,11 +749,11 @@ export default function AsesoresPage() {
                   </div>
                   <div className="flex flex-col items-center p-2 rounded-lg bg-green-500/5 border border-green-500/10">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Cierres</span>
-                    <span className="font-bold text-green-500">{perfMap[agent.id]?.transacciones ?? 0}</span>
+                    <span className="font-bold text-green-700 dark:text-green-500">{perfMap[agent.id]?.transacciones ?? 0}</span>
                   </div>
                   <div className="flex flex-col items-center p-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground">Cartera</span>
-                    <span className="font-bold text-blue-500">{perfMap[agent.id]?.cartera_activa ?? 0}</span>
+                    <span className="font-bold text-blue-700 dark:text-blue-500">{perfMap[agent.id]?.cartera_activa ?? 0}</span>
                   </div>
                 </div>
 
@@ -767,11 +767,11 @@ export default function AsesoresPage() {
                       Desvinculado
                     </Badge>
                   ) : agent.estado === "pausado" ? (
-                    <Badge className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/10 border-none px-2 py-0 text-[10px]">
+                    <Badge className="bg-amber-500/10 text-amber-800 dark:text-amber-400 hover:bg-amber-500/10 border-none px-2 py-0 text-[10px]">
                       Pausado
                     </Badge>
                   ) : (
-                    <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/10 border-none px-2 py-0 text-[10px]">
+                    <Badge className="bg-green-500/10 text-green-800 dark:text-green-400 hover:bg-green-500/10 border-none px-2 py-0 text-[10px]">
                       Activo
                     </Badge>
                   )}
@@ -814,7 +814,7 @@ export default function AsesoresPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-2 text-green-600 border-green-500/20 hover:bg-green-500/10"
+                    className="gap-2 text-green-800 dark:text-green-400 border-green-500/20 hover:bg-green-500/10"
                     disabled={reanudando === selectedAgent?.id}
                     onClick={() => selectedAgent && handleReanudar(selectedAgent)}
                   >
@@ -824,7 +824,7 @@ export default function AsesoresPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-2 text-amber-600 border-amber-500/20 hover:bg-amber-500/10"
+                    className="gap-2 text-amber-800 dark:text-amber-400 border-amber-500/20 hover:bg-amber-500/10"
                     onClick={() => { if (selectedAgent) { setAgentToPause(selectedAgent); setPauseReason("") } }}
                   >
                     <PauseCircle className="h-3 w-3" /> Pausar asesor
@@ -843,7 +843,7 @@ export default function AsesoresPage() {
 
               {/* Aviso de pausa vigente con su trazabilidad */}
               {selectedAgent?.estado === "pausado" && (
-                <div className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left text-xs text-amber-700 space-y-1">
+                <div className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-left text-xs text-amber-800 dark:text-amber-400 space-y-1">
                   <p className="font-bold flex items-center gap-1">
                     <PauseCircle className="h-3.5 w-3.5" /> Asesor pausado
                   </p>
@@ -901,7 +901,7 @@ export default function AsesoresPage() {
                 <CardHeader className="p-4 pb-0">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center justify-between">
                     Cierres Totales
-                    <TrendingUp className="h-3 w-3 text-green-500" />
+                    <TrendingUp className="h-3 w-3 text-green-700 dark:text-green-500" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
@@ -917,7 +917,7 @@ export default function AsesoresPage() {
                 <CardHeader className="p-4 pb-0">
                   <CardTitle className="text-xs font-bold uppercase text-muted-foreground flex items-center justify-between">
                     Rotación
-                    <Zap className="h-3 w-3 text-yellow-500" />
+                    <Zap className="h-3 w-3 text-yellow-700 dark:text-yellow-500" />
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4">
@@ -1048,7 +1048,7 @@ export default function AsesoresPage() {
               Cancelar
             </Button>
             <Button
-              className="bg-amber-500 hover:bg-amber-500/90 text-white gap-2"
+              className="bg-amber-700 hover:bg-amber-800 text-white gap-2"
               onClick={handleConfirmPausar}
               disabled={pausing || !pauseReason.trim()}
             >

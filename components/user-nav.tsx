@@ -71,7 +71,7 @@ export function UserNav({ userName, userEmail, userRole }: UserNavProps) {
         </DropdownMenuGroup>
         <DropdownMenuSeparator className="bg-accent/10" />
         <DropdownMenuItem 
-          className="gap-2 rounded-lg py-2 cursor-pointer focus:bg-red-500/10 focus:text-red-500 text-red-400 transition-colors"
+          className="gap-2 rounded-lg py-2 cursor-pointer focus:bg-red-500/10 focus:text-red-500 text-red-800 dark:text-red-400 transition-colors"
           onClick={() => logout()}
         >
           <LogOut className="h-4 w-4" />

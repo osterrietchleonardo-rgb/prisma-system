@@ -32,7 +32,7 @@ export function MapaPanelPrecios({
         {/* Se dice con que se esta pintando. La cuadricula corta manzanas al medio y junta
             las dos veredas de una avenida: quien lee el color tiene que saber cual de las
             dos esta viendo. */}
-        <p className="text-[9px] text-zinc-400">
+        <p className="text-[9px] text-zinc-600 dark:text-zinc-400">
           {unidad === "manzana" ? "por manzana real" : "por cuadrícula aproximada"}
         </p>
       </div>
@@ -51,7 +51,7 @@ export function MapaPanelPrecios({
               <span className="truncate text-[10px] text-zinc-500">{t.texto}</span>
             </div>
           ))}
-          <p className="pt-1 text-[9px] leading-tight text-zinc-400">
+          <p className="pt-1 text-[9px] leading-tight text-zinc-600 dark:text-zinc-400">
             La escala compara contra lo que se ve en pantalla: al acercarte, los colores se
             recalculan. Las zonas mas transparentes tienen una o dos propiedades: el dato
             existe, pero es flojo.
@@ -62,7 +62,7 @@ export function MapaPanelPrecios({
       <div className="min-h-0 flex-1">
         {cargando && barrios.length === 0 ? (
           <div className="flex h-full items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+            <Loader2 className="h-4 w-4 animate-spin text-zinc-600 dark:text-zinc-400" />
           </div>
         ) : barrios.length === 0 ? (
           <p className="p-3 text-[11px] text-zinc-500">
@@ -74,7 +74,7 @@ export function MapaPanelPrecios({
               {caro && barato && caro !== barato && (
                 <div className="mb-2 space-y-1 rounded-lg bg-zinc-100 p-2 dark:bg-zinc-800/60">
                   <p className="flex items-center gap-1.5 text-[11px]">
-                    <TrendingUp className="h-3 w-3 text-red-500" />
+                    <TrendingUp className="h-3 w-3 text-red-700 dark:text-red-500" />
                     <span className="truncate font-medium">{caro.nombre}</span>
                     <span className="ml-auto shrink-0 text-zinc-500">
                       {formatearM2(caro.mediana_m2, moneda)}
@@ -94,10 +94,10 @@ export function MapaPanelPrecios({
                 <tbody>
                   {barrios.map((b, i) => (
                     <tr key={b.nombre} className="border-b border-zinc-100 last:border-0 dark:border-zinc-800/60">
-                      <td className="py-1 pr-1 text-[10px] text-zinc-400">{i + 1}</td>
+                      <td className="py-1 pr-1 text-[10px] text-zinc-600 dark:text-zinc-400">{i + 1}</td>
                       <td className="py-1 pr-2">
                         <span className="block truncate text-[11px] font-medium">{b.nombre}</span>
-                        <span className="text-[9px] text-zinc-400">{b.propiedades} avisos</span>
+                        <span className="text-[9px] text-zinc-600 dark:text-zinc-400">{b.propiedades} avisos</span>
                       </td>
                       <td className="py-1 text-right text-[11px] font-semibold tabular-nums">
                         {formatearM2(b.mediana_m2, moneda)}

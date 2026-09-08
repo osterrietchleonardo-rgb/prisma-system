@@ -172,7 +172,7 @@ export function Step2Comparables({ comparables, onChange, onNext, onPrev }: Step
               <div className="flex-1 overflow-y-auto space-y-3 pr-2">
                 {tokkoResults.length === 0 && !isSearchingTokko ? (
                   <div className="py-8 text-center space-y-4">
-                    <Building className="w-12 h-12 text-accent/50 mx-auto" />
+                    <Building className="w-12 h-12 text-accent mx-auto" />
                     <p className="text-muted-foreground text-sm">Busca por ubicación, ID, o palabra clave para encontrar propiedades comparables.</p>
                   </div>
                 ) : (
@@ -288,7 +288,7 @@ export function Step2Comparables({ comparables, onChange, onNext, onPrev }: Step
                   <TableCell className="font-medium text-xs">{c.fuente}</TableCell>
                   <TableCell className="text-xs">{c.direccion}</TableCell>
                   <TableCell>
-                    <span className={`text-[10px] uppercase px-2 py-1 rounded-full ${c.tipo_precio === 'cierre' ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-500'}`}>
+                    <span className={`text-[10px] uppercase px-2 py-1 rounded-full ${c.tipo_precio === 'cierre' ? 'bg-green-500/20 text-green-800 dark:text-green-500' : 'bg-blue-500/20 text-blue-800 dark:text-blue-500'}`}>
                       {c.tipo_precio}
                     </span>
                   </TableCell>

@@ -1009,8 +1009,8 @@ export function BarraDeProgreso({
 const PINTA_DEL_RESULTADO: Record<ResultadoDeAplicacion, string> = {
   esperando: "bg-muted text-muted-foreground border-transparent",
   corriendo: "bg-muted text-muted-foreground border-transparent",
-  ok: "bg-green-500/10 text-green-600 border-green-500/20",
-  pendiente: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+  ok: "bg-green-500/10 text-green-800 dark:text-green-400 border-green-500/20",
+  pendiente: "bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-500/20",
   frenado: "bg-destructive/10 text-destructive border-destructive/20",
   error: "bg-destructive/10 text-destructive border-destructive/20",
 };

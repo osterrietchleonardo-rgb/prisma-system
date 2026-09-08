@@ -392,7 +392,7 @@ export function SubjectInput({
               {extractMeta.fecha && <p className="text-muted-foreground">Publicado: <span className="text-foreground">{extractMeta.fecha}</span></p>}
               {extractMeta.expensas ? <p className="text-muted-foreground">Expensas: <span className="text-foreground">$ {extractMeta.expensas.toLocaleString("es-AR")}</span></p> : null}
               {extractMeta.aviso && (
-                <p className="flex items-center gap-1 text-amber-500"><AlertTriangle className="w-3 h-3" /> {extractMeta.aviso}</p>
+                <p className="flex items-center gap-1 text-amber-700 dark:text-amber-500"><AlertTriangle className="w-3 h-3" /> {extractMeta.aviso}</p>
               )}
             </div>
           )}

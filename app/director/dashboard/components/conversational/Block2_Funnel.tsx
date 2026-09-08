@@ -42,7 +42,7 @@ const PIPELINE_STAGES = [
     label: "Activos",
     desc: "En conversación o esperando respuesta",
     icon: MessageCircle,
-    color: "text-blue-400",
+    color: "text-blue-600 dark:text-blue-400",
     bg: "bg-blue-400/10",
     border: "border-blue-400/20",
   },
@@ -51,7 +51,7 @@ const PIPELINE_STAGES = [
     label: "En pausa",
     desc: "Lead pausado, pendiente de seguimiento",
     icon: Clock,
-    color: "text-amber-400",
+    color: "text-amber-700 dark:text-amber-400",
     bg: "bg-amber-400/10",
     border: "border-amber-400/20",
   },
@@ -60,7 +60,7 @@ const PIPELINE_STAGES = [
     label: "Cerrados ganados",
     desc: "Conversión exitosa — reserva o venta cerrada",
     icon: CheckCircle2,
-    color: "text-emerald-400",
+    color: "text-emerald-700 dark:text-emerald-400",
     bg: "bg-emerald-400/10",
     border: "border-emerald-400/20",
   },
@@ -69,7 +69,7 @@ const PIPELINE_STAGES = [
     label: "Cerrados perdidos",
     desc: "Lead que no avanzó en el proceso",
     icon: XCircle,
-    color: "text-rose-400",
+    color: "text-rose-700 dark:text-rose-400",
     bg: "bg-rose-400/10",
     border: "border-rose-400/20",
   },
@@ -97,7 +97,7 @@ export function Block2Funnel({ funnel }: Block2FunnelProps) {
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help" />
+                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
               </TooltipTrigger>
               <TooltipContent className="max-w-[240px] text-xs">
                 Cada etapa muestra el número de conversaciones que alcanzaron ese punto del proceso comercial.
@@ -146,7 +146,7 @@ export function Block2Funnel({ funnel }: Block2FunnelProps) {
                       <p>{stage.count.toLocaleString("es-AR")} conversaciones</p>
                       <p>{stage.pct}% del total</p>
                       {idx > 0 && (
-                        <p className="text-rose-400 mt-1">
+                        <p className="text-rose-700 dark:text-rose-400 mt-1">
                           ↓ {stage.dropCount} perdidos desde etapa anterior ({stage.dropPct}%)
                         </p>
                       )}
@@ -156,7 +156,7 @@ export function Block2Funnel({ funnel }: Block2FunnelProps) {
                   {idx > 0 && stage.dropCount > 0 && (
                     <div className="flex items-center gap-3">
                       <span className="w-[140px] shrink-0" />
-                      <p className="text-[10px] text-muted-foreground/60 pl-1">
+                      <p className="text-[10px] text-muted-foreground pl-1">
                         ↘ {stage.dropCount} leads perdidos ({stage.dropPct}% de la etapa anterior)
                       </p>
                     </div>
@@ -175,7 +175,7 @@ export function Block2Funnel({ funnel }: Block2FunnelProps) {
               <TooltipProvider delayDuration={200}>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 text-muted-foreground/50 cursor-help" />
+                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
                   </TooltipTrigger>
                   <TooltipContent className="max-w-[240px] text-xs">
                     Estado marcado directamente en el sistema por el equipo, más confiable que el análisis de IA.
@@ -212,10 +212,10 @@ export function Block2Funnel({ funnel }: Block2FunnelProps) {
             {/* Tasa de cierre real */}
             {fs!.tasa_cierre_real !== null && (
               <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-400/5 border border-emerald-400/15">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
                 <p className="text-xs text-muted-foreground">
                   Tasa de cierre real (ganados vs. cerrados totales):{" "}
-                  <span className={`font-bold text-sm ${fs!.tasa_cierre_real >= 50 ? "text-emerald-400" : "text-amber-400"}`}>
+                  <span className={`font-bold text-sm ${fs!.tasa_cierre_real >= 50 ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}>
                     {fs!.tasa_cierre_real}%
                   </span>
                 </p>

@@ -271,14 +271,14 @@ export default function CalendarioPage() {
       <Dialog open={!!cancelingVisit} onOpenChange={(open) => !open && setCancelingVisit(null)}>
         <DialogContent className="bg-card border-red-500/20 max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-red-500 font-bold text-xl">Confirmar Cancelación</DialogTitle>
+            <DialogTitle className="text-red-700 dark:text-red-500 font-bold text-xl">Confirmar Cancelación</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-4">
             <p className="text-sm text-muted-foreground">
               ¿Estás seguro de que deseas cancelar la visita de <span className="font-bold">{cancelingVisit?.nombre_completo}</span>?
             </p>
             <div className="space-y-2">
-              <Label className="text-red-400">Motivo de la cancelación *</Label>
+              <Label className="text-red-600 dark:text-red-400">Motivo de la cancelación *</Label>
               <Textarea
                 placeholder="Por favor, indica por qué se cancela la visita..."
                 value={cancelReason}
@@ -368,7 +368,7 @@ export default function CalendarioPage() {
           </div>
           <div className="flex items-center gap-2">
              <Badge variant="outline" className="bg-card/50 text-[10px] gap-1"><Clock3 className="h-3 w-3" /> Agendadas</Badge>
-             <Badge variant="outline" className="bg-card/50 text-[10px] gap-1"><CheckCircle2 className="h-3 w-3 text-red-500" /> Canceladas</Badge>
+             <Badge variant="outline" className="bg-card/50 text-[10px] gap-1"><CheckCircle2 className="h-3 w-3 text-red-700 dark:text-red-500" /> Canceladas</Badge>
           </div>
         </div>
 
@@ -395,13 +395,13 @@ export default function CalendarioPage() {
                 key={idx} 
                 className={cn(
                   "border-r border-b border-accent/10 p-2 transition-colors hover:bg-accent/5 flex flex-col gap-1 overflow-y-auto scrollbar-hide",
-                  !isCurrentMonth ? "bg-accent/[0.02] text-muted-foreground/30" : "bg-card/20"
+                  !isCurrentMonth ? "bg-accent/[0.02] text-muted-foreground" : "bg-card/20"
                 )}
               >
                 <div className="flex justify-between items-center mb-1">
                   <span className={cn(
                     "text-xs font-bold h-6 w-6 flex items-center justify-center rounded-full",
-                    isToday ? "bg-accent text-white" : ""
+                    isToday ? "bg-accent text-accent-foreground" : ""
                   )}>
                     {format(day, "d")}
                   </span>
@@ -416,9 +416,9 @@ export default function CalendarioPage() {
                       <DialogTrigger asChild>
                         <div className={cn(
                           "group p-1.5 rounded-lg border text-[10px] cursor-pointer transition-all hover:scale-[1.02]",
-                          visit.estado_visita === 'agendada' ? "bg-accent/5 border-accent/20 text-accent/80" : 
-                          visit.estado_visita === 'cancelada' ? "bg-red-500/5 border-red-500/20 text-red-500/80" : 
-                          "bg-amber-500/5 border-amber-500/20 text-amber-500/80"
+                          visit.estado_visita === 'agendada' ? "bg-accent/5 border-accent/20 text-accent" : 
+                          visit.estado_visita === 'cancelada' ? "bg-red-500/5 border-red-500/20 text-red-800 dark:text-red-500" : 
+                          "bg-amber-500/5 border-amber-500/20 text-amber-800 dark:text-amber-500"
                         )}>
                           <div className="flex items-center justify-between gap-1 mb-1 font-bold">
                             <div className="flex items-center gap-1">
@@ -440,7 +440,7 @@ export default function CalendarioPage() {
                                  Detalle de Visita
                                </DialogTitle>
                                {visit.motivo_cambio && visit.estado_visita === 'agendada' && (
-                                 <Badge variant="outline" className="w-fit text-[10px] bg-amber-500/10 text-amber-500 border-amber-500/20">
+                                 <Badge variant="outline" className="w-fit text-[10px] bg-amber-500/10 text-amber-800 dark:text-amber-500 border-amber-500/20">
                                    Modificada
                                  </Badge>
                                )}
@@ -448,8 +448,8 @@ export default function CalendarioPage() {
                              <Badge className={cn(
                                "border-none px-3 capitalize",
                                visit.estado_visita === 'agendada' ? "bg-accent/10 text-accent" : 
-                               visit.estado_visita === 'cancelada' ? "bg-red-500/10 text-red-500" : 
-                               "bg-amber-500/10 text-amber-500"
+                               visit.estado_visita === 'cancelada' ? "bg-red-500/10 text-red-800 dark:text-red-500" : 
+                               "bg-amber-500/10 text-amber-800 dark:text-amber-500"
                              )}>
                                {visit.estado_visita}
                              </Badge>
@@ -513,9 +513,9 @@ export default function CalendarioPage() {
                                  <span className="text-[10px] uppercase font-bold text-muted-foreground">Calificación</span>
                                  <Badge className={cn(
                                    "block text-center border-none",
-                                   visit.calificacion_lead === 'HOT' ? "bg-red-500/10 text-red-500" : 
-                                   visit.calificacion_lead === 'WARM' ? "bg-amber-500/10 text-amber-500" : 
-                                   "bg-blue-500/10 text-blue-500"
+                                   visit.calificacion_lead === 'HOT' ? "bg-red-500/10 text-red-800 dark:text-red-500" : 
+                                   visit.calificacion_lead === 'WARM' ? "bg-amber-500/10 text-amber-800 dark:text-amber-500" : 
+                                   "bg-blue-500/10 text-blue-800 dark:text-blue-500"
                                  )}>
                                    {visit.calificacion_lead || '-'}
                                  </Badge>
@@ -548,7 +548,7 @@ export default function CalendarioPage() {
                                 )}>
                                   <span className={cn(
                                     "text-[10px] uppercase font-bold",
-                                    visit.estado_visita === 'cancelada' ? "text-red-500" : "text-amber-500"
+                                    visit.estado_visita === 'cancelada' ? "text-red-700 dark:text-red-500" : "text-amber-700 dark:text-amber-500"
                                   )}>
                                     {visit.estado_visita === 'cancelada' ? 'Motivo de Cancelación' : 'Motivo de Modificación'}
                                   </span>

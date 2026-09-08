@@ -468,7 +468,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
               {currentStep === 2 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
                   <div className="space-y-4">
-                    <Label className="text-sm font-bold text-red-500">Preocupaciones principales (Múltiple)</Label>
+                    <Label className="text-sm font-bold text-red-700 dark:text-red-500">Preocupaciones principales (Múltiple)</Label>
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                       {["Que se queme la propiedad", "Cobrar menos de lo esperado", "Inseguridad en visitas", "Trámites papeleros", "Honorarios caros", "Demora en la venta"].map(p => (
                         <Button
@@ -477,7 +477,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                           variant="outline"
                           className={cn(
                             "text-[10px] px-2 py-2 font-bold",
-                            form.watch("flow_data.preocupaciones").includes(p) ? "bg-red-500/10 border-red-500/50 text-red-600" : "border-muted/50"
+                            form.watch("flow_data.preocupaciones").includes(p) ? "bg-red-500/10 border-red-500/50 text-red-800 dark:text-red-400" : "border-muted/50"
                           )}
                           onClick={() => toggleArrayItem("flow_data.preocupaciones", p)}
                         >
@@ -498,7 +498,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label className="text-sm font-bold text-red-500">Miedo más frecuente</Label>
+                      <Label className="text-sm font-bold text-red-700 dark:text-red-500">Miedo más frecuente</Label>
                       <Input {...form.register("flow_data.miedo_frecuente")} placeholder="Ej: Que la propiedad se queme en el mercado" className="h-12" />
                     </div>
                     <div className="space-y-2">
@@ -723,7 +723,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                         <p className="text-sm font-bold">Propiedad seleccionada</p>
                         <p className="text-xs text-muted-foreground">{selectedProperty.title}</p>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => setSelectedProperty(null)} className="ml-auto text-xs font-bold text-red-500">
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedProperty(null)} className="ml-auto text-xs font-bold text-red-700 dark:text-red-500">
                         QUITAR
                       </Button>
                     </div>
@@ -901,7 +901,7 @@ export function IpcForm({ initialData, onSave }: { initialData?: any, onSave?: (
                     <Input {...form.register("flow_data.promesa_central")} placeholder="Ej: Mudate a las mejores expensas de la zona" className="h-12" />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-sm font-bold text-red-500">¿Qué NO mostrar o mencionar? (Filtro)</Label>
+                    <Label className="text-sm font-bold text-red-700 dark:text-red-500">¿Qué NO mostrar o mencionar? (Filtro)</Label>
                     <Input {...form.register("flow_data.no_mostrar")} placeholder="Ej: No mencionar que es por escalera" className="h-12 border-red-500/20" />
                   </div>
                 </div>

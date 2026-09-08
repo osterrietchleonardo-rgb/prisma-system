@@ -53,12 +53,12 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete, isDi
 
   const getTypeBadge = (type: string) => {
     const map: Record<string, { label: string; class: string; icon: any }> = {
-      prospeccion: { label: "Prospección", class: "bg-blue-500/10 text-blue-600 border-blue-200", icon: TrendingUp },
-      prelisting: { label: "Prelisting", class: "bg-purple-500/10 text-purple-600 border-purple-200", icon: Target },
-      prebuying: { label: "Prebuying", class: "bg-orange-500/10 text-orange-600 border-orange-200", icon: ShoppingCart },
-      captacion: { label: "Captación", class: "bg-indigo-500/10 text-indigo-600 border-indigo-200", icon: Home },
-      reserva: { label: "Reserva", class: "bg-amber-500/10 text-amber-600 border-amber-200", icon: ArrowDownCircle },
-      cierre: { label: "Cierre", class: "bg-emerald-500/10 text-emerald-600 border-emerald-200", icon: CheckCircle2 },
+      prospeccion: { label: "Prospección", class: "bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-200", icon: TrendingUp },
+      prelisting: { label: "Prelisting", class: "bg-purple-500/10 text-purple-800 dark:text-purple-400 border-purple-200", icon: Target },
+      prebuying: { label: "Prebuying", class: "bg-orange-500/10 text-orange-800 dark:text-orange-400 border-orange-200", icon: ShoppingCart },
+      captacion: { label: "Captación", class: "bg-indigo-500/10 text-indigo-800 dark:text-indigo-400 border-indigo-200", icon: Home },
+      reserva: { label: "Reserva", class: "bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-200", icon: ArrowDownCircle },
+      cierre: { label: "Cierre", class: "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-200", icon: CheckCircle2 },
     };
     const t = map[type] || { label: type, class: "bg-muted text-muted-foreground", icon: Activity };
     const Icon = t.icon;
@@ -159,11 +159,11 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete, isDi
                       )}
                       
                       {log.leads ? (
-                        <span className="text-[10px] text-blue-400 font-semibold truncate max-w-[200px] flex items-center gap-1" title={log.leads.full_name}>
+                        <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold truncate max-w-[200px] flex items-center gap-1" title={log.leads.full_name}>
                           👤 {log.leads.full_name}
                         </span>
                       ) : log.wa_contacts ? (
-                        <span className="text-[10px] text-emerald-500 font-semibold truncate max-w-[200px] flex items-center gap-1" title={log.wa_contacts.name || log.wa_contacts.phone}>
+                        <span className="text-[10px] text-emerald-700 dark:text-emerald-500 font-semibold truncate max-w-[200px] flex items-center gap-1" title={log.wa_contacts.name || log.wa_contacts.phone}>
                           💬 {log.wa_contacts.name || log.wa_contacts.phone}
                         </span>
                       ) : null}
@@ -174,20 +174,20 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete, isDi
                   </TableCell>
                   <TableCell className="text-center">
                     {log.type === "reserva" && (
-                      <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-amber-100 font-bold">
+                      <Badge variant="secondary" className="bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-100 font-bold">
                         Gap: {calculateGap(log)}
                       </Badge>
                     )}
                     {log.type === "cierre" && (
-                      <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-700 border-emerald-100 font-bold">
+                      <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 border-emerald-100 font-bold">
                         GCI: USD {calculateGCI(log)}
                       </Badge>
                     )}
                     {log.type === "captacion" && (
-                      <span className="text-[10px] uppercase font-bold text-indigo-500">{log.metadata?.condicion_captacion}</span>
+                      <span className="text-[10px] uppercase font-bold text-indigo-700 dark:text-indigo-500">{log.metadata?.condicion_captacion}</span>
                     )}
                     {log.type === "prospeccion" && (
-                      <span className="text-[10px] uppercase font-bold text-blue-500">{log.metadata?.origen}</span>
+                      <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-500">{log.metadata?.origen}</span>
                     )}
                   </TableCell>
                   {isDirector && (
@@ -264,7 +264,7 @@ export function PerformanceHistoryList({ logs, onRefresh, onEdit, onDelete, isDi
                         {/* Métrica de Negocio */}
                         <div className="space-y-4">
                            <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                             <Layers className="w-3 h-3 text-blue-500" /> IMPACTO EN NEGOCIO
+                             <Layers className="w-3 h-3 text-blue-700 dark:text-blue-500" /> IMPACTO EN NEGOCIO
                            </h4>
                            <div className="p-4 rounded-xl bg-accent/5 border border-accent/10 space-y-3">
                               {log.type === "reserva" && (

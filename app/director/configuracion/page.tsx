@@ -409,7 +409,7 @@ export default function DirectorConfiguracionPage() {
                       {invite.invitee_name || invite.used_by_profile?.full_name || "Sin nombre"}
                     </p>
                     {!invite.is_used ? (
-                      <Badge variant="outline" className="mt-1 border-green-500/30 text-green-500 bg-green-500/10">Activo</Badge>
+                      <Badge variant="outline" className="mt-1 border-green-500/30 text-green-800 dark:text-green-500 bg-green-500/10">Activo</Badge>
                     ) : (
                       <Badge variant="outline" className="mt-1 border-muted text-muted-foreground">Usado</Badge>
                     )}
@@ -455,22 +455,22 @@ export default function DirectorConfiguracionPage() {
 
       <Tabs defaultValue={defaultTab} className="space-y-6">
         <TabsList className="bg-card border border-accent/10">
-          <TabsTrigger value="perfil" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="perfil" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <User className="h-4 w-4" /> Mi Perfil
           </TabsTrigger>
-          <TabsTrigger value="agencia" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="agencia" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <Building2 className="h-4 w-4" /> Inmobiliaria
           </TabsTrigger>
-          <TabsTrigger value="creditos" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="creditos" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <Sparkles className="h-4 w-4" /> Créditos IA
           </TabsTrigger>
-          <TabsTrigger value="costos" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="costos" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <BarChart3 className="h-4 w-4" /> Costos Meta
           </TabsTrigger>
-          <TabsTrigger value="seguridad" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="seguridad" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <Lock className="h-4 w-4" /> Accesso & Seguridad
           </TabsTrigger>
-          <TabsTrigger value="integraciones" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="integraciones" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <CalendarCheck className="h-4 w-4" /> Integraciones
           </TabsTrigger>
         </TabsList>
@@ -653,10 +653,10 @@ export default function DirectorConfiguracionPage() {
             <CardContent>
               <Tabs defaultValue="asesores" className="space-y-4">
                 <TabsList className="bg-background/50 border border-accent/10">
-                  <TabsTrigger value="asesores" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+                  <TabsTrigger value="asesores" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
                     <Users className="h-4 w-4" /> Invitación de Asesores
                   </TabsTrigger>
-                  <TabsTrigger value="directores" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+                  <TabsTrigger value="directores" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
                     <Building2 className="h-4 w-4" /> Invitación de Directores
                   </TabsTrigger>
                 </TabsList>
@@ -735,7 +735,7 @@ export default function DirectorConfiguracionPage() {
                   <Loader2 className="h-4 w-4 animate-spin" /> Verificando conexión...
                 </div>
               ) : !gcal.configured ? (
-                <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-500">
+                <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-800 dark:text-amber-500">
                   La integración con Google todavía no está habilitada en el servidor. Contactá a soporte.
                 </div>
               ) : gcal.connected ? (
@@ -743,7 +743,7 @@ export default function DirectorConfiguracionPage() {
                   <div className="flex items-center justify-between p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-emerald-500/10">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                        <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
                       </div>
                       <div>
                         <h4 className="font-semibold text-sm">Conectado</h4>
@@ -811,7 +811,7 @@ export default function DirectorConfiguracionPage() {
                   Esta acción no se puede deshacer.
                 </p>
                 {codeToDelete?.is_used && (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-600">
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-400">
                     ⚠️ Este código <strong>ya fue usado</strong>. Borrarlo <strong>NO desvincula a la persona</strong> del
                     sistema (para eso usá «Desvincular asesor» en la sección Asesores). Solo saca la fila de esta lista.
                   </div>

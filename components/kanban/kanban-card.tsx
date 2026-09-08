@@ -183,7 +183,7 @@ export function KanbanCard({ lead, onClick, detailsUrl = "/director/leads" }: Ka
                 <span className="text-[9px] font-medium">{lead.tokko_agent_name.split(" ")[0]}</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1 text-[10px] text-amber-500 font-medium">
+              <div className="flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-500 font-medium">
                 <User className="h-3 w-3" />
                 <span>Sin asignar</span>
               </div>

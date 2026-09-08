@@ -28,10 +28,10 @@ const ICONO: Record<TipoLugar, typeof MapPin> = {
 }
 
 const COLOR: Record<TipoLugar, string> = {
-  zona: "text-amber-500",
-  cartera: "text-amber-600",
+  zona: "text-amber-700 dark:text-amber-500",
+  cartera: "text-amber-700 dark:text-amber-500",
   barrio: "text-sky-600",
-  direccion: "text-zinc-400",
+  direccion: "text-zinc-600 dark:text-zinc-400",
 }
 
 /** Direcciones de MapTiler. Devuelve [] ante cualquier problema: es un extra, no el plato. */
@@ -189,7 +189,7 @@ export function MapaBuscador({ onElegir }: { onElegir: (l: Lugar) => void }) {
   return (
     <div ref={caja} className="relative">
       <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600 dark:text-zinc-400" />
         <input
           value={texto}
           onChange={(e) => {
@@ -204,12 +204,12 @@ export function MapaBuscador({ onElegir }: { onElegir: (l: Lugar) => void }) {
           className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-9 pr-9 text-sm outline-none transition-colors focus:border-sky-500 dark:border-zinc-800 dark:bg-zinc-900"
         />
         {buscando ? (
-          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-400" />
+          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-zinc-600 dark:text-zinc-400" />
         ) : texto ? (
           <button
             onClick={limpiar}
             title="Borrar"
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
           >
             <X className="h-4 w-4" />
           </button>

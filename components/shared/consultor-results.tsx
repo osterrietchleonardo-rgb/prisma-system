@@ -205,7 +205,7 @@ export function UnifiedPropertyCard({ property }: { property: UnifiedProperty })
         {property.source === 'roomix' && property.amenities && property.amenities.length > 0 && (
           <div className="px-4 pb-3 flex flex-wrap gap-1.5 shrink-0">
             {property.amenities.slice(0, 3).map((a) => (
-              <span key={a} className="inline-flex items-center text-[9px] bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full font-semibold">
+              <span key={a} className="inline-flex items-center text-[9px] bg-blue-500/10 text-blue-800 dark:text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-full font-semibold">
                 {a}
               </span>
             ))}
@@ -234,7 +234,7 @@ export function UnifiedPropertyCard({ property }: { property: UnifiedProperty })
               <a
                 href={`tel:${cardTelefono.replace(/[^\d+]/g, '')}`}
                 onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full border border-blue-500/30 text-blue-800 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
               >
                 {cardTelefono}
               </a>
@@ -378,7 +378,7 @@ export function UnifiedPropertyDetail({
               <h3 className="font-bold text-sm uppercase tracking-wider text-muted-foreground mb-2">Comodidades</h3>
               <div className="flex flex-wrap gap-2">
                 {property.amenities.map((a) => (
-                  <span key={a} className="inline-flex items-center text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 px-3 py-1 rounded-full font-medium">
+                  <span key={a} className="inline-flex items-center text-xs bg-blue-500/10 text-blue-800 dark:text-blue-400 border border-blue-500/20 px-3 py-1 rounded-full font-medium">
                     ✓ {a}
                   </span>
                 ))}
@@ -407,7 +407,7 @@ export function UnifiedPropertyDetail({
                 {colegaTelefono && (
                   <a
                     href={`tel:${colegaTelefono.replace(/[^\d+]/g, '')}`}
-                    className="px-4 py-2 border border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 rounded-lg text-xs font-semibold transition-colors"
+                    className="px-4 py-2 border border-blue-500/30 text-blue-800 dark:text-blue-400 hover:bg-blue-500/10 rounded-lg text-xs font-semibold transition-colors"
                   >
                     Llamar {colegaTelefono}
                   </a>
@@ -563,7 +563,7 @@ function PropertySection({
         ))}
       </div>
       {properties.length > SCROLL_DESDE && (
-        <p className="text-center text-[10px] text-muted-foreground/60">
+        <p className="text-center text-[10px] text-muted-foreground">
           Deslizá dentro del recuadro para ver las {properties.length}
         </p>
       )}
@@ -608,7 +608,7 @@ export function ConsultorResultsSection({
 
       {/* Footer resumen */}
       <div className="text-center pt-4 pb-2 border-t">
-        <p className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-semibold">
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
           Mostrando {totalCount} propiedades de {
             [
               propias.length > 0 && 'cartera propia',

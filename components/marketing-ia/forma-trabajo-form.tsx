@@ -99,7 +99,7 @@ export function FormaTrabajoForm() {
 
   const avisoNumeros = (
     <div className="flex gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-      <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+      <AlertTriangle className="w-5 h-5 text-amber-700 dark:text-amber-500 shrink-0 mt-0.5" />
       <p className="text-sm text-muted-foreground">
         Estos números van a salir publicados en tus anuncios. <strong className="text-foreground">Cargá los reales.</strong>
       </p>

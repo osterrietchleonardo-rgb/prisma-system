@@ -268,13 +268,13 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
   }
 
   const getStatusBadge = (status: string, reason?: string | null) => {
-    if (status === 'APPROVED') return <Badge className="bg-green-500/10 text-green-600 border-green-500/20"><CheckCircle2 className="w-3 h-3 mr-1" />Aprobado</Badge>
+    if (status === 'APPROVED') return <Badge className="bg-green-500/10 text-green-800 dark:text-green-400 border-green-500/20"><CheckCircle2 className="w-3 h-3 mr-1" />Aprobado</Badge>
     if (status === 'REJECTED') {
       return (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Badge className="bg-red-500/10 text-red-600 border-red-500/20 cursor-help"><AlertCircle className="w-3 h-3 mr-1" />Rechazado</Badge>
+              <Badge className="bg-red-500/10 text-red-800 dark:text-red-400 border-red-500/20 cursor-help"><AlertCircle className="w-3 h-3 mr-1" />Rechazado</Badge>
             </TooltipTrigger>
             <TooltipContent>
               <p>{reason || 'Sin razón específica'}</p>
@@ -283,7 +283,7 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
         </TooltipProvider>
       )
     }
-    if (status === 'PENDING') return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20"><Clock className="w-3 h-3 mr-1" />Pendiente</Badge>
+    if (status === 'PENDING') return <Badge className="bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 border-yellow-500/20"><Clock className="w-3 h-3 mr-1" />Pendiente</Badge>
     return <Badge variant="outline">{status}</Badge>
   }
 
@@ -376,7 +376,7 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="templateBody" className="text-sm font-medium">Body <span className="text-red-500">*</span></label>
+                <label htmlFor="templateBody" className="text-sm font-medium">Body <span className="text-red-700 dark:text-red-500">*</span></label>
                 <Textarea 
                   id="templateBody"
                   rows={5} 
@@ -489,7 +489,7 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
               <Button 
                 onClick={handleSubmit} 
                 disabled={disableSubmit || loading} 
-                className="bg-accent hover:bg-accent/90 text-white"
+                className="bg-accent hover:bg-accent/90 text-accent-foreground"
               >
                 {loading ? "Enviando..." : "Enviar a Meta"}
               </Button>
@@ -546,7 +546,7 @@ export default function TemplatesTab({ instance }: TemplatesTabProps) {
             Sincronizar desde Meta
           </Button>
           <Button 
-            className="bg-accent hover:bg-accent/90 text-white" 
+            className="bg-accent hover:bg-accent/90 text-accent-foreground" 
             size="sm"
             onClick={() => {
               setFormData({ template_name: "", category: "MARKETING", language: "es_AR", header: "", body: "", footer: "", buttonType: "NONE", buttons: [] })

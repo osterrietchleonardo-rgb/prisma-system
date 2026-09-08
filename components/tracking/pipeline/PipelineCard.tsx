@@ -112,7 +112,7 @@ export function PipelineCardItem({ card, onOpen, onMoveTo, showAgent }: Props) {
       </div>
 
       {showAgent && card.agentName && (
-        <p className="text-[10px] font-medium text-accent/80 truncate">{card.agentName}</p>
+        <p className="text-[10px] font-medium text-accent truncate">{card.agentName}</p>
       )}
     </div>
   );

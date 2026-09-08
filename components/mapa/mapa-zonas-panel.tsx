@@ -92,7 +92,7 @@ export function MapaZonasPanel({
               borrar todos
             </button>
           </div>
-          <p className="px-1 pb-2 text-[10px] text-zinc-400">
+          <p className="px-1 pb-2 text-[10px] text-zinc-600 dark:text-zinc-400">
             Con varios trazos se muestran las de todos, sumadas.
           </p>
 
@@ -155,7 +155,7 @@ export function MapaZonasPanel({
 
       <ScrollArea className="flex-1">
         <div className="space-y-1 px-2 pb-2">
-          {cargando && <Loader2 className="mx-auto my-4 h-4 w-4 animate-spin text-zinc-400" />}
+          {cargando && <Loader2 className="mx-auto my-4 h-4 w-4 animate-spin text-zinc-600 dark:text-zinc-400" />}
 
           {!cargando && zonas.length === 0 && (
             <p className="px-1 py-3 text-[11px] leading-relaxed text-zinc-500">
@@ -180,7 +180,7 @@ export function MapaZonasPanel({
               </button>
               <button
                 onClick={() => borrar(z.id)}
-                className="rounded p-1 text-zinc-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                className="rounded p-1 text-zinc-600 dark:text-zinc-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
                 title="Borrar zona"
               >
                 <Trash2 className="h-3.5 w-3.5" />

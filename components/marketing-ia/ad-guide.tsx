@@ -15,11 +15,11 @@ const phases = [
     id: 1,
     icon: Target,
     color: "from-blue-500/20 to-blue-600/10",
-    badge: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    accentColor: "text-blue-400",
+    badge: "bg-blue-500/20 text-blue-800 dark:text-blue-400 border-blue-500/30",
+    accentColor: "text-blue-600 dark:text-blue-400",
     borderColor: "border-blue-500/40",
     budgetTag: "75% del presupuesto",
-    budgetColor: "bg-blue-500/20 text-blue-300",
+    budgetColor: "bg-blue-500/20 text-blue-800 dark:text-blue-300",
     title: "Preparando el Terreno",
     subtitle: "Tráfico Frío",
     description:
@@ -46,8 +46,8 @@ const phases = [
     id: 2,
     icon: Megaphone,
     color: "from-purple-500/20 to-purple-600/10",
-    badge: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-    accentColor: "text-purple-400",
+    badge: "bg-purple-500/20 text-purple-800 dark:text-purple-400 border-purple-500/30",
+    accentColor: "text-purple-600 dark:text-purple-400",
     borderColor: "border-purple-500/40",
     budgetTag: null,
     budgetColor: "",
@@ -75,8 +75,8 @@ const phases = [
     id: 3,
     icon: Filter,
     color: "from-amber-500/20 to-amber-600/10",
-    badge: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-    accentColor: "text-amber-400",
+    badge: "bg-amber-500/20 text-amber-800 dark:text-amber-400 border-amber-500/30",
+    accentColor: "text-amber-700 dark:text-amber-400",
     borderColor: "border-amber-500/40",
     budgetTag: null,
     budgetColor: "",
@@ -120,11 +120,11 @@ const phases = [
     id: 4,
     icon: RefreshCcw,
     color: "from-green-500/20 to-green-600/10",
-    badge: "bg-green-500/20 text-green-400 border-green-500/30",
-    accentColor: "text-green-400",
+    badge: "bg-green-500/20 text-green-800 dark:text-green-400 border-green-500/30",
+    accentColor: "text-green-700 dark:text-green-400",
     borderColor: "border-green-500/40",
     budgetTag: "25% del presupuesto",
-    budgetColor: "bg-green-500/20 text-green-300",
+    budgetColor: "bg-green-500/20 text-green-800 dark:text-green-300",
     title: "Retargeting",
     subtitle: "No pierdas a los interesados",
     description:
@@ -144,8 +144,8 @@ const phases = [
     id: 5,
     icon: BarChart2,
     color: "from-rose-500/20 to-rose-600/10",
-    badge: "bg-rose-500/20 text-rose-400 border-rose-500/30",
-    accentColor: "text-rose-400",
+    badge: "bg-rose-500/20 text-rose-800 dark:text-rose-400 border-rose-500/30",
+    accentColor: "text-rose-700 dark:text-rose-400",
     borderColor: "border-rose-500/40",
     budgetTag: null,
     budgetColor: "",
@@ -246,8 +246,8 @@ function PhaseCard({ phase, index }: { phase: (typeof phases)[0]; index: number 
           {/* Alert */}
           {"alert" in phase && phase.alert && (
             <div className="flex gap-3 rounded-xl bg-amber-500/10 border border-amber-500/20 p-3">
-              <phase.alert.icon className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-200">{phase.alert.text}</p>
+              <phase.alert.icon className="w-4 h-4 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700 dark:text-amber-200">{phase.alert.text}</p>
             </div>
           )}
 
@@ -257,13 +257,13 @@ function PhaseCard({ phase, index }: { phase: (typeof phases)[0]; index: number 
               {Object.entries(phase.dualQuestions).map(([key, section]) => (
                 <div key={key} className="rounded-xl bg-background/40 border border-white/5 p-4 space-y-2">
                   <div className="flex items-center gap-2">
-                    <section.icon className="w-4 h-4 text-amber-400" />
-                    <p className="text-xs font-semibold text-amber-300">{section.title}</p>
+                    <section.icon className="w-4 h-4 text-amber-700 dark:text-amber-400" />
+                    <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">{section.title}</p>
                   </div>
                   <ul className="space-y-1.5">
                     {section.questions.map((q, qi) => (
                       <li key={qi} className="text-xs text-foreground/70 leading-relaxed flex gap-2">
-                        <span className="text-amber-400 font-bold shrink-0">·</span>
+                        <span className="text-amber-700 dark:text-amber-400 font-bold shrink-0">·</span>
                         {q}
                       </li>
                     ))}
@@ -276,7 +276,7 @@ function PhaseCard({ phase, index }: { phase: (typeof phases)[0]; index: number 
           {/* Extra note (Fase 3) */}
           {"extraNote" in phase && phase.extraNote && (
             <div className="flex gap-2 text-xs text-foreground/70 bg-background/30 rounded-lg p-3 border border-white/5">
-              <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+              <Lightbulb className="w-3.5 h-3.5 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
               <span>{renderMarkdown(phase.extraNote)}</span>
             </div>
           )}
@@ -297,8 +297,8 @@ export function AdGuide() {
         <div className="absolute inset-0 bg-gradient-to-r from-orange-600/5 to-transparent pointer-events-none" />
         <div className="relative">
           <div className="flex items-center gap-2 mb-3">
-            <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
-            <span className="text-xs font-bold text-amber-400 uppercase tracking-widest">Guía Maestra 2026</span>
+            <Star className="w-5 h-5 text-amber-700 dark:text-amber-400 fill-amber-400" />
+            <span className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest">Guía Maestra 2026</span>
           </div>
           <h2 className="text-2xl md:text-3xl font-black text-foreground leading-tight mb-2">
             Captación de Leads{" "}
@@ -342,16 +342,16 @@ export function AdGuide() {
       <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-orange-500/5 p-6">
         <div className="flex gap-3">
           <div className="w-9 h-9 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
-            <Lightbulb className="w-5 h-5 text-amber-400 fill-amber-400/20" />
+            <Lightbulb className="w-5 h-5 text-amber-700 dark:text-amber-400 fill-amber-400/20" />
           </div>
           <div>
-            <p className="text-sm font-bold text-amber-300 mb-1">Consejo Final</p>
+            <p className="text-sm font-bold text-amber-700 dark:text-amber-300 mb-1">Consejo Final</p>
             <p className="text-sm text-foreground/80 leading-relaxed">
               No busques <strong className="text-foreground">volumen</strong>. Buscá <strong className="text-foreground">calidad</strong>.{" "}
               Es preferible cerrar con 5 personas calificadas por día que
               tener 50 que no saben por qué dejaron sus datos. La IA de Meta en 2026 es una fiera
               buscando gente —pero <em>vos</em> tenés que decirle exactamente qué tipo de{" "}
-              <span className="text-amber-300">&quot;fiera&quot;</span> querés en tu inmobiliaria.
+              <span className="text-amber-700 dark:text-amber-300">&quot;fiera&quot;</span> querés en tu inmobiliaria.
             </p>
           </div>
         </div>

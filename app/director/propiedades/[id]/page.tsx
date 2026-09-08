@@ -393,7 +393,7 @@ export default function PropertyDetailPage() {
                   <div className="flex items-center gap-3 p-3 rounded-xl bg-background/40 border border-accent/5 transition-all hover:border-accent/20">
                     <Avatar className="h-12 w-12 border-2 border-accent/10">
                       <AvatarImage src={property.assigned_agent.avatar_url} />
-                      <AvatarFallback className="bg-accent text-white font-bold">
+                      <AvatarFallback className="bg-accent text-accent-foreground font-bold">
                         {property.assigned_agent.name?.substring(0,2)}
                       </AvatarFallback>
                     </Avatar>

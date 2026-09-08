@@ -142,7 +142,7 @@ export function BarrioCombobox({
               )}
             >
               <span className="flex items-center gap-2 min-w-0">
-                <MapPin className="w-3.5 h-3.5 shrink-0 text-accent/70" />
+                <MapPin className="w-3.5 h-3.5 shrink-0 text-accent" />
                 <span className="truncate">{o.nombre}</span>
               </span>
               <span className="text-[11px] shrink-0 text-muted-foreground">

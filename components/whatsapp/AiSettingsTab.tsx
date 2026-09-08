@@ -406,7 +406,7 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
                 </div>
                 <div className="bg-accent/5 rounded-xl p-4 border border-accent/10">
                   {agencySetting.knowledge_text ? (
-                    <div className="flex items-center gap-2 text-green-500 font-medium text-sm">
+                    <div className="flex items-center gap-2 text-green-700 dark:text-green-500 font-medium text-sm">
                       <CheckCircle2 className="w-4 h-4" /> 
                       <span>Cargado (RAG Activo)</span>
                     </div>
@@ -425,9 +425,9 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
 
             <div className="mt-10 pt-8 border-t border-accent/5">
               <div className="flex items-start gap-4 p-4 bg-blue-500/5 rounded-2xl border border-blue-500/10 max-w-2xl">
-                <Info className="w-6 h-6 text-blue-400 shrink-0 mt-1" />
+                <Info className="w-6 h-6 text-blue-600 dark:text-blue-400 shrink-0 mt-1" />
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-blue-200">Consistencia de Marca Garantizada</p>
+                  <p className="text-sm font-medium text-blue-600 dark:text-blue-200">Consistencia de Marca Garantizada</p>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Esta configuración se aplica automáticamente a todos los asesores (Tokko y PRISMA). No es necesario configurar uno por uno. 
                     Cualquier cambio realizado aquí se reflejará instantáneamente en todas las conversaciones de WhatsApp.
@@ -535,7 +535,7 @@ export default function AiSettingsTab({ instance }: AiSettingsTabProps) {
                       <>
                         <div className="flex flex-col items-center gap-2">
                           {selectedSetting.knowledge_text ? (
-                            <div className="flex items-center gap-2 text-green-500 font-medium text-sm">
+                            <div className="flex items-center gap-2 text-green-700 dark:text-green-500 font-medium text-sm">
                               <CheckCircle2 className="w-4 h-4" /> Conocimiento cargado
                             </div>
                           ) : (

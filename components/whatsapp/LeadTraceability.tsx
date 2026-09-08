@@ -213,7 +213,7 @@ export default function LeadTraceability({ conversation, messages, onDeleteChat 
               onClick={handleCopyPhone}
               className="text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors bg-muted/50 px-2 py-1 rounded"
             >
-              {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+              {copied ? <Check className="w-3 h-3 text-green-700 dark:text-green-500" /> : <Copy className="w-3 h-3" />}
               {copied ? "¡Copiado!" : "Copiar"}
             </button>
           </div>

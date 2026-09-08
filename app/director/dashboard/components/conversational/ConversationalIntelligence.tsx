@@ -58,7 +58,7 @@ function EmptyState() {
 function ErrorState({ message }: { message?: string }) {
   return (
     <div className="flex flex-col items-center justify-center p-10 bg-rose-500/5 border border-rose-500/20 rounded-2xl min-h-[180px] text-center">
-      <AlertCircle className="h-10 w-10 text-rose-400 mb-3" />
+      <AlertCircle className="h-10 w-10 text-rose-700 dark:text-rose-400 mb-3" />
       <h3 className="text-base font-bold mb-1">Error en el análisis</h3>
       <p className="text-sm text-muted-foreground max-w-md">
         {message || "Ocurrió un error al procesar las conversaciones. Intentá nuevamente."}

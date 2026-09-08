@@ -75,7 +75,7 @@ export function DataQualityTab({ leads }: DataQualityTabProps) {
               </div>
               <div className="flex-1 space-y-4">
                  <div className="flex items-center gap-3">
-                    {avgScore > 80 ? <CheckCircle2 className="h-5 w-5 text-emerald-500" /> : <ShieldAlert className="h-5 w-5 text-yellow-500" />}
+                    {avgScore > 80 ? <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-500" /> : <ShieldAlert className="h-5 w-5 text-yellow-700 dark:text-yellow-500" />}
                     <h3 className="text-xl font-black">Salud del Dataset</h3>
                  </div>
                  <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
@@ -83,7 +83,7 @@ export function DataQualityTab({ leads }: DataQualityTabProps) {
                  </p>
                  <div className="flex flex-wrap gap-4">
                     <QualityIndicator label="Total registros" value={total.toString()} />
-                    <QualityIndicator label="Grado de integridad" value={avgScore > 75 ? "Óptimo" : "Mejorable"} color={avgScore > 75 ? "text-emerald-500" : "text-yellow-500"} />
+                    <QualityIndicator label="Grado de integridad" value={avgScore > 75 ? "Óptimo" : "Mejorable"} color={avgScore > 75 ? "text-emerald-700 dark:text-emerald-500" : "text-yellow-700 dark:text-yellow-500"} />
                  </div>
               </div>
            </div>
@@ -125,7 +125,7 @@ export function DataQualityTab({ leads }: DataQualityTabProps) {
                    <div className="flex items-center justify-between text-xs">
                       <span className="font-bold">{ag.name}</span>
                       <span className={cn("font-bold px-2 py-0.5 rounded-full text-[10px]", 
-                        ag.avg > 80 ? "bg-emerald-500/10 text-emerald-500" : "bg-yellow-500/10 text-yellow-500")}>
+                        ag.avg > 80 ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-500" : "bg-yellow-500/10 text-yellow-800 dark:text-yellow-500")}>
                         {ag.avg}%
                       </span>
                    </div>
@@ -137,7 +137,7 @@ export function DataQualityTab({ leads }: DataQualityTabProps) {
       </div>
 
       <div className="p-4 rounded-xl border border-blue-500/10 bg-blue-500/5 flex items-start gap-4">
-         <Info className="h-5 w-5 text-blue-500 mt-0.5" />
+         <Info className="h-5 w-5 text-blue-700 dark:text-blue-500 mt-0.5" />
          <div className="space-y-1">
             <h4 className="text-sm font-bold">Nota sobre 'Sin nombre'</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">

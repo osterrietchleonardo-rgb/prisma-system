@@ -43,7 +43,7 @@ export function AiCreditBadge({ className, showLabel = true }: AiCreditBadgeProp
           )}>
             <Sparkles className={cn(
               "w-4 h-4 transition-colors",
-              isDanger ? "text-destructive" : isWarning ? "text-yellow-500" : "text-accent"
+              isDanger ? "text-destructive" : isWarning ? "text-yellow-700 dark:text-yellow-500" : "text-accent"
             )} />
             {showLabel && (
               <span suppressHydrationWarning className="text-xs font-bold text-foreground">
@@ -59,7 +59,7 @@ export function AiCreditBadge({ className, showLabel = true }: AiCreditBadgeProp
               <span className="text-sm font-semibold">Mis Créditos IA</span>
               <span className={cn(
                 "text-xs font-bold",
-                isDanger ? "text-destructive" : isWarning ? "text-yellow-500" : "text-accent"
+                isDanger ? "text-destructive" : isWarning ? "text-yellow-700 dark:text-yellow-500" : "text-accent"
               )}>
                 {credits.porcentaje}% usado
               </span>
@@ -84,13 +84,13 @@ export function AiCreditBadge({ className, showLabel = true }: AiCreditBadgeProp
               </div>
               <div className="rounded-lg bg-yellow-500/10 p-2">
                 <div className="text-xs text-muted-foreground">Usados</div>
-                <div suppressHydrationWarning className={`text-sm font-bold ${isWarning ? "text-yellow-400" : ""}`}>
+                <div suppressHydrationWarning className={`text-sm font-bold ${isWarning ? "text-yellow-700 dark:text-yellow-400" : ""}`}>
                   {credits.consumidoMes.toLocaleString()}
                 </div>
               </div>
               <div className="rounded-lg bg-emerald-500/10 p-2">
                 <div className="text-xs text-muted-foreground">Quedan</div>
-                <div suppressHydrationWarning className="text-sm font-bold text-emerald-400">{credits.disponible.toLocaleString()}</div>
+                <div suppressHydrationWarning className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{credits.disponible.toLocaleString()}</div>
               </div>
             </div>
 
@@ -107,7 +107,7 @@ export function AiCreditBadge({ className, showLabel = true }: AiCreditBadgeProp
               </div>
             )}
 
-            <p className="text-[10px] text-muted-foreground/70 text-center border-t border-accent/10 pt-2 italic">
+            <p className="text-[10px] text-muted-foreground text-center border-t border-accent/10 pt-2 italic">
               Cuota personal · {credits.mesActual} · se renueva el 1°
             </p>
           </div>
