@@ -223,6 +223,17 @@ no → con su OK, en la misma tanda: párrafo en el email de todos los niveles y
 final de `{{2}}` del WhatsApp de 2/5 h (garantizada: se recorta el contexto, no la indicación);
 en 10/20 h no entra por la forma de la plantilla aprobada. 212 tests. Sigue todo lo pendiente del 4/9.
 
+**Tercera tanda: el panel de derivaciones de Kevin (180/170).** No hay estado que limpiar: el
+panel recalcula desde los mensajes. La IA leyó los 156 historiales "sin atender" (solo lectura):
+146 deuda real del asesor, 10 ruido (2 cerró, 2 no contestó al bot, 6 audios); 126 anteriores al
+31/8. Leonardo: no pasarlos a perdido, es decisión de Kevin. El defecto real: el filtro muestra
+"Últimos 30 días" pero sin período en la URL las páginas pasaban `from/to` vacíos y todo se
+contaba desde julio. Rama `fix/dashboard-periodo-por-defecto`: `lib/dashboard/periodo.ts` +
+las dos páginas del dashboard (director y asesor). Verificado en local con PRISMAIA (sin período
+= 30 explícitos) y proyectado en SQL para Central: 91 sin atender / 84 críticos (antes 156 / 147).
+TECNICO §22.10. Ojo: el navegador de chrome-devtools estaba tomado por otra terminal → playwright-cli
+(sesión `-s=dash`, login con `fill` + click en "Ingresar"; los refs vienen con prefijo `f1`).
+
 ## 2026-09-04 — sesión Super Agente: las notas internas hablan con Sofía (queja de Eric)
 
 **Qué pasó.** Queja en el admin (`system_feedback` dee8cc57, Eric Zambrana, Central, 3/9 22:00 AR):

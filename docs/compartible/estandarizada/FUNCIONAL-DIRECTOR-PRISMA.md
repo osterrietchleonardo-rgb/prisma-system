@@ -716,6 +716,44 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 > 💡 **Tip:** la ficha toma los **colores, el logo y el aviso legal** que definís en **Marketing IA → Identidad Visual**. Si el logo o el aviso legal no están cargados, simplemente no aparecen (y si no hay colores, usa un diseño elegante por defecto). Configurarlos una vez mejora todas las fichas que creen tus asesores.
 > 💰 Crear la ficha **no consume créditos**.
 
+### Configuración: lo que tu inmobiliaria le cuenta al propietario
+
+Tercera solapa del ACM, **Configuración**. **Solo la ves vos**: tus asesores no la tienen.
+
+**Para qué es.** La ficha explica muy bien **cuánto vale** la propiedad, pero no dice **quién** se lo está diciendo al propietario ni **qué va a pasar después**. Acá cargás eso, una sola vez, y sale dentro de **todas** las fichas que genere tu equipo, con tus colores y tu logo.
+
+**Es opcional. Si no cargás nada, el ACM sale exactamente como sale hoy.**
+
+**Las cuatro secciones, y dónde aparece cada una:**
+
+| Sección | Qué poner | Dónde sale |
+|---|---|---|
+| **Quiénes somos** | La carpeta de presentación, el "quiénes somos" de tu web, o el brochure de la primera reunión | Hoja 2, **antes** del precio |
+| **Cómo comercializamos su propiedad** | Tu plan de marketing: en qué portales publicás, cómo trabajás con otras inmobiliarias, cada cuánto le informás | Al final, después de las conclusiones |
+| **Cómo preparar su propiedad** | La guía para las muestras: orden, luz, limpieza, qué hacer el día de la visita | Última hoja |
+| **El rol de cada uno en la venta** | Quién define qué: el precio de oferta, el estado de la propiedad, el plan de marketing, el precio final | Al lado del gráfico del precio |
+
+**Cómo se carga, en criollo:**
+
+1. **Subís los PDF o Word que ya usás** con tus propietarios. Podés subir varios juntos (hasta 50 MB cada uno).
+2. Tocás **"Volver a leer con IA"**. PRISMA lee el texto y **propone** un texto para cada una de las cuatro secciones.
+3. **Vos decidís sección por sección.** Cada propuesta aparece al lado de lo que ya tenías, con **"Usar este"** y **"Descartar"**. Nada se guarda solo.
+4. Corregís lo que quieras a mano y tocás **Guardar**.
+
+> ✍️ **Podés escribirlas a mano y no subir ningún archivo.** Y si escribís algo desprolijo, el botón **"Acomodar con IA"** de cada sección lo ordena **sin agregarle nada** que vos no hayas escrito. También te muestra el resultado para aceptar o descartar.
+
+> 🔁 **Cambiar de opinión no cuesta nada.** Los archivos quedan en una lista con su fecha; podés **Reemplazar** o **Quitar** cualquiera cuando quieras. Y acá está la parte importante: si reemplazás un archivo y volvés a leer, **lo que ya corregiste a mano no se pisa** — aceptás solo las secciones que quieras. Quitar un archivo **tampoco borra** el texto que ya habías aceptado.
+
+> 📄 **Se copia solo el texto.** Los gráficos, las fotos y los logos de tus archivos **no pasan** a la ficha: PRISMA la dibuja con tus colores y tu logo para que todo el documento se vea igual. Si esperabas ver tus gráficos, no es un error.
+
+> ⚠️ **La IA no inventa.** Si tu material no dice nada sobre una sección, la deja **vacía** y te avisa, en vez de escribir algo que suene bien pero no sea tuyo. Igual **leelo antes de guardar**: lo que quede ahí se lo va a mandar tu equipo a los propietarios, y son promesas de servicio que después hay que cumplir.
+
+> 🎨 Arriba de todo ves **los colores, el logo y el aviso legal** con los que va a salir la ficha. Eso **no se edita acá**: se cambia en **Marketing IA → Configuración**, y hay un enlace directo.
+
+> 📌 Las fichas **ya enviadas no cambian**. Si mañana editás este material, las que tu equipo mandó antes siguen igual que el día que se enviaron.
+
+> 💰 Consume créditos **cada vez que tocás "Volver a leer con IA" o "Acomodar con IA"** (nunca por ACM generado). Como los dos botones los apretás vos, el gasto lo decidís vos.
+
 ---
 
 ## 17. Calendario (visitas)
