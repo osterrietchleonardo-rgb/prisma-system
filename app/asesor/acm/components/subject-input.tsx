@@ -330,17 +330,29 @@ export function SubjectInput({
       <div className="rounded-2xl border border-accent/10 bg-card/20 overflow-hidden">
         <p className="px-4 pt-4 text-[10px] font-bold uppercase tracking-widest text-accent">Dónde buscar</p>
 
-        {/* Opción 1 · el barrio de la propiedad */}
-        <label className="flex items-start gap-3 p-4 cursor-pointer">
+        {/* Opción 1 · el barrio de la propiedad.
+            El redondel va oculto a la vista pero presente para el teclado y el lector de
+            pantalla: lo que se ve es la fila resaltada, igual que el selector de modo de arriba.
+            Un redondel visible acá no servía — con el --radius del proyecto (0.75rem) la casilla
+            de tildar queda en 8px sobre 16px, o sea un círculo idéntico, y no se distinguía
+            "elegí uno" de "tildá si querés". */}
+        <label
+          className={cn(
+            "flex items-start gap-3 p-4 m-2 rounded-xl border cursor-pointer transition-all",
+            modoZona === "barrio" ? "border-accent bg-accent/10" : "border-transparent hover:border-accent/30"
+          )}
+        >
           <input
             type="radio"
             name="acm-donde-buscar"
             checked={modoZona === "barrio"}
             onChange={() => { onModoZonaChange("barrio"); onZonasElegidasChange([]); }}
-            className="mt-1 h-4 w-4 accent-[hsl(var(--accent))] shrink-0"
+            className="sr-only"
           />
           <span className="text-sm">
-            <span className="font-bold">En el barrio de la propiedad</span>
+            <span className={cn("font-bold", modoZona === "barrio" && "text-accent")}>
+              En el barrio de la propiedad
+            </span>
             <span className="block text-xs text-muted-foreground mt-0.5">
               Se comparan propiedades del mismo barrio y sus sub-barrios.
             </span>
@@ -350,7 +362,7 @@ export function SubjectInput({
         {/* El switch de linderos pertenece al modo barrio: en el modo zonas no significa nada. */}
         <label
           className={cn(
-            "flex items-start gap-3 px-4 pb-4 pl-11",
+            "flex items-start gap-3 px-6 pb-4 pl-8",
             modoZona === "zonas" ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
           )}
         >
@@ -371,11 +383,15 @@ export function SubjectInput({
         </label>
 
         {/* Opción 2 · las zonas dibujadas en el mapa */}
-        <div className="border-t border-accent/10">
+        <div>
           <label
             className={cn(
-              "flex items-start gap-3 p-4",
-              sinZonasGuardadas ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+              "flex items-start gap-3 p-4 m-2 rounded-xl border transition-all",
+              sinZonasGuardadas
+                ? "border-transparent opacity-50 cursor-not-allowed"
+                : modoZona === "zonas"
+                  ? "border-accent bg-accent/10 cursor-pointer"
+                  : "border-transparent hover:border-accent/30 cursor-pointer"
             )}
           >
             <input
@@ -384,10 +400,12 @@ export function SubjectInput({
               checked={modoZona === "zonas"}
               disabled={sinZonasGuardadas}
               onChange={() => onModoZonaChange("zonas")}
-              className="mt-1 h-4 w-4 accent-[hsl(var(--accent))] shrink-0"
+              className="sr-only"
             />
             <span className="text-sm">
-              <span className="font-bold">Solo dentro de mis zonas del mapa</span>
+              <span className={cn("font-bold", modoZona === "zonas" && "text-accent")}>
+                Solo dentro de mis zonas del mapa
+              </span>
               <span className="block text-xs text-muted-foreground mt-0.5">
                 {sinZonasGuardadas
                   ? "Todavía no dibujaste ninguna. Se crean en el Buscador IA, en la solapa Mapa: dibujás el área y la guardás con un nombre."
@@ -397,7 +415,7 @@ export function SubjectInput({
           </label>
 
           {modoZona === "zonas" && zonas.length > 0 && (
-            <div className="px-4 pb-4 pl-11 flex flex-col gap-2">
+            <div className="px-6 pb-4 pl-8 flex flex-col gap-2">
               {zonas.map((z) => (
                 <label key={z.id} className="flex items-center gap-2.5 cursor-pointer">
                   <Checkbox
