@@ -30,10 +30,10 @@ interface Decision {
 
 const ETIQUETA: Record<string, string> = { contactar: "Contactar", posponer: "Posponer", abandonar: "Abandonar", escalar: "Escalar" }
 const COLOR: Record<string, string> = {
-  contactar: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-  posponer: "bg-sky-500/15 text-sky-600 dark:text-sky-400",
+  contactar: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-400",
+  posponer: "bg-sky-500/15 text-sky-800 dark:text-sky-400",
   abandonar: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400",
-  escalar: "bg-red-500/15 text-red-600 dark:text-red-400",
+  escalar: "bg-red-500/15 text-red-800 dark:text-red-400",
 }
 
 function fechaCorta(iso: string): string {
@@ -104,7 +104,7 @@ export default function SeguimientoPanel({ conversationId }: { conversationId: s
                 <p className="text-xs text-muted-foreground"><span className="font-medium">El dato:</span> {d.decision_cruda.evidencia}</p>
               )}
               {miro && <p className="text-xs text-muted-foreground"><span className="font-medium">Miró:</span> {miro}</p>}
-              {res && <p className="text-[11px] text-muted-foreground/80">{res}</p>}
+              {res && <p className="text-[11px] text-muted-foreground">{res}</p>}
             </div>
           )
         })}

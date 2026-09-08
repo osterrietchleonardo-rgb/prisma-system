@@ -38,7 +38,7 @@ export default function MarketingIAPage() {
           <div className="flex flex-col gap-2">
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
               <Bot className="w-8 h-8 text-accent" />
-              Marketing IA <span className="text-muted-foreground/50 text-xl font-medium">Asesor</span>
+              Marketing IA <span className="text-muted-foreground text-xl font-medium">Asesor</span>
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl">
               Potencia tu marca personal. Genera copies de impacto y piezas visuales pro vinculadas a tus propiedades en Tokko.

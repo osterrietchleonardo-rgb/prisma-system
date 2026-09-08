@@ -151,7 +151,7 @@ export function ChatInterface({
                           {/* Mock timestamp */}
                           <div className={cn(
                              "text-[10px] mt-1 text-right opacity-50 select-none",
-                             message.role === "user" ? "text-accent/70 dark:text-accent-foreground/50" : "text-zinc-500"
+                             message.role === "user" ? "text-accent dark:text-accent-foreground/50" : "text-zinc-500"
                           )}>
                              {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>

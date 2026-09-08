@@ -388,7 +388,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
         <span className="text-[11px] uppercase tracking-widest text-muted-foreground font-semibold">o envío manual puntual</span>
         <div className="h-px flex-1 bg-border" />
       </div>
-      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-[12px] text-amber-700 dark:text-amber-400 flex items-start gap-2">
+      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-[12px] text-amber-800 dark:text-amber-400 flex items-start gap-2">
         <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
         <span>
           <b>Solo para grupos chicos o envíos individuales puntuales</b> (se procesa desde el navegador: tenés que dejar la pestaña abierta).
@@ -415,12 +415,12 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                  </div>
 
                  {parsedData.length > 0 ? (
-                   <div className="flex items-center gap-2 text-sm text-green-600 bg-green-500/10 p-3 rounded-md mt-2">
+                   <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-400 bg-green-500/10 p-3 rounded-md mt-2">
                      <CheckCircle2 className="w-4 h-4" />
                      {parsedData.length} contactos cargados listos para enviar.
                    </div>
                  ) : (
-                   <div className="flex items-center gap-2 text-sm text-yellow-600 bg-yellow-500/10 p-3 rounded-md mt-2">
+                   <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-400 bg-yellow-500/10 p-3 rounded-md mt-2">
                      <AlertCircle className="w-4 h-4" />
                      Ve a la pestaña Contactos y selecciona a quienes deseas enviar.
                    </div>
@@ -575,7 +575,7 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                           <span className="font-bold">{preflightStats.toSend}</span>
                         </div>
                         {preflightStats.toSkip > 0 && (
-                          <div className="flex items-center justify-between text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 p-2 rounded -mx-2 px-2">
+                          <div className="flex items-center justify-between text-yellow-800 dark:text-yellow-400 bg-yellow-500/10 p-2 rounded -mx-2 px-2">
                             <span className="flex items-center gap-2"><AlertCircle className="w-4 h-4"/> Se saltearán (ya enviados):</span>
                             <span className="font-bold">{preflightStats.toSkip}</span>
                           </div>
@@ -638,17 +638,17 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                     
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 flex flex-col items-center">
-                        <CheckCircle2 className="w-6 h-6 text-green-500 mb-1" />
+                        <CheckCircle2 className="w-6 h-6 text-green-700 dark:text-green-500 mb-1" />
                         <span className="text-xl font-bold text-green-700 dark:text-green-400">{results.success}</span>
                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Enviados</span>
                       </div>
                       <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 flex flex-col items-center">
-                        <Info className="w-6 h-6 text-yellow-500 mb-1" />
+                        <Info className="w-6 h-6 text-yellow-700 dark:text-yellow-500 mb-1" />
                         <span className="text-xl font-bold text-yellow-700 dark:text-yellow-400">{results.skipped}</span>
                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Salteados</span>
                       </div>
                       <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex flex-col items-center">
-                        <AlertCircle className="w-6 h-6 text-red-500 mb-1" />
+                        <AlertCircle className="w-6 h-6 text-red-700 dark:text-red-500 mb-1" />
                         <span className="text-xl font-bold text-red-700 dark:text-red-400">{results.error}</span>
                         <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">Errores</span>
                       </div>
@@ -760,8 +760,8 @@ export default function CampaignsTab({ instance }: CampaignsTabProps) {
                                   safeStatus === "error" ? "destructive" : "outline"
                                }
                                className={
-                                  safeStatus === "enviado" ? "bg-green-500 hover:bg-green-600 text-white" : 
-                                  safeStatus === "salteado" ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30" : ""
+                                  safeStatus === "enviado" ? "bg-green-700 hover:bg-green-800 text-white" : 
+                                  safeStatus === "salteado" ? "bg-yellow-500/20 text-yellow-800 dark:text-yellow-400 border-yellow-500/30" : ""
                                 }
                              >
                                {safeStatus === "salteado" ? "SALTEADO" : safeStatus.toUpperCase()}

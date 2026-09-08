@@ -155,19 +155,19 @@ export function RefreshButton({ lastUpdated }: RefreshButtonProps) {
       className: "bg-accent/70 text-accent-foreground cursor-not-allowed",
     },
     success: {
-      icon: <Check className="w-4 h-4 text-emerald-400" />,
+      icon: <Check className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />,
       label: "Actualizado",
-      className: "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30",
+      className: "bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border border-emerald-500/30",
     },
     partial: {
-      icon: <AlertTriangle className="w-4 h-4 text-amber-400" />,
+      icon: <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400" />,
       label: "Actualizado (parcial)",
-      className: "bg-amber-500/20 text-amber-400 border border-amber-500/30",
+      className: "bg-amber-500/20 text-amber-800 dark:text-amber-400 border border-amber-500/30",
     },
     error: {
-      icon: <X className="w-4 h-4 text-red-400" />,
+      icon: <X className="w-4 h-4 text-red-600 dark:text-red-400" />,
       label: "Error al actualizar",
-      className: "bg-red-500/20 text-red-400 border border-red-500/30",
+      className: "bg-red-500/20 text-red-800 dark:text-red-400 border border-red-500/30",
     },
   }
 
@@ -187,7 +187,7 @@ export function RefreshButton({ lastUpdated }: RefreshButtonProps) {
 
       <span
         className={`text-[10px] leading-tight text-right max-w-[280px] ${
-          state === "error" ? "text-red-400/80" : "text-muted-foreground/70"
+          state === "error" ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
         }`}
       >
         {detail && state !== "idle"

@@ -338,9 +338,9 @@ export function CopyGeneratorFlow() {
           <Sparkles className="mr-2 h-6 w-6" />
           {copyType === 'video' ? 'Generar 3 guiones para cámara' : 'Generar 3 Variantes Automáticamente'}
         </Button>
-        <p className="text-[10px] text-muted-foreground/50 text-center flex items-center justify-center gap-1">
+        <p className="text-[10px] text-muted-foreground text-center flex items-center justify-center gap-1">
           <Sparkles className="w-3 h-3" />
-          Cada generación consume <span className="font-semibold text-muted-foreground/70">1 crédito IA</span>
+          Cada generación consume <span className="font-semibold text-muted-foreground">1 crédito IA</span>
         </p>
       </CardFooter>
     </Card>

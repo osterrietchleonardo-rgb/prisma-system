@@ -126,7 +126,7 @@ export function DirectorHeader({ userName, userEmail, agencyName, agencyId, user
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-accent/5 border border-accent/10 hover:bg-accent/10 transition-colors cursor-default select-none">
-                    <Sparkles className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isCreditsDanger ? 'text-destructive' : isCreditsWarning ? 'text-yellow-500' : 'text-accent'}`} />
+                    <Sparkles className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isCreditsDanger ? 'text-destructive' : isCreditsWarning ? 'text-yellow-700 dark:text-yellow-500' : 'text-accent'}`} />
                     <span suppressHydrationWarning className="text-[10px] sm:text-xs font-semibold text-muted-foreground">
                       {remainingCredits.toLocaleString()} <span className="hidden sm:inline">créditos</span>
                     </span>
@@ -143,7 +143,7 @@ export function DirectorHeader({ userName, userEmail, agencyName, agencyId, user
                       <span suppressHydrationWarning>{aiCredits.consumed.toLocaleString()} usados</span>
                       <span suppressHydrationWarning>{aiCredits.allocated.toLocaleString()} total</span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground/70 mt-2 text-center border-t border-accent/10 pt-2">
+                    <p className="text-[10px] text-muted-foreground mt-2 text-center border-t border-accent/10 pt-2">
                       Renovación automática el día 1 de cada mes
                     </p>
                   </div>

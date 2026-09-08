@@ -66,7 +66,7 @@ export function MetaTokenManager() {
             </span>
           ) : status?.valid ? (
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 gap-1">
+              <Badge className="bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 border-emerald-500/20 gap-1">
                 <CheckCircle2 className="h-3.5 w-3.5" /> Token válido y activo
               </Badge>
               {status.phone_display && (

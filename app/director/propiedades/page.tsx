@@ -241,11 +241,11 @@ export default function PropiedadesPage() {
 
         <Tabs value={view} onValueChange={setView} className="w-full md:w-auto">
           <TabsList className="grid grid-cols-2 bg-card/50 border border-accent/10 w-full h-9">
-            <TabsTrigger value="grid" className="data-[state=active]:bg-accent data-[state=active]:text-white text-xs py-1">
+            <TabsTrigger value="grid" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground text-xs py-1">
               <LayoutGrid className="h-3.5 w-3.5 mr-1.5" />
               Grid
             </TabsTrigger>
-            <TabsTrigger value="list" className="data-[state=active]:bg-accent data-[state=active]:text-white text-xs py-1">
+            <TabsTrigger value="list" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground text-xs py-1">
               <List className="h-3.5 w-3.5 mr-1.5" />
               Lista
             </TabsTrigger>
@@ -282,7 +282,7 @@ export default function PropiedadesPage() {
                         className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-110"
                       />
                       <div className="absolute top-2 right-2 flex gap-1">
-                        <Badge className="bg-black/60 backdrop-blur-md text-[10px] border-none">
+                        <Badge className="bg-black/60 backdrop-blur-md text-white text-[10px] border-none">
                           {translateStatus(prop.status)}
                         </Badge>
                         <Badge className="bg-accent text-[10px] border-none">
@@ -326,7 +326,7 @@ export default function PropiedadesPage() {
                           </Badge>
                         </div>
                       ) : (
-                        <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 text-amber-500" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                        <Button variant="ghost" size="sm" className="h-7 text-[10px] gap-1 text-amber-700 dark:text-amber-500" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
                           <UserPlus className="h-3 w-3" />
                           Asignar asesor
                         </Button>

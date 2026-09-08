@@ -248,7 +248,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
                 key={p}
                 size="sm"
                 variant={preset === p ? "default" : "outline"}
-                className={`text-xs h-7 ${preset === p ? "bg-accent text-white" : "border-accent/20 text-muted-foreground"}`}
+                className={`text-xs h-7 ${preset === p ? "bg-accent text-accent-foreground" : "border-accent/20 text-muted-foreground"}`}
                 onClick={() => setPreset(p)}
               >
                 {label}
@@ -289,7 +289,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
           <Card className="border-accent/10 bg-card/30 backdrop-blur-md">
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Consumo del Período</CardTitle></CardHeader>
             <CardContent>
-              <div className={`text-3xl font-bold ${isDanger ? "text-destructive" : isWarning ? "text-yellow-500" : ""}`}>
+              <div className={`text-3xl font-bold ${isDanger ? "text-destructive" : isWarning ? "text-yellow-700 dark:text-yellow-500" : ""}`}>
                 {percentage.toFixed(1)}%
               </div>
               <Progress value={percentage} className="h-2 mt-3" />
@@ -298,10 +298,10 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
           </Card>
 
           <Card className="border-accent/10 bg-card/30 backdrop-blur-md relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><DollarSign className="w-24 h-24 text-emerald-500" /></div>
+            <div className="absolute top-0 right-0 p-4 opacity-10"><DollarSign className="w-24 h-24 text-emerald-700 dark:text-emerald-500" /></div>
             <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-muted-foreground">Consumo Real (USD)</CardTitle></CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-emerald-500">{fmtUsd(totalUsd)}</div>
+              <div className="text-3xl font-bold text-emerald-700 dark:text-emerald-500">{fmtUsd(totalUsd)}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 <span className="font-mono text-foreground font-semibold">{totalTokens.toLocaleString()}</span> tokens reales
               </p>
@@ -329,7 +329,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
                   <p className="text-lg mb-1">{mod?.icon ?? "⚡"}</p>
                   <p className="text-xs text-muted-foreground font-bold uppercase tracking-wide">{mod?.name ?? feature}</p>
                   <p className="text-base font-bold mt-1">{data.credits.toLocaleString()} <span className="text-[10px] font-normal text-muted-foreground">créditos</span></p>
-                  <p className="text-[11px] font-mono text-emerald-400 mt-0.5">{fmtUsd(data.usd)}</p>
+                  <p className="text-[11px] font-mono text-emerald-700 dark:text-emerald-400 mt-0.5">{fmtUsd(data.usd)}</p>
                   <p className="text-[10px] text-muted-foreground">{data.tokens.toLocaleString()} tkn</p>
                 </CardContent>
               </Card>
@@ -348,12 +348,12 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
           <div className="flex flex-wrap gap-2 items-center">
             {/* Toggle módulo/asesor */}
             <Button size="sm" variant={chartView === "module" ? "default" : "outline"}
-              className={`text-xs h-7 ${chartView === "module" ? "bg-accent text-white" : "border-accent/20"}`}
+              className={`text-xs h-7 ${chartView === "module" ? "bg-accent text-accent-foreground" : "border-accent/20"}`}
               onClick={() => setChartView("module")}>
               Por Módulo
             </Button>
             <Button size="sm" variant={chartView === "user" ? "default" : "outline"}
-              className={`text-xs h-7 ${chartView === "user" ? "bg-accent text-white" : "border-accent/20"}`}
+              className={`text-xs h-7 ${chartView === "user" ? "bg-accent text-accent-foreground" : "border-accent/20"}`}
               onClick={() => setChartView("user")}>
               <Users className="w-3 h-3 mr-1" /> Por Asesor
             </Button>
@@ -400,7 +400,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
           ) : (
             <ResponsiveContainer width="100%" height={280}>
               <LineChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(120,133,150,0.35)" />
                 <XAxis dataKey="day" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                 <YAxis tickFormatter={(v) => v === 0 ? "$0" : v < 0.001 ? `$${v.toFixed(5)}` : `$${v.toFixed(4)}`} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} width={70} />
                 <Tooltip
@@ -429,7 +429,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
           {!loading && totalUsd > 0 && (
             <div className="text-right hidden sm:block">
               <p className="text-xs text-muted-foreground">Total período</p>
-              <p className="text-lg font-bold text-emerald-500">{fmtUsd(totalUsd)} USD</p>
+              <p className="text-lg font-bold text-emerald-700 dark:text-emerald-500">{fmtUsd(totalUsd)} USD</p>
             </div>
           )}
         </CardHeader>
@@ -486,15 +486,15 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
                         <td className="px-4 py-3 text-right font-mono text-xs">
                           {data.total_tokens > 0 ? (
                             <span>
-                              <span className="text-blue-400">{inputTk.toLocaleString()}</span>
+                              <span className="text-blue-600 dark:text-blue-400">{inputTk.toLocaleString()}</span>
                               <span className="text-muted-foreground mx-0.5">/</span>
-                              <span className="text-purple-400">{outputTk.toLocaleString()}</span>
+                              <span className="text-purple-600 dark:text-purple-400">{outputTk.toLocaleString()}</span>
                             </span>
                           ) : <span className="text-muted-foreground text-[10px]">sin datos</span>}
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-sm font-medium">
                           {data.total_usd > 0
-                            ? <span className="text-emerald-500">{fmtUsd(data.total_usd)}</span>
+                            ? <span className="text-emerald-700 dark:text-emerald-500">{fmtUsd(data.total_usd)}</span>
                             : <span className="text-muted-foreground text-[10px]">sin datos</span>}
                         </td>
                         <td className="px-4 py-3 text-right font-mono text-sm font-medium text-destructive">
@@ -510,7 +510,7 @@ export function AiCreditsDashboard({ agencyId }: { agencyId: string }) {
                   <tr>
                     <td colSpan={3} className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase">Totales reales</td>
                     <td className="px-4 py-2 text-right font-mono text-xs font-bold">{totalTokens.toLocaleString()} tkn</td>
-                    <td className="px-4 py-2 text-right font-mono text-xs font-bold text-emerald-500">{fmtUsd(totalUsd)}</td>
+                    <td className="px-4 py-2 text-right font-mono text-xs font-bold text-emerald-700 dark:text-emerald-500">{fmtUsd(totalUsd)}</td>
                     <td className="px-4 py-2 text-right font-mono text-xs font-bold text-destructive">-{credits?.credits_used ?? 0}</td>
                   </tr>
                 </tfoot>

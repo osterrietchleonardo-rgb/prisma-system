@@ -72,7 +72,7 @@ export function BandejaFab({ href }: BandejaFabProps) {
           ? `Ir a la bandeja de WhatsApp. ${pendientes} sin atender`
           : "Ir a la bandeja de WhatsApp"
       }
-      className="md:hidden fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-accent text-white shadow-lg shadow-black/30 flex items-center justify-center transition-transform active:scale-95"
+      className="md:hidden fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-accent text-accent-foreground shadow-lg shadow-black/30 flex items-center justify-center transition-transform active:scale-95"
     >
       <MessageSquare className="w-6 h-6" />
       {pendientes > 0 && (

@@ -16,6 +16,64 @@
 
 ---
 
+## 2026-09-08 — contraste: que se lea todo, en claro y en oscuro
+
+**Qué se hizo**
+
+- **Auditoría medida, no mirada.** Un script inyectado en la página camina el DOM
+  renderizado, compone las capas translúcidas y calcula el contraste real de cada texto,
+  ícono y borde. Se corrió sobre **80 vistas por tema** (director, asesor y públicas, con
+  clic en cada solapa) más 13 en celular, entrando con PRISMAIA - VAKDOR.
+- **Modo claro: 2.702 textos por debajo del mínimo → 4.** Graves (bajo 3:1) 526 → 0.
+  Ilegibles (bajo 2:1) 221 → 0. Celular: 1.294 → 0.
+- **Modo oscuro: 539 → 9.** Graves 53 → 0. Ilegibles 21 → 0.
+- Lo peor que había: en `/legal` y `/terms` los títulos eran **blancos sobre blanco
+  (1,05:1)** — la página de divulgación que exige Google para el permiso de Calendar.
+
+**Las causas, y los números**
+
+- La app nació en oscuro (`defaultTheme="dark"`); el claro quedó de agregado.
+- El **cobre de marca** da 3,61:1 como texto sobre fondo claro. En claro va a 36% de luz
+  (`#8d5c2a`, 5,43). En oscuro el problema era el inverso: el texto ENCIMA del botón cobre
+  (blanco, 3,78) — ahora casi-negro (5,34) y el cobre sube a 52% para los chips (5,16).
+- **Ninguna opacidad del gris llega al mínimo en ningún tema**: `/80` da 3,48 en claro y
+  2,69 en oscuro. Se sacaron; el token entero rinde 5,24 y 6,96.
+- **Tono 600 no alcanza** para verde ni ámbar sobre fondo claro (3,60 y 3,04): va 700. Y
+  sobre el tinte del propio color hace falta un escalón más.
+- El **rojo de error en oscuro era más oscuro que el fondo**: 1,78:1.
+- `PerformanceMetricsGrid` armaba clases con plantillas (`text-${color}`), que Tailwind no
+  puede ver: funcionaba de rebote porque esas clases existían en otros archivos.
+
+**Errores propios que detectó la medición**
+
+- Al oscurecer los badges para el modo claro, **16 quedaron peor en oscuro**: subí el tono
+  sin dejar la variante `dark:`.
+- Al poner texto casi-negro sobre el cobre, **rompí el badge "Venta/Alquiler"** que va sobre
+  la foto (`bg-black/60`, hereda `text-primary-foreground`): quedó **1,00:1**. Y las chapas
+  del pipeline bajaron a 3,65.
+- **Regla que sale de acá:** cambiar `--accent-foreground` / `--primary-foreground` pega en
+  todo lo que usa el color por defecto de shadcn, incluidos los lugares donde el fondo se
+  pisa con otra cosa. Después de tocar un token hay que volver a medir **los dos temas**.
+- Mi propio medidor tenía un falso positivo: contaba el `<svg>` raíz de los gráficos como
+  ícono negro invisible.
+
+**Trampas de método**
+
+- **El dev server sirve código viejo** justo después de editar: un hallazgo "arreglado"
+  seguía apareciendo. La medición final se hace con el server recién arrancado.
+- **`next build` con `next dev` levantado pisa `.next`** y el server empieza a dar 404 en
+  todos los chunks. **Es lo que tenía roto el `:3000`.** Se arregla matando el proceso,
+  borrando `.next` y levantándolo de nuevo.
+
+**Quedó pendiente**
+
+- 4 textos en claro y 9 en oscuro, todos entre **3,86 y 4,48** (a un pelo del 4,5).
+- Los `border-accent/10` siguen en ~1,11:1 contra el fondo. Se movió el token `--border`
+  (91% → 85%) pero no los bordes con transparencia: las tarjetas igual se distinguen por su
+  relleno. Es decisión de diseño, no de accesibilidad.
+
+---
+
 ## 2026-09-07 — sesión Selección: varias propiedades en UNA ficha para el cliente
 
 **Qué se construyó**

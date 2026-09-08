@@ -120,7 +120,7 @@ export function SidebarNav({ rol, agencyId, onSelect, badges }: SidebarNavProps)
               />
               {g.titulo}
               {!abierto && pendientesDelGrupo > 0 ? (
-                <span className="ml-auto text-[10px] font-bold tracking-normal bg-amber-500 text-white px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">
+                <span className="ml-auto text-[10px] font-bold tracking-normal bg-amber-700 text-white px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">
                   {pendientesDelGrupo}
                 </span>
               ) : (
@@ -183,11 +183,11 @@ function ItemMenu({ item, pathname, agencyId, onSelect, badge }: ItemMenuProps) 
       <div
         aria-disabled="true"
         title="Función no disponible en tu plan"
-        className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-muted-foreground/40 cursor-not-allowed select-none"
+        className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-muted-foreground cursor-not-allowed select-none"
       >
         <item.icon className="w-4 h-4" />
         {item.name}
-        <span className="ml-auto text-[9px] font-bold uppercase tracking-wide bg-muted text-muted-foreground/60 px-1.5 py-0.5 rounded">
+        <span className="ml-auto text-[9px] font-bold uppercase tracking-wide bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
           Deshabilitada
         </span>
       </div>
@@ -208,7 +208,7 @@ function ItemMenu({ item, pathname, agencyId, onSelect, badge }: ItemMenuProps) 
       <item.icon className="w-4 h-4" />
       {item.name}
       {badge != null && badge > 0 && (
-        <span className="ml-auto text-[10px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">
+        <span className="ml-auto text-[10px] font-bold bg-amber-700 text-white px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">
           {badge}
         </span>
       )}

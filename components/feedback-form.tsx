@@ -51,10 +51,10 @@ const MAX_EVIDENCE_MB = 8
 const MAX_EVIDENCE_BYTES = MAX_EVIDENCE_MB * 1024 * 1024
 
 const feedbackTypes = [
-  { value: "sugerencia", label: "Sugerencia de Mejora", icon: Lightbulb, color: "text-amber-500", bg: "bg-amber-500/10" },
-  { value: "oportunidad", label: "Nueva Oportunidad", icon: Rocket, color: "text-blue-500", bg: "bg-blue-500/10" },
-  { value: "queja", label: "Queja o Problema", icon: AlertCircle, color: "text-red-500", bg: "bg-red-500/10" },
-  { value: "otro", label: "Otro", icon: MessageSquare, color: "text-purple-500", bg: "bg-purple-500/10" },
+  { value: "sugerencia", label: "Sugerencia de Mejora", icon: Lightbulb, color: "text-amber-800 dark:text-amber-500", bg: "bg-amber-500/10" },
+  { value: "oportunidad", label: "Nueva Oportunidad", icon: Rocket, color: "text-blue-800 dark:text-blue-500", bg: "bg-blue-500/10" },
+  { value: "queja", label: "Queja o Problema", icon: AlertCircle, color: "text-red-800 dark:text-red-500", bg: "bg-red-500/10" },
+  { value: "otro", label: "Otro", icon: MessageSquare, color: "text-purple-800 dark:text-purple-500", bg: "bg-purple-500/10" },
 ]
 
 export function FeedbackForm() {
@@ -158,7 +158,7 @@ export function FeedbackForm() {
       <Card className="w-full max-w-2xl mx-auto border-none shadow-2xl bg-gradient-to-b from-card to-card/50 backdrop-blur-sm animate-in fade-in zoom-in duration-500">
         <CardContent className="pt-12 pb-12 flex flex-col items-center text-center">
           <div className="w-20 h-20 rounded-full bg-emerald-500/10 flex items-center justify-center mb-6 animate-bounce">
-            <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+            <CheckCircle2 className="w-10 h-10 text-emerald-700 dark:text-emerald-500" />
           </div>
           <h2 className="text-2xl font-bold mb-2">¡Mensaje Recibido!</h2>
           <p className="text-muted-foreground mb-8 max-w-md">
@@ -359,10 +359,10 @@ export function FeedbackForm() {
               {history.map((item, idx) => {
                 const typeInfo = feedbackTypes.find(t => t.value === item.type)
                 const statusColors: Record<string, string> = {
-                  new: "text-blue-400 bg-blue-400/10",
-                  reviewing: "text-amber-400 bg-amber-400/10",
-                  resolved: "text-emerald-400 bg-emerald-400/10",
-                  rejected: "text-red-400 bg-red-400/10",
+                  new: "text-blue-800 dark:text-blue-400 bg-blue-400/10",
+                  reviewing: "text-amber-800 dark:text-amber-400 bg-amber-400/10",
+                  resolved: "text-emerald-800 dark:text-emerald-400 bg-emerald-400/10",
+                  rejected: "text-red-800 dark:text-red-400 bg-red-400/10",
                 }
                 const statusLabels: Record<string, string> = {
                   new: "Nuevo",
@@ -387,7 +387,7 @@ export function FeedbackForm() {
                     <td className="px-4 py-3 text-muted-foreground max-w-[200px]">
                       <span className="line-clamp-2 leading-relaxed">{item.content}</span>
                       {item.respuesta && (
-                        <div className="mt-1 text-[11px] text-indigo-400 font-medium bg-indigo-500/5 border border-indigo-500/10 rounded px-2 py-0.5 inline-block">
+                        <div className="mt-1 text-[11px] text-indigo-800 dark:text-indigo-400 font-medium bg-indigo-500/5 border border-indigo-500/10 rounded px-2 py-0.5 inline-block">
                           Respuesta: {item.respuesta}
                         </div>
                       )}
@@ -403,7 +403,7 @@ export function FeedbackForm() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-xs text-muted-foreground/40">—</span>
+                        <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3">

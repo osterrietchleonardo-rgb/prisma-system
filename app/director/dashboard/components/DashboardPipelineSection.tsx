@@ -34,16 +34,18 @@ interface Props {
 }
 
 // ── Stage labels & colors ─────────────────────────────────────────────────────
-const STAGE_META: Record<string, { label: string; color: string; light: string; desc: string }> = {
-  nuevo:            { label: "Nuevo contacto",    color: "#60a5fa", light: "rgba(96,165,250,0.15)",   desc: "Leads recién ingresados, sin primer contacto" },
-  contacto:         { label: "Primer contacto",   color: "#fb923c", light: "rgba(251,146,60,0.15)",   desc: "Se realizó un primer contacto con el lead" },
-  calificado:       { label: "Calificado",         color: "#a78bfa", light: "rgba(167,139,250,0.15)",  desc: "Lead con intención real y presupuesto definido" },
-  visita_agendada:  { label: "Visita agendada",    color: "#f59e0b", light: "rgba(245,158,11,0.15)",   desc: "Visita confirmada para ver la propiedad" },
-  visita_realizada: { label: "Visita realizada",   color: "#2dd4bf", light: "rgba(45,212,191,0.15)",   desc: "El lead ya visitó la propiedad" },
-  propuesta:        { label: "Propuesta enviada",  color: "#818cf8", light: "rgba(129,140,248,0.15)",  desc: "Se envió propuesta económica al lead" },
-  negociacion:      { label: "Negociación",         color: "#c084fc", light: "rgba(192,132,252,0.15)",  desc: "En proceso de negociación activa" },
-  cerrado:          { label: "Cerrado (Ganado)",   color: "#34d399", light: "rgba(52,211,153,0.15)",   desc: "Lead que cerró operación exitosamente" },
-  perdido:          { label: "Perdido",             color: "#f87171", light: "rgba(248,113,113,0.15)",  desc: "Lead que no avanzó o fue descartado" },
+/* `color` pinta la barra; `colorTexto` es el mismo color pero legible sobre
+   fondo claro, para el numero. En oscuro se sigue usando `color`. */
+const STAGE_META: Record<string, { label: string; color: string; colorTexto: string; light: string; desc: string }> = {
+  nuevo:            { label: "Nuevo contacto",    color: "#60a5fa", colorTexto: "#2563eb", light: "rgba(96,165,250,0.15)",   desc: "Leads recién ingresados, sin primer contacto" },
+  contacto:         { label: "Primer contacto",   color: "#fb923c", colorTexto: "#c2410c", light: "rgba(251,146,60,0.15)",   desc: "Se realizó un primer contacto con el lead" },
+  calificado:       { label: "Calificado",         color: "#a78bfa", colorTexto: "#7c3aed", light: "rgba(167,139,250,0.15)",  desc: "Lead con intención real y presupuesto definido" },
+  visita_agendada:  { label: "Visita agendada",    color: "#f59e0b", colorTexto: "#b45309", light: "rgba(245,158,11,0.15)",   desc: "Visita confirmada para ver la propiedad" },
+  visita_realizada: { label: "Visita realizada",   color: "#2dd4bf", colorTexto: "#0f766e", light: "rgba(45,212,191,0.15)",   desc: "El lead ya visitó la propiedad" },
+  propuesta:        { label: "Propuesta enviada",  color: "#818cf8", colorTexto: "#4f46e5", light: "rgba(129,140,248,0.15)",  desc: "Se envió propuesta económica al lead" },
+  negociacion:      { label: "Negociación",         color: "#c084fc", colorTexto: "#9333ea", light: "rgba(192,132,252,0.15)",  desc: "En proceso de negociación activa" },
+  cerrado:          { label: "Cerrado (Ganado)",   color: "#34d399", colorTexto: "#047857", light: "rgba(52,211,153,0.15)",   desc: "Lead que cerró operación exitosamente" },
+  perdido:          { label: "Perdido",             color: "#f87171", colorTexto: "#dc2626", light: "rgba(248,113,113,0.15)",  desc: "Lead que no avanzó o fue descartado" },
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -86,34 +88,34 @@ export function DashboardPipelineSection({ stages, summary }: Props) {
         <SummaryCard
           label="Activos"
           value={summary.total_activos}
-          icon={<TrendingUp className="h-4 w-4 text-blue-400" />}
+          icon={<TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
           desc="Leads en proceso (excluye cerrados y perdidos)"
-          valueClass="text-blue-400"
+          valueClass="text-blue-600 dark:text-blue-400"
         />
         <SummaryCard
           label="Cerrados"
           value={summary.total_cerrado}
-          icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+          icon={<CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />}
           desc="Operaciones cerradas exitosamente"
-          valueClass="text-emerald-400"
+          valueClass="text-emerald-700 dark:text-emerald-400"
         />
         <SummaryCard
           label="Perdidos"
           value={summary.total_perdido}
-          icon={<XCircle className="h-4 w-4 text-rose-400" />}
+          icon={<XCircle className="h-4 w-4 text-rose-700 dark:text-rose-400" />}
           desc="Leads que no avanzaron"
-          valueClass="text-rose-400"
+          valueClass="text-rose-700 dark:text-rose-400"
         />
         <SummaryCard
           label="Tasa de cierre"
           value={summary.tasa_cierre_real !== null ? `${summary.tasa_cierre_real}%` : "—"}
-          icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+          icon={<CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />}
           desc="Cerrados / (Cerrados + Perdidos)"
           valueClass={
             summary.tasa_cierre_real !== null
-              ? summary.tasa_cierre_real >= 60 ? "text-emerald-400"
-              : summary.tasa_cierre_real >= 40 ? "text-amber-400"
-              : "text-rose-400"
+              ? summary.tasa_cierre_real >= 60 ? "text-emerald-700 dark:text-emerald-400"
+              : summary.tasa_cierre_real >= 40 ? "text-amber-700 dark:text-amber-400"
+              : "text-rose-700 dark:text-rose-400"
               : ""
           }
         />
@@ -122,23 +124,23 @@ export function DashboardPipelineSection({ stages, summary }: Props) {
           <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Por origen</p>
           {summary.total_whatsapp > 0 && (
             <div className="flex items-center gap-1.5">
-              <MessageCircle className="h-3 w-3 text-green-400 shrink-0" />
+              <MessageCircle className="h-3 w-3 text-green-700 dark:text-green-400 shrink-0" />
               <span className="text-xs text-muted-foreground">WhatsApp</span>
-              <span className="ml-auto text-xs font-bold text-green-400">{summary.total_whatsapp}</span>
+              <span className="ml-auto text-xs font-bold text-green-700 dark:text-green-400">{summary.total_whatsapp}</span>
             </div>
           )}
           {summary.total_tokko > 0 && (
             <div className="flex items-center gap-1.5">
-              <Building2 className="h-3 w-3 text-blue-400 shrink-0" />
+              <Building2 className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
               <span className="text-xs text-muted-foreground">Tokko</span>
-              <span className="ml-auto text-xs font-bold text-blue-400">{summary.total_tokko}</span>
+              <span className="ml-auto text-xs font-bold text-blue-600 dark:text-blue-400">{summary.total_tokko}</span>
             </div>
           )}
           {summary.total_manual > 0 && (
             <div className="flex items-center gap-1.5">
-              <Users className="h-3 w-3 text-purple-400 shrink-0" />
+              <Users className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
               <span className="text-xs text-muted-foreground">Manual</span>
-              <span className="ml-auto text-xs font-bold text-purple-400">{summary.total_manual}</span>
+              <span className="ml-auto text-xs font-bold text-purple-600 dark:text-purple-400">{summary.total_manual}</span>
             </div>
           )}
         </Card>
@@ -172,9 +174,9 @@ export function DashboardPipelineSection({ stages, summary }: Props) {
                 </CardTitle>
                 {summary.tasa_cierre_real !== null && (
                   <span className={`text-xs font-bold ${
-                    summary.tasa_cierre_real >= 60 ? "text-emerald-400"
-                    : summary.tasa_cierre_real >= 40 ? "text-amber-400"
-                    : "text-rose-400"
+                    summary.tasa_cierre_real >= 60 ? "text-emerald-700 dark:text-emerald-400"
+                    : summary.tasa_cierre_real >= 40 ? "text-amber-700 dark:text-amber-400"
+                    : "text-rose-700 dark:text-rose-400"
                   }`}>
                     Tasa de cierre: {summary.tasa_cierre_real}%
                   </span>
@@ -188,7 +190,7 @@ export function DashboardPipelineSection({ stages, summary }: Props) {
 
               {/* Note sobre Tokko leads en cerrado */}
               {(summary.total_tokko > 0) && (
-                <p className="text-[10px] text-muted-foreground/60 pt-2 border-t border-accent/10">
+                <p className="text-[10px] text-muted-foreground pt-2 border-t border-accent/10">
                   ℹ Los leads de Tokko Broker marcados como "cerrado" en Tokko se sincronizan automáticamente.
                 </p>
               )}
@@ -224,7 +226,7 @@ function SummaryCard({
 }
 
 function StageBar({ stage, maxTotal }: { stage: PipelineStage; maxTotal: number }) {
-  const meta = STAGE_META[stage.id] || { label: stage.id, color: "#6b7280", light: "rgba(107,114,128,0.15)", desc: "" }
+  const meta = STAGE_META[stage.id] || { label: stage.id, color: "#6b7280", colorTexto: "#374151", light: "rgba(107,114,128,0.15)", desc: "" }
   const barWidth = maxTotal > 0 ? (stage.total / maxTotal) * 100 : 0
 
   return (
@@ -241,20 +243,23 @@ function StageBar({ stage, maxTotal }: { stage: PipelineStage; maxTotal: number 
                 style={{ width: `${barWidth}%`, backgroundColor: meta.light, borderRight: `2px solid ${meta.color}` }}
               />
               <div className="absolute inset-0 flex items-center justify-between px-2">
-                <span className="text-xs font-bold" style={{ color: meta.color }}>{stage.total}</span>
+                <span
+                  className="text-xs font-bold text-[var(--c-claro)] dark:text-[var(--c-oscuro)]"
+                  style={{ "--c-claro": meta.colorTexto, "--c-oscuro": meta.color } as React.CSSProperties}
+                >{stage.total}</span>
                 <div className="flex items-center gap-1.5">
                   {stage.leads_whatsapp > 0 && (
-                    <span className="text-[10px] text-green-400 flex items-center gap-0.5">
+                    <span className="text-[10px] text-green-700 dark:text-green-400 flex items-center gap-0.5">
                       <MessageCircle className="h-2.5 w-2.5" />{stage.leads_whatsapp}
                     </span>
                   )}
                   {stage.leads_tokko > 0 && (
-                    <span className="text-[10px] text-blue-400 flex items-center gap-0.5">
+                    <span className="text-[10px] text-blue-600 dark:text-blue-400 flex items-center gap-0.5">
                       <Building2 className="h-2.5 w-2.5" />{stage.leads_tokko}
                     </span>
                   )}
                   {stage.leads_manual > 0 && (
-                    <span className="text-[10px] text-purple-400 flex items-center gap-0.5">
+                    <span className="text-[10px] text-purple-600 dark:text-purple-400 flex items-center gap-0.5">
                       <Users className="h-2.5 w-2.5" />{stage.leads_manual}
                     </span>
                   )}
@@ -267,9 +272,9 @@ function StageBar({ stage, maxTotal }: { stage: PipelineStage; maxTotal: number 
           <p className="font-semibold">{meta.label}</p>
           <p>{meta.desc}</p>
           <p className="pt-1 border-t border-muted mt-1">{stage.total} leads en total</p>
-          {stage.leads_whatsapp > 0 && <p className="text-green-400">WhatsApp: {stage.leads_whatsapp}</p>}
-          {stage.leads_tokko > 0 && <p className="text-blue-400">Tokko Broker: {stage.leads_tokko}</p>}
-          {stage.leads_manual > 0 && <p className="text-purple-400">Manual: {stage.leads_manual}</p>}
+          {stage.leads_whatsapp > 0 && <p className="text-green-700 dark:text-green-400">WhatsApp: {stage.leads_whatsapp}</p>}
+          {stage.leads_tokko > 0 && <p className="text-blue-600 dark:text-blue-400">Tokko Broker: {stage.leads_tokko}</p>}
+          {stage.leads_manual > 0 && <p className="text-purple-600 dark:text-purple-400">Manual: {stage.leads_manual}</p>}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

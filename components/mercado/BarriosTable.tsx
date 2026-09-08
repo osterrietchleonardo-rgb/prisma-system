@@ -131,7 +131,7 @@ export function BarriosTable({ barrios, fuente, fechaActualizacion, brechaPct, b
           <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
             {fechaLabel ? `Actualizado: ${fechaLabel}` : "Sin fecha de actualización"} · Lista real vs. cierre estimado
             {hasError && (
-              <span className="ml-2 inline-flex items-center gap-1 text-amber-400">
+              <span className="ml-2 inline-flex items-center gap-1 text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="w-3 h-3" />
                 ⚠ Error de conexión
               </span>
@@ -203,7 +203,7 @@ export function BarriosTable({ barrios, fuente, fechaActualizacion, brechaPct, b
                   <td className="px-4 py-3.5 text-sm tabular-nums text-muted-foreground">
                     {fmt(b.precio_m2_usd)}
                   </td>
-                  <td className={`px-4 py-3.5 text-sm tabular-nums font-bold ${b.cierre_estimado ? "text-emerald-400" : "text-muted-foreground/30"}`}>
+                  <td className={`px-4 py-3.5 text-sm tabular-nums font-bold ${b.cierre_estimado ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground/30"}`}>
                     {fmt(b.cierre_estimado)}
                   </td>
                 </tr>
@@ -244,10 +244,10 @@ export function BarriosTable({ barrios, fuente, fechaActualizacion, brechaPct, b
 
       {/* Footer Attribution */}
       <div className="px-5 py-3 border-t bg-muted/5 flex flex-col sm:flex-row sm:items-center gap-1 justify-between">
-        <p className="text-[10px] text-muted-foreground/40 italic">
+        <p className="text-[10px] text-muted-foreground italic">
           Fuentes: {fuente ?? "—"} (lista) · REMAX + UCEMA (brecha de cierre{brechaLabel ? ` ${brechaLabel}` : ""})
         </p>
-        <p className="text-[10px] text-violet-400/60 font-medium">
+        <p className="text-[10px] text-violet-600 dark:text-violet-400 font-medium">
           {fechaLabel ? `Actualización automática · ${fechaLabel}` : "Actualización automática"}
         </p>
       </div>

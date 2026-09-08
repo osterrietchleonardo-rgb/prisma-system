@@ -163,7 +163,7 @@ export default function LeadDetailPage() {
             <div className="h-32 bg-gradient-to-r from-accent/20 via-accent/5 to-transparent relative">
               <div className="absolute -bottom-8 left-8">
                 <Avatar className="h-24 w-24 border-4 border-background shadow-xl">
-                  <AvatarFallback className="bg-accent text-white text-3xl">
+                  <AvatarFallback className="bg-accent text-accent-foreground text-3xl">
                     {lead.full_name?.substring(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -197,7 +197,7 @@ export default function LeadDetailPage() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-accent/5 flex items-center justify-center border border-accent/10">
-                        <Mail className="h-4 w-4 text-accent/70" />
+                        <Mail className="h-4 w-4 text-accent" />
                       </div>
                       <div className="flex-1">
                         <p className="text-[10px] text-muted-foreground uppercase font-bold">Email</p>
@@ -206,7 +206,7 @@ export default function LeadDetailPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-accent/5 flex items-center justify-center border border-accent/10">
-                        <Phone className="h-4 w-4 text-accent/70" />
+                        <Phone className="h-4 w-4 text-accent" />
                       </div>
                       <div className="flex-1">
                         <p className="text-[10px] text-muted-foreground uppercase font-bold">Teléfono Principal</p>
@@ -216,7 +216,7 @@ export default function LeadDetailPage() {
                     {tokkoAgent && (
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-accent/5 flex items-center justify-center border border-accent/10">
-                          <BadgeInfo className="h-4 w-4 text-accent/70" />
+                          <BadgeInfo className="h-4 w-4 text-accent" />
                         </div>
                         <div className="flex-1">
                           <p className="text-[10px] text-muted-foreground uppercase font-bold">Agente Responsable (Tokko)</p>
@@ -259,7 +259,7 @@ export default function LeadDetailPage() {
                         <p className="text-[10px] text-muted-foreground uppercase font-bold mb-2">Sucursales Involucradas</p>
                         <div className="flex flex-wrap gap-2">
                           {tokkoBranches.map((b: any, i: number) => (
-                            <Badge key={i} variant="secondary" className="bg-blue-500/10 text-blue-500 border-none">
+                            <Badge key={i} variant="secondary" className="bg-blue-500/10 text-blue-800 dark:text-blue-500 border-none">
                               {b.name}
                             </Badge>
                           ))}
@@ -337,7 +337,7 @@ export default function LeadDetailPage() {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="w-full justify-between text-[10px] text-muted-foreground/50 hover:text-accent/50 group"
+                  className="w-full justify-between text-[10px] text-muted-foreground hover:text-accent/50 group"
                   onClick={() => setShowRaw(!showRaw)}
                 >
                   <span className="flex items-center gap-2">
@@ -401,7 +401,7 @@ export default function LeadDetailPage() {
                     {activities.map((activity: any, i: number) => (
                       <div key={activity.id} className="relative flex items-start gap-4">
                         <div className={`mt-1 h-10 w-10 rounded-full border-4 border-background flex items-center justify-center shrink-0 z-10 shadow-sm ${
-                          i === 0 ? "bg-accent text-white" : "bg-card text-muted-foreground border-accent/5"
+                          i === 0 ? "bg-accent text-accent-foreground" : "bg-card text-muted-foreground border-accent/5"
                         }`}>
                           <RefreshCcw className="h-4 w-4" />
                         </div>

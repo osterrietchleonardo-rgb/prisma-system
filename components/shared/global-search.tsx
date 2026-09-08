@@ -78,7 +78,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
             )}
             <Input
               placeholder="Buscar propiedades, leads, contratos..."
-              className="pl-8 bg-transparent border-none focus-visible:ring-0 text-base placeholder:text-muted-foreground/50"
+              className="pl-8 bg-transparent border-none focus-visible:ring-0 text-base placeholder:text-muted-foreground"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               autoFocus
@@ -103,7 +103,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                       <div className="flex-1">
                         <p className="text-sm font-semibold group-hover:text-accent transition-colors">{result.title}</p>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-accent/70 uppercase tracking-widest font-black">
+                          <span className="text-[10px] text-accent uppercase tracking-widest font-black">
                             {result.type}
                           </span>
                           {result.subtitle && (
@@ -126,7 +126,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
                 <p className="text-sm text-muted-foreground">No se encontraron resultados para "{query}"</p>
               </div>
             ) : (
-              <div className="py-12 text-center text-muted-foreground/40">
+              <div className="py-12 text-center text-muted-foreground">
                 <p className="text-xs uppercase tracking-widest font-bold">Escribe para buscar en PRISMA</p>
               </div>
             )}
@@ -134,7 +134,7 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
         </ScrollArea>
         <div className="p-3 border-t border-accent/10 bg-accent/5 flex justify-between items-center">
           <div className="flex gap-2">
-             <kbd className="px-1.5 py-0.5 rounded border border-accent/20 bg-background text-[9px] font-bold text-accent/70">↑↓</kbd>
+             <kbd className="px-1.5 py-0.5 rounded border border-accent/20 bg-background text-[9px] font-bold text-accent">↑↓</kbd>
              <span className="text-[9px] text-muted-foreground uppercase font-bold tracking-tighter self-center">Navegar</span>
           </div>
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">

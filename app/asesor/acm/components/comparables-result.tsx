@@ -94,14 +94,14 @@ function pctEfectivo(c: AcmComparable, sujeto: Sujeto, fotos: "cargando" | FotoR
 }
 
 const estadoIcon = (e: ChecklistItem["estado"]) => {
-  if (e === "match") return <Check className="w-3.5 h-3.5 text-green-500" />;
-  if (e === "parcial") return <Minus className="w-3.5 h-3.5 text-amber-500" />;
-  if (e === "distinto") return <X className="w-3.5 h-3.5 text-red-500" />;
-  return <Minus className="w-3.5 h-3.5 text-muted-foreground/40" />;
+  if (e === "match") return <Check className="w-3.5 h-3.5 text-green-700 dark:text-green-500" />;
+  if (e === "parcial") return <Minus className="w-3.5 h-3.5 text-amber-700 dark:text-amber-500" />;
+  if (e === "distinto") return <X className="w-3.5 h-3.5 text-red-700 dark:text-red-500" />;
+  return <Minus className="w-3.5 h-3.5 text-muted-foreground" />;
 };
 
 const pctColor = (p: number) =>
-  p >= 80 ? "text-green-500" : p >= 60 ? "text-amber-500" : "text-muted-foreground";
+  p >= 80 ? "text-green-700 dark:text-green-500" : p >= 60 ? "text-amber-700 dark:text-amber-500" : "text-muted-foreground";
 
 const fmtPrecio = (c: AcmComparable) =>
   c.precio ? `${c.moneda === "ARS" ? "$" : "US$"} ${c.precio.toLocaleString("es-AR")}` : "Consultar";
@@ -157,7 +157,7 @@ function ComparableCard({
             className="shrink-0 self-start pt-1 text-accent"
             aria-label={selected ? "Quitar de la ficha" : "Agregar a la ficha"}
           >
-            {selected ? <CheckSquare className="w-6 h-6" /> : <Square className="w-6 h-6 text-muted-foreground/50" />}
+            {selected ? <CheckSquare className="w-6 h-6" /> : <Square className="w-6 h-6 text-muted-foreground" />}
           </button>
         )}
         {c.imagen && !fotoRota ? (
@@ -174,7 +174,7 @@ function ComparableCard({
           />
         ) : (
           <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-muted/40 shrink-0 flex items-center justify-center">
-            <Building2 className="w-7 h-7 text-muted-foreground/40" />
+            <Building2 className="w-7 h-7 text-muted-foreground" />
           </div>
         )}
 
@@ -185,7 +185,7 @@ function ComparableCard({
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 <MapPin className="w-3 h-3" /> {c.zona || c.direccion || "—"}
                 {esLindero && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-600 text-[10px] font-bold uppercase tracking-wide">
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-800 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wide">
                     lindero
                   </span>
                 )}
@@ -193,22 +193,22 @@ function ComparableCard({
                     al comparable (un aviso que bajó 12% o lleva 120 días publicado no se usa
                     igual para tasar que uno recién entrado a precio pleno). */}
                 {c.variacion_pct != null && c.variacion_pct <= -3 && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-800 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
                     ↓ bajó {Math.abs(Math.round(c.variacion_pct))}%
                   </span>
                 )}
                 {c.en_construccion && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-orange-500/15 text-orange-600 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-orange-500/15 text-orange-800 dark:text-orange-400 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
                     en construcción
                   </span>
                 )}
                 {c.dueno_directo && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-600 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-violet-500/15 text-violet-800 dark:text-violet-400 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
                     dueño directo
                   </span>
                 )}
                 {c.apto_credito && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-600 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-sky-500/15 text-sky-800 dark:text-sky-400 text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
                     apto crédito
                   </span>
                 )}
@@ -217,7 +217,7 @@ function ComparableCard({
             <div className="text-right shrink-0">
               {pctAjustado !== null && pctAjustado !== c.match_pct ? (
                 <p className="text-lg font-black leading-none whitespace-nowrap">
-                  <span className="text-muted-foreground/60 line-through decoration-2">{c.match_pct}%</span>{" "}
+                  <span className="text-muted-foreground line-through decoration-2">{c.match_pct}%</span>{" "}
                   <span className={pctColor(pctAjustado)}>{pctAjustado}%</span>
                 </p>
               ) : (
@@ -244,7 +244,7 @@ function ComparableCard({
                   {/* Posición vs la mediana del conjunto: la lectura más rápida de caro/barato
                       relativo. |±3%| se calla: a esa distancia es ruido, no señal. */}
                   {medianaM2 != null && medianaM2 > 0 && Math.abs((c.precio_m2 - medianaM2) / medianaM2) >= 0.03 && (
-                    <span className={`ml-1 font-bold ${c.precio_m2 > medianaM2 ? "text-red-500/80" : "text-emerald-600"}`}>
+                    <span className={`ml-1 font-bold ${c.precio_m2 > medianaM2 ? "text-red-700 dark:text-red-500" : "text-emerald-600"}`}>
                       {c.precio_m2 > medianaM2 ? "+" : "−"}{Math.abs(Math.round(((c.precio_m2 - medianaM2) / medianaM2) * 100))}% vs mediana
                     </span>
                   )}
@@ -728,7 +728,7 @@ export function ComparablesResult({
                   ? "No pudimos completar la búsqueda en tu cartera"
                   : "No pudimos completar la búsqueda en la red de comparables"}
             </p>
-            <p className="mt-0.5 text-red-700/90 dark:text-red-400/90">
+            <p className="mt-0.5 text-red-700/90 dark:text-red-400">
               Lo que ves abajo{" "}
               {carteraFallo && roomixFallo
                 ? "no incluye ningún comparable de ninguna de las dos fuentes"
@@ -750,7 +750,7 @@ export function ComparablesResult({
           <p className="text-sm text-muted-foreground">
             {sujeto.barrio} · {sujeto.tipo_propiedad} · {sujeto.m2_cubiertos} m² · {sujeto.dormitorios} dorm · {sujeto.banos} baños
           </p>
-          {!conSemantica && <p className="text-[11px] text-amber-500 mt-1">Ranking estructural (sin similitud semántica esta vez).</p>}
+          {!conSemantica && <p className="text-[11px] text-amber-700 dark:text-amber-500 mt-1">Ranking estructural (sin similitud semántica esta vez).</p>}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {!selecting ? (
@@ -928,7 +928,7 @@ export function ComparablesResult({
                     className="text-accent"
                     aria-label={incluirConclusiones ? "Sacar la sección de conclusiones" : "Incluir la sección de conclusiones"}
                   >
-                    {incluirConclusiones ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-muted-foreground/50" />}
+                    {incluirConclusiones ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-muted-foreground" />}
                   </button>
                   Incluir la sección de conclusiones en la ficha
                 </label>

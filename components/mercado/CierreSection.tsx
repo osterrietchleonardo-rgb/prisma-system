@@ -14,7 +14,7 @@ function VarBadge({ val, label }: { val: number | null; label: string }) {
       <span className="text-muted-foreground">{label}</span>
       <span
         className={`inline-flex items-center gap-0.5 font-semibold ${
-          isNeutral ? "text-muted-foreground" : isPos ? "text-emerald-400" : "text-red-400"
+          isNeutral ? "text-muted-foreground" : isPos ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
         }`}
       >
         {isNeutral ? <Minus className="w-3 h-3" /> : isPos ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
@@ -29,7 +29,7 @@ function SegmentoCard({ titulo, seg }: { titulo: string; seg: SegmentoCierre | n
   return (
     <div className="rounded-xl border bg-muted/10 p-4 flex flex-col gap-2">
       <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{titulo}</p>
-      <p className="text-2xl font-bold tabular-nums text-emerald-400">
+      <p className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
         {seg?.valor != null ? `USD ${seg.valor.toLocaleString("es-AR")}` : "—"}
       </p>
       <div className="flex flex-col gap-1 mt-1">
@@ -38,7 +38,7 @@ function SegmentoCard({ titulo, seg }: { titulo: string; seg: SegmentoCierre | n
         {seg?.brecha_pct != null && (
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Vs. publicado</span>
-            <span className="font-semibold text-violet-300/90">{seg.brecha_pct}%</span>
+            <span className="font-semibold text-violet-600 dark:text-violet-300">{seg.brecha_pct}%</span>
           </div>
         )}
       </div>
@@ -55,7 +55,7 @@ export function CierreSection({ cierre }: CierreSectionProps) {
         <div>
           <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
             Precio de cierre real · CABA
-            <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-400 text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/20">
+            <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 text-[10px] px-2 py-0.5 rounded-full border border-emerald-500/20">
               <BadgeCheck className="w-3 h-3" />
               Operaciones concretadas
             </span>
@@ -66,7 +66,7 @@ export function CierreSection({ cierre }: CierreSectionProps) {
           </p>
         </div>
         {hasError && (
-          <div className="flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-1 shrink-0">
+          <div className="flex items-center gap-1 text-xs text-amber-800 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-1 shrink-0">
             <AlertTriangle className="w-3 h-3" />
             Sin datos · ucema.edu.ar
           </div>
@@ -75,7 +75,7 @@ export function CierreSection({ cierre }: CierreSectionProps) {
 
       {hasError ? (
         <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0" />
           No se pudo obtener el Índice Real m2 (REMAX + UCEMA)
         </div>
       ) : (
@@ -88,7 +88,7 @@ export function CierreSection({ cierre }: CierreSectionProps) {
       )}
 
       <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-4 border-t border-border/50">
-        <p className="text-[10px] text-muted-foreground/50">
+        <p className="text-[10px] text-muted-foreground">
           Fuente: Índice Real m2 by REMAX y UCEMA (respaldo de Reporte Inmobiliario) · precios efectivos de venta de departamentos
         </p>
         {cierre.url_pdf && (

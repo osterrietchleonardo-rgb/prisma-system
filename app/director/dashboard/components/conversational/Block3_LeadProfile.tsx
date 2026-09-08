@@ -86,7 +86,7 @@ function HorizontalBarsCard({
             <TooltipProvider delayDuration={200}>
               <UITooltip>
                 <TooltipTrigger asChild>
-                  <Info className="h-3 w-3 text-muted-foreground/40 cursor-help ml-auto" />
+                  <Info className="h-3 w-3 text-muted-foreground cursor-help ml-auto" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[200px] text-xs">{tooltip}</TooltipContent>
               </UITooltip>
@@ -155,7 +155,7 @@ function DonutCard({
             <TooltipProvider delayDuration={200}>
               <UITooltip>
                 <TooltipTrigger asChild>
-                  <Info className="h-3 w-3 text-muted-foreground/40 cursor-help ml-auto" />
+                  <Info className="h-3 w-3 text-muted-foreground cursor-help ml-auto" />
                 </TooltipTrigger>
                 <TooltipContent className="max-w-[200px] text-xs">{tooltip}</TooltipContent>
               </UITooltip>
@@ -220,7 +220,7 @@ function BudgetCard({ lead_profile }: { lead_profile: LeadProfileData }) {
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-4">
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-blue-400">Compra (USD)</p>
+          <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">Compra (USD)</p>
           <p className="text-xl font-bold">
             {lead_profile.presupuesto_compra_avg_usd
               ? `USD ${lead_profile.presupuesto_compra_avg_usd.toLocaleString("es-AR")}`
@@ -229,7 +229,7 @@ function BudgetCard({ lead_profile }: { lead_profile: LeadProfileData }) {
           <p className="text-xs text-muted-foreground">Promedio declarado</p>
         </div>
         <div className="border-t border-accent/10 pt-3 space-y-1">
-          <p className="text-xs font-semibold text-teal-400">Alquiler (ARS)</p>
+          <p className="text-xs font-semibold text-teal-700 dark:text-teal-400">Alquiler (ARS)</p>
           <p className="text-xl font-bold">
             {lead_profile.presupuesto_alquiler_avg_ars
               ? `$ ${lead_profile.presupuesto_alquiler_avg_ars.toLocaleString("es-AR")}`
@@ -244,10 +244,10 @@ function BudgetCard({ lead_profile }: { lead_profile: LeadProfileData }) {
 
 function FlagMetricsCard({ lead_profile, total }: { lead_profile: LeadProfileData; total: number }) {
   const items = [
-    { label: "Primera vez comprando", value: lead_profile.primera_vez, color: "text-blue-400" },
-    { label: "Con experiencia previa", value: lead_profile.con_experiencia, color: "text-emerald-400" },
-    { label: "Inversores (buscan renta)", value: lead_profile.inversores, color: "text-amber-400" },
-    { label: "Con preaprobación crédito", value: lead_profile.con_preaprobacion, color: "text-purple-400" },
+    { label: "Primera vez comprando", value: lead_profile.primera_vez, color: "text-blue-600 dark:text-blue-400" },
+    { label: "Con experiencia previa", value: lead_profile.con_experiencia, color: "text-emerald-700 dark:text-emerald-400" },
+    { label: "Inversores (buscan renta)", value: lead_profile.inversores, color: "text-amber-700 dark:text-amber-400" },
+    { label: "Con preaprobación crédito", value: lead_profile.con_preaprobacion, color: "text-purple-600 dark:text-purple-400" },
   ]
 
   return (

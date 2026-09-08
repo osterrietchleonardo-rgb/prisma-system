@@ -62,7 +62,7 @@ export default function Error({
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
           <Button
             onClick={() => window.location.reload()}
-            className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-white gap-2 shadow-lg shadow-accent/20"
+            className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground gap-2 shadow-lg shadow-accent/20"
           >
             <RotateCw className="h-4 w-4" />
             Recargar la página

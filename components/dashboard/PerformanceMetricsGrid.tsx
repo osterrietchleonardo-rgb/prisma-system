@@ -36,12 +36,33 @@ interface MetricCardProps {
   color: string;
 }
 
+/* Las clases se escriben enteras a proposito: Tailwind no puede ver
+   `text-${color}` armado con una plantilla y no las genera. El primer tono es
+   el que se lee sobre fondo claro; el de dark: es el original. */
+const COLORES: Record<string, { fondo: string; icono: string }> = {
+  "blue-500":    { fondo: "bg-blue-500/10",    icono: "text-blue-700 dark:text-blue-500" },
+  "amber-500":   { fondo: "bg-amber-500/10",   icono: "text-amber-800 dark:text-amber-500" },
+  "purple-500":  { fondo: "bg-purple-500/10",  icono: "text-purple-700 dark:text-purple-500" },
+  "emerald-500": { fondo: "bg-emerald-500/10", icono: "text-emerald-800 dark:text-emerald-500" },
+  "orange-500":  { fondo: "bg-orange-500/10",  icono: "text-orange-800 dark:text-orange-500" },
+  "green-500":   { fondo: "bg-green-500/10",   icono: "text-green-800 dark:text-green-500" },
+  "slate-500":   { fondo: "bg-slate-500/10",   icono: "text-slate-700 dark:text-slate-400" },
+  "red-500":     { fondo: "bg-red-500/10",     icono: "text-red-700 dark:text-red-500" },
+  "cyan-500":    { fondo: "bg-cyan-500/10",    icono: "text-cyan-800 dark:text-cyan-500" },
+  "violet-500":  { fondo: "bg-violet-500/10",  icono: "text-violet-700 dark:text-violet-500" },
+  "teal-500":    { fondo: "bg-teal-500/10",    icono: "text-teal-800 dark:text-teal-500" },
+  "sky-500":     { fondo: "bg-sky-500/10",     icono: "text-sky-800 dark:text-sky-500" },
+}
+const COLOR_POR_DEFECTO = { fondo: "bg-muted", icono: "text-foreground" }
+
 function MetricGroup({ title, icon: Icon, metrics, color }: MetricCardProps) {
+  const c = COLORES[color] ?? COLOR_POR_DEFECTO
   return (
+
     <Card className="border-accent/10 bg-card/30 backdrop-blur-sm transition-all hover:border-accent/30 group">
       <CardHeader className="flex flex-row items-center gap-3 pb-2">
-        <div className={`p-2 rounded-lg bg-${color}/10 group-hover:scale-110 transition-transform`}>
-          <Icon className={`h-5 w-5 text-${color}`} />
+        <div className={`p-2 rounded-lg ${c.fondo} group-hover:scale-110 transition-transform`}>
+          <Icon className={`h-5 w-5 ${c.icono}`} />
         </div>
         <div>
           <CardTitle className="text-sm font-bold uppercase tracking-wider">{title}</CardTitle>

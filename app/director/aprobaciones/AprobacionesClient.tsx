@@ -111,7 +111,7 @@ export default function AprobacionesClient({ pendientes, historial, asesores }: 
         {pendientesFiltradas.length === 0 && (
           <Card>
             <CardContent className="pt-6 text-sm text-muted-foreground flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 dark:text-emerald-500" />
               {pendientes.length === 0 ? "No hay nada esperando tu decisión." : "Nada coincide con la búsqueda."}
             </CardContent>
           </Card>

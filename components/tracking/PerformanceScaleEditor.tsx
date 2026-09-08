@@ -138,7 +138,7 @@ export function PerformanceScaleEditor({ initialConfig }: PerformanceScaleEditor
         <Button 
           onClick={handleSave} 
           disabled={loading}
-          className="bg-accent hover:bg-accent/90 text-white gap-2 shadow-lg shadow-accent/20"
+          className="bg-accent hover:bg-accent/90 text-accent-foreground gap-2 shadow-lg shadow-accent/20"
         >
           {loading ? <Sparkles className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Guardar Configuración
@@ -173,13 +173,13 @@ export function PerformanceScaleEditor({ initialConfig }: PerformanceScaleEditor
                         Ver Prompt Experto
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-2xl bg-[#0f1219] border-accent/20">
+                    <DialogContent className="max-w-2xl bg-card dark:bg-[#0f1219] border-accent/20">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-accent">
                           <Sparkles className="h-5 w-5" />
                           Prompt Experto Recomendado
                         </DialogTitle>
-                        <DialogDescription className="text-muted-foreground/80">
+                        <DialogDescription className="text-muted-foreground">
                           Este prompt utiliza todas las variables disponibles del embudo (conversaciones, ACM, reservas, etc.) para un análisis integral.
                         </DialogDescription>
                       </DialogHeader>
@@ -199,7 +199,7 @@ export function PerformanceScaleEditor({ initialConfig }: PerformanceScaleEditor
                           <DialogClose asChild>
                             <Button 
                               size="sm" 
-                              className="h-7 px-3 text-xs bg-accent hover:bg-accent/90 text-white"
+                              className="h-7 px-3 text-xs bg-accent hover:bg-accent/90 text-accent-foreground"
                               onClick={() => {
                                 setConfig(prev => ({ ...prev, custom_instructions: EXPERT_PROMPT }));
                                 toast.success("Prompt experto aplicado", {
@@ -223,10 +223,10 @@ export function PerformanceScaleEditor({ initialConfig }: PerformanceScaleEditor
                 </Badge>
               </div>
 
-              <div className="space-y-0 border border-accent/20 rounded-xl overflow-hidden bg-[#0f1219]">
+              <div className="space-y-0 border border-accent/20 rounded-xl overflow-hidden bg-card dark:bg-[#0f1219]">
                 {/* Bloque Fijo Superior: Variables */}
                 <div className="bg-muted/30 border-b border-accent/20 p-4 font-mono text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2 mb-2 text-accent/80 font-bold uppercase tracking-wider">
+                  <div className="flex items-center gap-2 mb-2 text-accent font-bold uppercase tracking-wider">
                     <CheckCircle2 className="w-3 h-3" /> Variables de Sistema (No Editables)
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 opacity-90 mt-3">
@@ -251,7 +251,7 @@ export function PerformanceScaleEditor({ initialConfig }: PerformanceScaleEditor
 
                 {/* Bloque Fijo Inferior: Formato JSON */}
                 <div className="bg-muted/30 border-t border-accent/20 p-4 font-mono text-xs text-muted-foreground">
-                  <div className="flex items-center gap-2 mb-2 text-accent/80 font-bold uppercase tracking-wider">
+                  <div className="flex items-center gap-2 mb-2 text-accent font-bold uppercase tracking-wider">
                     <CheckCircle2 className="w-3 h-3" /> Salida JSON Automática
                   </div>
                   <p className="opacity-80">
@@ -263,45 +263,45 @@ export function PerformanceScaleEditor({ initialConfig }: PerformanceScaleEditor
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-blue-500/5 border border-blue-500/10 rounded-xl">
-                <div className="flex items-center gap-2 mb-2 text-blue-400">
+                <div className="flex items-center gap-2 mb-2 text-blue-600 dark:text-blue-400">
                   <Info className="h-4 w-4" />
                   <span className="text-xs font-bold uppercase">Métricas de Inventario</span>
                 </div>
-                <p className="text-[11px] text-blue-200/60 leading-relaxed mb-2">
+                <p className="text-[11px] text-blue-600 dark:text-blue-200 leading-relaxed mb-2">
                   La IA lee: propiedades captadas en el mes y el total de la cartera activa.
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  <Badge variant="outline" className="text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/20">captaciones</Badge>
-                  <Badge variant="outline" className="text-[9px] bg-blue-500/10 text-blue-400 border-blue-500/20">cartera_activa</Badge>
+                  <Badge variant="outline" className="text-[9px] bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-500/20">captaciones</Badge>
+                  <Badge variant="outline" className="text-[9px] bg-blue-500/10 text-blue-800 dark:text-blue-400 border-blue-500/20">cartera_activa</Badge>
                 </div>
               </div>
               <div className="p-4 bg-green-500/5 border border-green-500/10 rounded-xl">
-                <div className="flex items-center gap-2 mb-2 text-green-400">
+                <div className="flex items-center gap-2 mb-2 text-green-700 dark:text-green-400">
                   <TrendingUp className="h-4 w-4" />
                   <span className="text-xs font-bold uppercase">Cierres y Eficiencia</span>
                 </div>
-                <p className="text-[11px] text-green-200/60 leading-relaxed mb-2">
+                <p className="text-[11px] text-green-700 dark:text-green-200 leading-relaxed mb-2">
                   La IA lee: transacciones, reservas, facturación en USD y el porcentaje de rotación de cartera.
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-400 border-green-500/20">transacciones</Badge>
-                  <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-400 border-green-500/20">facturacion</Badge>
-                  <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-400 border-green-500/20">rotacion</Badge>
+                  <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-800 dark:text-green-400 border-green-500/20">transacciones</Badge>
+                  <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-800 dark:text-green-400 border-green-500/20">facturacion</Badge>
+                  <Badge variant="outline" className="text-[9px] bg-green-500/10 text-green-800 dark:text-green-400 border-green-500/20">rotacion</Badge>
                 </div>
               </div>
               <div className="p-4 bg-purple-500/5 border border-purple-500/10 rounded-xl">
-                <div className="flex items-center gap-2 mb-2 text-purple-400">
+                <div className="flex items-center gap-2 mb-2 text-purple-600 dark:text-purple-400">
                   <DollarSign className="h-4 w-4" />
                   <span className="text-xs font-bold uppercase">Top & Mid Funnel</span>
                 </div>
-                <p className="text-[11px] text-purple-200/60 leading-relaxed mb-2">
+                <p className="text-[11px] text-purple-600 dark:text-purple-200 leading-relaxed mb-2">
                   La IA lee: consultas totales por WhatsApp, prospección activa, prelistings, fichas ACM y compradores calificados.
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-400 border-purple-500/20">wa_chats</Badge>
-                  <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-400 border-purple-500/20">prospeccion</Badge>
-                  <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-400 border-purple-500/20">prelisting</Badge>
-                  <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-400 border-purple-500/20">acm</Badge>
+                  <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-800 dark:text-purple-400 border-purple-500/20">wa_chats</Badge>
+                  <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-800 dark:text-purple-400 border-purple-500/20">prospeccion</Badge>
+                  <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-800 dark:text-purple-400 border-purple-500/20">prelisting</Badge>
+                  <Badge variant="outline" className="text-[9px] bg-purple-500/10 text-purple-800 dark:text-purple-400 border-purple-500/20">acm</Badge>
                 </div>
               </div>
             </div>

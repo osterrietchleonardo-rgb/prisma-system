@@ -97,17 +97,17 @@ export function ProposedDashboardTab({ leads }: ProposedDashboardTabProps) {
            </CardHeader>
            <CardContent className="space-y-4">
               <InsightItem 
-                icon={<Lightbulb className="h-4 w-4 text-yellow-500" />}
+                icon={<Lightbulb className="h-4 w-4 text-yellow-700 dark:text-yellow-500" />}
                 title="Alta dependencia de Portales"
                 text="75% de los leads provienen de Zonaprop. Diversificar fuentes reduciría el riesgo de adquisición."
               />
               <InsightItem 
-                icon={<Lightbulb className="h-4 w-4 text-blue-500" />}
+                icon={<Lightbulb className="h-4 w-4 text-blue-700 dark:text-blue-500" />}
                 title="Ciclo de Vida 'Flash'"
                 text="Gran volumen de leads se cierran en < 24h. Podría indicar falta de seguimiento real o descarte automático."
               />
               <InsightItem 
-                icon={<Lightbulb className="h-4 w-4 text-emerald-500" />}
+                icon={<Lightbulb className="h-4 w-4 text-emerald-700 dark:text-emerald-500" />}
                 title="Top Asesores"
                 text="Un asesor concentra el 45% del total. Equilibrar la carga mejoraría la calidad de atención."
               />

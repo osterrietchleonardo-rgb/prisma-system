@@ -13,9 +13,9 @@ interface Props {
 }
 
 const SEVERITY_META: Record<HandoffSeverity, { label: string; dot: string; text: string; row: string }> = {
-  critico:  { label: "Crítico",  dot: "bg-red-500",    text: "text-red-500",    row: "border-l-red-500" },
-  demorado: { label: "Demorado", dot: "bg-amber-500",  text: "text-amber-500",  row: "border-l-amber-500" },
-  reciente: { label: "Reciente", dot: "bg-sky-400",    text: "text-sky-400",    row: "border-l-sky-400" },
+  critico:  { label: "Crítico",  dot: "bg-red-500",    text: "text-red-700 dark:text-red-500",    row: "border-l-red-500" },
+  demorado: { label: "Demorado", dot: "bg-amber-500",  text: "text-amber-700 dark:text-amber-500",  row: "border-l-amber-500" },
+  reciente: { label: "Reciente", dot: "bg-sky-400",    text: "text-sky-700 dark:text-sky-400",    row: "border-l-sky-400" },
 }
 
 function formatWait(hours: number): string {
@@ -60,21 +60,21 @@ export function HandoffsPanel({ data, basePath, scope }: Props) {
           value={unattended.length}
           icon={<AlertTriangle className="h-3.5 w-3.5 text-accent" />}
           desc="Derivaciones en las que todavía no escribió ningún asesor."
-          valueClass={unattended.length > 0 ? "text-red-500" : "text-emerald-500"}
+          valueClass={unattended.length > 0 ? "text-red-700 dark:text-red-500" : "text-emerald-700 dark:text-emerald-500"}
         />
         <SummaryCard
           label="Críticos (+24 h)"
           value={criticos}
           icon={<Clock className="h-3.5 w-3.5 text-accent" />}
           desc="Llevan más de un día esperando respuesta."
-          valueClass={criticos > 0 ? "text-red-500" : ""}
+          valueClass={criticos > 0 ? "text-red-700 dark:text-red-500" : ""}
         />
         <SummaryCard
           label="Esperando respuesta"
           value={esperandoConMensajes}
           icon={<MessageCircle className="h-3.5 w-3.5 text-accent" />}
           desc="El cliente siguió escribiendo después de la derivación y nadie le contestó."
-          valueClass={esperandoConMensajes > 0 ? "text-amber-500" : ""}
+          valueClass={esperandoConMensajes > 0 ? "text-amber-700 dark:text-amber-500" : ""}
         />
         <SummaryCard
           label="Respuesta (mediana)"
@@ -88,7 +88,7 @@ export function HandoffsPanel({ data, basePath, scope }: Props) {
       {unattended.length === 0 ? (
         <Card className="border-accent/10 bg-card/50 p-8">
           <div className="flex flex-col items-center gap-2 text-center">
-            <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+            <CheckCircle2 className="h-8 w-8 text-emerald-700 dark:text-emerald-500" />
             <p className="text-sm font-semibold text-foreground">Todas las derivaciones fueron atendidas</p>
             <p className="text-xs text-muted-foreground">
               {totalHandoffs} {totalHandoffs === 1 ? "derivación" : "derivaciones"} en el período, sin pendientes.
@@ -133,7 +133,7 @@ function HandoffRow({ handoff, basePath, scope }: { handoff: UnattendedHandoff; 
 
       <div className="flex shrink-0 items-center gap-3 pl-5 sm:pl-0">
         {handoff.clientMessagesAfter > 0 && (
-          <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-500">
+          <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-500">
             <MessageCircle className="h-3 w-3" />
             {handoff.clientMessagesAfter} sin responder
           </span>

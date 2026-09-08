@@ -432,7 +432,7 @@ export function FotosIA({
                 </div>
               </div>
               {(atributosIA.estado_conservacion === "sin_evidencia" || atributosIA.luminosidad === "sin_evidencia") && (
-                <p className="text-[11px] text-amber-500">
+                <p className="text-[11px] text-amber-700 dark:text-amber-500">
                   La IA no pudo evaluar {atributosIA.estado_conservacion === "sin_evidencia" && atributosIA.luminosidad === "sin_evidencia"
                     ? "el estado ni la luminosidad"
                     : atributosIA.estado_conservacion === "sin_evidencia" ? "el estado de conservación" : "la luminosidad"} con

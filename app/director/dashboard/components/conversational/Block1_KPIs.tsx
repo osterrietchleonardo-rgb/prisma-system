@@ -32,7 +32,7 @@ const KPI_CONFIG = [
     key: "chats_unicos",
     label: "Chats únicos",
     icon: MessageSquare,
-    color: "text-blue-400",
+    color: "text-blue-600 dark:text-blue-400",
     bg: "bg-blue-400/10",
     format: "number",
     tooltip: "Cantidad de conversaciones únicas de WhatsApp en el período analizado",
@@ -41,7 +41,7 @@ const KPI_CONFIG = [
     key: "visitas_agendadas",
     label: "Visitas agendadas",
     icon: CalendarCheck,
-    color: "text-emerald-400",
+    color: "text-emerald-700 dark:text-emerald-400",
     bg: "bg-emerald-400/10",
     format: "number",
     tooltip: "Conversaciones donde el lead confirmó una visita a una propiedad",
@@ -59,7 +59,7 @@ const KPI_CONFIG = [
     key: "seguimientos_ia",
     label: "Seguimientos IA",
     icon: Bot,
-    color: "text-purple-400",
+    color: "text-purple-600 dark:text-purple-400",
     bg: "bg-purple-400/10",
     format: "number",
     tooltip: "Mensajes proactivos enviados por el bot a leads que no habían respondido",
@@ -68,7 +68,7 @@ const KPI_CONFIG = [
     key: "tasa_consulta_visita",
     label: "Consulta → Visita",
     icon: Percent,
-    color: "text-teal-400",
+    color: "text-teal-700 dark:text-teal-400",
     bg: "bg-teal-400/10",
     format: "percent",
     tooltip: "% de chats únicos que derivaron en visita agendada",
@@ -77,7 +77,7 @@ const KPI_CONFIG = [
     key: "tasa_visita_reserva",
     label: "Visita → Reserva",
     icon: Percent,
-    color: "text-orange-400",
+    color: "text-orange-700 dark:text-orange-400",
     bg: "bg-orange-400/10",
     format: "percent",
     tooltip: "% de visitas que derivaron en reserva confirmada",
@@ -86,7 +86,7 @@ const KPI_CONFIG = [
     key: "consultas_apto_credito",
     label: "Consultas crédito",
     icon: CreditCard,
-    color: "text-sky-400",
+    color: "text-sky-700 dark:text-sky-400",
     bg: "bg-sky-400/10",
     format: "number",
     tooltip: "Leads que mencionaron o consultaron sobre crédito hipotecario",
@@ -95,7 +95,7 @@ const KPI_CONFIG = [
     key: "necesitan_vender_antes",
     label: "Necesitan vender antes",
     icon: Home,
-    color: "text-amber-400",
+    color: "text-amber-700 dark:text-amber-400",
     bg: "bg-amber-400/10",
     format: "number",
     tooltip: "Leads que indicaron que deben vender su propiedad actual primero",
@@ -104,7 +104,7 @@ const KPI_CONFIG = [
     key: "solicitaron_humano",
     label: "Pidieron asesor",
     icon: UserX,
-    color: "text-rose-400",
+    color: "text-rose-700 dark:text-rose-400",
     bg: "bg-rose-400/10",
     format: "number",
     tooltip: "Chats donde el lead pidió explícitamente ser atendido por una persona",
@@ -132,7 +132,7 @@ function KPICard({ config, value }: { config: typeof KPI_CONFIG[0]; value: numbe
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Info className="h-3 w-3 text-muted-foreground/50 cursor-help mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Info className="h-3 w-3 text-muted-foreground cursor-help mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[220px] text-xs">
                 {config.tooltip}
@@ -183,7 +183,7 @@ export function Block1KPIs({ kpis }: Block1KPIsProps) {
               <span className="font-bold">{kpis.derivados_a_humano || 0}</span>
               <span className="text-muted-foreground ml-1">derivados</span>
             </span>
-            <span className={`font-bold ${(kpis.tasa_derivacion_efectiva || 0) < 80 ? "text-rose-400" : "text-emerald-400"}`}>
+            <span className={`font-bold ${(kpis.tasa_derivacion_efectiva || 0) < 80 ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}`}>
               {kpis.tasa_derivacion_efectiva !== null && kpis.tasa_derivacion_efectiva !== undefined
                 ? `${kpis.tasa_derivacion_efectiva}% efectividad`
                 : "—"}

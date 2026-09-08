@@ -130,7 +130,7 @@ export function ManualContactFields({ onChange, inputClassName, emailRequired = 
   }) => {
     if (!show) return null;
     return match ? (
-      <p className="flex items-center gap-1 text-[11px] font-medium text-green-500">
+      <p className="flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-500">
         <Check className="w-3 h-3" /> {okLabel}
       </p>
     ) : (
@@ -214,7 +214,7 @@ export function ManualContactFields({ onChange, inputClassName, emailRequired = 
           />
           {phone.trim() !== "" &&
             (phonePreview ? (
-              <p className="flex items-center gap-1 text-[11px] font-medium text-green-500">
+              <p className="flex items-center gap-1 text-[11px] font-medium text-green-700 dark:text-green-500">
                 <Check className="w-3 h-3" /> Se guardará como {phonePreview}
               </p>
             ) : (

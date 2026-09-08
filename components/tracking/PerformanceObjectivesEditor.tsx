@@ -209,7 +209,7 @@ export function PerformanceObjectivesEditor() {
                 onClick={() => setMetric(m.key)}
                 className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${
                   metric === m.key
-                    ? "bg-accent text-white shadow-lg shadow-accent/20"
+                    ? "bg-accent text-accent-foreground shadow-lg shadow-accent/20"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
@@ -243,7 +243,7 @@ export function PerformanceObjectivesEditor() {
         <Button
           onClick={handleSave}
           disabled={isSaving || isLoading || isYearReadOnly || !dirty}
-          className="bg-accent hover:bg-accent/90 text-white font-bold h-10 px-6 rounded-xl gap-2"
+          className="bg-accent hover:bg-accent/90 text-accent-foreground font-bold h-10 px-6 rounded-xl gap-2"
         >
           {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Guardar objetivos
@@ -252,11 +252,11 @@ export function PerformanceObjectivesEditor() {
 
       {isLoading ? (
         <div className="h-64 flex flex-col items-center justify-center gap-4 text-muted-foreground border-2 border-dashed border-accent/10 rounded-[2rem] bg-accent/5">
-          <Loader2 className="w-10 h-10 animate-spin text-accent/50" />
+          <Loader2 className="w-10 h-10 animate-spin text-accent" />
           <p className="font-medium tracking-wide">Cargando objetivos...</p>
         </div>
       ) : advisors.length === 0 ? (
-        <div className="h-48 flex flex-col items-center justify-center gap-3 text-muted-foreground/60 border-2 border-dashed border-accent/10 rounded-[2rem]">
+        <div className="h-48 flex flex-col items-center justify-center gap-3 text-muted-foreground border-2 border-dashed border-accent/10 rounded-[2rem]">
           <Target className="w-10 h-10 opacity-20" />
           <p className="italic text-sm">No hay asesores en la inmobiliaria todavía.</p>
         </div>
@@ -273,7 +273,7 @@ export function PerformanceObjectivesEditor() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left min-w-[1100px]">
-              <thead className="bg-muted/30 text-muted-foreground/70 border-y border-accent/5">
+              <thead className="bg-muted/30 text-muted-foreground border-y border-accent/5">
                 <tr>
                   <th className="px-5 py-3 font-bold min-w-[180px] sticky left-0 bg-muted/95 backdrop-blur-md z-10 border-r border-accent/10">
                     Asesor
@@ -304,7 +304,7 @@ export function PerformanceObjectivesEditor() {
                       <span className="text-[11px] font-bold text-accent">% del mes</span>
                       <span
                         className={`text-[10px] font-semibold ${
-                          pesos100 ? "text-emerald-400" : "text-red-400"
+                          pesos100 ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
                         }`}
                       >
                         Suma: {Number.isInteger(sumaPesos) ? sumaPesos : sumaPesos.toFixed(1)}%{" "}

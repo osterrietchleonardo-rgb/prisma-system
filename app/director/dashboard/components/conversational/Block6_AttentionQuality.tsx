@@ -218,7 +218,7 @@ export function Block6AttentionQuality({ attention, totalConversations }: {
           <p className="text-xs text-muted-foreground leading-relaxed">
             <span className="text-accent font-semibold">Resumen del período:</span>{" "}
             De <span className="font-semibold text-foreground/80">{totalConversations}</span> conversaciones,{" "}
-            <span className="font-semibold text-purple-400">{a.bot_handled}</span> fueron resueltas íntegramente por el bot y{" "}
+            <span className="font-semibold text-purple-600 dark:text-purple-400">{a.bot_handled}</span> fueron resueltas íntegramente por el bot y{" "}
             <span className="font-semibold text-accent">{a.human_escalated}</span> requirieron intervención humana
             {a.tasa_derivacion_efectiva != null && ` (con ${a.tasa_derivacion_efectiva}% de efectividad en la derivación)`}.
             {a.objeciones_frecuencia?.length > 0 && ` La principal objeción detectada fue "${a.objeciones_frecuencia[0].label}" (${a.objeciones_frecuencia[0].pct}% de los chats).`}

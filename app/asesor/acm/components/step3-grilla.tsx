@@ -148,7 +148,7 @@ export function Step3Grilla({
                   <TableCell className="align-middle">
                     <div className="font-bold flex items-center gap-1">
                       Comp #{i+1}
-                      {isOutlier && !isExcluded && <AlertCircle className="w-4 h-4 text-amber-500 inline-block ml-1 animate-pulse" />}
+                      {isOutlier && !isExcluded && <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-500 inline-block ml-1 animate-pulse" />}
                     </div>
                     <div className="text-[10px] text-muted-foreground truncate w-24">
                       {comp.fuente}
@@ -234,12 +234,12 @@ export function Step3Grilla({
       </div>
 
       {resultado.resultados_comparables.some(c => c.es_outlier && !c.excluido) && (
-        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-500 rounded-xl p-4 flex items-center justify-between">
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-500 rounded-xl p-4 flex items-center justify-between">
           <div className="flex items-center gap-3 font-medium text-sm">
             <AlertCircle className="w-5 h-5 shrink-0" />
             <span>Hay comparables que se desvían más de un 20% de la media (Outliers). Revise sus características o exclúyalos.</span>
           </div>
-          <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-500 hover:bg-amber-500/20 whitespace-nowrap" onClick={() => {
+          <Button variant="outline" size="sm" className="border-amber-500/30 text-amber-800 dark:text-amber-500 hover:bg-amber-500/20 whitespace-nowrap" onClick={() => {
             const outLiersIds = resultado.resultados_comparables.filter(c => c.es_outlier).map(c => c.comparable_id);
             setExcluidos([...new Set([...excluidos, ...outLiersIds])]);
           }}>

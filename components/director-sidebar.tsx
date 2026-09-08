@@ -50,7 +50,7 @@ export function DirectorSidebar({ className, agencyName, agencyId, userName, use
 
       <div className="px-4 mb-4">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-accent/5 border border-accent/10">
-          <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold">
+          <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold">
             {userName?.charAt(0) || "U"}
           </div>
           <div>

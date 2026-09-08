@@ -22,8 +22,8 @@ function VarBadge({ val }: { val: number | null }) {
         isNeutral
           ? "bg-muted/30 text-muted-foreground"
           : isPositive
-          ? "bg-red-500/10 text-red-400"
-          : "bg-emerald-500/10 text-emerald-400"
+          ? "bg-red-500/10 text-red-800 dark:text-red-400"
+          : "bg-emerald-500/10 text-emerald-800 dark:text-emerald-400"
       }`}
     >
       {isNeutral ? (
@@ -85,7 +85,7 @@ export function ICCCard({ icc }: ICCCardProps) {
           )}
         </div>
         {hasError && (
-          <div className="flex items-center gap-1 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-1">
+          <div className="flex items-center gap-1 text-xs text-amber-800 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full px-2 py-1">
             <AlertTriangle className="w-3 h-3" />
             Sin datos · estadisticaciudad.gob.ar
           </div>
@@ -94,7 +94,7 @@ export function ICCCard({ icc }: ICCCardProps) {
 
       {hasError ? (
         <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0" />
           No se pudo obtener el índice ICC IDECBA (CABA)
         </div>
       ) : (
@@ -104,7 +104,7 @@ export function ICCCard({ icc }: ICCCardProps) {
               key={ch.label}
               className={`rounded-xl border p-4 ${ch.color}`}
             >
-              <p className="text-xs text-muted-foreground font-medium mb-2">{ch.label}</p>
+              <p className="text-xs text-foreground/70 font-medium mb-2">{ch.label}</p>
               <p className="text-xl font-bold tabular-nums mb-2">
                 {ch.value !== null ? ch.value.toLocaleString("es-AR", { minimumFractionDigits: 1 }) : "—"}
               </p>
@@ -115,10 +115,10 @@ export function ICCCard({ icc }: ICCCardProps) {
       )}
 
       <div className="mt-4 flex flex-col gap-2 pt-4 border-t border-border/50">
-        <p className="text-xs text-amber-300/80 font-medium bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+        <p className="text-xs text-amber-800 dark:text-amber-300 font-medium bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
           ⚠ Índice base 2012=100. No es un precio absoluto en $/m².
         </p>
-        <p className="text-[10px] text-muted-foreground/50">
+        <p className="text-[10px] text-muted-foreground">
           Fuente: IDECBA (CABA) · estadisticaciudad.gob.ar
         </p>
       </div>

@@ -136,7 +136,7 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
     <div className="space-y-4">
       {sinCliente > 0 && (
         <div className="flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs">
-          <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <AlertCircle className="w-4 h-4 text-amber-700 dark:text-amber-500 shrink-0 mt-0.5" />
           <p className="text-muted-foreground">
             <strong className="text-foreground">
               {sinCliente} {sinCliente === 1 ? "actividad" : "actividades"} sin cliente vinculado

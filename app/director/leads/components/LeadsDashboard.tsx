@@ -78,7 +78,7 @@ export function LeadsDashboard({ leads, tagsByGroup, lastSync }: LeadsDashboardP
            <div className="space-y-1">
               <h1 className="text-xl md:text-2xl font-black tracking-tight flex flex-wrap items-center gap-2 text-foreground">
                  Análisis de Leads — Tokko CRM
-                 <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 text-[9px] md:text-[10px] font-bold">
+                 <Badge variant="outline" className="bg-emerald-500/10 text-emerald-800 dark:text-emerald-500 border-emerald-500/20 text-[9px] md:text-[10px] font-bold">
                     Datos Reales (Sincronizado)
                  </Badge>
               </h1>

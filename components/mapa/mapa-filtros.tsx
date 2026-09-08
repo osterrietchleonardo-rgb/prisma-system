@@ -105,8 +105,8 @@ export function MapaFiltros({
                 onClick={() => alternarAmbiente(n)}
                 className={`min-w-9 border-r border-zinc-200 px-2.5 text-sm font-medium transition-colors last:border-r-0 dark:border-zinc-800 ${
                   elegido
-                    ? "bg-sky-600 text-white"
-                    : "bg-transparent text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    ? "bg-sky-700 text-white"
+                    : "bg-transparent text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:text-zinc-300 dark:hover:bg-zinc-800"
                 }`}
               >
                 {n === AMBIENTES_TOPE ? `${n}+` : n}

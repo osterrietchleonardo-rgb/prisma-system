@@ -30,9 +30,9 @@ interface ContratosGeneradosProps {
 }
 
 const ESTADO_GESTION_COLORS: Record<string, string> = {
-  original: "bg-green-500/10 text-green-500 border-green-500/20",
-  modificado: "bg-yellow-500/10 text-yellow-500 border-yellow-500/20",
-  eliminado: "bg-red-500/10 text-red-500 border-red-500/20",
+  original: "bg-green-500/10 text-green-800 dark:text-green-500 border-green-500/20",
+  modificado: "bg-yellow-500/10 text-yellow-800 dark:text-yellow-500 border-yellow-500/20",
+  eliminado: "bg-red-500/10 text-red-800 dark:text-red-500 border-red-500/20",
 }
 
 /** Datos del cliente derivados del form_data (varias convenciones de placeholder). */
@@ -281,7 +281,7 @@ export function ContratosGenerados({ role, onEdit }: ContratosGeneradosProps) {
             <Button
               onClick={confirmAction}
               disabled={processing}
-              className={actionTarget?.tipo === "eliminar" ? "bg-destructive hover:bg-destructive/90 text-white" : "bg-accent hover:bg-accent/90 text-accent-foreground"}
+              className={actionTarget?.tipo === "eliminar" ? "bg-destructive hover:bg-destructive/90 text-accent-foreground" : "bg-accent hover:bg-accent/90 text-accent-foreground"}
             >
               {processing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               {actionTarget?.tipo === "modificar" ? "Continuar" : "Eliminar"}

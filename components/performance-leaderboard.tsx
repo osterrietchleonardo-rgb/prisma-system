@@ -63,10 +63,10 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
 
   const getBadgeColor = (classification: string) => {
     const cls = classification?.toLowerCase() || "";
-    if (cls.includes('elite') || cls.includes('top') || cls.includes('estrella')) return "bg-yellow-500/20 text-yellow-500 border-yellow-500/50";
-    if (cls.includes('sólido') || cls.includes('solido') || cls.includes('consistente')) return "bg-blue-500/20 text-blue-500 border-blue-500/50";
-    if (cls.includes('desarrollo') || cls.includes('aprendizaje')) return "bg-orange-500/20 text-orange-500 border-orange-500/50";
-    return "bg-slate-500/20 text-slate-400 border-slate-500/50";
+    if (cls.includes('elite') || cls.includes('top') || cls.includes('estrella')) return "bg-yellow-500/20 text-yellow-800 dark:text-yellow-500 border-yellow-500/50";
+    if (cls.includes('sólido') || cls.includes('solido') || cls.includes('consistente')) return "bg-blue-500/20 text-blue-800 dark:text-blue-500 border-blue-500/50";
+    if (cls.includes('desarrollo') || cls.includes('aprendizaje')) return "bg-orange-500/20 text-orange-800 dark:text-orange-500 border-orange-500/50";
+    return "bg-slate-500/20 text-slate-800 dark:text-slate-400 border-slate-500/50";
   };
 
   const MetricHeader = ({ icon: Icon, label, tooltip }: { icon: any, label: string, tooltip: string }) => (
@@ -103,7 +103,7 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
       <CardContent className="p-0">
         <div className="overflow-x-auto w-full">
           <table className="w-full text-sm text-left min-w-[1080px]">
-            <thead className="bg-muted/30 text-muted-foreground/70 border-b border-accent/5">
+            <thead className="bg-muted/30 text-muted-foreground border-b border-accent/5">
               <tr>
                 <th className="px-6 py-4 font-bold min-w-[200px] sticky left-0 bg-muted/95 backdrop-blur-md z-20 border-r border-accent/10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.3)]">Asesor</th>
                 <MetricHeader icon={MessageSquare} label="Chats" tooltip="WhatsApp Recibidos" />
@@ -135,46 +135,46 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
                     </div>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <span className="font-medium text-blue-400/80">{advisor.wa_chats}</span>
+                    <span className="font-medium text-blue-600 dark:text-blue-400">{advisor.wa_chats}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <span className="font-medium text-indigo-400/80">{advisor.prospeccion}</span>
+                    <span className="font-medium text-indigo-600 dark:text-indigo-400">{advisor.prospeccion}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <span className="font-medium text-amber-400/80">{advisor.prelisting}</span>
+                    <span className="font-medium text-amber-700 dark:text-amber-400">{advisor.prelisting}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <span className="font-medium text-teal-400/80">{advisor.acm}</span>
+                    <span className="font-medium text-teal-700 dark:text-teal-400">{advisor.acm}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <span className="font-medium text-purple-400/80">{advisor.compradores}</span>
+                    <span className="font-medium text-purple-600 dark:text-purple-400">{advisor.compradores}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <span className="font-bold text-emerald-400/90">{advisor.captaciones}</span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">{advisor.captaciones}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <span className="font-bold text-orange-400/90">{advisor.reservas}</span>
+                    <span className="font-bold text-orange-700 dark:text-orange-400">{advisor.reservas}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <span className="font-bold text-red-400/90">{advisor.transacciones}</span>
+                    <span className="font-bold text-red-600 dark:text-red-400">{advisor.transacciones}</span>
                   </td>
                   <td className="px-3 py-4 text-center">
-                    <Badge variant="secondary" className="bg-slate-500/10 text-slate-400 border-none font-mono text-[10px]">
+                    <Badge variant="secondary" className="bg-slate-500/10 text-slate-700 dark:text-slate-400 border-none font-mono text-[10px]">
                       {advisor.cartera_activa}
                     </Badge>
                   </td>
                   <td className="px-3 py-4 text-center">
                     <span className={cn(
                       "font-mono text-[11px] font-bold",
-                      advisor.rotacion >= 10 ? "text-green-400" : 
-                      advisor.rotacion >= 5 ? "text-blue-400" : "text-orange-400"
+                      advisor.rotacion >= 10 ? "text-green-700 dark:text-green-400" : 
+                      advisor.rotacion >= 5 ? "text-blue-600 dark:text-blue-400" : "text-orange-700 dark:text-orange-400"
                     )}>
                       {advisor.rotacion.toFixed(1)}%
                     </span>
                   </td>
                   <td className="px-3 py-4 text-center">
                     {advisor.facturacion === null ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/50 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider font-semibold text-muted-foreground whitespace-nowrap">
                         <Lock className="h-3 w-3" />
                         Privado
                       </span>
@@ -206,7 +206,7 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
                             ) : (
                               // El motivo cita la facturación exacta ("Facturación US$12.500 y 3
                               // transacciones..."), así que se oculta junto con ella.
-                              <p className="text-xs text-muted-foreground/60 leading-relaxed italic">
+                              <p className="text-xs text-muted-foreground leading-relaxed italic">
                                 El detalle de esta clasificación es privado.
                               </p>
                             )}
@@ -221,7 +221,7 @@ export function PerformanceLeaderboard({ advisors }: PerformanceLeaderboardProps
                 <tr>
                   {/* 13 columnas: Asesor + 11 métricas + Clasificación */}
                   <td colSpan={13} className="px-6 py-16 text-center">
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground/50">
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
                       <LayoutDashboard className="h-10 w-10 opacity-20" />
                       <p className="italic text-sm font-light">No hay actividad registrada en este período.</p>
                     </div>

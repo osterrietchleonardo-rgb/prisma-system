@@ -183,7 +183,7 @@ export function MarketingAiSettings() {
                   onClick={addColor}
                   className="w-16 h-16 rounded-xl border-2 border-dashed border-accent/20 flex items-center justify-center hover:border-accent/40 hover:bg-accent/5 transition-all"
                 >
-                  <Plus className="w-6 h-6 text-accent/40" />
+                  <Plus className="w-6 h-6 text-accent" />
                 </button>
               )}
             </div>

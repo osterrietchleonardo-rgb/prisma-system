@@ -318,7 +318,7 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
   if (debugError && conversations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
-        <MessageSquare className="h-10 w-10 text-muted-foreground/50" />
+        <MessageSquare className="h-10 w-10 text-muted-foreground" />
         <p className="font-medium">No pudimos cargar las conversaciones</p>
         <p className="text-sm text-muted-foreground max-w-xs">
           Puede ser una demora momentánea. Probá de nuevo en unos segundos.
@@ -330,7 +330,7 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
           <RefreshCw className="h-4 w-4" />
           Reintentar
         </button>
-        <p className="text-[11px] text-muted-foreground/60 mt-2">{debugError}</p>
+        <p className="text-[11px] text-muted-foreground mt-2">{debugError}</p>
       </div>
     )
   }
@@ -548,7 +548,7 @@ export function ConversationsList({ instance, activeId, onSelect, hideAgentFilte
                       </div>
                     )}
 
-                    <p className="text-[11px] text-muted-foreground/80 truncate italic">
+                    <p className="text-[11px] text-muted-foreground truncate italic">
                       {conv.last_message_text || "Conversación iniciada"}
                     </p>
                   </div>

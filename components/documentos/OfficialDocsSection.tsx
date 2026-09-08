@@ -508,7 +508,7 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
                         {folders.map((f) => (
                           <SelectItem key={f.id} value={f.id}>
                             <div className="flex items-center gap-2">
-                              <Folder className="h-4 w-4 text-accent/60" />
+                              <Folder className="h-4 w-4 text-accent" />
                               <span>{folderLabel(f.id)}</span>
                             </div>
                           </SelectItem>
@@ -557,7 +557,7 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
                       <div className="max-h-40 overflow-y-auto custom-scrollbar space-y-1.5 rounded-xl border border-accent/10 bg-muted/20 p-2">
                         {selectedFiles.map((file, i) => (
                           <div key={`${file.name}-${i}`} className="flex w-full items-center gap-2 rounded-lg bg-card/60 px-3 py-2">
-                            <FileText className="h-4 w-4 text-accent/70 shrink-0" />
+                            <FileText className="h-4 w-4 text-accent shrink-0" />
                             <span className="text-xs font-medium truncate min-w-0 flex-1" title={file.name}>{titleFromFileName(file.name)}</span>
                             {formatBytes(file.size) && (
                               <span className="text-[10px] text-muted-foreground shrink-0">{formatBytes(file.size)}</span>
@@ -676,7 +676,7 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
           const isLast = i === breadcrumb.length - 1
           return (
             <div key={folder.id} className="flex items-center gap-1 shrink-0">
-              <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               <Button
                 variant="ghost"
                 size="sm"
@@ -751,7 +751,7 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
         ) : filteredDocs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[400px] text-center bg-muted/20 rounded-3xl border-2 border-dashed border-accent/10">
             <div className="w-20 h-20 bg-accent/5 rounded-full flex items-center justify-center mb-4">
-              <ShieldCheck className="h-10 w-10 text-accent/40" />
+              <ShieldCheck className="h-10 w-10 text-accent" />
             </div>
             <h3 className="text-xl font-semibold text-foreground">
               {isSearching ? "Sin resultados" : "No hay documentos oficiales"}
@@ -825,7 +825,7 @@ export default function OfficialDocsSection({ readOnly = false }: OfficialDocsSe
                       </div>
                     ) : <span />}
                     <Button variant="outline" size="sm"
-                      className="rounded-lg px-4 h-9 text-xs border-accent/20 bg-accent/5 hover:bg-accent hover:text-white transition-all duration-300"
+                      className="rounded-lg px-4 h-9 text-xs border-accent/20 bg-accent/5 hover:bg-accent hover:text-accent-foreground transition-all duration-300"
                       onClick={() => handleDownload(doc)}>
                       Descargar <Download className="ml-1.5 h-3 w-3" />
                     </Button>

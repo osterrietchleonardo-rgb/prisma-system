@@ -10,7 +10,7 @@ export function DataStructureTab() {
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <StructureCard 
-          icon={<User className="h-6 w-6 text-blue-500" />}
+          icon={<User className="h-6 w-6 text-blue-700 dark:text-blue-500" />}
           title="Capa 1: Contacto"
           description="Datos básicos de identidad y comunicación recolectados del lead."
           items={[
@@ -22,7 +22,7 @@ export function DataStructureTab() {
           color="border-blue-500/20 bg-blue-500/5"
         />
         <StructureCard 
-          icon={<ShieldCheck className="h-6 w-6 text-emerald-500" />}
+          icon={<ShieldCheck className="h-6 w-6 text-emerald-700 dark:text-emerald-500" />}
           title="Capa 2: Agente Asignado"
           description="Información vinculada del asesor responsable dentro de la inmobiliaria."
           items={[
@@ -34,7 +34,7 @@ export function DataStructureTab() {
           color="border-emerald-500/20 bg-emerald-500/5"
         />
         <StructureCard 
-          icon={<Tags className="h-6 w-6 text-purple-500" />}
+          icon={<Tags className="h-6 w-6 text-purple-700 dark:text-purple-500" />}
           title="Capa 3: Etiquetas (Tags)"
           description="Meta-información para segmentación y automatización de procesos."
           items={[

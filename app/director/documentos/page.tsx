@@ -512,7 +512,7 @@ export default function DocumentosPage() {
             <DialogContent className="bg-card border-accent/20 sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-                  {uploadType === "file" ? <FileText className="text-accent" /> : <Video className="text-red-500" />}
+                  {uploadType === "file" ? <FileText className="text-accent" /> : <Video className="text-red-700 dark:text-red-500" />}
                   Agregar Recurso
                 </DialogTitle>
                 <DialogDescription>
@@ -551,7 +551,7 @@ export default function DocumentosPage() {
                         <SelectContent>
                           <SelectItem value="director">
                             <div className="flex items-center gap-2">
-                              <Lock className="h-4 w-4 text-orange-500" />
+                              <Lock className="h-4 w-4 text-orange-700 dark:text-orange-500" />
                               <span>Privado</span>
                             </div>
                           </SelectItem>
@@ -576,7 +576,7 @@ export default function DocumentosPage() {
                           {folders.map(f => (
                             <SelectItem key={f.id} value={f.id}>
                               <div className="flex items-center gap-2">
-                                <Folder className="h-4 w-4 text-accent/60" />
+                                <Folder className="h-4 w-4 text-accent" />
                                 <span>{f.name}</span>
                               </div>
                             </SelectItem>
@@ -607,8 +607,8 @@ export default function DocumentosPage() {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-1.5">
-                          <Sparkles className={cn("h-3.5 w-3.5", uploadAiEnabled ? "text-violet-400" : "text-muted-foreground")} />
-                          <span className={cn("text-sm font-medium", uploadAiEnabled ? "text-violet-300" : "text-muted-foreground")}>Permitir consulta via Tutor IA</span>
+                          <Sparkles className={cn("h-3.5 w-3.5", uploadAiEnabled ? "text-violet-600 dark:text-violet-400" : "text-muted-foreground")} />
+                          <span className={cn("text-sm font-medium", uploadAiEnabled ? "text-violet-600 dark:text-violet-300" : "text-muted-foreground")}>Permitir consulta via Tutor IA</span>
                         </div>
                         <p className="text-[10px] text-muted-foreground mt-0.5">Los asesores podrán consultar este contenido con la IA, sin poder ver ni descargar el archivo.</p>
                       </div>
@@ -761,7 +761,7 @@ export default function DocumentosPage() {
         ) : filteredDocs.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-[400px] text-center bg-muted/20 rounded-3xl border-2 border-dashed border-accent/10">
             <div className="w-20 h-20 bg-accent/5 rounded-full flex items-center justify-center mb-4">
-              <BookOpen className="h-10 w-10 text-accent/40" />
+              <BookOpen className="h-10 w-10 text-accent" />
             </div>
             <h3 className="text-xl font-semibold text-foreground">No se encontraron recursos</h3>
             <p className="text-muted-foreground mt-2 max-w-sm">
@@ -779,19 +779,19 @@ export default function DocumentosPage() {
                   <div className="flex justify-between items-start">
                     <div className={cn(
                       "p-3 rounded-2xl transition-colors",
-                      doc.type?.includes("youtube") ? "bg-red-500/10 text-red-500" : "bg-accent/10 text-accent"
+                      doc.type?.includes("youtube") ? "bg-red-500/10 text-red-800 dark:text-red-500" : "bg-accent/10 text-accent"
                     )}>
                       {doc.type?.includes("youtube") ? <Video className="h-6 w-6" /> : <FileText className="h-6 w-6" />}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <Badge variant="outline" className={cn(
                         "rounded-lg px-2 py-0 text-[10px] uppercase font-bold tracking-wider",
-                        doc.visibility === "director" ? "border-orange-500/20 text-orange-500 bg-orange-500/5" : "border-accent/20 text-accent bg-accent/5"
+                        doc.visibility === "director" ? "border-orange-500/20 text-orange-800 dark:text-orange-500 bg-orange-500/5" : "border-accent/20 text-accent bg-accent/5"
                       )}>
                         {doc.visibility === "director" ? "Privado" : "Público"}
                       </Badge>
                       {doc.visibility === "director" && doc.ai_enabled && (
-                        <Badge variant="outline" className="rounded-lg px-2 py-0 text-[10px] uppercase font-bold tracking-wider border-violet-500/20 text-violet-400 bg-violet-500/5 gap-1">
+                        <Badge variant="outline" className="rounded-lg px-2 py-0 text-[10px] uppercase font-bold tracking-wider border-violet-500/20 text-violet-800 dark:text-violet-400 bg-violet-500/5 gap-1">
                           <Sparkles className="h-2.5 w-2.5" /> IA
                         </Badge>
                       )}
@@ -835,7 +835,7 @@ export default function DocumentosPage() {
                           className={cn(
                             "h-9 w-9 rounded-lg transition-colors",
                             doc.ai_enabled 
-                              ? "text-violet-400 bg-violet-500/10 hover:bg-violet-500/20" 
+                              ? "text-violet-800 dark:text-violet-400 bg-violet-500/10 hover:bg-violet-500/20" 
                               : "text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400"
                           )}
                           disabled={togglingAi === doc.id}
@@ -866,7 +866,7 @@ export default function DocumentosPage() {
                       </Button>
                     </div>
                     {doc.file_url ? (
-                      <Button variant="outline" size="sm" className="rounded-lg px-4 h-9 text-xs border-accent/20 bg-accent/5 hover:bg-accent hover:text-white transition-all duration-300" onClick={() => {
+                      <Button variant="outline" size="sm" className="rounded-lg px-4 h-9 text-xs border-accent/20 bg-accent/5 hover:bg-accent hover:text-accent-foreground transition-all duration-300" onClick={() => {
                         const { data } = supabase.storage.from("documents").getPublicUrl(doc.file_url);
                         window.open(data.publicUrl, "_blank");
                       }}>

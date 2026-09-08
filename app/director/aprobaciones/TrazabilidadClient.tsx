@@ -25,14 +25,14 @@ interface Props {
 
 /** Ícono, color y etiqueta de cada categoría de renglón. El verde es del asesor: es LO que Kevin busca ver. */
 const ESTILO: Record<CategoriaTraza, { icono: typeof Bell; color: string; etiqueta: string }> = {
-  cliente: { icono: MessageSquare, color: "text-blue-500", etiqueta: "Cliente" },
+  cliente: { icono: MessageSquare, color: "text-blue-700 dark:text-blue-500", etiqueta: "Cliente" },
   bot: { icono: Bot, color: "text-muted-foreground", etiqueta: "Bot" },
-  asesor: { icono: UserCheck, color: "text-emerald-500", etiqueta: "Asesor" },
-  interno: { icono: EyeOff, color: "text-amber-500", etiqueta: "Interno" },
-  agente: { icono: Sparkles, color: "text-purple-500", etiqueta: "Super Agente" },
-  aviso: { icono: Bell, color: "text-orange-500", etiqueta: "Aviso" },
-  equipo: { icono: Users, color: "text-sky-500", etiqueta: "Equipo" },
-  visita: { icono: CalendarDays, color: "text-pink-500", etiqueta: "Visita" },
+  asesor: { icono: UserCheck, color: "text-emerald-700 dark:text-emerald-500", etiqueta: "Asesor" },
+  interno: { icono: EyeOff, color: "text-amber-700 dark:text-amber-500", etiqueta: "Interno" },
+  agente: { icono: Sparkles, color: "text-purple-700 dark:text-purple-500", etiqueta: "Super Agente" },
+  aviso: { icono: Bell, color: "text-orange-700 dark:text-orange-500", etiqueta: "Aviso" },
+  equipo: { icono: Users, color: "text-sky-700 dark:text-sky-500", etiqueta: "Equipo" },
+  visita: { icono: CalendarDays, color: "text-pink-700 dark:text-pink-500", etiqueta: "Visita" },
 }
 
 type Traza = Awaited<ReturnType<typeof trazaDeConversacion>>
@@ -161,7 +161,7 @@ export default function TrazabilidadClient({ conversaciones: inicial, asesores }
                 <div className="text-xs text-muted-foreground truncate">
                   {c.asesor?.full_name ?? "Sin asesor"} · {c.eventos} {c.eventos === 1 ? "evento" : "eventos"}
                 </div>
-                <div className="text-xs text-muted-foreground/80 truncate mt-0.5">{c.ultimoEvento}</div>
+                <div className="text-xs text-muted-foreground truncate mt-0.5">{c.ultimoEvento}</div>
               </button>
             ))}
           </div>
@@ -261,7 +261,7 @@ function Renglon({ evento, onNota }: { evento: EventoTraza; onNota: () => void }
         type="button"
         onClick={onNota}
         title="Agregar una nota acá"
-        className="self-start mt-1 p-1 rounded text-muted-foreground/50 hover:text-foreground hover:bg-muted md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0"
+        className="self-start mt-1 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0"
       >
         <Plus className="w-3.5 h-3.5" />
       </button>
