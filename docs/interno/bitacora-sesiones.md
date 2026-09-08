@@ -118,6 +118,18 @@ sube archivos y no guarda, quedan huérfanos en el bucket.
 
 ---
 
+## 2026-09-08 — LangChain / LangGraph / Deep Agents: evaluación frente a PRISMA
+
+Leonardo preguntó si el Super Agente usa "loop" o "graph engineering" y pidió leer nueve páginas
+de docs.langchain.com "detalladamente" y anotarlo. Respuesta verificada en el código: grafo
+determinista con un solo nodo agéntico (`decidirConAgente`, 6 vueltas, decisión por herramienta,
+rechazo si no investigó); estado en Supabase; corre en Vercel por reloj. Evaluación completa en
+`docs/interno/evaluacion-langchain-langgraph-2026-09-08.md`. Veredicto: no migrar a LangGraph;
+robar ideas (middleware/guardarraíles reutilizables, estado explícito por corrida, skills con
+carga progresiva y subagentes aislados para el Buscador, prompt caching). El hueco real que
+mostró la lectura: **no hay set de evaluación** guardado por agente; los JSON de hoy (81 casos de
+despedida, 156 derivaciones) son la semilla. Managed Deep Agents y OpenWiki: anotados, sin acción.
+
 ## 2026-09-07 — sesión Super Agente: la despedida no es una espera (caso de Kevin)
 
 **Qué pasó.** Kevin (WhatsApp 10:54): el chat de Agustins (…789) terminó en «Gracias!!» (6/9
