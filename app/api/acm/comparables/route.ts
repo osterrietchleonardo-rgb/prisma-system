@@ -26,6 +26,7 @@ import {
   COCHERA_PATRON,
 } from "@/lib/acm/subject";
 import { buildChecklist, type SubScores } from "@/lib/acm/checklist";
+import { resolverZonas, type ZonaFila } from "@/lib/acm/zonas-poligonos";
 import { TOPE_COMPARABLES } from "@/lib/tasacion/types";
 import type { AcmComparable, Operacion, Sujeto } from "@/lib/tasacion/types";
 
@@ -64,6 +65,49 @@ export async function POST(req: Request) {
     // sujeto es Casa Y el cliente destildó la casilla. Cualquier otro caso → false.
     const considerarPh = body.considerar_ph !== false;
     const excludePh = sujeto.tipo_propiedad === "casa" && considerarPh === false;
+
+    // ── Zonas dibujadas en el mapa ──────────────────────────────────────────────────────
+    // Del navegador llegan IDS, nunca polígonos: aceptar el dibujo ya hecho dejaría que
+    // cualquiera pida cualquier recorte. Y la lectura filtra por user_id ADEMÁS de por id
+    // porque createAdminClient saltea RLS y las zonas son privadas: ni el director ve las de
+    // un asesor (ver app/api/mapa/zonas/route.ts).
+    //
+    // Con dibujo, el gate de barrio queda apagado del lado de la función SQL (v_geo). `p_barrio`
+    // se sigue mandando porque el checklist muestra el barrio del sujeto, pero deja de filtrar.
+    const zonaIds: string[] = Array.isArray(body.zona_ids)
+      ? body.zona_ids.filter((x: unknown) => typeof x === "string" && x.length > 0).slice(0, 20)
+      : [];
+
+    let poligonos: string[] | null = null;
+    let zonasUsadas: { id: string; nombre: string }[] = [];
+    let zonasInvalidas: string[] = [];
+
+    if (zonaIds.length > 0) {
+      const { data: filasZonas, error: zonasErr } = await createAdminClient()
+        .from("mapa_zonas")
+        .select("id, nombre, geojson")
+        .in("id", zonaIds)
+        .eq("user_id", userId);
+      if (zonasErr) throw zonasErr;
+
+      const resuelto = resolverZonas((filasZonas || []) as ZonaFila[]);
+      zonasUsadas = resuelto.usadas;
+      zonasInvalidas = resuelto.invalidas;
+
+      // Pidió buscar dentro de un dibujo y no hay dibujo utilizable. Caer al barrio acá sería
+      // devolverle una búsqueda distinta de la que pidió, sin que se note.
+      if (resuelto.poligonos.length === 0) {
+        const detalle =
+          zonasInvalidas.length > 0
+            ? `El trazo de ${zonasInvalidas.join(", ")} no se puede usar.`
+            : "No encontramos esas zonas entre las tuyas.";
+        return NextResponse.json(
+          { error: `No pudimos buscar dentro de las zonas elegidas. ${detalle}` },
+          { status: 400 }
+        );
+      }
+      poligonos = resuelto.poligonos;
+    }
     // Zona: por defecto ESTRICTO (mismo barrio + sub-barrios). Los barrios limítrofes
     // (zona_score 50) solo entran si el asesor los pidió explícitamente. Viaja DENTRO de
     // `sujeto` (no aparte) para que quede persistido en acm_searches.sujeto y "Mis ACM"
@@ -128,6 +172,7 @@ export async function POST(req: Request) {
         p_peso_semantica: pesoSemantica,
         p_m2_cubierta: true,
         p_limit: limit,
+        p_poligonos: poligonos,
       }),
       supabase.rpc("acm_match_roomix", {
         p_query_embedding: embStr,
@@ -157,6 +202,7 @@ export async function POST(req: Request) {
         p_piso: sujeto.piso ?? null,
         p_orientacion: orientacionParam(sujeto),
         p_disposicion: disposicionParam(sujeto),
+        p_poligonos: poligonos,
       }),
     ]);
 
@@ -346,7 +392,9 @@ export async function POST(req: Request) {
           agency_id: agencyId,
           user_id: userId,
           operacion,
-          sujeto,
+          // Las zonas viajan DENTRO del sujeto (mismo criterio que incluir_linderos): es lo
+          // unico que se fotografia, asi que es lo unico que "Mis ACM" puede leer al reabrir.
+          sujeto: zonasUsadas.length > 0 ? { ...sujeto, zonas: zonasUsadas } : sujeto,
           exclude_id: excludeId,
           // `cartera_fallo`/`roomix_fallo` viajan DENTRO de `resultados` (mismo criterio que
           // `con_semantica`, ya guardado acá): es el único campo de esta fila que
@@ -379,6 +427,10 @@ export async function POST(req: Request) {
         // resultado parcial como si fuera completo.
         cartera_fallo: carteraFallo,
         roomix_fallo: roomixFallo,
+        // Nombres, no ids: es lo que se muestra en el chip "Dentro de: ...".
+        zonas_usadas: zonasUsadas.map((z) => z.nombre),
+        // Zonas cuyo trazo no se pudo usar. Se avisan; nunca se ignoran en silencio.
+        zonas_invalidas: zonasInvalidas,
       },
     });
   } catch (e: any) {
