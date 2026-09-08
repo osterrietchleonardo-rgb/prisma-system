@@ -37,6 +37,13 @@ interface Props {
   searchId?: string | null;
   /** Avisa qué fila del historial quedó asociada a la ficha recién creada. */
   onFichaCreada?: (searchId: string | null) => void;
+  /**
+   * Nombres de las zonas dibujadas con las que se acotó esta búsqueda, tal como los devolvió el
+   * servidor. Vacío = búsqueda por barrio.
+   */
+  zonasUsadas?: string[];
+  /** Rehace la búsqueda por barrio, destildando las zonas. */
+  onBuscarSinZona?: () => void;
   onVolver: () => void;
 }
 
@@ -430,7 +437,8 @@ function Section({
 const MAX_FICHA = 12;
 
 export function ComparablesResult({
-  sujeto, operacion, cartera, roomix, conSemantica, carteraFallo, roomixFallo, searchId, onFichaCreada, onVolver,
+  sujeto, operacion, cartera, roomix, conSemantica, carteraFallo, roomixFallo, searchId, onFichaCreada,
+  zonasUsadas = [], onBuscarSinZona, onVolver,
 }: Props) {
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -767,6 +775,27 @@ export function ComparablesResult({
           </Button>
         </div>
       </div>
+
+      {/* Búsqueda acotada a un dibujo: se dice con qué zonas, cuántos entraron y se ofrece la
+          salida. El sistema nunca amplía solo — pero tampoco te deja sin el botón para hacerlo. */}
+      {zonasUsadas.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border border-accent/20 bg-accent/5">
+          <div className="text-sm">
+            <p className="font-bold">Dentro de: {zonasUsadas.join(" + ")}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {cartera.length + roomix.length === 0
+                ? "No hay ningún comparable adentro del dibujo."
+                : `${cartera.length + roomix.length} comparables adentro del dibujo.`}{" "}
+              Las propiedades sin ubicación en el mapa quedan afuera de una búsqueda por zona.
+            </p>
+          </div>
+          {onBuscarSinZona && (
+            <Button variant="outline" size="sm" className="border-accent/20 shrink-0" onClick={onBuscarSinZona}>
+              Buscar sin la zona
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Interruptor de la 3ra capa (fotos contra fotos): solo aparece si hay algo que
           comparar. Es una mitigación sin probar en producción — tiene que poder apagarse. */}

@@ -47,6 +47,12 @@ interface SubjectInputProps {
   onConsiderarPhChange: (v: boolean) => void;
   incluirLinderos: boolean;
   onIncluirLinderosChange: (v: boolean) => void;
+  /** Dónde buscar. Los dos modos son excluyentes y "barrio" es el que viene puesto. */
+  modoZona: "barrio" | "zonas";
+  onModoZonaChange: (m: "barrio" | "zonas") => void;
+  /** Ids de `mapa_zonas` tildados. Solo cuentan en el modo "zonas". */
+  zonasElegidas: string[];
+  onZonasElegidasChange: (ids: string[]) => void;
   descripcionIa: string;
   onDescripcionIaChange: (v: string) => void;
   incluirDescFicha: boolean;
@@ -114,6 +120,10 @@ export function SubjectInput({
   onConsiderarPhChange,
   incluirLinderos,
   onIncluirLinderosChange,
+  modoZona,
+  onModoZonaChange,
+  zonasElegidas,
+  onZonasElegidasChange,
   descripcionIa,
   onDescripcionIaChange,
   incluirDescFicha,
@@ -242,7 +252,27 @@ export function SubjectInput({
     }
   };
 
-  const isValido = sujeto.barrio && sujeto.m2_cubiertos > 0;
+  // Las zonas son PRIVADAS: este endpoint ya devuelve solo las del usuario logueado, y no hay
+  // forma de pedir las de otro. Ver app/api/mapa/zonas/route.ts.
+  const [zonas, setZonas] = useState<{ id: string; nombre: string }[]>([]);
+  const [zonasCargando, setZonasCargando] = useState(true);
+
+  useEffect(() => {
+    let vivo = true;
+    fetch("/api/mapa/zonas")
+      .then((r) => r.json())
+      .then((d) => { if (vivo) setZonas(d.zonas || []); })
+      .catch(() => { if (vivo) setZonas([]); })
+      .finally(() => { if (vivo) setZonasCargando(false); });
+    return () => { vivo = false; };
+  }, []);
+
+  const sinZonasGuardadas = !zonasCargando && zonas.length === 0;
+  // Modo zonas sin ninguna tildada: NO se busca. Caer al barrio ahí sería hacer una búsqueda
+  // distinta de la que el asesor pidió, sin que se note.
+  const modoZonasSinElegir = modoZona === "zonas" && zonasElegidas.length === 0;
+
+  const isValido = sujeto.barrio && sujeto.m2_cubiertos > 0 && !modoZonasSinElegir;
 
   const ModoBtn = ({ value, icon: Icon, label }: { value: Modo; icon: any; label: string }) => (
     <button
@@ -295,23 +325,117 @@ export function SubjectInput({
         </label>
       )}
 
-      {/* Barrios linderos: apagado por defecto. Con el gate estricto entran el mismo barrio
-          y sus sub-barrios (Belgrano R, Palermo Soho); los limítrofes (Núñez, Saavedra)
-          solo si el asesor los pide. */}
-      <label className="flex items-start gap-3 p-4 rounded-2xl border border-accent/10 bg-card/20 cursor-pointer">
-        <Checkbox
-          checked={incluirLinderos}
-          onCheckedChange={(v) => onIncluirLinderosChange(v === true)}
-          className="mt-0.5"
-        />
-        <span className="text-sm">
-          <span className="font-bold">Incluir barrios linderos</span>
-          <span className="block text-xs text-muted-foreground mt-0.5">
-            Por defecto se comparan solo propiedades del mismo barrio. Tildá si necesitás
-            ampliar a los barrios vecinos; los que entren van marcados como “lindero”.
+      {/* DÓNDE BUSCAR · dos opciones excluyentes. La de barrio es la que viene puesta: sin
+          tocar nada, el ACM se comporta igual que antes de que esto existiera. */}
+      <div className="rounded-2xl border border-accent/10 bg-card/20 overflow-hidden">
+        <p className="px-4 pt-4 text-[10px] font-bold uppercase tracking-widest text-accent">Dónde buscar</p>
+
+        {/* Opción 1 · el barrio de la propiedad.
+            El redondel va oculto a la vista pero presente para el teclado y el lector de
+            pantalla: lo que se ve es la fila resaltada, igual que el selector de modo de arriba.
+            Un redondel visible acá no servía — con el --radius del proyecto (0.75rem) la casilla
+            de tildar queda en 8px sobre 16px, o sea un círculo idéntico, y no se distinguía
+            "elegí uno" de "tildá si querés". */}
+        <label
+          className={cn(
+            "flex items-start gap-3 p-4 m-2 rounded-xl border cursor-pointer transition-all",
+            modoZona === "barrio" ? "border-accent bg-accent/10" : "border-transparent hover:border-accent/30"
+          )}
+        >
+          <input
+            type="radio"
+            name="acm-donde-buscar"
+            checked={modoZona === "barrio"}
+            onChange={() => { onModoZonaChange("barrio"); onZonasElegidasChange([]); }}
+            className="sr-only"
+          />
+          <span className="text-sm">
+            <span className={cn("font-bold", modoZona === "barrio" && "text-accent")}>
+              En el barrio de la propiedad
+            </span>
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              Se comparan propiedades del mismo barrio y sus sub-barrios.
+            </span>
           </span>
-        </span>
-      </label>
+        </label>
+
+        {/* El switch de linderos pertenece al modo barrio: en el modo zonas no significa nada. */}
+        <label
+          className={cn(
+            "flex items-start gap-3 px-6 pb-4 pl-8",
+            modoZona === "zonas" ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+          )}
+        >
+          <Checkbox
+            checked={incluirLinderos}
+            disabled={modoZona === "zonas"}
+            onCheckedChange={(v) => onIncluirLinderosChange(v === true)}
+            className="mt-0.5"
+          />
+          <span className="text-sm">
+            <span className="font-bold">Incluir barrios linderos</span>
+            <span className="block text-xs text-muted-foreground mt-0.5">
+              {modoZona === "zonas"
+                ? "No aplica: el dibujo reemplaza al barrio."
+                : "Tildá si necesitás ampliar a los barrios vecinos; los que entren van marcados como “lindero”."}
+            </span>
+          </span>
+        </label>
+
+        {/* Opción 2 · las zonas dibujadas en el mapa */}
+        <div>
+          <label
+            className={cn(
+              "flex items-start gap-3 p-4 m-2 rounded-xl border transition-all",
+              sinZonasGuardadas
+                ? "border-transparent opacity-50 cursor-not-allowed"
+                : modoZona === "zonas"
+                  ? "border-accent bg-accent/10 cursor-pointer"
+                  : "border-transparent hover:border-accent/30 cursor-pointer"
+            )}
+          >
+            <input
+              type="radio"
+              name="acm-donde-buscar"
+              checked={modoZona === "zonas"}
+              disabled={sinZonasGuardadas}
+              onChange={() => onModoZonaChange("zonas")}
+              className="sr-only"
+            />
+            <span className="text-sm">
+              <span className={cn("font-bold", modoZona === "zonas" && "text-accent")}>
+                Solo dentro de mis zonas del mapa
+              </span>
+              <span className="block text-xs text-muted-foreground mt-0.5">
+                {sinZonasGuardadas
+                  ? "Todavía no dibujaste ninguna. Se crean en el Buscador IA, en la solapa Mapa: dibujás el área y la guardás con un nombre."
+                  : "Se compara únicamente con lo que cae adentro del dibujo. Podés tildar más de una y se suman."}
+              </span>
+            </span>
+          </label>
+
+          {modoZona === "zonas" && zonas.length > 0 && (
+            <div className="px-6 pb-4 pl-8 flex flex-col gap-2">
+              {zonas.map((z) => (
+                <label key={z.id} className="flex items-center gap-2.5 cursor-pointer">
+                  <Checkbox
+                    checked={zonasElegidas.includes(z.id)}
+                    onCheckedChange={(v) =>
+                      onZonasElegidasChange(
+                        v === true ? [...zonasElegidas, z.id] : zonasElegidas.filter((id) => id !== z.id)
+                      )
+                    }
+                  />
+                  <span className="text-sm">{z.nombre}</span>
+                </label>
+              ))}
+              {modoZonasSinElegir && (
+                <p className="text-xs text-amber-500 mt-1">Elegí al menos una zona para poder buscar.</p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Modo cartera */}
       {modo === "cartera" && (
