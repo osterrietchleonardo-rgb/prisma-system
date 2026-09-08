@@ -10,6 +10,7 @@ import type { OverlayOptions } from "sharp";
 import { armarFranjaLegal } from "@/lib/marketing-ia/aviso-legal";
 import { formatoDe } from "@/lib/marketing-ia/formatos";
 import { halodeContraste, prepararLogo } from "@/lib/marketing-ia/logo";
+import { urlDelLogo } from "@/lib/marketing-ia/logo-variante";
 
 const buildImagePrompt = (payload: GenerateImagePayload, branding?: any): string => {
   // El tamano ya NO depende de que el modelo lea bien esta linea: va por parametro
@@ -24,7 +25,7 @@ const buildImagePrompt = (payload: GenerateImagePayload, branding?: any): string
       ? `PALETA DE COLORES DE MARCA: ${branding.brand_colors.join(', ')}. Usar estos colores para elementos gráficos, acentos y armonía visual.` 
       : '';
     
-    const logoArea = branding.logo_url 
+    const logoArea = urlDelLogo(branding, payload.logo_variant)
       ? `COMPOSICIÓN DE MARCA: La fotografía debe abarcar todo el lienzo de forma continua. NO dibujar recuadros blancos, cajas ni parches geométricos vacíos.`
       : '';
     
@@ -170,7 +171,10 @@ export async function POST(req: Request) {
       }
 
       // ─── Deterministic Logo Overlay via Sharp ──────────────────────
-      const logoUrl = marketingConfig.logo_url || agency?.logo_url;
+      // Cual de los dos logos de la agencia (estandar / lujo) lo eligio la persona al generar.
+      // Si pidio lujo y la agencia no lo cargo, urlDelLogo devuelve el estandar: la placa nunca
+      // se queda sin logo por esta eleccion. Ver lib/marketing-ia/logo-variante.ts.
+      const logoUrl = urlDelLogo(marketingConfig, payload.logo_variant) || agency?.logo_url;
       console.log('[DEBUG] Logo URL detected:', logoUrl);
 
       if (logoUrl) {

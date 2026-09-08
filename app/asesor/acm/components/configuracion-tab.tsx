@@ -6,12 +6,17 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Palette, Save } from "lucide-react";
 import { normalizarMaterial, type AcmMaterial } from "@/lib/acm/material";
+import type { VarianteLogo } from "@/lib/marketing-ia/logo-variante";
 import { ConfigMaterial } from "./config-material";
 
 /** La marca viaja para MOSTRARLA. Se edita en Marketing IA, no acá. */
 interface Marca {
   colors: string[];
   logo_url: string | null;
+  /** Cuál de los dos logos le tocó a la ficha del ACM, según los toggles de Marketing IA. */
+  logo_variante?: VarianteLogo;
+  /** Si la agencia cargó las dos versiones. Con una sola no hay nada que aclarar. */
+  dos_logos?: boolean;
   legal_notice: string;
 }
 
@@ -98,8 +103,15 @@ export function ConfiguracionTab() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Logo:</span>
             {marca.logo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={marca.logo_url} alt="Logo de la agencia" className="h-6 object-contain" />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={marca.logo_url} alt="Logo de la agencia" className="h-6 object-contain" />
+                {marca.dos_logos && (
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    versión {marca.logo_variante === "lujo" ? "lujo" : "estándar"}
+                  </span>
+                )}
+              </>
             ) : (
               <span className="text-xs italic text-muted-foreground">sin cargar</span>
             )}

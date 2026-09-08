@@ -23,6 +23,7 @@ import { generarRelato } from "@/lib/acm/zona-relato";
 import { recortarAPalabra, MAX_DESC_IA } from "@/lib/acm/descripcion-ia";
 import { normalizarImagenes, urlsFotoRed } from "@/lib/acm/fotos-url";
 import { seccionesParaFicha } from "@/lib/acm/material";
+import { logoParaDestino } from "@/lib/marketing-ia/logo-variante";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -241,7 +242,9 @@ export async function POST(req: Request) {
     const brand = {
       colors: Array.isArray(mk.brand_colors) ? mk.brand_colors.filter((c: any) => typeof c === "string" && c) : [],
       font: typeof mk.brand_font === "string" ? mk.brand_font : "sans",
-      logo_url: mk.logo_url || null,
+      // Con cual de los dos logos sale la ficha lo decidio el director una sola vez, en
+      // Marketing IA → Configuración IA. Sin elegir nada, el estandar.
+      logo_url: logoParaDestino(mk, "ficha_acm"),
       legal_notice: typeof mk.legal_notice === "string" ? mk.legal_notice : "",
     };
 
