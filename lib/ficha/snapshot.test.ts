@@ -181,4 +181,18 @@ describe("marcaDeLaAgencia", () => {
   it("sin configuración devuelve los valores por defecto", () => {
     expect(marcaDeLaAgencia(null)).toEqual({ colors: [], font: "sans", logo_url: null })
   })
+
+  it("con dos logos cargados y sin elegir nada, la ficha del cliente sale con el estándar", () => {
+    const marca = marcaDeLaAgencia({ logo_url: "https://cdn/e.png", logo_url_lujo: "https://cdn/l.png" })
+    expect(marca.logo_url).toBe("https://cdn/e.png")
+  })
+
+  it("si el director le asignó el logo de lujo a la ficha del cliente, sale ese", () => {
+    const marca = marcaDeLaAgencia({
+      logo_url: "https://cdn/e.png",
+      logo_url_lujo: "https://cdn/l.png",
+      logo_destinos: { ficha_cliente: "lujo", ficha_acm: "estandar" },
+    })
+    expect(marca.logo_url).toBe("https://cdn/l.png")
+  })
 })

@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 import { normalizarMaterial } from "@/lib/acm/material";
+import { logoParaDestino, logosCargados, varianteDeDestino } from "@/lib/marketing-ia/logo-variante";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,13 @@ export async function GET() {
         colors: Array.isArray(mk.brand_colors)
           ? (mk.brand_colors as unknown[]).filter((c): c is string => typeof c === "string" && !!c)
           : [],
-        logo_url: typeof mk.logo_url === "string" ? mk.logo_url : null,
+        // El MISMO resolvedor que usa la ficha de verdad (app/api/acm/ficha/route.ts). Si esta
+        // pantalla leyera mk.logo_url a secas, mostraria el estandar aunque el director le haya
+        // asignado el de lujo a la ficha del ACM: la vista previa mentiria.
+        logo_url: logoParaDestino(mk, "ficha_acm"),
+        logo_variante: varianteDeDestino(mk, "ficha_acm"),
+        // Con un solo logo cargado no hay versiones que distinguir y decir cual es solo estorba.
+        dos_logos: logosCargados(mk).estandar && logosCargados(mk).lujo,
         legal_notice: typeof mk.legal_notice === "string" ? mk.legal_notice : "",
       },
     });

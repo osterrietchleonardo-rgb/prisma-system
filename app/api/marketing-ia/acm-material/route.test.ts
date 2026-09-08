@@ -149,6 +149,40 @@ describe("GET", () => {
 
     expect(material.secciones.quienes_somos).toBe("");
     expect(material.archivos).toEqual([]);
-    expect(marca).toEqual({ colors: [], logo_url: null, legal_notice: "" });
+    expect(marca).toEqual({
+      colors: [],
+      logo_url: null,
+      logo_variante: "estandar",
+      dos_logos: false,
+      legal_notice: "",
+    });
+  });
+
+  // Esta pantalla dice "así se va a ver tu ficha". Si mostrara el logo estándar mientras la
+  // ficha sale con el de lujo, el director configuraría a ciegas creyendo que verificó.
+  it("si el director le asignó el logo de lujo a la ficha del ACM, la vista previa muestra ESE", async () => {
+    base.config = {
+      ...CONFIG_INICIAL,
+      logo_url_lujo: "https://cdn/logo-lujo.png",
+      logo_destinos: { ficha_acm: "lujo", ficha_cliente: "estandar" },
+    };
+
+    const res = await GET();
+    const { marca } = await res.json();
+
+    expect(marca.logo_url).toBe("https://cdn/logo-lujo.png");
+    expect(marca.logo_variante).toBe("lujo");
+    expect(marca.dos_logos).toBe(true);
+  });
+
+  it("con un solo logo cargado no dice de qué versión es: no hay nada que distinguir", async () => {
+    base.config = { ...CONFIG_INICIAL, logo_destinos: { ficha_acm: "lujo" } };
+
+    const res = await GET();
+    const { marca } = await res.json();
+
+    // Pidió lujo, pero esa ranura está vacía: sale el que hay, y sin etiqueta que confunda.
+    expect(marca.logo_url).toBe("https://cdn/logo.png");
+    expect(marca.dos_logos).toBe(false);
   });
 });

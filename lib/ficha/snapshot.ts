@@ -2,6 +2,7 @@
 // públicas. Vivía pegado adentro de app/api/ficha/share/route.ts; lo usan la ficha de UNA
 // propiedad y la de una SELECCIÓN, y si cada una tuviera su copia se desincronizarían.
 import { normalizarImagenes, urlsFotoRed } from "@/lib/acm/fotos-url"
+import { logoParaDestino } from "@/lib/marketing-ia/logo-variante"
 
 export type FuentePropiedad = "own" | "agency" | "roomix"
 
@@ -55,7 +56,9 @@ export function marcaDeLaAgencia(config: unknown): MarcaAgencia {
       ? mk.brand_colors.filter((c: any) => typeof c === "string" && c)
       : [],
     font: typeof mk.brand_font === "string" ? mk.brand_font : "sans",
-    logo_url: mk.logo_url || null,
+    // Cual de los dos logos de la agencia sale en la ficha que recibe el cliente lo eligio el
+    // director en Marketing IA → Configuración IA. Sin elegir nada, el estandar.
+    logo_url: logoParaDestino(config, "ficha_cliente"),
   }
 }
 
