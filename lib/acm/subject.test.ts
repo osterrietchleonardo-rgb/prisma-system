@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sujetoToEmbeddingText } from "./subject";
+import { sujetoToEmbeddingText, sujetoM2, sujetoTieneSuperficie } from "./subject";
 import type { Sujeto } from "@/lib/tasacion/types";
 
 const base = {
@@ -103,5 +103,53 @@ describe("fase 2: mappers nuevos del sujeto", () => {
     for (const palabra of ["cochera", "garage", "garaje", "estacionamiento"]) {
       expect(new RegExp(COCHERA_PATRON, "i").test(palabra)).toBe(true);
     }
+  });
+});
+
+/**
+ * EL M2 CON EL QUE SE BUSCA, SEGUN EL TIPO.
+ *
+ * Central, 8-sep-2026: un asesor busco un terreno con "40 m2 cubiertos" y "600 de lote" y el
+ * ACM no encontro nada. Del lado de los candidatos un lote se compara por su tamano (covered_area
+ * es 0 -> total_area), pero del lado del sujeto se mandaban los cubiertos: 40 contra lotes de
+ * 300. Probado con el lote real de Caballito (259 m2): con 40, 100 o 150 -> 0 encontrados; con
+ * 259 -> 1. La misma busqueda, el mismo lote.
+ *
+ * Regla: para un terreno el m2 es el del LOTE. Para todo lo demas, cubiertos + semicubiertos,
+ * como siempre.
+ */
+describe("sujetoM2 · el m2 de un terreno es el del lote", () => {
+  it("un terreno busca por el lote, no por los cubiertos (el caso de Central)", () => {
+    expect(sujetoM2({ tipo_propiedad: "terreno", m2_cubiertos: 40, m2_terreno: 600 })).toBe(600);
+  });
+
+  it("un terreno sin cubiertos igual tiene m2", () => {
+    expect(sujetoM2({ tipo_propiedad: "terreno", m2_cubiertos: 0, m2_terreno: 259 })).toBe(259);
+  });
+
+  it("un terreno sin lote cargado no tiene m2 (no se filtra por superficie), aunque tenga cubiertos", () => {
+    expect(sujetoM2({ tipo_propiedad: "terreno", m2_cubiertos: 40, m2_terreno: 0 })).toBeNull();
+    expect(sujetoM2({ tipo_propiedad: "terreno", m2_cubiertos: 40 })).toBeNull();
+  });
+
+  it("una casa sigue sumando cubiertos + semicubiertos y NO mira el lote", () => {
+    expect(sujetoM2({ tipo_propiedad: "casa", m2_cubiertos: 220, m2_semicubiertos: 102, m2_terreno: 1800 })).toBe(322);
+  });
+
+  it("un departamento se comporta exactamente como antes", () => {
+    expect(sujetoM2({ tipo_propiedad: "departamento", m2_cubiertos: 60, m2_semicubiertos: 0 })).toBe(60);
+    expect(sujetoM2({ tipo_propiedad: "departamento", m2_cubiertos: 0 })).toBeNull();
+  });
+});
+
+describe("sujetoTieneSuperficie · lo que el formulario exige para poder buscar", () => {
+  it("un terreno necesita el lote; los cubiertos no alcanzan", () => {
+    expect(sujetoTieneSuperficie({ tipo_propiedad: "terreno", m2_terreno: 600 })).toBe(true);
+    expect(sujetoTieneSuperficie({ tipo_propiedad: "terreno", m2_cubiertos: 40 })).toBe(false);
+  });
+
+  it("una casa o un departamento necesitan cubiertos, como siempre", () => {
+    expect(sujetoTieneSuperficie({ tipo_propiedad: "casa", m2_cubiertos: 100 })).toBe(true);
+    expect(sujetoTieneSuperficie({ tipo_propiedad: "casa", m2_terreno: 500 })).toBe(false);
   });
 });

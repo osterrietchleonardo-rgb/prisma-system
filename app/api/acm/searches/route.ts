@@ -2,6 +2,7 @@
 // El asesor ve las propias; el director ve las de toda la agencia (con el nombre de quién la hizo).
 // Devolvemos solo la cabecera de cada fila (sin el snapshot de comparables) para que la lista sea liviana.
 import { NextResponse } from "next/server";
+import { sujetoM2 } from "@/lib/acm/subject";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
 
@@ -38,7 +39,8 @@ export async function GET() {
         direccion: r.sujeto?.direccion || "",
         barrio: r.sujeto?.barrio || "",
         tipo: r.sujeto?.tipo_propiedad || "",
-        m2: r.sujeto?.m2_cubiertos ?? null,
+        // El mismo m² con el que se buscó (para un terreno, el lote).
+        m2: sujetoM2(r.sujeto || {}),
         total_cartera: r.total_cartera,
         total_roomix: r.total_roomix,
         ficha_token: r.ficha_token,

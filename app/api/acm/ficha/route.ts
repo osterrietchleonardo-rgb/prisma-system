@@ -4,6 +4,7 @@
 // agencia + su tarjeta de contacto). Guardamos un SNAPSHOT para que el link sobreviva a cambios.
 // Mismo molde que app/api/ficha/share/route.ts.
 import { NextResponse } from "next/server";
+import { sujetoM2 } from "@/lib/acm/subject";
 import crypto from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -263,7 +264,8 @@ export async function POST(req: Request) {
         direccion: sujeto.direccion || "",
         barrio: sujeto.barrio || "",
         tipo: sujeto.tipo_propiedad || "",
-        m2: sujeto.m2_cubiertos ? Number(sujeto.m2_cubiertos) : null,
+        // El mismo m² con el que se buscó: para un terreno es el lote, no "0 m² cubiertos".
+        m2: sujetoM2(sujeto),
         dormitorios: sujeto.dormitorios ?? null,
         banos: sujeto.banos ?? null,
         // Solo va si el asesor tildó la casilla. El tope de 700 ya se aplicó al generarla,

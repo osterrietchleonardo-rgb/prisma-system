@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { sujetoM2 } from "@/lib/acm/subject";
 import { createPortal } from "react-dom";
 import { AcmComparable, ChecklistItem, Sujeto, Operacion, TOPE_COMPARABLES } from "@/lib/tasacion/types";
 import { Button } from "@/components/ui/button";
@@ -756,7 +757,7 @@ export function ComparablesResult({
           <p className="text-[10px] font-bold uppercase tracking-widest text-accent">Propiedad analizada · {operacion}</p>
           <p className="font-black text-lg">{sujeto.direccion || "Sujeto"}</p>
           <p className="text-sm text-muted-foreground">
-            {sujeto.barrio} · {sujeto.tipo_propiedad} · {sujeto.m2_cubiertos} m² · {sujeto.dormitorios} dorm · {sujeto.banos} baños
+            {sujeto.barrio} · {sujeto.tipo_propiedad} · {sujetoM2(sujeto) ?? 0} m² · {sujeto.dormitorios} dorm · {sujeto.banos} baños
           </p>
           {!conSemantica && <p className="text-[11px] text-amber-700 dark:text-amber-500 mt-1">Ranking estructural (sin similitud semántica esta vez).</p>}
         </div>

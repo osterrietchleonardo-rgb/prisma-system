@@ -1,6 +1,8 @@
 "use client";
 
 import { Sujeto, TipoPropiedad, EstadoConservacion, CalidadConstruccion, Orientacion, Vista, SituacionOcupacion, Moneda, Amenidades } from "@/lib/tasacion/types";
+import { cn } from "@/lib/utils";
+import { sujetoTieneSuperficie } from "@/lib/acm/subject";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -29,8 +31,11 @@ export function Step1Sujeto({ sujeto, onChange, onNext, hideNextButton }: Step1S
     });
   };
 
+  // La superficie obligatoria depende del tipo: un terreno necesita el lote, el resto los
+  // cubiertos. Misma regla que usa la búsqueda (sujetoM2), para que no puedan discrepar.
+  const esTerreno = sujeto.tipo_propiedad === "terreno";
   const isValido = () => {
-    return sujeto.direccion && sujeto.barrio && sujeto.m2_cubiertos > 0;
+    return sujeto.direccion && sujeto.barrio && sujetoTieneSuperficie(sujeto);
   };
 
   // Estado de obra: si la propiedad no tiene uso, los años de antigüedad no aplican (se limpian).
@@ -88,7 +93,9 @@ export function Step1Sujeto({ sujeto, onChange, onNext, hideNextButton }: Step1S
         <h3 className="text-lg font-bold border-b border-accent/10 pb-2">2. Superficies (m²)</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-2">
-            <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Cubiertos *</Label>
+            <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
+              {esTerreno ? "Cubiertos" : "Cubiertos *"}
+            </Label>
             <Input 
               type="number"
               min="0"
@@ -118,7 +125,11 @@ export function Step1Sujeto({ sujeto, onChange, onNext, hideNextButton }: Step1S
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-sm font-bold uppercase tracking-wider text-muted-foreground lg:text-xs">Terreno (Casas)</Label>
+            {/* Para un terreno este es EL campo: es el m² con el que se busca. Antes decía
+                "Terreno (Casas)" y un asesor puso el lote en "Descubiertos" — 8-sep-2026. */}
+            <Label className={cn("text-sm font-bold uppercase tracking-wider lg:text-xs", esTerreno ? "text-accent" : "text-muted-foreground")}>
+              {esTerreno ? "Lote (m²) *" : "Terreno (casas)"}
+            </Label>
             <Input 
               type="number"
               min="0"

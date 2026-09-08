@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { sujetoTieneSuperficie } from "@/lib/acm/subject";
 import { Sujeto, Operacion, Amenidades } from "@/lib/tasacion/types";
 import { Step1Sujeto } from "./step1-sujeto";
 import { Button } from "@/components/ui/button";
@@ -90,7 +91,11 @@ function carteraToSujeto(p: CarteraItem, base: Sujeto): Sujeto {
     direccion: p.address || p.title || "",
     barrio: p.city || "",
     tipo_propiedad,
-    m2_cubiertos: p.m2 || 0,
+    // Para un lote, `p.m2` es el tamaño del lote (el endpoint devuelve total_area, y un lote
+    // tiene covered 0). Va a m2_terreno, que es el m² con el que se busca un terreno — ver
+    // sujetoM2. En cubiertos iría 0 y el botón quedaría bloqueado.
+    m2_cubiertos: tipo_propiedad === "terreno" ? 0 : p.m2 || 0,
+    m2_terreno: tipo_propiedad === "terreno" ? p.m2 || 0 : base.m2_terreno,
     dormitorios,
     banos: p.bathrooms || 0,
     antiguedad_anios: p.antiguedad ?? base.antiguedad_anios,
@@ -272,7 +277,9 @@ export function SubjectInput({
   // distinta de la que el asesor pidió, sin que se note.
   const modoZonasSinElegir = modoZona === "zonas" && zonasElegidas.length === 0;
 
-  const isValido = sujeto.barrio && sujeto.m2_cubiertos > 0 && !modoZonasSinElegir;
+  // La superficie obligatoria depende del tipo (un terreno necesita el lote): misma regla que
+  // la búsqueda, ver sujetoTieneSuperficie.
+  const isValido = sujeto.barrio && sujetoTieneSuperficie(sujeto) && !modoZonasSinElegir;
 
   const ModoBtn = ({ value, icon: Icon, label }: { value: Modo; icon: any; label: string }) => (
     <button

@@ -12,11 +12,29 @@ export function sujetoAmbientes(s: Partial<Sujeto>): number | null {
   return d > 0 ? d + 1 : null;
 }
 
+// El m² con el que se BUSCA. Para un terreno es el del lote: del lado de los candidatos un lote
+// se compara por su tamaño (covered_area 0 → total_area), así que mandar los cubiertos era
+// manzanas contra peras. Central, 8-sep-2026: "40 m² cubiertos, 600 de lote" buscaba lotes de
+// 24 a 56 m² y no encontraba ninguno. Probado con el lote real de Caballito (259 m²): con 40,
+// 100 o 150 → 0 encontrados; con 259 → 1. Para todo lo demás, cubiertos + semicubiertos.
 export function sujetoM2(s: Partial<Sujeto>): number | null {
+  if (s.tipo_propiedad === "terreno") {
+    const lote = s.m2_terreno ?? 0;
+    return lote > 0 ? lote : null;
+  }
   const cub = s.m2_cubiertos ?? 0;
   const semi = s.m2_semicubiertos ?? 0;
   const m2 = cub + semi; // superficie comparable aproximada
   return m2 > 0 ? m2 : null;
+}
+
+/**
+ * Lo que el formulario exige para dejar buscar: la superficie que de verdad se va a usar.
+ * Un terreno necesita el lote (los cubiertos no alcanzan); el resto, cubiertos. Vive acá y no
+ * en cada formulario para que los dos (`step1-sujeto` y `subject-input`) no puedan discrepar.
+ */
+export function sujetoTieneSuperficie(s: Partial<Sujeto>): boolean {
+  return sujetoM2(s) !== null;
 }
 
 // Dormitorios reales del sujeto (dato propio, distinto de "ambientes"). 0 = sin dato → null.
