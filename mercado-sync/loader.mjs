@@ -82,6 +82,10 @@ const CENTROIDES = {
   'villa-urquiza': { lat: -34.5700, lng: -58.4910, km: 2.5 },
   'saavedra':      { lat: -34.5510, lng: -58.4880, km: 2.5 },
   'palermo':       { lat: -34.5780, lng: -58.4260, km: 3.5 },
+  // GBA Norte. Centroide y radio MEDIDOS sobre 40 avisos reales (4-sep): la
+  // localidad es compacta (máx 2,28 km del centro), 5 km deja margen de sobra
+  // y aun así manda a cuarentena lo que venga de otra localidad del partido.
+  'don-torcuato':  { lat: -34.4954, lng: -58.6274, km: 5.0 },
 };
 const distKm = (a, b, c, d) => {
   const R = 6371, r = Math.PI / 180, x = (c - a) * r, y = (d - b) * r * Math.cos((a + c) / 2 * r);
@@ -118,11 +122,17 @@ function parsearStats(txt) {
 }
 
 function partirBarrio(neighborhood) {
-  // "Belgrano C, Belgrano, Capital Federal" → sub_barrio/barrio/ciudad (de menor a mayor)
+  // CABA: "Belgrano C, Belgrano, Capital Federal" → sub_barrio/barrio/ciudad (de menor a mayor)
+  // GBA:  "Don Torcuato, Tigre, GBA Norte" trae una parte MÁS: la última es la REGIÓN,
+  //       no la ciudad. Sin sacarla, la localidad (Don Torcuato) caía en sub_barrio y el
+  //       partido (Tigre) quedaba de barrio — y encima incoherente: un aviso con
+  //       sub-barrio ("San Fermin, Don Torcuato, Tigre, GBA Norte") sí daba barrio
+  //       correcto. Se saca la región primero y el resto se parte igual que siempre.
   const partes = (neighborhood || '').split(',').map(s => s.trim()).filter(Boolean);
-  if (partes.length >= 3) return { sub: partes[0], barrio: partes[1], ciudad: partes[2] };
-  if (partes.length === 2) return { sub: null, barrio: partes[0], ciudad: partes[1] };
-  return { sub: null, barrio: partes[0] || null, ciudad: null };
+  const region = /^GBA\b/i.test(partes[partes.length - 1] || '') ? partes.pop() : null;
+  if (partes.length >= 3) return { sub: partes[0], barrio: partes[1], ciudad: partes[2], region };
+  if (partes.length === 2) return { sub: null, barrio: partes[0], ciudad: partes[1], region };
+  return { sub: null, barrio: partes[0] || null, ciudad: null, region };
 }
 
 const esRango = (v) => /\d\s+a\s+\d/.test(String(v ?? ''));
@@ -196,7 +206,7 @@ function mapear(item, zona) {
     sub_barrio: loc.sub,
     ciudad: loc.ciudad,
     provincia: loc.ciudad === 'Capital Federal' ? 'CABA' : 'Buenos Aires',
-    region: loc.ciudad === 'Capital Federal' ? 'CABA' : null,
+    region: loc.ciudad === 'Capital Federal' ? 'CABA' : (loc.region ?? null),
     pais: 'AR',
     lat: get(item, 'location.latitude') ?? null,
     lng: get(item, 'location.longitude') ?? null,
