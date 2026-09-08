@@ -1525,6 +1525,28 @@ la IA lee la conversación aunque no haya nota.
   (`asesor_sigue_esperando`) no entra: `{{2}}` es solo "cliente, que busca X" y la plantilla
   aprobada no tiene otro hueco. Antes el aviso solo decía "respondele desde acá".
 
+### 22.10 El dashboard cuenta lo que la pantalla dice (7/9/2026, panel de derivaciones de Kevin)
+
+Kevin veía "180 sin responder / 170 críticos" bajo un filtro que decía "Últimos 30 días".
+`DatePeriodFilter` muestra 30 días por defecto, pero las páginas `app/director/dashboard` y
+`app/asesor/dashboard` pasaban `from`/`to` vacíos cuando la URL no los traía, y
+`getDashboardData` / `getHandoffsDashboardData` entonces no filtraban nada: el panel de
+derivaciones arrastraba desde el 2 de julio. Arreglo: `lib/dashboard/periodo.ts` →
+`periodoDelDashboard(searchParams)` resuelve el período una sola vez (últimos 30 días en fecha
+argentina, formato `yyyy-MM-dd` como el filtro; si la URL trae los dos extremos válidos se
+respetan). Vale para todas las secciones que reciben `from`/`to`, no solo el panel.
+Verificado: PRISMAIA en local (sin período = últimos 30 explícitos); para Central, la misma
+lógica del panel en SQL con la ventana de 30 días da 112 derivaciones, 91 sin atender, 84
+críticos (contra 156 / 147 sin ventana). Pendiente conocido, fuera de este arreglo:
+`getDashboardData` compara `created_at <= endDate` con la fecha pelada (medianoche), así que
+con un `to` explícito igual a hoy deja afuera lo de hoy; el panel de derivaciones sí usa
+`T23:59:59.999Z`.
+
+Análisis de la misma fecha (solo lectura, `scratch/_analizar-handoffs-sin-atender.mjs`, la IA
+leyó los 156 historiales): 146 son compromiso del asesor sin resolver, 2 el cliente cerró, 2 el
+cliente no le contestó al bot, 6 audios sin transcribir; 126 de los 146 son anteriores al
+encendido del Super Agente (31/8). Leonardo: NO se pasan a perdido (decisión de Kevin).
+
 ## 23. Buscador IA y Tutor IA: la conversación en vivo (2/9/2026)
 
 Punto 1 del plan de agentes (`docs/superpowers/plans/2026-09-02-buscador-conversacion-viva.md`);

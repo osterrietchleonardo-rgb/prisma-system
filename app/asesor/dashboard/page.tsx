@@ -12,6 +12,7 @@ import { DashboardHeaderActions } from "@/components/dashboard-header-actions"
 import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter"
 import { HandoffsPanel } from "@/components/dashboard/HandoffsPanel"
 import { getHandoffsDashboardData } from "@/lib/queries/handoffs"
+import { periodoDelDashboard } from "@/lib/dashboard/periodo"
 import { Button } from "@/components/ui/button"
 import { TrendingUp, Eye } from "lucide-react"
 
@@ -22,8 +23,9 @@ export default async function AsesorDashboardPage({
 }: {
   searchParams: { from?: string; to?: string }
 }) {
-  const from = searchParams.from
-  const to = searchParams.to
+  // Sin período elegido, el filtro muestra "Últimos 30 días": las consultas tienen que
+  // contar eso mismo, no todo el historial (defecto del 7/9/2026, panel de derivaciones).
+  const { from, to } = periodoDelDashboard(searchParams)
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
