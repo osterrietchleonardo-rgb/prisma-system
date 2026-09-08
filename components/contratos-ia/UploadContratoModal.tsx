@@ -152,7 +152,7 @@ export function UploadContratoModal({ open, onClose, onSaved }: UploadContratoMo
               </CardContent>
             </Card>
             <div className="border-2 border-dashed border-accent/30 rounded-xl p-8 text-center hover:border-accent/50 transition-colors">
-              <Upload className="w-10 h-10 mx-auto text-accent/50 mb-3" />
+              <Upload className="w-10 h-10 mx-auto text-accent mb-3" />
               <p className="text-sm text-muted-foreground mb-4">
                 Arrastrá o seleccioná un archivo .docx o .pdf (máx. 25MB)
               </p>
@@ -203,9 +203,9 @@ export function UploadContratoModal({ open, onClose, onSaved }: UploadContratoMo
               <Card className="border-yellow-500/30 bg-yellow-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <AlertTriangle className="w-4 h-4 text-yellow-700 dark:text-yellow-500 mt-0.5 flex-shrink-0" />
                     <div>
-                      <p className="text-sm font-medium text-yellow-500">Advertencias</p>
+                      <p className="text-sm font-medium text-yellow-700 dark:text-yellow-500">Advertencias</p>
                       <ul className="text-xs text-muted-foreground mt-1 space-y-1">
                         {result.advertencias.map((a, i) => (
                           <li key={i}>• {a}</li>

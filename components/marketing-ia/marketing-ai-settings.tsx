@@ -9,12 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { Loader2, Palette, Upload, Layout, Maximize2, Trash2, Plus, Type, Scale, Sparkles } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
+import { campoDeLogo, type DestinoLogo, type VarianteLogo } from "@/lib/marketing-ia/logo-variante"
 
 interface MarketingAiConfig {
   brand_colors: string[];
   logo_url: string | null;
+  /** El segundo logo, para las propiedades de lujo. Null hasta que el director lo suba. */
+  logo_url_lujo: string | null;
+  /** Qué logo sale en cada ficha. Sin dato, el estándar. Ver lib/marketing-ia/logo-variante.ts */
+  logo_destinos: Record<DestinoLogo, VarianteLogo>;
   logo_position: string;
   logo_size: string;
   brand_font: string;
@@ -22,10 +28,18 @@ interface MarketingAiConfig {
   creative_directive: string;
 }
 
+/** Las fichas cuyo logo se decide una sola vez acá (las placas se eligen al generar cada una). */
+const DESTINOS: Array<{ id: DestinoLogo; label: string; ayuda: string }> = [
+  { id: 'ficha_acm', label: 'Ficha del ACM', ayuda: 'La tasación que recibe el propietario.' },
+  { id: 'ficha_cliente', label: 'Ficha del cliente', ayuda: 'Las propiedades que le mandás a un comprador.' },
+]
+
 export function MarketingAiSettings() {
   const [config, setConfig] = useState<MarketingAiConfig>({
     brand_colors: [],
     logo_url: null,
+    logo_url_lujo: null,
+    logo_destinos: { ficha_acm: 'estandar', ficha_cliente: 'estandar' },
     logo_position: 'bottom-right',
     logo_size: 'medium',
     brand_font: 'sans',
@@ -34,7 +48,8 @@ export function MarketingAiSettings() {
   })
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
+  const [subiendo, setSubiendo] = useState<VarianteLogo | null>(null)
+  const isUploading = subiendo !== null
   const supabase = createClient()
 
   useEffect(() => {
@@ -47,7 +62,14 @@ export function MarketingAiSettings() {
       if (res.ok) {
         const data = await res.json()
         if (data && Object.keys(data).length > 0) {
-          setConfig(prev => ({ ...prev, ...data }))
+          // OJO: al guardar se manda este objeto ENTERO y pisa lo que había. El spread de `data`
+          // es lo que hace que sobrevivan las claves que esta pantalla no muestra (por ejemplo
+          // el material institucional del ACM). No sacarlo.
+          setConfig(prev => ({
+            ...prev,
+            ...data,
+            logo_destinos: { ...prev.logo_destinos, ...(data.logo_destinos || {}) },
+          }))
         }
       }
     } catch (error) {
@@ -76,11 +98,11 @@ export function MarketingAiSettings() {
     }
   }
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>, variante: VarianteLogo) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    setIsUploading(true)
+    setSubiendo(variante)
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -96,13 +118,34 @@ export function MarketingAiSettings() {
       }
 
       const { publicUrl } = await res.json()
-      setConfig(prev => ({ ...prev, logo_url: publicUrl }))
+      setConfig(prev => ({ ...prev, [campoDeLogo(variante)]: publicUrl }))
       toast.success("Logo subido correctamente")
     } catch (error: any) {
       toast.error("Error al subir logo: " + error.message)
     } finally {
-      setIsUploading(false)
+      setSubiendo(null)
     }
+  }
+
+  /**
+   * Al borrar un logo, las fichas que lo tenían asignado vuelven a la otra variante. Si no, el
+   * director ve "Ficha del ACM: lujo" con la ranura de lujo vacía y no entiende qué está pasando.
+   */
+  const borrarLogo = (variante: VarianteLogo) => {
+    const otra: VarianteLogo = variante === 'lujo' ? 'estandar' : 'lujo'
+    setConfig(prev => {
+      const destinos = { ...prev.logo_destinos }
+      for (const d of DESTINOS) if (destinos[d.id] === variante) destinos[d.id] = otra
+      return { ...prev, [campoDeLogo(variante)]: null, logo_destinos: destinos }
+    })
+  }
+
+  /**
+   * Un destino guarda UNA variante, así que asignárselo a un logo se lo saca al otro sin que
+   * haya que apagar nada: es la misma tecla.
+   */
+  const asignarDestino = (destino: DestinoLogo, variante: VarianteLogo) => {
+    setConfig(prev => ({ ...prev, logo_destinos: { ...prev.logo_destinos, [destino]: variante } }))
   }
 
   const addColor = () => {
@@ -144,8 +187,9 @@ export function MarketingAiSettings() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Colores de Marca */}
-        <Card className="border-accent/10 shadow-lg bg-card/50 backdrop-blur-sm">
+        {/* Colores de Marca. Ocupa el ancho completo para que la fila de abajo (los dos logos,
+            que también va completa) no deje un hueco al costado en pantalla grande. */}
+        <Card className="border-accent/10 shadow-lg bg-card/50 backdrop-blur-sm md:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Palette className="w-4 h-4 text-accent" />
@@ -183,47 +227,102 @@ export function MarketingAiSettings() {
                   onClick={addColor}
                   className="w-16 h-16 rounded-xl border-2 border-dashed border-accent/20 flex items-center justify-center hover:border-accent/40 hover:bg-accent/5 transition-all"
                 >
-                  <Plus className="w-6 h-6 text-accent/40" />
+                  <Plus className="w-6 h-6 text-accent" />
                 </button>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Logo de la Empresa */}
-        <Card className="border-accent/10 shadow-lg bg-card/50 backdrop-blur-sm">
+        {/* Logos de la Empresa: el de siempre y el de lujo */}
+        <Card className="border-accent/10 shadow-lg bg-card/50 backdrop-blur-sm md:col-span-2">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Upload className="w-4 h-4 text-accent" />
-              Logo de la Empresa
+              Logos de la Empresa
             </CardTitle>
-            <CardDescription>Sube tu logo institucional en formato PNG (sin fondo).</CardDescription>
+            <CardDescription>
+              Podés tener dos versiones de tu logo: la de siempre y una para propiedades de lujo.
+              Debajo de cada una elegís en qué fichas se usa. Formato PNG sin fondo.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center gap-6">
-              <div className="w-32 h-32 rounded-xl bg-muted/30 border-2 border-dashed border-accent/10 flex items-center justify-center overflow-hidden p-2">
-                {config.logo_url ? (
-                  <img src={config.logo_url} alt="Logo" className="max-w-full max-h-full object-contain" />
-                ) : (
-                  <Upload className="w-8 h-8 text-muted-foreground/30" />
-                )}
-              </div>
-              <div className="flex-1 space-y-3">
-                <Input 
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleLogoUpload}
-                  disabled={isUploading}
-                  className="text-xs"
-                />
-                <p className="text-[10px] text-muted-foreground">Recomendado: PNG transparente, 500x500px min.</p>
-                {config.logo_url && (
-                  <Button variant="ghost" size="sm" onClick={() => setConfig(prev => ({ ...prev, logo_url: null }))} className="text-destructive text-xs h-7">
-                    <Trash2 className="w-3 h-3 mr-2" /> Eliminar Logo
-                  </Button>
-                )}
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {([
+                { variante: 'estandar' as VarianteLogo, titulo: 'Estándar', bajada: 'El de todos los días.' },
+                { variante: 'lujo' as VarianteLogo, titulo: 'Lujo', bajada: 'Para propiedades premium.' },
+              ]).map(({ variante, titulo, bajada }) => {
+                const url = config[campoDeLogo(variante)]
+                // Sin las dos versiones cargadas no hay nada que elegir: los toggles quedan
+                // apagados y muestran la verdad (todo sale con el único logo que hay).
+                const puedeElegir = Boolean(config.logo_url && config.logo_url_lujo)
+                return (
+                  <div key={variante} className="rounded-2xl border border-accent/10 bg-muted/20 p-4 space-y-4">
+                    <div>
+                      <p className="text-sm font-bold">{titulo}</p>
+                      <p className="text-[10px] text-muted-foreground">{bajada}</p>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="w-24 h-24 shrink-0 rounded-xl bg-background/60 border-2 border-dashed border-accent/10 flex items-center justify-center overflow-hidden p-2">
+                        {subiendo === variante ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-accent" />
+                        ) : url ? (
+                          <img src={url} alt={`Logo ${titulo}`} className="max-w-full max-h-full object-contain" />
+                        ) : (
+                          <Upload className="w-7 h-7 text-muted-foreground/30" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleLogoUpload(e, variante)}
+                          disabled={isUploading}
+                          className="text-xs"
+                        />
+                        <p className="text-[10px] text-muted-foreground">PNG transparente, 500x500px mín.</p>
+                        {url && (
+                          <Button variant="ghost" size="sm" onClick={() => borrarLogo(variante)} className="text-destructive text-xs h-7 px-2">
+                            <Trash2 className="w-3 h-3 mr-2" /> Eliminar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-accent/10 space-y-3">
+                      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">Se usa en</p>
+                      {DESTINOS.map((d) => (
+                        <div key={d.id} className="flex items-center gap-3">
+                          <Switch
+                            id={`${variante}-${d.id}`}
+                            checked={config.logo_destinos[d.id] === variante}
+                            disabled={!puedeElegir}
+                            onCheckedChange={(prendido) =>
+                              asignarDestino(d.id, prendido ? variante : (variante === 'lujo' ? 'estandar' : 'lujo'))
+                            }
+                          />
+                          <Label htmlFor={`${variante}-${d.id}`} className={cn("flex-1 cursor-pointer", !puedeElegir && "opacity-60")}>
+                            <span className="text-xs font-bold block">{d.label}</span>
+                            <span className="text-[10px] text-muted-foreground font-normal">{d.ayuda}</span>
+                          </Label>
+                        </div>
+                      ))}
+                      {!puedeElegir && (
+                        <p className="text-[10px] text-muted-foreground leading-relaxed">
+                          Cargá las dos versiones para poder elegir. Con una sola, todo sale con esa.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
+
+            <p className="text-[11px] text-muted-foreground leading-relaxed border-t border-accent/10 pt-4">
+              Los anuncios de <strong className="text-foreground">Crear Anuncio</strong> no se configuran acá:
+              ahí el logo se elige en cada anuncio, antes de generarlo.
+            </p>
           </CardContent>
         </Card>
 

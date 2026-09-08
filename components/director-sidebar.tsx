@@ -5,52 +5,15 @@ import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { contarAprobacionesPendientes } from "@/app/actions/equipo"
 import { cn } from "@/lib/utils"
-import { 
-  Home, 
-  LayoutGrid, 
-  Building, 
-  Users, 
-  UserCircle, 
-  FileText,
-  Calculator,
-  Scale,
-  Calendar,
-  Settings, 
-  LogOut,
-  Sparkles,
-  TrendingUp,
-  FileSignature,
-  MessageSquare,
-  BarChart2,
-  ClipboardCheck,
-} from "lucide-react"
+import { LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { logout } from "@/lib/actions/auth"
-import { contratosIaDeshabilitado } from "@/lib/access/contratos-ia"
 import BrandLogo from "./brand-logo"
+import { SidebarNav, SidebarPie } from "./sidebar-nav"
+import { BotonCerrarBarra } from "./barra-lateral"
 
-const navItems = [
-  { name: "Dashboard", href: "/director/dashboard", icon: Home },
-  { name: "Pulso de Mercado", href: "/director/mercado", icon: BarChart2 },
-  { name: "Pipeline", href: "/director/pipeline", icon: LayoutGrid },
-  { name: "Propiedades", href: "/director/propiedades", icon: Building },
-  { name: "Tracking Performance", href: "/director/tracking-performance", icon: TrendingUp },
-  { name: "Leads Tokko", href: "/director/leads", icon: Users },
-  { name: "Asesor IA WhatsApp", href: "/director/asesor-ia-whatsapp", icon: MessageSquare },
-  { name: "Leads WhatsApp", href: "/director/leads-whatsapp", icon: MessageSquare },
-  { name: "Equipo", href: "/director/aprobaciones", icon: ClipboardCheck },
-  { name: "Marketing IA", href: "/director/marketing-ia", icon: Sparkles },
-  { name: "Contratos IA", href: "/director/contratos-ia", icon: FileSignature },
-  { name: "Asesores", href: "/director/asesores", icon: UserCircle },
-  { name: "Documentos", href: "/director/documentos", icon: FileText },
-  { name: "ACM", href: "/director/acm", icon: Scale },
-  { name: "Calendario", href: "/director/calendario", icon: Calendar },
-  { name: "Tutor IA", href: "/director/tutor", icon: Sparkles },
-  { name: "Buscador IA", href: "/director/consultor", icon: Sparkles },
-  { name: "Configuración", href: "/director/configuracion", icon: Settings },
-  { name: "Sugerencias", href: "/director/feedback", icon: MessageSquare },
-]
+// Las páginas del menú y sus grupos viven en `lib/nav/menu.ts`, compartido con el asesor.
 
 interface DirectorSidebarProps {
   className?: string
@@ -75,7 +38,8 @@ export function DirectorSidebar({ className, agencyName, agencyId, userName, use
 
   return (
     <div className={cn("flex flex-col h-full border-r bg-card", className)}>
-      <div className="p-6 pb-2">
+      <div className="relative p-6 pb-2">
+        <BotonCerrarBarra />
         <Link href="/">
           <BrandLogo logoSize="sm" />
         </Link>
@@ -86,7 +50,7 @@ export function DirectorSidebar({ className, agencyName, agencyId, userName, use
 
       <div className="px-4 mb-4">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-accent/5 border border-accent/10">
-          <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold">
+          <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold">
             {userName?.charAt(0) || "U"}
           </div>
           <div>
@@ -97,57 +61,16 @@ export function DirectorSidebar({ className, agencyName, agencyId, userName, use
       </div>
 
       <ScrollArea className="flex-1 px-4">
-        <nav className="space-y-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
-
-            // "Contratos IA" deshabilitada solo para la agencia indicada
-            const isDisabled =
-              item.href.endsWith("/contratos-ia") && contratosIaDeshabilitado(agencyId)
-
-            if (isDisabled) {
-              return (
-                <div
-                  key={item.href}
-                  aria-disabled="true"
-                  title="Función no disponible en tu plan"
-                  className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-muted-foreground/40 cursor-not-allowed select-none"
-                >
-                  <item.icon className="w-4 h-4" />
-                  {item.name}
-                  <span className="ml-auto text-[9px] font-bold uppercase tracking-wide bg-muted text-muted-foreground/60 px-1.5 py-0.5 rounded">
-                    Deshabilitada
-                  </span>
-                </div>
-              )
-            }
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onSelect}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all",
-                  isActive
-                    ? "bg-accent text-accent-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-accent/10 hover:text-foreground"
-                )}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.name}
-                {item.href === "/director/aprobaciones" && pendientes > 0 && (
-                  <span className="ml-auto text-[10px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center">
-                    {pendientes}
-                  </span>
-                )}
-              </Link>
-            )
-          })}
-        </nav>
+        <SidebarNav
+          rol="director"
+          agencyId={agencyId}
+          onSelect={onSelect}
+          badges={{ equipo: pendientes }}
+        />
       </ScrollArea>
 
-      <div className="p-4 border-t">
+      <div className="p-4 border-t space-y-1">
+        <SidebarPie rol="director" onSelect={onSelect} />
         <form action={logout} onSubmit={onSelect}>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-3">
             <LogOut className="w-4 h-4" />

@@ -63,4 +63,14 @@ describe("renderizarSemilla", () => {
     const t = renderizarSemilla({ ...base, metricas: {} }, 0, 0, "2026-08-24T15:00:00-03:00")
     expect(t).toContain("(sin datos capturados)")
   })
+  it("con nota interna la incluye y le dice que manda", () => {
+    const t = renderizarSemilla(base, 55, 0, "2026-09-04T12:00:00-03:00", null, [],
+      { texto: "Ya lo llamé, visita coordinada el viernes", fechaAR: "3/9 18:20" })
+    expect(t).toContain("NOTA INTERNA del asesor (3/9 18:20")
+    expect(t).toContain("«Ya lo llamé, visita coordinada el viernes»")
+    expect(t).toContain("manda sobre tu criterio")
+  })
+  it("sin nota interna no aparece el bloque", () => {
+    expect(renderizarSemilla(base, 55, 0, "2026-09-04T12:00:00-03:00")).not.toContain("NOTA INTERNA")
+  })
 })

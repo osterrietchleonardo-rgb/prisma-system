@@ -74,7 +74,7 @@ function Heatmap({ data }: { data: HeatmapRow[] }) {
         {/* Hour labels */}
         <div className="flex ml-[68px] mb-1 gap-[2px]">
           {HOURS.filter((_, i) => i % 3 === 0).map(h => (
-            <div key={h} className="text-[9px] text-muted-foreground/60 w-[calc((100%-68px)/8)]">
+            <div key={h} className="text-[9px] text-muted-foreground w-[calc((100%-68px)/8)]">
               {formatHour(h)}
             </div>
           ))}
@@ -152,9 +152,9 @@ export function Block5Temporal({ temporal }: { temporal: TemporalData }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Hora pico", value: t.peak_hour != null ? formatHour(t.peak_hour) : "—", sub: "de mayor actividad", color: "text-accent" },
-          { label: "Día pico", value: t.peak_day_name || "—", sub: "con más consultas", color: "text-purple-400" },
-          { label: "Duración media", value: formatDuration(t.avg_duration_min), sub: "por conversación", color: "text-blue-400" },
-          { label: "Mensajes de leads", value: t.total_lead_messages?.toLocaleString("es-AR") ?? "—", sub: "en el período", color: "text-emerald-400" },
+          { label: "Día pico", value: t.peak_day_name || "—", sub: "con más consultas", color: "text-purple-600 dark:text-purple-400" },
+          { label: "Duración media", value: formatDuration(t.avg_duration_min), sub: "por conversación", color: "text-blue-600 dark:text-blue-400" },
+          { label: "Mensajes de leads", value: t.total_lead_messages?.toLocaleString("es-AR") ?? "—", sub: "en el período", color: "text-emerald-700 dark:text-emerald-400" },
         ].map(({ label, value, sub, color }) => (
           <Card key={label} className="border-accent/10 bg-card/50 backdrop-blur-sm">
             <CardContent className="p-4">

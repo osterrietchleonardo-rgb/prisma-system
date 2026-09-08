@@ -46,7 +46,7 @@ export function RevisionZona({
           className="text-accent"
           aria-label={incluir ? "Sacar la hoja del entorno" : "Incluir la hoja del entorno"}
         >
-          {incluir ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-muted-foreground/50" />}
+          {incluir ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-muted-foreground" />}
         </button>
         Incluir la hoja &ldquo;La propiedad y su entorno&rdquo;
       </label>

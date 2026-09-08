@@ -7,9 +7,12 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Sparkles, Video, FileText, Loader2, ArrowRight, Smartphone, Camera } from "lucide-react"
+import { Sparkles, Video, FileText, Loader2, ArrowRight, Smartphone, Camera, RectangleVertical, Square } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { CopyType, EstructuraId, ImageFormat, ImageStyle, IpcProfile, TokkoProperty } from "@/types/marketing-ia"
 import { ESTRUCTURAS_LISTA } from "@/lib/marketing-ia/estructuras"
+import { FORMATOS_OFRECIDOS } from "@/lib/marketing-ia/formatos"
+import { logosCargados, type VarianteLogo } from "@/lib/marketing-ia/logo-variante"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -22,10 +25,15 @@ export function CopyGeneratorFlow() {
   
   const [copyType, setCopyType] = useState<CopyType>('video')
   const [estructura, setEstructura] = useState<EstructuraId | 'sugerida'>('sugerida')
-  const [format, setFormat] = useState<ImageFormat>('reels')
+  const [format, setFormat] = useState<ImageFormat>('post_vertical')
   const [style, setStyle] = useState<ImageStyle>('moderno')
   const [extraContext, setExtraContext] = useState("")
   const [tieneOferta, setTieneOferta] = useState(true)
+  // Con cuál de los dos logos de la agencia sale la placa. null = todavía no eligió.
+  const [logos, setLogos] = useState({ estandar: false, lujo: false })
+  const [logoVariant, setLogoVariant] = useState<VarianteLogo | null>(null)
+  /** Hay algo que elegir solo si el director cargó las dos versiones. */
+  const hayQueElegirLogo = logos.estandar && logos.lujo
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressText, setProgressText] = useState("")
@@ -42,6 +50,17 @@ export function CopyGeneratorFlow() {
     // ¿Ya armó su oferta irresistible? Si no, avisamos que los anuncios van a salir genéricos.
     supabase.from('advisor_operations').select('oferta_captacion, oferta_venta').maybeSingle()
       .then(({ data }) => setTieneOferta(Boolean(data?.oferta_captacion || data?.oferta_venta)))
+
+    // Qué logos cargó el director (los asesores leen la config de su agencia, no la editan).
+    // Si hay uno solo, queda elegido de entrada y no hay nada que preguntar.
+    fetch('/api/marketing-ia/settings')
+      .then(res => res.ok ? res.json() : null)
+      .then(config => {
+        const cargados = logosCargados(config)
+        setLogos(cargados)
+        if (cargados.estandar !== cargados.lujo) setLogoVariant(cargados.lujo ? 'lujo' : 'estandar')
+      })
+      .catch(() => { /* Sin la config, la placa sale con el logo estándar, como antes. */ })
   }, [])
 
   useEffect(() => {
@@ -54,6 +73,10 @@ export function CopyGeneratorFlow() {
   const handleGenerateBatch = async () => {
     if (!selectedIpcId || !selectedIpc) return toast.error("Seleccione un IPC")
     const esGuion = copyType === 'video'
+    // La placa lleva logo sí o sí: con dos versiones cargadas, elegir cuál no es opcional.
+    if (!esGuion && hayQueElegirLogo && !logoVariant) {
+      return toast.error("Elegí con qué logo sale la placa: estándar o lujo")
+    }
     setIsGenerating(true)
     setProgressText(esGuion ? "Escribiendo tus 3 guiones..." : "Generando copys...")
 
@@ -114,7 +137,8 @@ export function CopyGeneratorFlow() {
                 tokko_property: tokkoProperty,
                 format,
                 style,
-                extra_prompt: ""
+                extra_prompt: "",
+                logo_variant: logoVariant ?? 'estandar'
               })
             })
           } catch (imgError) {
@@ -145,11 +169,14 @@ export function CopyGeneratorFlow() {
     }
   }
 
-  const formats = [
-    { id: 'reels', label: 'Reels', icon: Smartphone, ratio: '9:16' },
-    { id: 'post', label: 'Post', icon: Camera, ratio: '1:1' },
-    { id: 'historia', label: 'Historia', icon: Smartphone, ratio: '9:16' },
-  ]
+  // Los formatos y sus medidas viven en un solo lugar (lib/marketing-ia/formatos.ts): la pantalla,
+  // el prompt de Gemini y lo que se guarda en la base ya no pueden decir cosas distintas.
+  const iconos: Record<string, LucideIcon> = {
+    post_vertical: RectangleVertical,
+    reels: Smartphone,
+    post: Square,
+  }
+  const formats = FORMATOS_OFRECIDOS.map((f) => ({ ...f, icon: iconos[f.id] ?? Square }))
 
   const styles: Array<{ id: ImageStyle; label: string }> = [
     { id: 'moderno', label: 'Moderno' },
@@ -295,7 +322,7 @@ export function CopyGeneratorFlow() {
                     onClick={() => setFormat(f.id as ImageFormat)}
                   >
                     <f.icon className="mx-auto mb-2 w-6 h-6 text-accent" />
-                    <p className="text-xs font-bold">{f.label}</p>
+                    <p className="text-xs font-bold leading-tight">{f.etiqueta}</p>
                     <p className="text-[10px] text-muted-foreground">{f.ratio}</p>
                   </Card>
                 ))}
@@ -306,7 +333,7 @@ export function CopyGeneratorFlow() {
               <Label className="text-sm font-bold">4. Estilo de Visual</Label>
               <div className="flex flex-wrap gap-2">
                 {styles.map((s) => (
-                  <Button 
+                  <Button
                     key={s.id}
                     variant="outline"
                     className={cn(
@@ -320,6 +347,42 @@ export function CopyGeneratorFlow() {
                 ))}
               </div>
             </div>
+
+            {/* Con qué logo sale la placa. Solo aparece si la agencia cargó alguno: si no hay
+                ninguno, no hay nada que preguntar y la placa sale como salía antes. */}
+            {(logos.estandar || logos.lujo) && (
+              <div className="space-y-4">
+                <Label className="text-sm font-bold">5. Logo de la placa</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { id: 'estandar' as VarianteLogo, label: 'Estándar', bajada: 'El de todos los días' },
+                    { id: 'lujo' as VarianteLogo, label: 'Lujo', bajada: 'Propiedades premium' },
+                  ]).map((v) => {
+                    const disponible = v.id === 'lujo' ? logos.lujo : logos.estandar
+                    if (!disponible) return null
+                    return (
+                      <Card
+                        key={v.id}
+                        className={cn(
+                          "p-3 cursor-pointer transition-all hover:border-accent text-center",
+                          logoVariant === v.id ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-muted",
+                          !hayQueElegirLogo && "cursor-default opacity-90"
+                        )}
+                        onClick={() => hayQueElegirLogo && setLogoVariant(v.id)}
+                      >
+                        <p className="text-xs font-bold leading-tight">{v.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{v.bajada}</p>
+                      </Card>
+                    )
+                  })}
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                  {hayQueElegirLogo
+                    ? "Elegí con cuál de los dos logos de la agencia sale esta placa."
+                    : "Tu director configuró un solo logo, así que las placas salen con ese."}
+                </p>
+              </div>
+            )}
           </div>
           )}
         </div>
@@ -333,9 +396,9 @@ export function CopyGeneratorFlow() {
           <Sparkles className="mr-2 h-6 w-6" />
           {copyType === 'video' ? 'Generar 3 guiones para cámara' : 'Generar 3 Variantes Automáticamente'}
         </Button>
-        <p className="text-[10px] text-muted-foreground/50 text-center flex items-center justify-center gap-1">
+        <p className="text-[10px] text-muted-foreground text-center flex items-center justify-center gap-1">
           <Sparkles className="w-3 h-3" />
-          Cada generación consume <span className="font-semibold text-muted-foreground/70">1 crédito IA</span>
+          Cada generación consume <span className="font-semibold text-muted-foreground">1 crédito IA</span>
         </p>
       </CardFooter>
     </Card>

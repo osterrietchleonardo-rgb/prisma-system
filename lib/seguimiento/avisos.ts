@@ -36,6 +36,7 @@ export type PlantillaEquipo =
   | "asesor_sigue_esperando"
   | "director_asesor_sin_respuesta"
   | "director_aprobacion_pendiente"
+  | "asesor_registro_pendiente"
 
 export interface Aviso {
   destinatario: PerfilEquipo

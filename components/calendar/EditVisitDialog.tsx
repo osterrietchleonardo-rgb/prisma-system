@@ -230,7 +230,7 @@ export function EditVisitDialog({ visit, open, onOpenChange, onSuccess, agencyId
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="motivo_cambio" className="text-red-400">Motivo del Cambio *</Label>
+            <Label htmlFor="motivo_cambio" className="text-red-600 dark:text-red-400">Motivo del Cambio *</Label>
             <Textarea 
               id="motivo_cambio" 
               value={formData.motivo_cambio}

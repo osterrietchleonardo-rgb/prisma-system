@@ -98,7 +98,7 @@ export function PulsoMercadoContent({
             <p className="text-sm text-muted-foreground mt-1">
               Cotización del dólar en tiempo real · Indicadores inmobiliarios por reporte oficial
             </p>
-            <p className="text-xs text-muted-foreground/60 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               Datos de mercado actualizados: {formatDateTime(lastUpdated)}
             </p>
           </div>

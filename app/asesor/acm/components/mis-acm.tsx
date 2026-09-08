@@ -85,7 +85,7 @@ export function MisAcm({ onAbrir, abriendoId, refreshKey }: Props) {
   if (rows.length === 0) {
     return (
       <div className="text-center py-12 space-y-2">
-        <Scale className="w-8 h-8 text-accent/40 mx-auto" />
+        <Scale className="w-8 h-8 text-accent mx-auto" />
         <p className="font-bold">Todavía no hay ACM guardados</p>
         <p className="text-sm text-muted-foreground">Cada análisis que hagas queda acá para volver a abrirlo cuando quieras.</p>
       </div>

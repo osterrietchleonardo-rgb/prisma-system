@@ -52,11 +52,11 @@ const fmtValue = (n: number, unit: "usd" | "count") => {
 };
 
 const pctColor = (pct: number | null) => {
-  if (pct === null) return "text-muted-foreground/50";
-  if (pct >= 100) return "text-green-400";
-  if (pct >= 60) return "text-blue-400";
-  if (pct >= 30) return "text-orange-400";
-  return "text-red-400/90";
+  if (pct === null) return "text-muted-foreground";
+  if (pct >= 100) return "text-green-700 dark:text-green-400";
+  if (pct >= 60) return "text-blue-600 dark:text-blue-400";
+  if (pct >= 30) return "text-orange-700 dark:text-orange-400";
+  return "text-red-600 dark:text-red-400";
 };
 
 export function ObjectivesDashboard({ initialData, initialYear, alcance = "agencia" }: Props) {
@@ -138,7 +138,7 @@ export function ObjectivesDashboard({ initialData, initialYear, alcance = "agenc
                   onClick={() => setMetric(m.key)}
                   className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all ${
                     metric === m.key
-                      ? "bg-accent text-white shadow-lg shadow-accent/20"
+                      ? "bg-accent text-accent-foreground shadow-lg shadow-accent/20"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -165,11 +165,11 @@ export function ObjectivesDashboard({ initialData, initialYear, alcance = "agenc
       <CardContent className="p-0">
         {isLoading ? (
           <div className="h-64 flex items-center justify-center gap-3 text-muted-foreground">
-            <Loader2 className="w-6 h-6 animate-spin text-accent/50" />
+            <Loader2 className="w-6 h-6 animate-spin text-accent" />
             <span>Cargando objetivos...</span>
           </div>
         ) : !hasAnyObjective ? (
-          <div className="h-48 flex flex-col items-center justify-center gap-3 text-muted-foreground/60">
+          <div className="h-48 flex flex-col items-center justify-center gap-3 text-muted-foreground">
             <Target className="w-10 h-10 opacity-20" />
             <p className="italic text-sm text-center px-6">
               {esPropio ? (
@@ -192,7 +192,7 @@ export function ObjectivesDashboard({ initialData, initialYear, alcance = "agenc
             {/* Tabla */}
             <div className="overflow-x-auto w-full">
               <table className="w-full text-sm text-left min-w-[1100px]">
-                <thead className="bg-muted/30 text-muted-foreground/70 border-b border-accent/5">
+                <thead className="bg-muted/30 text-muted-foreground border-b border-accent/5">
                   <tr>
                     <th className="px-5 py-3 font-bold min-w-[200px] sticky left-0 bg-muted/95 backdrop-blur-md z-10 border-r border-accent/10">
                       Asesor

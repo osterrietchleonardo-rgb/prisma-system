@@ -329,7 +329,7 @@ export function PerformanceLogForm({
               </p>
             )}
             {errors.proceso && (
-              <p className="text-xs text-red-400">{errors.proceso.message as string}</p>
+              <p className="text-xs text-red-600 dark:text-red-400">{errors.proceso.message as string}</p>
             )}
           </div>
         </div>
@@ -579,7 +579,7 @@ export function PerformanceLogForm({
         {/* Campos de Vinculación */}
         <Separator />
         <div className="space-y-4">
-          <header className="flex items-center gap-2 text-accent/70 font-semibold">
+          <header className="flex items-center gap-2 text-accent font-semibold">
              <MapPin className="w-4 h-4" />
              <h3 className="text-xs uppercase tracking-wider">Propiedad (opcional) y Cliente</h3>
           </header>
@@ -739,7 +739,7 @@ export function PerformanceLogForm({
           <>
             <Separator />
             <div className="space-y-4">
-              <header className="flex items-center gap-2 text-accent/70 font-semibold">
+              <header className="flex items-center gap-2 text-accent font-semibold">
                 <Briefcase className="w-4 h-4" />
                 <h3 className="text-xs uppercase tracking-wider">Auditoría</h3>
               </header>

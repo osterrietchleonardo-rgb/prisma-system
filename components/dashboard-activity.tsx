@@ -22,26 +22,26 @@ export function DashboardActivity({ data }: DashboardActivityProps) {
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'captacion':
-        return <Key className="h-4 w-4 text-amber-400" />
+        return <Key className="h-4 w-4 text-amber-700 dark:text-amber-400" />
       case 'transaccion':
-        return <TrendingUp className="h-4 w-4 text-emerald-400" />
+        return <TrendingUp className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
       case 'lead_seguimiento':
-        return <MessageSquare className="h-4 w-4 text-blue-400" />
+        return <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
       default:
-        return <Activity className="h-4 w-4 text-purple-400" />
+        return <Activity className="h-4 w-4 text-purple-600 dark:text-purple-400" />
     }
   }
 
   const getActivityColor = (type: string) => {
     switch (type) {
       case 'captacion':
-        return 'bg-amber-400/10 text-amber-400 border-amber-400/20'
+        return 'bg-amber-400/10 text-amber-800 dark:text-amber-400 border-amber-400/20'
       case 'transaccion':
-        return 'bg-emerald-400/10 text-emerald-400 border-emerald-400/20'
+        return 'bg-emerald-400/10 text-emerald-800 dark:text-emerald-400 border-emerald-400/20'
       case 'lead_seguimiento':
-        return 'bg-blue-400/10 text-blue-400 border-blue-400/20'
+        return 'bg-blue-400/10 text-blue-800 dark:text-blue-400 border-blue-400/20'
       default:
-        return 'bg-purple-400/10 text-purple-400 border-purple-400/20'
+        return 'bg-purple-400/10 text-purple-800 dark:text-purple-400 border-purple-400/20'
     }
   }
 
@@ -63,7 +63,7 @@ export function DashboardActivity({ data }: DashboardActivityProps) {
       <CardHeader className="flex flex-row items-center justify-between">
         <div className="space-y-1">
           <CardTitle className="text-xl font-bold tracking-tight">Movimientos Recientes</CardTitle>
-          <CardDescription className="text-muted-foreground/60">
+          <CardDescription className="text-muted-foreground">
             Actividad en tiempo real de los asesores
           </CardDescription>
         </div>
@@ -101,7 +101,7 @@ export function DashboardActivity({ data }: DashboardActivityProps) {
                     <p className="text-sm font-semibold text-foreground group-hover:text-accent transition-colors">
                       {activity.profiles?.full_name || "Asesor"}
                     </p>
-                    <span className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                       {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true, locale: es })}
                     </span>
                   </div>
@@ -116,13 +116,13 @@ export function DashboardActivity({ data }: DashboardActivityProps) {
                   </div>
 
                   {activity.propiedad_ref && (
-                    <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground/60">
+                    <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
                       <Key className="h-3 w-3" />
                       <span>REF: {activity.propiedad_ref}</span>
                       {activity.monto_operacion > 0 && (
                         <>
                           <span className="mx-1">•</span>
-                          <span className="text-emerald-400 font-medium">
+                          <span className="text-emerald-700 dark:text-emerald-400 font-medium">
                             USD {Number(activity.monto_operacion).toLocaleString()}
                           </span>
                         </>

@@ -521,9 +521,9 @@ export function LeadsTable({ leads, loading, tagsByGroup, onRefresh, basePath = 
 
                            <TableCell className="text-center hidden sm:table-cell">
                               <Badge className={cn("text-[10px] font-bold",
-                                 lead.dias_en_sistema < 7 ? "bg-green-500/10 text-green-500 hover:bg-green-500/20" :
-                                 lead.dias_en_sistema <= 30 ? "bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20" :
-                                 "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                                 lead.dias_en_sistema < 7 ? "bg-green-500/10 text-green-800 dark:text-green-500 hover:bg-green-500/20" :
+                                 lead.dias_en_sistema <= 30 ? "bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 hover:bg-yellow-500/20" :
+                                 "bg-red-500/10 text-red-800 dark:text-red-500 hover:bg-red-500/20"
                               )}>
                                  {lead.dias_en_sistema} {lead.dias_en_sistema === 1 ? 'día' : 'días'}
                               </Badge>

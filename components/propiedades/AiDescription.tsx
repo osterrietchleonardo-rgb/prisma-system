@@ -99,7 +99,7 @@ export function AiDescription({ propertyId, initial }: Props) {
             )}
             Generar descripción con IA
           </Button>
-          <p className="text-[11px] text-muted-foreground/70 flex items-center justify-center gap-1">
+          <p className="text-[11px] text-muted-foreground flex items-center justify-center gap-1">
             <Info className="h-3 w-3" /> Consume 1 crédito · No modifica la descripción original de Tokko
           </p>
         </div>
@@ -131,7 +131,7 @@ export function AiDescription({ propertyId, initial }: Props) {
             className="resize-none bg-background/60"
           />
           <div className="flex items-center justify-between gap-3">
-            <span className="text-[11px] text-muted-foreground/70 flex items-center gap-1">
+            <span className="text-[11px] text-muted-foreground flex items-center gap-1">
               <Info className="h-3 w-3" /> Consume 1 crédito · Es la última versión posible
             </span>
             <Button
@@ -164,7 +164,7 @@ export function AiDescription({ propertyId, initial }: Props) {
       )}
 
       {hasV2 && (
-        <p className="text-[11px] text-muted-foreground/70 flex items-center gap-1">
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1">
           <Info className="h-3 w-3" /> Llegaste al máximo de 2 versiones. Copiá la que prefieras y
           pegala en Tokko si querés publicarla.
         </p>
@@ -198,12 +198,12 @@ function VersionBox({
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-wider text-accent">{label}</span>
         <Button variant="outline" size="sm" className="h-7 gap-1.5 border-accent/20" onClick={onCopy}>
-          {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? <Check className="h-3.5 w-3.5 text-green-700 dark:text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
           {copied ? "Copiado" : "Copiar"}
         </Button>
       </div>
       {suggestion && (
-        <p className="text-[11px] italic text-muted-foreground/80">
+        <p className="text-[11px] italic text-muted-foreground">
           Sugerencia aplicada: &quot;{suggestion}&quot;
         </p>
       )}

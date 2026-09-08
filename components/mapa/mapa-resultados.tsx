@@ -8,6 +8,7 @@
 // para que nunca desaparezcan en silencio.
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MapPinOff } from "lucide-react"
+import { CheckSeleccion, candidataDePropiedad } from "@/components/seleccion/marca-seleccion"
 import { precioCreible } from "@/lib/mapa/lugares"
 import { tipoEnCastellano } from "@/lib/mapa/tipos-propiedad"
 import type { FuenteMapa, PropiedadMapa } from "@/lib/mapa/tipos"
@@ -88,7 +89,7 @@ export function MapaResultados({
   const contenido = (
     <div className="space-y-2 p-2">
         {sinUbicacion.length > 0 && (
-          <p className="px-1 pb-1 text-[11px] text-amber-600 dark:text-amber-500">
+          <p className="px-1 pb-1 text-[11px] text-amber-700 dark:text-amber-500">
             {sinUbicacion.length}{" "}
             {sinUbicacion.length === 1 ? "propiedad no tiene" : "propiedades no tienen"} ubicación
             cargada: están en la lista pero no en el mapa.
@@ -98,12 +99,21 @@ export function MapaResultados({
         {ordenadas.map((p) => {
           const ubicada = p.lat !== null && p.lng !== null
           return (
-            <button
+            // La fila era un <button> entero. Ahora lleva el check de la seleccion adentro,
+            // y un boton dentro de otro boton es HTML invalido: el navegador se come uno de
+            // los dos clicks. Por eso el contenedor pasa a <div> y quedan DOS zonas tocables
+            // separadas: el check, y el resto que abre la ficha.
+            <div
               key={p.id}
-              onClick={() => onAbrir(p.id)}
               onMouseEnter={() => ubicada && onEnfocar?.(p)}
-              className="flex w-full gap-3 rounded-xl border border-zinc-200 bg-white/60 p-2 text-left transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:border-zinc-600"
+              className="flex w-full items-center gap-1 rounded-xl border border-zinc-200 bg-white/60 p-2 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-900/60 dark:hover:border-zinc-600"
             >
+              <CheckSeleccion candidata={candidataDePropiedad(p)} />
+
+              <button
+                onClick={() => onAbrir(p.id)}
+                className="flex min-w-0 flex-1 gap-3 text-left"
+              >
               <img
                 src={p.images[0] || SIN_FOTO}
                 alt={p.title || "Propiedad"}
@@ -115,11 +125,11 @@ export function MapaResultados({
                   <span className="text-[9px] uppercase tracking-wider text-zinc-500">
                     {ETIQUETA_FUENTE[p.source]}
                   </span>
-                  {!ubicada && <MapPinOff className="h-3 w-3 text-amber-500" />}
+                  {!ubicada && <MapPinOff className="h-3 w-3 text-amber-700 dark:text-amber-500" />}
                 </div>
                 <p className="truncate text-sm font-semibold">{precio(p)}</p>
                 <p className="truncate text-xs text-zinc-500">{p.address || p.city || "Sin dirección"}</p>
-                <p className="truncate text-[11px] text-zinc-400">
+                <p className="truncate text-[11px] text-zinc-600 dark:text-zinc-400">
                   {/* `ambientes`, no `bedrooms`: hasta el 2026-08-14 esta linea decia
                       "3 amb." mostrando los DORMITORIOS, y en la cartera de Central los
                       dos numeros difieren en el 84% de las propiedades. */}
@@ -128,7 +138,8 @@ export function MapaResultados({
                     .join(" · ")}
                 </p>
               </div>
-            </button>
+              </button>
+            </div>
           )
         })}
     </div>

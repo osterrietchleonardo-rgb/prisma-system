@@ -276,7 +276,7 @@ export default function LeadsWhatsappClient({
                             {conv.bot_active && (
                               <TooltipProvider>
                                 <Tooltip>
-                                  <TooltipTrigger><Bot className="w-3 h-3 ml-1 text-emerald-400" /></TooltipTrigger>
+                                  <TooltipTrigger><Bot className="w-3 h-3 ml-1 text-emerald-700 dark:text-emerald-400" /></TooltipTrigger>
                                   <TooltipContent><p className="text-xs">Chatbot Activo</p></TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
@@ -310,7 +310,7 @@ export default function LeadsWhatsappClient({
                       {conv.etiquetas && conv.etiquetas.length > 0 ? (
                         <div className="flex flex-wrap gap-1 max-w-[150px]">
                           {conv.etiquetas.slice(0, 2).map((etiqueta, i) => (
-                            <Badge key={i} variant="outline" className="text-[9px] px-1.5 py-0 border-accent/20 bg-accent/5 text-accent/80">
+                            <Badge key={i} variant="outline" className="text-[9px] px-1.5 py-0 border-accent/20 bg-accent/5 text-accent">
                               {etiqueta}
                             </Badge>
                           ))}
@@ -337,7 +337,7 @@ export default function LeadsWhatsappClient({
                     <TableCell>
                       <Badge className={cn(
                         "text-[10px] font-bold px-2 py-0 border-none shadow-none",
-                        conv.status === 'active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-zinc-500/10 text-zinc-400'
+                        conv.status === 'active' ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-500' : 'bg-zinc-500/10 text-zinc-400'
                       )}>
                         {conv.status === 'active' ? 'Activo' : conv.status === 'closed' ? 'Cerrado' : 'Pendiente'}
                       </Badge>
@@ -581,7 +581,7 @@ export default function LeadsWhatsappClient({
                     key={tag}
                     type="button"
                     onClick={() => handleAddTag(tag)}
-                    className="text-[10px] px-2 py-0.5 rounded-full border border-accent/20 bg-accent/5 text-accent/80 hover:bg-accent/10 transition-colors"
+                    className="text-[10px] px-2 py-0.5 rounded-full border border-accent/20 bg-accent/5 text-accent hover:bg-accent/10 transition-colors"
                   >
                     + {tag}
                   </button>

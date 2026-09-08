@@ -30,7 +30,7 @@ export default function NotFound() {
             </Link>
           </Button>
           
-          <Button asChild className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-white gap-2 shadow-lg shadow-accent/20">
+          <Button asChild className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground gap-2 shadow-lg shadow-accent/20">
             {/* The user wants to verify auth and redirect, but this is a purely server-rendered or static-friendly 404. 
                 We use /dashboard as a generic redirect point that the mid-level auth handles. */}
             <Link href="/">

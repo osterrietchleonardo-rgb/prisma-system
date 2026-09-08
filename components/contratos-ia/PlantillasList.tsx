@@ -154,7 +154,7 @@ export function PlantillasList() {
                   <TableCell className="text-center">v{t.version}</TableCell>
                   <TableCell className="text-center">
                     {t.is_active ? (
-                      <Badge className="bg-green-600 text-white text-[10px]">Activa</Badge>
+                      <Badge className="bg-green-700 text-white text-[10px]">Activa</Badge>
                     ) : (
                       <Badge variant="outline" className="text-[10px] text-muted-foreground">Inactiva</Badge>
                     )}

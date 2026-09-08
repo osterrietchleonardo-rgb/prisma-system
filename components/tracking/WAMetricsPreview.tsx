@@ -22,7 +22,7 @@ export function WAMetricsPreview({ quant, qual, isAnalyzing }: Props) {
         <MetricCard
           label="1ra Respuesta"
           value={quant.wa_tiempo_respuesta_inicial_min !== null ? `${quant.wa_tiempo_respuesta_inicial_min}m` : "-"}
-          icon={<Zap className="w-3.5 h-3.5 text-yellow-500" />}
+          icon={<Zap className="w-3.5 h-3.5 text-yellow-700 dark:text-yellow-500" />}
           description="Desde el 1er mensaje del lead"
         />
         <MetricCard
@@ -39,7 +39,7 @@ export function WAMetricsPreview({ quant, qual, isAnalyzing }: Props) {
         <MetricCard
           label="Ratio MSGs"
           value={quant.wa_ratio ?? 0}
-          icon={<TrendingUp className="w-3.5 h-3.5 text-green-500" />}
+          icon={<TrendingUp className="w-3.5 h-3.5 text-green-700 dark:text-green-500" />}
           description="Tus msgs / msgs del lead"
         />
       </div>
@@ -70,7 +70,7 @@ export function WAMetricsPreview({ quant, qual, isAnalyzing }: Props) {
                 <Badge variant="secondary">{qual.tono}</Badge>
                 <Badge variant="secondary">Personalización {qual.nivel_personalizacion}</Badge>
                 {qual.score_general && (
-                  <Badge className={qual.score_general >= 7 ? "bg-green-500/10 text-green-600 hover:bg-green-500/20" : "bg-yellow-500/10 text-yellow-600 hover:bg-yellow-500/20"}>
+                  <Badge className={qual.score_general >= 7 ? "bg-green-500/10 text-green-800 dark:text-green-400 hover:bg-green-500/20" : "bg-yellow-500/10 text-yellow-800 dark:text-yellow-400 hover:bg-yellow-500/20"}>
                     Score: {qual.score_general}/10
                   </Badge>
                 )}
@@ -107,7 +107,7 @@ function MetricCard({ label, value, icon, description }: any) {
       {description && (
         <TooltipProvider>
           <Tooltip>
-            <TooltipTrigger className="text-[9px] text-muted-foreground/60 block truncate mt-1 text-left">
+            <TooltipTrigger className="text-[9px] text-muted-foreground block truncate mt-1 text-left">
               {description}
             </TooltipTrigger>
             <TooltipContent>

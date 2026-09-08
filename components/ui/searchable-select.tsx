@@ -73,7 +73,7 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
               {filteredOptions.map((opt) => (
                 <div
                   key={opt.value}
-                  className={`relative flex w-full cursor-default select-none items-center rounded-sm py-2 pl-2 pr-8 text-sm outline-none hover:bg-accent hover:text-white transition-colors ${
+                  className={`relative flex w-full cursor-default select-none items-center rounded-sm py-2 pl-2 pr-8 text-sm outline-none hover:bg-accent hover:text-accent-foreground transition-colors ${
                     value === opt.value ? 'bg-accent/20 text-accent font-medium' : ''
                   }`}
                   onClick={() => {

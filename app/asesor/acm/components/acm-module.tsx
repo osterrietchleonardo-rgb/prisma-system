@@ -11,6 +11,7 @@ import { Sujeto, Operacion, AcmComparable, TOPE_COMPARABLES } from "@/lib/tasaci
 import { SubjectInput } from "./subject-input";
 import { ComparablesResult } from "./comparables-result";
 import { MisAcm } from "./mis-acm";
+import { ConfiguracionTab } from "./configuracion-tab";
 
 export const SUJETO_INICIAL: Sujeto = {
   direccion: "",
@@ -51,13 +52,26 @@ export const SUJETO_INICIAL: Sujeto = {
 };
 
 // Componente principal del ACM (lo reutilizan tanto el asesor como el director).
-export function AcmModule() {
+// `esDirector` habilita la solapa Configuración, donde se carga el material institucional que
+// sale dentro de la ficha. Solo la pasa app/director/acm/page.tsx: al asesor no le llega y la
+// solapa no existe para él. Los endpoints igual devuelven 403 — esto es comodidad, no la
+// defensa.
+export function AcmModule({ esDirector = false }: { esDirector?: boolean }) {
   const [sujeto, setSujeto] = useState<Sujeto>(SUJETO_INICIAL);
   const [operacion, setOperacion] = useState<Operacion>("venta");
   const [considerarPh, setConsiderarPh] = useState(true); // ACM: considerar PH como comparables (solo aplica a Casa)
   // Barrios linderos: apagado por defecto. Un comparable de Núñez en un ACM de Belgrano
   // es técnicamente defendible pero le rompe la confianza al cliente, así que se pide.
   const [incluirLinderos, setIncluirLinderos] = useState(false);
+  // Dónde buscar: en el barrio (lo de siempre) o dentro de las zonas dibujadas en el mapa.
+  // Son EXCLUYENTES y el modo barrio es el que viene puesto: un ACM que se abre y se busca sin
+  // tocar nada tiene que devolver exactamente lo mismo que antes de que esto existiera.
+  const [modoZona, setModoZona] = useState<"barrio" | "zonas">("barrio");
+  const [zonasElegidas, setZonasElegidas] = useState<string[]>([]);
+  // Nombres de las zonas que efectivamente se usaron, tal como los devolvió el servidor. No se
+  // arman en el navegador: si una zona se borró entre que se eligió y se buscó, el chip tiene
+  // que decir lo que de verdad se usó.
+  const [zonasUsadas, setZonasUsadas] = useState<string[]>([]);
   const [excludeId, setExcludeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"input" | "results">("input");
@@ -69,7 +83,7 @@ export function AcmModule() {
     roomixFallo: boolean;
   } | null>(null);
   // Historial "Mis ACM": id de la búsqueda guardada (para linkearle la ficha) + solapa activa.
-  const [tab, setTab] = useState<"nuevo" | "historial">("nuevo");
+  const [tab, setTab] = useState<"nuevo" | "historial" | "configuracion">("nuevo");
   const [searchId, setSearchId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [abriendoId, setAbriendoId] = useState<string | null>(null);
@@ -81,10 +95,19 @@ export function AcmModule() {
     setOperacion("venta");
     setConsiderarPh(true);
     setIncluirLinderos(false);
+    setModoZona("barrio");
+    setZonasElegidas([]);
     setExcludeId(null);
   };
 
-  const handleBuscar = async () => {
+  // `sinZona` es un parámetro y no estado a propósito: el botón "Buscar sin la zona" de los
+  // resultados tiene que buscar YA, no en el render siguiente.
+  const handleBuscar = async (opts?: { sinZona?: boolean }) => {
+    const usarZonas = !opts?.sinZona && modoZona === "zonas" && zonasElegidas.length > 0;
+    if (opts?.sinZona) {
+      setModoZona("barrio");
+      setZonasElegidas([]);
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/acm/comparables", {
@@ -98,6 +121,9 @@ export function AcmModule() {
           operacion,
           exclude_id: excludeId,
           considerar_ph: considerarPh,
+          // Solo viaja en el modo zonas: así el servidor no tiene que adivinar la intención a
+          // partir de un array vacío.
+          ...(usarZonas ? { zona_ids: zonasElegidas } : {}),
           // Traer la lista larga, no una muestra de 50. El tope y el porqué están en
           // TOPE_COMPARABLES. Como cada sección ahora scrollea en su propio recuadro, una lista
           // larga ya no estira la página.
@@ -115,6 +141,10 @@ export function AcmModule() {
         carteraFallo,
         roomixFallo,
       });
+      setZonasUsadas(data.meta?.zonas_usadas || []);
+      if ((data.meta?.zonas_invalidas || []).length > 0) {
+        toast.warning(`No se pudo usar el trazo de: ${data.meta.zonas_invalidas.join(", ")}.`);
+      }
       setSearchId(data.search_id ?? null);
       setRefreshKey((k) => k + 1); // la búsqueda quedó guardada en "Mis ACM"
       setView("results");
@@ -152,6 +182,12 @@ export function AcmModule() {
       // Restaura el modo de zona con el que se hizo esta búsqueda (ver Sujeto.incluir_linderos).
       // Ausente (búsquedas guardadas antes de este fix) = false = estricto, el default seguro.
       setIncluirLinderos(Boolean(data.sujeto?.incluir_linderos));
+      // Con qué zonas se hizo esta búsqueda. Ausente = se hizo por barrio (o es anterior a que
+      // esto existiera), que es el default seguro.
+      const zonasGuardadas: { id: string; nombre: string }[] = data.sujeto?.zonas || [];
+      setModoZona(zonasGuardadas.length > 0 ? "zonas" : "barrio");
+      setZonasElegidas(zonasGuardadas.map((z) => z.id));
+      setZonasUsadas(zonasGuardadas.map((z) => z.nombre));
       // Búsqueda del historial: es un snapshot ya guardado, no hay una llamada en vivo que
       // pueda fallar AHORA — pero si la búsqueda ORIGINAL falló parcialmente (cartera y/o red
       // no completaron, ej. timeout), ese fallo quedó guardado dentro del propio snapshot
@@ -192,12 +228,15 @@ export function AcmModule() {
         </div>
       </div>
 
-      {/* Solapas: análisis nuevo / historial guardado */}
+      {/* Solapas: análisis nuevo / historial guardado / configuración (solo el director) */}
       <div className="inline-flex items-center gap-1 p-1 rounded-xl border border-accent/10 bg-card/30">
         {([
           ["nuevo", "Nuevo ACM"],
           ["historial", "Mis ACM"],
-        ] as const).map(([key, label]) => (
+          ["configuracion", "Configuración"],
+        ] as const)
+          .filter(([key]) => key !== "configuracion" || esDirector)
+          .map(([key, label]) => (
           <button
             key={key}
             onClick={() => setTab(key)}
@@ -215,17 +254,21 @@ export function AcmModule() {
         <CardHeader className="border-b border-accent/5 pb-4">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold uppercase tracking-widest text-accent">
-              {tab === "historial"
-                ? "Historial · Tus análisis guardados"
-                : view === "input"
-                  ? "1 · Elegí la propiedad a analizar"
-                  : "2 · Comparables encontrados"}
+              {tab === "configuracion"
+                ? "Configuración · Cómo sale la ficha para el propietario"
+                : tab === "historial"
+                  ? "Historial · Tus análisis guardados"
+                  : view === "input"
+                    ? "1 · Elegí la propiedad a analizar"
+                    : "2 · Comparables encontrados"}
             </p>
             <Badge variant="outline" className="text-[10px] border-accent/10">ACM</Badge>
           </div>
         </CardHeader>
         <CardContent className="p-4 sm:p-8">
-          {tab === "historial" ? (
+          {tab === "configuracion" && esDirector ? (
+            <ConfiguracionTab />
+          ) : tab === "historial" ? (
             <MisAcm onAbrir={handleAbrirGuardado} abriendoId={abriendoId} refreshKey={refreshKey} />
           ) : view === "input" ? (
             <SubjectInput
@@ -237,6 +280,10 @@ export function AcmModule() {
               onConsiderarPhChange={setConsiderarPh}
               incluirLinderos={incluirLinderos}
               onIncluirLinderosChange={setIncluirLinderos}
+              modoZona={modoZona}
+              onModoZonaChange={setModoZona}
+              zonasElegidas={zonasElegidas}
+              onZonasElegidasChange={setZonasElegidas}
               descripcionIa={sujeto.descripcion_ia ?? ""}
               onDescripcionIaChange={(v) => setSujeto((s) => ({ ...s, descripcion_ia: v }))}
               incluirDescFicha={sujeto.incluir_desc_ficha ?? true}
@@ -252,7 +299,7 @@ export function AcmModule() {
                   ...(v.luminosidad !== undefined ? { anclaje_luminosidad: v.luminosidad } : {}),
                 }))
               }
-              onBuscar={handleBuscar}
+              onBuscar={() => handleBuscar()}
               loading={loading}
               excludeId={excludeId}
               onExcludeIdChange={setExcludeId}
@@ -269,6 +316,8 @@ export function AcmModule() {
                 carteraFallo={results.carteraFallo}
                 roomixFallo={results.roomixFallo}
                 searchId={searchId}
+                zonasUsadas={zonasUsadas}
+                onBuscarSinZona={() => handleBuscar({ sinZona: true })}
                 onFichaCreada={(nuevoId) => {
                   setSearchId(nuevoId);
                   setRefreshKey((k) => k + 1);

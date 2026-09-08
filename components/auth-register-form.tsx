@@ -105,8 +105,8 @@ export default function RegisterForm() {
       <CardContent className="grid gap-4">
         <Tabs value={mode} onValueChange={(v) => setMode(v as "crear" | "unirme")} className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-background/50 border border-border/50">
-            <TabsTrigger value="crear" className="data-[state=active]:bg-accent data-[state=active]:text-white">Crear inmobiliaria nueva</TabsTrigger>
-            <TabsTrigger value="unirme" className="data-[state=active]:bg-accent data-[state=active]:text-white">Unirme a una inmobiliaria</TabsTrigger>
+            <TabsTrigger value="crear" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">Crear inmobiliaria nueva</TabsTrigger>
+            <TabsTrigger value="unirme" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">Unirme a una inmobiliaria</TabsTrigger>
           </TabsList>
         </Tabs>
 

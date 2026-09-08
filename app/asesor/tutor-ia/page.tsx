@@ -319,7 +319,7 @@ export default function AdvisorTutorIAPage() {
 
                   {s.summary && !renamingId && (
                     <div className="mt-2 pt-2 border-t border-accent/5">
-                      <p className="text-[10px] text-muted-foreground/80 line-clamp-2 italic leading-relaxed">
+                      <p className="text-[10px] text-muted-foreground line-clamp-2 italic leading-relaxed">
                         {s.summary}
                       </p>
                     </div>
@@ -330,7 +330,7 @@ export default function AdvisorTutorIAPage() {
                       <div className="flex gap-1 animate-in zoom-in-95 duration-200 bg-background/80 backdrop-blur-sm p-1 rounded-lg border shadow-sm">
                         <Button 
                           size="icon" 
-                          className="h-7 w-7 bg-destructive hover:bg-destructive/90 text-white rounded-md shadow-sm"
+                          className="h-7 w-7 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-md shadow-sm"
                           onClick={(e) => handleDelete(s.id, e)}
                         >
                           <Check className="w-4 h-4" />
@@ -486,7 +486,7 @@ export default function AdvisorTutorIAPage() {
                         </div>
                         {message.sources.map((src, idx) => (
                           <div key={idx} className="flex items-center gap-2 px-3 py-1 bg-white dark:bg-zinc-900 border border-border/60 rounded-full text-[11px] font-medium shadow-sm transition-all hover:bg-muted">
-                            <Quote className="w-3 h-3 text-accent/60" />
+                            <Quote className="w-3 h-3 text-accent" />
                             <span className="truncate max-w-[150px] md:max-w-[250px]">{src.title}</span>
                           </div>
                         ))}
@@ -529,7 +529,7 @@ export default function AdvisorTutorIAPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               disabled={isLoading}
-              className="flex-1 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 h-12 text-sm md:text-base placeholder:text-muted-foreground/60"
+              className="flex-1 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-0 h-12 text-sm md:text-base placeholder:text-muted-foreground"
             />
             <Button 
               type="submit" 
@@ -540,9 +540,9 @@ export default function AdvisorTutorIAPage() {
               <Send className="w-5 h-5 ml-0.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </Button>
           </form>
-          <p className="text-[10px] text-muted-foreground/40 text-center w-full flex items-center justify-center gap-1 mt-2">
+          <p className="text-[10px] text-muted-foreground text-center w-full flex items-center justify-center gap-1 mt-2">
             <Sparkles className="w-3 h-3" />
-            Cada respuesta consume <span className="font-semibold text-muted-foreground/60">1 crédito IA</span>
+            Cada respuesta consume <span className="font-semibold text-muted-foreground">1 crédito IA</span>
           </p>
         </CardFooter>
       </div>

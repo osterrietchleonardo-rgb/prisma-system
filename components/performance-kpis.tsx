@@ -28,7 +28,7 @@ export function PerformanceKpis({ data }: PerformanceKpisProps) {
       value: data.captaciones,
       description: "Propiedades captadas este mes",
       icon: Home,
-      color: "text-blue-500",
+      color: "text-blue-700 dark:text-blue-500",
       bg: "bg-blue-500/10",
     },
     {
@@ -36,7 +36,7 @@ export function PerformanceKpis({ data }: PerformanceKpisProps) {
       value: data.transacciones,
       description: "Cierres realizados",
       icon: Target,
-      color: "text-green-500",
+      color: "text-green-700 dark:text-green-500",
       bg: "bg-green-500/10",
     },
     {
@@ -52,7 +52,7 @@ export function PerformanceKpis({ data }: PerformanceKpisProps) {
       value: `${data.rotacion.toFixed(1)}%`,
       description: "Ventas / Inventario Promedio",
       icon: Percent,
-      color: "text-orange-500",
+      color: "text-orange-700 dark:text-orange-500",
       bg: "bg-orange-500/10",
     }
   ];

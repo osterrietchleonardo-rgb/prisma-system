@@ -71,10 +71,20 @@ Antes de operar, dejá lista la base. Andá a **Configuración** (último ítem 
 
 ## 3. Cómo moverte por PRISMA
 
-- **Menú lateral izquierdo:** tu navegación principal (18 secciones).
+- **Menú lateral izquierdo:** tu navegación principal. Las secciones están agrupadas por lo que hay adentro de cada una:
+  - **Mi día:** Dashboard, Calendario.
+  - **Bandejas:** Asesor IA WhatsApp (las conversaciones que entran).
+  - **Contactos:** Pipeline, Leads Tokko, Leads WhatsApp (los listados de gente).
+  - **Propiedades:** Propiedades, Buscador IA, ACM, Pulso de Mercado.
+  - **Herramientas IA:** Marketing IA, Contratos IA.
+  - **Mi equipo:** Equipo, Asesores, Tracking Performance.
+  - **Ayuda:** Tutor IA, Documentos, Sugerencias.
+- Cada grupo se abre y se cierra tocando su título. Podés cerrarlos todos; el grupo de la sección en la que estás queda con el título en color cobre para que no pierdas dónde estás. Al entrar a una sección, su grupo se abre solo. El menú se acuerda de qué grupos dejaste abiertos.
+- Si en el grupo **Mi equipo** hay aprobaciones pendientes, el contador aparece sobre "Equipo" y, si el grupo está cerrado, sobre el título del grupo.
+- **Cerrar la barra en la computadora:** arriba a la derecha de la barra hay un botón para esconderla y ver el contenido a todo lo ancho. Para volver a abrirla, usá el botón **"Barra lateral"** que aparece arriba a la izquierda. PRISMA se acuerda de cómo la dejaste. En el celular no cambia nada: la barra sigue saliendo desde el botón de las tres líneas.
 - Arriba a la derecha: **botón de tema** (☀️/🌙) para modo claro u oscuro.
 - Tu nombre y rol ("Director") aparecen arriba del menú.
-- **"Cerrar Sesión"** está al final del menú.
+- **"Configuración"** y **"Cerrar Sesión"** están al final del menú, siempre a mano.
 
 Como director ves **todo** lo de tu agencia: el trabajo de todos los asesores, métricas globales y la configuración.
 
@@ -706,6 +716,44 @@ Con los comparables a la vista, vos o tus asesores pueden armar una **ficha prof
 > 💡 **Tip:** la ficha toma los **colores, el logo y el aviso legal** que definís en **Marketing IA → Identidad Visual**. Si el logo o el aviso legal no están cargados, simplemente no aparecen (y si no hay colores, usa un diseño elegante por defecto). Configurarlos una vez mejora todas las fichas que creen tus asesores.
 > 💰 Crear la ficha **no consume créditos**.
 
+### Configuración: lo que tu inmobiliaria le cuenta al propietario
+
+Tercera solapa del ACM, **Configuración**. **Solo la ves vos**: tus asesores no la tienen.
+
+**Para qué es.** La ficha explica muy bien **cuánto vale** la propiedad, pero no dice **quién** se lo está diciendo al propietario ni **qué va a pasar después**. Acá cargás eso, una sola vez, y sale dentro de **todas** las fichas que genere tu equipo, con tus colores y tu logo.
+
+**Es opcional. Si no cargás nada, el ACM sale exactamente como sale hoy.**
+
+**Las cuatro secciones, y dónde aparece cada una:**
+
+| Sección | Qué poner | Dónde sale |
+|---|---|---|
+| **Quiénes somos** | La carpeta de presentación, el "quiénes somos" de tu web, o el brochure de la primera reunión | Hoja 2, **antes** del precio |
+| **Cómo comercializamos su propiedad** | Tu plan de marketing: en qué portales publicás, cómo trabajás con otras inmobiliarias, cada cuánto le informás | Al final, después de las conclusiones |
+| **Cómo preparar su propiedad** | La guía para las muestras: orden, luz, limpieza, qué hacer el día de la visita | Última hoja |
+| **El rol de cada uno en la venta** | Quién define qué: el precio de oferta, el estado de la propiedad, el plan de marketing, el precio final | Al lado del gráfico del precio |
+
+**Cómo se carga, en criollo:**
+
+1. **Subís los PDF o Word que ya usás** con tus propietarios. Podés subir varios juntos (hasta 50 MB cada uno).
+2. Tocás **"Volver a leer con IA"**. PRISMA lee el texto y **propone** un texto para cada una de las cuatro secciones.
+3. **Vos decidís sección por sección.** Cada propuesta aparece al lado de lo que ya tenías, con **"Usar este"** y **"Descartar"**. Nada se guarda solo.
+4. Corregís lo que quieras a mano y tocás **Guardar**.
+
+> ✍️ **Podés escribirlas a mano y no subir ningún archivo.** Y si escribís algo desprolijo, el botón **"Acomodar con IA"** de cada sección lo ordena **sin agregarle nada** que vos no hayas escrito. También te muestra el resultado para aceptar o descartar.
+
+> 🔁 **Cambiar de opinión no cuesta nada.** Los archivos quedan en una lista con su fecha; podés **Reemplazar** o **Quitar** cualquiera cuando quieras. Y acá está la parte importante: si reemplazás un archivo y volvés a leer, **lo que ya corregiste a mano no se pisa** — aceptás solo las secciones que quieras. Quitar un archivo **tampoco borra** el texto que ya habías aceptado.
+
+> 📄 **Se copia solo el texto.** Los gráficos, las fotos y los logos de tus archivos **no pasan** a la ficha: PRISMA la dibuja con tus colores y tu logo para que todo el documento se vea igual. Si esperabas ver tus gráficos, no es un error.
+
+> ⚠️ **La IA no inventa.** Si tu material no dice nada sobre una sección, la deja **vacía** y te avisa, en vez de escribir algo que suene bien pero no sea tuyo. Igual **leelo antes de guardar**: lo que quede ahí se lo va a mandar tu equipo a los propietarios, y son promesas de servicio que después hay que cumplir.
+
+> 🎨 Arriba de todo ves **los colores, el logo y el aviso legal** con los que va a salir la ficha. Eso **no se edita acá**: se cambia en **Marketing IA → Configuración**, y hay un enlace directo.
+
+> 📌 Las fichas **ya enviadas no cambian**. Si mañana editás este material, las que tu equipo mandó antes siguen igual que el día que se enviaron.
+
+> 💰 Consume créditos **cada vez que tocás "Volver a leer con IA" o "Acomodar con IA"** (nunca por ACM generado). Como los dos botones los apretás vos, el gasto lo decidís vos.
+
 ---
 
 ## 17. Calendario (visitas)
@@ -1068,6 +1116,10 @@ está **"Agregar una nota"**. Las notas las ven solo los directores; el asesor y
 **2. Cuando un cliente queda esperando a una persona.** Si el bot lo derivó a un asesor (o el cliente pidió hablar con alguien, o un asesor tomó el chat) y nadie le contestó, el sistema avisa: a las **2 horas** al asesor; a las **5** al asesor y a vos; a las **10** otra vez al asesor; a las **20**, al asesor y a vos para que decidas (reasignar, tomarlo o dar más tiempo). Cada aviso trae **qué busca el cliente y su último mensaje**. El aviso se apaga solo cuando un asesor le escribe al cliente: contestar "ya lo atiendo" por WhatsApp no alcanza.
 
 **La noche no cuenta y nada te llega de madrugada.** Las horas de espera se miden solo entre las **6 y las 23**: si un cliente escribe a las 3 de la mañana, recién "empieza a esperar" a las 6, y el primer aviso al asesor sale a las 8 — dormir no es ignorar a un cliente. Además, ningún aviso (ni email ni WhatsApp) sale entre las 23 y las 6: si algo pasa de madrugada, el email llega programado a las 6 en punto.
+
+**Las notas internas de tu equipo ahora frenan esos avisos.** Si un asesor atendió a un cliente por teléfono o en persona y lo dejó anotado en el chat, Sofía lee esa nota: si confirma que la gestión ya está hecha, los avisos de "cliente esperando" se frenan para ese caso, y no le llega nada de más a nadie. Lo que quedó sin registrar en PRISMA (la visita, la gestión en el chat, la actividad en el tracking) se le pide al asesor en ese mismo momento, en un solo correo.
+
+**Y una despedida del cliente tampoco dispara avisos.** Si el asesor le contestó y el cliente cerró con un "Gracias", un "Dale, buen finde" o un "ya alquilé", Sofía lee la conversación y entiende que ese cliente no está esperando nada: no sale ningún aviso, ni al asesor ni a vos, y nadie tiene que dejar una nota. En la Trazabilidad del lead queda escrito qué leyó y por qué. La excepción importante: si lo último que el cliente recibió fue una promesa ("el asesor se va a comunicar") y respondió "gracias", para Sofía sigue esperando ese contacto y los avisos salen igual. Ante la duda, avisa.
 
 **3. Recordatorios de visita.** 24 horas, 3 horas y 1 hora antes de cada visita agendada, y un mensaje si el cliente no fue.
 

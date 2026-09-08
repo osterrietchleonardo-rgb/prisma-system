@@ -40,6 +40,7 @@ import { AdvisorFilter } from "@/components/dashboard/advisor-filter"
 import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter"
 import { HandoffsPanel } from "@/components/dashboard/HandoffsPanel"
 import { getHandoffsDashboardData } from "@/lib/queries/handoffs"
+import { periodoDelDashboard } from "@/lib/dashboard/periodo"
 
 const DashboardCharts = dynamic(() => import("@/components/dashboard-charts").then(m => m.DashboardCharts), {
   ssr: false,
@@ -54,8 +55,10 @@ export default async function DashboardPage({
   searchParams: { agentId?: string; from?: string; to?: string }
 }) {
   const agentId = searchParams.agentId
-  const from = searchParams.from
-  const to = searchParams.to
+  // Sin período elegido, el filtro muestra "Últimos 30 días": las consultas tienen que
+  // contar eso mismo, no todo el historial (defecto del 7/9/2026: el panel de derivaciones
+  // de Kevin arrastraba desde julio bajo un cartel que decía 30 días).
+  const { from, to } = periodoDelDashboard(searchParams)
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

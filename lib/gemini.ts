@@ -75,7 +75,18 @@ export const analyzeChat = async (history: string) => {
   return response.text();
 };
 
-export const generateImage = async (prompt: string, quality: 'standard' | 'pro' = 'standard', images: { data: Buffer, mimeType: string }[] = []) => {
+// El 4to parametro (`salida`) es el que hace que la imagen salga del formato pedido. Antes de
+// septiembre-2026 no existia: el tamano se le escribia al modelo adentro del texto del prompt y
+// el devolvia lo que queria (medido: 768x1376 cuando el prompt decia 1080x1920). `aspectRatio`
+// se lo pide de verdad, e `imageSize` sube la resolucion. En gemini-3-pro-image, 1K y 2K
+// cuestan lo mismo (ver utils/aiCostCalculator.ts), asi que pedir 2K es gratis.
+// Es opcional a proposito: sin el, se comporta igual que siempre.
+export const generateImage = async (
+  prompt: string,
+  quality: 'standard' | 'pro' = 'standard',
+  images: { data: Buffer, mimeType: string }[] = [],
+  salida?: { aspectRatio?: string; imageSize?: '1K' | '2K' | '4K' }
+) => {
   const modelId = quality === 'pro' ? "gemini-3-pro-image-preview" : "gemini-3.1-flash-image-preview";
   const model = genAI.getGenerativeModel({ 
     model: modelId,
@@ -98,6 +109,9 @@ export const generateImage = async (prompt: string, quality: 'standard' | 'pro' 
     generationConfig: {
       // @ts-ignore - Image generation modalities for 2026 models
       responseModalities: ["IMAGE"],
+      // @ts-ignore - imageConfig no esta en los tipos del SDK viejo (@google/generative-ai),
+      // pero la API v1beta si lo acepta. Verificado el 3-sep-2026 contra el modelo pro.
+      ...(salida ? { imageConfig: salida } : {}),
     }
   });
 

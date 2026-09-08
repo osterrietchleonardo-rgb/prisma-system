@@ -75,7 +75,7 @@ export function VisitStatusActions({ visit, onSuccess }: VisitStatusActionsProps
         variant="outline"
         onClick={() => setEstado("no_asistio", "Marcada como no asistió")}
         disabled={!!loading}
-        className="w-full sm:w-auto border-amber-500/40 text-amber-600 hover:bg-amber-500/10"
+        className="w-full sm:w-auto border-amber-500/40 text-amber-800 dark:text-amber-400 hover:bg-amber-500/10"
       >
         <UserX className="h-4 w-4 mr-1.5" /> No asistió
       </Button>
@@ -91,7 +91,7 @@ export function VisitStatusActions({ visit, onSuccess }: VisitStatusActionsProps
         variant="outline"
         onClick={() => setEstado("no_asistio", "Corregida: el cliente no asistió")}
         disabled={!!loading}
-        className="w-full sm:w-auto border-amber-500/40 text-amber-600 hover:bg-amber-500/10"
+        className="w-full sm:w-auto border-amber-500/40 text-amber-800 dark:text-amber-400 hover:bg-amber-500/10"
       >
         <UserX className="h-4 w-4 mr-1.5" /> Corregir: no asistió
       </Button>

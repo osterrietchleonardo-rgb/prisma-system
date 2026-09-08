@@ -54,7 +54,7 @@ function VisitaRateCard({ title, icon, data }: { title: string; icon: string; da
           <TooltipProvider delayDuration={200}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Info className="h-3 w-3 text-muted-foreground/40 cursor-help ml-auto" />
+                <Info className="h-3 w-3 text-muted-foreground cursor-help ml-auto" />
               </TooltipTrigger>
               <TooltipContent className="max-w-[220px] text-xs">
                 Porcentaje de conversaciones de ese tipo que derivaron en visita agendada.
@@ -72,7 +72,7 @@ function VisitaRateCard({ title, icon, data }: { title: string; icon: string; da
               <span className="text-muted-foreground">{TIPO_PROP_LABELS[item.label] || TIPO_OP_LABELS[item.label] || item.label}</span>
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">{item.visitas}/{item.total}</span>
-                <span className={`font-bold ${item.tasa >= 30 ? "text-emerald-400" : item.tasa >= 15 ? "text-amber-400" : "text-rose-400"}`}>
+                <span className={`font-bold ${item.tasa >= 30 ? "text-emerald-700 dark:text-emerald-400" : item.tasa >= 15 ? "text-amber-700 dark:text-amber-400" : "text-rose-700 dark:text-rose-400"}`}>
                   {item.tasa}%
                 </span>
               </div>
@@ -169,7 +169,7 @@ export function Block4DemandAnalysis({ demand_analysis }: { demand_analysis: Dem
           <CardContent className="px-4 pb-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-blue-400">Compra (USD)</p>
+                <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">Compra (USD)</p>
                 {d.presupuesto_compra_usd.avg
                   ? <>
                     <p className="text-xl font-bold">{`USD ${d.presupuesto_compra_usd.avg.toLocaleString("es-AR")}`}</p>
@@ -183,7 +183,7 @@ export function Block4DemandAnalysis({ demand_analysis }: { demand_analysis: Dem
                   : <p className="text-sm text-muted-foreground">Sin datos</p>}
               </div>
               <div className="space-y-1 border-l border-accent/10 pl-4">
-                <p className="text-xs font-semibold text-teal-400">Alquiler (ARS)</p>
+                <p className="text-xs font-semibold text-teal-700 dark:text-teal-400">Alquiler (ARS)</p>
                 {d.presupuesto_alquiler_ars.avg
                   ? <>
                     <p className="text-xl font-bold">{`$ ${d.presupuesto_alquiler_ars.avg.toLocaleString("es-AR")}`}</p>

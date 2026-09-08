@@ -492,12 +492,12 @@ export default function AsesorDocumentosPage() {
                   <div className="flex justify-between items-start">
                     <div className={cn(
                       "p-2.5 rounded-xl",
-                      doc.type === "youtube" ? "bg-red-500/10 text-red-500" : "bg-accent/10 text-accent"
+                      doc.type === "youtube" ? "bg-red-500/10 text-red-800 dark:text-red-500" : "bg-accent/10 text-accent"
                     )}>
                       {doc.type === "youtube" ? <Video className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                     </div>
                     {doc.visibility === "director" ? (
-                      <Badge variant="outline" className="bg-violet-500/5 text-violet-400 border-violet-500/20 px-2 py-0 h-6 flex items-center gap-1">
+                      <Badge variant="outline" className="bg-violet-500/5 text-violet-800 dark:text-violet-400 border-violet-500/20 px-2 py-0 h-6 flex items-center gap-1">
                         <Sparkles className="h-3 w-3" /> Consultable via IA
                       </Badge>
                     ) : (
@@ -519,13 +519,13 @@ export default function AsesorDocumentosPage() {
                 </CardHeader>
                 <CardContent className="p-5 flex-1 flex flex-col">
                   {doc.visibility === "director" ? (
-                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-violet-300 bg-violet-500/10 p-2.5 rounded-lg border border-violet-500/20">
+                    <div className="mt-1 flex items-center gap-1.5 text-[10px] text-violet-800 dark:text-violet-300 bg-violet-500/10 p-2.5 rounded-lg border border-violet-500/20">
                       <Lock className="h-3 w-3 shrink-0" />
                       <span>Documento privado — consulta disponible a través de <strong>Tutor IA</strong></span>
                     </div>
                   ) : doc.content_text && (
                     <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground bg-muted/30 p-2 rounded-lg line-clamp-2 italic">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                      <CheckCircle2 className="h-3 w-3 text-emerald-700 dark:text-emerald-500 shrink-0" />
                       Indexado para Consultas
                     </div>
                   )}
@@ -555,7 +555,7 @@ export default function AsesorDocumentosPage() {
                           <Sparkles className="h-3 w-3" /> Consultar con IA
                         </Button>
                       ) : doc.file_url ? (
-                        <Button variant="outline" size="sm" className="rounded-lg px-4 h-9 text-xs border-accent/20 bg-accent/5 hover:bg-accent hover:text-white transition-all duration-300" onClick={() => {
+                        <Button variant="outline" size="sm" className="rounded-lg px-4 h-9 text-xs border-accent/20 bg-accent/5 hover:bg-accent hover:text-accent-foreground transition-all duration-300" onClick={() => {
                           const { data } = supabase.storage.from("documents").getPublicUrl(doc.file_url);
                           window.open(data.publicUrl, "_blank");
                         }}>

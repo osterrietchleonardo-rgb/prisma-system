@@ -42,7 +42,7 @@ export default function PublicLayout({
                 <ModeToggle />
                 <div className="hidden sm:flex items-center gap-6">
                   <Link href="/auth/login" className="text-sm font-bold text-muted-foreground hover:text-accent transition-colors uppercase tracking-widest">Acceso Socios</Link>
-                  <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-white border-0 px-8 rounded-full font-black uppercase tracking-tighter">
+                  <Button asChild size="sm" className="bg-accent hover:bg-accent/90 text-accent-foreground border-0 px-8 rounded-full font-black uppercase tracking-tighter">
                     <Link href="/agendar">Postular Agencia</Link>
                   </Button>
                 </div>

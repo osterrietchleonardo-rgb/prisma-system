@@ -15,6 +15,10 @@ import { ConsultorResultsSection, MatchedPropertiesResponse, UnifiedProperty } f
 import { BuscadorNotasSettings } from "@/components/consultor/buscador-notas-settings"
 import { NotebookPen, Map } from "lucide-react"
 import { MapaTab } from "@/components/mapa/mapa-tab"
+import { SeleccionProvider } from "@/components/seleccion/seleccion-contexto"
+import { BarraSeleccion } from "@/components/seleccion/barra-seleccion"
+import { RepasoSeleccion } from "@/components/seleccion/repaso-seleccion"
+import { PistaSeleccion } from "@/components/seleccion/pista-seleccion"
 import { consumirStreamIA } from "@/lib/buscador-stream"
 import { MarkdownIA } from "@/components/shared/MarkdownIA"
 interface Property {
@@ -73,6 +77,8 @@ export default function ConsultorIAPage() {
   const [agencyId, setAgencyId] = useState<string>("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [view, setView] = useState<"chat" | "notas" | "mapa">("chat")
+  // Repaso de la seleccion (las notas) antes de generar la ficha del cliente.
+  const [repasando, setRepasando] = useState(false)
   
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -291,6 +297,10 @@ export default function ConsultorIAPage() {
   }
 
   return (
+    /* El provider va ARRIBA de la barra de solapas a proposito: asi lo que el director marca
+       en el Buscador sigue marcado al pasar al Mapa y al reves, y se manda todo junto en
+       una sola ficha. Al salir de la pagina se desmonta y la seleccion se vacia sola. */
+    <SeleccionProvider>
     <div className="flex flex-col h-full overflow-hidden bg-background">
       {/* Barra de solapas: Buscador / Notas (Notas solo para el director) */}
       <div className="flex items-center gap-1 border-b bg-card/30 backdrop-blur-sm px-3">
@@ -322,6 +332,9 @@ export default function ConsultorIAPage() {
           <Map className="w-4 h-4" /> Mapa
         </button>
       </div>
+
+      {/* Para que se entienda de una que las tarjetas se pueden marcar. */}
+      <PistaSeleccion />
 
       {view === "mapa" ? (
         <div className="flex-1 min-h-0 overflow-y-auto p-3">
@@ -402,7 +415,7 @@ export default function ConsultorIAPage() {
                       <div className="flex gap-1 animate-in zoom-in-95 duration-200 bg-background/80 backdrop-blur-sm p-1 rounded-lg border shadow-sm">
                         <Button 
                           size="icon" 
-                          className="h-7 w-7 bg-destructive hover:bg-destructive/90 text-white rounded-md shadow-sm"
+                          className="h-7 w-7 bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-md shadow-sm"
                           onClick={(e) => handleDelete(s.id, e)}
                         >
                           <Check className="w-4 h-4" />
@@ -586,14 +599,18 @@ export default function ConsultorIAPage() {
               <Send className="w-5 h-5" />
             </Button>
           </form>
-          <p className="text-[10px] text-muted-foreground/40 text-center w-full flex items-center justify-center gap-1 mt-2">
+          <p className="text-[10px] text-muted-foreground text-center w-full flex items-center justify-center gap-1 mt-2">
             <Sparkles className="w-3 h-3" />
-            Cada respuesta consume <span className="font-semibold text-muted-foreground/60">1 crédito IA</span>
+            Cada respuesta consume <span className="font-semibold text-muted-foreground">1 crédito IA</span>
           </p>
         </CardFooter>
       </div>
       </div>
       )}
     </div>
+
+    <BarraSeleccion onContinuar={() => setRepasando(true)} />
+    <RepasoSeleccion abierto={repasando} onCerrar={() => setRepasando(false)} />
+    </SeleccionProvider>
   )
 }

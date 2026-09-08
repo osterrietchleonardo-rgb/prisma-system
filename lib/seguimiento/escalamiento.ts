@@ -3,6 +3,8 @@ import { dentroDeVentanaEnvio, horasHabiles } from "@/lib/whatsapp/sending-windo
 import { enviarAviso, linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
 import { bloqueContextoHtml, contextoDelLead, lineaContextoWhatsApp, type ContextoLead } from "./contexto"
 import { registrarEvento } from "./eventos"
+import { procesarDespedidaDelCaso, type LlamarDespedida, type ResultadoDespedida } from "./despedida"
+import { procesarNotaDelCaso, type LlamarVeredicto, type ResultadoNota } from "./nota-interna"
 import type { Candidato } from "./tipos"
 
 /**
@@ -27,6 +29,19 @@ import type { Candidato } from "./tipos"
  * Cada nivel una sola vez por caso; si el lead vuelve a escribir después de ser atendido, es un
  * caso nuevo. Sin tope por agencia: si 30 asesores no contestan, se avisa a los 30. El WhatsApp
  * sale con la plantilla nueva si Meta la aprobó; si no, va el email igual. Nunca se saltea.
+ *
+ * LA NOTA INTERNA HABLA (Leonardo, 4/9, tras la queja de Eric): si el asesor dejó una
+ * nota interna después del último mensaje del lead, la IA la lee junto con la
+ * conversación y decide. "Atendido" ⇒ la escalera se frena para ese caso y, si la
+ * gestión quedó fuera de PRISMA, sale UN aviso pidiendo registrar (chat / visita en
+ * calendario / actividad en tracking). Nota ambigua o solo-recordatorio ⇒ la escalera
+ * sigue: un aviso de más molesta menos que un cliente perdido.
+ *
+ * LA DESPEDIDA NO ES UNA ESPERA (Kevin, 7/9, el «Gracias!!» de Agustins): si no hay nota
+ * (o la nota no dijo "atendido"), la IA lee la conversación y decide si el último mensaje
+ * del cliente necesita respuesta. Un cierre ("gracias", "ya alquilé", "yo te aviso") ⇒ ningún
+ * nivel sale, a nadie. Un "gracias" después de una promesa de contacto NO es cierre. Una
+ * evaluación por caso (`despedida_evaluada`); si la IA falla, la escalera sigue como siempre.
  */
 
 export type Nivel = 2 | 5 | 10 | 20
@@ -48,7 +63,7 @@ export function casoCuenta(t0ISO: string, activoDesdeISO: string | null | undefi
   return Date.parse(t0ISO) >= Date.parse(activoDesdeISO)
 }
 
-type Conv = Pick<Candidato, "id" | "agency_id" | "contact_phone" | "metricas" | "agent_id" | "bot_active" | "last_message_at">
+type Conv = Pick<Candidato, "id" | "agency_id" | "contact_phone" | "metricas" | "agent_id" | "bot_active" | "last_message_at" | "visit_scheduled_at">
 
 /** ¿Este lead está en manos de un humano (o esperándolo)? */
 export function esperandoHumano(c: Pick<Candidato, "bot_active" | "metricas">): boolean {
@@ -120,10 +135,17 @@ export function armarAvisoAsesorEscalera(
       `<p>Hola ${esc(primerNombre(perfil))},</p>`,
       `<p><strong>Qué pasa:</strong> ${esc(cliente)} (${esc(tel)}) quedó esperando que lo atienda un asesor y lleva <strong>${esc(espera)}</strong> sin respuesta.${esc(avisoDirector)}</p>`,
       ...bloqueContextoHtml(info.contexto),
+      // Leonardo, 7/9: la mitad de los chats apagados de Central los apagó una persona sin escribir
+      // ni anotar. El aviso dice qué hacer si ya lo atendió por afuera, para que Sofía se entere y
+      // el trabajo quede registrado. Chat o nota: cualquiera de las dos frena estos avisos.
+      `<p><strong>Si ya lo atendiste por teléfono o en persona:</strong> mandale desde el chat de PRISMA un mensaje confirmando lo que acordaron, o dejá una <strong>nota interna</strong> contando qué hiciste — con cualquiera de las dos, Sofía se entera y estos avisos se frenan. Y registrá la visita en el <strong>calendario</strong> y la gestión en el <strong>tracking</strong>.</p>`,
       `<p>${porQueVos} Si no lo podés tomar, marcá «No lo puedo tomar» en el chat y el director lo reasigna.</p>`,
     ],
     link, "Abrir el chat en PRISMA", nombreAgencia
   )
+  // Va en el WhatsApp de 2/5 h ({{2}}, tope 700): se arma DESPUÉS del contexto pero se
+  // garantiza recortando el contexto, no la indicación.
+  const indicacion = " Si ya lo atendiste por teléfono, confirmáselo desde el chat de PRISMA o dejá una nota interna, y registrá la visita y la actividad."
   const base = { destinatario: perfil, esAsignado: info.esAsignado, link, html }
   if (nivel.plantillaAsesor === "asesor_sigue_esperando") {
     // "Hola {{1}}, {{2}} sigue esperando desde hace {{3}}. Si no lo podés tomar, avisá por acá y lo reasignamos: {{4}} ¡Gracias!"
@@ -139,7 +161,7 @@ export function armarAvisoAsesorEscalera(
     ...base,
     asunto: `${cliente} está esperando hace ${espera} — ${nombreAgencia}`,
     plantilla: "asesor_cliente_esperando",
-    variables: [primerNombre(perfil), unaLinea(`${cliente} (${tel}) lleva ${espera} esperando que lo atiendas.${lineaContextoWhatsApp(info.contexto)}${avisoDirector}`, 700), link],
+    variables: [primerNombre(perfil), unaLinea(`${cliente} (${tel}) lleva ${espera} esperando que lo atiendas.${lineaContextoWhatsApp(info.contexto)}${avisoDirector}`, 700 - indicacion.length) + indicacion, link],
   }
 }
 
@@ -184,24 +206,35 @@ export interface ResumenEscalamiento {
   atendidos: number
   avisos: number
   simulados: number
+  /** Casos en los que la IA leyó que el cliente cerró la conversación: no se avisó a nadie. */
+  despedidas: number
   /** true si la corrida no evaluó nada por estar fuera de la ventana 6-23 AR. */
   fueraDeVentana?: boolean
 }
 
 const MAX_POR_CORRIDA = 300
 
+/**
+ * Techo de llamadas a la IA por corrida (notas + despedidas, todas las agencias juntas).
+ * Pasado el tope la escalera sigue funcionando exactamente como antes de estas features, y
+ * la barrida siguiente (30 min) retoma los casos que quedaron sin evaluar.
+ */
+export const MAX_LLAMADAS_IA = 20
+
 export async function correrEscalamiento(
   db: SupabaseClient,
-  opts: { appUrl?: string; fetchFn?: typeof fetch; ahoraMs?: number } = {}
+  opts: { appUrl?: string; fetchFn?: typeof fetch; ahoraMs?: number; llamarNota?: LlamarVeredicto; llamarDespedida?: LlamarDespedida } = {}
 ): Promise<ResumenEscalamiento> {
   const appUrl = opts.appUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://prisma.vakdor.com"
   const ahoraMs = opts.ahoraMs ?? Date.now()
-  const resumen: ResumenEscalamiento = { esperando: 0, atendidos: 0, avisos: 0, simulados: 0 }
+  const resumen: ResumenEscalamiento = { esperando: 0, atendidos: 0, avisos: 0, simulados: 0, despedidas: 0 }
 
   // Nada de avisos de madrugada (Kevin, 2/9): fuera de 6-23 AR la corrida entera se saltea.
   // No se pierde nada: el reloj cada 30 min vuelve a pasar, y los niveles se miden en horas
   // hábiles, así que ningún caso "madura" durante la noche.
   if (!dentroDeVentanaEnvio(new Date(ahoraMs))) return { ...resumen, fueraDeVentana: true }
+
+  let llamadasIA = 0 // contador de TODA la corrida (notas + despedidas), no por agencia
 
   const { data: configs } = await db.from("seguimiento_config").select("agency_id, modo, activo_desde")
   const { data: agencias } = await db.from("agencies").select("id, name")
@@ -212,7 +245,7 @@ export async function correrEscalamiento(
     const desde = new Date(ahoraMs - DIAS_MAXIMOS_ESPERA * 24 * 3600e3).toISOString()
     const { data: candidatos } = await db
       .from("wa_conversations")
-      .select("id, agency_id, contact_phone, metricas, agent_id, bot_active, last_message_at")
+      .select("id, agency_id, contact_phone, metricas, agent_id, bot_active, last_message_at, visit_scheduled_at")
       .eq("agency_id", config.agency_id)
       .eq("opt_out", false)
       .not("funnel_status", "in", "(closed_won,closed_lost)")
@@ -249,6 +282,51 @@ export async function correrEscalamiento(
       // reloj y solo puede sobre-incluir (hábiles ≤ reloj), nunca dejar afuera un caso maduro.
       const horas = horasHabiles(Date.parse(t0), ahoraMs)
       if (horas < 2) continue
+
+      // La nota interna del asesor habla (Leonardo, 4/9): si hay una posterior al último
+      // mensaje del lead, la IA decide si el cliente ya está atendido. Determinista solo
+      // la detección; la interpretación jamás (una nota puede ser cualquier cosa).
+      const asesor = c.agent_id ? await perfil(c.agent_id) : null
+      let rNota: ResultadoNota = "sin_nota"
+      if (llamadasIA < MAX_LLAMADAS_IA) {
+        try {
+          rNota = await procesarNotaDelCaso(db, c, t0, {
+            modo: config.modo, asesor, appUrl,
+            nombreAgencia: nombreAgencia.get(c.agency_id) ?? "PRISMA",
+            ahoraMs, fetchFn: opts.fetchFn, llamar: opts.llamarNota,
+          })
+          if (rNota !== "sin_nota") llamadasIA++
+        } catch (e) {
+          // La escalera es lo que corre en producción: si la feature nueva explota, se anota
+          // y el caso sigue el camino de siempre. Nunca se cae la barrida entera.
+          await registrarEvento(db, c.agency_id, c.id, "nota_error",
+            `procesarNotaDelCaso falló; la escalera sigue: ${String(e).slice(0, 150)}`, { t0 })
+        }
+      }
+      if (rNota.startsWith("atendido")) {
+        resumen.atendidos++
+        if (rNota === "atendido_avisado") resumen.avisos++
+        continue
+      }
+
+      // La despedida no es una espera (Kevin, 7/9): sin nota, o con una nota que no dijo
+      // "atendido", la IA lee la conversación y decide si el cliente espera algo. Con
+      // `error_ia` de la nota no se insiste: si la API está caída, está caída para las dos.
+      if ((rNota === "sin_nota" || rNota === "escalera_sigue") && llamadasIA < MAX_LLAMADAS_IA) {
+        let rDesp: ResultadoDespedida | null = null
+        try {
+          rDesp = await procesarDespedidaDelCaso(db, c, t0, { ahoraMs, llamar: opts.llamarDespedida })
+          if (rDesp.llamoIA) llamadasIA++
+        } catch (e) {
+          await registrarEvento(db, c.agency_id, c.id, "despedida_error",
+            `procesarDespedidaDelCaso falló; la escalera sigue: ${String(e).slice(0, 150)}`, { t0 })
+        }
+        if (rDesp?.resultado === "despedida") {
+          resumen.despedidas++
+          continue
+        }
+      }
+
       resumen.esperando++
 
       // niveles ya mandados PARA ESTE CASO (mismo t0)
@@ -259,7 +337,6 @@ export async function correrEscalamiento(
       if (!nivel) continue
       const def = NIVELES.find((n) => n.horas === nivel)!
 
-      const asesor = c.agent_id ? await perfil(c.agent_id) : null
       const contexto = await contextoDelLead(db, c)
       const agencia = nombreAgencia.get(c.agency_id) ?? "PRISMA"
       const destinos: Array<{ quien: "asesor" | "director"; aviso: Aviso }> = []

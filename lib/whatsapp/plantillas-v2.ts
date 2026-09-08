@@ -108,6 +108,17 @@ export function plantillasEquipo(prefix: string): PlantillaV2[] {
       body_examples: ["Víctor", "crear una plantilla nueva de seguimiento para leads que piden tasación", "https://prisma.vakdor.com/director/configuracion"],
       buttons: [],
     },
+    // Notas internas (4/9): el asesor dejó una nota que dice que ya atendió al cliente por fuera
+    // de PRISMA. No es un reclamo: se le pide registrar lo que falta. Texto claro, sin dar nada
+    // por sabido (Leonardo, 4/9). {{2}} lo arma `armarAvisoRegistro` (lib/seguimiento/nota-interna.ts).
+    {
+      template_name: `${prefix}_asesor_registro_pendiente`,
+      category: "UTILITY",
+      language: "es_AR",
+      body: "Hola {{1}}, te escribe el asistente de PRISMA. {{2}} Esto no es un reclamo: es para que lo que hablaste con el cliente quede registrado y todo el equipo lo vea. Acá está el chat de ese cliente en PRISMA: {{3}} ¡Gracias!",
+      body_examples: ["Eric", "Vimos tu nota interna sobre Nicolás (+5491136299626) y entendemos que ya lo estás atendiendo, así que frenamos los avisos de cliente esperando por este caso. Falta registrar en PRISMA: un mensaje al cliente desde el chat, la visita en el calendario y la actividad en el tracking.", "https://prisma.vakdor.com/asesor/leads-whatsapp"],
+      buttons: [],
+    },
   ]
 }
 
@@ -116,4 +127,5 @@ export const NOMBRES_EQUIPO = [
   "asesor_sigue_esperando",
   "director_asesor_sin_respuesta",
   "director_aprobacion_pendiente",
+  "asesor_registro_pendiente",
 ] as const

@@ -1,53 +1,16 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { 
-  Home, 
-  LayoutGrid, 
-  Building, 
-  Users, 
-  Calendar, 
-  Bot, 
-  Search,
-  Calculator,
-  Scale,
-  Settings,
-  LogOut,
-  BookOpen,
-  TrendingUp,
-  FileSignature,
-  MessageSquare,
-  GraduationCap,
-  ShieldCheck,
-  BarChart2
-} from "lucide-react"
+import { LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { logout } from "@/lib/actions/auth"
-import { contratosIaDeshabilitado } from "@/lib/access/contratos-ia"
 import BrandLogo from "./brand-logo"
+import { SidebarNav, SidebarPie } from "./sidebar-nav"
+import { BotonCerrarBarra } from "./barra-lateral"
 
-const navItems = [
-  { name: "Mi Dashboard", href: "/asesor/dashboard", icon: Home },
-  { name: "Pulso de Mercado", href: "/asesor/mercado", icon: BarChart2 },
-  { name: "Mi Pipeline", href: "/asesor/pipeline", icon: LayoutGrid },
-  { name: "Mis Propiedades", href: "/asesor/propiedades", icon: Building },
-  { name: "Tracking Performance", href: "/asesor/tracking-performance", icon: TrendingUp },
-  { name: "Leads Tokko", href: "/asesor/leads", icon: Users },
-  { name: "WhatsApp Bandeja", href: "/asesor/whatsapp", icon: MessageSquare },
-  { name: "Leads WhatsApp", href: "/asesor/leads-whatsapp", icon: MessageSquare },
-  { name: "Marketing IA", href: "/asesor/marketing-ia", icon: Bot },
-  { name: "Contratos IA", href: "/asesor/contratos-ia", icon: FileSignature },
-  { name: "Mi Calendario", href: "/asesor/calendario", icon: Calendar },
-  { name: "Tutor IA", href: "/asesor/tutor-ia", icon: GraduationCap },
-  { name: "Buscador IA", href: "/asesor/consultor-ia", icon: ShieldCheck },
-  { name: "ACM", href: "/asesor/acm", icon: Scale },
-  { name: "Biblioteca", href: "/asesor/documentos", icon: BookOpen },
-  { name: "Configuración", href: "/asesor/configuracion", icon: Settings },
-  { name: "Sugerencias", href: "/asesor/feedback", icon: MessageSquare },
-]
+// Las páginas del menú y sus grupos viven en `lib/nav/menu.ts`, compartido con el director.
 
 interface AsesorSidebarProps {
   className?: string
@@ -59,11 +22,10 @@ interface AsesorSidebarProps {
 }
 
 export function AsesorSidebar({ className, agencyName, agencyId, userName, userRole, onSelect }: AsesorSidebarProps) {
-  const pathname = usePathname()
-
   return (
     <div className={cn("flex flex-col h-full border-r bg-card", className)}>
-      <div className="p-6 pb-2">
+      <div className="relative p-6 pb-2">
+        <BotonCerrarBarra />
         <Link href="/">
           <BrandLogo logoSize="sm" />
         </Link>
@@ -74,7 +36,7 @@ export function AsesorSidebar({ className, agencyName, agencyId, userName, userR
 
       <div className="px-4 mb-4">
         <div className="flex items-center gap-3 p-3 rounded-xl bg-accent/5 border border-accent/10">
-          <div className="w-10 h-10 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold">
+          <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold">
             {userName?.charAt(0) || "A"}
           </div>
           <div>
@@ -85,52 +47,11 @@ export function AsesorSidebar({ className, agencyName, agencyId, userName, userR
       </div>
 
       <ScrollArea className="flex-1 px-4">
-        <nav className="space-y-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
-
-            // "Contratos IA" deshabilitada solo para la agencia indicada
-            const isDisabled =
-              item.href.endsWith("/contratos-ia") && contratosIaDeshabilitado(agencyId)
-
-            if (isDisabled) {
-              return (
-                <div
-                  key={item.href}
-                  aria-disabled="true"
-                  title="Función no disponible en tu plan"
-                  className="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg text-muted-foreground/40 cursor-not-allowed select-none"
-                >
-                  <item.icon className="w-4 h-4" />
-                  {item.name}
-                  <span className="ml-auto text-[9px] font-bold uppercase tracking-wide bg-muted text-muted-foreground/60 px-1.5 py-0.5 rounded">
-                    Deshabilitada
-                  </span>
-                </div>
-              )
-            }
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={onSelect}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all",
-                  isActive
-                    ? "bg-accent text-accent-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-accent/10 hover:text-foreground"
-                )}
-              >
-                <item.icon className="w-4 h-4" />
-                {item.name}
-              </Link>
-            )
-          })}
-        </nav>
+        <SidebarNav rol="asesor" agencyId={agencyId} onSelect={onSelect} />
       </ScrollArea>
 
-      <div className="p-4 border-t">
+      <div className="p-4 border-t space-y-1">
+        <SidebarPie rol="asesor" onSelect={onSelect} />
         <form action={logout} onSubmit={onSelect}>
           <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/5 gap-3">
             <LogOut className="w-4 h-4" />

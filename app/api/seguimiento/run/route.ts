@@ -12,6 +12,8 @@ import { correrVisitas } from "@/lib/seguimiento/visitas"
 import { correrEscalamiento } from "@/lib/seguimiento/escalamiento"
 import { NOMBRES_V2 } from "@/lib/whatsapp/plantillas-v2"
 import { plantillaDesdeFila, type PlantillaDisponible } from "@/lib/seguimiento/plantillas"
+import { fechaCortaAR, unaLineaCorta } from "@/lib/seguimiento/contexto"
+import { MARCADOR_HANDOFF } from "@/lib/seguimiento/nota-interna"
 import type { Candidato, CompromisoActivo, ConfigAgencia } from "@/lib/seguimiento/tipos"
 
 export const maxDuration = 300
@@ -128,13 +130,22 @@ export async function POST(req: Request) {
       .eq("phone", c.contact_phone)
       .maybeSingle()
     const disponibles = plantillasPorAgencia.get(c.agency_id) ?? []
+    const { data: notaFila } = await db
+      .from("wa_messages").select("content, created_at")
+      .eq("conversation_id", c.id).eq("role", "internal")
+      .not("content", "like", `${MARCADOR_HANDOFF}%`)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle()
+    const notaInterna = notaFila?.content
+      ? { texto: unaLineaCorta(String(notaFila.content), 400), fechaAR: fechaCortaAR(String(notaFila.created_at)) }
+      : null
     const semilla = renderizarSemilla(
       c,
       score,
       compromisos.length,
       ahoraISO,
       contacto?.clasificacion ?? null,
-      disponibles
+      disponibles,
+      notaInterna
     )
     const herramientas = crearHerramientas(db, c)
 

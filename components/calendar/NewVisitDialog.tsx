@@ -388,11 +388,11 @@ export function NewVisitDialog({
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-sm">{selectedLead.full_name || selectedLead.name || 'Sin nombre'}</span>
                           {phone ? (
-                            <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-mono font-bold">
+                            <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-800 dark:text-emerald-400 font-mono font-bold">
                               📞 {phone}
                             </span>
                           ) : (
-                            <span className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 font-medium">
+                            <span className="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-800 dark:text-amber-400 font-medium">
                               ⚠️ Sin teléfono registrado
                             </span>
                           )}

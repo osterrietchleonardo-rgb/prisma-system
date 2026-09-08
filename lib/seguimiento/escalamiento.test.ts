@@ -47,10 +47,27 @@ describe("armarAvisoAsesorEscalera", () => {
     const a = armarAvisoAsesorEscalera(asesor, conv, { nivel: 2, horas: 2.2, esAsignado: true, contexto }, APP, "Central")
     expect(a.plantilla).toBe("asesor_cliente_esperando")
     expect(a.variables[0]).toBe("Martín")
-    expect(a.variables[1]).toBe("Laura Gómez (+5491155550000) lleva 2 horas esperando que lo atiendas. Busca: venta, casa en La Plata. Último mensaje del cliente (26/8 12:37): «¿Se puede visitar el sábado?».")
+    expect(a.variables[1]).toBe("Laura Gómez (+5491155550000) lleva 2 horas esperando que lo atiendas. Busca: venta, casa en La Plata. Último mensaje del cliente (26/8 12:37): «¿Se puede visitar el sábado?». Si ya lo atendiste por teléfono, confirmáselo desde el chat de PRISMA o dejá una nota interna, y registrá la visita y la actividad.")
     expect(a.variables[2]).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-1")
     expect(a.html).toContain("Qué busca:")
     expect(a.html).toContain("«No lo puedo tomar»")
+  })
+  // Leonardo, 7/9: 40 chats de Central apagados a mano sin escribir ni anotar. El aviso tiene que
+  // decir qué hacer si ya lo atendió por afuera: chat o nota (para Sofía), calendario y tracking.
+  it("todos los niveles: el email dice qué hacer si ya lo atendió por teléfono (chat o nota, calendario, tracking)", () => {
+    for (const nivel of [2, 5, 10, 20] as const) {
+      const a = armarAvisoAsesorEscalera(asesor, conv, { nivel, horas: nivel, esAsignado: true, contexto }, APP, "C")
+      expect(a.html).toContain("Si ya lo atendiste por teléfono o en persona")
+      expect(a.html).toContain("nota interna")
+      expect(a.html).toContain("calendario")
+      expect(a.html).toContain("tracking")
+    }
+  })
+  it("la indicación entra en el WhatsApp de 2/5 h aunque el contexto sea largo (va antes del corte de 700)", () => {
+    const largo = { busca: "venta, " + "departamento de 3 ambientes con cochera y balcón ".repeat(8), ultimoMensaje: { texto: "x".repeat(300), fechaAR: "26/8 12:37" } }
+    const a = armarAvisoAsesorEscalera(asesor, conv, { nivel: 2, horas: 2, esAsignado: true, contexto: largo }, APP, "C")
+    expect(a.variables[1].length).toBeLessThanOrEqual(700)
+    expect(a.variables[1]).toContain("dejá una nota interna")
   })
   it("5 h: avisa que el director también recibe el aviso", () => {
     const a = armarAvisoAsesorEscalera(asesor, conv, { nivel: 5, horas: 5, esAsignado: true }, APP, "C")
@@ -107,7 +124,7 @@ describe("correrEscalamiento: nada de madrugada (Kevin, 2/9)", () => {
       get() { throw new Error("la corrida de madrugada no debería tocar la base") },
     }) as never
     const r = await correrEscalamiento(dbQueNoSePuedeUsar, { ahoraMs: ar("2026-09-03T03:30:00") })
-    expect(r).toEqual({ esperando: 0, atendidos: 0, avisos: 0, simulados: 0, fueraDeVentana: true })
+    expect(r).toEqual({ esperando: 0, atendidos: 0, avisos: 0, simulados: 0, despedidas: 0, fueraDeVentana: true })
   })
 
   it("a las 23:00 en punto tampoco (la ventana cierra 22:59)", async () => {
@@ -134,5 +151,145 @@ describe("los niveles se miden en horas hábiles (la noche no corre)", () => {
     const t0 = ar("2026-09-03T22:00:00")
     expect(nivelQueToca(horasHabiles(t0, ar("2026-09-04T06:45:00")), [])).toBeNull()
     expect(nivelQueToca(horasHabiles(t0, ar("2026-09-04T07:00:00")), [])).toBe(2)
+  })
+})
+
+describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
+  const ar = (iso: string) => Date.parse(iso + "-03:00")
+
+  /** `tablasQueTiran` simula una tabla que revienta al leerla (permiso, timeout, columna que no está). */
+  function armarDbCorrida(tablasQueTiran: string[] = [], extra: { nota?: unknown } = {}) {
+    const inserts: Array<{ tabla: string; fila: Record<string, unknown> }> = []
+    const tablas: Record<string, unknown> = {
+      seguimiento_config: [{ agency_id: "ag-1", modo: "activo", activo_desde: "2026-08-31T00:00:00Z" }],
+      agencies: [{ id: "ag-1", name: "Central" }],
+      wa_conversations: [{
+        id: "conv-1", agency_id: "ag-1", contact_phone: "5491136299626",
+        metricas: { nombre: "Nicolás" }, agent_id: "p-1", bot_active: false,
+        last_message_at: "2026-09-03T20:09:43Z", visit_scheduled_at: null,
+      }],
+      profiles: [{ id: "p-1", full_name: "Eric Zambrana", role: "asesor", email: "e@x.com", phone: null }],
+      // wa_messages responde según los filtros: para simplificar, el último del lead y la nota
+      wa_messages_ultimo_lead: { created_at: "2026-09-03T20:09:43Z" },
+      wa_messages_humano: [],
+      wa_messages_nota: "nota" in extra ? extra.nota : { id: "n-1", content: "Ya lo llamé, visita el viernes", created_at: "2026-09-03T21:20:00Z" },
+      lead_eventos: [],
+      scheduled_visits: [], wa_contacts: null, performance_logs: [],
+      interacciones_canal: [], wa_templates: null, whatsapp_instances: null,
+    }
+    let vecesWaMessages = 0
+    const db = {
+      from(tabla: string) {
+        if (tablasQueTiran.includes(tabla)) throw new Error(`la tabla ${tabla} no se puede leer`)
+        let respuesta = tablas[tabla]
+        if (tabla === "wa_messages") {
+          // orden real de las llamadas en la corrida: último del lead → humano → nota → leer_mensajes
+          const orden = ["wa_messages_ultimo_lead", "wa_messages_humano", "wa_messages_nota", "wa_messages_humano"]
+          respuesta = tablas[orden[Math.min(vecesWaMessages, orden.length - 1)]]
+          vecesWaMessages++
+        }
+        const chain: Record<string, unknown> = {}
+        for (const m of ["select", "eq", "not", "gt", "gte", "order", "limit", "contains", "in", "lt"])
+          chain[m] = () => chain
+        chain.maybeSingle = async () => ({ data: Array.isArray(respuesta) ? (respuesta as unknown[])[0] ?? null : respuesta ?? null })
+        chain.is = () => chain
+        chain.then = (res: (v: unknown) => unknown) => Promise.resolve({ data: respuesta ?? [] }).then(res)
+        chain.insert = (fila: Record<string, unknown>) => {
+          inserts.push({ tabla, fila })
+          return { select: () => ({ single: async () => ({ data: { id: "x" } }) }), then: (r: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(r) }
+        }
+        return chain
+      },
+    }
+    return { db: db as never, inserts }
+  }
+
+  it("veredicto atendido ⇒ atendidos++, ni un nivel de escalera sale", async () => {
+    const { db, inserts } = armarDbCorrida()
+    const llamarNota = async () => ({
+      atendido: true, pedir_registro_chat: true, pedir_registro_visita: false,
+      pedir_registro_actividad: false, razon: "Gestión telefónica",
+    })
+    // El fetch no promete nada: sin RESEND_API_KEY el email ni se intenta (omitido_sin_resend).
+    const fetchOk = (async () => ({ ok: true, json: async () => ({}) })) as never
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.atendidos).toBe(1)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(false)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_evaluada")).toBe(true)
+  })
+
+  it("veredicto NO atendido ⇒ la escalera manda el nivel como siempre", async () => {
+    const { db, inserts } = armarDbCorrida()
+    const llamarNota = async () => ({
+      atendido: false, pedir_registro_chat: false, pedir_registro_visita: false,
+      pedir_registro_actividad: false, razon: "Solo un recordatorio",
+    })
+    const fetchOk = (async () => ({ ok: true, json: async () => ({ id: "r-1" }) })) as never
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(1)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(true)
+  })
+
+  it("si la lectura de la nota explota, la corrida NO se cae: sale el nivel y queda el evento nota_error", async () => {
+    // scheduled_visits reventando hace explotar a procesarNotaDelCaso FUERA de su try interno.
+    // La escalera es lo que corre en producción: no puede morirse porque la feature nueva falle.
+    const { db, inserts } = armarDbCorrida(["scheduled_visits"])
+    const llamarNota = async () => { throw new Error("API caída") }
+    const fetchOk = (async () => ({ ok: true, json: async () => ({}) })) as never
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(1)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(true)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_error")).toBe(true)
+  })
+
+  // Sin nota, la IA lee la conversación (Kevin, 7/9: el «Gracias!!» de Agustins disparó 2/5/10 h).
+  const fetchOk = (async () => ({ ok: true, json: async () => ({ id: "r-1" }) })) as never
+  const despedida = async () => ({ requiere_respuesta: false, razon: "Cerró con «Gracias!!»" })
+  const espera = async () => ({ requiere_respuesta: true, razon: "Pregunta por la dirección" })
+  const tipos = (inserts: Array<{ tabla: string; fila: Record<string, unknown> }>) =>
+    inserts.filter((i) => i.tabla === "lead_eventos").map((i) => i.fila.tipo as string)
+
+  it("sin nota y el cliente se despidió ⇒ despedidas++, ni un nivel sale, ni a la IA de la nota se llama", async () => {
+    const { db, inserts } = armarDbCorrida([], { nota: null })
+    const llamarNota = async () => { throw new Error("sin nota no se llama") }
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, llamarDespedida: despedida, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.despedidas).toBe(1)
+    expect(r.avisos).toBe(0)
+    expect(tipos(inserts)).toEqual(["despedida_evaluada"])
+  })
+
+  it("sin nota y el cliente espera algo ⇒ el nivel sale como siempre, con el marcador guardado", async () => {
+    const { db, inserts } = armarDbCorrida([], { nota: null })
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarDespedida: espera, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(1)
+    expect(r.despedidas).toBe(0)
+    expect(tipos(inserts)).toContain("despedida_evaluada")
+    expect(tipos(inserts)).toContain("escalera")
+  })
+
+  it("nota-recordatorio (no atendido) + despedida del cliente ⇒ también frena", async () => {
+    const { db, inserts } = armarDbCorrida()
+    const llamarNota = async () => ({ atendido: false, pedir_registro_chat: false, pedir_registro_visita: false, pedir_registro_actividad: false, razon: "Solo un recordatorio" })
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, llamarDespedida: despedida, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.despedidas).toBe(1)
+    expect(tipos(inserts)).not.toContain("escalera")
+  })
+
+  it("nota 'atendido' ⇒ la despedida ni se evalúa (ya se frenó por la nota)", async () => {
+    const { db } = armarDbCorrida()
+    const llamarNota = async () => ({ atendido: true, pedir_registro_chat: false, pedir_registro_visita: false, pedir_registro_actividad: false, razon: "Lo llamó" })
+    const llamarDespedida = async () => { throw new Error("no debería evaluar la despedida") }
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, llamarDespedida, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.atendidos).toBe(1)
+    expect(r.despedidas).toBe(0)
+  })
+
+  it("si la lectura de la despedida explota, la corrida NO se cae: sale el nivel y queda despedida_error", async () => {
+    const { db, inserts } = armarDbCorrida([], { nota: null })
+    const llamarDespedida = async () => { throw new Error("API caída") }
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarDespedida, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.avisos).toBe(1)
+    expect(tipos(inserts)).toContain("despedida_error")
+    expect(tipos(inserts)).toContain("escalera")
   })
 })

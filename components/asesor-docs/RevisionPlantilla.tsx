@@ -451,7 +451,7 @@ function TarjetaDeCampo({
            en medio contrato. Se muestra acá, al lado del campo, y no en la lista
            general de avisos: el director tiene que poder sacarlo de un clic sin
            buscar cuál era. */
-        <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-500">
+        <p className="flex items-start gap-2 rounded-lg bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-500">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
           <span>{avisoCorto}</span>
         </p>
@@ -533,7 +533,7 @@ function Resultado({ resultado }: { resultado: RespuestaConfirmacion }) {
                 variant="outline"
                 className={
                   r.estado === "ok"
-                    ? "bg-green-500/10 text-green-600 border-green-500/20"
+                    ? "bg-green-500/10 text-green-800 dark:text-green-400 border-green-500/20"
                     : "bg-destructive/10 text-destructive border-destructive/20"
                 }
               >

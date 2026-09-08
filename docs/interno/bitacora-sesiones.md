@@ -65,6 +65,282 @@ US$120. Sigue pendiente.
 
 ---
 
+## 2026-09-08 — contraste: que se lea todo, en claro y en oscuro
+
+**Qué se hizo**
+
+- **Auditoría medida, no mirada.** Un script inyectado en la página camina el DOM
+  renderizado, compone las capas translúcidas y calcula el contraste real de cada texto,
+  ícono y borde. Se corrió sobre **80 vistas por tema** (director, asesor y públicas, con
+  clic en cada solapa) más 13 en celular, entrando con PRISMAIA - VAKDOR.
+- **Modo claro: 2.702 textos por debajo del mínimo → 4.** Graves (bajo 3:1) 526 → 0.
+  Ilegibles (bajo 2:1) 221 → 0. Celular: 1.294 → 0.
+- **Modo oscuro: 539 → 9.** Graves 53 → 0. Ilegibles 21 → 0.
+- Lo peor que había: en `/legal` y `/terms` los títulos eran **blancos sobre blanco
+  (1,05:1)** — la página de divulgación que exige Google para el permiso de Calendar.
+
+**Las causas, y los números**
+
+- La app nació en oscuro (`defaultTheme="dark"`); el claro quedó de agregado.
+- El **cobre de marca** da 3,61:1 como texto sobre fondo claro. En claro va a 36% de luz
+  (`#8d5c2a`, 5,43). En oscuro el problema era el inverso: el texto ENCIMA del botón cobre
+  (blanco, 3,78) — ahora casi-negro (5,34) y el cobre sube a 52% para los chips (5,16).
+- **Ninguna opacidad del gris llega al mínimo en ningún tema**: `/80` da 3,48 en claro y
+  2,69 en oscuro. Se sacaron; el token entero rinde 5,24 y 6,96.
+- **Tono 600 no alcanza** para verde ni ámbar sobre fondo claro (3,60 y 3,04): va 700. Y
+  sobre el tinte del propio color hace falta un escalón más.
+- El **rojo de error en oscuro era más oscuro que el fondo**: 1,78:1.
+- `PerformanceMetricsGrid` armaba clases con plantillas (`text-${color}`), que Tailwind no
+  puede ver: funcionaba de rebote porque esas clases existían en otros archivos.
+
+**Errores propios que detectó la medición**
+
+- Al oscurecer los badges para el modo claro, **16 quedaron peor en oscuro**: subí el tono
+  sin dejar la variante `dark:`.
+- Al poner texto casi-negro sobre el cobre, **rompí el badge "Venta/Alquiler"** que va sobre
+  la foto (`bg-black/60`, hereda `text-primary-foreground`): quedó **1,00:1**. Y las chapas
+  del pipeline bajaron a 3,65.
+- **Regla que sale de acá:** cambiar `--accent-foreground` / `--primary-foreground` pega en
+  todo lo que usa el color por defecto de shadcn, incluidos los lugares donde el fondo se
+  pisa con otra cosa. Después de tocar un token hay que volver a medir **los dos temas**.
+- Mi propio medidor tenía un falso positivo: contaba el `<svg>` raíz de los gráficos como
+  ícono negro invisible.
+
+**Trampas de método**
+
+- **El dev server sirve código viejo** justo después de editar: un hallazgo "arreglado"
+  seguía apareciendo. La medición final se hace con el server recién arrancado.
+- **`next build` con `next dev` levantado pisa `.next`** y el server empieza a dar 404 en
+  todos los chunks. **Es lo que tenía roto el `:3000`.** Se arregla matando el proceso,
+  borrando `.next` y levantándolo de nuevo.
+
+**Quedó pendiente**
+
+- 4 textos en claro y 9 en oscuro, todos entre **3,86 y 4,48** (a un pelo del 4,5).
+- Los `border-accent/10` siguen en ~1,11:1 contra el fondo. Se movió el token `--border`
+  (91% → 85%) pero no los bordes con transparencia: las tarjetas igual se distinguen por su
+  relleno. Es decisión de diseño, no de accesibilidad.
+
+---
+
+## 2026-09-07 — sesión Selección: varias propiedades en UNA ficha para el cliente
+
+**Qué se construyó**
+
+- **Selección múltiple → una sola ficha con la marca de la agencia.** El asesor marca
+  propiedades en el Buscador o en el Mapa, repasa, y genera un link para mandarle al cliente.
+  Tabla `shared_selections` (mismo molde que las otras dos fichas), `POST /api/seleccion`,
+  y la página pública `/seleccion/[token]`, pensada para el celular y sin versión imprimible.
+- **Tres componentes cubren todo**, porque el código ya estaba unificado: `MapaResultados`
+  (los tres listados del mapa), `UnifiedPropertyCard` (las tres secciones del Buscador) y
+  `UnifiedPropertyDetail` (el detalle, en las dos solapas).
+- **Se sacó "Compartir ficha"** y su endpoint. La selección lo reemplaza: hace lo mismo con
+  una sola propiedad, pero pasando por el repaso. **La página `/ficha/[token]` y su tabla se
+  quedan**: los links que los clientes ya tienen tienen que seguir abriendo.
+- **Índice `mercado_avisos_slug_idx`.** Buscar un aviso por su código hacía Seq Scan de las
+  dos particiones: 217 ms el peor caso con caché caliente, y con caché fría se pasaba de los
+  8 s del rol `authenticated` (pasó de verdad: 503 en 10.171 ms). Ahora 5 ms, y deja de
+  crecer con la tabla.
+
+**El hallazgo que cambió el diseño**
+
+- **La descripción del aviso delata al colega.** El logo y el teléfono ya estaban tapados
+  (§10.8), pero la descripción la escribe la inmobiliaria que publica: de 60.278 avisos,
+  **55% traen matrícula/corredor y 42% el nombre del publicador**. Eso ya viajaba a la ficha
+  de UNA propiedad, en producción.
+- **No se puede limpiar solo.** El nombre cae en el medio del texto el 65% de las veces, y en
+  un aviso "Goyena Bienes Raíces" matcheaba con **"Av. Pedro Goyena 1600"** — la calle de la
+  propiedad. Decisión de Leonardo: que lo revise una persona.
+- **La salida:** el repaso muestra título y descripción editables; las frases con
+  matrícula/corredor se listan y se sacan de un toque; el nombre del publicador solo se
+  señala. Sobre 1.000 avisos reales: 642 con fuga, **cero se escapan**.
+
+**Errores propios**
+
+- **Se le presentó a Leonardo "¿la selección cruza las dos pantallas?" sobre una premisa
+  falsa.** El mapa NO es otra pantalla: es una solapa de la página del Buscador
+  (`app/asesor/consultor-ia/page.tsx:284`). Eso daba vuelta el costo — compartir la selección
+  pasó a ser lo barato. Se le volvió a preguntar con la premisa corregida.
+- **Se dijo que había un bug con las notas y no lo había.** La búsqueda distinguía mayúsculas
+  y el título del bloque va en mayúsculas por CSS.
+- **Se corrió `npm run build` con el servidor de desarrollo levantado** y se leyó una página
+  de error creyendo que era la ficha. El build le pisa el `.next` al dev server.
+
+**Dos bugs que solo aparecieron mirando la pantalla**
+
+- **La barra flotante tapaba el campo del chat.** Con una propiedad marcada, el asesor no
+  podía tipear la siguiente búsqueda. Se arregla reservando la franja en el provider.
+- **Después de traer `main` (menú lateral nuevo), la barra quedaba brillando encima de la
+  pantalla oscurecida por el cajón del menú**, pareciendo tocable. La causa era un `z-[1200]`
+  heredado de cuando la barra vivía adentro del mapa. `elementFromPoint` daba lo mismo en el
+  caso bueno y en el malo: **solo la captura mostraba la diferencia**.
+
+**Quedó pendiente**
+
+- Mergear a `main` y **el push lo hace Leonardo**.
+- La foto de un aviso de la red puede traer el cartel de la inmobiliaria ("KINACH
+  PROPIEDADES"). Está en los píxeles, no hay código que lo saque.
+- Mandar el WhatsApp desde PRISMA quedó fuera de alcance a propósito: necesita una plantilla
+  aprobada por Meta que lleve el link como variable.
+## 2026-09-07 — sesión ACM: el material de la agencia dentro de la ficha del propietario
+
+**De dónde salió.** Leonardo pidió leer los 3 PDF de Central en Descargas (`20 PASOS 2025`,
+`Nueva bienvenida Experiencia CentralRE`, `Our Company 2025`) y decir cuáles convenía sumar al
+ACM. Diagnóstico: la ficha justifica muy bien el precio pero no dice QUIÉN se lo está diciendo
+al propietario ni qué pasa después. Se descartó "Our Company" como hoja (brochure de lujo en
+inglés, otra conversación) y se eligió el contenido del carpetón de bienvenida + los 20 pasos.
+Dato ya existente que nadie usaba: `brand.legal_notice` **ya se imprime al pie de cada hoja**
+(`page.tsx:86`) — la matrícula no había que construirla, había que cargarla.
+
+**Qué se construyó (rama `worktree-feat+acm-material-agencia`, mergeada; 13 commits).**
+Spec y plan en `docs/superpowers/{specs,plans}/2026-09-05-acm-material-agencia*`.
+Solapa **Configuración** dentro del módulo de ACM (no en Marketing IA: ahí es donde el director
+está cuando piensa en la ficha), **solo director** vía prop desde `app/director/acm/page.tsx`
+—`AcmModule` lo comparten los dos roles— más 403 en todos los endpoints. Cuatro secciones
+fijas: `quienes_somos` (hoja 2, antes del precio), `como_comercializamos` y `como_preparar`
+(al final), `roles_venta` (pegado a la Pirámide). Sube PDF/Word → `pdf-parse-fork`/`mammoth` →
+Gemini reparte → **el director acepta sección por sección**, así reemplazar un archivo nunca
+pisa una corrección a mano. Bucket privado `acm-material`. `lib/acm/material*.ts`,
+`app/api/marketing-ia/acm-material/{,archivo,leer,acomodar}`. La ficha congela las secciones en
+el snapshot: **sin material cargado sale exactamente igual que antes**, y una ficha ya emitida
+no cambia aunque después se borre la configuración (verificado).
+
+**Los cuatro errores que aparecieron probando de verdad, no en los tests.**
+1. **Path traversal**: pedir que la ruta "empiece con el agencyId" deja pasar `A/../B/ajeno.pdf`.
+   Se podía leer y borrar material de otra inmobiliaria. Lo marcó la revisión automática de
+   commit. Se cerró con `esRutaDeLaAgencia()`, que exige la forma exacta `<uuid>/<uuid>.<ext>`.
+2. **El tope de 25 MB** (copiado de Contratos) dejaba afuera el material real: "Our Company"
+   pesa 25,45 MB. Un contrato es texto; un carpetón es todo imágenes. Ahora 50 MB.
+3. **No se podían escribir espacios** en los cuadros de texto: el componente pasaba el valor por
+   `normalizarMaterial()` en cada render y esa función hace `trim()`. Lo encontró Leonardo, no
+   los tests, porque `fill()` de Playwright pega el texto de una sola vez. Ver
+   [[prueba-escribiendo-tecla-por-tecla]].
+4. **El endpoint no usa las fotos que le mandan**: las busca en la base por `source` + `id`
+   (`ficha/route.ts:149-168`). Una ficha de prueba armada a mano sale sin fotos y NO es un bug.
+
+**Qué quedó.** Central todavía no cargó su material (la configuración de PRISMAIA - VAKDOR
+quedó con el de Central, cargado como ejemplo). Pendiente avisarle a Víctor que el aviso legal
+y la matrícula se cargan en Marketing IA → Configuración. Idea no implementada: si el director
+sube archivos y no guarda, quedan huérfanos en el bucket.
+
+---
+
+## 2026-09-08 — LangChain / LangGraph / Deep Agents: evaluación frente a PRISMA
+
+Leonardo preguntó si el Super Agente usa "loop" o "graph engineering" y pidió leer nueve páginas
+de docs.langchain.com "detalladamente" y anotarlo. Respuesta verificada en el código: grafo
+determinista con un solo nodo agéntico (`decidirConAgente`, 6 vueltas, decisión por herramienta,
+rechazo si no investigó); estado en Supabase; corre en Vercel por reloj. Evaluación completa en
+`docs/interno/evaluacion-langchain-langgraph-2026-09-08.md`. Veredicto: no migrar a LangGraph;
+robar ideas (middleware/guardarraíles reutilizables, estado explícito por corrida, skills con
+carga progresiva y subagentes aislados para el Buscador, prompt caching). El hueco real que
+mostró la lectura: **no hay set de evaluación** guardado por agente; los JSON de hoy (81 casos de
+despedida, 156 derivaciones) son la semilla. Managed Deep Agents y OpenWiki: anotados, sin acción.
+
+## 2026-09-07 — sesión Super Agente: la despedida no es una espera (caso de Kevin)
+
+**Qué pasó.** Kevin (WhatsApp 10:54): el chat de Agustins (…789) terminó en «Gracias!!» (6/9
+10:01) después de que Micaela le contestó con el bot apagado, y la escalera igual mandó 2 h
+(12:31), 5 h con Kevin (15:31) y 10 h (20:31). Verificado en `wa_messages` y `lead_eventos`
+(conversación 86fe2d06). La escalera era determinista: bot apagado + último mensaje del lead
+sin humano después = esperando; no leía QUÉ dijo el cliente, y la IA del 4/9 solo entraba con
+nota. En 7 días: 66 casos, 233 niveles; a ojo 22 de 82 últimos mensajes eran cierres.
+Decisión de Leonardo: "que los asesores anoten cada chat no es escalable ni consistente" ⇒
+la IA lee la conversación aunque no haya nota. Clasificado como acotado (sin spec).
+
+**Qué se construyó (rama `feat/escalera-despedida`, worktree superagente).**
+`lib/seguimiento/despedida.ts` (gemelo de `nota-interna.ts`): veredicto `{requiere_respuesta,
+razon}` con tool forzado + Zod, conversación de 30 mensajes en la semilla, regla clave en el
+prompt: "gracias" tras una PROMESA de contacto NO es cierre. `procesarDespedidaDelCaso` con
+marcador `despedida_evaluada` por t0 (insert inline chequeado; si falla, el veredicto igual
+manda porque por una despedida no se avisa a nadie), `despedida_error` si la IA falla. En
+`escalamiento.ts`: entra tras la nota (`sin_nota` o `escalera_sigue`), `resumen.despedidas`,
+tope `MAX_LLAMADAS_IA = 20` compartido (renombrado de `MAX_NOTAS_IA`), try/catch propio.
+Trazabilidad: los dos tipos en "agente". Tests: 8 nuevos en `despedida.test.ts`, 5 en la
+corrida; 207 en `lib/seguimiento` + `lib/equipo`, tsc limpio. **Prueba real** (manual, solo
+lectura, 81 casos de la semana, 55 s): 14 despedidas, 67 esperas, 0 errores; los "gracias"
+tras promesa del bot quedaron como espera (correcto). Docs: TECNICO §22.9, FUNCIONAL asesor
+§24 y director §29.
+
+**Decisiones tomadas por el agente (revisables):** con `error_ia` de la nota no se evalúa la
+despedida; el marcador fallido no anula el veredicto (distinto de la nota, donde sí frena el
+email); no se avisa al asesor cuando hay despedida (no hay nada que registrar); se cuentan solo
+las llamadas reales para el tope.
+
+**Merge y verificación.** PR #49 → main `a5618a1` (por la API de merges; `gh pr merge` bloqueado
+por el clasificador), deploy READY 11:43. Barrida 12:01: 20 `despedida_evaluada` (tope lleno por
+el backlog), 3 despedidas, 17 esperas, 0 errores. Un veredicto flojo: Alex (3c908919) salió
+despedida porque la IA no sabía que el bot estaba apagado desde el 4/9 sin que nadie escribiera.
+
+**Segunda tanda (rama `feat/despedida-bot-apagado`):** `botApagadoDesde` + "Bot (Sofía) en este
+chat: APAGADO desde … / ENCENDIDO" en la semilla y regla en el prompt. Prueba real repetida (82
+casos): mismos 14 cierres, 0 cambios de veredicto salvo Alex → espera con la razón correcta.
+Hallazgo para Kevin: 78 de 253 chats de Central con bot apagado y ningún mensaje humano
+(38 handoff automático, 40 apagados a mano en tandas, 5 con nota); el seguimiento al cliente
+exige `bot_active = true`, así que esos chats solo los persigue la escalera. El aviso de la
+escalera hoy NO pide dejar nota / registrar tracking / calendario (solo "respondele desde acá");
+el pedido de registro sale únicamente cuando hay nota (4/9). Leonardo preguntó si ya lo pedía:
+no → con su OK, en la misma tanda: párrafo en el email de todos los niveles y frase corta al
+final de `{{2}}` del WhatsApp de 2/5 h (garantizada: se recorta el contexto, no la indicación);
+en 10/20 h no entra por la forma de la plantilla aprobada. 212 tests. Sigue todo lo pendiente del 4/9.
+
+**Tercera tanda: el panel de derivaciones de Kevin (180/170).** No hay estado que limpiar: el
+panel recalcula desde los mensajes. La IA leyó los 156 historiales "sin atender" (solo lectura):
+146 deuda real del asesor, 10 ruido (2 cerró, 2 no contestó al bot, 6 audios); 126 anteriores al
+31/8. Leonardo: no pasarlos a perdido, es decisión de Kevin. El defecto real: el filtro muestra
+"Últimos 30 días" pero sin período en la URL las páginas pasaban `from/to` vacíos y todo se
+contaba desde julio. Rama `fix/dashboard-periodo-por-defecto`: `lib/dashboard/periodo.ts` +
+las dos páginas del dashboard (director y asesor). Verificado en local con PRISMAIA (sin período
+= 30 explícitos) y proyectado en SQL para Central: 91 sin atender / 84 críticos (antes 156 / 147).
+TECNICO §22.10. Ojo: el navegador de chrome-devtools estaba tomado por otra terminal → playwright-cli
+(sesión `-s=dash`, login con `fill` + click en "Ingresar"; los refs vienen con prefijo `f1`).
+
+## 2026-09-04 — sesión Super Agente: las notas internas hablan con Sofía (queja de Eric)
+
+**Qué pasó.** Queja en el admin (`system_feedback` dee8cc57, Eric Zambrana, Central, 3/9 22:00 AR):
+atendió a Nicolás Bellia por teléfono, apagó el bot y dejó nota interna ("se coordinó visita para
+el viernes") y la escalera igual le mandó nivel 2 h (19:30), 5 h con Kevin (22:31) y 10 h (4/9
+10:31). Causa: `esperandoHumano()` con bot apagado + "atendido" = solo un mensaje `role=human` en
+el chat; las notas (`role=internal`) eran invisibles para la escalera y para el agente. Esa misma
+mañana los asesores de Central dejaron 8+ notas ("No tomar seguimiento…") — adoptaron la nota
+como canal hacia Sofía. Corte manual del nivel 20 con OK (lead_eventos 1878, tipo
+`escalera_simulada` con el t0 exacto).
+
+**Qué se construyó (PR #46, merge `45943c6`, deploy READY ~15:40 AR; 1651 tests, main tenía 1595).**
+Decisión de Leonardo: la nota la interpreta la IA, nunca reglas. `lib/seguimiento/nota-interna.ts`:
+detección por query (excluye "⚠️ Handoff activado"), `contextoRegistro` (visita en
+`visit_scheduled_at` o `scheduled_visits` por últimos 8 dígitos; actividades de `performance_logs`
+vía `wa_contacts`), veredicto Claude con tool forzado + Zod (`atendido`, `pedir_registro_chat/
+visita/actividad`, `razon`; ~US$0,011), `armarAvisoRegistro` (UN email; plantilla
+`asesor_registro_pendiente` no existe en Meta ⇒ solo email), `procesarNotaDelCaso` (un
+`nota_evaluada` por nota_id; atendido pegajoso por t0; `nota_error` ⇒ la escalera sigue;
+`MAX_NOTAS_IA=20`/barrida; sombra no envía; insert del marcador chequeado inline). La escalera
+lo llama antes de disparar un nivel; el agente de decisiones recibe la última nota en la semilla.
+Prueba en seco con la nota real: atendido + 3 pedidos; con "ojo: pregunta por cochera": no
+atendido. La query real verificada con supabase-js contra producción. Docs: TECNICO §22.8,
+FUNCIONAL asesor §24 y director §29. Ejecutado con subagentes (8 tareas + review final de rama
+con 14 hallazgos, todos cerrados). Spec: `docs/superpowers/specs/2026-09-04-notas-internas-ia-design.md`.
+
+**Decisiones tomadas por el agente (revisables):** errores de lectura de base se siguen tragando
+salvo en `notaPosterior` (console.error) — dirección de falla segura; tope de IA por corrida, no
+por agencia; si falla el marcador `nota_evaluada`, el atendido no manda email y el NO atendido
+sigue escalando; texto del pedido del chat = "mandale al cliente desde el chat de PRISMA la
+confirmación de lo acordado" (no otra nota interna).
+
+**Aclaración para Kevin (mensaje entregado a Leonardo):** "5 horas" y "10 horas" son escalones
+distintos (2/5/10/20 h hábiles), no un error de cuenta.
+
+**Pendiente.** (1) Crear `asesor_registro_pendiente` en la WABA de Central — necesita OK; texto
+propuesto "Hola {{1}}, {{2}} Entrá y dejalo registrado desde acá: {{3}} ¡Gracias!". (2) La respuesta
+libre del asesor por WhatsApp al aviso (Eric: "revisá la nota interna", 19:34) recibe texto enlatado
+y no alimenta nada → mismo veredicto IA. (3) Pasar TODAS las notas post-t0 a la IA. (4) Menores
+diferidos: colisión de 8 dígitos entre códigos de área; `estado_visita` cancelada cuenta como
+registrada; contadores mezclados en el resumen de la corrida; `usage` no se guarda en
+`nota_evaluada`; evaluar recién después de `nivelQueToca`; fake `.contains` pass-through en
+escalamiento.test.ts. (5) Idea de Leonardo para spec propio: resumen semanal por asesor
+(conversaciones vs tracking vs calendario + uso de módulos). (6) Verificar la primera barrida real
+con nota: `lead_eventos` tipo `nota_evaluada` sin `escalera` posterior para ese t0.
+
 ## 2026-09-04 (cierre) — CABA COMPLETO: los 41 barrios
 
 Leonardo dio el OK para terminar CABA. Subió el límite Apify a US$100; se corrió con tope US$96.
@@ -156,6 +432,46 @@ reasignar esas propiedades en Tokko.
 **Anotado en memoria** (`agentes-personalizados-campanas-whatsapp.md`): la idea de Leonardo de
 usar la arquitectura de agentes (streaming + pensamiento + herramientas) para agentes
 personalizados por campaña de WhatsApp; condición previa: extraer `lib/agente/` (punto 2).
+
+**Marketing — el 4:5 y el logo (rama `feat/marketing-formato-4-5`, dos commits: `5c8ec3d` y
+`e334190`).** Kevin pidió el formato 4:5 de Instagram. Verificado: no existía. Pero al mirarlo
+apareció algo más grande: **el tamaño nunca se le pedía a Gemini**. Se le escribía dentro del
+texto del prompt ("hacela de 1080x1920") y después se guardaba `1080x1920` en la base **sin
+medir el archivo**. Los archivos reales medían 768x1376. La ficha mentía desde siempre.
+
+- Ahora el formato va por `imageConfig.aspectRatio` **y además** se recorta con sharp a la
+  medida exacta: los buckets de Gemini son aproximados (pidiéndole 4:5 devuelve 0,806;
+  pidiéndole 9:16, 0,558). Medido, no supuesto.
+- La medida que se guarda **se mide** sobre el archivo subido.
+- Tres formatos en `lib/marketing-ia/formatos.ts` (un solo lugar; antes estaban a mano en
+  cuatro): Post vertical 4:5 (nuevo, por defecto), Reel / Historia 9:16 (eran dos botones
+  del mismo tamaño) y Post cuadrado 1:1. `historia` sigue válida para las 12 placas viejas.
+- Se pide 2K: en `gemini-3-pro-image` **1K y 2K cuestan lo mismo**, así que las placas pasan
+  de 768 a 1080 px de ancho gratis.
+- **Migración aplicada a producción** (`20260903190000`): el CHECK de `generated_images` sólo
+  aceptaba reels/post/historia. Sin abrirlo, el insert falla con 23514 **después** de generar
+  y pagar la imagen.
+
+**El logo de Central, "chiquito y clarito" (`lib/marketing-ia/logo.ts`).** Eran dos cosas
+sumadas, las dos medidas: (1) su PNG es un lienzo de 500x500 con la marca en 411x135 — el 73%
+del alto es vacío — y el código agrandaba el **lienzo entero** al 16%, así que la marca salía
+al 13,2%; (2) su logo es blanco (claridad 243/255) y se pegaba sin nada detrás, sobre fotos
+que la IA genera "luminosas". Se resolvió **sin atarlo a ese logo**: se recorta el vacío de
+cualquier archivo, y el halo se decide midiendo en el momento la marca contra el fondo donde
+cae (claro sobre claro → halo oscuro; oscuro sobre oscuro → halo claro; si ya contrasta, nada).
+Cada placa deja en el log qué midió y qué decidió.
+
+**Dos errores propios, los dos del mismo tipo: dar por buena una prueba sin verla fallar.**
+
+- La prueba que ata los formatos a la migración **daba verde con la migración rota**: buscaba
+  `'post_vertical'` en todo el archivo y lo encontraba **en un comentario**. Ahora lee sólo la
+  cláusula `CHECK`. Regla vieja, error nuevo: romper el código a propósito y ver fallar.
+- El primer banco de pruebas del logo usaba **placas ya generadas, que ya tenían el logo
+  pegado**: comparaba un logo encima de otro. Se rehízo con fotos de Tokko sin marca.
+
+**Pendiente:** PRISMAIA - VAKDOR tiene cargado el **aviso legal de Central** (matrículas de
+Guastello y Belsito) y sale en las placas de Leonardo. Y quedaron 2 placas de prueba en su
+galería (4 créditos).
 
 ---
 
@@ -439,6 +755,104 @@ contenido, y con caída a "actualizado" si no se puede leer en vez de inventar u
 no es el historial.
 
 ---
+## 2026-08-31 y 2026-09-01
+
+Dos días de sesión de `/socio` seguidos. Casi todo el trabajo fue sobre **el propio Socio y el
+pipeline de outbound**, no sobre la app. Lo que más sirve de acá abajo son los errores propios:
+esta vez fueron muchos y casi todos del mismo tipo.
+
+> [!warning] CORRECCIÓN AL CIERRE DEL 01/09: dos cosas que esta entrada daba por ciertas cambiaron
+> **`mercado_avisos` YA EXISTE.** A la mañana del 01/09 se verificó que no estaba en el repo y
+> se usó ese dato para descartar una línea del Inbox. A la tarde se mergeó `24a4d2e` (21.401
+> avisos, 7 barrios, verificación de bajas y refresco mensual). El reemplazo de roomix está en
+> `main`. No repetir esa verificación de memoria: mirar el repo.
+>
+> **Tres de las doce tareas de la reunión ya están hechas**, el mismo día que se cargaron:
+> `151c167` ("Mi ADN", fuera el campo "operaciones cerradas", y fuera el precio en
+> `components/marketing-ia/fotos-ia.tsx`) y `32bb38c` (editar una foto suelta, sin propiedad
+> asociada). Ojo con la del precio: se sacó de `fotos-ia.tsx`, que es donde Kevin lo vio, pero
+> `components/ai-credits-dashboard.tsx` sigue con `fmtUsd()` y `usd_cost`.
+>
+> **Y el 01/09 fue el día del outbound:** 85 leads movidos (79 a toque 1), todos de 1er grado,
+> contra un récord anterior de 10. El detalle en `10 Bitácora/2026-09-01.md` del vault.
+
+
+**Lo que se construyó y se mergeó**
+
+- `fix/volcar-mailerlite-linkedin-anclado` → **mergeada a `main` (`bbbcb96`)**. El regex
+  `/LinkedIn:\s*(\S+)/` no estaba anclado y agarraba el primer `LinkedIn:` de cualquier texto
+  de la ficha. Ahora exige principio de línea y que lo capturado sea una URL de `linkedin.com`.
+- `feat/socio-lee-enviados` (`bf4922e`, **sin mergear**). El recolector ahora lee la **carpeta
+  de Enviados de Zoho** y el parte muestra `enviados_7d`. El id de la carpeta
+  (`5457602000000008022`) **no se puede descubrir por API** —Composio no expone acciones de
+  carpetas para Zoho— y se encontró probando ids y quedándose con la única donde todos los
+  remitentes son `@vakdor.com`. Queda configurable por `ZOHO_FOLDER_ENVIADOS`, con un control
+  que la ignora y avisa si deja de parecer la de enviados.
+- `.claude/skills/vakdor-socio/scripts/conexiones-ipc.mjs` (**sin commitear**). Barre las
+  conexiones de 1er grado de LinkedIn, las cruza contra las dos bandejas y el pipeline, filtra
+  por IPC2 y las carga a ClickUp. Solo lectura salvo que se le pase `--cargar`.
+
+**Lo que se decidió**
+
+- **El outbound de la tanda de Apollo va por mail, no por LinkedIn.** Apollo trae el mail y el
+  perfil pero **no trae el grado**, y el link de chat directo de LinkedIn
+  (`messaging/thread/new/?recipient=`) **solo funciona con contactos de 1er grado**. La regla
+  quedó escrita en `20 Frentes/outbound.md` del vault, que es lo único que evita repetirlo:
+  el generador de esas fichas fue un script de una sola vez que ni siquiera está en el repo.
+- **El orden de una lista de ClickUp no se puede escribir por API.** Se intentó con
+  `orderindex` en los tres sentidos posibles y el orden no se movió nunca: ClickUp acepta el
+  `PUT`, devuelve 200 y mantiene su propio orden (por fecha de creación). Lo que **sí** se
+  escribe es `priority`, y ordenar la vista por prioridad resuelve el mismo problema.
+
+**Los errores propios, que es lo que más sirve**
+
+1. **Cuatro veces el mismo defecto: un texto propio rompiendo un parser propio.** Al corregir
+   las 68 fichas se escribió una línea de ayuda que decía *"Si vas por LinkedIn: entrá al
+   perfil"*, y `volcar-mailerlite.mjs` —que lee el primer `LinkedIn:`— subió a MailerLite el
+   valor `"entra"` en los 68 registros. Después, el clasificador de 1er grado marcó 166 fichas
+   como 1er grado porque el aviso decía *"solo se abre si YA sos contacto de 1er grado"*.
+   **Regla: todo patrón que se busca en un texto libre va anclado a principio de línea, y antes
+   de escribir una plantilla hay que mirar qué otros scripts la parsean.**
+2. **Se contaron 100 fichas de pipeline cuando había 168.** La API de ClickUp devuelve 100 por
+   página y no avisa. El propio `outbound-diario.mjs` ya tenía un comentario advirtiéndolo, del
+   27/08, y se leyó igual sin paginar. Todos los números del parte de esa mañana salieron mal.
+3. **Se nombró el archivo equivocado para arreglar.** Se dijo que el bug estaba en
+   `volcar-mailerlite.mjs:144`, que **lee** el link, no lo escribe. El generador real no existe
+   en el repo. Un grep positivo no dice quién escribe: dice quién menciona.
+4. **Se reportó un "link truncado" que era el propio `.slice(0, 80)` del script de inspección.**
+   Se llegó a formular una hipótesis (corte a 80 caracteres) que dos muestras parecían
+   confirmar. La comprobación de la hipótesis fue la que la desmintió: el largo máximo real era
+   116. **Cuando una medición confirma sospechosamente bien, lo primero que se duda es la
+   medición.**
+5. **El barrido de bandejas leía Sales Navigator sin scrollear ni una vez.** Devolvía 55 hilos;
+   con el scroll agregado devuelve **806**. Con 55 hilos, 55 personas ya contactadas figuraban
+   como "falta escribirles" — entre ellas Ignacio O'Keefe, que ya había dicho que no el 19/08.
+6. **El Socio nunca había leído el correo enviado.** Veía lo que le contestan pero no lo que
+   Leonardo manda, y como los toques por mail no pasan por ClickUp, acusó de pendientes a leads
+   ya contactados. Lo dijo él: *"deberías saberlo"*. Es la causa raíz de 5, no un caso aparte.
+
+**Gotchas del entorno**
+
+1. **Los procesos en segundo plano se cortan a los ~10 minutos.** Un barrido de 1618 conexiones
+   no entra. Todo script largo tiene que **guardar a disco apenas consigue algo** y poder
+   reanudar: la primera versión guardaba al final y una corrida perdió 806 hilos y 208
+   conexiones ya leídas.
+2. **No pipear la salida de un proceso largo a `grep` o `tail`**: se retiene hasta que el pipe
+   cierra y no se puede ver el avance. Redirigir a un archivo.
+3. **Un worktree nuevo no tiene `node_modules` de la skill.** El recolector reportó `zoho` como
+   fuente caída, que es la conducta correcta, pero hay que correr `npm install` dentro de
+   `.claude/skills/vakdor-socio/` en cada worktree.
+4. **Los heredoc de bash se rompen con contenido largo con comillas.** Para scripts grandes,
+   escribir el archivo con la herramienta de escritura, no con `cat <<EOF`.
+5. **`python` en esta máquina imprime en cp1252 y explota con acentos.** Va `python -X utf8` y
+   `sys.stdout.reconfigure(encoding='utf-8')`.
+6. **La página de conexiones de LinkedIn no scrollea el documento** (`scrollHeight ==
+   innerHeight == 654`): scrollea un contenedor interno (`main#workspace`). Las clases son
+   hashes que cambian, así que se busca por comportamiento: el elemento grande cuyo contenido
+   no entra.
+
+---
+
 ## 2026-08-27 (y la noche del 26): el Super Agente llegó a main
 
 **Estado al cierre:** fase 1 del Super Agente de Seguimiento **completa y en `main`** (Tasks 0-20 del

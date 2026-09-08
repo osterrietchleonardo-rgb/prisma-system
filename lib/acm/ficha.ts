@@ -1,3 +1,5 @@
+import type { AcmSecciones } from "./material";
+
 // ACM · Ficha pública de comparables.
 // Tipos del snapshot + cálculos deterministas (pulso de mercado por barrio/ambientes y comparación de $/m²).
 // SIN IA: todos los % salen de fórmulas sobre datos reales:
@@ -117,6 +119,14 @@ export interface AcmFichaSnapshot {
   agent: FichaAgent;
   agency: { id: string; name: string };
   brand: FichaBrand;
+  /**
+   * Material institucional de la agencia (módulo ACM → Configuración). Ausente en toda ficha
+   * anterior a sep-2026, y ausente también cuando la agencia no cargó nada: en ese caso la
+   * ficha sale exactamente como salía antes. Nunca acceder sin verificar.
+   * La lista de archivos NO viaja acá: el propietario no tiene por qué recibir los nombres de
+   * los archivos internos de la agencia.
+   */
+  material?: AcmSecciones | null;
   created_at: string;
 }
 

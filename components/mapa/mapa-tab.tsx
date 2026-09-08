@@ -75,7 +75,7 @@ function BotonPanel({
           apilaban en tres filas y tapaban un tercio del mapa. */}
       <span className="hidden sm:inline">{texto}</span>
       {marca !== undefined && (
-        <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-bold text-white">
+        <span className="rounded-full bg-amber-700 px-1.5 text-[10px] font-bold text-white">
           {marca}
         </span>
       )}
@@ -370,7 +370,7 @@ export function MapaTab() {
         {(filtros.barrio || ubicacion) && (
           <div className="pointer-events-auto flex flex-wrap items-center gap-2">
             {filtros.barrio && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-600 py-1 pl-3 pr-1.5 text-xs font-medium text-white shadow">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-700 py-1 pl-3 pr-1.5 text-xs font-medium text-white shadow">
                 Solo {filtros.barrio}
                 <button
                   onClick={() => setFiltros((f) => ({ ...f, barrio: null }))}
@@ -488,7 +488,7 @@ export function MapaTab() {
         onClick={() => setLapizActivo((v) => !v)}
         title={lapizActivo ? "Salir del lápiz" : "Dibujar una zona a mano alzada"}
         className={`absolute right-3 top-3 z-[700] flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-colors ${
-          lapizActivo ? "bg-sky-600 text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+          lapizActivo ? "bg-sky-700 text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
         }`}
       >
         <Pencil className="h-4 w-4" />
@@ -498,14 +498,14 @@ export function MapaTab() {
         onClick={() => setVerPrecios((v) => !v)}
         title={verPrecios ? "Ocultar el precio por m²" : "Ver el precio por m² por manzana"}
         className={`absolute right-16 top-3 z-[700] flex h-10 w-10 items-center justify-center rounded-full shadow-lg transition-colors ${
-          verPrecios ? "bg-emerald-600 text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
+          verPrecios ? "bg-emerald-700 text-white" : "bg-white text-zinc-700 dark:bg-zinc-900 dark:text-zinc-200"
         }`}
       >
         <DollarSign className="h-4 w-4" />
       </button>
 
       {lapizActivo && (
-        <div className="pointer-events-none absolute left-1/2 top-3 z-[700] -translate-x-1/2 rounded-lg bg-sky-600/95 px-3 py-1.5 text-xs font-medium text-white shadow">
+        <div className="pointer-events-none absolute left-1/2 top-3 z-[700] -translate-x-1/2 rounded-lg bg-sky-700/95 px-3 py-1.5 text-xs font-medium text-white shadow">
           Dibujá la zona sin soltar. Podés hacer varios trazos: se suman.
         </div>
       )}
@@ -536,7 +536,7 @@ export function MapaTab() {
             {truncado && (
               /* La frase larga se esconde en el celular: el "+" ya avisa que es una
                  muestra, y el cartel entero le comia media pantalla de ancho. */
-              <span className="ml-1.5 hidden border-l border-zinc-300 pl-1.5 font-normal text-amber-600 sm:inline dark:border-zinc-700 dark:text-amber-500">
+              <span className="ml-1.5 hidden border-l border-zinc-300 pl-1.5 font-normal text-amber-700 sm:inline dark:border-zinc-700 dark:text-amber-500">
                 es una muestra, acercate para verlas todas
               </span>
             )}

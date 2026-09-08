@@ -803,6 +803,17 @@ Rate limit 30 req/h por usuario; validación Zod (10–50000 chars); `parseWhats
     - **~~Concern abierto~~ → CERRADO (ago-2026, migración `20260817130000_roomix_borrar_hnsw_duplicado.sql`).** Eran dos índices HNSW **idénticos** en `roomix_properties` (`idx_roomix_embedding_hnsw` + `idx_roomix_properties_embedding`), **1309 MB cada uno** al momento de borrarlos (la cifra vieja de ~972 MB quedó corta: la tabla siguió creciendo). Idénticos de verdad y no solo de nombre: misma columna, mismo método, **misma clase de operador** (`vector_cosine_ops` — lo que había que mirar: con `vector_l2_ops` medirían otra distancia y no serían intercambiables) y ninguno con cláusula `WITH`, o sea mismos `m`/`ef_construction`. **Cuál sobraba, medido:** los contadores de `pg_stat` venían del 2026-02-12 sin resetearse (6 meses) y en ese lapso `idx_roomix_embedding_hnsw` acumuló 24 usos contra **cero** del otro (`last_idx_scan` en null); corriendo una búsqueda semántica real con el vector como literal, el plan elige `Index Scan using idx_roomix_embedding_hnsw` y sube su contador mientras el otro sigue en cero. **Qué se ganó:** 1309 MB — la tabla pasó de 4718 a 3410 MB y sus índices de 2691 a 1382 MB —, y sobre todo cada escritura dejó de mantener dos HNSW en vez de uno (550.010 escrituras desde febrero, 12.937 filas tocadas en 7 días: la tabla se escribe seguido). **Qué NO tocó:** el mapa no usa embeddings (sus índices son los GiST geográficos y el btree de barrio) y el crawler actualiza/borra por `id` (`.eq('id')`, `.in('id')`, `upsert onConflict:'id'`), o sea por `roomix_properties_pkey`, que además no se puede dropear suelto por pertenecer a la PK. **Verificado antes/después con huella:** 3 vectores de consulta × `acm_match_roomix` y `match_roomix_ia`, comparando el contenido completo de cada fila **y el orden del ranking** (en una búsqueda vectorial el orden *es* el resultado) — 6 de 6 idénticos; más ACM y Buscador IA por la UI, ambos 200 OK con resultados reales.
       - *Gotcha para la próxima vez que se mida esto:* si el vector de consulta viene de un `JOIN`, pgvector **no puede usar el índice** y se va a barrido completo (43 s medidos) — el `EXPLAIN` parece decir que el índice no sirve cuando en realidad la prueba está mal armada. Las funciones reales lo reciben como parámetro, que para el planificador es una constante; para reproducirlo hay que inyectar el vector como literal.
 
+- **Material institucional de la agencia dentro de la ficha (7-sep-2026, rama `feat/acm-material-agencia`, merge `87896a5`, desplegado):** la ficha justificaba el precio pero no decía **quién** se lo estaba diciendo al propietario ni **qué pasa después**. Ahora cada agencia carga su propio material y sale impreso dentro de la ficha, con su marca. **Si la agencia no carga nada, la ficha sale byte por byte como antes** (`seccionesParaFicha()` devuelve `null` y los cuatro bloques son condicionales); las fichas anteriores no traen el campo, así que **nunca se accede a `snap.material` sin verificar**.
+  - **Dónde se configura:** solapa **Configuración** en el propio módulo de ACM, tercera junto a "Nuevo ACM"/"Mis ACM" (`app/asesor/acm/components/configuracion-tab.tsx` + `config-material.tsx`). **Solo director:** `AcmModule` lo comparten los dos roles, así que se habilita con la prop `esDirector` que únicamente pasa `app/director/acm/page.tsx` — pero eso es comodidad; la defensa son los **403 de los cuatro endpoints**. `requireTenant()` ya devuelve `role`, así que no hace falta la segunda consulta a `profiles` que hacen los endpoints más viejos.
+  - **Las cuatro secciones son FIJAS** (`SECCIONES` en `lib/acm/material.ts`), con su tope y el texto que guía al director sobre qué archivo subir: `quienes_somos` 1200 (hoja 2, **antes** del precio) · `como_comercializamos` 1800 (tras las conclusiones) · `como_preparar` 1500 (última hoja) · `roles_venta` 500 (pegado a la Pirámide del Precio). Si la IA pudiera inventar secciones, cada propietario recibiría una ficha con otra forma.
+  - **Se guarda TEXTO, no el archivo:** `agencies.marketing_ai_config.acm_material` = `{archivos[], secciones{}}`. Los PDF/Word van a un bucket **privado** `acm-material` (`scripts/crear-bucket-acm-material.mjs`, idempotente, 50 MB por archivo) y solo los abre el servidor al releer. `archivos[]` **no viaja al snapshot**: el propietario no tiene por qué recibir los nombres internos de la agencia.
+  - **Tope de 50 MB, no 25.** Arrancó en 25 copiado de Contratos y no alcanzaba: el "Our Company 2025" de Central pesa **25,45 MB** y quedaba afuera por 0,45. Un contrato es texto; un carpetón institucional es todo imágenes, y del archivo solo se extrae el texto.
+  - **Endpoint propio con MERGE (`app/api/marketing-ia/acm-material/route.ts`).** El `POST /api/marketing-ia/settings` viejo hace `update({ marketing_ai_config: config })`, o sea **reemplaza el jsonb entero**: guardar desde acá mandando solo el material le borraría a la agencia colores, logo, tipografía y aviso legal. El PUT relee el jsonb **en el servidor** y cambia una sola clave (eso además evita que dos pestañas se pisen). Tiene test de conducta que mira el jsonb escrito, verificado metiendo el bug.
+  - **Los otros tres endpoints:** `/archivo` (POST sube, DELETE borra), `/leer` (relee **todos** los archivos y propone las 4 secciones, sin guardar) y `/acomodar` (ordena lo que el director escribió en una sección, sin agregarle nada). Créditos: `consumeAiCredits("acm_material", 1, …)` por **operación de IA**, nunca por ACM generado; no se cobra si no había nada que leer.
+  - **Rutas del bucket: `esRutaDeLaAgencia()`, no `startsWith`.** Las rutas llegan del navegador. Pedir que empiecen con el `agencyId` deja pasar `A/../B/ajeno.pdf`, que también empieza con `A/`: si el storage normalizara ese `..` se podría **leer o borrar el material de otra inmobiliaria**. Se exige la forma exacta que arma la subida, `<agencyId>/<uuid>.<pdf|docx>`. Lo detectó la revisión automática de seguridad del commit; el ataque quedó como test en `/leer` y en el DELETE de `/archivo`.
+  - **Las tres reglas duras del prompt** (`lib/acm/material-ia.ts`): (1) si el material no dice nada de una sección, **la deja VACÍA** — es preferible vacía a verosímil pero falsa, porque la lee un propietario que decide plata; (2) siempre español rioplatense (hay material en inglés); (3) corta en 3-4 párrafos — sin esto devolvía mil caracteres corridos que ocupaban un cuarto de hoja y dejaban el resto en blanco. Verificado contra los 3 PDF de Central: con solo "Our Company" (que no habla de preparar la casa) esa sección vuelve vacía.
+  - **`normalizarMaterial()` vs `formaDeMaterial()` — no son intercambiables.** La primera limpia (trim + recorte al tope) y es la de **guardar y leer**; la segunda solo asegura la forma y es la del **cuadro de texto mientras se escribe**. Usar la de limpiar en el componente hacía que cada tecla borrara el espacio recién escrito: no se podía escribir la segunda palabra. Las pruebas con `fill()` no lo veían (pega el texto de una vez); se prueba con `pressSequentially`.
+
 **Legacy:** `/api/valuation/generate` + tabla `valuations` (Gemini) — sin uso confirmado en frontend (ver §20).
 
 ### 10.7 Conversational Insights (`/api/conversational-insights/analyze`)
@@ -1056,7 +1067,7 @@ Vive en `components/admin-vakdor/marketing-metrics-section.tsx` (UI) + `lib/admi
 ## 17. Frontend: estructura y convenciones
 
 - **App Router** con grupos: `(public)`, `director`, `asesor`, `admin-vakdor`. Layouts por rol con guards.
-- **Navegación:** `components/director-sidebar.tsx` (18 ítems) y `components/asesor-sidebar.tsx` (17 ítems). Headers con `ModeToggle`.
+- **Navegación (sep-2026, menú agrupado):** la lista de páginas vive en **un solo lugar**, `lib/nav/menu.ts` (19 renglones del director / 17 del asesor, en 7 grupos; nombres y rutas idénticos a los anteriores — `lib/nav/menu.test.ts` los compara renglón por renglón contra la lista vieja y falla si alguno cambia). Cada renglón declara nombre/href por rol y su grupo (Tracking cambia de grupo por rol: `mi-equipo` para el director, `mi-dia` para el asesor); un grupo sin renglones no se dibuja; ningún icono se repite. `components/sidebar-nav.tsx` dibuja los grupos plegables (todos se pueden cerrar; el grupo activo se abre al navegar; estado en `localStorage` `prisma.menu.abiertos.<rol>`; los contadores de los renglones suben al título del grupo cuando está plegado) y `components/{director,asesor}-sidebar.tsx` solo conservan cabecera, pie (Configuración + logout) y el contador de aprobaciones. **Barra lateral que se cierra en escritorio:** `components/barra-lateral.tsx` (botones) + `lib/nav/barra-lateral.ts` (script inline que lee `localStorage` `prisma.barra` ANTES del primer dibujo y pone `<html data-barra="oculta">`) + reglas en `app/globals.css` (`.barra-escritorio` a `width:0`, `.btn-abrir-barra` visible). El estado no pasa por React a propósito: sin salto de hidratación y sin animación de entrada. Gotcha resuelto: Leaflet no se re-mide al cambiar su caja → `AjustarAlContenedor` en `components/mapa/mapa-lienzo.tsx` (`ResizeObserver` → `invalidateSize`). Headers con `ModeToggle`.
 - **Accesos personalizables por agencia:** algunos módulos se habilitan/deshabilitan por `agency_id`. El primer caso vive en `lib/access/contratos-ia.ts` (`CONTRATOS_IA_AGENCIA_DESHABILITADA` + helper `contratosIaDeshabilitado(agencyId)`). Se aplica en dos capas: (1) **UI** — los sidebars reciben `agencyId` (layout → sidebar, y layout → header → sidebar móvil) y, si coincide, renderizan "Contratos IA" como `<div>` atenuado no clickeable con badge "Deshabilitada" en vez de `<Link>`; (2) **acceso directo** — las páginas `app/{director,asesor}/contratos-ia/page.tsx` (ahora server components `async`) leen `profiles.agency_id` y hacen `redirect()` al dashboard del rol si la agencia está deshabilitada. Patrón a reutilizar para futuras customizaciones por cliente.
 - **UI:** shadcn/ui (Radix), iconos `lucide-react`, toasts `sonner`. Estado: hooks estándar + `zustand` (Kanban).
 - **Tema** (`next-themes`, estrategia `class`): `defaultTheme="dark"`, `enableSystem={false}`. Tokens semánticos HSL en `app/globals.css` (`:root` claro / `.dark` oscuro). Regla: nunca `text-white` standalone sobre superficies theme-aware (usar `text-foreground`); `text-white` solo sobre fondos de color fijo. Excepciones oscuras: landing pública, simulaciones de marketing, panel Vakdor, drafts Roomix.
@@ -1397,6 +1408,144 @@ la página **"Equipo"** con dos solapas (Aprobaciones intacta + Trazabilidad). D
   Volver). El header del panel usa un alias de ruta (`director-header.tsx`) para decir "Equipo".
 - **v2 pendiente:** el tracking (`lead_activities` apunta a leads Tokko, no a conversaciones);
   botón "ya tomé contacto" del director si lo sigue pidiendo.
+
+### 22.8 Las notas internas hablan con Sofía (4/9/2026)
+
+Diseño completo: `docs/superpowers/specs/2026-09-04-notas-internas-ia-design.md`. Disparador: Eric
+(Central) atendió a Nicolás Bellia **por teléfono**, apagó el bot y dejó una nota interna
+("Ya estamos en contacto con el cliente, se coordino una visita para el Viernes") que la
+escalera no leía: dispararon los niveles 2h/5h/10h igual (`lead_eventos` id 1878, cortado a
+mano). Decisión de Leonardo: **la detección es determinista, la interpretación es de la IA**.
+
+- **Detección** (`notaPosterior`, `lib/seguimiento/nota-interna.ts`): la última fila de
+  `wa_messages` con `role='internal'` posterior a `t0` (último mensaje del lead), **excluyendo**
+  el marcador automático `"⚠️ Handoff activado"` (mismo `role`, lo escribe el sistema al
+  apagarse el bot — con un `.not("content", "like", "⚠️ Handoff activado%")`). Sin nota real
+  posterior a `t0`, la escalera de `escalamiento.ts` corre exactamente igual que antes (22.4);
+  la IA solo entra a tallar cuando un asesor escribió algo.
+- **Veredicto de la IA** (`crearLlamadaVeredicto`): una sola llamada a `claude-sonnet-5`
+  (`MODELO` de `lib/admin-vakdor/marketing/claude.ts`), `tool_choice` forzado a
+  `emitir_veredicto`, sin `thinking` (incompatible con tool forzado), `max_tokens: 1000`.
+  Devuelve `{atendido, pedir_registro_chat, pedir_registro_visita, pedir_registro_actividad,
+  razon}` validado con Zod (`VeredictoNotaSchema`). La semilla (`semillaVeredicto`) le pasa la
+  nota, la conversación completa (mismo formato que `leer_mensajes`), si hay visita registrada
+  (`visit_scheduled_at` de la conversación O una fila futura en `scheduled_visits` con teléfono
+  que matchea por los últimos 8 dígitos) y las actividades de `performance_logs` de los últimos
+  14 días (vía `wa_contacts.id → performance_logs.wa_contact_id`), más la propiedad de interés
+  (`metricas.propiedad_interes`/`propiedad_consultada`).
+- **Una evaluación por nota**: antes de llamar a la IA, `procesarNotaDelCaso` busca en
+  `lead_eventos` un `nota_evaluada` previo con `datos.nota_id` = esta nota; si existe, no
+  vuelve a llamar ni a avisar (`atendido_sin_aviso` / `escalera_sigue` según el veredicto
+  guardado). Una nota NUEVA del asesor dispara una evaluación nueva.
+- **Eventos nuevos en `lead_eventos`:** `nota_evaluada` (uno por `nota_id`, con el veredicto
+  completo en `datos`); `nota_error` (si la llamada a la IA falla, la escalera sigue como si no
+  hubiera nota — degradación registrada, nunca silenciosa: "un aviso de más molesta menos que
+  un cliente perdido"); `aviso_registro_simulado` (en `modo != 'activo'`: qué se le habría
+  pedido al asesor, sin mandar nada).
+- **El aviso de registro** (`armarAvisoRegistro` + `enviarAviso`, un único mensaje por nota):
+  si `atendido=true` y hay algún `pedir_registro_*`, sale UN aviso que reconoce la gestión y
+  pide solo lo que falta (chat / visita en el calendario / actividad en el tracking). Plantilla
+  `asesor_registro_pendiente` — está definida en el tipo pero **NO existe aprobada en Meta
+  todavía**, así que `enviarAviso` la omite (`omitido_plantilla_no_aprobada`) y el aviso sale
+  **solo por email**. Crear/aprobar la plantilla en Meta queda para la fase de notificaciones.
+- **El agente de decisiones (capa 3, `agente.ts`) también lee la última nota**: va en la
+  semilla igual que el marcador de handoff, y el prompt le dice que los renglones `[internal]`
+  mandan sobre su criterio propio ("no dar seguimiento" ⇒ no contactar; visita ya coordinada ⇒
+  no recontactar; un recordatorio suelto ⇒ contexto, no orden).
+- **Prueba en seco antes del merge** (Task 8, `scratch/_probar-veredicto-nota.mjs`, cero
+  escrituras, una sola llamada real a la API con los datos reales del caso Nicolás): con la
+  nota real de Eric el veredicto salió `atendido: true, pedir_registro_chat: true,
+  pedir_registro_visita: true, pedir_registro_actividad: true` (razón: la gestión fue real pero
+  quedó fuera de PRISMA — sin chat, sin visita en el calendario, sin actividad en el tracking).
+  Con una nota-recordatorio inventada ("ojo: pregunta siempre por cochera", misma conversación)
+  salió `atendido: false` con los cuatro pedidos en `false`. Los dos casos pasaron en el primer
+  intento, sin tocar `PROMPT_NOTA`.
+
+### 22.9 La despedida no es una espera (7/9/2026)
+
+Disparador: Kevin (7/9, 10:54) con el caso de Agustins (…789): Micaela apagó el bot, le
+contestó (6/9 9:59 y 10:00), el cliente cerró con «Gracias!!» (10:01) y la escalera disparó
+igual los niveles 2 h (12:31), 5 h con Kevin (15:31) y 10 h (20:31). En los 7 días previos,
+**14 de 81 casos escalados** terminaban en un cierre así (medido con la IA, ver abajo).
+Decisión de Leonardo: "que los asesores anoten cada chat no es escalable ni consistente" ⇒
+la IA lee la conversación aunque no haya nota.
+
+- **Módulo** `lib/seguimiento/despedida.ts`, gemelo de `nota-interna.ts`: `procesarDespedidaDelCaso(db, c, t0, {ahoraMs, llamar?})`
+  devuelve `{ resultado: "despedida" | "requiere_respuesta" | "error_ia", llamoIA }`. Una
+  sola llamada a `MODELO` (tool forzado `emitir_veredicto`, `max_tokens: 600`, Zod
+  `VeredictoDespedidaSchema` = `{requiere_respuesta, razon}`), con la conversación completa
+  (`leer_mensajes({cantidad: 30})`) y la hora AR en la semilla. **No mira registro ni
+  calendario**: la pregunta es una sola, ¿el último mensaje del cliente necesita respuesta?
+- **El prompt tiene una regla que importa**: un "gracias" después de una PROMESA de contacto
+  ("el asesor se va a comunicar", "te confirmo y te aviso") NO es cierre — el cliente sigue
+  esperando ese contacto. Es lo que separa a la IA de un regex: en la prueba real, 8 de los
+  "gracias" de la semana quedaron como espera por esa regla. Audios ("Mensaje de voz
+  recibido"), preguntas, horarios propuestos y reclamos ⇒ espera. Ante la duda, espera.
+- **Dónde entra** (`escalamiento.ts`): después de la nota. Si `rNota` es `sin_nota` o
+  `escalera_sigue` (nota-recordatorio), se evalúa la despedida; con `atendido*` ya se frenó y
+  no se gasta; con `error_ia` de la nota no se insiste (la API caída lo está para las dos).
+  `despedida` ⇒ `resumen.despedidas++` y `continue` — ningún nivel, a nadie, y sin aviso al
+  asesor (no hay nada que registrar).
+- **Una evaluación por caso**: marcador `despedida_evaluada` en `lead_eventos` con
+  `datos = {t0, requiere_respuesta, razon}`; las barridas siguientes lo reutilizan
+  (`.contains("datos", {t0})`) sin volver a llamar. Insert inline y chequeado; si falla, el
+  veredicto igual manda (por una despedida no se avisa a nadie; lo peor es re-preguntar en la
+  barrida siguiente, acotado por el tope). Si la IA falla: `despedida_error` y la escalera
+  sigue. Un `throw` fuera de su try queda en `despedida_error` y no tira la barrida.
+- **Tope compartido**: `MAX_NOTAS_IA` pasó a `MAX_LLAMADAS_IA = 20` por corrida, notas +
+  despedidas juntas; solo cuentan las llamadas reales (`llamoIA`), no los marcadores leídos.
+- **Trazabilidad**: `despedida_evaluada` y `despedida_error` van a la categoría "agente"
+  (`lib/equipo/trazabilidad.ts`); el director ve la razón en la ficha del lead.
+- **Prueba real antes del merge** (`lib/seguimiento/manual-despedida-semana.test.ts`, no se
+  commitea; `SEGUIMIENTO_MANUAL=1`, solo lectura, 81 llamadas reales, 55 s): 14 despedidas,
+  67 esperas, 0 errores. Despedidas: «Gracias!!» (Agustins), «Entonces imposible. Gracias.»,
+  «dale. Le consulto y te aviso», «Ya estamos hablando», «Gracias ya alquile», «Gracias, por
+  ahora no tengo más preguntas.», «Ahora te escribo gracias». Esperas correctas: «Dale gracias,
+  buen Finde semana», «Ok graciss», «Muchas gracias. Fuiste muy amable!!», «Gracias» (todas
+  tras una promesa del bot); «Lo estamos viendo por nuestra cuenta» quedó como espera por
+  conservador (el bot tenía una pregunta abierta). Salvedad de la prueba: la IA leyó la
+  conversación de HOY, no la del momento del caso, así que algunos "cierres" son porque el
+  asesor ya contestó después.
+- **El bot apagado va en la semilla (7/9, segunda tanda).** En la primera barrida real la IA
+  leyó el chat de Alex (3c908919) como despedida: "el cliente le debe una respuesta al bot",
+  sin saber que el bot estaba apagado desde el 4/9 15:14 y que ningún asesor había escrito.
+  `botApagadoDesde(db, c)` (último `bot_apagado` de `lead_eventos`, fecha AR) entra en
+  `semillaDespedida` como "Bot (Sofía) en este chat: APAGADO desde … / ENCENDIDO", y el prompt
+  dice que con el bot apagado y sin `[human]` posterior el cliente espera a una persona. Dato
+  de fondo que salió de ahí: en Central, 78 de 253 chats con actividad en 14 días tienen el
+  bot apagado sin NINGÚN mensaje humano (38 por handoff automático con marcador, 40 apagados a
+  mano, solo 5 con nota del asesor); esos chats no los toma el seguimiento al cliente
+  (`seguimiento_candidatos` exige `bot_active = true`) y solo la escalera los persigue.
+- **El aviso de la escalera dice qué hacer si ya lo atendió por afuera (7/9, OK de Leonardo).**
+  `armarAvisoAsesorEscalera`: párrafo en el email de todos los niveles ("mandale desde el chat
+  de PRISMA… o dejá una nota interna… registrá la visita en el calendario y la gestión en el
+  tracking") y una frase corta al final de `{{2}}` en el WhatsApp de 2/5 h
+  (`asesor_cliente_esperando`), garantizada recortando el contexto y no la indicación
+  (`unaLinea(…, 700 - indicacion.length) + indicacion`). En el de 10/20 h
+  (`asesor_sigue_esperando`) no entra: `{{2}}` es solo "cliente, que busca X" y la plantilla
+  aprobada no tiene otro hueco. Antes el aviso solo decía "respondele desde acá".
+
+### 22.10 El dashboard cuenta lo que la pantalla dice (7/9/2026, panel de derivaciones de Kevin)
+
+Kevin veía "180 sin responder / 170 críticos" bajo un filtro que decía "Últimos 30 días".
+`DatePeriodFilter` muestra 30 días por defecto, pero las páginas `app/director/dashboard` y
+`app/asesor/dashboard` pasaban `from`/`to` vacíos cuando la URL no los traía, y
+`getDashboardData` / `getHandoffsDashboardData` entonces no filtraban nada: el panel de
+derivaciones arrastraba desde el 2 de julio. Arreglo: `lib/dashboard/periodo.ts` →
+`periodoDelDashboard(searchParams)` resuelve el período una sola vez (últimos 30 días en fecha
+argentina, formato `yyyy-MM-dd` como el filtro; si la URL trae los dos extremos válidos se
+respetan). Vale para todas las secciones que reciben `from`/`to`, no solo el panel.
+Verificado: PRISMAIA en local (sin período = últimos 30 explícitos); para Central, la misma
+lógica del panel en SQL con la ventana de 30 días da 112 derivaciones, 91 sin atender, 84
+críticos (contra 156 / 147 sin ventana). Pendiente conocido, fuera de este arreglo:
+`getDashboardData` compara `created_at <= endDate` con la fecha pelada (medianoche), así que
+con un `to` explícito igual a hoy deja afuera lo de hoy; el panel de derivaciones sí usa
+`T23:59:59.999Z`.
+
+Análisis de la misma fecha (solo lectura, `scratch/_analizar-handoffs-sin-atender.mjs`, la IA
+leyó los 156 historiales): 146 son compromiso del asesor sin resolver, 2 el cliente cerró, 2 el
+cliente no le contestó al bot, 6 audios sin transcribir; 126 de los 146 son anteriores al
+encendido del Super Agente (31/8). Leonardo: NO se pasan a perdido (decisión de Kevin).
 
 ## 23. Buscador IA y Tutor IA: la conversación en vivo (2/9/2026)
 

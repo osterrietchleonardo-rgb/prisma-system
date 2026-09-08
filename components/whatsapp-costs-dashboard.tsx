@@ -205,7 +205,7 @@ export function WhatsAppCostsDashboard() {
             <Card className="border-accent/10 bg-card/30 backdrop-blur-md shadow-sm">
               <CardHeader className="pb-2 border-b border-accent/5 mb-4">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-blue-500" />
+                  <MessageSquare className="h-4 w-4 text-blue-700 dark:text-blue-500" />
                   Mensajes Entregados
                   <span className="ml-auto text-xl">{data.summary.total.volume}</span>
                 </CardTitle>
@@ -234,19 +234,19 @@ export function WhatsAppCostsDashboard() {
             <Card className="border-accent/10 bg-card/30 backdrop-blur-md shadow-sm">
               <CardHeader className="pb-2 border-b border-accent/5 mb-4">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <Gift className="h-4 w-4 text-emerald-500" />
+                  <Gift className="h-4 w-4 text-emerald-700 dark:text-emerald-500" />
                   Mensajes Gratuitos
-                  <span className="ml-auto text-xl text-emerald-500">{data.summary.free.volume}</span>
+                  <span className="ml-auto text-xl text-emerald-700 dark:text-emerald-500">{data.summary.free.volume}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground max-w-[200px] leading-tight">Servicio de atención al cliente gratuito</span>
-                  <span className="font-medium text-emerald-500">{data.summary.free.serviceTier}</span>
+                  <span className="font-medium text-emerald-700 dark:text-emerald-500">{data.summary.free.serviceTier}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground max-w-[200px] leading-tight">Gratuitas desde punto de acceso</span>
-                  <span className="font-medium text-emerald-500">{data.summary.free.entryPoint}</span>
+                  <span className="font-medium text-emerald-700 dark:text-emerald-500">{data.summary.free.entryPoint}</span>
                 </div>
               </CardContent>
             </Card>

@@ -335,19 +335,19 @@ export default function AsesorConfiguracionPage() {
 
       <Tabs defaultValue={defaultTab} className="space-y-6">
         <TabsList className="bg-card border border-accent/10">
-          <TabsTrigger value="perfil" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="perfil" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <User className="h-4 w-4" /> Perfil
           </TabsTrigger>
-          <TabsTrigger value="seguridad" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="seguridad" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <Lock className="h-4 w-4" /> Seguridad
           </TabsTrigger>
-          <TabsTrigger value="notificaciones" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="notificaciones" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <Bell className="h-4 w-4" /> Notificaciones
           </TabsTrigger>
-          <TabsTrigger value="creditos" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="creditos" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <Zap className="h-4 w-4" /> Créditos IA
           </TabsTrigger>
-          <TabsTrigger value="integraciones" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-white">
+          <TabsTrigger value="integraciones" className="gap-2 data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
             <CalendarCheck className="h-4 w-4" /> Integraciones
           </TabsTrigger>
         </TabsList>
@@ -413,7 +413,7 @@ export default function AsesorConfiguracionPage() {
                       : "Todavía no está cargado"}
                   </p>
                 </div>
-                <Smartphone className="h-5 w-5 text-accent/60" />
+                <Smartphone className="h-5 w-5 text-accent" />
               </div>
               <p className="text-xs text-muted-foreground">
                 Si cambiaste de número, pedíselo a la dirección de tu inmobiliaria: son los
@@ -555,14 +555,14 @@ export default function AsesorConfiguracionPage() {
                       </div>
                       <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-4 text-center">
                         <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Consumidos</div>
-                        <div className={`text-2xl font-bold ${creditData.porcentaje >= 80 ? "text-red-400" : "text-yellow-400"}`}>
+                        <div className={`text-2xl font-bold ${creditData.porcentaje >= 80 ? "text-red-600 dark:text-red-400" : "text-yellow-700 dark:text-yellow-400"}`}>
                           {creditData.consumidoMes}
                         </div>
                         <div className="text-xs text-muted-foreground mt-0.5">{creditData.porcentaje}% del límite</div>
                       </div>
                       <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
                         <div className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Disponibles</div>
-                        <div className="text-2xl font-bold text-emerald-400">{creditData.disponible}</div>
+                        <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{creditData.disponible}</div>
                         <div className="text-xs text-muted-foreground mt-0.5">créditos</div>
                       </div>
                     </div>
@@ -587,7 +587,7 @@ export default function AsesorConfiguracionPage() {
                         />
                       </div>
                       {creditData.porcentaje >= 80 && (
-                        <p className="text-xs text-red-400 flex items-center gap-1">
+                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
                           <TrendingUp className="h-3 w-3" />
                           Estás cerca de tu límite mensual. Usá los créditos con cuidado.
                         </p>
@@ -674,7 +674,7 @@ export default function AsesorConfiguracionPage() {
                   <Loader2 className="h-4 w-4 animate-spin" /> Verificando conexión...
                 </div>
               ) : !gcal.configured ? (
-                <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-500">
+                <div className="rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 p-4 text-sm text-amber-800 dark:text-amber-500">
                   La integración con Google todavía no está habilitada en el servidor. Contactá al administrador.
                 </div>
               ) : gcal.connected ? (
@@ -682,7 +682,7 @@ export default function AsesorConfiguracionPage() {
                   <div className="flex items-center justify-between p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-emerald-500/10">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                        <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
                       </div>
                       <div>
                         <h4 className="font-semibold text-sm">Conectado</h4>

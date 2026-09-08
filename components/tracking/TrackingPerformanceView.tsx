@@ -158,6 +158,11 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
     fetchLogs();
     fetchAgencyConfig();
     window.dispatchEvent(new CustomEvent('prisma-header-title', { detail: "Tracking Performance" }));
+    // Al salir se limpia el título, como hacen las fichas de lead y propiedad: si no,
+    // el header sigue diciendo "Tracking Performance" en todas las páginas siguientes.
+    return () => {
+      window.dispatchEvent(new CustomEvent('prisma-header-title', { detail: null }));
+    };
   }, [fetchLogs, fetchAgencyConfig]);
 
   // Derive unique advisors from logs for the director filter dropdown
@@ -234,7 +239,7 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-accent mb-1">
               <TrendingUp className="w-4 h-4" />
-              <span className="text-[10px] font-bold uppercase tracking-widest text-accent/70">Gestión de Rendimiento</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-accent">Gestión de Rendimiento</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground/90">
               Tracking Performance
@@ -258,7 +263,7 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                   setLogToEdit(null);
                   setIsDrawerOpen(true);
                 }}
-                className="bg-accent hover:bg-accent/90 text-white font-bold h-10 px-6 rounded-xl shadow-lg shadow-accent/20 gap-2 transition-all active:scale-95"
+                className="bg-accent hover:bg-accent/90 text-accent-foreground font-bold h-10 px-6 rounded-xl shadow-lg shadow-accent/20 gap-2 transition-all active:scale-95"
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">Nueva Actividad</span>
@@ -276,43 +281,43 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                 <div className="tracking-tabs-list flex bg-muted/30 p-1 rounded-xl border border-white/5 shrink-0">
                     <button 
                       onClick={() => setFilter("todos")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'todos' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'todos' ? 'bg-accent text-accent-foreground shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Todos
                     </button>
                     <button 
                       onClick={() => setFilter("prospeccion")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'prospeccion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'prospeccion' ? 'bg-accent text-accent-foreground shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Prospección
                     </button>
                     <button 
                       onClick={() => setFilter("prelisting")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'prelisting' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'prelisting' ? 'bg-accent text-accent-foreground shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Prelisting
                     </button>
                     <button 
                       onClick={() => setFilter("prebuying")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'prebuying' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'prebuying' ? 'bg-accent text-accent-foreground shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Prebuying
                     </button>
                     <button 
                       onClick={() => setFilter("captacion")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'captacion' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'captacion' ? 'bg-accent text-accent-foreground shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Captación
                     </button>
                     <button 
                       onClick={() => setFilter("reserva")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'reserva' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'reserva' ? 'bg-accent text-accent-foreground shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Reserva
                     </button>
                     <button 
                       onClick={() => setFilter("cierre")} 
-                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'cierre' ? 'bg-accent text-white shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
+                      className={`px-4 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap ${filter === 'cierre' ? 'bg-accent text-accent-foreground shadow-lg shadow-accent/20' : 'text-muted-foreground hover:text-foreground'}`}
                     >
                       Cierre
                     </button>
@@ -349,7 +354,7 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                   </div>
                 )}
                 <div className="relative w-full sm:w-[320px]">
-                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground/50" />
+                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
                   <Input
                     placeholder="Buscar por cliente o propiedad..."
                     className="pl-10 bg-background/30 border-white/5 focus:border-accent/50 transition-all rounded-xl h-10"
@@ -362,7 +367,7 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                     <button
                       type="button"
                       onClick={() => setViewMode("lista")}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${viewMode === "lista" ? "bg-accent text-white shadow-lg shadow-accent/20" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${viewMode === "lista" ? "bg-accent text-accent-foreground shadow-lg shadow-accent/20" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       <List className="w-3.5 h-3.5" />
                       Lista
@@ -370,7 +375,7 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
                     <button
                       type="button"
                       onClick={() => setViewMode("pipeline")}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${viewMode === "pipeline" ? "bg-accent text-white shadow-lg shadow-accent/20" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${viewMode === "pipeline" ? "bg-accent text-accent-foreground shadow-lg shadow-accent/20" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       <LayoutGrid className="w-3.5 h-3.5" />
                       Pipeline
@@ -394,7 +399,7 @@ export function TrackingPerformanceView({ isDirector = true }: TrackingPerforman
 
           {isLoading ? (
             <div className="h-64 flex flex-col items-center justify-center gap-4 text-muted-foreground border-2 border-dashed border-accent/10 rounded-[2rem] bg-accent/5">
-               <Loader2 className="w-10 h-10 animate-spin text-accent/50" />
+               <Loader2 className="w-10 h-10 animate-spin text-accent" />
                <p className="font-medium tracking-wide">Analizando historial de performance...</p>
             </div>
           ) : viewMode === "pipeline" ? (

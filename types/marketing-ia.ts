@@ -1,7 +1,12 @@
+import type { VarianteLogo } from "@/lib/marketing-ia/logo-variante";
+
 export type CopyType = 'video' | 'post';
 export type CopyAngle = 'pas' | 'autoridad' | 'transformacion' | 'social_proof' | 'curiosidad' | 'urgencia' | 'aspiracional' | 'datos';
 export type ConsciousnessLevel = 0 | 1 | 2 | 3 | 4;
-export type ImageFormat = 'reels' | 'post' | 'historia';
+// 'historia' quedo RETIRADA de la pantalla el 3-sep-2026 (era el mismo tamano que 'reels'), pero
+// sigue viva en la base y en las placas ya generadas, asi que no se saca del tipo.
+// Las medidas de cada uno estan en lib/marketing-ia/formatos.ts, no aca.
+export type ImageFormat = 'reels' | 'post' | 'post_vertical' | 'historia';
 export type ImageStyle = 'moderno' | 'lujoso' | 'calido' | 'corporativo' | 'vibrante';
 
 export interface CaptarFlowData {
@@ -162,6 +167,12 @@ export interface GenerateImagePayload {
   format: ImageFormat;
   style: ImageStyle;
   extra_prompt?: string;
+  /**
+   * Con cuál de los dos logos de la agencia sale la placa. Lo elige la persona al generar.
+   * Opcional a propósito: sin él, la placa sale con el estándar, que es lo que pasaba antes
+   * de que existieran dos logos. La regla completa está en lib/marketing-ia/logo-variante.ts.
+   */
+  logo_variant?: VarianteLogo;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

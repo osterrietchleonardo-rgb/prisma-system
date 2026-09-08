@@ -64,7 +64,7 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
           </p>
         </div>
         {hasData && (
-          <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-1 rounded-full shrink-0">
+          <span className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-800 dark:text-emerald-400 px-2 py-1 rounded-full shrink-0">
             {data.length} meses
           </span>
         )}
@@ -72,7 +72,7 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
 
       {!hasData ? (
         <div className="flex items-center gap-3 h-[200px] justify-center text-sm text-muted-foreground">
-          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0" />
           Sin datos históricos disponibles
         </div>
       ) : (
@@ -81,17 +81,17 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
             data={data}
             margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(120,133,150,0.35)" />
             <XAxis
               dataKey="label"
-              tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)" }}
-              axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+              tick={{ fontSize: 11 }}
+              axisLine={{ stroke: "rgba(120,133,150,0.45)" }}
               tickLine={false}
             />
             <YAxis
               domain={["dataMin - 60", "dataMax + 60"]}
-              tick={{ fontSize: 11, fill: "rgba(255,255,255,0.5)" }}
-              axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+              tick={{ fontSize: 11 }}
+              axisLine={{ stroke: "rgba(120,133,150,0.45)" }}
               tickLine={false}
               tickFormatter={(v: number) => `${v.toLocaleString("es-AR")}`}
             />
@@ -99,7 +99,7 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
             <Legend
               wrapperStyle={{ fontSize: 11 }}
               formatter={(value: string) => (
-                <span style={{ color: "rgba(255,255,255,0.7)" }}>{value}</span>
+                <span className="text-foreground">{value}</span>
               )}
             />
             <Line
@@ -124,7 +124,7 @@ export function EvolutionChart({ data }: EvolutionChartProps) {
         </ResponsiveContainer>
       )}
 
-      <p className="text-[10px] text-muted-foreground/50 mt-3">
+      <p className="text-[10px] text-muted-foreground mt-3">
         La distancia entre las dos líneas es la brecha real de negociación del mercado.
       </p>
     </div>

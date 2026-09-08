@@ -77,7 +77,7 @@ export function FirmaVirtualPanel({
                     {obligatorio && <Badge variant="outline" className="text-[10px]">Obligatorio</Badge>}
                   </div>
                   {isSigned && (
-                    <Badge className="bg-green-600 text-white">
+                    <Badge className="bg-green-700 text-white">
                       <Check className="w-3 h-3 mr-1" /> Firmado
                     </Badge>
                   )}
@@ -114,7 +114,7 @@ export function FirmaVirtualPanel({
       <div className="flex justify-end gap-3 pt-4 border-t border-border">
         <Button
           onClick={onFinalize}
-          className="bg-green-600 hover:bg-green-700 text-white"
+          className="bg-green-700 hover:bg-green-800 text-white"
           disabled={!allObligatorySigned || saving}
         >
           {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}

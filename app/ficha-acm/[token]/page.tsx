@@ -69,8 +69,14 @@ export async function generateMetadata({ params }: { params: { token: string } }
 // Pie de marca de cada hoja (logo + aviso legal + rótulo). Va DENTRO de cada hoja (in-flow),
 // no fijo, para que salga idéntico en pantalla y en PDF, sin artefactos de impresión.
 function SheetFooter({ brand, agencyName, primary }: { brand: FichaBrand; agencyName: string; primary: string }) {
+  const legal = (brand?.legal_notice || "").trim();
+  // Arriba de este largo el aviso ya no entra en la columna del medio y el pie se estira para
+  // abajo. El número no es a ojo: la columna del medio mide 352 px y a 9 px entran ~78 letras
+  // por renglón, así que en 220 caracteres el texto llega a los 3 renglones que mide el logo.
+  // De ahí en adelante el pie se reacomoda para darle lugar (ver .sf-ancho en el CSS).
+  const avisoLargo = legal.length > 220;
   return (
-    <footer className="sheet-footer">
+    <footer className={avisoLargo ? "sheet-footer sf-ancho" : "sheet-footer"}>
       <div className="sf-left">
         {brand?.logo_url ? (
           // Chip del MISMO color del banner superior: garantiza que el logo (venga claro u oscuro)
@@ -83,7 +89,10 @@ function SheetFooter({ brand, agencyName, primary }: { brand: FichaBrand; agency
           <strong style={{ color: primary }}>{agencyName || "PRISMA"}</strong>
         )}
       </div>
-      {brand?.legal_notice ? <div className="sf-legal">{brand.legal_notice}</div> : <div />}
+      {/* El div vacío no es de adorno: sin él, la agencia que no configuró aviso legal deja
+          libre la columna del medio y el rótulo se corre al centro en vez de quedarse en su
+          esquina. (En el modo ancho siempre hay aviso, por definición del umbral de arriba.) */}
+      {legal ? <div className="sf-legal">{legal}</div> : <div />}
       <div className="sf-right">Análisis Comparativo de Mercado</div>
     </footer>
   );
@@ -183,6 +192,17 @@ export default async function FichaAcmPage({ params }: { params: { token: string
         <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
       </section>
 
+      {/* ══════════ QUIÉNES SOMOS ══════════ */}
+      {/* Solo si la agencia lo cargó en ACM → Configuración. Va antes de la valuación: el
+          propietario sabe con quién está hablando antes de leer el precio. */}
+      {snap.material?.quienes_somos ? (
+        <MaterialSheet
+          titulo="Quiénes somos" texto={snap.material.quienes_somos}
+          primary={primary} accent={accent} onPrimary={onPrimary}
+          brand={brand} agencyName={agencyName}
+        />
+      ) : null}
+
       {/* ══════════ LA PROPIEDAD Y SU ENTORNO ══════════ */}
       {/* Ausente en las fichas anteriores a ago-2026 y cuando el asesor destildó la hoja. */}
       {snap.zona && (
@@ -249,6 +269,19 @@ export default async function FichaAcmPage({ params }: { params: { token: string
 
           <PiramidePrecios primary={primary} accent={accent} desvio={comparison.desvio_prom_pct} />
 
+          {/* Quién define qué. Refuerza la pirámide: el precio final no lo pone ni el
+              propietario ni la agencia. Solo si la agencia lo cargó. */}
+          {snap.material?.roles_venta ? (
+            <div className="roles-box">
+              <h4 style={{ color: primary, fontFamily: "var(--font-display)" }}>
+                El rol de cada uno en la venta
+              </h4>
+              {snap.material.roles_venta.split(/\n\s*\n/).map((p, i) => (
+                <p key={i}>{p.trim()}</p>
+              ))}
+            </div>
+          ) : null}
+
           {comparison.conclusiones.length > 0 && (
             <div className="conclusiones">
               <h3 style={{ fontFamily: "var(--font-display)", color: primary }}>Conclusiones del estudio</h3>
@@ -304,7 +337,56 @@ export default async function FichaAcmPage({ params }: { params: { token: string
 
         <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
       </section>
+
+      {/* ══════════ CÓMO COMERCIALIZAMOS · CÓMO PREPARAR ══════════ */}
+      {/* Después del precio: primero la valuación, después el servicio. Cada una sale solo si
+          la agencia la cargó en ACM → Configuración. */}
+      {snap.material?.como_comercializamos ? (
+        <MaterialSheet
+          titulo="Cómo comercializamos su propiedad" texto={snap.material.como_comercializamos}
+          primary={primary} accent={accent} onPrimary={onPrimary}
+          brand={brand} agencyName={agencyName}
+        />
+      ) : null}
+
+      {snap.material?.como_preparar ? (
+        <MaterialSheet
+          titulo="Cómo preparar su propiedad" texto={snap.material.como_preparar}
+          primary={primary} accent={accent} onPrimary={onPrimary}
+          brand={brand} agencyName={agencyName}
+        />
+      ) : null}
     </div>
+  );
+}
+
+// ── Hoja de material institucional de la agencia ─────────────────────────────
+// Una hoja por sección cargada. El texto lo escribió (o revisó y aprobó) el director en el
+// módulo ACM → Configuración; acá se imprime tal cual, con la marca de la agencia.
+// Los párrafos vienen separados por línea en blanco.
+function MaterialSheet({
+  titulo, texto, primary, accent, onPrimary, brand, agencyName,
+}: {
+  titulo: string; texto: string; primary: string; accent: string; onPrimary: string;
+  brand: FichaBrand; agencyName: string;
+}) {
+  return (
+    <section className="sheet">
+      <div className="pulso" style={{ backgroundColor: primary, color: onPrimary }}>
+        <div>
+          <span className="pulso-eyebrow" style={{ color: accent }}>{agencyName.toUpperCase()}</span>
+          <div className="pulso-barrio">{titulo}</div>
+        </div>
+      </div>
+      <div className="sheet-body">
+        <div className="material-body">
+          {texto.split(/\n\s*\n/).map((p, i) => (
+            <p key={i}>{p.trim()}</p>
+          ))}
+        </div>
+      </div>
+      <SheetFooter brand={brand} agencyName={agencyName} primary={primary} />
+    </section>
   );
 }
 
@@ -614,6 +696,25 @@ const CSS = `
 
 /* Pie de marca — mismo en cada hoja (in-flow, abajo de todo). */
 .sheet-footer { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 2.2fr 1fr; align-items: center; gap: 12px; padding: 8px var(--pad); border-top: 1px solid #ece8df; background: #faf9f6; }
+
+/* AVISO LEGAL LARGO. El de una inmobiliaria pasa los 800 caracteres (matrículas, leyes,
+   decretos, domicilio). Metido en la columna del medio se partía en 11 renglones y la banda del
+   pie se comía 150px = el 13% de CADA hoja, con la mitad del ancho de la hoja vacía a los dos
+   costados. Acá el pie se reacomoda en dos filas: arriba el logo en su esquina y el aviso
+   ocupando TODO el resto del ancho a su derecha —arranca donde termina el logo y nunca le pasa
+   por debajo—, y abajo el rótulo, que deja la esquina derecha libre y pasa al centro. Es el
+   rótulo el que le hace lugar al aviso: sacarlo de la esquina son 200px más de renglón. */
+.sheet-footer.sf-ancho { grid-template-columns: auto 1fr; column-gap: 14px; row-gap: 7px; }
+.sf-ancho .sf-left { grid-area: 1 / 1; }
+.sf-ancho .sf-legal { grid-area: 1 / 2; }
+.sf-ancho .sf-right { grid-area: 2 / 1 / 3 / 3; text-align: center; }
+/* Justificado, no centrado: en un bloque ancho de 6 renglones el centrado deja los bordes
+   dentados y se lee como un texto desarmado. Justificado da el bloque parejo de un aviso legal
+   de contrato. En el modo normal (la columna del medio) sigue centrado.
+   text-wrap: pretty evita que el último renglón quede con un pedazo suelto: sin él el teléfono
+   del aviso se partía al medio ("4789-" arriba y "3700" abajo), que en un texto legal se lee
+   como un error. El navegador que no lo entienda lo ignora y queda como antes. */
+.sf-ancho .sf-legal { text-align: justify; text-wrap: pretty; }
 .sf-logo-chip { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: 8px; }
 .sf-logo { height: 26px; max-height: 26px; max-width: 40mm; width: auto; object-fit: contain; object-position: left center; display: block; }
 .sf-left strong { font-size: 13px; }
@@ -774,6 +875,24 @@ const CSS = `
 .piramide-item-efecto { font-size: 11.5px; font-weight: 700; line-height: 1.3; margin-top: 1px; }
 .piramide-foot { display: flex; align-items: center; gap: 8px; margin-top: 9px; font-size: 10.5px; color: #7b7b7b; line-height: 1.45; }
 .piramide-chip { flex-shrink: 0; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+
+/* Material institucional de la agencia.
+   El ancho tope está en ch, no en px: una línea de más de ~65 caracteres cansa de leer, y
+   estas hojas son las únicas de la ficha que son texto corrido de punta a punta.
+   El cuerpo es más grande que el del resto de la ficha (15px contra 13): son pocas palabras
+   en una hoja entera, y con 13px quedaba un párrafo chico arriba y el resto de la hoja vacío. */
+/* 72ch a 15px es casi todo el ancho útil de la hoja. Con 60ch el texto usaba el 74% y
+   dejaba 139px de aire a la derecha: se leía como un error de maquetación, no como margen. */
+.material-body { max-width: 72ch; padding-top: 4px; }
+.material-body p { margin: 0 0 17px; font-size: 15px; line-height: 1.75; color: #3d3d3d; }
+.material-body p:first-child::first-letter { font-size: 1.05em; }
+.material-body p:last-child { margin-bottom: 0; }
+
+/* El rol de cada uno, abajo de la Pirámide */
+.roles-box { margin: 0 0 18px; padding: 13px 16px; border-radius: 10px; background: #f6f6f4; }
+.roles-box h4 { margin: 0 0 7px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+.roles-box p { margin: 0 0 7px; font-size: 12px; line-height: 1.55; color: #3d3d3d; }
+.roles-box p:last-child { margin-bottom: 0; }
 
 /* Conclusiones */
 .conclusiones ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }

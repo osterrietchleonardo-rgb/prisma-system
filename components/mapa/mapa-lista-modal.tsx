@@ -73,7 +73,7 @@ export function MapaListaModal({
 
         {hayBuscador && (
           <div className="relative shrink-0 border-b border-zinc-200 p-2 dark:border-zinc-800">
-            <Search className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600 dark:text-zinc-400" />
             <input
               value={consulta}
               onChange={(e) => setConsulta(e.target.value)}
@@ -85,7 +85,7 @@ export function MapaListaModal({
               <button
                 onClick={() => setConsulta("")}
                 aria-label="Borrar el filtro"
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
               >
                 <X className="h-3.5 w-3.5" />
               </button>

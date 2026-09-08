@@ -123,11 +123,11 @@ export default function AsesorPropiedadesPage() {
 
         <Tabs value={view} onValueChange={setView} className="w-full md:w-auto">
           <TabsList className="bg-card/50 border border-accent/10">
-            <TabsTrigger value="grid" className="data-[state=active]:bg-accent data-[state=active]:text-white">
+            <TabsTrigger value="grid" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
               <LayoutGrid className="h-4 w-4 mr-2" />
               Grid
             </TabsTrigger>
-            <TabsTrigger value="list" className="data-[state=active]:bg-accent data-[state=active]:text-white">
+            <TabsTrigger value="list" className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground">
               <List className="h-4 w-4 mr-2" />
               Lista
             </TabsTrigger>
@@ -161,7 +161,7 @@ export default function AsesorPropiedadesPage() {
                       className="object-cover transition-transform duration-500 group-hover:scale-110"
                     />
                     <div className="absolute top-2 right-2 flex gap-1">
-                      <Badge className="bg-black/60 backdrop-blur-md text-[10px] border-none uppercase">
+                      <Badge className="bg-black/60 backdrop-blur-md text-white text-[10px] border-none uppercase">
                         {prop.status}
                       </Badge>
                       <Badge className="bg-accent text-[10px] border-none">

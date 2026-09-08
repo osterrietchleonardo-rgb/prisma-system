@@ -40,7 +40,7 @@ export function DashboardPropertiesSection({ data }: { data: any }) {
         <Card className="bg-card/50 border-accent/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Valor cartera (USD)</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-500" />
+            <DollarSign className="h-4 w-4 text-emerald-700 dark:text-emerald-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(data.kpis.valorCarteraUSD)}</div>
@@ -51,7 +51,7 @@ export function DashboardPropertiesSection({ data }: { data: any }) {
         <Card className="bg-card/50 border-accent/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Precio promedio</CardTitle>
-            <Hash className="h-4 w-4 text-blue-500" />
+            <Hash className="h-4 w-4 text-blue-700 dark:text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(data.kpis.precioPromedioUSD)}</div>
@@ -62,7 +62,7 @@ export function DashboardPropertiesSection({ data }: { data: any }) {
         <Card className="bg-card/50 border-accent/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Precio m² cubierto</CardTitle>
-            <Maximize className="h-4 w-4 text-purple-500" />
+            <Maximize className="h-4 w-4 text-purple-700 dark:text-purple-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(data.kpis.precioPromedioM2USD)}</div>
@@ -75,7 +75,7 @@ export function DashboardPropertiesSection({ data }: { data: any }) {
         <Card className="bg-card/50 border-accent/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Apto Crédito</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            <CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.kpis.aptoCredito.count}</div>
@@ -86,7 +86,7 @@ export function DashboardPropertiesSection({ data }: { data: any }) {
         <Card className="bg-card/50 border-accent/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Con inquilino activo</CardTitle>
-            <Home className="h-4 w-4 text-orange-500" />
+            <Home className="h-4 w-4 text-orange-700 dark:text-orange-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.kpis.conInquilino.count}</div>
@@ -97,7 +97,7 @@ export function DashboardPropertiesSection({ data }: { data: any }) {
         <Card className="bg-card/50 border-accent/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Visita virtual</CardTitle>
-            <Video className="h-4 w-4 text-red-500" />
+            <Video className="h-4 w-4 text-red-700 dark:text-red-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.kpis.conVideo.count}</div>
@@ -108,7 +108,7 @@ export function DashboardPropertiesSection({ data }: { data: any }) {
         <Card className="bg-card/50 border-accent/10">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Fotos cargadas</CardTitle>
-            <ImageIcon className="h-4 w-4 text-blue-500" />
+            <ImageIcon className="h-4 w-4 text-blue-700 dark:text-blue-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data.kpis.conFotos.count}</div>

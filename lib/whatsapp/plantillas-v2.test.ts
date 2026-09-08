@@ -32,7 +32,7 @@ describe("catálogo de plantillas v2 (clientes)", () => {
 
 describe("catálogo del equipo (asesores/director)", () => {
   const cat = plantillasEquipo("ag57c613")
-  it("son las 4 del análisis del 25/8, todas UTILITY, sin BAJA", () => {
+  it("son las 4 del análisis del 25/8 + la de registro pendiente (4/9), todas UTILITY, sin BAJA", () => {
     expect(cat.map((p) => p.template_name)).toEqual(NOMBRES_EQUIPO.map((n) => `ag57c613_${n}`))
     for (const p of cat) {
       expect(p.category).toBe("UTILITY")
@@ -45,5 +45,12 @@ describe("catálogo del equipo (asesores/director)", () => {
       expect(p.body_examples).toHaveLength(cuentaVars(p.body))
       expect(p.body_examples.at(-1)).toMatch(/^https:\/\/prisma\.vakdor\.com\//)
     }
+  })
+  it("asesor_registro_pendiente: 3 variables, se presenta como PRISMA y aclara que no es un reclamo", () => {
+    const p = cat.find((x) => x.template_name === "ag57c613_asesor_registro_pendiente")!
+    expect(cuentaVars(p.body)).toBe(3)
+    expect(p.body).toContain("te escribe el asistente de PRISMA")
+    expect(p.body).toContain("no es un reclamo")
+    expect(p.body).toContain("Acá está el chat de ese cliente en PRISMA: {{3}}")
   })
 })

@@ -56,10 +56,18 @@
 
 ## 2. Cómo moverte por PRISMA
 
-- El **menú lateral izquierdo** es tu navegación principal. Cada ítem es una sección.
+- El **menú lateral izquierdo** es tu navegación principal. Las secciones están agrupadas por lo que hay adentro de cada una:
+  - **Mi día:** Mi Dashboard, Mi Calendario, Tracking Performance.
+  - **Bandejas:** WhatsApp Bandeja (las conversaciones que entran).
+  - **Contactos:** Mi Pipeline, Leads Tokko, Leads WhatsApp (los listados de gente).
+  - **Propiedades:** Mis Propiedades, Buscador IA, ACM, Pulso de Mercado.
+  - **Herramientas IA:** Marketing IA, Contratos IA.
+  - **Ayuda:** Tutor IA, Biblioteca, Sugerencias.
+- Cada grupo se abre y se cierra tocando su título. Podés cerrarlos todos; el grupo de la sección en la que estás queda con el título en color cobre. Al entrar a una sección, su grupo se abre solo, y el menú se acuerda de qué grupos dejaste abiertos.
+- **Cerrar la barra en la computadora:** arriba a la derecha de la barra hay un botón para esconderla y ver el contenido a todo lo ancho. Para volver a abrirla, usá el botón **"Barra lateral"** arriba a la izquierda. En el celular no cambia nada: la barra sigue saliendo desde el botón de las tres líneas.
 - Arriba a la derecha tenés el **botón de tema** (☀️/🌙) para cambiar entre modo claro y oscuro.
 - Tu **nombre y rol** ("Asesor") aparecen arriba del menú.
-- Para salir, usá **"Cerrar Sesión"** al final del menú.
+- **"Configuración"** y **"Cerrar Sesión"** están al final del menú, siempre a mano.
 
 **Regla de oro del asesor:** vos ves **solo tu información** (tus leads, tus propiedades, tus visitas) o lo que la agencia comparte para todos (documentos, datos de mercado). No ves los datos de otros asesores, salvo el ranking general del equipo.
 
@@ -608,6 +616,7 @@ Con los comparables a la vista podés armar una **ficha profesional** para pasar
 - Una **hoja final** con la **matriz comparativa de valores por m²** (con los **promedios de superficie, precio y $/m²** de la muestra), un gráfico de **"La Pirámide del Precio"** que muestra cómo cae la demanda cuando el precio se aleja del valor de mercado, las **conclusiones** (las que revisaste) y tus **datos de contacto** para que el cliente te escriba (WhatsApp / email).
 - Sobre tu nombre, en la tarjeta de contacto, aparece **tu clasificación** (Client Director / Client Support, la que te puso tu director; si no tenés, dice "Asesor/a").
 - Tu **logo** y el **aviso legal** en el pie de cada hoja (si el director los cargó en la configuración de marca).
+- **Puede traer hojas de tu inmobiliaria**, si tu director las cargó: *Quiénes somos* (antes del precio), *Cómo comercializamos su propiedad* y *Cómo preparar su propiedad* (al final), y *El rol de cada uno en la venta* (al lado del gráfico del precio). **No tenés que hacer nada**: si están cargadas salen solas en todas las fichas, y si no, la ficha sale como siempre. Sirven para que el propietario sepa con quién está hablando y qué va a pasar después de la valuación.
 
 > 💡 **Tip:** la ficha usa los **colores y el logo** de tu agencia (los configura el director en **Marketing IA → Identidad Visual**). Si todavía no están cargados, sale con un diseño elegante por defecto.
 > 💰 Crear la ficha **no consume créditos**.
@@ -890,6 +899,10 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 - **Marcar como perdido:** si el cliente no contesta más, con el motivo. Se puede **Reactivar** después.
 
 **Cuando te asignan un chat** (el director te lo pasa), te llega un aviso con qué busca el cliente, su último mensaje y **el comentario del director**, y en el chat tenés los mismos botones para tomarlo o devolverlo.
+
+**Si atendiste a un cliente por teléfono o en persona:** el mismo aviso de "cliente esperando" te lo recuerda: mandale desde el chat de PRISMA un mensaje confirmando lo que acordaron, o dejá una **nota interna** en el chat contando qué hiciste, como ya venís haciendo. Sofía la lee: si dice que ya lo estás atendiendo, deja de mandarte avisos de "cliente esperando" por ese caso. Y si la nota menciona algo que en PRISMA todavía no quedó cargado —la visita en el calendario, la gestión en el chat, la actividad en tu tracking— te lo pide, todo junto, en un solo correo.
+
+**Si el cliente se despidió, no te avisa.** Cuando le contestaste y el cliente cerró con un "Gracias", un "Dale, buen finde" o un "ya alquilé", Sofía lee la conversación y entiende que no está esperando nada: no te llega ningún aviso y no hace falta que dejes una nota. Ojo con una diferencia: si lo último que el cliente recibió fue una **promesa** ("el asesor se va a comunicar", "te confirmo y te aviso") y él respondió "gracias", para Sofía **sigue esperando** ese contacto, y los avisos salen igual hasta que le escribas. Ante la duda, avisa: un aviso de más molesta menos que un cliente perdido.
 
 > 💡 **Tip:** el seguimiento automático a los clientes que se enfriaron lo hace PRISMA solo, con mensajes naturales y como mucho tres veces; vos vas a ver en la ficha qué decidió y por qué. Lo tuyo son los clientes que **te esperan a vos**.
 

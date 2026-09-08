@@ -210,7 +210,7 @@ export function NotasIA({ propertyId }: Props) {
                 className="resize-none bg-background/60"
               />
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="text-[11px] text-muted-foreground/70">
+                <span className="text-[11px] text-muted-foreground">
                   {nueva.length}/{MAX_LARGO} caracteres · {notas.length}/{maxNotas} notas
                 </span>
                 <Button
@@ -228,7 +228,7 @@ export function NotasIA({ propertyId }: Props) {
                 </Button>
               </div>
               {llegoAlTope && (
-                <p className="text-[11px] text-amber-500">
+                <p className="text-[11px] text-amber-700 dark:text-amber-500">
                   Llegaste al máximo de {maxNotas} notas. Borrá alguna para agregar una nueva.
                 </p>
               )}
@@ -245,7 +245,7 @@ export function NotasIA({ propertyId }: Props) {
 
           {/* Lista */}
           {notas.length === 0 ? (
-            <p className="text-xs text-muted-foreground/70 italic">
+            <p className="text-xs text-muted-foreground italic">
               Todavía no hay notas cargadas para esta propiedad.
             </p>
           ) : (
@@ -268,7 +268,7 @@ export function NotasIA({ propertyId }: Props) {
                           className="resize-none bg-background/60"
                         />
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-[11px] text-muted-foreground/70">
+                          <span className="text-[11px] text-muted-foreground">
                             {textoEditado.length}/{MAX_LARGO}
                           </span>
                           <div className="flex items-center gap-2">

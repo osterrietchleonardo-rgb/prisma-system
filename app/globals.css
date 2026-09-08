@@ -11,19 +11,29 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 30 54% 46%; /* Copper #b87333 */
+    /* El cobre de marca (#b87333) sobre fondo claro da 3,61:1 como texto y
+       3,78:1 con blanco encima: los dos por debajo del minimo legible de 4,5.
+       En claro se usa un cobre mas oscuro (#8d5c2a) que pasa de los dos lados
+       (5,43 y 5,68) y sigue pasando sobre los chips bg-accent/10 (4,74).
+       En oscuro el cobre original queda igual: alli ya contrasta. */
+    --primary: 30 54% 36%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 30 54% 46%; /* Copper #b87333 */
+    /* 46.9% daba entre 4,22 y 4,49:1 segun la tarjeta: siempre corto por poco. */
+    --muted-foreground: 215.4 16.3% 43%;
+    --accent: 30 54% 36%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 84.2% 60.2%;
+    /* 60.2% daba 3,6:1 como texto sobre el fondo claro. */
+    --destructive: 0 72% 44%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 32% 91%;
-    --input: 214.3 32% 91%;
-    --ring: 30 54% 46%;
+    /* 91% daba 1,19:1 contra el fondo: la tarjeta se quedaba sin contorno. */
+    --border: 214.3 32% 85%;
+    /* El borde de un campo es lo unico que dice donde escribir: necesita 3:1.
+       A 91% daba 1,24:1 y el campo desaparecia. A 60% da 3,11:1. */
+    --input: 214.3 32% 60%;
+    --ring: 30 54% 36%;
     --radius: 0.75rem;
   }
 
@@ -35,19 +45,28 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 30 54% 46%; /* Copper */
-    --primary-foreground: 210 40% 98%;
+    /* El cobre de marca queda intacto en oscuro: como texto rinde 5,34:1 sobre
+       la pagina y 4,73 sobre la tarjeta. Lo que fallaba era el texto ENCIMA del
+       boton cobre: blanco daba 3,78:1. Con el texto casi-negro sube a 5,34. */
+    --primary: 30 54% 52%;
+    --primary-foreground: 222.2 84% 4.9%;
     --secondary: 217.2 32.6% 17.5%; /* #1e293b */
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-    --accent: 30 54% 46%; /* Copper #b87333 */
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --accent: 30 54% 52%; /* Cobre levantado para el fondo oscuro (#c78543):
+       el de marca (46%) sobre su propio tinte /10 daba 4,27:1 en las iniciales
+       y los chips. A 52% da 5,16 y sigue siendo el mismo cobre, un poco mas
+       vivo, que es lo que pide un fondo oscuro. */
+    --accent-foreground: 222.2 84% 4.9%;
+    /* El rojo de error era MAS oscuro que el fondo oscuro: 1,78:1 sobre la
+       tarjeta, ilegible. En oscuro va un rojo claro (5,47) con texto casi-negro
+       encima cuando se usa de fondo (6,18). */
+    --destructive: 0 75% 65%;
+    --destructive-foreground: 222.2 84% 4.9%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 30 54% 46%;
+    --ring: 30 54% 52%;
   }
 }
 
@@ -78,6 +97,25 @@
   .scrollbar-none::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* En modo claro la leyenda de los graficos hereda el color de su serie
+   (azul 400, verde 400...), que sobre el fondo blanco queda entre 1,7 y 2,7:1.
+   El punto de color al lado sigue identificando la serie; el texto se lee. */
+/* La leyenda del grafico hereda el color de su serie. En claro esos colores son
+   demasiado claros (1,7 a 2,7:1) y en oscuro los tonos oscuros quedan cortos
+   (3,5 a 3,9). El punto de color al lado sigue identificando la serie; el texto
+   usa el color del tema en los dos casos. */
+.recharts-legend-item-text {
+  fill: hsl(var(--foreground)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Los numeros de los ejes son texto: sin esto heredan el gris por defecto de
+   recharts (#666) o un blanco escrito a mano, y en claro no se leen. */
+.recharts-cartesian-axis-tick-value,
+.recharts-cartesian-axis-tick-value tspan {
+  fill: hsl(var(--muted-foreground));
 }
 
 /* PRISMA CUSTOM UTILS */
@@ -275,3 +313,11 @@
 }
 
 
+
+/* ===== Barra lateral de escritorio: se esconde con un botón =====
+   El estado va en <html data-barra="oculta"> y lo maneja components/barra-lateral.tsx.
+   Solo escritorio (md+): en el celular la barra es el cajón de la hamburguesa y no cambia. */
+@media (min-width: 768px) {
+  html[data-barra="oculta"] .barra-escritorio { width: 0; }
+  html[data-barra="oculta"] .btn-abrir-barra { display: inline-flex; }
+}
