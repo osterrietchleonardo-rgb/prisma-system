@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { transaccionesDe } from "@/lib/tracking/participacion"
 
 // El filtro de periodo manda las fechas como "yyyy-MM-dd" (DatePeriodFilter).
 // Comparar eso contra un timestamptz con <= corta a la medianoche y se pierde
@@ -151,12 +152,7 @@ export async function getDashboardData(
       }, 0) || 0,
     },
     cierre: {
-      transacciones: perfLogs?.filter(l => l.type === 'cierre').reduce((acc, l) => {
-        const part = l.metadata?.participacion;
-        if (part === 'Ambas puntas') return acc + 1;
-        if (part === 'Solo Comprador' || part === 'Solo Vendedor' || part === 'Solo Locador' || part === 'Solo Locatario') return acc + 0.5;
-        return acc + 1; // Default
-      }, 0) || 0,
+      transacciones: transaccionesDe(perfLogs),
       volumenVentas: perfLogs?.filter(l => l.type === 'cierre').reduce((acc, l) => acc + (Number(l.monto_operacion) || 0), 0) || 0,
       gci: perfLogs?.filter(l => l.type === 'cierre').reduce((acc, l) => {
         const valor = Number(l.monto_operacion) || 0;
@@ -302,12 +298,7 @@ export async function getDashboardData(
     // Let's do it better:
     
     const caps = pLogs.filter(l => l.type === 'captacion').length;
-    const trans = pLogs.filter(l => l.type === 'cierre').reduce((acc, l) => {
-        const part = l.metadata?.participacion;
-        if (part === 'Ambas puntas') return acc + 1;
-        if (part === 'Solo Comprador' || part === 'Solo Vendedor') return acc + 0.5;
-        return acc + 1;
-    }, 0);
+    const trans = transaccionesDe(pLogs);
     
     const prelisting = pLogs.filter(l => l.type === 'prelisting').length;
     const compradores = pLogs.filter(l => l.type === 'prebuying').length;
@@ -377,12 +368,7 @@ export async function getDashboardData(
     }).length;
 
     const mProspeccion = mLogs.filter(l => l.type === 'prospeccion').length;
-    const mTransacciones = mLogs.filter(l => l.type === 'cierre').reduce((acc, l) => {
-        const part = l.metadata?.participacion;
-        if (part === 'Ambas puntas') return acc + 1;
-        if (part === 'Solo Comprador' || part === 'Solo Vendedor') return acc + 0.5;
-        return acc + 1;
-    }, 0);
+    const mTransacciones = transaccionesDe(mLogs);
 
     return {
       name: m.name,
