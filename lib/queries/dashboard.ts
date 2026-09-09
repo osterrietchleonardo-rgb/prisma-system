@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { transaccionesDe, gciDe, desgloseDeCierres } from "@/lib/tracking/participacion"
+import { transaccionesDe, gciDe, volumenDe, honorarioRealDe, desgloseDeCierres } from "@/lib/tracking/participacion"
 
 // El filtro de periodo manda las fechas como "yyyy-MM-dd" (DatePeriodFilter).
 // Comparar eso contra un timestamptz con <= corta a la medianoche y se pierde
@@ -153,13 +153,14 @@ export async function getDashboardData(
     },
     cierre: {
       transacciones: transaccionesDe(perfLogs),
-      volumenVentas: perfLogs?.filter(l => l.type === 'cierre').reduce((acc, l) => acc + (Number(l.monto_operacion) || 0), 0) || 0,
+      // Una operación cuenta una sola vez, aunque la hayan cargado dos asesores
+      // (uno por punta). Sumar fila por fila duplicaba la propiedad.
+      volumenVentas: volumenDe(perfLogs),
       gci: gciDe(perfLogs),
       // Los mismos dos números abiertos por tipo de operación. Un alquiler y una
       // venta caían hasta acá en la misma bolsa; el dato para separarlos ya
       // estaba en `proceso`, sólo faltaba leerlo.
       desglose: desgloseDeCierres(perfLogs),
-      honorarioPromedioSum: perfLogs?.filter(l => l.type === 'cierre').reduce((acc, l) => acc + (Number(l.comision_generada) || 0), 0) || 0,
     },
     cartera: {
       activa: 0,
@@ -207,10 +208,14 @@ export async function getDashboardData(
   const gapNegociacion = metrics.reserva.volumen > 0 ? metrics.reserva.gapSum / metrics.reserva.volumen : 0;
 
   const tasaCierre = metrics.reserva.volumen > 0 ? (metrics.cierre.transacciones / metrics.reserva.volumen) * 100 : 0;
-  const honorarioCobrado = metrics.cierre.transacciones > 0 ? metrics.cierre.honorarioPromedioSum / (metrics.cierre.transacciones * (metrics.cierre.transacciones % 1 === 0 ? 1 : 2)) : 0; // Simplified
-  // Wait, the above honorario calculation is tricky because transacciones can be 0.5.
-  const cierreCount = perfLogs?.filter(l => l.type === 'cierre').length || 0;
-  const honorarioReal = cierreCount > 0 ? metrics.cierre.honorarioPromedioSum / cierreCount : 0;
+  // El honorario real es GCI ÷ volumen, no el promedio de los porcentajes de
+  // cada fila. El promedio simple —que es lo que había acá— no pesa por el
+  // tamaño de la operación: un 2% sobre US$159.000 y un 7% sobre US$40.000
+  // promedian 4,5%, cuando lo realmente cobrado sobre lo vendido es 3,0%.
+  // (Había además un `honorarioCobrado` con una fórmula a medio hacer y un
+  // comentario "Wait, ..." al lado; nunca se usaba, porque los KPIs siempre
+  // publicaron `honorarioReal`. Se fue con esto.)
+  const honorarioReal = honorarioRealDe(perfLogs);
 
   // Split calculation (Company Dollar vs Neto Asesores)
   // Assuming a default 50/50 split if not specified, but usually it's in agency config

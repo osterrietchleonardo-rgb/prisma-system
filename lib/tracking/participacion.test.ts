@@ -4,6 +4,8 @@ import {
   negociosDeCierre,
   transaccionesDe,
   gciDe,
+  volumenDe,
+  honorarioRealDe,
   desgloseDeCierres,
   type LogParaConteo,
 } from "./participacion";
@@ -185,5 +187,80 @@ describe("desgloseDeCierres", () => {
       expect(d.alquiler).toEqual({ transacciones: 0, gci: 0 });
       expect(d.sinDefinir).toEqual({ transacciones: 0, gci: 0 });
     }
+  });
+});
+
+/** Un cierre que pertenece a una operación compartida con otras filas. */
+const deOperacion = (
+  operacion_id: string | null,
+  monto: number,
+  comision: number,
+  participacion = "Solo Vendedor"
+): LogParaConteo => ({
+  type: "cierre",
+  proceso: "vendedor",
+  operacion_id,
+  monto_operacion: monto,
+  comision_generada: comision,
+  metadata: { participacion },
+});
+
+describe("volumenDe", () => {
+  it("una venta trabajada por dos asesores cuenta una sola vez", () => {
+    // El caso real: Andrés la punta del vendedor, Emiliano la del comprador,
+    // misma propiedad de US$120.000. Antes daba 240.000.
+    const misma = [deOperacion("op-1", 120000, 3), deOperacion("op-1", 120000, 3, "Solo Comprador")];
+    expect(volumenDe(misma)).toBe(120000);
+  });
+
+  it("las filas sin operación son cada una su propia operación", () => {
+    // Es todo lo cargado antes de que existiera la columna: no se agrupan.
+    expect(volumenDe([deOperacion(null, 120000, 3), deOperacion(null, 85000, 6)])).toBe(205000);
+  });
+
+  it("mezcla operaciones compartidas y sueltas sin confundirlas", () => {
+    const logs = [
+      deOperacion("op-1", 120000, 3),
+      deOperacion("op-1", 120000, 3),
+      deOperacion("op-2", 75000, 5),
+      deOperacion(null, 40000, 7),
+    ];
+    expect(volumenDe(logs)).toBe(120000 + 75000 + 40000);
+  });
+
+  it("si las dos filas de una operación traen montos distintos, gana el mayor", () => {
+    // Es un error de carga. Quedarse con el menor haría desaparecer plata sin
+    // que nadie lo note; el mayor deja el número alto y a la vista.
+    expect(volumenDe([deOperacion("op-1", 120000, 3), deOperacion("op-1", 118000, 3)])).toBe(120000);
+  });
+
+  it("ignora lo que no es cierre y no rompe con listas vacías", () => {
+    const captacion: LogParaConteo = { type: "captacion", monto_operacion: 999999 };
+    expect(volumenDe([deOperacion(null, 50000, 4), captacion])).toBe(50000);
+    expect(volumenDe([])).toBe(0);
+    expect(volumenDe(null)).toBe(0);
+  });
+});
+
+describe("honorarioRealDe", () => {
+  it("pesa por el tamaño de la operación, no promedia los porcentajes", () => {
+    // 2% sobre 159.000 = 3.180 y 7% sobre 40.000 = 2.800. Total 5.980 sobre
+    // 199.000 = 3,005%. El promedio simple de los porcentajes daba 4,5%.
+    const logs = [deOperacion(null, 159000, 2), deOperacion(null, 40000, 7)];
+    expect(honorarioRealDe(logs)).toBeCloseTo(3.005, 3);
+    const promedioSimple = (2 + 7) / 2;
+    expect(honorarioRealDe(logs)).not.toBeCloseTo(promedioSimple, 1);
+  });
+
+  it("no se hunde a la mitad cuando la venta la cargaron dos asesores", () => {
+    // Dos puntas al 3% sobre una propiedad de 120.000: la inmobiliaria cobró
+    // 6% de la operación. Sin agrupar, el volumen se duplicaba y daba 3%.
+    const misma = [deOperacion("op-1", 120000, 3), deOperacion("op-1", 120000, 3, "Solo Comprador")];
+    expect(honorarioRealDe(misma)).toBeCloseTo(6.0, 4);
+  });
+
+  it("sin volumen devuelve cero en vez de dividir por cero", () => {
+    expect(honorarioRealDe([])).toBe(0);
+    expect(honorarioRealDe([deOperacion(null, 0, 5)])).toBe(0);
   });
 });

@@ -57,6 +57,8 @@ export interface LogParaConteo {
   /** Postgres devuelve `numeric` como string, no como number. */
   monto_operacion?: number | string | null;
   comision_generada?: number | string | null;
+  /** Agrupa las filas que son el mismo negocio. NULL = esta fila es su propia operación. */
+  operacion_id?: string | null;
 }
 
 /**
@@ -103,6 +105,54 @@ export function gciDe(logs: readonly LogParaConteo[] | null | undefined): number
       const honorario = Number(l.comision_generada) || 0;
       return acc + (valor * honorario) / 100;
     }, 0);
+}
+
+/**
+ * El volumen operado: cuánta plata en propiedades se movió.
+ *
+ * A diferencia del GCI, esto NO se puede sumar fila por fila. Cuando dos
+ * asesores trabajan la misma venta —uno la punta del vendedor, el otro la del
+ * comprador— hay dos filas con el mismo `monto_operacion`, pero la propiedad se
+ * vendió una sola vez. Por eso las filas que comparten `operacion_id` aportan
+ * el monto UNA vez. Las que lo tienen en NULL son cada una su propia operación,
+ * que es lo que corresponde a todo lo cargado antes de que existiera la columna.
+ *
+ * Si dos filas de la misma operación traen montos distintos —un error de carga—
+ * se toma el mayor. Quedarse con el menor haría desaparecer plata sin que nadie
+ * lo note; el mayor deja el número alto y visible, que es el error que sí se
+ * revisa.
+ */
+export function volumenDe(logs: readonly LogParaConteo[] | null | undefined): number {
+  const cierres = (logs ?? []).filter((l) => l.type === "cierre");
+  const porOperacion = new Map<string, number>();
+  let sueltas = 0;
+
+  for (const l of cierres) {
+    const monto = Number(l.monto_operacion) || 0;
+    if (!l.operacion_id) {
+      sueltas += monto;
+      continue;
+    }
+    porOperacion.set(l.operacion_id, Math.max(porOperacion.get(l.operacion_id) ?? 0, monto));
+  }
+
+  let total = sueltas;
+  for (const monto of porOperacion.values()) total += monto;
+  return total;
+}
+
+/**
+ * El porcentaje que la inmobiliaria realmente cobró sobre lo que operó.
+ *
+ * Es GCI ÷ volumen, no el promedio de los porcentajes de cada fila. El promedio
+ * simple —que es lo que había antes— no pesa por el tamaño de la operación: un
+ * 2% sobre US$159.000 y un 7% sobre US$40.000 promedian 4,5%, cuando lo
+ * realmente cobrado sobre lo vendido es 3,0%.
+ */
+export function honorarioRealDe(logs: readonly LogParaConteo[] | null | undefined): number {
+  const volumen = volumenDe(logs);
+  if (volumen <= 0) return 0;
+  return (gciDe(logs) / volumen) * 100;
 }
 
 export interface MetricasDeCierre {
