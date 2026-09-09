@@ -529,16 +529,48 @@ export function PerformanceLogForm({
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Honorarios Totales Cobrados (%)</Label>
+              {/* Se llamaba "Honorarios Totales Cobrados". Ese "Totales" empujaba
+                  a cargar el total de la operación, y cuando dos asesores
+                  trabajan la misma venta —uno de cada punta— eso hace que la
+                  facturación se cuente dos veces. Con el criterio por punta, la
+                  suma fila por fila da bien sin necesidad de saber qué filas son
+                  la misma operación. */}
+              <div className="flex items-center gap-1.5">
+                <Label>Honorarios de tu punta (%)</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="text-muted-foreground hover:text-accent transition-colors">
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[300px]">
+                      <p className="text-xs leading-relaxed space-y-1">
+                        <span className="block">El porcentaje que le cobró la inmobiliaria a la parte que representaste vos. <strong>No es tu comisión personal.</strong></span>
+                        <span className="block">Si trabajaste <strong>una sola punta</strong>, poné lo que pagó esa parte. Si trabajaste <strong>las dos</strong>, poné el total de la operación.</span>
+                        <span className="block opacity-80">Cuando dos asesores trabajan la misma venta, cada uno carga lo suyo: así la facturación no se cuenta dos veces.</span>
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <div className="relative">
-                <Input 
-                  type="number" 
-                  placeholder="3" 
+                <Input
+                  type="number"
+                  placeholder="3"
                   className="pl-10 h-11"
                   {...register("comision_generada", { valueAsNumber: true })}
                 />
                 <Percent className="w-4 h-4 absolute left-3 top-3.5 opacity-40" />
               </div>
+              {/* La aclaración clave va también acá, a la vista, y no sólo en el
+                  globito: los tooltips de Radix no se abren al tocar en un
+                  celular, y buena parte de las cargas se hacen desde el
+                  teléfono. Confiarle este dato sólo al globito era dejar sin
+                  explicación justo a quien más la necesita. */}
+              <p className="text-[11px] text-muted-foreground">
+                Lo que pagó tu punta, no tu comisión personal.
+              </p>
             </div>
             <div className="space-y-2 col-span-1 md:col-span-2">
               <div className="flex items-center gap-1.5">
