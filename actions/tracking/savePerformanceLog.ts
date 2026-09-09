@@ -20,7 +20,10 @@ export async function savePerformanceLog(payload: any) {
 
   if (!profile) throw new Error("Perfil no encontrado");
 
-  const { waMetrics, waAnalysis, ...baseData } = payload;
+  // `enlazarOperacion` no es una columna: es la respuesta del asesor al aviso
+  // de "otro ya cargó un cierre en esta dirección". Se saca acá para que no
+  // viaje al INSERT.
+  const { waMetrics, waAnalysis, enlazarOperacion, ...baseData } = payload;
 
   // El proceso es obligatorio para toda alta nueva. Se valida acá también, y
   // no sólo en el formulario: el action es la última puerta antes de la base,
@@ -39,10 +42,25 @@ export async function savePerformanceLog(payload: any) {
   }
   baseData.proceso = proceso;
 
+  // El asesor confirmó que su punta es la misma operación que otra ya cargada.
+  // Se resuelve en el servidor y no se confía en nada que venga del navegador:
+  // el cliente nunca vio ni el id de la otra fila ni el de la operación.
+  //
+  // Sólo para cierres: en las demás etapas la pregunta no tiene sentido, y
+  // dejarlo abierto sería una vía para estampar operaciones donde no van.
+  let operacionId: string | null = null;
+  if (enlazarOperacion && tipo === "cierre") {
+    const { resolverOperacionId } = await import("./enlazarOperacion");
+    const direccion =
+      baseData.propiedad_ref || baseData.metadata?.propiedad_colaboracion || "";
+    operacionId = await resolverOperacionId(String(direccion));
+  }
+
   const fullPayload = {
     ...baseData,
     agent_id: user.id,
     agency_id: profile?.agency_id,
+    operacion_id: operacionId,
     wa_metrics: waMetrics || {},
     wa_analysis: waAnalysis || {},
   };

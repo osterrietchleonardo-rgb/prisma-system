@@ -22,6 +22,8 @@ import { createManualContact } from "@/actions/whatsapp/createManualContact";
 import { ManualContactFields, ManualContactData } from "@/components/shared/ManualContactFields";
 import { cn } from "@/lib/utils";
 import { PROCESOS_POR_ETAPA, ladoDelNegocio, etapasPermitidas, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
+import { normalizarDireccion, MINIMO_PARA_BUSCAR } from "@/lib/tracking/direcciones";
+import { hayOtroCierreEnEsaDireccion } from "@/actions/tracking/enlazarOperacion";
 import { PIPELINE_STAGES } from "@/lib/tracking/pipeline";
 
 interface Props {
@@ -141,6 +143,52 @@ export function PerformanceLogForm({
   // ser obligatorio, porque a esa altura ya debería tenerlo.
   const emailObligatorio = activityType !== "prospeccion";
 
+  // ── Enlace con la otra punta ──────────────────────────────────────────────
+  // Cuando el asesor escribe la dirección de un cierre, se pregunta al servidor
+  // si otro asesor de la casa ya cargó un cierre ahí. La respuesta es un sí o un
+  // no pelado: nunca sabemos quién ni cuándo, para no abrirle los cierres de sus
+  // compañeros (ver actions/tracking/enlazarOperacion.ts).
+  const [hayOtraPunta, setHayOtraPunta] = useState(false);
+  const [enlazarOperacion, setEnlazarOperacion] = useState<boolean | null>(null);
+
+  const propiedadRefEscrita = watch("propiedad_ref");
+  const propiedadColaboracion = watch("metadata")?.propiedad_colaboracion;
+
+  useEffect(() => {
+    // Sólo en cierres nuevos. Editar uno existente es otro flujo.
+    if (activityType !== "cierre" || logToEdit) {
+      setHayOtraPunta(false);
+      setEnlazarOperacion(null);
+      return;
+    }
+
+    const direccion = String(propiedadRefEscrita || propiedadColaboracion || "");
+    if (normalizarDireccion(direccion).length < MINIMO_PARA_BUSCAR) {
+      setHayOtraPunta(false);
+      setEnlazarOperacion(null);
+      return;
+    }
+
+    // Espera a que deje de tipear: sin esto se consulta por cada tecla.
+    let cancelado = false;
+    const temporizador = setTimeout(async () => {
+      try {
+        const { hay } = await hayOtroCierreEnEsaDireccion(direccion);
+        if (cancelado) return;
+        setHayOtraPunta(hay);
+        if (!hay) setEnlazarOperacion(null);
+      } catch (err) {
+        // Que falle la consulta no puede trabar la carga: se guarda sin enlazar.
+        console.error("No se pudo consultar si hay otra punta cargada", err);
+      }
+    }, 500);
+
+    return () => {
+      cancelado = true;
+      clearTimeout(temporizador);
+    };
+  }, [activityType, propiedadRefEscrita, propiedadColaboracion, logToEdit]);
+
   // Sync metadata when specific fields change
   const handleMetadataChange = (key: string, value: any) => {
     const currentMetadata = watch("metadata") || {};
@@ -152,7 +200,11 @@ export function PerformanceLogForm({
     try {
       // `const` y no `let`: nunca se reasigna, sólo se le escribe una propiedad
       // (`wa_contact_id`) más abajo, y eso `const` lo permite igual.
-      const finalValues = { ...values };
+      //
+      // `enlazarOperacion` viaja como la respuesta del asesor, no como un id: el
+      // servidor vuelve a buscar la otra punta por su cuenta y resuelve todo
+      // ahí. Desde el navegador no se puede pedir enlazar con una fila puntual.
+      const finalValues = { ...values, enlazarOperacion: enlazarOperacion === true };
 
       // Cliente obligatorio: sin cliente no se puede armar la tarjeta del
       // pipeline. Se valida sobre lo que el usuario ELIGIÓ, no sobre el
@@ -645,6 +697,45 @@ export function PerformanceLogForm({
                 <Input id="propiedad_ref" placeholder="Ej: Av. Santa Fe 1234" {...register("propiedad_ref")} className="pl-10" />
                 <MapPin className="w-4 h-4 absolute left-3 top-3.5 opacity-40" />
               </div>
+
+              {/* El aviso no dice quién ni cuándo a propósito: un asesor no ve
+                  los cierres de sus compañeros, y esto no es la excepción. Lo
+                  único que puede descubrir es que en una dirección que ya
+                  conocía —la está escribiendo— hubo otra punta. */}
+              {hayOtraPunta && (
+                <div className="rounded-xl border border-accent/30 bg-accent/5 p-3 space-y-2 animate-in fade-in slide-in-from-top-1">
+                  <p className="text-xs leading-relaxed">
+                    Otro asesor de la inmobiliaria ya cargó un cierre en esta dirección.{" "}
+                    <strong>¿Es la misma operación que estás cargando vos?</strong>
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={enlazarOperacion === true ? "accent" : "outline"}
+                      className="h-8 text-xs"
+                      onClick={() => setEnlazarOperacion(true)}
+                    >
+                      Sí, es la misma
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={enlazarOperacion === false ? "accent" : "outline"}
+                      className="h-8 text-xs"
+                      onClick={() => setEnlazarOperacion(false)}
+                    >
+                      No, es otra
+                    </Button>
+                  </div>
+                  {enlazarOperacion === true && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Se van a contar como un solo negocio, y la propiedad va a sumar una sola vez
+                      al volumen. Tus honorarios y los del otro asesor se suman igual.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
