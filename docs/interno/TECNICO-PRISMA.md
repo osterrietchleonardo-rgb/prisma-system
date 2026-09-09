@@ -1619,6 +1619,15 @@ director arma una plantilla UNA vez y cada asesor la comparte con sus clientes c
   una lista por ítem. Solo se muestra al imprimir. **Ojo al medir:** `scrollHeight` de un
   contenedor con `overflow: hidden` nunca baja de su alto visible; el espacio libre se mide con
   el borde inferior del último bloque.
+- **La marca en el documento** (pedido de Leonardo el 9-sep: "más profesional, color de la marca,
+  marca de agua sutil"): `RenderDocumento` pone en línea sobre `.documento` las variables
+  `--marca1`/`--marca2` (los dos primeros `brand.colors`) y `--marca-agua` (un SVG de casas y
+  edificios en el color principal, opacidad 0,11, como `data:` URI). Con eso el CSS dibuja la barra
+  de color arriba del header y abajo del footer, el nombre del bloque del asesor en tipografía de
+  título y color principal, los títulos con subrayado de acento, y la marca de agua repetida cada
+  1000 px en pantalla y centrada en cada hoja impresa; `Paginador` copia el `style` en línea a la
+  copia paginada y agrega "Hoja N de M". **Gotcha:** el color va crudo adentro del SVG, porque el
+  `encodeURIComponent` del data URI ya escapa el `#`; escaparlo dos veces deja el trazo invisible.
 - **Editor:** `EditorDocumento.tsx` (Tiptap React + `tippy.js` para el menú de `@`). Gotcha: al
   configurar `Mention` en el cliente hay que sobreescribir `renderHTML` igual que en el servidor;
   si no, el por defecto antepone el `@` a una etiqueta que ya lo trae y se ve `@@nombre`.

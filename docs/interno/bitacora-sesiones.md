@@ -52,6 +52,18 @@ contratos word... nadie dijo que eran contratos solamente". Queda como segunda s
   (sharp) llegaba al bundle del navegador por importar la guía desde el formulario — el
   `npm run build` lo tapaba porque yo miraba el `tail` y no el exit code.
 
+**Segunda vuelta, con lo que vio Leonardo en local:** (1) el link daba "Jest worker
+encountered 2 child process exceptions" — no era la página: el sistema mató un proceso hijo de
+Next por memoria (51 procesos de node, 3,6 GB, cuatro dev servers) y el servidor quedó en
+`write EPIPE`; se relanzó. (2) El footer de prueba tenía el recuadro azul cortado por MI
+recorte; se rehizo tapando con blanco solo el bloque dibujado del asesor (y ojo: en un mismo
+pipeline sharp aplica `extract` ANTES de `composite`, el parche cayó 140 px abajo; en dos
+pasos). (3) "Plantillas personalizadas" en la ficha de cada asesor pasó a "Contratos
+personalizados (Word)". (4) Diseño con la marca: barra de color, bloque del asesor, títulos,
+marca de agua, "Hoja N de M" (TECNICO §24). (5) "Crear" se quedó cargando por el mismo crash
+del servidor; ahora el formulario y la lista muestran el error con "Reintentar" en vez de
+girar para siempre.
+
 **Cómo se probó:** PRISMAIA - VAKDOR, Chrome real por Playwright (`playwright-core` con
 `channel: "chrome"`, instalado en el scratchpad), cuenta de asesor **descartable** creada por
 API (`scratch/documentos-asesor-descartable.mjs crear|borrar`). Tecleando, nunca `fill()`.
