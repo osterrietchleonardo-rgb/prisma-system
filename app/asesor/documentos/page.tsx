@@ -22,8 +22,10 @@ import {
   Pencil,
   Trash2,
   Sparkles,
-  Lock
+  Lock,
+  Share2
 } from "lucide-react"
+import { ParaCompartir } from "@/components/documentos/ParaCompartir"
 import { 
   Dialog,
   DialogContent,
@@ -56,7 +58,7 @@ import DocumentosDelAsesor from "@/components/asesor-docs/DocumentosDelAsesor"
 export default function AsesorDocumentosPage() {
   // Solapa de nivel superior: biblioteca compartida (IA), documentos oficiales
   // (solo lectura) y los propios del asesor (solo lectura)
-  const [section, setSection] = useState<"biblioteca" | "oficiales" | "mis-documentos">("biblioteca")
+  const [section, setSection] = useState<"biblioteca" | "oficiales" | "mis-documentos" | "compartir">("biblioteca")
   const [documents, setDocuments] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -275,7 +277,7 @@ export default function AsesorDocumentosPage() {
 
   return (
     <div className="flex flex-col h-full p-4 md:p-8 pt-6 overflow-hidden">
-      <Tabs value={section} onValueChange={(v) => setSection(v as "biblioteca" | "oficiales" | "mis-documentos")} className="flex flex-col h-full">
+      <Tabs value={section} onValueChange={(v) => setSection(v as "biblioteca" | "oficiales" | "mis-documentos" | "compartir")} className="flex flex-col h-full">
         <TabsList className="bg-muted/50 p-1 rounded-xl border border-accent/10 self-start mb-4">
           <TabsTrigger value="biblioteca" className="rounded-lg px-4 h-9 text-sm data-[state=active]:bg-card data-[state=active]:text-accent gap-2">
             <Sparkles className="h-4 w-4" /> Biblioteca Digital
@@ -285,6 +287,9 @@ export default function AsesorDocumentosPage() {
           </TabsTrigger>
           <TabsTrigger value="mis-documentos" className="rounded-lg px-4 h-9 text-sm data-[state=active]:bg-card data-[state=active]:text-accent gap-2">
             <FileText className="h-4 w-4" /> Mis Documentos
+          </TabsTrigger>
+          <TabsTrigger value="compartir" className="rounded-lg px-4 h-9 text-sm data-[state=active]:bg-card data-[state=active]:text-accent gap-2">
+            <Share2 className="h-4 w-4" /> Para compartir
           </TabsTrigger>
         </TabsList>
 
@@ -588,6 +593,10 @@ export default function AsesorDocumentosPage() {
               {[1, 2, 3].map(i => <Skeleton key={i} className="h-44 rounded-2xl w-full" />)}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="compartir" className="flex-1 overflow-y-auto mt-0 data-[state=inactive]:hidden">
+          <ParaCompartir />
         </TabsContent>
       </Tabs>
     </div>
