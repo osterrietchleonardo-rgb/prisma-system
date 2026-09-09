@@ -2,18 +2,12 @@
 // Documentos para clientes · qué imagen sirve de header o footer, y la guía al director.
 // Las medidas se leen del archivo con sharp, nunca del nombre ni del tipo declarado: el
 // navegador dice "image/png" de lo que sea que tenga esa extensión.
+// SOLO SERVIDOR (sharp). Las reglas y la guía están en ./imagen-reglas.ts, que sí va al navegador.
 // ─────────────────────────────────────────────────────────────────────────────
 import sharp, { type Metadata } from "sharp";
 
-export const MAX_IMAGEN = 2 * 1024 * 1024;
-export const ANCHO_MINIMO = 1600;
-
-export const GUIA_IMAGEN =
-  "Cómo tiene que ser la imagen: una franja apaisada de ancho completo, PNG o JPG, de al menos " +
-  `${ANCHO_MINIMO} px de ancho y hasta 2 MB. Los logos, el teléfono, la web y la dirección de la ` +
-  "inmobiliaria van adentro de la imagen, como vos los diseñes. Lo que NO tiene que tener: los datos " +
-  "del asesor. Nombre, categoría, mail y celular los pone PRISMA por cada persona, con lo que escribas " +
-  "en «Bloque del asesor». Si los dibujás en la imagen, salen fijos con los datos de uno solo.";
+import { MAX_IMAGEN, ANCHO_MINIMO, GUIA_IMAGEN } from "./imagen-reglas";
+export { MAX_IMAGEN, ANCHO_MINIMO, GUIA_IMAGEN };
 
 type Resultado =
   | { ok: true; ext: "png" | "jpg"; ancho: number; alto: number }

@@ -10,7 +10,7 @@ import { ArrowLeft, Loader2, Save, Trash2, Upload } from "lucide-react";
 import { EditorDocumento } from "./EditorDocumento";
 import { RenderDocumento } from "./RenderDocumento";
 import { normalizarPlantilla, POSICIONES, type Plantilla, type PosicionBloque } from "@/lib/documentos/plantilla";
-import { GUIA_IMAGEN } from "@/lib/documentos/imagen";
+import { GUIA_IMAGEN } from "@/lib/documentos/imagen-reglas";
 import type { SnapshotDocumento } from "@/lib/documentos/snapshot";
 
 const NOMBRE_POSICION: Record<PosicionBloque, string> = {
