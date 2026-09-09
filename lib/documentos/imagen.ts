@@ -3,7 +3,7 @@
 // Las medidas se leen del archivo con sharp, nunca del nombre ni del tipo declarado: el
 // navegador dice "image/png" de lo que sea que tenga esa extensión.
 // ─────────────────────────────────────────────────────────────────────────────
-import sharp from "sharp";
+import sharp, { type Metadata } from "sharp";
 
 export const MAX_IMAGEN = 2 * 1024 * 1024;
 export const ANCHO_MINIMO = 1600;
@@ -24,7 +24,7 @@ export async function validarImagen(buffer: Buffer, mime: string): Promise<Resul
     return { ok: false, motivo: "La imagen pasa los 2 MB. Exportala un poco más liviana." };
   }
 
-  let meta: sharp.Metadata;
+  let meta: Metadata;
   try {
     meta = await sharp(buffer).metadata();
   } catch {
