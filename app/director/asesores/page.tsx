@@ -68,7 +68,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { DocumentosDelAsesor } from "@/components/asesor-docs/DocumentosDelAsesor"
-import { PlantillasTab } from "@/components/asesor-docs/PlantillasTab"
+import { PlantillasSolapas } from "@/components/asesor-docs/PlantillasSolapas"
 import { toast } from "sonner"
 import { createClient } from "@/lib/supabase"
 import { QRCodeSVG } from "qrcode.react"
@@ -784,7 +784,7 @@ export default function AsesoresPage() {
         </TabsContent>
 
         <TabsContent value="plantillas" className="flex-1 min-h-0 flex flex-col mt-4 data-[state=inactive]:hidden">
-          <PlantillasTab />
+          <PlantillasSolapas />
         </TabsContent>
       </Tabs>
 
