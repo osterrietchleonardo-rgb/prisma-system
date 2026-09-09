@@ -585,11 +585,32 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 
 > 💡 **Tip:** si un asesor te dice que le falta un documento o que el que tiene quedó viejo, es él avisándote a vos — desde su lado no lo puede arreglar solo.
 
-### Cambiar el contrato de todos
+### Documentos para clientes (la plantilla se arma una vez)
+
+**Qué es:** los documentos que tus asesores le mandan a los clientes —la presentación de la inmobiliaria, las condiciones de la exclusiva, la guía para preparar la casa— los armás **una sola vez**, y cada asesor los comparte **con sus propios datos** (nombre, categoría, mail, celular), con tu logo y tus colores, como link y como PDF. Si después mejorás el documento, lo que se comparta de ahí en adelante sale con la versión nueva: **nadie tiene que volver a cargar nada.**
+
+**Dónde está:** en la página **Asesores**, solapa **"Plantillas"**, primera sub-solapa **"Documentos para clientes"**. (La segunda, "Contratos desde Word", es lo que se explica más abajo.)
+
+**Cómo armar una:**
+
+1. Escribí un nombre y tocá **"Crear nueva plantilla"**.
+2. **Header y footer** (los dos son opcionales): subís una imagen para cada uno, como una franja apaisada de ancho completo (PNG o JPG, de al menos 1600 píxeles de ancho, hasta 2 MB). Ahí van tus logos, el teléfono y la dirección de la inmobiliaria, como vos los diseñes. **Lo que NO tiene que tener la imagen: los datos del asesor.** Esos los pone PRISMA por cada persona (ver el punto 4). Si la imagen no sirve, te dice por qué y el archivo sigue elegido para que corrijas.
+3. **Cuerpo:** escribilo como en Word: negrita, cursiva, subrayado, títulos, listas, alineación. Escribí **@** y elegí una variable: `@nombre`, `@email`, `@celular`, `@categoria` (Client Director / Client Support) o `@agencia`. Por ejemplo: "Hola, soy @nombre y trabajo en @agencia".
+4. **Bloque del asesor:** una o dos líneas con las variables, por ejemplo `@nombre | @categoria` y abajo `@email | Cel: @celular`. Elegís dónde va: debajo del header, arriba del footer, en los dos, o en ninguno.
+5. A la derecha ves **cómo lo va a ver el cliente**, con los datos de un asesor real de tu equipo, mientras escribís.
+6. Prendé **"Activa"** y **"Guardar"**. Mientras esté apagada, es un borrador: la ves vos, tus asesores no.
+
+**Qué ve cada uno:** vos, desde la lista, podés **Compartir** (sale con tus datos), **Editar** o **Borrar**. Tus asesores, en su Biblioteca → **"Para compartir"**, ven las activas y tocan Compartir: se les copia el link, listo para mandar.
+
+> 💡 **Si a un asesor le falta un dato** (por ejemplo el celular), esa parte **se omite sola**: no queda un "Cel:" vacío. Al asesor le avisa arriba qué le falta; el celular se lo cargás vos desde su ficha en Asesores.
+> ⚠️ **Los links ya mandados no cambian.** Un cliente ve siempre lo que le mandaron, aunque después edites la plantilla o cambien los datos del asesor. Por eso, **borrar una plantilla que ya se compartió no la borra: la desactiva** (deja de ofrecerse para compartir, y los links siguen abiertos). Solo se borra del todo si nunca se compartió.
+> 💡 **El PDF que baja el cliente** trae el header y el footer en **todas las hojas**, y el texto nunca queda debajo de ellos.
+
+### Cambiar el contrato de todos ("Contratos desde Word")
 
 **Qué es:** cambió una cláusula del contrato que tienen todos tus asesores y hay que rehacérselo a cada uno. Antes eso significaba rehacer el Word persona por persona y subirlo uno por uno. Ahora **subís el Word una sola vez** y PRISMA le arma el documento a cada asesor con **sus propios datos**.
 
-**Dónde está:** en la página **Asesores**, arriba de todo, tenés la solapa **"Plantillas"**. Hay una fila por cada tipo de documento (por ejemplo, "Contrato de Asesor"), con la versión que está en uso, cuántos asesores lo tienen cargado y si quedó alguno para revisar.
+**Dónde está:** en la página **Asesores**, arriba de todo, tenés la solapa **"Plantillas"**, y adentro la segunda sub-solapa, **"Contratos desde Word"**. Hay una fila por cada tipo de documento (por ejemplo, "Contrato de Asesor"), con la versión que está en uso, cuántos asesores lo tienen cargado y si quedó alguno para revisar.
 
 **Lo primero, y es lo más raro de todo esto:** el Word que subís tiene que ser el contrato nuevo **YA COMPLETADO con los datos de una de tus personas**, y abajo tenés que decir de cuál. **No es un archivo con los campos en blanco.** El motivo: PRISMA busca los datos de esa persona adentro del documento (sabe cuál es su nombre, su CUIT, su zona) y **donde los encuentra sabe que ahí va el dato de cada uno**. Si subís un modelo genérico o con los lugares vacíos, no tiene contra qué comparar y te lo rechaza explicándote esto mismo.
 

@@ -1569,6 +1569,74 @@ PDF descargable) quedaron pendientes.
 
 ---
 
+## 24. Documentos para clientes (9/9/2026, rama `worktree-documentos-clientes`)
+
+Spec `docs/superpowers/specs/2026-09-09-documentos-para-clientes-design.md`, plan
+`docs/superpowers/plans/2026-09-09-documentos-para-clientes.md`. **Lo que pidió Leonardo desde
+el principio** y que el módulo de contratos Word (Etapa C, `lib/asesor-docs`) no resolvía: el
+director arma una plantilla UNA vez y cada asesor la comparte con sus clientes con SUS datos.
+
+- **Dónde vive:** Asesores → Plantillas ahora tiene dos sub-solapas
+  (`components/asesor-docs/PlantillasSolapas.tsx`): **"Documentos para clientes"** (esto,
+  `components/documentos/PlantillasClientes.tsx` + `PlantillaForm.tsx`) y **"Contratos desde
+  Word"** (el módulo Etapa C, intacto salvo el título). El asesor tiene la solapa **"Para
+  compartir"** en Biblioteca (`components/documentos/ParaCompartir.tsx`). **El menú no se tocó.**
+- **Tablas** (`supabase/migrations/20260909120000_documentos_para_clientes.sql`, aplicada en
+  producción el 9-sep por Management API): `documentos_plantillas` (cuerpo y bloque del asesor
+  como JSON de Tiptap, `header_path`/`footer_path` opcionales en el bucket público
+  `marketing-images`, `version`, `activa`; RLS: director ALL en su agencia, asesor SELECT solo
+  activas) y `shared_documentos` (calcada de `shared_selections`: token + snapshot, RLS
+  encendida SIN políticas, solo service-role; `increment_shared_documento_view`).
+- **Nunca se guarda ni se acepta HTML.** `lib/documentos/tiptap.ts` tiene LA lista de
+  extensiones (StarterKit sin link/código/cita/línea, TextAlign, Mention) que usan el editor y
+  `generarHtml()` en el servidor; un nodo que no está en la lista hace que Tiptap tire error.
+  **Gotcha real:** `TextAlign` pone el atributo en el `style` sin validarlo — `limpiarDoc()` tira
+  cualquier `textAlign` que no sea left/center/right antes de dibujar (test + mutación).
+  En Tiptap 3 el StarterKit ya trae `underline`: agregarlo aparte duplica la extensión.
+- **Variables** (`lib/documentos/variables.ts`): cinco y fijas — `@nombre @email @celular
+  @categoria @agencia`. Al compartir, `armarSnapshot()` las reemplaza por texto plano
+  (`aplicarVariables`) con los datos de QUIEN comparte; si falta el dato, se saca la mención y
+  la "etiqueta corta" (≤12 caracteres) que la precede, así `@email | Cel: @celular` sin celular
+  queda `email` y no `email | Cel:`. `@categoria` usa `lib/ficha/etiqueta-categoria.ts`, que se
+  extrajo de la ficha del ACM para que las dos digan lo mismo.
+- **Congelado:** el snapshot lleva las variables YA aplicadas y la marca de ese momento. Editar
+  la plantilla sube `version` y cambia lo que se comparta de ahí en adelante; un link ya mandado
+  no se mueve. Borrar una plantilla que ya se compartió la **desactiva** (el cliente con el link
+  no puede encontrarse con un 404); solo se borra si nunca se compartió.
+- **Imagen del header/footer** (`lib/documentos/imagen.ts`, solo servidor): PNG/JPG, ≥1600 px
+  de ancho **medido con sharp**, ≤2 MB; al rechazar, el nombre del archivo queda a la vista con
+  el motivo. La guía al director (`imagen-reglas.ts`, sin sharp: el build lo llevaba al
+  navegador y fallaba) dice explícitamente que NO dibuje los datos del asesor en la imagen.
+- **El PDF, lo más frágil, y cómo se resolvió (`components/documentos/Paginador.tsx`).** Medido
+  en el PDF con pdfjs, hoja por hoja: Chrome repite un `<thead>` en cada hoja pero **NO un
+  `<tfoot>`**, y una franja `position: fixed` corrida al margen de `@page` se **recorta y aparece
+  en la hoja siguiente** (la última hoja se queda sin header y la primera sin footer). Con
+  `fixed` + relleno, el texto quedaba debajo de las franjas en toda hoja que no fuera la primera.
+  Solución: paginar en JS. En pantalla el documento es continuo; al cargar se arma una copia
+  fuera de la vista (`.documento-impresion`, a 794 px = 210 mm) con hojas A4 de alto fijo,
+  header arriba, footer abajo y el cuerpo en el hueco; un párrafo que no entra **se parte por
+  palabra** (búsqueda binaria sobre un `Range`, conserva negritas) si quedan ≥3 líneas libres, y
+  una lista por ítem. Solo se muestra al imprimir. **Ojo al medir:** `scrollHeight` de un
+  contenedor con `overflow: hidden` nunca baja de su alto visible; el espacio libre se mide con
+  el borde inferior del último bloque.
+- **Editor:** `EditorDocumento.tsx` (Tiptap React + `tippy.js` para el menú de `@`). Gotcha: al
+  configurar `Mention` en el cliente hay que sobreescribir `renderHTML` igual que en el servidor;
+  si no, el por defecto antepone el `@` a una etiqueta que ya lo trae y se ve `@@nombre`.
+- **Endpoints:** `app/api/documentos-plantillas/{route,[id]/route,[id]/imagen/route}.ts`
+  (escritura solo director, 403; otra agencia = 404) y `app/api/documentos/{activas,compartir,
+  mis-links,vista-previa}/route.ts`. La vista previa arma el snapshot con el primer asesor
+  activo de la agencia (o el director si no hay) **sin guardar nada**. Tests de conducta en
+  `route.test.ts` (mutación: sacar el chequeo de rol, el filtro por agencia y el "no borrar si
+  tiene links" pone cada uno en rojo).
+- **Probado en el navegador** (Chrome real por Playwright, PRISMAIA - VAKDOR, cuenta de asesor
+  descartable): tecleando con `pressSequentially`, rechazo del header de 1040 px, vista previa
+  con asesor real, compartir como director y como asesor, link sin sesión en escritorio y
+  celular, PDF de 2-3 hojas analizado por texto y posición, congelado, sin celular, borrar.
+  Nota: `/documento/<token inventado>` devuelve la página de "no disponible" con HTTP 200 en
+  dev, **igual que `/seleccion` y `/ficha-acm`** — no es de este módulo.
+
+---
+
 ## FIN DEL DOCUMENTO
 
 Documento técnico de PRISMA basado en análisis directo del código fuente, sin ejecución ni modificación del sistema. Para la lógica detallada endpoint por endpoint, ver `LOGICA-PRISMA.md`.
