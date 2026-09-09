@@ -67,7 +67,9 @@ export function PlantillasClientes() {
     cargar();
   };
 
-  if (editando) return <PlantillaForm id={editando} onVolver={() => { setEditando(null); cargar(); }} />;
+  // Al volver, la lista se vacía antes de recargar: si no, medio segundo se ve la fila vieja
+  // (versión y estado de antes de guardar).
+  if (editando) return <PlantillaForm id={editando} onVolver={() => { setEditando(null); setLista(null); cargar(); }} />;
 
   return (
     <div className="space-y-4">

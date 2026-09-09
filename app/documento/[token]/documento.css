@@ -1,6 +1,7 @@
-/* El documento que el asesor le manda a su cliente. En pantalla es continuo; al imprimir,
-   header y footer se repiten en cada hoja (position: fixed) y el cuerpo lleva relleno arriba
-   y abajo con el alto medido de cada franja (ver AltoDeFranjas.tsx). */
+/* El documento que el asesor le manda a su cliente.
+   En PANTALLA es continuo (.documento): header, cuerpo, footer.
+   Al IMPRIMIR se muestra la copia paginada (.documento-impresion, la arma Paginador.tsx):
+   hojas A4 de alto fijo, header arriba, footer abajo, el cuerpo en el hueco del medio. */
 .documento-root { background: #e9e6df; min-height: 100vh; padding: 24px 12px 90px; font-family: var(--font-body), system-ui, sans-serif; color: #1c1c1c; }
 .documento { background: #fff; max-width: 794px; margin: 0 auto; box-shadow: 0 8px 30px rgba(0,0,0,.12); }
 .documento-franja { display: block; width: 100%; height: auto; }
@@ -17,6 +18,14 @@
 .documento-cuerpo li { margin: 0 0 4px; }
 .documento-cuerpo .variable, .documento-bloque .variable { background: #fff3d6; border-radius: 3px; padding: 0 2px; }
 
+/* La copia paginada vive fuera de la vista mientras se arma y se mide (a 794 px, el ancho de
+   hoja, para que cada franja mida lo mismo que impresa). */
+.documento-impresion { position: absolute; left: -20000px; top: 0; width: 794px; background: #fff; }
+.hoja { position: relative; width: 794px; height: 1123px; overflow: hidden; background: #fff; }
+.hoja .documento-header { position: absolute; top: 0; left: 0; right: 0; }
+.hoja .documento-footer { position: absolute; bottom: 0; left: 0; right: 0; }
+.hoja .documento-cuerpo { position: absolute; left: 0; right: 0; overflow: hidden; padding-top: 0; padding-bottom: 0; }
+
 @media (max-width: 640px) {
   .documento-root { padding: 12px 0 90px; }
   .documento-bloque { padding: 8px 16px; font-size: 13px; }
@@ -30,10 +39,10 @@
   #nprogress, [data-sonner-toaster], next-route-announcer { display: none !important; }
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   .documento-root { background: #fff; padding: 0; min-height: 0; }
-  .documento { max-width: none; box-shadow: none; }
-  .documento-header { position: fixed; top: 0; left: 0; right: 0; background: #fff; }
-  .documento-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; }
-  .documento-cuerpo { padding-top: calc(var(--alto-header, 0px) + 16px); padding-bottom: calc(var(--alto-footer, 0px) + 16px); }
+  .documento { display: none; }
+  .documento-impresion { position: static; left: auto; width: 210mm; }
+  .hoja { width: 210mm; height: 297mm; page-break-after: always; break-after: page; }
+  .hoja:last-child { page-break-after: auto; break-after: auto; }
   .documento-bloque .variable, .documento-cuerpo .variable { background: none; }
   .no-print { display: none !important; }
 }

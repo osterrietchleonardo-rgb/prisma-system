@@ -8,7 +8,7 @@ import type { Metadata } from "next";
 import PrintButton from "@/app/ficha-acm/[token]/PrintButton";
 import { RenderDocumento } from "@/components/documentos/RenderDocumento";
 import type { SnapshotDocumento } from "@/lib/documentos/snapshot";
-import AltoDeFranjas from "./AltoDeFranjas";
+import Paginador from "@/components/documentos/Paginador";
 import "./documento.css";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +53,7 @@ export default async function DocumentoPage({ params }: { params: { token: strin
 
   return (
     <div className={`${playfair.variable} ${inter.variable} documento-root`}>
-      <AltoDeFranjas />
+      <Paginador />
       <PrintButton accent={accent} onAccent={readableOn(accent)} fileName={nombreArchivo} />
       <RenderDocumento snap={snap} />
     </div>

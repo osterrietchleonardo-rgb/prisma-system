@@ -21,7 +21,10 @@ function extensionesConSugerencia() {
     ext.name === "mention"
       ? Mention.configure({
           HTMLAttributes: { class: "variable" },
+          // Igual que en el servidor: la etiqueta ya trae el @. Sin esto, el renderHTML por
+          // defecto de Mention le antepone otro y en el editor se ve "@@nombre".
           renderText: ({ node }) => String(node.attrs.label ?? `@${node.attrs.id}`),
+          renderHTML: ({ node }) => ["span", { class: "variable" }, String(node.attrs.label ?? `@${node.attrs.id}`)],
           suggestion: {
             char: "@",
             items: ({ query }) => itemsDeVariables(query),
