@@ -511,7 +511,7 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
       <section className="space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-foreground">Plantillas personalizadas</h3>
+            <h3 className="text-lg font-semibold text-foreground">Contratos personalizados (Word)</h3>
             <p className="text-sm text-muted-foreground">
               {readOnly
                 ? "Documentos que la agencia preparó para vos."
@@ -532,7 +532,7 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Subir plantilla personalizada</DialogTitle>
+                  <DialogTitle>Subir contrato personalizado</DialogTitle>
                   <DialogDescription>
                     Elegí el tipo de documento y el archivo Word (.docx). Si el asesor ya tiene uno de ese tipo, se reemplaza.
                   </DialogDescription>
@@ -597,8 +597,8 @@ export function DocumentosDelAsesor({ advisorId, agencyId, readOnly = false }: P
         ) : plantillas.length === 0 ? (
           <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
             {readOnly
-              ? "Todavía no tenés plantillas personalizadas cargadas."
-              : "Subí la primera plantilla personalizada para este asesor."}
+              ? "Todavía no tenés contratos personalizados cargados."
+              : "Subí el primer contrato personalizado para este asesor."}
           </div>
         ) : (
           <ul className="space-y-2">

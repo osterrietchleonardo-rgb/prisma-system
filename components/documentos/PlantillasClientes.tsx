@@ -20,10 +20,18 @@ export function PlantillasClientes() {
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [creando, setCreando] = useState(false);
 
+  const [errorLista, setErrorLista] = useState<string | null>(null);
   const cargar = async () => {
-    const r = await fetch("/api/documentos-plantillas");
-    const d = await r.json();
-    setLista(r.ok ? d.plantillas : []);
+    setErrorLista(null);
+    try {
+      const r = await fetch("/api/documentos-plantillas");
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || `No se pudieron cargar las plantillas (HTTP ${r.status}).`);
+      setLista(d.plantillas);
+    } catch (e) {
+      setLista([]);
+      setErrorLista(e instanceof Error ? e.message : "No se pudieron cargar las plantillas.");
+    }
   };
   useEffect(() => { cargar(); }, []);
 
@@ -85,9 +93,15 @@ export function PlantillasClientes() {
           {creando ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}Crear nueva plantilla
         </Button>
       </div>
+      {errorLista && (
+        <div className="flex items-center gap-3 text-sm text-destructive">
+          <span>{errorLista}</span>
+          <Button variant="outline" size="sm" onClick={cargar}>Reintentar</Button>
+        </div>
+      )}
       {lista === null ? (
         <Loader2 className="h-5 w-5 animate-spin text-accent" />
-      ) : lista.length === 0 ? (
+      ) : lista.length === 0 && !errorLista ? (
         <p className="text-sm text-muted-foreground">Todavía no hay plantillas. Creá la primera con el botón de arriba.</p>
       ) : (
         <ul className="space-y-2">

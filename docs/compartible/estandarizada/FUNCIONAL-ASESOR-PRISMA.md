@@ -650,7 +650,7 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca Digital"** (lo de arriba
 Al lado de "Biblioteca Digital" y "Documentos Oficiales" tenés una tercera solapa: **"Mis Documentos"**. Acá están, todos juntos, los archivos que la dirección te cargó a vos, personalmente — nadie más los ve.
 
 **Qué vas a encontrar, en dos grupos:**
-- **Plantillas personalizadas:** documentos que la dirección preparó con tus datos (por ejemplo, un contrato o una autorización con tu nombre ya puesto).
+- **Contratos personalizados (Word):** documentos que la dirección preparó con tus datos (por ejemplo, un contrato o una autorización con tu nombre ya puesto).
 - **Documentos de información:** cualquier otro archivo suelto que la dirección quiera que tengas a mano.
 
 **Cómo usarla:**

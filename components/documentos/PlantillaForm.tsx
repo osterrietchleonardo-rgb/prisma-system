@@ -33,16 +33,23 @@ export function PlantillaForm({ id, onVolver }: { id: string; onVolver: () => vo
   // empezar de cero. Solo se limpia cuando subió bien.
   const [rechazo, setRechazo] = useState<{ cual: Cual; archivo: string; motivo: string } | null>(null);
 
-  useEffect(() => {
-    (async () => {
+  // Si el pedido falla (o se cae el servidor), no se queda "cargando" para siempre: se dice y
+  // se puede reintentar.
+  const [errorCarga, setErrorCarga] = useState<string | null>(null);
+  const cargarPlantilla = async () => {
+    setErrorCarga(null);
+    try {
       const r = await fetch(`/api/documentos-plantillas/${id}`);
-      const d = await r.json();
-      if (!r.ok) { toast.error(d.error || "No se pudo cargar"); return; }
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || `No se pudo cargar la plantilla (HTTP ${r.status}).`);
       setP(normalizarPlantilla(d.plantilla));
       setUrls({ header: d.header_url, footer: d.footer_url });
       setCompartidos(d.compartidos ?? 0);
-    })();
-  }, [id]);
+    } catch (e) {
+      setErrorCarga(e instanceof Error ? e.message : "No se pudo cargar la plantilla.");
+    }
+  };
+  useEffect(() => { cargarPlantilla(); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Vista previa con un asesor real, al ritmo de lo que escribe (con una pausa para no
   // pegarle al servidor por tecla).
@@ -114,7 +121,23 @@ export function PlantillaForm({ id, onVolver }: { id: string; onVolver: () => vo
     }
   };
 
-  if (!p) return <div className="py-12 text-center"><Loader2 className="inline h-5 w-5 animate-spin text-accent" /></div>;
+  if (!p) {
+    return (
+      <div className="py-12 text-center space-y-3">
+        {errorCarga ? (
+          <>
+            <p className="text-sm text-destructive">{errorCarga}</p>
+            <div className="flex justify-center gap-2">
+              <Button variant="outline" size="sm" onClick={cargarPlantilla}>Reintentar</Button>
+              <Button variant="ghost" size="sm" onClick={onVolver}>Volver a la lista</Button>
+            </div>
+          </>
+        ) : (
+          <Loader2 className="inline h-5 w-5 animate-spin text-accent" />
+        )}
+      </div>
+    );
+  }
 
   const Franja = ({ cual }: { cual: Cual }) => (
     <div className="rounded-lg border border-accent/10 p-3 space-y-2" data-testid={`franja-${cual}`}>

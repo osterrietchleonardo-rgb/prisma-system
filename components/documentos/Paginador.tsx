@@ -46,6 +46,9 @@ function armar(root: HTMLElement) {
 
   const cont = document.createElement("div");
   cont.className = "documento-impresion";
+  // Los colores y la marca de agua de la agencia vienen como variables CSS en línea sobre
+  // .documento; la copia paginada vive afuera, así que se copian.
+  cont.style.cssText = src.style.cssText;
   root.appendChild(cont);
 
   const headerHtml = src.querySelector(".documento-header")?.innerHTML ?? "";
@@ -154,6 +157,19 @@ function armar(root: HTMLElement) {
 
   nuevaHoja();
   for (const bloque of bloques) colocar(bloque);
+
+  // "Hoja 1 de 3", arriba del footer, a la derecha. Solo si hay más de una.
+  const hojas = Array.from(cont.querySelectorAll<HTMLElement>(".hoja"));
+  if (hojas.length > 1) {
+    hojas.forEach((hoja, i) => {
+      const n = document.createElement("div");
+      n.className = "hoja-numero";
+      n.textContent = `Hoja ${i + 1} de ${hojas.length}`;
+      const f = hoja.querySelector<HTMLElement>(".documento-footer");
+      n.style.bottom = `${(f?.offsetHeight ?? 0) + 4}px`;
+      hoja.appendChild(n);
+    });
+  }
 }
 
 export default function Paginador() {
