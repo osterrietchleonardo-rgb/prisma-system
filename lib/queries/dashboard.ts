@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { transaccionesDe } from "@/lib/tracking/participacion"
+import { transaccionesDe, gciDe, desgloseDeCierres } from "@/lib/tracking/participacion"
 
 // El filtro de periodo manda las fechas como "yyyy-MM-dd" (DatePeriodFilter).
 // Comparar eso contra un timestamptz con <= corta a la medianoche y se pierde
@@ -154,11 +154,11 @@ export async function getDashboardData(
     cierre: {
       transacciones: transaccionesDe(perfLogs),
       volumenVentas: perfLogs?.filter(l => l.type === 'cierre').reduce((acc, l) => acc + (Number(l.monto_operacion) || 0), 0) || 0,
-      gci: perfLogs?.filter(l => l.type === 'cierre').reduce((acc, l) => {
-        const valor = Number(l.monto_operacion) || 0;
-        const hon = Number(l.comision_generada) || 0;
-        return acc + (valor * hon / 100);
-      }, 0) || 0,
+      gci: gciDe(perfLogs),
+      // Los mismos dos números abiertos por tipo de operación. Un alquiler y una
+      // venta caían hasta acá en la misma bolsa; el dato para separarlos ya
+      // estaba en `proceso`, sólo faltaba leerlo.
+      desglose: desgloseDeCierres(perfLogs),
       honorarioPromedioSum: perfLogs?.filter(l => l.type === 'cierre').reduce((acc, l) => acc + (Number(l.comision_generada) || 0), 0) || 0,
     },
     cartera: {
@@ -265,6 +265,15 @@ export async function getDashboardData(
     // Cierre
     transacciones: metrics.cierre.transacciones,
     volumenVentas: metrics.cierre.volumenVentas,
+    // Desglose venta / alquiler. `sinDefinir` son los cierres históricos que se
+    // cargaron antes de que existiera `proceso`: la pantalla los muestra aparte
+    // sólo cuando los hay, en vez de repartirlos a ojo entre los otros dos.
+    cierresVenta: metrics.cierre.desglose.venta.transacciones,
+    gciVenta: metrics.cierre.desglose.venta.gci,
+    cierresAlquiler: metrics.cierre.desglose.alquiler.transacciones,
+    gciAlquiler: metrics.cierre.desglose.alquiler.gci,
+    cierresSinDefinir: metrics.cierre.desglose.sinDefinir.transacciones,
+    gciSinDefinir: metrics.cierre.desglose.sinDefinir.gci,
     tasaCierre,
     honorarioCobrado: honorarioReal,
     gci: metrics.cierre.gci,

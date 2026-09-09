@@ -15,6 +15,8 @@
  * desincronizarse.
  */
 
+import { operacionDe } from "./proceso";
+
 /** A cuántas partes del negocio representó el asesor en el cierre. */
 export type Participacion =
   | "Ambas puntas"
@@ -50,6 +52,11 @@ const UNA_SOLA_PUNTA: ReadonlySet<string> = new Set<Participacion>([
 export interface LogParaConteo {
   type?: string | null;
   metadata?: { participacion?: unknown } | null;
+  /** Uno de los cuatro `ProcesoNegocio`, o null en las filas históricas. */
+  proceso?: string | null;
+  /** Postgres devuelve `numeric` como string, no como number. */
+  monto_operacion?: number | string | null;
+  comision_generada?: number | string | null;
 }
 
 /**
@@ -79,4 +86,59 @@ export function transaccionesDe(logs: readonly LogParaConteo[] | null | undefine
   return logs
     .filter((l) => l.type === "cierre")
     .reduce((acc, l) => acc + negociosDeCierre(l.metadata?.participacion), 0);
+}
+
+/**
+ * La facturación bruta (GCI) de una lista: para cada cierre, el valor de la
+ * operación por el porcentaje de honorarios. Mismo criterio que ya usaba el
+ * dashboard, escrito una sola vez para que el desglose por tipo de operación no
+ * vuelva a ser otra copia de la fórmula.
+ */
+export function gciDe(logs: readonly LogParaConteo[] | null | undefined): number {
+  if (!logs) return 0;
+  return logs
+    .filter((l) => l.type === "cierre")
+    .reduce((acc, l) => {
+      const valor = Number(l.monto_operacion) || 0;
+      const honorario = Number(l.comision_generada) || 0;
+      return acc + (valor * honorario) / 100;
+    }, 0);
+}
+
+export interface MetricasDeCierre {
+  transacciones: number;
+  gci: number;
+}
+
+/**
+ * Los mismos dos números, abiertos por tipo de operación.
+ *
+ * `sinDefinir` son los cierres históricos que se cargaron antes de que `proceso`
+ * existiera. No se reparten entre venta y alquiler ni se suman a uno de los dos:
+ * se muestran aparte cuando los hay. Por eso vale siempre que
+ * `venta + alquiler + sinDefinir === total`, y la pantalla nunca miente sumando
+ * de menos.
+ */
+export interface DesgloseDeCierres {
+  total: MetricasDeCierre;
+  venta: MetricasDeCierre;
+  alquiler: MetricasDeCierre;
+  sinDefinir: MetricasDeCierre;
+}
+
+export function desgloseDeCierres(
+  logs: readonly LogParaConteo[] | null | undefined
+): DesgloseDeCierres {
+  const cierres = (logs ?? []).filter((l) => l.type === "cierre");
+  const medir = (filas: LogParaConteo[]): MetricasDeCierre => ({
+    transacciones: transaccionesDe(filas),
+    gci: gciDe(filas),
+  });
+
+  return {
+    total: medir(cierres),
+    venta: medir(cierres.filter((l) => operacionDe(l.proceso) === "venta")),
+    alquiler: medir(cierres.filter((l) => operacionDe(l.proceso) === "alquiler")),
+    sinDefinir: medir(cierres.filter((l) => operacionDe(l.proceso) === null)),
+  };
 }

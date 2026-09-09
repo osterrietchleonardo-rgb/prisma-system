@@ -87,6 +87,12 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
   if (!kpis) return null;
 
   const formatUSD = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+
+  // El desglose de la tarjeta Cierre se muestra sólo si hay al menos un
+  // alquiler cerrado. Sin alquileres no hay nada que separar y la tarjeta queda
+  // exactamente como estaba.
+  const hayCierresDeAlquiler = kpis.cierresAlquiler > 0 || kpis.gciAlquiler > 0;
+  const hayCierresSinDefinir = kpis.cierresSinDefinir > 0 || kpis.gciSinDefinir > 0;
   const formatPercent = (val: number) => `${val.toFixed(1)}%`;
 
   return (
@@ -169,6 +175,21 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
         color="green-500"
         metrics={[
           { label: "GCI (Fact. Bruta)", value: formatUSD(kpis.gci), subValue: `Cierres: ${kpis.transacciones}` },
+          // Mismo criterio que la Composición de Demanda de Prospección: el
+          // desglose sólo aparece cuando hay alquileres que desglosar. Una
+          // inmobiliaria que únicamente vende ve la tarjeta igual que siempre.
+          ...(hayCierresDeAlquiler
+            ? [
+                { label: "— Venta", value: formatUSD(kpis.gciVenta), subValue: `Cierres: ${kpis.cierresVenta}` },
+                { label: "— Alquiler", value: formatUSD(kpis.gciAlquiler), subValue: `Cierres: ${kpis.cierresAlquiler}` },
+                // Los cierres viejos, cargados antes de que existiera el
+                // proceso, no se reparten a ojo entre venta y alquiler: se
+                // muestran aparte para que las tres líneas sumen el total.
+                ...(hayCierresSinDefinir
+                  ? [{ label: "— Sin definir", value: formatUSD(kpis.gciSinDefinir), subValue: `Cierres: ${kpis.cierresSinDefinir}` }]
+                  : []),
+              ]
+            : []),
           { label: "Honorario Real", value: `${kpis.honorarioCobrado.toFixed(1)}%` },
           { label: "Neto Asesores", value: formatUSD(kpis.netoAsesores), subValue: `Agency: ${formatUSD(kpis.companyDollar)}` },
         ]}
