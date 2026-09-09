@@ -5,6 +5,10 @@
 // (imagen, iframe, link) hace que Tiptap tire error en vez de dibujarlo, y eso es la defensa
 // contra meter código en un documento público: no hace falta sanitizar HTML porque nunca
 // se acepta HTML.
+//
+// La única puerta que Tiptap deja abierta es el atributo textAlign: al serializar lo pone en
+// un style tal cual, sin mirar la lista de alineaciones. Por eso antes de dibujar se recorre
+// el doc y se tira cualquier textAlign que no sea left/center/right (ver limpiarDoc).
 // ─────────────────────────────────────────────────────────────────────────────
 import type { Extensions } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
@@ -12,6 +16,8 @@ import Mention from "@tiptap/extension-mention";
 import TextAlign from "@tiptap/extension-text-align";
 import { generateHTML } from "@tiptap/html";
 import type { DocTiptap } from "./plantilla";
+
+export const ALINEACIONES = ["left", "center", "right"] as const;
 
 export function extensionesDocumento(): Extensions {
   return [
@@ -26,7 +32,7 @@ export function extensionesDocumento(): Extensions {
       horizontalRule: false,
       strike: false,
     }),
-    TextAlign.configure({ types: ["heading", "paragraph"], alignments: ["left", "center", "right"] }),
+    TextAlign.configure({ types: ["heading", "paragraph"], alignments: [...ALINEACIONES] }),
     Mention.configure({
       HTMLAttributes: { class: "variable" },
       // En el HTML la mención se ve como su etiqueta (@nombre). Al compartir, aplicarVariables
@@ -37,6 +43,25 @@ export function extensionesDocumento(): Extensions {
   ];
 }
 
+type Nodo = { attrs?: Record<string, unknown>; content?: Nodo[] } & Record<string, unknown>;
+
+/** Copia del doc sin ningún textAlign que no esté en la lista. */
+export function limpiarDoc(doc: DocTiptap): DocTiptap {
+  const limpiar = (n: Nodo): Nodo => {
+    const out: Nodo = { ...n };
+    if (out.attrs && "textAlign" in out.attrs) {
+      const a = out.attrs.textAlign;
+      if (typeof a !== "string" || !(ALINEACIONES as readonly string[]).includes(a)) {
+        const { textAlign: _fuera, ...resto } = out.attrs;
+        out.attrs = resto;
+      }
+    }
+    if (Array.isArray(out.content)) out.content = out.content.map(limpiar);
+    return out;
+  };
+  return limpiar(doc as unknown as Nodo) as unknown as DocTiptap;
+}
+
 export function generarHtml(doc: DocTiptap): string {
-  return generateHTML(doc as Record<string, unknown>, extensionesDocumento());
+  return generateHTML(limpiarDoc(doc) as Record<string, unknown>, extensionesDocumento());
 }

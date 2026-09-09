@@ -44,6 +44,13 @@ describe("generarHtml", () => {
     ).toThrow();
   });
 
+  it("un textAlign que no es left/center/right no llega al style: TextAlign no lo valida solo", () => {
+    const html = generarHtml(doc({ type: "paragraph", attrs: { textAlign: "left; background: url(http://x/pixel)" }, content: [{ type: "text", text: "x" }] }));
+    expect(html).not.toContain("background");
+    expect(html).not.toContain("url(");
+    expect(html).toContain("<p>x</p>");
+  });
+
   it("el doc vacío no rompe", () => {
     expect(() => generarHtml({ type: "doc", content: [] })).not.toThrow();
   });
