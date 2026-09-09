@@ -1,0 +1,39 @@
+/* El documento que el asesor le manda a su cliente. En pantalla es continuo; al imprimir,
+   header y footer se repiten en cada hoja (position: fixed) y el cuerpo lleva relleno arriba
+   y abajo con el alto medido de cada franja (ver AltoDeFranjas.tsx). */
+.documento-root { background: #e9e6df; min-height: 100vh; padding: 24px 12px 90px; font-family: var(--font-body), system-ui, sans-serif; color: #1c1c1c; }
+.documento { background: #fff; max-width: 794px; margin: 0 auto; box-shadow: 0 8px 30px rgba(0,0,0,.12); }
+.documento-franja { display: block; width: 100%; height: auto; }
+.documento-bloque { padding: 10px 40px; font-size: 14px; line-height: 1.5; }
+.documento-bloque p { margin: 0; }
+.documento-cuerpo { padding: 28px 48px 36px; font-size: 15px; line-height: 1.7; }
+.documento-cuerpo h2 { font-family: var(--font-display), Georgia, serif; font-size: 24px; margin: 22px 0 10px; line-height: 1.25; }
+.documento-cuerpo h3 { font-family: var(--font-display), Georgia, serif; font-size: 18px; margin: 18px 0 8px; line-height: 1.3; }
+.documento-cuerpo h2:first-child, .documento-cuerpo h3:first-child { margin-top: 0; }
+.documento-cuerpo p { margin: 0 0 12px; }
+.documento-cuerpo ul, .documento-cuerpo ol { margin: 0 0 12px 22px; padding: 0; }
+.documento-cuerpo ul { list-style: disc; }
+.documento-cuerpo ol { list-style: decimal; }
+.documento-cuerpo li { margin: 0 0 4px; }
+.documento-cuerpo .variable, .documento-bloque .variable { background: #fff3d6; border-radius: 3px; padding: 0 2px; }
+
+@media (max-width: 640px) {
+  .documento-root { padding: 12px 0 90px; }
+  .documento-bloque { padding: 8px 16px; font-size: 13px; }
+  .documento-cuerpo { padding: 18px 16px 24px; font-size: 15px; }
+}
+
+@media print {
+  @page { size: A4; margin: 0; }
+  html, body { background: #fff !important; }
+  body > *:not(.documento-root) { display: none !important; }
+  #nprogress, [data-sonner-toaster], next-route-announcer { display: none !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .documento-root { background: #fff; padding: 0; min-height: 0; }
+  .documento { max-width: none; box-shadow: none; }
+  .documento-header { position: fixed; top: 0; left: 0; right: 0; background: #fff; }
+  .documento-footer { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; }
+  .documento-cuerpo { padding-top: calc(var(--alto-header, 0px) + 16px); padding-bottom: calc(var(--alto-footer, 0px) + 16px); }
+  .documento-bloque .variable, .documento-cuerpo .variable { background: none; }
+  .no-print { display: none !important; }
+}
