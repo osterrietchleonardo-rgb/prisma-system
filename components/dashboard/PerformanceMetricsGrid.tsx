@@ -190,6 +190,12 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
                   : []),
               ]
             : []),
+          // Cuánto se movió en propiedades. Se venía calculando desde siempre y
+          // no se mostraba en ninguna pantalla: viajaba hasta los KPIs y ahí
+          // moría. Va justo antes del Honorario Real porque es su denominador —
+          // se lee "facturamos tanto sobre este volumen, o sea a esta tasa".
+          // Una operación trabajada por dos asesores cuenta una sola vez.
+          { label: "Volumen Operado", value: formatUSD(kpis.volumenVentas) },
           { label: "Honorario Real", value: `${kpis.honorarioCobrado.toFixed(1)}%` },
           { label: "Neto Asesores", value: formatUSD(kpis.netoAsesores), subValue: `Agency: ${formatUSD(kpis.companyDollar)}` },
         ]}
