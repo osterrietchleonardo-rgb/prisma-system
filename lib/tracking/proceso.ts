@@ -25,6 +25,36 @@ export function ladoDelNegocio(proceso: ProcesoNegocio | null): LadoDelNegocio |
 }
 
 /**
+ * El otro eje del proceso: si la operación es una compraventa o un alquiler.
+ *
+ * `ladoDelNegocio` parte los cuatro procesos en ofrece/busca; esto los parte por
+ * la otra mitad. Vendedor y comprador son las dos puntas de una venta; locador y
+ * locatario, las de un alquiler.
+ *
+ * Existe porque el dashboard mezclaba las dos cosas: un alquiler y una venta
+ * caían en el mismo GCI y en el mismo conteo de cierres, sin forma de
+ * separarlos. El dato para distinguirlos ya estaba guardado en `proceso` desde
+ * que pasó a cuatro valores — lo que faltaba era que alguien lo leyera.
+ *
+ * Devuelve null en las filas históricas sin proceso definido. Ese null NO se
+ * reparte ni se adivina: se muestra aparte, porque meterlo en cualquiera de los
+ * dos lados sería inventar.
+ */
+export type TipoOperacion = "venta" | "alquiler";
+
+// El parámetro acepta `string` además de `ProcesoNegocio` a propósito: las filas
+// llegan de Postgres como texto plano, y obligar a castear en cada llamada sólo
+// esconde el problema. Las comparaciones son por igualdad, así que un valor raro
+// cae en null igual que un nulo.
+export function operacionDe(
+  proceso: ProcesoNegocio | string | null | undefined
+): TipoOperacion | null {
+  if (proceso === "vendedor" || proceso === "comprador") return "venta";
+  if (proceso === "locador" || proceso === "locatario") return "alquiler";
+  return null;
+}
+
+/**
  * Qué valores de proceso admite cada etapa. Reemplaza al viejo `PROCESO_FIJO`:
  * antes cada etapa fija tenía UN solo valor posible (una captación sólo podía
  * ser "venta"), pero ahora una captación puede ser de un vendedor o de un
