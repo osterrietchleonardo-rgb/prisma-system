@@ -22,6 +22,12 @@ describe("catálogo de plantillas v2 (clientes)", () => {
       expect(p.body.trim().endsWith("}}")).toBe(false)
     }
   })
+  it("regla de Leonardo (10/9): ningún nombre propio a mano en el cuerpo fijo — asesor, director, agencia, cliente y bot son dinámicos", () => {
+    // El nombre de la agencia entra por parámetro (acá "PRISMAIA - VAKDOR"); el del bot va en {{2}}.
+    for (const p of [...plantillasV2("ag57c613", "Inmobiliaria X"), ...plantillasEquipo("ag57c613")]) {
+      expect(p.body).not.toMatch(/Sofía|Sofia|Lara|Central|Kevin|Vakdor|PRISMAIA/)
+    }
+  })
   it("ninguna trae la BAJA fija (la agrega el ejecutor desde el 2º seguimiento)", () => {
     for (const p of cat) expect(p.body).not.toMatch(/BAJA/)
   })

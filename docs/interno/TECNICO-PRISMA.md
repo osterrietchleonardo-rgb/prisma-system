@@ -1547,6 +1547,29 @@ leyó los 156 historiales): 146 son compromiso del asesor sin resolver, 2 el cli
 cliente no le contestó al bot, 6 audios sin transcribir; 126 de los 146 son anteriores al
 encendido del Super Agente (31/8). Leonardo: NO se pasan a perdido (decisión de Kevin).
 
+### 22.11 Regla de producto: nombres dinámicos en plantillas y emails (10/9/2026)
+
+Leonardo: "nombre de asesor, nombre de director, nombre de agencia, nombre de cliente, nombre
+de bot tienen que ser dinámicos en las plantillas que se crean en automático cuando se conecta
+cada cliente, así todas las plantillas de WhatsApp como los emails se adaptan a cada cliente".
+Verificado el 10/9 sobre el catálogo completo (8 base + 5 seguimiento + 5 equipo) y los avisos:
+
+| Nombre | De dónde sale | Dónde va |
+|---|---|---|
+| Asesor / director | `profiles.full_name` → primer nombre | `{{1}}` de las plantillas del equipo; saludo de los emails |
+| Cliente | `metricas.nombre` (validado por `nombreValido`) | `{{1}}` de las plantillas al cliente; dentro de `{{2}}` en los avisos al equipo |
+| Agencia | `agencies.name` | horneado en el cuerpo de las 5 plantillas de seguimiento al crearlas ("te escribo de X"); asunto y pie de los emails. Si la agencia cambia de nombre hay que recrear esas plantillas. |
+| Bot | `whatsapp_ai_settings.bot_name` (agent_id nulo) → `nombresDeBot(db)`; sin nombre, `BOT_GENERICO` | dentro de `{{2}}` de `asesor_registro_pendiente` y de `asesor_cliente_esperando`; emails de registro y de escalera; semilla de la despedida |
+
+Reglas para cualquier plantilla o email nuevo: (1) ningún nombre propio en el cuerpo fijo que
+aprueba Meta; lo único fijo es la marca PRISMA; (2) las explicaciones y el porqué van en la
+variable de texto (`{{2}}`), así cambiarlos no requiere una nueva aprobación de Meta; (3) un
+test que asegure que el cuerpo no contiene `Sofía|Central|Kevin|Lara`; (4) un nombre nuevo se
+pasa desde la corrida como `nombreAgencia` y `nombreBot` (mapa por corrida, una consulta).
+La plantilla `asesor_registro_pendiente` pasó a cuerpo neutro por esta regla (PR #58); la
+versión aprobada en Meta para Central (id 2259260301311141) se edita aparte con
+`scratch/_editar-plantilla-meta.mjs`, con OK.
+
 ## 23. Buscador IA y Tutor IA: la conversación en vivo (2/9/2026)
 
 Punto 1 del plan de agentes (`docs/superpowers/plans/2026-09-02-buscador-conversacion-viva.md`);
