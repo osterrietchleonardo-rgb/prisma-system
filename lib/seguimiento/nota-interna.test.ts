@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest"
-import { MARCADOR_HANDOFF, notaPosterior, coincideTelefono, contextoRegistro, semillaVeredicto, VeredictoNotaSchema, armarAvisoRegistro, procesarNotaDelCaso } from "./nota-interna"
+import { MARCADOR_HANDOFF, notaPosterior, coincideTelefono, contextoRegistro, semillaVeredicto, VeredictoNotaSchema, armarAvisoRegistro, armarAvisoNotaInsuficiente, procesarNotaDelCaso } from "./nota-interna"
 import type { PerfilEquipo } from "./avisos"
 
 /** Fake mínimo: cada from() devuelve una cadena donde todo método se encadena y
@@ -133,6 +133,41 @@ describe("VeredictoNotaSchema", () => {
       pedir_registro_actividad: false, razon: "La nota dice que ya lo llamó",
     }).success).toBe(true)
     expect(VeredictoNotaSchema.safeParse({ atendido: true }).success).toBe(false)
+  })
+})
+
+describe("armarAvisoNotaInsuficiente: la nota no alcanzó, se le dice qué faltó (queja de Carmen, 10/9)", () => {
+  const carmen: PerfilEquipo = { id: "p-2", full_name: "Carmen Gonzalez", role: "asesor", email: "c@x.com", phone: "5491141739232" }
+  const conv = { id: "conv-2", contact_phone: "5491134673022", metricas: { nombre: "Paola" } }
+  const nota = { id: "n-2", content: "Es una gran oferta", created_at: "2026-09-10T15:54:00Z" }
+  const APP = "https://prisma.vakdor.com"
+
+  it("cita la nota y el motivo, dice que los avisos siguen y qué escribir para frenarlos; el bot va por su nombre", () => {
+    const a = armarAvisoNotaInsuficiente(carmen, conv, nota, {
+      atendido: false, pedir_registro_chat: false, pedir_registro_visita: false,
+      pedir_registro_actividad: false, razon: "La nota es un comentario sobre la propiedad, no dice que hayas hablado con Paola.",
+    }, APP, "Central", "Sofía")
+    expect(a.plantilla).toBe("asesor_registro_pendiente")
+    expect(a.asunto).toBe("Paola: leímos tu nota, pero los avisos siguen — Central")
+    expect(a.html).toContain("«Es una gran oferta»")
+    expect(a.html).toContain("La nota es un comentario sobre la propiedad, no dice que hayas hablado con Paola.")
+    expect(a.html).toContain("los avisos de \"cliente esperando\" siguen para este caso")
+    expect(a.html).toContain("desde el <strong>chat de PRISMA</strong>")
+    expect(a.html).toContain("Sofía tenga contexto")
+    expect(a.html).not.toMatch(/reclamo|trazabilidad/)
+    expect(a.variables).toHaveLength(3)
+    expect(a.variables[0]).toBe("Carmen")
+    expect(a.variables[1]).toBe("Vimos tu nota interna sobre Paola (+5491134673022): «Es una gran oferta». No nos quedó claro que ya lo estés atendiendo, así que los avisos de cliente esperando siguen para este caso. Si ya hablaste con el cliente, escribile desde el chat de PRISMA confirmando lo acordado, o dejá una nota que diga que ya hablaste y qué quedó pendiente. Así queda registrado y Sofía tiene contexto para dar un mejor seguimiento al cliente.")
+    expect(a.variables[1].length).toBeLessThanOrEqual(700)
+    expect(a.variables[2]).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-2")
+  })
+  it("una nota larga se recorta para que {{2}} no pase de 700", () => {
+    const larga = { ...nota, content: "x".repeat(900) }
+    const a = armarAvisoNotaInsuficiente(carmen, conv, larga, {
+      atendido: false, pedir_registro_chat: false, pedir_registro_visita: false, pedir_registro_actividad: false, razon: "r",
+    }, APP, "Central")
+    expect(a.variables[1].length).toBeLessThanOrEqual(700)
+    expect(a.variables[1]).toContain("tu Asesor IA tiene contexto")
   })
 })
 
@@ -324,13 +359,53 @@ describe("procesarNotaDelCaso", () => {
     expect(evento?.fila.datos).toMatchObject({ nota_id: "n-1", t0, atendido: true })
   })
 
-  it("veredicto NO atendido (nota-recordatorio): la escalera sigue", async () => {
+  it("veredicto NO atendido: la escalera sigue Y se le avisa al asesor qué le faltó a la nota (una sola vez)", async () => {
+    // Carmen, 10/9: dejó "Ya hablé", la IA la rechazó y nadie se lo dijo; el siguiente aviso
+    // (con copia al director) le pedía "dejá una nota interna", que era lo que ya había hecho.
+    const { db, inserts } = armarDb({ wa_messages: [nota], lead_eventos: [], scheduled_visits: [], wa_contacts: null })
+    const enviados: Array<{ plantilla: string; asunto: string }> = []
+    const enviar = (async (..._args: unknown[]) => { enviados.push(_args[2] as never); return { email: "enviado", whatsapp: "enviado" } }) as never
+    const llamar = async () => ({
+      atendido: false, pedir_registro_chat: false, pedir_registro_visita: false,
+      pedir_registro_actividad: false, razon: "Es solo un recordatorio",
+    })
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar, enviar }))).toBe("no_atendido_avisado")
+    expect(enviados).toHaveLength(1)
+    expect(enviados[0].plantilla).toBe("asesor_registro_pendiente")
+    expect(enviados[0].asunto).toContain("leímos tu nota, pero los avisos siguen")
+    const evento = inserts.find((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_evaluada")
+    expect(evento?.fila.datos).toMatchObject({ nota_id: "n-1", t0, atendido: false })
+  })
+
+  it("veredicto NO atendido ya guardado para esa nota: 'escalera_sigue' sin IA y sin repetir el aviso", async () => {
+    const { db } = armarDb({
+      wa_messages: [nota],
+      lead_eventos: [{ datos: { nota_id: "n-1", t0, atendido: false } }],
+    })
+    const llamar = async () => { throw new Error("no debería llamar a la IA") }
+    const enviar = (async () => { throw new Error("no debería mandar") }) as never
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar, enviar }))).toBe("escalera_sigue")
+  })
+
+  it("veredicto NO atendido sin asesor asignado: la escalera sigue y no hay a quién avisar", async () => {
     const { db } = armarDb({ wa_messages: [nota], lead_eventos: [], scheduled_visits: [], wa_contacts: null })
     const llamar = async () => ({
       atendido: false, pedir_registro_chat: false, pedir_registro_visita: false,
       pedir_registro_actividad: false, razon: "Es solo un recordatorio",
     })
-    expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar }))).toBe("escalera_sigue")
+    const enviar = (async () => { throw new Error("no debería mandar") }) as never
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ llamar, enviar, asesor: null }))).toBe("escalera_sigue")
+  })
+
+  it("veredicto NO atendido en sombra: no manda, registra el simulado", async () => {
+    const { db, inserts } = armarDb({ wa_messages: [nota], lead_eventos: [], scheduled_visits: [], wa_contacts: null })
+    const llamar = async () => ({
+      atendido: false, pedir_registro_chat: false, pedir_registro_visita: false,
+      pedir_registro_actividad: false, razon: "Es solo un recordatorio",
+    })
+    const enviar = (async () => { throw new Error("no debería mandar") }) as never
+    expect(await procesarNotaDelCaso(db, c, t0, opciones({ modo: "sombra", llamar, enviar }))).toBe("no_atendido_simulado")
+    expect(inserts.some((i) => (i.fila.tipo as string) === "aviso_nota_simulado")).toBe(true)
   })
 
   it("en sombra no manda: registra el simulado", async () => {

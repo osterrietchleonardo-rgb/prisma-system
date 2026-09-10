@@ -109,14 +109,23 @@ export const VeredictoNotaSchema = z.object({
 export type VeredictoNota = z.infer<typeof VeredictoNotaSchema>
 export type LlamarVeredicto = (semilla: string) => Promise<VeredictoNota>
 
-/** Decisión de Leonardo (4/9): la nota NO se interpreta con reglas — la lee la IA. */
+/**
+ * Decisión de Leonardo (4/9): la nota NO se interpreta con reglas — la lee la IA.
+ * Ajuste del 10/9 (queja de Carmen): con el prompt anterior la IA rechazaba las notas cortas
+ * («Ya hablé», «Respondido», «Estoy yo en contacto») por "ambiguas" y usaba la falta de visita en
+ * el calendario para no dar por atendido: 6 de 7 rechazos en 10 días eran una asesora diciendo
+ * que ya lo tenía, y la escalera seguía hasta el director. La nota vive DENTRO del chat de ese
+ * cliente: "ya hablé" es con él. Atender y registrar son dos cosas distintas.
+ */
 const PROMPT_NOTA = `Sos el intérprete de notas internas del agente de seguimiento de una inmobiliaria argentina. El sistema escala avisos cuando un cliente queda esperando a un asesor; una nota interna del asesor puede indicar que en realidad ya lo está atendiendo por otro canal. Leé la nota y la conversación y emití un veredicto honesto:
-- atendido: true SOLO si la nota indica que el asesor ya está gestionando a ESTE cliente (lo llamó, coordinó una visita, le está resolviendo algo, o pide explícitamente que no se le dé seguimiento). Un recordatorio o un detalle ("ojo que pregunta por cochera") NO es atención.
-- pedir_registro_chat: true si la gestión ocurrió fuera de PRISMA (teléfono, presencial) y no quedó registrada en el chat.
-- pedir_registro_visita: true SOLO si la nota menciona una visita coordinada Y el dato dice que NO está registrada en el calendario.
+- atendido: true si la nota dice que el asesor ya está en contacto con ESTE cliente o ya se ocupó de lo que esperaba: lo llamó, hablaron, le respondió, coordinó una visita, le está resolviendo algo, o pide explícitamente que no se le dé seguimiento. La nota está escrita DENTRO del chat de este cliente: una nota corta como «ya hablé», «respondido», «estoy en contacto», «ya se habló» o «lo llamé» se refiere a él aunque no lo nombre, y CUENTA como atención. No exijas que diga con quién, cuándo, por dónde ni qué acordaron: eso se pide aparte como registro.
+- atendido: false SOLO si la nota no habla de contacto con el cliente: un recordatorio, un detalle de la propiedad («ojo que pregunta por cochera»), un comentario («es una gran oferta», «buen perfil»), una pregunta al equipo, o un texto redactado como mensaje para el cliente que quedó en la nota y el cliente nunca recibió.
+- Que no haya visita en el calendario ni actividades en el tracking NUNCA baja atendido: eso solo enciende los pedidos de registro.
+- pedir_registro_chat: true si la gestión ocurrió fuera de PRISMA (teléfono, presencial, otro WhatsApp) o la nota no dice por dónde, y después de la nota no hay un mensaje del equipo al cliente en el chat que confirme lo acordado.
+- pedir_registro_visita: true SOLO si la nota o la conversación mencionan una visita coordinada Y el dato dice que NO está registrada en el calendario.
 - pedir_registro_actividad: true SOLO si la gestión que cuenta la nota no aparece reflejada en las actividades del tracking (mirá tipo, fecha y propiedad de cada actividad contra lo que la nota cuenta y la propiedad consultada).
 - razon: una o dos frases en castellano citando la nota; la puede leer el asesor.
-Si la nota es ambigua, atendido=false: la escalera existe para que ningún cliente quede sin atender, y un aviso de más molesta menos que un cliente perdido.`
+La escalera existe para que ningún cliente quede sin atender, pero la palabra del asesor vale: si dice que ya lo tiene, se le cree y se le pide el registro. Rechazar esa nota manda más avisos, con copia al director, a alguien que ya está atendiendo.`
 
 const HERRAMIENTA_VEREDICTO = {
   name: "emitir_veredicto",
@@ -250,9 +259,57 @@ export function armarAvisoRegistro(
   }
 }
 
+/**
+ * La nota NO alcanzó (Carmen, 10/9): la asesora dejó «Ya hablé», la IA la rechazó y nadie se lo
+ * dijo; el siguiente aviso (con copia al director) le pedía "dejá una nota interna", que era lo que
+ * ya había hecho. Ahora se le cuenta qué faltó y qué escribir para frenar los avisos. UNA vez por
+ * nota (el marcador `nota_evaluada` por nota_id es el que lo garantiza). Misma plantilla neutra.
+ */
+export function armarAvisoNotaInsuficiente(
+  perfil: PerfilEquipo,
+  c: { id: string; contact_phone: string; metricas: Record<string, unknown> },
+  nota: NotaInterna,
+  v: VeredictoNota,
+  appUrl: string,
+  nombreAgencia: string,
+  nombreBot: string = BOT_GENERICO
+): Aviso {
+  const cliente = nombreCliente(c)
+  const tel = `+${c.contact_phone.replace(/\D/g, "")}`
+  const link = linkAlChat(perfil, c.id, appUrl)
+  const html = [
+    `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;color:#1a1a1a">`,
+    `<p>Hola ${esc(primerNombre(perfil))},</p>`,
+    `<p>Vimos tu nota sobre <strong>${esc(cliente)}</strong> (${esc(tel)}): <em>«${esc(unaLinea(nota.content, 200))}»</em></p>`,
+    `<p>Por lo que dice, no pudimos confirmar que ya lo estés atendiendo, así que los avisos de "cliente esperando" siguen para este caso. Motivo: ${esc(v.razon)}</p>`,
+    `<p>Si ya hablaste con el cliente, cualquiera de estas dos frena los avisos y hace que quede registrado y ${esc(nombreBot)} tenga contexto para dar un mejor seguimiento al cliente:</p><ul>`,
+    `<li>Mandale desde el <strong>chat de PRISMA</strong> un mensaje confirmando lo que acordaron.</li>`,
+    `<li>Dejá una <strong>nota interna</strong> que diga que ya hablaste con el cliente y qué quedó pendiente.</li>`,
+    `</ul>`,
+    `<p><a href="${link}" style="display:inline-block;background:#111;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Abrir el chat en PRISMA</a></p>`,
+    `<p style="color:#888;font-size:13px">— Agente de seguimiento de PRISMA · ${esc(nombreAgencia)}</p>`,
+    `</div>`,
+  ].join("\n")
+  // {{2}} de `asesor_registro_pendiente` (tope 700): la nota se recorta a lo que queda después del
+  // texto fijo, así una nota larga nunca rompe el envío.
+  const fijo = (n: string) =>
+    `Vimos tu nota interna sobre ${cliente} (${tel}): «${n}». No nos quedó claro que ya lo estés atendiendo, así que los avisos de cliente esperando siguen para este caso. Si ya hablaste con el cliente, escribile desde el chat de PRISMA confirmando lo acordado, o dejá una nota que diga que ya hablaste y qué quedó pendiente. Así queda registrado y ${nombreBot} tiene contexto para dar un mejor seguimiento al cliente.`
+  const margen = 700 - fijo("").length
+  return {
+    destinatario: perfil,
+    esAsignado: true,
+    link,
+    asunto: `${cliente}: leímos tu nota, pero los avisos siguen — ${nombreAgencia}`,
+    html,
+    plantilla: "asesor_registro_pendiente",
+    variables: [primerNombre(perfil), fijo(unaLinea(nota.content, Math.max(20, margen))), link],
+  }
+}
+
 export type ResultadoNota =
   | "sin_nota" | "escalera_sigue" | "atendido_sin_aviso"
-  | "atendido_avisado" | "atendido_simulado" | "error_ia"
+  | "atendido_avisado" | "atendido_simulado"
+  | "no_atendido_avisado" | "no_atendido_simulado" | "error_ia"
 
 /**
  * El caso tiene nota → la IA decide. Una evaluación por nota (evento `nota_evaluada`
@@ -332,7 +389,20 @@ export async function procesarNotaDelCaso(
     return veredicto.atendido ? "atendido_sin_aviso" : "escalera_sigue"
   }
 
-  if (!veredicto.atendido) return "escalera_sigue"
+  if (!veredicto.atendido) {
+    // La escalera sigue igual; lo nuevo es que el asesor se entera de que su nota no alcanzó
+    // y de qué escribir. Sin asesor asignado no hay a quién contárselo.
+    if (!opts.asesor) return "escalera_sigue"
+    const aviso = armarAvisoNotaInsuficiente(opts.asesor, c, nota, veredicto, opts.appUrl, opts.nombreAgencia, opts.nombreBot ?? BOT_GENERICO)
+    if (opts.modo !== "activo") {
+      await registrarEvento(db, c.agency_id, c.id, "aviso_nota_simulado",
+        `[${opts.modo}] se le habría avisado al asesor ${opts.asesor.full_name ?? ""} que su nota no alcanzó para frenar la escalera`,
+        { nota_id: nota.id, asunto: aviso.asunto })
+      return "no_atendido_simulado"
+    }
+    await (opts.enviar ?? enviarAviso)(db, c as never, aviso, opts.nombreAgencia, { fetchFn: opts.fetchFn })
+    return "no_atendido_avisado"
+  }
   const hayPedidos = veredicto.pedir_registro_chat || veredicto.pedir_registro_visita || veredicto.pedir_registro_actividad
   if (!hayPedidos || !opts.asesor) return "atendido_sin_aviso"
 

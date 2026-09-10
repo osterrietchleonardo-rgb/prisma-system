@@ -223,7 +223,7 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
     expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_evaluada")).toBe(true)
   })
 
-  it("veredicto NO atendido ⇒ la escalera manda el nivel como siempre", async () => {
+  it("veredicto NO atendido ⇒ la escalera manda el nivel como siempre, y ADEMÁS le dice al asesor que su nota no alcanzó (10/9)", async () => {
     const { db, inserts } = armarDbCorrida()
     const llamarNota = async () => ({
       atendido: false, pedir_registro_chat: false, pedir_registro_visita: false,
@@ -231,8 +231,10 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
     })
     const fetchOk = (async () => ({ ok: true, json: async () => ({ id: "r-1" }) })) as never
     const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
-    expect(r.avisos).toBe(1)
+    expect(r.avisos).toBe(2)
     expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "escalera")).toBe(true)
+    const asuntos = inserts.filter((i) => i.tabla === "interacciones_canal" && i.fila.canal === "email").map((i) => String(i.fila.asunto))
+    expect(asuntos.some((a) => a.includes("leímos tu nota, pero los avisos siguen"))).toBe(true)
   })
 
   it("si la lectura de la nota explota, la corrida NO se cae: sale el nivel y queda el evento nota_error", async () => {

@@ -314,11 +314,13 @@ export async function correrEscalamiento(
         if (rNota === "atendido_avisado") resumen.avisos++
         continue
       }
+      if (rNota === "no_atendido_avisado") resumen.avisos++
 
       // La despedida no es una espera (Kevin, 7/9): sin nota, o con una nota que no dijo
       // "atendido", la IA lee la conversación y decide si el cliente espera algo. Con
       // `error_ia` de la nota no se insiste: si la API está caída, está caída para las dos.
-      if ((rNota === "sin_nota" || rNota === "escalera_sigue") && llamadasIA < MAX_LLAMADAS_IA) {
+      const notaNoFreno = rNota === "sin_nota" || rNota === "escalera_sigue" || rNota.startsWith("no_atendido")
+      if (notaNoFreno && llamadasIA < MAX_LLAMADAS_IA) {
         let rDesp: ResultadoDespedida | null = null
         try {
           rDesp = await procesarDespedidaDelCaso(db, c, t0, { ahoraMs, llamar: opts.llamarDespedida, nombreBot: bot(c.agency_id) })
