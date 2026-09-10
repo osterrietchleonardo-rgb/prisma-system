@@ -16,7 +16,7 @@ import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { AlertCircle } from "lucide-react";
-import { PIPELINE_STAGES, buildPipeline, type PipelineCard } from "@/lib/tracking/pipeline";
+import { mensajeDeEtapaDelOtroLado, PIPELINE_STAGES, buildPipeline, type PipelineCard } from "@/lib/tracking/pipeline";
 import type { ActivityType, PerformanceLog, PipelineMove } from "@/lib/tracking/types";
 import { movePipelineCard } from "@/actions/tracking/movePipelineCard";
 import { PipelineColumnView } from "./PipelineColumn";
@@ -68,10 +68,10 @@ export function PipelineBoard({ logs, moves, isDirector, cardFilter, onRefresh, 
     // negocio. La tarjeta vuelve sola porque su posición se recalcula desde los
     // datos, así que alcanza con explicar por qué y no refrescar.
     if (!etapasPermitidas(card.proceso).includes(destino)) {
-      toast.error(
-        `${PIPELINE_STAGES.find((s) => s.id === destino)?.title} es del otro lado del negocio: ` +
-          `esta tarjeta es de ${labelDeProceso(card.proceso)}.`
-      );
+      // El texto vive en lib/tracking/pipeline.ts para poder probarlo: este
+      // aviso aparece al soltar una tarjeta arrastrada, y eso es de lo más
+      // difícil de reproducir sin una persona.
+      toast.error(mensajeDeEtapaDelOtroLado(card.proceso, destino), { duration: 8000 });
       return;
     }
 

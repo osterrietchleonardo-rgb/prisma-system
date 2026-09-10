@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildPipeline } from "./pipeline";
+import { buildPipeline, mensajeDeEtapaDelOtroLado } from "./pipeline";
+import { labelDeProceso } from "./proceso";
 import type { ActivityType, PerformanceLog, PipelineMove } from "./types";
 
 /** Un log mínimo pero completo, vinculado por defecto al contacto de WhatsApp "wa-1". */
@@ -160,5 +161,44 @@ describe("buildPipeline: lo de siempre no se rompe", () => {
       []
     );
     expect(cards[0].cardKey).toBe(`${cards[0].clientKey}::comprador`);
+  });
+});
+
+describe("mensajeDeEtapaDelOtroLado", () => {
+  it("dice la salida, no solo la regla", () => {
+    // El caso real que origino esto: un asesor de Central intento llevar a su
+    // cliente de Captacion a Prebuying y leyo el rechazo como una prohibicion.
+    const msg = mensajeDeEtapaDelOtroLado("vendedor", "prebuying");
+    expect(msg).toContain("es del otro lado del negocio");
+    expect(msg).toContain("Vendedor");
+    // Lo que faltaba y es la unica parte que le sirve:
+    expect(msg).toContain("Abrir proceso de Comprador");
+  });
+
+  it("ofrece el proceso opuesto del MISMO tipo de operacion", () => {
+    // Una venta se sigue con vendedor y comprador; un alquiler, con locador y
+    // locatario. Ofrecerle "Comprador" a un Locador seria mandarlo a cargar mal.
+    expect(mensajeDeEtapaDelOtroLado("locador", "prebuying")).toContain("Abrir proceso de Locatario");
+    expect(mensajeDeEtapaDelOtroLado("locatario", "captacion")).toContain("Abrir proceso de Locador");
+    expect(mensajeDeEtapaDelOtroLado("comprador", "captacion")).toContain("Abrir proceso de Vendedor");
+  });
+
+  it("nunca le ofrece abrir el proceso que la tarjeta ya es", () => {
+    for (const proceso of ["vendedor", "comprador", "locador", "locatario"] as const) {
+      const msg = mensajeDeEtapaDelOtroLado(proceso, "prebuying");
+      expect(msg).not.toContain(`Abrir proceso de ${labelDeProceso(proceso)}`);
+    }
+  });
+
+  it("nombra la columna a la que quiso ir", () => {
+    expect(mensajeDeEtapaDelOtroLado("vendedor", "prebuying")).toMatch(/^Prebuying/);
+    expect(mensajeDeEtapaDelOtroLado("comprador", "captacion")).toMatch(/^Captaci/);
+  });
+
+  it("sin proceso definido explica pero no inventa una salida", () => {
+    // Una tarjeta historica sin proceso no tiene un opuesto que ofrecer.
+    const msg = mensajeDeEtapaDelOtroLado(null, "prebuying");
+    expect(msg).toContain("es del otro lado del negocio");
+    expect(msg).not.toContain("Abrir proceso");
   });
 });
