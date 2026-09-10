@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizarPlantilla, docVacio, DOC_VACIO, MAX_NOMBRE } from "./plantilla";
+import { normalizarPlantilla, docVacio, DOC_VACIO, MAX_NOMBRE, MAX_SOLAPE } from "./plantilla";
 
 describe("normalizarPlantilla", () => {
   it("de nada devuelve una plantilla vacía, inactiva, sin header ni footer, con el bloque en 'ninguno'", () => {
@@ -8,7 +8,7 @@ describe("normalizarPlantilla", () => {
     expect(p.cuerpo).toEqual(DOC_VACIO);
     expect(p.header_path).toBeNull();
     expect(p.footer_path).toBeNull();
-    expect(p.bloque_asesor).toEqual({ texto: DOC_VACIO, posicion: "ninguno" });
+    expect(p.bloque_asesor).toEqual({ texto: DOC_VACIO, posicion: "ninguno", solape: 0 });
     expect(p.version).toBe(1);
     expect(p.activa).toBe(false);
   });
@@ -21,6 +21,14 @@ describe("normalizarPlantilla", () => {
   it("una posición inventada cae en 'ninguno'", () => {
     const p = normalizarPlantilla({ bloque_asesor: { texto: DOC_VACIO, posicion: "arriba" } });
     expect(p.bloque_asesor.posicion).toBe("ninguno");
+  });
+
+  it("el solape del bloque sobre la imagen es un entero entre 0 y el tope; lo que no, cae en 0", () => {
+    expect(normalizarPlantilla({ bloque_asesor: { texto: DOC_VACIO, posicion: "footer", solape: 60 } }).bloque_asesor.solape).toBe(60);
+    expect(normalizarPlantilla({ bloque_asesor: { texto: DOC_VACIO, posicion: "footer", solape: 999 } }).bloque_asesor.solape).toBe(MAX_SOLAPE);
+    expect(normalizarPlantilla({ bloque_asesor: { texto: DOC_VACIO, posicion: "footer", solape: -5 } }).bloque_asesor.solape).toBe(0);
+    expect(normalizarPlantilla({ bloque_asesor: { texto: DOC_VACIO, posicion: "footer", solape: "40" } }).bloque_asesor.solape).toBe(0);
+    expect(normalizarPlantilla({ bloque_asesor: { texto: DOC_VACIO, posicion: "footer" } }).bloque_asesor.solape).toBe(0);
   });
 
   it("un cuerpo que no es un doc de Tiptap cae en el doc vacío", () => {

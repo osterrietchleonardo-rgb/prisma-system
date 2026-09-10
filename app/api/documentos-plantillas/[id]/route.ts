@@ -5,9 +5,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { requireTenant } from "@/lib/auth/tenant-validation";
-import {
-  normalizarPlantilla, docVacio, esDoc, POSICIONES, MAX_NOMBRE, DOC_VACIO, type PosicionBloque,
-} from "@/lib/documentos/plantilla";
+import { normalizarPlantilla, normalizarBloque, docVacio, esDoc, MAX_NOMBRE, DOC_VACIO } from "@/lib/documentos/plantilla";
 import { urlPublica } from "@/lib/documentos/storage";
 
 export const dynamic = "force-dynamic";
@@ -60,11 +58,7 @@ export async function PUT(req: Request, { params }: Ctx) {
     if (!nombre) return NextResponse.json({ error: "Ponele un nombre a la plantilla." }, { status: 400 });
 
     const cuerpo = esDoc(body.cuerpo) ? body.cuerpo : DOC_VACIO;
-    const bloqueIn = (body.bloque_asesor && typeof body.bloque_asesor === "object" ? body.bloque_asesor : {}) as Record<string, unknown>;
-    const bloque_asesor = {
-      texto: esDoc(bloqueIn.texto) ? bloqueIn.texto : DOC_VACIO,
-      posicion: POSICIONES.includes(bloqueIn.posicion as PosicionBloque) ? bloqueIn.posicion : "ninguno",
-    };
+    const bloque_asesor = normalizarBloque(body.bloque_asesor);
     const activa = body.activa === true;
     if (activa && docVacio(cuerpo)) {
       return NextResponse.json(

@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { ArrowLeft, Loader2, Save, Trash2, Upload } from "lucide-react";
 import { EditorDocumento } from "./EditorDocumento";
 import { RenderDocumento } from "./RenderDocumento";
-import { normalizarPlantilla, POSICIONES, type Plantilla, type PosicionBloque } from "@/lib/documentos/plantilla";
+import { normalizarPlantilla, POSICIONES, MAX_SOLAPE, type Plantilla, type PosicionBloque } from "@/lib/documentos/plantilla";
 import { GUIA_IMAGEN } from "@/lib/documentos/imagen-reglas";
 import type { SnapshotDocumento } from "@/lib/documentos/snapshot";
 
@@ -208,6 +208,20 @@ export function PlantillaForm({ id, onVolver }: { id: string; onVolver: () => vo
               </button>
             ))}
           </div>
+          {p.bloque_asesor.posicion !== "ninguno" && (urls.header || urls.footer) && (
+            <div className="space-y-1 pt-1">
+              <label htmlFor="bloque-solape" className="text-xs text-muted-foreground">
+                Encimar el bloque sobre la imagen: <b>{p.bloque_asesor.solape} px</b>. Si tu imagen tiene aire arriba (un recuadro que sobresale, una línea al medio), subilo hasta que el bloque quede pegado a la línea. Mirá la vista previa.
+              </label>
+              <input
+                id="bloque-solape" type="range" min={0} max={MAX_SOLAPE} step={2}
+                value={p.bloque_asesor.solape}
+                onChange={(e) => setP({ ...p, bloque_asesor: { ...p.bloque_asesor, solape: Number(e.target.value) } })}
+                className="w-full accent-[var(--accent)]"
+                data-testid="bloque-solape"
+              />
+            </div>
+          )}
         </div>
 
         <Franja cual="footer" />

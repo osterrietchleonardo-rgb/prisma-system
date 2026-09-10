@@ -118,7 +118,7 @@ export function EditorDocumento({
         <Sep />
         <Boton title="Insertar variable (o escribí @)" on={() => editor.chain().focus().insertContent("@").run()}><AtSign className="h-4 w-4" /></Boton>
         <span className="ml-auto text-[11px] text-muted-foreground pr-1 hidden sm:inline">
-          Escribí <b>@</b> para poner el nombre, el mail o el celular del asesor
+          <b>@</b> pone una variable · <b>Enter</b> párrafo nuevo · <b>Shift+Enter</b> salto de línea
         </span>
       </div>
       <EditorContent editor={editor} />

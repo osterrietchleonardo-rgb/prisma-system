@@ -17,7 +17,7 @@ export function marcaDeAgua(color: string): string {
   const c = /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : "#0a1f33";
   const svg =
     `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 794 1000'>` +
-    `<g fill='none' stroke='${c}' stroke-width='3.5' stroke-linejoin='round' stroke-linecap='round' opacity='0.11' transform='translate(197 300)'>` +
+    `<g fill='none' stroke='${c}' stroke-width='4' stroke-linejoin='round' stroke-linecap='round' opacity='0.2' transform='translate(197 300)'>` +
     // edificio alto
     `<rect x='40' y='80' width='120' height='300'/>` +
     `<path d='M70 110h20M110 110h20M70 150h20M110 150h20M70 190h20M110 190h20M70 230h20M110 230h20M70 270h20M110 270h20M70 310h20M110 310h20'/>` +
@@ -42,6 +42,10 @@ export function RenderDocumento({ snap }: { snap: SnapshotDocumento }) {
   const bloqueHtml = generarHtml(bloque.texto);
   const arriba = bloque.posicion === "header" || bloque.posicion === "ambos";
   const abajo = bloque.posicion === "footer" || bloque.posicion === "ambos";
+  // El bloque se encima sobre la imagen de la franja los px que pidió el director (solo si hay imagen).
+  const solape = Math.max(0, bloque.solape ?? 0);
+  const estiloArriba = plantilla.header_url && solape ? { marginTop: `-${solape}px` } : undefined;
+  const estiloAbajo = plantilla.footer_url && solape ? { marginBottom: `-${solape}px` } : undefined;
 
   const colores = snap.brand?.colors?.filter(Boolean) ?? [];
   const marca1 = colores[0] || COLORES_POR_DEFECTO[0];
@@ -62,7 +66,7 @@ export function RenderDocumento({ snap }: { snap: SnapshotDocumento }) {
           <img src={plantilla.header_url} alt="" className="documento-franja" />
         )}
         {arriba && bloqueHtml && (
-          <div className="documento-bloque" dangerouslySetInnerHTML={{ __html: bloqueHtml }} />
+          <div className="documento-bloque" style={estiloArriba} dangerouslySetInnerHTML={{ __html: bloqueHtml }} />
         )}
       </header>
 
@@ -70,7 +74,7 @@ export function RenderDocumento({ snap }: { snap: SnapshotDocumento }) {
 
       <footer className="documento-footer">
         {abajo && bloqueHtml && (
-          <div className="documento-bloque" dangerouslySetInnerHTML={{ __html: bloqueHtml }} />
+          <div className="documento-bloque" style={estiloAbajo} dangerouslySetInnerHTML={{ __html: bloqueHtml }} />
         )}
         {plantilla.footer_url && (
           // eslint-disable-next-line @next/next/no-img-element

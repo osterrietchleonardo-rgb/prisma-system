@@ -21,7 +21,7 @@ export interface SnapshotDocumento {
     cuerpo: DocTiptap;
     header_url: string | null;
     footer_url: string | null;
-    bloque_asesor: { texto: DocTiptap; posicion: PosicionBloque };
+    bloque_asesor: { texto: DocTiptap; posicion: PosicionBloque; solape: number };
   };
   agent: AgenteSnapshot;
   agency: { id: string; name: string };
@@ -50,6 +50,7 @@ export function armarSnapshot(args: {
       bloque_asesor: {
         texto: aplicarVariables(plantilla.bloque_asesor.texto, valores),
         posicion: plantilla.bloque_asesor.posicion,
+        solape: plantilla.bloque_asesor.solape ?? 0,
       },
     },
     agent,

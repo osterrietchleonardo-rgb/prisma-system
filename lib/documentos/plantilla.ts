@@ -10,9 +10,16 @@ export const POSICIONES: readonly PosicionBloque[] = ["header", "footer", "ambos
 export type DocTiptap = { type: "doc"; content?: unknown[] };
 export const DOC_VACIO: DocTiptap = { type: "doc", content: [] };
 
+/** Hasta cuántos px puede subir el bloque sobre la imagen del footer (o bajar sobre la del header). */
+export const MAX_SOLAPE = 200;
+
 export interface BloqueAsesor {
   texto: DocTiptap;
   posicion: PosicionBloque;
+  /** Cuánto se encima el bloque sobre la imagen de la franja, en px. Sirve para imágenes con
+   *  aire arriba (el footer de Central: el recuadro azul sobresale y la línea queda al medio):
+   *  sin esto, el bloque queda lejos de la línea. 0 = no se encima. */
+  solape: number;
 }
 
 export interface Plantilla {
@@ -39,12 +46,21 @@ export function esDoc(v: unknown): v is DocTiptap {
 
 const doc = (v: unknown): DocTiptap => (esDoc(v) ? v : DOC_VACIO);
 
-export function normalizarPlantilla(raw: unknown): Plantilla {
-  const r = esObjeto(raw) ? raw : {};
-  const bloque = esObjeto(r.bloque_asesor) ? r.bloque_asesor : {};
+/** La forma del bloque del asesor, limpia. La usan normalizarPlantilla y el PUT del endpoint. */
+export function normalizarBloque(raw: unknown): BloqueAsesor {
+  const bloque = esObjeto(raw) ? raw : {};
   const posicion = POSICIONES.includes(bloque.posicion as PosicionBloque)
     ? (bloque.posicion as PosicionBloque)
     : "ninguno";
+  const solape =
+    typeof bloque.solape === "number" && Number.isFinite(bloque.solape)
+      ? Math.min(MAX_SOLAPE, Math.max(0, Math.round(bloque.solape)))
+      : 0;
+  return { texto: doc(bloque.texto), posicion, solape };
+}
+
+export function normalizarPlantilla(raw: unknown): Plantilla {
+  const r = esObjeto(raw) ? raw : {};
 
   return {
     id: typeof r.id === "string" ? r.id : "",
@@ -52,7 +68,7 @@ export function normalizarPlantilla(raw: unknown): Plantilla {
     cuerpo: doc(r.cuerpo),
     header_path: typeof r.header_path === "string" && r.header_path ? r.header_path : null,
     footer_path: typeof r.footer_path === "string" && r.footer_path ? r.footer_path : null,
-    bloque_asesor: { texto: doc(bloque.texto), posicion },
+    bloque_asesor: normalizarBloque(r.bloque_asesor),
     version: typeof r.version === "number" && r.version >= 1 ? Math.floor(r.version) : 1,
     activa: r.activa === true,
     updated_at: typeof r.updated_at === "string" ? r.updated_at : "",

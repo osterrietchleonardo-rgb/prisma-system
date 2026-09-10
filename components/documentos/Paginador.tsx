@@ -111,9 +111,10 @@ function armar(root: HTMLElement) {
   /** Espacio libre en la hoja actual, en px. */
   const libre = () => hueco - usado();
 
-  const colocar = (original: HTMLElement) => {
-    // Un párrafo vacío (el Enter final del editor) no ocupa una hoja.
-    if (!original.textContent?.trim() && !original.querySelector("img")) return;
+  const colocar = (original: HTMLElement, esUltimo: boolean) => {
+    // Los renglones vacíos se respetan (son saltos de línea que puso el director), salvo el
+    // último de todos, que es el Enter final del editor y no tiene que abrir una hoja nueva.
+    if (esUltimo && !original.textContent?.trim() && !original.querySelector("img")) return;
     const b = original.cloneNode(true) as HTMLElement;
     cuerpo.appendChild(b);
     if (entra()) return;
@@ -156,7 +157,7 @@ function armar(root: HTMLElement) {
   };
 
   nuevaHoja();
-  for (const bloque of bloques) colocar(bloque);
+  bloques.forEach((bloque, i) => colocar(bloque, i === bloques.length - 1));
 
   // "Hoja 1 de 3", arriba del footer, a la derecha. Solo si hay más de una.
   const hojas = Array.from(cont.querySelectorAll<HTMLElement>(".hoja"));
