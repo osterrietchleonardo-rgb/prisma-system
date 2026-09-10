@@ -64,6 +64,15 @@ marca de agua, "Hoja N de M" (TECNICO §24). (5) "Crear" se quedó cargando por 
 del servidor; ahora el formulario y la lista muestran el error con "Reintentar" en vez de
 girar para siempre.
 
+**Tercera vuelta (10-sep, madrugada):** "me encantó, pero" — (a) el bloque del asesor quedaba
+lejos de la línea azul porque el recuadro del footer sobresale: control "Encimar el bloque
+sobre la imagen" (`bloque_asesor.solape`, px), generalizable a cualquier imagen con aire;
+(b) marca de agua más visible y línea fina del margen izquierdo en el color de acento; (c)
+"que el editor me deje hacer saltos de línea y se muestre en el preview": Enter/Shift+Enter ya
+andaban, lo que se perdía era el renglón vacío (párrafo vacío de alto cero, y el Paginador lo
+salteaba). El dev server tardaba "una eternidad" con la máquina sin memoria: se sirve el
+build de producción en :3009 (`next start`), 0,13 s por pantalla.
+
 **Cómo se probó:** PRISMAIA - VAKDOR, Chrome real por Playwright (`playwright-core` con
 `channel: "chrome"`, instalado en el scratchpad), cuenta de asesor **descartable** creada por
 API (`scratch/documentos-asesor-descartable.mjs crear|borrar`). Tecleando, nunca `fill()`.

@@ -1628,6 +1628,14 @@ director arma una plantilla UNA vez y cada asesor la comparte con sus clientes c
   1000 px en pantalla y centrada en cada hoja impresa; `Paginador` copia el `style` en línea a la
   copia paginada y agrega "Hoja N de M". **Gotcha:** el color va crudo adentro del SVG, porque el
   `encodeURIComponent` del data URI ya escapa el `#`; escaparlo dos veces deja el trazo invisible.
+- **`bloque_asesor.solape`** (0-200 px, `normalizarBloque()` en `lib/documentos/plantilla.ts`, usado
+  por `normalizarPlantilla` y por el PUT): cuánto se encima el bloque sobre la imagen de la franja
+  (`margin-bottom` negativo sobre el footer, `margin-top` sobre el header; solo si hay imagen). Nace
+  del footer de Central: el recuadro azul sobresale y la línea queda al medio, así que sin esto el
+  bloque quedaba lejos de la línea. El alto de la franja que mide el Paginador ya lo descuenta.
+  También: línea fina en el margen izquierdo del cuerpo (`.documento-cuerpo::before`, `--marca2`),
+  marca de agua a opacidad 0,2, y **los párrafos vacíos ocupan una línea** (`p:empty::before`) y el
+  Paginador los respeta salvo el último (el Enter final del editor).
 - **Editor:** `EditorDocumento.tsx` (Tiptap React + `tippy.js` para el menú de `@`). Gotcha: al
   configurar `Mention` en el cliente hay que sobreescribir `renderHTML` igual que en el servidor;
   si no, el por defecto antepone el `@` a una etiqueta que ya lo trae y se ve `@@nombre`.

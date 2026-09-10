@@ -596,7 +596,8 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 1. Escribí un nombre y tocá **"Crear nueva plantilla"**.
 2. **Header y footer** (los dos son opcionales): subís una imagen para cada uno, como una franja apaisada de ancho completo (PNG o JPG, de al menos 1600 píxeles de ancho, hasta 2 MB). Ahí van tus logos, el teléfono y la dirección de la inmobiliaria, como vos los diseñes. **Lo que NO tiene que tener la imagen: los datos del asesor.** Esos los pone PRISMA por cada persona (ver el punto 4). Si la imagen no sirve, te dice por qué y el archivo sigue elegido para que corrijas.
 3. **Cuerpo:** escribilo como en Word: negrita, cursiva, subrayado, títulos, listas, alineación. Escribí **@** y elegí una variable: `@nombre`, `@email`, `@celular`, `@categoria` (Client Director / Client Support) o `@agencia`. Por ejemplo: "Hola, soy @nombre y trabajo en @agencia".
-4. **Bloque del asesor:** una o dos líneas con las variables, por ejemplo `@nombre | @categoria` y abajo `@email | Cel: @celular`. Elegís dónde va: debajo del header, arriba del footer, en los dos, o en ninguno.
+4. **Bloque del asesor:** una o dos líneas con las variables, por ejemplo `@nombre | @categoria` y abajo `@email | Cel: @celular`. Elegís dónde va: debajo del header, arriba del footer, en los dos, o en ninguno. Si tu imagen tiene aire arriba (un recuadro que sobresale, una línea al medio), con el control **"Encimar el bloque sobre la imagen"** lo subís hasta que quede pegado a la línea; lo ves en la vista previa.
+   > 💡 En el editor, **Enter** abre un párrafo nuevo, **Shift+Enter** hace un salto de línea dentro del mismo párrafo, y Enter dos veces deja un renglón vacío, como en Word.
 5. A la derecha ves **cómo lo va a ver el cliente**, con los datos de un asesor real de tu equipo, mientras escribís.
 6. Prendé **"Activa"** y **"Guardar"**. Mientras esté apagada, es un borrador: la ves vos, tus asesores no.
 
