@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { normalizePhoneE164 } from "@/lib/whatsapp/phone";
 import type { ActivityType, PerformanceLog, PipelineMove } from "./types";
-import { cardKeyDe, type ProcesoNegocio } from "./proceso";
+import { cardKeyDe, labelDeProceso, type ProcesoNegocio } from "./proceso";
 
 export interface PipelineStageDef {
   id: ActivityType;
@@ -87,6 +87,52 @@ export interface PipelineCard {
  * Devuelve null si el registro no tiene ningún cliente vinculado: esos no
  * generan tarjeta (se cuentan aparte para avisarle al usuario).
  */
+/**
+ * Qué decirle a alguien que arrastró una tarjeta a una columna del otro lado
+ * del negocio.
+ *
+ * Existe por una queja real: un asesor de Central intentó llevar a su cliente
+ * de Captación a Prebuying, el tablero se lo rechazó, y escribió pidiendo
+ * "poder usar al mismo cliente en captación y en prebuying". Se puede desde
+ * siempre —el cliente lleva una tarjeta por proceso— pero el mensaje explicaba
+ * la regla sin decir la salida, así que se leía como una prohibición.
+ *
+ * Por eso la segunda oración no es un adorno: es la única parte que le sirve.
+ * Un mensaje de error que no dice qué hacer manda a la gente a pedir ayuda.
+ *
+ * Está acá y no dentro del componente para poder probar el texto: el mensaje
+ * aparece al soltar una tarjeta arrastrada, que es de lo más difícil de
+ * reproducir sin una persona.
+ */
+export function mensajeDeEtapaDelOtroLado(
+  proceso: ProcesoNegocio | null,
+  destino: ActivityType
+): string {
+  const columna = PIPELINE_STAGES.find((s) => s.id === destino)?.title ?? "Esa columna";
+  const esDe = labelDeProceso(proceso);
+  const falta = proceso ? PROCESO_OPUESTO[proceso] : null;
+
+  const explicacion = `${columna} es del otro lado del negocio: esta tarjeta es de ${esDe}.`;
+  if (!falta) return explicacion;
+
+  return (
+    `${explicacion} Para seguir al mismo cliente como ${labelDeProceso(falta)}, ` +
+    `abrí su ficha y tocá "Abrir proceso de ${labelDeProceso(falta)}".`
+  );
+}
+
+/**
+ * El proceso del otro lado, del mismo tipo de operación: el que hay que abrirle
+ * al cliente para seguirlo también por ahí. Una venta se sigue con vendedor y
+ * comprador; un alquiler, con locador y locatario.
+ */
+const PROCESO_OPUESTO: Record<ProcesoNegocio, ProcesoNegocio> = {
+  vendedor: "comprador",
+  comprador: "vendedor",
+  locador: "locatario",
+  locatario: "locador",
+};
+
 export function clientKeyFromLog(log: PerformanceLog): string | null {
   if (log.wa_contact_id) {
     const phone = normalizePhoneE164(log.wa_contacts?.phone);
