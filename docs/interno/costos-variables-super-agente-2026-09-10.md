@@ -1,117 +1,143 @@
-# Costos variables del Super Agente de Seguimiento — Central Real Estate (10/9/2026)
+# El Super Agente de Seguimiento en Central: qué hace, qué vale, qué cuesta (últimos 30 días)
 
-> Pedido de Leonardo: "análisis detallado de los gastos variables de este super agente, y todo
-> lo que hace detrás, cada costo, para solicitar que mi cliente me pague estos gastos por mes".
-> Todo lo de acá sale de la base de producción (Central, agencia `4962bf85`) y de las tarifas
-> oficiales, con la fuente al lado. Período medido: **1 al 9 de septiembre de 2026** (9 días
-> completos desde el encendido del 1/9 00:07). La proyección mensual es ×30/9 sobre ese ritmo.
+> Pedido de Leonardo (10/9): análisis de los gastos variables del Super Agente "para solicitar
+> que mi cliente me pague estos gastos por mes", del período de los últimos 30 días, "más
+> explicado para mostrarle lo que vale, qué es lo que hace, cuál es el valor, la oportunidad".
+> Período: **11 de agosto al 10 de septiembre de 2026**. Todo sale de la base de producción de
+> Central (agencia `4962bf85`) y de tarifas oficiales, con la fuente al lado. Versión para
+> compartir: artefacto "Costos del Super Agente" (misma información, en página).
 
-## 1. Qué hace el Super Agente cada media hora (y qué cuesta cada paso)
+## 1. Qué es, en una frase
 
-Un reloj en n8n llama tres tareas cada 30 minutos entre las 6 y las 23 (hora Argentina).
+Un sistema que cada media hora, de 6 a 23, revisa todas las conversaciones de WhatsApp de la
+agencia y se ocupa de dos cosas que antes no hacía nadie: **que ningún cliente quede esperando
+a un asesor sin que alguien se entere**, y **que ningún cliente que se enfrió quede olvidado**.
+Deja escrito todo lo que hace en la ficha de cada cliente, y el director lo ve en Trazabilidad.
 
-| Paso | Qué hace | Costo variable que genera |
+## 2. Antes y después (el dato que lo explica todo)
+
+Derivaciones del bot a un asesor ("Handoff activado") y qué pasó con ellas, por mes. Fuente:
+`wa_messages` (marca de handoff; atendida = un mensaje humano o una nota después).
+
+| Mes | Derivaciones | Atendidas | % atendidas | Mediana de horas hasta la respuesta | Atendidas en menos de 24 h |
+|---|---|---|---|---|---|
+| Julio | 55 | 16 | 29 % | 17,5 h | 11 |
+| Agosto (sistema en sombra) | 113 | 19 | **17 %** | **238 h (10 días)** | 7 |
+| Septiembre, 1 al 10 (sistema activo) | 34 | 17 | **50 %** | **12,3 h** | 12 |
+
+Con el sistema encendido, la proporción de clientes atendidos se triplicó respecto de agosto y
+el tiempo de respuesta bajó de diez días a doce horas. Muestra chica (10 días), pero es el
+mismo equipo, los mismos clientes y la misma temporada.
+
+## 3. Qué hizo en los 30 días
+
+Dos tramos: **en sombra** del 11 al 31 de agosto (decidía y registraba, sin mandar nada: la
+prueba antes de encender) y **activo** desde el 1 de septiembre.
+
+| Lo que hizo | Sombra 11–31/8 | Activo 1–10/9 | Fuente |
+|---|---|---|---|
+| Decisiones de seguimiento al cliente (la IA leyó el chat y decidió) | 725 (378 contactar, 284 escalar, 55 abandonar, 8 posponer), ninguna ejecutada | 35 (16 contactar, 15 escalar, 4 abandonar), 32 ejecutadas | `seguimiento_decisiones` |
+| Mensajes de seguimiento enviados a clientes | 0 | 28 (13 de utilidad, 15 de marketing) | `seguimiento_decisiones` ejecutadas |
+| Clientes que respondieron a ese mensaje en 7 días | — | **10 de 28 (36 %)** | `wa_messages` role `lead` posterior |
+| Escaleras "cliente esperando" | 223 simuladas en 131 chats | **355 avisos reales en 104 clientes** | `lead_eventos` |
+| Clientes avisados que recibieron respuesta humana después del aviso | — | **44 de 131 casos** (42 dentro de las 24 h; mediana 1,6 h después del aviso) | `wa_messages` role `human` posterior al primer aviso |
+| Notas internas leídas por la IA (desde el 4/9) | — | 13 | `lead_eventos` `nota_evaluada` |
+| Despedidas leídas por la IA (desde el 7/9) | — | 101 en 90 chats | `lead_eventos` `despedida_evaluada` |
+| WhatsApp de aviso entregados al equipo | 0 | 526 (352 asesores, 174 director) | `interacciones_canal` con `wamid` |
+| Emails de aviso al equipo | 0 | 527 | `interacciones_canal` con `resend_id` |
+| Compromisos "el asesor responde en 24 h" creados | 138 en 58 chats (sombra y activo) | | `lead_eventos` `compromiso_creado` |
+
+Lo que todavía no se ve en los datos: de los 104 clientes escalados en septiembre, 1 tiene una
+visita cargada en el calendario después del aviso y 2 fueron gestionados desde los botones de
+PRISMA. Es el punto que el aviso nuevo (7/9) empuja: que la gestión quede registrada.
+
+## 4. La oportunidad, en plata
+
+- **104 clientes en 10 días** quedaron esperando a un asesor y el sistema los persiguió. Al mismo
+  ritmo son **unos 300 por mes**.
+- **Presupuesto mediano declarado** por esos clientes: **US$ 97.000** (73 de los 104 lo dijeron;
+  fuente: `metricas.presupuesto`/`presupuesto_max`).
+- Con un honorario de compra del 3 % (**a confirmar con Kevin**), cada uno de esos clientes vale
+  en promedio **≈ US$ 2.900 de honorarios** si se cierra.
+- En agosto, **94 de 113 derivaciones** quedaron sin atender. Desde julio, la IA contó **146**
+  derivaciones con un compromiso real del asesor sin resolver (análisis del 7/9).
+- El costo variable de todo el sistema (≈ US$ 56/mes, sección 5) es **menos del 2 % de un solo
+  honorario**. Con que una operación al año se cierre porque el cliente fue atendido a tiempo, el
+  sistema se pagó cuatro veces.
+
+## 5. Qué cuesta
+
+### 5.1 Los últimos 30 días, real
+
+| Concepto | US$ | Fuente |
 |---|---|---|
-| **Escalera del lead que espera a un humano** | Detecta clientes derivados a un asesor sin respuesta humana y avisa a las 2 h (asesor), 5 h (asesor + director), 10 h (asesor) y 20 h (asesor + director). | Un **WhatsApp por plantilla de utilidad** (Meta) y un **email** (Resend) por cada aviso. |
-| **Lectura de la nota interna** (desde el 4/9) | Si el asesor dejó una nota después del último mensaje del cliente, la IA la lee y decide si el cliente ya está atendido. | Una llamada a **Claude Sonnet 5** por nota. |
-| **Lectura de la despedida** (desde el 7/9) | Si no hay nota, la IA lee la conversación y decide si el cliente espera respuesta o se despidió. | Una llamada a **Claude Sonnet 5** por caso (una sola vez por caso). |
-| **Seguimiento al cliente** | Para leads que se enfriaron (20 h sin mensajes), la IA investiga con herramientas (mensajes, intentos, compromisos, propiedad) y decide: contactar, esperar, abandonar o escalar. | Un bucle de **3 a 6 llamadas a Claude Sonnet 5** por decisión, más **un WhatsApp al cliente** (plantilla de marketing o de utilidad) si decide contactar. |
-| **Recordatorios de visita** | 24 h, 3 h y 1 h antes de cada visita agendada, y un mensaje si el cliente no fue. | Un WhatsApp de utilidad por recordatorio (marketing el de no-show). En el período no se disparó ninguno. |
-| **Registro en la bitácora del lead** | Cada paso deja un evento en `lead_eventos` (trazabilidad del director). | Solo base de datos: costo fijo, no variable. |
+| IA en sombra (11–31/8): 725 decisiones, 5,99 M tokens de entrada, 1,2 M de salida, 6,6 M de caché | **≈ 27** | tokens de `seguimiento_decisiones` a tarifa Sonnet 5 (+ escritura de caché). Control: la cuenta entera de Anthropic gastó US$ 31,83 en ese tramo (Admin API); el Super Agente fue el 85 %. |
+| IA activa (1–10/9): 35 decisiones + 114 veredictos | ≈ 2,1 | tokens reales + `count_tokens` sobre 12 casos (2.600 de entrada por veredicto) |
+| WhatsApp al equipo: 526 × 0,0260 | 13,68 | hoja de tarifas de Meta, Argentina, USD, vigente 1/7/2026 |
+| WhatsApp a clientes: 13 × 0,0260 + 15 × 0,0618 | 1,27 | ídem |
+| Emails: 527 | 0 (Free) o parte del fijo (Pro) | resend.com/pricing |
+| **Total 30 días** | **≈ 44** | |
 
-## 2. Lo que pasó del 1 al 9 de septiembre (datos reales)
+La sombra fue el período de prueba antes de encender y **no se repite**: son US$ 27 que Vakdor
+absorbió para validar el sistema con datos reales antes de que le llegara un solo mensaje a un
+asesor de Central.
 
-| Medición (Central, 1–9/9) | Cantidad | Fuente |
-|---|---|---|
-| Leads escalados (esperando a un humano) | 104 | `lead_eventos` tipo `escalera`, distintos `conversation_id` |
-| Niveles de escalera disparados | 355 | `lead_eventos` tipo `escalera` |
-| WhatsApp de aviso entregados al equipo (con `wamid` de Meta) | **526** (352 a asesores, 174 al director) | `interacciones_canal`, canal `whatsapp`, salida |
-| Emails de aviso enviados al equipo | **527** (353 asesores, 174 director) | `interacciones_canal`, canal `email`, `resend_id` |
-| Pico diario de avisos | 87 el 8/9 (mínimo 44 el 6/9) | `interacciones_canal` por día |
-| Veredictos de IA: notas internas | 13 | `lead_eventos` tipo `nota_evaluada` |
-| Veredictos de IA: despedidas | 101 | `lead_eventos` tipo `despedida_evaluada` |
-| Decisiones del agente de seguimiento al cliente (1–10/9) | 35 (16 contactar, 15 escalar, 4 abandonar) | `seguimiento_decisiones` |
-| Mensajes de seguimiento enviados a clientes (1–10/9) | 28 (13 `seg_pendiente` utilidad; 15 marketing: 8 `seg_retomar`, 5 `seg_puerta_abierta`, 2 `seg_valor`) | `seguimiento_decisiones` ejecutadas |
-| Tokens del agente de seguimiento (35 decisiones) | 265.092 entrada · 61.182 salida · 246.885 leídos de caché | `contexto_snapshot.tokens` |
-| Tokens de entrada por veredicto (medido con `count_tokens` sobre 12 casos reales) | 2.600 promedio (1.933–3.026) | `scratch/_contar-tokens-veredictos.mjs` |
-| Gasto total de la cuenta de Anthropic (todo Vakdor, 1–10/9) | US$5,99 | Admin API `cost_report` (`scratch/_anthropic-costos.mjs`) |
+### 5.2 Lo que va a costar por mes, al ritmo de septiembre (×30/9)
 
-## 3. Tarifas usadas (con fuente)
+| Concepto | Unidades por mes | Unitario US$ | US$ por mes |
+|---|---|---|---|
+| WhatsApp de avisos al equipo (utilidad) | ≈ 1.750 | 0,0260 | **≈ 45,6** |
+| WhatsApp de seguimiento a clientes | ≈ 39 utilidad + 45 marketing | 0,0260 / 0,0618 | ≈ 3,8 |
+| IA, decisiones de seguimiento | ≈ 105 | ≈ 0,038 | ≈ 4,0 |
+| IA, veredictos de notas y despedidas | ≈ 340 | ≈ 0,0067 | ≈ 2,3 |
+| Recordatorios de visita | 0 en el período | 0,0260 | 0 |
+| Emails | ≈ 1.750 | 0 (Free) | 0, o US$ 20 fijos si el plan es Pro |
+| **Total variable por mes** | | | **≈ 56 (hasta ≈ 76)** |
+
+### 5.3 Tarifas usadas
 
 | Proveedor | Tarifa | Fuente |
 |---|---|---|
-| Meta WhatsApp, Argentina, por mensaje, vigente desde 1/7/2026 | **Marketing US$0,0618 · Utilidad US$0,0260 · Autenticación US$0,0260** | Hoja de tarifas en USD de Meta (`meta-usd.csv`, bajada el 10/9 desde developers.facebook.com/docs/whatsapp/pricing). Las plantillas de utilidad entregadas dentro de una ventana de atención abierta (el destinatario escribió en las últimas 24 h) son gratis. |
-| Claude Sonnet 5 (Anthropic) | **Entrada US$2 · Salida US$10 · Lectura de caché US$0,20 · Escritura de caché US$2,50, por millón de tokens** | Tabla de modelos de la API de Claude (cacheada 24/6/2026). Ojo: `agente.ts` calcula `costo_usd` con la tarifa vieja de Sonnet 4.6 (3/15/0,30); el dato guardado sobreestima un 50 %. Acá se recalcula con la tarifa real. |
-| Resend (email) | **Plan Free: 3.000 emails/mes y 100 por día, US$0. Plan Pro: US$20/mes hasta 50.000.** | resend.com/pricing (10/9). Qué plan tiene la cuenta de Vakdor: **a confirmar en el panel de Resend**. |
+| Meta, WhatsApp, Argentina, por mensaje | Marketing 0,0618 · Utilidad 0,0260 · Autenticación 0,0260 (USD), vigente desde 1/7/2026 | hoja de tarifas USD de developers.facebook.com/docs/whatsapp/pricing (bajada el 10/9). Utilidad gratis dentro de una ventana de atención abierta (el destinatario escribió en las últimas 24 h). |
+| Claude Sonnet 5 | Entrada 2 · Salida 10 · Lectura de caché 0,20 · Escritura de caché 2,50 (USD por millón de tokens) | tabla de modelos de la API de Claude. `agente.ts` guarda `costo_usd` con la tarifa vieja de Sonnet 4.6 (3/15/0,30): sobreestima 50 %; acá se recalculó. |
+| Resend | Free: 3.000/mes y 100/día, US$ 0 · Pro: US$ 20/mes | resend.com/pricing. Plan de la cuenta: a confirmar. |
 
-## 4. El costo por unidad de cada cosa
+## 6. Lo que no es variable
 
-| Unidad | Cálculo | US$ |
-|---|---|---|
-| Un aviso de escalera por WhatsApp al equipo | plantilla de utilidad, Argentina | **0,0260** |
-| Un aviso de escalera por email | dentro del plan de Resend | 0 (Free) o parte del fijo (Pro) |
-| Un veredicto de IA (nota o despedida) | 2.600 tok entrada × 2 + ~150 tok salida × 10, /1M | **≈ 0,0067** |
-| Una decisión del agente de seguimiento | promedio de 35 reales: 7.574 entrada, 1.748 salida, 7.054 caché | **≈ 0,034** (+ escritura de caché, ≈ 0,004) |
-| Un mensaje de seguimiento al cliente, plantilla de utilidad (`seg_pendiente`) | | **0,0260** |
-| Un mensaje de seguimiento al cliente, plantilla de marketing | | **0,0618** |
-| Un recordatorio de visita | utilidad | 0,0260 |
+Hosting (Vercel), base de datos (Supabase), el servidor del reloj (EasyPanel) y las
+suscripciones de Vakdor: fijos, compartidos, dentro del abono. Las conversaciones del bot Sofía
+con los clientes son otro módulo con su propio costo.
 
-## 5. Lo que costó el período y la proyección mensual
+## 7. Antes de facturar, verificar
 
-| Concepto | 1–9/9 (real) | Por mes (×30/9) |
-|---|---|---|
-| WhatsApp de avisos al equipo: 526 × 0,0260 | US$13,68 | **≈ US$45,6** (≈ 1.750 mensajes) |
-| WhatsApp de seguimiento a clientes: 13 × 0,0260 + 15 × 0,0618 | US$1,27 | **≈ US$3,8** |
-| Claude, decisiones del seguimiento: 265k×2 + 61k×10 + 247k×0,2 (+ caché) | US$1,19 (+≈0,15) | **≈ US$4,0** |
-| Claude, veredictos de notas y despedidas: 114 × 0,0067 | US$0,76 | **≈ US$2,3** (el arranque incluyó backlog; en régimen es menos) |
-| Recordatorios de visita | 0 | 0 (a 0,026 cada uno cuando aparezcan) |
-| Emails: ≈ 1.750/mes | 0 en Free | **0 (Free) o US$20 fijo (Pro), a confirmar** |
-| **Total variable atribuible a Central** | **≈ US$17** | **≈ US$56/mes** (hasta ≈ US$76 si Resend es Pro) |
-
-Control cruzado: la cuenta entera de Anthropic gastó US$5,99 en los 10 días (todo Vakdor, en la
-misma clave que usa PRISMA); la parte del Super Agente calculada arriba (≈ US$2,1) es un tercio,
-coherente con que en esa clave también corren el generador de contenido y otros módulos.
-
-## 6. Lo que NO es variable (y no se factura aparte)
-
-Vercel (hosting de la app), Supabase (base de datos), el servidor de EasyPanel donde corre el
-reloj de n8n, y las suscripciones de Vakdor. Son costos fijos compartidos entre clientes; están
-dentro del abono. Las conversaciones del bot Sofía con los clientes (n8n + Gemini/OpenAI) tampoco
-entran acá: son otro módulo con su propio costo.
-
-## 7. Tres cosas que Leonardo tiene que verificar antes de facturar
-
-1. **Quién le paga a Meta por la WABA de Central.** Los 526 mensajes salieron por el número de
-   Central (plantillas con prefijo `ag4962bf_`). Si el medio de pago de esa cuenta de WhatsApp
-   Business es de Central, Meta ya se lo cobra a ellos y no corresponde refacturarlo; si es de
-   Vakdor, sí. Se ve en el Administrador comercial de Meta → Facturación de WhatsApp.
-2. **El plan de Resend** (Free o Pro): cambia el total en US$20.
-3. **La ventana gratis de utilidad**: los avisos al equipo son gratis si el asesor le escribió al
-   número de la agencia en las últimas 24 h. En el período hubo solo 27 respuestas de asesores por
-   WhatsApp, así que casi todos se cobraron; el cálculo asume que se cobran todos (conservador).
+1. **Quién le paga a Meta por la WABA de Central.** Los 526 avisos salieron por el número de
+   Central (plantillas `ag4962bf_*`). Si el medio de pago es de Central, Meta ya se lo cobra y no
+   se refactura; si es de Vakdor, sí. Administrador comercial de Meta → Facturación de WhatsApp.
+2. **Plan de Resend** (Free o Pro): US$ 20 de diferencia.
+3. **Ventana gratis de utilidad**: solo 27 respuestas de asesores por WhatsApp en el período;
+   el cálculo asume que se cobran todos los avisos (conservador).
 
 ## 8. El dato que cambia la conversación con Kevin
 
-El 80 % del costo variable son los avisos al equipo, y esos avisos existen porque un cliente
-quedó esperando: 355 niveles para 104 leads son **3,4 avisos por lead**. Si los asesores
-contestan (o dejan una nota, o el cliente se despide y la IA lo lee) antes de las 2 horas, el
-aviso no sale y el costo baja solo. El costo es proporcional a la falta de respuesta del equipo,
-no al uso del sistema.
+El 82 % del costo variable son los avisos al equipo, y cada aviso existe porque un cliente quedó
+esperando: 355 avisos para 104 clientes, 3,4 por cliente. Si el asesor contesta, deja una nota
+o el cliente se despide, el aviso no sale. **El costo es proporcional a la falta de respuesta
+del equipo, no al uso del sistema.** Cuanto mejor atienda Central, menos paga.
 
-## 9. Cómo pedirlo (dos formas, a elección)
+## 9. Cómo pedirlo
 
-- **Cargo fijo mensual con colchón:** US$80/mes por "mensajería y IA del seguimiento", con
-  revisión trimestral contra el real. Simple de explicar y de cobrar; cubre el peor caso medido.
-- **Reembolso al costo + gestión:** el real del mes (hoy ≈ US$56) + 25 %, con el detalle de esta
-  tabla adjunto cada mes. Más justo, más trabajo.
+- **Cargo fijo con colchón: US$ 80/mes** por "mensajería e IA del seguimiento", revisión
+  trimestral contra el real. Simple; cubre el peor caso medido.
+- **Reembolso al costo + 25 %**: hoy ≈ US$ 70, con estas tablas adjuntas cada mes.
 
-Ambas suponen que Meta le cobra a Vakdor (punto 7.1). Si Meta le cobra a Central directo, lo
-único a facturar es Claude: ≈ US$6–7/mes, y conviene meterlo dentro del abono y no cobrarlo.
+Las dos suponen que Meta le cobra a Vakdor (7.1). Si Meta le cobra a Central directo, lo único
+facturable es la IA (≈ US$ 6–7/mes) y conviene dejarla dentro del abono.
 
 ## Cómo se recalcula el mes que viene
 
 ```
-node scratch/_anthropic-costos.mjs 2026-10-01 2026-10-31     # gasto real de Anthropic
+node scratch/_anthropic-costos.mjs 2026-10-01 2026-10-31   # gasto real de Anthropic (Admin API)
+node scratch/_contar-tokens-veredictos.mjs                 # tokens por veredicto (gratis)
 ```
-y las consultas de la sección 2 sobre `interacciones_canal`, `lead_eventos` y
-`seguimiento_decisiones` con el rango nuevo (están en la bitácora del 10/9).
+y las consultas de las secciones 2 y 3 sobre `wa_messages`, `lead_eventos`,
+`seguimiento_decisiones` e `interacciones_canal` con el rango nuevo.
