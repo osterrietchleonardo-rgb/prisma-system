@@ -16,6 +16,75 @@
 
 ---
 
+## 2026-09-09 — Documentos para clientes: la plantilla se arma una vez y cada asesor la comparte con sus datos
+
+**Qué pidió Leonardo:** "cranear una solución para este apartado de plantillas que se suben
+una vez y luego se puede mejorar la versión sin subir a cada asesor nuevamente", con lo que
+dibujó Víctor: editor en tres partes (header, cuerpo, footer), formato tipo Word, variables
+`@nombre` `@email` `@celular` que el sistema conoce. Generalizable a cualquier agencia.
+
+**Lo que se descubrió antes de construir:** el módulo de Asesores → Plantillas (Etapa C,
+ago-2026) resolvía OTRO problema (detectar el molde de un contrato Word) y en Central tiene
+**cero plantillas** con 24 asesores. Leonardo, textual: "la idea inicial era esta, no la de
+contratos word... nadie dijo que eran contratos solamente". Queda como segunda sub-solapa,
+"Contratos desde Word", sin tocar su lógica. Qué hacer con él a largo plazo es decisión suya.
+
+**Qué se construyó** (rama `worktree-documentos-clientes`, 14 commits, spec y plan en
+`docs/superpowers/*/2026-09-09-documentos-para-clientes*`; detalle técnico en TECNICO §24):
+- Director: Asesores → Plantillas → **"Documentos para clientes"** → "Crear nueva plantilla".
+  Editor Tiptap con negrita/cursiva/subrayado/títulos/listas/alineación y variables al tipear
+  `@`; header y footer como imagen **por plantilla y opcionales**; bloque del asesor con
+  posición; vista previa con un asesor real; activa/borrador.
+- Asesor: Biblioteca → **"Para compartir"**: Compartir copia el link; lista de los que ya
+  generó con vistas; aviso de datos faltantes.
+- Cliente: `/documento/<token>` público con marca y PDF. **Copia congelada.**
+- Migración `20260909120000_documentos_para_clientes.sql` **aplicada en producción** (la corrió
+  Leonardo con `!` porque el clasificador del modo auto no me deja escribir en la base).
+
+**Lo que costó, medido:**
+- **El PDF de varias hojas.** Spike con pdfjs: Chrome repite `thead` pero no `tfoot`; una franja
+  fija corrida al margen de `@page` se recorta y cae en la hoja siguiente. Se paginó en JS
+  (`Paginador.tsx`): hojas A4 fijas, párrafo partido por palabra. Verificado hoja por hoja por
+  posición del texto.
+- **Seguridad:** `TextAlign` de Tiptap no valida el atributo al serializar → `limpiarDoc()`.
+- **Tres bugs que solo salieron en el navegador:** `@@nombre` en el editor (faltaba `renderHTML`
+  en el cliente), la lista volvía con la fila vieja al guardar, y `lib/documentos/imagen.ts`
+  (sharp) llegaba al bundle del navegador por importar la guía desde el formulario — el
+  `npm run build` lo tapaba porque yo miraba el `tail` y no el exit code.
+
+**Segunda vuelta, con lo que vio Leonardo en local:** (1) el link daba "Jest worker
+encountered 2 child process exceptions" — no era la página: el sistema mató un proceso hijo de
+Next por memoria (51 procesos de node, 3,6 GB, cuatro dev servers) y el servidor quedó en
+`write EPIPE`; se relanzó. (2) El footer de prueba tenía el recuadro azul cortado por MI
+recorte; se rehizo tapando con blanco solo el bloque dibujado del asesor (y ojo: en un mismo
+pipeline sharp aplica `extract` ANTES de `composite`, el parche cayó 140 px abajo; en dos
+pasos). (3) "Plantillas personalizadas" en la ficha de cada asesor pasó a "Contratos
+personalizados (Word)". (4) Diseño con la marca: barra de color, bloque del asesor, títulos,
+marca de agua, "Hoja N de M" (TECNICO §24). (5) "Crear" se quedó cargando por el mismo crash
+del servidor; ahora el formulario y la lista muestran el error con "Reintentar" en vez de
+girar para siempre.
+
+**Tercera vuelta (10-sep, madrugada):** "me encantó, pero" — (a) el bloque del asesor quedaba
+lejos de la línea azul porque el recuadro del footer sobresale: control "Encimar el bloque
+sobre la imagen" (`bloque_asesor.solape`, px), generalizable a cualquier imagen con aire;
+(b) marca de agua más visible y línea fina del margen izquierdo en el color de acento; (c)
+"que el editor me deje hacer saltos de línea y se muestre en el preview": Enter/Shift+Enter ya
+andaban, lo que se perdía era el renglón vacío (párrafo vacío de alto cero, y el Paginador lo
+salteaba). El dev server tardaba "una eternidad" con la máquina sin memoria: se sirve el
+build de producción en :3009 (`next start`), 0,13 s por pantalla.
+
+**Cómo se probó:** PRISMAIA - VAKDOR, Chrome real por Playwright (`playwright-core` con
+`channel: "chrome"`, instalado en el scratchpad), cuenta de asesor **descartable** creada por
+API (`scratch/documentos-asesor-descartable.mjs crear|borrar`). Tecleando, nunca `fill()`.
+Suite completa 1919 tests, tsc, eslint y build limpios.
+
+**Qué quedó:** el OK de Leonardo sobre la prueba en local (`:3009`), mergear por API de
+GitHub, borrar los datos de prueba (4 plantillas "Presentación de prueba", sus links, y la
+cuenta descartable), y ExitWorktree. El header de ejemplo de Central mide 1040 px: para
+producción hay que pedirle a Central la franja a 1600 o más.
+
+---
+
 ## 2026-09-08 — Primera zona de GBA: terrenos de Don Torcuato (y el bug de ubicación que destapó)
 
 **Qué pidió Leonardo:** ver si había terrenos en ZonaProp en Don Torcuato y Monte Grande, y

@@ -650,7 +650,7 @@ Arriba de la pantalla tenés dos solapas: **"Biblioteca Digital"** (lo de arriba
 Al lado de "Biblioteca Digital" y "Documentos Oficiales" tenés una tercera solapa: **"Mis Documentos"**. Acá están, todos juntos, los archivos que la dirección te cargó a vos, personalmente — nadie más los ve.
 
 **Qué vas a encontrar, en dos grupos:**
-- **Plantillas personalizadas:** documentos que la dirección preparó con tus datos (por ejemplo, un contrato o una autorización con tu nombre ya puesto).
+- **Contratos personalizados (Word):** documentos que la dirección preparó con tus datos (por ejemplo, un contrato o una autorización con tu nombre ya puesto).
 - **Documentos de información:** cualquier otro archivo suelto que la dirección quiera que tengas a mano.
 
 **Cómo usarla:**
@@ -659,6 +659,21 @@ Al lado de "Biblioteca Digital" y "Documentos Oficiales" tenés una tercera sola
 - Si te falta un documento, o el que tenés quedó viejo y hay que cambiarlo, **pedíselo a la dirección**: son quienes lo suben y lo actualizan.
 
 > 💡 **Tip:** si cambia un documento que tienen todos (por ejemplo, se actualiza el contrato), **vos no tenés que hacer nada**: la dirección lo cambia una sola vez y **el tuyo se actualiza solo, con tus propios datos**. Lo que ves acá es siempre lo último, sin tener que fijarte cuál era el viejo. Cuando lo bajás, el archivo trae un número al final del nombre (por ejemplo **"Contrato de Asesor - v2.docx"**): es para que puedas distinguirlo del que hayas bajado antes.
+
+### Solapa "Para compartir" (documentos para tus clientes)
+
+La cuarta solapa, **"Para compartir"**, es distinta a las otras: no son documentos para vos, son documentos **para mandarle a un cliente**. La presentación de la inmobiliaria, las condiciones de la exclusiva, la guía para preparar la casa antes de las visitas: lo que la dirección haya armado.
+
+**Cómo funciona:**
+- Ves la lista de documentos que la dirección dejó listos. Tocás **"Compartir"** en el que quieras y PRISMA arma **tu versión**: con tu nombre, tu categoría, tu mail y tu celular, con el logo y los colores de la agencia. El link queda copiado, listo para pegar en WhatsApp o en un mail.
+- El cliente lo abre **sin usuario ni contraseña**, en el celular o en la computadora, y tiene un botón para **bajarlo en PDF**. En el PDF, el encabezado y el pie de la inmobiliaria salen en **todas las hojas**.
+- Abajo, en **"Los que ya generaste"**, están los links que fuiste creando, con la fecha y cuántas veces los abrieron. Si ya le mandaste uno a alguien, no hace falta generar otro: copialo de ahí.
+
+**Qué pasa cuando algo cambia:**
+- Si la dirección **mejora un documento**, la próxima vez que toques "Compartir" sale la versión nueva. Vos no tenés que hacer nada.
+- Los links que **ya mandaste no cambian**: el cliente ve exactamente lo que le mandaste, aunque después cambie el documento o cambien tus datos.
+
+> ⚠️ **Si te falta un dato** (por ejemplo el celular), arriba te lo avisa. El documento sale igual, pero **sin esa parte**: no queda un "Cel:" vacío. Tu celular lo carga la dirección desde su pantalla de Asesores.
 
 ---
 

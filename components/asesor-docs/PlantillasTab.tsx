@@ -320,7 +320,7 @@ export function PlantillasTab() {
           botón entra sin desborde horizontal y sin pisar el título. */}
       <div className="shrink-0 flex flex-row items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold text-foreground">Plantillas de documentos</h3>
+          <h3 className="text-lg font-semibold text-foreground">Contratos desde Word</h3>
           {/* En el celular este párrafo NO va acá: ocupa media pantalla y, como
               el encabezado es fijo, le come el alto a la lista hasta dejarla en
               una ranura. Abajo se repite adentro del scroll, donde se lee una

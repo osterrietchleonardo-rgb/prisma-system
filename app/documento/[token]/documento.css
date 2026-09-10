@@ -1,0 +1,74 @@
+/* El documento que el asesor le manda a su cliente.
+   En PANTALLA es continuo (.documento): header, cuerpo, footer.
+   Al IMPRIMIR se muestra la copia paginada (.documento-impresion, la arma Paginador.tsx):
+   hojas A4 de alto fijo, header arriba, footer abajo, el cuerpo en el hueco del medio.
+   La marca entra por variables puestas en línea sobre .documento: --marca1, --marca2 y
+   --marca-agua (ver RenderDocumento.tsx). */
+.documento-root { background: #e9e6df; min-height: 100vh; padding: 24px 12px 90px; font-family: var(--font-body), system-ui, sans-serif; color: #1f2328; }
+.documento { position: relative; background: #fff; max-width: 794px; margin: 0 auto; box-shadow: 0 8px 30px rgba(0,0,0,.12); }
+
+/* la barra de color de la marca, arriba del header y abajo del footer */
+.documento-barra { height: 6px; background: linear-gradient(90deg, var(--marca1, #0a1f33) 0%, var(--marca1, #0a1f33) 62%, var(--marca2, #c8a061) 62%, var(--marca2, #c8a061) 100%); }
+.documento-franja { display: block; width: 100%; height: auto; }
+
+/* el bloque del asesor: nombre en el color principal, con una línea fina de acento */
+.documento-bloque { position: relative; z-index: 1; padding: 10px 48px 6px; font-size: 13.5px; line-height: 1.55; color: #3a4048; }
+.documento-bloque p { margin: 0; }
+.documento-bloque p:first-child { font-family: var(--font-display), Georgia, serif; font-size: 16px; color: var(--marca1, #0a1f33); letter-spacing: .01em; }
+.documento-header .documento-bloque { border-bottom: 1px solid color-mix(in srgb, var(--marca2, #c8a061) 55%, #fff); }
+.documento-footer .documento-bloque { border-top: 1px solid color-mix(in srgb, var(--marca2, #c8a061) 55%, #fff); }
+
+/* el cuerpo: la marca de agua repetida cada hoja de alto y la línea fina del margen izquierdo */
+.documento-cuerpo {
+  position: relative;
+  padding: 30px 48px 40px; font-size: 15px; line-height: 1.7;
+  background-image: var(--marca-agua); background-repeat: repeat-y; background-position: center top; background-size: 794px 1000px;
+}
+.documento-cuerpo::before { content: ""; position: absolute; left: 24px; top: 30px; bottom: 30px; width: 2px; background: var(--marca2, #c8a061); opacity: .7; }
+.documento-cuerpo h2 { font-family: var(--font-display), Georgia, serif; font-size: 23px; font-weight: 600; color: var(--marca1, #0a1f33); margin: 26px 0 12px; line-height: 1.25; }
+.documento-cuerpo h2::after { content: ""; display: block; width: 44px; height: 2px; margin-top: 8px; background: var(--marca2, #c8a061); }
+.documento-cuerpo h3 { font-family: var(--font-display), Georgia, serif; font-size: 17.5px; font-weight: 600; color: var(--marca1, #0a1f33); margin: 20px 0 8px; line-height: 1.3; }
+.documento-cuerpo h2:first-child, .documento-cuerpo h3:first-child { margin-top: 0; }
+.documento-cuerpo p { margin: 0 0 12px; }
+/* Un renglón vacío (Enter dos veces en el editor) es un párrafo vacío: ocupa una línea, como en Word. */
+.documento-cuerpo p:empty::before, .documento-bloque p:empty::before { content: "\00a0"; }
+.documento-cuerpo ul, .documento-cuerpo ol { margin: 0 0 12px 22px; padding: 0; }
+.documento-cuerpo ul { list-style: disc; }
+.documento-cuerpo ul li::marker, .documento-cuerpo ol li::marker { color: var(--marca2, #c8a061); }
+.documento-cuerpo ol { list-style: decimal; }
+.documento-cuerpo li { margin: 0 0 5px; padding-left: 2px; }
+.documento-cuerpo strong { color: #14181d; }
+.documento-cuerpo .variable, .documento-bloque .variable { background: #fff3d6; border-radius: 3px; padding: 0 2px; }
+
+/* La copia paginada vive fuera de la vista mientras se arma y se mide (a 794 px, el ancho de
+   hoja, para que cada franja mida lo mismo que impresa). */
+.documento-impresion { position: absolute; left: -20000px; top: 0; width: 794px; background: #fff; }
+.hoja { position: relative; width: 794px; height: 1123px; overflow: hidden; background: #fff; background-image: var(--marca-agua); background-repeat: no-repeat; background-position: center 56%; background-size: 794px 1000px; }
+.hoja .documento-header { position: absolute; top: 0; left: 0; right: 0; }
+.hoja .documento-footer { position: absolute; bottom: 0; left: 0; right: 0; }
+.hoja .documento-cuerpo { position: absolute; left: 0; right: 0; overflow: hidden; padding-top: 0; padding-bottom: 0; background-image: none; }
+.hoja .documento-cuerpo::before { top: 0; bottom: 0; }
+.hoja-numero { position: absolute; right: 48px; font-size: 10.5px; letter-spacing: .06em; color: #8a9099; }
+
+@media (max-width: 640px) {
+  .documento-root { padding: 12px 0 90px; }
+  .documento-bloque { padding: 8px 16px 6px; font-size: 13px; }
+  .documento-cuerpo::before { left: 6px; }
+  .documento-bloque p:first-child { font-size: 15px; }
+  .documento-cuerpo { padding: 20px 16px 26px; font-size: 15px; background-size: 100% auto; }
+}
+
+@media print {
+  @page { size: A4; margin: 0; }
+  html, body { background: #fff !important; }
+  body > *:not(.documento-root) { display: none !important; }
+  #nprogress, [data-sonner-toaster], next-route-announcer { display: none !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .documento-root { background: #fff; padding: 0; min-height: 0; }
+  .documento { display: none; }
+  .documento-impresion { position: static; left: auto; width: 210mm; }
+  .hoja { width: 210mm; height: 297mm; page-break-after: always; break-after: page; }
+  .hoja:last-child { page-break-after: auto; break-after: auto; }
+  .documento-bloque .variable, .documento-cuerpo .variable { background: none; }
+  .no-print { display: none !important; }
+}

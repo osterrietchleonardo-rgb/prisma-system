@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // están dando vueltas dejan de mostrar la foto rota (ver `normalizarFotoRoomix`).
 import { urlFotoRed } from "@/lib/acm/fotos-url";
 import { formatPhoneInternational } from "@/lib/whatsapp/phone";
+import { etiquetaDeCategoria } from "@/lib/ficha/etiqueta-categoria";
 import { notFound } from "next/navigation";
 import { Playfair_Display, Inter } from "next/font/google";
 import type { Metadata } from "next";
@@ -125,14 +126,7 @@ export default async function FichaAcmPage({ params }: { params: { token: string
   const opLabel = operacion === "alquiler" ? "Alquiler" : "Venta";
   // Bajada arriba del nombre en la tarjeta de contacto. Para asesores usa la clasificación secundaria
   // que pone el director en "Asesores" (Client Director / Client Support); sin clasificar → "Asesor/a".
-  const roleLabel =
-    agent?.role === "director"
-      ? "Director/a"
-      : agent?.clasificacion === "client_director"
-      ? "Client Director"
-      : agent?.clasificacion === "client_support"
-      ? "Client Support"
-      : "Asesor/a";
+  const roleLabel = etiquetaDeCategoria(agent?.clasificacion, agent?.role);
   const initials = (agent?.full_name || "A").split(" ").map((s) => s[0]).slice(0, 2).join("").toUpperCase();
   const phoneDigits = (agent?.phone || "").replace(/[^\d]/g, "");
   const waLink = phoneDigits
