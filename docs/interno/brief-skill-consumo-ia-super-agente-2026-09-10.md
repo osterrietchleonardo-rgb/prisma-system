@@ -41,6 +41,16 @@ Días activos en la ventana = días entre `max(desde, activo_desde)` y `hasta`, 
 | escritura de caché | US$ 2,50 / millón | ídem |
 | Admin API `cost_report` | `amount` viene en **centavos** como string → `/100` | `lib/admin-vakdor/finance/providers.ts` (verificado contra el saldo de la consola) |
 
+**Regla: la tarifa NO va escrita a mano en la skill.** Leonardo encontró listas públicas con
+Sonnet 5 a 3 / 15 ("tarifas permanentes ajustadas tras ofertas previas"). Lo que la cuenta de
+Vakdor pagó de verdad del 1 al 10/9 (cost_report ÷ usage_report, misma ventana) fue: entrada
+3,018 / 1.508.944 tok = **2,00**; salida 2,185 / 218.501 = **10,00**; escritura de caché
+0,702 / 280.686 = 2,50; lectura 0,089 / 446.380 = 0,20 (USD por millón). La skill calcula en
+cada corrida la **tarifa efectiva** = costo del concepto ÷ tokens del concepto (Admin API,
+sección 2C), la muestra en "Cómo se midió" y la usa para valorizar 2A y 2B. Si Anthropic sube el
+precio, el informe lo refleja solo; si `usage_report` no trae tokens para el período, recién ahí
+cae a la tabla de arriba y lo declara como supuesto.
+
 Meta (referencia, NO se factura: lo paga el cliente): Argentina, por mensaje, vigente 1/7/2026:
 marketing 0,0618 · utilidad 0,0260 · autenticación 0,0260 USD (hoja de tarifas USD de
 developers.facebook.com/docs/whatsapp/pricing).
