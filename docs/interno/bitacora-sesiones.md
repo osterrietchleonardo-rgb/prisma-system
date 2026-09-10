@@ -16,6 +16,35 @@
 
 ---
 
+## 2026-09-10 — La queja de Carmen: las notas cortas ahora cuentan, y si no alcanzan se le dice
+
+**Qué pasó:** Carmen (Central) dejó en Sugerencias: "Ya dejé en notas que estoy en comunicación
+y me siguen llegando mails con demora en respuesta". Caso Paola: nota «Ya hablé» 12:54, la IA la
+rechazó 13:03 por "ambigua" (y por no tener la visita en el calendario), nivel 5 h con copia a
+Kevin 14:02 pidiéndole "dejá una nota interna". Nadie le avisó que la nota no había alcanzado.
+Medido: en 10 días, 6 de 7 rechazos eran una asesora diciendo que ya lo tenía; Carmen 3 veces,
+2 escaladas a Kevin; la misma frase aceptada a una y rechazada a otra en el mismo minuto.
+
+**Qué se hizo** (rama `fix/notas-cortas-cuentan-como-atendido`, TECNICO §22.12, guía del
+asesor §24):
+- Prompt de notas: una nota corta que afirma contacto cuenta (vive dentro del chat de ese
+  cliente); ambigua es solo la que no habla de contacto; la falta de calendario/tracking nunca
+  baja atendido, solo pide registro.
+- Aviso nuevo "leímos tu nota, pero los avisos siguen" cuando igual queda rechazada: cita la
+  nota, el motivo y qué escribir. Una vez por nota. Misma plantilla neutra.
+- Prueba con las 8 notas reales (7 rechazadas + Silvina que debe seguir rechazada): prompt
+  viejo 5 de 7 mal; nuevo 8 de 8 bien. Suite: 251 verdes.
+
+**Errores de la sesión:** (1) la prueba se autoenvenenaba: el chat de hoy tiene notas
+posteriores y la IA las leía; se corta el chat en la hora de la nota. (2) Escribir `"\n"`
+dentro de un heredoc de Bash lo convierte en salto de línea real: los parches en Python van en
+archivo, no inline.
+
+**Qué quedó:** OK de Leonardo para mergear; con OK, borrar el marcador `nota_evaluada` de los
+casos abiertos (Paola, Anita Becker) para que la barrida los relea con el prompt nuevo. La
+sugerencia de Carmen del mismo día (audio de cliente que muestra "Error" y no se escucha) está
+anotada, sin investigar.
+
 ## 2026-09-09 — Documentos para clientes: la plantilla se arma una vez y cada asesor la comparte con sus datos
 
 **Qué pidió Leonardo:** "cranear una solución para este apartado de plantillas que se suben

@@ -1570,6 +1570,55 @@ La plantilla `asesor_registro_pendiente` pasó a cuerpo neutro por esta regla (P
 versión aprobada en Meta para Central (id 2259260301311141) se edita aparte con
 `scratch/_editar-plantilla-meta.mjs`, con OK.
 
+### 22.12 La palabra del asesor vale: notas cortas y el aviso de "tu nota no alcanzó" (10/9/2026)
+
+Disparador: queja de Carmen Gonzalez (Central) en Sugerencias, 10/9 14:06: "Estoy yo en
+contacto. Ya dejé en notas que estoy en comunicación y me siguen llegando mails con demora en
+respuesta". Caso Paola (`c0b121e7…`): nota «Ya hablé» a las 12:54 → `nota_evaluada` con
+`atendido=false` a las 13:03 ("ambigua, no dice con quién ni qué acordó; además la visita no
+está en el calendario") → nivel 5 h a las 14:02 con copia a Kevin, y el texto le pedía "dejá una
+nota interna", que era lo que ya había hecho. Nadie le avisa que su nota fue rechazada: el
+veredicto solo queda en `lead_eventos`.
+
+**Medido en los 10 días previos:** 16 notas evaluadas, 7 rechazadas; 6 de las 7 eran una
+asesora afirmando contacto («ya se hablo», «Respondido» ×2, «Estoy yo en contacto», «Ya
+hablé», «Ya estoy en contacto ir WhatsApp»). Carmen: 3 rechazadas, 2 escaladas al director.
+Inconsistente además: «Ya estoy en contacto» (Carolina E.) aceptada el mismo minuto que «Estoy
+yo en contacto» (Carmen) rechazada. Causa: `PROMPT_NOTA` exigía "lo llamó, coordinó una visita,
+le está resolviendo algo" y cerraba con "si la nota es ambigua, atendido=false"; y la IA usaba la
+falta de visita/tracking como razón para no dar por atendido (mezcla atender con registrar).
+
+**Qué cambió (rama `fix/notas-cortas-cuentan-como-atendido`):**
+- **`PROMPT_NOTA`** (`lib/seguimiento/nota-interna.ts`): la nota vive DENTRO del chat de ese
+  cliente, así que una nota corta que afirma contacto cuenta como atendido sin exigir con quién,
+  cuándo ni qué acordaron (eso se pide como registro). `atendido=false` SOLO si la nota no habla de
+  contacto: recordatorio, detalle de la propiedad, comentario, pregunta al equipo, o un texto
+  redactado como mensaje al cliente que quedó en la nota. La falta de calendario/tracking NUNCA
+  baja atendido: solo enciende `pedir_registro_*`. `pedir_registro_visita` mira "la nota o la
+  conversación" (Paola pidió la visita en el chat, no en la nota).
+- **Aviso "leímos tu nota, pero los avisos siguen"** (`armarAvisoNotaInsuficiente`): si el
+  veredicto sigue siendo `atendido=false` y hay asesor asignado, sale UN aviso (email + WhatsApp
+  por la plantilla neutra `asesor_registro_pendiente`) que cita la nota, el motivo de la IA y las
+  dos formas de frenar los avisos (mensaje al cliente desde el chat, o una nota que diga que ya
+  habló y qué quedó pendiente). Una vez por nota: lo garantiza el marcador `nota_evaluada` por
+  `nota_id`. Resultados nuevos de `procesarNotaDelCaso`: `no_atendido_avisado` /
+  `no_atendido_simulado` (evento `aviso_nota_simulado` fuera de modo activo). La escalera sigue
+  igual y la despedida se evalúa igual que con `escalera_sigue`.
+- **Prueba de regresión con las notas reales** (`lib/seguimiento/manual-notas-cortas.test.ts`,
+  `SEGUIMIENTO_MANUAL=1`, solo lectura, ids fijos de `wa_messages`): las 7 rechazadas del 8-10/9
+  + la de Silvina del 4/9 (mensaje sin mandar, debe seguir rechazada). Con el prompt viejo: 5 de 7
+  mal (y esa corrida ACEPTÓ «Es una gran oferta»). Con el nuevo: 8 de 8 bien. Gotcha de la prueba:
+  el chat se corta en la hora de la nota (`FECHA_AR`), porque hoy tiene notas posteriores y la IA
+  las leía ("Es una gran oferta" salía atendido por una nota de después): la escalera evalúa la
+  ÚLTIMA nota con el chat de ese momento.
+- **Lo que NO cambia:** la detección de la nota, el marcador por `nota_id`, "atendido" pegajoso
+  por caso, y el aviso de registro cuando sí está atendido.
+
+**Pendiente al desplegar:** los casos ya evaluados con el prompt viejo tienen su marcador
+`nota_evaluada` con `atendido=false` y no se re-evalúan solos. Con OK de Leonardo se borra ese
+marcador en los casos todavía abiertos (Paola y Anita Becker el 10/9; Glo Bouche y Sofia Petty ya
+en el tope de la escalera) para que la barrida siguiente los lea con el prompt nuevo.
+
 ## 23. Buscador IA y Tutor IA: la conversación en vivo (2/9/2026)
 
 Punto 1 del plan de agentes (`docs/superpowers/plans/2026-09-02-buscador-conversacion-viva.md`);
