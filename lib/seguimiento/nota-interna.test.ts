@@ -146,18 +146,23 @@ describe("armarAvisoRegistro: un solo aviso, tono de ayuda, solo los pedidos que
     const a = armarAvisoRegistro(eric, conv, nota, {
       atendido: true, pedir_registro_chat: true, pedir_registro_visita: true,
       pedir_registro_actividad: true, razon: "La nota dice que ya lo llamó y coordinó visita",
-    }, APP, "Central")
+    }, APP, "Central", "Sofía")
     expect(a.plantilla).toBe("asesor_registro_pendiente")
     expect(a.html).toContain("Perfecto que ya lo estés atendiendo")
     expect(a.html).toContain("se frenaron para este caso")
     // El pedido del chat es un MENSAJE AL CLIENTE, no otra nota interna (Leonardo, 4/9)
     expect(a.html).toContain("Mandale al cliente desde el <strong>chat de PRISMA</strong> un mensaje confirmando lo acordado")
+    // Leonardo, 10/9: al grano — registrado + el bot (con el nombre de la agencia) tiene contexto;
+    // nada de "no es un reclamo", "que todo el equipo lo vea" ni "trazabilidad"
+    expect(a.html).toContain("Para que quede registrado y Sofía tenga contexto para dar un mejor seguimiento al cliente:")
+    expect(a.html).not.toMatch(/reclamo|todo el equipo|nada se pierda|trazabilidad/)
+    expect(a.variables[1]).toContain("Así queda registrado y Sofía tiene contexto para dar un mejor seguimiento al cliente.")
     expect(a.html).toContain("calendario")
     expect(a.html).toContain("tracking")
     expect(a.link).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-1")
     expect(a.variables).toHaveLength(3)
     expect(a.variables[0]).toBe("Eric")
-    expect(a.variables[1]).toBe("Vimos tu nota interna sobre Nicolás (+5491136299626) y entendemos que ya lo estás atendiendo, así que frenamos los avisos de cliente esperando por este caso. Falta registrar en PRISMA: un mensaje al cliente desde el chat, la visita en el calendario, la actividad en el tracking.")
+    expect(a.variables[1]).toBe("Vimos tu nota interna sobre Nicolás (+5491136299626) y entendemos que ya lo estás atendiendo, así que frenamos los avisos de cliente esperando por este caso. Falta registrar en PRISMA: un mensaje al cliente desde el chat, la visita en el calendario, la actividad en el tracking. Así queda registrado y Sofía tiene contexto para dar un mejor seguimiento al cliente.")
     expect(a.variables[2]).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-1")
   })
   it("solo el pedido que aplica: sin visita ni tracking no los menciona", () => {

@@ -44,10 +44,13 @@ describe("nivelQueToca: 2 h → 5 h → 10 h → 20 h, cada uno una vez, sin rá
 
 describe("armarAvisoAsesorEscalera", () => {
   it("2 h: plantilla 'cliente esperando' con qué pasa, contexto y link del asesor", () => {
-    const a = armarAvisoAsesorEscalera(asesor, conv, { nivel: 2, horas: 2.2, esAsignado: true, contexto }, APP, "Central")
+    const a = armarAvisoAsesorEscalera(asesor, conv, { nivel: 2, horas: 2.2, esAsignado: true, contexto }, APP, "Central", "Sofía")
     expect(a.plantilla).toBe("asesor_cliente_esperando")
     expect(a.variables[0]).toBe("Martín")
-    expect(a.variables[1]).toBe("Laura Gómez (+5491155550000) lleva 2 horas esperando que lo atiendas. Busca: venta, casa en La Plata. Último mensaje del cliente (26/8 12:37): «¿Se puede visitar el sábado?». Si ya lo atendiste por teléfono, confirmáselo desde el chat de PRISMA o dejá una nota interna, y registrá la visita y la actividad.")
+    // Leonardo, 10/9: el porqué es que quede registrado y el bot (nombre de la agencia) tenga contexto
+    expect(a.variables[1]).toBe("Laura Gómez (+5491155550000) lleva 2 horas esperando que lo atiendas. Busca: venta, casa en La Plata. Último mensaje del cliente (26/8 12:37): «¿Se puede visitar el sábado?». Si ya lo atendiste por teléfono, confirmáselo desde el chat de PRISMA o dejá una nota interna: así queda registrado y Sofía tiene contexto para seguir mejor al cliente. Y registrá la visita y la actividad.")
+    expect(a.html).toContain("Así queda registrado y Sofía tiene contexto para dar un mejor seguimiento al cliente")
+    expect(a.html).not.toMatch(/trazabilidad|Sofía se entera/)
     expect(a.variables[2]).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-1")
     expect(a.html).toContain("Qué busca:")
     expect(a.html).toContain("«No lo puedo tomar»")
@@ -68,6 +71,8 @@ describe("armarAvisoAsesorEscalera", () => {
     const a = armarAvisoAsesorEscalera(asesor, conv, { nivel: 2, horas: 2, esAsignado: true, contexto: largo }, APP, "C")
     expect(a.variables[1].length).toBeLessThanOrEqual(700)
     expect(a.variables[1]).toContain("dejá una nota interna")
+    // sin nombre de bot configurado, el genérico (nunca un nombre a mano)
+    expect(a.variables[1]).toContain("tu Asesor IA tiene contexto")
   })
   it("5 h: avisa que el director también recibe el aviso", () => {
     const a = armarAvisoAsesorEscalera(asesor, conv, { nivel: 5, horas: 5, esAsignado: true }, APP, "C")

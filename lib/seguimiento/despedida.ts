@@ -29,7 +29,7 @@ const PROMPT_DESPEDIDA = `Sos el intérprete de conversaciones del agente de seg
 - requiere_respuesta: false SOLO si el cliente cerró el intercambio sin dejar nada pendiente del lado de la inmobiliaria: un agradecimiento o despedida después de recibir lo que pidió ("Gracias!!", "Dale, buen finde", "Ok, perfecto"), un aviso de que ya no le interesa o ya resolvió por otro lado ("ya alquilé", "lo vemos por nuestra cuenta"), o un "yo te aviso" donde el próximo paso es del cliente.
 - requiere_respuesta: true si el mensaje contiene o implica una pregunta, un pedido, un dato que el asesor tenía que confirmar (un horario propuesto, una dirección, un presupuesto que el asesor pidió), un reclamo, un "sigo esperando", o si es un audio o un mensaje que no se puede leer.
 - IMPORTANTE: si lo último que recibió el cliente antes de su mensaje fue una PROMESA de contacto ("el asesor se va a comunicar", "te llamo mañana", "te confirmo y te aviso"), un "gracias" NO cierra nada: el cliente está esperando ese contacto y sigue esperando hasta que un asesor le escriba o lo llame → requiere_respuesta: true. Lo mismo si el asesor le hizo una pregunta y el cliente la contestó: ahora espera el siguiente paso.
-- Los mensajes [bot] son del asistente automático (Sofía), los [human] son de un asesor de la inmobiliaria, los [internal] son notas del equipo que el cliente no ve.
+- Los mensajes [bot] son del asistente automático de la inmobiliaria (su nombre viene en la semilla), los [human] son de un asesor de la inmobiliaria, los [internal] son notas del equipo que el cliente no ve.
 - Si el bot está APAGADO en el chat, una persona del equipo lo tomó. Si desde ese momento ningún [human] le escribió al cliente, el cliente está esperando a esa persona → requiere_respuesta: true, aunque su último mensaje haya sido una respuesta a una pregunta del bot. Solo una despedida clara del cliente ("gracias, no necesito más", "ya alquilé") cierra un chat con el bot apagado.
 - razon: una frase en castellano citando el último mensaje del cliente; la puede leer el director.
 Ante la duda, requiere_respuesta=true.`
@@ -53,13 +53,13 @@ const HERRAMIENTA_VEREDICTO = {
  * encendido. Sin este dato la IA leía "el cliente le debe una respuesta al bot" en chats donde
  * el bot ya no estaba (Alex, 7/9): un asesor lo había tomado sin escribir.
  */
-export function semillaDespedida(input: { mensajes: string; ahoraISO: string; botApagadoDesde: string | null }): string {
+export function semillaDespedida(input: { mensajes: string; ahoraISO: string; botApagadoDesde: string | null; nombreBot?: string }): string {
   const bot = input.botApagadoDesde
     ? `APAGADO desde ${input.botApagadoDesde} (una persona del equipo tomó el chat; si desde entonces ningún [human] escribió, el cliente sigue esperando a esa persona)`
     : "ENCENDIDO (el bot sigue contestando en este chat)"
   return [
     `Fecha y hora actual (Argentina): ${input.ahoraISO}`,
-    `Bot (Sofía) en este chat: ${bot}`,
+    `Bot (${input.nombreBot ?? "el asistente IA de la inmobiliaria"}) en este chat: ${bot}`,
     `Conversación real, del más viejo al más nuevo:\n${input.mensajes}`,
     `¿El último mensaje del cliente necesita respuesta del asesor? Emití tu veredicto con emitir_veredicto.`,
   ].join("\n\n")
@@ -125,7 +125,7 @@ export async function procesarDespedidaDelCaso(
   db: SupabaseClient,
   c: Pick<Candidato, "id" | "agency_id" | "contact_phone" | "metricas" | "bot_active">,
   t0: string,
-  opts: { ahoraMs: number; llamar?: LlamarDespedida }
+  opts: { ahoraMs: number; llamar?: LlamarDespedida; nombreBot?: string }
 ): Promise<ResultadoDespedida> {
   const { data: previa } = await db
     .from("lead_eventos").select("datos")
@@ -143,7 +143,7 @@ export async function procesarDespedidaDelCaso(
 
   let veredicto: VeredictoDespedida
   try {
-    veredicto = await (opts.llamar ?? crearLlamadaDespedida())(semillaDespedida({ mensajes, ahoraISO, botApagadoDesde: apagadoDesde }))
+    veredicto = await (opts.llamar ?? crearLlamadaDespedida())(semillaDespedida({ mensajes, ahoraISO, botApagadoDesde: apagadoDesde, nombreBot: opts.nombreBot }))
   } catch (e) {
     await registrarEvento(db, c.agency_id, c.id, "despedida_error",
       `La IA no pudo leer si el cliente espera respuesta; la escalera sigue como siempre: ${String(e).slice(0, 150)}`,

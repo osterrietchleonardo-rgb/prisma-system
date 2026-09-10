@@ -109,14 +109,17 @@ export function plantillasEquipo(prefix: string): PlantillaV2[] {
       buttons: [],
     },
     // Notas internas (4/9): el asesor dejó una nota que dice que ya atendió al cliente por fuera
-    // de PRISMA. No es un reclamo: se le pide registrar lo que falta. Texto claro, sin dar nada
-    // por sabido (Leonardo, 4/9). {{2}} lo arma `armarAvisoRegistro` (lib/seguimiento/nota-interna.ts).
+    // de PRISMA. Cuerpo NEUTRO (Leonardo, 10/9): el porqué ("así queda registrado y Sofía tiene
+    // contexto para seguir mejor al cliente", con el nombre del bot de la agencia) va dentro de
+    // {{2}}, que arma `armarAvisoRegistro` (lib/seguimiento/nota-interna.ts). Así cambiar el texto
+    // no requiere una nueva aprobación de Meta. OJO: la versión APROBADA en Meta para Central
+    // (id 2259260301311141) tiene el cuerpo viejo y se edita aparte, con OK.
     {
       template_name: `${prefix}_asesor_registro_pendiente`,
       category: "UTILITY",
       language: "es_AR",
-      body: "Hola {{1}}, te escribe el asistente de PRISMA. {{2}} Esto no es un reclamo: es para que lo que hablaste con el cliente quede registrado y todo el equipo lo vea. Acá está el chat de ese cliente en PRISMA: {{3}} ¡Gracias!",
-      body_examples: ["Eric", "Vimos tu nota interna sobre Nicolás (+5491136299626) y entendemos que ya lo estás atendiendo, así que frenamos los avisos de cliente esperando por este caso. Falta registrar en PRISMA: un mensaje al cliente desde el chat, la visita en el calendario y la actividad en el tracking.", "https://prisma.vakdor.com/asesor/leads-whatsapp"],
+      body: "Hola {{1}}, te escribe el asistente de PRISMA. {{2}} Acá está el chat de ese cliente: {{3}} ¡Gracias!",
+      body_examples: ["Eric", "Vimos tu nota interna sobre Nicolás (+5491136299626) y entendemos que ya lo estás atendiendo, así que frenamos los avisos de cliente esperando por este caso. Falta registrar en PRISMA: un mensaje al cliente desde el chat, la visita en el calendario y la actividad en el tracking. Así queda registrado y Sofía tiene contexto para dar un mejor seguimiento al cliente.", "https://prisma.vakdor.com/asesor/leads-whatsapp"],
       buttons: [],
     },
   ]

@@ -22,6 +22,12 @@ describe("catálogo de plantillas v2 (clientes)", () => {
       expect(p.body.trim().endsWith("}}")).toBe(false)
     }
   })
+  it("regla de Leonardo (10/9): ningún nombre propio a mano en el cuerpo fijo — asesor, director, agencia, cliente y bot son dinámicos", () => {
+    // El nombre de la agencia entra por parámetro (acá "PRISMAIA - VAKDOR"); el del bot va en {{2}}.
+    for (const p of [...plantillasV2("ag57c613", "Inmobiliaria X"), ...plantillasEquipo("ag57c613")]) {
+      expect(p.body).not.toMatch(/Sofía|Sofia|Lara|Central|Kevin|Vakdor|PRISMAIA/)
+    }
+  })
   it("ninguna trae la BAJA fija (la agrega el ejecutor desde el 2º seguimiento)", () => {
     for (const p of cat) expect(p.body).not.toMatch(/BAJA/)
   })
@@ -46,11 +52,12 @@ describe("catálogo del equipo (asesores/director)", () => {
       expect(p.body_examples.at(-1)).toMatch(/^https:\/\/prisma\.vakdor\.com\//)
     }
   })
-  it("asesor_registro_pendiente: 3 variables, se presenta como PRISMA y aclara que no es un reclamo", () => {
+  it("asesor_registro_pendiente: 3 variables, cuerpo neutro (el porqué va en {{2}} con el nombre del bot de la agencia; Leonardo, 10/9)", () => {
     const p = cat.find((x) => x.template_name === "ag57c613_asesor_registro_pendiente")!
     expect(cuentaVars(p.body)).toBe(3)
     expect(p.body).toContain("te escribe el asistente de PRISMA")
-    expect(p.body).toContain("no es un reclamo")
-    expect(p.body).toContain("Acá está el chat de ese cliente en PRISMA: {{3}}")
+    expect(p.body).not.toMatch(/reclamo|todo el equipo|trazabilidad|Sofía/)
+    expect(p.body).toContain("Acá está el chat de ese cliente: {{3}}")
+    expect(p.body_examples[1]).toContain("tiene contexto para dar un mejor seguimiento al cliente")
   })
 })

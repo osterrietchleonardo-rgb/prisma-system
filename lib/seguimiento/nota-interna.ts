@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import Anthropic from "@anthropic-ai/sdk"
 import { z } from "zod"
 import { MODELO } from "@/lib/admin-vakdor/marketing/claude"
-import { enviarAviso, linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
+import { BOT_GENERICO, enviarAviso, linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
 import { registrarEvento } from "./eventos"
 import { crearHerramientas } from "./herramientas"
 import type { Candidato } from "./tipos"
@@ -206,24 +206,27 @@ export function armarAvisoRegistro(
   nota: NotaInterna,
   v: VeredictoNota,
   appUrl: string,
-  nombreAgencia: string
+  nombreAgencia: string,
+  nombreBot: string = BOT_GENERICO
 ): Aviso {
   const cliente = nombreCliente(c)
   const tel = `+${c.contact_phone.replace(/\D/g, "")}`
   const link = linkAlChat(perfil, c.id, appUrl)
   const pedidos: string[] = []
   if (v.pedir_registro_chat)
-    pedidos.push("Lo que hablaron por teléfono no quedó en PRISMA. Mandale al cliente desde el <strong>chat de PRISMA</strong> un mensaje confirmando lo acordado (día y hora de la visita, lo que le prometiste): así queda el registro para todo el equipo y Sofía sabe que lo estás atendiendo.")
+    pedidos.push("Lo que hablaron por teléfono no quedó en PRISMA. Mandale al cliente desde el <strong>chat de PRISMA</strong> un mensaje confirmando lo acordado (día y hora de la visita, lo que le prometiste).")
   if (v.pedir_registro_visita)
-    pedidos.push("La visita que mencionás no figura en el <strong>calendario</strong> de PRISMA: cargala así los recordatorios al cliente corren solos.")
+    pedidos.push("La visita que mencionás no figura en el <strong>calendario</strong> de PRISMA: cargala, así los recordatorios al cliente salen solos.")
   if (v.pedir_registro_actividad)
-    pedidos.push("Registrá la gestión en el <strong>tracking</strong> (la actividad con este cliente y la propiedad): es lo que después cuenta como trabajo hecho.")
+    pedidos.push("Registrá la gestión en el <strong>tracking</strong> (la actividad con este cliente y la propiedad).")
   const html = [
     `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;color:#1a1a1a">`,
     `<p>Hola ${esc(primerNombre(perfil))},</p>`,
     `<p>Vimos tu nota sobre <strong>${esc(cliente)}</strong> (${esc(tel)}): <em>«${esc(unaLinea(nota.content, 200))}»</em></p>`,
     `<p>Perfecto que ya lo estés atendiendo — los avisos de "cliente esperando" se frenaron para este caso.</p>`,
-    pedidos.length ? `<p>Para que nada se pierda:</p><ul>${pedidos.map((p) => `<li>${p}</li>`).join("")}</ul>` : "",
+    // Leonardo, 10/9: al grano — es para que quede registrado y el bot (con el nombre de la agencia,
+    // nunca a mano) tenga contexto para seguir mejor al cliente. Antes: "para que nada se pierda".
+    pedidos.length ? `<p>Para que quede registrado y ${esc(nombreBot)} tenga contexto para dar un mejor seguimiento al cliente:</p><ul>${pedidos.map((p) => `<li>${p}</li>`).join("")}</ul>` : "",
     `<p><a href="${link}" style="display:inline-block;background:#111;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Abrir el chat en PRISMA</a></p>`,
     `<p style="color:#888;font-size:13px">— Agente de seguimiento de PRISMA · ${esc(nombreAgencia)}</p>`,
     `</div>`,
@@ -240,9 +243,10 @@ export function armarAvisoRegistro(
     asunto: `${cliente}: gestión anotada — falta el registro en PRISMA — ${nombreAgencia}`,
     html,
     plantilla: "asesor_registro_pendiente",
-    // {{2}} de la plantilla `asesor_registro_pendiente`: la plantilla ya se presenta como PRISMA y
-    // aclara que no es un reclamo; acá va solo lo del caso, sin dar nada por sabido.
-    variables: [primerNombre(perfil), unaLinea(`Vimos tu nota interna sobre ${cliente} (${tel}) y entendemos que ya lo estás atendiendo, así que frenamos los avisos de cliente esperando por este caso. Falta registrar en PRISMA: ${queRegistrar || "nada, está todo al día"}.`, 700), link],
+    // {{2}} de la plantilla `asesor_registro_pendiente`: la plantilla es neutra (se presenta como
+    // PRISMA y da el link); acá va lo del caso y el porqué, con el nombre del bot de la agencia,
+    // así cambiar el texto no requiere que Meta vuelva a aprobar nada (Leonardo, 10/9).
+    variables: [primerNombre(perfil), unaLinea(`Vimos tu nota interna sobre ${cliente} (${tel}) y entendemos que ya lo estás atendiendo, así que frenamos los avisos de cliente esperando por este caso. Falta registrar en PRISMA: ${queRegistrar || "nada, está todo al día"}. Así queda registrado y ${nombreBot} tiene contexto para dar un mejor seguimiento al cliente.`, 700), link],
   }
 }
 
@@ -264,6 +268,8 @@ export async function procesarNotaDelCaso(
     asesor: PerfilEquipo | null
     appUrl: string
     nombreAgencia: string
+    /** Nombre del agente IA de la agencia (whatsapp_ai_settings.bot_name); sin él, el genérico. */
+    nombreBot?: string
     ahoraMs: number
     fetchFn?: typeof fetch
     llamar?: LlamarVeredicto
@@ -330,7 +336,7 @@ export async function procesarNotaDelCaso(
   const hayPedidos = veredicto.pedir_registro_chat || veredicto.pedir_registro_visita || veredicto.pedir_registro_actividad
   if (!hayPedidos || !opts.asesor) return "atendido_sin_aviso"
 
-  const aviso = armarAvisoRegistro(opts.asesor, c, nota, veredicto, opts.appUrl, opts.nombreAgencia)
+  const aviso = armarAvisoRegistro(opts.asesor, c, nota, veredicto, opts.appUrl, opts.nombreAgencia, opts.nombreBot ?? BOT_GENERICO)
   if (opts.modo !== "activo") {
     await registrarEvento(db, c.agency_id, c.id, "aviso_registro_simulado",
       `[${opts.modo}] se le habría pedido al asesor ${opts.asesor.full_name ?? ""} registrar la gestión en PRISMA`,

@@ -24,9 +24,12 @@ describe("semillaDespedida: la conversación entera y la hora, nada inventado", 
     expect(s).toContain("ENCENDIDO")
   })
   it("con el bot apagado lo dice y desde cuándo (Alex, 7/9: un asesor tomó el chat sin escribir)", () => {
-    const s = semillaDespedida({ mensajes: "[lead] Mi nombre es alex", ahoraISO: "2026-09-07 12:01", botApagadoDesde: "2026-09-04 15:14" })
+    const s = semillaDespedida({ mensajes: "[lead] Mi nombre es alex", ahoraISO: "2026-09-07 12:01", botApagadoDesde: "2026-09-04 15:14", nombreBot: "Lara" })
     expect(s).toContain("APAGADO desde 2026-09-04 15:14")
     expect(s).not.toContain("ENCENDIDO")
+    // el nombre del bot viene de la agencia (Lara en PRISMAIA), nunca a mano
+    expect(s).toContain("Bot (Lara) en este chat")
+    expect(s).not.toContain("Sofía")
   })
 })
 
