@@ -45,6 +45,93 @@ casos abiertos (Paola, Anita Becker) para que la barrida los relea con el prompt
 sugerencia de Carmen del mismo día (audio de cliente que muestra "Error" y no se escucha) está
 anotada, sin investigar.
 
+---
+
+## 2026-09-10 — Los números del Cierre estaban mal de cinco formas (salió de revisar un Excel)
+
+**De dónde salió:** Kevin (Central) armó un Excel con los cierres del año para que Leonardo los
+cargue, y pidió que lo revisáramos "para no hacer todo al pedo". Revisarlo destapó que el
+dashboard venía dando números equivocados. Nadie pidió arreglar nada de eso: apareció.
+
+**Lo que se descubrió antes de construir:**
+- La tabla `performance_logs` **no está en el repo**: existe solo en producción. Auditar contra
+  el repo no alcanza (ver `supabase/schema.sql`, no la tiene).
+- `performance_logs` **no tiene política de UPDATE**. `updatePerformanceLog` escribe con el
+  cliente admin y usa el SELECT de la RLS como control de permisos. Patrón a copiar.
+- Central tenía **un solo cierre** cargado (Carolina Grossi, 23/1) y ya estaba en el Excel de
+  Kevin → duplicado esperando. El Excel se retipeó a mano, no salió del sistema.
+- Un asesor ve SOLO lo suyo: sus propiedades (`getTrackingOptions.ts:26`), sus leads (`:38`) y
+  sus actividades (RLS). Compartimentado a propósito.
+
+**Qué se arregló** (5 merges a main, de `d5548af` a `f96e948`):
+1. `fix/conteo-participacion-alquileres` — la regla de "media operación" estaba escrita 3 veces
+   en `dashboard.ts` y 2 se habían quedado sin locador/locatario: un alquiler de una punta
+   contaba 0,5 en el total de la agencia y 1 en el ranking y el gráfico mensual.
+2. `feat/dashboard-venta-vs-alquiler` — la tarjeta Cierre abre GCI y cierres en Venta/Alquiler.
+   Los históricos sin `proceso` van a una tercera línea "Sin definir"; un test exige que las
+   tres sumen el total.
+3. `fix/etiqueta-honorarios-por-punta` — "Honorarios Totales Cobrados" → **"Honorarios de tu
+   punta"**. Ese "Totales" empujaba a duplicar la facturación. Idea de Leonardo: arreglarlo en
+   la etiqueta sale más barato que en el cálculo, y así el GCI suma bien fila por fila.
+4. `feat/operacion-id` — columna `operacion_id` (migración `20260909160000`, **aplicada**), el
+   volumen cuenta cada operación una vez, y el Honorario Real pasa a ser GCI ÷ volumen. Antes
+   era el promedio simple de los porcentajes. Con los datos de demo: **5,5% → 4,4% → 6,1%**.
+   De paso se fue `honorarioCobrado`, una fórmula a medio hacer que nunca se usó.
+5. `feat/mostrar-volumen-operado` — el volumen se calculaba desde siempre y **no lo pintaba
+   ningún componente**.
+6. `feat/enlazar-operacion-a-ciegas` — al escribir la dirección de un cierre, avisa si otro
+   asesor ya cargó uno ahí. Más la solapa **Operaciones** en la página Equipo, para unir,
+   separar y **deshacer** un enlace mal confirmado (antes no se podía deshacer de ningún modo).
+7. `fix/mensaje-otro-lado-del-negocio` — queja de Matias Di Leo: "necesito el mismo cliente en
+   captación y prebuying". **Se podía desde siempre** (una tarjeta por proceso, botón "Abrir
+   proceso de…" en la ficha). El tablero le decía la regla sin decir la salida. Ahora la dice.
+
+**Decisiones de producto (de Leonardo, no mías):**
+- El aviso al asesor es **a ciegas**: no dice quién ni cuándo cerró el otro. Pero el
+  **desplegable de direcciones sí es de toda la agencia** — "una dirección cerrada dentro de tu
+  agencia no es un secreto", y para verla hay que haber escrito casi toda.
+- Una operación compartida con una inmobiliaria **de afuera** cuenta 0,5 para siempre. Queda
+  así; **hay que avisarle a Kevin antes de que vea el año cargado**, o va a ver menos cierres
+  de los que hizo.
+- El volumen dice **cuánto se vendió**, no "cuánto nos toca". Por eso se deduplica en vez de
+  dividir por la mitad: 6,1% es una tarifa que existió; 7,3% no.
+
+**Lo que costó, medido:**
+- **El matching de direcciones.** Con un aviso a ciegas el asesor no puede detectar un falso
+  positivo, y enlazar mal hace desaparecer una venta del volumen. Las pruebas encontraron dos
+  agujeros que yo no había previsto: "Córdoba 2450 **5B**" vs "**8A**" (compartían el 2450) y
+  "5B" vs "5A" (mismos números, texto casi igual). Reglas finales en `lib/tracking/direcciones.ts`.
+- **Enlazar no controlaba que las puntas tuvieran sentido.** Verificado en producción: un
+  "Ambas puntas" enlazado con un "Solo Vendedor" hacía que UNA operación contara 1,5 negocios.
+  `puedenSerLasDosPuntas()`.
+- **Recordar un "no son la misma" sin tabla nueva:** se le da a cada fila su propia operación.
+  Dejan de estar sueltas, no se vuelven a proponer, y las cuentas no cambian.
+
+**Gotchas nuevos (los tres cuestan horas):**
+- **Los tooltips de Radix NO se abren al tocar en un celular.** Ni hover, ni `pointerdown`+`up`
+  con `pointerType: touch`, ni `click()`. Alcanza a los 16 lugares de la app. Lo que cambia lo
+  que la persona escribe va como línea visible, no en el globito. Anotado en memoria.
+- **El clasificador del modo auto bloquea el DDL** contra producción (`ALTER TABLE`), incluso
+  vía `scripts/sql-produccion.mjs`. Lo corrió Leonardo con `!`. `CREATE INDEX` sí pasó.
+- **`npm install` reemplaza un junction de `node_modules` por una carpeta real.** El worktree
+  `PRISMA-SYSTEM-conteo` quedó con el suyo propio; el principal, intacto y coherente en
+  `d5548af`. El día que se actualice va a necesitar su `npm install` (9 dependencias de tiptap).
+
+**Datos de demo cargados en PRISMAIA** (pedido de Leonardo, NO borrar): 5 cierres con las
+direcciones "DEMO - …", repartidos entre los perfiles ZZ DEMO. Cubren venta y alquiler, una y
+dos puntas, y una operación de dos asesores enlazada. Central **no se tocó en todo el día**.
+
+**Qué quedó pendiente:**
+- **Kevin:** el Excel con las columnas nuevas (Operación Venta/Alquiler, y seis columnas de
+  cliente: nombre/celular/email del que vende y del que compra). Y sin responder: si el
+  porcentaje de honorarios que cargaron es el de su punta o el total de la operación.
+- **Los globitos del celular.** Leonardo dijo "para otro momento". Es un solo archivo
+  (`components/ui/tooltip.tsx`); lo caro es verificar los 16 lugares que lo usan.
+- **La carga del año de Central**, cuando vuelva el Excel. El informe de filas problemáticas va
+  ANTES de escribir nada.
+
+---
+
 ## 2026-09-09 — Documentos para clientes: la plantilla se arma una vez y cada asesor la comparte con sus datos
 
 **Qué pidió Leonardo:** "cranear una solución para este apartado de plantillas que se suben
