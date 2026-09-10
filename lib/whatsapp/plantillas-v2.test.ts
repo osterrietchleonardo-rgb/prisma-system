@@ -46,12 +46,12 @@ describe("catálogo del equipo (asesores/director)", () => {
       expect(p.body_examples.at(-1)).toMatch(/^https:\/\/prisma\.vakdor\.com\//)
     }
   })
-  it("asesor_registro_pendiente: 3 variables, se presenta como PRISMA y va al grano: registro y trazabilidad (Leonardo, 10/9)", () => {
+  it("asesor_registro_pendiente: 3 variables, cuerpo neutro (el porqué va en {{2}} con el nombre del bot de la agencia; Leonardo, 10/9)", () => {
     const p = cat.find((x) => x.template_name === "ag57c613_asesor_registro_pendiente")!
     expect(cuentaVars(p.body)).toBe(3)
     expect(p.body).toContain("te escribe el asistente de PRISMA")
-    expect(p.body).toContain("quede registrado en PRISMA y tengamos trazabilidad")
-    expect(p.body).not.toMatch(/reclamo|todo el equipo/)
+    expect(p.body).not.toMatch(/reclamo|todo el equipo|trazabilidad|Sofía/)
     expect(p.body).toContain("Acá está el chat de ese cliente: {{3}}")
+    expect(p.body_examples[1]).toContain("tiene contexto para dar un mejor seguimiento al cliente")
   })
 })

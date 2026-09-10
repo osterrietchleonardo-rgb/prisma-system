@@ -75,6 +75,24 @@ export function linkAlChat(perfil: Pick<PerfilEquipo, "role">, conversationId: s
 }
 
 /** Solo el nombre de `metricas` (regla 24/8); nunca el del perfil de WhatsApp. */
+/** Si la agencia no le puso nombre a su agente IA de WhatsApp. Mismo texto que usa la ficha de propiedad. */
+export const BOT_GENERICO = "tu Asesor IA"
+
+/**
+ * Nombre que cada agencia le puso a su agente IA (Sofía en Central, Lara en PRISMAIA). Vive en
+ * `whatsapp_ai_settings.bot_name` con `agent_id` nulo. Un mapa por corrida: los avisos lo nombran
+ * para explicar por qué registrar ("así Sofía tiene contexto"), nunca escrito a mano (Leonardo, 10/9).
+ */
+export async function nombresDeBot(db: SupabaseClient): Promise<Map<string, string>> {
+  const { data } = await db.from("whatsapp_ai_settings").select("agency_id, bot_name").is("agent_id", null)
+  const mapa = new Map<string, string>()
+  for (const r of (data ?? []) as Array<{ agency_id: string; bot_name: string | null }>) {
+    const nombre = (r.bot_name ?? "").trim()
+    if (nombre) mapa.set(r.agency_id, nombre)
+  }
+  return mapa
+}
+
 export function nombreCliente(c: Pick<Candidato, "metricas">): string {
   return nombreValido(c as Candidato) ? String(c.metricas.nombre).trim() : "Un cliente"
 }

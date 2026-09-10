@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { dentroDeVentanaEnvio, horasHabiles } from "@/lib/whatsapp/sending-window"
-import { enviarAviso, linkAlChat, nombreCliente, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
+import { BOT_GENERICO, enviarAviso, linkAlChat, nombreCliente, nombresDeBot, unaLinea, type Aviso, type PerfilEquipo } from "./avisos"
 import { bloqueContextoHtml, contextoDelLead, lineaContextoWhatsApp, type ContextoLead } from "./contexto"
 import { registrarEvento } from "./eventos"
 import { procesarDespedidaDelCaso, type LlamarDespedida, type ResultadoDespedida } from "./despedida"
@@ -121,7 +121,8 @@ export function armarAvisoAsesorEscalera(
   c: Lead,
   info: { nivel: Nivel; horas: number; esAsignado: boolean; contexto?: ContextoLead },
   appUrl: string,
-  nombreAgencia: string
+  nombreAgencia: string,
+  nombreBot: string = BOT_GENERICO
 ): Aviso {
   const cliente = nombreCliente(c)
   const tel = `+${c.contact_phone.replace(/\D/g, "")}`
@@ -138,14 +139,16 @@ export function armarAvisoAsesorEscalera(
       // Leonardo, 7/9: la mitad de los chats apagados de Central los apagó una persona sin escribir
       // ni anotar. El aviso dice qué hacer si ya lo atendió por afuera, para que Sofía se entere y
       // el trabajo quede registrado. Chat o nota: cualquiera de las dos frena estos avisos.
-      `<p><strong>Si ya lo atendiste por teléfono o en persona:</strong> mandale desde el chat de PRISMA un mensaje confirmando lo que acordaron, o dejá una <strong>nota interna</strong> contando qué hiciste: así queda registrado, hay trazabilidad y estos avisos se frenan. Y registrá la visita en el <strong>calendario</strong> y la gestión en el <strong>tracking</strong>.</p>`,
+      // Leonardo, 10/9: al grano — es para que quede registrado y el bot tenga contexto para seguir
+      // mejor al cliente. El nombre del bot es el de la agencia, nunca escrito a mano.
+      `<p><strong>Si ya lo atendiste por teléfono o en persona:</strong> mandale desde el chat de PRISMA un mensaje confirmando lo que acordaron, o dejá una <strong>nota interna</strong> contando qué hiciste. Así queda registrado y ${esc(nombreBot)} tiene contexto para dar un mejor seguimiento al cliente, y estos avisos se frenan. Y registrá la visita en el <strong>calendario</strong> y la gestión en el <strong>tracking</strong>.</p>`,
       `<p>${porQueVos} Si no lo podés tomar, marcá «No lo puedo tomar» en el chat y el director lo reasigna.</p>`,
     ],
     link, "Abrir el chat en PRISMA", nombreAgencia
   )
   // Va en el WhatsApp de 2/5 h ({{2}}, tope 700): se arma DESPUÉS del contexto pero se
   // garantiza recortando el contexto, no la indicación.
-  const indicacion = " Si ya lo atendiste por teléfono, confirmáselo desde el chat de PRISMA o dejá una nota interna, y registrá la visita y la actividad."
+  const indicacion = ` Si ya lo atendiste por teléfono, confirmáselo desde el chat de PRISMA o dejá una nota interna: así queda registrado y ${nombreBot} tiene contexto para seguir mejor al cliente. Y registrá la visita y la actividad.`
   const base = { destinatario: perfil, esAsignado: info.esAsignado, link, html }
   if (nivel.plantillaAsesor === "asesor_sigue_esperando") {
     // "Hola {{1}}, {{2}} sigue esperando desde hace {{3}}. Si no lo podés tomar, avisá por acá y lo reasignamos: {{4}} ¡Gracias!"
@@ -239,6 +242,8 @@ export async function correrEscalamiento(
   const { data: configs } = await db.from("seguimiento_config").select("agency_id, modo, activo_desde")
   const { data: agencias } = await db.from("agencies").select("id, name")
   const nombreAgencia = new Map<string, string>((agencias ?? []).map((a) => [a.id, a.name ?? "PRISMA"]))
+  const nombreBot = await nombresDeBot(db)
+  const bot = (agencyId: string) => nombreBot.get(agencyId) ?? BOT_GENERICO
 
   for (const config of configs ?? []) {
     if (config.modo === "apagado") continue
@@ -293,6 +298,7 @@ export async function correrEscalamiento(
           rNota = await procesarNotaDelCaso(db, c, t0, {
             modo: config.modo, asesor, appUrl,
             nombreAgencia: nombreAgencia.get(c.agency_id) ?? "PRISMA",
+            nombreBot: bot(c.agency_id),
             ahoraMs, fetchFn: opts.fetchFn, llamar: opts.llamarNota,
           })
           if (rNota !== "sin_nota") llamadasIA++
@@ -315,7 +321,7 @@ export async function correrEscalamiento(
       if ((rNota === "sin_nota" || rNota === "escalera_sigue") && llamadasIA < MAX_LLAMADAS_IA) {
         let rDesp: ResultadoDespedida | null = null
         try {
-          rDesp = await procesarDespedidaDelCaso(db, c, t0, { ahoraMs, llamar: opts.llamarDespedida })
+          rDesp = await procesarDespedidaDelCaso(db, c, t0, { ahoraMs, llamar: opts.llamarDespedida, nombreBot: bot(c.agency_id) })
           if (rDesp.llamoIA) llamadasIA++
         } catch (e) {
           await registrarEvento(db, c.agency_id, c.id, "despedida_error",
@@ -340,8 +346,8 @@ export async function correrEscalamiento(
       const contexto = await contextoDelLead(db, c)
       const agencia = nombreAgencia.get(c.agency_id) ?? "PRISMA"
       const destinos: Array<{ quien: "asesor" | "director"; aviso: Aviso }> = []
-      if (asesor) destinos.push({ quien: "asesor", aviso: armarAvisoAsesorEscalera(asesor, c, { nivel, horas, esAsignado: true, contexto }, appUrl, agencia) })
-      else if (director) destinos.push({ quien: "director", aviso: armarAvisoAsesorEscalera(director, c, { nivel, horas, esAsignado: false, contexto }, appUrl, agencia) })
+      if (asesor) destinos.push({ quien: "asesor", aviso: armarAvisoAsesorEscalera(asesor, c, { nivel, horas, esAsignado: true, contexto }, appUrl, agencia, bot(c.agency_id)) })
+      else if (director) destinos.push({ quien: "director", aviso: armarAvisoAsesorEscalera(director, c, { nivel, horas, esAsignado: false, contexto }, appUrl, agencia, bot(c.agency_id)) })
       if (def.director && director && asesor) destinos.push({ quien: "director", aviso: armarAvisoDirectorSinRespuesta(director, c, { asesorNombre: asesor.full_name, horas, contexto }, appUrl, agencia) })
       if (!destinos.length) {
         await registrarEvento(db, c.agency_id, c.id, "aviso_sin_destinatario", `Escalera nivel ${nivel} h: no hay asesor ni director activo a quien avisar`, { nivel, t0 })
