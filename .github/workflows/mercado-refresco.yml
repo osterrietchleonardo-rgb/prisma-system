@@ -3,8 +3,9 @@
 # Por zona: relee el inventario completo con --tanda 30 (precios, republicaciones,
 # altas que el descubrimiento se perdió) y después verifica los avisos que el
 # refresco no vio — el ÚNICO camino que marca 'caido'. Al final, embeddings de lo
-# nuevo. Cubre los 48 barrios de CABA (41 + 7 linderos). Costo ≈ US$ 60-70/mes con
-# Apify. NO pasa --ckpt: siempre relee todo desde la página 1, sin saltear.
+# nuevo. Cubre los 48 barrios de CABA (41 + 7 linderos) más las zonas del bloque
+# `include` (fuera de CABA / otro tipo de propiedad, con slug propio). Costo ≈ US$ 60-70/mes
+# con Apify. NO pasa --ckpt: siempre relee todo desde la página 1, sin saltear.
 #
 # max-parallel 3: el plan de Apify permite 5 corridas simultáneas y el
 # descubrimiento diario también necesita lugar. Cada zona es un job propio con su
@@ -78,6 +79,11 @@ jobs:
           - colegiales
           - saavedra
           - coghlan
+        # Zonas fuera de CABA o con otro tipo de propiedad: llevan su propio slug de
+        # búsqueda (`base`) porque el default `departamentos-venta-<zona>` no aplica.
+        # `hasta` chico para no pagar corridas vacías en localidades con pocas páginas.
+        include:
+          - { zona: don-torcuato, base: terrenos-venta-don-torcuato, hasta: 60 }
     env:
       APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -88,7 +94,9 @@ jobs:
         with:
           node-version: 22
       - name: Refresco ${{ matrix.zona }}
-        run: node mercado-sync/barrido.mjs --base departamentos-venta-${{ matrix.zona }} --desde 1 --hasta 220 --tanda 30 --zona ${{ matrix.zona }} --tope-usd 95
+        # `matrix.base` / `matrix.hasta` solo existen en las entradas de `include`;
+        # para las 48 zonas de la lista quedan vacíos y cae al default.
+        run: node mercado-sync/barrido.mjs --base ${{ matrix.base || format('departamentos-venta-{0}', matrix.zona) }} --desde 1 --hasta ${{ matrix.hasta || 220 }} --tanda 30 --zona ${{ matrix.zona }} --tope-usd 95
       - name: Verificación de bajas ${{ matrix.zona }}
         run: node mercado-sync/verificacion.mjs --zona ${{ matrix.zona }} --dias 25 --max 500
 
