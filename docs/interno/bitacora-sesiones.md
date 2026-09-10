@@ -85,6 +85,50 @@ producción hay que pedirle a Central la franja a 1600 o más.
 
 ---
 
+## 2026-09-10 — Consumo para facturar, y Don Torcuato dejó de estar huérfano
+
+**Qué pidió Leonardo:** el detalle de gastos variables de la red de mercado para cobrárselo a
+Central en la próxima factura (últimos 30 días, sin su infraestructura, con todo lo ya
+gastado); después, un spec copiable para que otra terminal arme la skill `consumo`; y por
+último, que Don Torcuato entre a los automatismos.
+
+**El informe de consumo (artifact `5e12f071…`)** — ventana 11/08–10/09, **US$234,35**:
+Apify US$93,40 (construcción US$84,48 única vez + mantenimiento US$8,92) · OpenAI US$86,07 ·
+Gemini US$54,88 (imágenes 29,37 · texto 20,54 · embeddings 4,97). Cada cifra consultada en
+vivo en la API de cada proveedor; ninguna estimada. Lo excluido (Supabase, servidor, proxy,
+Vercel, Claude Code, monotributo) va listado a propósito. Tres cosas que salieron midiendo:
+1. **OpenAI gastó US$93,86 en agosto y no se veía**: el sync de `finance_api_costs` está
+   parado desde el 19-jul para OpenAI y Anthropic (solo Google sigue). Sigue sin arreglar.
+2. **El régimen de CABA proyecta ~US$103/mes de Apify contra un tope de US$100.**
+3. **`roomix_properties_legacy` pesa 3.841 MB = 70% de la base** (5.466 MB). Borrarla
+   requiere OK explícito.
+Error propio corregido antes de publicar: había proyectado el mes siguiente en US$150-190.
+Falso: el armado no se repite pero entra el refresco mensual → US$225-250.
+
+**El spec de la skill `consumo`** se entregó en dos versiones; la segunda porque Leonardo
+marcó, con razón, que nada puede ir clavado a mano (actor, precio, zonas, plan). Todo se
+descubre en vivo: el actor sale de los `actId` de las corridas; su precio vigente de
+`pricingInfos` eligiendo la versión de mayor `startedAt` (¡NO `[0]`, es la más vieja!);
+las zonas del refresco se parsean del workflow; el project ref se deriva de
+`NEXT_PUBLIC_SUPABASE_URL`. Incluye el chequeo de **zonas huérfanas**: barrios en la base
+que no estén ni en el refresco ni dentro del `--location` diario quedan congelados en silencio.
+
+**Don Torcuato estaba huérfano** (cargado a mano el 8-sep, pero el descubrimiento diario
+filtra por "Capital Federal" y el refresco tenía solo las 48 zonas de CABA → foto congelada).
+Arreglo, mergeado:
+- `mercado-refresco.yml`: bloque `include` en la matriz con
+  `{ zona: don-torcuato, base: terrenos-venta-don-torcuato, hasta: 60 }`; la línea del
+  barrido usa `${{ matrix.base || format('departamentos-venta-{0}', matrix.zona) }}` y
+  `${{ matrix.hasta || 220 }}`, así las 48 zonas no cambian. 49 jobs.
+- `mercado-descubrimiento.yml`: paso propio `--location "Don Torcuato" --zona don-torcuato
+  --tipo-prop terrenos`, con `continue-on-error: true` para no frenar los embeddings de CABA.
+- **Probado en vivo el comando exacto:** trajo 3 terrenos nuevos de los últimos 2 días, los 3
+  calidad ok (pasaron el centroide), insertados y embebidos. Costo centavos.
+- Patrón para la próxima zona fuera de CABA: una línea en `include` + un paso en el
+  descubrimiento. No hay que tocar código.
+
+---
+
 ## 2026-09-08 — Primera zona de GBA: terrenos de Don Torcuato (y el bug de ubicación que destapó)
 
 **Qué pidió Leonardo:** ver si había terrenos en ZonaProp en Don Torcuato y Monte Grande, y

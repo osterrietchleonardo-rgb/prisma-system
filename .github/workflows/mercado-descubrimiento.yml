@@ -34,6 +34,16 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: node mercado-sync/descubrimiento.mjs --location "Capital Federal" --zona caba --dentro-de 2 --max 1500
+      # Zonas fuera de CABA: el filtro "Capital Federal" no las ve, van como paso propio.
+      # `continue-on-error`: una falla acá no debe frenar los embeddings de CABA.
+      # --zona con centroide en loader.mjs → lo que caiga fuera de la localidad va a cuarentena.
+      - name: Descubrimiento Don Torcuato (terrenos)
+        continue-on-error: true
+        env:
+          APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node mercado-sync/descubrimiento.mjs --location "Don Torcuato" --zona don-torcuato --tipo-prop terrenos --dentro-de 2 --max 200
       - name: Embeddings de lo nuevo
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
