@@ -3,9 +3,10 @@
 import { randomUUID } from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { decidirEnlace } from "@/lib/tracking/enlace";
+import { decidirEnlace, puedenSerLasDosPuntas } from "@/lib/tracking/enlace";
 import {
   actividadCoincideConDireccion,
+  direccionesCoinciden,
   normalizarDireccion,
   MINIMO_PARA_BUSCAR,
 } from "@/lib/tracking/direcciones";
@@ -27,7 +28,7 @@ interface Candidata {
   id: string;
   operacion_id: string | null;
   propiedad_ref: string | null;
-  metadata: { propiedad_colaboracion?: unknown } | null;
+  metadata: { propiedad_colaboracion?: unknown; participacion?: unknown } | null;
 }
 
 function haceUnAno(): string {
@@ -52,7 +53,8 @@ function haceUnAno(): string {
 async function buscarCandidatas(
   agencyId: string,
   agentId: string,
-  direccion: string
+  direccion: string,
+  participacionPropia: unknown
 ): Promise<Candidata[]> {
   if (normalizarDireccion(direccion).length < MINIMO_PARA_BUSCAR) return [];
 
@@ -74,9 +76,14 @@ async function buscarCandidatas(
     return [];
   }
 
-  return (data ?? []).filter((fila) =>
-    actividadCoincideConDireccion(fila as Candidata, direccion)
-  ) as Candidata[];
+  return (data ?? []).filter((fila) => {
+    const c = fila as Candidata;
+    if (!actividadCoincideConDireccion(c, direccion)) return false;
+    // Las dos filas tienen que poder ser puntas complementarias. Sin esto se
+    // enlazaba un "Ambas puntas" con un "Solo Vendedor" y una sola operación
+    // pasaba a contar 1,5 negocios.
+    return puedenSerLasDosPuntas(participacionPropia, c.metadata?.participacion);
+  }) as Candidata[];
 }
 
 /** El perfil de quien está llamando, o null si no hay sesión. */
@@ -106,12 +113,18 @@ async function quienLlama(): Promise<{ userId: string; agencyId: string } | null
  * hoy un asesor no puede ver.
  */
 export async function hayOtroCierreEnEsaDireccion(
-  direccion: string
+  direccion: string,
+  participacionPropia?: unknown
 ): Promise<{ hay: boolean }> {
   const quien = await quienLlama();
   if (!quien) return { hay: false };
 
-  const candidatas = await buscarCandidatas(quien.agencyId, quien.userId, direccion);
+  const candidatas = await buscarCandidatas(
+    quien.agencyId,
+    quien.userId,
+    direccion,
+    participacionPropia
+  );
   return { hay: candidatas.length > 0 };
 }
 
@@ -129,11 +142,19 @@ export async function hayOtroCierreEnEsaDireccion(
  * UPDATE (mismo camino que `updatePerformanceLog`), y sólo toca UNA columna de
  * filas que ya verificó que son de la misma agencia.
  */
-export async function resolverOperacionId(direccion: string): Promise<string | null> {
+export async function resolverOperacionId(
+  direccion: string,
+  participacionPropia?: unknown
+): Promise<string | null> {
   const quien = await quienLlama();
   if (!quien) return null;
 
-  const candidatas = await buscarCandidatas(quien.agencyId, quien.userId, direccion);
+  const candidatas = await buscarCandidatas(
+    quien.agencyId,
+    quien.userId,
+    direccion,
+    participacionPropia
+  );
 
   // El criterio vive en `lib/tracking/enlace.ts`, aparte y probado: qué hacer
   // con varias candidatas, con las que ya están enlazadas y con el caso ambiguo
@@ -160,4 +181,55 @@ export async function resolverOperacionId(direccion: string): Promise<string | n
   }
 
   return operacionId;
+}
+
+/**
+ * Las direcciones de cierres ya cargados en la agencia que coinciden con lo que
+ * el asesor está escribiendo, para ofrecerlas como sugerencia.
+ *
+ * Devuelve SOLO direcciones: ni el asesor, ni la fecha, ni el monto, ni el id.
+ * La decisión de mostrar esto (Leonardo, 9-sep-2026) fue que una dirección
+ * cerrada dentro de la propia inmobiliaria no es un secreto — y para que
+ * aparezca hay que haber escrito ya la mayor parte de ella, así que no se puede
+ * curiosear la lista, sólo confirmar algo que ya se conocía.
+ *
+ * Su valor principal no es ahorrar tecleo: es que la dirección quede escrita
+ * SIEMPRE IGUAL. Es la causa raíz de que después dos filas de la misma
+ * operación no se encuentren entre sí.
+ */
+export async function direccionesDeCierresDeLaAgencia(
+  texto: string
+): Promise<{ direcciones: string[] }> {
+  const quien = await quienLlama();
+  if (!quien) return { direcciones: [] };
+  if (normalizarDireccion(texto).length < MINIMO_PARA_BUSCAR) return { direcciones: [] };
+
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("performance_logs")
+    .select("propiedad_ref, metadata")
+    .eq("agency_id", quien.agencyId)
+    .eq("type", "cierre")
+    .neq("status", "eliminada")
+    .gte("fecha_actividad", haceUnAno())
+    .limit(TOPE_CANDIDATAS);
+
+  if (error) {
+    console.error("Sugerencia de direcciones:", error.message);
+    return { direcciones: [] };
+  }
+
+  const encontradas = new Set<string>();
+  for (const fila of data ?? []) {
+    const c = fila as Candidata;
+    if (!actividadCoincideConDireccion(c, texto)) continue;
+    // Se ofrece el texto tal como quedó escrito, no el normalizado: la idea es
+    // que el asesor adopte esa forma exacta y dejen de divergir.
+    const colaboracion = c.metadata?.propiedad_colaboracion;
+    for (const candidato of [c.propiedad_ref, typeof colaboracion === "string" ? colaboracion : null]) {
+      if (candidato && direccionesCoinciden(candidato, texto)) encontradas.add(candidato.trim());
+    }
+  }
+
+  return { direcciones: Array.from(encontradas).sort().slice(0, 8) };
 }

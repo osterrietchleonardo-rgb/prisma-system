@@ -53,7 +53,12 @@ export async function savePerformanceLog(payload: any) {
     const { resolverOperacionId } = await import("./enlazarOperacion");
     const direccion =
       baseData.propiedad_ref || baseData.metadata?.propiedad_colaboracion || "";
-    operacionId = await resolverOperacionId(String(direccion));
+    // La participación va también: sin ella el servidor no puede descartar a
+    // las candidatas que no son una punta complementaria.
+    operacionId = await resolverOperacionId(
+      String(direccion),
+      baseData.metadata?.participacion
+    );
   }
 
   const fullPayload = {

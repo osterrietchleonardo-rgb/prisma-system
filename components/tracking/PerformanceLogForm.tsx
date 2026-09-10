@@ -23,7 +23,7 @@ import { ManualContactFields, ManualContactData } from "@/components/shared/Manu
 import { cn } from "@/lib/utils";
 import { PROCESOS_POR_ETAPA, ladoDelNegocio, etapasPermitidas, labelDeProceso, type ProcesoNegocio } from "@/lib/tracking/proceso";
 import { normalizarDireccion, MINIMO_PARA_BUSCAR } from "@/lib/tracking/direcciones";
-import { hayOtroCierreEnEsaDireccion } from "@/actions/tracking/enlazarOperacion";
+import { hayOtroCierreEnEsaDireccion, direccionesDeCierresDeLaAgencia } from "@/actions/tracking/enlazarOperacion";
 import { PIPELINE_STAGES } from "@/lib/tracking/pipeline";
 
 interface Props {
@@ -149,8 +149,10 @@ export function PerformanceLogForm({
   // no pelado: nunca sabemos quién ni cuándo, para no abrirle los cierres de sus
   // compañeros (ver actions/tracking/enlazarOperacion.ts).
   const [hayOtraPunta, setHayOtraPunta] = useState(false);
+  const [sugerencias, setSugerencias] = useState<string[]>([]);
   const [enlazarOperacion, setEnlazarOperacion] = useState<boolean | null>(null);
 
+  const participacionElegida = watch("metadata")?.participacion;
   const propiedadRefEscrita = watch("propiedad_ref");
   const propiedadColaboracion = watch("metadata")?.propiedad_colaboracion;
 
@@ -159,6 +161,7 @@ export function PerformanceLogForm({
     if (activityType !== "cierre" || logToEdit) {
       setHayOtraPunta(false);
       setEnlazarOperacion(null);
+      setSugerencias([]);
       return;
     }
 
@@ -166,6 +169,7 @@ export function PerformanceLogForm({
     if (normalizarDireccion(direccion).length < MINIMO_PARA_BUSCAR) {
       setHayOtraPunta(false);
       setEnlazarOperacion(null);
+      setSugerencias([]);
       return;
     }
 
@@ -173,8 +177,12 @@ export function PerformanceLogForm({
     let cancelado = false;
     const temporizador = setTimeout(async () => {
       try {
-        const { hay } = await hayOtroCierreEnEsaDireccion(direccion);
+        const [{ hay }, { direcciones }] = await Promise.all([
+          hayOtroCierreEnEsaDireccion(direccion, participacionElegida),
+          direccionesDeCierresDeLaAgencia(direccion),
+        ]);
         if (cancelado) return;
+        setSugerencias(direcciones);
         setHayOtraPunta(hay);
         if (!hay) setEnlazarOperacion(null);
       } catch (err) {
@@ -187,7 +195,7 @@ export function PerformanceLogForm({
       cancelado = true;
       clearTimeout(temporizador);
     };
-  }, [activityType, propiedadRefEscrita, propiedadColaboracion, logToEdit]);
+  }, [activityType, propiedadRefEscrita, propiedadColaboracion, participacionElegida, logToEdit]);
 
   // Sync metadata when specific fields change
   const handleMetadataChange = (key: string, value: any) => {
@@ -694,9 +702,20 @@ export function PerformanceLogForm({
             <div className="space-y-2">
               <Label htmlFor="propiedad_ref">Referencia en Texto (Alternativo)</Label>
               <div className="relative">
-                <Input id="propiedad_ref" placeholder="Ej: Av. Santa Fe 1234" {...register("propiedad_ref")} className="pl-10" />
+                <Input id="propiedad_ref" placeholder="Ej: Av. Santa Fe 1234" list="direcciones-ya-cargadas" autoComplete="off" {...register("propiedad_ref")} className="pl-10" />
                 <MapPin className="w-4 h-4 absolute left-3 top-3.5 opacity-40" />
               </div>
+
+              {/* Sugerencias de direcciones ya cerradas en la inmobiliaria. Se
+                  ofrecen para que la direccion quede escrita SIEMPRE IGUAL:
+                  esa es la causa raiz de que despues dos filas de la misma
+                  operacion no se encuentren entre si. Solo la direccion: ni
+                  quien, ni cuando, ni cuanto. */}
+              <datalist id="direcciones-ya-cargadas">
+                {sugerencias.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
 
               {/* El aviso no dice quién ni cuándo a propósito: un asesor no ve
                   los cierres de sus compañeros, y esto no es la excepción. Lo
