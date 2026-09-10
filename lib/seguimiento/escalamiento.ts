@@ -138,7 +138,7 @@ export function armarAvisoAsesorEscalera(
       // Leonardo, 7/9: la mitad de los chats apagados de Central los apagó una persona sin escribir
       // ni anotar. El aviso dice qué hacer si ya lo atendió por afuera, para que Sofía se entere y
       // el trabajo quede registrado. Chat o nota: cualquiera de las dos frena estos avisos.
-      `<p><strong>Si ya lo atendiste por teléfono o en persona:</strong> mandale desde el chat de PRISMA un mensaje confirmando lo que acordaron, o dejá una <strong>nota interna</strong> contando qué hiciste — con cualquiera de las dos, Sofía se entera y estos avisos se frenan. Y registrá la visita en el <strong>calendario</strong> y la gestión en el <strong>tracking</strong>.</p>`,
+      `<p><strong>Si ya lo atendiste por teléfono o en persona:</strong> mandale desde el chat de PRISMA un mensaje confirmando lo que acordaron, o dejá una <strong>nota interna</strong> contando qué hiciste: así queda registrado, hay trazabilidad y estos avisos se frenan. Y registrá la visita en el <strong>calendario</strong> y la gestión en el <strong>tracking</strong>.</p>`,
       `<p>${porQueVos} Si no lo podés tomar, marcá «No lo puedo tomar» en el chat y el director lo reasigna.</p>`,
     ],
     link, "Abrir el chat en PRISMA", nombreAgencia

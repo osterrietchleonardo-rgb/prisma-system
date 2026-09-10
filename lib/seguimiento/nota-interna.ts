@@ -213,17 +213,19 @@ export function armarAvisoRegistro(
   const link = linkAlChat(perfil, c.id, appUrl)
   const pedidos: string[] = []
   if (v.pedir_registro_chat)
-    pedidos.push("Lo que hablaron por teléfono no quedó en PRISMA. Mandale al cliente desde el <strong>chat de PRISMA</strong> un mensaje confirmando lo acordado (día y hora de la visita, lo que le prometiste): así queda el registro para todo el equipo y Sofía sabe que lo estás atendiendo.")
+    pedidos.push("Lo que hablaron por teléfono no quedó en PRISMA. Mandale al cliente desde el <strong>chat de PRISMA</strong> un mensaje confirmando lo acordado (día y hora de la visita, lo que le prometiste).")
   if (v.pedir_registro_visita)
-    pedidos.push("La visita que mencionás no figura en el <strong>calendario</strong> de PRISMA: cargala así los recordatorios al cliente corren solos.")
+    pedidos.push("La visita que mencionás no figura en el <strong>calendario</strong> de PRISMA: cargala, así los recordatorios al cliente salen solos.")
   if (v.pedir_registro_actividad)
-    pedidos.push("Registrá la gestión en el <strong>tracking</strong> (la actividad con este cliente y la propiedad): es lo que después cuenta como trabajo hecho.")
+    pedidos.push("Registrá la gestión en el <strong>tracking</strong> (la actividad con este cliente y la propiedad).")
   const html = [
     `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;color:#1a1a1a">`,
     `<p>Hola ${esc(primerNombre(perfil))},</p>`,
     `<p>Vimos tu nota sobre <strong>${esc(cliente)}</strong> (${esc(tel)}): <em>«${esc(unaLinea(nota.content, 200))}»</em></p>`,
     `<p>Perfecto que ya lo estés atendiendo — los avisos de "cliente esperando" se frenaron para este caso.</p>`,
-    pedidos.length ? `<p>Para que nada se pierda:</p><ul>${pedidos.map((p) => `<li>${p}</li>`).join("")}</ul>` : "",
+    // Leonardo, 10/9: al grano — es para que quede registrado y haya trazabilidad (antes: "para que
+    // nada se pierda" / "que todo el equipo lo vea").
+    pedidos.length ? `<p>Para que quede registrado en PRISMA y haya trazabilidad:</p><ul>${pedidos.map((p) => `<li>${p}</li>`).join("")}</ul>` : "",
     `<p><a href="${link}" style="display:inline-block;background:#111;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none">Abrir el chat en PRISMA</a></p>`,
     `<p style="color:#888;font-size:13px">— Agente de seguimiento de PRISMA · ${esc(nombreAgencia)}</p>`,
     `</div>`,

@@ -109,13 +109,15 @@ export function plantillasEquipo(prefix: string): PlantillaV2[] {
       buttons: [],
     },
     // Notas internas (4/9): el asesor dejó una nota que dice que ya atendió al cliente por fuera
-    // de PRISMA. No es un reclamo: se le pide registrar lo que falta. Texto claro, sin dar nada
-    // por sabido (Leonardo, 4/9). {{2}} lo arma `armarAvisoRegistro` (lib/seguimiento/nota-interna.ts).
+    // de PRISMA. Se le pide registrar lo que falta, al grano: para que quede registrado y haya
+    // trazabilidad (Leonardo, 10/9; antes decía "no es un reclamo… que todo el equipo lo vea").
+    // {{2}} lo arma `armarAvisoRegistro` (lib/seguimiento/nota-interna.ts). OJO: la versión
+    // APROBADA en Meta para Central (id 2259260301311141) se edita aparte, con OK.
     {
       template_name: `${prefix}_asesor_registro_pendiente`,
       category: "UTILITY",
       language: "es_AR",
-      body: "Hola {{1}}, te escribe el asistente de PRISMA. {{2}} Esto no es un reclamo: es para que lo que hablaste con el cliente quede registrado y todo el equipo lo vea. Acá está el chat de ese cliente en PRISMA: {{3}} ¡Gracias!",
+      body: "Hola {{1}}, te escribe el asistente de PRISMA. {{2}} Es para que quede registrado en PRISMA y tengamos trazabilidad. Acá está el chat de ese cliente: {{3}} ¡Gracias!",
       body_examples: ["Eric", "Vimos tu nota interna sobre Nicolás (+5491136299626) y entendemos que ya lo estás atendiendo, así que frenamos los avisos de cliente esperando por este caso. Falta registrar en PRISMA: un mensaje al cliente desde el chat, la visita en el calendario y la actividad en el tracking.", "https://prisma.vakdor.com/asesor/leads-whatsapp"],
       buttons: [],
     },

@@ -152,6 +152,9 @@ describe("armarAvisoRegistro: un solo aviso, tono de ayuda, solo los pedidos que
     expect(a.html).toContain("se frenaron para este caso")
     // El pedido del chat es un MENSAJE AL CLIENTE, no otra nota interna (Leonardo, 4/9)
     expect(a.html).toContain("Mandale al cliente desde el <strong>chat de PRISMA</strong> un mensaje confirmando lo acordado")
+    // Leonardo, 10/9: al grano — registro y trazabilidad; nada de "no es un reclamo" ni "que todo el equipo lo vea"
+    expect(a.html).toContain("Para que quede registrado en PRISMA y haya trazabilidad:")
+    expect(a.html).not.toMatch(/reclamo|todo el equipo|nada se pierda/)
     expect(a.html).toContain("calendario")
     expect(a.html).toContain("tracking")
     expect(a.link).toBe("https://prisma.vakdor.com/asesor/leads-whatsapp/conv-1")
