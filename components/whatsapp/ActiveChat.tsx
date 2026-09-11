@@ -1144,12 +1144,29 @@ export function ActiveChat({ conversation: initialConv, instance, onBack, onDele
 // Media renderer
 // =============================================
 
+const ADJUNTO_VENCIDO: Record<string, string> = {
+  audio: 'Este audio ya no se puede escuchar: WhatsApp guarda los archivos solo 7 días.',
+  image: 'Esta foto ya no se puede ver: WhatsApp guarda los archivos solo 7 días.',
+  video: 'Este video ya no se puede ver: WhatsApp guarda los archivos solo 7 días.',
+  document: 'Este archivo ya no se puede abrir: WhatsApp guarda los archivos solo 7 días.',
+}
+
 function MediaContent({ msg }: { msg: WAMessage }) {
+  // El content solo sirve de link si ES un link: en los adjuntos del cliente dice
+  // "Mensaje de voz recibido", y usarlo de src dejaba el reproductor en "Error".
   const mediaUrl: string | undefined =
     (msg.metadata as any)?.media_url ||
-    (msg.message_type !== 'text' && msg.message_type !== 'other' ? msg.content : undefined)
+    (/^(https?:|blob:)/.test(msg.content || '') ? msg.content : undefined)
 
-  if (!mediaUrl) return null
+  if (!mediaUrl) {
+    // Adjuntos de clientes anteriores al 11/9/2026: nunca se bajaron y Meta ya los borró.
+    if (msg.role !== 'lead' || !ADJUNTO_VENCIDO[msg.message_type || '']) return null
+    return (
+      <p className="text-xs italic text-muted-foreground px-3 pt-2">
+        {ADJUNTO_VENCIDO[msg.message_type || '']}
+      </p>
+    )
+  }
 
   if (msg.message_type === 'image') {
     return (
@@ -1178,8 +1195,22 @@ function MediaContent({ msg }: { msg: WAMessage }) {
   }
 
   if (msg.message_type === 'audio') {
+    // "Descargar": respaldo para iPhones con iOS anterior a 18.4, que no reproducen el
+    // formato de las notas de voz de WhatsApp (ogg/opus) dentro de la página.
+    const esStorage = /^https?:\/\/[^/]+\.supabase\.co\/storage\//.test(mediaUrl)
     return (
-      <audio src={mediaUrl} controls className="w-full" />
+      <div>
+        {/* Ancho fijo: la burbuja se achica al texto y con w-full el reproductor quedaba sin barra. */}
+        <audio src={mediaUrl} controls preload="metadata" className="w-72 max-w-full" />
+        {esStorage && (
+          <a
+            href={`${mediaUrl}${mediaUrl.includes('?') ? '&' : '?'}download=`}
+            className="inline-block text-xs underline text-muted-foreground px-3 py-3"
+          >
+            Descargar audio
+          </a>
+        )}
+      </div>
     )
   }
 
