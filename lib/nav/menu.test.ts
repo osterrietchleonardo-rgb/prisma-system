@@ -6,12 +6,14 @@ import { GRUPOS, grupoActivo, menuPara, pieMenuPara, type Rol } from "./menu"
  * `components/asesor-sidebar.tsx` antes de agrupar el menú (main e0bba05).
  * El pedido fue "las mismas páginas, mismos nombres, mismas direcciones,
  * solo agrupadas": si este test se pone rojo, cambió algo que no debía.
+ * Único agregado desde entonces: «Farming» (spec 2026-09-11), en Propiedades para los dos roles.
  */
 const DIRECTOR_ANTES = [
   { name: "Dashboard",            href: "/director/dashboard" },
   { name: "Pulso de Mercado",     href: "/director/mercado" },
   { name: "Pipeline",             href: "/director/pipeline" },
   { name: "Propiedades",          href: "/director/propiedades" },
+  { name: "Farming",              href: "/director/farming" },
   { name: "Tracking Performance", href: "/director/tracking-performance" },
   { name: "Leads Tokko",          href: "/director/leads" },
   { name: "Asesor IA WhatsApp",   href: "/director/asesor-ia-whatsapp" },
@@ -34,6 +36,7 @@ const ASESOR_ANTES = [
   { name: "Pulso de Mercado",     href: "/asesor/mercado" },
   { name: "Mi Pipeline",          href: "/asesor/pipeline" },
   { name: "Mis Propiedades",      href: "/asesor/propiedades" },
+  { name: "Farming",              href: "/asesor/farming" },
   { name: "Tracking Performance", href: "/asesor/tracking-performance" },
   { name: "Leads Tokko",          href: "/asesor/leads" },
   { name: "WhatsApp Bandeja",     href: "/asesor/whatsapp" },
@@ -64,9 +67,9 @@ describe("el menú agrupado no cambia ni un nombre ni una dirección", () => {
     expect(ahora).toEqual(antes.map(clave).sort())
   })
 
-  it("director: 19 renglones; asesor: 17", () => {
-    expect(planos("director")).toHaveLength(19)
-    expect(planos("asesor")).toHaveLength(17)
+  it("director: 20 renglones; asesor: 18", () => {
+    expect(planos("director")).toHaveLength(20)
+    expect(planos("asesor")).toHaveLength(18)
   })
 })
 
@@ -107,7 +110,7 @@ describe("grupos", () => {
   it("el orden dentro de cada grupo es el acordado (director)", () => {
     const porGrupo = Object.fromEntries(menuPara("director").map((g) => [g.id, g.items.map((it) => it.name)]))
     expect(porGrupo["contactos"]).toEqual(["Pipeline", "Leads Tokko", "Leads WhatsApp"])
-    expect(porGrupo["propiedades"]).toEqual(["Propiedades", "Buscador IA", "ACM", "Pulso de Mercado"])
+    expect(porGrupo["propiedades"]).toEqual(["Propiedades", "Farming", "Buscador IA", "ACM", "Pulso de Mercado"])
     expect(porGrupo["mi-equipo"]).toEqual(["Equipo", "Asesores", "Tracking Performance"])
     expect(porGrupo["ayuda"]).toEqual(["Tutor IA", "Documentos", "Sugerencias"])
   })
