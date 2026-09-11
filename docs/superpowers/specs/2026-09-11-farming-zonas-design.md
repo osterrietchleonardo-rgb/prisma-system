@@ -385,10 +385,10 @@ Corre igual al crear y **al editar** (redibujar o sumar un pedazo): una edición
 otro asesor se rechaza exactamente como una creación. Al guardar una zona:
 
 1. **Validar el polígono.** Mínimo 4 puntos (ya es la regla del lápiz), máximo 5.000
-   vértices (un trazo a mano trae ~300), y **`booleanValid`**: un trazo a mano alzada puede
+   vértices (un trazo a mano trae ~300), y **`booleanValid` + `kinks`**: un trazo a mano alzada puede
    cruzarse consigo mismo si el asesor da la vuelta de más, y con un polígono en forma de 8
    el cálculo de solapamiento devuelve cualquier cosa. Si está cruzado, se pide redibujar —
-   nunca se guarda un territorio con forma inválida.
+   nunca se guarda un territorio con forma inválida (leído el código de Turf 7.4: `booleanValid` solo no detecta el cruce del anillo exterior; `kinks` sí).
 2. **Traer las zonas `activa` de la agencia**, menos la propia si es una edición.
 3. **`intersect` contra cada una.** Dos zonas que comparten una calle se tocan sin pisarse:
    por eso el rechazo pide una superposición real — **más de 100 m² o más del 1% de la zona
