@@ -51,6 +51,8 @@ Todas en chat, y este spec no se aparta de ninguna:
 | Próxima acción | **Obligatoria al mover la tarjeta**. Sin fecha, no se mueve |
 | Enganche con Tracking | **Sí, con un botón, nunca solo** |
 | Carga manual | **El asesor puede cargar una dirección y sus propietarios aunque no exista ningún aviso publicado** (pedido explícito del 11-sep) |
+| Editar el trazo | **Redibujar entero y sumar pedazos.** Una zona puede tener más de un pedazo |
+| Tarjeta que queda fuera | **Se saca sola solo si está vacía.** Con cualquier dato cargado se queda, marcada |
 
 ## Qué NO se toca
 
@@ -67,10 +69,19 @@ Esto va primero a propósito, porque es lo que importa:
 
 ## Qué se construye
 
-### 1. El botón en el Buscador, y por qué la zona se COPIA
+### 1. Dónde se dibuja, y por qué la zona se COPIA
 
-En `components/mapa/mapa-zonas-panel.tsx`, cada zona guardada suma un botón **«usar para
-farming»**. Al apretarlo se pide un nombre y **se copia el polígono** a `farming_zonas`.
+**Dos puertas, el mismo lápiz.** El mapa y el lápiz (`components/mapa/`) se usan en los dos
+lados; es el mismo componente, no una copia:
+
+- **Desde el Buscador** (`components/mapa/mapa-zonas-panel.tsx`): cada zona guardada suma un
+  botón **«usar para farming»**. Es el atajo para cuando el asesor ya tiene dibujada una
+  zona de una búsqueda y la quiere reusar como territorio.
+- **Desde Farming**: dibujar una zona nueva, redibujar una que ya tiene y sumarle pedazos.
+  Esta puerta **es obligatoria**: la zona de farming es una copia, así que en el Buscador
+  «Belgrano R farming» ni siquiera existe — no hay cómo editarla desde allá.
+
+Al crearla se pide un nombre y **se copia el polígono** a `farming_zonas`.
 
 Se copia, no se referencia, y es a propósito: si el asesor redibuja esa zona en el Buscador
 para otra búsqueda, **su territorio exclusivo no se tiene que mover solo**. Un territorio
@@ -84,10 +95,11 @@ Renglón nuevo **«Farming»** en el grupo **Propiedades** de `lib/nav/menu.ts`,
 Propiedades» y «Buscador IA». Ícono: `Sprout` (existe en `lucide-react`, verificado; falta
 confirmar contra `menu.test.ts` que ningún ícono se repita dentro del rol).
 
-**Solapa 1 · Mis zonas.** Las zonas de farming del asesor: nombre, km², direcciones
-relevadas, avisos a la venta hoy, y con quién la comparte. El desplegable de compartir trae
-los asesores activos de la agencia. Acá no se dibuja: el botón «dibujar una zona nueva»
-lleva al mapa del Buscador.
+**Solapa 1 · Mis zonas.** Las zonas de farming del asesor: nombre, km², cuántos pedazos
+tiene, direcciones relevadas, avisos a la venta hoy, y con quién la comparte. El desplegable
+de compartir trae los asesores activos de la agencia. Cinco botones por zona: **redibujar**,
+**sumar un pedazo**, **compartir**, **borrar** y el mapa para verla. Y arriba, **dibujar una
+zona nueva**.
 
 **Solapa 2 · Relevamiento.** El tablero de 6 columnas. Es la hoja 1 del Excel convertida en
 tarjetas. Botón **«+ agregar dirección»** siempre visible (ver «La carga a pie», más abajo).
@@ -154,6 +166,88 @@ Por eso:
   hoja 2 del Excel ya trabaja así (una fila por visita, con piso y propietario). Meterlos en
   una columna de texto sería perder el dato que después hace falta para el pipeline.
 
+## Editar el trazo: qué cambia en vivo y qué no se pierde nunca
+
+Planteado por Leonardo el 11-sep: *«¿puede editar ese tramo? ¿por si le faltó una manzana? ¿o
+si se pasó una cuadra? … y cada una de estas acciones guardadas, ¿afecta en vivo el filtro de
+la lista de avisos?»*.
+
+### Una zona puede tener varios pedazos
+
+El lápiz dibuja a mano alzada y **no tiene tiradores para mover esquinas** — el plugin que
+hace eso es pago y por eso el lápiz se escribió a mano. Así que editar son dos operaciones,
+no una:
+
+- **Redibujar** → el trazo nuevo reemplaza al anterior. Para «me pasé una cuadra» o «me
+  equivoqué de lado».
+- **Sumar un pedazo** → se dibuja un trazo más y se suma. Para «me faltó esta manzana», sin
+  tener que redibujar diez cuadras de contorno.
+
+Por eso `geojson` guarda un `Polygon` **o** un `MultiPolygon`. No es una complicación
+gratuita: el mapa **ya trabaja así** — `lib/mapa/filtro-poligono.ts` dice textual que varios
+trazos *se suman*, y Turf maneja `MultiPolygon` en `intersect`, `area` y `booleanValid` sin
+nada especial.
+
+Consecuencias, todas obligatorias:
+
+- El tope de 5 km² se mide sobre **la suma de los pedazos**.
+- **Cada edición vuelve a pasar por el control de choque**, igual que la creación. Sumar una
+  manzana que ya es de otro asesor se rechaza con el mismo 409 y el mismo recorte rayado.
+- En ese control, la zona **se excluye a sí misma** — si no, redibujarla chocaría siempre
+  contra su propia versión anterior.
+- Los pedazos de una misma zona sí se pueden tocar entre ellos: si se solapan, se unen.
+
+### La lista de avisos es en vivo porque no está guardada
+
+**No existe ninguna tabla con «los avisos de la zona de Leo».** La solapa 3 agarra el
+polígono y le pregunta a `mercado_avisos` qué cae adentro, en ese momento. No hay nada que
+recalcular, nada que sincronizar y nada que se pueda desfasar.
+
+| Qué hace el asesor | Qué pasa con la lista |
+|---|---|
+| Borra la zona | la solapa queda vacía: sin polígono no hay avisos |
+| Suma una manzana | aparecen los avisos de esa manzana |
+| Saca una cuadra | desaparecen los de esa cuadra |
+
+**En vivo significa «al guardar el cambio y recargar la solapa»**, no que la pantalla se
+mueva sola mientras dibuja. Decirlo importa: prometer tiempo real y entregar una recarga es
+la clase de cosa que hace desconfiar de todo lo demás.
+
+Las marcas de `farming_avisos_marca` no estorban: un aviso descartado que queda fuera del
+trazo simplemente no aparece más, y si la zona vuelve a crecer sobre él, sigue descartado.
+
+### Lo trabajado no se borra por mover un trazo
+
+Acá hay dos objetos que se parecen y no son lo mismo:
+
+- **El aviso** de la solapa 3 no es del asesor, es del mercado. Entra y sale según el
+  polígono, sin drama.
+- **La tarjeta** del tablero es trabajo del asesor. Esa **nunca** se borra por editar la zona.
+
+Al guardar un trazo que deja direcciones afuera, PRISMA las separa en dos grupos:
+
+| La tarjeta… | Qué pasa |
+|---|---|
+| está **vacía**: etapa `relevado`, sin encargado, sin propietarios y sin ningún contacto | se saca sola. Es la que se creó de un clic desde un aviso y nunca se tocó: no hay trabajo que perder |
+| tiene **cualquier dato cargado** —aunque siga en `relevado`— | **se queda en el tablero**, con `fuera_de_zona = true` y un cartel visible: *«esta dirección quedó fuera de tu zona»*. Se sigue trabajando hasta captarla |
+
+La distinción es a propósito y no es la literal de «no avanzó de columna»: caminar un
+edificio, contar 8 pisos × 4 unidades y anotar que el encargado se llama Roberto **es
+trabajo**, y todo eso vive en la columna «Relevado».
+
+El aviso que se muestra al guardar dice las dos cosas — cuántas se sacaron, cuántas se
+quedan marcadas — y **una tercera que el asesor tiene que saber**: esas cuadras quedan
+libres para que otro asesor las dibuje. Es lo que está soltando, y se le dice antes de que
+pase, no después.
+
+### Borrar una zona
+
+- **Sin ninguna tarjeta cargada** → se borra de verdad, sin preguntar. Es el caso «me
+  equivoqué, dibujo otra».
+- **Con tarjetas** → no se borra: pasa a `archivada`. Las cuadras se liberan igual, y las
+  tarjetas con su historial quedan accesibles. **Nunca se pierde trabajo por apretar un
+  botón**, y ningún borrado de datos del asesor ocurre en silencio.
+
 ## El modelo de datos: 6 tablas nuevas
 
 Todas con `agency_id` para la separación por agencia, todas con RLS, ninguna toca nada
@@ -167,11 +261,12 @@ existente.
 | `agency_id` | uuid not null | |
 | `owner_user_id` | uuid not null | quien la dibujó; el único que puede borrarla o compartirla |
 | `nombre` | text not null | |
-| `geojson` | jsonb not null | el Polygon copiado del Buscador |
-| `area_km2` | numeric(10,4) | calculada con `@turf/area` al guardar |
+| `geojson` | jsonb not null | `Polygon` **o `MultiPolygon`**: una zona puede tener varios pedazos |
+| `area_km2` | numeric(10,4) | `@turf/area` sobre **la suma de los pedazos**, recalculada en cada edición |
 | `origen_mapa_zona_id` | uuid null | **sin FK**: informativo |
-| `estado` | text not null | `activa` \| `liberada` |
-| `liberada_en` / `liberada_por` / `motivo_liberacion` | | |
+| `estado` | text not null | `activa` \| `liberada` (el director) \| `archivada` (la borró su dueño pero tenía tarjetas) |
+| `liberada_en` / `liberada_por` / `motivo_liberacion` | | sirven igual para el archivado |
+| `trazo_editado_en` | timestamptz | última vez que cambió la forma; el cartel de «fuera de zona» lo usa para explicar desde cuándo |
 | `created_at` / `updated_at` | | |
 
 Índices: `(agency_id, estado)`, `(owner_user_id)`.
@@ -206,6 +301,8 @@ existente.
 | `precio_pedido` / `moneda` | numeric / text | |
 | `aviso_id` / `aviso_es_dueno_directo` | bigint / boolean | **las dos**: la PK de `mercado_avisos` es compuesta por la partición. **Sin FK dura** |
 | `origen` | text not null | `caminata` \| `aviso` |
+| `fuera_de_zona` | boolean not null default false | quedó afuera al editar el trazo. La tarjeta se sigue trabajando; el tablero muestra el cartel |
+| `fuera_de_zona_desde` | timestamptz null | cuándo quedó afuera |
 | `observaciones` | text | la columna ancha de la hoja 1 |
 | `creada_por` / `created_at` / `updated_at` | | |
 
@@ -284,7 +381,8 @@ mensaje («pisa 18% de «Belgrano C», de Juan Pérez») se arma donde se muestr
 `@turf/turf@7.4.0` ya es dependencia; `intersect`, `area` y `booleanValid` están en
 `node_modules`, verificado.
 
-Al guardar una zona:
+Corre igual al crear y **al editar** (redibujar o sumar un pedazo): una edición que pisa a
+otro asesor se rechaza exactamente como una creación. Al guardar una zona:
 
 1. **Validar el polígono.** Mínimo 4 puntos (ya es la regla del lápiz), máximo 5.000
    vértices (un trazo a mano trae ~300), y **`booleanValid`**: un trazo a mano alzada puede
@@ -394,6 +492,8 @@ vistazo.
 | 6 columnas en un teléfono | se mide en el navegador con emulación de celular, no de la captura |
 | `mercado_avisos` tiene PK compuesta por la partición | la tarjeta guarda `aviso_id` **y** `aviso_es_dueno_directo` |
 | La red solo tiene CABA y Don Torcuato cargados | la zona de prueba se dibuja ahí; en La Plata daría verde sin probar nada |
+| **Editar el trazo borra trabajo del asesor** | prueba que achica una zona sobre una tarjeta con contactos cargados y exige que siga en el tablero; se la ve fallar antes de implementar la regla |
+| Redibujar una zona choca contra su propia versión anterior | el control de choque excluye la zona que se está editando; prueba propia |
 
 ## Cómo se verifica
 
@@ -414,7 +514,7 @@ vistazo.
 
 | Etapa | Qué queda funcionando | Por qué en ese orden |
 |---|---|---|
-| **1. El territorio** | botón en el Buscador, zonas exclusivas con su validación, contornos ajenos en el mapa, compartir, liberar | sin esto las otras dos solapas no tienen de dónde agarrarse |
+| **1. El territorio** | dibujar desde Farming y desde el Buscador, **redibujar y sumar pedazos**, la validación de choque en las dos, contornos ajenos en el mapa, compartir, borrar/archivar, liberar | sin esto las otras dos solapas no tienen de dónde agarrarse |
 | **2. A la venta en mi zona** | el listado con los 4 atajos de captación, medido | da valor el primer día, sin que el asesor cargue nada |
 | **3. El tablero y la caminata** | «+ agregar dirección», propietarios, 6 columnas, diálogo obligatorio, historial firmado, los 9 indicadores, el botón a Tracking | es la más grande y se apoya en las dos anteriores |
 
@@ -428,7 +528,7 @@ no cierran.
 
 1. **Máximo 3 zonas de farming activas por asesor.** El PDF, punto 9: «territorio: trabajar
    una zona concreta, no dispersarse». Las liberadas no cuentan.
-2. **Máximo 5 km² por zona.** Sin tope, el primero que dibuja puede reclamar medio barrio y
-   la exclusividad se vuelve un candado en vez de un reparto.
+2. **Máximo 5 km² por zona**, sumando todos sus pedazos. Sin tope, el primero que dibuja
+   puede reclamar medio barrio y la exclusividad se vuelve un candado en vez de un reparto.
 3. **El director no dibuja ni asigna zonas.** Ve, mide y libera. Asignar no fue pedido y
    agrega una pantalla entera.
