@@ -16,6 +16,38 @@
 
 ---
 
+## 2026-09-11 — Los audios de los clientes no se podían escuchar (nunca se pudo)
+
+**Qué pidió Leonardo:** resolver la sugerencia de cbgonzalez (Central, 10/9): "los clientes mandan
+audios y no se puede escuchar". Captura de iPhone: el reproductor decía "Error" (chat Fabian Palilla).
+
+**Dos causas, las dos necesarias**
+
+- **La app nunca bajaba el archivo.** Meta manda un `media_id`, no el archivo; el webhook lo guardaba
+  en `metadata` y listo. El chat, sin `media_url`, usaba el `content` ("Mensaje de voz recibido")
+  como `src`. Medido: **168 audios y 29 fotos** de clientes (2/7 al 10/9), **ninguno** abrible.
+- **El CSP no tenía `media-src`** → caía en `default-src 'self'` y el navegador bloqueaba todo
+  audio/video de Supabase. Solo se vio en el navegador (consola), no con curl.
+- Meta borra el archivo a los **7 días** (doc oficial) → un proxy "al vuelo" no servía; hay que
+  guardarlo al llegar.
+
+**Qué se hizo**
+
+- Rescate con OK: los **14** que Meta todavía tenía (12 audios, 2 fotos) bajados y subidos a
+  `documents/wa-inbound/...`, link en `metadata.media_url`. Verificado por sha256 contra Meta. Los
+  otros 183 ya no existen.
+- Rama `fix/audios-de-clientes`: descarga al llegar (`lib/whatsapp/adjuntos-entrantes.ts`), `media-src`
+  en el CSP, aviso "ya no se puede escuchar… 7 días" en los viejos, "Descargar audio" (iOS < 18.4
+  no reproduce ogg/opus), reproductor de ancho fijo (con `w-full` quedaba sin barra). Tests del
+  webhook: verificado que fallan con el bug reintroducido.
+- Probado en el navegador (escritorio + celular emulado) con mensajes simulados por `page.route`
+  en el chat "Leo" de PRISMAIA: el audio carga, 23 s, play avanza. **No probado en iPhone real.**
+
+**Quedó pendiente:** confirmar con la asesora en su iPhone; responder la sugerencia en el admin.
+El bot no cambió: n8n ya bajaba y transcribía el audio por su cuenta (sección 9.1.2 del técnico).
+
+---
+
 ## 2026-09-10 — La queja de Carmen: las notas cortas ahora cuentan, y si no alcanzan se le dice
 
 **Qué pasó:** Carmen (Central) dejó en Sugerencias: "Ya dejé en notas que estoy en comunicación
