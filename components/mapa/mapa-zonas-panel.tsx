@@ -3,7 +3,8 @@
 // Panel de "Mis zonas": los trazos guardados del usuario.
 // Son PRIVADAS: cada uno ve solo las suyas, ni el director ve las de un asesor.
 import { useEffect, useState } from "react"
-import { Loader2, MapPinned, Plus, Trash2, X } from "lucide-react"
+import { usePathname } from "next/navigation"
+import { Loader2, MapPinned, Plus, Sprout, Trash2, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,6 +32,39 @@ export function MapaZonasPanel({
   const [formularioDe, setFormularioDe] = useState<string | null>(null)
   const [nombre, setNombre] = useState("")
   const [descripcion, setDescripcion] = useState("")
+
+  // «Usar para farming»: copia el dibujo a una zona de farming (spec 2026-09-11). Solo el
+  // asesor: el director no dibuja territorio, así que en /director/... el botón no aparece.
+  const pathname = usePathname()
+  const esAsesor = pathname?.startsWith("/asesor/") ?? false
+  const [farmingDe, setFarmingDe] = useState<string | null>(null)
+  const [nombreFarming, setNombreFarming] = useState("")
+  const [creandoFarming, setCreandoFarming] = useState(false)
+
+  const usarParaFarming = async (z: ZonaGuardada) => {
+    if (!nombreFarming.trim()) return toast.error("Ponele un nombre a la zona de farming")
+    setCreandoFarming(true)
+    try {
+      const r = await fetch("/api/farming/zonas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: nombreFarming.trim(), geojson: z.geojson, origen_mapa_zona_id: z.id }),
+      })
+      const d = await r.json()
+      if (r.status === 409) {
+        const c = d.choques?.[0]
+        throw new Error(c ? `Ese dibujo pisa «${c.nombre}», zona de ${c.owner_nombre}. Corregilo desde Farming.` : d.error)
+      }
+      if (!r.ok) throw new Error(d.error || "No se pudo crear la zona de farming")
+      setFarmingDe(null)
+      setNombreFarming("")
+      toast.success("Zona de farming creada. La ves en Propiedades → Farming.")
+    } catch (e: any) {
+      toast.error(e.message)
+    } finally {
+      setCreandoFarming(false)
+    }
+  }
 
   useEffect(() => {
     fetch("/api/mapa/zonas")
@@ -165,26 +199,57 @@ export function MapaZonasPanel({
           )}
 
           {zonas.map((z) => (
-            <div
-              key={z.id}
-              className="group flex items-start gap-2 rounded-lg border border-zinc-200 p-2 dark:border-zinc-800"
-            >
-              <button className="min-w-0 flex-1 text-left" onClick={() => onAplicarZona(z)}>
-                <div className="flex items-center gap-1.5">
-                  <MapPinned className="h-3 w-3 shrink-0 text-sky-600" />
-                  <span className="truncate text-xs font-medium">{z.nombre}</span>
-                </div>
-                {z.descripcion && (
-                  <p className="mt-0.5 line-clamp-2 text-[11px] text-zinc-500">{z.descripcion}</p>
+            <div key={z.id} className="group rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
+              <div className="flex items-start gap-2">
+                <button className="min-w-0 flex-1 text-left" onClick={() => onAplicarZona(z)}>
+                  <div className="flex items-center gap-1.5">
+                    <MapPinned className="h-3 w-3 shrink-0 text-sky-600" />
+                    <span className="truncate text-xs font-medium">{z.nombre}</span>
+                  </div>
+                  {z.descripcion && (
+                    <p className="mt-0.5 line-clamp-2 text-[11px] text-zinc-500">{z.descripcion}</p>
+                  )}
+                </button>
+                {esAsesor && (
+                  <button
+                    onClick={() => { setFarmingDe(farmingDe === z.id ? null : z.id); setNombreFarming(z.nombre) }}
+                    className="rounded p-1 text-zinc-600 hover:text-green-700 dark:text-zinc-400"
+                    title="Usar este dibujo como zona de farming"
+                  >
+                    <Sprout className="h-3.5 w-3.5" />
+                  </button>
                 )}
-              </button>
-              <button
-                onClick={() => borrar(z.id)}
-                className="rounded p-1 text-zinc-600 dark:text-zinc-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
-                title="Borrar zona"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+                <button
+                  onClick={() => borrar(z.id)}
+                  className="rounded p-1 text-zinc-600 dark:text-zinc-400 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                  title="Borrar zona"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {farmingDe === z.id && (
+                <div className="mt-2 space-y-1.5">
+                  {/* Línea visible, no globito: en el celular los globitos no se abren. */}
+                  <p className="text-[10px] text-zinc-600 dark:text-zinc-400">Se copia el dibujo a Farming. Esta zona del Buscador queda igual.</p>
+                  <Input
+                    className="h-8 text-xs"
+                    placeholder="Nombre de la zona de farming"
+                    value={nombreFarming}
+                    onChange={(e) => setNombreFarming(e.target.value)}
+                    maxLength={80}
+                    autoFocus
+                  />
+                  <div className="flex gap-1">
+                    <Button size="sm" className="h-7 flex-1 text-xs" disabled={creandoFarming} onClick={() => usarParaFarming(z)}>
+                      {creandoFarming ? <Loader2 className="h-3 w-3 animate-spin" /> : "Usar para farming"}
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setFarmingDe(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
