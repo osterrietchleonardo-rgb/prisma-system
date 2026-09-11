@@ -7,7 +7,7 @@ import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
 import { areaKm2, choquesContra, MAX_KM2, sumarPedazo, validarDibujo, type Dibujo } from "@/lib/farming/geometria"
-import { armarZona, nombreDe, type FilaZona } from "@/lib/farming/armar"
+import { armarZona, candidatasParaChoque, type FilaZona } from "@/lib/farming/armar"
 import { cargarContexto, COLUMNAS_ZONA, responderError } from "@/lib/farming/servidor"
 
 export const dynamic = "force-dynamic"
@@ -76,12 +76,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const ctx = await cargarContexto(admin, agencyId)
     // La zona se excluye a sí misma: si no, redibujarla chocaría contra su versión anterior.
-    const choques = choquesContra(
-      dibujo,
-      ctx.filas
-        .filter((z) => z.id !== zona.id)
-        .map((z) => ({ id: z.id, nombre: z.nombre, owner_nombre: z.owner_user_id === userId ? "vos" : nombreDe(ctx.perfiles, z.owner_user_id), geojson: z.geojson })),
-    )
+    const choques = choquesContra(dibujo, candidatasParaChoque(ctx.filas, ctx.perfiles, userId, zona.id))
     if (choques.length > 0) {
       const p = choques[0]
       return NextResponse.json(

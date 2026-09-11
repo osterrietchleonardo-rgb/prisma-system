@@ -1,6 +1,6 @@
 // lib/farming/armar.ts
 // De filas de la base a lo que ve la pantalla. Puro, sin Supabase: se prueba solo.
-import { contarPedazos, MAX_KM2, MAX_ZONAS_ACTIVAS, type Dibujo } from "./geometria"
+import { contarPedazos, MAX_KM2, MAX_ZONAS_ACTIVAS, type Dibujo, type ZonaParaChoque } from "./geometria"
 import type { Colega, ContornoAjeno, RespuestaZonas, ZonaFarming } from "./tipos"
 
 export interface FilaZona {
@@ -59,6 +59,18 @@ export function armarZona(fila: FilaZona, compartidas: FilaCompartida[], perfile
       .filter((c) => c.zona_id === fila.id)
       .map((c) => ({ id: c.user_id, nombre: nombreDe(perfiles, c.user_id) })),
   }
+}
+
+/** Las zonas contra las que se controla el choque: las activas de la agencia, sin la que se está editando. Las propias se llaman "vos". */
+export function candidatasParaChoque(
+  filas: FilaZona[],
+  perfiles: FilaPerfil[],
+  userId: string,
+  excluirId?: string,
+): ZonaParaChoque[] {
+  return filas
+    .filter((z) => z.id !== excluirId)
+    .map((z) => ({ id: z.id, nombre: z.nombre, owner_nombre: z.owner_user_id === userId ? "vos" : nombreDe(perfiles, z.owner_user_id), geojson: z.geojson }))
 }
 
 export function armarRespuesta(args: {

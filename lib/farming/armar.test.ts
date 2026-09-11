@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { armarRespuesta, armarZona, colegasActivos, nombreDe, type FilaPerfil, type FilaZona } from "./armar"
+import { armarRespuesta, armarZona, candidatasParaChoque, colegasActivos, nombreDe, type FilaPerfil, type FilaZona } from "./armar"
 
 /**
  * De filas de la base a lo que ve la pantalla. Reglas:
@@ -45,6 +45,23 @@ describe("armarZona", () => {
     expect(z.pedazos).toBe(1)
     expect(z.owner_nombre).toBe("Leo")
     expect(z.compartida_con).toEqual([{ id: JUAN, nombre: "Juan Pérez" }])
+  })
+})
+
+describe("candidatasParaChoque", () => {
+  const filas = [fila("z-mia", YO, "Mía"), fila("z-juan", JUAN, "De Juan"), fila("z-maria", MARIA, "De María")]
+
+  it("sin excluirId trae las tres, la propia como 'vos' y las demás con su nombre", () => {
+    const c = candidatasParaChoque(filas, perfiles, YO)
+    expect(c.map((z) => z.id)).toEqual(["z-mia", "z-juan", "z-maria"])
+    expect(c.find((z) => z.id === "z-mia")?.owner_nombre).toBe("vos")
+    expect(c.find((z) => z.id === "z-juan")?.owner_nombre).toBe("Juan Pérez")
+    expect(c.find((z) => z.id === "z-maria")?.owner_nombre).toBe("otro asesor")
+  })
+
+  it("con excluirId esa zona no aparece y el resto queda igual", () => {
+    const c = candidatasParaChoque(filas, perfiles, YO, "z-mia")
+    expect(c.map((z) => z.id)).toEqual(["z-juan", "z-maria"])
   })
 })
 

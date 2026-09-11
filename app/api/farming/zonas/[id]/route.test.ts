@@ -86,6 +86,7 @@ describe("PATCH", () => {
     expect(r.status).toBe(409)
     expect((await r.json()).choques[0].owner_nombre).toBe("Juan Pérez")
     expect(base.tablas.farming_zonas[0].geojson.type).toBe("Polygon")
+    expect(base.tablas.farming_zonas[0].geojson).toEqual(cuadrado(-58.40, -34.56))
   })
 
   it("sumar hasta pasar los 5 km²: 400", async () => {

@@ -8,7 +8,7 @@ import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
 import { areaKm2, choquesContra, MAX_KM2, MAX_ZONAS_ACTIVAS, validarDibujo } from "@/lib/farming/geometria"
-import { armarRespuesta, armarZona, nombreDe, type FilaZona } from "@/lib/farming/armar"
+import { armarRespuesta, armarZona, candidatasParaChoque, type FilaZona } from "@/lib/farming/armar"
 import { cargarContexto, COLUMNAS_ZONA, responderError } from "@/lib/farming/servidor"
 
 export const dynamic = "force-dynamic"
@@ -55,10 +55,7 @@ export async function POST(req: Request) {
 
     // Se controla contra TODAS las activas de la agencia, las propias incluidas: dos zonas
     // del mismo asesor una encima de la otra tampoco tienen sentido.
-    const choques = choquesContra(
-      v.dibujo,
-      ctx.filas.map((z) => ({ id: z.id, nombre: z.nombre, owner_nombre: z.owner_user_id === userId ? "vos" : nombreDe(ctx.perfiles, z.owner_user_id), geojson: z.geojson })),
-    )
+    const choques = choquesContra(v.dibujo, candidatasParaChoque(ctx.filas, ctx.perfiles, userId))
     if (choques.length > 0) {
       const primero = choques[0]
       return NextResponse.json(
