@@ -19,13 +19,22 @@ export function FarmingDirector() {
   const [ocupado, setOcupado] = useState(false)
 
   const recargar = useCallback(async () => {
-    const r = await fetch("/api/farming/zonas")
-    const d = await r.json()
-    if (!r.ok) return toast.error(d.error || "No se pudieron traer las zonas")
-    setDatos(d)
+    try {
+      const r = await fetch("/api/farming/zonas")
+      const d = await r.json()
+      if (!r.ok) return toast.error(d.error || "No se pudieron traer las zonas")
+      setDatos(d)
+    } catch {
+      toast.error("No se pudieron traer las zonas: revisá la conexión y volvé a intentar")
+    }
   }, [])
 
   useEffect(() => { recargar() }, [recargar])
+
+  const cerrarDialogo = () => {
+    setLiberando(null)
+    setMotivo("")
+  }
 
   const liberar = async () => {
     if (!liberando) return
@@ -39,11 +48,14 @@ export function FarmingDirector() {
       const d = await r.json()
       if (!r.ok) throw new Error(d.error)
       toast.success(`«${liberando.nombre}» liberada. Esas cuadras ya se pueden volver a dibujar.`)
-      setLiberando(null)
-      setMotivo("")
+      cerrarDialogo()
       await recargar()
     } catch (e: any) {
-      toast.error(e.message)
+      toast.error(
+        e instanceof Error && e.message && !/fetch/i.test(e.message)
+          ? e.message
+          : "No se pudo liberar la zona: revisá la conexión y volvé a intentar"
+      )
     } finally {
       setOcupado(false)
     }
@@ -92,7 +104,7 @@ export function FarmingDirector() {
         </div>
       ))}
 
-      <Dialog open={!!liberando} onOpenChange={(a) => { if (!a) setLiberando(null) }}>
+      <Dialog open={!!liberando} onOpenChange={(a) => { if (!a) cerrarDialogo() }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>Liberar «{liberando?.nombre}»</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
@@ -100,7 +112,7 @@ export function FarmingDirector() {
           </p>
           <Textarea placeholder="Por qué se libera (ej: el asesor se desvinculó)" value={motivo} onChange={(e) => setMotivo(e.target.value)} maxLength={300} />
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setLiberando(null)}>Cancelar</Button>
+            <Button variant="ghost" onClick={cerrarDialogo}>Cancelar</Button>
             <Button disabled={!motivo.trim() || ocupado} onClick={liberar}>
               {ocupado ? <Loader2 className="h-4 w-4 animate-spin" /> : "Liberar"}
             </Button>
