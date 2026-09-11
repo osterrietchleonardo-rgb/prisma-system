@@ -1,9 +1,11 @@
 "use client"
 
 // Los polígonos de Farming sobre el mapa: la zona propia (verde), las ajenas (gris punteado,
-// con el nombre y de quién es) y los recortes de choque (rojo). Se montan como `children`
-// de MapaLienzo, o sea ADENTRO del MapContainer: por eso este archivo solo se carga con
-// dynamic(..., { ssr: false }), igual que el lienzo.
+// con la etiqueta permanente a propósito: en el celular un globito de hover no se abre
+// nunca, y saber de quién es la zona gris es justamente lo que evita chocar) y los recortes
+// de choque (rojo). Se montan como `children` de MapaLienzo, o sea ADENTRO del
+// MapContainer: por eso este archivo solo se carga con dynamic(..., { ssr: false }), igual
+// que el lienzo.
 import { Polygon, Tooltip } from "react-leaflet"
 import type { Dibujo } from "@/lib/farming/geometria"
 import type { Choque, ContornoAjeno } from "@/lib/farming/tipos"
@@ -31,10 +33,8 @@ export default function CapasFarming({
           positions={posicionesDe(z.geojson)}
           pathOptions={{ color: "#71717a", weight: 2, dashArray: "6 4", fillColor: "#71717a", fillOpacity: 0.08 }}
         >
-          <Tooltip sticky>
-            <span className="font-semibold">{z.nombre}</span>
-            <br />
-            zona de {z.owner_nombre}
+          <Tooltip permanent direction="center" opacity={0.9}>
+            {z.nombre} · {z.owner_nombre}
           </Tooltip>
         </Polygon>
       ))}
