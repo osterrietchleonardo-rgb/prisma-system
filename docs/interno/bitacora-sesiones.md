@@ -16,6 +16,32 @@
 
 ---
 
+## 2026-09-12 — El descubrimiento diario fallaba hace 4 días: esperábamos menos de lo que tarda
+
+Leonardo avisó por los mails de GitHub Actions. `mercado-descubrimiento` falló 9, 10, 11 y
+12 de septiembre (y 5 y 7). **No era Apify: era nuestra espera.**
+
+- El script esperaba **10 min** fijos (60 vueltas × 10 s) a que terminara el actor. Desde
+  que subimos `--max 1500` (4-sep), la corrida de todo CABA tarda **10 a 13 min**
+  (medido: 11.5 / 11.6 / 10.3 / 12.1 / 11.6 / 12.0 / 12.6). Justo arriba del límite.
+- Lo caro: **la corrida se paga igual** (US$1.507 cada una). Cortábamos la espera 2 min
+  antes de que terminara, tirábamos el dataset de 1500 avisos y encima el job moría, así
+  que **tampoco corrían Don Torcuato ni los embeddings**.
+- Arreglo: `--espera-min` (default **40**), log de progreso cada 2 min, y
+  `timeout-minutes: 30 → 90` en el job.
+- Nuevo: **`--recuperar <runId>`** carga el dataset de una corrida ya pagada que quedó sin
+  cargar, sin lanzar nada nuevo. Recuperar sale US$0; volver a correr, US$1.51.
+
+**Hallazgos que son decisión de Leonardo, no se tocó nada:**
+
+1. Las corridas traen **exactamente 1500 items = el tope**. CABA en 2 días publica más de
+   eso: estamos truncando. No se pierde nada para siempre (el refresco mensual barre los
+   48 barrios), pero lo de arriba de 1500 entra hasta un mes tarde.
+2. El descubrimiento pasó de "centavos" a **US$1.51/día ≈ US$45/mes**. Sumado al refresco
+   (~US$65) da ~US$110/mes contra un tope de cuenta de US$100. Bajar a `--dentro-de 1`
+   lo partiría al medio (y entraría cómodo en tiempo), a costa de perder el solape.
+3. Quedaron 4 días pagados sin cargar (≈US$6): corridas del 9, 10, 11 y 12.
+
 ## 2026-09-09 — Documentos para clientes: la plantilla se arma una vez y cada asesor la comparte con sus datos
 
 **Qué pidió Leonardo:** "cranear una solución para este apartado de plantillas que se suben

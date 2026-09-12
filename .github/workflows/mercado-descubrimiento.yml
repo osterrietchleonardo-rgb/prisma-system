@@ -17,7 +17,10 @@ on:
 jobs:
   descubrir:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 90 min: la corrida de CABA con --max 1500 tarda 10-13 min en Apify (medido
+    # 5..12-sep) + descarga de ~145 MB + loader + Don Torcuato + embeddings.
+    # Con 30 min el job moría justo cuando el actor estaba por terminar.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
