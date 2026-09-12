@@ -17,7 +17,10 @@ on:
 jobs:
   descubrir:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 90 min: la corrida de CABA con --max 1500 tarda 10-13 min en Apify (medido
+    # 5..12-sep) + descarga de ~145 MB + loader + Don Torcuato + embeddings.
+    # Con 30 min el job moría justo cuando el actor estaba por terminar.
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,13 +30,18 @@ jobs:
       # publicado en cualquier barrio de la ciudad (verificado 4-sep: 48 items de
       # ~48 barrios distintos). --zona caba no tiene centroide → el loader saca el
       # barrio del propio aviso y saltea el geo-check (que igual cubre el refresco
-      # mensual por-barrio). --max alto para no truncar un día real de CABA.
+      # mensual por-barrio).
+      #
+      # --max 1800: CABA publica 1277-1543 avisos/día (medido 8..12-sep). La ventana
+      # real de --dentro-de 2 es "ayer entero + lo que va de hoy" ≈ 1500-1600, no dos
+      # días enteros, así que el tope NO encarece la corrida (se paga por item
+      # devuelto): solo deja de cortar. Con 1500 el 11-sep perdimos 87 avisos.
       - name: Descubrimiento CABA (todos los barrios, todos los tipos)
         env:
           APIFY_API_KEY: ${{ secrets.APIFY_API_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: node mercado-sync/descubrimiento.mjs --location "Capital Federal" --zona caba --dentro-de 2 --max 1500
+        run: node mercado-sync/descubrimiento.mjs --location "Capital Federal" --zona caba --dentro-de 2 --max 1800
       # Zonas fuera de CABA: el filtro "Capital Federal" no las ve, van como paso propio.
       # `continue-on-error`: una falla acá no debe frenar los embeddings de CABA.
       # --zona con centroide en loader.mjs → lo que caiga fuera de la localidad va a cuarentena.
