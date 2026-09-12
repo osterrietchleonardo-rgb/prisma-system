@@ -49,18 +49,42 @@ function anillos(d: Dibujo): Position[][] {
   return d.type === "Polygon" ? d.coordinates : d.coordinates.flat()
 }
 
+/** Igual al anillo de entrada pero sin dos puntos seguidos iguales. No lo muta. */
+function sinRepetidosConsecutivos(anillo: Position[]): Position[] {
+  const limpio: Position[] = []
+  for (const p of anillo) {
+    const anterior = limpio[limpio.length - 1]
+    if (!anterior || anterior[0] !== p[0] || anterior[1] !== p[1]) limpio.push(p)
+  }
+  return limpio
+}
+
+/**
+ * Aplica `sinRepetidosConsecutivos` a cada anillo del dibujo, sin tocar el original: el lápiz
+ * cierra el anillo repitiendo el primer punto, y si el último punto muestreado YA era ese
+ * punto quedan dos puntos idénticos seguidos, que kinks() confunde con un cruce consigo mismo.
+ */
+function sinRepetidosEnDibujo(d: Dibujo): Dibujo {
+  return d.type === "Polygon"
+    ? { type: "Polygon", coordinates: d.coordinates.map(sinRepetidosConsecutivos) }
+    : { type: "MultiPolygon", coordinates: d.coordinates.map((poligono) => poligono.map(sinRepetidosConsecutivos)) }
+}
+
 /**
  * Devuelve el dibujo listo para guardar, o el motivo —en criollo— por el que no sirve. Los
  * motivos se muestran tal cual al asesor: dicen qué hacer, no qué falló técnicamente.
  */
 export function validarDibujo(g: unknown): Validacion {
-  const d = g as Dibujo
-  if (!d || typeof d !== "object" || (d.type !== "Polygon" && d.type !== "MultiPolygon")) {
+  const bruto = g as Dibujo
+  if (!bruto || typeof bruto !== "object" || (bruto.type !== "Polygon" && bruto.type !== "MultiPolygon")) {
     return { ok: false, motivo: "Eso no es una zona dibujada" }
   }
-  if (!Array.isArray(d.coordinates) || d.coordinates.length === 0) {
+  if (!Array.isArray(bruto.coordinates) || bruto.coordinates.length === 0) {
     return { ok: false, motivo: "El dibujo está vacío" }
   }
+
+  // Normaliza ANTES de mirar los vértices: ver el comentario de sinRepetidosEnDibujo.
+  const d = sinRepetidosEnDibujo(bruto)
 
   let vertices = 0
   for (const anillo of anillos(d)) {

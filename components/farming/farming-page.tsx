@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react"
 import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import type { Dibujo } from "@/lib/farming/geometria"
+import { contornosParaDibujar } from "@/lib/farming/armar"
 import type { RespuestaZonas, ZonaFarming } from "@/lib/farming/tipos"
 import { ListaZonas } from "./lista-zonas"
 import { CompartirDialog } from "./compartir-dialog"
@@ -13,7 +14,13 @@ import { MapaFarming, type ModoMapa } from "./mapa-farming"
 
 /** Un pedido a la API que, si viene 409, rechaza con los choques adentro. */
 async function pedir(url: string, init?: RequestInit) {
-  const r = await fetch(url, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) } })
+  const esGet = !init || !init.method
+  const r = await fetch(url, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+    // Sin esto el navegador podía servir de caché una lista vieja después de guardar.
+    ...(esGet ? { cache: "no-store" as const } : {}),
+  })
   const d = await r.json().catch(() => ({}))
   if (!r.ok) {
     const e: any = new Error(d.error || "Algo salió mal")
@@ -28,6 +35,8 @@ export function FarmingPage() {
   const [cargando, setCargando] = useState(true)
   const [modo, setModo] = useState<ModoMapa | null>(null)
   const [compartiendo, setCompartiendo] = useState<ZonaFarming | null>(null)
+  // El título del mapa en modo "ver": distinto según si la zona es mía o de un colega.
+  const [tituloVer, setTituloVer] = useState("")
 
   const recargar = useCallback(async () => {
     try {
@@ -50,13 +59,17 @@ export function FarmingPage() {
 
   const guardar = async ({ nombre, geojson }: { nombre?: string; geojson: Dibujo }) => {
     if (!modo || modo.tipo === "ver") return
+    let zona: ZonaFarming
     if (modo.tipo === "nueva") {
-      await pedir("/api/farming/zonas", { method: "POST", body: JSON.stringify({ nombre, geojson }) })
+      zona = (await pedir("/api/farming/zonas", { method: "POST", body: JSON.stringify({ nombre, geojson }) })).zona
       toast.success("Zona guardada")
     } else {
-      await pedir(`/api/farming/zonas/${modo.zonaId}`, { method: "PATCH", body: JSON.stringify({ accion: modo.tipo, geojson }) })
+      zona = (await pedir(`/api/farming/zonas/${modo.zonaId}`, { method: "PATCH", body: JSON.stringify({ accion: modo.tipo, geojson }) })).zona
       toast.success(modo.tipo === "sumar" ? "Pedazo sumado" : "Zona redibujada")
     }
+    // La respuesta del servidor se aplica de una: así la tarjeta nunca muestra números viejos
+    // (km²/pedazos) mientras la lista completa todavía se está recargando.
+    setDatos((d) => d && { ...d, mias: modo.tipo === "nueva" ? [zona, ...d.mias] : d.mias.map((z) => (z.id === zona.id ? zona : z)) })
     setModo(null)
     await recargar()
   }
@@ -111,14 +124,25 @@ export function FarmingPage() {
         // Key con el modo: MapaFarming arranca lapizActivo a partir de modo.tipo solo al
         // montarse, así que cambiar de "ver" a "redibujar" (u otro modo) sin desmontar dejaría
         // el lápiz en el estado del modo anterior.
-        <MapaFarming key={`${modo.tipo}-${"zonaId" in modo ? modo.zonaId : ""}`} modo={modo} ajenas={datos.ajenas} onGuardar={guardar} onCerrar={() => setModo(null)} />
+        <MapaFarming
+          key={`${modo.tipo}-${"zonaId" in modo ? modo.zonaId : ""}`}
+          modo={modo}
+          ajenas={contornosParaDibujar(datos, "zonaId" in modo ? modo.zonaId : undefined)}
+          titulo={modo.tipo === "ver" ? tituloVer : undefined}
+          onGuardar={guardar}
+          onCerrar={() => setModo(null)}
+        />
       ) : (
         <ListaZonas
           mias={datos.mias}
           compartidasConmigo={datos.compartidas_conmigo}
           topes={datos.topes}
           onNueva={() => setModo({ tipo: "nueva" })}
-          onVer={(z) => setModo({ tipo: "ver", actual: z.geojson })}
+          onVer={(z) => {
+            const esMia = datos.mias.some((m) => m.id === z.id)
+            setTituloVer(esMia ? `«${z.nombre}»` : `«${z.nombre}» · zona de ${z.owner_nombre}`)
+            setModo({ tipo: "ver", actual: z.geojson })
+          }}
           onRedibujar={(z) => setModo({ tipo: "redibujar", zonaId: z.id, actual: z.geojson })}
           onSumar={(z) => setModo({ tipo: "sumar", zonaId: z.id, actual: z.geojson })}
           onCompartir={(z) => setCompartiendo(z)}

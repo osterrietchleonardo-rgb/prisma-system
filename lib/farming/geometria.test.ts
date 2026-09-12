@@ -69,6 +69,23 @@ describe("validarDibujo", () => {
     expect(v.ok).toBe(false)
     if (!v.ok) expect(v.motivo).toMatch(/cruza/)
   })
+
+  it("acepta un trazo cuyo punto de cierre quedó duplicado (el lápiz lo repite dos veces)", () => {
+    // El lápiz cierra el anillo agregando el primer punto; si el último punto muestreado YA
+    // era ese punto, quedan dos [LNG, LAT] seguidos: antes, kinks() lo confundía con un cruce.
+    const base = cuadrado(LNG, LAT)
+    const conCierreDuplicado = { type: "Polygon" as const, coordinates: [[...base.coordinates[0], [LNG, LAT]]] }
+    const v = validarDibujo(conCierreDuplicado)
+    expect(v.ok).toBe(true)
+    if (v.ok) {
+      expect(v.dibujo.type).toBe("Polygon")
+      const anillo = (v.dibujo as { coordinates: number[][][] }).coordinates[0]
+      for (let i = 1; i < anillo.length; i++) {
+        const igual = anillo[i][0] === anillo[i - 1][0] && anillo[i][1] === anillo[i - 1][1]
+        expect(igual).toBe(false)
+      }
+    }
+  })
 })
 
 describe("areaKm2 y contarPedazos", () => {

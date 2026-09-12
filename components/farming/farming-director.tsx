@@ -78,7 +78,13 @@ export function FarmingDirector() {
         </p>
       </div>
 
-      <MapaFarming modo={{ tipo: "ver", actual: null }} ajenas={datos.ajenas} onGuardar={async () => {}} onCerrar={() => {}} />
+      <MapaFarming
+        modo={{ tipo: "ver", actual: null }}
+        ajenas={datos.ajenas}
+        titulo="Las zonas de la inmobiliaria"
+        onGuardar={async () => {}}
+        onCerrar={() => {}}
+      />
 
       {datos.equipo.length === 0 && (
         <p className="text-sm text-muted-foreground">Ningún asesor dibujó todavía su zona.</p>

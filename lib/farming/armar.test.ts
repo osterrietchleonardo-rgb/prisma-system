@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { armarRespuesta, armarZona, candidatasParaChoque, colegasActivos, nombreDe, type FilaPerfil, type FilaZona } from "./armar"
+import { armarRespuesta, armarZona, candidatasParaChoque, colegasActivos, contornosParaDibujar, nombreDe, type FilaPerfil, type FilaZona } from "./armar"
 
 /**
  * De filas de la base a lo que ve la pantalla. Reglas:
@@ -85,5 +85,30 @@ describe("armarRespuesta", () => {
     expect(r.mias).toEqual([])
     expect(r.equipo.map((z) => z.id)).toEqual(["z-mia", "z-juan", "z-maria"])
     expect(r.ajenas.map((z) => z.id)).toEqual(["z-mia", "z-juan", "z-maria"])
+  })
+})
+
+describe("contornosParaDibujar", () => {
+  // Mismo escenario que "armarRespuesta: asesor": 1 ajena (de Juan), 1 compartida conmigo
+  // (de María) y 2 mías.
+  const filasConDosMias = [fila("z-ajena", JUAN, "Ajena"), fila("z-compartida", MARIA, "Compartida"), fila("z-mia1", YO, "Mía 1"), fila("z-mia2", YO, "Mía 2")]
+  const compartidas = [{ zona_id: "z-compartida", user_id: YO, agregado_por: MARIA, created_at: "" }]
+  const datos = armarRespuesta({ filas: filasConDosMias, compartidas, perfiles, userId: YO, role: "asesor" })
+
+  it("sin excluirId trae las 4: la ajena, la compartida y las 2 mías como 'vos'", () => {
+    const c = contornosParaDibujar(datos)
+    expect(c.map((z) => z.id)).toEqual(["z-ajena", "z-compartida", "z-mia1", "z-mia2"])
+    expect(c.find((z) => z.id === "z-mia1")?.owner_nombre).toBe("vos")
+    expect(c.find((z) => z.id === "z-mia2")?.owner_nombre).toBe("vos")
+    expect(c.find((z) => z.id === "z-compartida")?.owner_nombre).toBe("otro asesor")
+  })
+
+  it("con excluirId esa mía no aparece y el resto queda igual", () => {
+    const c = contornosParaDibujar(datos, "z-mia1")
+    expect(c.map((z) => z.id)).toEqual(["z-ajena", "z-compartida", "z-mia2"])
+  })
+
+  it("cada contorno tiene exactamente las claves id, nombre, owner_nombre, geojson", () => {
+    for (const z of contornosParaDibujar(datos)) expect(Object.keys(z).sort()).toEqual(["geojson", "id", "nombre", "owner_nombre"])
   })
 })

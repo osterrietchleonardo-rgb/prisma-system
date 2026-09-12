@@ -100,3 +100,25 @@ export function armarRespuesta(args: {
     topes: { max_zonas: MAX_ZONAS_ACTIVAS, max_km2: MAX_KM2 },
   }
 }
+
+/** Todo lo que se dibuja como contorno mientras el asesor traza: las ajenas, las compartidas
+ *  conmigo y las propias (menos la que está editando). Las propias se llaman "vos". Sin esto
+ *  el asesor dibuja a ciegas contra zonas que el servidor sí controla, y se lleva un 409. */
+export function contornosParaDibujar(datos: RespuestaZonas, excluirId?: string): ContornoAjeno[] {
+  const vistos = new Set<string>()
+  const contornos: ContornoAjeno[] = []
+  const agregar = (c: ContornoAjeno) => {
+    if (vistos.has(c.id)) return
+    vistos.add(c.id)
+    contornos.push(c)
+  }
+
+  for (const z of datos.ajenas) agregar(z)
+  for (const z of datos.compartidas_conmigo) agregar({ id: z.id, nombre: z.nombre, owner_nombre: z.owner_nombre, geojson: z.geojson })
+  for (const z of datos.mias) {
+    if (z.id === excluirId) continue
+    agregar({ id: z.id, nombre: z.nombre, owner_nombre: "vos", geojson: z.geojson })
+  }
+
+  return contornos
+}

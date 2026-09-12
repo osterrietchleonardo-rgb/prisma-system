@@ -46,11 +46,14 @@ const nada = () => {}
 export function MapaFarming({
   modo,
   ajenas,
+  titulo,
   onGuardar,
   onCerrar,
 }: {
   modo: ModoMapa
   ajenas: ContornoAjeno[]
+  /** Reemplaza el texto de la barra de arriba (por default sale de TITULO según el modo). */
+  titulo?: string
   onGuardar: (args: { nombre?: string; geojson: Dibujo }) => Promise<void>
   onCerrar: () => void
 }) {
@@ -123,7 +126,7 @@ export function MapaFarming({
       {/* Barra de arriba */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[600] flex flex-wrap items-center gap-2 p-3 pl-14">
         <div className="pointer-events-auto rounded-lg bg-white/95 px-3 py-1.5 text-xs font-medium shadow dark:bg-zinc-900/95">
-          {TITULO[modo.tipo]}
+          {titulo ?? TITULO[modo.tipo]}
         </div>
         {modo.tipo === "nueva" && (
           <Input
