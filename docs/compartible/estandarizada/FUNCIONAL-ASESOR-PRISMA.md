@@ -60,8 +60,10 @@
   - **Mi día:** Mi Dashboard, Mi Calendario, Tracking Performance.
   - **Bandejas:** WhatsApp Bandeja (las conversaciones que entran).
   - **Contactos:** Mi Pipeline, Leads Tokko, Leads WhatsApp (los listados de gente).
+  - **Difusión:** Contactos (tu agenda de WhatsApp).
   - **Propiedades:** Mis Propiedades, Buscador IA, ACM, Pulso de Mercado.
-  - **Herramientas IA:** Marketing IA, Contratos IA.
+  - **Marketing IA:** Crear Anuncio, HomeStaging, Clientes Ideales (IPC), Mi ADN, Mis Generaciones, Guía Mágica.
+  - **Documentación:** Contratos IA. (Si tu agencia no lo tiene contratado, este grupo no aparece.)
   - **Ayuda:** Tutor IA, Biblioteca, Sugerencias.
 - Cada grupo se abre y se cierra tocando su título. Podés cerrarlos todos; el grupo de la sección en la que estás queda con el título en color cobre. Al entrar a una sección, su grupo se abre solo, y el menú se acuerda de qué grupos dejaste abiertos.
 - **Cerrar la barra en la computadora:** arriba a la derecha de la barra hay un botón para esconderla y ver el contenido a todo lo ancho. Para volver a abrirla, usá el botón **"Barra lateral"** arriba a la izquierda. En el celular no cambia nada: la barra sigue saliendo desde el botón de las tres líneas.
@@ -284,7 +286,7 @@ El proceso ya no es sólo "compra o venta": son cuatro opciones, porque la agenc
 - A la izquierda, la **lista de conversaciones**; al centro, el **chat en vivo**.
 - Escribís y respondés directamente desde acá (mensajería en tiempo real).
 - Podés **filtrar los chats por clasificación** (origen del lead); cada chat muestra su **etiqueta de clasificación** con un color.
-- Arriba tenés dos solapas: **💬 Bandeja** (los chats) y **👥 Contactos** (tu agenda para importar leads y campañas).
+- Esta página es solo la **💬 Bandeja** (los chats). Tu agenda de **👥 Contactos** (para importar leads) es una página aparte: **Difusión → Contactos** en el menú.
 - **En Contactos ves solo TUS contactos:** los que vos importaste/cargaste y los de los leads que tenés asignados. **No ves los contactos de los otros asesores** (ni ellos los tuyos). Tu director sí ve los de todos.
 - Si tu director todavía no configuró WhatsApp, vas a ver un cartel de **"WhatsApp no configurado"** (esa configuración la hace el director, no vos).
 
@@ -353,7 +355,7 @@ Al abrir un chat, en **Información del contacto** (el ícono de la persona arri
 
 **Qué es:** un generador de contenido publicitario con inteligencia artificial (la pantalla se titula "Marketing IA Asesor").
 
-**Tiene 6 pestañas:** Crear Anuncio · **Fotos** · Clientes Ideales (IPC) · Mi ADN · Mis Generaciones · Guía Mágica. (La pestaña de "Configuración IA" de la marca es solo del director.)
+**Son 6 páginas, en el grupo Marketing IA del menú:** Crear Anuncio · **HomeStaging** (antes "Fotos") · Clientes Ideales (IPC) · Mi ADN · Mis Generaciones · Guía Mágica. (La "Configuración IA" de la marca es solo del director.)
 
 **Cómo usarlo paso a paso:**
 1. En **Clientes Ideales (IPC)** creás un **perfil IPC** (Cliente Ideal). Elegís el objetivo:
@@ -367,7 +369,7 @@ Al abrir un chat, en **Información del contacto** (el ícono de la persona arri
 4. Apretás el botón de generar: la IA te crea **3 variantes** con ángulos distintos (PAS, Transformación, Autoridad/Datos) para que elijas la mejor.
 5. Todo queda guardado en **Mis Generaciones**, donde lo ves, editás el texto, descargás la imagen o lo borrás.
 
-### Fotos (arreglar las fotos de una propiedad)
+### HomeStaging (arreglar las fotos de una propiedad)
 
 **Qué es:** agarra una foto y te la deja publicable. No hace falta que sepas editar.
 
@@ -398,14 +400,14 @@ Al abrir un chat, en **Información del contacto** (el ícono de la persona arri
 
 > ⚠️ **Sobre ambientes que ya tienen muebles:** lo que los muebles tapaban, el sistema lo tiene que imaginar. Miralo bien antes de publicar, sobre todo si conocés la propiedad.
 
-**Dónde quedan:** en **Historial / Galería**, en la solapa **Fotos retocadas**. Cada foto es **una tarjeta**: la abrís y vas viendo cada paso como un álbum, empezando por la original de la ficha. En cualquiera de ellos podés **seguir editando**, **descargar** o **borrar**.
+**Dónde quedan:** en **Mis Generaciones**, en la solapa **Fotos retocadas**. Cada foto es **una tarjeta**: la abrís y vas viendo cada paso como un álbum, empezando por la original de la ficha. En cualquiera de ellos podés **seguir editando**, **descargar** o **borrar**.
 
 > 💰 Cada paso consume **3 créditos**. Los tres modos juntos son 9.
 
 
 ### Mi ADN (tu oferta irresistible)
 
-**Para qué sirve:** el IPC dice *a quién* le hablás. Esta pestaña dice *quién sos vos y por qué te tienen que elegir a vos y no a la inmobiliaria de la otra cuadra*. Con tus datos, la IA te arma **dos ofertas irresistibles**: una para **captar** (dueños que quieren vender) y otra para **vender** (gente que quiere comprar). Después esas ofertas se meten solas en todos tus anuncios.
+**Para qué sirve:** el IPC dice *a quién* le hablás. Esta página dice *quién sos vos y por qué te tienen que elegir a vos y no a la inmobiliaria de la otra cuadra*. Con tus datos, la IA te arma **dos ofertas irresistibles**: una para **captar** (dueños que quieren vender) y otra para **vender** (gente que quiere comprar). Después esas ofertas se meten solas en todos tus anuncios.
 
 **Son 4 pasos:**
 1. **Mi perfil** (opcional, pero es el que más suma): años en el rubro, la zona en la que sos experto, en qué te especializás, cuántas operaciones cerraste, **2 o 3 casos reales** tuyos y qué incluye tu servicio. También hay un campo para decir **qué NO se puede prometer nunca** en tus anuncios: la IA lo respeta a rajatabla.
@@ -725,7 +727,7 @@ Tiene 4 pestañas:
 | Buscador IA | 1 crédito |
 | Tutor IA | 1 crédito |
 | Marketing IA — "Generar 3 Variantes" | ~7 créditos (3 textos + 3 imágenes) |
-| Marketing IA — Fotos (cada paso) | 3 créditos |
+| Marketing IA — HomeStaging (cada paso) | 3 créditos |
 | ACM (comparables) | **0 — sin costo por uso** |
 | Contratos (finalizar) | 5 créditos |
 

@@ -16,6 +16,46 @@
 
 ---
 
+## 2026-09-12 — Las solapas de WhatsApp y de Marketing IA pasan a ser páginas del menú
+
+**Qué pidió Leonardo:** (1) un grupo nuevo «Difusión» con Contactos, Plantillas, Campañas y
+Configuración IA (las solapas de Asesor IA WhatsApp); (2) «Marketing IA» reemplaza a
+«Herramientas IA» con las 7 solapas como páginas, y «Fotos» pasa a llamarse «HomeStaging»;
+(3) Contratos IA en un grupo propio («Documentación», nombre mío). Cada rol ve como páginas
+exactamente las solapas que veía; si un rol no tenía ninguna, no ve el grupo. Y la agencia con
+Contratos IA desactivado (Central) directamente no lo ve en la barra, ni al grupo.
+Antes se le mostró un artifact con la barra propuesta y un análisis de factibilidad con el dato
+al lado (los 4 lugares donde las solapas se hablaban entre sí).
+
+**Qué se hizo** (rama `feat/menu-difusion-marketing-paginas`, worktree `.claude/worktrees/menu-difusion`,
+desde `origin/main` 1b4d2a5):
+
+- `lib/nav/menu.ts`: 9 grupos; `menuPara(rol, { agencyId })` filtra Contratos IA para la agencia
+  desactivada y tira el grupo vacío. El renglón gris "Deshabilitada" de la barra se fue.
+  `menu.test.ts` reescrito con la lista completa (29 renglones director, 23 asesor).
+- Rutas nuevas: `/{rol}/difusion/*` y `/{rol}/marketing-ia/*`. Difusión NO cuelga de
+  `/asesor-ia-whatsapp` porque `esRutaActiva` toma subrutas y quedarían dos renglones en cobre.
+  Los componentes de cada solapa no se tocaron: cada página es un envoltorio.
+- Saltos entre solapas → navegaciones: Contactos→Campañas escucha `CampaignState.setActiveTab`
+  (`components/difusion/PaginaDifusion.tsx`); los de Marketing (`generation-complete` → Historial,
+  `retomar-foto-ia` → HomeStaging) los escucha `navegacion-marketing.tsx` desde el layout.
+- Dirección vieja `/marketing-ia` → redirect en `next.config.mjs`. Con `redirect()` en un
+  page.tsx saltaba "Rendered more hooks" del router de Next en dev; con el config, no.
+- Títulos del header en `lib/nav/titulos.ts` (compartido por los dos headers). Guías FUNCIONAL
+  de director y asesor actualizadas. `WhatsAppTabsWrapper.tsx` borrado.
+- Probado en el navegador en :3021 (Playwright): 13 rutas del director, 7 del asesor (con un
+  asesor descartable creado y borrado por Admin API), los 3 saltos, la redirección, celular 390px.
+  tsc limpio; 1993 tests (+8).
+
+**Cambio de comportamiento que sí existe:** el borrador de campaña a medio armar ya no sobrevive si
+vas a Contactos y volvés (antes las solapas quedaban montadas). Los contactos elegidos sí viajan.
+**Al mergear con `farming-zonas`:** las dos ramas tocan `menu.ts` y `menu.test.ts` (Farming en
+Propiedades); conflicto chico y esperable.
+
+**Quedó pendiente:** el OK de Leonardo en el navegador → commit → merge. El dev del 3021 queda levantado.
+
+---
+
 ## 2026-09-11 — Los audios de los clientes no se podían escuchar (nunca se pudo)
 
 **Qué pidió Leonardo:** resolver la sugerencia de cbgonzalez (Central, 10/9): "los clientes mandan
