@@ -16,6 +16,61 @@
 
 ---
 
+## 2026-09-12 — Farming: el mapa arranca con la manito, lupita, y el director ve cada asesor en su color
+
+**Qué pidió Leonardo:** (1) una lupita en el mapa de Farming para ir a un barrio, zona o dirección;
+(2) que el mapa NO arranque con el lápiz —arrastrar para llegar dibujaba—, sino con la manito, y al
+terminar el trazo preguntar nombre y "guardar como zona farming"; (3) en la pantalla del director,
+ver marcadas las zonas de cada asesor y que tocar una de la lista lleve el mapa hasta ella.
+
+**Qué se hizo** (rama `farming-mapa-ux`, un solo archivo de lógica nueva)
+
+- `mapa-farming.tsx`: el lápiz arranca apagado; la lupita es el mismo `MapaBuscador` del Buscador
+  IA (barrios, zonas guardadas, direcciones de MapTiler; la dirección clava el pin rojo); al soltar
+  el trazo el lápiz se apaga solo y se abre un cuadro (nueva: nombre + «Guardar como zona de
+  farming»; redibujar/sumar: la pregunta, sin nombre). «Seguir editando» deja el trazo y un botón
+  «Guardar» para reabrirlo. Un 409 cierra el cuadro para que se vea lo rayado.
+- Director: `lib/farming/colores.ts` (un color por asesor, sin el rojo del choque ni el verde de la
+  zona propia), `unirBBoxes` para abrir el mapa sobre todo el equipo, clic en la fila → el mapa
+  vuela, la zona se resalta (borde grueso), el título dice cuál es, y en el celular la pantalla
+  sube sola hasta el mapa.
+- Tests: `colores.test.ts` (4) y `unirBBoxes` (2), vistos fallar antes. Farming: 83 tests, 0 errores
+  de tipos, lint limpio.
+
+**Lo que encontró el navegador y se corrigió en la misma rama**
+
+- **En el celular, el globito del chat tapaba la indicación y el botón «Guardar»**, que estaban
+  abajo a la derecha. Todo lo que se lee o se toca pasó arriba (lápiz en la fila del título,
+  indicación y botones debajo). Medido a 390×844: nada se pisa con el globito (768 px) ni con el
+  «Volver» de Leaflet.
+- **La X de cerrar el mapa medía 32 px de ancho** (44 de alto por la regla global): pasó a 44×44.
+
+**Verificación real** (usuarios de prueba de PRISMAIA - VAKDOR, escritorio y celular)
+
+- Arrastrar con la manito no dibuja; con el lápiz, `touch-action: none` y el dedo no mueve la
+  página (scroll 0 → 0). Lupita «Belgrano» → el mapa vuela (zoom 13 → 14). Crear, cancelar,
+  reabrir y guardar con Enter; sumar un pedazo → la tarjeta pasa a «2 pedazos» al instante.
+- Director: tres zonas en tres colores; clic en «Palermo (prueba B)» → zoom 16, resaltada, fila
+  «marcada en el mapa».
+- Contraste: director claro 5,68 / 18,26 / 5,49; oscuro 5,84 / 13,98 / 6,96; asesor claro 17,72.
+
+**Trampas de método**
+
+- **`Map container is already initialized`**: al editar `mapa-farming.tsx` con el dev server
+  andando, el recargado en caliente vuelve a montar el `MapContainer` de react-leaflet sobre el
+  mismo `div` y la pantalla cae en «Algo salió mal». Es solo de desarrollo: recargando limpio no
+  vuelve. No confundirlo con un bug.
+- Los eventos táctiles sintéticos del script de prueba disparan `setPointerCapture … No active
+  pointer` (el dedo "no existe" para el navegador) y cuatro `400` del panel de errores de Next
+  buscando el código del script. Ninguno viene de la app.
+
+**Hallazgo, no tocado:** la X del cuadro (componente global `Dialog`) mide 16 px de ancho en el
+celular. Es de toda la app.
+
+Las dos zonas de prueba de esta verificación se borraron; quedan los tres usuarios de prueba.
+
+---
+
 ## 2026-09-12 — Farming, etapa 1: el territorio (zonas exclusivas, compartir, liberar)
 
 **Qué se construyó** (rama `farming-zonas`, 21 commits, spec `2026-09-11-farming-zonas-design.md`,
