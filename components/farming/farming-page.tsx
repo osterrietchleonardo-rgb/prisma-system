@@ -7,28 +7,11 @@ import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import type { Dibujo } from "@/lib/farming/geometria"
 import { contornosParaDibujar } from "@/lib/farming/armar"
+import { pedir } from "@/lib/farming/cliente"
 import type { RespuestaZonas, ZonaFarming } from "@/lib/farming/tipos"
 import { ListaZonas } from "./lista-zonas"
 import { CompartirDialog } from "./compartir-dialog"
 import { MapaFarming, type ModoMapa } from "./mapa-farming"
-
-/** Un pedido a la API que, si viene 409, rechaza con los choques adentro. */
-async function pedir(url: string, init?: RequestInit) {
-  const esGet = !init || !init.method
-  const r = await fetch(url, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-    // Sin esto el navegador podía servir de caché una lista vieja después de guardar.
-    ...(esGet ? { cache: "no-store" as const } : {}),
-  })
-  const d = await r.json().catch(() => ({}))
-  if (!r.ok) {
-    const e: any = new Error(d.error || "Algo salió mal")
-    if (r.status === 409) e.choques = d.choques
-    throw e
-  }
-  return d
-}
 
 export function FarmingPage() {
   const [datos, setDatos] = useState<RespuestaZonas | null>(null)
@@ -137,6 +120,7 @@ export function FarmingPage() {
           mias={datos.mias}
           compartidasConmigo={datos.compartidas_conmigo}
           topes={datos.topes}
+          miId={datos.mi_id}
           onNueva={() => setModo({ tipo: "nueva" })}
           onVer={(z) => {
             const esMia = datos.mias.some((m) => m.id === z.id)

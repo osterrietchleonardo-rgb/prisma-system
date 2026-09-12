@@ -157,10 +157,12 @@ describe("choquesContra", () => {
     expect(areaKm2(r[0].recorte)).toBeGreaterThan(0.4)
   })
 
-  it("una zona chica adentro de una grande es choque del 100%", () => {
+  it("una zona chica adentro de una grande pisa solo una parte", () => {
+    // El pct es de la zona AJENA (Juan), no del dibujo nuevo: 0.003² / 0.01² ≈ 9%.
     const r = choquesContra(cuadrado(LNG + 0.002, LAT + 0.002, 0.003), [juan])
     expect(r).toHaveLength(1)
-    expect(r[0].pct).toBe(100)
+    expect(r[0].pct).toBeGreaterThanOrEqual(7)
+    expect(r[0].pct).toBeLessThanOrEqual(11)
   })
 
   it("revisa contra todas y devuelve solo las que pisa", () => {

@@ -37,7 +37,7 @@ export interface Choque {
   zona_id: string
   nombre: string
   owner_nombre: string
-  /** Qué porcentaje del dibujo NUEVO cae sobre esa zona. */
+  /** Qué porcentaje de ESA zona ajena queda pisado. */
   pct: number
   /** El pedazo que se pisa, para dibujarlo rayado. */
   recorte: Dibujo
@@ -173,7 +173,7 @@ export function choquesContra(nuevo: Dibujo, otras: ZonaParaChoque[]): Choque[] 
       zona_id: z.id,
       nombre: z.nombre,
       owner_nombre: z.owner_nombre,
-      pct: Math.min(100, Math.round((areaRecorte / areaNuevo) * 100)),
+      pct: Math.min(100, Math.round((areaRecorte / areaOtra) * 100)),
       recorte: recorte.geometry,
     })
   }

@@ -14,6 +14,7 @@ import { cargarContexto, COLUMNAS_ZONA, responderError } from "@/lib/farming/ser
 export const dynamic = "force-dynamic"
 
 const LARGO_NOMBRE = 80
+const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function GET() {
   try {
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
     if (choques.length > 0) {
       const primero = choques[0]
       return NextResponse.json(
-        { error: `Tu trazo pisa «${primero.nombre}», zona de ${primero.owner_nombre}. Corré el trazo y volvé a intentar.`, choques },
+        { error: `Tu trazo pisa el ${primero.pct}% de «${primero.nombre}», zona de ${primero.owner_nombre}. Corré el trazo y volvé a intentar.`, choques },
         { status: 409 },
       )
     }
@@ -72,7 +73,9 @@ export async function POST(req: Request) {
         nombre,
         geojson: v.dibujo,
         area_km2: Number(km2.toFixed(4)),
-        origen_mapa_zona_id: typeof body?.origen_mapa_zona_id === "string" ? body.origen_mapa_zona_id : null,
+        // Si viene algo que no es un uuid (un valor pisado a mano, un bug del cliente) se
+        // guarda null en vez de dejar que Postgres tire un 500 con texto técnico.
+        origen_mapa_zona_id: typeof body?.origen_mapa_zona_id === "string" && RE_UUID.test(body.origen_mapa_zona_id) ? body.origen_mapa_zona_id : null,
         estado: "activa",
       })
       .select(COLUMNAS_ZONA)

@@ -118,6 +118,14 @@ describe("POST /api/farming/zonas", () => {
     expect(r.status).toBe(201)
   })
 
+  it("origen_mapa_zona_id que no es un uuid se guarda como null", async () => {
+    const r = await post({ nombre: "Núñez", geojson: cuadrado(-58.40, -34.56), origen_mapa_zona_id: "no-es-un-uuid" })
+    const d = await r.json()
+    expect(r.status).toBe(201)
+    const fila = base.tablas.farming_zonas.find((z) => z.id === d.zona.id)!
+    expect(fila.origen_mapa_zona_id).toBeNull()
+  })
+
   it("el director no crea zonas: 403", async () => {
     sesion.userId = DIRECTOR
     sesion.role = "director"

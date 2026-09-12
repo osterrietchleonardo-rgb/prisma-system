@@ -47,6 +47,7 @@ beforeEach(() => {
       zona("z-mia", YO, cuadrado(-58.40, -34.56)),
       zona("z-juan", JUAN, cuadrado(-58.46, -34.56)),
       zona("z-ajena", "u-x", cuadrado(-58.40, -34.56), { agency_id: "ag-2" }),
+      zona("z-liberada", YO, cuadrado(-58.20, -34.56), { estado: "liberada" }),
     ],
     farming_zonas_compartidas: [{ zona_id: "z-juan", user_id: YO, agregado_por: JUAN, created_at: "" }],
   })
@@ -107,6 +108,13 @@ describe("PATCH", () => {
   it("acción desconocida: 400", async () => {
     expect((await patch("z-mia", { accion: "volar" })).status).toBe(400)
   })
+
+  it("una zona liberada no se puede renombrar: 404 y la fila queda igual", async () => {
+    const r = await patch("z-liberada", { accion: "renombrar", nombre: "Otra cosa" })
+    expect(r.status).toBe(404)
+    const fila = base.tablas.farming_zonas.find((z) => z.id === "z-liberada")!
+    expect(fila.nombre).toBe("z-liberada")
+  })
 })
 
 describe("DELETE", () => {
@@ -121,5 +129,11 @@ describe("DELETE", () => {
   it("un compartido no borra: 403", async () => {
     expect((await borrar("z-juan")).status).toBe(403)
     expect(base.tablas.farming_zonas.find((z) => z.id === "z-juan")).toBeDefined()
+  })
+
+  it("una zona liberada no se puede borrar: 404 y sigue en la base", async () => {
+    const r = await borrar("z-liberada")
+    expect(r.status).toBe(404)
+    expect(base.tablas.farming_zonas.find((z) => z.id === "z-liberada")).toBeDefined()
   })
 })

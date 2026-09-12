@@ -18,7 +18,7 @@
 
 ## 2026-09-12 — Farming, etapa 1: el territorio (zonas exclusivas, compartir, liberar)
 
-**Qué se construyó** (rama `farming-zonas`, 18 commits, spec `2026-09-11-farming-zonas-design.md`,
+**Qué se construyó** (rama `farming-zonas`, 21 commits, spec `2026-09-11-farming-zonas-design.md`,
 plan `2026-09-12-farming-etapa1-territorio.md`)
 
 - Tablas `farming_zonas` y `farming_zonas_compartidas` con RLS por agencia, **aplicadas en
@@ -30,7 +30,7 @@ plan `2026-09-12-farming-etapa1-territorio.md`)
 - Renglón «Farming» en Propiedades para los dos roles; página del asesor (Mis zonas + mapa con
   el lápiz del Buscador), botón «usar para farming» en el panel de zonas del Buscador (solo
   asesor), pantalla del director (mapa + liberar).
-- Tests: 36 nuevos en `lib/farming` + 50 en `app/api/farming` (doble de base en memoria).
+- Tests: 36 en `lib/farming` + 38 en `app/api/farming` (74) (doble de base en memoria).
   Suite completa: 1911 vitest + 103 node.
 
 **Decisiones que se tomaron sobre la marcha** (todas en el ledger del plan)

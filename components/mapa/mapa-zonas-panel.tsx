@@ -53,7 +53,7 @@ export function MapaZonasPanel({
       const d = await r.json()
       if (r.status === 409) {
         const c = d.choques?.[0]
-        throw new Error(c ? `Ese dibujo pisa «${c.nombre}», zona de ${c.owner_nombre}. Corregilo desde Farming.` : d.error)
+        throw new Error(c ? `Ese dibujo pisa «${c.nombre}», zona de ${c.owner_nombre}. Corregilo desde Farming.` : d.error || "Ese dibujo pisa la zona de un colega. Corregilo desde Farming.")
       }
       if (!r.ok) throw new Error(d.error || "No se pudo crear la zona de farming")
       setFarmingDe(null)

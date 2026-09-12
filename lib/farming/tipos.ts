@@ -41,6 +41,8 @@ export interface RespuestaZonas {
   /** Asesores activos de la agencia (sin uno mismo), para el desplegable de compartir. */
   colegas: Colega[]
   topes: { max_zonas: number; max_km2: number }
+  /** El id de quien pide: para que la tarjeta diga "vos" en vez de su propio nombre. */
+  mi_id: string
 }
 
 export interface RespuestaChoque {

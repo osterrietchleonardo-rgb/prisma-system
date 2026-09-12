@@ -98,6 +98,7 @@ export function armarRespuesta(args: {
     equipo: esDirector ? todas : [],
     colegas: colegasActivos(perfiles, userId),
     topes: { max_zonas: MAX_ZONAS_ACTIVAS, max_km2: MAX_KM2 },
+    mi_id: userId,
   }
 }
 

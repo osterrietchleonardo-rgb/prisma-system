@@ -55,7 +55,8 @@ export function MapaFarming({
   /** Reemplaza el texto de la barra de arriba (por default sale de TITULO según el modo). */
   titulo?: string
   onGuardar: (args: { nombre?: string; geojson: Dibujo }) => Promise<void>
-  onCerrar: () => void
+  /** Sin esto no hay X: el director no tiene a dónde "cerrar" (el mapa es lo único en su pantalla). */
+  onCerrar?: () => void
 }) {
   const [trazo, setTrazo] = useState<Trazo | null>(null)
   const [lapizActivo, setLapizActivo] = useState(modo.tipo !== "ver")
@@ -137,13 +138,15 @@ export function MapaFarming({
             maxLength={80}
           />
         )}
-        <button
-          onClick={onCerrar}
-          title="Cerrar"
-          className="pointer-events-auto ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-white text-zinc-700 shadow dark:bg-zinc-900 dark:text-zinc-200"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        {onCerrar && (
+          <button
+            onClick={onCerrar}
+            title="Cerrar"
+            className="pointer-events-auto ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-white text-zinc-700 shadow dark:bg-zinc-900 dark:text-zinc-200"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {puedeDibujar && (
@@ -167,7 +170,7 @@ export function MapaFarming({
       {/* La línea visible del choque, no un globito: en el celular los globitos no se abren. */}
       {choques.length > 0 && (
         <div className="absolute inset-x-3 bottom-16 z-[700] rounded-lg bg-red-700/95 px-3 py-2 text-xs text-white shadow">
-          Tu trazo pisa {choques.map((c) => `«${c.nombre}» (${c.owner_nombre}, ${c.pct}%)`).join(", ")}. Lo rayado es lo que choca: corré el trazo y volvé a guardar.
+          {choques.map((c) => `Tu trazo pisa el ${c.pct}% de «${c.nombre}» (${c.owner_nombre})`).join(". ")}. Lo rayado es lo que choca: corré el trazo y volvé a guardar.
         </div>
       )}
 

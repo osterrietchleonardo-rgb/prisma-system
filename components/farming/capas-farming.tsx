@@ -53,7 +53,7 @@ export default function CapasFarming({
           pathOptions={{ color: "#b91c1c", weight: 2, dashArray: "4 4", fillColor: "#ef4444", fillOpacity: 0.4 }}
         >
           <Tooltip permanent direction="center" opacity={1}>
-            <span className="font-semibold">pisa «{c.nombre}»</span> de {c.owner_nombre} ({c.pct}%)
+            <span className="font-semibold">pisa el {c.pct}% de «{c.nombre}»</span> de {c.owner_nombre}
           </Tooltip>
         </Polygon>
       ))}

@@ -9,6 +9,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { pedir } from "@/lib/farming/cliente"
 import type { RespuestaZonas, ZonaFarming } from "@/lib/farming/tipos"
 import { MapaFarming } from "./mapa-farming"
 
@@ -20,12 +21,9 @@ export function FarmingDirector() {
 
   const recargar = useCallback(async () => {
     try {
-      const r = await fetch("/api/farming/zonas")
-      const d = await r.json()
-      if (!r.ok) return toast.error(d.error || "No se pudieron traer las zonas")
-      setDatos(d)
-    } catch {
-      toast.error("No se pudieron traer las zonas: revisá la conexión y volvé a intentar")
+      setDatos(await pedir("/api/farming/zonas"))
+    } catch (e: any) {
+      toast.error(e.message)
     }
   }, [])
 
@@ -40,22 +38,12 @@ export function FarmingDirector() {
     if (!liberando) return
     setOcupado(true)
     try {
-      const r = await fetch(`/api/farming/zonas/${liberando.id}/liberar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ motivo }),
-      })
-      const d = await r.json()
-      if (!r.ok) throw new Error(d.error)
+      await pedir(`/api/farming/zonas/${liberando.id}/liberar`, { method: "POST", body: JSON.stringify({ motivo }) })
       toast.success(`«${liberando.nombre}» liberada. Esas cuadras ya se pueden volver a dibujar.`)
       cerrarDialogo()
       await recargar()
     } catch (e: any) {
-      toast.error(
-        e instanceof Error && e.message && !/fetch/i.test(e.message)
-          ? e.message
-          : "No se pudo liberar la zona: revisá la conexión y volvé a intentar"
-      )
+      toast.error(e.message)
     } finally {
       setOcupado(false)
     }
@@ -65,9 +53,14 @@ export function FarmingDirector() {
     return <div className="flex h-64 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
   }
 
-  // Agrupado por asesor, para leer el reparto de un vistazo.
-  const porAsesor = new Map<string, ZonaFarming[]>()
-  for (const z of datos.equipo) porAsesor.set(z.owner_nombre, [...(porAsesor.get(z.owner_nombre) || []), z])
+  // Agrupado por owner_user_id, no por nombre: dos asesores sin nombre cargado (o dos
+  // homónimos) son "otro asesor" los dos, y por nombre caerían en el mismo grupo.
+  const porAsesor = new Map<string, { nombre: string; zonas: ZonaFarming[] }>()
+  for (const z of datos.equipo) {
+    const grupo = porAsesor.get(z.owner_user_id)
+    if (grupo) grupo.zonas.push(z)
+    else porAsesor.set(z.owner_user_id, { nombre: z.owner_nombre, zonas: [z] })
+  }
 
   return (
     <div className="flex h-full flex-col gap-6 p-4 pt-6 md:p-8">
@@ -83,16 +76,15 @@ export function FarmingDirector() {
         ajenas={datos.ajenas}
         titulo="Las zonas de la inmobiliaria"
         onGuardar={async () => {}}
-        onCerrar={() => {}}
       />
 
       {datos.equipo.length === 0 && (
         <p className="text-sm text-muted-foreground">Ningún asesor dibujó todavía su zona.</p>
       )}
 
-      {[...porAsesor.entries()].map(([asesor, zonas]) => (
-        <div key={asesor} className="space-y-2">
-          <h2 className="text-sm font-semibold">{asesor}</h2>
+      {[...porAsesor.entries()].map(([ownerId, { nombre, zonas }]) => (
+        <div key={ownerId} className="space-y-2">
+          <h2 className="text-sm font-semibold">{nombre}</h2>
           {zonas.map((z) => (
             <div key={z.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-card px-4 py-3 dark:border-zinc-800">
               <div>

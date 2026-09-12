@@ -10,6 +10,7 @@ import type { ZonaFarming } from "@/lib/farming/tipos"
 function Tarjeta({
   zona,
   propia,
+  miId,
   onVer,
   onRedibujar,
   onSumar,
@@ -18,12 +19,18 @@ function Tarjeta({
 }: {
   zona: ZonaFarming
   propia: boolean
+  /** Para decir "vos" en vez de mi propio nombre en la lista de quién la trabaja. */
+  miId: string
   onVer: () => void
   onRedibujar?: () => void
   onSumar?: () => void
   onCompartir?: () => void
   onBorrar?: () => void
 }) {
+  // Si es mía, la lista empieza en "vos"; si no, en el dueño. El resto son los compartidos,
+  // con mi propia fila (cuando la zona no es mía) reemplazada por "vos" en vez de mi nombre.
+  const primero = propia ? "vos" : zona.owner_nombre
+  const resto = zona.compartida_con.map((c) => (c.id === miId ? "vos" : c.nombre))
   return (
     <div className="rounded-xl border border-zinc-200 bg-card p-4 dark:border-zinc-800">
       <div className="flex items-start justify-between gap-3">
@@ -42,9 +49,7 @@ function Tarjeta({
       {/* Línea visible, no globito: quién más trabaja esta zona se tiene que ver de un vistazo. */}
       <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
         <Users className="h-3.5 w-3.5 shrink-0" />
-        {zona.compartida_con.length === 0
-          ? propia ? "Solo la trabajás vos" : `La trabajan ${zona.owner_nombre} y vos`
-          : `La trabajan ${propia ? "vos" : zona.owner_nombre} y ${zona.compartida_con.map((c) => c.nombre).join(", ")}`}
+        {resto.length === 0 ? "Solo la trabajás vos" : `La trabajan ${primero} y ${resto.join(", ")}`}
       </p>
 
       {propia && (
@@ -71,6 +76,7 @@ export function ListaZonas({
   mias,
   compartidasConmigo,
   topes,
+  miId,
   onNueva,
   onVer,
   onRedibujar,
@@ -81,6 +87,8 @@ export function ListaZonas({
   mias: ZonaFarming[]
   compartidasConmigo: ZonaFarming[]
   topes: { max_zonas: number; max_km2: number }
+  /** El id de quien mira la pantalla, para que la tarjeta diga "vos". */
+  miId: string
   onNueva: () => void
   onVer: (z: ZonaFarming) => void
   onRedibujar: (z: ZonaFarming) => void
@@ -114,7 +122,7 @@ export function ListaZonas({
 
       <div className="grid gap-3 sm:grid-cols-2">
         {mias.map((z) => (
-          <Tarjeta key={z.id} zona={z} propia onVer={() => onVer(z)} onRedibujar={() => onRedibujar(z)} onSumar={() => onSumar(z)} onCompartir={() => onCompartir(z)} onBorrar={() => onBorrar(z)} />
+          <Tarjeta key={z.id} zona={z} propia miId={miId} onVer={() => onVer(z)} onRedibujar={() => onRedibujar(z)} onSumar={() => onSumar(z)} onCompartir={() => onCompartir(z)} onBorrar={() => onBorrar(z)} />
         ))}
       </div>
 
@@ -123,7 +131,7 @@ export function ListaZonas({
           <h3 className="text-sm font-semibold">Zonas que comparten conmigo</h3>
           <div className="grid gap-3 sm:grid-cols-2">
             {compartidasConmigo.map((z) => (
-              <Tarjeta key={z.id} zona={z} propia={false} onVer={() => onVer(z)} />
+              <Tarjeta key={z.id} zona={z} propia={false} miId={miId} onVer={() => onVer(z)} />
             ))}
           </div>
         </>

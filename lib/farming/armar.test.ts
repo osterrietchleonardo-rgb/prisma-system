@@ -78,6 +78,7 @@ describe("armarRespuesta", () => {
     expect(r.equipo).toEqual([])
     expect(r.colegas.map((c) => c.id)).toEqual([JUAN, MARIA])
     expect(r.topes).toEqual({ max_zonas: 3, max_km2: 5 })
+    expect(r.mi_id).toBe(YO)
   })
 
   it("director: nada propio, todas en equipo", () => {

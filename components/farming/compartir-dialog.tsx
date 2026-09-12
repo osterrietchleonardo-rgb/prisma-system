@@ -54,7 +54,11 @@ export function CompartirDialog({
             {zona.compartida_con.map((c) => (
               <li key={c.id} className="flex items-center justify-between rounded-lg border border-zinc-200 px-3 py-2 text-sm dark:border-zinc-800">
                 {c.nombre}
-                <button onClick={() => onSacar(zona.id, c.id)} title="Dejar de compartir" className="rounded p-1 text-muted-foreground hover:text-destructive">
+                <button
+                  onClick={() => onSacar(zona.id, c.id)}
+                  title="Dejar de compartir"
+                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded text-muted-foreground hover:text-destructive"
+                >
                   <X className="h-4 w-4" />
                 </button>
               </li>

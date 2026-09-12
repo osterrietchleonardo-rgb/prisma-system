@@ -14,13 +14,15 @@ export const dynamic = "force-dynamic"
 
 const LARGO_NOMBRE = 80
 
-/** La zona, si es de la agencia. `mia` dice si el que llama es el dueño. */
+/** La zona, si es de la agencia y sigue activa. `mia` dice si el que llama es el dueño.
+ *  Una zona liberada o archivada no se toca más: queda en el historial con motivo y firma. */
 async function buscarZona(admin: ReturnType<typeof createAdminClient>, id: string, agencyId: string, userId: string) {
   const { data, error } = await admin
     .from("farming_zonas")
     .select(COLUMNAS_ZONA)
     .eq("id", id)
     .eq("agency_id", agencyId)
+    .eq("estado", "activa")
     .maybeSingle()
   if (error) throw error
   const zona = data as FilaZona | null
@@ -32,7 +34,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const { userId, agencyId } = await requireTenant()
     const admin = createAdminClient()
     const { zona, mia } = await buscarZona(admin, params.id, agencyId, userId)
-    if (!zona) return NextResponse.json({ error: "No encontramos esa zona" }, { status: 404 })
+    if (!zona) return NextResponse.json({ error: "No encontramos esa zona activa" }, { status: 404 })
     if (!mia) return NextResponse.json({ error: "Solo quien dibujó la zona puede cambiarla" }, { status: 403 })
 
     const body = await req.json().catch(() => ({}))
@@ -80,7 +82,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     if (choques.length > 0) {
       const p = choques[0]
       return NextResponse.json(
-        { error: `Ese trazo pisa «${p.nombre}», zona de ${p.owner_nombre}. Corré el trazo y volvé a intentar.`, choques },
+        { error: `Tu trazo pisa el ${p.pct}% de «${p.nombre}», zona de ${p.owner_nombre}. Corré el trazo y volvé a intentar.`, choques },
         { status: 409 },
       )
     }
@@ -112,7 +114,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     const { userId, agencyId } = await requireTenant()
     const admin = createAdminClient()
     const { zona, mia } = await buscarZona(admin, params.id, agencyId, userId)
-    if (!zona) return NextResponse.json({ error: "No encontramos esa zona" }, { status: 404 })
+    if (!zona) return NextResponse.json({ error: "No encontramos esa zona activa" }, { status: 404 })
     if (!mia) return NextResponse.json({ error: "Solo quien dibujó la zona puede borrarla" }, { status: 403 })
 
     // ETAPA 3: si la zona tiene direcciones cargadas NO se borra: pasa a estado 'archivada'
