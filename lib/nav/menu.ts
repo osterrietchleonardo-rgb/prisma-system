@@ -48,6 +48,7 @@ import {
   BookOpen,
   Lightbulb,
   Settings,
+  Sprout,
 } from "lucide-react"
 import { contratosIaDeshabilitado } from "@/lib/access/contratos-ia"
 import { rutaMarketing } from "@/lib/marketing-ia/rutas"
@@ -137,6 +138,9 @@ const RENGLONES: Renglon[] = [
   { id: "propiedades", icon: Building, grupo: "propiedades",
     director: { name: "Propiedades",     href: "/director/propiedades" },
     asesor:   { name: "Mis Propiedades", href: "/asesor/propiedades" } },
+  { id: "farming", icon: Sprout, grupo: "propiedades",
+    director: { name: "Farming", href: "/director/farming" },
+    asesor:   { name: "Farming", href: "/asesor/farming" } },
   { id: "buscador-ia", icon: Search, grupo: "propiedades",
     director: { name: "Buscador IA", href: "/director/consultor" },
     asesor:   { name: "Buscador IA", href: "/asesor/consultor-ia" } },

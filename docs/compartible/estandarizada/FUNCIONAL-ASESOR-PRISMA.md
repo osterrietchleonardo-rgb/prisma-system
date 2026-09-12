@@ -33,6 +33,7 @@
 22. [Personalizaciones de tu agencia](#22-personalizaciones-de-tu-agencia)
 23. [El Mapa del Buscador IA](#23-el-mapa-del-buscador-ia)
 24. [Cuando un cliente queda esperando: los avisos y tus botones](#24-cuando-un-cliente-queda-esperando-los-avisos-y-tus-botones)
+25. [Farming: tu zona](#25-farming-tu-zona)
 
 ---
 
@@ -925,3 +926,30 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 
 > 💡 **Tip:** el seguimiento automático a los clientes que se enfriaron lo hace PRISMA solo, con mensajes naturales y como mucho tres veces; vos vas a ver en la ficha qué decidió y por qué. Lo tuyo son los clientes que **te esperan a vos**.
 
+
+---
+
+## 25. Farming: tu zona
+
+**Qué es:** tu territorio de farming — las cuadras que vas a trabajar casa por casa para captar propiedades. En PRISMA es una zona dibujada a mano sobre el mapa, que es **tuya**: ningún otro asesor de la inmobiliaria puede dibujar encima.
+
+**Dónde está:** en el menú, dentro de **Propiedades → Farming**.
+
+**Cómo dibujarla (dos caminos):**
+- **Desde Farming:** apretá **"dibujar una zona nueva"**, tocá el lápiz, y dibujá el contorno sin soltar. Ponele nombre y **Guardar**.
+- **Desde el Buscador IA:** si ya tenés una zona guardada en el mapa del Buscador, al lado de su nombre hay un botón con una **hojita** ("usar para farming"). Te copia el dibujo a Farming; la zona del Buscador queda como estaba.
+
+**Las zonas grises son de tus colegas.** Mientras dibujás las ves con el nombre y de quién son, para que no las pises. Si igual tu trazo se mete en una, PRISMA **no lo guarda**: te marca en rojo el pedazo que choca y te dice de quién es. Tu dibujo no se borra — corré el trazo y volvé a guardar.
+
+**Si te faltó una manzana o te pasaste:**
+- **"sumar un pedazo"**: dibujás un trazo más y se suma a la zona (una zona puede tener varios pedazos).
+- **"redibujar"**: el trazo nuevo reemplaza al anterior.
+
+**Compartir la zona:** con **"compartir"** elegís a un colega del desplegable. A él le aparece en su Farming como "zona que comparten conmigo" y la trabajan juntos. Vos seguís siendo el dueño: solo vos podés borrarla o sacar a alguien.
+
+**Borrar:** con **"borrar"**. Ojo: esas cuadras quedan libres para que otro las dibuje.
+
+**Los topes:** hasta **3 zonas** activas por asesor y **5 km²** por zona (sumando sus pedazos). Farming es para trabajar una zona concreta, no para dispersarse.
+
+> 💡 Si el director **libera** una zona tuya (por ejemplo, porque cambiaste de territorio), desaparece de tu lista y esas cuadras vuelven a estar disponibles. No se pierde nada: queda en el historial.
+> 🔜 Las solapas **"Relevamiento"** (el tablero de direcciones que vas trabajando) y **"A la venta en mi zona"** (los avisos publicados adentro de tu zona) llegan en las próximas etapas.

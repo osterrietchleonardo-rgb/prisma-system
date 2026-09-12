@@ -11,6 +11,7 @@ import { CONTRATOS_IA_AGENCIA_DESHABILITADA } from "@/lib/access/contratos-ia"
  * "Marketing IA" pasaron a ser páginas propias, en dos grupos nuevos: «Difusión»
  * y «Marketing IA» (que reemplaza a «Herramientas IA»). «Contratos IA» quedó solo
  * en «Documentación». Cada rol ve como páginas exactamente las solapas que veía.
+ * El 12/9/2026 se sumó «Farming» (spec 2026-09-11) en Propiedades para los dos roles.
  */
 const DIRECTOR = [
   { name: "Dashboard",              href: "/director/dashboard" },
@@ -24,6 +25,7 @@ const DIRECTOR = [
   { name: "Campañas",               href: "/director/difusion/campanas" },
   { name: "Configuración IA",       href: "/director/difusion/configuracion-ia" },
   { name: "Propiedades",            href: "/director/propiedades" },
+  { name: "Farming",                href: "/director/farming" },
   { name: "Buscador IA",            href: "/director/consultor" },
   { name: "ACM",                    href: "/director/acm" },
   { name: "Pulso de Mercado",       href: "/director/mercado" },
@@ -56,6 +58,7 @@ const ASESOR = [
   { name: "Leads WhatsApp",         href: "/asesor/leads-whatsapp" },
   { name: "Contactos",              href: "/asesor/difusion/contactos" },
   { name: "Mis Propiedades",        href: "/asesor/propiedades" },
+  { name: "Farming",                href: "/asesor/farming" },
   { name: "Buscador IA",            href: "/asesor/consultor-ia" },
   { name: "ACM",                    href: "/asesor/acm" },
   { name: "Pulso de Mercado",       href: "/asesor/mercado" },
@@ -87,9 +90,9 @@ describe("las páginas del menú, por nombre y dirección", () => {
     expect(ahora).toEqual(esperados.map(clave).sort())
   })
 
-  it("director: 29 renglones; asesor: 23", () => {
-    expect(planos("director")).toHaveLength(29)
-    expect(planos("asesor")).toHaveLength(23)
+  it("director: 30 renglones; asesor: 24", () => {
+    expect(planos("director")).toHaveLength(30)
+    expect(planos("asesor")).toHaveLength(24)
   })
 
   it("las direcciones viejas de las páginas con solapas ya no son renglones (redirigen)", () => {
@@ -137,7 +140,7 @@ describe("grupos", () => {
     const porGrupo = Object.fromEntries(menuPara("director").map((g) => [g.id, g.items.map((it) => it.name)]))
     expect(porGrupo["contactos"]).toEqual(["Pipeline", "Leads Tokko", "Leads WhatsApp"])
     expect(porGrupo["difusion"]).toEqual(["Contactos", "Plantillas", "Campañas", "Configuración IA"])
-    expect(porGrupo["propiedades"]).toEqual(["Propiedades", "Buscador IA", "ACM", "Pulso de Mercado"])
+    expect(porGrupo["propiedades"]).toEqual(["Propiedades", "Farming", "Buscador IA", "ACM", "Pulso de Mercado"])
     expect(porGrupo["marketing-ia"]).toEqual([
       "Crear Anuncio", "HomeStaging", "Clientes Ideales (IPC)", "Mi ADN", "Historial / Galería", "Guía Mágica", "Configuración IA",
     ])
