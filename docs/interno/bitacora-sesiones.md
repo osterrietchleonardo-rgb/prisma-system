@@ -16,6 +16,73 @@
 
 ---
 
+## 2026-09-12 — Farming, etapa 1: el territorio (zonas exclusivas, compartir, liberar)
+
+**Qué se construyó** (rama `farming-zonas`, 18 commits, spec `2026-09-11-farming-zonas-design.md`,
+plan `2026-09-12-farming-etapa1-territorio.md`)
+
+- Tablas `farming_zonas` y `farming_zonas_compartidas` con RLS por agencia, **aplicadas en
+  producción el 12-sep** por Management API. Nada existente se tocó.
+- `lib/farming/geometria.ts`: validar el dibujo, km², sumar pedazos (`Polygon`/`MultiPolygon`),
+  y el control de choque con Turf (umbral: >100 m² o >1% de la zona más chica).
+- Endpoints `/api/farming/zonas` (GET/POST), `[id]` (PATCH redibujar/sumar/renombrar, DELETE),
+  `[id]/compartir`, `[id]/liberar`. Helpers compartidos en `lib/farming/servidor.ts`.
+- Renglón «Farming» en Propiedades para los dos roles; página del asesor (Mis zonas + mapa con
+  el lápiz del Buscador), botón «usar para farming» en el panel de zonas del Buscador (solo
+  asesor), pantalla del director (mapa + liberar).
+- Tests: 36 nuevos en `lib/farming` + 50 en `app/api/farming` (doble de base en memoria).
+  Suite completa: 1911 vitest + 103 node.
+
+**Decisiones que se tomaron sobre la marcha** (todas en el ledger del plan)
+
+- Un `route.ts` de Next NO puede exportar funciones sueltas (rompe el build): lo compartido
+  va a `lib/farming/servidor.ts`.
+- `booleanValid` de Turf **no detecta un trazo cruzado (un 8)**: se usa `kinks()` antes.
+  Y un trazo que cierra exactamente donde empezó deja dos puntos iguales seguidos que `kinks`
+  marca como cruce: `validarDibujo` limpia consecutivos repetidos.
+- La etiqueta de la zona ajena es **permanente**, no un globito de hover (en el celular no se
+  abre). Al dibujar se ven también las compartidas conmigo y las propias, no solo las ajenas.
+- El motivo de liberar se limpia al cancelar (si no, la siguiente zona lo heredaba).
+
+**Verificación real**
+
+- **Ataque RLS contra producción (12-sep, 2 asesores de prueba):** B no pudo editar, borrar,
+  compartirse ni crear a nombre de A (4 ataques fallan); A sí pudo crear, editar y borrar la
+  suya, y B ve el contorno (5 controles positivos pasan). Limpieza: 0 filas.
+- **Navegador (escritorio 1366×768 claro y oscuro; celular 390×844):** 17 PASS / 1 FAIL en la
+  primera pasada; el FAIL (las compartidas no se veían al dibujar) y tres observaciones se
+  arreglaron en `0eb977d`. En el celular todos los botones miden 44 px, dibujar con el dedo no
+  scrollea, el aviso de choque se lee sin abrir nada. Segunda pasada tras el fix: **8/8 PASS**
+  (la compartida se ve gris con etiqueta al dibujar; la tarjeta refresca sola; título del
+  mapa correcto; cierre exacto del trazo aceptado). Capturas en el workspace del plan.
+
+**Errores propios**
+
+- El envoltorio `scratch/aplicar-sql.mjs` importaba `scripts/sql-produccion.mjs`, que
+  **ejecuta `argv[2]` al cargarse**: mandó la ruta del archivo como SQL. Nada se aplicó
+  (transacción). Reescrito standalone.
+- El plan mandaba tests que no cubrían el 403/404 del DELETE de compartir ni el 404 de liberar:
+  se agregaron en revisión.
+- Un implementador se cortó por el límite de sesión de la API a mitad de la Task 11; los
+  archivos quedaron en disco y un segundo los verificó byte a byte contra el brief.
+
+**Usuarios de prueba creados en PRISMAIA - VAKDOR** (con OK): `prueba-farming-a@`,
+`prueba-farming-b@` y `prueba-farming-director@vakdor.com`. Credenciales solo en `scratch/`.
+Queda en producción una zona «Belgrano R» en estado `liberada` (de la prueba). **Pendiente:**
+preguntarle a Leonardo si los tres usuarios y esa fila se quedan o se borran.
+
+**Quedó pendiente**
+
+- Etapa 2 («A la venta en mi zona»: `farming_avisos_marca` + función PostGIS medida con
+  `EXPLAIN ANALYZE`) y etapa 3 (el tablero y la caminata: `farming_direcciones`,
+  `farming_propietarios`, `farming_contactos`; los comentarios `// ETAPA 3:` dicen dónde).
+- Minors diferidos en el ledger (`.superpowers/sdd/2026-09-12-farming-etapa1-territorio/
+  progress.md`): la línea «La trabajan…» nombra al propio usuario en las compartidas conmigo;
+  botones icon-only chicos en el panel del Buscador (patrón preexistente).
+- Merge a `main`: con el OK de Leonardo.
+
+---
+
 ## 2026-09-08 — Primera zona de GBA: terrenos de Don Torcuato (y el bug de ubicación que destapó)
 
 **Qué pidió Leonardo:** ver si había terrenos en ZonaProp en Don Torcuato y Monte Grande, y

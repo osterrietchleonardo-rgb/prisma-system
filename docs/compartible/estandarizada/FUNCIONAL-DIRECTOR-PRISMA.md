@@ -38,6 +38,7 @@
 27. [El Mapa del Buscador IA](#27-el-mapa-del-buscador-ia)
 28. [Aprobaciones (pedidos de tu equipo)](#28-aprobaciones-pedidos-de-tu-equipo)
 29. [El agente de seguimiento y los avisos que te llegan](#29-el-agente-de-seguimiento-y-los-avisos-que-te-llegan)
+30. [Farming: el reparto del territorio](#30-farming-el-reparto-del-territorio)
 
 ---
 
@@ -1131,3 +1132,18 @@ está **"Agregar una nota"**. Las notas las ven solo los directores; el asesor y
 
 > 💡 **Tip:** para que los avisos por WhatsApp le lleguen a tu equipo, cargá los celulares de los asesores desde **Asesores**. Mientras no estén, reciben todo por email igual.
 
+
+---
+
+## 30. Farming: el reparto del territorio
+
+**Qué es:** cada asesor dibuja en el mapa su **zona de farming** — las cuadras que trabaja casa por casa para captar. Las zonas son exclusivas: nadie puede dibujar encima de la de un colega, y el que la dibuja primero se la queda. Vos no dibujás ni asignás: **ves el reparto y, si hace falta, liberás**.
+
+**Dónde está:** en el menú, dentro de **Propiedades → Farming**.
+
+**Qué muestra:** el mapa de la inmobiliaria con todas las zonas y de quién es cada una, y abajo la lista agrupada por asesor: nombre de la zona, km², cuántos pedazos tiene y con quién la comparte.
+
+**Liberar una zona:** el botón **"liberar"** pide un motivo (queda en el historial). **No se borra nada:** la zona deja de bloquear esas cuadras, que vuelven a estar disponibles para que otro asesor las dibuje. Usalo cuando un asesor se va, se pausa o cambia de territorio; si no, sus cuadras quedarían trabadas para siempre.
+
+> 💡 Cada asesor puede tener hasta **3 zonas** de **5 km²** cada una. Si alguien reclama de más, liberar es tu herramienta.
+> 🔜 El tablero de relevamiento y la lista de avisos a la venta dentro de cada zona llegan en las próximas etapas.
