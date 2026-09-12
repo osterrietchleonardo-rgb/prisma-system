@@ -936,7 +936,7 @@ Si no querés la hoja, destildá la casilla y la ficha sale como siempre.
 **Dónde está:** en el menú, dentro de **Propiedades → Farming**.
 
 **Cómo dibujarla (dos caminos):**
-- **Desde Farming:** apretá **"dibujar una zona nueva"**, tocá el lápiz, y dibujá el contorno sin soltar. Ponele nombre y **Guardar**.
+- **Desde Farming:** apretá **"dibujar una zona nueva"**. El mapa abre para **mover** (con el dedo o el mouse lo arrastrás, sin dibujar). Buscá tu zona con la **lupita** de arriba —un barrio, una zona que ya guardaste o una dirección— o llegá arrastrando. Recién ahí tocá el **lápiz** y dibujá el contorno sin soltar. Al soltar, el lápiz se apaga solo y aparece un cuadro para ponerle **nombre** y **"Guardar como zona de farming"**. Si tocás "Seguir editando", el trazo queda en pantalla y lo guardás después con el botón **"Guardar"** de arriba.
 - **Desde el Buscador IA:** si ya tenés una zona guardada en el mapa del Buscador, al lado de su nombre hay un botón con una **hojita** ("usar para farming"). Te copia el dibujo a Farming; la zona del Buscador queda como estaba.
 
 **Las zonas grises son de tus colegas.** Mientras dibujás las ves con el nombre y de quién son, para que no las pises. Si igual tu trazo se mete en una, PRISMA **no lo guarda**: te marca en rojo el pedazo que choca y te dice de quién es. Tu dibujo no se borra — corré el trazo y volvé a guardar.

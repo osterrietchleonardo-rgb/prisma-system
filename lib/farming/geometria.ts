@@ -196,3 +196,15 @@ export function bboxDeDibujo(d: Dibujo): BBox | null {
   if (!Number.isFinite(sur) || !Number.isFinite(oeste)) return null
   return { sur, oeste, norte, este }
 }
+
+/** Rectángulo que encierra varios rectángulos (las zonas de todo el equipo). Null si no hay ninguno. */
+export function unirBBoxes(cajas: (BBox | null)[]): BBox | null {
+  const validas = cajas.filter((b): b is BBox => b !== null)
+  if (validas.length === 0) return null
+  return {
+    sur: Math.min(...validas.map((b) => b.sur)),
+    norte: Math.max(...validas.map((b) => b.norte)),
+    oeste: Math.min(...validas.map((b) => b.oeste)),
+    este: Math.max(...validas.map((b) => b.este)),
+  }
+}

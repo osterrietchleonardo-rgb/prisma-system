@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
-  validarDibujo, areaKm2, contarPedazos, sumarPedazo, choquesContra, bboxDeDibujo,
+  validarDibujo, areaKm2, contarPedazos, sumarPedazo, choquesContra, bboxDeDibujo, unirBBoxes,
   MAX_VERTICES, MAX_KM2, MAX_ZONAS_ACTIVAS, MIN_M2_CHOQUE,
   type Dibujo,
 } from "./geometria"
@@ -185,5 +185,20 @@ describe("bboxDeDibujo", () => {
     expect(b.este).toBeCloseTo(LNG + 0.06, 5)
     expect(b.sur).toBeCloseTo(LAT, 5)
     expect(b.norte).toBeCloseTo(LAT + 0.01, 5)
+  })
+})
+
+describe("unirBBoxes", () => {
+  it("abarca todas las zonas del equipo y saltea las nulas", () => {
+    const b = unirBBoxes([bboxDeDibujo(cuadrado(LNG, LAT)), null, bboxDeDibujo(cuadrado(LNG + 0.05, LAT + 0.02))])!
+    expect(b.oeste).toBeCloseTo(LNG, 5)
+    expect(b.este).toBeCloseTo(LNG + 0.06, 5)
+    expect(b.sur).toBeCloseTo(LAT, 5)
+    expect(b.norte).toBeCloseTo(LAT + 0.03, 5)
+  })
+
+  it("sin ninguna zona devuelve null", () => {
+    expect(unirBBoxes([])).toBeNull()
+    expect(unirBBoxes([null])).toBeNull()
   })
 })

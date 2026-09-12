@@ -1169,7 +1169,9 @@ está **"Agregar una nota"**. Las notas las ven solo los directores; el asesor y
 
 **Dónde está:** en el menú, dentro de **Propiedades → Farming**.
 
-**Qué muestra:** el mapa de la inmobiliaria con todas las zonas y de quién es cada una, y abajo la lista agrupada por asesor: nombre de la zona, km², cuántos pedazos tiene y con quién la comparte.
+**Qué muestra:** el mapa de la inmobiliaria con todas las zonas, **cada asesor con su color** (el mismo color marca su nombre en la lista), y abajo la lista agrupada por asesor: nombre de la zona, km², cuántos pedazos tiene y con quién la comparte. El mapa abre mostrando todas las zonas del equipo, y tiene la **lupita** para ir a un barrio o una dirección.
+
+**Ver una zona en el mapa:** tocá la zona en la lista. El mapa te lleva hasta ella y la marca con el borde más grueso; la fila queda "marcada en el mapa". En el celular la pantalla sube sola hasta el mapa.
 
 **Liberar una zona:** el botón **"liberar"** pide un motivo (queda en el historial). **No se borra nada:** la zona deja de bloquear esas cuadras, que vuelven a estar disponibles para que otro asesor las dibuje. Usalo cuando un asesor se va, se pausa o cambia de territorio; si no, sus cuadras quedarían trabadas para siempre.
 
