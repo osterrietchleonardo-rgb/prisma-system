@@ -57,6 +57,317 @@ termómetro: si `n < --max`, ayer entró completo.
 US$0.001). Con el refresco mensual (~US$65) el régimen real de Apify es **~US$111/mes**
 contra un tope de cuenta de US$100. Hay que subirlo a US$150 o el 3-oct el refresco choca.
 
+## 2026-09-12 — Farming: el mapa arranca con la manito, lupita, y el director ve cada asesor en su color
+
+**Qué pidió Leonardo:** (1) una lupita en el mapa de Farming para ir a un barrio, zona o dirección;
+(2) que el mapa NO arranque con el lápiz —arrastrar para llegar dibujaba—, sino con la manito, y al
+terminar el trazo preguntar nombre y "guardar como zona farming"; (3) en la pantalla del director,
+ver marcadas las zonas de cada asesor y que tocar una de la lista lleve el mapa hasta ella.
+
+**Qué se hizo** (rama `farming-mapa-ux`, un solo archivo de lógica nueva)
+
+- `mapa-farming.tsx`: el lápiz arranca apagado; la lupita es el mismo `MapaBuscador` del Buscador
+  IA (barrios, zonas guardadas, direcciones de MapTiler; la dirección clava el pin rojo); al soltar
+  el trazo el lápiz se apaga solo y se abre un cuadro (nueva: nombre + «Guardar como zona de
+  farming»; redibujar/sumar: la pregunta, sin nombre). «Seguir editando» deja el trazo y un botón
+  «Guardar» para reabrirlo. Un 409 cierra el cuadro para que se vea lo rayado.
+- Director: `lib/farming/colores.ts` (un color por asesor, sin el rojo del choque ni el verde de la
+  zona propia), `unirBBoxes` para abrir el mapa sobre todo el equipo, clic en la fila → el mapa
+  vuela, la zona se resalta (borde grueso), el título dice cuál es, y en el celular la pantalla
+  sube sola hasta el mapa.
+- Tests: `colores.test.ts` (4) y `unirBBoxes` (2), vistos fallar antes. Farming: 83 tests, 0 errores
+  de tipos, lint limpio.
+
+**Lo que encontró el navegador y se corrigió en la misma rama**
+
+- **En el celular, el globito del chat tapaba la indicación y el botón «Guardar»**, que estaban
+  abajo a la derecha. Todo lo que se lee o se toca pasó arriba (lápiz en la fila del título,
+  indicación y botones debajo). Medido a 390×844: nada se pisa con el globito (768 px) ni con el
+  «Volver» de Leaflet.
+- **La X de cerrar el mapa medía 32 px de ancho** (44 de alto por la regla global): pasó a 44×44.
+
+**Verificación real** (usuarios de prueba de PRISMAIA - VAKDOR, escritorio y celular)
+
+- Arrastrar con la manito no dibuja; con el lápiz, `touch-action: none` y el dedo no mueve la
+  página (scroll 0 → 0). Lupita «Belgrano» → el mapa vuela (zoom 13 → 14). Crear, cancelar,
+  reabrir y guardar con Enter; sumar un pedazo → la tarjeta pasa a «2 pedazos» al instante.
+- Director: tres zonas en tres colores; clic en «Palermo (prueba B)» → zoom 16, resaltada, fila
+  «marcada en el mapa».
+- Contraste: director claro 5,68 / 18,26 / 5,49; oscuro 5,84 / 13,98 / 6,96; asesor claro 17,72.
+
+**Trampas de método**
+
+- **`Map container is already initialized`**: al editar `mapa-farming.tsx` con el dev server
+  andando, el recargado en caliente vuelve a montar el `MapContainer` de react-leaflet sobre el
+  mismo `div` y la pantalla cae en «Algo salió mal». Es solo de desarrollo: recargando limpio no
+  vuelve. No confundirlo con un bug.
+- Los eventos táctiles sintéticos del script de prueba disparan `setPointerCapture … No active
+  pointer` (el dedo "no existe" para el navegador) y cuatro `400` del panel de errores de Next
+  buscando el código del script. Ninguno viene de la app.
+
+**Hallazgo, no tocado:** la X del cuadro (componente global `Dialog`) mide 16 px de ancho en el
+celular. Es de toda la app.
+
+Las dos zonas de prueba de esta verificación se borraron; quedan los tres usuarios de prueba.
+
+---
+
+## 2026-09-12 — Farming, etapa 1: el territorio (zonas exclusivas, compartir, liberar)
+
+**Qué se construyó** (rama `farming-zonas`, 21 commits, spec `2026-09-11-farming-zonas-design.md`,
+plan `2026-09-12-farming-etapa1-territorio.md`)
+
+- Tablas `farming_zonas` y `farming_zonas_compartidas` con RLS por agencia, **aplicadas en
+  producción el 12-sep** por Management API. Nada existente se tocó.
+- `lib/farming/geometria.ts`: validar el dibujo, km², sumar pedazos (`Polygon`/`MultiPolygon`),
+  y el control de choque con Turf (umbral: >100 m² o >1% de la zona más chica).
+- Endpoints `/api/farming/zonas` (GET/POST), `[id]` (PATCH redibujar/sumar/renombrar, DELETE),
+  `[id]/compartir`, `[id]/liberar`. Helpers compartidos en `lib/farming/servidor.ts`.
+- Renglón «Farming» en Propiedades para los dos roles; página del asesor (Mis zonas + mapa con
+  el lápiz del Buscador), botón «usar para farming» en el panel de zonas del Buscador (solo
+  asesor), pantalla del director (mapa + liberar).
+- Tests: 36 en `lib/farming` + 38 en `app/api/farming` (74) (doble de base en memoria).
+  Suite completa: 1911 vitest + 103 node.
+
+**Decisiones que se tomaron sobre la marcha** (todas en el ledger del plan)
+
+- Un `route.ts` de Next NO puede exportar funciones sueltas (rompe el build): lo compartido
+  va a `lib/farming/servidor.ts`.
+- `booleanValid` de Turf **no detecta un trazo cruzado (un 8)**: se usa `kinks()` antes.
+  Y un trazo que cierra exactamente donde empezó deja dos puntos iguales seguidos que `kinks`
+  marca como cruce: `validarDibujo` limpia consecutivos repetidos.
+- La etiqueta de la zona ajena es **permanente**, no un globito de hover (en el celular no se
+  abre). Al dibujar se ven también las compartidas conmigo y las propias, no solo las ajenas.
+- El motivo de liberar se limpia al cancelar (si no, la siguiente zona lo heredaba).
+
+**Verificación real**
+
+- **Ataque RLS contra producción (12-sep, 2 asesores de prueba):** B no pudo editar, borrar,
+  compartirse ni crear a nombre de A (4 ataques fallan); A sí pudo crear, editar y borrar la
+  suya, y B ve el contorno (5 controles positivos pasan). Limpieza: 0 filas. **Revisión final:** los usuarios tenían permiso de escribir directo en las dos
+  tablas por PostgREST (default de Supabase). Migración `20260912130000` aplicada el 12-sep:
+  se revoca insert/update/delete a `authenticated`/`anon`. Ataque versionado en
+  `scripts/farming-rls-ataque.mjs`: **7 de 7 ataques fallan** (incluido cambiarse el
+  `agency_id` y reescribir el `geojson`), controles positivos pasan, la fila no cambió.
+- **Navegador (escritorio 1366×768 claro y oscuro; celular 390×844):** 17 PASS / 1 FAIL en la
+  primera pasada; el FAIL (las compartidas no se veían al dibujar) y tres observaciones se
+  arreglaron en `0eb977d`. En el celular todos los botones miden 44 px, dibujar con el dedo no
+  scrollea, el aviso de choque se lee sin abrir nada. Segunda pasada tras el fix: **8/8 PASS**
+  (la compartida se ve gris con etiqueta al dibujar; la tarjeta refresca sola; título del
+  mapa correcto; cierre exacto del trazo aceptado). Capturas en el workspace del plan.
+
+**Errores propios**
+
+- El envoltorio `scratch/aplicar-sql.mjs` importaba `scripts/sql-produccion.mjs`, que
+  **ejecuta `argv[2]` al cargarse**: mandó la ruta del archivo como SQL. Nada se aplicó
+  (transacción). Reescrito standalone.
+- El plan mandaba tests que no cubrían el 403/404 del DELETE de compartir ni el 404 de liberar:
+  se agregaron en revisión.
+- Un implementador se cortó por el límite de sesión de la API a mitad de la Task 11; los
+  archivos quedaron en disco y un segundo los verificó byte a byte contra el brief.
+
+**Usuarios de prueba creados en PRISMAIA - VAKDOR** (con OK): `prueba-farming-a@`,
+`prueba-farming-b@` y `prueba-farming-director@vakdor.com`. Credenciales solo en `scratch/`.
+Queda en producción una zona «Belgrano R» en estado `liberada` (de la prueba). **Pendiente:**
+preguntarle a Leonardo si los tres usuarios y esa fila se quedan o se borran.
+
+**Quedó pendiente**
+
+- Etapa 2 («A la venta en mi zona»: `farming_avisos_marca` + función PostGIS medida con
+  `EXPLAIN ANALYZE`) y etapa 3 (el tablero y la caminata: `farming_direcciones`,
+  `farming_propietarios`, `farming_contactos`; los comentarios `// ETAPA 3:` dicen dónde).
+- Minors diferidos en el ledger (`.superpowers/sdd/2026-09-12-farming-etapa1-territorio/
+  progress.md`): la línea «La trabajan…» nombra al propio usuario en las compartidas conmigo;
+  botones icon-only chicos en el panel del Buscador (patrón preexistente).
+- Merge a `main`: con el OK de Leonardo.
+## 2026-09-12 — Las solapas de WhatsApp y de Marketing IA pasan a ser páginas del menú
+
+**Qué pidió Leonardo:** (1) un grupo nuevo «Difusión» con Contactos, Plantillas, Campañas y
+Configuración IA (las solapas de Asesor IA WhatsApp); (2) «Marketing IA» reemplaza a
+«Herramientas IA» con las 7 solapas como páginas, y «Fotos» pasa a llamarse «HomeStaging»;
+(3) Contratos IA en un grupo propio («Documentación», nombre mío). Cada rol ve como páginas
+exactamente las solapas que veía; si un rol no tenía ninguna, no ve el grupo. Y la agencia con
+Contratos IA desactivado (Central) directamente no lo ve en la barra, ni al grupo.
+Antes se le mostró un artifact con la barra propuesta y un análisis de factibilidad con el dato
+al lado (los 4 lugares donde las solapas se hablaban entre sí).
+
+**Qué se hizo** (rama `feat/menu-difusion-marketing-paginas`, worktree `.claude/worktrees/menu-difusion`,
+desde `origin/main` 1b4d2a5):
+
+- `lib/nav/menu.ts`: 9 grupos; `menuPara(rol, { agencyId })` filtra Contratos IA para la agencia
+  desactivada y tira el grupo vacío. El renglón gris "Deshabilitada" de la barra se fue.
+  `menu.test.ts` reescrito con la lista completa (29 renglones director, 23 asesor).
+- Rutas nuevas: `/{rol}/difusion/*` y `/{rol}/marketing-ia/*`. Difusión NO cuelga de
+  `/asesor-ia-whatsapp` porque `esRutaActiva` toma subrutas y quedarían dos renglones en cobre.
+  Los componentes de cada solapa no se tocaron: cada página es un envoltorio.
+- Saltos entre solapas → navegaciones: Contactos→Campañas escucha `CampaignState.setActiveTab`
+  (`components/difusion/PaginaDifusion.tsx`); los de Marketing (`generation-complete` → Historial,
+  `retomar-foto-ia` → HomeStaging) los escucha `navegacion-marketing.tsx` desde el layout.
+- Dirección vieja `/marketing-ia` → redirect en `next.config.mjs`. Con `redirect()` en un
+  page.tsx saltaba "Rendered more hooks" del router de Next en dev; con el config, no.
+- Títulos del header en `lib/nav/titulos.ts` (compartido por los dos headers). Guías FUNCIONAL
+  de director y asesor actualizadas. `WhatsAppTabsWrapper.tsx` borrado.
+- Probado en el navegador en :3021 (Playwright): 13 rutas del director, 7 del asesor (con un
+  asesor descartable creado y borrado por Admin API), los 3 saltos, la redirección, celular 390px.
+  tsc limpio; 1993 tests (+8).
+
+**Cambio de comportamiento que sí existe:** el borrador de campaña a medio armar ya no sobrevive si
+vas a Contactos y volvés (antes las solapas quedaban montadas). Los contactos elegidos sí viajan.
+**Al mergear con `farming-zonas`:** las dos ramas tocan `menu.ts` y `menu.test.ts` (Farming en
+Propiedades); conflicto chico y esperable.
+
+**Quedó pendiente:** el OK de Leonardo en el navegador → commit → merge. El dev del 3021 queda levantado.
+
+---
+
+## 2026-09-11 — Los audios de los clientes no se podían escuchar (nunca se pudo)
+
+**Qué pidió Leonardo:** resolver la sugerencia de cbgonzalez (Central, 10/9): "los clientes mandan
+audios y no se puede escuchar". Captura de iPhone: el reproductor decía "Error" (chat Fabian Palilla).
+
+**Dos causas, las dos necesarias**
+
+- **La app nunca bajaba el archivo.** Meta manda un `media_id`, no el archivo; el webhook lo guardaba
+  en `metadata` y listo. El chat, sin `media_url`, usaba el `content` ("Mensaje de voz recibido")
+  como `src`. Medido: **168 audios y 29 fotos** de clientes (2/7 al 10/9), **ninguno** abrible.
+- **El CSP no tenía `media-src`** → caía en `default-src 'self'` y el navegador bloqueaba todo
+  audio/video de Supabase. Solo se vio en el navegador (consola), no con curl.
+- Meta borra el archivo a los **7 días** (doc oficial) → un proxy "al vuelo" no servía; hay que
+  guardarlo al llegar.
+
+**Qué se hizo**
+
+- Rescate con OK: los **14** que Meta todavía tenía (12 audios, 2 fotos) bajados y subidos a
+  `documents/wa-inbound/...`, link en `metadata.media_url`. Verificado por sha256 contra Meta. Los
+  otros 183 ya no existen.
+- Rama `fix/audios-de-clientes`: descarga al llegar (`lib/whatsapp/adjuntos-entrantes.ts`), `media-src`
+  en el CSP, aviso "ya no se puede escuchar… 7 días" en los viejos, "Descargar audio" (iOS < 18.4
+  no reproduce ogg/opus), reproductor de ancho fijo (con `w-full` quedaba sin barra). Tests del
+  webhook: verificado que fallan con el bug reintroducido.
+- Probado en el navegador (escritorio + celular emulado) con mensajes simulados por `page.route`
+  en el chat "Leo" de PRISMAIA: el audio carga, 23 s, play avanza. **No probado en iPhone real.**
+
+**Quedó pendiente:** confirmar con la asesora en su iPhone; responder la sugerencia en el admin.
+El bot no cambió: n8n ya bajaba y transcribía el audio por su cuenta (sección 9.1.2 del técnico).
+
+---
+
+## 2026-09-10 — La queja de Carmen: las notas cortas ahora cuentan, y si no alcanzan se le dice
+
+**Qué pasó:** Carmen (Central) dejó en Sugerencias: "Ya dejé en notas que estoy en comunicación
+y me siguen llegando mails con demora en respuesta". Caso Paola: nota «Ya hablé» 12:54, la IA la
+rechazó 13:03 por "ambigua" (y por no tener la visita en el calendario), nivel 5 h con copia a
+Kevin 14:02 pidiéndole "dejá una nota interna". Nadie le avisó que la nota no había alcanzado.
+Medido: en 10 días, 6 de 7 rechazos eran una asesora diciendo que ya lo tenía; Carmen 3 veces,
+2 escaladas a Kevin; la misma frase aceptada a una y rechazada a otra en el mismo minuto.
+
+**Qué se hizo** (rama `fix/notas-cortas-cuentan-como-atendido`, TECNICO §22.12, guía del
+asesor §24):
+- Prompt de notas: una nota corta que afirma contacto cuenta (vive dentro del chat de ese
+  cliente); ambigua es solo la que no habla de contacto; la falta de calendario/tracking nunca
+  baja atendido, solo pide registro.
+- Aviso nuevo "leímos tu nota, pero los avisos siguen" cuando igual queda rechazada: cita la
+  nota, el motivo y qué escribir. Una vez por nota. Misma plantilla neutra.
+- Prueba con las 8 notas reales (7 rechazadas + Silvina que debe seguir rechazada): prompt
+  viejo 5 de 7 mal; nuevo 8 de 8 bien. Suite: 251 verdes.
+
+**Errores de la sesión:** (1) la prueba se autoenvenenaba: el chat de hoy tiene notas
+posteriores y la IA las leía; se corta el chat en la hora de la nota. (2) Escribir `"\n"`
+dentro de un heredoc de Bash lo convierte en salto de línea real: los parches en Python van en
+archivo, no inline.
+
+**Qué quedó:** OK de Leonardo para mergear; con OK, borrar el marcador `nota_evaluada` de los
+casos abiertos (Paola, Anita Becker) para que la barrida los relea con el prompt nuevo. La
+sugerencia de Carmen del mismo día (audio de cliente que muestra "Error" y no se escucha) está
+anotada, sin investigar.
+
+---
+
+## 2026-09-10 — Los números del Cierre estaban mal de cinco formas (salió de revisar un Excel)
+
+**De dónde salió:** Kevin (Central) armó un Excel con los cierres del año para que Leonardo los
+cargue, y pidió que lo revisáramos "para no hacer todo al pedo". Revisarlo destapó que el
+dashboard venía dando números equivocados. Nadie pidió arreglar nada de eso: apareció.
+
+**Lo que se descubrió antes de construir:**
+- La tabla `performance_logs` **no está en el repo**: existe solo en producción. Auditar contra
+  el repo no alcanza (ver `supabase/schema.sql`, no la tiene).
+- `performance_logs` **no tiene política de UPDATE**. `updatePerformanceLog` escribe con el
+  cliente admin y usa el SELECT de la RLS como control de permisos. Patrón a copiar.
+- Central tenía **un solo cierre** cargado (Carolina Grossi, 23/1) y ya estaba en el Excel de
+  Kevin → duplicado esperando. El Excel se retipeó a mano, no salió del sistema.
+- Un asesor ve SOLO lo suyo: sus propiedades (`getTrackingOptions.ts:26`), sus leads (`:38`) y
+  sus actividades (RLS). Compartimentado a propósito.
+
+**Qué se arregló** (5 merges a main, de `d5548af` a `f96e948`):
+1. `fix/conteo-participacion-alquileres` — la regla de "media operación" estaba escrita 3 veces
+   en `dashboard.ts` y 2 se habían quedado sin locador/locatario: un alquiler de una punta
+   contaba 0,5 en el total de la agencia y 1 en el ranking y el gráfico mensual.
+2. `feat/dashboard-venta-vs-alquiler` — la tarjeta Cierre abre GCI y cierres en Venta/Alquiler.
+   Los históricos sin `proceso` van a una tercera línea "Sin definir"; un test exige que las
+   tres sumen el total.
+3. `fix/etiqueta-honorarios-por-punta` — "Honorarios Totales Cobrados" → **"Honorarios de tu
+   punta"**. Ese "Totales" empujaba a duplicar la facturación. Idea de Leonardo: arreglarlo en
+   la etiqueta sale más barato que en el cálculo, y así el GCI suma bien fila por fila.
+4. `feat/operacion-id` — columna `operacion_id` (migración `20260909160000`, **aplicada**), el
+   volumen cuenta cada operación una vez, y el Honorario Real pasa a ser GCI ÷ volumen. Antes
+   era el promedio simple de los porcentajes. Con los datos de demo: **5,5% → 4,4% → 6,1%**.
+   De paso se fue `honorarioCobrado`, una fórmula a medio hacer que nunca se usó.
+5. `feat/mostrar-volumen-operado` — el volumen se calculaba desde siempre y **no lo pintaba
+   ningún componente**.
+6. `feat/enlazar-operacion-a-ciegas` — al escribir la dirección de un cierre, avisa si otro
+   asesor ya cargó uno ahí. Más la solapa **Operaciones** en la página Equipo, para unir,
+   separar y **deshacer** un enlace mal confirmado (antes no se podía deshacer de ningún modo).
+7. `fix/mensaje-otro-lado-del-negocio` — queja de Matias Di Leo: "necesito el mismo cliente en
+   captación y prebuying". **Se podía desde siempre** (una tarjeta por proceso, botón "Abrir
+   proceso de…" en la ficha). El tablero le decía la regla sin decir la salida. Ahora la dice.
+
+**Decisiones de producto (de Leonardo, no mías):**
+- El aviso al asesor es **a ciegas**: no dice quién ni cuándo cerró el otro. Pero el
+  **desplegable de direcciones sí es de toda la agencia** — "una dirección cerrada dentro de tu
+  agencia no es un secreto", y para verla hay que haber escrito casi toda.
+- Una operación compartida con una inmobiliaria **de afuera** cuenta 0,5 para siempre. Queda
+  así; **hay que avisarle a Kevin antes de que vea el año cargado**, o va a ver menos cierres
+  de los que hizo.
+- El volumen dice **cuánto se vendió**, no "cuánto nos toca". Por eso se deduplica en vez de
+  dividir por la mitad: 6,1% es una tarifa que existió; 7,3% no.
+
+**Lo que costó, medido:**
+- **El matching de direcciones.** Con un aviso a ciegas el asesor no puede detectar un falso
+  positivo, y enlazar mal hace desaparecer una venta del volumen. Las pruebas encontraron dos
+  agujeros que yo no había previsto: "Córdoba 2450 **5B**" vs "**8A**" (compartían el 2450) y
+  "5B" vs "5A" (mismos números, texto casi igual). Reglas finales en `lib/tracking/direcciones.ts`.
+- **Enlazar no controlaba que las puntas tuvieran sentido.** Verificado en producción: un
+  "Ambas puntas" enlazado con un "Solo Vendedor" hacía que UNA operación contara 1,5 negocios.
+  `puedenSerLasDosPuntas()`.
+- **Recordar un "no son la misma" sin tabla nueva:** se le da a cada fila su propia operación.
+  Dejan de estar sueltas, no se vuelven a proponer, y las cuentas no cambian.
+
+**Gotchas nuevos (los tres cuestan horas):**
+- **Los tooltips de Radix NO se abren al tocar en un celular.** Ni hover, ni `pointerdown`+`up`
+  con `pointerType: touch`, ni `click()`. Alcanza a los 16 lugares de la app. Lo que cambia lo
+  que la persona escribe va como línea visible, no en el globito. Anotado en memoria.
+- **El clasificador del modo auto bloquea el DDL** contra producción (`ALTER TABLE`), incluso
+  vía `scripts/sql-produccion.mjs`. Lo corrió Leonardo con `!`. `CREATE INDEX` sí pasó.
+- **`npm install` reemplaza un junction de `node_modules` por una carpeta real.** El worktree
+  `PRISMA-SYSTEM-conteo` quedó con el suyo propio; el principal, intacto y coherente en
+  `d5548af`. El día que se actualice va a necesitar su `npm install` (9 dependencias de tiptap).
+
+**Datos de demo cargados en PRISMAIA** (pedido de Leonardo, NO borrar): 5 cierres con las
+direcciones "DEMO - …", repartidos entre los perfiles ZZ DEMO. Cubren venta y alquiler, una y
+dos puntas, y una operación de dos asesores enlazada. Central **no se tocó en todo el día**.
+
+**Qué quedó pendiente:**
+- **Kevin:** el Excel con las columnas nuevas (Operación Venta/Alquiler, y seis columnas de
+  cliente: nombre/celular/email del que vende y del que compra). Y sin responder: si el
+  porcentaje de honorarios que cargaron es el de su punta o el total de la operación.
+- **Los globitos del celular.** Leonardo dijo "para otro momento". Es un solo archivo
+  (`components/ui/tooltip.tsx`); lo caro es verificar los 16 lugares que lo usan.
+- **La carga del año de Central**, cuando vuelva el Excel. El informe de filas problemáticas va
+  ANTES de escribir nada.
+
+---
+
 ## 2026-09-09 — Documentos para clientes: la plantilla se arma una vez y cada asesor la comparte con sus datos
 
 **Qué pidió Leonardo:** "cranear una solución para este apartado de plantillas que se suben

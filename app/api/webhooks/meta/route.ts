@@ -5,6 +5,7 @@ import { triggerN8nWithSafetyNet } from '@/lib/whatsapp/n8nTrigger'
 import { buscarInterno, procesarMensajeInterno, crearEnviadorTexto } from '@/lib/whatsapp/gate-internos'
 import { actualizarEstadoEntrega } from '@/lib/whatsapp/delivery-status'
 import { buscarOCrearConversacion } from '@/lib/whatsapp/conversations'
+import { guardarAdjuntoEntrante } from '@/lib/whatsapp/adjuntos-entrantes'
 
 // El disparo a n8n hace hasta 3 intentos (timeout 15s c/u). Subimos el límite de
 // la función para que Vercel no la mate antes de terminar los reintentos.
@@ -44,6 +45,9 @@ export async function POST(req: Request) {
 
     // Recorrer el batch de cambios
     const n8nTriggers: Promise<any>[] = []
+    // Descargas de adjuntos: corren en paralelo con n8n y se esperan antes de responder
+    // (si respondemos antes, Vercel corta la función y el archivo no se guarda).
+    const adjuntosPendientes: Promise<void>[] = []
 
     // FALLO DE BASE (26/8/2026): si Supabase no responde, este webhook devolvía 200 igual
     // (la instancia "no se encontraba") y Meta daba el mensaje por entregado: se perdía en
@@ -93,7 +97,7 @@ export async function POST(req: Request) {
              // Buscar la instancia por phone_number_id
              const { data: instance, error: errInstance } = await supabase
                  .from('whatsapp_instances')
-                 .select('id, agency_id')
+                 .select('id, agency_id, token')
                  .eq('phone_number_id', phoneNumberId)
                  .maybeSingle()
 
@@ -250,6 +254,29 @@ export async function POST(req: Request) {
                     .select('id')
                     .single()
 
+                // Audio/foto/video/documento del cliente: bajarlo de Meta y guardarlo en
+                // Storage ANTES de que Meta lo borre (7 días). Ver lib/whatsapp/adjuntos-entrantes.ts.
+                const adjunto = message[message.type]
+                if (insertedMsg?.id && adjunto?.id && instance.token) {
+                    const mensajeId = insertedMsg.id
+                    adjuntosPendientes.push(
+                        guardarAdjuntoEntrante(supabase, {
+                            token: instance.token,
+                            mediaId: adjunto.id,
+                            mimeDeclarado: adjunto.mime_type,
+                            agencyId: instance.agency_id,
+                            conversationId: conversation_id,
+                        }).then(async (guardado) => {
+                            if (!guardado) return
+                            const { error } = await supabase
+                                .from('wa_messages')
+                                .update({ metadata: { ...message, ...guardado } })
+                                .eq('id', mensajeId)
+                            if (error) console.error('[Meta Webhook] Adjunto guardado pero sin link en el mensaje:', error.message)
+                        })
+                    )
+                }
+
                 // Gatillar n8n si el bot esta activo
                 if (botIsActive) {
                     // Obtener los ultimos 10 mensajes para dar contexto de historial
@@ -359,6 +386,8 @@ export async function POST(req: Request) {
     if (n8nTriggers.length > 0) {
         await Promise.all(n8nTriggers)
     }
+    // allSettled: un adjunto que falla no puede tumbar la respuesta a Meta.
+    await Promise.allSettled(adjuntosPendientes)
 
     if (falloBase) {
         // 503 = "reintentá más tarde". Lo ya procesado en este batch no se duplica: el

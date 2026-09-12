@@ -128,7 +128,7 @@ export function ConfiguracionTab() {
         </div>
 
         <Link
-          href="/director/marketing-ia"
+          href="/director/marketing-ia/configuracion-ia"
           className="inline-block text-xs text-accent hover:underline"
         >
           Ir a Marketing IA → Configuración

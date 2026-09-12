@@ -126,6 +126,7 @@ const CATEGORIA_POR_TIPO: Record<string, CategoriaTraza> = {
   despedida_evaluada: "agente",
   despedida_error: "agente",
   aviso_registro_simulado: "aviso",
+  aviso_nota_simulado: "aviso",
   escalera: "aviso",
   escalera_simulada: "aviso",
   escalamiento_simulado: "aviso",

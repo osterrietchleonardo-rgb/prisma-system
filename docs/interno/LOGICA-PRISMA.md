@@ -271,7 +271,8 @@ Endpoint que los layouts consultan para verificar si la cuenta sigue activa. Ret
 | Leads Tokko | `/director/leads` | Leads importados de Tokko |
 | Asesor IA WhatsApp | `/director/asesor-ia-whatsapp` | Config del bot IA de WhatsApp |
 | Leads WhatsApp | `/director/leads-whatsapp` | Leads capturados via WA |
-| Marketing IA | `/director/marketing-ia` | Generador de copy + imágenes |
+| Difusión (Contactos, Plantillas, Campañas, Configuración IA) | `/director/difusion/*` | Lo de WhatsApp que no es el chat (antes solapas de Asesor IA WhatsApp) |
+| Marketing IA (7 páginas) | `/director/marketing-ia/*` | Generador de copy + imágenes; `/director/marketing-ia` redirige a `crear-anuncio` |
 | Contratos IA | `/director/contratos-ia` | Generador de contratos |
 | Asesores | `/director/asesores` | Gestión de equipo |
 | Documentos | `/director/documentos` | Base de conocimiento |
@@ -1133,7 +1134,7 @@ Los IPC son perfiles estratégicos de marketing que definen:
   - **Captar:** tipo_propietario, motivo_venta, urgencia, preocupaciones, objeción_principal, angulo_marketing, tono, promesa_central, CTA
   - **Vender:** tipo_comprador_ideal, necesidad_concreta, atractivos_propiedad, angulo_copy, mensaje_central, CTA, propiedad_tokko_id (opcional)
 
-> **Estructura de la página:** Marketing IA funciona con pestañas. Director: **Crear Anuncio · Fotos · Clientes Ideales (IPC) · Mi ADN · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/page.tsx`, título "Marketing IA Pro"). Asesor: las mismas salvo **Configuración IA** (6 pestañas, título "Marketing IA Asesor"). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) tiene dos vistas: **Anuncios y copys** (los anuncios agrupados por tanda, con ver/editar/descargar/borrar) y **Fotos retocadas** (`galeria-fotos.tsx`, ver 13.7).
+> **Estructura:** desde el 12/9/2026 Marketing IA es un grupo del menú con una página por lo que antes era una pestaña. Director: **Crear Anuncio · HomeStaging (antes "Fotos") · Clientes Ideales (IPC) · Mi ADN · Historial/Galería · Guía Mágica · Configuración IA** (`app/director/marketing-ia/<pagina>/page.tsx`; el encabezado "Marketing IA Pro" vive en `layout.tsx`). Asesor: las mismas salvo **Configuración IA** (6 páginas, encabezado "Marketing IA Asesor"; su historial se llama "Mis Generaciones", ruta `mis-generaciones`). "Guía Mágica" (`ad-guide.tsx`) es contenido estático de buenas prácticas de Meta Ads (sin backend); "Historial/Galería" (`marketing-history.tsx`) tiene dos vistas: **Anuncios y copys** (los anuncios agrupados por tanda, con ver/editar/descargar/borrar) y **Fotos retocadas** (`galeria-fotos.tsx`, ver 13.7).
 
 ### 13.1.b Mi ADN y la oferta irresistible (fórmula de Hormozi)
 
@@ -2279,8 +2280,8 @@ El Director tiene acceso total a la configuración de la agencia (tenant), estad
   - **Asesores:** Invitar nuevos asesores mediante códigos. Cada tarjeta muestra performance real (Captaciones/Cierres/Cartera/Rotación, de `getDashboardData`) y un panel con el embudo de conversión. La única acción de gestión es **Desvincular asesor** (server action `desvincularAsesor`): pone `estado='eliminado'` + `tokens_invalidos_desde` y bloquea el email en `emails_bloqueados`, dejándolo sin acceso al sistema. Cada tarjeta también permite **clasificar** al asesor como *Client Director* o *Client Support* (`setClasificacionAsesor` → `profiles.clasificacion`, toggle: volver a tocar el botón activo lo deja en NULL = "Asesor"). Es una **etiqueta secundaria de organización interna: no modifica `role` ni `estado`**, así que no cambia permisos, rutas ni lo que ve el asesor.
   - **Configuración:** Token de Tokko, Instancia de WhatsApp, Branding (logo y colores para Marketing IA), y facturación.
 
-#### 6. Herramientas IA (Marketing, Contratos, Tasaciones)
-- **Marketing IA (`/director/marketing-ia`):** Generador de anuncios a partir de perfiles IPC (Ideal Prospect Client) para "Captar" propietarios o "Vender" (atraer compradores). El flujo "Crear Anuncio" genera de una **3 variantes completas (copy + imagen)** con ángulos distintos (no hay "copy simple" en la UI). Las imágenes usan **Nano Banana Pro (Gemini 3 Pro Image)** integrando el branding de la agencia. En el IPC "Vender" se puede vincular una propiedad de Tokko, pero esa función está **reservada a futuro**: hoy el copy no usa sus datos concretos. Ver detalle en §13.
+#### 6. Marketing IA y Contratos IA (grupos «Marketing IA» y «Documentación» del menú; antes «Herramientas IA»)
+- **Marketing IA (`/director/marketing-ia/*`):** Generador de anuncios a partir de perfiles IPC (Ideal Prospect Client) para "Captar" propietarios o "Vender" (atraer compradores). El flujo "Crear Anuncio" genera de una **3 variantes completas (copy + imagen)** con ángulos distintos (no hay "copy simple" en la UI). Las imágenes usan **Nano Banana Pro (Gemini 3 Pro Image)** integrando el branding de la agencia. En el IPC "Vender" se puede vincular una propiedad de Tokko, pero esa función está **reservada a futuro**: hoy el copy no usa sus datos concretos. Ver detalle en §13.
 - **Tasaciones (`/director/tasaciones`):** Asistente MCM (Método Comparativo de Mercado) de 4 pasos, **cálculo client-side** que emite rango mínimo/sugerido/máximo. **No usa IA generativa y NO consume créditos.**
 - **Contratos (`/director/contratos-ia`):** Gestión de plantillas y conversión a contratos formales. La **firma es presencial (papel)** — se quitó la sección de firma virtual. Consume 5 créditos por contrato finalizado.
 

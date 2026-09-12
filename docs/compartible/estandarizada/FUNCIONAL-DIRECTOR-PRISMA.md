@@ -38,6 +38,7 @@
 27. [El Mapa del Buscador IA](#27-el-mapa-del-buscador-ia)
 28. [Aprobaciones (pedidos de tu equipo)](#28-aprobaciones-pedidos-de-tu-equipo)
 29. [El agente de seguimiento y los avisos que te llegan](#29-el-agente-de-seguimiento-y-los-avisos-que-te-llegan)
+30. [Farming: el reparto del territorio](#30-farming-el-reparto-del-territorio)
 
 ---
 
@@ -75,8 +76,10 @@ Antes de operar, dejá lista la base. Andá a **Configuración** (último ítem 
   - **Mi día:** Dashboard, Calendario.
   - **Bandejas:** Asesor IA WhatsApp (las conversaciones que entran).
   - **Contactos:** Pipeline, Leads Tokko, Leads WhatsApp (los listados de gente).
+  - **Difusión:** Contactos, Plantillas, Campañas, Configuración IA (todo lo de WhatsApp que no es el chat: la agenda, las plantillas, los envíos masivos y cómo se comporta el bot).
   - **Propiedades:** Propiedades, Buscador IA, ACM, Pulso de Mercado.
-  - **Herramientas IA:** Marketing IA, Contratos IA.
+  - **Marketing IA:** Crear Anuncio, HomeStaging, Clientes Ideales (IPC), Mi ADN, Historial / Galería, Guía Mágica, Configuración IA.
+  - **Documentación:** Contratos IA. (Si tu agencia no tiene contratado Contratos IA, este grupo directamente no aparece.)
   - **Mi equipo:** Equipo, Asesores, Tracking Performance.
   - **Ayuda:** Tutor IA, Documentos, Sugerencias.
 - Cada grupo se abre y se cierra tocando su título. Podés cerrarlos todos; el grupo de la sección en la que estás queda con el título en color cobre para que no pierdas dónde estás. Al entrar a una sección, su grupo se abre solo. El menú se acuerda de qué grupos dejaste abiertos.
@@ -333,13 +336,15 @@ El resultado de estos objetivos se ve en el **Dashboard**, en la sección "Objet
 ### Si todavía no conectaste WhatsApp
 Vas a ver un **asistente de configuración** que te guía paso a paso para conectar tu WhatsApp. Seguilo y listo.
 
-### Una vez conectado, tenés 5 pestañas:
-- **💬 Chat:** la bandeja de conversaciones en vivo. Podés **filtrar los chats por clasificación** (origen del lead) además de por asesor; cada chat muestra su **etiqueta de clasificación** con un color.
-- **📋 Plantillas:** es un **gestor completo de plantillas de WhatsApp**. Además de las **8 plantillas de seguimiento** que PRISMA prepara (recordatorios de visita, reactivaciones, follow-ups) y de ver su **estado de aprobación**, podés **crear tus propias plantillas** (categoría, idioma, encabezado/cuerpo/pie, botones y variables `{{1}}`), **editarlas, eliminarlas** y **sincronizarlas desde Meta**.
-- **👥 Contactos:** la lista de contactos de WhatsApp (la "agenda" para campañas), con búsqueda, **filtro por clasificación**, **paginación de 100 por página** (soporta miles), selección múltiple e **importación desde CSV/Excel**. Cada contacto tiene **Clasificación** (etiqueta de color) y botón para **eliminarlo**. Al **importar**: escribís una **clasificación para todo el lote**, el sistema **descarta repetidos** (por teléfono) y te avisa cuántos entraron/omitieron.
+### Una vez conectado
+La página **Asesor IA WhatsApp** es la **bandeja**: el chat, y nada más. Lo que antes eran pestañas de esta misma pantalla (Plantillas, Contactos, Campañas y Configuración IA) ahora son **páginas propias**, en el grupo **Difusión** del menú. Funcionan igual; solo cambió desde dónde entrás.
+
+- **💬 Chat (la página Asesor IA WhatsApp):** la bandeja de conversaciones en vivo. Podés **filtrar los chats por clasificación** (origen del lead) además de por asesor; cada chat muestra su **etiqueta de clasificación** con un color.
+- **📋 Plantillas (Difusión → Plantillas):** es un **gestor completo de plantillas de WhatsApp**. Además de las **8 plantillas de seguimiento** que PRISMA prepara (recordatorios de visita, reactivaciones, follow-ups) y de ver su **estado de aprobación**, podés **crear tus propias plantillas** (categoría, idioma, encabezado/cuerpo/pie, botones y variables `{{1}}`), **editarlas, eliminarlas** y **sincronizarlas desde Meta**.
+- **👥 Contactos (Difusión → Contactos):** la lista de contactos de WhatsApp (la "agenda" para campañas), con búsqueda, **filtro por clasificación**, **paginación de 100 por página** (soporta miles), selección múltiple e **importación desde CSV/Excel**. Cada contacto tiene **Clasificación** (etiqueta de color) y botón para **eliminarlo**. Al **importar**: escribís una **clasificación para todo el lote**, el sistema **descarta repetidos** (por teléfono) y te avisa cuántos entraron/omitieron.
   - **Como director ves TODOS los contactos de la agencia.** En cambio, **cada asesor ve solo los suyos** (los que él importó/cargó, o los del lead que tiene asignado). Así cada uno trabaja con su propia base sin ver la de los demás, y vos tenés la vista completa.
   - **Excel/CSV — columnas:** solo necesita una columna de **teléfono** (puede llamarse `celular`, `telefono`, `phone`, etc.) — el **nombre del contacto es opcional**. Los teléfonos pueden venir en **cualquier formato argentino** (con/sin +, con 0, con 15, áreas 11/221/2227…): el sistema los **convierte solo** al formato de WhatsApp. La clasificación NO va en el Excel (se pone al importar).
-- **📣 Campañas:** dos modos:
+- **📣 Campañas (Difusión → Campañas):** dos modos:
   - **Campaña automática por segmento (recomendada para masivo):** elegís una **clasificación** (ej. `reclutamiento`) + una **plantilla** y tocás **"Crear campaña"** (queda lista, en cola, sin enviar). Después confirmás con **"🚀 Lanzar ahora"**: empieza a enviar **en el acto** y sigue **solo, en goteo diario, hasta tu límite real de Meta**, marca enviados y **no repite**, hasta terminar todo el segmento (aunque cierres el navegador). **No tenés que entrar a GitHub ni a ningún lado.** Podés **pausar/eliminar** y ver el **progreso** (enviados/total, en cola, errores). El estado de cada lead se ve en **Contactos** (EN COLA → ENVIADO/ERROR + fecha).
   - **Envío manual puntual:** solo para **grupos chicos o individuales** (corre en el navegador, hay que dejar la pestaña abierta).
   - **🤖 Bot IA en las respuestas (en los dos modos):** antes de enviar, un **interruptor** decide si los chats que cree esa campaña nacen con la **IA prendida** (cuando el contacto responde, el bot le contesta — ideal para **captación de clientes**) o **apagada** (los chats quedan en **modo manual** — ideal para **reclutamiento** u otros envíos que **no son clientes**, donde no querés que la IA responda). Viene **prendido por defecto**. En el listado de campañas se ve una etiqueta **"Bot IA"** / **"Sin bot"**.
@@ -349,7 +354,9 @@ Vas a ver un **asistente de configuración** que te guía paso a paso para conec
     > - **Al importar no se duplica nada.** Si el teléfono ya está en la agenda, se le **suma** la clasificación de la lista nueva: mismo contacto, mismo chat, sin perder de dónde venía. Antes esos contactos se salteaban y quedaban fuera del lote.
     > - **Las plantillas que mandás clasifican solas**, no tenés que cargar nada. Si la campaña va a un segmento, manda **el nombre que le pusiste al lote** cuando importaste (ej. `Oferta-Julio`), no el nombre técnico de la plantilla: un solo badge, no dos parecidos. El nombre de la plantilla se usa solo cuando la campaña va a todos los contactos, o en el envío manual puntual.
     > - Los seguimientos automáticos del sistema (recordatorios de visita, reactivación) **no** clasifican, para no ensuciar la lista.
-- **⚙️ Configuración IA:** definís el comportamiento del bot (cómo responde, conocimiento, etc.).
+- **⚙️ Configuración IA (Difusión → Configuración IA):** definís el comportamiento del bot (cómo responde, conocimiento, etc.).
+
+> 💡 Al elegir contactos y tocar **"Configurar Campaña"**, PRISMA te lleva solo a la página **Campañas** con esos contactos ya cargados.
 
 Arriba a la derecha, un **indicador de conexión** te muestra si la instancia está conectada.
 
@@ -441,22 +448,22 @@ Justo debajo, el bloque **Agente de seguimiento** muestra las últimas decisione
 
 **Qué es:** el generador de contenido publicitario con IA, alineado a tu marca (la pantalla se titula "Marketing IA Pro").
 
-**Tiene 7 pestañas:**
+**Son 7 páginas, en el grupo Marketing IA del menú** (antes eran pestañas de una sola pantalla):
 1. **Crear Anuncio:** el generador principal (ver abajo).
-2. **Fotos:** arregla las fotos de una propiedad (ver abajo).
+2. **HomeStaging:** arregla las fotos de una propiedad (ver abajo). Antes se llamaba "Fotos".
 3. **Clientes Ideales (IPC):** donde creás y administrás tus perfiles de cliente ideal.
 4. **Mi ADN:** tu operación real y tus 2 ofertas irresistibles (ver abajo).
 5. **Historial / Galería:** con dos vistas — **Anuncios y copys** (todo lo generado, agrupado por tanda: lo ves, editás el texto, descargás la imagen y lo borrás) y **Fotos retocadas** (las fotos de propiedades que trabajaste).
 6. **Guía Mágica:** una guía práctica de 5 fases para hacer campañas de captación de leads de calidad en Meta (Facebook/Instagram) Ads: segmentación, el anuncio, el formulario "filtro de oro", retargeting y medición. Es material de lectura, no genera nada.
 7. **Configuración IA:** los ajustes de marca de la agencia (solo director, ver abajo).
 
-**Cómo usarlo (pestaña "Crear Anuncio"):**
-1. Primero creás un **perfil IPC** (Cliente Ideal) en la pestaña de IPC: objetivo **Captar** (propietarios) o **Vender** (compradores). Completás el perfil paso a paso (motivo, urgencia, ángulo, tono, CTA, nivel de conciencia, etc.).
+**Cómo usarlo (página "Crear Anuncio"):**
+1. Primero creás un **perfil IPC** (Cliente Ideal) en la página **Clientes Ideales (IPC)**: objetivo **Captar** (propietarios) o **Vender** (compradores). Completás el perfil paso a paso (motivo, urgencia, ángulo, tono, CTA, nivel de conciencia, etc.).
 2. En "Crear Anuncio" elegís el **IPC** y el **tipo de copy**:
    - **Video/Reel** → salen **3 guiones para hablar a cámara**, sin imágenes. Elegís también la **estructura del guión** (o dejás "Sugerida").
    - **Post/Texto** → como siempre: **formato de imagen** (Reels, Post o Historia) y **estilo visual** (Moderno, Lujoso, Cálido, Corporativo o Vibrante), con sus 3 imágenes.
 3. Apretás el botón de generar: en una sola acción la IA crea **3 variantes** usando 3 ángulos distintos (PAS, Transformación y Autoridad/Datos), para que elijas la que mejor convierta.
-4. El resultado queda en la pestaña **Historial / Galería**.
+4. El resultado queda en **Historial / Galería** (PRISMA te lleva solo cuando termina).
 
 **Mi ADN (tu oferta irresistible):**
 Es un formulario que se completa **una sola vez** y es **de cada persona**: la tuya es tuya y la de cada asesor es suya (los números tienen que ser de quien habla en el anuncio). Cargás cómo trabajás —a qué porcentaje de tu tasación cerrás, cuántos compradores tenés en base, en cuánto entregás la tasación, qué te bancás vos para que el dueño no mueva un dedo, tus casos reales— y la IA te arma **2 ofertas irresistibles**: una para captar propietarios y otra para vender. Esas ofertas después entran solas en todos tus anuncios y guiones.
@@ -467,7 +474,7 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 
 **Los guiones de video:** cada guión viene partido en bloques y, en cada uno, el texto exacto a decir, los segundos que dura, cómo decirlo (tono y gesto) y **por qué va ahí**. Es material de formación para el equipo, no solo un texto para copiar. Desde el historial se copia "para teleprompter" (limpio) o "completo" (con las explicaciones).
 
-**Ajustes de Marca (pestaña "Configuración IA", solo director):**
+**Ajustes de Marca (página "Configuración IA" de Marketing IA, solo director):**
 - **Colores de marca:** hasta 3 colores.
 - **Logo:** subís el logo, y elegís su **posición** (4 esquinas) y su **tamaño** (chico/mediano/grande).
 - **Tipografía:** moderna/sans, elegante/serif, manuscrita/script o impacto/bold.
@@ -481,7 +488,7 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 
 ---
 
-### Fotos (arreglar las fotos de una propiedad)
+### HomeStaging (arreglar las fotos de una propiedad)
 
 **Qué es:** agarra una foto y la deja publicable. No hay que saber editar. **Tus asesores también la tienen.**
 
@@ -520,7 +527,7 @@ Es un formulario que se completa **una sola vez** y es **de cada persona**: la t
 
 ## 13. Contratos IA
 
-**Qué es:** generación y gestión de contratos a partir de plantillas, con trazabilidad completa.
+**Qué es:** generación y gestión de contratos a partir de plantillas, con trazabilidad completa. Está en el grupo **Documentación** del menú. Si tu agencia no lo tiene contratado, ni la página ni el grupo aparecen en la barra.
 
 **Pestañas que ves como director:**
 - **Nuevo Contrato:** elegís tipo y completás el asistente.
@@ -1153,3 +1160,20 @@ está **"Agregar una nota"**. Las notas las ven solo los directores; el asesor y
 
 > 💡 **Tip:** para que los avisos por WhatsApp le lleguen a tu equipo, cargá los celulares de los asesores desde **Asesores**. Mientras no estén, reciben todo por email igual.
 
+
+---
+
+## 30. Farming: el reparto del territorio
+
+**Qué es:** cada asesor dibuja en el mapa su **zona de farming** — las cuadras que trabaja casa por casa para captar. Las zonas son exclusivas: nadie puede dibujar encima de la de un colega, y el que la dibuja primero se la queda. Vos no dibujás ni asignás: **ves el reparto y, si hace falta, liberás**.
+
+**Dónde está:** en el menú, dentro de **Propiedades → Farming**.
+
+**Qué muestra:** el mapa de la inmobiliaria con todas las zonas, **cada asesor con su color** (el mismo color marca su nombre en la lista), y abajo la lista agrupada por asesor: nombre de la zona, km², cuántos pedazos tiene y con quién la comparte. El mapa abre mostrando todas las zonas del equipo, y tiene la **lupita** para ir a un barrio o una dirección.
+
+**Ver una zona en el mapa:** tocá la zona en la lista. El mapa te lleva hasta ella y la marca con el borde más grueso; la fila queda "marcada en el mapa". En el celular la pantalla sube sola hasta el mapa.
+
+**Liberar una zona:** el botón **"liberar"** pide un motivo (queda en el historial). **No se borra nada:** la zona deja de bloquear esas cuadras, que vuelven a estar disponibles para que otro asesor las dibuje. Usalo cuando un asesor se va, se pausa o cambia de territorio; si no, sus cuadras quedarían trabadas para siempre.
+
+> 💡 Cada asesor puede tener hasta **3 zonas** de **5 km²** cada una. Si alguien reclama de más, liberar es tu herramienta.
+> 🔜 El tablero de relevamiento y la lista de avisos a la venta dentro de cada zona llegan en las próximas etapas.

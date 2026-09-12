@@ -156,7 +156,7 @@ export function CopyGeneratorFlow() {
       // Auto-refresh credit badge
       window.dispatchEvent(new CustomEvent('prisma-refresh-credits'));
       
-      setProgressText("¡Todo listo! Ve a la pestaña 'Mis Generaciones'.")
+      setProgressText("¡Todo listo! Te llevamos a tus generaciones.")
 
     } catch (error: any) {
       console.error('handleGenerateBatch error:', error)
