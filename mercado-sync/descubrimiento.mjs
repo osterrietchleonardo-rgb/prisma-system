@@ -93,7 +93,8 @@ async function main() {
   }
 
   const txt = await (await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${TOK}&clean=true&format=json`)).text();
-  const n = JSON.parse(txt).length;
+  const items = JSON.parse(txt);
+  const n = items.length;
   const dataDir = join(__dirname, 'data');
   mkdirSync(dataDir, { recursive: true });
   const destino = join(dataDir, `descubrimiento-${ZONA}-${new Date().toISOString().slice(0, 10)}${RECUPERAR ? '-rec-' + RECUPERAR : ''}.json`);
@@ -101,13 +102,23 @@ async function main() {
   console.log(`[descubrimiento] ${n} avisos nuevos → ${destino}`);
   if (n === 0) { console.log('[descubrimiento] día sin publicaciones nuevas.'); return; }
 
+  // Cuántos trae de cada día de publicación. Es el termómetro del tope: la ventana
+  // real es "ayer entero + lo que va de hoy", así que si n queda por debajo de --max
+  // significa que ayer entró completo. Medido 8..12-sep: CABA publica 1277-1543/día.
+  const porDia = {};
+  for (const it of items) { const d = (it.list_publication_begin || '').slice(0, 10); if (d) porDia[d] = (porDia[d] || 0) + 1; }
+  console.log(`[descubrimiento] por día de publicación: ${JSON.stringify(porDia)}`);
+
   execFileSync(process.execPath, [
     join(__dirname, 'loader.mjs'),
     '--file', destino, '--zona', ZONA, '--tipo', 'descubrimiento',
     '--paginas', '1', '--esperados', '0',
   ], { stdio: 'inherit', env: process.env });
 
-  if (n >= MAX) console.warn(`[descubrimiento] AVISO: se alcanzó el tope de ${MAX} items; subir --max o correr con --dentro-de 2 para cubrir el resto.`);
+  // Si tocó el tope, el día más viejo de la ventana quedó cortado y esos avisos no
+  // los vuelve a ver nadie hasta el refresco mensual. Subir --max, que no encarece:
+  // la ventana real es más chica que el tope, se paga por item devuelto.
+  if (!RECUPERAR && n >= MAX) console.warn(`[descubrimiento] AVISO: se tocó el tope de ${MAX} items — hay avisos del día anterior que quedaron afuera. Subir --max.`);
 }
 
 main().catch(e => { console.error('[descubrimiento] FATAL:', e.message); process.exit(1); });

@@ -32,15 +32,30 @@ Leonardo avisó por los mails de GitHub Actions. `mercado-descubrimiento` falló
 - Nuevo: **`--recuperar <runId>`** carga el dataset de una corrida ya pagada que quedó sin
   cargar, sin lanzar nada nuevo. Recuperar sale US$0; volver a correr, US$1.51.
 
-**Hallazgos que son decisión de Leonardo, no se tocó nada:**
+**Recuperación:** se cargaron las 4 corridas pagadas (9, 10, 11, 12) con `--recuperar`.
+**5.333 avisos nuevos** a la base, US$0 de costo extra, más sus embeddings.
 
-1. Las corridas traen **exactamente 1500 items = el tope**. CABA en 2 días publica más de
-   eso: estamos truncando. No se pierde nada para siempre (el refresco mensual barre los
-   48 barrios), pero lo de arriba de 1500 entra hasta un mes tarde.
-2. El descubrimiento pasó de "centavos" a **US$1.51/día ≈ US$45/mes**. Sumado al refresco
-   (~US$65) da ~US$110/mes contra un tope de cuenta de US$100. Bajar a `--dentro-de 1`
-   lo partiría al medio (y entraría cómodo en tiempo), a costa de perder el solape.
-3. Quedaron 4 días pagados sin cargar (≈US$6): corridas del 9, 10, 11 y 12.
+**Cuánto publica CABA por día — medido, no estimado.** El campo del dataset es
+`list_publication_begin`. Uniendo las 4 corridas:
+
+| día | 8-sep | 9-sep | 10-sep | 11-sep |
+|---|---|---|---|---|
+| avisos publicados | 1.347 | 1.336 | 1.277 | **1.543** |
+
+**Lo que esto cambió (decidido, ya aplicado):** `--max 1500 → 1800`.
+
+La clave es que la ventana de `--dentro-de 2` **no son dos días enteros**: es *ayer
+completo + lo que va de hoy* (las corridas arrancan ~11:00 ART, así que de hoy traen 44 a
+237). O sea ~1.500-1.600 avisos, no ~2.800. Como el actor **cobra por item devuelto**,
+subir el tope no encarece la corrida: solo deja de cortar. Con 1500 el 11-sep se
+perdieron 87 avisos (1.543 publicados, 1.456 traídos), y esos no los ve nadie hasta el
+refresco mensual. El log ahora imprime el reparto por día de publicación, que es el
+termómetro: si `n < --max`, ayer entró completo.
+
+**Lo que NO se tocó y sigue siendo decisión de Leonardo:** el descubrimiento cuesta
+~US$1.55/día ≈ **US$46/mes** (no son centavos: son ~1.350 avisos nuevos por día a
+US$0.001). Con el refresco mensual (~US$65) el régimen real de Apify es **~US$111/mes**
+contra un tope de cuenta de US$100. Hay que subirlo a US$150 o el 3-oct el refresco choca.
 
 ## 2026-09-09 — Documentos para clientes: la plantilla se arma una vez y cada asesor la comparte con sus datos
 
