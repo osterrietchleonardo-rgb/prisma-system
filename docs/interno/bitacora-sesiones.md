@@ -16,6 +16,43 @@
 
 ---
 
+## 2026-09-14 — Outbound con foco AMBA: censo de Zonaprop, Apollo y filtro en el buscador
+
+**Qué pidió Leonardo:** enfocar la prospección en inmobiliarias de AMBA (sin Central), buscando
+en Apollo, Apify y LinkedIn, con nombre y contacto.
+
+**Qué se hizo**
+
+- **Censo Zonaprop AMBA** (Apify, US$5,16): 4.890 publicadores, **218 con 300+ avisos**, 631 con
+  100-299. `avisos` es el total NACIONAL de la agencia. Teléfono en 12,9% (muchas veces el celular
+  de un agente); mail/web/dirección: 0%. El modo `agencies` de oswaldocarabano **no segmenta ni
+  con `startUrls`**: se usó el directorio `inmobiliarias-{zona}-pagina-N.html` vía apify/web-fetch.
+  La cuenta de Apify llegó al **tope mensual** a mitad de camino (ni PRISMA ni los 33 flujos de
+  n8n usan Apify: verificado).
+- **Apollo:** búsqueda amplia AMBA gratis (200 personas, ~76 decisores nuevos tras limpiar).
+  14 enriquecidos (14 créditos; quedan 106 hasta el 07/10); 13 cargados al pipeline en «sin
+  contactar» (Hasler/Grupo Solanas fuera: hotelería). Pinus y KW San Isidro con `OJO ANTES DE
+  ESCRIBIRLE:` (mail de otra persona / buzón genérico).
+- **Lista unida** en `OneDrive\Escritorio\Vakdor\Prospeccion\Inmobiliarias-AMBA-2026-09-14.csv`.
+- **`outbound-diario.mjs`**: `--amba` (criterio en `scripts/amba.mjs`), exclusión de toda
+  Central, `--busqueda=<savedSearchId>`. Corrida real: 348 perfiles, 0 candidatos — la búsqueda
+  de LATAM ya no tiene AMBA sin contactar.
+
+**Errores propios**
+
+- El primer cruce censo↔pipeline perdió DIC, Mel y Miranda Bosch: claves cortas («dic») salteadas
+  y el texto de la ficha sin pasar por la misma normalización que el nombre. Se corrigió y se
+  verificaron las tres a mano.
+- En la apertura se midió «AMBA en el pipeline» con un regex que casaba apellidos («Martinez»):
+  dio 3 sin contactar y eran más (Parrinello, Estivariz no casaban). Medir por empresa, no por
+  palabra suelta.
+
+**Quedó pendiente:** que Leonardo arme la búsqueda de Sales Navigator solo AMBA y pase el id;
+completar las ~160 inmobiliarias del censo que faltaron (con Chrome visible); enriquecer a los
+dueños de las 300+ sin contacto (tope 40 créditos).
+
+---
+
 ## 2026-09-12 — Farming: el mapa arranca con la manito, lupita, y el director ve cada asesor en su color
 
 **Qué pidió Leonardo:** (1) una lupita en el mapa de Farming para ir a un barrio, zona o dirección;
