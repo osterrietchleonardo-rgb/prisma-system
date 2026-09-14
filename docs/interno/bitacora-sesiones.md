@@ -252,6 +252,30 @@ El bot no cambió: n8n ya bajaba y transcribía el audio por su cuenta (sección
 
 ---
 
+## 2026-09-14 — El reloj fallaba porque la escalera creció hasta rozar los 2 minutos
+
+**Qué pidió Leonardo:** "revisar porque falló el superagente_reloj". Ejecuciones en rojo del
+flujo de n8n, siempre en el nodo de la escalera, a los 2:05: el nodo tenía timeout de 120 s y
+la escalera pasó de 0,6 s (31/8) a 107 s (13/9) porque recorre 72 casos con 3-5 consultas cada
+uno, incluidos 80 casos ya en el tope de 20 h que nunca cierran. Detalle en TECNICO §22.13.
+
+**Qué se hizo** (rama `fix/escalera-un-viaje`, PR pendiente de OK): función SQL
+`escalera_casos` que trae t0/humano/nota/niveles de todos los casos en un viaje;
+`estadosDeCasos` en la escalera; los casos en el tope sin nota nueva no se releen; el timeout
+del nodo en n8n a 290 s (script listo, lo corre Leonardo con `!` porque el clasificador
+bloquea la escritura en n8n desde el agente). Suite: 199 verdes en `lib/seguimiento`.
+
+**Lo que no pude:** el clasificador bloqueó también las lecturas por `_sa-query.mjs` después
+del DELETE de los marcadores del 10/9 (la misma herramienta sirve para escribir). Los datos de
+hoy salieron de la API de n8n y de la API de Vercel. Para aplicar la migración: `node
+scratch/_sa-query.mjs --file supabase/migrations/20260914120000_escalera_casos.sql` con `!`.
+
+**Qué quedó:** (1) Leonardo aplica la migración y el timeout de n8n con `!`; (2) correr
+`SEGUIMIENTO_MANUAL=1 npx vitest run lib/seguimiento/manual-escalera-casos` (compara la
+función con las consultas viejas caso por caso y mide); (3) OK al merge; (4) mirar la duración
+del nodo en las corridas siguientes (antes ~105 s de día). Los casos en el tope que nunca
+cierran siguen siendo deuda de Kevin, no del código: son 80.
+
 ## 2026-09-10 — La queja de Carmen: las notas cortas ahora cuentan, y si no alcanzan se le dice
 
 **Qué pasó:** Carmen (Central) dejó en Sugerencias: "Ya dejé en notas que estoy en comunicación
