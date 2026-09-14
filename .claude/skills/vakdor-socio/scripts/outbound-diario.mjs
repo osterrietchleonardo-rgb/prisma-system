@@ -9,7 +9,7 @@
  *
  * NUNCA manda un mensaje. Los manda Leonardo a mano.
  *
- *   node .claude/skills/vakdor-socio/scripts/outbound-diario.mjs [paginas]
+ *   node .claude/skills/vakdor-socio/scripts/outbound-diario.mjs [paginas] [--amba]
  *
  * MANTENIMIENTO: todo el codigo que se manda al navegador va en constantes con
  * String.raw. Sin eso, un \s dentro de un template literal llega al navegador como
@@ -19,17 +19,36 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { esAmba } from './amba.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ = path.resolve(AQUI, '../../../..');
 const SALIDA = path.join(AQUI, '..', 'estado');
-const PAGINAS = Number(process.argv[2] || 5);
+const ARGS = process.argv.slice(2);
+/*
+ * --amba (pedido de Leonardo el 14/09/2026): solo deja pasar a quien figura en el AMBA
+ * (CABA + conurbano + La Plata; el criterio esta en amba.mjs). La busqueda guardada es de
+ * toda Latinoamerica, asi que con el filtro hay que leer mas paginas para juntar 10: por eso
+ * el default sube de 5 a 15.
+ */
+const SOLO_AMBA = ARGS.includes('--amba');
+const PAGINAS = Number(ARGS.find(a => /^\d+$/.test(a)) || (SOLO_AMBA ? 15 : 5));
 /** Perfil del navegador, FUERA del repo: guarda las cookies de la sesion de LinkedIn. */
 const PERFIL = path.join(process.env.USERPROFILE || process.env.HOME || '', '.playwright-perfiles', 'linkedin');
-const BUSQUEDA = 'https://www.linkedin.com/sales/search/people?savedSearchId=2001387130';
+/*
+ * --busqueda=<id> usa otra busqueda guardada de Sales Navigator. La de siempre (2001387130) es de
+ * toda Latinoamerica y el 14/09/2026 ya no tenia nadie de AMBA sin contactar: 348 perfiles leidos,
+ * 113 con propuesta, 7 en el pipeline, 227 fuera de AMBA. El id sale de la URL de la busqueda
+ * guardada (savedSearchId=...).
+ */
+const BUSQUEDA_ID = ((ARGS.find(a => a.startsWith('--busqueda=')) || '').split('=')[1] || '2001387130').trim();
+if (!/^\d+$/.test(BUSQUEDA_ID)) { console.error(`--busqueda tiene que ser el numero de savedSearchId, no "${BUSQUEDA_ID}"`); process.exit(1); }
+const BUSQUEDA = 'https://www.linkedin.com/sales/search/people?savedSearchId=' + BUSQUEDA_ID;
 
 // Nunca contactar. Victor Arlandi es el presidente de Central (padre de Kevin).
 const NUNCA = [/victor\s+arlandi/i, /kevin\s+arlandi/i];
+// Y nadie de Central: es el cliente. Apollo mostro 3 directivos mas de Central el 14/09/2026.
+const EMPRESA_NUNCA = /central real estate/i;
 
 const env = (() => {
   const t = fs.readFileSync(path.join(RAIZ, '.env'), 'utf8');
@@ -213,7 +232,7 @@ const CARGO_SI = /(due[nñ]o|propietari|presidente|vicepresidente|socio|co-?foun
 const CARGO_NO = /(asesor inmobiliari|agente inmobiliari|advisor|corredor independiente|coach|mentor|docente|profesor|estudiante|community manager|recursos humanos|marketing digital)/i;
 
 /** Devuelve el bloque "cargo + empresa + lugar", que es lo unico que se lee con confianza. */
-function bloqueCargo(resto, nombre) {
+function bloqueCargo(resto, nombre, max = 120) {
   let t = resto;
   if (nombre && t.startsWith(nombre)) t = t.slice(nombre.length).trim();
   t = t.replace(/^Contacto de \S+ y miembro de LinkedIn Premium ·\s*\S+\s*/i, '')
@@ -222,7 +241,7 @@ function bloqueCargo(resto, nombre) {
        .replace(/^Guardado\s*/i, '')
        .replace(/\s*Guardado\s*/i, ' ');
   t = t.split(/\s+\d+\s+a[nñ]os?\s/)[0].split(/\s+\d+\s+mes(es)?\s/)[0].split(/\s+Acerca de:/)[0];
-  return t.trim().slice(0, 120);
+  return t.trim().slice(0, max);
 }
 
 /** Descarta duro. Devuelve el motivo si NO encaja, o null si encaja. */
@@ -488,8 +507,16 @@ for (const p of todos) {
   if (!clave || vistos.has(clave)) continue;
   vistos.add(clave);
   if (NUNCA.some(re => re.test(p.nombre))) { console.log(`  excluido por regla: ${p.nombre}`); continue; }
+  if (EMPRESA_NUNCA.test(p.resto)) { console.log(`  excluido por regla (es de Central): ${p.nombre}`); continue; }
   if (conPropuesta.has(clave)) { yaEscritos++; continue; }
   if (excluir.has(clave)) { yaPipeline++; continue; }
+  /*
+   * El lugar se mira en el bloque cargo+empresa+lugar SIN recortar: con el tope de 120
+   * caracteres la ubicacion quedaba cortada ("Buenos Aires, Provincia ") — asi aparece en la
+   * ficha de Diego Luciano. Y no se mira el "Acerca de", que puede nombrar Buenos Aires en
+   * alguien que vive en Madrid.
+   */
+  if (SOLO_AMBA && !esAmba(bloqueCargo(p.resto, p.nombre, 400))) { descartados.push({ nombre: p.nombre, motivo: 'fuera de AMBA' }); continue; }
   const motivo = noEncaja(p);
   if (motivo) { descartados.push({ nombre: p.nombre, motivo }); continue; }
   candidatos.push({ ...p, ...puntuar(p) });

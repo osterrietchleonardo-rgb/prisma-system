@@ -191,8 +191,13 @@ Si maquilla los números, decíselo: con datos de fantasía el plan es de fantas
 ## El outbound diario (la tarea de las 11:00)
 
 ```bash
-node .claude/skills/vakdor-socio/scripts/outbound-diario.mjs [paginas]
+node .claude/skills/vakdor-socio/scripts/outbound-diario.mjs [paginas] [--amba]
 ```
+
+**`--amba`** (desde el 14/09/2026, foco pedido por Leonardo): solo pasan quienes figuran en
+CABA, el conurbano o La Plata. "Provincia de Buenos Aires" sola **no** es AMBA (Mar del Plata,
+Bahía Blanca): el criterio está en `scripts/amba.mjs`. Con el filtro lee 15 páginas por
+defecto en vez de 5, porque la búsqueda guardada es de toda Latinoamérica.
 
 Abre Sales Navigator con la sesión real de Leonardo, en **navegador visible y a ritmo
 humano**. Lee la búsqueda guardada con paginación, descarta a quien ya está contactado
