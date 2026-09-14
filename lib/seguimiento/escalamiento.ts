@@ -224,6 +224,34 @@ const MAX_POR_CORRIDA = 300
  */
 export const MAX_LLAMADAS_IA = 20
 
+/** Lo que `escalera_casos` (SQL, migración 20260914120000) devuelve por conversación. */
+export interface EstadoCaso {
+  conversation_id: string
+  /** Último mensaje del LEAD (la clave del caso, misma cadena que antes daba PostgREST). */
+  t0: string
+  humano_despues: boolean
+  /** Hay una nota interna REAL del asesor después de t0 (sin el marcador de handoff). */
+  nota_despues: boolean
+  niveles: number[]
+}
+
+const IDS_POR_TANDA = 200
+
+/**
+ * Estado de los casos en un viaje por tanda de ids. Si la función no existe o falla, la
+ * corrida se cae con el error a la vista: una escalera que reporta "0 esperando" porque no
+ * pudo leer es peor que una que no corrió (n8n la marca en rojo y se ve).
+ */
+export async function estadosDeCasos(db: SupabaseClient, ids: string[], desdeISO: string): Promise<Map<string, EstadoCaso>> {
+  const estados = new Map<string, EstadoCaso>()
+  for (let i = 0; i < ids.length; i += IDS_POR_TANDA) {
+    const { data, error } = await db.rpc("escalera_casos", { p_ids: ids.slice(i, i + IDS_POR_TANDA), p_desde: desdeISO })
+    if (error) throw new Error(`escalera_casos: ${error.message}`)
+    for (const fila of (data ?? []) as EstadoCaso[]) estados.set(fila.conversation_id, { ...fila, niveles: (fila.niveles ?? []).map(Number) })
+  }
+  return estados
+}
+
 export async function correrEscalamiento(
   db: SupabaseClient,
   opts: { appUrl?: string; fetchFn?: typeof fetch; ahoraMs?: number; llamarNota?: LlamarVeredicto; llamarDespedida?: LlamarDespedida } = {}
@@ -272,21 +300,30 @@ export async function correrEscalamiento(
       return perfiles.get(id) ?? null
     }
 
-    for (const c of (candidatos ?? []) as Conv[]) {
-      if (!esperandoHumano(c)) continue
+    // 14/9: el estado de TODOS los casos de la agencia (t0, humano después, nota después,
+    // niveles ya mandados) viene en una sola llamada (`escalera_casos`). Antes eran 3 consultas
+    // por caso, una atrás de la otra: con 72 casos la barrida tardaba 107 s y el reloj de n8n
+    // la cortaba a los 120. Los casos que no aparecen no tienen mensaje del lead en la ventana.
+    const esperan = ((candidatos ?? []) as Conv[]).filter(esperandoHumano)
+    const estados = await estadosDeCasos(db, esperan.map((c) => c.id), desde)
+
+    for (const c of esperan) {
+      const estado = estados.get(c.id)
+      if (!estado) continue
       // t0 = último mensaje del lead; atendido = algún mensaje HUMANO después de t0
-      const { data: ultimoLead } = await db.from("wa_messages").select("created_at").eq("conversation_id", c.id)
-        .eq("role", "lead").order("created_at", { ascending: false }).limit(1).maybeSingle()
-      if (!ultimoLead?.created_at || Date.parse(ultimoLead.created_at) < Date.parse(desde)) continue
-      const t0 = ultimoLead.created_at
+      const t0 = estado.t0
       if (!casoCuenta(t0, config.activo_desde)) continue // anterior al encendido: backlog, no se persigue
-      const { data: humano } = await db.from("wa_messages").select("id").eq("conversation_id", c.id)
-        .eq("role", "human").gt("created_at", t0).limit(1)
-      if (humano?.length) { resumen.atendidos++; continue }
+      if (estado.humano_despues) { resumen.atendidos++; continue }
       // Horas HÁBILES (6-23 AR): la noche no cuenta. El prefiltro de arriba usa horas de
       // reloj y solo puede sobre-incluir (hábiles ≤ reloj), nunca dejar afuera un caso maduro.
       const horas = horasHabiles(Date.parse(t0), ahoraMs)
       if (horas < 2) continue
+
+      // Ya se mandó el último escalón (20 h): no queda nada por avisar, y releerlo (nota,
+      // despedida, mensajes) cada media hora era lo que engordaba la barrida. Se salta salvo
+      // que el asesor haya dejado una nota nueva: esa sí se evalúa (Glo Bouche, 9/9).
+      const enviados = estado.niveles.filter((n): n is Nivel => [2, 5, 10, 20].includes(n))
+      if (enviados.includes(20) && !estado.nota_despues) { resumen.esperando++; continue }
 
       // La nota interna del asesor habla (Leonardo, 4/9): si hay una posterior al último
       // mensaje del lead, la IA decide si el cliente ya está atendido. Determinista solo
@@ -337,10 +374,7 @@ export async function correrEscalamiento(
 
       resumen.esperando++
 
-      // niveles ya mandados PARA ESTE CASO (mismo t0)
-      const { data: previos } = await db.from("lead_eventos").select("datos").eq("conversation_id", c.id)
-        .in("tipo", ["escalera", "escalera_simulada"]).contains("datos", { t0 })
-      const enviados = (previos ?? []).map((e) => Number((e.datos as { nivel?: number })?.nivel)).filter((n) => [2, 5, 10, 20].includes(n)) as Nivel[]
+      // niveles ya mandados PARA ESTE CASO (mismo t0): vienen en `estado.niveles`
       const nivel = nivelQueToca(horas, enviados)
       if (!nivel) continue
       const def = NIVELES.find((n) => n.horas === nivel)!

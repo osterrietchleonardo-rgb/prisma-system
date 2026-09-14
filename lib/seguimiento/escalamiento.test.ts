@@ -161,10 +161,13 @@ describe("los niveles se miden en horas hábiles (la noche no corre)", () => {
 
 describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
   const ar = (iso: string) => Date.parse(iso + "-03:00")
+  const fetchOk = (async () => ({ ok: true, json: async () => ({ id: "r-1" }) })) as never
 
   /** `tablasQueTiran` simula una tabla que revienta al leerla (permiso, timeout, columna que no está). */
-  function armarDbCorrida(tablasQueTiran: string[] = [], extra: { nota?: unknown } = {}) {
+  function armarDbCorrida(tablasQueTiran: string[] = [], extra: { nota?: unknown; niveles?: number[]; rpcTira?: boolean } = {}) {
     const inserts: Array<{ tabla: string; fila: Record<string, unknown> }> = []
+    const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = []
+    const lecturas: string[] = []
     const tablas: Record<string, unknown> = {
       seguimiento_config: [{ agency_id: "ag-1", modo: "activo", activo_desde: "2026-08-31T00:00:00Z" }],
       agencies: [{ id: "ag-1", name: "Central" }],
@@ -178,18 +181,39 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
       wa_messages_ultimo_lead: { created_at: "2026-09-03T20:09:43Z" },
       wa_messages_humano: [],
       wa_messages_nota: "nota" in extra ? extra.nota : { id: "n-1", content: "Ya lo llamé, visita el viernes", created_at: "2026-09-03T21:20:00Z" },
+      // los niveles ya mandados los devuelve el rpc (extra.niveles); la tabla queda vacía para
+      // que el "¿ya hubo veredicto atendido?" de la nota (contains, que el fake no filtra) no se confunda
       lead_eventos: [],
       scheduled_visits: [], wa_contacts: null, performance_logs: [],
       interacciones_canal: [], wa_templates: null, whatsapp_instances: null,
     }
     let vecesWaMessages = 0
     const db = {
+      // 14/9: el estado de cada caso (t0, humano después, nota después, niveles ya mandados) sale
+      // de UNA función SQL por agencia, no de 3 consultas por caso.
+      async rpc(fn: string, args: Record<string, unknown>) {
+        rpcs.push({ fn, args })
+        if (extra.rpcTira) return { data: null, error: { message: "function escalera_casos does not exist" } }
+        const nota = tablas.wa_messages_nota as { created_at: string } | null
+        const t0 = (tablas.wa_messages_ultimo_lead as { created_at: string }).created_at
+        return {
+          data: [{
+            conversation_id: "conv-1", t0,
+            humano_despues: (tablas.wa_messages_humano as unknown[]).length > 0,
+            nota_despues: Boolean(nota && nota.created_at > t0),
+            niveles: extra.niveles ?? [],
+          }],
+          error: null,
+        }
+      },
       from(tabla: string) {
         if (tablasQueTiran.includes(tabla)) throw new Error(`la tabla ${tabla} no se puede leer`)
+        lecturas.push(tabla)
         let respuesta = tablas[tabla]
         if (tabla === "wa_messages") {
-          // orden real de las llamadas en la corrida: último del lead → humano → nota → leer_mensajes
-          const orden = ["wa_messages_ultimo_lead", "wa_messages_humano", "wa_messages_nota", "wa_messages_humano"]
+          // orden real de las llamadas en la corrida (14/9, ya sin último-del-lead ni humano):
+          // nota → leer_mensajes (nota) → leer_mensajes (despedida)
+          const orden = ["wa_messages_nota", "wa_messages_humano"]
           respuesta = tablas[orden[Math.min(vecesWaMessages, orden.length - 1)]]
           vecesWaMessages++
         }
@@ -206,8 +230,47 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
         return chain
       },
     }
-    return { db: db as never, inserts }
+    return { db: db as never, inserts, rpcs, lecturas }
   }
+
+  // 14/9: la escalera tardaba 107 s (72 casos × 3-5 consultas cada uno) y el reloj de n8n la
+  // cortaba a los 120. Ahora el estado de todos los casos de la agencia viene en UNA llamada.
+  it("los estados de los casos salen de UNA llamada a escalera_casos por agencia, con los ids que esperan a un humano", async () => {
+    const { db, rpcs, lecturas } = armarDbCorrida([], { nota: null })
+    await correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), llamarDespedida: async () => ({ requiere_respuesta: true, razon: "espera" }), fetchFn: fetchOk, appUrl: "https://x" })
+    expect(rpcs).toHaveLength(1)
+    expect(rpcs[0].fn).toBe("escalera_casos")
+    expect(rpcs[0].args.p_ids).toEqual(["conv-1"])
+    // ni "último mensaje del lead", ni "humano después", ni "niveles previos" por caso:
+    // wa_messages se lee solo para la nota, para que la IA lea la conversación y para el
+    // contexto del aviso que sale (antes eran 5 lecturas)
+    expect(lecturas.filter((t) => t === "wa_messages").length).toBeLessThanOrEqual(3)
+  })
+
+  it("un caso ya en el tope (20 h mandado) y sin nota nueva: no se lee, no se llama a la IA, cuenta como esperando", async () => {
+    const { db, lecturas, inserts } = armarDbCorrida([], { nota: null, niveles: [2, 5, 10, 20] })
+    const llamarNota = async () => { throw new Error("no debería llamar a la IA de la nota") }
+    const llamarDespedida = async () => { throw new Error("no debería llamar a la IA de la despedida") }
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-05T12:00:00"), llamarNota, llamarDespedida, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.esperando).toBe(1)
+    expect(r.avisos).toBe(0)
+    expect(lecturas.filter((t) => t === "wa_messages")).toHaveLength(0)
+    expect(inserts).toHaveLength(0)
+  })
+
+  it("un caso en el tope PERO con una nota nueva del asesor: la nota sí se evalúa (Glo Bouche, 9/9)", async () => {
+    const { db, inserts } = armarDbCorrida([], { niveles: [2, 5, 10, 20] })
+    const llamarNota = async () => ({ atendido: true, pedir_registro_chat: false, pedir_registro_visita: false, pedir_registro_actividad: false, razon: "Ya la llamó" })
+    const r = await correrEscalamiento(db, { ahoraMs: ar("2026-09-05T12:00:00"), llamarNota, fetchFn: fetchOk, appUrl: "https://x" })
+    expect(r.atendidos).toBe(1)
+    expect(inserts.some((i) => i.tabla === "lead_eventos" && (i.fila.tipo as string) === "nota_evaluada")).toBe(true)
+  })
+
+  it("si escalera_casos falla, la corrida se cae CON el error a la vista (nunca 'todo bien' con cero casos)", async () => {
+    const { db } = armarDbCorrida([], { rpcTira: true })
+    await expect(correrEscalamiento(db, { ahoraMs: ar("2026-09-04T12:00:00"), fetchFn: fetchOk, appUrl: "https://x" }))
+      .rejects.toThrow(/escalera_casos/)
+  })
 
   it("veredicto atendido ⇒ atendidos++, ni un nivel de escalera sale", async () => {
     const { db, inserts } = armarDbCorrida()
@@ -250,7 +313,6 @@ describe("correrEscalamiento con nota interna: la IA frena la escalera", () => {
   })
 
   // Sin nota, la IA lee la conversación (Kevin, 7/9: el «Gracias!!» de Agustins disparó 2/5/10 h).
-  const fetchOk = (async () => ({ ok: true, json: async () => ({ id: "r-1" }) })) as never
   const despedida = async () => ({ requiere_respuesta: false, razon: "Cerró con «Gracias!!»" })
   const espera = async () => ({ requiere_respuesta: true, razon: "Pregunta por la dirección" })
   const tipos = (inserts: Array<{ tabla: string; fila: Record<string, unknown> }>) =>

@@ -1620,6 +1620,45 @@ falta de visita/tracking como razón para no dar por atendido (mezcla atender co
 marcador en los casos todavía abiertos (Paola y Anita Becker el 10/9; Glo Bouche y Sofia Petty ya
 en el tope de la escalera) para que la barrida siguiente los lea con el prompt nuevo.
 
+### 22.13 La escalera en un viaje: por qué fallaba `SuperAgente_Reloj` (14/9/2026)
+
+**Síntoma:** ejecuciones en rojo del flujo `SuperAgente_Reloj` (n8n, id `qSMsyCv2rgaClTOl`),
+siempre en el tercer nodo, "Escalamiento al director", con "The connection was aborted, perhaps
+the server is offline" a los 2:05 de empezar. Por día: 7/9 una, 8/9 catorce, 9/9 diecisiete,
+10/9 quince, 11/9 ocho, 12/9 cuatro, 13/9 cero, 14/9 cinco seguidas (9:00-11:00). El servidor
+no estaba caído: la ruta `/api/seguimiento/run` tiene `maxDuration = 300`, pero ese nodo tenía
+`options.timeout = 120000` (el de seguimiento ya estaba en 290000).
+
+**Causa:** el paso de la escalera crece con los casos que recorre. Medido en las salidas del
+nodo (`esperando` / duración): 31/8 0 casos / 0,6 s · 2/9 13 / 95 s · 5/9 35 / 54 s · 9/9 64 /
+101 s · 13/9 72 / 107 s. Por cada conversación que espera a un humano el código hacía 3
+consultas secuenciales (último mensaje del lead, humano después, niveles previos) más las de la
+nota y la despedida; con ~120 conversaciones con bot apagado en la ventana de 14 días son
+~450 viajes a la base. Y 82 casos ya habían llegado al tope (20 h), 80 sin respuesta humana
+nunca: no tienen nada más que mandar pero se releían enteros cada 30 min hasta caerse de la
+ventana. El backlog solo crece.
+
+**Qué se hizo (rama `fix/escalera-un-viaje`):**
+- **Migración `20260914120000_escalera_casos.sql`**: función SQL `escalera_casos(p_ids uuid[],
+  p_desde timestamptz)` → por conversación `t0` (último mensaje del LEAD), `humano_despues`,
+  `nota_despues` (nota interna real, sin el marcador de handoff) y `niveles` (los `escalera` /
+  `escalera_simulada` cuyo `datos.t0` castea igual a ese t0). STABLE, solo lectura, sin tocar RLS.
+  El `t0` que devuelve PostgREST desde la función es la MISMA cadena que antes daba la columna:
+  la clave del caso no cambia (verificado caso por caso con `manual-escalera-casos.test.ts`).
+- **`estadosDeCasos(db, ids, desde)`** (`escalamiento.ts`): una llamada por tanda de 200 ids.
+  Si la función no existe o falla, la corrida **se cae con el error a la vista** (n8n en rojo):
+  una escalera que dice "0 esperando" porque no pudo leer es peor que una que no corrió.
+- **Caso agotado no se relee**: si ya se mandó el 20 h y no hay nota nueva del asesor, se
+  cuenta como `esperando` y se salta (sin nota, sin despedida, sin leer mensajes). Con nota
+  nueva sí se evalúa (Glo Bouche, 9/9: Carmen anotó cuando el caso ya estaba en el tope).
+- **n8n**: `options.timeout` del nodo "Escalamiento al director" 120000 → 290000, igual al de
+  seguimiento (`scratch/_n8n-reloj-timeout.mjs --aplicar`, con backup en `scratch/_backup-reloj-*`).
+  El clasificador del modo auto bloquea esa escritura desde el agente: la corre Leonardo con `!`.
+- Orden de despliegue: **primero la migración** (la ruta nueva la necesita), después el merge.
+
+**Qué NO cambia:** `esperandoHumano`, `casoCuenta`, horas hábiles, `nivelQueToca`, la nota, la
+despedida, los avisos y sus textos. Solo de dónde salen t0/humano/niveles y que el tope no se relee.
+
 ## 23. Buscador IA y Tutor IA: la conversación en vivo (2/9/2026)
 
 Punto 1 del plan de agentes (`docs/superpowers/plans/2026-09-02-buscador-conversacion-viva.md`);

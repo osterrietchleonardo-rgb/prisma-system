@@ -12,7 +12,8 @@
 // corte. El refresco mensual atrapa cualquier resto.
 //
 // Uso:  node mercado-sync/descubrimiento.mjs --location Belgrano --zona belgrano
-//       [--tipo-prop departamentos] [--dentro-de 1]
+//       [--tipo-prop departamentos] [--dentro-de 1] [--max 50] [--espera-min 40]
+//       [--recuperar <runId>]  ← carga una corrida ya pagada que quedó sin cargar
 // ============================================================================
 
 import { execFileSync } from 'node:child_process';
@@ -27,6 +28,10 @@ const ZONA = arg('zona', (LOCATION || '').toLowerCase());
 const TIPO_PROP = arg('tipo-prop', '');            // vacío = todos los tipos
 const DENTRO = arg('dentro-de', '1');              // 1|2|3 días
 const MAX = parseInt(arg('max', '50'));            // tope de items por corrida
+// Cuánto esperamos a que el actor termine. OJO: la corrida YA SE PAGA aunque
+// nosotros dejemos de esperar, así que cortar temprano es tirar plata. Todo CABA
+// con --max 1500 tarda 10-13 min (medido 5..12-sep); 40 min deja margen de sobra.
+const ESPERA_MIN = parseInt(arg('espera-min', '40'));
 if (!LOCATION) { console.error('Falta --location'); process.exit(1); }
 
 const envFile = process.env.ENV_FILE;
@@ -39,7 +44,11 @@ if (!TOK) { console.error('Falta APIFY_API_KEY'); process.exit(1); }
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-async function main() {
+// Si nos pasan --recuperar <runId>, no lanzamos nada: agarramos el dataset de una
+// corrida que ya se pagó y quedó sin cargar (p.ej. porque se agotó la espera).
+const RECUPERAR = arg('recuperar', '');
+
+async function lanzar() {
   const input = {
     filterOperation: 'venta',
     filterLocation: LOCATION,
@@ -57,24 +66,48 @@ async function main() {
   console.log(`[descubrimiento] run ${run.id} · ${LOCATION} · últimos ${DENTRO} día(s)`);
 
   let datasetId = null;
-  for (let i = 0; i < 60; i++) {
+  const vueltas = ESPERA_MIN * 6;   // una cada 10 s
+  for (let i = 0; i < vueltas; i++) {
     await sleep(10000);
     const st = (await (await fetch(`https://api.apify.com/v2/actor-runs/${run.id}?token=${TOK}`)).json()).data;
     if (['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT'].includes(st.status)) {
       if (st.status !== 'SUCCEEDED') throw new Error(`run terminó ${st.status}`);
       datasetId = st.defaultDatasetId; break;
     }
+    if (i > 0 && i % 12 === 0) console.log(`[descubrimiento] ${(i / 6).toFixed(0)} min esperando (${st.status})…`);
   }
-  if (!datasetId) throw new Error('run no terminó en 10 min');
+  if (!datasetId) throw new Error(`run no terminó en ${ESPERA_MIN} min — la corrida ${run.id} igual se pagó; se recupera con --recuperar ${run.id}`);
+  return datasetId;
+}
+
+async function main() {
+  let datasetId;
+  if (RECUPERAR) {
+    const st = (await (await fetch(`https://api.apify.com/v2/actor-runs/${RECUPERAR}?token=${TOK}`)).json()).data;
+    if (!st) throw new Error(`no existe la corrida ${RECUPERAR}`);
+    if (st.status !== 'SUCCEEDED') throw new Error(`la corrida ${RECUPERAR} está ${st.status}, no hay nada que recuperar`);
+    datasetId = st.defaultDatasetId;
+    console.log(`[descubrimiento] recuperando la corrida ${RECUPERAR} (${st.startedAt.slice(0, 16)}) — ya pagada, no se lanza nada`);
+  } else {
+    datasetId = await lanzar();
+  }
 
   const txt = await (await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${TOK}&clean=true&format=json`)).text();
-  const n = JSON.parse(txt).length;
+  const items = JSON.parse(txt);
+  const n = items.length;
   const dataDir = join(__dirname, 'data');
   mkdirSync(dataDir, { recursive: true });
-  const destino = join(dataDir, `descubrimiento-${ZONA}-${new Date().toISOString().slice(0, 10)}.json`);
+  const destino = join(dataDir, `descubrimiento-${ZONA}-${new Date().toISOString().slice(0, 10)}${RECUPERAR ? '-rec-' + RECUPERAR : ''}.json`);
   writeFileSync(destino, txt);
   console.log(`[descubrimiento] ${n} avisos nuevos → ${destino}`);
   if (n === 0) { console.log('[descubrimiento] día sin publicaciones nuevas.'); return; }
+
+  // Cuántos trae de cada día de publicación. Es el termómetro del tope: la ventana
+  // real es "ayer entero + lo que va de hoy", así que si n queda por debajo de --max
+  // significa que ayer entró completo. Medido 8..12-sep: CABA publica 1277-1543/día.
+  const porDia = {};
+  for (const it of items) { const d = (it.list_publication_begin || '').slice(0, 10); if (d) porDia[d] = (porDia[d] || 0) + 1; }
+  console.log(`[descubrimiento] por día de publicación: ${JSON.stringify(porDia)}`);
 
   execFileSync(process.execPath, [
     join(__dirname, 'loader.mjs'),
@@ -82,7 +115,10 @@ async function main() {
     '--paginas', '1', '--esperados', '0',
   ], { stdio: 'inherit', env: process.env });
 
-  if (n >= MAX) console.warn(`[descubrimiento] AVISO: se alcanzó el tope de ${MAX} items; subir --max o correr con --dentro-de 2 para cubrir el resto.`);
+  // Si tocó el tope, el día más viejo de la ventana quedó cortado y esos avisos no
+  // los vuelve a ver nadie hasta el refresco mensual. Subir --max, que no encarece:
+  // la ventana real es más chica que el tope, se paga por item devuelto.
+  if (!RECUPERAR && n >= MAX) console.warn(`[descubrimiento] AVISO: se tocó el tope de ${MAX} items — hay avisos del día anterior que quedaron afuera. Subir --max.`);
 }
 
 main().catch(e => { console.error('[descubrimiento] FATAL:', e.message); process.exit(1); });

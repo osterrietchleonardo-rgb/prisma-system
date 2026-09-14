@@ -27,8 +27,7 @@ en Apollo, Apify y LinkedIn, con nombre y contacto.
   100-299. `avisos` es el total NACIONAL de la agencia. Teléfono en 12,9% (muchas veces el celular
   de un agente); mail/web/dirección: 0%. El modo `agencies` de oswaldocarabano **no segmenta ni
   con `startUrls`**: se usó el directorio `inmobiliarias-{zona}-pagina-N.html` vía apify/web-fetch.
-  La cuenta de Apify llegó al **tope mensual** a mitad de camino (ni PRISMA ni los 33 flujos de
-  n8n usan Apify: verificado).
+  La cuenta de Apify llegó al **tope mensual** a mitad de camino (ver el primer error propio).
 - **Apollo:** búsqueda amplia AMBA gratis (200 personas, ~76 decisores nuevos tras limpiar).
   14 enriquecidos (14 créditos; quedan 106 hasta el 07/10); 13 cargados al pipeline en «sin
   contactar» (Hasler/Grupo Solanas fuera: hotelería). Pinus y KW San Isidro con `OJO ANTES DE
@@ -40,6 +39,14 @@ en Apollo, Apify y LinkedIn, con nombre y contacto.
 
 **Errores propios**
 
+- **Se le dijo a Leonardo que PRISMA no usa Apify, y es falso.** Se buscó solo en `app/`, `lib/`,
+  `components/` y `scripts/`; `mercado-sync/` (descubrimiento diario y refresco mensual de
+  `mercado_avisos`) **sí** usa Apify, y es **la misma cuenta** que la del MCP (LeoOsterrietch_Vakdor,
+  STARTER, tope US$100, ciclo 31/08–29/09; la corrida del censo `Ur6SNrkV5X89QMOE5` se ve con la
+  clave del `.env`). Quedó en **US$102,38**: el descubrimiento diario falla hasta que se suba el
+  tope. La entrada del 12/09 ya advertía que el régimen normal (~US$111/mes) pasa el tope; el censo
+  lo adelantó 2-3 días. **Regla: antes de gastar en una cuenta compartida, `grep` en TODO el repo y
+  mirar `/v2/users/me/limits`.** Los 33 flujos de n8n no usan Apify (verificado).
 - El primer cruce censo↔pipeline perdió DIC, Mel y Miranda Bosch: claves cortas («dic») salteadas
   y el texto de la ficha sin pasar por la misma normalización que el nombre. Se corrigió y se
   verificaron las tres a mano.
@@ -50,6 +57,49 @@ en Apollo, Apify y LinkedIn, con nombre y contacto.
 **Quedó pendiente:** que Leonardo arme la búsqueda de Sales Navigator solo AMBA y pase el id;
 completar las ~160 inmobiliarias del censo que faltaron (con Chrome visible); enriquecer a los
 dueños de las 300+ sin contacto (tope 40 créditos).
+
+---
+
+## 2026-09-12 — El descubrimiento diario fallaba hace 4 días: esperábamos menos de lo que tarda
+
+Leonardo avisó por los mails de GitHub Actions. `mercado-descubrimiento` falló 9, 10, 11 y
+12 de septiembre (y 5 y 7). **No era Apify: era nuestra espera.**
+
+- El script esperaba **10 min** fijos (60 vueltas × 10 s) a que terminara el actor. Desde
+  que subimos `--max 1500` (4-sep), la corrida de todo CABA tarda **10 a 13 min**
+  (medido: 11.5 / 11.6 / 10.3 / 12.1 / 11.6 / 12.0 / 12.6). Justo arriba del límite.
+- Lo caro: **la corrida se paga igual** (US$1.507 cada una). Cortábamos la espera 2 min
+  antes de que terminara, tirábamos el dataset de 1500 avisos y encima el job moría, así
+  que **tampoco corrían Don Torcuato ni los embeddings**.
+- Arreglo: `--espera-min` (default **40**), log de progreso cada 2 min, y
+  `timeout-minutes: 30 → 90` en el job.
+- Nuevo: **`--recuperar <runId>`** carga el dataset de una corrida ya pagada que quedó sin
+  cargar, sin lanzar nada nuevo. Recuperar sale US$0; volver a correr, US$1.51.
+
+**Recuperación:** se cargaron las 4 corridas pagadas (9, 10, 11, 12) con `--recuperar`.
+**5.333 avisos nuevos** a la base, US$0 de costo extra, más sus embeddings.
+
+**Cuánto publica CABA por día — medido, no estimado.** El campo del dataset es
+`list_publication_begin`. Uniendo las 4 corridas:
+
+| día | 8-sep | 9-sep | 10-sep | 11-sep |
+|---|---|---|---|---|
+| avisos publicados | 1.347 | 1.336 | 1.277 | **1.543** |
+
+**Lo que esto cambió (decidido, ya aplicado):** `--max 1500 → 1800`.
+
+La clave es que la ventana de `--dentro-de 2` **no son dos días enteros**: es *ayer
+completo + lo que va de hoy* (las corridas arrancan ~11:00 ART, así que de hoy traen 44 a
+237). O sea ~1.500-1.600 avisos, no ~2.800. Como el actor **cobra por item devuelto**,
+subir el tope no encarece la corrida: solo deja de cortar. Con 1500 el 11-sep se
+perdieron 87 avisos (1.543 publicados, 1.456 traídos), y esos no los ve nadie hasta el
+refresco mensual. El log ahora imprime el reparto por día de publicación, que es el
+termómetro: si `n < --max`, ayer entró completo.
+
+**Lo que NO se tocó y sigue siendo decisión de Leonardo:** el descubrimiento cuesta
+~US$1.55/día ≈ **US$46/mes** (no son centavos: son ~1.350 avisos nuevos por día a
+US$0.001). Con el refresco mensual (~US$65) el régimen real de Apify es **~US$111/mes**
+contra un tope de cuenta de US$100. Hay que subirlo a US$150 o el 3-oct el refresco choca.
 
 ---
 
@@ -247,6 +297,30 @@ audios y no se puede escuchar". Captura de iPhone: el reproductor decía "Error"
 El bot no cambió: n8n ya bajaba y transcribía el audio por su cuenta (sección 9.1.2 del técnico).
 
 ---
+
+## 2026-09-14 — El reloj fallaba porque la escalera creció hasta rozar los 2 minutos
+
+**Qué pidió Leonardo:** "revisar porque falló el superagente_reloj". Ejecuciones en rojo del
+flujo de n8n, siempre en el nodo de la escalera, a los 2:05: el nodo tenía timeout de 120 s y
+la escalera pasó de 0,6 s (31/8) a 107 s (13/9) porque recorre 72 casos con 3-5 consultas cada
+uno, incluidos 80 casos ya en el tope de 20 h que nunca cierran. Detalle en TECNICO §22.13.
+
+**Qué se hizo** (rama `fix/escalera-un-viaje`, PR pendiente de OK): función SQL
+`escalera_casos` que trae t0/humano/nota/niveles de todos los casos en un viaje;
+`estadosDeCasos` en la escalera; los casos en el tope sin nota nueva no se releen; el timeout
+del nodo en n8n a 290 s (script listo, lo corre Leonardo con `!` porque el clasificador
+bloquea la escritura en n8n desde el agente). Suite: 199 verdes en `lib/seguimiento`.
+
+**Lo que no pude:** el clasificador bloqueó también las lecturas por `_sa-query.mjs` después
+del DELETE de los marcadores del 10/9 (la misma herramienta sirve para escribir). Los datos de
+hoy salieron de la API de n8n y de la API de Vercel. Para aplicar la migración: `node
+scratch/_sa-query.mjs --file supabase/migrations/20260914120000_escalera_casos.sql` con `!`.
+
+**Qué quedó:** (1) Leonardo aplica la migración y el timeout de n8n con `!`; (2) correr
+`SEGUIMIENTO_MANUAL=1 npx vitest run lib/seguimiento/manual-escalera-casos` (compara la
+función con las consultas viejas caso por caso y mide); (3) OK al merge; (4) mirar la duración
+del nodo en las corridas siguientes (antes ~105 s de día). Los casos en el tope que nunca
+cierran siguen siendo deuda de Kevin, no del código: son 80.
 
 ## 2026-09-10 — La queja de Carmen: las notas cortas ahora cuentan, y si no alcanzan se le dice
 
