@@ -99,3 +99,82 @@ Reglas que valen para cualquier deep agent de PRISMA, aprendidas del Super Agent
 
 Mientras no pase ninguna de las tres, la librería sería cambiar la caja de herramientas sin
 cambiar la casa.
+
+## 6. Segunda lectura: "Arquitectura de un Agente CLI para tu SaaS" (15/9/2026)
+
+> Pedido de Leonardo (15/9): "analizá el documento de mi carpeta de descargas, a ver si podés
+> sacar algo de valor para sumar a lo que ya tenemos". Fuente: `arquitectura_agente_cli_saas.pdf`
+> (guía técnica genérica, 14 páginas, sin autor, "edición de referencia septiembre 2026").
+> Contrastado contra `lib/seguimiento/agente.ts`, `herramientas.ts`, `nota-interna.ts`,
+> `app/api/seguimiento/run/route.ts` y las secciones 1-5 de este documento.
+
+**Qué es:** una guía para construir un asistente tipo "Claude Code dentro de un SaaS": bucle
+ReAct con tool-calling nativo, sub-agentes, sandbox de código, registro de skills con carga
+perezosa, ventana deslizante de contexto, streaming SSE, y una lista de anti-patrones y un
+checklist de producción. Su tesis coincide con la decisión del 8/9: bucle propio para producción,
+frameworks solo para prototipos, LangGraph solo si hacen falta ramas explícitas.
+
+### 6.1 Lo que ya tenemos (verificado en el código el 15/9)
+
+| Recomendación del documento | En PRISMA |
+|---|---|
+| Tool-calling nativo, nada de regex sobre texto | `decidirConAgente`: herramientas de la API de Anthropic, decisión por tool `emitir_decision` |
+| Presupuesto de turnos | `MAX_ITERACIONES = 6` por decisión; `MAX_LLAMADAS_IA = 20` por barrida de la escalera |
+| Validar el esquema de cada tool_call y devolver el error al modelo | `DecisionAgenteSchema.safeParse` + `tool_result` con `is_error` y el motivo; `requisitosInvestigacion` |
+| Prompt de sistema corto y cacheado | `cache_control: ephemeral` sobre `PROMPT_AGENTE` + tools; `cacheLeido` medido |
+| Herramientas que devuelven resúmenes, no volcados | `leer_mensajes` recorta a 400 caracteres por mensaje y 50 mensajes; `leer_propiedad` a 3 filas |
+| Telemetría por turno | `pasos` (herramienta, input, 200 caracteres de salida) y tokens guardados en `seguimiento_decisiones` |
+| Fallos nunca silenciosos | regla del 4/9: `nota_error`, `despedida_error`, `escalera_casos` que tira en vez de "0 esperando" |
+| Worklog compartido append-only | `lead_eventos`, la bitácora por lead |
+| Multi-tenancy con aislamiento | RLS por agencia; nombres dinámicos por agencia (§22.11 del TECNICO) |
+| Streaming al usuario | NDJSON del Buscador y el Tutor (TECNICO §23) |
+| Set de evaluación antes de tocar un prompt | §3.1 de este documento; hecho a mano el 10/9 con 8 notas reales |
+
+### 6.2 Lo que suma, por orden de valor
+
+1. **Alertas automáticas cuando una corrida falla.** El documento fija "error rate > 5 %" como
+   alarma mínima. Dato propio: `SuperAgente_Reloj` falló 78 veces entre el 7 y el 14/9 (14-17
+   por día del 8 al 10/9) y nadie se enteró hasta que Leonardo abrió n8n (TECNICO §22.13).
+   Traducción: el ajuste `errorWorkflow` de n8n apuntando a un flujo mínimo que mande un
+   correo por cada ejecución en rojo (los 3 flujos del Super Agente y `Gestion_Handoff`).
+   Escritura en n8n: con OK. Es lo más barato del documento y lo que más faltó.
+2. **Tiempo máximo por llamada a la IA en el agente de decisiones.** `nota-interna.ts` y
+   `despedida.ts` crean el cliente con `timeout: 20_000, maxRetries: 1`; `agente.ts` lo crea con
+   los valores por defecto del SDK (10 minutos, 2 reintentos). Una llamada colgada se come sola
+   los 300 s de la ruta. Traducción: mismo patrón, con un techo acorde a las 6 vueltas (por
+   ejemplo 60 s por llamada, 1 reintento) y un evento `error` si se agota.
+3. **Duración por paso.** Se guarda qué herramienta llamó el agente y cuántos tokens usó, pero no
+   cuánto tardó cada llamada ni cada herramienta. El diagnóstico del 14/9 tuvo que salir de la
+   API de n8n. Traducción: `ms` en cada `PasoAgente` y `duracion_ms` en la decisión; alimenta el
+   informe `/consumo` y cualquier diagnóstico futuro sin salir de la base. Se junta con el
+   evento `corrida` por barrida que ya pide el brief de la skill
+   (`brief-skill-consumo-ia-super-agente-2026-09-10.md`).
+4. **Frenar las llamadas repetidas.** El documento propone hashear los parámetros de cada
+   tool_call y, a la tercera repetición idéntica, cortar con explicación. Hoy `decidirConAgente`
+   deja que el agente pida la misma propiedad seis veces hasta agotar las vueltas. Traducción:
+   un mapa `herramienta+input → salida` dentro del loop; a la repetición se devuelve "ya lo leíste,
+   está arriba" sin ir a la base. Chico y gratis.
+5. **Ejecutar en paralelo las herramientas de un mismo turno.** El loop las corre una atrás de
+   otra (`for (const tu of llamadas)`); Claude puede pedir varias en un turno. `Promise.all`
+   sobre las de lectura. Ganancia pequeña por decisión; la lección del 14/9 (25,7 s → 82 ms) fue
+   exactamente "no encadenar viajes a la base".
+
+Refuerzan lo ya anotado en §3: resumir el historial largo de WhatsApp en vez de mandarlo entero
+(§4, componente "gestión de contexto"), y correr el set de evaluación en cada cambio de prompt,
+nunca a ojo (§3.1). El documento agrega "A/B de prompts: nunca cambiar sin medir", que es la
+misma regla.
+
+### 6.3 Lo que no es para PRISMA
+
+Sandbox de código (Docker, E2B, Firecracker), cobro por tokens con Stripe, SSO, RBAC de tres
+roles, SDK de Vercel para el bucle, fallback entre proveedores por sesión. Los agentes de PRISMA
+no ejecutan código generado por el modelo, al cliente no se le cobran tokens (se le factura el
+costo de IA aparte, ver `costos-variables-super-agente-2026-09-10.md`), los roles ya existen
+(asesor / director / admin), y el bucle ya está hecho y medido.
+
+### 6.4 Dónde entra cada punto
+
+Ninguno de los cinco está aprobado para construir. El 1 es una escritura en n8n con OK. El 2, 3
+y 4 son cambios chicos en `lib/seguimiento/agente.ts` y se prueban con el set de evaluación
+manual antes de tocar producción. El 5 puede esperar. Se retoman cuando se extraiga `lib/agente/`
+(§3.2), o antes si vuelve a pasar algo como lo del reloj.
