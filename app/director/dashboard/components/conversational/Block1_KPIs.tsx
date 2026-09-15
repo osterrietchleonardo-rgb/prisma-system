@@ -1,196 +1,94 @@
-"use client"
-
 import { Card, CardContent } from "@/components/ui/card"
 import {
-  MessageSquare, CalendarCheck, Handshake, Bot,
-  TrendingUp, TrendingDown, Percent, CreditCard,
-  Home, UserX, Minus
+  MessageSquare, CalendarCheck, Handshake, Bot, Percent, CreditCard, Home, UserX,
+  type LucideIcon,
 } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Info } from "lucide-react"
+import type { ConversationalData } from "@/lib/queries/conversacional"
+import { fmtNum, fmtPct } from "./formato"
 
-interface KPIData {
-  chats_unicos: number
-  visitas_agendadas: number
-  reservas_confirmadas: number
-  seguimientos_ia: number
-  tasa_consulta_visita: number
-  tasa_visita_reserva: number
-  consultas_apto_credito: number
-  necesitan_vender_antes: number
-  solicitaron_humano: number
-  derivados_a_humano?: number
-  tasa_derivacion_efectiva?: number | null
+interface Tarjeta {
+  label: string
+  valor: string
+  desc: string
+  icon: LucideIcon
+  color: string
+  bg: string
 }
 
-interface Block1KPIsProps {
-  kpis: KPIData
-}
-
-const KPI_CONFIG = [
-  {
-    key: "chats_unicos",
-    label: "Chats únicos",
-    icon: MessageSquare,
-    color: "text-blue-600 dark:text-blue-400",
-    bg: "bg-blue-400/10",
-    format: "number",
-    tooltip: "Cantidad de conversaciones únicas de WhatsApp en el período analizado",
-  },
-  {
-    key: "visitas_agendadas",
-    label: "Visitas agendadas",
-    icon: CalendarCheck,
-    color: "text-emerald-700 dark:text-emerald-400",
-    bg: "bg-emerald-400/10",
-    format: "number",
-    tooltip: "Conversaciones donde el lead confirmó una visita a una propiedad",
-  },
-  {
-    key: "reservas_confirmadas",
-    label: "Reservas confirmadas",
-    icon: Handshake,
-    color: "text-accent",
-    bg: "bg-accent/10",
-    format: "number",
-    tooltip: "Chats donde se confirmó pago de reserva (puede ser antes o después de la visita)",
-  },
-  {
-    key: "seguimientos_ia",
-    label: "Seguimientos IA",
-    icon: Bot,
-    color: "text-purple-600 dark:text-purple-400",
-    bg: "bg-purple-400/10",
-    format: "number",
-    tooltip: "Mensajes proactivos enviados por el bot a leads que no habían respondido",
-  },
-  {
-    key: "tasa_consulta_visita",
-    label: "Consulta → Visita",
-    icon: Percent,
-    color: "text-teal-700 dark:text-teal-400",
-    bg: "bg-teal-400/10",
-    format: "percent",
-    tooltip: "% de chats únicos que derivaron en visita agendada",
-  },
-  {
-    key: "tasa_visita_reserva",
-    label: "Visita → Reserva",
-    icon: Percent,
-    color: "text-orange-700 dark:text-orange-400",
-    bg: "bg-orange-400/10",
-    format: "percent",
-    tooltip: "% de visitas que derivaron en reserva confirmada",
-  },
-  {
-    key: "consultas_apto_credito",
-    label: "Consultas crédito",
-    icon: CreditCard,
-    color: "text-sky-700 dark:text-sky-400",
-    bg: "bg-sky-400/10",
-    format: "number",
-    tooltip: "Leads que mencionaron o consultaron sobre crédito hipotecario",
-  },
-  {
-    key: "necesitan_vender_antes",
-    label: "Necesitan vender antes",
-    icon: Home,
-    color: "text-amber-700 dark:text-amber-400",
-    bg: "bg-amber-400/10",
-    format: "number",
-    tooltip: "Leads que indicaron que deben vender su propiedad actual primero",
-  },
-  {
-    key: "solicitaron_humano",
-    label: "Pidieron asesor",
-    icon: UserX,
-    color: "text-rose-700 dark:text-rose-400",
-    bg: "bg-rose-400/10",
-    format: "number",
-    tooltip: "Chats donde el lead pidió explícitamente ser atendido por una persona",
-  },
-]
-
-function formatValue(value: number | null | undefined, format: string): string {
-  if (value === null || value === undefined) return "—"
-  if (format === "percent") return `${value}%`
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`
-  return value.toString()
-}
-
-function KPICard({ config, value }: { config: typeof KPI_CONFIG[0]; value: number | null | undefined }) {
-  const Icon = config.icon
-  const formatted = formatValue(value, config.format)
-
+function KPICard({ t }: { t: Tarjeta }) {
+  const Icon = t.icon
   return (
-    <Card className="border-accent/10 bg-card/50 backdrop-blur-sm hover:border-accent/20 transition-colors group">
+    <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
       <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className={`p-2 rounded-lg ${config.bg}`}>
-            <Icon className={`h-4 w-4 ${config.color}`} />
-          </div>
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="h-3 w-3 text-muted-foreground cursor-help mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[220px] text-xs">
-                {config.tooltip}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        <div className={`mb-3 inline-flex p-2 rounded-lg ${t.bg}`}>
+          <Icon className={`h-4 w-4 ${t.color}`} />
         </div>
-
         <div className="space-y-1">
-          <p className="text-2xl font-bold tracking-tight">{formatted}</p>
-          <p className="text-xs text-muted-foreground leading-tight">{config.label}</p>
+          <p className="text-2xl font-bold tracking-tight">{t.valor}</p>
+          <p className="text-xs font-semibold leading-tight">{t.label}</p>
+          {/* La explicación va a la vista: en el celular los globitos no se abren. */}
+          <p className="text-[11px] text-muted-foreground leading-snug">{t.desc}</p>
         </div>
       </CardContent>
     </Card>
   )
 }
 
-export function Block1KPIs({ kpis }: Block1KPIsProps) {
+export function Block1KPIs({ chats, kpis }: { chats: number; kpis: ConversationalData["kpis"] }) {
+  // 15/9/2026: esta fila leía `consultas_apto_credito` y `solicitaron_humano`, pero el cálculo
+  // mandaba `apto_credito` y `solicitudes_humano`: esas dos tarjetas salían siempre vacías.
+  const tarjetas: Tarjeta[] = [
+    { label: "Chats", valor: fmtNum(chats), desc: "Conversaciones de WhatsApp que entraron en el período", icon: MessageSquare, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-400/10" },
+    { label: "Visitas agendadas", valor: fmtNum(kpis.visitas), desc: "Conversaciones donde quedó una visita agendada", icon: CalendarCheck, color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-400/10" },
+    { label: "Reservas confirmadas", valor: fmtNum(kpis.reservas), desc: "Conversaciones donde se confirmó una reserva", icon: Handshake, color: "text-accent", bg: "bg-accent/10" },
+    { label: "Seguimientos enviados", valor: fmtNum(kpis.seguimientos), desc: "Mensajes automáticos a clientes que habían dejado de responder", icon: Bot, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-400/10" },
+    { label: "Consulta → Visita", valor: fmtPct(kpis.tasaConsultaVisita), desc: "De cada 100 chats, cuántos llegaron a visita agendada", icon: Percent, color: "text-teal-700 dark:text-teal-400", bg: "bg-teal-400/10" },
+    { label: "Visita → Reserva", valor: fmtPct(kpis.tasaVisitaReserva), desc: "De cada 100 visitas agendadas, cuántas terminaron en reserva", icon: Percent, color: "text-orange-700 dark:text-orange-400", bg: "bg-orange-400/10" },
+    { label: "Aptos para crédito", valor: fmtNum(kpis.aptoCredito), desc: "El bot registró que el cliente puede comprar con crédito", icon: CreditCard, color: "text-sky-700 dark:text-sky-400", bg: "bg-sky-400/10" },
+    { label: "Necesitan vender antes", valor: fmtNum(kpis.necesitanVender), desc: "Tienen que vender su propiedad para poder comprar", icon: Home, color: "text-amber-700 dark:text-amber-400", bg: "bg-amber-400/10" },
+    { label: "Pidieron asesor", valor: fmtNum(kpis.pidieronAsesor), desc: "El cliente pidió hablar con una persona", icon: UserX, color: "text-rose-700 dark:text-rose-400", bg: "bg-rose-400/10" },
+  ]
+
+  // (pidió ∧ derivado) / pidió. Antes era derivados / pidieron y en Central daba 202 %, porque
+  // contaba también a los derivados que no lo habían pedido (15/9/2026). Esos van aparte.
+  const tasa = kpis.tasaDerivacion
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h3 className="text-lg font-bold">Métricas Generales</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-lg font-bold">Métricas generales</h3>
         <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 font-medium">
-          Período analizado
+          Período elegido arriba
         </span>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-        {KPI_CONFIG.map((config) => (
-          <KPICard
-            key={config.key}
-            config={config}
-            value={kpis[config.key as keyof KPIData] as number}
-          />
-        ))}
+        {tarjetas.map((t) => <KPICard key={t.label} t={t} />)}
       </div>
 
-      {/* Derivation quality row */}
-      {kpis.derivados_a_humano !== undefined && kpis.solicitaron_humano > 0 && (
-        <div className="flex flex-wrap gap-3 p-3 rounded-lg border border-dashed border-accent/20 bg-card/30">
-          <p className="text-xs text-muted-foreground w-full font-medium mb-0.5">Derivación a asesor humano</p>
-          <div className="flex gap-6 text-sm">
-            <span>
-              <span className="font-bold">{kpis.solicitaron_humano}</span>
-              <span className="text-muted-foreground ml-1">solicitaron</span>
+      <div className="p-3 rounded-lg border border-dashed border-accent/20 bg-card/30 space-y-2">
+        <p className="text-xs text-muted-foreground font-medium">Derivación a una persona del equipo</p>
+        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          <span>
+            <span className="font-bold">{fmtNum(kpis.pidieronAsesor)}</span>
+            <span className="text-muted-foreground ml-1">pidieron hablar con una persona</span>
+          </span>
+          <span>
+            <span className="font-bold">{fmtNum(kpis.pidieronYDerivados)}</span>
+            <span className="text-muted-foreground ml-1">de esos quedaron derivados a un asesor</span>
+          </span>
+          <span>
+            <span className={`font-bold ${tasa === null ? "" : tasa < 80 ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}`}>
+              {fmtPct(tasa)}
             </span>
-            <span>
-              <span className="font-bold">{kpis.derivados_a_humano || 0}</span>
-              <span className="text-muted-foreground ml-1">derivados</span>
-            </span>
-            <span className={`font-bold ${(kpis.tasa_derivacion_efectiva || 0) < 80 ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"}`}>
-              {kpis.tasa_derivacion_efectiva !== null && kpis.tasa_derivacion_efectiva !== undefined
-                ? `${kpis.tasa_derivacion_efectiva}% efectividad`
-                : "—"}
-            </span>
-          </div>
+            <span className="text-muted-foreground ml-1">de los pedidos se derivaron</span>
+          </span>
+          <span>
+            <span className="font-bold">{fmtNum(kpis.derivadosSinPedirlo)}</span>
+            <span className="text-muted-foreground ml-1">derivados sin haberlo pedido</span>
+          </span>
         </div>
-      )}
+      </div>
     </div>
   )
 }

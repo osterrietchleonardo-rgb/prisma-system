@@ -69,7 +69,6 @@ PRISMA es un SaaS **multi-tenant** para inmobiliarias argentinas. Cada inmobilia
 │  /api/valuation/*   → Tasaciones IA                     │
 │  /api/mercado/*     → Sync mercado + Refresh            │
 │  /api/documents/*   → Upload, Extract, Process          │
-│  /api/conversational-insights/* → Analytics agregado    │
 │  /api/push/*        → Push notification subscriptions   │
 │  /api/cron/*        → Tareas programadas                │
 │  /api/admin-vakdor/* → Super-admin endpoints            │
@@ -385,7 +384,7 @@ El borrado definitivo **no puede destruir el historial de alguien real**: antes 
 - **`mercado_stats`** — Estadísticas agregadas de cierre (Reporte Inmobiliario)
 
 #### Analytics
-- **`dashboard_conversational_insights`** — Cache de análisis conversacional agregado
+- ~~`dashboard_conversational_insights`~~ — borrada el 15/9/2026: el análisis conversacional se calcula en vivo (ver §17).
 
 #### Admin
 - **`admin_vakdor_users`** — Usuarios super-admin
@@ -1580,8 +1579,14 @@ Es el mismo estudio que Remax publica como "índice Remax". Código: `lib/mercad
 
 ## 17. Módulo Conversational Insights (Analytics)
 
-**Endpoint:** `POST /api/conversational-insights/analyze`  
-**Archivo:** `app/api/conversational-insights/analyze/route.ts`
+> **Cambió el 15/9/2026.** Todo lo que sigue sobre endpoints, botón "Analizar", períodos propios y
+> caché describe la versión vieja. Hoy la sección se calcula **en vivo y sin IA** en cada carga del
+> Dashboard, en `lib/queries/conversacional.ts` (`getConversationalData(agencyId, agentId, from, to)`),
+> con el filtro de arriba (período en días argentinos + asesor). No hay rutas `/api/conversational-insights/*`
+> ni tabla de caché. Las fórmulas corregidas están comentadas en ese archivo.
+
+**Endpoint (viejo, borrado):** `POST /api/conversational-insights/analyze`  
+**Archivo (viejo, borrado):** `app/api/conversational-insights/analyze/route.ts`
 
 ### 17.1 Propósito
 
@@ -1633,7 +1638,7 @@ Dashboard de analytics **sin IA** que agrega métricas de todas las conversacion
 
 ### 17.4 Status Endpoint
 
-**Endpoint:** `GET /api/conversational-insights/status`
+**Endpoint (viejo, borrado el 15/9/2026):** `GET /api/conversational-insights/status`
 
 Retorna el estado del análisis en progreso.
 
@@ -2437,8 +2442,6 @@ Las herramientas como **Tasaciones, Tutor IA y Consultor IA** funcionan de idén
 | `/api/contratos/generate-pdf` | POST | Tenant | Finalizar + firmar |
 | `/api/contratos/[id]` | GET, PATCH, DELETE | Sesión | Contrato individual |
 | `/api/contratos/[id]/signatures` | GET, POST | Sesión | Firmas |
-| `/api/conversational-insights/analyze` | POST | Director | Analytics WA |
-| `/api/conversational-insights/status` | GET | Director | Estado análisis |
 | `/api/cron/sync-templates` | GET | CRON_SECRET | Sync templates Meta |
 | `/api/debug/env-check` | GET | — | Debug env vars |
 | `/api/debug/rls-check` | GET | — | Debug RLS |

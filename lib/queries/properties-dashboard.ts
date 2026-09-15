@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { todasLasFilas } from "@/lib/queries/todas-las-filas"
 import { estabaEnCartera } from "@/lib/queries/cartera"
+import { finDelDiaAR } from "@/lib/dashboard/periodo"
 
 /** Tokko guarda la situación en inglés; la pantalla la muestra en castellano. */
 const SITUACION: Record<string, string> = {
@@ -24,7 +25,7 @@ export async function getPropertiesDashboardData(agencyId: string, agentId?: str
     const { data } = await supabase.from("profiles").select("email").eq("id", agentId).maybeSingle()
     emailAsesor = data?.email ?? null
   }
-  const instante = endDate ? Date.parse(`${endDate}T23:59:59.999`) : Date.now()
+  const instante = endDate ? Date.parse(finDelDiaAR(endDate)) : Date.now()
 
   // Todas (también las dadas de baja): con alta y baja se sabe cuáles estaban al cierre del
   // período. De a tandas: la base corta en 1.000 filas.

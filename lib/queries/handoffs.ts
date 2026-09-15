@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { inicioDelDiaAR, finDelDiaAR } from "@/lib/dashboard/periodo"
 
 /**
  * Handoffs sin atender.
@@ -100,10 +101,11 @@ export async function getHandoffsDashboardData(
     .order("created_at", { ascending: false })
     .limit(MAX_HANDOFFS)
 
-  if (startDate) handoffQuery = handoffQuery.gte("created_at", startDate)
+  // Días argentinos: sin zona, el período corría 3 horas (15/9/2026).
+  if (startDate) handoffQuery = handoffQuery.gte("created_at", inicioDelDiaAR(startDate))
   // El filtro de fecha manda 'yyyy-MM-dd'. Sin extenderlo a fin de día se perderían
   // los handoffs de hoy, que son justamente los que hay que atender.
-  if (endDate) handoffQuery = handoffQuery.lte("created_at", `${endDate}T23:59:59.999Z`)
+  if (endDate) handoffQuery = handoffQuery.lte("created_at", finDelDiaAR(endDate))
 
   const { data: handoffMsgs, error: handoffError } = await handoffQuery
   if (handoffError || !handoffMsgs?.length) return EMPTY

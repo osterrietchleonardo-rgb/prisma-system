@@ -59,7 +59,33 @@ Mergeada: PR #62 (`3c78370`).
 - Verificado (VAKDOR, 30 días vs 1/1–30/6): consultas 0→1, cartera 94→89, propiedades 94→89,
   pipeline 0→1, meses Ene–Jun, objetivos sólo "Leonardo Asesor" al elegirlo.
 
-**Pendiente:** tanda 3 (Conversacional en vivo, Leads de Tokko corregido, Inhibidores reales).
+Mergeada: PR #64 (`a64c961`).
+
+**Tanda 3 — Conversacional en vivo, Leads corregido, días argentinos** (misma rama)
+
+- Brief de sólo lectura + dos agentes en paralelo (archivos disjuntos); yo conecté `page.tsx`.
+- `lib/queries/conversacional.ts`: en vivo, sin IA, sin botón ni caché, con el filtro. Arreglados:
+  claves que no coincidían, derivación 202 %, "necesitan vender" (clave `necesita_vender_para_comprar`),
+  calificados (`metricas.calificado`), visitas con estados inexistentes, horas en UTC y con 11 % de
+  los mensajes, "null" como categoría. Tasa de cierre con las cantidades al lado (2 ganadas, 0 perdidas
+  daba "100 %"). Borradas `/api/conversational-insights/{analyze,status}` y `ConversationalFilters`.
+- `lib/queries/leads-dashboard.ts`: agregados en el servidor, fecha = `tokko_created_date` (el
+  `created_at` es la hora del sync), sin tope de 5.000, estados reales, "Qué está frenando la
+  conversión" calculado (antes textos fijos), tabla por asesor ordenable. Fuera "Ciclo de vida"
+  (`tokko_raw.deleted_at` no es fecha de cierre) y la pestaña de texto fijo.
+- `lib/dashboard/periodo.ts#inicioDelDiaAR/finDelDiaAR`: todos los cortes en -03:00 (antes UTC:
+  el período corría 3 h; Central 483 → 482 en 30 días).
+- Verificado (VAKDOR 1/1–15/9): 1 chat, pico 16 h sábado; 1.594 leads, 285 sin contactar (277 +48 h),
+  todos sin asignar — igual que el SQL. Sin textos de IA, sin NaN, sin errores de página. 4,4 s de carga.
+
+**Base — PENDIENTE (Leonardo dio el OK el 15/9, pero el clasificador de Claude Code frenó el DDL
+contra producción: "Modify Shared Resources"; no se aplicó nada, verificado con SELECT):**
+- Índices `wa_conversations(agency_id, created_at)`, `wa_messages(agency_id, created_at)`,
+  `leads(agency_id, tokko_created_date)` con CONCURRENTLY: `20260915120000_indices_dashboard_por_fecha.sql`
+  (cada sentencia sola: CONCURRENTLY no va en transacción).
+- Borrar `dashboard_conversational_insights`, recién DESPUÉS del deploy (el código viejo la leía):
+  `20260915130000_borrar_cache_conversacional.sql`. Respaldo previo (18 filas, todas de VAKDOR,
+  columnas, 4 políticas, restricciones) en el scratchpad de la sesión del 15/9.
 
 ---
 

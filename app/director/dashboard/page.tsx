@@ -40,6 +40,8 @@ import { AdvisorFilter } from "@/components/dashboard/advisor-filter"
 import { DatePeriodFilter } from "@/components/dashboard/DatePeriodFilter"
 import { HandoffsPanel } from "@/components/dashboard/HandoffsPanel"
 import { getHandoffsDashboardData } from "@/lib/queries/handoffs"
+import { getLeadsDashboardData } from "@/lib/queries/leads-dashboard"
+import { getConversationalData } from "@/lib/queries/conversacional"
 import { periodoDelDashboard } from "@/lib/dashboard/periodo"
 
 const DashboardCharts = dynamic(() => import("@/components/dashboard-charts").then(m => m.DashboardCharts), {
@@ -85,12 +87,18 @@ export default async function DashboardPage({
   // Todo responde al filtro de arriba (fechas + asesor). Los objetivos son anuales: toman el año
   // en que termina el período elegido.
   const anioFiltro = Number(to.slice(0, 4)) || new Date().getFullYear()
-  const [dashboardData, propertiesData, pipelineData, objectivesData, handoffsData] = await Promise.all([
+  const [dashboardData, propertiesData, pipelineData, objectivesData, handoffsData, leadsData, conversacionalData] = await Promise.all([
     getDashboardData(profile.agency_id, agentId, from, to),
     getPropertiesDashboardData(profile.agency_id, agentId, to),
     getPipelineDashboardData(profile.agency_id, agentId, from, to),
     getObjectivesDashboard(profile.agency_id, anioFiltro),
     getHandoffsDashboardData(profile.agency_id, agentId, from, to),
+    // Leads de Tokko: calculados en el servidor con el mismo filtro (antes se pedían desde el
+    // navegador, con su propio filtro de fechas y un tope de 5.000 filas).
+    getLeadsDashboardData(profile.agency_id, agentId, from, to),
+    // Inteligencia Conversacional: en vivo y sin IA, con el mismo filtro. Antes había que
+    // apretar "Analizar" y se leía de una caché que Central nunca tuvo (15/9/2026).
+    getConversationalData(profile.agency_id, agentId, from, to),
   ])
   const objetivosDelFiltro = agentId ? objectivesData.filter((o) => o.agentId === agentId) : objectivesData
   // El desplegable de asesores necesita la lista entera; el ranking, sólo el elegido.
@@ -157,14 +165,14 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      <ConversationalIntelligence />
+      <ConversationalIntelligence data={conversacionalData} />
 
       <DashboardPipelineSection
         stages={pipelineData.stages}
         summary={pipelineData.summary}
       />
 
-      <DashboardLeadsSection />
+      <DashboardLeadsSection data={leadsData} />
 
       {propertiesData && (
         <DashboardPropertiesSection data={propertiesData} />

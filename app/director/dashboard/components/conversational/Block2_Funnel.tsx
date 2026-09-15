@@ -1,239 +1,110 @@
-"use client"
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Info, CheckCircle2, XCircle, Clock, MessageCircle } from "lucide-react"
+import { CheckCircle2, XCircle, MessageCircle } from "lucide-react"
+import type { ConversationalData } from "@/lib/queries/conversacional"
+import { fmtNum, fmtPct } from "./formato"
 
-interface FunnelStage {
-  count: number
-  pct: number
-}
+const pctDe = (n: number, total: number) => (total > 0 ? Math.round((n / total) * 100) : 0)
 
-interface FunnelStatusData {
-  open: FunnelStage
-  snoozed: FunnelStage
-  closed_lost: FunnelStage
-  closed_won: FunnelStage
-  tasa_cierre_real: number | null
-}
+export function Block2Funnel({ chats, embudo }: { chats: number; embudo: ConversationalData["embudo"] }) {
+  // "Calificados" es el dato que marcó el agente (`metricas.calificado` = 'sí'). La regla vieja
+  // (tener operación, tipo o presupuesto) daba 463 de 482 en Central (15/9/2026).
+  const etapas = [
+    { key: "chats", label: "Chats recibidos", count: chats, color: "#60a5fa", lightColor: "rgba(96,165,250,0.15)" },
+    { key: "calificados", label: "Calificados", count: embudo.calificados, color: "#34d399", lightColor: "rgba(52,211,153,0.15)" },
+    { key: "visitas", label: "Visita agendada", count: embudo.visitas, color: "#a78bfa", lightColor: "rgba(167,139,250,0.15)" },
+    { key: "reservas", label: "Reserva confirmada", count: embudo.reservas, color: "#f59e0b", lightColor: "rgba(245,158,11,0.15)" },
+  ]
+  const max = chats || 1
 
-interface FunnelData {
-  chats_recibidos: FunnelStage
-  leads_calificados: FunnelStage
-  visita_agendada: FunnelStage
-  reserva_confirmada: FunnelStage
-  funnel_status?: FunnelStatusData
-}
-
-interface Block2FunnelProps {
-  funnel: FunnelData
-}
-
-const STAGES = [
-  { key: "chats_recibidos",   label: "Chats recibidos",    color: "#60a5fa", lightColor: "rgba(96,165,250,0.15)" },
-  { key: "leads_calificados", label: "Leads calificados",  color: "#34d399", lightColor: "rgba(52,211,153,0.15)" },
-  { key: "visita_agendada",   label: "Visita agendada",    color: "#a78bfa", lightColor: "rgba(167,139,250,0.15)" },
-  { key: "reserva_confirmada",label: "Reserva confirmada", color: "#f59e0b", lightColor: "rgba(245,158,11,0.15)" },
-]
-
-const PIPELINE_STAGES = [
-  {
-    key: "open" as const,
-    label: "Activos",
-    desc: "En conversación o esperando respuesta",
-    icon: MessageCircle,
-    color: "text-blue-600 dark:text-blue-400",
-    bg: "bg-blue-400/10",
-    border: "border-blue-400/20",
-  },
-  {
-    key: "snoozed" as const,
-    label: "En pausa",
-    desc: "Lead pausado, pendiente de seguimiento",
-    icon: Clock,
-    color: "text-amber-700 dark:text-amber-400",
-    bg: "bg-amber-400/10",
-    border: "border-amber-400/20",
-  },
-  {
-    key: "closed_won" as const,
-    label: "Cerrados ganados",
-    desc: "Conversión exitosa — reserva o venta cerrada",
-    icon: CheckCircle2,
-    color: "text-emerald-700 dark:text-emerald-400",
-    bg: "bg-emerald-400/10",
-    border: "border-emerald-400/20",
-  },
-  {
-    key: "closed_lost" as const,
-    label: "Cerrados perdidos",
-    desc: "Lead que no avanzó en el proceso",
-    icon: XCircle,
-    color: "text-rose-700 dark:text-rose-400",
-    bg: "bg-rose-400/10",
-    border: "border-rose-400/20",
-  },
-]
-
-export function Block2Funnel({ funnel }: Block2FunnelProps) {
-  const maxCount = funnel.chats_recibidos.count || 1
-
-  const stageData = STAGES.map((stage, idx) => {
-    const data = funnel[stage.key as keyof Pick<FunnelData, "chats_recibidos" | "leads_calificados" | "visita_agendada" | "reserva_confirmada">]
-    const prevData = idx > 0 ? funnel[STAGES[idx - 1].key as keyof Pick<FunnelData, "chats_recibidos" | "leads_calificados" | "visita_agendada" | "reserva_confirmada">] : null
-    const dropCount = prevData ? prevData.count - data.count : 0
-    const dropPct = prevData && prevData.count > 0 ? Math.round((dropCount / prevData.count) * 100) : 0
-    return { ...stage, ...data, dropCount, dropPct }
-  })
-
-  const fs = funnel.funnel_status
-  const hasPipelineData = fs && (fs.open.count + fs.snoozed.count + fs.closed_won.count + fs.closed_lost.count) > 0
+  const estados = [
+    { key: "abiertas", label: "Abiertas", desc: "Siguen en curso", count: embudo.abiertas, icon: MessageCircle, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-400/10", border: "border-blue-400/20" },
+    { key: "ganadas", label: "Ganadas", desc: "Marcadas como cerradas con éxito", count: embudo.ganadas, icon: CheckCircle2, color: "text-emerald-700 dark:text-emerald-400", bg: "bg-emerald-400/10", border: "border-emerald-400/20" },
+    { key: "perdidas", label: "Perdidas", desc: "Marcadas como cerradas sin éxito", count: embudo.perdidas, icon: XCircle, color: "text-rose-700 dark:text-rose-400", bg: "bg-rose-400/10", border: "border-rose-400/20" },
+  ]
 
   return (
     <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
       <CardHeader className="pb-2">
-        <div className="flex items-center gap-2">
-          <CardTitle className="text-lg">Funnel de Conversión</CardTitle>
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent className="max-w-[240px] text-xs">
-                Cada etapa muestra el número de conversaciones que alcanzaron ese punto del proceso comercial.
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        <CardTitle className="text-lg">Embudo de conversión</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Cuántas conversaciones del período llegaron a cada etapa. El porcentaje es sobre el total de chats.
+        </p>
       </CardHeader>
       <CardContent className="space-y-6">
-
-        {/* ── Funnel de etapas (desde metricas) ── */}
         <div className="space-y-2">
-          {stageData.map((stage, idx) => {
-            const barWidth = maxCount > 0 ? (stage.count / maxCount) * 100 : 0
+          {etapas.map((etapa, idx) => {
+            const anterior = idx > 0 ? etapas[idx - 1].count : null
+            const menos = anterior !== null ? anterior - etapa.count : 0
             return (
-              <TooltipProvider key={stage.key} delayDuration={100}>
-                <div className="space-y-1">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex items-center gap-3 group cursor-default">
-                        <span className="text-xs text-muted-foreground w-[140px] shrink-0 text-right">
-                          {stage.label}
-                        </span>
-                        <div className="flex-1 relative h-8 rounded-lg overflow-hidden bg-muted/30">
-                          <div
-                            className="absolute inset-y-0 left-0 rounded-lg transition-all duration-700"
-                            style={{
-                              width: `${barWidth}%`,
-                              backgroundColor: stage.lightColor,
-                              borderRight: `2px solid ${stage.color}`,
-                            }}
-                          />
-                          <div className="absolute inset-0 flex items-center justify-between px-3">
-                            <span className="text-xs font-bold" style={{ color: stage.color }}>
-                              {stage.count.toLocaleString("es-AR")}
-                            </span>
-                            <span className="text-xs font-semibold text-foreground/70">
-                              {stage.pct}%
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="text-xs">
-                      <p className="font-semibold">{stage.label}</p>
-                      <p>{stage.count.toLocaleString("es-AR")} conversaciones</p>
-                      <p>{stage.pct}% del total</p>
-                      {idx > 0 && (
-                        <p className="text-rose-700 dark:text-rose-400 mt-1">
-                          ↓ {stage.dropCount} perdidos desde etapa anterior ({stage.dropPct}%)
-                        </p>
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-
-                  {idx > 0 && stage.dropCount > 0 && (
-                    <div className="flex items-center gap-3">
-                      <span className="w-[140px] shrink-0" />
-                      <p className="text-[10px] text-muted-foreground pl-1">
-                        ↘ {stage.dropCount} leads perdidos ({stage.dropPct}% de la etapa anterior)
-                      </p>
+              <div key={etapa.key} className="space-y-1">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground w-[96px] sm:w-[140px] shrink-0 text-right leading-tight">
+                    {etapa.label}
+                  </span>
+                  <div className="flex-1 relative h-8 rounded-lg overflow-hidden bg-muted/30">
+                    <div
+                      className="absolute inset-y-0 left-0 rounded-lg transition-all duration-700"
+                      style={{ width: `${(etapa.count / max) * 100}%`, backgroundColor: etapa.lightColor, borderRight: `2px solid ${etapa.color}` }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-between px-3">
+                      <span className="text-xs font-bold text-foreground">{fmtNum(etapa.count)}</span>
+                      <span className="text-xs font-semibold text-foreground/70">{pctDe(etapa.count, chats)}%</span>
                     </div>
-                  )}
+                  </div>
                 </div>
-              </TooltipProvider>
+
+                {etapa.key === "calificados" && embudo.calificadosParcial > 0 && (
+                  <p className="text-[11px] text-muted-foreground pl-[108px] sm:pl-[152px]">
+                    Además, {fmtNum(embudo.calificadosParcial)} quedaron calificados a medias (el bot marcó "parcial").
+                  </p>
+                )}
+                {menos > 0 && etapa.key !== "calificados" && (
+                  <p className="text-[11px] text-muted-foreground pl-[108px] sm:pl-[152px]">
+                    ↘ {fmtNum(menos)} menos que la etapa anterior
+                  </p>
+                )}
+              </div>
             )
           })}
         </div>
 
-        {/* ── Estado real del pipeline (funnel_status nativo) ── */}
-        {hasPipelineData && (
-          <div className="pt-4 border-t border-accent/10 space-y-3">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-semibold">Estado real del pipeline</p>
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-[240px] text-xs">
-                    Estado marcado directamente en el sistema por el equipo, más confiable que el análisis de IA.
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {PIPELINE_STAGES.map(({ key, label, desc, icon: Icon, color, bg, border }) => {
-                const data = fs![key]
-                return (
-                  <TooltipProvider key={key} delayDuration={150}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <div className={`rounded-xl p-3 border ${bg} ${border} cursor-default`}>
-                          <div className="flex items-center gap-1.5 mb-1.5">
-                            <Icon className={`h-3.5 w-3.5 ${color}`} />
-                            <span className={`text-[10px] font-semibold uppercase tracking-wide ${color}`}>
-                              {label}
-                            </span>
-                          </div>
-                          <p className="text-xl font-bold">{data.count}</p>
-                          <p className="text-[10px] text-muted-foreground">{data.pct}% del total</p>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent className="text-xs max-w-[180px]">{desc}</TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )
-              })}
-            </div>
-
-            {/* Tasa de cierre real */}
-            {fs!.tasa_cierre_real !== null && (
-              <div className="flex items-center gap-2 p-2 rounded-lg bg-emerald-400/5 border border-emerald-400/15">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
-                <p className="text-xs text-muted-foreground">
-                  Tasa de cierre real (ganados vs. cerrados totales):{" "}
-                  <span className={`font-bold text-sm ${fs!.tasa_cierre_real >= 50 ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}>
-                    {fs!.tasa_cierre_real}%
-                  </span>
-                </p>
-              </div>
-            )}
+        <div className="pt-4 border-t border-accent/10 space-y-3">
+          <div>
+            <p className="text-sm font-semibold">Cómo quedaron marcadas</p>
+            <p className="text-[11px] text-muted-foreground">Estado de cada conversación en el sistema.</p>
           </div>
-        )}
 
-        {/* Summary note */}
+          <div className="grid grid-cols-1 min-[400px]:grid-cols-3 gap-2">
+            {estados.map(({ key, label, desc, count, icon: Icon, color, bg, border }) => (
+              <div key={key} className={`rounded-xl p-3 border ${bg} ${border}`}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Icon className={`h-3.5 w-3.5 ${color}`} />
+                  <span className={`text-[10px] font-semibold uppercase tracking-wide ${color}`}>{label}</span>
+                </div>
+                <p className="text-xl font-bold">{fmtNum(count)}</p>
+                <p className="text-[10px] text-muted-foreground">{pctDe(count, chats)}% del total · {desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-start gap-2 p-2 rounded-lg bg-emerald-400/5 border border-emerald-400/15">
+            <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 text-emerald-700 dark:text-emerald-400 shrink-0" />
+            <p className="text-xs text-muted-foreground">
+              Tasa de cierre (ganadas sobre ganadas más perdidas):{" "}
+              <span className="font-bold text-sm text-foreground">{fmtPct(embudo.tasaCierre)}</span>
+              {/* Las cantidades al lado: con pocas cerradas el % engaña (Central, 15/9/2026: 100% con 2 ganadas y 0 perdidas). */}
+              {embudo.tasaCierre !== null &&
+                ` (${embudo.ganadas} ${embudo.ganadas === 1 ? "ganada" : "ganadas"}, ${embudo.perdidas} ${embudo.perdidas === 1 ? "perdida" : "perdidas"})`}
+              {embudo.tasaCierre === null && " — todavía no hay conversaciones del período marcadas como ganadas o perdidas."}
+            </p>
+          </div>
+        </div>
+
         <div className="pt-1 border-t border-accent/10">
           <p className="text-xs text-muted-foreground">
-            <span className="text-accent font-semibold">{funnel.chats_recibidos.count}</span> conversaciones analizadas.
-            Tasa de conversión general:{" "}
-            <span className="font-semibold text-foreground/80">
-              {funnel.chats_recibidos.count > 0
-                ? `${Math.round((funnel.reserva_confirmada.count / funnel.chats_recibidos.count) * 100)}%`
-                : "—"}
-            </span>
+            <span className="text-accent font-semibold">{fmtNum(chats)}</span> conversaciones en el período.
+            Tasa de conversión general (reservas sobre chats):{" "}
+            <span className="font-semibold text-foreground/80">{chats > 0 ? `${pctDe(embudo.reservas, chats)}%` : "—"}</span>
           </p>
         </div>
       </CardContent>
