@@ -23,6 +23,8 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import type { TiempoRespuesta, TiemposRespuesta } from "@/lib/queries/dashboard";
+import { etiquetaPeriodo } from "@/lib/dashboard/periodo";
 
 interface MetricCardProps {
   title: string;
@@ -34,6 +36,8 @@ interface MetricCardProps {
     trend?: "up" | "down" | "neutral";
   }[];
   color: string;
+  /** Aclaración visible al pie de la tarjeta (los globitos no se abren en el celular). */
+  note?: React.ReactNode;
 }
 
 /* Las clases se escriben enteras a proposito: Tailwind no puede ver
@@ -55,7 +59,7 @@ const COLORES: Record<string, { fondo: string; icono: string }> = {
 }
 const COLOR_POR_DEFECTO = { fondo: "bg-muted", icono: "text-foreground" }
 
-function MetricGroup({ title, icon: Icon, metrics, color }: MetricCardProps) {
+function MetricGroup({ title, icon: Icon, metrics, color, note }: MetricCardProps) {
   const c = COLORES[color] ?? COLOR_POR_DEFECTO
   return (
 
@@ -78,6 +82,11 @@ function MetricGroup({ title, icon: Icon, metrics, color }: MetricCardProps) {
             </div>
           </div>
         ))}
+        {note && (
+          <div className="border-t border-accent/10 pt-2 text-[11px] leading-snug text-muted-foreground space-y-1">
+            {note}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -94,6 +103,13 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
   const hayCierresDeAlquiler = kpis.cierresAlquiler > 0 || kpis.gciAlquiler > 0;
   const hayCierresSinDefinir = kpis.cierresSinDefinir > 0 || kpis.gciSinDefinir > 0;
   const formatPercent = (val: number) => `${val.toFixed(1)}%`;
+
+  // Tiempos de respuesta: arriba el promedio, abajo la mediana y cuántas veces se midió.
+  const rt: TiemposRespuesta | null | undefined = kpis.responseTime;
+  const filaTiempo = (label: string, t?: TiempoRespuesta) =>
+    t && t.casos > 0
+      ? { label, value: t.promedio, subValue: `mediana ${t.mediana} · ${t.casos} ${t.casos === 1 ? "vez" : "veces"}` }
+      : { label, value: "---" };
 
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -243,11 +259,29 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
         icon={Clock}
         color="cyan-500"
         metrics={[
-          { label: "1er Msg (BOT)", value: kpis.responseTime?.botFirst || "---" },
-          { label: "Entre Msg (BOT)", value: kpis.responseTime?.botBetween || "---" },
-          { label: "1er Msg (ASESOR)", value: kpis.responseTime?.humanFirst || "---" },
-          { label: "Entre Msg (ASESOR)", value: kpis.responseTime?.humanBetween || "---" },
+          filaTiempo("1er Msg (BOT)", rt?.botFirst),
+          filaTiempo("Entre Msg (BOT)", rt?.botBetween),
+          filaTiempo("1er Msg (ASESOR)", rt?.humanFirst),
+          filaTiempo("Entre Msg (ASESOR)", rt?.humanBetween),
         ]}
+        note={
+          <>
+            <p>
+              Período: {etiquetaPeriodo(rt?.desde, rt?.hasta)}. Mide desde que el cliente escribe
+              hasta que le contestan. «1er Msg» es la primera respuesta de la charla; «Entre Msg», el resto.
+            </p>
+            <p>
+              <span className="font-semibold text-foreground">Arriba, el promedio:</span> suma todas
+              las esperas; unas pocas muy largas lo suben.{" "}
+              <span className="font-semibold text-foreground">Abajo, la mediana:</span> la mitad de
+              las respuestas llegó más rápido que esto; es lo habitual.
+            </p>
+            <p>
+              Si el bot pasó el cliente al asesor y el cliente no volvió a escribir, esa espera se ve
+              en «Handoffs sin atender», más abajo.
+            </p>
+          </>
+        }
       />
     </div>
   );

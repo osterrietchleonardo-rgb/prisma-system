@@ -9,6 +9,24 @@ function finDelDia(fecha: string): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T23:59:59.999` : fecha
 }
 
+/** Una fila de la tarjeta "Tiempos Respuesta": promedio y mediana de la espera, ya formateados. */
+export interface TiempoRespuesta {
+  promedio: string
+  mediana: string
+  /** Cuántas esperas entraron en la cuenta. */
+  casos: number
+}
+
+export interface TiemposRespuesta {
+  botFirst: TiempoRespuesta
+  botBetween: TiempoRespuesta
+  humanFirst: TiempoRespuesta
+  humanBetween: TiempoRespuesta
+  /** El período del filtro, 'yyyy-MM-dd', para que la aclaración diga qué días cuenta. */
+  desde?: string
+  hasta?: string
+}
+
 export async function getDashboardData(
   agencyId: string,
   agentId?: string,
@@ -238,7 +256,7 @@ export async function getDashboardData(
     leadsLocatarios: metrics.prospeccion.leads.locatario,
     channelDistribution: Object.entries(metrics.prospeccion.channels).map(([label, count]) => ({ label, count })),
     // Inicializado aqui para tipar la clave; se sobreescribe mas abajo con los valores reales
-    responseTime: { botFirst: '', botBetween: '', humanFirst: '', humanBetween: '' },
+    responseTime: null as TiemposRespuesta | null,
 
     // Prelisting
     consultasWa: metrics.prospeccion.waChats,
@@ -404,18 +422,31 @@ export async function getDashboardData(
     };
   }).reverse();
 
-  // 5. Response Time Analytics (New)
-  let msgQuery = supabase
-    .from("wa_messages")
-    .select("conversation_id, role, created_at, wa_conversations!inner(agent_id)")
-    .eq("agency_id", agencyId)
-    .order("created_at", { ascending: true });
+  // 5. Tiempos de respuesta.
+  // La base entrega como máximo 1.000 filas por consulta. Sin paginar, la tarjeta se calculaba
+  // solo con los primeros días del período (15/9/2026: Central tenía 9.104 mensajes en 30 días
+  // y la "1 h y pico" de la tarjeta salía de una sola respuesta).
+  const PAGINA = 1000;
+  const messages: any[] = [];
+  for (let desde = 0; ; desde += PAGINA) {
+    let msgQuery = supabase
+      .from("wa_messages")
+      .select("conversation_id, role, created_at, wa_conversations!inner(agent_id)")
+      .eq("agency_id", agencyId)
+      .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(desde, desde + PAGINA - 1);
 
-  if (agentId) msgQuery = msgQuery.eq("wa_conversations.agent_id", agentId);
-  if (startDate) msgQuery = msgQuery.gte("created_at", startDate);
-  if (endDate) msgQuery = msgQuery.lte("created_at", endDate);
+    if (agentId) msgQuery = msgQuery.eq("wa_conversations.agent_id", agentId);
+    if (startDate) msgQuery = msgQuery.gte("created_at", startDate);
+    // El filtro manda 'yyyy-MM-dd': sin extenderlo a fin de día se perdía el último día.
+    if (endDate) msgQuery = msgQuery.lte("created_at", `${endDate}T23:59:59.999Z`);
 
-  const { data: messages } = await msgQuery;
+    const { data, error } = await msgQuery;
+    if (error || !data?.length) break;
+    messages.push(...data);
+    if (data.length < PAGINA) break;
+  }
 
   const respTimes = {
     bot: { first: [] as number[], between: [] as number[] },
@@ -465,6 +496,14 @@ export async function getDashboardData(
   });
 
   const calculateAvg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+  // El promedio lo suben unas pocas esperas muy largas; la mediana muestra lo habitual.
+  // Se muestran los dos porque cuentan cosas distintas (Central, 30 días: 10 h vs 1 h 34 m).
+  const calculateMedian = (arr: number[]) => {
+    if (!arr.length) return 0;
+    const s = [...arr].sort((a, b) => a - b);
+    const mid = Math.floor(s.length / 2);
+    return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+  };
   const formatDuration = (ms: number) => {
     if (ms <= 0) return "---";
     const sec = Math.floor(ms / 1000);
@@ -476,11 +515,19 @@ export async function getDashboardData(
     return `${Math.floor(hr/24)}d ${hr%24}h`;
   };
 
+  const tiempo = (arr: number[]): TiempoRespuesta => ({
+    promedio: formatDuration(calculateAvg(arr)),
+    mediana: formatDuration(calculateMedian(arr)),
+    casos: arr.length,
+  });
+
   kpis.responseTime = {
-    botFirst: formatDuration(calculateAvg(respTimes.bot.first)),
-    botBetween: formatDuration(calculateAvg(respTimes.bot.between)),
-    humanFirst: formatDuration(calculateAvg(respTimes.human.first)),
-    humanBetween: formatDuration(calculateAvg(respTimes.human.between))
+    botFirst: tiempo(respTimes.bot.first),
+    botBetween: tiempo(respTimes.bot.between),
+    humanFirst: tiempo(respTimes.human.first),
+    humanBetween: tiempo(respTimes.human.between),
+    desde: startDate,
+    hasta: endDate,
   };
 
   return {
