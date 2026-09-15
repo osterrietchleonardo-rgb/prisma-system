@@ -59,7 +59,7 @@ export function DashboardPipelineSection({ stages, summary }: Props) {
           <div>
             <h2 className="text-xl font-bold text-foreground">Estado del Pipeline</h2>
             <p className="text-xs text-muted-foreground">
-              Conversaciones de WhatsApp de PRISMA, en qué etapa están hoy
+              Conversaciones de WhatsApp de PRISMA que entraron en el período, en qué etapa están hoy
             </p>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { transaccionesDe, gciDe, volumenDe, honorarioRealDe, desgloseDeCierres } from "@/lib/tracking/participacion"
 import { todasLasFilas } from "@/lib/queries/todas-las-filas"
+import { estabaEnCartera } from "@/lib/queries/cartera"
 
 // El filtro de periodo manda las fechas como "yyyy-MM-dd" (DatePeriodFilter).
 // Comparar eso contra un timestamptz con <= corta a la medianoche y se pierde
@@ -46,7 +47,8 @@ export async function getDashboardData(
       .order("id", { ascending: true })
       .range(desde, hasta);
     if (startDate) q = q.gte("created_at", startDate);
-    if (endDate) q = q.lte("created_at", endDate);
+    // 'yyyy-MM-dd' estirado a fin de día: si no, el último día del período quedaba afuera.
+    if (endDate) q = q.lte("created_at", finDelDia(endDate));
     return q;
   });
 
@@ -57,11 +59,16 @@ export async function getDashboardData(
     return acc;
   }, {});
 
-  const { count: waChatsCount } = await supabase
+  // Consultas WhatsApp del PERÍODO, y del asesor si hay uno elegido. Antes contaba todo el
+  // historial bajo un filtro que decía 30 días (15/9/2026, Central: 2.340 contra 483).
+  let waChatsQuery = supabase
     .from("wa_conversations")
-    .select("id", { count: 'exact' })
-    .eq("agency_id", agencyId)
-    .filter(agentId ? 'agent_id' : 'id', agentId ? 'eq' : 'not.is', agentId || null);
+    .select("id", { count: 'exact', head: true })
+    .eq("agency_id", agencyId);
+  if (agentId) waChatsQuery = waChatsQuery.eq("agent_id", agentId);
+  if (startDate) waChatsQuery = waChatsQuery.gte("created_at", startDate);
+  if (endDate) waChatsQuery = waChatsQuery.lte("created_at", finDelDia(endDate));
+  const { count: waChatsCount } = await waChatsQuery;
 
   // 2. Performance Logs (The main source for business metrics)
   // Del más nuevo al más viejo: "Movimientos Recientes" toma los primeros 10. Sin orden, la
@@ -113,7 +120,9 @@ export async function getDashboardData(
       .order("id", { ascending: true })
       .range(desde, hasta)
   );
-  const properties = todasLasPropiedades.filter((p) => p.is_active);
+  // La cartera es la que había al CIERRE del período elegido (la de hoy, si termina hoy).
+  const finPeriodo = endDate ? Date.parse(finDelDia(endDate)) : Date.now();
+  const properties = todasLasPropiedades.filter((p) => estabaEnCartera(p, finPeriodo));
 
   // 4.b Fichas ACM creadas.
   //
@@ -232,10 +241,10 @@ export async function getDashboardData(
     metrics.cartera.activa++;
     // Sólo precios en dólares: sumar los pesos de un alquiler a los dólares de una venta no da nada.
     if (p.currency === 'USD') metrics.cartera.volumen += Number(p.price) || 0;
-    // Días publicada: desde el alta en Tokko hasta hoy.
+    // Días publicada: desde el alta en Tokko hasta el cierre del período (o hoy, si es antes).
     const alta = p.alta ? Date.parse(p.alta) : NaN;
     if (!Number.isNaN(alta)) {
-      metrics.cartera.domSum += (ahora - alta) / 86_400_000;
+      metrics.cartera.domSum += (Math.min(ahora, finPeriodo) - alta) / 86_400_000;
       metrics.cartera.domCount++;
     }
   });
@@ -413,14 +422,22 @@ export async function getDashboardData(
   // Evolution Data
   const months = [];
   const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-  for (let i = 0; i < 6; i++) {
+  // Los meses del PERÍODO elegido (hasta 12; si es más largo, los últimos 12). Antes eran siempre
+  // los últimos 6, pero los datos venían recortados al período: 4 de 6 salían en 0 por el
+  // filtro y no por falta de actividad. Sin período, los últimos 6.
+  const hoyMes = new Date();
+  const desdeMes = startDate ? new Date(`${startDate}T12:00:00`) : new Date(hoyMes.getFullYear(), hoyMes.getMonth() - 5, 1);
+  const hastaMes = endDate ? new Date(`${endDate}T12:00:00`) : hoyMes;
+  const totalMeses = Math.max(1, (hastaMes.getFullYear() - desdeMes.getFullYear()) * 12 + hastaMes.getMonth() - desdeMes.getMonth() + 1);
+  const cruzaAnios = desdeMes.getFullYear() !== hastaMes.getFullYear();
+  for (let i = 0; i < Math.min(totalMeses, 12); i++) {
     // Día 1 de cada mes: con setMonth sobre un día 31 se salteaba un mes entero.
-    const hoy = new Date();
-    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    const d = new Date(hastaMes.getFullYear(), hastaMes.getMonth() - i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     // Último instante del mes, para saber cuánta cartera había al cerrarlo.
     const fin = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
-    months.push({ key, name: monthNames[d.getMonth()], fin });
+    const name = cruzaAnios ? `${monthNames[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` : monthNames[d.getMonth()];
+    months.push({ key, name, fin });
   }
 
   const performanceEvolution = months.map(m => {
@@ -429,7 +446,9 @@ export async function getDashboardData(
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` === m.key;
     }) || [];
 
+    // Con un asesor elegido, sólo sus chats (waCounts es de toda la agencia porque lo usa el ranking).
     const mWaChats = (waCounts || []).filter(c => {
+        if (agentId && c.agent_id !== agentId) return false;
         const date = new Date(c.created_at);
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}` === m.key;
     }).length;
@@ -437,17 +456,8 @@ export async function getDashboardData(
     const mProspeccion = mLogs.filter(l => l.type === 'prospeccion').length;
     const mTransacciones = transaccionesDe(mLogs);
 
-    // Cartera a fin de mes: dada de alta antes de que cierre el mes y, si hoy está dada de baja,
-    // que la baja haya sido después. La fecha de baja de Tokko sólo vale para las inactivas:
-    // las activas también la traen cargada (15/9/2026: las 349 activas de Central).
-    const cartera = todasLasPropiedades.filter(p => {
-      if (!esDelAlcance(p)) return false;
-      const alta = p.alta ? Date.parse(p.alta) : NaN;
-      if (Number.isNaN(alta) || alta > m.fin) return false;
-      if (p.is_active) return true;
-      const baja = p.baja ? Date.parse(p.baja) : NaN;
-      return !Number.isNaN(baja) && baja > m.fin;
-    }).length;
+    // Cartera a fin de mes (ver estabaEnCartera).
+    const cartera = todasLasPropiedades.filter(p => esDelAlcance(p) && estabaEnCartera(p, m.fin)).length;
 
     return {
       name: m.name,
@@ -600,18 +610,29 @@ export async function getDashboardData(
 // sincronizados de Tokko NO entran (decisión de Leonardo, 15/9/2026): el "Cerrado" de Tokko es un
 // contacto archivado, no una venta, y metía 1.077 "ganados" contra 1 solo cierre cargado en 2026.
 // Solo agencia del director logueado. Nunca mezcla agencias.
-export async function getPipelineDashboardData(agencyId: string) {
+export async function getPipelineDashboardData(
+  agencyId: string,
+  agentId?: string,
+  startDate?: string,
+  endDate?: string
+) {
   const supabase = createClient()
 
-  // De a tandas: Central ya tiene 2.340 conversaciones y la base corta en 1.000.
+  // Las conversaciones que ENTRARON en el período (y del asesor elegido), con la etapa en la que
+  // están hoy. De a tandas: Central ya tiene 2.340 y la base corta en 1.000.
   const conversaciones = await todasLasFilas<{ pipeline_stage: string | null; funnel_status: string | null }>(
-    (desde, hasta) =>
-      supabase
+    (desde, hasta) => {
+      let q = supabase
         .from("wa_conversations")
         .select("pipeline_stage, funnel_status")
         .eq("agency_id", agencyId)
         .order("id", { ascending: true })
         .range(desde, hasta)
+      if (agentId) q = q.eq("agent_id", agentId)
+      if (startDate) q = q.gte("created_at", startDate)
+      if (endDate) q = q.lte("created_at", finDelDia(endDate))
+      return q
+    }
   )
 
   const STAGES = [

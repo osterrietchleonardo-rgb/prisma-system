@@ -43,8 +43,23 @@ gráficos vacíos por claves que no coinciden, pipeline cortado en 1.000 de 8.18
 - Verificado en navegador (VAKDOR): 94 / US$11.117.650 / 635 días / 20 aptas / 4 con inquilino,
   igual que el SQL. Sin NaN, sin scroll lateral en el celular.
 
-**Pendiente:** tanda 2 (filtro fijo arriba y que todo le responda) y tanda 3 (Conversacional en
-vivo, Leads de Tokko corregido, Inhibidores reales desde `dropoff_reason`).
+Mergeada: PR #62 (`3c78370`).
+
+**Tanda 2 — el filtro de arriba fijo y todo le responde** (misma rama)
+
+- Barra `sticky top-0` dentro del `<main>` que hace scroll (layout del director); en el celular
+  dos filas, 114 px de 844.
+- Consultas WA del período (antes todo el historial); `finDelDia` en todas las fechas de fin.
+- Gráficos: meses del período (hasta 12). Cartera = la que había al cierre del período
+  (`lib/queries/cartera.ts#estabaEnCartera`), también en la sección Propiedades.
+- Pipeline por período + asesor; Objetivos con el año del filtro + asesor (también el server
+  action al cambiar el año); ranking sólo con el asesor elegido.
+- Bug encontrado probando: `DatePeriodFilter` mostraba un día menos (`new Date('yyyy-MM-dd')`
+  es UTC) → `parseISO`.
+- Verificado (VAKDOR, 30 días vs 1/1–30/6): consultas 0→1, cartera 94→89, propiedades 94→89,
+  pipeline 0→1, meses Ene–Jun, objetivos sólo "Leonardo Asesor" al elegirlo.
+
+**Pendiente:** tanda 3 (Conversacional en vivo, Leads de Tokko corregido, Inhibidores reales).
 
 ---
 
