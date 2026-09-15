@@ -1,86 +1,65 @@
-"use client"
-
+import type { ReactNode } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { AlertTriangle, CheckCircle2, XCircle, TrendingDown } from "lucide-react"
+import { AlertTriangle, CheckCircle2, XCircle, MessageSquare, Bot } from "lucide-react"
+import type { ConversationalData } from "@/lib/queries/conversacional"
+import { fmtNum, fmtPct } from "./formato"
 
-interface TopItem { label: string; count: number; pct: number }
+type Atencion = ConversationalData["atencion"]
 
-interface AttentionData {
-  tasa_resolucion_bot: number
-  tasa_solicitud_humano: number
-  tasa_derivacion_efectiva: number | null
-  objeciones_frecuencia: { label: string; count: number; pct: number }[]
-  total_objeciones_detectadas: number
-  causas_no_avance: TopItem[]
-  avg_mensajes_lead: number | null
-  compromisos: { alto: number; medio: number; bajo: number }
-  bot_handled: number
-  human_escalated: number
-  avg_duration_min: number | null
-}
-
-function GaugeCard({ label, value, color, icon, sub }: {
-  label: string; value: string | number; color: string; icon: React.ReactNode; sub?: string
+function GaugeCard({ label, value, color, bg, icon, sub }: {
+  label: string; value: string; color: string; bg: string; icon: ReactNode; sub: string
 }) {
   return (
     <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
       <CardContent className="p-4 flex items-start gap-3">
-        <div className={`p-2 rounded-lg bg-opacity-10 shrink-0`} style={{ backgroundColor: `${color}20` }}>
-          <div style={{ color }}>{icon}</div>
-        </div>
-        <div>
-          <p className="text-2xl font-bold" style={{ color }}>{value}</p>
+        <div className={`p-2 rounded-lg shrink-0 ${bg} ${color}`}>{icon}</div>
+        <div className="min-w-0">
+          <p className={`text-2xl font-bold ${color}`}>{value}</p>
           <p className="text-xs font-semibold">{label}</p>
-          {sub && <p className="text-[10px] text-muted-foreground">{sub}</p>}
+          <p className="text-[10px] text-muted-foreground leading-snug">{sub}</p>
         </div>
       </CardContent>
     </Card>
   )
 }
 
-function ObjecionBar({ label, count, pct, max }: { label: string; count: number; pct: number; max: number }) {
-  const severity = pct >= 30 ? "#f87171" : pct >= 15 ? "#fb923c" : "#fbbf24"
+function Barra({ label, count, pct, max, color }: { label: string; count: number; pct: number; max: number; color: string }) {
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-muted-foreground flex items-center gap-1.5">
-          <AlertTriangle className="h-3 w-3" style={{ color: severity }} />
-          {label}
-        </span>
-        <span className="font-semibold">{count} <span className="text-muted-foreground font-normal">({pct}%)</span></span>
+      <div className="flex items-start justify-between gap-2 text-xs">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-semibold shrink-0">{count} <span className="text-muted-foreground font-normal">({pct}%)</span></span>
       </div>
       <div className="w-full h-2 bg-muted/30 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${(count / max) * 100}%`, backgroundColor: severity }} />
+        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${(count / (max || 1)) * 100}%`, backgroundColor: color }} />
       </div>
     </div>
   )
 }
 
-function CompromisosChart({ compromisos, total }: { compromisos: { alto: number; medio: number; bajo: number }; total: number }) {
-  const { alto, medio, bajo } = compromisos
+function CompromisosChart({ c, total }: { c: Atencion["compromiso"]; total: number }) {
   const t = total || 1
   const bars = [
-    { label: "Alto", count: alto, color: "#34d399" },
-    { label: "Medio", count: medio, color: "#f59e0b" },
-    { label: "Bajo", count: bajo, color: "#fb7185" },
+    { label: "Alto", count: c.alto, color: "#34d399" },
+    { label: "Medio", count: c.medio, color: "#f59e0b" },
+    { label: "Bajo", count: c.bajo, color: "#fb7185" },
+    { label: "Sin datos", count: c.sinDatos, color: "#94a3b8" },
   ]
   return (
     <div className="space-y-3">
       <div className="flex gap-1 h-10 w-full rounded-lg overflow-hidden">
-        {bars.map(b => b.count > 0 && (
-          <div key={b.label} className="flex items-center justify-center text-xs font-bold text-white"
-            style={{ width: `${(b.count / t) * 100}%`, backgroundColor: b.color }}>
+        {bars.map((b) => b.count > 0 && (
+          <div key={b.label} className="flex items-center justify-center text-xs font-bold text-white" style={{ width: `${(b.count / t) * 100}%`, backgroundColor: b.color }}>
             {Math.round((b.count / t) * 100) > 10 ? `${Math.round((b.count / t) * 100)}%` : ""}
           </div>
         ))}
       </div>
-      <div className="flex gap-4">
-        {bars.map(b => (
+      <div className="flex flex-wrap gap-4">
+        {bars.map((b) => (
           <div key={b.label} className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: b.color }} />
             <div>
-              <p className="text-xs font-bold">{b.count}</p>
+              <p className="text-xs font-bold">{b.count} <span className="font-normal text-muted-foreground">({Math.round((b.count / t) * 100)}%)</span></p>
               <p className="text-[10px] text-muted-foreground">{b.label}</p>
             </div>
           </div>
@@ -90,83 +69,68 @@ function CompromisosChart({ compromisos, total }: { compromisos: { alto: number;
   )
 }
 
-export function Block6AttentionQuality({ attention, totalConversations }: {
-  attention: AttentionData; totalConversations: number
+export function Block6AttentionQuality({ atencion, chats, pidieron, tasaDerivacion }: {
+  atencion: Atencion
+  chats: number
+  pidieron: number
+  tasaDerivacion: number | null
 }) {
-  const a = attention
-  const maxObjCount = a.objeciones_frecuencia?.[0]?.count || 1
-  const maxCausaCount = a.causas_no_avance?.[0]?.count || 1
-
-  const totalCompromisos = (a.compromisos?.alto || 0) + (a.compromisos?.medio || 0) + (a.compromisos?.bajo || 0)
+  const a = atencion
+  const conMotivo = a.causasNoAvance.conDato
+  const maxCausa = a.causasNoAvance.items[0]?.cantidad || 1
+  const maxCorte = a.cortes[0]?.cantidad || 1
+  const pctMotivo = (n: number) => (conMotivo > 0 ? Math.round((n / conMotivo) * 100) : 0)
+  const objeciones = [
+    { label: "Precio o presupuesto", count: a.objecionPrecio },
+    { label: "Ubicación o zona", count: a.objecionUbicacion },
+  ]
+  const maxObj = Math.max(a.objecionPrecio, a.objecionUbicacion, 1)
+  const conPersona = chats - a.sinIntervencionHumana
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h3 className="text-lg font-bold">Calidad de Atención</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-lg font-bold">Calidad de atención</h3>
         <span className="text-xs text-muted-foreground px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 font-medium">
           ¿Por qué se pierden oportunidades?
         </span>
       </div>
 
-      {/* KPI row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {/* 15/9/2026: "Resuelto por bot" era total − pidieron (no mide eso), "Derivación efectiva"
+          daba 202 % y "Mensajes prom./lead" era en realidad el promedio de seguimientos. */}
+      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 lg:grid-cols-4 gap-3">
         <GaugeCard
-          label="Resuelto por bot"
-          value={`${a.tasa_resolucion_bot ?? 0}%`}
-          color="#a78bfa"
-          icon={<CheckCircle2 className="h-5 w-5" />}
-          sub="sin intervención humana"
+          label="Sin intervención humana"
+          value={fmtPct(a.tasaSinIntervencion)}
+          color="text-purple-600 dark:text-purple-400" bg="bg-purple-400/10"
+          icon={<Bot className="h-5 w-5" />}
+          sub={`${fmtNum(a.sinIntervencionHumana)} de ${fmtNum(chats)} conversaciones no tienen ningún mensaje de una persona del equipo`}
         />
         <GaugeCard
           label="Pidieron asesor"
-          value={`${a.tasa_solicitud_humano ?? 0}%`}
-          color="#fb923c"
+          value={fmtPct(a.tasaPidieron)}
+          color="text-orange-700 dark:text-orange-400" bg="bg-orange-400/10"
           icon={<AlertTriangle className="h-5 w-5" />}
-          sub="solicitaron humano"
+          sub={`${fmtNum(pidieron)} de ${fmtNum(chats)} clientes pidieron hablar con una persona`}
         />
         <GaugeCard
-          label="Derivación efectiva"
-          value={a.tasa_derivacion_efectiva != null ? `${a.tasa_derivacion_efectiva}%` : "—"}
-          color={a.tasa_derivacion_efectiva != null && a.tasa_derivacion_efectiva >= 80 ? "#34d399" : "#fb7185"}
-          icon={a.tasa_derivacion_efectiva != null && a.tasa_derivacion_efectiva >= 80
-            ? <CheckCircle2 className="h-5 w-5" />
-            : <XCircle className="h-5 w-5" />}
-          sub="de solicitudes atendidas"
+          label="Derivación"
+          value={fmtPct(tasaDerivacion)}
+          color={tasaDerivacion !== null && tasaDerivacion >= 80 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}
+          bg={tasaDerivacion !== null && tasaDerivacion >= 80 ? "bg-emerald-400/10" : "bg-rose-400/10"}
+          icon={tasaDerivacion !== null && tasaDerivacion >= 80 ? <CheckCircle2 className="h-5 w-5" /> : <XCircle className="h-5 w-5" />}
+          sub="de los que pidieron una persona, cuántos quedaron derivados a un asesor"
         />
         <GaugeCard
-          label="Mensajes prom./lead"
-          value={a.avg_mensajes_lead != null ? a.avg_mensajes_lead.toString() : "—"}
-          color="#60a5fa"
-          icon={<TrendingDown className="h-5 w-5" />}
-          sub="engagement de leads"
+          label="Mensajes del cliente por chat"
+          value={a.mensajesLeadPorChat !== null ? a.mensajesLeadPorChat.toLocaleString("es-AR") : "—"}
+          color="text-blue-600 dark:text-blue-400" bg="bg-blue-400/10"
+          icon={<MessageSquare className="h-5 w-5" />}
+          sub="promedio de mensajes que escribió cada cliente en el período"
         />
       </div>
 
-      {/* Objeciones + causas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <div className="flex items-center gap-2">
-              <span className="text-base">⚠️</span>
-              <CardTitle className="text-sm font-semibold">Objeciones detectadas</CardTitle>
-              {a.total_objeciones_detectadas > 0 && (
-                <span className="ml-auto text-xs text-muted-foreground">{a.total_objeciones_detectadas} total</span>
-              )}
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-1">
-              Frenan la decisión del lead en las conversaciones
-            </p>
-          </CardHeader>
-          <CardContent className="px-4 pb-4 space-y-3">
-            {!a.objeciones_frecuencia?.length
-              ? <p className="text-xs text-muted-foreground">Sin objeciones detectadas</p>
-              : a.objeciones_frecuencia.map(obj => (
-                <ObjecionBar key={obj.label} label={obj.label}
-                  count={obj.count} pct={obj.pct} max={maxObjCount} />
-              ))}
-          </CardContent>
-        </Card>
-
         <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
           <CardHeader className="pb-2 pt-4 px-4">
             <div className="flex items-center gap-2">
@@ -174,54 +138,92 @@ export function Block6AttentionQuality({ attention, totalConversations }: {
               <CardTitle className="text-sm font-semibold">Causas de no avance</CardTitle>
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">
-              Por qué el lead no continuó el proceso
+              {conMotivo > 0
+                ? `El bot anotó un motivo en ${fmtNum(conMotivo)} conversaciones. Los motivos escritos igual se agrupan; el % es sobre esas ${fmtNum(conMotivo)}.`
+                : "El bot no anotó motivos de no avance en este período."}
             </p>
           </CardHeader>
           <CardContent className="px-4 pb-4 space-y-2">
-            {!a.causas_no_avance?.length
-              ? <p className="text-xs text-muted-foreground">Sin datos suficientes</p>
-              : a.causas_no_avance.map(item => (
-                <div key={item.label} className="flex items-center gap-2">
-                  <span className="text-[11px] text-muted-foreground flex-1 truncate">{item.label}</span>
-                  <div className="w-24 h-3 bg-muted/30 rounded-sm overflow-hidden">
-                    <div className="h-full bg-rose-400/70 rounded-sm"
-                      style={{ width: `${(item.count / maxCausaCount) * 100}%` }} />
-                  </div>
-                  <span className="text-[11px] font-semibold w-6 text-right shrink-0">{item.count}</span>
+            {a.causasNoAvance.items.map((item) => (
+              <div key={item.etiqueta} className="flex items-center gap-2">
+                <span className="text-[11px] text-muted-foreground flex-1 truncate" title={item.etiqueta}>{item.etiqueta}</span>
+                <div className="w-16 sm:w-24 h-3 bg-muted/30 rounded-sm overflow-hidden shrink-0">
+                  <div className="h-full bg-rose-400/70 rounded-sm" style={{ width: `${(item.cantidad / maxCausa) * 100}%` }} />
                 </div>
-              ))}
+                <span className="text-[11px] font-semibold w-6 text-right shrink-0">{item.cantidad}</span>
+              </div>
+            ))}
           </CardContent>
         </Card>
+
+        <div className="space-y-4">
+          <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <div className="flex items-center gap-2">
+                <span className="text-base">⚠️</span>
+                <CardTitle className="text-sm font-semibold">Objeciones: precio y ubicación</CardTitle>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Motivos de no avance que nombran el precio (precio, presupuesto, caro, tope, valor, expensas) o la ubicación (ubicación, zona, barrio, lejos, distancia). El % es sobre los motivos anotados.
+              </p>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-3">
+              {conMotivo === 0
+                ? <p className="text-xs text-muted-foreground">Sin motivos anotados en el período</p>
+                : objeciones.map((o) => (
+                  <Barra key={o.label} label={o.label} count={o.count} pct={pctMotivo(o.count)} max={maxObj} color="#fb923c" />
+                ))}
+            </CardContent>
+          </Card>
+
+          <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <div className="flex items-center gap-2">
+                <span className="text-base">✂️</span>
+                <CardTitle className="text-sm font-semibold">Conversaciones que se cortaron</CardTitle>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">Marcadas por el sistema como cortadas. El % es sobre todos los chats.</p>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-3">
+              {a.cortes.length === 0
+                ? <p className="text-xs text-muted-foreground">Ninguna conversación del período quedó marcada como cortada.</p>
+                : a.cortes.map((c) => (
+                  <Barra key={c.etiqueta} label={c.etiqueta} count={c.cantidad} pct={c.pct} max={maxCorte} color="#fb7185" />
+                ))}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
-      {/* Commitment levels */}
       <Card className="border-accent/10 bg-card/50 backdrop-blur-sm">
         <CardHeader className="pb-2 pt-4 px-4">
           <div className="flex items-center gap-2">
             <span className="text-base">🎯</span>
-            <CardTitle className="text-sm font-semibold">Nivel de compromiso de los leads</CardTitle>
+            <CardTitle className="text-sm font-semibold">Nivel de compromiso de los clientes</CardTitle>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1">
-            Alto = preguntó muchos detalles / quiso visitar · Medio = interés moderado · Bajo = pregunta única sin seguimiento
-          </p>
+          {/* La leyenda vieja ("preguntó muchos detalles") no describía la regla (15/9/2026).
+              Esta es exactamente la que se calcula en lib/queries/conversacional.ts. */}
+          <ul className="text-[10px] text-muted-foreground mt-1 space-y-0.5">
+            <li><span className="font-semibold text-foreground/80">Alto:</span> agendó una visita o confirmó una reserva.</li>
+            <li><span className="font-semibold text-foreground/80">Medio:</span> dijo qué busca (operación, tipo de propiedad o presupuesto), dio un plazo de hasta 6 meses y no tiene motivo de no avance.</li>
+            <li><span className="font-semibold text-foreground/80">Bajo:</span> el resto.</li>
+            <li><span className="font-semibold text-foreground/80">Sin datos:</span> el bot no registró nada de esa conversación.</li>
+          </ul>
         </CardHeader>
         <CardContent className="px-4 pb-4">
-          {totalCompromisos > 0
-            ? <CompromisosChart compromisos={a.compromisos} total={totalCompromisos} />
-            : <p className="text-xs text-muted-foreground">Sin datos suficientes</p>}
+          {chats > 0 ? <CompromisosChart c={a.compromiso} total={chats} /> : <p className="text-xs text-muted-foreground">Sin datos</p>}
         </CardContent>
       </Card>
 
-      {/* Summary insight */}
-      {totalConversations > 0 && (
+      {chats > 0 && (
         <div className="p-4 rounded-xl border border-dashed border-accent/20 bg-card/20">
           <p className="text-xs text-muted-foreground leading-relaxed">
             <span className="text-accent font-semibold">Resumen del período:</span>{" "}
-            De <span className="font-semibold text-foreground/80">{totalConversations}</span> conversaciones,{" "}
-            <span className="font-semibold text-purple-600 dark:text-purple-400">{a.bot_handled}</span> fueron resueltas íntegramente por el bot y{" "}
-            <span className="font-semibold text-accent">{a.human_escalated}</span> requirieron intervención humana
-            {a.tasa_derivacion_efectiva != null && ` (con ${a.tasa_derivacion_efectiva}% de efectividad en la derivación)`}.
-            {a.objeciones_frecuencia?.length > 0 && ` La principal objeción detectada fue "${a.objeciones_frecuencia[0].label}" (${a.objeciones_frecuencia[0].pct}% de los chats).`}
+            de <span className="font-semibold text-foreground/80">{fmtNum(chats)}</span> conversaciones,{" "}
+            <span className="font-semibold text-purple-600 dark:text-purple-400">{fmtNum(a.sinIntervencionHumana)}</span> las llevó solo el bot y{" "}
+            <span className="font-semibold text-accent">{fmtNum(conPersona)}</span> tuvieron al menos un mensaje de una persona del equipo.{" "}
+            {fmtNum(pidieron)} clientes pidieron hablar con un asesor
+            {tasaDerivacion !== null && ` y el ${tasaDerivacion}% de ellos quedó derivado`}.
           </p>
         </div>
       )}

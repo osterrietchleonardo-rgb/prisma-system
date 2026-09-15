@@ -100,7 +100,7 @@ El producto integra: CRM (Tokko Broker), WhatsApp bidireccional (Evolution API +
 │  /api/ai/*  /api/marketing-ia/*  /api/tokko/*             │
 │  /api/tokko-proxy/*  /api/webhooks/*  /api/whatsapp/*     │
 │  /api/n8n/*  /api/contratos/*  /api/mercado/*            │
-│  /api/documents/*  /api/conversational-insights/*        │
+│  /api/documents/*                                        │
 │  /api/push/*  /api/cron/*  /api/admin-vakdor/*           │
 ├──────────────────────────────────────────────────────────┤
 │                    SERVICIOS EXTERNOS                       │
@@ -187,7 +187,7 @@ La obtención server-side del tenant se centraliza en `lib/auth/tenant-validatio
 - `mercado_icc` (1 fila id=1), `mercado_zonas` (histórico por zona+mes), `mercado_barrios`, `mercado_escrituras` (PK periodo), `mercado_stats`.
 
 **Analytics / Admin / Push**
-- `dashboard_conversational_insights` — cache de analytics agregado.
+- (`dashboard_conversational_insights` se borró el 15/9/2026: Inteligencia Conversacional se calcula en vivo, ver §10.7.)
 - `admin_vakdor_users`, `audit_logs`, `ai_credit_transactions`, `push_subscriptions`.
 
 ### 4.3 Funciones RPC (PostgreSQL / Supabase)
@@ -354,7 +354,6 @@ Patrón estándar de un endpoint protegido:
 
 **Documentos / Analytics / Créditos / Push / Cron**
 - `POST /api/documents/process`, `POST /api/documents/extract`.
-- `POST /api/conversational-insights/analyze`, `GET /api/conversational-insights/status`.
 - `GET /api/asesor/creditos`, `GET /api/auth/check-status`.
 - `POST/DELETE /api/push/subscribe`.
 - `GET /api/cron/sync-templates`.
@@ -817,8 +816,8 @@ Rate limit 30 req/h por usuario; validación Zod (10–50000 chars); `parseWhats
 
 **Legacy:** `/api/valuation/generate` + tabla `valuations` (Gemini) — sin uso confirmado en frontend (ver §20).
 
-### 10.7 Conversational Insights (`/api/conversational-insights/analyze`)
-Analytics **sin IA** (agregación pura), solo director. Lee `wa_conversations.metricas` + `wa_messages`; cache en `dashboard_conversational_insights` (refresh > 6 h). Bloques: KPIs, funnel, perfil del lead, demanda, comportamiento temporal, calidad de atención.
+### 10.7 Inteligencia Conversacional (`lib/queries/conversacional.ts`)
+Analytics **sin IA** (agregación pura), solo director. Desde el 15/9/2026 se calcula **en vivo** en cada carga del Dashboard (`getConversationalData(agencyId, agentId, from, to)`), con el filtro de arriba (período en días argentinos + asesor). Lee `wa_conversations.metricas` + `wa_messages` de a tandas. Ya no hay botón "Analizar", ni caché, ni las rutas `/api/conversational-insights/*`. Bloques: KPIs, funnel, perfil del lead, demanda, comportamiento temporal, calidad de atención.
 
 ### 10.8 Documentos / base de conocimiento
 `/api/documents/process`: extracción por tipo → `generateEmbedding(texto[:5000])` → `agency_documents` (con `visibility` director/asesor). El backend soporta PDF/imagen (Gemini), DOCX (mammoth), CSV (papaparse) y YouTube (transcript), pero el **uploader de la UI solo acepta `.pdf/.doc/.docx/.csv` + YouTube** (no permite seleccionar imágenes). Para docs `director` (privados) hay un flag `ai_enabled` que habilita su consulta por Tutor IA sin exponer el archivo. Subida directa a Storage `documents` (evita el límite de 4.5 MB de Vercel).

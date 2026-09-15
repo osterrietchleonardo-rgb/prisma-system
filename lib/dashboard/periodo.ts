@@ -38,6 +38,22 @@ export function periodoDelDashboard(
 }
 
 /**
+ * Límites del día en hora ARGENTINA para filtrar columnas timestamptz.
+ *
+ * El filtro manda 'yyyy-MM-dd'. Comparado tal cual (o con `T23:59:59.999` sin zona), la base lo
+ * toma en UTC: el período corría 3 horas y lo escrito entre las 21 y las 24 de cada día caía en
+ * el día siguiente (auditoría del dashboard, 15/9/2026). Argentina no tiene horario de verano:
+ * -03:00 fijo. Si no es una fecha 'yyyy-MM-dd' se devuelve tal cual.
+ */
+export function inicioDelDiaAR(fecha: string): string {
+  return ES_FECHA.test(fecha) ? `${fecha}T00:00:00-03:00` : fecha
+}
+
+export function finDelDiaAR(fecha: string): string {
+  return ES_FECHA.test(fecha) ? `${fecha}T23:59:59.999-03:00` : fecha
+}
+
+/**
  * "del 16/08 al 15/09": las aclaraciones de los tiempos de respuesta dicen qué período están
  * contando, así el número se lee junto con el filtro que el director eligió.
  */

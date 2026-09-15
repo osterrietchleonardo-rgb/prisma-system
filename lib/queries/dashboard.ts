@@ -3,12 +3,14 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { transaccionesDe, gciDe, volumenDe, honorarioRealDe, desgloseDeCierres } from "@/lib/tracking/participacion"
 import { todasLasFilas } from "@/lib/queries/todas-las-filas"
 import { estabaEnCartera } from "@/lib/queries/cartera"
+import { inicioDelDiaAR, finDelDiaAR } from "@/lib/dashboard/periodo"
 
 // El filtro de periodo manda las fechas como "yyyy-MM-dd" (DatePeriodFilter).
 // Comparar eso contra un timestamptz con <= corta a la medianoche y se pierde
 // el ultimo dia entero, asi que lo estiramos al final del dia.
+// En hora argentina: sin zona, la base lo tomaba en UTC y el período corría 3 horas (15/9/2026).
 function finDelDia(fecha: string): string {
-  return /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? `${fecha}T23:59:59.999` : fecha
+  return finDelDiaAR(fecha)
 }
 
 /** Una fila de la tarjeta "Tiempos Respuesta": promedio y mediana de la espera, ya formateados. */
@@ -46,7 +48,7 @@ export async function getDashboardData(
       .eq("agency_id", agencyId)
       .order("id", { ascending: true })
       .range(desde, hasta);
-    if (startDate) q = q.gte("created_at", startDate);
+    if (startDate) q = q.gte("created_at", inicioDelDiaAR(startDate));
     // 'yyyy-MM-dd' estirado a fin de día: si no, el último día del período quedaba afuera.
     if (endDate) q = q.lte("created_at", finDelDia(endDate));
     return q;
@@ -66,7 +68,7 @@ export async function getDashboardData(
     .select("id", { count: 'exact', head: true })
     .eq("agency_id", agencyId);
   if (agentId) waChatsQuery = waChatsQuery.eq("agent_id", agentId);
-  if (startDate) waChatsQuery = waChatsQuery.gte("created_at", startDate);
+  if (startDate) waChatsQuery = waChatsQuery.gte("created_at", inicioDelDiaAR(startDate));
   if (endDate) waChatsQuery = waChatsQuery.lte("created_at", finDelDia(endDate));
   const { count: waChatsCount } = await waChatsQuery;
 
@@ -143,7 +145,7 @@ export async function getDashboardData(
     .eq("agency_id", agencyId)
 
   if (agentId) acmQuery = acmQuery.eq("created_by", agentId)
-  if (startDate) acmQuery = acmQuery.gte("created_at", startDate)
+  if (startDate) acmQuery = acmQuery.gte("created_at", inicioDelDiaAR(startDate))
   if (endDate) acmQuery = acmQuery.lte("created_at", finDelDia(endDate))
 
   const { data: acmRows, error: acmError } = await acmQuery
@@ -497,9 +499,9 @@ export async function getDashboardData(
       .range(desde, desde + PAGINA - 1);
 
     if (agentId) msgQuery = msgQuery.eq("wa_conversations.agent_id", agentId);
-    if (startDate) msgQuery = msgQuery.gte("created_at", startDate);
+    if (startDate) msgQuery = msgQuery.gte("created_at", inicioDelDiaAR(startDate));
     // El filtro manda 'yyyy-MM-dd': sin extenderlo a fin de día se perdía el último día.
-    if (endDate) msgQuery = msgQuery.lte("created_at", `${endDate}T23:59:59.999Z`);
+    if (endDate) msgQuery = msgQuery.lte("created_at", finDelDiaAR(endDate));
 
     const { data, error } = await msgQuery;
     if (error || !data?.length) break;
@@ -629,7 +631,7 @@ export async function getPipelineDashboardData(
         .order("id", { ascending: true })
         .range(desde, hasta)
       if (agentId) q = q.eq("agent_id", agentId)
-      if (startDate) q = q.gte("created_at", startDate)
+      if (startDate) q = q.gte("created_at", inicioDelDiaAR(startDate))
       if (endDate) q = q.lte("created_at", finDelDia(endDate))
       return q
     }
