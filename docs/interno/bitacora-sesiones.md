@@ -61,6 +61,49 @@ aclaraciones.
 
 ---
 
+## 2026-09-12 — El descubrimiento diario fallaba hace 4 días: esperábamos menos de lo que tarda
+
+Leonardo avisó por los mails de GitHub Actions. `mercado-descubrimiento` falló 9, 10, 11 y
+12 de septiembre (y 5 y 7). **No era Apify: era nuestra espera.**
+
+- El script esperaba **10 min** fijos (60 vueltas × 10 s) a que terminara el actor. Desde
+  que subimos `--max 1500` (4-sep), la corrida de todo CABA tarda **10 a 13 min**
+  (medido: 11.5 / 11.6 / 10.3 / 12.1 / 11.6 / 12.0 / 12.6). Justo arriba del límite.
+- Lo caro: **la corrida se paga igual** (US$1.507 cada una). Cortábamos la espera 2 min
+  antes de que terminara, tirábamos el dataset de 1500 avisos y encima el job moría, así
+  que **tampoco corrían Don Torcuato ni los embeddings**.
+- Arreglo: `--espera-min` (default **40**), log de progreso cada 2 min, y
+  `timeout-minutes: 30 → 90` en el job.
+- Nuevo: **`--recuperar <runId>`** carga el dataset de una corrida ya pagada que quedó sin
+  cargar, sin lanzar nada nuevo. Recuperar sale US$0; volver a correr, US$1.51.
+
+**Recuperación:** se cargaron las 4 corridas pagadas (9, 10, 11, 12) con `--recuperar`.
+**5.333 avisos nuevos** a la base, US$0 de costo extra, más sus embeddings.
+
+**Cuánto publica CABA por día — medido, no estimado.** El campo del dataset es
+`list_publication_begin`. Uniendo las 4 corridas:
+
+| día | 8-sep | 9-sep | 10-sep | 11-sep |
+|---|---|---|---|---|
+| avisos publicados | 1.347 | 1.336 | 1.277 | **1.543** |
+
+**Lo que esto cambió (decidido, ya aplicado):** `--max 1500 → 1800`.
+
+La clave es que la ventana de `--dentro-de 2` **no son dos días enteros**: es *ayer
+completo + lo que va de hoy* (las corridas arrancan ~11:00 ART, así que de hoy traen 44 a
+237). O sea ~1.500-1.600 avisos, no ~2.800. Como el actor **cobra por item devuelto**,
+subir el tope no encarece la corrida: solo deja de cortar. Con 1500 el 11-sep se
+perdieron 87 avisos (1.543 publicados, 1.456 traídos), y esos no los ve nadie hasta el
+refresco mensual. El log ahora imprime el reparto por día de publicación, que es el
+termómetro: si `n < --max`, ayer entró completo.
+
+**Lo que NO se tocó y sigue siendo decisión de Leonardo:** el descubrimiento cuesta
+~US$1.55/día ≈ **US$46/mes** (no son centavos: son ~1.350 avisos nuevos por día a
+US$0.001). Con el refresco mensual (~US$65) el régimen real de Apify es **~US$111/mes**
+contra un tope de cuenta de US$100. Hay que subirlo a US$150 o el 3-oct el refresco choca.
+
+---
+
 ## 2026-09-12 — Farming: el mapa arranca con la manito, lupita, y el director ve cada asesor en su color
 
 **Qué pidió Leonardo:** (1) una lupita en el mapa de Farming para ir a un barrio, zona o dirección;
@@ -255,6 +298,30 @@ audios y no se puede escuchar". Captura de iPhone: el reproductor decía "Error"
 El bot no cambió: n8n ya bajaba y transcribía el audio por su cuenta (sección 9.1.2 del técnico).
 
 ---
+
+## 2026-09-14 — El reloj fallaba porque la escalera creció hasta rozar los 2 minutos
+
+**Qué pidió Leonardo:** "revisar porque falló el superagente_reloj". Ejecuciones en rojo del
+flujo de n8n, siempre en el nodo de la escalera, a los 2:05: el nodo tenía timeout de 120 s y
+la escalera pasó de 0,6 s (31/8) a 107 s (13/9) porque recorre 72 casos con 3-5 consultas cada
+uno, incluidos 80 casos ya en el tope de 20 h que nunca cierran. Detalle en TECNICO §22.13.
+
+**Qué se hizo** (rama `fix/escalera-un-viaje`, PR pendiente de OK): función SQL
+`escalera_casos` que trae t0/humano/nota/niveles de todos los casos en un viaje;
+`estadosDeCasos` en la escalera; los casos en el tope sin nota nueva no se releen; el timeout
+del nodo en n8n a 290 s (script listo, lo corre Leonardo con `!` porque el clasificador
+bloquea la escritura en n8n desde el agente). Suite: 199 verdes en `lib/seguimiento`.
+
+**Lo que no pude:** el clasificador bloqueó también las lecturas por `_sa-query.mjs` después
+del DELETE de los marcadores del 10/9 (la misma herramienta sirve para escribir). Los datos de
+hoy salieron de la API de n8n y de la API de Vercel. Para aplicar la migración: `node
+scratch/_sa-query.mjs --file supabase/migrations/20260914120000_escalera_casos.sql` con `!`.
+
+**Qué quedó:** (1) Leonardo aplica la migración y el timeout de n8n con `!`; (2) correr
+`SEGUIMIENTO_MANUAL=1 npx vitest run lib/seguimiento/manual-escalera-casos` (compara la
+función con las consultas viejas caso por caso y mide); (3) OK al merge; (4) mirar la duración
+del nodo en las corridas siguientes (antes ~105 s de día). Los casos en el tope que nunca
+cierran siguen siendo deuda de Kevin, no del código: son 80.
 
 ## 2026-09-10 — La queja de Carmen: las notas cortas ahora cuentan, y si no alcanzan se le dice
 
