@@ -16,6 +16,38 @@
 
 ---
 
+## 2026-09-15 — Auditoría del Dashboard del director, tanda 1 de 3
+
+**Qué pidió Leonardo:** revisar cada dato del Dashboard, que sea correcto y que responda al filtro;
+cada tabla ordenable por columna con forma simple de volver al orden original. Decisiones suyas:
+todo determinista (sin IA en el cálculo) y en vivo; el Pipeline sólo con lo generado en PRISMA;
+Leads y Propiedades de Tokko se quedan pero corregidos; fuera el reparto Neto 50/50; los
+valores inventados se calculan de verdad; la Clasificación IA queda como está. En 3 tandas.
+
+**Auditoría** (3 agentes de sólo lectura + SQL contra Central): de 10 secciones, 2 estaban bien.
+Lo más grave: cartera en 0 (filtraba `status='Active'`, que no existe: son "Venta"/"Alquiler"/
+"Temporary rent"), Consultas WhatsApp con todo el historial (2.340 vs 483 del período),
+gráficos vacíos por claves que no coinciden, pipeline cortado en 1.000 de 8.182 y con el
+"Cerrado" de Tokko como venta ganada, Conversacional siempre vacía (0 análisis de Central).
+
+**Tanda 1 — errores de cálculo + orden por columna** (rama `fix/dashboard-auditoria`)
+
+- `lib/queries/todas-las-filas.ts`: helper de tandas de 1.000 con orden estable; usado en
+  dashboard, pipeline y propiedades.
+- Cartera por `is_active`; "Días publicada" = alta en Tokko → hoy (antes 45 fijo); stock a fin
+  de mes con alta/baja de Tokko (la baja sólo vale en las inactivas: las activas también la traen).
+- Pipeline: sólo `wa_conversations`. Propiedades: "Eligible"/"Tenant" (inglés de Tokko), m² y
+  promedio sólo ventas. Movimientos ordenados; tipos reales.
+- `hooks/use-orden-tabla.ts` + `components/dashboard/orden-tabla.tsx`: 1er clic menor→mayor,
+  2º mayor→menor, 3º original, botón "Orden original". En Ranking y Objetivos.
+- Verificado en navegador (VAKDOR): 94 / US$11.117.650 / 635 días / 20 aptas / 4 con inquilino,
+  igual que el SQL. Sin NaN, sin scroll lateral en el celular.
+
+**Pendiente:** tanda 2 (filtro fijo arriba y que todo le responda) y tanda 3 (Conversacional en
+vivo, Leads de Tokko corregido, Inhibidores reales desde `dropoff_reason`).
+
+---
+
 ## 2026-09-15 — Tiempos de respuesta del dashboard: los dos números se calculaban con datos cortados
 
 **Qué pidió Leonardo:** Kevin (Central) veía «1 h y pico» en la tarjeta «Tiempos Respuesta» y

@@ -3,18 +3,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import {
-  KanbanSquare, CheckCircle2, XCircle, Users, MessageCircle, Building2, Info, TrendingUp
+  KanbanSquare, CheckCircle2, XCircle, Users, TrendingUp
 } from "lucide-react"
 import Link from "next/link"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
+// Sólo conversaciones de WhatsApp de PRISMA: los leads de Tokko ya no entran (15/9/2026).
 interface PipelineStage {
   id: string
   total: number
-  leads_whatsapp: number
-  leads_tokko: number
-  leads_manual: number
-  leads_total: number
 }
 
 interface PipelineSummary {
@@ -23,9 +20,6 @@ interface PipelineSummary {
   total_cerrado: number
   total_perdido: number
   tasa_cierre_real: number | null
-  total_whatsapp: number
-  total_tokko: number
-  total_manual: number
 }
 
 interface Props {
@@ -37,15 +31,15 @@ interface Props {
 /* `color` pinta la barra; `colorTexto` es el mismo color pero legible sobre
    fondo claro, para el numero. En oscuro se sigue usando `color`. */
 const STAGE_META: Record<string, { label: string; color: string; colorTexto: string; light: string; desc: string }> = {
-  nuevo:            { label: "Nuevo contacto",    color: "#60a5fa", colorTexto: "#2563eb", light: "rgba(96,165,250,0.15)",   desc: "Leads recién ingresados, sin primer contacto" },
+  nuevo:            { label: "Nuevo contacto",    color: "#60a5fa", colorTexto: "#2563eb", light: "rgba(96,165,250,0.15)",   desc: "Conversaciones que todavía no avanzaron de etapa" },
   contacto:         { label: "Primer contacto",   color: "#fb923c", colorTexto: "#c2410c", light: "rgba(251,146,60,0.15)",   desc: "Se realizó un primer contacto con el lead" },
   calificado:       { label: "Calificado",         color: "#a78bfa", colorTexto: "#7c3aed", light: "rgba(167,139,250,0.15)",  desc: "Lead con intención real y presupuesto definido" },
   visita_agendada:  { label: "Visita agendada",    color: "#f59e0b", colorTexto: "#b45309", light: "rgba(245,158,11,0.15)",   desc: "Visita confirmada para ver la propiedad" },
   visita_realizada: { label: "Visita realizada",   color: "#2dd4bf", colorTexto: "#0f766e", light: "rgba(45,212,191,0.15)",   desc: "El lead ya visitó la propiedad" },
   propuesta:        { label: "Propuesta enviada",  color: "#818cf8", colorTexto: "#4f46e5", light: "rgba(129,140,248,0.15)",  desc: "Se envió propuesta económica al lead" },
   negociacion:      { label: "Negociación",         color: "#c084fc", colorTexto: "#9333ea", light: "rgba(192,132,252,0.15)",  desc: "En proceso de negociación activa" },
-  cerrado:          { label: "Cerrado (Ganado)",   color: "#34d399", colorTexto: "#047857", light: "rgba(52,211,153,0.15)",   desc: "Lead que cerró operación exitosamente" },
-  perdido:          { label: "Perdido",             color: "#f87171", colorTexto: "#dc2626", light: "rgba(248,113,113,0.15)",  desc: "Lead que no avanzó o fue descartado" },
+  cerrado:          { label: "Cerrado (Ganado)",   color: "#34d399", colorTexto: "#047857", light: "rgba(52,211,153,0.15)",   desc: "Conversación marcada como operación ganada en PRISMA" },
+  perdido:          { label: "Perdido",             color: "#f87171", colorTexto: "#dc2626", light: "rgba(248,113,113,0.15)",  desc: "Conversación descartada o que el cliente dejó de responder" },
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -65,7 +59,7 @@ export function DashboardPipelineSection({ stages, summary }: Props) {
           <div>
             <h2 className="text-xl font-bold text-foreground">Estado del Pipeline</h2>
             <p className="text-xs text-muted-foreground">
-              Todos los leads activos — WhatsApp + Tokko Broker + Manual
+              Conversaciones de WhatsApp de PRISMA, en qué etapa están hoy
             </p>
           </div>
         </div>
@@ -78,39 +72,39 @@ export function DashboardPipelineSection({ stages, summary }: Props) {
       </div>
 
       {/* ── Summary KPI cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <SummaryCard
-          label="Total leads"
+          label="Conversaciones"
           value={summary.total}
           icon={<Users className="h-4 w-4 text-accent" />}
-          desc="Todos los leads de todas las fuentes"
+          desc="Todas las conversaciones de WhatsApp de la inmobiliaria"
         />
         <SummaryCard
-          label="Activos"
+          label="Activas"
           value={summary.total_activos}
           icon={<TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
-          desc="Leads en proceso (excluye cerrados y perdidos)"
+          desc="En proceso: sin las ganadas ni las perdidas"
           valueClass="text-blue-600 dark:text-blue-400"
         />
         <SummaryCard
-          label="Cerrados"
+          label="Ganadas"
           value={summary.total_cerrado}
           icon={<CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />}
-          desc="Operaciones cerradas exitosamente"
+          desc="Marcadas como operación ganada en PRISMA"
           valueClass="text-emerald-700 dark:text-emerald-400"
         />
         <SummaryCard
-          label="Perdidos"
+          label="Perdidas"
           value={summary.total_perdido}
           icon={<XCircle className="h-4 w-4 text-rose-700 dark:text-rose-400" />}
-          desc="Leads que no avanzaron"
+          desc="Descartadas o el cliente dejó de responder"
           valueClass="text-rose-700 dark:text-rose-400"
         />
         <SummaryCard
           label="Tasa de cierre"
           value={summary.tasa_cierre_real !== null ? `${summary.tasa_cierre_real}%` : "—"}
           icon={<CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />}
-          desc="Cerrados / (Cerrados + Perdidos)"
+          desc="Ganadas ÷ (ganadas + perdidas)"
           valueClass={
             summary.tasa_cierre_real !== null
               ? summary.tasa_cierre_real >= 60 ? "text-emerald-700 dark:text-emerald-400"
@@ -119,31 +113,6 @@ export function DashboardPipelineSection({ stages, summary }: Props) {
               : ""
           }
         />
-        {/* Origen breakdown */}
-        <Card className="border-accent/10 bg-card/50 p-3 flex flex-col gap-1.5">
-          <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide">Por origen</p>
-          {summary.total_whatsapp > 0 && (
-            <div className="flex items-center gap-1.5">
-              <MessageCircle className="h-3 w-3 text-green-700 dark:text-green-400 shrink-0" />
-              <span className="text-xs text-muted-foreground">WhatsApp</span>
-              <span className="ml-auto text-xs font-bold text-green-700 dark:text-green-400">{summary.total_whatsapp}</span>
-            </div>
-          )}
-          {summary.total_tokko > 0 && (
-            <div className="flex items-center gap-1.5">
-              <Building2 className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
-              <span className="text-xs text-muted-foreground">Tokko</span>
-              <span className="ml-auto text-xs font-bold text-blue-600 dark:text-blue-400">{summary.total_tokko}</span>
-            </div>
-          )}
-          {summary.total_manual > 0 && (
-            <div className="flex items-center gap-1.5">
-              <Users className="h-3 w-3 text-purple-600 dark:text-purple-400 shrink-0" />
-              <span className="text-xs text-muted-foreground">Manual</span>
-              <span className="ml-auto text-xs font-bold text-purple-600 dark:text-purple-400">{summary.total_manual}</span>
-            </div>
-          )}
-        </Card>
       </div>
 
       {/* ── Stage bars ── */}
@@ -187,13 +156,6 @@ export function DashboardPipelineSection({ stages, summary }: Props) {
               {closedStages.map(stage => (
                 <StageBar key={stage.id} stage={stage} maxTotal={maxTotal} />
               ))}
-
-              {/* Note sobre Tokko leads en cerrado */}
-              {(summary.total_tokko > 0) && (
-                <p className="text-[10px] text-muted-foreground pt-2 border-t border-accent/10">
-                  ℹ Los leads de Tokko Broker marcados como "cerrado" en Tokko se sincronizan automáticamente.
-                </p>
-              )}
             </CardContent>
           </Card>
         )}
@@ -208,20 +170,15 @@ function SummaryCard({
 }: {
   label: string; value: string | number; icon: React.ReactNode; desc: string; valueClass?: string
 }) {
+  // La explicación va a la vista: en el celular el globito no se abre.
   return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Card className="border-accent/10 bg-card/50 p-3 cursor-default">
-            <div className="flex items-center gap-1.5 mb-1.5">{icon}
-              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide truncate">{label}</span>
-            </div>
-            <p className={`text-2xl font-bold ${valueClass}`}>{value}</p>
-          </Card>
-        </TooltipTrigger>
-        <TooltipContent className="text-xs max-w-[180px]">{desc}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Card className="border-accent/10 bg-card/50 p-3">
+      <div className="flex items-center gap-1.5 mb-1.5">{icon}
+        <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide truncate">{label}</span>
+      </div>
+      <p className={`text-2xl font-bold ${valueClass}`}>{value}</p>
+      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{desc}</p>
+    </Card>
   )
 }
 
@@ -247,23 +204,6 @@ function StageBar({ stage, maxTotal }: { stage: PipelineStage; maxTotal: number 
                   className="text-xs font-bold text-[var(--c-claro)] dark:text-[var(--c-oscuro)]"
                   style={{ "--c-claro": meta.colorTexto, "--c-oscuro": meta.color } as React.CSSProperties}
                 >{stage.total}</span>
-                <div className="flex items-center gap-1.5">
-                  {stage.leads_whatsapp > 0 && (
-                    <span className="text-[10px] text-green-700 dark:text-green-400 flex items-center gap-0.5">
-                      <MessageCircle className="h-2.5 w-2.5" />{stage.leads_whatsapp}
-                    </span>
-                  )}
-                  {stage.leads_tokko > 0 && (
-                    <span className="text-[10px] text-blue-600 dark:text-blue-400 flex items-center gap-0.5">
-                      <Building2 className="h-2.5 w-2.5" />{stage.leads_tokko}
-                    </span>
-                  )}
-                  {stage.leads_manual > 0 && (
-                    <span className="text-[10px] text-purple-600 dark:text-purple-400 flex items-center gap-0.5">
-                      <Users className="h-2.5 w-2.5" />{stage.leads_manual}
-                    </span>
-                  )}
-                </div>
               </div>
             </div>
           </div>
@@ -271,10 +211,7 @@ function StageBar({ stage, maxTotal }: { stage: PipelineStage; maxTotal: number 
         <TooltipContent side="right" className="text-xs max-w-[200px] space-y-1">
           <p className="font-semibold">{meta.label}</p>
           <p>{meta.desc}</p>
-          <p className="pt-1 border-t border-muted mt-1">{stage.total} leads en total</p>
-          {stage.leads_whatsapp > 0 && <p className="text-green-700 dark:text-green-400">WhatsApp: {stage.leads_whatsapp}</p>}
-          {stage.leads_tokko > 0 && <p className="text-blue-600 dark:text-blue-400">Tokko Broker: {stage.leads_tokko}</p>}
-          {stage.leads_manual > 0 && <p className="text-purple-600 dark:text-purple-400">Manual: {stage.leads_manual}</p>}
+          <p className="pt-1 border-t border-muted mt-1">{stage.total} conversaciones</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

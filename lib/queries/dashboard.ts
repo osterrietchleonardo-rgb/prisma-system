@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { transaccionesDe, gciDe, volumenDe, honorarioRealDe, desgloseDeCierres } from "@/lib/tracking/participacion"
+import { todasLasFilas } from "@/lib/queries/todas-las-filas"
 
 // El filtro de periodo manda las fechas como "yyyy-MM-dd" (DatePeriodFilter).
 // Comparar eso contra un timestamptz con <= corta a la medianoche y se pierde
@@ -36,16 +37,18 @@ export async function getDashboardData(
 ) {
   const supabase = createClient()
   
-  // 1. WhatsApp Conversations (Top of Funnel)
-  let waBaseQuery = supabase
-    .from("wa_conversations")
-    .select("agent_id, created_at")
-    .eq("agency_id", agencyId);
-
-  if (startDate) waBaseQuery = waBaseQuery.gte("created_at", startDate);
-  if (endDate) waBaseQuery = waBaseQuery.lte("created_at", endDate);
-
-  const { data: waCounts } = await waBaseQuery;
+  // 1. WhatsApp Conversations (Top of Funnel). De a tandas: la base corta en 1.000 filas.
+  const waCounts = await todasLasFilas<{ agent_id: string | null; created_at: string }>((desde, hasta) => {
+    let q = supabase
+      .from("wa_conversations")
+      .select("agent_id, created_at")
+      .eq("agency_id", agencyId)
+      .order("id", { ascending: true })
+      .range(desde, hasta);
+    if (startDate) q = q.gte("created_at", startDate);
+    if (endDate) q = q.lte("created_at", endDate);
+    return q;
+  });
 
   const waCountsByAgent = (waCounts || []).reduce((acc: any, curr: any) => {
     if (curr.agent_id) {
@@ -61,16 +64,21 @@ export async function getDashboardData(
     .filter(agentId ? 'agent_id' : 'id', agentId ? 'eq' : 'not.is', agentId || null);
 
   // 2. Performance Logs (The main source for business metrics)
-  let logsQuery = supabase
-    .from("performance_logs")
-    .select("*")
-    .eq("agency_id", agencyId);
-
-  if (agentId) logsQuery = logsQuery.eq("agent_id", agentId);
-  if (startDate) logsQuery = logsQuery.gte("fecha_actividad", startDate);
-  if (endDate) logsQuery = logsQuery.lte("fecha_actividad", endDate);
-
-  const { data: rawLogs } = await logsQuery;
+  // Del más nuevo al más viejo: "Movimientos Recientes" toma los primeros 10. Sin orden, la
+  // base los devolvía en cualquier orden y los "recientes" no eran los recientes.
+  const rawLogs = await todasLasFilas<any>((desde, hasta) => {
+    let q = supabase
+      .from("performance_logs")
+      .select("*")
+      .eq("agency_id", agencyId)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: true })
+      .range(desde, hasta);
+    if (agentId) q = q.eq("agent_id", agentId);
+    if (startDate) q = q.gte("fecha_actividad", startDate);
+    if (endDate) q = q.lte("fecha_actividad", endDate);
+    return q;
+  });
   const perfLogs = rawLogs?.filter(l => l.status !== 'eliminada') || [];
 
   // 3. Profiles — only asesores (directors are excluded from the leaderboard).
@@ -93,12 +101,19 @@ export async function getDashboardData(
     ? todosLosAsesores
     : (todosLosAsesores ?? []).filter((p) => p.estado !== "eliminado");
 
-  // 4. Inventory (Tokko Properties)
-  const { data: properties } = await supabase
-    .from("properties")
-    .select("assigned_agent, price, created_at, status")
-    .eq("agency_id", agencyId)
-    .eq("is_active", true);
+  // 4. Cartera (propiedades sincronizadas de Tokko). Se traen también las dadas de baja: con
+  //    su fecha de alta y de baja se reconstruye cuánta cartera había a fin de cada mes.
+  //    Si está activa lo dice `is_active`, NO `status`: en producción `status` vale "Venta",
+  //    "Alquiler" o "Temporary rent", nunca "Active" (15/9/2026: la tarjeta mostraba 0 de 349).
+  const todasLasPropiedades = await todasLasFilas<any>((desde, hasta) =>
+    supabase
+      .from("properties")
+      .select("is_active, assigned_agent, price, currency, alta:tokko_data->>created_at, baja:tokko_data->>deleted_at")
+      .eq("agency_id", agencyId)
+      .order("id", { ascending: true })
+      .range(desde, hasta)
+  );
+  const properties = todasLasPropiedades.filter((p) => p.is_active);
 
   // 4.b Fichas ACM creadas.
   //
@@ -161,13 +176,16 @@ export async function getDashboardData(
       volumen: perfLogs?.filter(l => l.type === 'reserva').length || 0,
       compromiso: perfLogs?.filter(l => l.type === 'reserva').reduce((acc, l) => acc + (Number(l.metadata?.monto_depositado) || 0), 0) || 0,
       gapSum: perfLogs?.filter(l => l.type === 'reserva').reduce((acc, l) => {
-        const publicado = l.metadata?.valor_publicacion_actual;
-        const ofertado = l.monto_operacion;
-        if (publicado && publicado > 0) {
+        const publicado = Number(l.metadata?.valor_publicacion_actual);
+        const ofertado = Number(l.monto_operacion) || 0;
+        if (publicado > 0) {
           return acc + ((ofertado - publicado) / publicado) * 100;
         }
         return acc;
       }, 0) || 0,
+      // El GAP se promedia sólo entre las reservas que tienen precio publicado: dividir por
+      // todas diluía el número con reservas que no aportaban nada a la suma.
+      gapCount: perfLogs?.filter(l => l.type === 'reserva' && Number(l.metadata?.valor_publicacion_actual) > 0).length || 0,
     },
     cierre: {
       transacciones: transaccionesDe(perfLogs),
@@ -202,16 +220,23 @@ export async function getDashboardData(
     metrics.prospeccion.channels[origen] = (metrics.prospeccion.channels[origen] || 0) + 1;
   });
 
+  // ¿La propiedad es del asesor filtrado? Lista completa a propósito: si se filtra por un
+  // asesor ya desvinculado (p. ej. un link guardado), su cartera tiene que seguir resolviéndose.
+  const emailFiltrado = agentId ? todosLosAsesores?.find(prof => prof.id === agentId)?.email : null;
+  const esDelAlcance = (p: any) => !agentId || (!!emailFiltrado && (p.assigned_agent as any)?.email === emailFiltrado);
+  const ahora = Date.now();
+
   // Process Cartera (Tokko)
-  properties?.forEach(p => {
-    const agentEmail = (p.assigned_agent as any)?.email;
-    // Lista completa a proposito: si se filtra por un asesor ya desvinculado
-    // (p. ej. un link guardado), su cartera tiene que seguir resolviendose.
-    const isOwner = agentId ? (todosLosAsesores?.find(prof => prof.id === agentId)?.email === agentEmail) : true;
-    
-    if (isOwner && p.status === 'Active') {
-      metrics.cartera.activa++;
-      metrics.cartera.volumen += Number(p.price) || 0;
+  properties.forEach(p => {
+    if (!esDelAlcance(p)) return;
+    metrics.cartera.activa++;
+    // Sólo precios en dólares: sumar los pesos de un alquiler a los dólares de una venta no da nada.
+    if (p.currency === 'USD') metrics.cartera.volumen += Number(p.price) || 0;
+    // Días publicada: desde el alta en Tokko hasta hoy.
+    const alta = p.alta ? Date.parse(p.alta) : NaN;
+    if (!Number.isNaN(alta)) {
+      metrics.cartera.domSum += (ahora - alta) / 86_400_000;
+      metrics.cartera.domCount++;
     }
   });
 
@@ -220,10 +245,17 @@ export async function getDashboardData(
   const ticketPromedioBusqueda = metrics.prebuying.volumen > 0 ? metrics.prebuying.poder / metrics.prebuying.volumen : 0;
   const hitRate = metrics.prelisting.volumen > 0 ? (metrics.captacion.nuevas / metrics.prelisting.volumen) * 100 : 0;
   const ratioExclusividad = metrics.captacion.nuevas > 0 ? (metrics.captacion.exclusivas / metrics.captacion.nuevas) * 100 : 0;
-  const honorarioPactado = metrics.captacion.nuevas > 0 ? metrics.captacion.honorarioTotal / metrics.captacion.nuevas : 0;
-  
+  // Honorario pactado ponderado por el valor de cada captación, mismo criterio que el Honorario
+  // Real: un 2% sobre US$300.000 pesa más que un 5% sobre US$50.000. Si no hay montos
+  // cargados, queda el promedio simple de los porcentajes.
+  const capsConMonto = perfLogs.filter(l => l.type === 'captacion' && Number(l.monto_operacion) > 0);
+  const montoCaps = capsConMonto.reduce((acc, l) => acc + Number(l.monto_operacion), 0);
+  const honorarioPactado = montoCaps > 0
+    ? capsConMonto.reduce((acc, l) => acc + Number(l.monto_operacion) * (Number(l.comision_generada) || 0), 0) / montoCaps
+    : metrics.captacion.nuevas > 0 ? metrics.captacion.honorarioTotal / metrics.captacion.nuevas : 0;
+
   const tasaOferta = metrics.prebuying.volumen > 0 ? (metrics.reserva.volumen / metrics.prebuying.volumen) * 100 : 0;
-  const gapNegociacion = metrics.reserva.volumen > 0 ? metrics.reserva.gapSum / metrics.reserva.volumen : 0;
+  const gapNegociacion = metrics.reserva.gapCount > 0 ? metrics.reserva.gapSum / metrics.reserva.gapCount : 0;
 
   const tasaCierre = metrics.reserva.volumen > 0 ? (metrics.cierre.transacciones / metrics.reserva.volumen) * 100 : 0;
   // El honorario real es GCI ÷ volumen, no el promedio de los porcentajes de
@@ -234,11 +266,6 @@ export async function getDashboardData(
   // comentario "Wait, ..." al lado; nunca se usaba, porque los KPIs siempre
   // publicaron `honorarioReal`. Se fue con esto.)
   const honorarioReal = honorarioRealDe(perfLogs);
-
-  // Split calculation (Company Dollar vs Neto Asesores)
-  // Assuming a default 50/50 split if not specified, but usually it's in agency config
-  const companyDollar = metrics.cierre.gci * 0.5; 
-  const netoAsesores = metrics.cierre.gci * 0.5;
 
   // Global Efficiency
   const totalConsultas = metrics.prospeccion.waChats + metrics.prospeccion.active;
@@ -300,14 +327,18 @@ export async function getDashboardData(
     tasaCierre,
     honorarioCobrado: honorarioReal,
     gci: metrics.cierre.gci,
-    companyDollar,
-    netoAsesores,
-    
+    // "Neto Asesores / Agency" se fue (15/9/2026): era un 50/50 fijo en el código y no existe
+    // ninguna configuración del reparto. Decisión de Leonardo: sacarlo, no inventarlo.
+
     // Cartera
     carteraActiva: metrics.cartera.activa,
     volumenCartera: metrics.cartera.volumen,
-    rotacion: totalConsultas > 0 ? (metrics.cierre.transacciones / metrics.cartera.activa) * 100 : 0, // Simplified rotation
-    dom: 45, // Placeholder for Days on Market
+    // Cierres del período sobre la cartera activa. Sin cartera no hay rotación que medir
+    // (antes dividía por cero y la pantalla podía mostrar "NaN%").
+    rotacion: metrics.cartera.activa > 0 ? (metrics.cierre.transacciones / metrics.cartera.activa) * 100 : 0,
+    // Días que lleva publicada, en promedio, la cartera activa (alta en Tokko → hoy).
+    // Antes era un 45 fijo escrito en el código.
+    dom: metrics.cartera.domCount > 0 ? Math.round(metrics.cartera.domSum / metrics.cartera.domCount) : 0,
     
     // Global
     ratioConsultasCierres,
@@ -337,7 +368,8 @@ export async function getDashboardData(
     const reservas = pLogs.filter(l => l.type === 'reserva').length;
     const prospeccion = pLogs.filter(l => l.type === 'prospeccion').length;
     
-    const finalInv = pProps.filter(prop => prop.status === 'Active').length;
+    // `properties` ya son sólo las activas (is_active). Filtrar por status 'Active' daba 0 siempre.
+    const finalInv = pProps.length;
     const initialInv = Math.max(0, finalInv - caps + trans);
     const avgInv = (initialInv + finalInv) / 2;
     const rotacion = avgInv > 0 ? (trans / avgInv) * 100 : 0;
@@ -382,10 +414,13 @@ export async function getDashboardData(
   const months = [];
   const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   for (let i = 0; i < 6; i++) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - i);
+    // Día 1 de cada mes: con setMonth sobre un día 31 se salteaba un mes entero.
+    const hoy = new Date();
+    const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    months.push({ key, name: monthNames[d.getMonth()] });
+    // Último instante del mes, para saber cuánta cartera había al cerrarlo.
+    const fin = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999).getTime();
+    months.push({ key, name: monthNames[d.getMonth()], fin });
   }
 
   const performanceEvolution = months.map(m => {
@@ -402,8 +437,22 @@ export async function getDashboardData(
     const mProspeccion = mLogs.filter(l => l.type === 'prospeccion').length;
     const mTransacciones = transaccionesDe(mLogs);
 
+    // Cartera a fin de mes: dada de alta antes de que cierre el mes y, si hoy está dada de baja,
+    // que la baja haya sido después. La fecha de baja de Tokko sólo vale para las inactivas:
+    // las activas también la traen cargada (15/9/2026: las 349 activas de Central).
+    const cartera = todasLasPropiedades.filter(p => {
+      if (!esDelAlcance(p)) return false;
+      const alta = p.alta ? Date.parse(p.alta) : NaN;
+      if (Number.isNaN(alta) || alta > m.fin) return false;
+      if (p.is_active) return true;
+      const baja = p.baja ? Date.parse(p.baja) : NaN;
+      return !Number.isNaN(baja) && baja > m.fin;
+    }).length;
+
     return {
       name: m.name,
+      cartera,
+      rotacion: cartera > 0 ? (mTransacciones / cartera) * 100 : 0,
       captaciones: mLogs.filter(l => l.type === 'captacion').length,
       transacciones: mTransacciones,
       waChats: mWaChats,
@@ -547,92 +596,57 @@ export async function getDashboardData(
 }
 
 // ------------------------------------ Pipeline Dashboard Data ------------------------------------
-// Lee pipeline_stage de AMBAS tablas (leads + wa_conversations) por agency_id
+// Sólo lo generado en PRISMA: las conversaciones de WhatsApp y su etapa. Los leads que llegan
+// sincronizados de Tokko NO entran (decisión de Leonardo, 15/9/2026): el "Cerrado" de Tokko es un
+// contacto archivado, no una venta, y metía 1.077 "ganados" contra 1 solo cierre cargado en 2026.
 // Solo agencia del director logueado. Nunca mezcla agencias.
 export async function getPipelineDashboardData(agencyId: string) {
   const supabase = createClient()
 
-  const [leadsRes, waRes] = await Promise.all([
-    supabase
-      .from("leads")
-      .select("pipeline_stage, source")
-      .eq("agency_id", agencyId),
-    supabase
-      .from("wa_conversations")
-      .select("pipeline_stage, funnel_status")
-      .eq("agency_id", agencyId),
-  ])
+  // De a tandas: Central ya tiene 2.340 conversaciones y la base corta en 1.000.
+  const conversaciones = await todasLasFilas<{ pipeline_stage: string | null; funnel_status: string | null }>(
+    (desde, hasta) =>
+      supabase
+        .from("wa_conversations")
+        .select("pipeline_stage, funnel_status")
+        .eq("agency_id", agencyId)
+        .order("id", { ascending: true })
+        .range(desde, hasta)
+  )
 
   const STAGES = [
     "nuevo", "contacto", "calificado", "visita_agendada",
     "visita_realizada", "propuesta", "negociacion", "cerrado", "perdido",
   ] as const
 
-  type Stage = typeof STAGES[number]
-
-  // Contar leads (Tokko + manual)
-  const leadsByStage: Record<string, { total: number; bySource: Record<string, number> }> = {}
-  for (const row of (leadsRes.data || [])) {
-    const stage = (row.pipeline_stage || "nuevo") as string
-    if (!leadsByStage[stage]) leadsByStage[stage] = { total: 0, bySource: {} }
-    leadsByStage[stage].total++
-    const src = row.source || "Manual"
-    leadsByStage[stage].bySource[src] = (leadsByStage[stage].bySource[src] || 0) + 1
-  }
-
-  // Contar wa_conversations
-  // Importante: si funnel_status = closed_lost → efectivamente están en "perdido"
-  const waByStage: Record<string, number> = {}
-  for (const row of (waRes.data || [])) {
+  // Si el embudo ya la dio por ganada o perdida, esa es su etapa aunque pipeline_stage diga otra.
+  const porEtapa: Record<string, number> = {}
+  for (const row of conversaciones) {
     const stage = row.funnel_status === "closed_lost"
       ? "perdido"
       : row.funnel_status === "closed_won"
         ? "cerrado"
         : (row.pipeline_stage || "nuevo")
-    waByStage[stage] = (waByStage[stage] || 0) + 1
+    porEtapa[stage] = (porEtapa[stage] || 0) + 1
   }
 
-  // Unificar por etapa
-  const allStages = new Set([...Object.keys(leadsByStage), ...Object.keys(waByStage)])
-  const stages = STAGES.filter(s => allStages.has(s)).map(s => {
-    const leads = leadsByStage[s]?.total || 0
-    const whatsapp = waByStage[s] || 0
-    return {
-      id: s,
-      leads_total: leads,
-      leads_whatsapp: whatsapp,
-      leads_tokko: leadsByStage[s]?.bySource?.["Tokko Broker"] || 0,
-      leads_manual: (leads) - (leadsByStage[s]?.bySource?.["Tokko Broker"] || 0),
-      total: leads + whatsapp,
-    }
-  })
+  const stages = STAGES.filter(s => porEtapa[s]).map(s => ({ id: s, total: porEtapa[s] }))
 
-  // Totales generales
-  const total = stages.reduce((acc, s) => acc + s.total, 0)
-  const totalCerrado = (leadsByStage["cerrado"]?.total || 0) + (waByStage["cerrado"] || 0)
-  const totalPerdido = (leadsByStage["perdido"]?.total || 0) + (waByStage["perdido"] || 0)
-  const totalCerradosMasPerdidos = totalCerrado + totalPerdido
-  const tasaCierreReal = totalCerradosMasPerdidos > 0
-    ? Math.round((totalCerrado / totalCerradosMasPerdidos) * 100)
+  const total = conversaciones.length
+  const totalCerrado = porEtapa["cerrado"] || 0
+  const totalPerdido = porEtapa["perdido"] || 0
+  const tasaCierreReal = totalCerrado + totalPerdido > 0
+    ? Math.round((totalCerrado / (totalCerrado + totalPerdido)) * 100)
     : null
-
-  // Leads activos (excluye cerrado y perdido)
-  const totalActivos = stages
-    .filter(s => s.id !== "cerrado" && s.id !== "perdido")
-    .reduce((acc, s) => acc + s.total, 0)
 
   return {
     stages,
     summary: {
       total,
-      total_activos: totalActivos,
+      total_activos: total - totalCerrado - totalPerdido,
       total_cerrado: totalCerrado,
       total_perdido: totalPerdido,
       tasa_cierre_real: tasaCierreReal,
-      // Por origen
-      total_whatsapp: stages.reduce((acc, s) => acc + s.leads_whatsapp, 0),
-      total_tokko: stages.reduce((acc, s) => acc + s.leads_tokko, 0),
-      total_manual: stages.reduce((acc, s) => acc + s.leads_manual, 0),
     }
   }
 }
