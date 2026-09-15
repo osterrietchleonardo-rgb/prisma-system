@@ -78,14 +78,18 @@ Mergeada: PR #64 (`a64c961`).
 - Verificado (VAKDOR 1/1–15/9): 1 chat, pico 16 h sábado; 1.594 leads, 285 sin contactar (277 +48 h),
   todos sin asignar — igual que el SQL. Sin textos de IA, sin NaN, sin errores de página. 4,4 s de carga.
 
-**Base — PENDIENTE (Leonardo dio el OK el 15/9, pero el clasificador de Claude Code frenó el DDL
-contra producción: "Modify Shared Resources"; no se aplicó nada, verificado con SELECT):**
-- Índices `wa_conversations(agency_id, created_at)`, `wa_messages(agency_id, created_at)`,
-  `leads(agency_id, tokko_created_date)` con CONCURRENTLY: `20260915120000_indices_dashboard_por_fecha.sql`
-  (cada sentencia sola: CONCURRENTLY no va en transacción).
-- Borrar `dashboard_conversational_insights`, recién DESPUÉS del deploy (el código viejo la leía):
-  `20260915130000_borrar_cache_conversacional.sql`. Respaldo previo (18 filas, todas de VAKDOR,
-  columnas, 4 políticas, restricciones) en el scratchpad de la sesión del 15/9.
+Mergeada: PR #65 (`888123a`); Vercel publicó el deploy ("success").
+
+**Base — APLICADA el 15/9** (OK de Leonardo). El clasificador de Claude Code frenó el DDL contra
+producción ("Modify Shared Resources") antes de ejecutarlo; no se esquivó: Leonardo corrió cada
+comando con `!` y yo verifiqué con SELECT después de cada uno.
+- `dashboard_conversational_insights` borrada DESPUÉS de que Vercel publicó (el código viejo la
+  leía): `20260915130000_borrar_cache_conversacional.sql`. Verificado: la tabla ya no existe y no
+  quedan políticas. Respaldo previo (18 filas, todas de VAKDOR, columnas, 4 políticas,
+  restricciones) en el scratchpad de la sesión del 15/9.
+- Índices con CONCURRENTLY, uno por comando (no va en transacción):
+  `20260915120000_indices_dashboard_por_fecha.sql`. Verificados válidos: `wa_conversations_agency_created_idx`
+  (112 kB), `wa_messages_agency_created_idx` (896 kB), `leads_agency_tokko_created_idx` (456 kB).
 
 ---
 
