@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { todasLasFilas } from "@/lib/queries/todas-las-filas"
+import { estabaEnCartera } from "@/lib/queries/cartera"
 
 /** Tokko guarda la situación en inglés; la pantalla la muestra en castellano. */
 const SITUACION: Record<string, string> = {
@@ -11,19 +12,35 @@ const SITUACION: Record<string, string> = {
   "---": "Sin dato",
 }
 
-export async function getPropertiesDashboardData(agencyId: string) {
+/**
+ * La cartera responde al filtro del dashboard: la del asesor elegido (Tokko guarda el asesor por
+ * email) y la que había al cierre del período (`endDate`, 'yyyy-MM-dd'; hoy si no viene).
+ */
+export async function getPropertiesDashboardData(agencyId: string, agentId?: string, endDate?: string) {
   const supabase = createClient()
 
-  // De a tandas: la base corta en 1.000 filas.
-  const properties = await todasLasFilas<any>((desde, hasta) =>
+  let emailAsesor: string | null = null
+  if (agentId) {
+    const { data } = await supabase.from("profiles").select("email").eq("id", agentId).maybeSingle()
+    emailAsesor = data?.email ?? null
+  }
+  const instante = endDate ? Date.parse(`${endDate}T23:59:59.999`) : Date.now()
+
+  // Todas (también las dadas de baja): con alta y baja se sabe cuáles estaban al cierre del
+  // período. De a tandas: la base corta en 1.000 filas.
+  const todas = await todasLasFilas<any>((desde, hasta) =>
     supabase
       .from("properties")
       .select("*")
       .eq("agency_id", agencyId)
-      .eq("is_active", true)
       .order("id", { ascending: true })
       .range(desde, hasta)
   )
+  const properties = todas.filter((p) => {
+    if (agentId && (!emailAsesor || p.assigned_agent?.email !== emailAsesor)) return false
+    const raw = p.tokko_data || {}
+    return estabaEnCartera({ is_active: p.is_active, alta: raw.created_at, baja: raw.deleted_at }, instante)
+  })
 
   if (properties.length === 0) {
     return null

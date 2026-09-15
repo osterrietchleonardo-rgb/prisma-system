@@ -40,6 +40,8 @@ interface Props {
    * ajusta los textos para que no diga "total inmobiliaria" sobre un gráfico que es suyo.
    */
   alcance?: "agencia" | "propio";
+  /** Asesor elegido en el filtro del dashboard: al cambiar el año se sigue mostrando sólo ese. */
+  agentId?: string;
 }
 
 const fmtValue = (n: number, unit: "usd" | "count") => {
@@ -61,7 +63,7 @@ const pctColor = (pct: number | null) => {
   return "text-red-600 dark:text-red-400";
 };
 
-export function ObjectivesDashboard({ initialData, initialYear, alcance = "agencia" }: Props) {
+export function ObjectivesDashboard({ initialData, initialYear, alcance = "agencia", agentId }: Props) {
   const esPropio = alcance === "propio";
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState<number>(initialYear);
@@ -82,14 +84,14 @@ export function ObjectivesDashboard({ initialData, initialYear, alcance = "agenc
     setYear(y);
     setIsLoading(true);
     try {
-      const fresh = await getObjectivesDashboardForYear(y);
+      const fresh = await getObjectivesDashboardForYear(y, agentId);
       setData(fresh);
     } catch (e) {
       console.error(e);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [agentId]);
 
   // Totales por mes (suma de todos los asesores) para el gráfico
   const chartData = useMemo(() => {

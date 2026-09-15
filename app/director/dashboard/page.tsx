@@ -82,14 +82,19 @@ export default async function DashboardPage({
     )
   }
 
-  const currentYear = new Date().getFullYear()
+  // Todo responde al filtro de arriba (fechas + asesor). Los objetivos son anuales: toman el año
+  // en que termina el período elegido.
+  const anioFiltro = Number(to.slice(0, 4)) || new Date().getFullYear()
   const [dashboardData, propertiesData, pipelineData, objectivesData, handoffsData] = await Promise.all([
     getDashboardData(profile.agency_id, agentId, from, to),
-    getPropertiesDashboardData(profile.agency_id),
-    getPipelineDashboardData(profile.agency_id),
-    getObjectivesDashboard(profile.agency_id, currentYear),
+    getPropertiesDashboardData(profile.agency_id, agentId, to),
+    getPipelineDashboardData(profile.agency_id, agentId, from, to),
+    getObjectivesDashboard(profile.agency_id, anioFiltro),
     getHandoffsDashboardData(profile.agency_id, agentId, from, to),
   ])
+  const objetivosDelFiltro = agentId ? objectivesData.filter((o) => o.agentId === agentId) : objectivesData
+  // El desplegable de asesores necesita la lista entera; el ranking, sólo el elegido.
+  const rankingDelFiltro = agentId ? dashboardData.advisors.filter((a) => a.id === agentId) : dashboardData.advisors
 
   return (
     <div id="dashboard-content" className="space-y-8 animate-in fade-in duration-300 px-4 md:px-8 py-8 bg-background">
@@ -105,24 +110,25 @@ export default async function DashboardPage({
         <DashboardHeaderActions data={dashboardData} />
       </div>
 
-      {/* Filters Bar at the TOP */}
-      <div className="flex flex-col gap-6 p-4 rounded-xl border border-accent/10 bg-card/30 backdrop-blur-sm sm:flex-row sm:items-end md:items-center">
+      {/* Filtro de arriba: queda fijo al hacer scroll y TODAS las métricas le responden.
+          En el celular va compacto (dos filas) para no comerse la pantalla. */}
+      <div className="sticky top-0 z-30 -mx-2 flex flex-col gap-2 rounded-xl border border-accent/10 bg-card/95 p-2 shadow-lg backdrop-blur-md sm:mx-0 sm:flex-row sm:items-center sm:gap-6 sm:p-4">
         <div className="flex-1 w-full">
           <AdvisorFilter advisors={dashboardData.advisors.map(a => ({ id: a.id, name: a.name }))} />
         </div>
-        
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
-          <div className="flex-1 sm:flex-initial">
+
+        <div className="flex flex-row items-center gap-2 sm:gap-4 w-full sm:w-auto">
+          <div className="flex-1 min-w-0 sm:flex-initial">
             <DatePeriodFilter />
           </div>
-          
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-xs text-accent font-semibold hover:bg-accent/10 h-10 sm:h-9 border border-accent/10 sm:border-none"
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="shrink-0 text-xs text-accent font-semibold hover:bg-accent/10 h-10 sm:h-9 border border-accent/10 sm:border-none"
             asChild
           >
-            <a href="?">Limpiar Filtros</a>
+            <a href="?">Limpiar</a>
           </Button>
         </div>
       </div>
@@ -137,11 +143,17 @@ export default async function DashboardPage({
         channels={dashboardData.charts.channelDistribution}
       />
 
-      <ObjectivesDashboard initialData={objectivesData} initialYear={currentYear} />
+      {/* key: al cambiar el filtro, la tabla arranca de nuevo con el año y el asesor elegidos. */}
+      <ObjectivesDashboard
+        key={`${anioFiltro}-${agentId ?? "todos"}`}
+        initialData={objetivosDelFiltro}
+        initialYear={anioFiltro}
+        agentId={agentId}
+      />
 
       <div className="grid gap-6 lg:grid-cols-7">
         <div className="lg:col-span-7 w-full overflow-hidden">
-          <PerformanceLeaderboard advisors={dashboardData.advisors} />
+          <PerformanceLeaderboard advisors={rankingDelFiltro} />
         </div>
       </div>
 
