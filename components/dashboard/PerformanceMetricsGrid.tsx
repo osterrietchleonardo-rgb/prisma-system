@@ -168,7 +168,7 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
         metrics={[
           { label: "Inventario Nuevo", value: kpis.captaciones, subValue: `Hit Rate: ${formatPercent(kpis.hitRate)}` },
           { label: "Exclusividad", value: formatPercent(kpis.ratioExclusividad) },
-          { label: "Honorario Pactado", value: `${kpis.honorarioPactado}%` },
+          { label: "Honorario Pactado", value: `${Number(kpis.honorarioPactado || 0).toFixed(1)}%` },
         ]}
       />
 
@@ -213,7 +213,6 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
           // Una operación trabajada por dos asesores cuenta una sola vez.
           { label: "Volumen Operado", value: formatUSD(kpis.volumenVentas) },
           { label: "Honorario Real", value: `${kpis.honorarioCobrado.toFixed(1)}%` },
-          { label: "Neto Asesores", value: formatUSD(kpis.netoAsesores), subValue: `Agency: ${formatUSD(kpis.companyDollar)}` },
         ]}
       />
 
@@ -223,9 +222,9 @@ export function PerformanceMetricsGrid({ kpis }: { kpis: any }) {
         icon={Briefcase}
         color="slate-500"
         metrics={[
-          { label: "Inventario Activo", value: kpis.carteraActiva, subValue: formatUSD(kpis.volumenCartera) },
-          { label: "Rotación (Venta)", value: formatPercent(kpis.rotacion) },
-          { label: "Days on Market", value: `${kpis.dom} días` },
+          { label: "Inventario Activo", value: kpis.carteraActiva, subValue: `${formatUSD(kpis.volumenCartera)} (en dólares)` },
+          { label: "Rotación", value: formatPercent(kpis.rotacion), subValue: "cierres del período ÷ cartera" },
+          { label: "Días publicada", value: kpis.dom > 0 ? `${kpis.dom} días` : "---", subValue: "promedio de la cartera activa" },
         ]}
       />
 

@@ -19,13 +19,17 @@ interface DashboardActivityProps {
 }
 
 export function DashboardActivity({ data }: DashboardActivityProps) {
+  // Los tipos reales de performance_logs. Antes se esperaban 'transaccion' y 'lead_seguimiento',
+  // que no existen, y los cierres, prospecciones y prelistings salían como "Actividad".
   const getActivityIcon = (type: string) => {
     switch (type) {
       case 'captacion':
         return <Key className="h-4 w-4 text-amber-700 dark:text-amber-400" />
-      case 'transaccion':
+      case 'cierre':
+      case 'reserva':
         return <TrendingUp className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
-      case 'lead_seguimiento':
+      case 'prospeccion':
+      case 'prebuying':
         return <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
       default:
         return <Activity className="h-4 w-4 text-purple-600 dark:text-purple-400" />
@@ -36,27 +40,26 @@ export function DashboardActivity({ data }: DashboardActivityProps) {
     switch (type) {
       case 'captacion':
         return 'bg-amber-400/10 text-amber-800 dark:text-amber-400 border-amber-400/20'
-      case 'transaccion':
+      case 'cierre':
+      case 'reserva':
         return 'bg-emerald-400/10 text-emerald-800 dark:text-emerald-400 border-emerald-400/20'
-      case 'lead_seguimiento':
+      case 'prospeccion':
+      case 'prebuying':
         return 'bg-blue-400/10 text-blue-800 dark:text-blue-400 border-blue-400/20'
       default:
         return 'bg-purple-400/10 text-purple-800 dark:text-purple-400 border-purple-400/20'
     }
   }
 
-  const getActivityLabel = (type: string) => {
-    switch (type) {
-      case 'captacion':
-        return 'Captación'
-      case 'transaccion':
-        return 'Cierre'
-      case 'lead_seguimiento':
-        return 'Seguimiento'
-      default:
-        return 'Actividad'
-    }
+  const ETIQUETAS: Record<string, string> = {
+    prospeccion: 'Prospección',
+    prelisting: 'Prelisting',
+    prebuying: 'Prebuying',
+    captacion: 'Captación',
+    reserva: 'Reserva',
+    cierre: 'Cierre',
   }
+  const getActivityLabel = (type: string) => ETIQUETAS[type] || 'Actividad'
 
   return (
     <Card className="border-accent/10 bg-card/40 backdrop-blur-md h-full shadow-xl shadow-black/20">

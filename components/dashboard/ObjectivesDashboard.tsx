@@ -28,6 +28,8 @@ import {
   type AdvisorObjectives,
   type ObjectiveMetric,
 } from "@/lib/tracking/objetivos-types";
+import { useOrdenTabla } from "@/hooks/use-orden-tabla";
+import { AvisoOrden, IconoOrden } from "@/components/dashboard/orden-tabla";
 
 interface Props {
   initialData: AdvisorObjectives[];
@@ -106,6 +108,17 @@ export function ObjectivesDashboard({ initialData, initialYear, alcance = "agenc
       return { name: mn, objetivo, alcanzado, pct };
     });
   }, [data, metric]);
+
+  // Orden de la tabla: por asesor (A→Z) o por el % cumplido de un mes. Las tres filas de cada
+  // asesor (objetivo, alcanzado, %) se mueven juntas. Clave "asesor" o el número de mes.
+  const valorObjetivo = useCallback(
+    (adv: AdvisorObjectives, clave: string) =>
+      clave === "asesor" ? adv.name : adv.metrics[metric]?.[Number(clave)]?.pct ?? null,
+    [metric],
+  );
+  const { ordenadas, orden, alternar, restablecer } = useOrdenTabla(data, valorObjetivo);
+  const ariaSort = (k: string) =>
+    orden?.clave === k ? (orden.dir === "asc" ? "ascending" : "descending") : "none";
 
   const hasAnyObjective = useMemo(
     () => data.some((a) => Object.values(a.metrics[metric] || {}).some((c) => c.objetivo > 0)),
@@ -190,22 +203,41 @@ export function ObjectivesDashboard({ initialData, initialYear, alcance = "agenc
         ) : (
           <>
             {/* Tabla */}
+            <div className="px-5 pt-3">
+              <AvisoOrden
+                etiqueta={
+                  !orden ? null : orden.clave === "asesor" ? "Asesor" : `% cumplido de ${MONTH_NAMES[Number(orden.clave) - 1]}`
+                }
+                dir={orden?.dir}
+                esTexto={orden?.clave === "asesor"}
+                onRestablecer={restablecer}
+              />
+            </div>
             <div className="overflow-x-auto w-full">
               <table className="w-full text-sm text-left min-w-[1100px]">
                 <thead className="bg-muted/30 text-muted-foreground border-b border-accent/5">
                   <tr>
-                    <th className="px-5 py-3 font-bold min-w-[200px] sticky left-0 bg-muted/95 backdrop-blur-md z-10 border-r border-accent/10">
-                      Asesor
+                    <th className="px-5 py-3 font-bold min-w-[200px] sticky left-0 bg-muted/95 backdrop-blur-md z-10 border-r border-accent/10" aria-sort={ariaSort("asesor")}>
+                      <button type="button" onClick={() => alternar("asesor")} className="flex min-h-11 items-center gap-1.5 hover:text-accent">
+                        Asesor <IconoOrden activo={orden?.clave === "asesor"} dir={orden?.dir} />
+                      </button>
                     </th>
-                    {MONTH_NAMES.map((mn) => (
-                      <th key={mn} className="px-2 py-3 font-bold text-center text-[11px]">
-                        {mn}
+                    {MONTH_NAMES.map((mn, i) => (
+                      <th key={mn} className="px-2 py-3 font-bold text-center text-[11px]" aria-sort={ariaSort(String(i + 1))}>
+                        <button
+                          type="button"
+                          onClick={() => alternar(String(i + 1))}
+                          title={`Ordenar por el % cumplido de ${mn}`}
+                          className="mx-auto flex min-h-11 items-center gap-0.5 hover:text-accent"
+                        >
+                          {mn} <IconoOrden activo={orden?.clave === String(i + 1)} dir={orden?.dir} />
+                        </button>
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-accent/5">
-                  {data.map((adv) => (
+                  {ordenadas.map((adv) => (
                     <React.Fragment key={adv.agentId}>
                       {/* Objetivo */}
                       <tr className="hover:bg-accent/5">
