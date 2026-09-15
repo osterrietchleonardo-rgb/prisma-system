@@ -36,3 +36,13 @@ export function periodoDelDashboard(
   const desde = new Date(ahora.getTime() - DIAS_POR_DEFECTO * 24 * 3600e3)
   return { from: FECHA_AR(desde), to: FECHA_AR(ahora), porDefecto: true }
 }
+
+/**
+ * "del 16/08 al 15/09": las aclaraciones de los tiempos de respuesta dicen qué período están
+ * contando, así el número se lee junto con el filtro que el director eligió.
+ */
+export function etiquetaPeriodo(from?: string, to?: string): string {
+  if (!from || !to || !ES_FECHA.test(from) || !ES_FECHA.test(to)) return "todo el historial"
+  const corta = (f: string) => `${f.slice(8, 10)}/${f.slice(5, 7)}`
+  return from === to ? `el ${corta(from)}` : `del ${corta(from)} al ${corta(to)}`
+}

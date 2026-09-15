@@ -1,8 +1,8 @@
 import { Card } from "@/components/ui/card"
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { AlertTriangle, CheckCircle2, Clock, MessageCircle, PhoneForwarded, UserCheck } from "lucide-react"
 import Link from "next/link"
 import type { HandoffsDashboardData, HandoffSeverity, UnattendedHandoff } from "@/lib/queries/handoffs"
+import { etiquetaPeriodo } from "@/lib/dashboard/periodo"
 
 interface Props {
   data: HandoffsDashboardData
@@ -25,7 +25,7 @@ function formatWait(hours: number): string {
 }
 
 export function HandoffsPanel({ data, basePath, scope }: Props) {
-  const { unattended, totalHandoffs, attended, criticos, esperandoConMensajes, medianResponseHours } = data
+  const { unattended, totalHandoffs, attended, criticos, esperandoConMensajes, medianResponseHours, averageResponseHours } = data
 
   // Sin derivaciones en el período no hay nada útil que mostrar.
   if (!totalHandoffs) return null
@@ -77,12 +77,24 @@ export function HandoffsPanel({ data, basePath, scope }: Props) {
           valueClass={esperandoConMensajes > 0 ? "text-amber-700 dark:text-amber-500" : ""}
         />
         <SummaryCard
-          label="Respuesta (mediana)"
+          label="Respuesta del asesor"
           value={medianResponseHours === null ? "—" : formatWait(medianResponseHours)}
+          extra={averageResponseHours === null ? undefined : `promedio ${formatWait(averageResponseHours)}`}
           icon={<UserCheck className="h-3.5 w-3.5 text-accent" />}
-          desc={`Cuánto tarda el asesor en responder. ${attended} de ${totalHandoffs} derivaciones atendidas.`}
+          desc={`Mediana, desde la derivación hasta la 1ª respuesta. ${attended} de ${totalHandoffs} atendidas.`}
         />
       </div>
+
+      {/* Aclaración visible: los globitos no se abren en el celular. */}
+      <p className="text-[11px] leading-snug text-muted-foreground">
+        Período: {etiquetaPeriodo(data.desde, data.hasta)}. La respuesta del asesor se mide desde que el
+        bot le pasa el cliente hasta que el asesor le escribe por primera vez.{" "}
+        <span className="font-semibold text-foreground">Mediana:</span> la mitad de las respuestas
+        llegó más rápido que esto y la otra mitad, más lento; es lo habitual.{" "}
+        <span className="font-semibold text-foreground">Promedio:</span> suma todas las esperas; unas
+        pocas muy largas lo suben. Las derivaciones que siguen sin respuesta no entran en ninguno de
+        los dos.
+      </p>
 
       {/* ── Listado ── */}
       {unattended.length === 0 ? (
@@ -148,23 +160,19 @@ function HandoffRow({ handoff, basePath, scope }: { handoff: UnattendedHandoff; 
 }
 
 function SummaryCard({
-  label, value, icon, desc, valueClass = ""
+  label, value, extra, icon, desc, valueClass = ""
 }: {
-  label: string; value: string | number; icon: React.ReactNode; desc: string; valueClass?: string
+  label: string; value: string | number; extra?: string; icon: React.ReactNode; desc: string; valueClass?: string
 }) {
+  // La explicación va a la vista, no en un globito: en el celular el globito no se abre.
   return (
-    <TooltipProvider delayDuration={150}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Card className="border-accent/10 bg-card/50 p-3 cursor-default">
-            <div className="flex items-center gap-1.5 mb-1.5">{icon}
-              <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide truncate">{label}</span>
-            </div>
-            <p className={`text-2xl font-bold ${valueClass}`}>{value}</p>
-          </Card>
-        </TooltipTrigger>
-        <TooltipContent className="text-xs max-w-[180px]">{desc}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Card className="border-accent/10 bg-card/50 p-3">
+      <div className="flex items-center gap-1.5 mb-1.5">{icon}
+        <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wide truncate">{label}</span>
+      </div>
+      <p className={`text-2xl font-bold ${valueClass}`}>{value}</p>
+      {extra && <p className="text-xs font-semibold text-muted-foreground">{extra}</p>}
+      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{desc}</p>
+    </Card>
   )
 }

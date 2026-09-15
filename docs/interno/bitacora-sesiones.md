@@ -16,6 +16,51 @@
 
 ---
 
+## 2026-09-15 — Tiempos de respuesta del dashboard: los dos números se calculaban con datos cortados
+
+**Qué pidió Leonardo:** Kevin (Central) veía «1 h y pico» en la tarjeta «Tiempos Respuesta» y
+12 h en la mediana de «Handoffs sin atender», y no sabía cuál mirar. Verificar los dos y
+aclarar cada uno para que pueda ir con fundamentos a sus asesores.
+
+**Qué se encontró** (leído de producción, Central, 15/8 al 14/9)
+
+- **Supabase entrega como máximo 1.000 filas por consulta** (`max_rows: 1000`, Management API
+  `/postgrest`). La tarjeta pedía los mensajes del período sin paginar: Central tenía 9.104 y
+  la tarjeta usaba los 1.000 más viejos. La «1 h y pico» salía de **una sola respuesta**.
+- El panel de handoffs también se cortaba: 1.945 mensajes después de las derivaciones y leía
+  1.000, así que algunas conversaciones atendidas aparecían como «sin atender».
+- **Miden cosas distintas.** La tarjeta cuenta desde el último mensaje del cliente sin respuesta
+  hasta que escribe el asesor, en toda la charla, y deja afuera las respuestas del asesor sin un
+  mensaje del cliente antes (121 de 182). El handoff cuenta desde la derivación hasta la primera
+  respuesta del asesor. **El handoff es el que sirve para exigirles a los asesores.**
+- Con todos los datos: tarjeta, entre mensajes del asesor, 10 h 11 m de promedio y 1 h 34 m de
+  mediana; handoff, 18 h 53 m de mediana, **28 de 101 derivaciones atendidas**.
+- La tarjeta además dejaba afuera el último día del período (`lte` con `yyyy-MM-dd`).
+
+**Qué se hizo** (rama `fix/tiempos-respuesta-dashboard`, 5 archivos)
+
+- `lib/queries/dashboard.ts` y `lib/queries/handoffs.ts`: consultas de a tandas de 1.000
+  (`.range()` + orden por `created_at` e `id`), y promedio + mediana en los dos lugares.
+- `PerformanceMetricsGrid.tsx`: promedio arriba, «mediana X · N veces» abajo, y una aclaración
+  visible al pie. `HandoffsPanel.tsx`: la tarjeta pasa a «Respuesta del asesor» (la mediana y el
+  promedio), las descripciones salen del globito y quedan a la vista, más una línea que explica
+  los dos números. `lib/dashboard/periodo.ts`: `etiquetaPeriodo()` hace que cada aclaración diga
+  el período del filtro.
+
+**Verificación real**
+
+- Las tandas, contra Central, solo lectura: 9.109 traídas, 9.109 distintas, 9.109 en la base,
+  en 1,7 s.
+- Navegador, PRISMAIA - VAKDOR, escritorio y celular 390×844: handoff 6 días (la base da
+  153,7 h), las filas del asesor en «---» (la base da 0 esperas medibles), el filtro del 1 al
+  15/09 cambia el período y los números, y la página no se corre de costado. Los valores del
+  bot solo se vieron, no se compararon contra un cálculo aparte.
+
+**Ojo:** la tarjeta y el panel son los mismos en el dashboard del asesor; ellos también ven las
+aclaraciones.
+
+---
+
 ## 2026-09-12 — El descubrimiento diario fallaba hace 4 días: esperábamos menos de lo que tarda
 
 Leonardo avisó por los mails de GitHub Actions. `mercado-descubrimiento` falló 9, 10, 11 y
@@ -56,6 +101,8 @@ termómetro: si `n < --max`, ayer entró completo.
 ~US$1.55/día ≈ **US$46/mes** (no son centavos: son ~1.350 avisos nuevos por día a
 US$0.001). Con el refresco mensual (~US$65) el régimen real de Apify es **~US$111/mes**
 contra un tope de cuenta de US$100. Hay que subirlo a US$150 o el 3-oct el refresco choca.
+
+---
 
 ## 2026-09-12 — Farming: el mapa arranca con la manito, lupita, y el director ve cada asesor en su color
 
