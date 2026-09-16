@@ -188,7 +188,12 @@ export async function POST(req: Request) {
     let propertyData: TokkoProperty | null = null;
     const propertyId = payload.propiedad_tokko_id || ipc.propiedad_tokko_id || (ipc.flow_data as any).propiedad_tokko_id;
 
-    if (propertyId) {
+    // El id viaja a una URL de Tokko CON la clave de la agencia adentro: mismo guardia que
+    // traerPropiedad en generate-image/route.ts. Un valor sin validar no debe llegar a una URL
+    // con una credencial adentro.
+    if (propertyId && !/^\d+$/.test(String(propertyId))) {
+      console.error("[GENERATE-BATCH] propiedad_tokko_id invalido, no es un id numerico:", propertyId);
+    } else if (propertyId) {
       try {
         if (agencyId) {
           const TOKKO_API_KEY = agencyTokkoKey || process.env.TOKKO_API_KEY;

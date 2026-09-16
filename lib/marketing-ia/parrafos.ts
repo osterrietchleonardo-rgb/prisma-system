@@ -70,6 +70,18 @@ export function armarDesarrollo(parrafos: unknown): string {
   if (typeof parrafos === "string") return parrafos.trim();
   if (!Array.isArray(parrafos)) return "";
 
+  // Si el modelo manda una forma plausible pero distinta —p.ej. `[{ texto: "..." }, ...]`— cada
+  // entrada no-string se convierte en "" y desaparece del `.filter`, sin ningun error: el
+  // desarrollo queda vacio y el asesor abre un post con hook, cta, y nada en el medio. Esto NO
+  // cambia esa conducta (el diseño de "nunca romper" es a propósito) pero la deja en el log.
+  const descartadas = parrafos.filter((p) => typeof p !== "string");
+  if (descartadas.length > 0) {
+    const tipos = [...new Set(descartadas.map((p) => (p === null ? "null" : typeof p)))].join(", ");
+    console.warn(
+      `[PARRAFOS] armarDesarrollo: se descartaron ${descartadas.length} de ${parrafos.length} entradas no-string (tipo: ${tipos})`
+    );
+  }
+
   return parrafos
     .map((p) => (typeof p === "string" ? unEmojiPorParrafo(p) : ""))
     .filter((p) => p.length > 0)
@@ -111,11 +123,22 @@ export function sellarContenidoPost(content: any): any {
   // ningún error. Las rutas ya llaman a esto solo en la rama de post; esto es el cinturón.
   if (Array.isArray((content as any)?.bloques)) return content;
 
+  const desarrollo = armarDesarrollo(content?.parrafos ?? content?.desarrollo);
+
+  // La razon de pedirle al modelo una LISTA de parrafos (y no un bloque suelto) es que el
+  // servidor pueda contarlos (ver el comentario del encabezado del archivo). Hasta ahora
+  // `contarParrafos` se probaba pero no se llamaba desde ningun lado: solo log, no se rechaza ni
+  // se reintenta — el diseño "nunca romper" sigue igual.
+  const cantidad = contarParrafos(desarrollo);
+  if (cantidad < 6 || cantidad > 8) {
+    console.warn(`[PARRAFOS] sellarContenidoPost: el desarrollo quedo con ${cantidad} parrafos (se pidieron 6 a 8)`);
+  }
+
   return {
     // EN LA IMAGEN NO VA NINGUN EMOJI (Leonardo, 16-sep-2026). El hook es lo que se dibuja
     // sobre la placa, asi que se limpia acá y no se confia en que el modelo obedezca.
     hook: sinEmojis(content?.hook ?? ""),
-    desarrollo: armarDesarrollo(content?.parrafos ?? content?.desarrollo),
+    desarrollo,
     cta: (content?.cta ?? "").trim(),
   };
 }

@@ -26,7 +26,12 @@ async function traerPropiedad(
   tokkoId: number | string | null | undefined,
   claveAgencia: string | null
 ): Promise<TokkoProperty | null> {
-  if (!tokkoId) return null;
+  if (!tokkoId) {
+    // Sin id no hay forma de traer nada: la placa sale sin direccion, sin precio y sin m² y
+    // nadie se entera si esto no queda en el log.
+    console.error("[PLACA] traerPropiedad sin id: la placa va a salir sin direccion, precio ni m²");
+    return null;
+  }
   // El id viaja a una URL de Tokko CON la clave de la agencia adentro. No confiamos en que
   // llegue numerico solo porque el tipo dice `number | string`: un string cualquiera ahi
   // adentro viaja con la credencial en un pedido saliente. Nunca se pudo explotar (Tokko
@@ -37,10 +42,16 @@ async function traerPropiedad(
     return null;
   }
   const clave = claveAgencia || process.env.TOKKO_API_KEY;
-  if (!clave) return null;
+  if (!clave) {
+    console.error("[PLACA] Sin clave de Tokko (ni de la agencia ni la global), no se pudo traer la propiedad:", tokkoId);
+    return null;
+  }
   try {
     const res = await fetch(`https://tokkobroker.com/api/v1/property/${tokkoId}/?key=${clave}&format=json`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.error(`[PLACA] Tokko devolvio ${res.status} para la propiedad ${tokkoId}, la placa va a salir sin direccion, precio ni m²`);
+      return null;
+    }
     const p = await res.json();
     return {
       id: p.id,
@@ -351,6 +362,11 @@ export async function POST(req: Request) {
 
     let imageBuffer: Buffer;
     let txId: string | null = null;
+    // Ver `MedidaPanel.desborda` en lib/marketing-ia/placa-con-foto.ts: si queda true, el panel
+    // se dibujo encima del aviso legal. Antes esto solo quedaba en el log del servidor y la
+    // placa se subia y se guardaba igual, con un toast de éxito para el asesor. Ahora viaja en
+    // la respuesta para que la pantalla lo avise.
+    let desborda = false;
 
     if (!payload.foto_url) {
       // ─── Camino sin foto: como siempre, la imagen la inventa Gemini ──────────────────
@@ -528,6 +544,7 @@ export async function POST(req: Request) {
         // Ver el comentario de `desborda` en lib/marketing-ia/placa-con-foto.ts: ni soltando
         // casillas y bajada, ni achicando el titulo, ni bajando la foto a su piso minimo alcanzo.
         console.error(`[ERROR] Placa: el panel desbordo el hueco reservado (${reservadoAbajo}px)`);
+        desborda = true;
       }
       if (placa.escalaFoto > 1.5) {
         console.warn(`[WARN] Placa: la foto se agrandó ${placa.escalaFoto}x, va a salir poco nítida`);
@@ -606,7 +623,10 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       success: true,
-      ...savedImage
+      ...savedImage,
+      // No se guarda en la fila: es una señal para esta respuesta, no un dato de la propiedad.
+      // Ver el comentario de `desborda` en lib/marketing-ia/placa-con-foto.ts.
+      desborda
     });
 
   } catch (error: any) {

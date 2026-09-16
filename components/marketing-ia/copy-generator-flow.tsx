@@ -199,6 +199,10 @@ export function CopyGeneratorFlow() {
         // sin imagen y nadie se enteraba. Se sigue tolerando el fallo — una imagen caída no
         // frena a las demás — pero ahora se cuenta y se avisa al final.
         let fallosImagen = 0
+        // Cuenta las placas que salieron pero con el panel montado encima del aviso legal (ver
+        // `desborda` en la respuesta de generate-image). Antes esto quedaba solo en el log del
+        // servidor: la placa se subia igual y el asesor la veia recien publicada.
+        let placasDesbordadas = 0
         for (const draft of insertedDrafts) {
           setProgressText("Se está generando la imagen...")
           try {
@@ -219,6 +223,12 @@ export function CopyGeneratorFlow() {
             if (!resImagen.ok) {
               fallosImagen++
               console.error("generate-image devolvió un error para el draft", draft.id, resImagen.status)
+            } else {
+              const dataImagen = await resImagen.json().catch(() => null)
+              if (dataImagen?.desborda) {
+                placasDesbordadas++
+                console.error("generate-image devolvió una placa con el panel desbordado para el draft", draft.id)
+              }
             }
           } catch (imgError) {
             fallosImagen++
@@ -231,6 +241,13 @@ export function CopyGeneratorFlow() {
             fallosImagen === insertedDrafts.length
               ? "No se pudo generar ninguna de las placas. Revisá tus generaciones e intentá de nuevo."
               : `${fallosImagen} de ${insertedDrafts.length} placas no se pudieron generar. Esas variantes van a quedar sin imagen.`
+          )
+        }
+        if (placasDesbordadas > 0) {
+          toast.warning(
+            placasDesbordadas === 1
+              ? "Una placa salió con el aviso legal muy largo para el formato: el texto puede superponerse. Revisala antes de publicar."
+              : `${placasDesbordadas} placas salieron con el aviso legal muy largo para el formato: el texto puede superponerse. Revisalas antes de publicar.`
           )
         }
       }

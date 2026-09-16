@@ -9,7 +9,7 @@
 //
 // Como se dibujan las letras (y por que no son texto) esta en lib/tipografia/contornos.ts.
 import sharp from "sharp";
-import { anchoDelTexto, comoPaths, contornosDeTexto, repartirEnRenglones } from "@/lib/tipografia/contornos";
+import { comoPaths, contornosDeTexto, repartirEnRenglones } from "@/lib/tipografia/contornos";
 
 // Todo se mide contra un ancho de referencia de 1080 px (el lado de una placa de Instagram) y
 // despues se escala, asi la franja se ve igual en un post cuadrado que en una historia.
