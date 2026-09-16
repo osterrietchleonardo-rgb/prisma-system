@@ -17,10 +17,12 @@
 ## 1. La v1 en una frase
 
 La agencia pega **una línea** en su sitio y aparece un chat donde responde su mismo asistente
-(Sofía, Lara), que **solo sabe lo que la agencia cargó y lo que hay en su cartera**. El asistente
-conversa, pide los datos (nombre, celular, email, qué busca) y, cuando tiene con qué, **le manda al
-número que la agencia eligió una plantilla de WhatsApp con el lead y un link para escribirle de una**.
-El director ve todos los chats en una bandeja nueva dentro de PRISMA.
+(Sofía, Lara). **No es un asistente de compradores: atiende a cualquiera que entre al sitio.** Lo
+primero que hace es entender qué necesita esa persona —comprar o alquilar, vender su propiedad,
+sumarse al equipo, una consulta sobre la empresa o sus servicios, o un reclamo—, la orienta con lo
+que la agencia cargó de cada sección del sitio, **la califica según el caso** y, cuando tiene con
+qué, **le manda al número que la agencia eligió una plantilla de WhatsApp con el resumen y un link
+para escribirle de una**. El director ve todos los chats en una bandeja nueva dentro de PRISMA.
 
 **La decisión de fondo (Leonardo, 16/9):** hay bandeja para el director, pero **se conversa con el
 lead desde WhatsApp, no desde PRISMA**. La bandeja es para ver, entender y no perder nada; el ida y
@@ -53,7 +55,11 @@ mismo camino que las del equipo (`plantillasEquipo` en `lib/whatsapp/plantillas-
    carga una vez y sirve para los dos canales. Una sola fuente de verdad por agencia.
 2. **La cartera**: búsqueda por significado sobre `properties` de esa agencia (`match_properties_ia`,
    la que ya usa el Buscador).
-3. **La página desde donde le escribieron** (la URL), para poder decir "veo que estás mirando el
+3. **Las secciones del sitio, cargadas a mano en el formulario del widget**: nombre, link y dos
+   líneas de qué hay en cada una (Propiedades, Tasaciones, Alquileres, Servicios, Nosotros, Sumate
+   al equipo, Contacto…). Es texto corto, va en el contexto, y con eso el asistente orienta y pasa
+   el link correcto sin que haya que rastrear el sitio con un robot.
+4. **La página desde donde le escribieron** (la URL), para poder decir "veo que estás mirando el
    departamento de…".
 
 **Puede** cuatro cosas:
@@ -66,6 +72,26 @@ mismo camino que las del equipo (`plantillasEquipo` en `lib/whatsapp/plantillas-
 | `pasar_a_whatsapp` | botón "Seguir por WhatsApp" con el resumen prellenado | el visitante es el que escribe: no hace falta plantilla ni permiso de Meta |
 
 No agenda visitas, no manda emails al visitante, no toma archivos, no habla de comisiones, no tasa.
+
+### Los cinco caminos (Leonardo, 16/9)
+
+Lo primero de cada conversación es entender **para qué entró**. No lo decide un clasificador aparte:
+lo detecta el mismo asistente mientras conversa, y lo deja anotado en la conversación (`objetivo`),
+que es lo que después filtra la bandeja y viaja en la derivación. Si no está claro, pregunta; si
+cambia en el medio, se actualiza.
+
+| Camino | Qué califica antes de derivar | Qué le ofrece |
+|---|---|---|
+| **Busca propiedad** (comprar o alquilar) | operación, tipo, zona, ambientes, presupuesto y moneda, plazo, si necesita crédito, si tiene que vender algo antes | hasta 3 propiedades de la cartera con su ficha |
+| **Quiere vender o alquilar la suya** | dirección, barrio, tipo, metros, ambientes, antigüedad, precio pretendido, si ya está publicada y dónde, si trabaja con otra inmobiliaria, plazo, quién decide, si está ocupada | la reunión o la tasación con un asesor; **nunca un valor por chat** |
+| **Quiere sumarse al equipo** | nombre, zona donde vive o quiere trabajar, experiencia, matrícula, disponibilidad, contacto | qué busca la agencia y cómo sigue el proceso |
+| **Consulta sobre la empresa o un servicio** | qué necesita exactamente, y contacto | la respuesta con el documento de la agencia y el link a la sección que corresponde |
+| **Reclamo o algo que no encaja** | qué pasó y contacto | nada de improvisar: se deriva rápido, con el texto del reclamo entero |
+
+Dos reglas que valen para los cinco: **se pregunta de a un dato por respuesta**, nunca de corrido, y
+**la calificación del que quiere vender su propiedad usa el mismo diccionario de campos que el agente
+de propietarios** (`2026-09-16-agente-propietarios-design.md` §3), para que un dueño que entra por la
+web y otro que entra por prospección terminen con la misma ficha.
 
 ### Los guardarraíles (en código, no en el prompt)
 
@@ -108,6 +134,11 @@ Es el corazón de la v1, y lo que decide si esto sirve o no.
 Se escribe dos veces, como el alta de contactos del tracking, y se guarda en formato internacional.
 Puede ser el director, un asesor o el número general de la agencia; puede cambiarse cuando quieran.
 
+**Un número por camino, si la agencia quiere.** Hay uno obligatorio, que recibe todo por defecto, y
+la posibilidad de poner otro para alguno de los cinco caminos: las consultas de propiedades a un
+asesor, las de sumarse al equipo al director, las de vender su propiedad a quien capta. Sin eso,
+alguien que quiere trabajar en la agencia le llega al asesor de ventas.
+
 **Durante la charla**, el asistente pide de a poco —nunca de corrido— nombre, celular, email, qué
 busca, zona y presupuesto. Apenas tiene **nombre y una forma de contacto**, dispara la derivación.
 
@@ -115,9 +146,17 @@ busca, zona y presupuesto. Apenas tiene **nombre y una forma de contacto**, disp
 
 > Hola {{1}}, entró una consulta por el sitio de {{2}}. {{3}} Escribile directo acá: {{4}}
 
-donde {{3}} lo arma el asistente con lo que sabe (qué busca, zona, presupuesto, la propiedad que
-estaba mirando y el último mensaje textual), y {{4}} es el link `wa.me/<celular del lead>` con un
-texto sugerido ya escrito. Un toque y la persona está escribiéndole al lead.
+donde {{3}} lo arma el asistente **empezando por el camino** (busca propiedad, quiere vender la suya,
+quiere sumarse al equipo, consulta, reclamo) y siguiendo con lo que calificó de ese caso y el último
+mensaje textual; {{4}} es el link `wa.me/<celular del lead>` con un texto sugerido ya escrito. Un
+toque y la persona está escribiéndole al lead. Ejemplos del mismo mensaje según el camino:
+
+> …entró una consulta por el sitio de Central. **Quiere vender**: departamento en Olazábal 2580,
+> Belgrano, 3 ambientes, 78 m², pretende 180.000 dólares, publicado hace 5 meses en Zonaprop, sin
+> inmobiliaria. Escribile directo acá: …
+
+> …entró una consulta por el sitio de Central. **Quiere sumarse al equipo**: Martín, vive en Núñez,
+> 3 años en inmobiliaria, tiene matrícula, disponibilidad completa. Escribile directo acá: …
 
 Reglas de la derivación:
 - **Una por conversación.** Si el lead sigue hablando y da datos nuevos, no se manda otra: la
@@ -205,7 +244,7 @@ en silencio.
 
 | Sacado | Motivo | Cuándo vuelve |
 |---|---|---|
-| Rastrear e indexar el sitio del cliente (tabla y embeddings propios) | Es un robot con sus fallas, y el 90 % de lo que respondería ya está en el documento de la agencia y en la cartera | Cuando un cliente pida que el chat conozca páginas que no están en el documento |
+| Rastrear e indexar el sitio del cliente (tabla y embeddings propios) | Es un robot con sus fallas, y lo que respondería ya está en el documento de la agencia, en la cartera y en las secciones que el director carga a mano en el formulario (§3), que además son más precisas que lo que sacaría un robot | Cuando un cliente tenga un sitio grande y cargar las secciones a mano se vuelva un trabajo |
 | El analizador de 45 campos portado de n8n | Duplica un analizador que ya existe y que va a morir cuando el bot de compradores pase a código. El asistente guarda los 6 datos que importan con una herramienta | Junto con la mudanza del bot de compradores |
 | Responder al lead desde PRISMA, y el tiempo real | La bandeja SÍ va (decisión de Leonardo, 16/9), pero para ver: el ida y vuelta se hace por WhatsApp. Sin responder desde la web no hace falta tiempo real: la lista se refresca sola cada 15 segundos | Cuando el equipo pida contestar desde ahí |
 | Mostrar los pasos de pensamiento | Suma trabajo y no cambia la respuesta | Nunca, salvo pedido |
@@ -220,7 +259,11 @@ en silencio.
 2. **Resuelto (16/9):** hay bandeja para el director, y el ida y vuelta con el lead se hace por
    WhatsApp, con la plantilla y el link directo (§4-bis).
 2-bis. ¿Qué número recibe los leads en cada agencia? Tiene que ser de alguien del equipo, o Sofía
-   le va a contestar cuando responda (§4-bis).
+   le va a contestar cuando responda (§4-bis). ¿Va uno solo, o uno distinto para el que quiere
+   sumarse al equipo y para el que quiere vender su propiedad? (recomendado: uno para arrancar, y
+   separar el de "sumarse al equipo", que no es un lead comercial)
+2-ter. ¿Los cinco caminos se encienden todos, o alguna agencia apaga alguno? (recomendado: todos
+   encendidos, y que el director apague el que no quiera desde la misma tarjeta)
 3. ¿Quién carga el documento de la agencia? Hoy está vacío en las dos, y sin eso el asistente solo
    sabe de la cartera (recomendado: Leonardo el suyo; Kevin el de Central, con un pedido concreto)
 4. El modelo arranca con Luna solo si pasa la prueba contra el actual; si no, queda el de hoy.
