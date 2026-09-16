@@ -11,16 +11,27 @@
 /**
  * Los emojis de verdad, sin llevarse puestos los simbolos tipograficos.
  *
- * Matchea secuencias COMPLETAS de emojis (base + selector de variación + modificador de tono +
- * cadenas ZWJ), no puntos de código individuales. Por qué: un emoji comido a mitad (por ej. si
- * solo capturamos el U+26A0 de ⚠️ y dejamos el U+FE0F) llega a un renderer de placa como un
- * U+FE0F huérfano, se dibuja como .notdef (nada), y queda un fantasma invisible en el HTML.
+ * Tres familias:
  *
- * `\p{Extended_Pictographic}` agarra los pictogramas (🏡 🔑 ⚠️) pero NO agarra el guion largo,
- * las comillas, el simbolo de grado ni el ² de "45 m²", que Inter si sabe dibujar y que el copy
- * inmobiliario usa todo el tiempo.
+ * 1. EMOJIS DE TECLA (keycaps): `1️⃣` `#️⃣` `*️⃣`. La base es ASCII (dígito, #, *), así que
+ *    Extended_Pictographic no los agarra y el U+FE0F + U+20E3 llegan a la placa como invisibles.
+ *    "3️⃣ razones para invertir" es un titular plausible.
+ *
+ * 2. BANDERAS: Dos regional indicators (p.ej. 🇦🇷 = U+1F1E6 U+1F1F7). Extended_Pictographic
+ *    tampoco las ve. "Invertí en Argentina 🇦🇷" es común en la red.
+ *
+ * 3. SECUENCIAS GENERALES (extended pictographics con variantes): base + selector de variación +
+ *    modificador de tono + cadenas ZWJ. Un emoji comido a mitad (p.ej. solo U+26A0 de ⚠️, dejando
+ *    el U+FE0F) se dibuja como .notdef invisible.
+ *
+ * EXCEPCIÓN: `©®™` se preservan. Medido contra la fuente Inter incrustada (515 glifos): existen
+ * como copyright, registered, trademark. Pero `★` NO existe en Inter, así que se saca.
+ *
+ * Los caracteres invisibles (U+FE0F, U+20E3, U+200D) se escriben con \uXXXX para evitar que una
+ * re-guardada en otro encoding o un paste a través de un canal con pérdida los corrompa sin diff
+ * visible — esto es el UNO LUGAR cuyo trabajo es evitar exactamente eso.
  */
-const EMOJI = /\p{Extended_Pictographic}(️|\p{Emoji_Modifier}|⃣)?(‍\p{Extended_Pictographic}️?)*/gu;
+const EMOJI = /[0-9#*]️?⃣|[\u{1F1E6}-\u{1F1FF}]{2}|(?![©®™])\p{Extended_Pictographic}(️|\p{Emoji_Modifier}|⃣)?(‍\p{Extended_Pictographic}️?)*/gu;
 
 /** Deja el texto sin un solo emoji. Lo que va dibujado sobre la placa pasa siempre por acá. */
 export function sinEmojis(texto: string): string {

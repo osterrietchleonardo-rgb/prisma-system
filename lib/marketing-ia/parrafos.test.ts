@@ -17,6 +17,31 @@ describe("sinEmojis", () => {
   it("un texto sin emojis vuelve igual", () => {
     expect(sinEmojis("Los números no mienten")).toBe("Los números no mienten");
   });
+
+  it("saca los emojis de tecla, que traen caracteres invisibles pegados", () => {
+    // "3️⃣ razones para invertir" es un titular plausible. La base es un dígito ASCII, así que
+    // el regex de pictogramas no los agarraba y el U+FE0F y el U+20E3 llegaban a la placa.
+    expect(sinEmojis("Paso 1️⃣ listo")).toBe("Paso listo");
+  });
+
+  it("saca las banderas", () => {
+    expect(sinEmojis("Invertí en Argentina \u{1F1E6}\u{1F1F7}")).toBe("Invertí en Argentina");
+  });
+
+  it("no deja ningún carácter invisible suelto", () => {
+    // Lo que de verdad importa: un U+FE0F huérfano se dibuja como nada y nadie se entera.
+    const r = sinEmojis("Paso 1️⃣ y \u{1F1E6}\u{1F1F7} y \u{1F3E1}");
+    expect([...r].filter((c) => ["️", "‍", "⃣"].includes(c))).toHaveLength(0);
+  });
+
+  it("respeta las marcas legales, que Inter sí sabe dibujar", () => {
+    // Medido contra la fuente incrustada: copyright, registered y trademark existen como glifos.
+    expect(sinEmojis("Central Real Estate® © 2026")).toBe("Central Real Estate® © 2026");
+  });
+
+  it("saca la estrella, que Inter NO sabe dibujar", () => {
+    expect(sinEmojis("Una estrella ★ suelta")).toBe("Una estrella suelta");
+  });
 });
 
 describe("unEmojiPorParrafo", () => {
