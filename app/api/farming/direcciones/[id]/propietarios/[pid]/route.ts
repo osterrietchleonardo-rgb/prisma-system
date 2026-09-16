@@ -8,7 +8,7 @@
 import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
-import { direccionAccesible, responderError } from "@/lib/farming/servidor"
+import { direccionAccesible, responderError, FORMA_UUID } from "@/lib/farming/servidor"
 import { VINCULOS } from "@/lib/farming/direcciones"
 import { normalizePhoneE164 } from "@/lib/whatsapp/phone"
 
@@ -33,6 +33,14 @@ function telefonoAGuardar(raw: unknown): string | null {
 }
 
 async function candado(admin: ReturnType<typeof createAdminClient>, direccionId: string, pid: string, agencyId: string, userId: string) {
+  // `farming_propietarios.id` es `uuid`: un `pid` con otra forma ("abc") no da "no existe", le
+  // rompe el cast a Postgres (22P02) — un 500 crudo donde la semántica pide 404. Se corta ACÁ,
+  // antes de tocar la base (ni siquiera se llega a mirar la dirección): mismo criterio que
+  // `direccionAccesible`/`zonaAccesible`, que hacen lo mismo con su propio id.
+  if (!FORMA_UUID.test(pid)) {
+    return { ok: false as const, resp: NextResponse.json({ error: "No encontramos ese propietario en esta tarjeta" }, { status: 404 }) }
+  }
+
   const { direccion, puede } = await direccionAccesible(admin, direccionId, agencyId, userId)
   if (!direccion) return { ok: false as const, resp: NextResponse.json({ error: "No encontramos esa tarjeta" }, { status: 404 }) }
   if (!puede) return { ok: false as const, resp: NextResponse.json({ error: "Esa tarjeta es de la zona de un colega" }, { status: 403 }) }

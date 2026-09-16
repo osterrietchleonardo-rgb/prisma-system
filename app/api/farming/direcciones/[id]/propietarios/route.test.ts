@@ -326,6 +326,26 @@ describe("PATCH /api/farming/direcciones/[id]/propietarios/[pid]", () => {
     const r = await patch(D_MIA, "30000000-0000-0000-0000-000000000099", { piso: "9" })
     expect(r.status).toBe(404)
   })
+
+  // Contra Postgres real, "abc" no es un uuid: el cast revienta con 22P02 dentro del SELECT
+  // que busca al propietario, y sin este chequeo ese error crudo se propaga como 500 (donde
+  // la semántica pide 404). El doble de prueba no tira ese error —compara strings sin mirar el
+  // tipo, así que un `pid` inventado simplemente no matchea ninguna fila y el candado ya
+  // devolvía 404 igual, por casualidad—, así que mirar solo el status NO alcanza para probar
+  // esto: lo que prueba que la guarda corre ANTES de todo es que `base.from` no se llama ni una
+  // vez (sin la guarda, esta prueba pasaría igual en status pero `consulto` daría `true`).
+  it("un pid sin forma de uuid: 404 sin consultar la base", async () => {
+    let consulto = false
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      consulto = true
+      return fromOriginal(tabla)
+    }) as typeof base.from
+
+    const r = await patch(D_MIA, "abc", { piso: "9" })
+    expect(r.status).toBe(404)
+    expect(consulto).toBe(false)
+  })
 })
 
 describe("DELETE /api/farming/direcciones/[id]/propietarios/[pid]", () => {
@@ -357,5 +377,23 @@ describe("DELETE /api/farming/direcciones/[id]/propietarios/[pid]", () => {
   it("algo que no existe: 404", async () => {
     const r = await borrar(D_MIA, "30000000-0000-0000-0000-000000000099")
     expect(r.status).toBe(404)
+  })
+
+  // Mismo motivo que en el PATCH: contra Postgres real, "abc" rompe el cast a uuid (22P02)
+  // dentro del propio candado, antes de llegar al DELETE. El doble de prueba no lo nota (una
+  // fila nunca "matchea" un id que no es uuid, así que el candado ya daba 404 por descarte), así
+  // que el status solo no alcanza — lo que prueba que la guarda corre primero es que `base.from`
+  // no se llama ni una vez.
+  it("un pid sin forma de uuid: 404 sin consultar la base", async () => {
+    let consulto = false
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      consulto = true
+      return fromOriginal(tabla)
+    }) as typeof base.from
+
+    const r = await borrar(D_MIA, "abc")
+    expect(r.status).toBe(404)
+    expect(consulto).toBe(false)
   })
 })

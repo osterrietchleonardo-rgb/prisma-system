@@ -12,8 +12,10 @@ export const COLUMNAS_ZONA =
   "id, agency_id, owner_user_id, nombre, geojson, area_km2, origen_mapa_zona_id, estado, trazo_editado_en, created_at"
 
 /** `farming_zonas.id` es `uuid` en Postgres: un valor con otra forma no da "no existe", da un
- *  error crudo (22P02, "invalid input syntax for type uuid"). zonaAccesible lo corta antes. */
-const FORMA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+ *  error crudo (22P02, "invalid input syntax for type uuid"). zonaAccesible lo corta antes.
+ *  Exportada: cualquier otro id de esta familia de tablas (por ejemplo, el `pid` de un
+ *  propietario) tiene que guardarse contra la MISMA forma, no una copia del literal. */
+export const FORMA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export function responderError(e: unknown, contexto: string) {
   console.error(`Farming (${contexto}):`, e)
