@@ -109,28 +109,18 @@ const RANGOS = {
 } as const
 
 /**
- * Validación en dos niveles: lo que bloquea la guardia y lo que avisa.
- *
- * `errores` vacío = se puede guardar. Nunca vacío = no se guarda: son los valores IMPOSIBLES
- * (violan un `check` de la migración) además de la calle y el tipo.
- * `avisos` nunca bloquean: el asesor está en la vereda con el teléfono, no llena todo de una —
- * son datos INCOMPLETOS, que se completan después.
+ * Lo que NO PUEDE EXISTIR: un valor fuera de la lista cerrada o del rango que la base acepta
+ * (los mismos `check` de la migración). Separado de `validarDireccion` porque el PATCH manda
+ * datos parciales: un cuerpo sin calle es legítimo cuando se está corrigiendo un solo campo,
+ * pero `moneda: "EUR"` no lo es nunca — esté o no la calle, esté o no el tipo. Por eso cada
+ * chequeo acá solo mira el campo si VINO en `e` (`!= null`): ausente no es lo mismo que
+ * imposible.
  */
-export function validarDireccion(e: Partial<EntradaDireccion>): { errores: string[]; avisos: string[] } {
+export function valoresImposibles(e: Partial<EntradaDireccion>): string[] {
   const errores: string[] = []
-  const avisos: string[] = []
 
-  // Obligatorios: la calle y el tipo. Lo demás se completa después.
-  if (!e.calle?.trim()) errores.push("Falta la calle.")
-  if (!e.tipo || !CLAVES_TIPO.includes(e.tipo)) errores.push("Elegí qué tipo de propiedad es.")
+  if (e.tipo != null && !CLAVES_TIPO.includes(e.tipo)) errores.push("Elegí qué tipo de propiedad es.")
 
-  // Si carga pisos, hace falta el otro número: si no, el total queda en blanco y el indicador
-  // de «unidades potenciales» miente. Pero no bloquea la guardia.
-  if (e.pisos && !e.unidades_por_piso) avisos.push("Pusiste los pisos: falta cuántas unidades hay por piso.")
-  if (e.unidades_por_piso && !e.pisos) avisos.push("Pusiste las unidades por piso: faltan los pisos.")
-
-  // Los mismos topes que el `check` de la migración: un dato incompleto se completa después,
-  // uno imposible no existe y bloquea (si no, Postgres lo rechaza con un 23514 crudo).
   if (e.pisos != null && (!Number.isFinite(e.pisos) || e.pisos < RANGOS.pisos[0] || e.pisos > RANGOS.pisos[1])) {
     errores.push(`Los pisos van de ${RANGOS.pisos[0]} a ${RANGOS.pisos[1]}.`)
   }
@@ -151,7 +141,6 @@ export function validarDireccion(e: Partial<EntradaDireccion>): { errores: strin
     errores.push(`Las unidades van de ${RANGOS.unidades_manual[0]} a ${RANGOS.unidades_manual[1]}.`)
   }
 
-  if (e.precio_pedido != null && !e.moneda) avisos.push("Un precio sin moneda no dice nada: elegí USD o pesos.")
   if (e.moneda != null && !MONEDAS_VALIDAS.includes(e.moneda as any)) {
     errores.push("La moneda tiene que ser USD o pesos.")
   }
@@ -159,9 +148,38 @@ export function validarDireccion(e: Partial<EntradaDireccion>): { errores: strin
   if (e.cartel != null && !CARTELES_VALIDOS.includes(e.cartel as any)) {
     errores.push("Ese tipo de cartel no existe.")
   }
+
+  return errores
+}
+
+/**
+ * Validación en dos niveles: lo que bloquea la guardia y lo que avisa.
+ *
+ * `errores` vacío = se puede guardar. Nunca vacío = no se guarda: son los obligatorios que
+ * faltan (calle y tipo) más los valores IMPOSIBLES (`valoresImposibles`).
+ * `avisos` nunca bloquean: el asesor está en la vereda con el teléfono, no llena todo de una —
+ * son datos INCOMPLETOS, que se completan después.
+ */
+export function validarDireccion(e: Partial<EntradaDireccion>): { errores: string[]; avisos: string[] } {
+  const avisos: string[] = []
+
+  // Obligatorios: la calle y el tipo. Lo demás se completa después. Un tipo PRESENTE pero
+  // inválido no es "falta el tipo": eso es un valor imposible, y lo corta valoresImposibles.
+  const errores: string[] = []
+  if (!e.calle?.trim()) errores.push("Falta la calle.")
+  if (!e.tipo) errores.push("Elegí qué tipo de propiedad es.")
+
+  // Si carga pisos, hace falta el otro número: si no, el total queda en blanco y el indicador
+  // de «unidades potenciales» miente. Pero no bloquea la guardia.
+  if (e.pisos && !e.unidades_por_piso) avisos.push("Pusiste los pisos: falta cuántas unidades hay por piso.")
+  if (e.unidades_por_piso && !e.pisos) avisos.push("Pusiste las unidades por piso: faltan los pisos.")
+
+  if (e.precio_pedido != null && !e.moneda) avisos.push("Un precio sin moneda no dice nada: elegí USD o pesos.")
   if (e.cartel === "inmobiliaria" && !e.inmobiliaria_cartel?.trim()) {
     avisos.push("Decinos de qué inmobiliaria es el cartel.")
   }
+
+  errores.push(...valoresImposibles(e))
 
   return { errores, avisos }
 }

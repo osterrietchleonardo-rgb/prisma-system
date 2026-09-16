@@ -197,17 +197,35 @@ describe("PATCH /api/farming/direcciones/[id]", () => {
     expect(d.direccion.calle).toBe("Sí cambia")
   })
 
-  it("no manda unidades_totales al UPDATE aunque el payload interno se arme a mano", async () => {
-    // No hay forma directa de "ver" la consulta SQL con el doble de prueba, pero si el
-    // handler alguna vez hiciera `...direccion` (leer con select * y esparcir) en vez de la
-    // lista blanca, este PATCH dejaría unidades_totales en el objeto pisado con el mismo
-    // valor: lo que este test corta es que un cambio en otro campo (calle) no arrastre nada
-    // más que lo que vino en el body.
-    const r = await patch(D_MIA, { calle: "Otra" })
+  // valoresImposibles corre ANTES de tocar la base: sin esto, `moneda: "EUR"` o `pisos: 9999`
+  // llegan crudos a Postgres y ese 23514 sale como un 500 genérico en vez de un 400 legible.
+  it("una moneda que no existe: 400, y no escribe", async () => {
+    const r = await patch(D_MIA, { moneda: "EUR" })
+    const d = await r.json()
+    expect(r.status).toBe(400)
+    expect(typeof d.error).toBe("string")
+    const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!
+    expect(fila.moneda).toBeNull()
+  })
+
+  it("unos pisos afuera de 1-200: 400, y no escribe", async () => {
+    const r = await patch(D_MIA, { pisos: 9999 })
+    const d = await r.json()
+    expect(r.status).toBe(400)
+    expect(typeof d.error).toBe("string")
+    const fila = base.tablas.farming_direcciones.find((x: any) => x.id === D_MIA)!
+    expect(fila.pisos).toBeNull()
+  })
+
+  // Esta es la prueba que atraparía a alguien "arreglando" el chequeo con `validarDireccion`
+  // en vez de `valoresImposibles`: un PATCH legítimo, parcial, sin calle ni tipo, tiene que
+  // seguir guardando. `validarDireccion` los exige (son obligatorios en el ALTA) y rechazaría
+  // esto con 400 aunque no haya nada imposible en el body.
+  it("un PATCH parcial sin calle ni tipo se guarda igual (valoresImposibles, no validarDireccion)", async () => {
+    const r = await patch(D_MIA, { orden: 5 })
     const d = await r.json()
     expect(r.status).toBe(200)
-    expect(d.direccion.calle).toBe("Otra")
-    expect(d.direccion.pisos).toBeNull()
+    expect(d.direccion.orden).toBe(5)
   })
 })
 

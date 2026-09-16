@@ -7,7 +7,7 @@ import { NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { requireTenant } from "@/lib/auth/tenant-validation"
 import { direccionAccesible, responderError } from "@/lib/farming/servidor"
-import { ETAPAS } from "@/lib/farming/direcciones"
+import { ETAPAS, valoresImposibles } from "@/lib/farming/direcciones"
 
 export const dynamic = "force-dynamic"
 
@@ -62,10 +62,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     const body = await req.json().catch(() => ({}))
 
-    // Antes de tocar la base: una etapa fuera de las siete del check de la migración es un
-    // error del que se avisa (400), no un 500 crudo de Postgres.
+    // Antes de tocar la base: una etapa fuera de las siete del check de la migración, o
+    // cualquier otro valor imposible (tipo, cartel, moneda, pisos, unidades_por_piso,
+    // unidades_manual fuera de lo que la migración acepta), es un error del que se avisa (400),
+    // no un 500 crudo de Postgres con un 23514/22P02 sin traducir. `valoresImposibles` —y no
+    // `validarDireccion`— porque el PATCH manda datos PARCIALES: un cuerpo sin calle ni tipo es
+    // legítimo acá (se está corrigiendo un solo campo), cosa que `validarDireccion` rechazaría.
+    const errores: string[] = []
     if (Object.prototype.hasOwnProperty.call(body, "etapa") && !CLAVES_ETAPA.includes(body.etapa)) {
-      return NextResponse.json({ error: "Esa etapa no existe." }, { status: 400 })
+      errores.push("Esa etapa no existe.")
+    }
+    errores.push(...valoresImposibles(body))
+    if (errores.length > 0) {
+      return NextResponse.json({ error: errores.join(" ") }, { status: 400 })
     }
 
     // ETAPA 3-B: cuando el PATCH cambia `etapa`, acá va el insert en farming_contactos que
