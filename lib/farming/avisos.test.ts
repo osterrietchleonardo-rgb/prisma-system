@@ -74,6 +74,7 @@ describe("armarAviso", () => {
   })
 
   it("un precio que no es número queda en null (la pantalla no muestra NaN)", () => {
+    expect(armarAviso({ ...base, precio_usd: null }).precio_usd).toBeNull()
     expect(armarAviso({ ...base, precio_usd: "a consultar" }).precio_usd).toBeNull()
   })
 
