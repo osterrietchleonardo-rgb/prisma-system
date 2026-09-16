@@ -1,0 +1,119 @@
+//
+// Farming · la solapa «A la venta en mi zona»: lo que se publica HOY adentro de la zona del
+// asesor. Es la lista que le da trabajo el primer día, sin que cargue nada.
+//
+// Las cuatro señales salen de columnas que `mercado_avisos` ya tiene. Medido en producción el
+// 16-sep sobre 67.577 avisos de venta: dueño directo 823, +120 días 13.950, caídos 0 y con baja
+// de precio 20. Por eso un atajo se dibuja SOLO si tiene datos: un botón que siempre da cero se
+// siente roto, y cuando el pipeline de mercado vuelva a marcar caídos aparece solo.
+import { urlFotoRed } from "@/lib/acm/fotos-url"
+
+export type Senal = "duenos" | "caidos" | "viejos" | "bajaron"
+
+/** En el orden del spec, que es el del valor para captar: primero el dueño que vende solo. */
+export const SENALES: { clave: Senal; etiqueta: string; porque: string }[] = [
+  { clave: "duenos", etiqueta: "Dueño directo", porque: "Vende solo, sin inmobiliaria" },
+  { clave: "caidos", etiqueta: "Se cayó del portal", porque: "Lo bajó sin venderlo" },
+  { clave: "viejos", etiqueta: "Lleva +120 días", porque: "El colega no lo mueve" },
+  { clave: "bajaron", etiqueta: "Bajó el precio", porque: "Ya aceptó que estaba caro" },
+]
+
+/** Más de 120 días publicado. El día 120 justo todavía no es «lleva mucho». */
+const DIAS_VIEJO = 120
+
+export const POR_PAGINA = 60
+
+export interface ConteosSenales {
+  total: number
+  duenos: number
+  caidos: number
+  viejos: number
+  bajaron: number
+}
+
+/** Una fila cruda de `farming_avisos_en_zona`. */
+export interface FilaAviso {
+  id: number
+  es_dueno_directo: boolean
+  titulo: string | null
+  tipo: string | null
+  direccion: string | null
+  barrio: string | null
+  precio_usd: number | string | null
+  superficie_total_m2: number | string | null
+  ambientes: number | null
+  url_publica: string
+  foto_portada: string | null
+  publicador_nombre: string | null
+  estado: string
+  dias_publicado: number | null
+  variacion_precio_pct: number | string | null
+  caido_en: string | null
+}
+
+export interface AvisoEnZona {
+  id: number
+  es_dueno_directo: boolean
+  titulo: string
+  tipo: string | null
+  direccion: string | null
+  barrio: string | null
+  precio_usd: number | null
+  m2: number | null
+  ambientes: number | null
+  url_publica: string
+  foto: string | null
+  publicador: string | null
+  senales: Senal[]
+}
+
+export interface RespuestaAvisos {
+  zona: { id: string; nombre: string }
+  conteos: ConteosSenales
+  atajos: Senal[]
+  avisos: AvisoEnZona[]
+  pagina: number
+  hay_mas: boolean
+}
+
+/** Los atajos que se dibujan: los que tienen al menos un aviso, en el orden del spec. */
+export function atajosVisibles(c: ConteosSenales): Senal[] {
+  return SENALES.filter((s) => (c[s.clave] ?? 0) > 0).map((s) => s.clave)
+}
+
+const num = (v: number | string | null): number | null => {
+  if (v === null || v === undefined) return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+/** Qué señales de captación tiene un aviso. Un mismo aviso puede tener varias. */
+export function senalesDe(f: FilaAviso): Senal[] {
+  const s: Senal[] = []
+  if (f.es_dueno_directo) s.push("duenos")
+  if (f.estado === "caido") s.push("caidos")
+  if ((f.dias_publicado ?? 0) > DIAS_VIEJO) s.push("viejos")
+  if ((num(f.variacion_precio_pct) ?? 0) < 0) s.push("bajaron")
+  return s
+}
+
+export function armarAviso(f: FilaAviso): AvisoEnZona {
+  return {
+    id: f.id,
+    es_dueno_directo: f.es_dueno_directo,
+    // Sin título el aviso igual tiene que poder nombrarse: el asesor lo busca por la puerta.
+    titulo: f.titulo?.trim() || f.direccion?.trim() || "Sin título",
+    tipo: f.tipo,
+    direccion: f.direccion,
+    barrio: f.barrio,
+    precio_usd: num(f.precio_usd),
+    m2: num(f.superficie_total_m2),
+    ambientes: f.ambientes,
+    url_publica: f.url_publica,
+    // La foto SIEMPRE por el proxy: el CSP de la app (img-src) no permite CDNs de terceros, y
+    // así el navegador del asesor tampoco deja su Referer en el CDN ajeno.
+    foto: f.foto_portada ? urlFotoRed(f.foto_portada) : null,
+    publicador: f.publicador_nombre,
+    senales: senalesDe(f),
+  }
+}
