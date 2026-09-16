@@ -6,17 +6,31 @@ import { baseFalsa } from "@/lib/farming/base-falsa"
  *  1. La zona se valida SIEMPRE: de otro asesor → 403; de otra agencia o liberada → 404.
  *     createAdminClient se saltea la RLS, así que el filtro explícito no es opcional.
  *  2. Los descartados NO vuelven: viajan a la función como p_excluir, para que la página
- *     no quede corta y los conteos no mientan.
+ *     no quede corta y los conteos no mientan. El filtro es POR zona y POR estado: una marca
+ *     de otra zona, o una que no está descartada, no cuenta.
  *  3. Los atajos que se devuelven son solo los que tienen datos.
  *  4. Una señal desconocida es 400, no una consulta sin filtro.
+ *  5. La 61ª fila es una sonda para saber si hay más: nunca llega al cliente.
+ *  6. Una sesión rota (401) o una función SQL caída (500) no devuelven una lista a medias.
+ *  7. Un zona_id o una página con forma rara no llegan a Postgres ni rompen el endpoint.
+ *
+ * Los ids de zona son UUIDs de mentira (con forma real) porque la columna en producción es
+ * `uuid`: un id sin esa forma se corta ANTES de consultar (ver el test de zona_id malformado).
  */
 
 const AGENCIA = "ag-1"
 const YO = "u-yo", JUAN = "u-juan"
 const cuadrado = { type: "Polygon", coordinates: [[[-58.46, -34.56], [-58.45, -34.56], [-58.45, -34.55], [-58.46, -34.55], [-58.46, -34.56]]] }
 
+const Z_MIA = "10000000-0000-0000-0000-000000000001"
+const Z_JUAN = "10000000-0000-0000-0000-000000000002"
+const Z_LIBERADA = "10000000-0000-0000-0000-000000000003"
+const Z_AJENA = "10000000-0000-0000-0000-000000000004"
+const Z_SIN_MARCAS = "10000000-0000-0000-0000-000000000005"
+
 const sesion = { userId: YO, agencyId: AGENCIA, role: "asesor" }
-vi.mock("@/lib/auth/tenant-validation", () => ({ requireTenant: async () => ({ ...sesion }) }))
+vi.mock("@/lib/auth/tenant-validation", () => ({ requireTenant: vi.fn(async () => ({ ...sesion })) }))
+import { requireTenant } from "@/lib/auth/tenant-validation"
 
 const espia = { rpc: [] as { fn: string; args: any }[] }
 let base = baseFalsa({})
@@ -39,13 +53,20 @@ beforeEach(() => {
   base = baseFalsa(
     {
       farming_zonas: [
-        { id: "z-mia", agency_id: AGENCIA, owner_user_id: YO, nombre: "Colegiales", geojson: cuadrado, estado: "activa" },
-        { id: "z-juan", agency_id: AGENCIA, owner_user_id: JUAN, nombre: "De Juan", geojson: cuadrado, estado: "activa" },
-        { id: "z-liberada", agency_id: AGENCIA, owner_user_id: YO, nombre: "Vieja", geojson: cuadrado, estado: "liberada" },
-        { id: "z-ajena", agency_id: "ag-2", owner_user_id: "u-x", nombre: "Otra agencia", geojson: cuadrado, estado: "activa" },
+        { id: Z_MIA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Colegiales", geojson: cuadrado, estado: "activa" },
+        { id: Z_JUAN, agency_id: AGENCIA, owner_user_id: JUAN, nombre: "De Juan", geojson: cuadrado, estado: "activa" },
+        { id: Z_LIBERADA, agency_id: AGENCIA, owner_user_id: YO, nombre: "Vieja", geojson: cuadrado, estado: "liberada" },
+        { id: Z_AJENA, agency_id: "ag-2", owner_user_id: "u-x", nombre: "Otra agencia", geojson: cuadrado, estado: "activa" },
+        { id: Z_SIN_MARCAS, agency_id: AGENCIA, owner_user_id: YO, nombre: "Sin marcas", geojson: cuadrado, estado: "activa" },
       ],
-      farming_zonas_compartidas: [{ zona_id: "z-juan", user_id: YO, agregado_por: JUAN, created_at: "" }],
-      farming_avisos_marca: [{ zona_id: "z-mia", aviso_id: 7, aviso_es_dueno_directo: false, user_id: YO, estado: "descartado", created_at: "" }],
+      farming_zonas_compartidas: [{ zona_id: Z_JUAN, user_id: YO, agregado_por: JUAN, created_at: "" }],
+      farming_avisos_marca: [
+        { zona_id: Z_MIA, aviso_id: 7, aviso_es_dueno_directo: false, user_id: YO, estado: "descartado", created_at: "" },
+        // Una marca de OTRA zona: si el filtro por zona_id se rompe, se cuela en el excluir de Z_MIA.
+        { zona_id: Z_JUAN, aviso_id: 99, aviso_es_dueno_directo: false, user_id: YO, estado: "descartado", created_at: "" },
+        // Una marca de la MISMA zona pero YA convertida: si el filtro por estado se rompe, también se cuela.
+        { zona_id: Z_MIA, aviso_id: 55, aviso_es_dueno_directo: false, user_id: YO, estado: "convertido", created_at: "" },
+      ],
     },
     {
       farming_avisos_en_zona: (args: any) => { espia.rpc.push({ fn: "farming_avisos_en_zona", args }); return [fila(1), fila(2, { es_dueno_directo: true })] },
@@ -56,10 +77,10 @@ beforeEach(() => {
 
 describe("GET /api/farming/avisos", () => {
   it("devuelve los avisos de mi zona con los conteos y solo los atajos con datos", async () => {
-    const r = await pedir("zona_id=z-mia")
+    const r = await pedir(`zona_id=${Z_MIA}`)
     const d = await r.json()
     expect(r.status).toBe(200)
-    expect(d.zona).toEqual({ id: "z-mia", nombre: "Colegiales" })
+    expect(d.zona).toEqual({ id: Z_MIA, nombre: "Colegiales" })
     expect(d.conteos.total).toBe(170)
     expect(d.atajos).toEqual(["duenos", "viejos"])
     expect(d.avisos).toHaveLength(2)
@@ -67,40 +88,68 @@ describe("GET /api/farming/avisos", () => {
   })
 
   it("los descartados viajan como p_excluir a las DOS funciones", async () => {
-    await pedir("zona_id=z-mia")
+    await pedir(`zona_id=${Z_MIA}`)
     expect(espia.rpc).toHaveLength(2)
     for (const llamada of espia.rpc) expect(llamada.args.p_excluir).toEqual([7])
   })
 
+  it("una marca de otra zona y una propia con otro estado no ensucian el p_excluir", async () => {
+    // La fixture ya trae una marca en Z_JUAN y otra "convertida" en Z_MIA (ver beforeEach).
+    // Si el filtro `.eq("zona_id", ...)` o `.eq("estado", "descartado")` se sacara, esto fallaría.
+    await pedir(`zona_id=${Z_MIA}`)
+    for (const llamada of espia.rpc) expect(llamada.args.p_excluir).toEqual([7])
+  })
+
+  it("una zona sin marcas manda p_excluir: [] a las dos funciones", async () => {
+    await pedir(`zona_id=${Z_SIN_MARCAS}`)
+    expect(espia.rpc).toHaveLength(2)
+    for (const llamada of espia.rpc) expect(llamada.args.p_excluir).toEqual([])
+  })
+
   it("una zona compartida conmigo también se puede ver", async () => {
-    expect((await pedir("zona_id=z-juan")).status).toBe(200)
+    expect((await pedir(`zona_id=${Z_JUAN}`)).status).toBe(200)
   })
 
   it("la zona de otro asesor que NO comparte conmigo: 403", async () => {
     base.tablas.farming_zonas_compartidas = []
-    expect((await pedir("zona_id=z-juan")).status).toBe(403)
+    expect((await pedir(`zona_id=${Z_JUAN}`)).status).toBe(403)
   })
 
   it("una zona de otra agencia: 404", async () => {
-    expect((await pedir("zona_id=z-ajena")).status).toBe(404)
+    expect((await pedir(`zona_id=${Z_AJENA}`)).status).toBe(404)
   })
 
   it("una zona liberada: 404", async () => {
-    expect((await pedir("zona_id=z-liberada")).status).toBe(404)
+    expect((await pedir(`zona_id=${Z_LIBERADA}`)).status).toBe(404)
   })
 
   it("sin zona_id: 400", async () => {
     expect((await pedir("")).status).toBe(400)
   })
 
+  it("un zona_id sin forma de uuid: 404, y ni se consulta la base (Postgres tiraría un error crudo)", async () => {
+    // El doble no valida tipos de columna como Postgres, así que la única forma de probar que
+    // el corte pasa ANTES de la consulta es espiar si `farming_zonas` llegó a tocarse.
+    let consultoZonas = false
+    const fromOriginal = base.from
+    base.from = ((tabla: string) => {
+      if (tabla === "farming_zonas") consultoZonas = true
+      return fromOriginal(tabla)
+    }) as typeof base.from
+
+    const r = await pedir("zona_id=abc")
+    expect(r.status).toBe(404)
+    expect(consultoZonas).toBe(false)
+  })
+
   it("una señal que no existe: 400 y no se consulta nada", async () => {
-    const r = await pedir("zona_id=z-mia&senal=cualquiera")
+    const r = await pedir(`zona_id=${Z_MIA}&senal=cualquiera`)
     expect(r.status).toBe(400)
     expect(espia.rpc).toEqual([])
   })
 
   it("una señal válida viaja tal cual, y la página se traduce a offset", async () => {
-    await pedir("zona_id=z-mia&senal=duenos&pagina=2")
+    await pedir(`zona_id=${Z_MIA}&senal=duenos&pagina=2`)
     const lista = espia.rpc.find((x) => x.fn === "farming_avisos_en_zona")!
     expect(lista.args.p_senal).toBe("duenos")
     expect(lista.args.p_offset).toBe(120)
@@ -108,8 +157,61 @@ describe("GET /api/farming/avisos", () => {
   })
 
   it("hay_mas es true solo si vino una fila de más", async () => {
-    const d = await (await pedir("zona_id=z-mia")).json()
+    const d = await (await pedir(`zona_id=${Z_MIA}`)).json()
     expect(d.hay_mas).toBe(false)
     expect(d.pagina).toBe(0)
+  })
+
+  it("hay_mas es true y la lista se corta en 60 cuando llegan 61 filas (la 61ª es la sonda)", async () => {
+    const filas61 = Array.from({ length: 61 }, (_, i) => fila(i + 1))
+    base = baseFalsa(
+      {
+        farming_zonas: base.tablas.farming_zonas,
+        farming_zonas_compartidas: base.tablas.farming_zonas_compartidas,
+        farming_avisos_marca: base.tablas.farming_avisos_marca,
+      },
+      {
+        farming_avisos_en_zona: (args: any) => { espia.rpc.push({ fn: "farming_avisos_en_zona", args }); return filas61 },
+        farming_avisos_conteos: (args: any) => { espia.rpc.push({ fn: "farming_avisos_conteos", args }); return [{ total: 170, duenos: 1, caidos: 0, viejos: 30, bajaron: 0 }] },
+      },
+    )
+    const d = await (await pedir(`zona_id=${Z_MIA}`)).json()
+    expect(d.hay_mas).toBe(true)
+    expect(d.avisos).toHaveLength(60)
+  })
+
+  it("si una función SQL devuelve error, la respuesta es 500 y no hay avisos a medias", async () => {
+    // No se registra farming_avisos_conteos: el doble responde { error: "rpc desconocida" }.
+    base = baseFalsa(
+      {
+        farming_zonas: base.tablas.farming_zonas,
+        farming_zonas_compartidas: base.tablas.farming_zonas_compartidas,
+        farming_avisos_marca: base.tablas.farming_avisos_marca,
+      },
+      {
+        farming_avisos_en_zona: (args: any) => { espia.rpc.push({ fn: "farming_avisos_en_zona", args }); return [fila(1)] },
+      },
+    )
+    const r = await pedir(`zona_id=${Z_MIA}`)
+    const d = await r.json()
+    expect(r.status).toBe(500)
+    expect(d.avisos).toBeUndefined()
+  })
+
+  it("si requireTenant revienta con Unauthorized: 401, no 500", async () => {
+    vi.mocked(requireTenant).mockRejectedValueOnce(new Error("Unauthorized"))
+    const r = await pedir(`zona_id=${Z_MIA}`)
+    expect(r.status).toBe(401)
+  })
+
+  it("una pagina con forma rara (Infinity o no entera) se toma como 0, no rompe ni miente", async () => {
+    const d1 = await (await pedir(`zona_id=${Z_MIA}&pagina=1e400`)).json()
+    expect(d1.pagina).toBe(0)
+    expect(espia.rpc.find((x) => x.fn === "farming_avisos_en_zona")!.args.p_offset).toBe(0)
+
+    espia.rpc = []
+    const d2 = await (await pedir(`zona_id=${Z_MIA}&pagina=0.01`)).json()
+    expect(d2.pagina).toBe(0)
+    expect(espia.rpc.find((x) => x.fn === "farming_avisos_en_zona")!.args.p_offset).toBe(0)
   })
 })

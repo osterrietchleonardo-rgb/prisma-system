@@ -11,6 +11,10 @@ import type { FilaCompartida, FilaPerfil, FilaZona } from "./armar"
 export const COLUMNAS_ZONA =
   "id, agency_id, owner_user_id, nombre, geojson, area_km2, origen_mapa_zona_id, estado, trazo_editado_en, created_at"
 
+/** `farming_zonas.id` es `uuid` en Postgres: un valor con otra forma no da "no existe", da un
+ *  error crudo (22P02, "invalid input syntax for type uuid"). zonaAccesible lo corta antes. */
+const FORMA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export function responderError(e: unknown, contexto: string) {
   console.error(`Farming (${contexto}):`, e)
   const msg = (e as any)?.message || "Algo salió mal"
@@ -57,6 +61,9 @@ export async function zonaAccesible(
   agencyId: string,
   userId: string,
 ): Promise<{ zona: { id: string; nombre: string; geojson: unknown } | null; puede: boolean }> {
+  // Un id sin forma de uuid no existe, así de simple: ni vale la pena mandarlo a Postgres.
+  if (!FORMA_UUID.test(zonaId)) return { zona: null, puede: false }
+
   const { data, error } = await admin
     .from("farming_zonas")
     .select("id, nombre, geojson, owner_user_id")

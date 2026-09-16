@@ -25,7 +25,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "No conozco ese filtro" }, { status: 400 })
     }
 
-    const pagina = Math.max(0, Number(q.get("pagina") ?? 0) || 0)
+    // Number("1e400") da Infinity, y Infinity * POR_PAGINA no es un offset válido: se
+    // sanea a página 0 en vez de mentir con "pagina": null o romper con un offset no entero.
+    const paginaCruda = Number(q.get("pagina") ?? 0)
+    const pagina = Number.isFinite(paginaCruda) ? Math.max(0, Math.floor(paginaCruda)) : 0
 
     const admin = createAdminClient()
     const { zona, puede } = await zonaAccesible(admin, zonaId, agencyId, userId)
