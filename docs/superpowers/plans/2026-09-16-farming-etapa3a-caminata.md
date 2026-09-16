@@ -27,6 +27,7 @@ El spec describe la etapa 3 entera: los datos, el tablero, el historial, los ind
 - **Un arreglo de seguridad no está hecho hasta que el ataque falla:** `scripts/farming-rls-ataque.mjs` se extiende y se corre contra producción después de aplicar.
 - **Lo único obligatorio para guardar una dirección es la calle y el tipo** (spec). Todo lo demás se completa después. El asesor está en la vereda, no llenando una planilla.
 - **`unidades_totales` no se carga a mano**: sale de `pisos × unidades_por_piso`, o de `unidades_manual` cuando no hay pisos.
+- **`unidades_totales` es una columna GENERADA: nunca se escribe.** Mandarla en un `insert` o un `update` hace fallar la consulta con `428C9 cannot insert a non-DEFAULT value into column`. La trampa es leer-modificar-escribir: un `select *`, esparcir el objeto y mandarlo de vuelta. Las tareas que escriben esta tabla eligen las columnas a mano o sacan esa clave antes.
 - **El encargado se guarda por su nombre**, no como un sí/no.
 - **Los propietarios son filas propias**, nunca una columna de texto.
 - **Nada de globitos:** lo que el asesor necesita leer va como línea visible. En el celular no se abren.
@@ -131,10 +132,16 @@ parallel safe
 as $$
   -- El diccionario va calificado con el esquema: sin eso la función falla recién al
   -- ejecutarse, no al crearse.
-  select regexp_replace(
-           lower(public.unaccent('public.unaccent'::regdictionary,
-             btrim(coalesce(p_calle, '')) || ' ' || btrim(coalesce(p_altura, '')))),
-           '\s+', ' ', 'g')
+  -- Tres pasos, y el orden importa: sacar acentos y bajar a minúsculas, después tirar todo lo
+  -- que no sea letra, número o espacio (así «Av. Ejemplo» y «Av Ejemplo» son la misma puerta:
+  -- el punto de la abreviatura es la diferencia más común entre dos asesores), y recién
+  -- entonces colapsar los espacios que quedaron.
+  select btrim(regexp_replace(
+           regexp_replace(
+             lower(public.unaccent('public.unaccent'::regdictionary,
+               btrim(coalesce(p_calle, '')) || ' ' || btrim(coalesce(p_altura, '')))),
+             '[^a-z0-9 ]', '', 'g'),
+           '\s+', ' ', 'g'))
 $$;
 
 comment on function public.farming_direccion_normalizada(text, text) is
@@ -387,6 +394,11 @@ describe("normalizarDireccion", () => {
     expect(normalizarDireccion("Av   Ejemplo", "1200")).toBe("av ejemplo 1200")
   })
 
+  it("el punto de la abreviatura tampoco: «Av. Ejemplo» y «Av Ejemplo» son la misma puerta", () => {
+    expect(normalizarDireccion("Av. Ejemplo", "1200")).toBe(normalizarDireccion("Av Ejemplo", "1200"))
+    expect(normalizarDireccion("Av. Ejemplo", "1200")).toBe("av ejemplo 1200")
+  })
+
   it("sin altura (el «s/n») no rompe", () => {
     expect(normalizarDireccion("Camino Real", null)).toBe("camino real")
   })
@@ -525,10 +537,14 @@ export function unidadesTotales(
  * mandar el formulario, pero el candado de verdad es el de Postgres.
  */
 export function normalizarDireccion(calle: string, altura?: string | null): string {
+  // Los mismos tres pasos, en el mismo orden, que `farming_direccion_normalizada` en la base.
+  // El segundo —tirar todo lo que no sea letra, número o espacio— es el que hace que
+  // «Av. Ejemplo» y «Av Ejemplo» sean la misma puerta.
   return `${(calle || "").trim()} ${(altura || "").trim()}`
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, "")
     .replace(/\s+/g, " ")
     .trim()
 }
@@ -559,7 +575,7 @@ export function validarDireccion(e: Partial<EntradaDireccion>): string[] {
 - [ ] **Step 4: Correr y ver pasar**
 
 Run: `npx vitest run lib/farming/direcciones.test.ts`
-Expected: PASS, 15 tests.
+Expected: PASS, 17 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -797,6 +813,80 @@ Con `prueba-farming-a@vakdor.com` y la zona «Palermo de prueba», **nunca con l
 - [ ] **Step 5: Documentar**
 
 Guía del asesor §25 (la solapa nueva, sin tecnicismos), la bitácora del día, y el spec si algo se decidió distinto. Después, ofrecer el merge.
+
+---
+
+### Task 9: Borrar una zona con tarjetas la archiva, no la borra
+
+> **Orden de ejecución:** después de la Task 5 y **antes** de la prueba en el navegador de la Task 8. Está escrita al final para no renumerar las tareas que ya estaban en marcha.
+
+**De dónde sale:** la revisión de la Task 1. `app/api/farming/zonas/[id]/route.ts` está **en producción hoy** y borra la fila de la zona de verdad; lo único que iba a frenar la cascada era el comentario `// ETAPA 3:` que dejó la etapa 1. La migración ya pasa esa FK a `on delete restrict`, así que a partir de ahora ese `DELETE` **falla** si la zona tiene tarjetas. Esta tarea convierte esa falla en el comportamiento que el spec pide.
+
+Regla del spec, textual: *«Sin ninguna tarjeta cargada → se borra de verdad, sin preguntar. Con tarjetas → no se borra: pasa a `archivada`. Las cuadras se liberan igual, y las tarjetas con su historial quedan accesibles. Nunca se pierde trabajo por apretar un botón.»*
+
+**Files:**
+- Modify: `app/api/farming/zonas/[id]/route.ts` (el `DELETE`)
+- Modify: `app/api/farming/zonas/[id]/route.test.ts` (ya existe, con `const borrar = (id) => DELETE(...)`)
+- Modify: `components/farming/farming-page.tsx` (el texto del `window.confirm` y el mensaje de éxito)
+
+**Interfaces:**
+- `DELETE /api/farming/zonas/<id>` pasa a devolver `{ ok: true, accion: "borrada" }` **o** `{ ok: true, accion: "archivada" }`. La forma ya estaba prevista: hoy devuelve `accion: "borrada"`.
+
+**Lo que hay que verificar antes de escribir:** `farming_zonas.estado` ya acepta `'archivada'` — la restricción en producción es `check (estado = any (array['activa','liberada','archivada']))`. **No hace falta ninguna migración sobre `farming_zonas`.**
+
+- [ ] **Step 1: El test que falla con el bug puesto**
+
+En `app/api/farming/zonas/[id]/route.test.ts`, con el molde que el archivo ya usa:
+1. Borrar una zona **sin** tarjetas → 200, `accion: "borrada"`, y la fila desaparece de `base.tablas.farming_zonas`.
+2. Borrar una zona **con** una tarjeta en `farming_direcciones` → 200, `accion: "archivada"`, **la fila sigue estando** y su `estado` es `archivada`.
+3. La tarjeta **no se toca**: sigue en `farming_direcciones` después de archivar.
+4. Archivar libera las cuadras igual: la zona archivada ya no cuenta para el choque (afirmar que `estado !== 'activa'`).
+5. La zona de un colega sigue dando 403 y no se archiva.
+
+Correr y ver fallar el 2 y el 3 (hoy la zona se borra).
+
+- [ ] **Step 2: El endpoint**
+
+En el `DELETE`, después de la validación que ya existe (`buscarZona`, `mia`) y **antes** de borrar: contar las tarjetas de la zona.
+
+```ts
+    // El spec: nunca se pierde trabajo por apretar un botón. Si la zona tiene tarjetas, no se
+    // borra — pasa a `archivada`, que es un estado que farming_zonas ya acepta desde la etapa 1.
+    // Las cuadras se liberan igual, porque el choque solo mira las zonas 'activa'.
+    const { count, error: eCuenta } = await admin
+      .from("farming_direcciones")
+      .select("id", { count: "exact", head: true })
+      .eq("zona_id", zona.id)
+    if (eCuenta) throw eCuenta
+
+    if ((count ?? 0) > 0) {
+      const { error } = await admin
+        .from("farming_zonas")
+        .update({ estado: "archivada", updated_at: new Date().toISOString() })
+        .eq("id", zona.id)
+        .eq("owner_user_id", userId)
+      if (error) throw error
+      return NextResponse.json({ ok: true, accion: "archivada", tarjetas: count })
+    }
+```
+
+El camino de borrado que ya existe queda tal cual, debajo. El comentario `// ETAPA 3:` se reemplaza por esto (ya no es una promesa).
+
+**Ojo con el doble de prueba:** `baseFalsa` tiene que soportar `select(..., { count: "exact", head: true })`. Si no lo soporta, agregarlo con la misma fidelidad que el resto (devolver `{ data, count, error }`, sin tirar). Es una modificación chica de `lib/farming/base-falsa.ts` y va en esta tarea.
+
+- [ ] **Step 3: Lo que ve el asesor**
+
+En `components/farming/farming-page.tsx`, la función `borrar`:
+- El texto del `window.confirm` se mantiene para el caso normal, pero el mensaje de éxito pasa a depender de la respuesta: si `accion === "archivada"`, el toast dice **«Zona archivada. Tus tarjetas y su historial quedan guardados; esas cuadras vuelven a estar libres.»**; si no, el de hoy.
+
+- [ ] **Step 4: Verificar y commitear**
+
+`npx vitest run app/api/farming/zonas` y `npm test`, los dos verdes.
+
+```bash
+git add app/api/farming/zonas/\[id\]/route.ts app/api/farming/zonas/\[id\]/route.test.ts components/farming/farming-page.tsx lib/farming/base-falsa.ts
+git commit -m "feat(farming): borrar una zona con tarjetas la archiva, no la borra"
+```
 
 ---
 
