@@ -14,6 +14,8 @@
 
 import { prismaIA } from "@/lib/gemini";
 import { fotosDelAviso } from "@/lib/acm/fotos-aviso";
+import { elegirBarrio } from "@/lib/acm/barrio-aviso";
+import { obtenerPaginaSegura, UrlNoPermitida, validarUrlPublica } from "@/lib/acm/url-segura";
 import type { ExtractResult, Moneda, Operacion, TipoPropiedad, Sujeto } from "@/lib/tasacion/types";
 
 const UA =
@@ -118,7 +120,7 @@ function pickListing(nodes: any[]): any | null {
   );
 }
 
-function fromJsonLd(html: string): { extract: Partial<ExtractResult>; sujeto: Partial<Sujeto> } | null {
+function fromJsonLd(html: string): { extract: Partial<ExtractResult>; sujeto: Partial<Sujeto>; barrios: string[] } | null {
   const nodes = parseJsonLdListings(html);
   if (nodes.length === 0) return null;
   const ld = pickListing(nodes);
@@ -145,7 +147,6 @@ function fromJsonLd(html: string): { extract: Partial<ExtractResult>; sujeto: Pa
 
   const sujeto: Partial<Sujeto> = {
     direccion: addr.streetAddress || ld.name || "",
-    barrio: addr.addressLocality || addr.addressRegion || "",
     tipo_propiedad: mapTipo(Array.isArray(me["@type"]) ? me["@type"][0] : me["@type"] || ld.name),
     m2_cubiertos: m2 ?? 0,
     dormitorios: bedrooms ?? (rooms ? Math.max(0, rooms - 1) : 0),
@@ -162,6 +163,9 @@ function fromJsonLd(html: string): { extract: Partial<ExtractResult>; sujeto: Pa
       metodo: "json-ld",
     },
     sujeto,
+    // Los dos campos van como CANDIDATOS: Argenprop y Zonaprop ponen la ciudad en
+    // addressLocality y el barrio en addressRegion. Decide `elegirBarrio` al final.
+    barrios: [addr.addressLocality, addr.addressRegion].filter((b: unknown): b is string => typeof b === "string"),
   };
 }
 
@@ -308,6 +312,10 @@ function looksBlocked(status: number, html: string): boolean {
 async function tryExtractorService(url: string, conFotos = false): Promise<ExtractResult | null> {
   const svc = process.env.ACM_EXTRACTOR_URL;
   if (!svc) return null;
+  // El servicio abre el link con un navegador dentro de NUESTRO servidor de EasyPanel: un link
+  // interno no se le manda nunca. Se valida acá, antes de mandarlo, y no se confía en que el que
+  // llama lo haya hecho.
+  if (!(await validarUrlPublica(url)).ok) return null;
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (process.env.ACM_EXTRACTOR_SECRET) headers["x-extractor-secret"] = process.env.ACM_EXTRACTOR_SECRET;
@@ -351,21 +359,33 @@ export async function extractFromUrl(url: string, opts: { conFotos?: boolean } =
   const conFotos = opts.conFotos === true;
   const fuente_portal = portalFromUrl(url);
 
+  // Antes que nada: un link que apunta a una dirección interna no se abre por ningún camino
+  // (ni acá ni en el servicio con navegador). Ver lib/acm/url-segura.ts.
+  const validacion = await validarUrlPublica(url);
+  if (!validacion.ok) {
+    return { ...emptyResult(), fuente_portal, aviso: `Ese link no se puede abrir: ${validacion.motivo}.` };
+  }
+
   let status = 0;
   let html = "";
   try {
-    const res = await fetch(url, {
+    // Pedido seguro: sigue las redirecciones a mano y vuelve a controlar el destino en cada una,
+    // incluida la dirección a la que se conecta de verdad.
+    const pagina = await obtenerPaginaSegura(url, {
       headers: {
         "User-Agent": UA,
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "es-AR,es;q=0.9,en;q=0.8",
       },
-      redirect: "follow",
-      signal: AbortSignal.timeout(12000),
+      timeoutMs: 12000,
     });
-    status = res.status;
-    html = await res.text();
-  } catch {
+    status = pagina.status;
+    html = pagina.html;
+  } catch (e) {
+    // Un salto que lleva adentro corta todo: tampoco se le pasa el link al servicio con navegador.
+    if (e instanceof UrlNoPermitida) {
+      return { ...emptyResult(), fuente_portal, aviso: `Ese link no se puede abrir: ${e.message}.` };
+    }
     status = 0;
   }
 
@@ -386,8 +406,12 @@ export async function extractFromUrl(url: string, opts: { conFotos?: boolean } =
 
   // Tier 1: estructurado (JSON-LD → OpenGraph) y, si queda flojo, IA.
   const parts: Array<{ extract: Partial<ExtractResult>; sujeto: Partial<Sujeto> } | null> = [];
+  // Candidatos a barrio de todas las fuentes; se elige uno solo al final (ver barrio-aviso.ts).
+  const barrios: string[] = [];
   if (html) {
-    parts.push(fromJsonLd(html));
+    const ld = fromJsonLd(html);
+    if (ld) barrios.push(...ld.barrios);
+    parts.push(ld);
     parts.push(fromOpenGraph(html));
   }
 
@@ -417,6 +441,7 @@ export async function extractFromUrl(url: string, opts: { conFotos?: boolean } =
   if (html && !blocked) {
     const ia = await fromIA(html, url);
     if (ia) {
+      if (ia.sujeto.barrio) barrios.push(ia.sujeto.barrio);
       // Vacíos: la IA completa lo que los deterministas no trajeron.
       for (const [k, v] of Object.entries(ia.sujeto)) if (isEmpty((sujeto as any)[k]) && !isEmpty(v)) (sujeto as any)[k] = v;
       for (const [k, v] of Object.entries(ia.extract)) if (isEmpty((ext as any)[k]) && !isEmpty(v)) (ext as any)[k] = v;
@@ -435,6 +460,10 @@ export async function extractFromUrl(url: string, opts: { conFotos?: boolean } =
       if (S.amenidades && Object.keys(S.amenidades).length) sujeto.amenidades = S.amenidades;
     }
   }
+
+  // El barrio no es "el primero que llegó" sino el que confirman el link o varias fuentes, y
+  // nunca una ciudad entera ("CABA", "Capital Federal"). Vacío si ninguno es un barrio real.
+  sujeto.barrio = elegirBarrio(barrios, url);
 
   const ok = Boolean((sujeto.m2_cubiertos && sujeto.m2_cubiertos > 0) || (sujeto.dormitorios && sujeto.dormitorios > 0) || ext.precio);
 
