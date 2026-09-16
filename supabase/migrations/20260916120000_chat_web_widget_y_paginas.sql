@@ -46,6 +46,17 @@ create table if not exists public.web_widgets (
   -- Son EL MAPA y mandan sobre lo que encuentre el rastreo (spec §3).
   secciones           jsonb not null default '[]'::jsonb,
 
+  -- LA IDENTIDAD VISUAL NO SE GUARDA ACÁ (decisión de Leonardo, 16/9). El logo, los colores y
+  -- la tipografía ya los cargó el director en Marketing IA → Configuración, y viven en
+  -- `agencies.marketing_ai_config` (claves brand_colors, logo_url, brand_font; se leen con
+  -- marcaDeLaAgencia() de lib/ficha/snapshot.ts). El chat los LEE de ahí cada vez que se
+  -- muestra. Copiarlos acá haría que el día que el director cambie el color en Marketing IA,
+  -- el chat siga con el viejo hasta que alguien se acuerde de sincronizar. Nadie se acuerda.
+  --
+  -- Lo único que sí es del chat: un color que el director quiera pisar SOLO acá (por ejemplo,
+  -- si su color de marca queda pesado en el globito). Vacío = hereda todo.
+  acento              text,
+
   -- Apagado hasta que el director lo prenda. Un widget nuevo no atiende a nadie.
   activo              boolean not null default false,
 
